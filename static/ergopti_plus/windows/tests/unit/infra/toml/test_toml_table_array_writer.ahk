@@ -383,7 +383,9 @@ Test("toml config document writer: current source preparation requires real boot
 
 ; New sections are admitted by one parse of the retained headers. A bulk change
 ; that introduced many sections paid one complete source parse per section
-; (8 s for one tray click on a 830-line config).
+; (8 s for one tray click on a 830-line config). The writer reports its
+; admission parses: a wall-clock ratio against one parse went red on hosted
+; runners once the tokenizer got faster, while the 16 ms tick hid the unit.
 _TBUI_NewSectionsShareOneAdmission() {
 	Source := ""
 	Loop 300
@@ -391,27 +393,15 @@ _TBUI_NewSectionsShareOneAdmission() {
 	Updates := []
 	Loop 40
 		Updates.Push({ Section: "fresh.section_" . A_Index, Key: "enabled", Value: TOML_Bool(true) })
-	Unit := 0, Build := 0
-	Loop 3 {
-		Started := A_TickCount
-		TOML_ParseDocument(Source)
-		Elapsed := A_TickCount - Started
-		Unit := A_Index == 1 ? Elapsed : Min(Unit, Elapsed)
-	}
-	Loop 2 {
-		Started := A_TickCount
-		Result := TOML_BuildConfigDocumentCandidate(Source, Updates, [])
-		Elapsed := A_TickCount - Started
-		Build := A_Index == 1 ? Elapsed : Min(Build, Elapsed)
-	}
+	Result := TOML_BuildConfigDocumentCandidate(Source, Updates, [])
 	Parsed := TOML_ParseDocument(Result["content"])
 	AssertTrue(TOML_SameValue(Parsed["fresh"]["section_40"]["enabled"], TOML_Bool(true)))
-	AssertTrue(InStr(Result["content"], "[fresh.section_1]`nenabled = true`n") > 0,
-		"an admitted section is written under its own header")
-	; One header parse per section costs about 40 source parses; a shared
-	; admission costs a handful (source, model, admission, final check).
-	AssertTrue(Build <= 15 * Max(Unit, 16),
-		Format("40 new sections took {1} ms against {2} ms per parse", Build, Unit))
+	Loop 40 {
+		AssertTrue(InStr(Result["content"], "[fresh.section_" . A_Index . "]`nenabled = true`n") > 0,
+			"admitted section " . A_Index . " is written under its own header")
+	}
+	AssertEqual(1, Result["header_admission_parses"],
+		"40 legal new sections are admitted by one shared header parse")
 }
 Test("toml config document writer: new sections share one header admission (toml-batch-admission)",
 	_TBUI_NewSectionsShareOneAdmission)
@@ -423,6 +413,37 @@ _TBUI_RefusedHeaderFallsBackPerSection() {
 	Updates := [{ Section: "a.b", Key: "d", Value: 2 }, { Section: "z", Key: "k", Value: 3 }]
 	Result := TOML_BuildConfigDocumentCandidate(Source, Updates, [])
 	AssertEqual(Chr(0xFEFF) . "[a]`nb.c = 1`nb.d = 2`n[z]`nk = 3`n", Result["content"])
+	AssertEqual(3, Result["header_admission_parses"],
+		"the refused batch parse is followed by one parse per candidate header")
 }
 Test("toml config document writer: a closed namespace falls back to its owner (toml-batch-admission)",
 	_TBUI_RefusedHeaderFallsBackPerSection)
+
+; An end-anchored regex rescanned the whole growing buffer on every append,
+; which spent about a second rendering a 900-line config.
+_TBUI_EndsWithLineBreakReadsTheTail() {
+	AssertFalse(TOML_EndsWithLineBreak(""))
+	AssertFalse(TOML_EndsWithLineBreak("a = 1"))
+	AssertFalse(TOML_EndsWithLineBreak("a`n "), "only the final character counts")
+	AssertTrue(TOML_EndsWithLineBreak("a = 1`n"))
+	AssertTrue(TOML_EndsWithLineBreak("a = 1`r"))
+	AssertTrue(TOML_EndsWithLineBreak("a = 1`r`n"))
+	AssertTrue(TOML_EndsWithLineBreak("`n"))
+}
+Test("toml config document writer: the line-break probe reads only the tail (toml-batch-admission)",
+	_TBUI_EndsWithLineBreakReadsTheTail)
+
+; Every source renderer appends record by record, so one remaining end-anchored
+; probe brings the quadratic render back. The floor proves the scan sees the
+; renderers (the helper serves six append sites in three files).
+_TBUI_NoEndAnchoredLineBreakRegex() {
+	Src := _DriverSourceNoComments()
+	Probes := 0, Position := 1
+	while Position := InStr(Src, "TOML_EndsWithLineBreak(", true, Position)
+		Probes += 1, Position += 1
+	AssertTrue(Probes >= 4,Format("the scan must see the line-break probes, found {1}", Probes))
+	AssertEqual(0, InStr(Src, ', "[\r\n]$")', true),
+		"a growing source buffer must not be probed with an end-anchored regex")
+}
+Test("toml config document writer: no renderer probes its buffer with an end-anchored regex (toml-batch-admission)",
+	_TBUI_NoEndAnchoredLineBreakRegex)

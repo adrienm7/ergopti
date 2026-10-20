@@ -96,7 +96,7 @@ _PersonalTomlRenderEntry(Entry, Original := 0) {
 _PersonalTomlAppendSource(&Content, Text) {
 	if Text == ""
 		return
-	if Content != "" && Content != Chr(0xFEFF) && !RegExMatch(Content, "[\r\n]$")
+	if Content != "" && Content != Chr(0xFEFF) && !TOML_EndsWithLineBreak(Content)
 		Content .= "`n"
 	Content .= Text
 }
