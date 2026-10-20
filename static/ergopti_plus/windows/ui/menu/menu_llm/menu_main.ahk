@@ -432,10 +432,11 @@ _LLM_MenuLayout_Fallback() {
 }
 
 /**
- * Emits one settings row by its shared-spec id. The spec (_LLM_MenuLayout_Rows)
- * owns the ORDER and the `disabled` flag; this dispatch owns the platform-native
- * label formatting and submenu construction (which read Win32/tray state and so
- * cannot live in shared data). Conditional native-only rows that have no shared
+ * Emits one `dynamic` settings row by its shared-spec id. The declared `group`
+ * rows never come here: the renderer draws them from _LLM_Menu_GroupBuilders.
+ * The spec (_LLM_MenuLayout_Rows) owns the ORDER and the `disabled` flag; this
+ * dispatch owns the platform-native label formatting and submenu construction
+ * (which read Win32/tray state and so cannot live in shared data). Conditional native-only rows that have no shared
  * entry — the thinking-model info row and the separator after the profile row —
  * are emitted here at their anchor row to preserve menu order.
  * @param {String}  id                  Row id from the manifest's llm_menu.
@@ -554,22 +555,6 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			MenuDispatcher_PruneMenu(ProfileMenu)
 			throw Err
 		}
-	case "llm_trigger":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_trigger",
-			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
-			throw Error("Declared LLM group 'llm_trigger' was refused.")
-	case "llm_generation_settings":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_generation_settings",
-			Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu), disabled)
-			throw Error("Declared LLM group 'llm_generation_settings' was refused.")
-	case "llm_display":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_display",
-			Map("llm_display", LLM_Menu_BuildDisplayMenu), disabled)
-			throw Error("Declared LLM group 'llm_display' was refused.")
-	case "llm_navigation":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_navigation",
-			Map("llm_navigation", LLM_Menu_BuildNavMenu), disabled)
-			throw Error("Declared LLM group 'llm_navigation' was refused.")
 	default:
 		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in the shared menu manifest — skipped.", id)
 	}
