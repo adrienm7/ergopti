@@ -4,9 +4,8 @@
 ; MODULE: Diagnostics Page Actions And Suggest A Feature (Windows)
 ; DESCRIPTION:
 ; Drives HealthCheck_PerformAction, what the diagnostics page's buttons do once
-; HealthCheck_ValidateAction accepted them, over recorded side effects (Debug >
-; Report a bug opens the page at its preview; its report button sends the
-; "report" action):
+; HealthCheck_ValidateAction accepted them, over recorded side effects (the
+; page's report button and Debug > Report a bug both send the "report" action):
 ; 1. copy writes the redacted report, and a refused clipboard is a failure
 ;    that keeps the window (nothing closes here);
 ; 2. save writes the redacted report under the snapshot's diagnostics folder
@@ -18,7 +17,8 @@
 ; 4. open_path opens the path the host collected, creating a missing folder,
 ;    and refuses a file that does not exist;
 ; 5. an unknown profile folder refuses everything: nothing could be redacted;
-; 6. Suggest a feature opens the feature form with the version and the system.
+; 6. Suggest a feature opens the feature form with the version and the system;
+; 7. Report a bug runs the report action on a fresh snapshot without a window.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -267,6 +267,41 @@ _THPA_SuggestFeature() {
 }
 Test("Suggest a feature: opens the feature form with the version and the system (report-bug-flow)",
 	_THPA_SuggestFeature)
+
+; Debug > Report a bug only opened the diagnostics window, so the menu never
+; reached GitHub; it now runs the page's report action on a fresh snapshot
+; (menu-report-bug).
+_THPA_MenuReportBug() {
+	global _SharedDir
+	Calls := []
+	AssertTrue(HealthCheck_ReportBug(_THPA_Effects(Calls)))
+	AssertEqual(4, Calls.Length, _THPA_Join(Calls))
+	for Index, Kind in ["copy:", "save:", "reveal:", "open_url:"]
+		AssertEqual(1, InStr(Calls[Index], Kind), "The menu follows the page's report order: " . _THPA_Join(Calls))
+	Copied := SubStr(Calls[1], StrLen("copy:") + 1)
+	AssertTrue(InStr(Copied, "# ErgoptiPlus diagnostics") = 1, "The clipboard holds the approved report")
+	AssertTrue(InStr(Calls[2], ":" . Copied) > 0, "The attachment holds the same approved report")
+	GitHub := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"]
+	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
+		. "/issues/new?template=bug_report.yml&"
+	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "Not a bare URL: the bug template is selected")
+	AssertEqual("windows", _THPA_QueryValue(Calls[4], "driver"))
+	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
+	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "", "The version is prefilled: " . Calls[4])
+	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"), "The editable report field stays out of the URL")
+}
+Test("Report a bug (menu): copies, saves and opens the prefilled bug form (menu-report-bug)",
+	_THPA_MenuReportBug)
+
+_THPA_MenuReportBugFailureNotifies() {
+	Calls := []
+	AssertFalse(HealthCheck_ReportBug(_THPA_Effects(Calls, Map("clipboard", false))))
+	for Call in Calls
+		AssertTrue(InStr(Call, "open_url:") = 0, "The browser must not open without the report: " . _THPA_Join(Calls))
+	AssertEqual("notify:error", Calls[Calls.Length], "A refused report is said to the user")
+}
+Test("Report a bug (menu): a refused clipboard notifies instead of opening the form (menu-report-bug)",
+	_THPA_MenuReportBugFailureNotifies)
 
 
 /** Replays the same synthetic sharing corpus as the JavaScript and Lua ports. */

@@ -7,8 +7,8 @@
 --- healthcheck.actions accepted them: copy the report, save it as a Markdown
 --- file under the logs folder and open that folder, report it on GitHub (copy
 --- it, then save and reveal its attachment before opening the bug template) or
---- a file. Also the Debug menu's "Report a bug", which opens the diagnostics
---- window at its preview, and "Suggest a feature".
+--- a file. Also the Debug menu's "Report a bug", which runs that same report
+--- action on a fresh snapshot without the window, and "Suggest a feature".
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared output is rebuilt from the host snapshot through a closed typed
@@ -265,49 +265,80 @@ end
 -- =============================
 -- =============================
 
---- Opens the diagnostics window at its preview: the user reviews exactly what
---- is shared before the report button copies it and opens GitHub.
---- @return boolean opened
-function M.report_bug()
-	return require("ui.healthcheck.bridge").open("report")
-end
+-- One request per Debug menu row: a second click supersedes the first
+local _menu_slots = { report_bug = {}, suggest_feature = {} }
 
---- Opens the GitHub feature form with the version and the system prefilled.
+--- Runs one Debug menu GitHub request under an exact owner: a failure is
+--- logged and notified, and the completion receives the child outcome.
+--- @param id string The menu row, a key of _menu_slots.
 --- @param overrides table|nil Replacement side effects (tests only).
-local _feature_request, _feature_owner
-
---- @return table|nil cancellable request; completion receives the child outcome.
-function M.suggest_feature(overrides, complete)
-	local previous = _feature_request
+--- @param complete function|nil Receives true once the form opened.
+--- @param start function Receives the owner and returns the perform request.
+--- @return table|nil cancellable request
+local function menu_request(id, overrides, complete, start)
+	local slot = _menu_slots[id]
+	local previous = slot.request
 	local token = {}
-	_feature_owner, _feature_request = token, nil
-	local function current() return _feature_owner == token and package.loaded["ui.healthcheck.report"] == M end
+	slot.owner, slot.request = token, nil
+	local function current() return slot.owner == token and package.loaded["ui.healthcheck.report"] == M end
 	if previous then previous.cancel() end
 	if not current() then return nil end
 	local effects = effects_with(overrides)
 	local function finished(result)
 		if not current() then return end
-		_feature_request = nil
+		slot.request = nil
 		if result.ok ~= true then
 			local i18n = require("infra.i18n")
-			effects.notify(i18n.get("menu.debug.suggest_feature"), i18n.get("notify.github_report_failed"), "error")
+			effects.notify(i18n.get("menu.debug." .. id), i18n.get("notify.github_report_failed"), "error")
 		end
 		if current() and type(complete) == "function" then complete(result.ok == true) end
 	end
 	local completed = false
-	local ok, request = xpcall(function()
-		local bridge = require("ui.healthcheck.bridge")
-		local documents = bridge.config()
-		local document = Share.document(bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false), documents.schema,
+	local ok, request = xpcall(start, debug.traceback, {
+		current = current, complete = function(result) completed = true; finished(result) end,
+	})
+	if not ok then Logger.error(LOG, "Debug menu request '%s' failed: %s", id, tostring(request)); finished({ ok = false }); return nil end
+	if current() and not completed then slot.request = request else request.cancel() end
+	return request
+end
+
+--- The daemon's snapshot without the window, the probes not run.
+--- @return table snapshot, table documents
+local function menu_snapshot()
+	local bridge = require("ui.healthcheck.bridge")
+	return bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false), bridge.config()
+end
+
+--- Reports a bug exactly as the diagnostics page's report button does, without
+--- the window: the approved report of a fresh snapshot is copied, saved and its
+--- folder opened, then the bug form opens with the host version, OS and driver.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request
+function M.report_bug(overrides, complete)
+	return menu_request("report_bug", overrides, complete, function(owner)
+		local snapshot, documents = menu_snapshot()
+		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
+			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
+		local document = Share.document(snapshot, documents.schema,
+			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+		return M.perform({ action = "report", text = document.text, fields = document.fields },
+			snapshot.sections.paths, documents, M.redaction_context(overrides), overrides, snapshot, owner)
+	end)
+end
+
+--- Opens the GitHub feature form with the version and the system prefilled.
+--- @param overrides table|nil Replacement side effects (tests only).
+--- @param complete function|nil Receives true once the form opened.
+--- @return table|nil cancellable request; completion receives the child outcome.
+function M.suggest_feature(overrides, complete)
+	return menu_request("suggest_feature", overrides, complete, function(owner)
+		local snapshot, documents = menu_snapshot()
+		local document = Share.document(snapshot, documents.schema,
 			require("infra.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
-		return M.perform({ action = "suggest_feature", url = url }, {}, documents, {}, overrides, nil, {
-			current = current, complete = function(result) completed = true; finished(result) end,
-		})
-	end, debug.traceback)
-	if not ok then Logger.error(LOG, "Feature request failed: %s", tostring(request)); finished({ ok = false }); return nil end
-	if current() and not completed then _feature_request = request else request.cancel() end
-	return request
+		return M.perform({ action = "suggest_feature", url = url }, {}, documents, {}, overrides, nil, owner)
+	end)
 end
 
 return M
