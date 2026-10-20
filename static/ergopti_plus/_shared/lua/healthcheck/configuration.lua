@@ -14,6 +14,9 @@
 ---    cannot leave the machine through this section.
 --- 3. The AHK port (windows/ui/healthcheck/configuration.ahk) replays the same
 ---    vectors (_shared/tests/corpus/healthcheck/configuration_vectors.json).
+--- 4. read_files and collect report the state of each configuration file in
+---    the order they apply: ok, missing, unreadable or invalid. A file that
+---    cannot be read is named, never skipped, and nothing is cached or written.
 --- ==============================================================================
 
 local M = {}
@@ -120,6 +123,59 @@ function M.rows(features, document, driver, limit)
 	table.sort(rows, function(left, right) return left.setting < right.setting end)
 	while #rows > limit do rows[#rows] = nil end
 	return rows
+end
+
+-- errno of a file that does not exist: the one open failure that means
+-- "missing" rather than "present but unreadable"
+local ENOENT = 2
+
+--- Reads the configuration files in the order they apply and reports each
+--- state: ok, missing, unreadable (a folder, a permission, a lock) or invalid
+--- (the config.toml that does not decode). Nothing is cached or written.
+--- @param ids table File ids, defaults first.
+--- @param path_of function Maps an id to its path.
+--- @param decode function TOML text to table; raises on malformed input.
+--- @param open_fn function|nil io.open replacement for tests.
+--- @return table items Rows { id, state }.
+--- @return table|nil document The decoded config.toml.
+function M.read_files(ids, path_of, decode, open_fn)
+	open_fn = open_fn or io.open
+	local items, document = {}, nil
+	for _, id in ipairs(ids) do
+		local state = "ok"
+		if id ~= "defaults" then
+			local handle, _, code = open_fn(path_of(id), "rb")
+			if not handle then
+				state = code == ENOENT and "missing" or "unreadable"
+			else
+				local read_ok, content = pcall(handle.read, handle, "*a")
+				handle:close()
+				if not read_ok or type(content) ~= "string" then
+					state = "unreadable"
+				elseif id == "config" then
+					local decoded_ok, decoded = pcall(decode, content)
+					if decoded_ok and type(decoded) == "table" then document = decoded else state = "invalid" end
+				end
+			end
+		end
+		items[#items + 1] = { id = id, state = state }
+	end
+	return items, document
+end
+
+--- Collects both configuration sections of the snapshot.
+--- @param schema table The diagnostics schema.
+--- @param driver string windows, macos or linux.
+--- @param features table The generated manifest's feature entries.
+--- @param path_of function Maps a file id to its path.
+--- @param decode function TOML text to table.
+--- @param open_fn function|nil io.open replacement for tests.
+--- @return table { files = { items }, settings = { items } }
+function M.collect(schema, driver, features, path_of, decode, open_fn)
+	local spec = schema.configuration
+	local items, document = M.read_files(spec.files[driver], path_of, decode, open_fn)
+	local rows = document and M.rows(features, document, driver, spec.max_rows) or {}
+	return { files = { items = items }, settings = { items = rows } }
 end
 
 return M
