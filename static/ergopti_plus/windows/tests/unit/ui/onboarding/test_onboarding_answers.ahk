@@ -174,6 +174,36 @@ _TOAN_AnyInvalidAnswerRefusesTheBatch() {
 Test("onboarding answers: any invalid answer refuses the whole batch (onboarding-answers-windows)",
 	_TOAN_AnyInvalidAnswerRefusesTheBatch)
 
+; The layout step's persistent controls: each path one of their choices writes
+; is claimed once, takes exactly the values those choices write, and becomes a
+; sparse row like any answer, a neutral value a deletion (neutral-layout-wizard).
+_TOAN_LayoutControlsBecomeRows() {
+	Index := OnboardingCatalogue()
+	for Path in ["layout.ergopti_base", "layout.ergopti_variant", "layout.emulated_layout",
+			"layout.ergopti_alt_gr", "layout.emulate_number_row", "layout.direct_access_digits"]
+		AssertEqual("control", Index["entries"][Path]["kind"], Path . " is answered by a layout control")
+	Rows := OnboardingAnswerRows(Index, [
+		_TOAN_Op("layout.ergopti_base", true),
+		_TOAN_Op("layout.ergopti_variant", "ergopti_plus"),
+		_TOAN_Op("layout.emulate_number_row", false),
+		_TOAN_Op("layout.direct_access_digits", "native")
+	])
+	AssertTrue(Rows is Array, "control answers produce rows: " . (Rows is String ? Rows : ""))
+	AssertEqual(1, _TOAN_RowFor(Rows, "layout", "ergopti_base").Value)
+	AssertEqual("ergopti_plus", _TOAN_RowFor(Rows, "layout", "ergopti_variant").Value)
+	AssertEqual(0, _TOAN_RowFor(Rows, "layout", "emulate_number_row").Value)
+	Native := _TOAN_RowFor(Rows, "layout", "direct_access_digits")
+	AssertTrue(Native.HasOwnProp("Delete") && Native.Delete == 1, "the native order is the neutral value: a deletion")
+	for Probe in [["layout.direct_access_digits", "sideways"], ["layout.ergopti_variant", "bepo"],
+			["layout.emulated_layout", "ergol"], ["layout.ergopti_base", "true"]] {
+		Why := OnboardingAnswerRows(Index, [_TOAN_Op(Probe[1], Probe[2])])
+		AssertTrue(Why is String, Probe[1] . " refuses a value no choice writes")
+		AssertContains(Why, "one of the values its choices write")
+	}
+}
+Test("onboarding answers: the layout controls write only their choices' values (neutral-layout-wizard)",
+	_TOAN_LayoutControlsBecomeRows)
+
 _TOAN_TriggerLengthCountsCharacters() {
 	Index := OnboardingCatalogue()
 	Emoji := Chr(0x1F600)

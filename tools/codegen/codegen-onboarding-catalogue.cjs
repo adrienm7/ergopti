@@ -104,7 +104,19 @@ const PAGE_FIELDS = new Set([
 	'state',
 	'triggers',
 	'settings',
-	'settings_label_key'
+	'settings_label_key',
+	'controls'
+]);
+
+// The fields of one [[onboarding.pages.<scope>.controls]] declaration.
+const CONTROL_FIELDS = new Set([
+	'id',
+	'label_key',
+	'path',
+	'choice_label_prefix',
+	'choices',
+	'platforms',
+	'reason_key'
 ]);
 
 // What the page draws between an item's trigger and the action it imports. No
@@ -1256,6 +1268,127 @@ function magicKeyFor(id, page, platform, projection, labels) {
 }
 
 /**
+ * The page's persistent controls on one platform: settings drawn on the page
+ * itself rather than in its checklist, each set to the value in force and
+ * changed only by the user, never prefilled with a recommendation. A control
+ * either sets one manifest feature (`path`: a Boolean is a checkbox, an enum
+ * one choice per value, labelled `choice_label_prefix` + value) or offers
+ * `choices`, each writing a fixed set of paths. A platform the control's
+ * `platforms` leave out gets it unavailable, with its `reason_key`: the page
+ * draws it greyed with why and the host accepts none of its paths.
+ * @param {string} id Page id.
+ * @param {object} page Declaration.
+ * @param {string} platform Manifest platform token.
+ * @param {Map<string, object>} features Indexed manifest features.
+ * @param {object} projection Manifest projection.
+ * @param {object} labels Label helpers.
+ * @returns {object[]} Control descriptors.
+ */
+function controlsFor(id, page, platform, features, projection, labels) {
+	if (page.controls === undefined) return [];
+	if (!Array.isArray(page.controls) || page.controls.length === 0)
+		throw new Error(`[onboarding.pages.${id}] controls must be a non-empty array`);
+	const seen = new Set();
+	return page.controls.map((declared) => {
+		const where = `[onboarding.pages.${id}.controls] ${declared && declared.id}`;
+		if (!isPlainObject(declared) || typeof declared.id !== 'string' || declared.id === '')
+			throw new Error(`[onboarding.pages.${id}.controls] needs an id`);
+		for (const field of Object.keys(declared))
+			if (!CONTROL_FIELDS.has(field)) throw new Error(`${where} has unknown field ${field}`);
+		if (seen.has(declared.id)) throw new Error(`${where} is declared twice`);
+		seen.add(declared.id);
+		labels.requireKey(declared.label_key, where);
+		const platforms = declared.platforms || MANIFEST_PLATFORMS;
+		if (!Array.isArray(platforms) || platforms.some((p) => !MANIFEST_PLATFORMS.includes(p)))
+			throw new Error(`${where} platforms must list known platforms`);
+		if (platforms.length < MANIFEST_PLATFORMS.length) {
+			if (typeof declared.reason_key !== 'string')
+				throw new Error(`${where} needs the reason_key the other platforms show`);
+			labels.requireKey(declared.reason_key, where);
+		}
+		const available = platforms.includes(platform);
+		if ((declared.path === undefined) === (declared.choices === undefined))
+			throw new Error(`${where} declares either a path or choices`);
+		let kind;
+		let choices;
+		if (declared.path !== undefined) {
+			const feature = features.get(declared.path);
+			if (!feature) throw new Error(`${where}: ${declared.path} is not a manifest feature`);
+			if (feature.type === 'boolean') {
+				kind = 'check';
+				choices = [true, false].map((value) => ({ value, writes: { [declared.path]: value } }));
+			} else if (feature.type === 'enum') {
+				if (typeof declared.choice_label_prefix !== 'string')
+					throw new Error(`${where} needs the choice_label_prefix of its values`);
+				kind = 'choice';
+				choices = feature.enum_values.map((value) => ({
+					value,
+					label_key: declared.choice_label_prefix + value,
+					writes: { [declared.path]: value }
+				}));
+			} else throw new Error(`${where}: ${declared.path} is neither a Boolean nor an enum`);
+		} else {
+			if (!Array.isArray(declared.choices) || declared.choices.length < 2)
+				throw new Error(`${where} offers at least two choices`);
+			kind = 'choice';
+			choices = declared.choices.map((choice) => {
+				if (
+					!isPlainObject(choice) ||
+					typeof choice.value !== 'string' ||
+					!isPlainObject(choice.writes)
+				)
+					throw new Error(`${where} has a choice without a value and its writes`);
+				return { value: choice.value, label_key: choice.label_key, writes: choice.writes };
+			});
+		}
+		const paths = Object.keys(choices[0].writes).sort();
+		const control = {
+			id: declared.id,
+			kind,
+			label_key: declared.label_key,
+			available,
+			choices: []
+		};
+		if (!available) control.reason_key = declared.reason_key;
+		for (const choice of choices) {
+			if (kind === 'choice') labels.requireKey(choice.label_key, `${where} choice ${choice.value}`);
+			if (Object.keys(choice.writes).sort().join() !== paths.join())
+				throw new Error(`${where}: every choice writes the same paths`);
+			const built = { value: choice.value };
+			if (kind === 'choice') built.label_key = choice.label_key;
+			if (available) {
+				built.writes = paths.map((writePath) => {
+					const feature = features.get(writePath);
+					if (!feature) throw new Error(`${where}: ${writePath} is not a manifest feature`);
+					if (projection.scopeOf(writePath) !== id)
+						throw new Error(`${where}: ${writePath} belongs to another scope`);
+					const value = choice.writes[writePath];
+					const allowed =
+						feature.type === 'boolean'
+							? typeof value === 'boolean'
+							: feature.type === 'enum'
+								? feature.enum_values.includes(value)
+								: typeof value === 'string';
+					if (!allowed)
+						throw new Error(`${where}: ${writePath} cannot take ${JSON.stringify(value)}`);
+					return {
+						path: writePath,
+						value,
+						default: projection.project(writePath, platform).default
+					};
+				});
+			}
+			control.choices.push(built);
+		}
+		if (
+			new Set(control.choices.map((choice) => String(choice.value))).size !== control.choices.length
+		)
+			throw new Error(`${where} offers one value twice`);
+		return control;
+	});
+}
+
+/**
  * Builds one page for one platform.
  * @returns {object} Page descriptor.
  */
@@ -1307,6 +1440,8 @@ function buildPage(id, page, platform, manifest, features, projection, labels, u
 		const magicKey = magicKeyFor(id, page, platform, projection, labels);
 		if (magicKey) built.magic_key = magicKey;
 	}
+	const controls = controlsFor(id, page, platform, features, projection, labels);
+	if (controls.length > 0) built.controls = controls;
 	return built;
 }
 
@@ -1381,6 +1516,13 @@ function buildCatalogue() {
 			if (page.sub_switch) claim(page.sub_switch);
 			if (page.state) claim(page.state);
 			if (page.magic_key) claim(page.magic_key);
+			// A control's choices share their paths: each path is claimed once,
+			// by the control, and a checklist row writing it too is refused.
+			for (const control of page.controls || []) {
+				if (!control.available) continue;
+				for (const write of control.choices[0].writes)
+					claim({ path: write.path, default: write.default });
+			}
 			(function walk(groups) {
 				for (const group of groups) {
 					if (group.path) claim(group);

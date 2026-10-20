@@ -7053,11 +7053,49 @@ description_key = "onboarding.page.keyboard_layout.description"
 master = { ahk = "category_enabled.layout" }
 checklist = "recommended"
 # The AltGr virtual-key compensation answers a custom layout detected at
-# runtime; it is not one of Ergopti's preferences to import.
-exclude = ["script.alt_gr_is_kana_remap"]
+# runtime; it is not one of Ergopti's preferences to import. The emulated
+# layout and the number-row ordering are the page's own controls (below), which
+# a Yes never prefills.
+exclude = ["script.alt_gr_is_kana_remap", "layout.ergopti_base", "layout.ergopti_variant", "layout.ergopti_alt_gr", "layout.direct_access_digits"]
 # macOS installs the layout as a system input source and Linux through its
 # desktop: both are chosen in the keyboard-layout menu, not switched here.
 note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboarding.page.keyboard_layout.system_note" }
+
+# The layout step's persistent controls (the maintainer's request of October
+# 13): the emulated layout and its AltGr layer, the number-row emulation (its
+# base and Shift levels) and the number-row ordering, drawn on the page rather
+# than in its checklist. Each starts at the value in force and changes only
+# when the user changes it, so a new installation emulates no layout and
+# reorders nothing; a change redraws the controls alone. Layout emulation and the ordering are
+# Windows-only today: macOS and Linux draw the controls greyed with why.
+[[onboarding.pages.keyboard_layout.controls]]
+id = "emulated_layout"
+label_key = "onboarding.layout.emulated_layout"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_base" = false, "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
+
+[[onboarding.pages.keyboard_layout.controls]]
+id = "alt_gr_emulation"
+label_key = "layout.ergoptialtgr"
+path = "layout.ergopti_alt_gr"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[onboarding.pages.keyboard_layout.controls]]
+id = "number_row_emulation"
+label_key = "onboarding.layout.number_row_emulation"
+path = "layout.emulate_number_row"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[onboarding.pages.keyboard_layout.controls]]
+id = "number_row_order"
+label_key = "menu.layout.number_row"
+path = "layout.direct_access_digits"
+choice_label_prefix = "menu.layout.number_row_"
+platforms = ["ahk"]
+reason_key = "platform_reason.number_row_override_unsupported"
 
 [onboarding.pages.hotstrings]
 title_key = "menu.hotstrings.title"
