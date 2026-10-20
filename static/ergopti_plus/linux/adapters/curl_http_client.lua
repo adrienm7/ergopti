@@ -476,6 +476,12 @@ end
 
 --- Binds the accepted representation only to its actual final endpoint/validator.
 local function attach_etag(request, result)
+	-- A refused conditional request still wrote its final headers: an exhausted
+	-- GitHub rate limit names its reset time there (403/429, curl exit 22).
+	if request.conditional and request.etag_headers_eof == true and not request.terminal
+		and (result.status == 403 or result.status == 429) then
+		result.rate_limit = RedirectReceipt.response_rate_limit(request.etag_headers, result.status)
+	end
 	if not request.conditional or request.etag_headers_eof ~= true or request.exit_code ~= 0
 		or request.exit_signal ~= 0 or (result.ok ~= true and result.status ~= 304) then return result end
 	local headers = RedirectReceipt.response_etag(request.etag_headers, result.status, HeaderPolicy.validate)
