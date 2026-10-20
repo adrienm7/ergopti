@@ -75,7 +75,7 @@ const SHARED = [
 	['llm_ui', 'inactive_align_char'],
 	['llm_ui', 'footer_space_divider'],
 	['llm_ui', 'footer_combined_separator'],
-	['llm_ui', 'shortcut_label_gap'],
+	['llm_ui', 'shortcut_modifier_order'],
 	['tint', 'lightness'],
 	['tint', 'saturation']
 ];
@@ -95,7 +95,6 @@ const PAIRED = [
 	['llm_colors', 'unsel_gray_hex', 'unsel_gray'],
 	['llm_colors', 'loading_hex', 'loading'],
 	['llm_colors', 'cursor_hex', 'cursor'],
-	['llm_colors', 'cmd_sel_hex', 'cmd_sel'],
 	['llm_colors', 'cmd_dim_hex', 'cmd_dim'],
 	['accent_colors', 'ai_loading_hex', 'ai_loading']
 ];
@@ -151,6 +150,24 @@ for (const [section, ahkKey, hsKey] of PAIRED) {
 	}
 }
 
+// The shortcut column's labels and joiner are each OS's own spelling of one
+// list: Windows and macOS read their own, the same length as the shared order.
+const SHORTCUT_LISTS = [
+	['shortcut_labels_ahk', 'shortcut_joiner_ahk', ahkReads],
+	['shortcut_labels_hs', 'shortcut_joiner_hs', luaReads]
+];
+const listLength = (raw) => JSON.parse(raw).split(',').length;
+for (const [labels, joiner, reads] of SHORTCUT_LISTS) {
+	if (!declared('llm_ui', labels) || !declared('llm_ui', joiner)) continue;
+	if (!reads('llm_ui', labels) || !reads('llm_ui', joiner))
+		errors.push(`[llm_ui].${labels} / ${joiner} are not read by their driver`);
+	if (
+		declared('llm_ui', 'shortcut_modifier_order') &&
+		listLength(toml.llm_ui[labels]) !== listLength(toml.llm_ui.shortcut_modifier_order)
+	)
+		errors.push(`[llm_ui].${labels} must label every modifier of shortcut_modifier_order`);
+}
+
 // Style globals must start empty: a literal is a second source that silently
 // wins whenever the loader is skipped (the old UI_OFFSET_RIGHT := 15).
 const STYLE_GLOBALS = [
@@ -177,7 +194,9 @@ const STYLE_GLOBALS = [
 	'UI_LLM_UNSEL_GRAY_HEX',
 	'UI_LLM_LOADING_HEX',
 	'UI_LLM_CURSOR_HEX',
-	'UI_LLM_CMD_SEL_HEX',
+	'UI_LLM_SHORTCUT_ORDER',
+	'UI_LLM_SHORTCUT_LABELS',
+	'UI_LLM_SHORTCUT_JOINER',
 	'UI_LLM_CMD_DIM_HEX',
 	'UI_AI_LOADING_HEX'
 ];

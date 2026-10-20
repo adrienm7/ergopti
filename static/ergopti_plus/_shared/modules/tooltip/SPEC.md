@@ -264,7 +264,19 @@ canvas_h = pad_y + preds_h + line_spacing
 
 Prediction lines stack as one text block: no per-line padding and no rule
 between them. `preds_w` is the widest line over every highlighted row, so
-navigating never resizes the panel. The footer never widens the panel while its
+navigating never resizes the panel.
+
+Each line that carries a prediction ends with the chord that inserts it, in a
+shortcut column: `preds_w = max_line_w + label_gap + max_shortcut_w` when any
+row has a chord, each chord right-aligned against the inner edge, bottom
+aligned with its line at the hint size, in `cmd_dim` on every row. The chord is
+the validation modifiers in `shortcut_modifier_order`, under the OS's
+`shortcut_labels_*` and `shortcut_joiner_*`, then the row's digit (0 for the
+tenth row, nothing beyond); no modifier means the bare digit. The rule is
+`_shared/lua/tooltip/llm_line.lua` `shortcut_label`, pinned by
+`_shared/tests/corpus/tooltip/llm_shortcut_vectors.json`. macOS places the
+column on a right tab stop carried by each line's prefix; Windows and Linux
+draw it at `canvas_w − pad_x − shortcut_w`. The footer never widens the panel while its
 combined row fits (`combined_w ≤ preds_w`); otherwise it wraps into a hint row
 and an info row, and only the wider of those may widen it. Width is sized with
 the worst-case timing line so a later TTLT never clips.
