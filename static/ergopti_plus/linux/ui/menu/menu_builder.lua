@@ -2339,6 +2339,56 @@ local function _build_hotstrings(ctx)
 end
 
 --- Builds the AI / LLM submenu.
+--- Captures the displayed value and publication authority from one exact read.
+--- @param ctx table Native menu context.
+--- @param owner table Original settings owner.
+--- @param module_name string Settings module identity.
+--- @param name string Setting key.
+--- @param path string Canonical preference path.
+--- @return any value, function|nil save
+local function numeric_setting_request(ctx, owner, module_name, name, path)
+	local Preferences = require("infra.llm_preferences")
+	local Paths = require("infra.config_paths")
+	local set, get_many, generation = owner.set, Preferences.get_many, Preferences.generation
+	local revision_current, publish, config = Preferences.is_current_revision, Preferences.set_many, Paths.config
+	if type(set) ~= "function" or type(get_many) ~= "function" or type(generation) ~= "function"
+		or type(revision_current) ~= "function" or type(publish) ~= "function" or type(config) ~= "function" then return nil end
+	local function ports_current()
+		return package.loaded[module_name] == owner and owner.set == set
+			and package.loaded["infra.llm_preferences"] == Preferences and Preferences.get_many == get_many
+			and Preferences.generation == generation and Preferences.is_current_revision == revision_current
+			and Preferences.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
+	end
+	local root_ok, root = pcall(config, "config.toml")
+	if not root_ok or type(root) ~= "string" or not ports_current() then return nil end
+	local called, values, source, revision = pcall(get_many, { path })
+	if not called or type(values) ~= "table" or type(values[path]) ~= "number" or type(source) ~= "table"
+		or type(revision) ~= "number" or revision < 0 or revision % 1 ~= 0 then return nil end
+	local function current()
+		if not ports_current() then return false end
+		local read, selected = pcall(config, "config.toml")
+		return read and selected == root and ports_current() and revision_current(revision) == true and ports_current()
+	end
+	local function refused()
+		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
+		local okay, notifier = pcall(require, "adapters.notifier")
+		if okay and type(notifier.send) == "function" then
+			pcall(notifier.send, i18n_safe("dialog.bulk_toggle.save_failed"), { level = "error" })
+		end
+		return false
+	end
+	if not current() then refused(); return nil end
+	return values[path], function(value)
+		if not current() then return refused() end
+		local checked, actual = pcall(generation)
+		if not checked or actual ~= revision or not current() then return refused() end
+		local saved, accepted = pcall(set, name, value, source, current)
+		if not saved or accepted ~= true then return refused() end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+end
+
 local function _build_llm(ctx)
 	local NativeParent = require("ui.menu.ai_parent")
 	local parent = NativeParent.begin(ManifestMenu, "llm", ctx)
@@ -2408,17 +2458,16 @@ local function _build_llm(ctx)
 					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
 					return
 				end
+				local value, save = numeric_setting_request(ctx, TriggerSettings, "modules.llm.trigger_settings",
+					"debounce_ms", "llm.trigger.debounce_ms")
+				if not save then return false end
 				Prompt.ask({
 					title = i18n_safe("menu.llm.trigger_menu_title"),
 					hint = string.format("%d – %d ms", bounds.min, bounds.max),
-					value = current_delay,
+					value = value,
 					min = bounds.min,
 					max = bounds.max,
-					on_save = function(value)
-						local saved = TriggerSettings.set("debounce_ms", math.floor(value))
-						if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-						return saved
-					end,
+					on_save = function(number) return save(math.floor(number)) end,
 				}, ctx.webview)
 			end,
 		})
@@ -3012,17 +3061,16 @@ local function _build_llm(ctx)
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
 							return
 						end
+						local value, save = numeric_setting_request(ctx, Settings, "modules.llm.settings",
+							setting.name, "llm.generation." .. setting.name)
+						if not save then return false end
 						Prompt.ask({
 							title = i18n_safe(setting.key),
 							hint = string.format("%s – %s", tostring(bounds.min), tostring(bounds.max)),
-							value = Settings.get(setting.name),
+							value = value,
 							min = bounds.min,
 							max = bounds.max,
-							on_save = function(value)
-								local saved = Settings.set(setting.name, value)
-								if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-								return saved
-							end,
+							on_save = save,
 						}, ctx.webview)
 					end,
 				})

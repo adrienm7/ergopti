@@ -134,6 +134,7 @@ local function with_numeric_menu(options, exercise)
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
 		local log = { prompts = {}, changed = 0 }
+		package.loaded["adapters.notifier"] = { send = function() return true end }
 		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }
@@ -233,7 +234,12 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_type(f.writer.write_refusal(f.path), "string")
 				package.loaded["toml_codec.writer"] = nil
 				package.loaded["infra.llm_preferences"] = nil
-				helpers.assert_true(spec.on_save(context.candidate))
+				helpers.assert_eq(spec.on_save(context.candidate), false,
+					"replacement preference owners cannot adopt the retained request")
+				helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)
+				row.fn()
+				helpers.assert_true(f.log.prompts[2].spec.on_save(context.candidate),
+					"a reopened request captures fresh owners and can retry the original write")
 				helpers.assert_eq(f.log.changed, 1)
 			end)
 		end)
