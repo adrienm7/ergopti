@@ -518,6 +518,14 @@ local function new(options)
 			return false
 		end
 
+		-- Scheduler cleanup may synchronously publish a newer request from an
+		-- exact settlement observer. Retire only our unpublished candidate.
+		if my_generation ~= _generation then
+			if not _cancel_timeout_handle(timeout_handle, "Superseded request admission") then
+				_retain_timeout_cleanup(timeout_handle)
+			end
+			return false
+		end
 		_timeout_timer = timeout_handle
 		return true
 	end
@@ -576,9 +584,16 @@ local function new(options)
 	--- @param callback function Completion callback.
 	--- @return integer|nil generation New request generation, or nil on refusal.
 	local function _prepare_request(callback)
+		local admission_generation = _generation
 		if _request_active or _timeout_timer or _active_task then
-			if inst.cancel() ~= true then
+			local cancelled = inst.cancel()
+			admission_generation = admission_generation + 1
+			-- cancel() notifies real settlement observers after its mutation.
+			-- Their newer request/cancel intent supersedes this outer admission.
+			if admission_generation ~= _generation then return nil end
+			if cancelled ~= true then
 				Logger.error(LOG, "HTTP request refused while native cancellation remains pending.")
+				if admission_generation ~= _generation then return nil end
 				invoke_callback(callback, {
 					ok = false,
 					status = 0,
@@ -588,8 +603,11 @@ local function new(options)
 				return nil
 			end
 		end
-		if not _retry_timeout_cleanup() then
+		local cleanup_settled = _retry_timeout_cleanup()
+		if admission_generation ~= _generation then return nil end
+		if not cleanup_settled then
 			Logger.error(LOG, "HTTP request refused while timeout cleanup remains pending.")
+			if admission_generation ~= _generation then return nil end
 			invoke_callback(callback, {
 				ok = false,
 				status = 0,
@@ -602,7 +620,9 @@ local function new(options)
 		_cancelled = false
 		_generation = _generation + 1
 		local my_generation = _generation
-		if not _arm_timeout(callback, my_generation) then
+		local armed = _arm_timeout(callback, my_generation)
+		if my_generation ~= _generation then return nil end
+		if not armed then
 			_cancelled = true
 			invoke_callback(callback, {
 				ok = false,
