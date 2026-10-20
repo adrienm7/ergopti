@@ -2448,7 +2448,8 @@ Updater_FetchLatestJson(Channel) {
 			return ""
 		Etag := ""
 		try Etag := Req.GetResponseHeader("ETag")
-		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url, RequestOwner)
+		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url, RequestOwner,
+			_Updater_ReadRateLimit(Req))
 	} catch as Err {
 		LoggerWarn("Updater", "HTTP request failed: {1}.", Err.Message)
 	}
@@ -2463,7 +2464,28 @@ Updater_FetchLatestJson(Channel) {
 ; when the list holds no release of the channel. Updates the per-channel
 ; conditional-GET cache on a fresh 200; the cache keeps the whole list, so a 304
 ; selects the channel's release again.
-_Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
+; Reads the final response's GitHub rate-limit headers; a missing one reads "".
+_Updater_ReadRateLimit(Http) {
+	Remaining := "", Reset := ""
+	try Remaining := Http.GetResponseHeader("X-RateLimit-Remaining")
+	try Reset := Http.GetResponseHeader("X-RateLimit-Reset")
+	return Map("remaining", Remaining, "reset", Reset)
+}
+
+; Names an exhausted GitHub API rate limit (403 or 429 with no call left) and
+; its UTC reset, the sentence of the Lua drivers' updater.rate_limit; "" when
+; the response is not an exhausted rate limit (#95).
+_Updater_RateLimitDetail(Status, Remaining, Reset) {
+	if (Status != 403 && Status != 429) || Remaining != "0"
+		return ""
+	When := ""
+	if RegExMatch(Reset, "^\d+$")
+		When := ", it resets at "
+			. FormatTime(DateAdd("19700101000000", Integer(Reset), "Seconds"), "yyyy-MM-dd HH:mm:ss") . " UTC"
+	return Format("HTTP {1}: the GitHub API rate limit is exhausted{2}", Status, When)
+}
+
+_Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, RateLimit := 0) {
 	global _UpdaterFetchCache
 	Json := ""
 	if (Status == 304) {
@@ -2479,8 +2501,14 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 			else
 				_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
 		}
-	} else if (Status == 403) {
-		try LoggerWarn("Updater", "GitHub API rate limit (HTTP 403) for '{1}'.", Url)
+	} else if (Status == 403 || Status == 429) {
+		Detail := (RateLimit is Map)
+			? _Updater_RateLimitDetail(Status, RateLimit["remaining"], RateLimit["reset"]) : ""
+		if (Detail != "") {
+			try LoggerWarn("Updater", "GitHub releases for '{1}': {2}.", Url, Detail)
+		} else {
+			try LoggerWarn("Updater", "GitHub refused the releases request (HTTP {1}) for '{2}'.", Status, Url)
+		}
 	} else {
 		try LoggerWarn("Updater", "GitHub API HTTP {1} for '{2}'.", Status, Url)
 	}
@@ -3081,6 +3109,7 @@ _Updater_PollAsync(id) {
 	Status := 0
 	Body := ""
 	Etag := ""
+	RateLimit := 0
 	CancelledDuringLease := false
 	try {
 		http := rec.Get("http", 0)
@@ -3100,6 +3129,7 @@ _Updater_PollAsync(id) {
 			}
 		} else {
 			try Etag := http.GetResponseHeader("ETag")
+			RateLimit := _Updater_ReadRateLimit(http)
 			Status := http.Status
 			Body := http.ResponseText
 		}
@@ -3129,7 +3159,7 @@ _Updater_PollAsync(id) {
 	if (!failed and ready) {
 		try {
 			Json := _Updater_InterpretResponse(
-				Status, Body, Etag, Channel, Url, Request)
+				Status, Body, Etag, Channel, Url, Request, RateLimit)
 		} catch as Err {
 			try LoggerDebug("Updater", "Async response read failed: {1}.", Err.Message)
 			Json := ""

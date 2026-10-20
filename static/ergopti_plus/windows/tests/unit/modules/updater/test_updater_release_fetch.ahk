@@ -578,3 +578,25 @@ _UpdaterTest_BackgroundTickIsAsync() {
 		"Updater_BackgroundTick must not call the blocking Updater_FetchLatestJson directly")
 }
 Test("Updater: background poller dispatches asynchronously (regression: sync fetch froze remapping)", _UpdaterTest_BackgroundTickIsAsync)
+
+_UpdaterTest_RateLimitDetail() {
+	AssertEqual("HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC",
+		_Updater_RateLimitDetail(403, "0", "86400"), "an exhausted limit names its UTC reset")
+	AssertEqual("HTTP 429: the GitHub API rate limit is exhausted",
+		_Updater_RateLimitDetail(429, "0", ""), "a missing reset still names the limit")
+	AssertEqual("HTTP 403: the GitHub API rate limit is exhausted",
+		_Updater_RateLimitDetail(403, "0", "soon"), "a malformed reset is not a time")
+	AssertEqual("", _Updater_RateLimitDetail(403, "12", "86400"), "calls left is another refusal")
+	AssertEqual("", _Updater_RateLimitDetail(403, "", ""), "no rate-limit header is another refusal")
+	AssertEqual("", _Updater_RateLimitDetail(500, "0", "86400"), "only 403 and 429 are rate limits")
+	SavedCache := _UpdaterFetchCache
+	try {
+		_UpdaterFetchCache := Map()
+		AssertEqual("", _Updater_InterpretResponse(403, "{}", "", "dev", "test://limited", ,
+			Map("remaining", "0", "reset", "86400")), "a rate-limited answer has no release")
+		AssertFalse(_UpdaterFetchCache.Has("dev"), "a refusal never enters the response cache")
+	} finally {
+		_UpdaterFetchCache := SavedCache
+	}
+}
+Test("Updater: an exhausted GitHub rate limit names its reset time (#95)", _UpdaterTest_RateLimitDetail)
