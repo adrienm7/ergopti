@@ -11,7 +11,7 @@
  *
  * ROOT CAUSE ENCODED (incident of 2026-09-30):
  * The Karabiner lease worker answers every PING, PAUSE and RESUME within its
- * private command budget (kPrivateCommandAckTimeoutSeconds, 1.75 s, in
+ * private command budget (kPrivateCommandAckTimeoutSeconds, then 1.75 s, in
  * RemapLeaseWorker.swift) or fences itself. Hammerspoon waited 2.0 s for that
  * answer: 0.25 s for the pipe and a main thread busy with its start-up builds.
  * dev.152 failed with "timeout waiting for PONG 1". The fix (f4c5c1d48) raised
@@ -92,24 +92,60 @@ function swiftFuncBody(src, name) {
 	return null;
 }
 
-/** Reads one `let kName: TimeInterval = <number>` from a Swift source. */
-function swiftSeconds(src, name, file) {
-	const m = src.match(new RegExp(`\\blet\\s+${name}\\s*:\\s*TimeInterval\\s*=\\s*([\\d_.]+)`));
-	if (!m) {
-		errors.push(`${file}: ${name} is not declared as a TimeInterval literal any more`);
-		return NaN;
+/**
+ * Evaluates a budget written as a sum of numeric literals and named constants
+ * of the same source (4cea89e508 derives the lease budgets from their parts,
+ * e.g. the CLI timeout plus its settlement margin). Any other operator fails:
+ * the contract must not guess at an expression it cannot read.
+ * @param {string} expression Right-hand side, comments already stripped.
+ * @param {(name: string) => number} resolve Reads one named constant.
+ * @returns {number} The sum, or NaN when a term cannot be read.
+ */
+function sumOfTerms(expression, resolve) {
+	const terms = expression.split('+').map((term) => term.trim());
+	let total = 0;
+	for (const term of terms) {
+		if (/^[\d_]+(\.[\d_]+)?$/.test(term)) total += Number(term.replace(/_/g, ''));
+		else if (/^[A-Za-z_]\w*$/.test(term)) total += resolve(term);
+		else return NaN;
 	}
-	return Number(m[1].replace(/_/g, ''));
+	return total;
 }
 
-/** Reads one `local NAME = <number>` from a Lua source. */
-function luaSeconds(src, name, file) {
-	const m = src.match(new RegExp(`^local\\s+${name}\\s*=\\s*([\\d.]+)`, 'm'));
-	if (!m) {
-		errors.push(`${file}: ${name} is not declared as a numeric local any more`);
+/**
+ * Reads one Swift `let kName[: TimeInterval] = <sum>` from a source. A literal
+ * must be typed TimeInterval; a sum of other constants inherits their type.
+ */
+function swiftSeconds(src, name, file, seen = new Set()) {
+	const m = src.match(new RegExp(`\\blet\\s+${name}\\s*(:\\s*TimeInterval\\s*)?=\\s*([^\\n]+)`));
+	const resolve = (term) => {
+		if (seen.has(term)) return NaN;
+		return swiftSeconds(src, term, file, new Set([...seen, name]));
+	};
+	const value = m ? sumOfTerms(m[2], resolve) : NaN;
+	const typed = m && (m[1] !== undefined || !/^\s*[\d_.]+\s*$/.test(m[2]));
+	if (!typed || !Number.isFinite(value)) {
+		if (seen.size === 0)
+			errors.push(`${file}: ${name} is not declared as a TimeInterval literal or sum any more`);
 		return NaN;
 	}
-	return Number(m[1]);
+	return value;
+}
+
+/** Reads one Lua `local NAME = <sum>` (continuation lines start with +). */
+function luaSeconds(src, name, file, seen = new Set()) {
+	const m = src.match(new RegExp(`^local\\s+${name}\\s*=\\s*([^\\n]+(?:\\n\\s*\\+[^\\n]*)*)`, 'm'));
+	const resolve = (term) => {
+		if (seen.has(term)) return NaN;
+		return luaSeconds(src, term, file, new Set([...seen, name]));
+	};
+	const value = m ? sumOfTerms(m[1], resolve) : NaN;
+	if (!Number.isFinite(value)) {
+		if (seen.size === 0)
+			errors.push(`${file}: ${name} is not declared as a numeric local or sum any more`);
+		return NaN;
+	}
+	return value;
 }
 
 /** Counts non-overlapping literal occurrences. */
@@ -302,16 +338,25 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 			`${LEASE_LUA}: the worker spawn no longer passes HEARTBEAT_INTERVAL_SEC as its heartbeat`
 		);
 	}
+	// Since 4cea89e508 the slack is the command budget plus a host-stall
+	// allowance, injected with kLeaseInnerSilenceSlackSeconds as its default.
+	const slackDeclaration = worker.match(/\blet\s+kLeaseInnerSilenceSlackSeconds\s*=\s*([^\n]+)/);
+	const slack = swiftSeconds(worker, 'kLeaseInnerSilenceSlackSeconds', WORKER_FILE);
 	if (
-		!/timeout:\s*identity\.heartbeatSeconds\s*\+\s*kPrivateCommandAckTimeoutSeconds/.test(worker)
+		!/timeout:\s*identity\.heartbeatSeconds\s*\+\s*outerSilenceSlack\b/.test(worker) ||
+		!/outerSilenceSlack:\s*TimeInterval\s*=\s*kLeaseInnerSilenceSlackSeconds\b/.test(worker) ||
+		!slackDeclaration ||
+		!slackDeclaration[1]
+			.split('+')
+			.some((term) => term.trim() === 'kPrivateCommandAckTimeoutSeconds')
 	) {
 		errors.push(
 			`${WORKER_FILE}: the inner's silence deadline is no longer heartbeat + command budget`
 		);
-	} else if (Number.isFinite(heartbeat)) {
+	} else if (Number.isFinite(heartbeat) && Number.isFinite(slack)) {
 		passes.push(
 			`lease heartbeat: Lua ticks every ${heartbeat} s, the inner fences after ` +
-				`${(heartbeat + commandBudget).toFixed(2)} s of silence`
+				`${(heartbeat + slack).toFixed(2)} s of silence`
 		);
 	}
 }
