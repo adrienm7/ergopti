@@ -290,7 +290,7 @@ for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-mas
 		_LRPS_LevelCustody.Bind(0, false, _LRPE_ChildSource, [_LRPE_Mode], "PASS number-row-edges-admission"))
 
 
-_LRPCM_ChildSource() {
+_LRPCM_ChildSource(BodyName := "layout_row_chosen_magic_body.ahk", AdditionalSource := "") {
 	global _DriverDir
 	Source := _NRP_LayoutSource()
 	Start := InStr(Source, "_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(")
@@ -304,9 +304,36 @@ _LRPCM_ChildSource() {
 	}
 	Extra .= "_LRPCM_RegisterMagic() {`n global ScriptInformation, Features`n"
 		. SubStr(Source, Start, Finish - Start) . "`n}`n"
-	return _LRPS_ChildSource("layout_row_chosen_magic_body.ahk", Extra)
+	return _LRPS_ChildSource(BodyName, Extra . AdditionalSource)
 }
 
 for _LRPCM_Row in ["number", "top", "home", "bottom"]
 	Test("layout rows: chosen magic on " . _LRPCM_Row . " keeps only its plain press (layout-row-chosen-magic-scope)",
 		_LRPS_LevelCustody.Bind(0, false, _LRPCM_ChildSource, [_LRPCM_Row], "PASS layout-row-chosen-magic"))
+
+
+_LRPN_ChildSource() {
+	global _DriverDir, _SharedDir
+	Extra := ""
+	for Relative in ["adapters\key_state.ahk", "modules\keymap\keylayout\keylayout_parser.ahk",
+		"modules\keymap\keylayout\keylayout_tables.ahk", "modules\keymap\layout\layout_ergopti.ahk",
+		"modules\keymap\layout\accented_shortcuts.ahk", "modules\keymap\layout\digit_row_bindings.ahk"]
+		Extra .= "#Include " . _DriverDir . "\" . Relative . "`n"
+	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
+		"KeylayoutEmulation_NumberRowLevels", "_KLE_MagicKeyOwnsKey", "GetCapsLockCondition", "_DigitShiftSend"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "the actual built-in row dependency must exist: " . Name)
+		Extra .= Definition . "`n"
+	}
+	return _LRPCM_ChildSource("builtin_number_row_magic_body.ahk", Extra)
+}
+
+for _LRPN_Scan in ["SC002", "SC029", "SC00C", "SC00D"]
+	for _LRPN_Emulated in [false, true]
+		for _LRPN_Caps in [false, true]
+			Test("built-in number row: " . _LRPN_Scan . " " . (_LRPN_Emulated ? "emulated" : "native")
+				. " row caps " . (_LRPN_Caps ? "on" : "off") . " retains chosen magic and releases (builtin-number-row-magic-owner)",
+				_LRPS_LevelCustody.Bind(0, false, _LRPN_ChildSource,
+					[_LRPN_Scan, _LRPN_Emulated ? "on" : "off", _LRPN_Caps ? "on" : "off", _StaticDir, _DriverDir],
+					"PASS builtin-number-row-magic-owner"))
