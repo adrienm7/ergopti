@@ -19,7 +19,8 @@
 --- 2. Choosing a model is choosing the backend: the server's API entry is
 ---    stored (api_panel.apply_local_server), then the API backend is selected
 ---    if it was not, so predictions go to the server at once.
---- 3. Every failure offers its fix: a server that stopped answering, a key it
+--- 3. Inert with the AI off: no sweep, no live row, as on Windows (issue #97).
+--- 4. Every failure offers its fix: a server that stopped answering, a key it
 ---    wants and a model it no longer serves each post a notice whose click
 ---    searches again, asks for the key or asks for another model.
 --- ==============================================================================
@@ -73,6 +74,14 @@ local function admitted(ctx)
 	if type(ctx) ~= "table" or ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
 	local ok, paused = pcall(ctx.is_paused)
 	return ok and type(paused) == "boolean" and paused == false
+end
+
+--- Whether the user switched the AI on. With the AI off the rows stay inert
+--- and no sweep probes the servers behind it (issue #97).
+--- @param ctx table|nil Engine menu context.
+--- @return boolean
+local function ai_enabled(ctx)
+	return type(ctx) == "table" and type(ctx.state) == "table" and ctx.state.llm_enabled == true
 end
 
 --- Captures an originating entry and current jointly published model view.
@@ -372,11 +381,12 @@ function M.rows(ctx)
 	servers().set_failure_handler(on_failure)
 	-- Source provenance is refreshed before cache age can grant a model view.
 	api_remote.refresh_local_server_views()
-	if admitted(ctx) and servers().is_stale() and not _rescan_deferred then
+	if admitted(ctx) and ai_enabled(ctx) and servers().is_stale() and not _rescan_deferred then
 		_rescan_deferred = true
 		local scheduled = DeferredWork.after(0, function()
 			_rescan_deferred = false
-			M.rescan(_ctx)
+			-- A switch-off before the build returned drops the queued sweep.
+			if ai_enabled(_ctx) then M.rescan(_ctx) end
 		end, "menu_llm.local_servers.rescan")
 		if not scheduled then _rescan_deferred = false end
 	end
@@ -385,7 +395,7 @@ function M.rows(ctx)
 	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end
 	return ServerMenu.rows({
 		order = data.view_order(), servers = data.view_servers(), detected = data.detected(),
-		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx),
+		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx) or not ai_enabled(ctx),
 		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
 		entry_id = function(id) local entry = remote().local_server_entry(id); return entry and entry.id end,
 		tr = i18n.get, format = i18n.format,
