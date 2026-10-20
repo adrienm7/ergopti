@@ -3352,13 +3352,17 @@ These are software implementations; final hardware verification remains below.
       liveness proof per `AllLive` call (all guards share the same shipped
       registry) keeps the custody guarantee; that alone divides the cost by
       the number of open files.
-- [ ] **Intermittent compiled prior-release upgrade input.** On October 17 the
+- [x] **Intermittent compiled prior-release upgrade input.** On October 17 the
       Windows "Qualify compiled prior-release upgrade and installed full save"
       step once read the pinned prior release's config without
       `metrics.metrics_enabled` (`Native prior Metrics enabled value differs`,
       undefined instead of false) and passed on a rerun. Check whether the prior
       release's first boot writes that key from a deferred save that can lose
       the race with the smoke shutdown, and observe the profile only after it.
+      Cause: dev.155's sparse writer deletes a value equal to its manifest
+      default (`metrics_enabled = false`), so a boot save that finishes before
+      shutdown removes the key. The contract now accepts absent as the same
+      setting and records false; other values still refuse.
 - [x] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
       Done (1136466c): the Hotstrings gate follows the wrap block in
       `_OnPrefixChar`; a meta test pins the order.
