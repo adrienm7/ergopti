@@ -109,6 +109,90 @@ exports.run = function run(root) {
 		assert.ok(document.includes('excluded_entries'));
 		assert.equal(JSON.stringify(vector.snapshot), original);
 	}
+	// The configuration section: a path, a sentence or a token cannot be shared
+	// whatever type a row claims (negative controls shared with the Lua and AHK
+	// replays of the same file).
+	const configuration = JSON.parse(
+		fs.readFileSync(
+			path.join(shared, 'tests/corpus/healthcheck/configuration_share_vectors.json'),
+			'utf8'
+		)
+	);
+	// The collectors and the projection share one list of files and states.
+	const spec = schema.configuration;
+	const projected =
+		schema.share_policy.projection.fields.sections.fields.configuration_files.fields.items.item
+			.fields;
+	assert.deepEqual(projected.id.values, ['defaults', ...Object.keys(spec.file_names)]);
+	assert.deepEqual(projected.state.values, spec.states);
+	for (const [driver, ids] of Object.entries(spec.files))
+		for (const id of ids)
+			assert.ok(id === 'defaults' || spec.file_names[id], driver + ' lists an unknown file ' + id);
+	assert.match(
+		fs.readFileSync(path.join(shared, 'keymap/layer_actions.toml'), 'utf8'),
+		new RegExp('^user_file = "' + spec.file_names.layers.replace('.', '\\.') + '"', 'm'),
+		'the layers file name is the layer vocabulary user_file'
+	);
+	for (const rel of [
+		'../windows/platform/remap/tap_hold_loader.ahk',
+		'../linux/platform/remap/tap_hold_loader.lua'
+	])
+		assert.ok(
+			fs.readFileSync(path.join(shared, rel), 'utf8').includes(spec.file_names.tap_hold),
+			rel + ' reads the configured tap-hold file name'
+		);
+	for (const driver of ['windows', 'macos', 'linux'])
+		for (const vector of configuration.vectors) {
+			const snapshot = {
+				schema_version: 2,
+				driver,
+				generated_at: '2026-10-20T10:00:00Z',
+				detailed: false,
+				extensive: false,
+				sections: {
+					configuration: { items: vector.items },
+					configuration_files: { items: configuration.files }
+				}
+			};
+			const label = driver + ': ' + vector.id;
+			const safe = model.shareSnapshot(snapshot, schema);
+			assert.deepEqual(
+				JSON.parse(JSON.stringify(safe.sections.configuration.items)),
+				vector.expected,
+				label
+			);
+			assert.deepEqual(
+				JSON.parse(JSON.stringify(safe.sections.configuration_files.items)),
+				configuration.expected_files,
+				label + ' files'
+			);
+			const document = model.formatShareable(snapshot, schema, (key) => key);
+			for (const canary of configuration.canaries)
+				assert.ok(!document.includes(canary), label + ' leaked ' + canary);
+			for (const row of vector.expected)
+				assert.ok(
+					document.includes('| ' + row.setting + ' | ' + row.type + ': ' + row.value + ' |'),
+					label
+				);
+		}
+	const crowded = Array.from({ length: 801 }, (_, index) => ({
+		setting: 'script.k' + index,
+		type: 'boolean',
+		value: 'true'
+	}));
+	assert.equal(
+		model.shareSnapshot(
+			{
+				schema_version: 2,
+				driver: 'windows',
+				generated_at: '2026-10-20T10:00:00Z',
+				sections: { configuration: { items: crowded } }
+			},
+			schema
+		).sections.configuration.items.length,
+		800,
+		'the configuration rows are bounded'
+	);
 	assert.throws(() => model.shareSnapshot({ driver: 'foreign' }, schema));
 	assert.throws(() => model.shareSnapshot(corpus.vectors[0].snapshot, {}));
 	console.log(

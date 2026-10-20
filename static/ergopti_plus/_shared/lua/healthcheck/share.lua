@@ -11,10 +11,41 @@ local M = {}
 local Json = require("json")
 
 local KINDS = { object = true, array = true, enum = true, boolean = true, number = true, integer = true,
-	version = true, hash = true, utc = true, commit = true, runtime = true }
+	version = true, hash = true, utc = true, commit = true, runtime = true, setting_row = true }
+
+-- The value grammar of one configuration row, by its type. A path or a sentence
+-- matches none of them: an enum is a bare identifier, a text or a list only a
+-- count.
+local SETTING_TYPES = { boolean = true, number = true, enum = true, text = true, list = true }
+local MAX_SETTING_LENGTH = 96
+
+--- Projects one configuration row {setting, type, value}; nil when any part is
+--- outside its grammar, so a mislabelled value is dropped whole.
+--- @param value any
+--- @return table|nil
+local function setting_row(value)
+	if type(value) ~= "table" then return nil end
+	local setting, kind, text = value.setting, value.type, value.value
+	if type(setting) ~= "string" or #setting == 0 or #setting > MAX_SETTING_LENGTH
+		or type(kind) ~= "string" or not SETTING_TYPES[kind] or type(text) ~= "string" then return nil end
+	for segment in (setting .. "."):gmatch("([^.]*)%.") do
+		if not segment:match("^[%w_%-]+$") then return nil end
+	end
+	local fits = false
+	if kind == "boolean" then fits = text == "true" or text == "false"
+	elseif kind == "number" then
+		local number = tonumber(text)
+		fits = #text <= 24 and text:match("^%-?%d[%d.]*[eE]?[+%-]?%d*$") ~= nil and number ~= nil
+			and number == number and number ~= math.huge and number ~= -math.huge
+	elseif kind == "enum" then fits = #text >= 1 and #text <= 40 and text:match("^[%w_+%-]+$") ~= nil
+	else fits = #text >= 1 and #text <= 6 and text:match("^%d+$") ~= nil end
+	if not fits then return nil end
+	return { setting = setting, type = kind, value = text }
+end
 
 local function project(value, rule)
 	assert(KINDS[rule.kind], "Unknown diagnostic sharing rule")
+	if rule.kind == "setting_row" then return setting_row(value) end
 	if rule.kind == "object" then
 		local result = {}
 		if type(value) ~= "table" then return result end
@@ -28,7 +59,10 @@ local function project(value, rule)
 	elseif rule.kind == "array" then
 		local result = {}
 		if type(value) == "table" then
-			for _, item in ipairs(value) do result[#result + 1] = project(item, rule.item) end
+			for _, item in ipairs(value) do
+				if rule.max_items and #result >= rule.max_items then break end
+				result[#result + 1] = project(item, rule.item)
+			end
 		end
 		return Json.array(result)
 	elseif rule.kind == "enum" then
@@ -198,6 +232,8 @@ local function rows_for(value, rule, prefix, rows)
 		end
 	elseif rule.kind == "array" then
 		for index, item in ipairs(value) do rows_for(item, rule.item, prefix .. "." .. index, rows) end
+	elseif rule.kind == "setting_row" then
+		rows[#rows + 1] = "| " .. cell(value.setting) .. " | " .. cell(value.type .. ": " .. value.value) .. " |"
 	else
 		local text = rule.kind == "boolean" and (value and "true" or "false")
 			or type(value) == "number" and Json.encode(value) or value

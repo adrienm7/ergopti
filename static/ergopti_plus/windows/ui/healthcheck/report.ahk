@@ -28,11 +28,34 @@
 
 #Requires AutoHotkey v2.0
 
+/**
+ * Projects one configuration row {setting, type, value}. A value outside the
+ * grammar of its type drops the whole row: an enum is a bare identifier, a text
+ * or a list only a count, so a path or a sentence matches none of them.
+ */
+_HCShare_SettingRow(Value) {
+	if !(Value is Map)
+		return 0
+	Setting := Value.Get("setting", 0), Kind := Value.Get("type", 0), Text := Value.Get("value", 0)
+	if !(Setting is String) || !(Kind is String) || !(Text is String) || StrLen(Setting) > 96
+		|| !RegExMatch(Setting, "^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$")
+		return 0
+	switch Kind {
+		case "boolean": Fits := Text == "true" || Text == "false"
+		case "number": Fits := StrLen(Text) <= 24 && RegExMatch(Text, "i)^-?\d[\d.]*e?[+-]?\d*$") && IsNumber(Text)
+			&& Abs(Number(Text)) < 1.7e308
+		case "enum": Fits := RegExMatch(Text, "^[A-Za-z0-9_+-]{1,40}$")
+		case "text", "list": Fits := RegExMatch(Text, "^\d{1,6}$")
+		default: Fits := false
+	}
+	return Fits ? Map("setting", Setting, "type", Kind, "value", Text) : 0
+}
+
 /** Projects only typed fields declared in the canonical sharing policy. */
 _HCShare_Project(Value, Rule, &Present) {
 	Present := true
 	Kind := Rule["kind"]
-	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|", "|" . Kind . "|")
+	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|setting_row|", "|" . Kind . "|")
 		throw Error("An unknown diagnostic sharing rule was refused.")
 	if Kind == "object" {
 		Result := Map()
@@ -50,9 +73,19 @@ _HCShare_Project(Value, Rule, &Present) {
 	if Kind == "array" {
 		Result := []
 		if Value is Array
-			for Item in Value
-				Result.Push(_HCShare_Project(Item, Rule["item"], &HasValue))
+			for Item in Value {
+				if Rule.Has("max_items") && Result.Length >= Rule["max_items"]
+					break
+				Kept := _HCShare_Project(Item, Rule["item"], &HasValue)
+				if HasValue
+					Result.Push(Kept)
+			}
 		return Result
+	}
+	if Kind == "setting_row" {
+		Row := _HCShare_SettingRow(Value)
+		Present := Row is Map
+		return Row
 	}
 	if Kind == "enum" {
 		if Value is String
@@ -215,6 +248,8 @@ _HCShare_Rows(Value, Rule, Prefix, Rows) {
 	} else if Rule["kind"] == "array" {
 		for Index, Item in Value
 			_HCShare_Rows(Item, Rule["item"], Prefix . "." . Index, Rows)
+	} else if Rule["kind"] == "setting_row" {
+		Rows.Push("| " . _HCShare_Cell(Value["setting"]) . " | " . _HCShare_Cell(Value["type"] . ": " . Value["value"]) . " |")
 	} else {
 		Text := Rule["kind"] == "boolean" ? (Value ? "true" : "false") : Value
 		Rows.Push("| " . _HCShare_Cell(Prefix) . " | " . _HCShare_Cell(Text) . " |")

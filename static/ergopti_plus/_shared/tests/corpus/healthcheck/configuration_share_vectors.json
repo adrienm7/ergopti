@@ -1,0 +1,140 @@
+{
+	"_comment": "Negative controls of the closed sharing projection for the configuration section, replayed by model.js, share.lua and report.ahk. Each vector is the raw `items` a collector might hand over; `expected` is what may be shared. A path, a sentence or a token must never survive, whatever type a row claims, and a row outside its grammar is dropped whole.",
+	"canaries": [
+		"PRIVATE_USER_ZEBRA",
+		"PRIVATE_SECRET_TOKEN_A1B2",
+		"C:\\Users\\PRIVATE_USER_ZEBRA\\notes",
+		"/home/PRIVATE_USER_ZEBRA/notes",
+		"a sentence typed by PRIVATE_USER_ZEBRA"
+	],
+	"files": [
+		{ "id": "defaults", "state": "ok" },
+		{
+			"id": "config",
+			"state": "invalid",
+			"path": "C:\\Users\\PRIVATE_USER_ZEBRA\\notes\\config.toml"
+		},
+		{ "id": "layers", "state": "missing" },
+		{ "id": "tap_hold", "state": "PRIVATE_SECRET_TOKEN_A1B2" }
+	],
+	"expected_files": [
+		{ "id": "defaults", "state": "ok" },
+		{ "id": "config", "state": "invalid" },
+		{ "id": "layers", "state": "missing" },
+		{ "id": "tap_hold", "state": "unreadable" }
+	],
+	"vectors": [
+		{
+			"id": "valid-rows-pass-unchanged",
+			"items": [
+				{ "setting": "script.show_error_dialog", "type": "boolean", "value": "true" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "45" },
+				{ "setting": "llm.display.opacity", "type": "number", "value": "0.25" },
+				{ "setting": "script.log_level", "type": "enum", "value": "DEBUG" },
+				{ "setting": "script.locale", "type": "text", "value": "12" },
+				{ "setting": "llm.models.user_models", "type": "list", "value": "0" }
+			],
+			"expected": [
+				{ "setting": "script.show_error_dialog", "type": "boolean", "value": "true" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "45" },
+				{ "setting": "llm.display.opacity", "type": "number", "value": "0.25" },
+				{ "setting": "script.log_level", "type": "enum", "value": "DEBUG" },
+				{ "setting": "script.locale", "type": "text", "value": "12" },
+				{ "setting": "llm.models.user_models", "type": "list", "value": "0" }
+			]
+		},
+		{
+			"id": "a-path-or-sentence-cannot-pass-as-an-enum",
+			"items": [
+				{
+					"setting": "script.log_level",
+					"type": "enum",
+					"value": "C:\\Users\\PRIVATE_USER_ZEBRA\\notes"
+				},
+				{
+					"setting": "script.log_level",
+					"type": "enum",
+					"value": "/home/PRIVATE_USER_ZEBRA/notes"
+				},
+				{
+					"setting": "script.log_level",
+					"type": "enum",
+					"value": "a sentence typed by PRIVATE_USER_ZEBRA"
+				},
+				{
+					"setting": "script.log_level",
+					"type": "enum",
+					"value": "PRIVATE_SECRET_TOKEN_A1B2@host"
+				},
+				{ "setting": "script.log_level", "type": "enum", "value": "" },
+				{ "setting": "script.log_level", "type": "enum", "value": "ok" }
+			],
+			"expected": [{ "setting": "script.log_level", "type": "enum", "value": "ok" }]
+		},
+		{
+			"id": "text-and-list-rows-carry-only-a-count",
+			"items": [
+				{ "setting": "script.locale", "type": "text", "value": "/home/PRIVATE_USER_ZEBRA/notes" },
+				{ "setting": "script.locale", "type": "text", "value": "PRIVATE_USER_ZEBRA" },
+				{ "setting": "llm.models.user_models", "type": "list", "value": "3 items" },
+				{ "setting": "llm.models.user_models", "type": "list", "value": "1234567" },
+				{ "setting": "llm.models.user_models", "type": "list", "value": "" },
+				{ "setting": "llm.models.user_models", "type": "list", "value": "3" }
+			],
+			"expected": [{ "setting": "llm.models.user_models", "type": "list", "value": "3" }]
+		},
+		{
+			"id": "booleans-and-numbers-keep-their-grammar",
+			"items": [
+				{ "setting": "script.show_error_dialog", "type": "boolean", "value": "yes" },
+				{ "setting": "script.show_error_dialog", "type": "boolean", "value": "PRIVATE_USER_ZEBRA" },
+				{
+					"setting": "metrics.keep_days",
+					"type": "number",
+					"value": "C:\\Users\\PRIVATE_USER_ZEBRA\\notes"
+				},
+				{ "setting": "metrics.keep_days", "type": "number", "value": "12abc" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "1e+400" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "-3" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "1e-05" }
+			],
+			"expected": [
+				{ "setting": "metrics.keep_days", "type": "number", "value": "-3" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "1e-05" }
+			]
+		},
+		{
+			"id": "setting-names-are-dotted-identifiers",
+			"items": [
+				{ "setting": "C:\\Users\\PRIVATE_USER_ZEBRA\\notes", "type": "text", "value": "1" },
+				{ "setting": "/home/PRIVATE_USER_ZEBRA/notes", "type": "text", "value": "1" },
+				{ "setting": "a sentence typed by PRIVATE_USER_ZEBRA", "type": "text", "value": "1" },
+				{ "setting": "script..locale", "type": "text", "value": "1" },
+				{ "setting": ".script", "type": "text", "value": "1" },
+				{ "setting": "script.", "type": "text", "value": "1" },
+				{ "setting": "", "type": "text", "value": "1" },
+				{ "setting": "script.locale", "type": "text", "value": "1" }
+			],
+			"expected": [{ "setting": "script.locale", "type": "text", "value": "1" }]
+		},
+		{
+			"id": "unknown-types-and-extra-members-are-removed",
+			"items": [
+				{ "setting": "script.locale", "type": "secret", "value": "1" },
+				{ "setting": "script.locale", "value": "1" },
+				{ "setting": "script.locale", "type": "text" },
+				"PRIVATE_SECRET_TOKEN_A1B2",
+				7,
+				false,
+				{
+					"setting": "script.locale",
+					"type": "text",
+					"value": "4",
+					"name": "PRIVATE_USER_ZEBRA",
+					"path": "/home/PRIVATE_USER_ZEBRA/notes"
+				}
+			],
+			"expected": [{ "setting": "script.locale", "type": "text", "value": "4" }]
+		}
+	]
+}

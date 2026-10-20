@@ -490,6 +490,12 @@
 		if (section.id === 'permissions' && column === 'id')
 			return t('healthcheck.permission.' + value);
 		if (section.id === 'permissions' && column === 'state') return t('healthcheck.state.' + value);
+		if (section.id === 'configuration_files' && column === 'id')
+			return t('healthcheck.config_file.' + value);
+		if (section.id === 'configuration_files' && column === 'state')
+			return t('healthcheck.config_state.' + value);
+		if (section.id === 'configuration' && column === 'type')
+			return t('healthcheck.setting_type.' + value);
 		if (section.id === 'peripherals' && column === 'bus') return t('healthcheck.bus.' + value);
 		if (section.id === 'peripherals' && column === 'kind') return t('healthcheck.device.' + value);
 		// The host sends the manifest's reason key: the report is in the reader's language
@@ -510,6 +516,10 @@
 			return 'muted';
 		}
 		if (section.id === 'features') return isTrue(item.enabled) ? 'ok' : 'muted';
+		if (section.id === 'configuration_files') {
+			if (item.state === 'ok') return 'ok';
+			return item.state === 'missing' ? 'muted' : 'fail';
+		}
 		return 'value';
 	}
 
@@ -963,6 +973,36 @@
 		return { version: info.version, os: info.os, driver: info.driver };
 	}
 
+	/**
+	 * One configuration row {setting, type, value}. A value outside the grammar of
+	 * its type drops the whole row: an enum is a bare identifier, a text or a list
+	 * only a count, so a path or a sentence matches none of them.
+	 * @param {*} value
+	 * @returns {object|undefined}
+	 */
+	function projectSettingRow(value) {
+		if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+		var setting = value.setting,
+			kind = value.type,
+			text = value.value;
+		if (
+			typeof setting !== 'string' ||
+			setting.length > 96 ||
+			!/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(setting) ||
+			typeof text !== 'string'
+		)
+			return undefined;
+		var fits;
+		if (kind === 'boolean') fits = text === 'true' || text === 'false';
+		else if (kind === 'number')
+			fits =
+				text.length <= 24 && /^-?\d[\d.]*e?[+-]?\d*$/i.test(text) && Number.isFinite(Number(text));
+		else if (kind === 'enum') fits = /^[A-Za-z0-9_+-]{1,40}$/.test(text);
+		else if (kind === 'text' || kind === 'list') fits = /^\d{1,6}$/.test(text);
+		else fits = false;
+		return fits ? { setting: setting, type: kind, value: text } : undefined;
+	}
+
 	/** Projects only typed fields declared by the canonical sharing policy. */
 	function projectShare(value, rule) {
 		if (
@@ -977,7 +1017,8 @@
 				'hash',
 				'utc',
 				'commit',
-				'runtime'
+				'runtime',
+				'setting_row'
 			].indexOf(rule.kind) < 0
 		)
 			throw new Error('Unknown diagnostic sharing rule');
@@ -997,10 +1038,15 @@
 		}
 		if (rule.kind === 'array') {
 			if (!Array.isArray(value)) return [];
-			return value.map(function (item) {
-				return projectShare(item, rule.item);
-			});
+			var items = [];
+			for (var entry of value) {
+				if (rule.max_items !== undefined && items.length >= rule.max_items) break;
+				var kept = projectShare(entry, rule.item);
+				if (kept !== undefined) items.push(kept);
+			}
+			return items;
 		}
+		if (rule.kind === 'setting_row') return projectSettingRow(value);
 		if (rule.kind === 'enum')
 			return typeof value === 'string' && rule.values.indexOf(value) >= 0 ? value : rule.default;
 		if (rule.kind === 'boolean') {
@@ -1187,7 +1233,9 @@
 			value.forEach(function (item, index) {
 				shareRows(item, rule.item, prefix + '.' + (index + 1), rows);
 			});
-		} else
+		} else if (rule.kind === 'setting_row')
+			rows.push('| ' + cell(value.setting) + ' | ' + cell(value.type + ': ' + value.value) + ' |');
+		else
 			rows.push(
 				'| ' + cell(prefix) + ' | ' + cell(rule.kind === 'boolean' ? !!value : value) + ' |'
 			);
