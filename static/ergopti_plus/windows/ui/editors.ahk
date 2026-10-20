@@ -63,16 +63,17 @@ MagicKeyEditor(*) {
 				}
 				IH.Wait()
 		} finally {
-				_MagicKeyEditorStopOwned(IH)
+				CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
 				if (_MagicKeyEditorGui == GuiToShow)
 						_MagicKeyEditorGui := ""
 				; The Close event may already have destroyed the native window.
 				try GuiToShow.Destroy()
 				Critical(_InheritedCritical)
 		}
-		; InputHook.Wait pumps messages and native Suspend does not stop hooks by
-		; itself. Discard a capture whose wait crossed the pause boundary.
-		if A_IsSuspended
+		; Close or a complete pause/resume may retire this exact owner while a
+		; completed native hook still retains its Max reason and input. Only the
+		; terminal path which actually retires that owner may persist its result.
+		if !CaptureSettled || A_IsSuspended
 				return
 		if (IH.EndReason = "Max" && IH.Input != "")
 				ModifyMagicKey(0, IH.Input)
@@ -85,17 +86,19 @@ _MagicKeyEditorClose(IH, GuiToClose, *) {
 		return !_MagicKeyEditorStopOwned(IH)
 }
 
-_MagicKeyEditorStopOwned(IH) {
+; Cleanup is idempotent for Close/lifecycle callers. Terminal capture delivery
+; instead requires this call to retire the exact owner after native Stop.
+_MagicKeyEditorStopOwned(IH, SettleCapture := false) {
 		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
 		PreviousCritical := Critical("On")
 		try {
 				if !IsObject(_MagicKeyEditorInputHook) {
 						_MagicKeyEditorStopDebt := false
-						return true
+						return !SettleCapture
 				}
 				; A stale Close/finally must never stop or clear a successor editor.
 				if _MagicKeyEditorInputHook != IH
-						return true
+						return !SettleCapture
 		} finally Critical(PreviousCritical)
 
 		try IH.Stop()
@@ -111,7 +114,7 @@ _MagicKeyEditorStopOwned(IH) {
 				} finally Critical(PreviousCritical)
 				; Stop may have pumped an OnEnd/finally that settled this owner first.
 				if !OwnerRetained
-						return true
+						return !SettleCapture
 				LoggerError("Editors", "Could not stop the Magic Key capture; cleanup ownership was retained: {1}.", Err.Message)
 				return false
 		}
@@ -122,9 +125,12 @@ _MagicKeyEditorStopOwned(IH) {
 				and _MagicKeyEditorInputHook == IH {
 						_MagicKeyEditorInputHook := ""
 						_MagicKeyEditorStopDebt := false
+						return true
 				}
 		} finally Critical(PreviousCritical)
-		return true
+		; Cleanup remains idempotent for Close/lifecycle callers. A capture
+		; receipt additionally proves that no reentrant Stop already revoked it.
+		return !SettleCapture
 }
 
 _EditorWriteToml(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
@@ -279,14 +285,15 @@ MagicKeySourceCapture(*) {
 				IH.Wait()
 		} finally {
 				SetTimer(MagicKeyCapturePoll, 0)
-				_MagicKeyEditorStopOwned(IH)
+				CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
 				if (_MagicKeyEditorGui == GuiToShow)
 						_MagicKeyEditorGui := ""
 				try GuiToShow.Destroy()
 				Critical(_InheritedCritical)
 		}
-		; A capture whose wait crossed the pause boundary is discarded.
-		if A_IsSuspended
+		; A completed candidate can outlive external Close or pause/resume. Its
+		; retained Scan/Stopped result is valid only for the terminal owner.
+		if !CaptureSettled || A_IsSuspended
 				return
 		; Escape, Close and the timeout all end without an answer.
 		if (IH.EndReason != "Stopped")
