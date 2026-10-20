@@ -146,6 +146,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 			local compile = loadstring or load
 			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keylogger)\n"
 				.. "local ch, app_id, tooltip_preview, result, now_ms = '★', 'owned-fixture', nil, nil, 0\n"
+				.. "local opts = { dry_run = false }\n"
 				.. slice .. "\nend", "@actual-dynamic-daemon-parent"))()
 			local engine = require("hotstring_engine").new()
 			engine:reset(false)

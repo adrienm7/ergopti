@@ -281,6 +281,7 @@ return {
 	"tests.meta.boot.test_daemon_smoke",
 	"tests.unit.ui.editors.test_dashboard_bridge_actions",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager",
+	"tests.unit.modules.dynamic_hotstrings.test_dynamic_dry_run_dispatch",
 	"tests.meta.harness.test_e2e_contract",
 	"tests.unit.infra.lifecycle.test_startup_inventory_soak",
 	"tests.unit.modules.hotstrings.engine.test_engine_current_buffer",
