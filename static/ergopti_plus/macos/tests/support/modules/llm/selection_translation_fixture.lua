@@ -9,6 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- The shared logger is a process singleton; Scope preserves its exact identity.
+require("logger")
+local Scope = require("tests.support.modules.llm.selection_translation_scope")
 local json = require("json")
 
 local shared_lua = helpers.shared("lua/")
@@ -72,6 +75,7 @@ local function make_synthetic(world)
 		record(mods, key)
 		local chord = table.concat(mods or {}, "+")
 		if chord == "cmd" and key == "c" and world.selection ~= "" then
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = world.selection
 		elseif chord == "cmd" and key == "v" then
 			world.pasted = world.clipboard
@@ -80,8 +84,15 @@ local function make_synthetic(world)
 		end
 		return true
 	end
+	function synthetic.emit_guarded_key_stroke(mods, key, tx)
+		if type(tx.publication) ~= "table" or tx.publication.current() ~= true then return false end
+		tx.native_down_attempted = true
+		return synthetic.emit_key_stroke(mods, key)
+	end
 	function synthetic.emit_key_strokes() error("the translation never types key by key") end
-	function synthetic.begin(owner, effect) return { owner = owner, effect = effect } end
+	function synthetic.begin(owner, effect, publication)
+		return { owner = owner, effect = effect, publication = publication, dispatched_callbacks = {} }
+	end
 	function synthetic.begin_batch(tx) return { tx = tx } end
 	function synthetic.keyStroke(_, mods, key)
 		record(mods, key)
@@ -93,13 +104,22 @@ local function make_synthetic(world)
 		return true
 	end
 	function synthetic.on_complete(tx, callback) tx.callback = callback end
-	function synthetic.on_dispatched(tx, callback) tx.dispatched = callback end
+	function synthetic.on_dispatched(tx, callback)
+		tx.dispatched_callbacks[#tx.dispatched_callbacks + 1] = callback
+	end
 	function synthetic.seal(tx)
-		if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+		if tx.completed then return false end
+		tx.completed = true
+		local batch = { native_down_attempted = tx.native_down_attempted == true }
+		for _, callback in ipairs(tx.dispatched_callbacks) do
+			callback(tx, batch, "dispatched")
+		end
 		if tx.callback then tx.callback(tx, "complete") end
 		return true
 	end
 	function synthetic.cancel(tx)
+		if tx.completed then return false end
+		tx.completed = true
 		if tx.callback then tx.callback(tx, "cancelled") end
 		return true
 	end
@@ -115,6 +135,7 @@ local function build_world(selection, ui_locale, options)
 	local world = {
 		posts = {}, notices = {}, keys = {}, document = {}, renders = {}, loadings = 0, hides = 0,
 		selection = selection, clipboard = USER_CLIPBOARD, pasted = nil, focus = "7:101",
+		clipboard_generation = 0,
 	}
 
 	for name in pairs(package.loaded) do
@@ -148,22 +169,25 @@ local function build_world(selection, ui_locale, options)
 	hs_stub.application = hs_stub.application or {}
 	hs_stub.application.frontmostApplication = function() return front_app end
 	hs_stub.pasteboard = {
+		changeCount = function() return world.clipboard_generation end,
 		readAllData = function()
 			if world.clipboard == nil then return {} end
 			return { ["public.utf8-plain-text"] = world.clipboard }
 		end,
 		writeAllData = function(data)
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = data["public.utf8-plain-text"]
 			return true
 		end,
 		getContents = function() return world.clipboard end,
 		setContents = function(value)
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = value
 			return true
 		end,
 		clearContents = function()
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = nil
-			return true
 		end,
 	}
 
@@ -283,7 +307,7 @@ end
 --- @param ui_locale string|nil The interface locale.
 --- @param scenario function Receives the world.
 local function with_world(selection, ui_locale, scenario)
-	return require("tests.support.modules.llm.selection_translation_scope").run(function()
+	return Scope.run(function()
 		return scenario(build_world(selection, ui_locale))
 	end)
 end

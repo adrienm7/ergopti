@@ -21,6 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- The shared logger is a process singleton; Scope preserves its exact identity.
+require("logger")
 local json = require("json")
 local Rewrite = require("llm.rewrite")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
@@ -67,6 +69,7 @@ local function make_synthetic(world)
 		record(mods, key)
 		local chord = table.concat(mods or {}, "+")
 		if chord == "cmd" and key == "c" and world.selection ~= "" then
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = world.selection
 		elseif chord == "cmd" and key == "v" then
 			world.pasted = world.clipboard
@@ -75,9 +78,14 @@ local function make_synthetic(world)
 		end
 		return true
 	end
+	function synthetic.emit_guarded_key_stroke(mods, key, tx)
+		if type(tx.publication) ~= "table" or tx.publication.current() ~= true then return false end
+		tx.native_down_attempted = true
+		return synthetic.emit_key_stroke(mods, key)
+	end
 	function synthetic.emit_key_strokes() error("the tone actions never type key by key") end
-	function synthetic.begin(owner, effect)
-		return { owner = owner, effect = effect, complete_callbacks = {}, dispatched_callbacks = {} }
+	function synthetic.begin(owner, effect, publication)
+		return { owner = owner, effect = effect, publication = publication, complete_callbacks = {}, dispatched_callbacks = {} }
 	end
 	function synthetic.begin_batch(tx) return { tx = tx } end
 	function synthetic.keyStroke(_, mods, key)
@@ -99,7 +107,8 @@ local function make_synthetic(world)
 	function synthetic.seal(tx)
 		if tx.sealed then return false end
 		tx.sealed, tx.completed, tx.status = true, true, "complete"
-		for _, callback in ipairs(tx.dispatched_callbacks) do callback(tx, nil, "dispatched") end
+		local batch = { native_down_attempted = tx.native_down_attempted == true }
+		for _, callback in ipairs(tx.dispatched_callbacks) do callback(tx, batch, "dispatched") end
 		for _, callback in ipairs(tx.complete_callbacks) do callback(tx, tx.status) end
 		return true
 	end
@@ -119,6 +128,7 @@ local function build_world(selection)
 	local world = {
 		posts = {}, notices = {}, keys = {}, document = {},
 		selection = selection, clipboard = USER_CLIPBOARD, pasted = nil, focus = "7:101",
+		clipboard_generation = 0,
 	}
 
 	for name in pairs(package.loaded) do
@@ -154,22 +164,25 @@ local function build_world(selection)
 	hs_stub.application = hs_stub.application or {}
 	hs_stub.application.frontmostApplication = function() return front_app end
 	hs_stub.pasteboard = {
+		changeCount = function() return world.clipboard_generation end,
 		readAllData = function()
 			if world.clipboard == nil then return {} end
 			return { ["public.utf8-plain-text"] = world.clipboard }
 		end,
 		writeAllData = function(data)
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = data["public.utf8-plain-text"]
 			return true
 		end,
 		getContents = function() return world.clipboard end,
 		setContents = function(value)
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = value
 			return true
 		end,
 		clearContents = function()
+			world.clipboard_generation = world.clipboard_generation + 1
 			world.clipboard = nil
-			return true
 		end,
 	}
 
