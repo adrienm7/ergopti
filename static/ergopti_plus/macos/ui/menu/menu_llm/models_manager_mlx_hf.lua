@@ -870,9 +870,14 @@ function M.install(ctx)
 			return false
 		end
 		local show_ok, webview = xpcall(function()
+			-- The caption is the shared token_prompt/hf_login presentation; a
+			-- refused receipt makes the factory refuse before any allocation.
+			local title_receipt = ui_builder.prepare_app_window_title("token_prompt", "hf_login")
 			return ui_builder.show_webview({
 				frame             = frame,
-				title             = i18n.get("mlx.hf_login_title"),
+				app_id            = "token_prompt",
+				presentation_id   = "hf_login",
+				presentation_receipt = title_receipt,
 				style_masks       = { "titled", "closable", "nonactivating" },
 				allow_new_windows = false,
 				delete_on_close   = true,

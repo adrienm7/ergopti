@@ -158,7 +158,12 @@ local function with_fixture(options, callback)
 				return "/fixture/" .. tostring(path)
 			end,
 		}
+		fixture.title_receipt = {}
 		package.loaded["ui.ui_builder"] = {
+			prepare_app_window_title = function(app_id, presentation_id)
+				fixture.title_request = { app_id, presentation_id }
+				return fixture.title_receipt
+			end,
 			show_webview = function(opts)
 				fixture.webview_options = opts
 				local webview = { live = true, deletes = 0 }
@@ -345,6 +350,13 @@ helpers.describe("HuggingFace prompt/webview/task exact requirement ownership", 
 			helpers.assert_true(fixture.registered)
 			fixture.fire_prompt_timer()
 			helpers.assert_not_nil(fixture.webview)
+			-- The window caption is the shared token_prompt/hf_login presentation,
+			-- never a title the menu code labels itself (native-menu-rows census).
+			helpers.assert_eq(fixture.title_request, { "token_prompt", "hf_login" })
+			helpers.assert_true(fixture.webview_options.presentation_receipt == fixture.title_receipt)
+			helpers.assert_eq(fixture.webview_options.app_id, "token_prompt")
+			helpers.assert_eq(fixture.webview_options.presentation_id, "hf_login")
+			helpers.assert_nil(fixture.webview_options.title)
 			helpers.assert_eq(#fixture.tasks, 0)
 			fixture.validate()
 			helpers.assert_eq(#fixture.tasks, 1)
