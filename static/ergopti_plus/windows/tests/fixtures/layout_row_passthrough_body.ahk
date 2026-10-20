@@ -9,7 +9,7 @@ global Features := Map("layout", Map("ergopti_base", true,
 	"emulate_number_row", true, "emulate_top_row", false,
 	"emulate_home_row", true, "emulate_bottom_row", true),
 	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceScan", "SC030")
+global ScriptInformation := Map("MagicKeySourceChosen", false, "MagicKeySourceScan", "SC030")
 global _LRPS_Bindings := Map(), _LRPS_Current := 0, _LRPS_Emits := []
 global _LRPS_Throw := A_Args[2] == "throw"
 

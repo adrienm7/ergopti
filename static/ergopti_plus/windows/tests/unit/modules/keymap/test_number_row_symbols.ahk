@@ -676,8 +676,11 @@ _NRP_RowScopes() {
 		AssertTrue(Criteria["+SC010"].Call(), "on its Shift level too")
 		AssertFalse(Criteria["*SC01E"].Call(), "a home-row key stays with the emulation")
 		Magic := ScriptInformation["MagicKeySourceScan"]
-		if LayoutRowOf(Magic) == "top_row" && Features["hotstrings"]["magic_key"]["replace"]["enabled"]
-			AssertFalse(Criteria["*" . StrUpper(Magic)].Call(), "the magic key keeps its key")
+		if LayoutRowOf(Magic) == "top_row" && Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
+			AssertFalse(Criteria[StrUpper(Magic)].Call(StrUpper(Magic)), "the magic key keeps its plain press")
+			AssertEqual(ScriptInformation["MagicKeySourceChosen"], Criteria["*" . StrUpper(Magic)].Call("*" . StrUpper(Magic)),
+				"only a chosen source's modified presses follow the native row")
+		}
 		Layout["ergopti_base"] := false
 		_NRP_UseLayout(Layout)
 		AssertFalse(Criteria["*SC010"].Call(), "without the built-in emulation nothing passes through")

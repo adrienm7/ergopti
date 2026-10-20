@@ -271,7 +271,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	; The magic-key producer may register this scan again: retain one context
 	; identity so its later callback replaces the earlier layout fallback.
 	if !WinCriteria.Has(ScanCode)
-		WinCriteria[ScanCode] := (*) => !_LayoutRowPassthroughCriterion(ScanCode)
+		WinCriteria[ScanCode] := (*) => !_LayoutRowPassthroughCriterion(ScanCode, "#" . ScanCode)
 	MagicEditorRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
 		: _RemapEmit.Bind("#" Character, Character), WinCriteria[ScanCode])
 }

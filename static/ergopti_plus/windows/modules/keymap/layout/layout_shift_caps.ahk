@@ -287,13 +287,16 @@ RegisterLayoutRowPassthrough(HotkeyFn := Hotkey, HotIfFn := HotIf) {
 }
 
 ; Holds while the built-in emulation would type a key whose row is off.
-_LayoutRowPassthroughCriterion(Sc, *) {
+_LayoutRowPassthroughCriterion(Sc, HotkeyName := "", *) {
 	global Features, ScriptInformation
 	if !BuiltinNumberRowIsActive() || LayoutRowIsEmulated(Sc)
 		return false
-	; The magic key's source keeps its key on every row.
-	return !(IsSet(ScriptInformation) && StrCompare(ScriptInformation["MagicKeySourceScan"], Sc, true) == 0
+	if !(IsSet(ScriptInformation) && StrCompare(ScriptInformation["MagicKeySourceScan"], Sc, true) == 0
 		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+		return true
+	; A chosen source owns only its plain press. Its wildcard and modifier
+	; variants follow the effective row; a layout's own source keeps every level.
+	return ScriptInformation["MagicKeySourceChosen"] && StrCompare(HotkeyName, Sc, true) != 0
 }
 
 ; Hook hotkeys ignore synthetic events at or below their input level. Match
