@@ -382,6 +382,11 @@ if (luaSites.length === 0) {
 const LUA_JUDGED = [
 	{
 		file: 'linux/modules/dynamic_hotstrings/manager.lua',
+		match: '(LOG, "Dynamic single-field expansion refused: no retained text destination.")',
+		why: 'The constant diagnostic interpolates no personal-info value; "expansion" appears only in prose.'
+	},
+	{
+		file: 'linux/modules/dynamic_hotstrings/manager.lua',
 		match: 'prefix_rules module unavailable',
 		why: 'no interpolation at all; "expansion" is in the prose.'
 	},

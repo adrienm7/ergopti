@@ -458,9 +458,10 @@ end
 --- @param trigger string The character that just triggered the check (the
 ---   magic key, typically "★" or "\\").
 --- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
+--- @param publication table|nil Original single-field text destination.
 --- @return boolean True if a dynamic expansion was performed.
 --- @return table|nil Canonical event details for a successful expansion.
-function M.on_trigger(buffer, trigger, start_is_boundary)
+function M.on_trigger(buffer, trigger, start_is_boundary, publication)
 	if not M.is_enabled() then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
@@ -501,12 +502,17 @@ function M.on_trigger(buffer, trigger, start_is_boundary)
 		return false
 	end
 	local backspace_count = suffix_length + 1  -- suffix + trigger
+	if type(publication) ~= "table" or getmetatable(publication) ~= nil
+		or type(publication.current) ~= "function" or type(publication.cached) ~= "function" then
+		Logger.warn(LOG, "Dynamic single-field expansion refused: no retained text destination.")
+		return false
+	end
 	-- Injector is loaded once at require-time; the hotstrings injector module
 	-- wraps ydotool and is always available on Linux.
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if ok_inj and injector and type(injector.inject) == "function" then
 		local delivery = injector.inject(backspace_count, match.result,
-			match.rule.section == PERSONAL_SECTION)
+			match.rule.section == PERSONAL_SECTION, nil, publication)
 		if type(delivery) ~= "table" or delivery.ok ~= true then
 			Logger.error(LOG,
 				"Dynamic expansion output did not commit for '%s' (family=%s, %d-char content withheld).",
