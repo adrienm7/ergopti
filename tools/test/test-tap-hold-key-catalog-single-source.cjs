@@ -463,7 +463,7 @@ function savedLinuxOneShotClosure(sources) {
 	const hookAt = daemon.indexOf('require("adapters.keyboard_hook")');
 	return (
 		assignment?.trim().replace(/\s+/g, ' ') ===
-			'return action ~= "caps_word" and (action ~= "one_shot_shift" or _hook == _native_hook) and _tap_action_set()[action] == true' &&
+			'return (action ~= "one_shot_shift" or _hook == _native_hook) and _tap_action_set()[action] == true' &&
 		bodies.init.includes(capture) &&
 		bodies.init.indexOf(capture) < bodies.init.indexOf('Logger.start(') &&
 		bodies.init.indexOf(capture) < bodies.init.indexOf('_load(true)') &&
@@ -473,9 +473,10 @@ function savedLinuxOneShotClosure(sources) {
 		hookAt > managerAt &&
 		daemon.indexOf('TapHold.init({') > hookAt &&
 		keylogger.includes('require("platform.remap.tap_hold_manager")') &&
-		bodies.tap.startsWith(
-			'if action == "one_shot_shift" or action == "caps_word" then return action end'
-		) &&
+		// CapsWord is an ordinary executor action: handing its id back to the
+		// Hook would start the engine's second, settings-less CapsWord.
+		bodies.tap.startsWith('if action == "one_shot_shift" then return action end') &&
+		!bodies.tap.includes('"caps_word"') &&
 		!/(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(manager) &&
 		bodies.frame.includes('origin_view.origin == "native-evdev" and _remapper_input_owner') &&
 		bodies.frame.includes('origin_view.source == source') &&
@@ -666,7 +667,7 @@ for (const [index, token] of [
 	[0, 'require("platform.remap.key_combination_engine")'],
 	[1, 'receipt.physical == true'],
 	[1, 'current.source == receipt.source'],
-	[0, 'action ~= "caps_word"'],
+	[2, 'action~=\"caps_word\"'],
 	[3, 'Scope.edit(rows,ctx.is_paused,source)']
 ]) {
 	const changed = linuxSources.slice();
@@ -680,7 +681,7 @@ for (const [index, token] of [
 	[0, '_hook == _native_hook'],
 	[0, '_tap_action_set()[action] == true'],
 	[0, '_native_hook = package.loaded["adapters.keyboard_hook"]'],
-	[0, 'if action == "one_shot_shift" or action == "caps_word" then return action end'],
+	[0, 'if action == "one_shot_shift" then return action end'],
 	[0, 'function M.init(opts)'],
 	[4, 'origin_view.origin == "native-evdev" and _remapper_input_owner'],
 	[4, 'origin_view.source == source'],
