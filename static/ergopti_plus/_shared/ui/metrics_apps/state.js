@@ -205,7 +205,7 @@ function buildAggregatedData() {
 			// Per-day rollup: date_str → { time_ms, active_ms, chars, switches, sessions }
 			by_date: {},
 			// Per-category rollup: cat → { time_ms, chars, active_ms }
-			by_category: {},
+			by_category: Object.create(null),
 			// Sessions count signal: how many app/day rows whose longest_ms is
 			// above the long-session threshold (≥ 90 min by default).
 			long_sessions: 0,
@@ -311,7 +311,7 @@ function buildAggregatedData() {
 				switches: 0,
 				sessions: 0,
 				passive_ms: 0,
-				by_category: {},
+				by_category: Object.create(null),
 				first_min: null,
 				last_min: null
 			});
@@ -532,7 +532,7 @@ function buildAggregatedData() {
 					slot.score_x_ms = (slot.score_x_ms || 0) + (_hourCat.score || 0) * hMs;
 					// Ribbon (#25) per-day per-hour per-category accumulation
 					const ribDay = r.ribbon[d.key] || (r.ribbon[d.key] = {});
-					const ribHour = ribDay[hour] || (ribDay[hour] = {});
+					const ribHour = ribDay[hour] || (ribDay[hour] = Object.create(null));
 					const ribCat = _hourCat.type || 'Général';
 					ribHour[ribCat] = (ribHour[ribCat] || 0) + hMs;
 					// Hour × weekday cell — same dow as the day this app/day row
@@ -584,7 +584,7 @@ function buildAggregatedData() {
 			else r.prod_split.neutral_ms += appMs;
 
 			// #22 per-weekday × category time
-			const wkSlot = r.weekday_category[dow] || (r.weekday_category[dow] = {});
+			const wkSlot = r.weekday_category[dow] || (r.weekday_category[dow] = Object.create(null));
 			wkSlot[cat] = (wkSlot[cat] || 0) + appMs;
 
 			const catName = cat;
@@ -595,7 +595,7 @@ function buildAggregatedData() {
 					Object.values(appData.hourly).forEach((h) => (totalAppChars += h.c || 0));
 
 					Object.entries(appData.hourly).forEach(([hour, hData]) => {
-						if (!result.timeline[hour]) result.timeline[hour] = {};
+						if (!result.timeline[hour]) result.timeline[hour] = Object.create(null);
 
 						let hTimeMs = hData.time_ms || 0;
 						if (hTimeMs === 0 && totalAppChars > 0 && hData.c > 0) {
@@ -607,7 +607,7 @@ function buildAggregatedData() {
 				}
 			} else {
 				const dayLabel = formatDisplayDate(d.key).substring(0, 5);
-				if (!result.timeline[dayLabel]) result.timeline[dayLabel] = {};
+				if (!result.timeline[dayLabel]) result.timeline[dayLabel] = Object.create(null);
 				result.timeline[dayLabel][catName] =
 					(result.timeline[dayLabel][catName] || 0) + (Number(appData.app_time_ms) || 0);
 			}
