@@ -328,3 +328,47 @@ _TIT_LiteralLineBoundaryControls() {
 }
 Test("TOML: line boundaries retain literal and multiline string contracts (toml-literal-line-boundary)",
 	_TIT_LiteralLineBoundaryControls)
+
+; The tokenizer takes unquoted runs in one native search (toml-token-run); its
+; result must stay what the character-by-character reading produced.
+_TIT_TokenRun() {
+	Text := "  key  = [ 1 , 'a#b' ]  # tail`nnext"
+	Position := 1
+	Record := _TOML_DocumentToken(Text, &Position, Chr(10), &Separated, &SpanStart, &SpanEnd)
+	AssertEqual("key  = [ 1 , 'a#b' ]", Record, "a run, a container and a comment form one trimmed record")
+	AssertTrue(Separated, "the unquoted line feed still ends the record")
+	AssertEqual(3, SpanStart, "the span starts at the first solid character, not at leading blanks")
+	AssertEqual(22, SpanEnd, "the span ends at the last solid character, before the comment")
+	AssertEqual(Position - 1, InStr(Text, Chr(10)), "the cursor sits just after the separator")
+	Position := 1
+	Key := _TOML_DocumentToken("a , b = 1", &Position, "=", &Separated, &SpanStart, &SpanEnd)
+	AssertEqual("a , b", Key, "a comma is plain content when the separator is =")
+	AssertEqual(1, SpanStart)
+	AssertEqual(5, SpanEnd)
+	Position := 1
+	Member := _TOML_DocumentToken("{ a = 1, b = 2 }, c", &Position, ",", &Separated)
+	AssertEqual("{ a = 1, b = 2 }", Member, "a separator inside a container does not end the token")
+	AssertTrue(Separated)
+	Position := 1
+	AssertEqual("", _TOML_DocumentToken("   ", &Position, ",", &Separated, &SpanStart, &SpanEnd),
+		"blank content has no span")
+	AssertEqual(0, SpanStart)
+	AssertEqual(0, SpanEnd)
+	AssertFalse(Separated)
+}
+Test("TOML: unquoted token runs keep their spans and separators (toml-token-run)", _TIT_TokenRun)
+
+_TIT_BlankRuns() {
+	Source := "[a]`nx = 1`n`n`n`n`n[b]`r`n`r`ny = 2`n"
+	Physical := []
+	TOML_ParseDocument(Source, , &Physical)
+	Rebuilt := ""
+	for Row in Physical
+		Rebuilt .= Row.Text
+	AssertEqual(Source, Rebuilt, "every physical record, blank ones included, rebuilds the source exactly")
+	AssertEqual("trivia", Physical[3].Kind)
+	AssertEqual("a", Physical[3].Section, "a blank line belongs to the section above it")
+	AssertEqual(Chr(10), Physical[3].Text)
+	AssertEqual(9, Physical.Length)
+}
+Test("TOML: blank runs rebuild the source and keep their section (toml-blank-runs)", _TIT_BlankRuns)
