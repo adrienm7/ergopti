@@ -258,7 +258,10 @@ LLM_Menu_Build() {
 	; The LLM builder owns only a detached child. The root coordinator attaches
 	; it while publishing a complete root, so an asynchronous LLM rebuild can
 	; never expose an IA-only tray or mutate a root currently being staged.
-	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)
+	; A busy or still-incomplete root replaces the narrow worker with a full
+	; rebuild; the child goes with the request so that rebuild attaches it
+	; instead of constructing the IA submenu a second time.
+	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true, StagedHandle)
 		throw Error("tray root coordinator refused the LLM subtree")
 	MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
 	_LLM_Menu_InTray := true
