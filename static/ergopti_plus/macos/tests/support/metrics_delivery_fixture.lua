@@ -21,7 +21,7 @@ local function with_delivery(cached, callback)
 				return "{}", "ok"
 			end,
 		}
-		package.loaded["modules.keylogger.sqlite_reader"] = { read_manifest = function() return {} end }
+		package.loaded["modules.keylogger.sqlite_reader"] = { read_manifest = function() return {}, true end }
 		package.loaded["modules.keylogger.context_tracker"] = { get_active_app_snapshot = function() end }
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, evaluations, errors, successes = {}, {}, {}, {}

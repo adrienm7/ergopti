@@ -100,7 +100,7 @@ local function load_dashboard(options)
 		end,
 	}
 	package.loaded["modules.keylogger.sqlite_reader"] = {
-		read_manifest = function() return {} end,
+		read_manifest = function() return {}, true end,
 	}
 	package.loaded["modules.keylogger.context_tracker"] = {
 		get_active_app_snapshot = function() return nil end,
