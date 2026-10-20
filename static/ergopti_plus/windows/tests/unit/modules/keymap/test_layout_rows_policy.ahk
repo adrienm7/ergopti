@@ -117,7 +117,7 @@ Test("layout rows: a registry layout's number row switched off is reordered on t
 
 ; Exercise the actual registration -> criterion -> callback -> emission path.
 ; The child shadows SendEvent, so no user window can receive a fixture key.
-_LRPS_ChildSource() {
+_LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := "") {
 	global _DriverDir, _SharedDir
 	; Other entry points in the included module name services this narrow child
 	; never calls. Runtime unset reads still throw; only load-time warnings stop.
@@ -134,7 +134,8 @@ _LRPS_ChildSource() {
 		AssertTrue(Definition != "", "the real row policy helper must exist: " . Name)
 		Code .= Definition . "`n"
 	}
-	Code .= FileRead(_DriverDir . "\tests\fixtures\layout_row_passthrough_body.ahk", "UTF-8")
+	Code .= ExtraSource . "`n"
+	Code .= FileRead(_DriverDir . "\tests\fixtures\" . BodyName, "UTF-8")
 	return Code
 }
 
@@ -145,19 +146,24 @@ _LRPS_Completion(State, Code, Output, ErrorText) {
 	State.Calls += 1
 }
 
-_LRPS_LevelCustody(CallerLevel, Throws) {
+_LRPS_LevelCustody(CallerLevel, Throws, SourceFn := _LRPS_ChildSource, ExtraArgs := unset,
+		Receipt := "PASS row-passthrough-level-custody") {
 	global _SharedDir
 	Stem := A_Temp . "\ergopti_row_passthrough_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	Script := Stem . ".ahk"
 	AssertFalse(FileExist(Script), "the isolated row sender requires a fresh owned path")
-	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _LRPS_ChildSource()) != 0)
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . SourceFn.Call()) != 0)
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }
 	Handle := 0, Primary := 0
 	PreviousCritical := Critical("Off")
 	try {
 		Observer := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)
-		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
-			["/ErrorStdOut=UTF-8", Script, String(CallerLevel), Throws ? "throw" : "success", _SharedDir, String(Observer.MinSendLevel)],
+		Args := ["/ErrorStdOut=UTF-8", Script, String(CallerLevel), Throws ? "throw" : "success", _SharedDir, String(Observer.MinSendLevel)]
+		if IsSet(ExtraArgs) {
+			for Arg in ExtraArgs
+				Args.Push(Arg)
+		}
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, Args,
 			_LRPS_Completion.Bind(State))
 		AssertTrue(Handle.start(), "the exact production row sender child must start")
 		Started := A_TickCount
@@ -168,7 +174,7 @@ _LRPS_LevelCustody(CallerLevel, Throws) {
 		AssertEqual(1, State.Calls, "the row sender child must settle once")
 		AssertEqual(0, State.Code, "the row sender refused: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText, "no native child error may be hidden")
-		AssertEqual("PASS row-passthrough-level-custody", State.Output)
+		AssertEqual(Receipt, State.Output)
 	} catch as Err {
 		Primary := Err
 	}
@@ -194,3 +200,17 @@ for _LRPS_CallerLevel in [0, 2, 3]
 	for _LRPS_Throws in [false, true]
 		Test("layout row sender: caller level " . _LRPS_CallerLevel . " survives " . (_LRPS_Throws ? "refusal" : "success")
 			. " without rehooking (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
+
+
+_LRPW_ChildSource() {
+	global _DriverDir
+	Definition := _DriverFuncBody("RemapKey")
+	AssertTrue(Definition != "", "the real built-in registrar must be exercised")
+	return _LRPS_ChildSource("layout_row_win_fallback_body.ahk",
+		"#Include " . _DriverDir . "\infra\magic_editor.ahk`n" . Definition)
+}
+
+for _LRPW_Row in ["number", "top", "home", "bottom"]
+	for _LRPW_Mode in ["off", "on", "magic-source", "magic-other", "ordinary", "legacy"]
+		Test("layout Win fallback: " . _LRPW_Row . " row " . _LRPW_Mode . " (layout-row-win-fallback)",
+			_LRPS_LevelCustody.Bind(0, false, _LRPW_ChildSource, [_LRPW_Row, _LRPW_Mode], "PASS row-win-fallback"))
