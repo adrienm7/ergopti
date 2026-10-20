@@ -62,6 +62,9 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
             "func RunServer(_ *cobra.Command, _ []string) error {\n",
             "func RunServer(_ *cobra.Command, _ []string) (result error) {\n"
             "\tdefer func() {\n\t\tif err := nativehttp.CloseListenerEvent(); result == nil && err != nil { result = err }\n\t}()\n"
+            # The managed server applies the shared serve environment (local
+            # models only: no ollama.com contact) before reading its config.
+            "\tif err := nativehttp.ApplyServeEnvironment(); err != nil { return err }\n"
             "\tif err := nativehttp.PrepareListenerEvent(); err != nil { return err }\n",
         ),
         "server/images.go": (

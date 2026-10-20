@@ -24,6 +24,10 @@ class OllamaRuntimeOwner {
 				|| !this._LocalPath(Options.Get("helper", ""))
 				|| !RegExMatch(Options.Get("helper_sha256", ""), "^[0-9a-f]{64}$")
 			throw TypeError("Runtime ownership requires a trusted launcher path.")
+		; The shared serve environment (OLLAMA_NO_CLOUD) is part of every owned launch.
+		if !this._LocalPath(Options.Get("environment", ""))
+				|| !RegExMatch(Options.Get("environment_sha256", ""), "^[0-9a-f]{64}$")
+			throw TypeError("Runtime ownership requires the captured shared serve environment.")
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
 		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
@@ -95,6 +99,8 @@ class OllamaRuntimeOwner {
 				["StartedTick", "started_tick"], ["DeadlineMs", "deadline_ms"]] {
 				Arguments.Push("-" . Pair[1], String(Target[Pair[2]]))
 			}
+			Arguments.Push("-ServeEnvironmentPath", this.Options["environment"],
+				"-ServeEnvironmentSha256", this.Options["environment_sha256"])
 			Spawn := this.Options.Get("spawn", ObjBindMethod(this, "_NativeSpawn"))
 			Task := Spawn.Call(PowerShell, Arguments, ObjBindMethod(this, "_OnTerminal", Record),
 				ObjBindMethod(this, "_AdoptConstruction", Record))

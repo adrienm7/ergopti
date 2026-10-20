@@ -154,7 +154,12 @@ build. For a bump, extract the tag tarball (`gh api
 repos/ollama/ollama/tarball/vX`) into an empty scratch folder, recompute the
 preimages, and run `python tools/test/macos_managed_ollama_source_test.py
 --source <folder>`, which applies the real hooks without Go
-(`test-ollama-release-pin-parity.cjs` refuses any retired pin).
+(`test-ollama-release-pin-parity.cjs` refuses any retired pin). The managed
+server must also never contact ollama.com: `managed_ollama_environment.json`
+(`OLLAMA_NO_CLOUD=1`) is embedded in the Go package and applied by the
+`RunServer` hook (`ApplyServeEnvironment`), passed by Windows to its launcher
+with a digest, and appended by Linux to the serve child; only the server a
+driver owns gets it (`test-managed-ollama-no-cloud.cjs`).
 
 ### project-macos-ai-runtimes-install-on-selection
 

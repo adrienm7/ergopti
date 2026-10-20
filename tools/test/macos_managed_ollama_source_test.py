@@ -5,6 +5,7 @@
 import argparse
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import shutil
 import tempfile
@@ -107,6 +108,24 @@ class Hooks(unittest.TestCase):
         self.assertIn("resp, err := nativehttp.Do(client, req)", download)
         self.assertNotIn("resp, err := client.Do(req)", download)
 
+    def test_managed_server_applies_shared_serve_environment_first(self):
+        # Ollama 0.40.4 contacts ollama.com from the daemon unless
+        # OLLAMA_NO_CLOUD is set; the managed server must set it before serving.
+        PRODUCER.apply_hooks(self.candidate, REPOSITORY)
+        command = (self.candidate / "cmd/cmd.go").read_text()
+        body = command[command.index("func RunServer(") :]
+        self.assertLess(
+            body.index("nativehttp.ApplyServeEnvironment()"),
+            body.index("initializeKeypair()"),
+        )
+        declared = json.loads(
+            (
+                REPOSITORY
+                / "static/ergopti_plus/_shared/modules/llm/managed_ollama_environment.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertEqual(declared["serve_environment"].get("OLLAMA_NO_CLOUD"), "1")
+
     def test_producer_names_no_retired_upstream_seam(self):
         producer = (REPOSITORY / "tools/build/build-macos-managed-ollama.py").read_text()
         contract = PRODUCER.runtime_contract(REPOSITORY)
@@ -148,6 +167,7 @@ class Hooks(unittest.TestCase):
             ),
         )
         self.assertIn("address_policy.go", {path.name for path in package.iterdir()})
+        self.assertIn("managed_ollama_environment.json", {path.name for path in package.iterdir()})
         for path in package.iterdir():
             self.assertEqual(
                 path.read_bytes(),

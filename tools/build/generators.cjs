@@ -66,7 +66,8 @@ const GENERATORS = [
 		outputs: [
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift',
 			'static/ergopti_plus/_shared/go/native_http/managed_ollama_bootstrap.json',
-			'static/ergopti_plus/_shared/go/native_http/proxy_policy.json'
+			'static/ergopti_plus/_shared/go/native_http/proxy_policy.json',
+			'static/ergopti_plus/_shared/go/native_http/managed_ollama_environment.json'
 		]
 	},
 	{

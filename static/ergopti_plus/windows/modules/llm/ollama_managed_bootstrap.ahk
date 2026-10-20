@@ -229,10 +229,11 @@ class OllamaManagedBootstrap {
 		Catalogue := _SharedDir . "\modules\llm\ollama_release.json"
 		Updater := _SharedDir . "\modules\updater\defaults.json"
 		Policy := _SharedDir . "\modules\network\proxy_policy.json"
+		ServeEnvironment := _SharedDir . "\modules\llm\managed_ollama_environment.json"
 		Helper := Directory . "\ollama_managed_files.ps1"
 		Acquisition := Directory . "\ollama_managed_acquisition.ps1"
 		Vendor := _VendorDir
-		for Path in [Catalogue, Updater, Policy, Helper, Acquisition,
+		for Path in [Catalogue, Updater, Policy, ServeEnvironment, Helper, Acquisition,
 			Directory . "\ollama_download_archive.ps1", Directory . "\ollama-runtime-launch.ps1",
 			Directory . "\ollama-model-pull.ps1"]
 			this.Sources[Path] := this._Hash(Path)
@@ -267,6 +268,7 @@ class OllamaManagedBootstrap {
 			"on_physical", ObjBindMethod(this, "_Physical"), "on_error", ObjBindMethod(this, "_Error")))
 		this.Runtime := OllamaRuntimeOwner(Map("launcher", Directory . "\ollama-runtime-launch.ps1",
 			"helper", Helper, "helper_sha256", this.Sources[Helper],
+			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"on_retired", ObjBindMethod(this, "_RuntimeRetired"), "on_error", ObjBindMethod(this, "_Error")))
 	}
 

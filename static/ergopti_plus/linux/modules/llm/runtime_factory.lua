@@ -25,6 +25,8 @@ function M.new(engine, profiles)
 	local Timings = require("infra.timings")
 	local resolver, reason = require("modules.llm.ollama_install_resolver").new()
 	if not resolver then return nil, reason end
+	local serve_environment, environment_reason = require("modules.llm.managed_ollama_environment").load()
+	if not serve_environment then return nil, environment_reason end
 	local source = require("modules.llm.runtime_source").new({
 		preferences = require("infra.llm_preferences"), profiles = profiles,
 		writer = require("toml_codec.writer"), manifest = require("infra.manifest_reader"),
@@ -42,6 +44,7 @@ function M.new(engine, profiles)
 		admission = require("modules.llm.ollama_install_admission"),
 		install_phase = require("llm.ollama_install_phase"), process = process,
 		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,
+		serve_environment = serve_environment,
 		environment = function()
 			local values = native.os_environ()
 			if type(values) ~= "table" then return nil end

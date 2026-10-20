@@ -156,21 +156,25 @@ function render(bootstrapBytes, proxyBytes) {
 	);
 }
 
-function renderOutputs(bootstrapBytes, proxyBytes) {
+function renderOutputs(bootstrapBytes, proxyBytes, environmentBytes) {
 	// Standalone Go extraction needs the same physical embed inputs as the
 	// native producer. Keep their bytes owned by the canonical JSON policies.
+	if (!Buffer.isBuffer(environmentBytes)) throw new Error('Serve environment bytes are required.');
+	strictJSON(environmentBytes);
 	const go = path.join(root, 'static/ergopti_plus/_shared/go/native_http');
 	return new Map([
 		[output, Buffer.from(render(bootstrapBytes, proxyBytes))],
 		[path.join(go, 'managed_ollama_bootstrap.json'), bootstrapBytes],
-		[path.join(go, 'proxy_policy.json'), proxyBytes]
+		[path.join(go, 'proxy_policy.json'), proxyBytes],
+		[path.join(go, 'managed_ollama_environment.json'), environmentBytes]
 	]);
 }
 
 function generate() {
 	const outputs = renderOutputs(
 		fs.readFileSync(path.join(shared, 'llm/managed_ollama_bootstrap.json')),
-		fs.readFileSync(path.join(shared, 'network/proxy_policy.json'))
+		fs.readFileSync(path.join(shared, 'network/proxy_policy.json')),
+		fs.readFileSync(path.join(shared, 'llm/managed_ollama_environment.json'))
 	);
 	for (const [file, bytes] of outputs) {
 		if (process.argv.includes('--check')) {
