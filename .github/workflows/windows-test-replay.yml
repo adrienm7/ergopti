@@ -57,6 +57,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install the authenticated AutoHotkey runtime
+        id: runtime
         shell: pwsh
         run: |
           $contract = Get-Content -Raw static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json | ConvertFrom-Json
@@ -71,10 +72,140 @@ jobs:
           "ERGOPTI_REPLAY_AHK=$runtime" >> $env:GITHUB_ENV
 
       - name: Build the native navigation prerequisite
+        id: navigation
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
 
+      - name: Prepare the production entry and E2E inputs
+        id: entry_inputs
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { throw 'Node dependency preparation failed.' }
+          npm run build:manifest
+          if ($LASTEXITCODE -ne 0) { throw 'Features manifest preparation failed.' }
+          python tools/build/build_static_bundle.py
+          if ($LASTEXITCODE -ne 0) { throw 'The production FileInstall bundle is unavailable.' }
+
+      - name: Authenticate the production-entry compiler
+        id: entry_compiler
+        if: ${{ !cancelled() && steps.entry_inputs.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $sourceSha = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $sourceSha -cne $env:GITHUB_SHA) { throw 'The full-entry source SHA differs from the workflow.' }
+          $contractPath = 'static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json'
+          $contract = Get-Content -Raw -LiteralPath $contractPath | ConvertFrom-Json
+          $runtimeArchive = Join-Path $env:RUNNER_TEMP 'ahk-replay-runtime.zip'
+          $compilerArchive = Join-Path $env:RUNNER_TEMP $contract.compiler.asset
+          Invoke-WebRequest -Uri $contract.compiler.url -OutFile $compilerArchive
+          $runtimeArchiveHash = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $compilerArchiveHash = (Get-FileHash -LiteralPath $compilerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($runtimeArchiveHash -cne $contract.runtime.sha256 -or $compilerArchiveHash -cne $contract.compiler.sha256) { throw 'The production-entry toolchain archive identity differs from its contract.' }
+          # The existing parse gate deliberately resolves these installed paths.
+          $runtimeDirectory = Join-Path $env:ProgramFiles 'AutoHotkey/v2'
+          $compilerDirectory = Join-Path $env:ProgramFiles 'AutoHotkey/Compiler'
+          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath $runtimeDirectory -Force
+          Expand-Archive -LiteralPath $compilerArchive -DestinationPath $compilerDirectory -Force
+          $runtime = Join-Path $runtimeDirectory 'AutoHotkey64.exe'
+          $compiler = Join-Path $compilerDirectory 'Ahk2Exe.exe'
+          $runtimeHash = (Get-FileHash -LiteralPath $runtime -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($runtimeHash -cne (Get-FileHash -LiteralPath $env:ERGOPTI_REPLAY_AHK -Algorithm SHA256).Hash.ToLowerInvariant()) { throw 'The parse base differs from the authenticated replay runtime.' }
+          [ordered]@{
+              source_sha = $sourceSha; github_run_id = $env:GITHUB_RUN_ID; github_run_attempt = $env:GITHUB_RUN_ATTEMPT
+              runtime_version = $contract.runtime.version; compiler_tag = $contract.compiler.tag
+              runtime_archive_sha256 = $runtimeArchiveHash; compiler_archive_sha256 = $compilerArchiveHash
+              runtime_sha256 = $runtimeHash; compiler_sha256 = (Get-FileHash -LiteralPath $compiler -Algorithm SHA256).Hash.ToLowerInvariant()
+              contract_sha256 = (Get-FileHash -LiteralPath $contractPath -Algorithm SHA256).Hash.ToLowerInvariant()
+              full_suite_qualified = $false
+          } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'toolchain.json') -Encoding utf8
+
+      - name: Parse the complete production entry with the measured compiler
+        id: entry_parse
+        if: ${{ !cancelled() && steps.entry_compiler.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
+          $env:LOCALAPPDATA = Join-Path $evidence 'parse-local-app-data'
+          New-Item -ItemType Directory -Force -Path $env:LOCALAPPDATA | Out-Null
+          $stdout = Join-Path $evidence 'parse.stdout.log'
+          $stderr = Join-Path $evidence 'parse.stderr.log'
+          $receipt = [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'production-entry-parse'; status = 'failed'; native_exit_code = $null; positive_graph_receipt = $false; skip_detected = $false; started_at = [DateTime]::UtcNow.ToString('o'); ended_at = $null; full_suite_qualified = $false }
+          try {
+              node tools/test/test-ahk-parse-coverage.cjs 1> $stdout 2> $stderr
+              $receipt.native_exit_code = $LASTEXITCODE
+              $text = Get-Content -LiteralPath $stdout -Raw
+              Get-Content -LiteralPath $stdout | ForEach-Object { Write-Host $_ }
+              Get-Content -LiteralPath $stderr | ForEach-Object { Write-Host $_ }
+              $receipt.positive_graph_receipt = $text -match '\[OK\] ErgoptiPlus\.ahk and its whole #Include graph compile\.'
+              $receipt.skip_detected = $text -match '\[SKIP\]'
+              if ($receipt.native_exit_code -ne 0 -or $receipt.skip_detected -or -not $receipt.positive_graph_receipt) { throw 'The complete production entry has no successful native parse receipt.' }
+              $receipt.status = 'passed'
+          } finally {
+              $receipt.ended_at = [DateTime]::UtcNow.ToString('o')
+              $receipt | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'parse.receipt.json') -Encoding utf8
+          }
+
+      - name: Run the complete native Windows E2E corpus
+        id: entry_e2e
+        if: ${{ !cancelled() && steps.entry_inputs.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
+          New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+          $runner = Join-Path $env:GITHUB_WORKSPACE 'static/ergopti_plus/windows/tests/e2e/run_e2e.ahk'
+          $tap = Join-Path $evidence 'e2e.tap.txt'
+          $env:ERGOPTI_AHK_RESULTS_FILE = $tap
+          $stdout = Join-Path $evidence 'e2e.stdout.log'
+          $stderr = Join-Path $evidence 'e2e.stderr.log'
+          $manifest = Join-Path $evidence 'e2e.manifest.json'
+          $receipt = [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'hotstrings-pure-and-native-edit'; status = 'failed'; native_exit_code = $null; pid = $null; expected_count = $null; started_at = [DateTime]::UtcNow.ToString('o'); ended_at = $null; full_suite_qualified = $false }
+          $proc = $null
+          try {
+              . ./tools/ci/ahk-tap-follower.ps1
+              $follower = New-AhkTapFollower -Path $tap
+              $proc = Start-Process -FilePath $env:ERGOPTI_REPLAY_AHK -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+              $null = $proc.Handle
+              $receipt.pid = $proc.Id
+              $clock = [Diagnostics.Stopwatch]::StartNew()
+              while (-not $proc.HasExited) {
+                  if ($clock.ElapsedMilliseconds -gt 180000) { $proc.Kill(); $proc.WaitForExit(); throw 'The native E2E process exceeded its deadline.' }
+                  $follower.Poll() | ForEach-Object { Write-Host $_ }
+                  Start-Sleep -Milliseconds 100
+              }
+              $proc.WaitForExit()
+              $receipt.native_exit_code = $proc.ExitCode
+              $follower.Finish() | ForEach-Object { Write-Host $_ }
+              Get-Content -LiteralPath $stdout | ForEach-Object { Write-Host $_ }
+              Get-Content -LiteralPath $stderr | ForEach-Object { Write-Host $_ }
+              if ($null -eq $receipt.native_exit_code -or $receipt.native_exit_code -ne 0) { throw 'The native E2E process failed.' }
+              node tools/test/validate-ahk-e2e-manifest.cjs --input $tap
+              if ($LASTEXITCODE -ne 0) { throw 'The mandatory pure and native Edit corpus is incomplete.' }
+              node tools/test/validate-ahk-suite-manifest.cjs --input $tap --json $manifest
+              if ($LASTEXITCODE -ne 0) { throw 'The native E2E execution manifest is incomplete.' }
+              $observed = Get-Content -Raw -LiteralPath $manifest | ConvertFrom-Json
+              $corpus = Get-Content -Raw -LiteralPath 'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json' | ConvertFrom-Json
+              $receipt.expected_count = 2 * $corpus.vectors.Count + 2
+              if ($observed.executed_count -ne $receipt.expected_count -or $observed.timed_count -ne $receipt.expected_count -or $observed.failed -ne 0) { throw 'The complete E2E corpus and Unicode controls did not all execute.' }
+              foreach ($tier in @('pure', 'native-edit')) {
+                  $name = "e2e[$tier] supplementary trigger and completion preserve native edits (unicode-erase)"
+                  if (@($observed.executed | Where-Object { $_.name -ceq $name -and $_.status -ceq 'ok' }).Count -ne 1) { throw 'The native E2E Unicode control is missing.' }
+              }
+              $receipt.status = 'passed'
+          } finally {
+              if ($null -ne $proc) { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() }; $proc.Dispose() }
+              $receipt.ended_at = [DateTime]::UtcNow.ToString('o')
+              $receipt | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
+          }
+
       - name: Replay every case alone and the selection in reverse
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
         shell: pwsh
         env:
           ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-fixes.json' }}
@@ -89,5 +220,14 @@ jobs:
         with:
           name: windows-test-replay-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ahk-replay-evidence
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain production-entry parse and native E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-full-entry-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/windows-full-entry-evidence
           if-no-files-found: error
           retention-days: 7
