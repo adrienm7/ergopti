@@ -74,6 +74,50 @@ _GSQ_Render(Owner, Format, LParam, Msg, Hwnd) {
 	return 0
 }
 
+/** Observes the borrowed native bitmap under the existing worker lock. */
+_GSQ_BitmapDiagnostics() {
+	return "Add-Type -TypeDefinition '"
+		. 'using System;using System.Runtime.InteropServices;'
+		. 'public static class ErgoptiRegionBitmapDiagnostic {'
+		. '[DllImport("gdi32.dll",SetLastError=true)]static extern uint GetObjectType(IntPtr image);'
+		. '[DllImport("gdi32.dll",EntryPoint="GetObjectW",SetLastError=true)]static extern int GetObjectW(IntPtr image,int size,IntPtr data);'
+		. '[DllImport("kernel32.dll")]static extern uint GetLastError();'
+		. '[DllImport("kernel32.dll",EntryPoint="SetLastError")]static extern void ClearLastError(uint code);'
+		. '[DllImport("user32.dll")]static extern IntPtr GetClipboardOwner();'
+		. '[DllImport("user32.dll")]static extern bool IsClipboardFormatAvailable(uint format);'
+		. '[DllImport("user32.dll",SetLastError=true)]static extern IntPtr CopyImage(IntPtr image,uint type,int width,int height,uint flags);'
+		. '[DllImport("gdi32.dll",SetLastError=true)]static extern bool DeleteObject(IntPtr image);'
+		. '[DllImport("user32.dll",SetLastError=true)]static extern IntPtr GetDC(IntPtr window);'
+		. '[DllImport("user32.dll",SetLastError=true)]static extern int ReleaseDC(IntPtr window,IntPtr dc);'
+		. '[DllImport("gdi32.dll",SetLastError=true)]static extern int GetDIBits(IntPtr dc,IntPtr image,uint start,uint count,IntPtr pixels,IntPtr info,uint usage);'
+		. 'static string LastError(){int managed=Marshal.GetLastWin32Error();uint native=GetLastError();return managed+" native_error="+native;}'
+		. 'public static void Observe(IntPtr bitmap){'
+		. 'Console.WriteLine("REGION_BITMAP_OWNER handle="+bitmap.ToInt64()+" owner="+GetClipboardOwner().ToInt64()+" cf_dib="+IsClipboardFormatAvailable(8)+" cf_dibv5="+IsClipboardFormatAvailable(17));'
+		. 'ClearLastError(0);uint type=GetObjectType(bitmap);string typeError=LastError();'
+		. 'Console.WriteLine("REGION_BITMAP_TYPE result="+type+" last_error="+typeError);'
+		. 'int size=IntPtr.Size==8?104:84;IntPtr info=Marshal.AllocHGlobal(size);'
+		. 'try{Marshal.Copy(new byte[size],0,info,size);ClearLastError(0);int received=GetObjectW(bitmap,size,info);string error=LastError();'
+		. 'byte[] bytes=new byte[size];Marshal.Copy(info,bytes,0,size);'
+		. 'Console.WriteLine("REGION_BITMAP_OBJECT result="+received+" last_error="+error+" bytes="+BitConverter.ToString(bytes));'
+		. 'foreach(uint flags in new uint[]{0,8192}){ClearLastError(0);IntPtr copy=CopyImage(bitmap,0,0,0,flags);string copyError=LastError();'
+		. 'Console.WriteLine("REGION_BITMAP_COPY flags="+flags+" handle="+copy.ToInt64()+" last_error="+copyError+" borrowed="+(copy==bitmap));'
+		. 'if(copy!=IntPtr.Zero&&copy!=bitmap){ClearLastError(0);bool deleted=DeleteObject(copy);string deleteError=LastError();'
+		. 'Console.WriteLine("REGION_BITMAP_DELETE flags="+flags+" result="+deleted+" last_error="+deleteError);}}'
+		. 'if(received>=24&&Marshal.ReadInt32(info,4)==1&&Marshal.ReadInt32(info,8)==1){ObservePixel(bitmap);}'
+		. 'else{Console.WriteLine("REGION_BITMAP_PIXEL skipped=not_one_pixel_bitmap");}'
+		. '}finally{Marshal.FreeHGlobal(info);}}'
+		. 'static void ObservePixel(IntPtr bitmap){ClearLastError(0);IntPtr dc=GetDC(IntPtr.Zero);string dcError=LastError();'
+		. 'Console.WriteLine("REGION_BITMAP_DC handle="+dc.ToInt64()+" last_error="+dcError);if(dc==IntPtr.Zero){return;}'
+		. 'IntPtr header=IntPtr.Zero,pixels=IntPtr.Zero;'
+		. 'try{header=Marshal.AllocHGlobal(40);pixels=Marshal.AllocHGlobal(4);Marshal.Copy(new byte[40],0,header,40);Marshal.WriteInt32(pixels,0);'
+		. 'Marshal.WriteInt32(header,0,40);Marshal.WriteInt32(header,4,1);Marshal.WriteInt32(header,8,1);Marshal.WriteInt16(header,12,1);Marshal.WriteInt16(header,14,32);Marshal.WriteInt32(header,20,4);'
+		. 'ClearLastError(0);int lines=GetDIBits(dc,bitmap,0,1,pixels,header,0);string error=LastError();byte[] pixel=new byte[4];Marshal.Copy(pixels,pixel,0,4);'
+		. 'Console.WriteLine("REGION_BITMAP_PIXEL result="+lines+" last_error="+error+" bgra="+BitConverter.ToString(pixel));'
+		. '}finally{if(header!=IntPtr.Zero){Marshal.FreeHGlobal(header);}if(pixels!=IntPtr.Zero){Marshal.FreeHGlobal(pixels);}ClearLastError(0);int released=ReleaseDC(IntPtr.Zero,dc);string releaseError=LastError();'
+		. 'Console.WriteLine("REGION_BITMAP_DC_RELEASE result="+released+" last_error="+releaseError);}}}'
+		. "' -ErrorAction Stop;"
+}
+
 _GSQ_Receive(Mode) {
 	global _GestureRegionCapture, _GSWO_Handles
 	Stem := A_Temp . "\ergopti_region_sequence_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
@@ -140,12 +184,16 @@ _GSQ_Receive(Mode) {
 				. "Write-Output ('OWNED_SEQUENCE='+[ErgoptiRegionFixtureClipboard]::GetClipboardSequenceNumber());"
 			Script := _GSQ_ReplaceOnce(Script, "$img.Save(", CopyBlue . "$img.Save(")
 		}
+		; Observe only after the real acquisition, while its original lock is held.
+		Acquire := "$bitmapHandle = [ErgoptiScreenshotClipboard]::GetClipboardData(2);"
+		Script := _GSQ_ReplaceOnce(Script, Acquire,
+			Acquire . "[ErgoptiRegionBitmapDiagnostic]::Observe($bitmapHandle);")
 		StageLiteral := StrReplace(Stage, "'", "''")
 		Script .= ";$received=[System.Drawing.Image]::FromFile('" . StageLiteral . "');"
 			. "try{Write-Output ('PIXEL='+$received.GetPixel(0,0).R+','+$received.GetPixel(0,0).G+','+$received.GetPixel(0,0).B)}finally{$received.Dispose()}"
 		FixtureType := "$ProgressPreference = 'SilentlyContinue';Add-Type -TypeDefinition 'public static class ErgoptiRegionFixtureClipboard {"
 			. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern uint GetClipboardSequenceNumber();}' . "' -ErrorAction Stop;"
-		Args[Args.Length] := FixtureType . Script
+		Args[Args.Length] := FixtureType . _GSQ_BitmapDiagnostics() . Script
 		PowerShell := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
 		Handle := ShellRunner_SpawnTreeOwned(PowerShell, Args, _GSQ_Done.Bind(State))
 		AssertTrue(Handle.start(), "the actual native worker must start")
@@ -161,6 +209,10 @@ _GSQ_Receive(Mode) {
 			}
 			_SR_TreePoll()
 			Sleep(10)
+		}
+		for DiagnosticLine in StrSplit(StrReplace(State.Output, "`r`n", "`n"), "`n") {
+			if InStr(DiagnosticLine, "REGION_BITMAP_") == 1
+				_TestAppendProgress("# " . DiagnosticLine)
 		}
 		AssertEqual(1, State.Calls, "the exact worker must settle once")
 		if Mode == "after" {
