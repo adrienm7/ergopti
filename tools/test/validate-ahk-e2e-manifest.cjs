@@ -10,7 +10,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
-const { parsePlan, validateExecution } = require('../ci/windows-test-replay.cjs');
 const corpus = require('../../static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json');
 
 /** Validates observed terminal results against both mandatory corpus tiers. */
@@ -43,6 +42,7 @@ function validateAhkE2eManifest(source, vectors = corpus.vectors) {
 
 /** Admits only a fresh native dry-run plan, including the mandatory regressions. */
 function validateAhkE2eDiscovery(planSource, source, vectors = corpus.vectors) {
+	const { parsePlan } = require('../ci/windows-test-replay.cjs');
 	const errors = [];
 	let names = [];
 	try {
@@ -75,6 +75,7 @@ function validateAhkE2eDiscovery(planSource, source, vectors = corpus.vectors) {
 
 /** Requires execution to match every freshly discovered name and timing in order. */
 function validateAhkE2ePlanExecution(source, discovery, vectors = corpus.vectors) {
+	const { validateExecution } = require('../ci/windows-test-replay.cjs');
 	const manifest = validateAhkE2eManifest(source, vectors);
 	const errors = [...discovery.errors, ...manifest.errors];
 	try {

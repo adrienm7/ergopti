@@ -87,6 +87,41 @@ try {
 	fs.rmSync(root, { recursive: true, force: true });
 }
 
+// The change planner's isolated consumers ship only the legacy validator inputs.
+// Native replay support must not acquire a CI dependency until explicitly used.
+const isolatedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-e2e-legacy-'));
+try {
+	const repository = path.resolve(__dirname, '../..');
+	for (const relative of [
+		'tools/test/validate-ahk-e2e-manifest.cjs',
+		'tools/test/validate-ahk-suite-manifest.cjs',
+		'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json'
+	]) {
+		const destination = path.join(isolatedRoot, relative);
+		fs.mkdirSync(path.dirname(destination), { recursive: true });
+		fs.copyFileSync(path.join(repository, relative), destination);
+	}
+	assert.equal(fs.existsSync(path.join(isolatedRoot, 'tools/ci')), false);
+	const isolatedValidator = path.join(isolatedRoot, 'tools/test/validate-ahk-e2e-manifest.cjs');
+	const isolated = createRequire(isolatedValidator)(isolatedValidator);
+	assert.equal(isolated.validateAhkE2eManifest(transcript(complete)).complete, true);
+	assert.equal(
+		isolated.validateAhkE2eManifest(transcript(complete.slice(0, nativeIndex))).complete,
+		false
+	);
+	const receipt = path.join(isolatedRoot, 'legacy.tap');
+	fs.writeFileSync(receipt, transcript(complete));
+	const result = spawnSync(process.execPath, [isolatedValidator, '--input', receipt], {
+		encoding: 'utf8',
+		windowsHide: true,
+		timeout: 5000
+	});
+	assert.ifError(result.error);
+	assert.equal(result.status, 0, result.stderr);
+} finally {
+	fs.rmSync(isolatedRoot, { recursive: true, force: true });
+}
+
 const gateFile = path.join(__dirname, 'verify-change.cjs');
 const originalRequire = createRequire(gateFile);
 let current = transcript(complete);
