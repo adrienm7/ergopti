@@ -1026,6 +1026,10 @@ _RegisterRollsAltGrHotkeys()
 ; down itself when its row belongs to the OS, including modified zoom chords.
 #HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
 ^SC02F:: _RemapEmit("^v", "v")
+
+; The first eligible context wins: leave the general zoom to non-Office hosts
+; so the Wheel variants below can handle Word, Excel and the other Office apps.
+#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and !MicrosoftApps()
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf

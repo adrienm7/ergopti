@@ -351,7 +351,7 @@ for _LRPN_Scan in ["SC002", "SC029", "SC00C", "SC00D"]
 					"PASS builtin-number-row-magic-owner"))
 
 
-_LRCC_ChildSource() {
+_LRCC_ChildSource(BodyName := "layout_row_control_body.ahk", AdditionalSource := "") {
 	Source := FileRead(_DriverProductionFileForSymbol("RemapKey"), "UTF-8")
 	Start := InStr(Source, "; ======= 7/ CONTROL LAYER")
 	AssertTrue(Start > 0, "the actual control layer must be found")
@@ -370,7 +370,7 @@ _LRCC_ChildSource() {
 				. ', "callback", _LRCC_Callback' . Index . ')')
 		}
 	}
-	AssertEqual(2, Gates, "both actual control-layer contexts must be exercised")
+	AssertEqual(3, Gates, "all three actual control-layer contexts must be exercised")
 	AssertEqual(5, Plan.Length, "all five actual control-layer callbacks must be exercised")
 	Items := ""
 	for Item in Plan
@@ -381,7 +381,7 @@ _LRCC_ChildSource() {
 		AssertTrue(Definition != "", "the actual control-layer dependency must exist: " . Name)
 		Extra .= Definition . "`n"
 	}
-	return _LRPS_ChildSource("layout_row_control_body.ahk", Extra)
+	return _LRPS_ChildSource(BodyName, Extra . AdditionalSource)
 }
 
 for _LRCC_Entry in [1, 2, 3, 4, 5]
@@ -390,3 +390,20 @@ for _LRCC_Entry in [1, 2, 3, 4, 5]
 			. " preserves native shortcuts and live admission (layout-row-control-admission)",
 			_LRPS_LevelCustody.Bind(0, false, _LRCC_ChildSource,
 				[String(_LRCC_Entry), _LRCC_Enabled ? "on" : "off"], "PASS layout-row-control-admission"))
+
+
+_LRCZ_ChildSource() {
+	Owner := _DriverProductionFileForSymbol("MicrosoftApps")
+	Source := FileRead(Owner, "UTF-8")
+	AssertTrue(RegExMatch(Source, "ms)^global MICROSOFT_OFFICE_EXES := Map\(.*?^\)", &Declaration) > 0,
+		"the genuine Microsoft host catalogue must exist")
+	Definition := _DriverFuncBody("MicrosoftApps")
+	AssertTrue(Definition != "", "the genuine Microsoft classifier must exist")
+	return _LRCC_ChildSource("layout_control_zoom_host_body.ahk", Declaration[0] . "`n" . Definition . "`n")
+}
+
+for _LRCZ_Sc in ["SC00C", "SC00D"]
+	for _LRCZ_Host in ["word", "excel", "other", "invalid", "failure"]
+		Test("layout zoom: " . _LRCZ_Sc . " chooses its actual " . _LRCZ_Host . " host owner (layout-zoom-host-precedence)",
+			_LRPS_LevelCustody.Bind(0, false, _LRCZ_ChildSource,
+				[_LRCZ_Sc, _LRCZ_Host], "PASS layout-zoom-host-precedence"))
