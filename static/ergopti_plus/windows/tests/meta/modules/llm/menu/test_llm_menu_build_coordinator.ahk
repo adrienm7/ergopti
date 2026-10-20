@@ -83,8 +83,8 @@ _LMBCM_RawBuilderIsSinglePassAndCoordinatorOwned() {
 	Assert(InStr(RequestBody, ".Request(Reason)") > 0,
 		"the public request boundary must delegate to the generation owner")
 	Assert(InStr(RawBody,
-		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)") > 0,
-		"the detached LLM builder must request a narrow projection that promotes to a full rebuild on contention")
+		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true, StagedHandle)") > 0,
+		"the detached LLM builder must request a narrow projection that promotes to a full rebuild on contention, lending that rebuild its child")
 	Assert(InStr(RootWorkerBody, "initMenu(_LLM_Menu_PreparedRootCurrent.Bind(Submenu, PublishAuthorizeFn), false, Submenu)") > 0,
 		"the LLM root projection must attach the staged submenu through the root publication fence")
 	Assert(InStr(RootWorkerBody, "InitSubMenus(") == 0
@@ -419,9 +419,10 @@ _LMPC_Authorize() {
   _LLM_Menu_Handle := _LMPC_State["foreign"]
  return !InStr(_LMPC_State["mode"], "refusal")
 }
-RebuildTrayMenu(AuthorizeFn, WorkerFn, Narrow, Promote) {
+RebuildTrayMenu(AuthorizeFn, WorkerFn, Narrow, Promote, CallerLlm) {
  global _LMPC_State, _LLM_Menu_Handle
  AssertTrue(Narrow && Promote)
+ AssertTrue(CallerLlm == _LLM_Menu_Handle, "the request lends the exact child it built")
  _LMPC_State["expected"] := _LLM_Menu_Handle
  if _LMPC_State["mode"] == "stale_candidate"
   _LLM_Menu_Handle := _LMPC_State["foreign"]

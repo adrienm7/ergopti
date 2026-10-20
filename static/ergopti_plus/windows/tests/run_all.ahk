@@ -786,6 +786,7 @@ _LLM_Deps_State := "ready"
 #Include meta/modules/llm/tooltip/test_llm_markchain_no_rerender.ahk
 #Include meta/modules/llm/menu/test_llm_menu_build_critical.ahk
 #Include meta/modules/llm/menu/test_llm_menu_build_coordinator.ahk
+#Include meta/modules/llm/menu/test_llm_menu_caller_child_full_root.ahk
 _LogBootProgress("LLM modules + tests included")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).

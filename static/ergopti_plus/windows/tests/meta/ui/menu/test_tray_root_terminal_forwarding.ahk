@@ -29,7 +29,7 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 	BindPos := InStr(Drain,
 		"PublishAuthorizeFn := _TrayRootPublishAuthorized.Bind(")
 	BuildPos := InStr(Drain,
-		"_TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn)")
+		"_TrayRootBuildOnce(PublishAuthorizeFn, WorkerFn, CallerLlm)")
 	Assert(BindPos > 0 and BuildPos > BindPos,
 		"the root owner must bind its exact generation/lifecycle ticket and pass it to the selected worker")
 
@@ -39,8 +39,8 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 		"WorkerFn.Call(PublishAuthorizeFn)") > 0,
 		"an injected root worker must receive the exact terminal authorizer")
 	Assert(InStr(RootBuild,
-		"initMenu(PublishAuthorizeFn)") > 0,
-		"the canonical production root worker must pass its terminal authorizer to initMenu")
+		"initMenu(PublishAuthorizeFn, false, LiveLlm?)") > 0,
+		"the canonical production root worker must pass its terminal authorizer, and the AI child its request lent, to initMenu")
 
 	BootBuild := _DriverFuncBody("_TrayRootBuildBoot")
 	Assert(BootBuild != "", "_TrayRootBuildBoot() must exist")
