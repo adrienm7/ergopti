@@ -7,7 +7,7 @@
 _MSUC_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Name in ["MagicKeyEditor", "MagicKeySourceCapture", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned",
+	for Name in ["_SIHO_ScalarEndKeys", "_SIHO_ReadScalar", "MagicKeyEditor", "MagicKeySourceCapture", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned",
 		"_MagicKeySourceCapturePoll", "_MagicKeySourcePressedScan", "_MagicKeySourceCaptureKeyDown"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "The startup child requires its genuine owner: " . Name)

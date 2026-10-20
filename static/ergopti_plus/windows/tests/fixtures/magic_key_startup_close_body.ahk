@@ -62,6 +62,10 @@ LoggerError(*) {
 	_MSUC.Errors += 1
 }
 
+LoggerWarn(*) {
+	throw Error("The startup lifecycle corpus must not qualify malformed scalar text.")
+}
+
 ModifyMagicKey(Window, Value) {
 	_MSUC_Record("character", Value)
 }
@@ -115,7 +119,7 @@ _MSUC_CreateHook(Options, EndKeys := "") {
 	global _MSUC
 	_MSUC_Require(!IsObject(_MSUC.Hook), "The genuine entry point must construct exactly one hook.")
 	if _MSUC.Editor == "character"
-		_MSUC_Require(Options == "L1 I" && EndKeys == "{Escape}", "The character constructor must remain genuine.")
+		_MSUC_Require(Options == "L2 E C I" && EndKeys == _SIHO_ScalarEndKeys() . "{Escape}", "The character constructor must remain genuine.")
 	else
 		_MSUC_Require(Options == "L0 I T" . (_MSUC.Timeout / 1000.0) && EndKeys == "", "The source constructor must remain genuine.")
 	_MSUC.FactoryVisible := DllCall("User32\IsWindowVisible", "Ptr", _MSUC.Hwnd, "Int") != 0
@@ -131,7 +135,7 @@ _MSUC_CreateHook(Options, EndKeys := "") {
 
 class _MSUC_Hook {
 	__New() {
-		this.Input := "", this.EndReason := "", this.InProgress := false
+		this.Input := "", this.EndKey := "", this.EndReason := "", this.InProgress := false
 		this.Starts := 0, this.Stops := 0, this.Waits := 0
 	}
 	KeyOpt(Keys, Options) {
@@ -165,7 +169,7 @@ class _MSUC_Hook {
 			if _MSUC.CloseSent
 				this.Stop()
 			else if _MSUC.Editor == "character" {
-				this.Input := "a", this.EndReason := "Max", this.InProgress := false
+				this.EndKey := "a", this.EndReason := "EndKey", this.InProgress := false
 			} else
 				_MagicKeySourceCapturePoll(_MSUC.State, this)
 		}

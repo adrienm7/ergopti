@@ -7,14 +7,15 @@
 if A_Args.Length != 7 || !Map("character", true, "source", true).Has(A_Args[1])
 	ExitApp(2)
 _MESC_Modes := Map("live", true, "cancel", true, "completed-close", true, "completed-paused-resumed", true,
-	"completed-close-successor", true, "stop-refusal", true, "stop-reentrant", true)
+	"completed-close-successor", true, "stop-refusal", true, "stop-reentrant", true,
+	"scalar-pair", true, "invalid-high-BMP", true, "invalid-low", true, "invalid-max", true)
 if !_MESC_Modes.Has(A_Args[2])
 	ExitApp(2)
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
 global HOTKEY_MODIFIER_VKS := Map()
 global _MESC := { Editor: A_Args[1], Mode: A_Args[2], Code: A_Args[3], Scan: A_Args[4], Scans: StrSplit(A_Args[5], ","),
 	Poll: Integer(A_Args[6]), Timeout: Integer(A_Args[7]), Windows: [], Hooks: [], Down: Map(), State: 0,
-	Calls: 0, Value: "", Errors: 0, Interrupts: 0, Failure: 0, Window: 0, Timer: 0, CloseAcks: 0 }
+	Calls: 0, Value: "", Errors: 0, Warnings: 0, Interrupts: 0, Failure: 0, Window: 0, Timer: 0, CloseAcks: 0 }
 OnExit(_MESC_Exit)
 
 _MESC_Require(Condition, Message) {
@@ -41,6 +42,19 @@ WMPresentWindow(Window) {
 LoggerError(*) {
 	global _MESC
 	_MESC.Errors += 1
+}
+
+LoggerWarn(Tag, Message, Reason) {
+	global _MESC
+	_MESC_Require(Reason == "incomplete-scalar" || Reason == "unexpected-end-reason",
+		"Only the malformed scalar reason may reach the warning observer.")
+	_MESC.Warnings += 1
+}
+
+_MESC_RawUnit(Unit) {
+	Bytes := Buffer(4, 0)
+	NumPut("UShort", Unit, Bytes)
+	return StrGet(Bytes, 1, "UTF-16")
 }
 
 ModifyMagicKey(Window, Value) {
@@ -102,7 +116,7 @@ class _MESC_Hook {
 		this.Source := Source, this.Mode := Mode
 		this.State := Source ? _MESC.State : 0
 		this.Window := _MESC.Window
-		this.Input := "", this.EndReason := "", this.InProgress := false
+		this.Input := "", this.EndKey := "", this.EndReason := "", this.InProgress := false
 		this.Starts := 0, this.Stops := 0
 		this.TerminalStop := Source ? 2 : 1
 	}
@@ -142,8 +156,16 @@ class _MESC_Hook {
 			}
 		} else {
 			this.InProgress := false
-			this.EndReason := this.Mode == "cancel" || this.Mode == "successor" ? "EndKey" : "Max"
-			this.Input := this.EndReason == "Max" ? "a" : ""
+			this.EndReason := "EndKey"
+			this.EndKey := this.Mode == "cancel" || this.Mode == "successor" ? "Escape" : "a"
+			if this.Mode == "scalar-pair"
+				this.Input := _MESC_RawUnit(0xD83D), this.EndKey := _MESC_RawUnit(0xDE00)
+			else if this.Mode == "invalid-high-BMP"
+				this.Input := _MESC_RawUnit(0xD83D)
+			else if this.Mode == "invalid-low"
+				this.EndKey := _MESC_RawUnit(0xDE00)
+			else if this.Mode == "invalid-max"
+				this.Input := _MESC_RawUnit(0xD83D) . _MESC_RawUnit(0xD83D), this.EndKey := "", this.EndReason := "Max"
 		}
 		if this.Mode != "completed-close" && this.Mode != "completed-paused-resumed" && this.Mode != "completed-close-successor"
 			return
@@ -165,7 +187,7 @@ _MESC_CreateHook(Options, EndKeys := "") {
 		_MESC_Require(Options == "L0 I T" . (_MESC.Timeout / 1000.0) && EndKeys == "",
 			"Only the real physical source constructor boundary is bound.")
 	else
-		_MESC_Require(Options == "L1 I" && EndKeys == "{Escape}", "Only the real character constructor boundary is bound.")
+		_MESC_Require(Options == "L2 E C I" && EndKeys == _SIHO_ScalarEndKeys() . "{Escape}", "Only the real character constructor boundary is bound.")
 	Mode := _MESC.Hooks.Length == 0 ? _MESC.Mode : "successor"
 	Hook := _MESC_Hook(Source, Mode)
 	_MESC.Hooks.Push(Hook)
@@ -260,13 +282,13 @@ try {
 	if IsObject(_MESC.Failure)
 		throw _MESC.Failure
 	_MESC_Original := _MESC.Hooks[1]
-	_MESC_Expected := _MESC.Mode == "live" ? 1 : 0
+	_MESC_Expected := _MESC.Mode == "live" || _MESC.Mode == "scalar-pair" ? 1 : 0
 	FileAppend("RECEIPT editor=" . _MESC.Editor . " mode=" . _MESC.Mode . " publish_calls=" . _MESC.Calls
 		. " expected=" . _MESC_Expected . " stops=" . _MESC_Original.Stops . " reason=" . _MESC_Original.EndReason . "`n", "*")
 	_MESC_Require(_MESC_Original.Starts == 1 && _MESC.Calls == _MESC_Expected,
 		"Only an uninterrupted completed editor may reach its real persistence route.")
 	if _MESC_Expected
-		_MESC_Require(_MESC.Value == (_MESC.Editor == "character" ? "a" : _MESC.Code), "A live capture must retain its exact value.")
+		_MESC_Require(_MESC.Value == (_MESC.Editor == "character" ? (_MESC.Mode == "scalar-pair" ? Chr(0x1F600) : "a") : _MESC.Code), "A live capture must retain its exact value.")
 	if _MESC.Mode == "stop-refusal" || _MESC.Mode == "completed-close-successor" || _MESC.Mode == "stop-reentrant" {
 		_MESC_Retained := _MESC.Mode == "stop-refusal" ? _MESC_Original : _MESC.Hooks[2]
 		_MESC_Require(_MagicKeyEditorInputHook == _MESC_Retained && _MagicKeyEditorStopDebt && _MESC.Errors == 1,
@@ -279,6 +301,7 @@ try {
 		_MESC_Require(!IsObject(_MagicKeyEditorInputHook) && !_MagicKeyEditorStopDebt && _MESC.Errors == 0,
 			"No orphan singleton or hidden Stop error may survive this editor.")
 	}
+	_MESC_Require(_MESC.Warnings == (InStr(_MESC.Mode, "invalid-") == 1 ? 1 : 0), "Malformed text is refused visibly without persisting partial units.")
 	if InStr(_MESC.Mode, "completed-close") == 1 || _MESC.Mode == "stop-reentrant"
 		_MESC_Require(_MESC.CloseAcks == 1, "The refusal must cross exactly one actual native Close event.")
 	FileAppend("PASS magic-key-capture-settlement " . _MESC.Editor . " " . _MESC.Mode . "`n", "*")

@@ -26,7 +26,9 @@ _UNC_Allowed := Map("one-shot-a", true, "one-shot-AB", true, "one-shot-surrogate
 	"one-shot-disabled-surrogate", true, "one-shot-disabled-magic-astral", true,
 	"dead-key-punctuation", true, "dead-key-open-brace", true, "dead-key-close-brace", true,
 	"dead-key-enter", true, "dead-key-pair-B", true,
-	"one-shot-backspace", true, "one-shot-delete", true, "dead-key-backspace", true, "dead-key-delete", true)
+	"one-shot-backspace", true, "one-shot-delete", true, "dead-key-backspace", true, "dead-key-delete", true,
+	"magic-editor-a", true, "magic-editor-AB", true, "magic-editor-surrogate", true,
+	"magic-editor-open-brace", true, "magic-editor-close-brace", true, "magic-editor-punctuation", true)
 if !_UNC_Allowed.Has(A_Args[2]) {
 	FileAppend("REFUSED: unknown native Unicode capture case.`n", "**")
 	ExitApp(2)
@@ -40,9 +42,10 @@ if !_UNC_Allowed.Has(A_Args[2]) {
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605))
 global OneShotShiftEnabled := false, InDeadKeySequence := false
+global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
 global _UNC := { Case: A_Args[2], Gui: 0, Edit: 0, Hwnd: 0, EditHwnd: 0, Thread: 0,
 	Pid: DllCall("GetCurrentProcessId", "UInt"), Guard: 0, Observer: 0, Target: 0, Token: 0,
-	Units: [], ExpectedObserved: 0, Observed: [], Tail: [], Emits: [], Controls: [], Ups: 0, UpVk: 0xE7, Calls: 0, Inserted: -1,
+	Units: [], ExpectedObserved: 0, Observed: [], Tail: [], Emits: [], Controls: [], Persisted: [], Ups: 0, UpVk: 0xE7, Calls: 0, Inserted: -1,
 	PrototypeInjectedAt: 0,
 	Debt: false, Injected: false, Cancelled: false, Error: 0, Logs: 0, Activations: 0, ArmedAt: 0 }
 OnExit(_UNC_Exit)
@@ -98,6 +101,38 @@ Send(Keys) {
 LoggerWarn(*) {
 	global _UNC
 	_UNC.Logs += 1
+}
+
+t(Key) {
+	return Key
+}
+
+class _UNC_EditorGui extends Gui {
+	Show(Options := "") {
+		super.Show(Options)
+		_UNC_FocusCapture()
+	}
+}
+
+Gui_Create(Options, Title) {
+	global _UNC
+	_UNC_Require(InStr(_UNC.Case, "magic-editor-") == 1 && !IsObject(_UNC.Gui),
+		"Only the genuine editor may request one fixture-owned native window.")
+	; A real Edit gives the same exact PID/thread/focus admission as the existing
+	; capture fixture. The product still performs its real hidden construction,
+	; Start, Show, Wait and Destroy; only the GUI provider adds the owned Edit.
+	_UNC_OpenCapture(_UNC_EditorGui(Options, Title), false)
+	return _UNC.Gui
+}
+
+WMPresentWindow(Window) {
+	Window.Show()
+}
+
+ModifyMagicKey(Window, Text) {
+	global _UNC
+	_UNC_Require(Window == 0, "The genuine editor's persistence route must retain its actual arguments.")
+	_UNC.Persisted.Push(_UNC_Units(Text))
 }
 
 _UNC_Identity(Hwnd) {
@@ -164,11 +199,15 @@ _UNC_Packets(Units, Vk := 0) {
 }
 
 _UNC_Inject() {
-	global _UNC, _SIHO_Owners
+	global _UNC, _SIHO_Owners, _MagicKeyEditorInputHook, _MagicKeyEditorGui
+	Editor := InStr(_UNC.Case, "magic-editor-") == 1
 	if _UNC.Injected || _UNC.Cancelled
 		return
 	try {
-		if SIHO_Count() != 1 {
+		Ready := Editor ? IsObject(_MagicKeyEditorInputHook) && _MagicKeyEditorInputHook.InProgress
+			&& DllCall("IsWindowVisible", "Ptr", _UNC.Hwnd, "Int")
+			&& DllCall("GetForegroundWindow", "Ptr") == _UNC.Hwnd && DllCall("GetFocus", "Ptr") == _UNC.EditHwnd : SIHO_Count() == 1
+		if !Ready {
 			_UNC_Require(DllCall("GetTickCount64", "UInt64") - _UNC.ArmedAt < 5000,
 				"The actual product capture never acquired its owner.")
 			SetTimer(_UNC_Inject, -5)
@@ -176,13 +215,20 @@ _UNC_Inject() {
 		}
 		PreviousCritical := Critical("On")
 		try {
-			for Token, Record in _SIHO_Owners {
-				_UNC.Token := Token, _UNC.Target := Record["hook"]
-				ExpectedOwner := InStr(_UNC.Case, "prototype-") == 1 ? "scalar-prototype"
-					: (InStr(_UNC.Case, "one-shot-") == 1 ? "one-shot-shift" : "dead-key")
-				_UNC_Require(Record["owner"] == ExpectedOwner && Record["exclusive"]
-					&& _UNC.Target is InputHook && _UNC.Target.InProgress && _UNC.Target.MinSendLevel == 0,
-					"The real registered native product InputHook must own injection.")
+			if Editor {
+				_UNC.Target := _MagicKeyEditorInputHook
+				_UNC_Require(SIHO_Count() == 0 && _MagicKeyEditorGui == _UNC.Gui
+					&& _UNC.Target is InputHook && _UNC.Target.InProgress && _UNC.Target.MinSendLevel == 1,
+					"The genuine MagicEditor singleton must own the actual native I1 capture.")
+			} else {
+				for Token, Record in _SIHO_Owners {
+					_UNC.Token := Token, _UNC.Target := Record["hook"]
+					ExpectedOwner := InStr(_UNC.Case, "prototype-") == 1 ? "scalar-prototype"
+						: (InStr(_UNC.Case, "one-shot-") == 1 ? "one-shot-shift" : "dead-key")
+					_UNC_Require(Record["owner"] == ExpectedOwner && Record["exclusive"]
+						&& _UNC.Target is InputHook && _UNC.Target.InProgress && _UNC.Target.MinSendLevel == 0,
+						"The real registered native product InputHook must own injection.")
+				}
 			}
 			; Newest and visible: observe every packet before the product consumes
 			; its prefix. The older suppressive guard owns any remaining tail.
@@ -203,8 +249,11 @@ _UNC_Inject() {
 		} finally Critical(PreviousCritical)
 	} catch as Err {
 		_UNC.Error := Err
-		try SIHO_StopAll()
-		catch as CleanupErr
+		try {
+			SIHO_StopAll()
+			if Editor && IsObject(_MagicKeyEditorInputHook)
+				_UNC_Require(_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook), "The failed injection must retire its exact editor owner.")
+		} catch as CleanupErr
 			FileAppend("CLEANUP_FAILED " . CleanupErr.Message . "`n", "**")
 	}
 }
@@ -234,7 +283,7 @@ _UNC_Close(*) {
 }
 
 _UNC_Exit(Reason, Code) {
-	global _UNC
+	global _UNC, _MagicKeyEditorInputHook
 	if _UNC.Debt {
 		FileAppend("RETAINED pid=" . _UNC.Pid . " case=" . _UNC.Case . " native_input_debt=true natural_exit=false`n", "**")
 		return 1
@@ -243,8 +292,11 @@ _UNC_Exit(Reason, Code) {
 	try SetTimer(_UNC_Inject, 0)
 	catch as Err
 		Failures.Push(Err)
-	try SIHO_StopAll()
-	catch as Err
+	try {
+		SIHO_StopAll()
+		if IsObject(_MagicKeyEditorInputHook)
+			_UNC_Require(_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook), "The native editor owner must retire before child exit.")
+	} catch as Err
 		Failures.Push(Err)
 	for Hook in [_UNC.Observer, _UNC.Guard] {
 		if !IsObject(Hook)
@@ -258,7 +310,7 @@ _UNC_Exit(Reason, Code) {
 			FileAppend("RETAINED cleanup_failure=" . Err.Message . " external_owned_retirement_required=true`n", "**")
 		return 1
 	}
-	if IsObject(_UNC.Gui) {
+	if IsObject(_UNC.Gui) && DllCall("IsWindow", "Ptr", _UNC.Hwnd, "Int") {
 		try _UNC.Gui.Destroy()
 		catch as Err {
 			FileAppend("RETAINED gui_cleanup_failure=" . Err.Message . " external_owned_retirement_required=true`n", "**")
@@ -269,24 +321,31 @@ _UNC_Exit(Reason, Code) {
 	return 0
 }
 
-_UNC_OpenCapture() {
+_UNC_OpenCapture(Window := 0, Display := true) {
 	global _UNC
-	_UNC.Gui := Gui("", "Ergopti explicit native InputHook Unicode capture")
+	_UNC.Gui := IsObject(Window) ? Window : Gui("", "Ergopti explicit native InputHook Unicode capture")
 	_UNC.Gui.OnEvent("Close", _UNC_Close)
 	_UNC.Gui.OnEvent("Escape", _UNC_Close)
 	_UNC.Edit := _UNC.Gui.AddEdit("w480 r3")
 	_UNC.Hwnd := _UNC.Gui.Hwnd, _UNC.EditHwnd := _UNC.Edit.Hwnd
 	_UNC.Thread := _UNC_Identity(_UNC.Hwnd)["thread"]
-	_UNC.Gui.Show()
-	WinActivate("ahk_id " . _UNC.Hwnd)
-	_UNC_Require(WinWaitActive("ahk_id " . _UNC.Hwnd, , 3), "The exact owned Edit could not activate.")
-	_UNC.Edit.Focus()
-	_UNC_Admit()
+	if Display {
+		_UNC.Gui.Show()
+		_UNC_FocusCapture()
+	}
 	InstallKeybdHook()
 	_UNC.Guard := InputHook("L0")
 	_UNC.Guard.OnChar := _UNC_Tail
 	_UNC.Guard.Start()
 	_UNC_Require(SIHO_Count() == 0, "Only the actual product hook joins the product's exclusive registry.")
+}
+
+_UNC_FocusCapture() {
+	global _UNC
+	WinActivate("ahk_id " . _UNC.Hwnd)
+	_UNC_Require(WinWaitActive("ahk_id " . _UNC.Hwnd, , 3), "The exact owned Edit could not activate.")
+	_UNC.Edit.Focus()
+	_UNC_Admit()
 }
 
 ; Construction/decoding now come from the canonical production helper.
@@ -553,11 +612,71 @@ _UNC_Run() {
 		"No hidden error or application text may qualify this capture, and only genuine special results activate hotstrings.")
 }
 
+_UNC_RunEditor() {
+	global _UNC, _MagicKeyEditorInputHook, _MagicKeyEditorGui
+	Mode := SubStr(_UNC.Case, 14)
+	ExpectedTail := []
+	switch Mode {
+		case "a":
+			_UNC.Units := [0x61], Expected := [0x61]
+		case "AB":
+			_UNC.Units := [0x41, 0x42], Expected := [0x41], ExpectedTail := [0x42]
+		case "surrogate":
+			_UNC.Units := [0xD83D, 0xDE00], Expected := [0xD83D, 0xDE00]
+		case "open-brace":
+			_UNC.Units := [0x7B], Expected := [0x7B]
+		case "close-brace":
+			_UNC.Units := [0x7D], Expected := [0x7D]
+		case "punctuation":
+			_UNC.Units := [0x2E], Expected := [0x2E]
+		default:
+			throw Error("Unknown native MagicEditor scalar vector.")
+	}
+	_UNC.ArmedAt := DllCall("GetTickCount64", "UInt64")
+	SetTimer(_UNC_Inject, -1)
+	CaptureError := 0
+	try MagicKeyEditor()
+	catch as Err
+		CaptureError := Err
+	finally SetTimer(_UNC_Inject, 0)
+	_UNC_Require(_UNC.Injected && _UNC.Calls == 1, "The genuine editor must receive one explicit native batch.")
+	try _UNC_Drain()
+	catch as DrainError {
+		if IsObject(CaptureError)
+			FileAppend("OWNER_FAILURE " . CaptureError.Message . "`n" . CaptureError.Stack . "`n", "**")
+		throw DrainError
+	}
+	if IsObject(_UNC.Error)
+		throw _UNC.Error
+	Input := _UNC_Units(_UNC.Target.Input), EndKey := _UNC_Units(_UNC.Target.EndKey)
+	Scalar := _UNC_Units(_UNC.Target.Input . _UNC.Target.EndKey)
+	FileAppend("RECEIPT source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case
+		. " input=" . _UNC_Hex(_UNC.Units) . " observed=" . _UNC_Hex(_UNC.Observed)
+		. " input_buffer=" . _UNC_Hex(Input) . " end_key=" . _UNC_Hex(EndKey) . " target=" . _UNC_Hex(Scalar)
+		. " end_reason=" . _UNC.Target.EndReason . " tail=" . _UNC_Hex(_UNC.Tail) . " ups=" . _UNC.Ups
+		. " native_calls=" . _UNC.Calls . " inserted=" . _UNC.Inserted . " min_send_level=" . _UNC.Target.MinSendLevel
+		. " persist_calls=" . _UNC.Persisted.Length . " persisted=" . (_UNC.Persisted.Length == 1 ? _UNC_Hex(_UNC.Persisted[1]) : "none")
+		. " scope=native_editor_capture_and_observed_persistence application_receiving=false config_write=false`n", "*")
+	if IsObject(CaptureError)
+		throw CaptureError
+	_UNC_Require(_UNC.Target.EndReason == "EndKey" && !_UNC.Target.InProgress && _UNC.Target.MinSendLevel == 1
+		&& !IsObject(_MagicKeyEditorInputHook) && !IsObject(_MagicKeyEditorGui) && SIHO_Count() == 0,
+		"The genuine I1 editor must retire its exact singleton before accepting text.")
+	_UNC_Require(!DllCall("IsWindow", "Ptr", _UNC.Hwnd, "Int") && !DllCall("IsWindow", "Ptr", _UNC.EditHwnd, "Int"),
+		"The genuine editor finally must destroy its actual GUI and Edit after capture.")
+	_UNC_Require(_UNC_Same(Scalar, Expected) && _UNC.Persisted.Length == 1 && _UNC_Same(_UNC.Persisted[1], Expected),
+		"Only the complete independent scalar golden may reach the actual persistence callback arguments.")
+	_UNC_Require(_UNC_Same(_UNC.Tail, ExpectedTail) && _UNC.Logs == 0 && _UNC.Emits.Length == 0 && _UNC.Controls.Length == 0,
+		"The safety guard owns the independent tail, with no hidden error or application emit.")
+}
+
 FileAppend("BEGIN source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case . "`n", "*")
 try {
 	Prototype := InStr(_UNC.Case, "prototype-") == 1
 	if Prototype
 		_UNC_RunPrototype()
+	else if InStr(_UNC.Case, "magic-editor-") == 1
+		_UNC_RunEditor()
 	else
 		_UNC_Run()
 	FileAppend("PASS " . (Prototype ? "native-inputhook-endchars-prototype" : "native-inputhook-unicode-capture") . "`n", "*")
