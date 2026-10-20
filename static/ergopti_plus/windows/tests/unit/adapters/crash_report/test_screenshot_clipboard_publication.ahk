@@ -7,6 +7,8 @@
 _GSCP_Publish(Record, Stage) {
 	Receipt := _GestureScreenshotDefaultPublishClipboard(Stage)
 	Record["receipt"] := Receipt
+	Record["sequence_after_publish"] := CB_GetSequenceNumber()
+	Record["clipboard_owner"] := DllCall("User32\GetClipboardOwner", "Ptr")
 	Mode := Record["mode"]
 	if InStr(Mode, "foreign") {
 		if Mode == "foreign-image"
@@ -62,9 +64,13 @@ _GSCP_Case(Mode) {
 			"started_tick", A_TickCount, "timeout_ms", 60000, "callback", _GSWO_RecordTerminal)
 		Job := Map("stage", Stage, "cancel_requested", false)
 		GestureDirectCaptureWorkerDone(1, 1, Job, 0, "", "")
-		AssertEqual(1, _GSWO_Terminals.Length, "the real direct owner must settle exactly once")
+		Receipt := Record.Get("receipt", Map())
+		Diagnostic := " / mode=" . Mode . " receipt=" . Receipt.Get("sequence", 0)
+			. " afterPublish=" . Record.Get("sequence_after_publish", 0)
+			. " current=" . CB_GetSequenceNumber() . " owner=" . Record.Get("clipboard_owner", 0)
+		AssertEqual(1, _GSWO_Terminals.Length, "the real direct owner must settle exactly once" . Diagnostic)
 		AssertEqual(Mode == "owned-success", _GSWO_Terminals[1]["ok"],
-			"a later foreign copy cannot authorize the original screenshot's success")
+			"a later foreign copy cannot authorize the original screenshot's success" . Diagnostic)
 		if InStr(Mode, "foreign") {
 			AssertEqual(Record["foreign_sequence"], CB_GetSequenceNumber(),
 				"rollback must never replace the genuine foreign clipboard copy")
@@ -76,7 +82,7 @@ _GSCP_Case(Mode) {
 			AssertTrue(CB_HasImage(), "the admitted bitmap must remain published")
 		} else
 			AssertEqual("original clipboard publication fixture", CB_Read(),
-				"owned cancellation restores the snapshot and an unmutated failure preserves it")
+				"owned cancellation restores the snapshot and an unmutated failure preserves it" . Diagnostic)
 		AssertEqual(ActiveBefore, CBClipboardOwner.active.Count, "every real clipboard owner must retire")
 		AssertFalse(CBClipboardOwner.restore_debt is Map, "no fixture debt may escape the completed rollback")
 	} catch as Err {
