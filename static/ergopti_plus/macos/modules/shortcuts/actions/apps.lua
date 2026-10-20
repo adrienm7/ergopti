@@ -92,6 +92,7 @@ local _copy_capture_apps_generation = nil
 local _copy_recovery_only = false
 local _copy_capture_timer = nil
 local _copy_restore_retry_timer = nil
+local _copy_dispatch = nil
 
 -- App navigation owns two kinds of asynchronous native capabilities: deferred
 -- timers and ShellRunner processes.  Each parent scope has one admission
@@ -457,6 +458,8 @@ end
 
 local function release_copy_capture(generation)
 	if generation ~= _copy_capture_generation then return false end
+	if _copy_dispatch and _copy_dispatch.pending then return false end
+	_copy_dispatch = nil
 	_copy_capture_in_flight = false
 	_copy_saved_prior = nil
 	_copy_capture_scope = nil
@@ -469,6 +472,14 @@ end
 local function restore_copy_capture(prior, generation)
 	if generation ~= _copy_capture_generation or not _copy_capture_in_flight then
 		return false, "stale copy generation"
+	end
+	local dispatch = _copy_dispatch
+	if dispatch and dispatch.pending then
+		dispatch.cancel_requested = true
+		pcall(SyntheticInput.cancel, dispatch.tx)
+		if dispatch.pending then return false, "copy transaction retirement pending" end
+		-- Cancellation may synchronously deliver the exact terminal and restoration.
+		if generation ~= _copy_capture_generation then return true, nil end
 	end
 	local ok_restore, restore_result
 	if type(prior) == "table" and next(prior) ~= nil then
@@ -512,7 +523,9 @@ local function arm_copy_timer(slot, delay, label, generation, callback)
 						label .. " callback failed", callback_error)
 				end
 			end
-		end, clear_slot, slot == "restore")
+		-- Both slots continue this exact retained capture, including from its due
+		-- callback. They do not admit a new action past a settling timer entry.
+		end, clear_slot, slot == "restore" or slot == "capture")
 	if committed ~= true then
 		return false, "timer acquisition refused"
 	end
@@ -552,6 +565,68 @@ abort_copy_capture = function(prior, generation, reason, detail)
 	end
 	Logger.error(LOG, "copy_or_open_path %s — %s (restore=%s).",
 		reason, tostring(detail), tostring(restore_error))
+end
+
+--- Retains admission before Cmd+C, then measures its settle interval from native handoff.
+--- A timer that expires behind another FIFO producer cannot read or release the clipboard.
+local function start_copy_dispatch(prior, generation, scope, apps_generation, modifiers, delay, label, callback)
+	local dispatch = { pending = true, timer_elapsed = false }
+	_copy_dispatch = dispatch
+	local function owns_dispatch()
+		return _copy_dispatch == dispatch and generation == _copy_capture_generation
+	end
+	local capture
+	local function arm(wait)
+		dispatch.timer_elapsed = false
+		local armed, detail = arm_copy_timer("capture", wait, label, generation, capture)
+		if not armed then
+			abort_copy_capture(prior, generation, label .. " timer refused", detail)
+		end
+		return armed
+	end
+	capture = function()
+		if not owns_dispatch() or not copy_capture_authorized(generation, scope, apps_generation) then return end
+		if dispatch.deadline == nil then dispatch.timer_elapsed = true; return end
+		local remaining = dispatch.deadline - hs.timer.absoluteTime()
+		if remaining > 0 then arm(remaining / 1e9); return end
+		if dispatch.pending then dispatch.timer_elapsed = true; return end
+		_copy_dispatch = nil
+		callback()
+	end
+	local ok, accepted = xpcall(function()
+		dispatch.tx = SyntheticInput.begin("shortcuts.apps.copy", "action", {
+			current = function() return owns_dispatch() and copy_capture_authorized(generation, scope, apps_generation) end,
+			cached = function() return owns_dispatch() and copy_capture_authorized(generation, scope, apps_generation) end,
+		})
+		SyntheticInput.on_complete(dispatch.tx, function(_, status)
+			dispatch.pending = false
+			if not owns_dispatch() then return end
+			if dispatch.cancel_requested then
+				local restored = restore_copy_capture(prior, generation)
+				if not restored and generation == _copy_capture_generation then queue_copy_restore_retry(prior, generation) end
+			elseif status ~= "complete" then
+				abort_copy_capture(prior, generation, "copy transaction failed", status)
+			elseif dispatch.timer_elapsed and dispatch.deadline ~= nil then
+				capture()
+			end
+		end)
+		SyntheticInput.on_dispatched(dispatch.tx, function(_, _, status)
+			if not owns_dispatch() or status ~= "dispatched" then return end
+			dispatch.deadline = hs.timer.absoluteTime() + math.ceil(delay * 1e9)
+			if dispatch.timer_elapsed and copy_capture_authorized(generation, scope, apps_generation) then arm(delay) end
+		end)
+		if not arm(delay) then return false end
+		assert(SyntheticInput.emit_key_stroke(modifiers, "c", KEYSTROKE_NO_DELAY_US, dispatch.tx) == true,
+			"copy shortcut admission refused")
+		assert(SyntheticInput.seal(dispatch.tx) == true, "copy transaction seal refused")
+		return true
+	end, debug.traceback)
+	if not ok then
+		if dispatch.tx == nil then dispatch.pending = false end
+		abort_copy_capture(prior, generation, "copy dispatch failed", accepted)
+		return false
+	end
+	return accepted == true
 end
 
 --- Heuristically checks whether a string looks like a URL and normalises it.
@@ -841,31 +916,11 @@ function M.copy_or_open_path(parent)
 				end
 				if sel and sel ~= "" then open_or_search(sel) end
 			end
-			local armed, timer_error = arm_copy_timer(
-				"capture", COPY_SETTLE_SEC, "fallback selection", capture_generation,
-				read_fallback_selection)
-			if not armed then
-				abort_copy_capture(prior, capture_generation, "fallback timer refused", timer_error)
-				return
-			end
-			local ok_copy, copied = pcall(
-				SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-			if not ok_copy or copied ~= true then
-				abort_copy_capture(prior, capture_generation,
-					"fallback copy shortcut refused", copied)
-			end
+			start_copy_dispatch(prior, capture_generation, scope, capture_apps_generation,
+				{ "cmd" }, COPY_SETTLE_SEC, "fallback selection", read_fallback_selection)
 		end
-		local armed, timer_error = arm_copy_timer(
-			"capture", FINDER_PATH_SETTLE_SEC, "Finder path", capture_generation,
-			read_finder_path)
-		if not armed then
-			abort_copy_capture(prior, capture_generation, "Finder timer refused", timer_error)
-			return false
-		end
-		local ok_copy, copied = pcall(
-			SyntheticInput.emit_key_stroke, { "cmd", "alt" }, "c", KEYSTROKE_NO_DELAY_US)
-		if not ok_copy or copied ~= true then
-			abort_copy_capture(prior, capture_generation, "Finder copy shortcut refused", copied)
+		if not start_copy_dispatch(prior, capture_generation, scope, capture_apps_generation,
+			{ "cmd", "alt" }, FINDER_PATH_SETTLE_SEC, "Finder path", read_finder_path) then
 			return false
 		end
 		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
@@ -904,16 +959,8 @@ function M.copy_or_open_path(parent)
 		end
 		if sel and sel ~= "" then open_or_search(sel) end
 	end
-	local armed, timer_error = arm_copy_timer(
-		"capture", COPY_SETTLE_SEC, "selection", capture_generation, read_selection)
-	if not armed then
-		abort_copy_capture(prior, capture_generation, "selection timer refused", timer_error)
-		return false
-	end
-	local ok_copy, copied = pcall(
-		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-	if not ok_copy or copied ~= true then
-		abort_copy_capture(prior, capture_generation, "copy shortcut refused", copied)
+	if not start_copy_dispatch(prior, capture_generation, scope, capture_apps_generation,
+		{ "cmd" }, COPY_SETTLE_SEC, "selection", read_selection) then
 		return false
 	end
 	if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
