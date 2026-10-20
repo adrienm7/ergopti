@@ -1,0 +1,9 @@
+{
+	"expected_count": 2,
+	"filters": [
+		{
+			"contains": "clipboardall-external-lock",
+			"expected_count": 2
+		}
+	]
+}
