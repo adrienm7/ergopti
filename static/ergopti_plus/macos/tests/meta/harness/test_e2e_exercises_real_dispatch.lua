@@ -115,8 +115,13 @@ local function matrix_harness_name(src, job_at, step_at, name, roles)
 	helpers.assert_true(rows ~= nil, "the E2E plan must declare its mandatory literal rows")
 	local architecture, count = nil, 0
 	for line in rows:gmatch("[^\n]+") do
+		-- The fifth argument (a scenario, e.g. the Intel XCTest cohort) is optional.
 		local role, runner, label, timeout = line:match(
 			"^%s*cell%('([^']+)', '([^']+)', '([^']+)', (%d+)%),?%s*$")
+		if role == nil then
+			role, runner, label, timeout = line:match(
+				"^%s*cell%('([^']+)', '([^']+)', '([^']+)', (%d+), '[%w_%-]+'%),?%s*$")
+		end
 		helpers.assert_true(role ~= nil, "the mandatory matrix row must be a literal canonical cell")
 		if role == "e2e-hs" then
 			count = count + 1
