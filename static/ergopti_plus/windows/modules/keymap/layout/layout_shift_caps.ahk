@@ -193,14 +193,17 @@ RegisterShiftLayer() {
 ; they still win where their choice applies; CapsLock keeps its own layer.
 RegisterBuiltinNumberRow() {
 	global ERGOPTI_SPEC, ERGOPTI_NUMBER_ROW
+	static Criteria := Map()
 	Row := ERGOPTI_SPEC["number_row_base"]
 	try LoggerStart("LayoutNumberRow", "Registering the built-in Ergopti number row…")
 	Count := 0
 	try {
-		HotIf((*) => BuiltinNumberRowIsActive() and !GetCapsLockCondition())
 		for SC in ERGOPTI_NUMBER_ROW {
 			if !Row.Has(SC) || !Row[SC].Has("text")
 				throw Error("The Ergopti number row has no text on " . SC . ".")
+			if !Criteria.Has(SC)
+				Criteria[SC] := _BuiltinNumberRowCriterion.Bind(SC)
+			HotIf(Criteria[SC])
 			Text := Row[SC]["text"]
 			; Digits press and release like the direct-access digits (OTP boxes);
 			; the edge keys type like theirs. The tap keys' hotkeys, created
@@ -219,6 +222,13 @@ RegisterBuiltinNumberRow() {
 		HotIf() ; Reset to no condition
 	}
 	try LoggerSuccess("LayoutNumberRow", "Built-in Ergopti number row registered ({1} keys).", Count)
+}
+
+; The chosen magic key owns its plain press even when this contextual
+; number-row binding would otherwise outrank the global magic fallback.
+_BuiltinNumberRowCriterion(Sc, *) {
+	return BuiltinNumberRowIsActive() && !GetCapsLockCondition()
+		&& LayoutRowIsEmulated(Sc) && !_KLE_MagicKeyOwnsKey(Sc)
 }
 
 /**
