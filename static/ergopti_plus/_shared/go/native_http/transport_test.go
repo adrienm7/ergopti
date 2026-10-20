@@ -264,7 +264,9 @@ func TestBypassIndependentVectors(t *testing.T) {
 
 func TestIdleDeadlinePhysicallyRetiresPeer(t *testing.T) {
 	transport, record := peerTransport(t, "stall-body")
-	transport.IdleTimeout = 100 * time.Millisecond
+	// The idle clock starts with the worker process; 100 ms left a slow runner
+	// no time to start the peer before headers, so RoundTrip itself expired.
+	transport.IdleTimeout = time.Second
 	request, _ := http.NewRequest("GET", "https://example.test/blob", nil)
 	response, err := transport.RoundTrip(request)
 	if err != nil {
