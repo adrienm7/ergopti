@@ -16038,6 +16038,11 @@ test precondition failure, not a Lua defect or a successful permission grant.
   admission and cross-driver cleanup and menu regressions. The maintainer's
   local checkout was updated from schema 11 to 12 without editing the profile;
   the subsequent activation incident below is separate.
+  Progress (58ef8cfc): macOS and Linux now post the translated
+  `config.read_only.newer_schema` notice once after a "newer" boot migration,
+  as Windows does on each refused save (`config_migrate.read_only_notice_key`,
+  pinned by the shared contract). Still open: grey the AI persistence actions
+  with that reason and recheck retained callbacks.
 
 - [ ] **142.** Provide an explicit local driver control command for reload.
 
