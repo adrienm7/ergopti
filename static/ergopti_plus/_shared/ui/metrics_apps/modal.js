@@ -252,3 +252,7 @@ function format_int(n) {
 }
 
 document.addEventListener('DOMContentLoaded', initDashboard);
+
+// Native readiness becomes visible after every external page dependency has run.
+window.publishMetricsAppsCategories = metricsAppsPublications.categories;
+window.publishMetricsAppsData = metricsAppsPublications.data;
