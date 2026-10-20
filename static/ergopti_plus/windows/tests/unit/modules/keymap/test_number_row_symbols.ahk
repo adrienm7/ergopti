@@ -300,6 +300,153 @@ _NRP_AssertQwertySymbolsFirst(Hkl) {
 Test("number row: symbols first reorders the OS layout's row without a registry layout (number-row-native-symbols-first)",
 	_KLT_WithEmulation.Bind(_NRP_NativeSymbolsFirst))
 
+; Counts the occurrences of Needle in Text.
+_NRP_Count(Text, Needle) {
+	StrReplace(Text, Needle, , , &Count)
+	return Count
+}
+
+; The system layout switches AZERTY -> QWERTY -> AZERTY while the driver runs:
+; the layout poll re-evaluates the stored choice on each switch, logs each
+; change between applied and inert once, and refreshes the menu each time
+; what it shows changes; the stored choice is never rewritten
+; (number-row-inert-choice).
+_NRP_SystemLayoutSwitchReevaluates() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, _DigitRowProfiles, KS_DIGIT_ROW_KEYS
+	global _NumberRowEffectiveLogged, _NumberRowMenuSignature, _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL
+	global _LAYOUT_REMAP_HKL, _LayoutPollRetry
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), _DigitRowProfiles, _NumberRowEffectiveLogged,
+		_NumberRowMenuSignature, IsSet(_LAST_KEYBOARD_HKL) ? _LAST_KEYBOARD_HKL : 0,
+		IsSet(_PENDING_KEYBOARD_HKL) ? _PENDING_KEYBOARD_HKL : 0, IsSet(_LAYOUT_REMAP_HKL) ? _LAYOUT_REMAP_HKL : 0,
+		_LayoutPollRetry]
+	Azerty := 0x7E57040C, Qwerty := 0x7E570409
+	Symbols := ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"]
+	AzPlain := Map(), AzShift := Map(), UsPlain := Map(), UsShift := Map()
+	for Index, Key in KS_DIGIT_ROW_KEYS {
+		AzPlain[Key[2]] := Chr(0x26), AzShift[Key[2]] := Mod(Index, 10) . ""
+		UsPlain[Key[2]] := Mod(Index, 10) . "", UsShift[Key[2]] := Symbols[Index]
+	}
+	Dir := _KLT_TempDir()
+	Path := Dir . "number_row.toml"
+	Image := '[layout]`ndirect_access_digits = "digits"`n'
+	FileAppend(Image, Path, "UTF-8-RAW")
+	try {
+		_NRP_UseLayout(Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+			"ergopti_variant", "none", "direct_access_digits", "digits"))
+		KLE_Model := 0
+		KLE_Id := ""
+		_DigitRowProfiles := Map(
+			Azerty, Map("shifted", true, "symbols", AzPlain, "shift_symbols", AzShift),
+			Qwerty, Map("shifted", false, "symbols", UsPlain, "shift_symbols", UsShift))
+		Refreshes := []
+		Port := Map("needs_reload", (Hkl) => false, "reload", (RefusedFn) => false, "pending", () => false,
+			"veto_honored", () => true, "now", () => A_TickCount, "notify", () => 0,
+			"number_row", (Hkl) => NumberRowLayoutObserved(Hkl, (*) => Refreshes.Push(Hkl)))
+		_LAYOUT_REMAP_HKL := Azerty
+		_LAST_KEYBOARD_HKL := Azerty
+		_PENDING_KEYBOARD_HKL := 0
+		_LayoutPollRetry := _LayoutPollNewRetry(0)
+		_NumberRowEffectiveLogged := ""
+		Effective := []
+		Log := _NRP_CaptureLog(() => (
+			_NumberRowMenuSignature := NumberRowMenuSignature(Azerty, false),
+			Effective.Push(NumberRowEffectiveMode(Azerty, false)),
+			LayoutPollTick(Qwerty, false, false, 0, 0, 5000, false, Port),
+			Effective.Push(NumberRowEffectiveMode(Qwerty, false)),
+			LayoutPollTick(Azerty, false, false, 0, 0, 5000, false, Port),
+			Effective.Push(NumberRowEffectiveMode(Azerty, false))))
+		AssertEqual("digits native digits", Effective[1] . " " . Effective[2] . " " . Effective[3],
+			"digits first applies on AZERTY, is inert on QWERTY, applies again on AZERTY")
+		AssertEqual(2, Refreshes.Length, "the menu is refreshed on both switches")
+		AssertEqual(Qwerty, Refreshes[1])
+		AssertEqual(Azerty, Refreshes[2])
+		AssertEqual(1, _NRP_Count(Log, "'digits' applies on this layout"), "the first state is logged once")
+		AssertEqual(1, _NRP_Count(Log, "is not applied on this layout (already_digits_first)"), "turning inert is logged once")
+		AssertEqual(1, _NRP_Count(Log, "'digits' applies again on this layout"), "applying again is logged once")
+		AssertEqual(Image, FSReadUtf8Exact(Path), "the stored choice is byte-identical")
+		AssertEqual("digits", MasterGateDesiredFeatures(Features)["layout"]["direct_access_digits"])
+		; A switch between two layouts the menu shows alike refreshes nothing.
+		Same := 0x7E57140C
+		_DigitRowProfiles[Same] := _DigitRowProfiles[Azerty]
+		LayoutPollTick(Same, false, false, 0, 0, 5000, false, Port)
+		AssertEqual(2, Refreshes.Length, "an equivalent layout does not rebuild the menu")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		_DigitRowProfiles := Saved[5]
+		_NumberRowEffectiveLogged := Saved[6]
+		_NumberRowMenuSignature := Saved[7]
+		_LAST_KEYBOARD_HKL := Saved[8]
+		_PENDING_KEYBOARD_HKL := Saved[9]
+		_LAYOUT_REMAP_HKL := Saved[10]
+		_LayoutPollRetry := Saved[11]
+		DirDelete(Dir, true)
+	}
+}
+Test("number row: a system layout switch re-evaluates the stored choice and refreshes the menu (number-row-inert-choice)",
+	_KLT_WithEmulation.Bind(_NRP_SystemLayoutSwitchReevaluates))
+
+; The emulated layout changes A -> B, then the emulation is turned off and on:
+; each change re-evaluates the stored choice, with one log line per change of
+; state or reason (number-row-inert-choice).
+_NRP_EmulationChangesReevaluate() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, _NumberRowEffectiveLogged
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), _NumberRowEffectiveLogged]
+	Dir := _KLT_TempDir()
+	Path := Dir . "number_row.toml"
+	Image := '[layout]`ndirect_access_digits = "digits"`n'
+	FileAppend(Image, Path, "UTF-8-RAW")
+	Base := Map("emulated_layout", "", "ergopti_base", true, "ergopti_alt_gr", false,
+		"ergopti_variant", "none", "direct_access_digits", "digits")
+	Use(Emulated, On) {
+		Layout := Base.Clone()
+		Layout["emulated_layout"] := Emulated
+		Layout["ergopti_base"] := On
+		_NRP_UseLayout(Layout)
+		if Emulated != "" && On
+			_KLT_Load(Emulated)
+		else {
+			KLE_Model := 0
+			KLE_Id := ""
+		}
+		return NumberRowEffectiveMode()
+	}
+	try {
+		_NumberRowEffectiveLogged := ""
+		Modes := []
+		Log := ""
+		_NRP_WithAzertyShapedForeground((Hkl) => (
+			Log := _NRP_CaptureLog(() => (
+				Modes.Push(Use("ergol", true)),
+				Modes.Push(Use("ergopti", true)),
+				Modes.Push(Use("", false)),
+				Modes.Push(Use("ergopti", true))))))
+		AssertEqual("native native digits native", Modes[1] . " " . Modes[2] . " " . Modes[3] . " " . Modes[4],
+			"Ergo-L and Ergopti cannot be reordered; the AZERTY row under no emulation can")
+		AssertEqual(1, _NRP_Count(Log, "(already_digits_first)"), "Ergo-L: logged once")
+		AssertEqual(2, _NRP_Count(Log, "(digits_on_both)"), "Ergopti, before and after the emulation pause")
+		AssertEqual(1, _NRP_Count(Log, "'digits' applies again on this layout"), "the emulation turned off")
+		AssertEqual(Image, FSReadUtf8Exact(Path), "the stored choice is byte-identical")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		_NumberRowEffectiveLogged := Saved[5]
+		DirDelete(Dir, true)
+	}
+}
+Test("number row: an emulated layout change and the emulation on and off re-evaluate the stored choice (number-row-inert-choice)",
+	_KLT_WithEmulation.Bind(_NRP_EmulationChangesReevaluate))
+
 ; « Digits first » used to type Ergopti's « $ % = » on the edge keys on any
 ; layout. It reorders the ten digit keys only: the edges keep what the
 ; effective layout types there (number-row-effective-edges).

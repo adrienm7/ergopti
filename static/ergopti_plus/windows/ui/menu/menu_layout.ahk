@@ -214,6 +214,10 @@ _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 			return []
 	}
 	Availability := Expected.Get("availability", 0)
+	; The layout poll refreshes the menu when a layout change alters this.
+	global _NumberRowMenuSignature
+	if Expected.Has("hkl") && Expected.Has("caps")
+		_NumberRowMenuSignature := NumberRowMenuSignature(Expected["hkl"], Expected["caps"])
 	for Index, Item in Row["items"] {
 		Value := Definition[1]["choices"][Index]["value"]
 		; An ordering that cannot make the row's base level differ from its
