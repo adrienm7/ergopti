@@ -1,0 +1,123 @@
+{
+	"_comment": "Replayed by the three drivers' configuration reducers (_shared/lua/healthcheck/configuration.lua on macOS and Linux, windows/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. Every canary is a private value that must reach neither a row nor a shared document.",
+	"features": [
+		{
+			"path": "script.log_level",
+			"default": "INFO",
+			"platforms": ["ahk", "hs", "linux"],
+			"enum_values": ["DEBUG", "INFO", "ERROR"]
+		},
+		{ "path": "script.locale", "default": "fr", "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "script.show_error_dialog", "default": true, "platforms": ["ahk"] },
+		{ "path": "metrics.keep_days", "default": 30, "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "llm.display.opacity", "default": 0.5, "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "llm.models.user_models", "default": [], "platforms": ["ahk", "hs", "linux"] },
+		{ "path": "shortcuts.keyboard.undo", "default": "none", "platforms": ["ahk", "linux"] },
+		{ "path": "layout.mac_only", "default": false, "platforms": ["hs"] },
+		{
+			"path": "hotstrings.autocorrection.names",
+			"default": { "enabled": false, "time_activation_seconds": 0.5 },
+			"platforms": ["ahk", "hs", "linux"]
+		}
+	],
+	"canaries": [
+		"PRIVATE_USER_ZEBRA",
+		"PRIVATE_SECRET_TOKEN_A1B2",
+		"C:\\Users\\PRIVATE_USER_ZEBRA\\notes",
+		"/home/PRIVATE_USER_ZEBRA/notes",
+		"a sentence typed by PRIVATE_USER_ZEBRA"
+	],
+	"vectors": [
+		{
+			"id": "exact-scalars",
+			"driver": "windows",
+			"toml": "[script]\nlog_level = \"DEBUG\"\nshow_error_dialog = false\n\n[metrics]\nkeep_days = 45\n\n[llm.display]\nopacity = 0.25\n",
+			"expected": [
+				{ "setting": "llm.display.opacity", "type": "number", "value": "0.25" },
+				{ "setting": "metrics.keep_days", "type": "number", "value": "45" },
+				{ "setting": "script.log_level", "type": "enum", "value": "DEBUG" },
+				{ "setting": "script.show_error_dialog", "type": "boolean", "value": "false" }
+			]
+		},
+		{
+			"id": "unknown-enum-member-is-text",
+			"driver": "linux",
+			"toml": "[script]\nlog_level = \"a sentence typed by PRIVATE_USER_ZEBRA\"\n",
+			"expected": [{ "setting": "script.log_level", "type": "text", "value": "38" }]
+		},
+		{
+			"id": "paths-and-free-text-keep-only-their-length",
+			"driver": "macos",
+			"toml": "[script]\nlocale = \"/home/PRIVATE_USER_ZEBRA/notes\"\n\n[llm.models]\nuser_models = [\"PRIVATE_SECRET_TOKEN_A1B2\", \"b\", \"c\"]\n",
+			"expected": [
+				{ "setting": "llm.models.user_models", "type": "list", "value": "3" },
+				{ "setting": "script.locale", "type": "text", "value": "30" }
+			]
+		},
+		{
+			"id": "windows-path-keeps-only-its-length",
+			"driver": "windows",
+			"toml": "[script]\nlocale = 'C:\\Users\\PRIVATE_USER_ZEBRA\\notes'\n\n[shortcuts.keyboard]\nundo = \"none\"\n",
+			"expected": [
+				{ "setting": "script.locale", "type": "text", "value": "33" },
+				{ "setting": "shortcuts.keyboard.undo", "type": "text", "value": "4" }
+			]
+		},
+		{
+			"id": "empty-list-and-empty-text",
+			"driver": "linux",
+			"toml": "[script]\nlocale = \"\"\n\n[llm.models]\nuser_models = []\n",
+			"expected": [
+				{ "setting": "llm.models.user_models", "type": "list", "value": "0" },
+				{ "setting": "script.locale", "type": "text", "value": "0" }
+			]
+		},
+		{
+			"id": "unicode-length-counts-characters",
+			"driver": "macos",
+			"toml": "[script]\nlocale = \"é😀ü\"\n",
+			"expected": [{ "setting": "script.locale", "type": "text", "value": "3" }]
+		},
+		{
+			"id": "table-default-reports-its-declared-members-only",
+			"driver": "windows",
+			"toml": "[hotstrings.autocorrection.names]\nenabled = true\ntime_activation_seconds = 2\nsecret_note = \"PRIVATE_SECRET_TOKEN_A1B2\"\n",
+			"expected": [
+				{
+					"setting": "hotstrings.autocorrection.names.enabled",
+					"type": "boolean",
+					"value": "true"
+				},
+				{
+					"setting": "hotstrings.autocorrection.names.time_activation_seconds",
+					"type": "number",
+					"value": "2"
+				}
+			]
+		},
+		{
+			"id": "undeclared-keys-never-become-rows",
+			"driver": "linux",
+			"toml": "[script]\napi_key = \"PRIVATE_SECRET_TOKEN_A1B2\"\n\n[custom]\nowner = \"PRIVATE_USER_ZEBRA\"\n",
+			"expected": []
+		},
+		{
+			"id": "platform-gate",
+			"driver": "windows",
+			"toml": "[layout]\nmac_only = true\n",
+			"expected": []
+		},
+		{
+			"id": "platform-gate-applies-on-its-own-driver",
+			"driver": "macos",
+			"toml": "[layout]\nmac_only = true\n",
+			"expected": [{ "setting": "layout.mac_only", "type": "boolean", "value": "true" }]
+		},
+		{
+			"id": "empty-document",
+			"driver": "macos",
+			"toml": "",
+			"expected": []
+		}
+	]
+}

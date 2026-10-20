@@ -433,6 +433,7 @@ InstallSendNoOps()
 #Include ../ui/paths_editor/init.ahk
 #Include unit/ui/windows/test_paths_editor_logs_dir.ahk
 #Include unit/ui/healthcheck/test_healthcheck_core.ahk
+#Include unit/ui/healthcheck/test_healthcheck_configuration.ahk
 #Include unit/ui/healthcheck/test_diagnostics_collection.ahk
 #Include unit/ui/healthcheck/test_diagnostics_window_control.ahk
 #Include unit/ui/healthcheck/test_healthcheck_owner_snapshots.ahk
@@ -1999,6 +2000,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../ui/healthcheck/probes.ahk
 #Include ../ui/healthcheck/report.ahk
 #Include ../ui/healthcheck/actions.ahk
+#Include ../ui/healthcheck/configuration.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_readers.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_lift_respects_owner.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_ctrl_chords.ahk
