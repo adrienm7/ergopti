@@ -170,6 +170,8 @@ local KEY_MAP = {
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
 	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
+	-- Declared for macOS like the ordering it extends: kept, never applied here.
+	layout_number_row_reorder_edges      = { sec = "layout", key = "number_row_reorder_edges" },
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
 	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
 	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
