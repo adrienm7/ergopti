@@ -1,0 +1,57 @@
+{
+	"expected_count": 91,
+	"filters": [
+		{
+			"contains": "suppressive-capture-settlement",
+			"expected_count": 14
+		},
+		{
+			"contains": "one-shot-rearm-admission",
+			"expected_count": 8
+		},
+		{
+			"contains": "inputhook-unicode-capture",
+			"expected_count": 6
+		},
+		{
+			"contains": "inputhook-endchars-prototype",
+			"expected_count": 7
+		},
+		{
+			"contains": "inputhook-scalar-dispatch",
+			"expected_count": 17
+		},
+		{
+			"contains": "inputhook-scalar-reader",
+			"expected_count": 24
+		},
+		{
+			"contains": "inputhook-scalar-prewarm",
+			"expected_count": 1
+		},
+		{
+			"contains": "inputhook-scalar-rejection",
+			"expected_count": 9
+		},
+		{
+			"contains": "tap-holds: OneShotShift re-emits consumed Backspace/Enter/Delete end keys",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout: DeadKey InputHook has a timeout and finally block",
+			"expected_count": 1
+		},
+		{
+			"contains": "deadkey-endkey-consumed",
+			"expected_count": 1
+		},
+		{
+			"contains": "deadkey-unmapped-absorbs-base-char",
+			"expected_count": 1
+		},
+		{
+			"contains": "SIHO boot window: the owner count answers before its registry exists",
+			"expected_count": 1
+		}
+	]
+}

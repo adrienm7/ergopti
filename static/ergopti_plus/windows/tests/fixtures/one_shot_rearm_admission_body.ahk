@@ -61,6 +61,10 @@ KeyWait(Name, Options) {
 	return true
 }
 
+LoggerWarn(*) {
+	throw Error("No malformed scalar belongs to the existing rearm corpus.")
+}
+
 ActivateHotstrings() {
 	global _OSRA
 	_OSRA.Activations += 1
@@ -121,7 +125,7 @@ class _OSRA_Hook {
 		if _OSRA.Mode == "incumbent-special"
 			this.EndKey := ".", this.EndReason := "EndKey"
 		else
-			this.Input := "a", this.EndReason := "Max"
+			this.EndKey := "a", this.EndReason := "EndKey"
 	}
 	Stop() {
 		this.Stops += 1
@@ -132,8 +136,8 @@ class _OSRA_Hook {
 
 _OSRA_CreateHook(Options, EndKeys) {
 	global _OSRA
-	_OSRA_Require(InStr(Options, "L1 T") == 1 && InStr(Options, " E") > 0, "the genuine bounded suppressive options must reach the passive factory")
-	_OSRA_Require(InStr(EndKeys, ".") > 0 && InStr(EndKeys, "★") > 0, "the real shared table and chosen magic key must populate the capture")
+	_OSRA_Require(InStr(Options, "L2 T") == 1 && InStr(Options, " E C") > 0, "the genuine bounded suppressive options must reach the passive factory")
+	_OSRA_Require(InStr(EndKeys, ".") > 0 && InStr(EndKeys, "★") > 0, "the complete scalar table must admit punctuation and the chosen BMP magic key")
 	Hook := _OSRA_Hook(_OSRA.Hooks.Length == 0)
 	_OSRA.Hooks.Push(Hook)
 	return Hook

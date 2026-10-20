@@ -11,7 +11,7 @@
  *
  * WHAT IS CHECKED:
  * `_shared/tap_hold/one_shot_shift.json` declares the results; the Windows
- * one-shot takes them (and its InputHook end keys) from the shared reader in
+ * one-shot takes its results from the shared reader in
  * tap_hold_loader.ahk and spells none itself; the Linux tap-hold manager reads
  * the same file and its engine spells none either.
  * ==============================================================================
@@ -62,9 +62,35 @@ if (/SpecialCharacter\s*:=\s*("[^"]|Chr\()/.test(body)) {
 		'OneShotShift() spells a one-shot result itself again instead of reading the shared table.'
 	);
 }
-if (!body.includes('TapHoldOneShotResult(') || !body.includes('TapHoldOneShotEndKeys(')) {
+if (
+	!body.includes('TapHoldOneShotResult(Scalar, MagicKey)') ||
+	!body.includes('_TapHoldOneShotTable()')
+) {
 	errors.push(
-		'OneShotShift() must take its results and its end keys from TapHoldOneShotResult/TapHoldOneShotEndKeys.'
+		'OneShotShift() must preload the shared table and dispatch its complete scalar through TapHoldOneShotResult.'
+	);
+}
+const preload = body.indexOf('_TapHoldOneShotTable()');
+const capture = body.indexOf('InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())');
+const startOwned = body.indexOf('SIHO_StartOwned(');
+const decode = body.indexOf('Capture := _SIHO_ReadScalar(ihvText, NamedKeys)');
+const scalar = body.indexOf('Scalar := Capture.Text');
+if (
+	!(
+		preload >= 0 &&
+		capture > preload &&
+		startOwned > capture &&
+		decode > startOwned &&
+		scalar > decode
+	)
+) {
+	errors.push(
+		'OneShotShift() must preload JSON before native capture, then decode a complete scalar before shared dispatch.'
+	);
+}
+if (body.includes('TapHoldOneShotEndKeys(')) {
+	errors.push(
+		'The old magic-key EndChars list can reintroduce an astral high surrogate before scalar completion.'
 	);
 }
 if (!fs.readFileSync(AHK_LOADER, 'utf8').includes('one_shot_shift.json')) {
