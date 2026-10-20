@@ -18,14 +18,16 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		local hs_stub = require("tests.stubs.hs")
 		hs_stub.__reset()
 		local selected = string.rep("a", 32)
+		local change_count = 0
 		hs_stub.pasteboard = {
+			changeCount = function() return change_count end,
 			getContents = function() return selected end,
-			setContents = function() return true end,
-			clearContents = function() return true end,
+			setContents = function() change_count = change_count + 1; return true end,
+			clearContents = function() change_count = change_count + 1 end,
 			readAllData = function()
 				return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" }
 			end,
-			writeAllData = function() return true end,
+			writeAllData = function() change_count = change_count + 1; return true end,
 		}
 		_G.hs = hs_stub
 		package.loaded.hs = hs_stub
@@ -44,6 +46,10 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			helpers.assert_not_nil(tx, "copy and paste require explicit completion ownership")
 			calls.implicit = calls.implicit + 1
 			return true
+		end
+		function synthetic.emit_guarded_key_stroke(mods, key, tx)
+			tx.guarded = true
+			return synthetic.emit_key_stroke(mods, key, nil, tx)
 		end
 		function synthetic.emit_key_strokes() return true end
 		function synthetic.begin(owner, effect)
@@ -64,9 +70,14 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			return true
 		end
 		function synthetic.on_complete(tx, callback) tx.callback = callback end
-		function synthetic.on_dispatched(tx, callback) tx.dispatched = callback end
+		function synthetic.on_dispatched(tx, callback)
+			tx.dispatched = tx.dispatched or {}
+			tx.dispatched[#tx.dispatched + 1] = callback
+		end
 	function synthetic.seal(tx)
-			if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+			for _, callback in ipairs(tx.dispatched or {}) do
+				callback(tx, { native_down_attempted = tx.guarded == true }, "dispatched")
+			end
 		if tx.callback then tx.callback(tx, "complete") end
 			calls.seals = calls.seals + 1
 			return true

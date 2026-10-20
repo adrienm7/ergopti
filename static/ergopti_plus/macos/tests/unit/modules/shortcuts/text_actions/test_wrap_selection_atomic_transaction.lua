@@ -46,6 +46,7 @@ local function load_fixture(options)
 		["public.png"] = "\137PNG\r\n",
 	})
 	local clipboard_data = clone(initial)
+	local change_count = 0
 	local timers = {}
 	local clock_ns = 0
 	local deferred = {}
@@ -98,7 +99,7 @@ local function load_fixture(options)
 			if tx.callback then tx.callback(tx, "cancelled") end
 			return true
 		end,
-		emit_key_stroke = function(_mods, key, _delay)
+		emit_guarded_key_stroke = function(_mods, key)
 			helpers.assert_eq(key, "v", "wrap_selection may emit only Cmd+V")
 			calls.emit_attempts = calls.emit_attempts + 1
 			local outcome = next_outcome(emit_outcomes, calls.emit_attempts)
@@ -120,6 +121,7 @@ local function load_fixture(options)
 	package.loaded["adapters.synthetic_input"] = synthetic
 
 	local pasteboard = {
+		changeCount = function() return change_count end,
 		readAllData = function()
 			calls.read = calls.read + 1
 			local outcome = next_outcome(read_outcomes, calls.read)
@@ -132,6 +134,7 @@ local function load_fixture(options)
 			local outcome = next_outcome(write_outcomes, calls.write_text)
 			-- Model a native call that changed the pasteboard before it reported
 			-- failure. Rollback must therefore run for both false and throw.
+			change_count = change_count + 1
 			clipboard_data = { ["public.utf8-plain-text"] = text }
 			if outcome == "throw" then error("injected clipboard write failure") end
 			if outcome == "false" then return false end
@@ -144,13 +147,14 @@ local function load_fixture(options)
 			if outcome == "throw" then error("injected clipboard restore failure") end
 			if outcome == "false" then return false end
 			if outcome == "nil" then return nil end
+			change_count = change_count + 1
 			clipboard_data = clone(snapshot)
 			return true
 		end,
 		clearContents = function()
 			calls.clear = calls.clear + 1
+			change_count = change_count + 1
 			clipboard_data = {}
-			return true
 		end,
 		getContents = function()
 			return clipboard_data["public.utf8-plain-text"]

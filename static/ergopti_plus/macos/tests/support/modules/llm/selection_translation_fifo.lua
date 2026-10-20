@@ -35,29 +35,54 @@ function M.build(configure, options)
 	world.native_destination.utils.prewarm_ignored_win_watchers({}, {})
 	assert(world.native_destination.utils.capture_text_destination(), "native tracker must retain its classified receipt")
 	local delivered = 0
+	local direct_pending = nil
 
+	local function apply_key(event)
+		if not event.isDown then return end
+		local modifiers = table.concat(event.modifiers or {}, "+")
+		if modifiers == "cmd" and event.key == "c" then
+			if world.selection ~= "" then hs.pasteboard.setContents(world.selection) end
+		elseif modifiers == "cmd" and event.key == "v" then
+			world.pasted = world.clipboard
+			world.document[#world.document + 1] = world.clipboard
+			world.paste_focus = world.focus
+			world.selection = ""
+		elseif modifiers == "shift" and event.key == "right" then
+			world.selection = world.pasted
+		end
+	end
+	-- Guarded clipboard pairs post outside the HID collector. Observe their
+	-- actual native event.post calls rather than fabricating a CG trigger.
+	local prior_observer = quartz.key_observer
+	quartz.key_observer = function(event, app)
+		if prior_observer then prior_observer(event, app) end
+		apply_key(event)
+	end
+	local function direct_timer()
+		for _, timer in ipairs(quartz.timers) do
+			if not timer.stopped and timer.delay == world.synthetic.PERIODIC_OWNER_TICK_SEC then return timer end
+		end
+	end
 	function world.deliver()
+		if direct_pending then
+			local timer = direct_pending
+			direct_pending = nil
+			if timer.stopped then return end
+			for index, retained in ipairs(quartz.timers) do
+				if retained == timer then table.remove(quartz.timers, index); break end
+			end
+			world.elapse(timer.delay)
+			timer.callback()
+			if timer.recurring and not timer.stopped then quartz.timers[#quartz.timers + 1] = timer end
+			return
+		end
 		delivered = delivered + 1
 		local trigger = assert(quartz.triggers[delivered], "expected a posted native broker trigger")
 		local reads = world.native_destination.reads
 		quartz.deliver_posted_trigger(trigger)
 		assert(world.native_destination.reads == reads, "broker delivery must never probe AX")
 		local delivery = quartz.pump_deliveries[#quartz.pump_deliveries]
-		for _, event in ipairs(delivery.events or {}) do
-			if event.isDown then
-				local modifiers = table.concat(event.modifiers or {}, "+")
-				if modifiers == "cmd" and event.key == "c" then
-					world.clipboard = world.selection ~= "" and world.selection or world.clipboard
-				elseif modifiers == "cmd" and event.key == "v" then
-					world.pasted = world.clipboard
-					world.document[#world.document + 1] = world.clipboard
-					world.paste_focus = world.focus
-					world.selection = ""
-				elseif modifiers == "shift" and event.key == "right" then
-					world.selection = world.pasted
-				end
-			end
-		end
+		for _, event in ipairs(delivery.events or {}) do apply_key(event) end
 	end
 	function world.elapse(delay)
 		quartz.options.absolute_time = quartz.timer.absoluteTime() + math.ceil(delay * 1e9)
@@ -75,12 +100,13 @@ function M.build(configure, options)
 	end
 	function world.complete_handoff()
 		for _ = 1, 20 do
-			local found = false
+			local delay
 			for _, timer in ipairs(quartz.timers) do
-				if not timer.stopped and timer.delay == 0 then found = true; break end
+				if not timer.stopped and timer.delay == 0 then delay = 0; break end
 			end
-			if not found then return end
-			world.fire(0)
+			if delay == nil and direct_timer() then delay = world.synthetic.PERIODIC_OWNER_TICK_SEC end
+			if delay == nil then return end
+			world.fire(delay)
 		end
 		error("native handoff completion did not settle")
 	end
@@ -96,6 +122,8 @@ function M.build(configure, options)
 	function world.post_next()
 		local previous = #quartz.triggers
 		for _ = 1, 20 do
+			local timer = direct_timer()
+			if timer then direct_pending = timer; return end
 			world.fire(0)
 			if #quartz.triggers > previous then return end
 		end
@@ -103,7 +131,7 @@ function M.build(configure, options)
 	end
 	function world.flush()
 		for _ = 1, 100 do
-			if delivered < #quartz.triggers then
+			if direct_pending or delivered < #quartz.triggers then
 				world.deliver()
 			else
 				local next_delay

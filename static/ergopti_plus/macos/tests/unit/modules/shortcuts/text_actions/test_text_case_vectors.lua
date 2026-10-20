@@ -60,12 +60,14 @@ local function transformed_by(action_name, selected)
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	local written = nil
+	local change_count = 0
 	hs_stub.pasteboard = {
+		changeCount = function() return change_count end,
 		getContents = function() return selected end,
-		setContents = function(value) written = value; return true end,
-		clearContents = function() return true end,
+		setContents = function(value) change_count = change_count + 1; written = value; return true end,
+		clearContents = function() change_count = change_count + 1 end,
 		readAllData = function() return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" } end,
-		writeAllData = function() return true end,
+		writeAllData = function() change_count = change_count + 1; return true end,
 	}
 	_G.hs = hs_stub
 	package.loaded.hs = hs_stub
