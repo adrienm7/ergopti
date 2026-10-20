@@ -147,6 +147,16 @@ local function has(haystack, needle)
 	return haystack:find(needle, 1, true) ~= nil
 end
 
+--- Extracts the suppression summary line from a sink's contents.
+--- @param blob string Everything one sink received.
+--- @return string|nil The summary line, without its trailing newline.
+local function summary_line(blob)
+	for line in blob:gmatch("([^\n]+)") do
+		if line:find("identical lines suppressed", 1, true) then return line end
+	end
+	return nil
+end
+
 --- Path of the topical sub-file the routed tag is expected to reach.
 ---
 --- Derived from the unified log rather than from the directory handed to
@@ -464,6 +474,11 @@ helpers.describe("logger file sinks — the suppression summary", function()
 			.. "count, so a storm and a one-off read identically. Got:\n%s", errors_log))
 		helpers.assert_true(has(errors_log, string.format("%d identical", SUPPRESSED_COUNT)),
 			"the mirrored summary must carry the same count as the unified one")
+		helpers.assert_eq(
+			summary_line(errors_log), summary_line(text_of(writes, Logger.today_log_path())),
+			"the mirrored summary must be the SAME line as the unified one. A mirror that "
+			.. "re-renders is a second formatter, and the first thing a second formatter gets "
+			.. "wrong is the number")
 	end)
 
 	helpers.it("keeps a suppressed INFO streak out of the errors-only log", function()
