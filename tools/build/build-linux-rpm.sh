@@ -145,6 +145,10 @@ sed 's|^ExecStart=.*|ExecStart=/usr/bin/ergopti --service --tray|' \
 # ----------------------------------------------------------------------
 # 8. SPEC file
 # ----------------------------------------------------------------------
+# The package carries the x86_64 native archive backend
+# (bin/libergopti_archive_publication.so), like the amd64 .deb, so it is
+# built for that architecture: rpmbuild refuses arch-dependent binaries in a
+# noarch package. The release asset keeps its historical file name.
 cat > "$RPM_ROOT/SPECS/ergopti.spec" << SPEC_EOF
 Name:           $PACKAGE_NAME
 Version:        $VERSION
@@ -154,7 +158,7 @@ License:        MIT
 URL:            https://github.com/adrienm7/ergopti
 Source0:        %{name}-%{version}.tar.gz
 
-BuildArch:      noarch
+BuildArch:      $ARCH
 
 # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
 Requires:       luajit >= 2.1
