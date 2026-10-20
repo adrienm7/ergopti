@@ -3173,7 +3173,8 @@ These are software implementations; final hardware verification remains below.
       New on dev run 39375032517: Linux `input-display` window switching
       (`run_window_switch_receipts.py`) found no visible `owned111_active`
       xmessage within its deliberate 5 s deadline, with openbox up and the
-      child alive; root-cause from its next failure.
+      child alive: Openbox had not yet managed it (449529dc, see the
+      owned-window receipts item).
 - [ ] **Deploy site fails after every CI run until dev reaches main.**
       `workflow_run` always reads `deploy-site.yml` from the default branch.
       Main still lacks the job guard of 53c94136 (start the receiver only for
@@ -15330,6 +15331,12 @@ Every deferred qualification remains open and must never count as a pass:
       exceeded its existing five-second visibility deadline before production
       dispatch; its cause remains unresolved. Keep the independent native
       fixture-family and external-recovery controls running.
+      Cause found on dev run 39375032517: the failure snapshot shows the
+      xmessage as an unmapped root child with no WM_STATE and absent from
+      `_NET_CLIENT_LIST`, so Openbox had not handled its MapRequest right after
+      the two `xrandr --setmonitor` changes. 449529dc waits for an Openbox
+      desktop round trip before any owned client; 34/34 pass on a local
+      Xvfb/Openbox. Close after it stays green on hosted runs.
 - [ ] Qualify the complete macOS Brew ZIP/XZ upgrade/refusal boundary. Its
       unconfined-positive AppleEvent returned consent-required -1744; no Mac
       is available. Deferring the combined test also defers its archive proof.
