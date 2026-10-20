@@ -679,3 +679,19 @@ The canonical `llm.display.streaming_multi = true` means progressive display on
 every driver. Windows inverts it only at its native engine field
 `show_all_at_once`; flipping the polarity anywhere else shows predictions all at
 once where the user asked for streaming.
+
+### project-local-reload-command-reports-three-states
+
+The local reload command (`tools/control/request_driver_reload.ps1` on
+Windows, `request_driver_reload.sh` on macOS and Linux) authenticates with the
+token of a session file in a user-private folder declared by
+`_shared/modules/control/driver_control.json`, and is rung by the existing
+Diagnostics window-control owner (Windows), a folder pathwatcher (macOS) or
+SIGUSR1 (Linux). The driver hands an admitted request to its own reload owner
+(`ReloadPreservingSuspend`, `TerminationCoordinator.request_reload_owned`,
+the tray's `perform_reload`) and writes `requested` with the successor pid;
+only that successor, once ready, writes `completed`. A Windows request carries
+a refusal callback, so it is refused as `busy` instead of joining a pending or
+deferred reload. Action: never report a launch or an exit as completion, and
+change the folders or file names only in the declaration, then in the POSIX
+tool, which the Linux suite checks against it.
