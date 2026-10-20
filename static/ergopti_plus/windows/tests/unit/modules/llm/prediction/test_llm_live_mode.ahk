@@ -537,7 +537,9 @@ _LLV_MenuListsRewritePrompts() {
 	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(!InStr(Emit, 'case "llm_live_mode":', true), "the AI menu has no second live profile selector")
 	Assert(!InStr(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', true), "the retired live selector is not bound")
-	Assert(_LMNM_GenerationRoute(Emit), "the native generation group keeps the same typed renderer")
+	Assert(!InStr(_DriverFuncBody("_LLM_Menu_GroupBuilders"), "llm_live_mode", true), "the retired live selector has no group builder")
+	Assert(_LMNM_GenerationRoute(_DriverFuncBody("_LLM_Menu_GroupBuilders"), _DriverFuncBody("LLM_Menu_BuildSubmenu")),
+		"the native generation group keeps the same typed renderer")
 }
 Test("LLM live mode: retained prompt chooser and shortcut owners preserve state (retired-live-menu)",
 	_LLV_MenuListsRewritePrompts)
