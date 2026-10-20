@@ -1020,6 +1020,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 	_KLE_RegisterBindings(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
 			BrokerFn := MagicEditorRecordLayoutFallback) {
 		local Count
+		static WinCriteria := Map()
 		global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
 		global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
 		global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverGeneration
@@ -1058,9 +1059,13 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 				HotIfFn.Call(_KLE_ShortcutCriterion)
 				for Prefix in KLE_SHORTCUT_PREFIXES {
 					Level := (SubStr(Prefix, 1, 1) == "!") ? KLE_ALT_INPUT_LEVEL : KLE_INPUT_LEVEL
-					if Prefix == "#"
-						BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), _KLE_ShortcutCriterion)
-					else
+					if Prefix == "#" {
+						; The broker calls admission without a HotIf name. Retain the
+						; physical row here, including across a registration retry.
+						if !WinCriteria.Has(Sc)
+							WinCriteria[Sc] := _KLE_ShortcutCriterion.Bind("#" . Sc)
+						BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), WinCriteria[Sc])
+					} else
 						HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
 					Count += 1
 				}
