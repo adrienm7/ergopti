@@ -301,7 +301,7 @@ function M.with_manager_session(options, body)
 					s.actions[#s.actions + 1] = { action, binding }
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
 					return true
-				end, action_names = function() return { "copy" } end, on_text_injected = function() end,
+				end, action_names = function() return options.action_names or { "copy" } end, on_text_injected = function() end,
 				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }) == true)
 			s.manager, s.engine, s.owner = manager, manager.configuration_snapshot().engine, manager.configuration_snapshot().combinations
 			s.arm_deadline = function() return s.engine.one_shot_until end

@@ -313,17 +313,20 @@ helpers.describe("actual shared Linux ordered-pair menu",function()
 			helpers.assert_eq(find_menu(rows,s.translate("menu.shortcuts.key_combinations_chord")),nil)
 		end)
 	end)
-	helpers.it("opens the real action catalogue and excludes pair-native state actions",function()
+	helpers.it("opens the real action catalogue, offers CapsWord and excludes pair-native state actions",function()
 		with_menu(function(s)
 			local row=find_menu(s.build(),"caps_lock → tab")
 			local tap=find_menu(row.menu,s.translate("menu.shortcuts.key_combinations_hold_tap"):gsub("%%s","open_url"))
 			helpers.assert_true(tap.fn());helpers.assert_eq(s.picker.binding,binding)
-			local found=false
+			local found,caps_word=false,false
 			for _,item in ipairs(s.picker.items) do
-				helpers.assert_true(item.id~="one_shot_shift" and item.id~="caps_word")
+				helpers.assert_true(item.id~="one_shot_shift")
 				if item.id=="open_url" then found=true end
+				if item.id=="caps_word" then caps_word=true end
 			end
 			helpers.assert_true(found)
+			-- (linux-caps-word-trigger) the Windows pair LAlt then CapsLock can bind it.
+			helpers.assert_true(caps_word,"the pair picker offers CapsWord")
 			helpers.assert_true(s.picker.confirm("open_url","https://picker.example"))
 			helpers.assert_eq(s.gestures.get_action_parameter(binding,"open_url"),"https://picker.example")
 			helpers.assert_eq(Codec.decode(s.bytes[path]).gesture_parameters[parameter],"https://picker.example")

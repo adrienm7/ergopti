@@ -638,6 +638,9 @@ end
 --- @return table { [action_id] = function(binding, parameter): boolean }
 function M.action_handlers()
 	return {
+		-- A key, a key combination, a tap-hold or a gesture bound to CapsWord
+		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
+		["caps_word"] = function() return M.toggle_caps_word() end,
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,

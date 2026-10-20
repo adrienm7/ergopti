@@ -152,7 +152,12 @@ local managed_owners = setmetatable({}, { __mode = "k" })
 local function _run_tap(action, binding)
 	-- This is intent, not an ACK: only Hook's original live-frame controller
 	-- can mint and publish the input arm. Late public exports grant no authority.
-	if action == "one_shot_shift" or action == "caps_word" then return action end
+	if action == "one_shot_shift" then return action end
+	-- CapsWord is an ordinary catalogue action, as on Windows: the executor
+	-- toggles the shortcuts manager's session, the one the tray row shows,
+	-- which locks CapsLock and ends on the [shortcuts.caps_word] settings.
+	-- Returning its id would ask the hook for the engine's own per-letter
+	-- mode instead, a second CapsWord with neither those endings nor the row.
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -495,7 +500,8 @@ local function _build(loaded, boot)
 		actions = { is_assignable = function(action)
 			-- Native adapter identity selects the request route; frame/source/output
 			-- admission still belongs exclusively to its original controller.
-			return action ~= "caps_word" and (action ~= "one_shot_shift" or _hook == _native_hook)
+			-- CapsWord runs through the executor like any action (_run_tap).
+			return (action ~= "one_shot_shift" or _hook == _native_hook)
 				and _tap_action_set()[action] == true
 		end } })
 	issued.engine_options=rawget(combinations,"engine_options")

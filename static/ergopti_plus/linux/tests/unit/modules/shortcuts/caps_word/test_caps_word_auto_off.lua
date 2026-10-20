@@ -411,6 +411,20 @@ helpers.describe("caps word auto-off: the manager session", function()
 		end)
 	end)
 
+	helpers.it("(linux-caps-word-trigger) the catalogue action toggles the tray's session", function()
+		-- A key, a key combination, a tap-hold or a gesture bound to caps_word
+		-- reaches this handler through the action executor.
+		with_caps_word(nil, function(c)
+			local handler = c.manager.action_handlers().caps_word
+			helpers.assert_eq(type(handler), "function", "the shortcuts manager answers caps_word")
+			helpers.assert_true(handler("combination__left_alt_then_caps_lock"))
+			helpers.assert_true(c.manager.is_caps_word_active(), "the same session the tray row shows")
+			helpers.assert_eq(c.hook.locks, 1)
+			helpers.assert_true(handler("combination__left_alt_then_caps_lock"))
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_eq(c.hook.releases, 1)
+		end)
+	end)
 end)
 
 
@@ -419,7 +433,91 @@ end)
 
 -- =================================================================
 -- =================================================================
--- ======= 5/ Wiring ===============================================
+-- ======= 5/ The Shared Corpus, Session Deep ======================
+-- =================================================================
+-- =================================================================
+
+--- Renders a TOML array of quoted delimiter keys.
+--- @param keys table Dense array of delimiter keys.
+--- @return string
+local function toml_list(keys)
+	local quoted = {}
+	for index, key in ipairs(keys) do quoted[index] = string.format("%q", key) end
+	return "[" .. table.concat(quoted, ", ") .. "]"
+end
+
+--- Reads the shared vectors the policy contract replays on every driver.
+--- @return table corpus
+local function corpus()
+	local path = helpers.driver_root() .. "/../_shared/tests/corpus/caps_word/auto_off_vectors.json"
+	local file = assert(io.open(path, "rb"), "the shared CapsWord corpus is readable")
+	local text = file:read("*a")
+	file:close()
+	return require("json").decode(text)
+end
+
+-- The policy contract proves each vector's verdict on the policy alone; these
+-- cases replay the same vectors through the Linux session, so a verdict also
+-- ends the session and unlocks its CapsLock, and a refusal keeps both.
+helpers.describe("caps word session: the shared corpus", function()
+	--- Asserts a session ended by a vector unlocked CapsLock, or kept it.
+	local function assert_outcome(c, ended, expected, label)
+		helpers.assert_eq(ended, expected, label)
+		helpers.assert_eq(c.manager.is_caps_word_active(), not expected, label .. ": session state")
+		helpers.assert_eq(c.hook.held, not expected, label .. ": CapsLock held")
+		helpers.assert_eq(c.hook.releases, expected and 1 or 0, label .. ": unlocks")
+	end
+
+	helpers.it("(linux-caps-word-lock) every typed-text vector ends the session and unlocks only on a checked delimiter", function()
+		local vectors = corpus().text
+		helpers.assert_true(#vectors > 0, "the corpus has text vectors")
+		for index, vector in ipairs(vectors) do
+			local config = "[shortcuts.caps_word]\nterminators = " .. toml_list(vector.terminators) .. "\n"
+			with_caps_word(config, function(c)
+				helpers.assert_true(c.manager.toggle_caps_word())
+				assert_outcome(c, c.manager.caps_word_observe_text(vector.text), vector.expected,
+					string.format("text vector %d (%q)", index, vector.text))
+			end)
+		end
+	end)
+
+	helpers.it("(linux-caps-word-lock) every native-key vector ends the session and unlocks only on a checked delimiter", function()
+		local vectors = corpus().keys
+		helpers.assert_true(#vectors > 0, "the corpus has key vectors")
+		for index, vector in ipairs(vectors) do
+			local config = "[shortcuts.caps_word]\nterminators = " .. toml_list(vector.terminators) .. "\n"
+			with_caps_word(config, function(c)
+				helpers.assert_true(c.manager.toggle_caps_word())
+				assert_outcome(c, c.manager.caps_word_observe_control(vector.key), vector.expected,
+					string.format("key vector %d (%s)", index, vector.key))
+			end)
+		end
+	end)
+
+	helpers.it("(linux-caps-word-lock) every pointer vector ends the session and unlocks only on a checked kind", function()
+		local data = corpus()
+		helpers.assert_true(#data.pointer > 0, "the corpus has pointer vectors")
+		for index, vector in ipairs(data.pointer) do
+			local lines = { "[shortcuts.caps_word.pointer]" }
+			for _, kind in ipairs(data.pointer_kinds) do
+				lines[#lines + 1] = kind .. " = " .. tostring(assert(data.pointer_sets[vector.pointer])[kind])
+			end
+			with_caps_word(table.concat(lines, "\n") .. "\n", function(c)
+				helpers.assert_true(c.manager.toggle_caps_word())
+				assert_outcome(c, c.manager.caps_word_observe_pointer(vector.kind), vector.expected,
+					string.format("pointer vector %d (%s, %s)", index, vector.pointer, vector.kind))
+			end)
+		end
+	end)
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ Wiring ===============================================
 -- =================================================================
 -- =================================================================
 

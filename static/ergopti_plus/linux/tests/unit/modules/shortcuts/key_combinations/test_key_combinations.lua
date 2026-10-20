@@ -309,7 +309,7 @@ helpers.describe("configured pair publication lifecycle",function()
 			helpers.assert_eq(action,nil);helpers.assert_true(frame.ack(true))
 			local _,tap,slot,release=hook.engine:process(15,0,100,origin())
 			helpers.assert_eq(tap,"copy");helpers.assert_eq(slot,binding);helpers.assert_true(release.ack(true))
-			for _,unsupported in ipairs({"one_shot_shift","caps_word"}) do
+			for _,unsupported in ipairs({"one_shot_shift"}) do
 				local accepted=pcall(pairs.configuration_candidate,require("toml_codec").decode(next_text:gsub('"copy"','"'..unsupported..'"')),true)
 				assert_false(accepted,"native-only tap state must not be claimed as a dispatched pair action")
 			end
