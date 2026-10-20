@@ -69,21 +69,19 @@ _GSWO_FakeFileExists(Path) {
 _GSWO_FakePublishFile(Stage, Destination) {
 	global _GSWO_ExistingFiles, _GSWO_FilePublishes
 	_GSWO_FilePublishes += 1
-	if !_GSWO_ExistingFiles.Get(Stage, false)
-		return false
-	_GSWO_ExistingFiles.Delete(Stage)
+	if !_GSWO_ExistingFiles.Get(Stage, false) || _GSWO_ExistingFiles.Get(Destination, false)
+		return Map("published", false, "snapshot", 0)
 	_GSWO_ExistingFiles[Destination] := true
-	return true
+	return Map("published", true, "snapshot", Map("fake_owned_path", Destination))
 }
 
 _GSWO_FakePublishFilePartialFailure(Stage, Destination) {
 	global _GSWO_ExistingFiles, _GSWO_FilePublishes
 	_GSWO_FilePublishes += 1
-	if !_GSWO_ExistingFiles.Get(Stage, false)
-		return false
-	_GSWO_ExistingFiles.Delete(Stage)
+	if !_GSWO_ExistingFiles.Get(Stage, false) || _GSWO_ExistingFiles.Get(Destination, false)
+		return Map("published", false, "snapshot", 0)
 	_GSWO_ExistingFiles[Destination] := true
-	return false
+	return Map("published", false, "snapshot", Map("fake_owned_path", Destination))
 }
 
 _GSWO_FakePublishClipboard(Stage) {
@@ -117,8 +115,9 @@ _GSWO_FakeCleanupStage(Path) {
 	return true
 }
 
-_GSWO_FakeRollbackFile(Path) {
+_GSWO_FakeRollbackFile(Path, Snapshot) {
 	global _GSWO_ExistingFiles, _GSWO_FileRollbacks
+	AssertEqual(Path, Snapshot["fake_owned_path"], "the fake rollback must receive its publisher ownership receipt")
 	_GSWO_FileRollbacks += 1
 	if _GSWO_ExistingFiles.Has(Path)
 		_GSWO_ExistingFiles.Delete(Path)
@@ -765,3 +764,5 @@ Test("screenshot-worker-ownership: every entry point and lifecycle boundary shar
 #Include test_screenshot_region_startup.ahk
 
 #Include test_screenshot_region_sequence.ahk
+
+#Include test_screenshot_file_publication.ahk

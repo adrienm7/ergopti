@@ -19,6 +19,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../../adapters/file_publication.ahk
+
 global _GestureRegionCapture := false
 global _GestureRegionCaptureEpoch := 0
 global _GestureDirectCaptures := Map()
@@ -85,15 +87,35 @@ _GestureScreenshotDefaultFileExists(Path) {
 }
 
 _GestureScreenshotDefaultPublishFile(Stage, Destination) {
+	return FSPublishCreateOwned(Stage, Destination)
+}
+
+_GestureScreenshotFileSnapshot(Path) {
+	Reader := 0
 	try {
-		if !FileExist(Stage) || FileExist(Destination)
-			return false
-		FileMove(Stage, Destination)
-		return FileExist(Destination) != ""
-	} catch as Err {
-		LoggerError("gestures", "Screenshot file publication failed for '{1}': {2}.", Destination, Err.Message)
-		return false
+		Reader := FSOpenStrict(Path, "r-wd", "UTF-8-RAW")
+		return IsObject(Reader) ? FSHandleSnapshot(Reader.Handle) : 0
+	} catch {
+		return 0
+	} finally {
+		if IsObject(Reader)
+			Reader.Close()
 	}
+}
+
+_GestureScreenshotSnapshotMatches(Expected, Path) {
+	Observed := _GestureScreenshotFileSnapshot(Path)
+	if !(Expected is Map) || !Expected.Get("ok", false)
+			|| !(Observed is Map) || !Observed.Get("ok", false)
+		return false
+	for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+		if Expected[Key] != Observed[Key]
+			return false
+	return true
+}
+
+_GestureScreenshotDefaultRollbackFile(Destination, Snapshot) {
+	return FSDeleteVerified(Destination, _GestureScreenshotSnapshotMatches.Bind(Snapshot))
 }
 
 _GestureScreenshotDefaultPublishClipboard(Stage) {
@@ -164,10 +186,10 @@ _GestureScreenshotCleanupStage(Job) {
 	}
 }
 
-_GestureScreenshotRollbackFile(Destination) {
+_GestureScreenshotRollbackFile(Destination, Snapshot) {
 	Fn := IsObject(GestureScreenshotWorkerState.rollback_file_fn)
-		? GestureScreenshotWorkerState.rollback_file_fn : _GestureScreenshotDefaultDeleteFile
-	try return Fn.Call(Destination)
+		? GestureScreenshotWorkerState.rollback_file_fn : _GestureScreenshotDefaultRollbackFile
+	try return Fn.Call(Destination, Snapshot)
 	catch as Err {
 		LoggerError("gestures", "Canceled screenshot file rollback threw for '{1}': {2}.", Destination, Err.Message)
 		return false
@@ -553,19 +575,20 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 	}
 
 	if State["mode"] == "save" {
-		DestinationExistedBefore := _GestureScreenshotFileExists(State["path"])
-		Published := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+		Publication := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+		Published := Publication["published"]
+		DestinationSnapshot := Publication["snapshot"]
 		DestinationExistsAfter := _GestureScreenshotFileExists(State["path"])
-		OwnsDestination := !DestinationExistedBefore && DestinationExistsAfter
+		OwnsDestination := DestinationSnapshot is Map
 		if !IsObject(_GestureDirectCaptureState(Epoch, WorkerId))
 				|| A_IsSuspended || Job["cancel_requested"] {
 			if OwnsDestination
-				_GestureScreenshotRollbackFile(State["path"])
+				_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 			return
 		}
 		Ok := Published && DestinationExistsAfter
 		if !Ok && OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 	} else {
 		OwnerToken := CB_TryBeginOwnedTransaction("gesture_direct_screenshot")
 		if !OwnerToken {
@@ -607,7 +630,7 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 	if !GestureDirectCaptureFinish(Epoch, Ok,
 			Ok ? "" : "worker output could not be published") && Ok {
 		if State["mode"] == "save" && OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		else if State["mode"] != "save" && ClipboardChanged
 			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
 				OwnerToken)
@@ -993,25 +1016,26 @@ GestureRegionSaveWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		return
 	}
 
-	DestinationExistedBefore := _GestureScreenshotFileExists(State["path"])
-	Published := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+	Publication := _GestureScreenshotPublishFile(Job["stage"], State["path"])
+	Published := Publication["published"]
+	DestinationSnapshot := Publication["snapshot"]
 	DestinationExistsAfter := _GestureScreenshotFileExists(State["path"])
-	OwnsDestination := !DestinationExistedBefore && DestinationExistsAfter
+	OwnsDestination := DestinationSnapshot is Map
 	if !IsObject(_GestureRegionCaptureState(Epoch, WorkerId))
 			|| A_IsSuspended || Job["cancel_requested"] {
 		if OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		return
 	}
 	if !Published || !DestinationExistsAfter {
 		if OwnsDestination
-			_GestureScreenshotRollbackFile(State["path"])
+			_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		LoggerError("gestures", "Region screenshot staging file could not be published.")
 		GestureRegionCaptureFinish(Epoch, "save publication failed")
 		return
 	}
 	if !GestureRegionCaptureFinish(Epoch, "saved") {
-		_GestureScreenshotRollbackFile(State["path"])
+		_GestureScreenshotRollbackFile(State["path"], DestinationSnapshot)
 		return
 	}
 	LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", State["path"])
