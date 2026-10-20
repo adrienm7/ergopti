@@ -199,19 +199,13 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(handler.bridge_name, "model_browser_bridge")
     end)
     helpers.it("pushes the curated Ollama catalogue and routes exact page actions", function()
-      local previous_manager = package.loaded["ui.webview_manager"]
-      local pushed, selected, download, closes = {}, nil, nil, 0
-      package.loaded["ui.webview_manager"] = {
-        eval_js = function(app, code)
-          pushed[#pushed + 1] = { app = app, code = code }
-          return true
-        end,
-      }
+      local selected, download = nil, nil
       handler._reset()
       local state = {
         llm = {
-          get_models = function() return { "qwen3.5:0.8b" } end,
+          get_cached_models = function() return { "qwen3.5:0.8b" } end,
           get_current_model = function() return "qwen3.5:0.8b" end,
+          refresh_models = function() return {} end,
           set_model = function(name) selected = name; return true end,
           download_model = function(runtime_name, label)
             download = { runtime_name = runtime_name, label = label }
@@ -219,31 +213,32 @@ helpers.describe("ui.bridge_handlers", function()
           end,
         },
       }
-      local context = {
-        close_owned_window = function() closes = closes + 1; return true end,
-      }
-      local ready = handler.on_message("ready", state, context)
-      helpers.assert_true(ready.pushed)
-      helpers.assert_eq(pushed[1].app, "model_browser")
-      helpers.assert_true(pushed[1].code:find("window.injectModels", 1, true) ~= nil)
-      helpers.assert_true(#ready.data.models > 0)
-
-      local installed, available = nil, nil
-      for _, row in ipairs(ready.data.models) do
-        if row.runtime_name == "qwen3.5:0.8b" then installed = row end
-        if not available and row.installed ~= true then available = row end
-      end
-      helpers.assert_not_nil(installed)
-      helpers.assert_not_nil(available)
-      local chosen = handler.on_message({ action = "select_model", name = installed.name }, state, context)
-      helpers.assert_true(chosen.selected and chosen.closed)
-      helpers.assert_eq(selected, installed.runtime_name)
-      local queued = handler.on_message({ action = "select_model", name = available.name }, state, context)
-      helpers.assert_true(queued.downloading and queued.closed)
-      helpers.assert_eq(download.runtime_name, available.runtime_name)
-      helpers.assert_eq(download.label, available.name)
-      helpers.assert_eq(closes, 2)
-      package.loaded["ui.webview_manager"] = previous_manager
+      local fixture = require("tests.support.document_fixture").new("model_browser", handler, state)
+      local ok, failure = xpcall(function()
+        local ready = fixture.handshake()
+        helpers.assert_true(ready.pushed)
+        helpers.assert_true(fixture.effects[1].code:find("window.injectModels", 1, true) ~= nil)
+        helpers.assert_true(#ready.data.models > 0)
+        local installed, available = nil, nil
+        for _, row in ipairs(ready.data.models) do
+          if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+          if not available and row.installed ~= true then available = row end
+        end
+        helpers.assert_not_nil(installed)
+        helpers.assert_not_nil(available)
+        fixture.send({ action = "select_model", name = installed.name })
+        helpers.assert_eq(selected, installed.runtime_name)
+        helpers.assert_eq(fixture.manager.is_visible("model_browser"), false)
+        helpers.assert_true(fixture.manager.show("model_browser"))
+        fixture.handshake()
+        fixture.send({ action = "select_model", name = available.name })
+        helpers.assert_eq(download.runtime_name, available.runtime_name)
+        helpers.assert_eq(download.label, available.name)
+        helpers.assert_eq(fixture.manager.is_visible("model_browser"), false)
+      end, debug.traceback)
+      local closed = fixture.close()
+      assert(ok, failure)
+      helpers.assert_true(closed)
     end)
   end)
 

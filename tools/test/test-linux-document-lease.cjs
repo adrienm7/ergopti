@@ -29,6 +29,7 @@ function page(seed, host = 'linux', cryptoAvailable = true) {
 			messageHandlers: {
 				changelog_bridge: { postMessage: (x) => messages.push(x) },
 				dl_bridge: { postMessage: (x) => messages.push(x) },
+				model_browser_bridge: { postMessage: (x) => messages.push(x) },
 				token_bridge: { postMessage: (x) => messages.push(x) }
 			}
 		}
@@ -214,6 +215,61 @@ test('network progress rejects successor queued old phase effect', () => {
 		false
 	);
 	assert.equal(b.context.effects, 0);
+});
+test('model browser requires its nonce ACK before fresh ready and actions', () => {
+	const p = page(1);
+	assert.equal(p.call("makeHostBridge('model_browser_bridge')('ready')"), false);
+	assert.equal(p.messages.length, 0);
+	const n = p.call("getLinuxDocumentNonce('model_browser_bridge')");
+	assert.match(n, /^[a-f0-9]{36}$/);
+	assert.equal(
+		p.call(`initializeLinuxDocumentBridge('model_browser_bridge',1,'${token}','${n}')`),
+		true
+	);
+	assert.equal(p.messages[0].__ergopti_document_ack.page_nonce, n);
+	assert.equal(
+		p.call("makeHostBridge('model_browser_bridge')({action:'select_model',name:'Qwen'})"),
+		false
+	);
+	assert.equal(
+		p.call(`confirmLinuxDocumentBridge('model_browser_bridge',1,'${token}','${n}')`),
+		true
+	);
+	assert.equal(p.messages[1].payload, 'ready');
+	assert.equal(p.call("makeHostBridge('model_browser_bridge')('refresh')"), true);
+	assert.equal(p.messages[2].__ergopti_document.page_nonce, n);
+});
+test('model browser successor rejects the previous document challenge and queued effect', () => {
+	const a = page(1),
+		b = page(2);
+	const n = a.call("getLinuxDocumentNonce('model_browser_bridge')");
+	a.call(`initializeLinuxDocumentBridge('model_browser_bridge',1,'${token}','${n}')`);
+	b.context.effects = 0;
+	assert.equal(
+		b.call(`initializeLinuxDocumentBridge('model_browser_bridge',1,'${token}','${n}')`),
+		false
+	);
+	assert.equal(
+		b.call(
+			`runLinuxOwnedDocumentEffect('model_browser_bridge',1,'${token}','${n}',function(){effects++})`
+		),
+		false
+	);
+	assert.equal(b.context.effects, 0);
+	const missing = page(1, 'linux', false);
+	assert.equal(missing.call("getLinuxDocumentNonce('model_browser_bridge')"), null);
+});
+test('model browser preserves macOS and Windows wire contracts', () => {
+	const mac = page(1, 'macos');
+	mac.call("makeHostBridge('model_browser_bridge')('ready')");
+	mac.call("makeHostBridge('model_browser_bridge')({action:'select_model',name:'Qwen'})");
+	assert.equal(mac.messages[0], 'ready');
+	assert.equal(mac.messages[1].action, 'select_model');
+	const win = page(1, 'windows');
+	win.window.chrome = { webview: { postMessage: (x) => win.messages.push(x) } };
+	win.call("makeHostBridge('model_browser_bridge')('ready')");
+	win.call("makeHostBridge('model_browser_bridge')({action:'select_model',name:'Qwen'})");
+	assert.deepEqual(win.messages, ['ready', '{"action":"select_model","name":"Qwen"}']);
 });
 console.log(
 	JSON.stringify({ passed, failed, kind: 'pure actual production JS replay; native unexecuted' })

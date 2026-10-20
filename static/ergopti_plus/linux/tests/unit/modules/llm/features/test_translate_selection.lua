@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("json")
 local Translate = require("llm.translate")
@@ -93,12 +94,13 @@ local function scenario(opts, body)
 			active = function() return ENTRY end,
 			list = function() return { ENTRY } end,
 		}
-		package.loaded["modules.llm.profiles"] = {
-			init = function() end,
+		local profiles = ProfilesFixture.without_inventory({
+			init = function() return true end,
 			is_enabled = function() return opts.disabled ~= true end,
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
-		}
+		})
+		package.loaded["modules.llm.profiles"] = profiles
 		package.loaded["modules.llm.api_ollama"] = { chat = function() end, cancel = function() return true end }
 
 		local scheduler = Fakes.timer_scheduler()
@@ -173,6 +175,7 @@ local function scenario(opts, body)
 		for _, name in ipairs(RELOADED) do package.loaded[name] = previous[name] end
 		for _, name in ipairs(FAKED) do package.loaded[name] = previous[name] end
 		if not ok then error(err, 0) end
+		profiles.assert_no_inventory()
 	end, { initial = BASE_PREFERENCES })
 end
 

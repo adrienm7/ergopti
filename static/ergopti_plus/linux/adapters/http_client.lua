@@ -160,6 +160,12 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 		return rejected("owned request authorization is invalid", nil)
 	end
 	local owner = owner_name(type(options) == "table" and rawget(options, "owner") or nil)
+	local failure_log_level
+	if type(options) == "table" then failure_log_level = rawget(options, "failure_log_level") end
+	if failure_log_level == nil then failure_log_level = "error" end
+	if failure_log_level ~= "error" and failure_log_level ~= "warn" then
+		return rejected("HTTP failure log level is invalid", nil)
+	end
 	local timeout = tonumber(type(options) == "table" and rawget(options, "timeout_ms") or nil) or Curl.default_timeout_ms()
 	local timeout_valid = timeout > 0 and timeout % 1 == 0 and timeout ~= math.huge
 	local absolute_deadline = type(options) == "table" and rawget(options, "absolute_deadline_ms") or nil
@@ -171,7 +177,7 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 	if stopping then return rejected("HTTP client stopped", nil) end
 	if not active then return rejected(initialization_refusal, nil) end
 	local request = { owner = owner, timeout_ms = timeout_valid and timeout or 0, method = method, buffered = buffered, owned_api = true,
-		absolute_deadline_ms = deadline_valid and absolute_deadline or nil }
+		absolute_deadline_ms = deadline_valid and absolute_deadline or nil, failure_log_level = failure_log_level }
 	local function prepare()
 		if not timeout_valid then return nil, "HTTP timeout is invalid" end
 		if not deadline_valid then return nil, "HTTP absolute deadline is invalid" end
@@ -182,6 +188,7 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 		captured.single_hop_redirect, captured.single_hop_receipt_bytes, captured.single_hop_url_bytes = nil, nil, nil
 		captured.prepared_headers = nil
 		captured.owner, captured.timeout_ms, captured.absolute_deadline_ms = owner, timeout, absolute_deadline
+		captured.failure_log_level = failure_log_level
 		captured.method, captured.buffered, captured.owned_api = method, buffered, true
 		captured.authorized = authorized
 		if native_override then
@@ -243,6 +250,8 @@ end
 --- Sends a GET retaining actual lookup/curl/process/pipe settlement ownership.
 --- managed_redirects=true explicitly selects shared per-hop ownership; the
 --- default preserves historical sensitive-header no-follow and HTTP receipts.
+--- failure_log_level="warn" marks optional direct-service absence or HTTP 5xx;
+--- native acquisition, cleanup and callback faults retain ERROR diagnostics.
 --- @param url string
 --- @param headers table
 --- @param options table|nil

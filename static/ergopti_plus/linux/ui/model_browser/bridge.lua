@@ -20,8 +20,7 @@ local APP_NAME = "model_browser"
 local LOG = "bridge.model_browser"
 
 local _catalogue = nil
-local _rows_by_name = {}
-local _allowed_urls = {}
+local _projection, _page_epoch = nil, nil
 
 -- Borrowed, never re-implemented: ModelCatalogue.build decides which row is
 -- ACTIVE with this exact rule, and the lookup below decides which rows are
@@ -45,43 +44,87 @@ local function load_catalogue()
 	return _catalogue
 end
 
-local function installed_lookup(state)
+local function installed_lookup(frame)
 	local lookup = {}
-	local models = type(state) == "table" and type(state.llm) == "table"
-		and type(state.llm.get_models) == "function" and state.llm.get_models() or {}
+	local models = frame.llm_ports.get_cached_models()
 	for _, name in ipairs(type(models) == "table" and models or {}) do
 		lookup[normalise_name(name)] = true
 	end
 	return lookup
 end
 
-local function build_payload(state)
-	local installed = installed_lookup(state)
-	local current = type(state) == "table" and type(state.llm) == "table"
-		and type(state.llm.get_current_model) == "function"
-		and state.llm.get_current_model() or ""
+local function build_payload(frame)
+	local installed = installed_lookup(frame)
+	local current = frame.llm_ports.get_current_model() or ""
 	local payload = ModelCatalogue.build(load_catalogue() or {}, "ollama", current,
 		function(_display_name, runtime_name)
 			return installed[normalise_name(runtime_name)] == true
 		end)
-	_rows_by_name = {}
-	_allowed_urls = {}
+	local rows, urls = {}, {}
 	for _, row in ipairs(payload.models) do
-		_rows_by_name[row.name] = row
-		if type(row.url) == "string" and row.url ~= "" then _allowed_urls[row.url] = true end
+		rows[row.name] = row
+		if type(row.url) == "string" and row.url ~= "" then urls[row.url] = true end
 	end
-	return payload
+	return payload, rows, urls
 end
 
-local function push_payload(state)
-	local ok_manager, manager = pcall(require, "ui.webview_manager")
-	if not ok_manager or type(manager.eval_js) ~= "function" then return false, nil end
-	local payload = build_payload(state)
+local function retained(frame)
+	if not frame or _projection ~= frame or _page_epoch ~= frame.epoch
+		or package.loaded["ui.webview_manager"] ~= frame.manager or frame.state.llm ~= frame.llm then return false end
+	for name, port in pairs(frame.manager_ports) do if frame.manager[name] ~= port then return false end end
+	for name, port in pairs(frame.llm_ports) do if frame.llm[name] ~= port then return false end end
+	return true
+end
+
+local function projection_current(frame)
+	if not retained(frame) then return false end
+	local ports = frame.manager_ports
+	local state, epoch = ports.get_daemon_state(), ports.current_epoch(APP_NAME)
+	if not retained(frame) or state ~= frame.state or epoch ~= frame.epoch then return false end
+	local ok, current = pcall(ports.document_owner_current, frame.document)
+	if not ok or current ~= true or not retained(frame) then return false end
+	return ports.document_owner_retained(frame.document) == true and retained(frame)
+end
+
+local function push_payload(frame)
+	if not projection_current(frame) then return false, nil end
+	local payload, rows, urls = build_payload(frame)
+	if not projection_current(frame) then return false, nil end
 	local ok_json, encoded = pcall(Json.encode, payload)
-	if not ok_json or type(encoded) ~= "string" then return false, nil end
-	local pushed = manager.eval_js(APP_NAME,
-		"if(window.injectModels)window.injectModels(" .. encoded .. ")") == true
+	if not ok_json or type(encoded) ~= "string" or not projection_current(frame) then return false, nil end
+	local called, accepted = pcall(frame.manager_ports.eval_owned_js, APP_NAME, frame.document,
+		"if(window.injectModels)window.injectModels(" .. encoded .. ")")
+	local pushed = called and accepted == true and projection_current(frame)
+	if pushed then frame.rows, frame.urls = rows, urls end
 	return pushed, payload
+end
+
+local function capture_projection(state, context)
+	if type(state) ~= "table" or type(state.llm) ~= "table" or type(context) ~= "table"
+		or context.app_name ~= APP_NAME or context.epoch ~= _page_epoch or context.document_owner == nil then return nil end
+	local manager = package.loaded["ui.webview_manager"]
+	if type(manager) ~= "table" then return nil end
+	local frame = { state = state, llm = state.llm, manager = manager, document = context.document_owner,
+		epoch = context.epoch, manager_ports = {}, llm_ports = {}, rows = {}, urls = {} }
+	for _, name in ipairs({ "capture_document_owner", "document_owner_current", "document_owner_retained",
+		"eval_owned_js", "get_daemon_state", "current_epoch" }) do
+		if type(manager[name]) ~= "function" then return nil end
+		frame.manager_ports[name] = manager[name]
+	end
+	for _, name in ipairs({ "get_cached_models", "get_current_model", "refresh_models" }) do
+		if type(state.llm[name]) ~= "function" then return nil end
+		frame.llm_ports[name] = state.llm[name]
+	end
+	for _, name in ipairs({ "set_model", "download_model" }) do
+		if type(state.llm[name]) == "function" then frame.llm_ports[name] = state.llm[name] end
+	end
+	_projection = frame
+	if not projection_current(frame) or frame.manager_ports.capture_document_owner(APP_NAME) ~= frame.document
+		or not projection_current(frame) then
+		if _projection == frame then _projection = nil end
+		return nil
+	end
+	return frame
 end
 
 local function close_owned(context)
@@ -96,31 +139,33 @@ end
 --- @return table|nil
 function M.on_message(payload, state, context)
 	if payload == "ready" or payload == "refresh" then
-		if payload == "refresh" and type(state) == "table" and type(state.llm) == "table"
-				and type(state.llm.refresh_models) == "function" then
-			state.llm.refresh_models()
-		end
-		local pushed, data = push_payload(state)
+		local frame = payload == "ready" and capture_projection(state, context) or _projection
+		if not frame or frame.state ~= state or type(context) ~= "table" or context.document_owner ~= frame.document
+			or not projection_current(frame) then return nil end
+		frame.llm_ports.refresh_models()
+		local pushed, data = push_payload(frame)
 		if not pushed then Logger.error(LOG, "Model catalogue could not reach the page.") end
 		return { pushed = pushed, data = data }
 	end
 	if type(payload) ~= "table" then return nil end
+	local frame = _projection
+	if not frame or frame.state ~= state or type(context) ~= "table" or context.document_owner ~= frame.document
+		or not projection_current(frame) then return nil end
 
 	if payload.action == "select_model" and type(payload.name) == "string" then
-		local row = _rows_by_name[payload.name]
+		local row = frame.rows[payload.name]
 		if not row then
 			Logger.warn(LOG, "Refused unknown model selection '%s'.", payload.name)
 			return { selected = false }
 		end
-		local llm = type(state) == "table" and state.llm or nil
 		if row.installed == true then
-			local selected = type(llm) == "table" and type(llm.set_model) == "function"
-				and llm.set_model(row.runtime_name) == true
+			local selected = type(frame.llm_ports.set_model) == "function" and projection_current(frame)
+				and frame.llm_ports.set_model(row.runtime_name) == true
 			local closed = selected and close_owned(context) or false
 			return { selected = selected, closed = closed, model = row.runtime_name }
 		end
-		local downloading = type(llm) == "table" and type(llm.download_model) == "function"
-			and llm.download_model(row.runtime_name, row.name, function(succeeded)
+		local downloading = type(frame.llm_ports.download_model) == "function" and projection_current(frame)
+			and frame.llm_ports.download_model(row.runtime_name, row.name, function(succeeded)
 				if succeeded and type(state) == "table"
 						and type(state.on_config_changed) == "function" then
 					state.on_config_changed()
@@ -136,12 +181,12 @@ function M.on_message(payload, state, context)
 	end
 
 	if payload.action == "open_url" and type(payload.url) == "string" then
-		if _allowed_urls[payload.url] ~= true or not Shell.has_command("xdg-open") then
+		if frame.urls[payload.url] ~= true or not Shell.has_command("xdg-open") or not projection_current(frame) then
 			Logger.warn(LOG, "Refused model source URL outside the active catalogue.")
 			return { opened = false }
 		end
-		local opened = Shell.run(
-			"xdg-open " .. Shell.quote(payload.url) .. " >/dev/null 2>&1 &")
+		local command = "xdg-open " .. Shell.quote(payload.url) .. " >/dev/null 2>&1 &"
+		local opened = projection_current(frame) and Shell.run(command) == true
 		return { opened = opened }
 	end
 
@@ -149,11 +194,34 @@ function M.on_message(payload, state, context)
 	return nil
 end
 
+--- Reprojects the contemporary service cache into only its current document.
+--- @return boolean pushed No network acquisition is started.
+function M.reproject_current()
+	local frame = _projection
+	if not projection_current(frame) then return false end
+	local document = frame.manager_ports.capture_document_owner(APP_NAME)
+	if document ~= frame.document or not projection_current(frame) then return false end
+	return push_payload(frame)
+end
+
+--- Retires the old page projection before a successor native acquisition.
+--- @param epoch number Exact Manager window epoch.
+--- @return boolean accepted
+function M.on_window_acquiring(epoch)
+	_page_epoch, _projection = epoch, nil
+	return true
+end
+
+--- Forgets only the closing page's projection; its successor keeps its own rows.
+--- @param epoch number Exact closing Manager window epoch.
+function M.on_window_closed(epoch)
+	if _page_epoch == epoch then _page_epoch, _projection = nil, nil end
+end
+
 --- Test seam: forgets file and page projections.
 function M._reset()
 	_catalogue = nil
-	_rows_by_name = {}
-	_allowed_urls = {}
+	_projection, _page_epoch = nil, nil
 end
 
 return M

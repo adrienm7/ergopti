@@ -162,8 +162,8 @@ local _shutting_down = false
 -- replacement.
 local _next_window_epoch = 0
 
--- Only the actual Versions and network progress producers require this protocol.
-local DOCUMENT_APPS = { changelog = true, download_window = true }
+-- Deferred producers publish only into their exact acknowledged document.
+local DOCUMENT_APPS = { changelog = true, download_window = true, model_browser = true }
 local _document_windows, _document_debts = {}, {}
 
 --- Announces a native initialization error without writing to the failed page.

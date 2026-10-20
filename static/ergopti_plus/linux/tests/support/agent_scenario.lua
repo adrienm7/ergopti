@@ -14,6 +14,7 @@
 local M = {}
 
 local Fakes = require("tests.fakes")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Json = require("json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
@@ -102,12 +103,13 @@ function M.run(opts, body)
 			list = function() return entries end,
 		}
 		local ai_on = opts.disabled ~= true
-		package.loaded["modules.llm.profiles"] = {
-			init = function() end,
+		local profiles = ProfilesFixture.without_inventory({
+			init = function() return true end,
 			is_enabled = function() return ai_on end,
 			get_current_model = function() return "ollama-model" end,
 			get_base_url = function() return world.base_url end,
-		}
+		})
+		package.loaded["modules.llm.profiles"] = profiles
 		if opts.local_backend then
 			package.loaded["modules.llm.api_ollama"] = nil
 		else
@@ -292,6 +294,7 @@ function M.run(opts, body)
 			error(cleanup_err, 0)
 		end
 		if not ok then error(err, 0) end
+		profiles.assert_no_inventory()
 	end, { initial = stored })
 end
 

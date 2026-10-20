@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("json")
 local EvdevCodes = require("infra.evdev_codes")
@@ -125,8 +126,8 @@ local function scenario(opts, body)
 				return true
 			end,
 		}
-		package.loaded["modules.llm.profiles"] = {
-			init = function() end,
+		local profiles = ProfilesFixture.without_inventory({
+			init = function() return true end,
 			is_enabled = function() return opts.disabled ~= true end,
 			get_current_model = function() return "ollama-model" end,
 			set_model = function(name, source, admission)
@@ -134,7 +135,8 @@ local function scenario(opts, body)
 				return preferences.set_many({ ["llm.models.ollama"] = name }, source, admission)
 			end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
-		}
+		})
+		package.loaded["modules.llm.profiles"] = profiles
 		package.loaded["modules.llm.api_ollama"] = {
 			chat = function(_, _, messages, request_opts, _, on_done)
 				world.ollama[#world.ollama + 1] = { messages = messages, opts = request_opts, on_done = on_done }
@@ -230,6 +232,7 @@ local function scenario(opts, body)
 		for _, name in ipairs(RELOADED) do package.loaded[name] = previous[name] end
 		for _, name in ipairs(FAKED) do package.loaded[name] = previous[name] end
 		if not ok then error(err, 0) end
+		profiles.assert_no_inventory()
 	end, { initial = stored })
 end
 

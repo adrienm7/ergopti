@@ -1506,6 +1506,10 @@ local function main()
 			on_live_change = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
+			on_models_changed = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+				require("ui.model_browser.bridge").reproject_current()
+			end,
 			on_offer = function(context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keylogger.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))

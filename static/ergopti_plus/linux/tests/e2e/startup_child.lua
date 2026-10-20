@@ -253,13 +253,51 @@ package.preload["adapters.event_loop"] = function()
 		assert(collector.get_flush_status().committed == true, "expected a real SQLite COMMIT")
 		record("FACT", "metrics_native_commit=true")
 	end
+	local inventory_owner, inventory_pending
+	local function settle_inventory(deadline)
+		local profiles = package.loaded["modules.llm.profiles"]
+		if profiles == nil then
+			assert(inventory_owner == nil, "the inventory owner disappeared during startup")
+			return
+		end
+		if inventory_owner == nil then
+			assert(type(profiles) == "table" and type(profiles.model_inventory_pending) == "function",
+				"the startup inventory requires its physical pending API")
+			inventory_owner, inventory_pending = profiles, profiles.model_inventory_pending
+		end
+		local function pending()
+			assert(package.loaded["modules.llm.profiles"] == inventory_owner
+				and inventory_owner.model_inventory_pending == inventory_pending,
+				"the startup inventory owner or pending API changed")
+			local value = inventory_pending()
+			assert(package.loaded["modules.llm.profiles"] == inventory_owner
+				and inventory_owner.model_inventory_pending == inventory_pending,
+				"the startup inventory owner or pending API changed")
+			assert(type(value) == "boolean", "the startup inventory pending acknowledgement must be boolean")
+			return value
+		end
+		local uv = require("luv")
+		while pending() do
+			assert(uv.hrtime() < deadline, "startup inventory exceeded the native soak window")
+			uv.run("nowait")
+			assert(uv.hrtime() < deadline, "startup inventory exceeded the native soak window")
+			if pending() then
+				assert(uv.hrtime() < deadline, "startup inventory exceeded the native soak window")
+				uv.sleep(1)
+			end
+		end
+	end
 	local function soak(loop)
+		local deadline = require("luv").hrtime() + SOAK_SECONDS * 1e9
 		for _ = 1, SOAK_SECONDS do
 			clock_seconds = clock_seconds + 1
 			if type(loop.onIdle) == "function" then loop.onIdle() end
 			if type(loop.onPeriodic) == "function" then loop.onPeriodic() end
 			adapter._run_idle_tick()
 			settle_metrics()
+			-- Native inventory callbacks must acknowledge closure before the next
+			-- virtual second can age their unchanged five-second HTTP deadline.
+			settle_inventory(deadline)
 		end
 	end
 	local native_run = adapter.run
