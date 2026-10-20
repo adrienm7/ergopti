@@ -44,14 +44,20 @@ _TK_UsQwerty() {
 }
 
 ; Runs Body with the digit-row emulation switched as asked, then puts it back.
+; The built-in Ergopti emulation types its own row, edges included, whichever
+; ordering is chosen (RegisterBuiltinNumberRow), so it follows the switch too.
 _TK_WithEmulation(Enabled, Body) {
 	global Features
 	Saved := Features["layout"]["direct_access_digits"]
+	SavedBase := Features["layout"]["ergopti_base"]
 	Features["layout"]["direct_access_digits"] := Enabled ? "digits" : "native"
+	Features["layout"]["ergopti_base"] := Enabled
 	try
 		return Body.Call()
-	finally
+	finally {
 		Features["layout"]["direct_access_digits"] := Saved
+		Features["layout"]["ergopti_base"] := SavedBase
+	}
 }
 
 _TK_Names(Probe) {

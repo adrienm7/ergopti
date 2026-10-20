@@ -828,6 +828,8 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 
 ; Shift layer — bindings registered table-driven via modules/keymap/layout/layout_shift_caps.ahk.
 RegisterShiftLayer()
+; The built-in emulation's unshifted digit keys, after the direct-access ones.
+RegisterBuiltinNumberRow()
 
 
 

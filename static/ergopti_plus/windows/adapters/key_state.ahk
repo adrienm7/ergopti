@@ -449,6 +449,33 @@ KS_LayoutDigitRowSymbols(Hkl) {
 	return Symbols
 }
 
+; What each digit-row key types with Shift on layout Hkl: the digits on AZERTY,
+; "!" to ")" on US QWERTY. MapVirtualKeyExW has no Shift level, so this asks
+; ToUnicodeEx with Shift down and flag 4, which leaves the kernel keyboard and
+; dead-key state untouched. A dead key reads as its accent (the call answers
+; -1 with the accent in the buffer); a key typing nothing is left out.
+; @param Hkl {Integer} Keyboard layout handle; 0 gives an empty map.
+; @return {Map} Scan code -> string.
+KS_LayoutDigitRowShiftedSymbols(Hkl) {
+	global KS_DIGIT_ROW_KEYS
+	Symbols := Map()
+	if (Hkl == 0)
+		return Symbols
+	State := Buffer(256, 0)
+	NumPut("UChar", 0x80, State, 0x10) ; VK_SHIFT
+	NumPut("UChar", 0x80, State, 0xA0) ; VK_LSHIFT
+	Chars := Buffer(32, 0)
+	for _, Key in KS_DIGIT_ROW_KEYS {
+		Count := DllCall("ToUnicodeEx", "UInt", Key[1], "UInt", Key[2], "Ptr", State,
+			"Ptr", Chars, "Int", 16, "UInt", 4, "Ptr", Hkl, "Int")
+		if (Count > 0)
+			Symbols[Key[2]] := StrGet(Chars, Count, "UTF-16")
+		else if (Count < 0)
+			Symbols[Key[2]] := StrGet(Chars, 1, "UTF-16")
+	}
+	return Symbols
+}
+
 ; Translates a scancode into its virtual key under Hkl, distinguishing left and
 ; right keys (MAPVK_VSC_TO_VK_EX = 3).
 ; @param Scancode {Integer} The physical scancode.

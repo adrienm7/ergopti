@@ -43,6 +43,66 @@ NumberRowPolicySymbolsShift(Digit, Plain, Shifted) {
 	return PlainDigit == ShiftDigit ? Refused : Map("supported", true, "shift", PlainDigit)
 }
 
+; What one level of a row key holds: "d" its own digit, "s" another character
+; or a dead key, "n" nothing.
+_NumberRowPolicyLevelClass(Digit, Value) {
+	if !_NumberRowPolicyDescriptor(Value)
+		return "n"
+	return StrCompare(Value["Kind"], "text", true) == 0 && Value["Text"] == Digit ? "d" : "s"
+}
+
+/**
+ * Which ordering options can make the row's base level differ from its Shift
+ * level, from what the ten digit keys of the effective layout hold.
+ * "digits" is usable only when every key has a symbol unshifted and its digit
+ * on Shift, "symbols" only when every key has its digit unshifted and a symbol
+ * on Shift. A row whose keys disagree is "mixed": no option can reorder all
+ * ten keys, so both are refused. "native" (the layout as it is) is always valid.
+ * @param {Array} Levels Ten Map("plain", descriptor, "shift", descriptor), keys 1 to 0.
+ * @returns {Map} "digits" and "symbols": "" when usable, else the refusal reason:
+ *   already_digits_first, already_symbols_first, digits_on_both,
+ *   symbols_on_both, no_digits, incomplete or mixed.
+ */
+NumberRowPolicyAvailability(Levels) {
+	if !(Levels is Array) || Levels.Length != 10
+		throw ValueError("The number-row availability needs the ten digit keys.")
+	Classes := Map()
+	for Index, Key in Levels {
+		Digit := Mod(Index, 10) . ""
+		Plain := Key is Map ? Key.Get("plain", 0) : 0
+		Shift := Key is Map ? Key.Get("shift", 0) : 0
+		Classes[_NumberRowPolicyLevelClass(Digit, Plain) . _NumberRowPolicyLevelClass(Digit, Shift)] := true
+	}
+	if Classes.Count != 1
+		return Map("digits", "mixed", "symbols", "mixed")
+	for Class in Classes {
+		switch Class, true {
+			case "sd": return Map("digits", "", "symbols", "already_symbols_first")
+			case "ds": return Map("digits", "already_digits_first", "symbols", "")
+			case "dd": return Map("digits", "digits_on_both", "symbols", "digits_on_both")
+			case "ss": return Map("digits", "symbols_on_both", "symbols", "symbols_on_both")
+			case "dn", "nd": return Map("digits", "incomplete", "symbols", "incomplete")
+		}
+	}
+	return Map("digits", "no_digits", "symbols", "no_digits")
+}
+
+/**
+ * The ordering that applies on the effective layout: the stored choice, or
+ * "native" while that choice cannot reorder this layout (it stays stored and
+ * applies again on a layout where it can).
+ * @param {String} Mode Stored choice.
+ * @param {Map} Availability NumberRowPolicyAvailability result.
+ * @returns {Map} "mode" effective ordering, "reason" why the choice is inert ("" when not).
+ */
+NumberRowPolicyEffective(Mode, Availability) {
+	Mode := NumberRowPolicyMode(Mode)
+	if Mode == "" || Mode == "native"
+		return Map("mode", "native", "reason", "")
+	Reason := Availability[Mode]
+	return Reason == "" ? Map("mode", Mode, "reason", "") : Map("mode", "native", "reason", Reason)
+}
+
 NumberRowPolicyCapable(Platform, Mode, Symbols) {
 	if !(Platform is String) || NumberRowPolicyMode(Mode) == ""
 		return false

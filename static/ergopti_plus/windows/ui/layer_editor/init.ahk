@@ -185,7 +185,8 @@ LayerEditor_CurrentEmulation() {
 	Layout := (IsSet(Features) && Features is Map && Features.Has("layout")) ? Features["layout"] : Map()
 	Registry := KeylayoutEmulation_LayerIsActive("ergopti_base")
 	Ergopti := !Registry && Layout.Get("ergopti_base", false) == true
-	Digits := NumberRowPolicyMode(Layout.Get("direct_access_digits", "")) == "digits"
+	; The ordering in effect: a stored choice that is inert on this layout types nothing.
+	Digits := NumberRowEffectiveMode() == "digits"
 	return Map("active", Registry || Ergopti,
 		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Digits))
 }
@@ -195,7 +196,7 @@ LayerEditor_CurrentEmulation() {
 ; (keylayout_emulation.ahk), then the Ergopti base layer, whose characters and
 ; dead keys come from its .keylayout (layout_ergopti.ahk).
 _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
-	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS
+	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS, ERGOPTI_NUMBER_ROW
 	Code := Integer("0x" . SubStr(Sc, 3))
 	if Digits {
 		for _, Key in KS_DIGIT_ROW_KEYS {
@@ -220,6 +221,9 @@ _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 		return ""
 	Spec := ErgoptiLayout_Spec()
 	Base := Spec["levels"]["base"]
+	; The number row types the Ergopti row (RegisterBuiltinNumberRow).
+	if !Base.Has(Sc) && ERGOPTI_NUMBER_ROW.Has(Sc)
+		Base := Spec["number_row_base"]
 	if !Base.Has(Sc)
 		return ""
 	Descriptor := Base[Sc]

@@ -79,6 +79,36 @@ function M.run(helpers, corpus_path)
 				"pause then resume retains epoch")
 
 		end)
+		helpers.it("offers an ordering only where it reorders all ten keys (number-row-availability)", function()
+			local function descriptor(spelling)
+				if spelling == "" then return nil end
+				if spelling:sub(1, 5) == "dead:" then
+					return { Kind = "dead", Text = spelling:sub(6), State = "corpus", Action = "corpus" }
+				end
+				return { Kind = "text", Text = spelling, State = "", Action = "" }
+			end
+			local function levels(case)
+				local out = {}
+				for index = 1, 10 do
+					out[index] = { plain = descriptor(case.plain[index]), shift = descriptor(case.shift[index]) }
+				end
+				return out
+			end
+			helpers.assert_eq(#corpus.availability, 10, "every row shape of the rule is represented")
+			local by_id = {}
+			for _, case in ipairs(corpus.availability) do
+				by_id[case.id] = case
+				local actual = Policy.availability(levels(case))
+				helpers.assert_eq(actual.digits, case.digits, case.id .. ": digits first")
+				helpers.assert_eq(actual.symbols, case.symbols, case.id .. ": symbols first")
+			end
+			for _, case in ipairs(corpus.effective) do
+				local actual = Policy.effective(case.mode, Policy.availability(levels(by_id[case.availability])))
+				helpers.assert_eq(actual.mode, case.effective, case.mode .. " on " .. case.availability)
+				helpers.assert_eq(actual.reason, case.reason, case.mode .. " on " .. case.availability .. ": reason")
+			end
+			helpers.assert_eq(pcall(Policy.availability, {}), false, "the rule needs all ten keys")
+		end)
 		helpers.it("uses the real renderer for native-only posture and translated disabled choices", function()
 			local Renderer = require("menu.renderer")
 			local shared = corpus_path:gsub("tests/corpus/layouts/number_row_policy%.json$", "")
