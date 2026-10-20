@@ -407,9 +407,9 @@ check('Unit refuses withdrawn, deferred, foreign or late human-lot selection', (
 	assert.throws(() => Full.fromFiles(changed(MAC, record, foreign)));
 });
 for (const [id, prior, predecessor, output] of [
-	['e2e-hs', 'unit', 'test-hs', 'e2e'],
-	['package-macos', 'e2e', null, null],
-	['launch', 'build', 'package-macos', 'testbuild']
+	['e2e-hs', 'e2e', 'test-hs', 'e2e'],
+	['package-macos', 'build', null, null],
+	['launch', 'testbuild', 'package-macos', 'testbuild']
 ]) {
 	check(`${id} preserves the genuine receiver admission before products`, () => {
 		const original = source.find((entry) => entry.rel === MAC);

@@ -24,26 +24,62 @@ const host = (cell) => ({
 	os: cell.runner === 'ubuntu-latest' ? 'linux' : 'darwin',
 	architecture: cell.architecture === 'amd64' ? 'x64' : 'arm64'
 });
+/** The successful direct predecessor aggregates a receiving stage is given. */
+function needsOf(receiver, result = 'success') {
+	return Object.fromEntries(
+		roles.PREDECESSORS[receiver].map((stage) => [
+			roles.JOBS[roles.STAGES.indexOf(stage)],
+			{ result }
+		])
+	);
+}
+/** Admits one receiving stage from its predecessors' receipts, as the workflow does. */
+function admitted(receiver, all, ctx = context, attempt = 1) {
+	const displayed = receiver === 'build' ? undefined : roles.displayPlan(receiver, ctx);
+	return roles.admit(
+		receiver,
+		displayed?.matrix.lot[0],
+		displayed?.metadata,
+		needsOf(receiver),
+		ctx,
+		attempt,
+		() => roles.PREDECESSORS[receiver].flatMap((stage) => all[stage])
+	);
+}
 function complete(ctx = context, attempt = 1) {
-	let proof = { context: ctx, chain: [] };
 	const all = {};
 	for (const stage of roles.STAGES) {
+		const prior =
+			stage === 'unit' ? { context: ctx, chain: [] } : admitted(stage, all, ctx, attempt);
 		all[stage] = roles
 			.plan(stage, ctx)
-			.map((cell) => roles.record(stage, cell, 'success', proof, ctx, host(cell), attempt));
-		proof = roles.union(stage, all[stage], 'success', ctx, attempt);
+			.map((cell) => roles.record(stage, cell, 'success', prior, ctx, host(cell), attempt));
 	}
+	const proof = roles.union('testbuild', all.testbuild, 'success', ctx, attempt);
 	return { all, proof };
 }
 const completed = complete();
-check('exact five visible jobs with only immediate predecessor edges', () => {
+check('exact five visible jobs with only their declared predecessor edges', () => {
 	const workflow = YAML.parse(
 		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
 	);
 	const jobs = ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'];
 	assert.deepEqual(Object.keys(workflow.jobs), jobs);
-	for (const [index, id] of jobs.entries()) {
-		assert.deepEqual(workflow.jobs[id].needs || [], index === 0 ? [] : [jobs[index - 1]]);
+	const needs = {
+		'test-hs': [],
+		'e2e-hs': ['test-hs'],
+		'package-macos': ['test-hs'],
+		launch: ['e2e-hs', 'package-macos'],
+		'macos-ok': ['launch']
+	};
+	for (const [index, stage] of roles.STAGES.entries())
+		assert.deepEqual(
+			needs[roles.JOBS[index]],
+			roles.PREDECESSORS[stage].map((name) => roles.JOBS[roles.STAGES.indexOf(name)]),
+			'The workflow edges are the stage predecessors'
+		);
+	for (const id of jobs) {
+		assert.deepEqual(workflow.jobs[id].needs || [], needs[id]);
 		const ids = workflow.jobs[id].steps.filter((step) => step.id).map((step) => step.id);
 		assert.equal(ids.length, new Set(ids).size, 'Merged roles must retain unique step IDs');
 	}
@@ -301,6 +337,15 @@ check('direct predecessor identity is exact', () => {
 		() => roles.aggregate({ 'package-macos': { result: 'success' } }, 'testbuild'),
 		/Closed stage/
 	);
+	// The test build's direct predecessors are both E2E and Build.
+	assert.equal(roles.aggregate(needsOf('testbuild'), ['e2e', 'build']), 'success');
+	for (const job of ['e2e-hs', 'package-macos']) {
+		const partial = needsOf('testbuild');
+		delete partial[job];
+		assert.throws(() => roles.aggregate(partial, ['e2e', 'build']), /Closed stage/);
+		const failed = { ...needsOf('testbuild'), [job]: { result: 'failure' } };
+		assert.throws(() => roles.aggregate(failed, ['e2e', 'build']), /Direct predecessor aggregate/);
+	}
 });
 check('artifact reader refuses duplicate fields and unexpected members', () => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-macos-stage-test-'));
@@ -529,10 +574,7 @@ for (const lot of [
 			/Missing or foreign human lot/
 		);
 	});
-for (const [priorStage, receiver] of [
-	['unit', 'e2e'],
-	['build', 'testbuild']
-]) {
+for (const receiver of ['e2e', 'testbuild']) {
 	check(receiver + ' validates the whole lot map before any predecessor access', () => {
 		const displayed = roles.displayPlan(receiver, context);
 		const metadata = structuredClone(displayed.metadata);
@@ -548,57 +590,62 @@ for (const [priorStage, receiver] of [
 		let reads = 0;
 		assert.throws(
 			() =>
-				roles.admit(priorStage, displayed.matrix.lot[0], metadata, needs, context, 1, () => {
+				roles.admit(receiver, displayed.matrix.lot[0], metadata, needs, context, 1, () => {
 					reads++;
-					return completed.all[priorStage];
+					return roles.PREDECESSORS[receiver].flatMap((stage) => completed.all[stage]);
 				}),
 			/Complete human lot metadata map differs/
 		);
 		assert.equal(reads, 0);
 	});
 }
-for (const [index, stage] of ['unit', 'e2e', 'build'].entries()) {
-	const receiver = roles.STAGES[index + 1];
+for (const receiver of ['e2e', 'build', 'testbuild']) {
 	const displayed = receiver === 'build' ? undefined : roles.displayPlan(receiver, context);
 	const lot = displayed?.matrix.lot[0];
-	check(stage + ' admission retains aggregate custody and the exact prior proof', () => {
+	const receipts = () => roles.PREDECESSORS[receiver].flatMap((stage) => completed.all[stage]);
+	check(receiver + ' admission retains aggregate custody and the exact prior proof', () => {
 		let reads = 0;
 		const proof = roles.admit(
-			stage,
+			receiver,
 			lot,
 			displayed?.metadata,
-			{ [roles.JOBS[index]]: { result: 'success' } },
+			needsOf(receiver),
 			context,
 			1,
 			() => {
 				reads++;
-				return completed.all[stage];
+				return receipts();
 			}
 		);
-		assert.deepEqual(proof, roles.union(stage, completed.all[stage], 'success', context, 1));
+		assert.deepEqual(proof, { context, chain: completed.all[receiver][0].prior });
+		assert.deepEqual(
+			proof.chain.map((row) => row.stage),
+			roles.priorStages(receiver)
+		);
 		assert.equal(reads, 1);
 	});
 	for (const result of ['failure', 'cancelled', 'skipped'])
-		check(stage + ' lot admission preserves ' + result + ' aggregate refusal before read', () => {
-			let reads = 0;
-			assert.throws(
-				() =>
-					roles.admit(
-						stage,
-						lot,
-						displayed?.metadata,
-						{ [roles.JOBS[index]]: { result } },
-						context,
-						1,
-						() => {
-							reads++;
-							return completed.all[stage];
-						}
-					),
-				/Direct predecessor aggregate/
-			);
-			assert.equal(reads, 0);
-		});
+		check(
+			receiver + ' lot admission preserves ' + result + ' aggregate refusal before read',
+			() => {
+				for (const stage of roles.PREDECESSORS[receiver]) {
+					let reads = 0;
+					const needs = {
+						...needsOf(receiver),
+						[roles.JOBS[roles.STAGES.indexOf(stage)]]: { result }
+					};
+					assert.throws(
+						() =>
+							roles.admit(receiver, lot, displayed?.metadata, needs, context, 1, () => {
+								reads++;
+								return receipts();
+							}),
+						/Direct predecessor aggregate/
+					);
+					assert.equal(reads, 0);
+				}
+			}
+		);
 }
 for (const stage of roles.STAGES) {
 	check(stage + ' lot recording preserves every original receipt field and complete cell', () => {
@@ -1109,5 +1156,174 @@ assert.equal(
 	174,
 	'all prior 167 controls and seven managed native history controls execute'
 );
+
+// The stage graph: Build admits Unit beside E2E, and the test build joins both.
+const testbuildLot = roles.displayPlan('testbuild', context);
+const admitTestbuild = (receipts, needs = needsOf('testbuild'), ctx = context, attempt = 1) =>
+	roles.admit(
+		'testbuild',
+		testbuildLot.matrix.lot[0],
+		testbuildLot.metadata,
+		needs,
+		ctx,
+		attempt,
+		() => receipts
+	);
+check('stage graph keeps every earlier stage once, in order, on every chain', () => {
+	assert.deepEqual(roles.PREDECESSORS, {
+		unit: [],
+		e2e: ['unit'],
+		build: ['unit'],
+		testbuild: ['e2e', 'build']
+	});
+	assert.deepEqual(
+		roles.STAGES.map((stage) => roles.priorStages(stage)),
+		[[], ['unit'], ['unit'], ['unit', 'e2e', 'build']]
+	);
+	assert.deepEqual(
+		completed.proof.chain.map((row) => row.stage),
+		roles.STAGES
+	);
+	assert.deepEqual(
+		completed.all.build[0].prior.map((row) => row.stage),
+		['unit']
+	);
+	assert.deepEqual(
+		completed.all.e2e[0].prior.map((row) => row.stage),
+		['unit']
+	);
+	assert.throws(
+		() => roles.admit('unit', undefined, undefined, {}, context, 1, () => []),
+		/Unknown receiving stage/
+	);
+});
+for (const [name, receipts, pattern] of [
+	['missing Build', () => completed.all.e2e, /Missing or extra/],
+	['missing E2E', () => completed.all.build, /Missing or extra/],
+	[
+		'one missing E2E cell',
+		() => [...completed.all.e2e.slice(1), ...completed.all.build],
+		/Missing or extra/
+	],
+	[
+		'a Unit receipt',
+		() => [...completed.all.e2e, ...completed.all.build, completed.all.unit[0]],
+		/Foreign stage receipt/
+	],
+	[
+		'a test-build receipt',
+		() => [...completed.all.e2e, ...completed.all.build, completed.all.testbuild[0]],
+		/Foreign stage receipt/
+	],
+	[
+		'a Build receipt from another run',
+		() => {
+			const build = structuredClone(completed.all.build);
+			build[0].context.run_id = '4321';
+			return [...completed.all.e2e, ...build];
+		},
+		/Foreign source/
+	],
+	[
+		'an E2E receipt from another source',
+		() => {
+			const e2e = structuredClone(completed.all.e2e);
+			e2e[0].context.source_sha = 'b'.repeat(40);
+			return [...e2e, ...completed.all.build];
+		},
+		/Foreign source/
+	],
+	[
+		'a Build receipt over another Unit history',
+		() => {
+			const build = structuredClone(completed.all.build);
+			for (const row of build) row.prior[0].cells[0].host.architecture = 'x64';
+			return [...completed.all.e2e, ...build];
+		},
+		/Conflicting predecessor/
+	],
+	[
+		'a Build receipt with no Unit predecessor',
+		() => {
+			const build = structuredClone(completed.all.build);
+			build[0].prior = [];
+			return [...completed.all.e2e, ...build];
+		},
+		/prior stage/
+	],
+	[
+		'a Build receipt claiming an E2E predecessor',
+		() => {
+			const build = structuredClone(completed.all.build);
+			build[0].prior.push(structuredClone(completed.all.testbuild[0].prior[1]));
+			return [...completed.all.e2e, ...build];
+		},
+		/prior stage/
+	]
+])
+	check('test-build admission refuses ' + name, () => {
+		const rows = receipts();
+		assert.throws(() => admitTestbuild(rows), pattern);
+	});
+check('test-build admission refuses a missing or failed predecessor aggregate', () => {
+	const receipts = [...completed.all.e2e, ...completed.all.build];
+	assert.throws(() => admitTestbuild(receipts, { launch: { result: 'success' } }), /Closed stage/);
+	assert.throws(
+		() => admitTestbuild(receipts, { 'package-macos': { result: 'success' } }),
+		/Closed stage/
+	);
+	assert.throws(
+		() => admitTestbuild(receipts, { 'e2e-hs': { result: 'success' } }),
+		/Closed stage/
+	);
+});
+check('a rerun of E2E alone keeps the earlier Build and still admits', () => {
+	const e2e = completed.all.e2e.map((row) => ({ ...structuredClone(row), attempt: 2 }));
+	const proof = admitTestbuild([...e2e, ...completed.all.build], needsOf('testbuild'), context, 2);
+	assert.deepEqual(
+		proof.chain.map((row) => [row.stage, Math.max(...row.cells.map((cell) => cell.attempt))]),
+		[
+			['unit', 1],
+			['e2e', 2],
+			['build', 1]
+		]
+	);
+	const receipt = roles.record(
+		'testbuild',
+		roles.plan('testbuild', context)[0],
+		'success',
+		proof,
+		context,
+		host(roles.plan('testbuild', context)[0]),
+		2
+	);
+	assert.deepEqual(receipt.prior, proof.chain);
+});
+check('a Build older than its Unit predecessor is a backward lineage', () => {
+	const unit = completed.all.unit.map((row) => ({ ...structuredClone(row), attempt: 2 }));
+	const prior = roles.admit(
+		'build',
+		undefined,
+		undefined,
+		needsOf('build'),
+		context,
+		2,
+		() => unit
+	);
+	assert.throws(
+		() =>
+			roles.validateChain(
+				[
+					...prior.chain,
+					{ stage: 'e2e', cells: structuredClone(completed.proof.chain[1].cells) },
+					{ stage: 'build', cells: structuredClone(completed.proof.chain[2].cells) }
+				],
+				'testbuild',
+				context
+			),
+		/Backward predecessor attempt lineage/
+	);
+});
+assert.equal(controls, 188, 'all prior 174 controls and fourteen stage graph controls execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

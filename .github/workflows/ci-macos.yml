@@ -1,7 +1,9 @@
 # .github/workflows/ci-macos.yml
 #
-# macOS lane: Unit -> E2E -> Build -> Test build -> Verdict.
-# Native roles stay parallel inside their authored stage matrices.
+# macOS lane: Unit -> (E2E and Build side by side) -> Test build -> Verdict.
+# Build packages after Unit; the test build admits both E2E and Build, so the
+# verdict still proves all four stages. Native roles stay parallel inside their
+# authored stage matrices.
 # Lua unit and stubbed engine E2E tests run on Ubuntu. The Swift launcher tests
 # share the macOS packaging host. The launch matrix installs the exact uploaded
 # archive over the canonical user-state profile on Apple silicon and, for a
@@ -206,7 +208,7 @@ jobs:
         id: stage-admission
         env:
           MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
-        run: node tools/ci/macos-stage-roles.cjs admit unit "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
+        run: node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
       # Retained original role: e2e-hs
       - uses: actions/checkout@v4
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
@@ -227,7 +229,7 @@ jobs:
       # today. Named/commented explicitly so a green check here never implies
       # OS-level coverage it does not have (F-HIGH-30). Its fresh checkout
       # and interpreter are independent of the unit job; both must pass before
-      # packaging or native tooltip observation.
+      # any installed-app launch.
       - name: Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}
         # Exercises Registry + Expander via the stub layer against
@@ -1703,7 +1705,7 @@ jobs:
   package-macos:
     name: Build
     needs:
-      - e2e-hs
+      - test-hs
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -1721,13 +1723,13 @@ jobs:
       - name: Download exact prior stage receipts
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-stage-e2e-*-${{ github.run_id }}
+          pattern: macos-stage-unit-*-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-inputs
       - name: Admit complete successful predecessor stage
         id: stage-admission
         env:
           MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
-        run: node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
+        run: node tools/ci/macos-stage-roles.cjs admit build "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
       # A depth-1 clone: the build reads tracked files and HEAD, never history.
       - uses: actions/checkout@v4
         if: ${{ steps.stage-admission.outcome == 'success' }}
@@ -2507,6 +2509,7 @@ jobs:
   launch:
     name: Install and launch
     needs:
+      - e2e-hs
       - package-macos
     runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}
     timeout-minutes: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}
@@ -2526,13 +2529,13 @@ jobs:
       - name: Download exact prior stage receipts
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-stage-build-*-${{ github.run_id }}
+          pattern: macos-stage-{e2e,build}-*-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-inputs
       - name: Admit complete successful predecessor stage
         id: stage-admission
         env:
           MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
-        run: node tools/ci/macos-stage-roles.cjs admit build "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
+        run: node tools/ci/macos-stage-roles.cjs admit testbuild "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
       # Retained original role: launch
       - uses: actions/checkout@v4
         env:
