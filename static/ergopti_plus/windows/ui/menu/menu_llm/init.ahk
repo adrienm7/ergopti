@@ -244,10 +244,17 @@ _LLM_Menu_DegradeFirstRestoreHotkeys(Detail, NotifyFn := 0) {
  */
 LLM_Menu_ActivateDeferredHotkeys(ActivateFn := 0, Attempt := 1, ScheduleFn := 0,
 		IsPaused := unset) {
-	global _LLM_Menu_FirstRestoreHotkeysDeferred
+	global _LLM_Menu_FirstRestoreHotkeysDeferred, _LLM_Menu_HotkeysAwaitEnable
 	global LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS, LLM_MENU_DEFERRED_HOTKEY_RETRY_MS
 	if !_LLM_Menu_FirstRestoreHotkeysDeferred
 		return true
+	; A switch-off may win while the initial callback or a retry is queued.
+	; Transfer its unfinished activation back to the next explicit switch-on.
+	if !LLM_Menu_AiEnabled() {
+		_LLM_Menu_FirstRestoreHotkeysDeferred := false
+		_LLM_Menu_HotkeysAwaitEnable := true
+		return false
+	}
 	; Paused again before this ran: the next resume takes it.
 	if (IsSet(IsPaused) ? IsPaused : A_IsSuspended)
 		return false
@@ -260,6 +267,7 @@ LLM_Menu_ActivateDeferredHotkeys(ActivateFn := 0, Attempt := 1, ScheduleFn := 0,
 	}
 	if Attempt >= LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS {
 		_LLM_Menu_FirstRestoreHotkeysDeferred := false
+		_LLM_Menu_HotkeysAwaitEnable := true
 		LoggerError("LLM",
 			"AI hotkeys deferred by the pause could not be activated after {1} attempts.",
 			Attempt)
