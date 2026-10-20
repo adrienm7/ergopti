@@ -49,36 +49,62 @@ global _HC_ProbeRun := 0
 ; @param Schema {Map} The diagnostics schema.
 ; @param Publish {Func} (Epoch, Id, Result, Sections) receives each answer once.
 ; @param LocalOnly {Boolean} Start only the probes that read local files.
-HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides := 0) {
+; @param CurrentFn {Func|Integer} Optional pure predicate for the initiating window.
+HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides := 0, CurrentFn := 0) {
 	global _HC_ProbeRun
-	HealthCheck_CancelProbes()
+	HasOwner := !(CurrentFn is Integer && CurrentFn == 0)
+	if HasOwner && !HasMethod(CurrentFn, "Call")
+		throw TypeError("The diagnostics probe owner must be callable or zero.")
+	if HasOwner && !CurrentFn.Call()
+		return false
+	HealthCheck_CancelProbes(CurrentFn)
 	Run := { Epoch: Epoch, Cancelled: false, Requests: [], Publish: Publish }
-	_HC_ProbeRun := Run
+	; Abort and terminal retirement can dispatch native messages. Publish only
+	; while the initiating window still owns the request, never over its successor.
+	PreviousCritical := Critical("On")
+	try {
+		if HasOwner && !CurrentFn.Call()
+			return false
+		_HC_ProbeRun := Run
+	} finally Critical(PreviousCritical)
 	Probes := Schema["probes"]
 	_HC_ProbeConfiguration(Run, Probes["configuration"], Overrides)
 	if LocalOnly
-		return
+		return true
 	Github := Probes["github_api"]
 	_HC_ProbeHttp(Run, "github_api", Github["url"],
 		Map("User-Agent", HC_PROBE_USER_AGENT, "Accept", "application/vnd.github+json"),
 		Github["timeout_ms"], _HC_GithubAnswer)
 	_HC_ProbeAi(Run, Probes["ai_health"])
 	_HC_ProbeCpu(Run, Probes["cpu_load"])
+	return true
 }
 
 ; Cancels the current run: its curl children are stopped, its answers dropped.
-HealthCheck_CancelProbes() {
+; @param CurrentFn {Func|Integer} Optional pure predicate for the requesting page.
+HealthCheck_CancelProbes(CurrentFn := 0) {
+	HasOwner := !(CurrentFn is Integer && CurrentFn == 0)
+	if HasOwner && !HasMethod(CurrentFn, "Call")
+		throw TypeError("The diagnostics probe owner must be callable or zero.")
+	if HasOwner && !CurrentFn.Call()
+		return false
 	ManagedNetworkTerminalFailure.Retire("diagnostics")
 	global _HC_ProbeRun
-	if !IsObject(_HC_ProbeRun)
-		return
-	Run := _HC_ProbeRun
-	_HC_ProbeRun := 0
-	Run.Cancelled := true
+	PreviousCritical := Critical("On")
+	try {
+		if HasOwner && !CurrentFn.Call()
+			return false
+		if !IsObject(_HC_ProbeRun)
+			return true
+		Run := _HC_ProbeRun
+		_HC_ProbeRun := 0
+		Run.Cancelled := true
+	} finally Critical(PreviousCritical)
 	for Request in Run.Requests {
 		if !Request.Abort()
 			LoggerError("Healthcheck", "A diagnostics probe's curl child refused to stop; its cleanup is retained.")
 	}
+	return true
 }
 
 ; Logs a probe's start: the one TRACE that _HC_ProbeFinish's DONE closes.
