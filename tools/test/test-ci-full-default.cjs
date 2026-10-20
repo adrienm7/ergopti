@@ -361,14 +361,17 @@ check('mandatory default predicates are the actual workflow predicates', () => {
 			),
 			'if'
 		),
-		macRole.condition('managed-ollama-native')
+		macRole.condition('managed-ollama-native', "${{ matrix.scenario != 'runtime' }}")
 	);
 	assert.equal(
 		Full.stepField(
 			Full.step(Full.job('e2e-hs'), 'Qualify actual native PAC and WPAD XCTest controls'),
 			'if'
 		),
-		macRole.condition('managed-ollama-native', '${{ !cancelled() }}')
+		macRole.condition(
+			'managed-ollama-native',
+			"${{ !cancelled() && matrix.scenario != 'runtime' }}"
+		)
 	);
 });
 check('Common TOML receiving retains its owned step, identity and check command', () => {

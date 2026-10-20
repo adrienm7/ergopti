@@ -978,7 +978,10 @@ function nativeHttpClockPipeline(workflow, expected) {
 		],
 		'Package original first-two mandatory controls and duplicate deferral must stay exact.'
 	);
-	assert.strictEqual(owners[0].if, macRole.condition('managed-ollama-native', '!cancelled()'));
+	assert.strictEqual(
+		owners[0].if,
+		macRole.condition('managed-ollama-native', "!cancelled() && matrix.scenario != 'xctest'")
+	);
 	assert.strictEqual(owners[0].shell, 'bash');
 	assert.strictEqual(owners[0]['timeout-minutes'], 5);
 	assert.notStrictEqual(owners[0]['continue-on-error'], true);

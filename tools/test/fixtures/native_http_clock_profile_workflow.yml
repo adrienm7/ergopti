@@ -3,7 +3,7 @@ jobs:
   managed-ollama-native:
     steps:
       - name: Receive actual independent managed HTTP native clients
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.scenario != 'xctest' }}
         id: native_http_clock
         shell: bash
         run: |
@@ -55,7 +55,7 @@ jobs:
           exit "$status"
         timeout-minutes: 5
       - name: Retain independent native HTTP clock receiving
-        if: ${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}
+        if: ${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' && matrix.scenario != 'xctest' }}
         uses: actions/upload-artifact@v4
         with:
           name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}

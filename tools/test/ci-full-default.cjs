@@ -95,13 +95,13 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Observe independent native Apple Shortcuts SDK preflight and discovery',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native Apple Shortcuts SDK observation',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-linux.yml',
@@ -149,43 +149,43 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive and admit the clean native source asset from its build cell',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual selected number-row Carbon XCTest controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive selected-release shell corpus and native guardian cancellation',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain selected number-row Carbon XCTest diagnostics',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify native input-source and launcher XCTest controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain native input-source and launcher XCTest diagnostics',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain selected-release native ownership receiving',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
@@ -203,73 +203,73 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive actual private-session and numeric TLS peer controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain actual private-session and numeric TLS peer diagnostics',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual SDK accepted-owner and deadline XCTest controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify numeric logger boundary XCTest controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual native PAC source ownership XCTest controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native SDK XCTest diagnostics',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual native PAC and WPAD XCTest controls',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native PAC XCTest diagnostics',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive actual independent managed HTTP native clients',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native HTTP clock receiving',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true' && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual explicit curl stream ownership',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive actual native model create, pull, inference and retirement',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.scenario != 'xctest') }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',

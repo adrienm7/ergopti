@@ -272,25 +272,25 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Observe independent native Apple Shortcuts SDK preflight and discovery',
-		"${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		"${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain independent native Apple Shortcuts SDK observation',
-		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Observe installed Shortcuts Events metadata without launch',
-		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}"
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain installed Shortcuts Events metadata diagnostic',
-		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest' }}"
 	],
 	// The clean source build runs in its own parallel cell and hands its sealed
 	// bytes to the receiving cell, which admits them under the original build id.
@@ -323,61 +323,61 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Receive and admit the clean native source asset from its build cell',
-		NOT_CANCELLED
+		"${{ !cancelled() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Receive actual native model create, pull, inference and retirement',
-		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Qualify actual selected number-row Carbon XCTest controls',
-		NOT_CANCELLED
+		"${{ !cancelled() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain selected number-row Carbon XCTest diagnostics',
-		'always()'
+		"${{ always() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Qualify native input-source and launcher XCTest controls',
-		NOT_CANCELLED
+		"${{ !cancelled() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain native input-source and launcher XCTest diagnostics',
-		'always()'
+		"${{ always() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain selected-release native ownership receiving',
-		'always()'
+		"${{ always() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Qualify actual native PAC source ownership XCTest controls',
-		NOT_CANCELLED
+		"${{ !cancelled() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Qualify actual native PAC and WPAD XCTest controls',
-		NOT_CANCELLED
+		"${{ !cancelled() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain independent native PAC XCTest diagnostics',
-		'always()'
+		"${{ always() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
@@ -390,25 +390,25 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Qualify actual explicit curl stream ownership',
-		'${{ !cancelled() }}'
+		"${{ !cancelled() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Receive actual independent managed HTTP native clients',
-		'${{ !cancelled() }}'
+		"${{ !cancelled() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain independent native HTTP clock receiving',
-		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}"
+		"${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Upload the actual managed native release asset',
-		'inputs.release'
+		"${{ inputs.release && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
@@ -420,19 +420,19 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain independent native launcher compiler diagnostics',
-		'always()'
+		"${{ always() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain independent native SDK XCTest diagnostics',
-		'always()'
+		"${{ always() && matrix.scenario != 'runtime' }}"
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
 		'Retain actual private-session and numeric TLS peer diagnostics',
-		'always()'
+		"${{ always() && matrix.scenario != 'xctest' }}"
 	],
 	[
 		MACOS_BOX,
@@ -6818,7 +6818,7 @@ for (const [what, from, to] of [
 
 // A disjoint mandatory cohort; literal ownership is narrower than a generic Swift filter.
 const PAC_SOURCE_STEP = retainedManagedStep(
-	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n'
+	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() && matrix.scenario != \'runtime\' }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n'
 );
 function nativePacSourceProblems(files) {
 	const mac = files.find((file) => file.rel === MACOS_BOX)?.text ?? '';
@@ -6861,14 +6861,22 @@ for (const [replacement, error] of [
 	],
 	[
 		rawSourceStep.replace(
-			'if: ' + macRole.condition('managed-ollama-native', '${{ !cancelled() }}'),
+			'if: ' +
+				macRole.condition(
+					'managed-ollama-native',
+					"${{ !cancelled() && matrix.scenario != 'runtime' }}"
+				),
 			'if: false'
 		),
 		/\[ci-full-default\].*full step condition/
 	],
 	[
 		rawSourceStep.replace(
-			'if: ' + macRole.condition('managed-ollama-native', '${{ !cancelled() }}'),
+			'if: ' +
+				macRole.condition(
+					'managed-ollama-native',
+					"${{ !cancelled() && matrix.scenario != 'runtime' }}"
+				),
 			'if: ${{ success() }}'
 		),
 		/\[ci-full-default\].*full step condition/
@@ -6887,7 +6895,11 @@ for (const [name, changed] of [
 	[
 		'skipped source step',
 		PAC_SOURCE_STEP.replace(
-			'if: ' + macRole.condition('managed-ollama-native', '${{ !cancelled() }}'),
+			'if: ' +
+				macRole.condition(
+					'managed-ollama-native',
+					"${{ !cancelled() && matrix.scenario != 'runtime' }}"
+				),
 			'if: false'
 		)
 	],
@@ -7491,10 +7503,10 @@ for (const [label, from, to] of SITE_DEPLOY_REFUSALS) {
 
 // Current read-only number-row cohort is mandatory independently of full package prerequisites.
 const NUMBER_ROW_NATIVE_STEP = retainedManagedStep(
-	'      - name: Qualify actual selected number-row Carbon XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          evidence="$RUNNER_TEMP/number-row-source-evidence"\n          mkdir "$evidence"\n          transcript="$evidence/number-row-xctest.log"\n          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"\n          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          git show "$GITHUB_SHA:$source" | cmp - "$source"\n          git show "$GITHUB_SHA:$producer" | cmp - "$producer"\n          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))\')"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests([/.]|$)\' 2>&1 | tee "$transcript"\n          number_row_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#number_row_statuses[@]}" -eq 2\n          set +e\n          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\\n            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \\\n            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \\\n            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"\n          number_row_receipt_status=$?\n          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<\'NODE\'\n          const fs = require(\'node:fs\');\n          const transport = require(\'./tools/diagnostics/tis_evidence_transport.cjs\');\n          const receipt = JSON.parse(fs.readFileSync(process.argv[2], \'utf8\'));\n          if (!receipt.passed || receipt.scope !== \'NumberRowSourceProbeTests\' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error(\'exact twelve-case number-row receiving refused\');\n          const session = transport.validate(process.argv[3], process.argv[4]);\n          const expectedSources = {\n            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: \'com.apple.keylayout.US\',\n            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: \'com.apple.keylayout.French\',\n            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: \'com.apple.keylayout.US\',\n            testActualUSCapsMaskChangesAnIndependentLetterExpectation: \'com.apple.keylayout.US\',\n            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: \'com.apple.keylayout.French\',\n            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: \'com.apple.keylayout.US\',\n            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: \'com.apple.keylayout.US\'\n          };\n          const expected = Object.keys(expectedSources).sort();\n          const observed = session.receipts.map((row) => {\n            if (row.test.state !== \'present\' || row.omittedEvents !== 0) throw new Error(\'native diagnostic identity refused\');\n            const match = /^(?:(?:\\w+\\.)?NumberRowSourceProbeTests\\.|-\\[(?:\\w+\\.)?NumberRowSourceProbeTests )(test\\w+)(?:\\])?:(com\\.apple\\.keylayout\\.(?:US|French))$/.exec(row.test.value);\n            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error(\'foreign native method fixture\');\n            const captures = row.events.filter((event) => event.phase === \'original.capture\');\n            if (captures.length !== 1 || captures[0].original?.id?.state !== \'present\' || typeof captures[0].original.id.value !== \'string\' || captures[0].original.id.value.length === 0) throw new Error(\'captured original source unavailable\');\n            const originalID = captures[0].original.id.value;\n            for (const phase of [\'restore.inner.after\', \'restore.outer.after\']) {\n              const events = row.events.filter((event) => event.phase === phase);\n              if (events.length !== 1 || events[0].status !== 0) throw new Error(\'native source restoration refused\');\n              if (events[0].original?.id?.state !== \'present\' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== \'present\' || events[0].current.id.value !== originalID) throw new Error(\'sampled selected source restoration refused\');\n            }\n            return match[1];\n          }).sort();\n          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(\'exact seven native diagnostic closures refused\');\n          NODE\n          number_row_tis_status=$?\n          set -e\n          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          test "$number_row_receipt_status" -eq 0\n          test "$number_row_tis_status" -eq 0\n        timeout-minutes: 10\n'
+	'      - name: Qualify actual selected number-row Carbon XCTest controls\n        if: ${{ !cancelled() && matrix.scenario != \'runtime\' }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          evidence="$RUNNER_TEMP/number-row-source-evidence"\n          mkdir "$evidence"\n          transcript="$evidence/number-row-xctest.log"\n          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"\n          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          git show "$GITHUB_SHA:$source" | cmp - "$source"\n          git show "$GITHUB_SHA:$producer" | cmp - "$producer"\n          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))\')"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests([/.]|$)\' 2>&1 | tee "$transcript"\n          number_row_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#number_row_statuses[@]}" -eq 2\n          set +e\n          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\\n            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \\\n            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \\\n            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"\n          number_row_receipt_status=$?\n          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<\'NODE\'\n          const fs = require(\'node:fs\');\n          const transport = require(\'./tools/diagnostics/tis_evidence_transport.cjs\');\n          const receipt = JSON.parse(fs.readFileSync(process.argv[2], \'utf8\'));\n          if (!receipt.passed || receipt.scope !== \'NumberRowSourceProbeTests\' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error(\'exact twelve-case number-row receiving refused\');\n          const session = transport.validate(process.argv[3], process.argv[4]);\n          const expectedSources = {\n            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: \'com.apple.keylayout.US\',\n            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: \'com.apple.keylayout.French\',\n            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: \'com.apple.keylayout.US\',\n            testActualUSCapsMaskChangesAnIndependentLetterExpectation: \'com.apple.keylayout.US\',\n            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: \'com.apple.keylayout.French\',\n            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: \'com.apple.keylayout.US\',\n            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: \'com.apple.keylayout.US\'\n          };\n          const expected = Object.keys(expectedSources).sort();\n          const observed = session.receipts.map((row) => {\n            if (row.test.state !== \'present\' || row.omittedEvents !== 0) throw new Error(\'native diagnostic identity refused\');\n            const match = /^(?:(?:\\w+\\.)?NumberRowSourceProbeTests\\.|-\\[(?:\\w+\\.)?NumberRowSourceProbeTests )(test\\w+)(?:\\])?:(com\\.apple\\.keylayout\\.(?:US|French))$/.exec(row.test.value);\n            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error(\'foreign native method fixture\');\n            const captures = row.events.filter((event) => event.phase === \'original.capture\');\n            if (captures.length !== 1 || captures[0].original?.id?.state !== \'present\' || typeof captures[0].original.id.value !== \'string\' || captures[0].original.id.value.length === 0) throw new Error(\'captured original source unavailable\');\n            const originalID = captures[0].original.id.value;\n            for (const phase of [\'restore.inner.after\', \'restore.outer.after\']) {\n              const events = row.events.filter((event) => event.phase === phase);\n              if (events.length !== 1 || events[0].status !== 0) throw new Error(\'native source restoration refused\');\n              if (events[0].original?.id?.state !== \'present\' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== \'present\' || events[0].current.id.value !== originalID) throw new Error(\'sampled selected source restoration refused\');\n            }\n            return match[1];\n          }).sort();\n          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(\'exact seven native diagnostic closures refused\');\n          NODE\n          number_row_tis_status=$?\n          set -e\n          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          test "$number_row_receipt_status" -eq 0\n          test "$number_row_tis_status" -eq 0\n        timeout-minutes: 10\n'
 );
 const NUMBER_ROW_NATIVE_RETENTION = retainedManagedStep(
-	'      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n'
+	"      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: ${{ always() && matrix.scenario != 'runtime' }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n"
 );
 function numberRowNativeReceivingProblems(files) {
 	const mac = files.find((entry) => entry.rel === MACOS_BOX)?.text ?? '';
@@ -7563,7 +7575,8 @@ for (const [label, before, after] of [
 for (const [label, before, after] of [
 	[
 		'skipped retention',
-		'if: ' + macRole.condition('managed-ollama-native', 'always()'),
+		'if: ' +
+			macRole.condition('managed-ollama-native', "${{ always() && matrix.scenario != 'runtime' }}"),
 		'if: false'
 	],
 	[
@@ -7587,7 +7600,12 @@ for (const [label, before, after] of [
 	const name = 'Receive selected-release shell corpus and native guardian cancellation';
 	const head = `      - name: ${name}\n`;
 	const body = pipeline.step(macRole.body(pipeline.file(MACOS_BOX), 'managed-ollama-native'), name);
-	assert.equal(pipeline.stepField(body, 'if'), macRole.condition('managed-ollama-native'));
+	// Runtime receiving: the Intel XCTest cell skips it.
+	const runtimeOnly = macRole.condition(
+		'managed-ollama-native',
+		"${{ matrix.scenario != 'xctest' }}"
+	);
+	assert.equal(pipeline.stepField(body, 'if'), runtimeOnly);
 	assert.doesNotThrow(() => pipeline.validateRaw(files));
 	const mutants = [
 		['deleted receiver', '', /no step named/],
@@ -7633,10 +7651,7 @@ for (const [label, before, after] of [
 	])
 		mutants.push([
 			`conditional receiver ${condition}`,
-			body.replace(
-				'        if: ' + macRole.condition('managed-ollama-native') + '\n',
-				`        if: ${condition}\n`
-			),
+			body.replace('        if: ' + runtimeOnly + '\n', `        if: ${condition}\n`),
 			/full step condition/
 		]);
 	for (const [label, replacement, error] of mutants) {
@@ -7717,7 +7732,7 @@ for (const name of [
 		'        if: ' +
 		macRole.condition(
 			'managed-ollama-native',
-			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.scenario != 'xctest' }}"
 		) +
 		'\n';
 	assert.doesNotThrow(() => pipeline.validateRaw(files));
@@ -7788,7 +7803,7 @@ for (const name of [
 const SHORTCUTS_INDEPENDENT_OBSERVER = retainedManagedStep(
 	[
 		'      - name: Observe independent native Apple Shortcuts SDK preflight and discovery',
-		"        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		"        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest' }}",
 		'        shell: bash',
 		'        run: |',
 		'          set -euo pipefail',
@@ -7802,7 +7817,7 @@ const SHORTCUTS_INDEPENDENT_OBSERVER = retainedManagedStep(
 const SHORTCUTS_INDEPENDENT_RETENTION = retainedManagedStep(
 	[
 		'      - name: Retain independent native Apple Shortcuts SDK observation',
-		"        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		"        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest' }}",
 		'        uses: actions/upload-artifact@v4',
 		'        with:',
 		'          name: native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
