@@ -372,8 +372,9 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 		local end_at = src:find("\n\t\tend,", start_at, true)
 		helpers.assert_true(end_at ~= nil, "the queue-loss callback must be a bounded option block")
 		local block = src:sub(start_at, end_at)
-		helpers.assert_true(block:find("engine:reset()", 1, true) ~= nil,
-			"typed trigger state derived before SYN_DROPPED must be cleared")
+		-- Lost input also loses the word start (unknown-context-resets).
+		helpers.assert_true(block:find("engine:reset(false)", 1, true) ~= nil,
+			"typed trigger state derived before SYN_DROPPED must be cleared at an unknown word start")
 		helpers.assert_true(block:find("prediction_engine.cancel()", 1, true) ~= nil,
 			"an LLM request derived from lost input must be cancelled")
 		helpers.assert_true(block:find("tooltip_preview.hide()", 1, true) ~= nil,

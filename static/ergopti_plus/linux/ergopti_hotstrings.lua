@@ -939,11 +939,14 @@ local function main()
 	})
 
 	local script_actions = ScriptActions.new({
+		-- Runs when the script pauses: the user keeps typing text this engine
+		-- never sees, so the resumed caret is not known to start a word (macOS
+		-- discard_paused_text_context makes the same claim).
 		reset = function()
 			keylogger.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
-			engine:reset()
+			engine:reset(false)
 		end,
 		reload = perform_reload,
 		quit = shutdown.request,
@@ -1261,8 +1264,10 @@ local function main()
 						end
 					end
 				else
+					-- An uncommitted output leaves the line in an unknown state: the
+					-- next key must not borrow a word start it cannot prove.
 					_undoable = nil
-					engine:reset()
+					engine:reset(false)
 					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
 						and delivery_error == "programmable publication is no longer current" and Logger.warn or Logger.error
 					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
@@ -1476,7 +1481,8 @@ local function main()
 					if invalidated then return end
 					invalidated = true
 					_undoable = nil
-					engine:reset()
+					-- The caret sits after replaced text the engine never typed.
+					engine:reset(false)
 				end
 				return privacy_owners.selection.replace_staged(receipt, text, authorized, function(value, publication)
 					return injector.prepare_selected(value, publication)
@@ -1637,7 +1643,9 @@ local function main()
 				Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
 					utf8.len(undo.trigger) or #undo.trigger)
 				injector.inject(remaining - 1, undo.trigger, undo.is_private, nil, undo.destination)
-				engine:reset()
+				-- The restored trigger ends the line and is not in the buffer: a
+				-- word-start rule typed next would otherwise fire inside it.
+				engine:reset(false)
 				return
 			end
 		end
@@ -1705,9 +1713,9 @@ local function main()
 			local result = injector.inject(0, text, false, nil, publication)
 			if type(result) ~= "table" or result.ok ~= true then return false end
 			-- The caret moved over replaced text: what the engine buffered no longer
-			-- describes the line.
+			-- describes the line, and what precedes the caret is not known.
 			_undoable = nil
-			engine:reset()
+			engine:reset(false)
 			return true
 		end,
 	})
@@ -2745,7 +2753,8 @@ local function main()
 			_last_offered = nil
 			if tooltip_preview then tooltip_preview.hide() end
 			if prediction_engine then prediction_engine.cancel() end
-			engine:reset()
+			-- Lost input means the text around the caret is a guess.
+			engine:reset(false)
 		end,
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.

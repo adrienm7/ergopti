@@ -131,8 +131,12 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local click_body = src:sub(click_start, focus_start - 1)
       local focus_body = src:sub(focus_start, focus_end)
 
-      helpers.assert_true(control_body:find("engine:reset()", 1, true) ~= nil,
+      -- Control keys reset through the word-reset owner; the undo restore resets
+      -- at an unknown word start (unknown-context-resets).
+      helpers.assert_true(control_body:find("WordReset.apply_control(engine, key_name, detail)", 1, true) ~= nil,
         "control keys must reset text and its aligned timing history")
+      helpers.assert_true(control_body:find("engine:reset(false)", 1, true) ~= nil,
+        "the undo restore must reset text at an unknown word start")
       helpers.assert_true(click_body:find("secure_focus_guard.invalidate()", 1, true) ~= nil,
         "pointer clicks must cross the text buffer and privacy state together")
       helpers.assert_true(focus_body:find("secure_focus_guard.prime()", 1, true) ~= nil,

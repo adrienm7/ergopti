@@ -136,6 +136,89 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 	end)
 end)
 
+-- unknown-context-resets: a pause, an uncommitted output, a replaced selection,
+-- an undo, a typed action result and lost input all leave the caret after text
+-- this engine never buffered. A plain reset declared a word start there, so
+-- "adn" restored by Undo followed by "dt★" fired the date inside the word.
+local UNKNOWN_CONTEXT_MARKERS = {
+	"reset = function()",
+	"if remaining >= 1 then",
+	"invalidated = true",
+	"local result = injector.inject(0, text, false, nil, publication)",
+	"onDesync = function()",
+}
+
+-- Plain resets are reserved for genuine word starts: an idle pause, a
+-- final_result expansion and a consumed dynamic trigger.
+local BOUNDARY_RESET_CONTEXTS = {
+	"if WordReset.observe_key(now_ms) then",
+	"if result.final_result then",
+	"Dynamic expansion consumed the trigger",
+}
+
+helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)", function()
+	helpers.it("each reviewed daemon reset leaves the next word start unknown", function()
+		local source = daemon_source()
+		local Core = require("hotstring_engine")
+		local compile = loadstring or load
+		local count = 0
+		for _, marker in ipairs(UNKNOWN_CONTEXT_MARKERS) do
+			local first = source:find(marker, 1, true)
+			helpers.assert_true(first ~= nil, "reviewed reset site must exist: " .. marker)
+			helpers.assert_nil(source:find(marker, first + 1, true), "reviewed marker must be unique: " .. marker)
+			local prefix = assert(source:sub(first + #marker):match("^(.-engine:reset%b())"), "site must reset: " .. marker)
+			local callback = assert(compile("return function(engine, injector, Logger)\n"
+				.. "local keylogger = require(\"modules.keylogger.keylogger\")\n"
+				.. "local _undoable, _last_offered, tooltip_preview, llm_overlay, prediction_engine\n"
+				.. "local LOG, undo, text, publication = \"fixture\", { trigger = \"adn\" }, \"owned\", {}\n"
+				-- The marker line itself is not part of the prefix: seed what it bound.
+				.. "local remaining, result = 3, { ok = true }\n"
+				.. prefix .. "\nend", "@reviewed-unknown-reset-prefix"))()
+			local engine = Core.new()
+			helpers.assert_true(engine:load_mappings({ { trigger = "dt", replacement = "owned-date",
+				is_word = true, auto_expand = true } }))
+			-- Positive control: the same mapping fires from a genuine word start.
+			engine:reset(true)
+			engine:on_char("d")
+			helpers.assert_not_nil(engine:on_char("t"), "the control mapping fires at a known word start")
+			engine:reset(true)
+			callback(engine, { inject = function() return { ok = true } end }, { info = function() end })
+			helpers.assert_eq(engine:buffer_starts_at_word_boundary(), false, marker)
+			engine:on_char("d")
+			helpers.assert_nil(engine:on_char("t"), "no word-start mapping fires after " .. marker)
+			count = count + 1
+		end
+		helpers.assert_eq(count, #UNKNOWN_CONTEXT_MARKERS)
+	end)
+
+	helpers.it("every daemon reset names whether a word starts", function()
+		local source = daemon_source()
+		local plain, explicit = 0, 0
+		local position = 1
+		while true do
+			local first, last, argument = source:find("engine:reset(%b())", position)
+			if not first then break end
+			position = last + 1
+			local inner = argument:sub(2, -2)
+			if inner == "" then
+				local context = source:sub(math.max(1, first - 600), first)
+				local allowed = false
+				for _, marker in ipairs(BOUNDARY_RESET_CONTEXTS) do
+					if context:find(marker, 1, true) then allowed = true end
+				end
+				helpers.assert_true(allowed, "a plain reset outside a known word start, near byte " .. first)
+				plain = plain + 1
+			else
+				helpers.assert_true(inner == "false" or inner == "at_word_start",
+					"a reset argument must be false or the click setting, got " .. inner)
+				explicit = explicit + 1
+			end
+		end
+		helpers.assert_eq(plain, #BOUNDARY_RESET_CONTEXTS, "each genuine word-start reset is accounted for")
+		helpers.assert_true(explicit >= #UNKNOWN_CONTEXT_MARKERS, "the reviewed sites pass an explicit boundary")
+	end)
+end)
+
 helpers.describe("Linux builtin dynamic word-start owners", function()
 	helpers.it("the actual daemon captures boundary with its buffer before prediction callbacks", function()
 		with_manager(function(manager, injections)
