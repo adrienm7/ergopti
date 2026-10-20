@@ -59,6 +59,20 @@ SIHO_StartOwned(Hook, Owner, Exclusive := false) {
 	} finally Critical(PreviousCritical)
 }
 
+; Whether the exact token/hook pair is still admitted. A caller publishing
+; logical state after Start must keep its query and publication in one Critical.
+; @param Token {Integer} Immutable ownership token returned by SIHO_StartOwned.
+; @param Hook {Object} The suppressive hook admitted with that token.
+; @returns {Boolean} True only while that exact pair remains registered.
+SIHO_IsOwned(Token, Hook) {
+	global _SIHO_Owners
+	PreviousCritical := Critical("On")
+	try {
+		return Token is Integer && Token > 0 && _SIHO_Owners.Has(Token)
+			&& _SIHO_Owners[Token]["hook"] == Hook
+	} finally Critical(PreviousCritical)
+}
+
 ; Stops and unregisters one exact owner as a single terminal transaction. A
 ; refused native Stop leaves the record intact so lifecycle teardown can retry.
 SIHO_StopOwned(Token, Hook) {
