@@ -261,3 +261,30 @@ _LRPR_AssertBrokerRowsLoaded(Rows) {
 			State[Key] := Value
 	}
 }
+
+
+_LRPE_ChildSource() {
+	global _DriverDir, _SharedDir
+	Source := _NRP_LayoutSource()
+	Pattern := "m)^#HotIf ([^`r`n]*NumberRowEdgesEffective\(\)[^`r`n]*)$"
+	At := RegExMatch(Source, Pattern, &Criterion)
+	AssertTrue(At > 0, "the actual static edge criterion must be found")
+	AssertEqual(0, RegExMatch(Source, Pattern, , At + Criterion.Len), "the edge cohort must have one real static criterion")
+	Extra := "#Include " . _DriverDir . "\adapters\key_state.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	for Name in ["KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
+		"KeylayoutEmulation_NumberRowLevels", "TapHoldKanaAltGrHeld"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "the real edge dependency must exist: " . Name)
+		Extra .= Definition . "`n"
+	}
+	; Evaluate the production expression with AHK's real short-circuit semantics,
+	; without arming a host hotkey or inventing a second admission implementation.
+	Extra .= "_LRPE_EdgeCriterion() => " . Criterion[1] . "`n"
+	return _LRPS_ChildSource("number_row_edges_boot_body.ahk", Extra)
+}
+
+for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-masked", "native-policy",
+	"published-on", "published-off", "kana-held", "inert-ordering"]
+	Test("number row edges: " . _LRPE_Mode . " keeps actual static admission safe (number-row-edges-boot-admission)",
+		_LRPS_LevelCustody.Bind(0, false, _LRPE_ChildSource, [_LRPE_Mode], "PASS number-row-edges-admission"))
