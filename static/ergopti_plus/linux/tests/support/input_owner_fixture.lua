@@ -53,10 +53,15 @@ function M.with_session(options, body)
 			descriptors[fd] = path; return fd
 		end,
 		close = function(fd)
+			s.source_closes = (s.source_closes or 0) + 1
 			descriptors[fd] = nil; released_fds[#released_fds + 1] = fd
 			return options.fail_reader_close and -1 or 0
 		end,
 		ioctl = function(fd, request, argument)
+			if request == 0x80044520 then
+				argument.bytes = options.event_bits or require("tests.support.evdev_capabilities_fixture").key_bits(fd, request, argument.count)
+				return options.event_result ~= nil and options.event_result or argument.count
+			end
 			if type(argument) == "table" then
 				argument.bytes = string.rep("\0", argument.count or 1)
 				if options.position_bits and request % 256 == 0x18 then
@@ -134,6 +139,7 @@ function M.with_session(options, body)
 		is_key_device = function() return true end,
 		-- Controlled keyboard sources have no REL/ABS axes.
 		is_interceptable_key_device = function() return true end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		physical_sources = function(devices)
 			local result = {}; for _, path in ipairs(devices) do result[#result + 1] = {
 				path = path, sysfs = "/controlled/source", name = "controlled", physical = s.virtual ~= true } end
@@ -157,6 +163,7 @@ function M.with_session(options, body)
 		s.bootstrap = options.late_reader and "late-reader" or "cold-hook-before-backend"
 		if options.custom_reader then
 			s.reader._set_backend({ open = symbols.open, close = function(fd) symbols.close(fd); return true end,
+				read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 				ioctl = function() return true end, read_bits = function(_, _, count) return string.rep("\0", count) end,
 				read = function(fd) local queue = queues[descriptors[fd]]; return queue and table.remove(queue, 1) end,
 				poll = function(fd) return #(queues[descriptors[fd]] or {}) > 0 end })

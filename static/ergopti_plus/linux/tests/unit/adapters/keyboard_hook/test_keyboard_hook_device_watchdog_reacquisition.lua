@@ -170,6 +170,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 			is_key_device = function() return true, nil end,
 			-- Controlled keyboard sources have no REL/ABS axes.
 			is_interceptable_key_device = function() return true, nil end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
 		local queues = {
 			[node_a] = { InputEvent.encode(InputEvent.EV_KEY, 42, InputEvent.VALUE_DOWN, nil, 1) },
@@ -343,6 +344,7 @@ helpers.describe("keyboard_hook: an explicit device owns its watchdog policy", f
 				return true, nil
 			end,
 			-- Controlled keyboard sources have no REL/ABS axes.
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 			is_interceptable_key_device = function(path)
 				if path == pinned then
 					return pinned_is_key, pinned_is_key and nil or "reports no EV_KEY capability"
@@ -422,6 +424,7 @@ helpers.describe("keyboard_hook: multi-device ownership", function()
 			is_key_device = function() return true, nil end,
 			-- Controlled keyboard sources have no REL/ABS axes.
 			is_interceptable_key_device = function() return true, nil end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
 		local reader = helpers.load_module("adapters.evdev_reader")
 		local backend, log = multi_recorder(queues)
@@ -603,6 +606,7 @@ helpers.describe("keyboard_hook: ordinary overlapping physical-source release", 
 			is_key_device = function() return true end,
 			-- Controlled keyboard sources have no REL/ABS axes.
 			is_interceptable_key_device = function() return true end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
 		local reader = helpers.load_module("adapters.evdev_reader")
 		local backend = multi_recorder(queues)

@@ -132,6 +132,68 @@ end)
 
 helpers.describe("fakes: the shapes callers depend on", function()
 
+	helpers.it("reader capabilities belong only to the queried open slot", function()
+		local reader = Fakes.evdev_reader()
+		local mask, reason = reader.event_capabilities()
+		helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+		helpers.assert_true(reader.open("keyboard-a"))
+		helpers.assert_eq(reader.event_capabilities(), 3)
+		helpers.assert_nil(reader.event_capabilities(reader.POINTER))
+		helpers.assert_true(reader.open("pointer-b", reader.POINTER))
+		helpers.assert_true(reader.close())
+		helpers.assert_nil(reader.event_capabilities())
+		helpers.assert_eq(reader.event_capabilities(reader.POINTER), 3)
+		helpers.assert_nil(Fakes.evdev_reader().event_capabilities(reader.POINTER))
+		helpers.assert_nil(reader.capture_source_owner(reader.POINTER), "modeled bits cannot certify native origin")
+	end)
+
+	helpers.it("reader capability overrides keep numeric masks and explicit failures", function()
+		local calls = 0
+		local reader = Fakes.evdev_reader({ event_capabilities = function(slot, path)
+			calls = calls + 1
+			if slot == "keyboard" and path == "keyboard-a" then return 7 end
+			return nil, "controlled query failure"
+		end })
+		helpers.assert_nil(reader.event_capabilities()); helpers.assert_eq(calls, 0)
+		reader.open("keyboard-a"); reader.open("pointer-b", reader.POINTER)
+		helpers.assert_eq(reader.event_capabilities(), 7)
+		local mask, reason = reader.event_capabilities(reader.POINTER)
+		helpers.assert_nil(mask); helpers.assert_eq(reason, "controlled query failure")
+		local zero = Fakes.evdev_reader({ event_capabilities = 0 }); zero.open("empty-device")
+		helpers.assert_eq(zero.event_capabilities(), 0)
+		for _, invalid in ipairs({ "3", -1, .5, 4294967296, math.huge }) do
+			local malformed = Fakes.evdev_reader({ event_capabilities = invalid }); malformed.open("invalid-mask")
+			mask, reason = malformed.event_capabilities()
+			helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+		end
+	end)
+
+	helpers.it("a same-path reopen retires the original capability query", function()
+		local reader, replaced
+		reader = Fakes.evdev_reader({ event_capabilities = function(slot, path)
+			if not replaced then replaced = true; reader.close(slot); reader.open(path, slot) end
+			return 3
+		end })
+		reader.open("same-path")
+		local mask, reason = reader.event_capabilities()
+		helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+		helpers.assert_true(reader.is_open()); helpers.assert_eq(reader.event_capabilities(), 3)
+		reader.close(); helpers.assert_nil(reader.event_capabilities())
+	end)
+
+	helpers.it("capability provider withdrawal cannot acknowledge an old query", function()
+		local options, reader = {}, nil
+		options.event_capabilities = function() options.event_capabilities = 7; return 3 end
+		reader = Fakes.evdev_reader(options); reader.open("keyboard-a")
+		helpers.assert_nil(reader.event_capabilities()); helpers.assert_eq(reader.event_capabilities(), 7)
+		reader.open("pointer-b", reader.POINTER)
+		options.event_capabilities = function() reader.close(reader.POINTER); return 3 end
+		helpers.assert_eq(reader.event_capabilities(), 3, "another slot cannot retire this open query")
+		options.event_capabilities = function() error("controlled query exception") end
+		local mask, reason = reader.event_capabilities()
+		helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+	end)
+
 	helpers.it("storage round-trips a value and reports absence as the default", function()
 		local storage = Fakes.storage()
 		helpers.assert_eq(storage.get("nothing", "fallback"), "fallback",

@@ -157,12 +157,14 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 			is_key_device = function() return true end,
 			-- Controlled keyboard sources have no REL/ABS axes.
 			is_interceptable_key_device = function() return true end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
 		package.loaded["adapters.xkb_capture"] = {
 			is_ready = function() return true end, reset_state = function() return true end,
 			process = function() end, modifier_role = function() end,
 		}
 		Reader._set_backend({
+			read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 			open = function(path) return path end, close = function() return true end,
 			ioctl = function() return true end, read = function() end, poll = function() return false end,
 			read_bits = function(_, _, count) return string.rep("\0", count) end,
@@ -261,6 +263,7 @@ helpers.describe("keyboard_hook.while_released: running observe dialogs", functi
 		local Hook = helpers.load_module("adapters.keyboard_hook")
 		Reader = require("adapters.evdev_reader")
 		Reader._set_backend({
+			read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 			open = function(path) return path end, close = function() return true end,
 			ioctl = function() return true end,
 			read = function(path) return table.remove(ctx.queues[path], 1) end,

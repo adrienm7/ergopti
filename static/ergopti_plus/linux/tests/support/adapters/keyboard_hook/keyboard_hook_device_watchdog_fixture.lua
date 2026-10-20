@@ -71,6 +71,7 @@ local function stub_device_finder(initial)
 		is_key_device = function() return true, nil end,
 		-- Controlled keyboard sources have no REL/ABS axes.
 		is_interceptable_key_device = function() return true, nil end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
 	return function(next_answer) answer = next_answer end, function() return calls end
 end
@@ -89,6 +90,7 @@ local function recorder()
 			log.ioctl_fds[#log.ioctl_fds + 1] = fd
 			return true
 		end,
+		read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 		read  = function() return nil end,
 		poll  = function() return false end,
 		close = function() log.closes = log.closes + 1 end,
@@ -109,6 +111,7 @@ local function multi_recorder(queues)
 			log.ioctls[#log.ioctls + 1] = { fd = fd, arg = arg }
 			return true
 		end,
+		read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 		read = function(fd)
 			local queue = queues[fd] or {}
 			local next_value = table.remove(queue, 1)
@@ -156,6 +159,7 @@ local function aggregate_consumer_session(streams, options)
 		is_key_device = function() return true end,
 		-- Controlled keyboard sources have no REL/ABS axes.
 		is_interceptable_key_device = function() return true end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
 	local reader = helpers.load_module("adapters.evdev_reader")
 	local backend = multi_recorder(queues)
