@@ -684,3 +684,5 @@ Test("managed bootstrap: actual enable admission preserves exact READY successor
 #Include test_ollama_runtime_ready_cancellation.ahk
 
 #Include test_ollama_runtime_terminal_delivery.ahk
+
+#Include test_ollama_failure_epoch_publication.ahk
