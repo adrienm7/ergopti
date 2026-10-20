@@ -654,6 +654,8 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 		Label := Prefix . (IsSet(Label) ? Label : t(I18nKey))
 	Disabled := MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters)
 	ReasonKey := _MR_Get(Item, "disabled_reason_key")
+	if Disabled && ReasonKey != "" && !_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey)
+		return false
 	if Disabled && ReasonKey != "" && IsSet(Label)
 		return Map("label", Label, "disabled", true, "disabled_reason_key", ReasonKey)
 	if Disabled && ReasonKey != ""
@@ -1823,6 +1825,8 @@ _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
+		if ReasonKey != "" && !_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey)
+			return false
 		if ReasonKey != "" {
 			Row["disabled_reason_key"] := ReasonKey
 			Row.Delete("action")
@@ -2042,6 +2046,38 @@ _MR_NormalizeSeparators(TargetMenu) {
 ; The short form of a translated reason: the text before its first colon,
 ; ASCII or full-width, which every platform reason opens with, or the whole
 ; text when it has none.
+; Names the reason a greyed row shows: the first ``disabled_reasons`` entry
+; whose state getter answers true (a configuration saved by a newer version),
+; otherwise its ``disabled_reason_key``. A malformed entry or a missing getter
+; refuses the row, as the manifest generator refuses the declaration.
+; @returns {Integer} 1 with ReasonKey set, 0 when the row is refused.
+_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey) {
+	ReasonKey := _MR_Get(Item, "disabled_reason_key")
+	if !Item.Has("disabled_reasons")
+		return 1
+	Cases := Item["disabled_reasons"]
+	if !(Cases is Array) || Cases.Length == 0 || Type(ReasonKey) != "String" || ReasonKey == "" {
+		try LoggerError("MenuRenderer", "Invalid disabled reasons on '{1}.{2}' — row refused.", ManifestKey, _MR_Get(Item, "id"))
+		return 0
+	}
+	for ReasonCase in Cases {
+		When := (ReasonCase is Map) ? _MR_Get(ReasonCase, "when") : ""
+		CaseKey := (ReasonCase is Map) ? _MR_Get(ReasonCase, "reason_key") : ""
+		if Type(When) != "String" || When == "" || Type(CaseKey) != "String" || CaseKey == ""
+			|| !(StateGetters is Map) || !StateGetters.Has(When) {
+			try LoggerError("MenuRenderer", "No getter or reason for disabled reason '{1}' on '{2}.{3}' — row refused.",
+				When, ManifestKey, _MR_Get(Item, "id"))
+			return 0
+		}
+		Answer := (StateGetters[When])()
+		if (Answer is Integer) && Answer == 1 {
+			ReasonKey := CaseKey
+			return 1
+		}
+	}
+	return 1
+}
+
 _MR_ReasonHead(Text) {
 	Cut := 0
 	for _, Mark in [":", "："] {

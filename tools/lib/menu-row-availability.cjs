@@ -127,6 +127,35 @@ function classifyMenuRow(row, where) {
 			throw new Error(`${where}: disabled_reason_key needs the disabled_when that greys the row`);
 		if (!labelled) throw new Error(`${where}: a greyed row needs an i18n label`);
 	}
+	if (row.disabled_reasons !== undefined) {
+		// A more precise reason for the same greying: the first entry whose
+		// state getter answers true replaces disabled_reason_key on the row.
+		if (
+			!['command', 'toggle'].includes(row.type) ||
+			typeof row.disabled_reason_key !== 'string' ||
+			row.disabled_reason_key === ''
+		)
+			throw new Error(
+				`${where}: disabled_reasons refines the disabled_reason_key of a command or toggle row`
+			);
+		if (!Array.isArray(row.disabled_reasons) || row.disabled_reasons.length === 0)
+			throw new Error(`${where}: disabled_reasons must be a nonempty array`);
+		for (const entry of row.disabled_reasons) {
+			if (
+				!entry ||
+				typeof entry !== 'object' ||
+				Array.isArray(entry) ||
+				Object.keys(entry).length !== 2 ||
+				typeof entry.when !== 'string' ||
+				entry.when === '' ||
+				typeof entry.reason_key !== 'string' ||
+				entry.reason_key === ''
+			)
+				throw new Error(
+					`${where}: each disabled_reasons entry is exactly { when, reason_key } with nonempty names`
+				);
+		}
+	}
 	return row.unavailable === 'hide'
 		? 'not-applicable'
 		: row.unavailable === 'grey'

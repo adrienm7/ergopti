@@ -72,7 +72,9 @@ const HEADER = {
 		'without the field is hidden, as before the field existed. A top-level disabled = true ' +
 		'presentation uses its i18n label and reason_key without constructing the component. disabled_reason_key (command/check ' +
 		'rows or identified labelled groups with disabled_when): why disabled_when greys the row where it is drawn, rendered ' +
-		"like a 'grey' row: « label — head of the reason », with nothing to run."
+		"like a 'grey' row: « label — head of the reason », with nothing to run. disabled_reasons (command/toggle " +
+		'rows with disabled_reason_key): [{ when, reason_key }], the first entry whose state getter answers true ' +
+		'names the cause of that greying instead (a configuration saved by a newer version).'
 };
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
