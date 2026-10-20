@@ -439,6 +439,7 @@ const RULES = [
 			f.startsWith('tools/diagnostics/macos_action_picker_pool') ||
 			f.startsWith('tools/diagnostics/macos_layout_manager_pool') ||
 			f.startsWith('tools/diagnostics/macos_permission_dialog_pool') ||
+			f.startsWith('tools/diagnostics/macos_metrics_apps_page') ||
 			f.startsWith('tools/diagnostics/macos_webview_raw_delete') ||
 			f === 'tools/diagnostics/macos_owned_process.py' ||
 			f === 'tools/test/run-macos-tooltip-canvas-tests.cjs'

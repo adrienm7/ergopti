@@ -213,6 +213,10 @@ const permissionCompleted = {
 	...completed,
 	stderr: 'Ran 23 tests in 0.01s\n\nOK\n'
 };
+const metricsPageCompleted = {
+	...completed,
+	stderr: 'Ran 23 tests in 0.01s\n\nOK\n'
+};
 const observerCompleted = {
 	status: 0,
 	stderr: '',
@@ -230,7 +234,8 @@ function successfulControl(_command, args) {
 		'macos_physical_shortcuts_close_test.py': physicalCompleted,
 		'macos_action_picker_pool_test.py': pickerCompleted,
 		'macos_layout_manager_pool_test.py': layoutCompleted,
-		'macos_permission_dialog_pool_test.py': permissionCompleted
+		'macos_permission_dialog_pool_test.py': permissionCompleted,
+		'macos_metrics_apps_page_test.py': metricsPageCompleted
 	};
 	return receipts[args[6]] || { status: 1, stdout: '', stderr: 'unexpected control' };
 }
@@ -246,7 +251,7 @@ assert.equal(
 	0
 );
 assert.equal(calls[0][0], 'selected-python');
-assert.equal(calls.length, 11);
+assert.equal(calls.length, 12);
 assert.equal(calls[0][2].cwd, root);
 assert.deepEqual(calls[0][1], [
 	'-m',
@@ -292,7 +297,8 @@ assert.deepEqual(calls[3][1], [
 ]);
 for (const [offset, script] of [
 	[4, 'macos_layout_manager_pool_test.py'],
-	[5, 'macos_permission_dialog_pool_test.py']
+	[5, 'macos_permission_dialog_pool_test.py'],
+	[6, 'macos_metrics_apps_page_test.py']
 ]) {
 	assert.equal(calls[offset][0], 'selected-python');
 	assert.deepEqual(calls[offset][1], [
@@ -307,10 +313,10 @@ for (const [offset, script] of [
 	]);
 	assert.equal(calls[offset][2].cwd, root);
 }
-assert.deepEqual(calls[6].slice(0, 2), ['luajit', ['-v']]);
+assert.deepEqual(calls[7].slice(0, 2), ['luajit', ['-v']]);
 for (const [offset, script] of [
-	[7, 'macos_layout_manager_pool_observer_test.lua'],
-	[9, 'macos_permission_dialog_pool_observer_test.lua']
+	[8, 'macos_layout_manager_pool_observer_test.lua'],
+	[10, 'macos_permission_dialog_pool_observer_test.lua']
 ]) {
 	for (const [index, order] of ['forward', 'reverse'].entries()) {
 		assert.equal(calls[offset + index][0], 'luajit');
@@ -332,7 +338,8 @@ for (const [offset, script] of [
 }
 for (const [script, count] of [
 	['macos_layout_manager_pool_test.py', 22],
-	['macos_permission_dialog_pool_test.py', 23]
+	['macos_permission_dialog_pool_test.py', 23],
+	['macos_metrics_apps_page_test.py', 23]
 ]) {
 	for (const receipt of [
 		{ ...completed, status: 1 },
@@ -571,6 +578,9 @@ for (const file of [
 	'tools/diagnostics/macos_permission_dialog_pool_test.py',
 	'tools/diagnostics/macos_permission_dialog_pool_observer.lua',
 	'tools/diagnostics/macos_permission_dialog_pool_observer_test.lua',
+	'tools/diagnostics/macos_metrics_apps_page.lua',
+	'tools/diagnostics/macos_metrics_apps_page.py',
+	'tools/diagnostics/macos_metrics_apps_page_test.py',
 	'tools/diagnostics/macos_owned_process.py',
 	'tools/test/run-macos-tooltip-canvas-tests.cjs'
 ]) {
