@@ -163,7 +163,9 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; acknowledgement, independently audited by the native-ternary controls.
 	; This is three additional counted lines, not three new writer owners.
 	; No production caller disappears when this source-bound gateway moves.
-	AssertEqual(40, Calls,
+	; 41: the CapsWord auto-off setter (CapsWordAutoOffStore) commits through
+	; ConfigCommitUpdates and returns false when that commit refuses.
+	AssertEqual(41, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
