@@ -487,8 +487,9 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
 	LowerTrig := StrLower(Trigger)
 	TitleTrig := StrTitle(Trigger)
 	UpperTrig := StrUpper(Trigger)
-	_AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
-	_AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
+	; The replacement keeps its own capitals, as CreateCaseSensitiveHotstrings fires it.
+	_AddTriggerToIndex(LowerTrig, Output, Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
+	_AddTriggerToIndex(TitleTrig, _HSE_ReplTitle(Output), Category, Section, Individual, IndexTarget, SetTarget, SourceDefault, IsSet(PersonalSource) ? PersonalSource : unset)
 	MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
 		? ScriptInformation["MagicKey"] : "★"
 	BodyLen := StrLen(RTrim(Trigger, MagicSuffix))

@@ -379,11 +379,12 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		; a bare ' inside Map() as a string delimiter, causing a parse error.
 		static UppercasedSymbols := _BuildUppercasedSymbols()
 
-		; Only the lowercase forms are needed to decide and take the case-conform fast
-		; path below; the Title / UPPER forms (4 StrXxx calls) serve solely the
-		; explicit-variant path, so they are computed only after the conform return.
+		; Only the lowercase trigger is needed to decide and take the case-conform fast
+		; path below; the Title / UPPER forms serve solely the explicit-variant path,
+		; so they are computed only after the conform return. The replacement is never
+		; lowercased: a lower-case typing emits it as written, so a capitalised output
+		; ("ppt" -> "PowerPoint") keeps its capitals, as on macOS and Linux.
 		AbbreviationLowerCase := StrLower(Abbreviation)
-		ReplacementLowerCase := StrLower(Replacement)
 
 		; ── Case-conform fast path ──────────────────────────────────────────────
 		; For a star trigger with no shift-symbol char (the common case — every
@@ -407,7 +408,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				ConformOneChar := StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1
 				; Drop the "C" flag so any-case typing matches the single registered spec.
 				ConformFlags := StrReplace(Flags, "C")
-				ConformMeta := _MakeHotstringMeta(ReplacementLowerCase, AbbreviationLowerCase, OnlyText,
+				ConformMeta := _MakeHotstringMeta(Replacement, AbbreviationLowerCase, OnlyText,
 						FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
 				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
@@ -416,7 +417,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				_RegisterHotstringFast(
 						Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
 						Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
-						Rec ? _MakeHotstringCallback(ReplacementLowerCase, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+						Rec ? _MakeHotstringCallback(Replacement, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
 						ConformMeta
 				)
 				return
@@ -431,7 +432,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		AbbreviationTitleCase := StrTitle(Abbreviation)
 		AbbreviationUpperCase := StrUpper(Abbreviation)
 		FirstChar := SubStr(Abbreviation, 1, 1)
-		ReplacementTitleCase := StrTitle(Replacement)
+		ReplacementTitleCase := _HSE_ReplTitle(Replacement)
 		ReplacementUpperCase := StrUpper(Replacement)
 
 		; Helper closure: installs one hotstring variant with positional args
@@ -448,7 +449,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
 		)
 
-		RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
+		RegisterVariant(AbbreviationLowerCase, Replacement)
 
 		; When an abbreviation is only one character, titlecase = uppercase
 		if StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1 {
@@ -519,13 +520,25 @@ StrTitle(Text) {
 		}
 }
 
+; The Title form of a REPLACEMENT: its first character upper-cased, the rest kept
+; as written (the shared text_utils.repl_title). StrTitle lowercases the rest,
+; which is right for a trigger variant but turned "PowerPoint" into "Powerpoint".
+_HSE_ReplTitle(Text) {
+		if (Text == "")
+				return Text
+		FirstLen := (Ord(Text) > 0xFFFF) ? 2 : 1
+		return StrUpper(SubStr(Text, 1, FirstLen)) . SubStr(Text, FirstLen + 1)
+}
+
 ; Case-conform a replacement to the way the user actually typed the trigger. This
 ; replaces the old explicit lower/UPPER/Title variant registrations:
 ; CreateCaseSensitiveHotstrings now registers ONE case-insensitive spec (for star
 ; triggers without a shift-symbol char), and HSE_DispatchMatch calls this at fire
 ; time to pick the output casing — roughly halving the magic-key registration
 ; (~2119 -> ~1000 specs) with no observable change.
-;   - ``Repl``      the registered (lowercase) replacement.
+;   - ``Repl``      the registered replacement, in the casing it was written:
+;                   a lower-case typing emits it unchanged, Title capitalises
+;                   only its first letter, UPPER upper-cases all of it.
 ;   - ``Typed``     the trigger exactly as typed (the matched buffer suffix).
 ;   - ``Canonical`` the registered (lowercase) trigger.
 ;   - ``OneChar``   true when the abbreviation is a single character before the
@@ -544,10 +557,10 @@ _HSE_ConformReplacement(Repl, Typed, Canonical, OneChar, &DoFire) {
 		; "!==" is case-SENSITIVE inequality — plain "!=" is case-insensitive in AHK v2
 		; and would treat "Ab" and "ab" as equal, collapsing the Title branch.
 		if (Typed == TitleForm and TitleForm !== Canonical) {
-				return StrTitle(Repl)
+				return _HSE_ReplTitle(Repl)
 		}
 		if (Typed == StrUpper(Canonical)) {
-				return OneChar ? StrTitle(Repl) : StrUpper(Repl)
+				return OneChar ? _HSE_ReplTitle(Repl) : StrUpper(Repl)
 		}
 		DoFire := false
 		return ""
