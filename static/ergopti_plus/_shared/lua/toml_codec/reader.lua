@@ -40,7 +40,9 @@ local RecordScanner = require("toml_codec.record_scanner")
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
 -- unaffected. When present it must expose load(path)->table|nil,
--- capture_source(path)->opaque, and store(path, parsed, opaque). Kept as an
+-- capture_source(path)->opaque, and store(path, parsed, opaque). The optional
+-- read_snapshot(path, opaque)->string supplies exact closed bytes to parse.
+-- Kept as an
 -- injected hook so this shared module owns no host-specific cache filesystem
 -- policy. The slow character-level parse below is bypassed entirely when an
 -- unchanged snapshot already exists on disk.
@@ -732,10 +734,11 @@ end
 --- @return boolean committed True only after the complete file was read and closed.
 function M.parse(path)
 	if type(path) ~= "string" then return empty_document(), false end
+	local cache_provider = _cache_provider
 
 	-- A cache miss or provider failure falls through to the canonical parser
-	if _cache_provider and type(_cache_provider.load) == "function" then
-		local ok_load, cached = pcall(_cache_provider.load, path)
+	if cache_provider and type(cache_provider.load) == "function" then
+		local ok_load, cached = pcall(cache_provider.load, path)
 		if ok_load and type(cached) == "table" and type(cached.source_entries) == "table" then
 			return cached, true
 		end
@@ -743,20 +746,38 @@ function M.parse(path)
 
 	-- Capture before reading; the provider revalidates identity before publication
 	local source_identity = nil
-	if _cache_provider and type(_cache_provider.capture_source) == "function" then
-		local ok_capture, captured = pcall(_cache_provider.capture_source, path)
+	if cache_provider and type(cache_provider.capture_source) == "function" then
+		local ok_capture, captured = pcall(cache_provider.capture_source, path)
 		if ok_capture then source_identity = captured end
 	end
 
-	Logger.debug(LOG, "Parsing TOML file…")
-	local ok, f = pcall(io.open, path, "r")
-	if not ok or not f then
-		Logger.warn(LOG, "TOML file open failed (failure content withheld).")
-		return empty_document(), false
+	local result, committed
+	local read_snapshot = cache_provider and cache_provider.read_snapshot
+	if source_identity ~= nil and read_snapshot ~= nil then
+		local read_ok, source = false, nil
+		if type(read_snapshot) == "function" then read_ok, source = pcall(read_snapshot, path, source_identity) end
+		if read_ok and type(source) == "string" then
+			-- Parse the exact closed snapshot owned by this token, not a second
+			-- file stream that can change A-B-A before store revalidates A.
+			result, committed = M.parse_text(source)
+		else
+			-- A legacy file parse may still succeed, but this refused receipt
+			-- cannot authorize publication of different, unattested bytes.
+			source_identity = nil
+		end
 	end
-	local result, committed = parse_lines(function() return f:lines() end)
-	local close_ok, closed = pcall(f.close, f)
-	if not committed or not close_ok or closed ~= true then
+	if result == nil then
+		Logger.debug(LOG, "Parsing TOML file…")
+		local ok, f = pcall(io.open, path, "r")
+		if not ok or not f then
+			Logger.warn(LOG, "TOML file open failed (failure content withheld).")
+			return empty_document(), false
+		end
+		result, committed = parse_lines(function() return f:lines() end)
+		local close_ok, closed = pcall(f.close, f)
+		if not close_ok or closed ~= true then committed = false end
+	end
+	if not committed then
 		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
 		return empty_document(), false
 	end
@@ -764,9 +785,9 @@ function M.parse(path)
 	-- Refresh the on-disk snapshot so the next boot takes the fast path. Wrapped
 	-- so a read-only cache dir can never break a successful parse.
 	if source_identity ~= nil
-		and _cache_provider
-		and type(_cache_provider.store) == "function" then
-		pcall(_cache_provider.store, path, result, source_identity)
+		and cache_provider
+		and type(cache_provider.store) == "function" then
+		pcall(cache_provider.store, path, result, source_identity)
 	end
 
 	Logger.info(LOG, "TOML file parsed successfully.")
@@ -801,7 +822,7 @@ end
 --- snapshot instead. Pass nil to disable. The provider keeps this shared module
 --- filesystem-free (port-adapter purity); the host driver supplies the actual
 --- read/write implementation.
---- @param provider table|nil ``{ load, capture_source, store }`` cache provider.
+--- @param provider table|nil ``{ load, capture_source, store, read_snapshot? }`` cache provider.
 function M.set_cache_provider(provider)
 	_cache_provider = provider
 end

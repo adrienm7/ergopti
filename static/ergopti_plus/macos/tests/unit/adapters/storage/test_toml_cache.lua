@@ -189,11 +189,11 @@ helpers.describe("adapters.toml_cache: snapshot round-trip + invalidation", func
 				local parsed, committed = Reader.parse(SRC)
 				helpers.assert_eq(committed, true); helpers.assert_eq(parsed.sections.probe.entries[1].output, "repaired")
 				local snapshot = assert(loadfile(snapshot_path(SRC)))()
-				helpers.assert_eq(snapshot.ver, 6, "repaired sources must publish the current parser schema")
+				helpers.assert_eq(snapshot.ver, 7, "repaired sources must publish the current parser schema")
 				hits = cache.stats().hits
 				local warm, warm_accepted = Reader.parse(SRC)
 				helpers.assert_eq(warm_accepted, true); helpers.assert_eq(warm.sections.probe.entries[1].output, "repaired")
-				helpers.assert_eq(cache.stats().hits, hits + 1, "the repaired version-6 cache remains usable")
+				helpers.assert_eq(cache.stats().hits, hits + 1, "the repaired version-7 cache remains usable")
 			end)
 			Reader.set_cache_provider(nil)
 			write(original); cur_mtime, cur_size = before_mtime, before_size
