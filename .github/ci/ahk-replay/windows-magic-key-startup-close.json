@@ -1,0 +1,4 @@
+{
+	"expected_count": 4,
+	"filters": [{ "contains": "magic-key-editor-startup-close", "expected_count": 4 }]
+}
