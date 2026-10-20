@@ -207,7 +207,8 @@ _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
 		return _SHIFT_DIGIT_SCS.Has(Sc) && _DigitRowSwapResolution(Code, Hkl)["swap"]
 	}
 	Code := Integer("0x" . SubStr(Sc, 3))
-	return _SHIFT_DIGIT_SCS.Has(Sc) || ErgoptiNumberRowEdgeMapping().Has(Code)
+	; Only the ten digit keys: the edge keys keep the emulation's own level.
+	return _SHIFT_DIGIT_SCS.Has(Sc)
 }
 
 /**
@@ -399,8 +400,6 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 	if NumberRowEffectiveMode(Hkl, Caps) == "digits" {
 		if !Shift && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: Mod(Code - 1, 10) . ""}
-		else if !Shift && ErgoptiNumberRowEdgeMapping().Has(Code)
-			Native := {Count: 1, Text: ErgoptiNumberRowEdgeMapping()[Code]}
 		else if Shift && DigitRowIsSwapped(Hkl) && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: DigitRowSwapSymbol(Code, Hkl)}
 	}

@@ -203,9 +203,6 @@ _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 			if (Key[2] == Code)
 				return Chr(Key[1])
 		}
-		Edges := ErgoptiNumberRowEdgeMapping()
-		if Edges.Has(Code)
-			return Edges[Code]
 	}
 	if Registry {
 		Shift := false

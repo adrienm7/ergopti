@@ -385,7 +385,8 @@ _LEH_EmulatedLegendsComeFromTheKeylayout() {
 	AssertTrue(Compared >= 30, "only " . Compared . " emulated keys compared")
 	AssertTrue(Legends["keys"]["KeyQ"] != "x", "KeyQ is not read from the OS layout under the emulation")
 	AssertEqual("1", Legends["keys"]["Digit1"], "the digit row types its digits")
-	AssertEqual(ErgoptiNumberRowEdgeMapping()[0x29], Legends["keys"]["Backquote"], "the digit row's left edge")
+	AssertEqual(Spec["number_row_base"]["SC029"]["text"], Legends["keys"]["Backquote"],
+		"the left edge keeps the emulated layout's character (number-row-effective-edges)")
 	; Without « digits first » the built-in emulation still types its own number
 	; row (number-row-availability); only a registry-free OS layout keeps it.
 	NoDigits := LayerEditor_Legends(Ctx, Map("active", true,

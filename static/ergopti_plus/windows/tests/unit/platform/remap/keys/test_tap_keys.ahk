@@ -43,14 +43,13 @@ _TK_UsQwerty() {
 	return _TK_FakeLayout(Map(0x29, _TK_Key(0xC0, _TK_GRAVE), 0x0C, _TK_Key(0xBD, "-"), 0x0D, _TK_Key(0xBB, "=")))
 }
 
-; Runs Body with the digit-row emulation switched as asked, then puts it back.
-; The built-in Ergopti emulation types its own row, edges included, whichever
-; ordering is chosen (RegisterBuiltinNumberRow), so it follows the switch too.
-_TK_WithEmulation(Enabled, Body) {
+; Runs Body with the built-in Ergopti emulation and the number-row ordering
+; as asked, then puts them back.
+_TK_WithEmulation(Enabled, Body, Digits := "native") {
 	global Features
 	Saved := Features["layout"]["direct_access_digits"]
 	SavedBase := Features["layout"]["ergopti_base"]
-	Features["layout"]["direct_access_digits"] := Enabled ? "digits" : "native"
+	Features["layout"]["direct_access_digits"] := Digits
 	Features["layout"]["ergopti_base"] := Enabled
 	try
 		return Body.Call()
@@ -67,23 +66,35 @@ _TK_Names(Probe) {
 	return Names[1] . " " . Names[2] . " " . Names[3]
 }
 
+_TK_AssertOsLabels(Digits) {
+	AssertEqual("² ) =", _TK_Names(_TK_Azerty()), "AZERTY without the emulation, " . Digits)
+	AssertEqual(_TK_GRAVE . " - =", _TK_Names(_TK_UsQwerty()), "US QWERTY without the emulation, " . Digits)
+}
+
+_TK_AssertEmulatedLabels(Expected, Digits) {
+	AssertEqual(Expected, _TK_Names(_TK_Azerty()), "the built-in Ergopti row over AZERTY, " . Digits)
+	AssertEqual(Expected, _TK_Names(_TK_UsQwerty()), "the built-in Ergopti row over US QWERTY, " . Digits)
+}
+
 _TK_LabelsFollowTheOsLayout() {
-	_TK_WithEmulation(false, () => (
-		AssertEqual("² ) =", _TK_Names(_TK_Azerty()), "AZERTY without the emulation"),
-		AssertEqual(_TK_GRAVE . " - =", _TK_Names(_TK_UsQwerty()), "US QWERTY without the emulation")
-	))
+	for Digits in ["native", "digits"] {
+		; « Digits first » reorders only the ten digit keys: the edge keys keep
+		; the OS layout's characters (number-row-effective-edges).
+		_TK_WithEmulation(false, _TK_AssertOsLabels.Bind(Digits), Digits)
+	}
 }
 Test("tap keys: labels read the OS layout when the emulation leaves the keys alone (tap-keys)", _TK_LabelsFollowTheOsLayout)
 
 _TK_LabelsFollowTheEmulation() {
-	_TK_WithEmulation(true, () => (
-		AssertEqual("$ % =", _TK_Names(_TK_Azerty()), "the Ergopti digit row over AZERTY"),
-		AssertEqual("$ % =", _TK_Names(_TK_UsQwerty()), "the Ergopti digit row over US QWERTY")
-	))
-	Table := ErgoptiNumberRowEdgeMapping()
-	AssertEqual(3, Table.Count, "the emulation table names the three edge keys")
+	global ERGOPTI_SPEC
+	Row := ERGOPTI_SPEC["number_row_base"]
+	Expected := Row["SC029"]["text"] . " " . Row["SC00C"]["text"] . " " . Row["SC00D"]["text"]
+	AssertEqual("$ % =", Expected, "the Ergopti .keylayout types $, % and = on the edge keys")
+	for Digits in ["native", "digits"] {
+		_TK_WithEmulation(true, _TK_AssertEmulatedLabels.Bind(Expected, Digits), Digits)
+	}
 }
-Test("tap keys: labels read the emulation table while it remaps the digit row (tap-keys)", _TK_LabelsFollowTheEmulation)
+Test("tap keys: labels read the emulated layout while it types the edge keys (number-row-effective-edges)", _TK_LabelsFollowTheEmulation)
 
 _TK_DeadAndSilentKeys() {
 	UsIntl := _TK_FakeLayout(Map(0x29, _TK_Key(0xC0, _TK_GRAVE, -1), 0x0C, _TK_Key(0xBD, "-"), 0x0D, _TK_Key(0, "")))

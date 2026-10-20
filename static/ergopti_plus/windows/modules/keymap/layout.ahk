@@ -650,7 +650,8 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; re-introducing the out-of-order emission Critical was added to prevent — only
 ; with the digit as the unprotected boundary (remap-emit-critical-uneven). There
 ; is no Sleep on these paths, so Critical's guarantee holds.
-SC029:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x29])
+; Only the ten digit keys are reordered: the edge keys (left of 1, right of 0)
+; keep what the effective layout types there (number-row-effective-edges).
 SC002:: _DigitRowDown("1")
 SC002 Up:: _DigitRowUp("1")
 SC003:: _DigitRowDown("2")
@@ -671,8 +672,6 @@ SC00A:: _DigitRowDown("9")
 SC00A Up:: _DigitRowUp("9")
 SC00B:: _DigitRowDown("0")
 SC00B Up:: _DigitRowUp("0")
-SC00C:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0C])
-SC00D:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0D])
 #HotIf
 
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
