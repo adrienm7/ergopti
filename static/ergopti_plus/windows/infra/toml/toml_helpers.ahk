@@ -1031,7 +1031,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 			FirstSection := true
 			for _, sec in SortedSections {
 					if !FirstSection {
-							EnsureTrailingBlankLines(5)
+							EnsureTrailingBlankLines(TOML_ParseKeyPath(sec).Length > 1 ? 3 : 5)
 					}
 					FirstSection := false
 					body .= "[" . sec . "]`n"
