@@ -213,7 +213,9 @@ function M.fetch(sources, get, logger, tag, on_done)
 				finish({ source = M.SOURCE_API, kind = "json", body = body })
 				return
 			end
-			logger.warn(tag, "GitHub API release list failed (%s); trying the Atom feed.", reason)
+			-- Expected without a token (60 API requests an hour, HTTP 403): the
+			-- feed serves the list, and only an exhausted fetch is a warning.
+			logger.info(tag, "GitHub API release list failed (%s); trying the Atom feed.", reason)
 			try_feed(reason, status)
 		end))
 end

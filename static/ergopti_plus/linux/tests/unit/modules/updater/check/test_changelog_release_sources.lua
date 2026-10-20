@@ -152,6 +152,19 @@ helpers.describe("release_sources: ordered fetch", function()
 		helpers.assert_true(logged(lines, "served by the Atom feed (API failed: timeout)"))
 	end)
 
+	helpers.it("reports a fallback the feed served at INFO, never as a warning (issue #95)", function()
+		local get, calls = scripted_get()
+		local logger, lines = recording_logger()
+		Sources.fetch(sources, get, logger, "test", function() end)
+		calls[1].callback(403, "", "HTTP 403")
+		calls[2].callback(200, FEED, nil)
+		for _, line in ipairs(lines) do
+			helpers.assert_true(line.level ~= "warn" and line.level ~= "error",
+				"a rate-limited API the feed covered is not a warning: " .. line.text)
+		end
+		helpers.assert_true(logged(lines, "GitHub API release list failed (HTTP 403); trying the Atom feed."))
+	end)
+
 	helpers.it("reports a rate limit only when GitHub throttled the API", function()
 		local get, calls = scripted_get()
 		local logger, lines = recording_logger()
