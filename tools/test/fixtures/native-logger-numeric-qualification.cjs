@@ -293,6 +293,18 @@ node "$NUMERIC_FIXTURE_SWIFT_JS" "$@"
 exit "\${NUMERIC_FIXTURE_CAPTURE_STATUS:-0}"
 `
 		);
+		// Git for Windows' bash.exe puts its own /usr/bin ahead of the inherited
+		// PATH, which would shadow the uname/swift/tee doubles; re-prepend them.
+		const windowsBashPath = {};
+		if (process.platform === 'win32') {
+			const bashEnvironment = path.join(bin, 'bash-environment');
+			fs.writeFileSync(
+				bashEnvironment,
+				'export PATH="$(cygpath -u "$NUMERIC_FIXTURE_BIN"):$PATH"\n'
+			);
+			windowsBashPath.NUMERIC_FIXTURE_BIN = bin;
+			windowsBashPath.BASH_ENV = bashEnvironment;
+		}
 		let runnerControls = 0;
 		const runNative = (text, options = {}) => {
 			const out = path.join(evidence, 'runner-' + ++serial);
@@ -315,6 +327,7 @@ exit "\${NUMERIC_FIXTURE_CAPTURE_STATUS:-0}"
 					env: {
 						...env,
 						PATH: bin + path.delimiter + env.PATH,
+						...windowsBashPath,
 						NUMERIC_FIXTURE_ARGUMENTS: argsFile,
 						NUMERIC_FIXTURE_TRANSCRIPT: transcript,
 						NUMERIC_FIXTURE_SWIFT_JS: swiftChild,

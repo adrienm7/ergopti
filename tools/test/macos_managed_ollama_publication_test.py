@@ -28,6 +28,7 @@ def module(name, path):
 
 
 STAGE = module("managed_inputs", ROOT / "tools/build/stage-macos-managed-ollama-inputs.py")
+HOST = module("host_capabilities", ROOT / "tools/lib/host_capabilities.py")
 PUBLICATION = module(
     "managed_publication", ROOT / "tools/build/verify-macos-managed-ollama-publication.py"
 )
@@ -86,6 +87,7 @@ class ProducerInputs(unittest.TestCase):
             STAGE.physical_inputs(self.inputs, self.contract)
 
     def test_archive_symlink_refuses(self):
+        HOST.require_symlinks()
         path = self.inputs / "independent-arm64.tgz"
         foreign = self.root / "foreign"
         path.rename(foreign)
@@ -99,6 +101,7 @@ class ProducerInputs(unittest.TestCase):
             STAGE.physical_inputs(self.inputs, self.contract)
 
     def test_directory_alias_refuses(self):
+        HOST.require_symlinks()
         alias = self.root / "alias"
         alias.symlink_to(self.inputs, target_is_directory=True)
         with self.assertRaises(ValueError):

@@ -17,6 +17,9 @@ from unittest.mock import patch
 from permission_observation import OPERATION, PermissionProtocol, PermissionQuery
 from run_signed_query_probe import QueryProtocol, Refused, SignedQuery
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from tools.lib.host_capabilities import require_symlinks  # noqa: E402
+
 
 @contextmanager
 def controlled_executable_metadata(helper):
@@ -363,6 +366,7 @@ class PermissionAdmissionControls(unittest.TestCase):
             probe.load_permission_query(root, "a" * 40, hashes)
 
     def test_linked_decoder_refuses_even_when_bytes_hash_and_git_match(self):
+        require_symlinks()
         probe, root, target, relative, raw, hashes = self.fixture()
         real = root / "retained-decoder"
         target.rename(real)

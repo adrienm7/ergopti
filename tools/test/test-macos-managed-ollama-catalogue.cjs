@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
+const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
 
 const result = spawnSync(
 	pythonExecutable(),
@@ -29,7 +30,7 @@ process.stdout.write(result.stderr);
 
 const publication = spawnSync(
 	pythonExecutable(),
-	['tools/test/macos_managed_ollama_publication_test.py'],
+	['tools/test/macos_managed_ollama_publication_test.py', '-v'],
 	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 60000 }
 );
 assert.equal(publication.error, undefined, 'the native publication boundary must start');
@@ -41,7 +42,20 @@ assert.equal(
 assert.equal(publication.status, 0, publication.stderr || publication.stdout);
 assert.match(publication.stderr, /Ran 24 tests in/);
 assert.match(publication.stderr, /\bOK\b/);
-assert.doesNotMatch(publication.stderr, /skipped=/);
+// The archive-symlink and directory-alias refusals need a symlink; a local
+// Windows host without the privilege skips exactly those two, with that reason.
+if (canRunSymlinkCase('managed Ollama publication archive symlink and directory alias refusals'))
+	assert.doesNotMatch(publication.stderr, /skipped=/);
+else {
+	assert.match(publication.stderr, /\nOK \(skipped=2\)\s*$/);
+	assert.equal(
+		publication.stderr.match(
+			/\.\.\. skipped 'not executed: this Windows account lacks the symlink/g
+		)?.length,
+		2,
+		'only the two symlink refusals may be skipped'
+	);
+}
 process.stdout.write(publication.stdout);
 process.stdout.write(publication.stderr);
 

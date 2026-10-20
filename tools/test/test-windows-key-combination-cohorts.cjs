@@ -6,6 +6,7 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
+const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
 const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const pins = JSON.parse(
 	fs.readFileSync(path.join(__dirname, 'portable-control-inputs.json'), 'utf8')
@@ -605,14 +606,15 @@ test('PAC terminal receiving refuses even internally consistent produced-image r
 			'PAC final images changed'
 		);
 	}));
-test('PAC receiving refuses a same-byte source symlink', () =>
-	pacFixture((f) => {
-		const original = path.join(f.directory, f.sourceNames[4]);
-		const copied = `${original}.owned-copy`;
-		fs.renameSync(original, copied);
-		fs.symlinkSync(copied, original);
-		refused(() => R.receivePublishedPac(f.directory, f.sourcePins, 'success'), 'symlink refused');
-	}));
+if (canRunSymlinkCase('PAC receiving refuses a same-byte source symlink'))
+	test('PAC receiving refuses a same-byte source symlink', () =>
+		pacFixture((f) => {
+			const original = path.join(f.directory, f.sourceNames[4]);
+			const copied = `${original}.owned-copy`;
+			fs.renameSync(original, copied);
+			fs.symlinkSync(copied, original);
+			refused(() => R.receivePublishedPac(f.directory, f.sourcePins, 'success'), 'symlink refused');
+		}));
 console.log(
 	`# ${passed} modeled portable receiver controls passed; native selection/execution UNRUN.`
 );

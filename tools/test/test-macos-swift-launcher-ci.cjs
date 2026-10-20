@@ -59,6 +59,7 @@ const path = require('path');
 const pipeline = require('./ci-full-default.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
 const macPlans = require('../ci/macos-stage-roles.cjs');
+const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
@@ -1114,10 +1115,12 @@ check(
 		fs.appendFileSync(path.join(temporary, workerRelative), '\n// changed after begin\n');
 		assert.throws(() => sdk.judge(temporary, candidate, receipt, valid, 0, 0));
 		fs.writeFileSync(path.join(temporary, workerRelative), worker);
-		const alias = path.join(temporary, 'capture-alias');
 		fs.writeFileSync(path.join(temporary, 'capture'), valid);
-		fs.symlinkSync('capture', alias);
-		assert.throws(() => sdk.readBoundedRegular(alias, 16777216));
+		if (canRunSymlinkCase('SDK evidence reader refuses a symlinked capture')) {
+			const alias = path.join(temporary, 'capture-alias');
+			fs.symlinkSync('capture', alias);
+			assert.throws(() => sdk.readBoundedRegular(alias, 16777216));
+		}
 		assert.throws(() => sdk.readBoundedRegular(path.join(temporary, 'capture'), 1));
 		fs.writeFileSync(path.join(temporary, 'bad-utf8'), Buffer.from([0xff]));
 		assert.throws(() => sdk.readBoundedRegular(path.join(temporary, 'bad-utf8'), 1));

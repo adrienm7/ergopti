@@ -14,6 +14,7 @@ module.exports = function run({
 	const os = require('node:os');
 	const path = require('node:path');
 	const { execFileSync, spawnSync } = require('node:child_process');
+	const { canRunSymlinkCase } = require('../lib/host-capabilities.cjs');
 	const repository = path.resolve(__dirname, '../../..');
 	const reader = require('../../diagnostics/native_logger_regression_xctest_evidence.cjs');
 	const seven = require('../../diagnostics/native_daemon_log_xctest_evidence.cjs');
@@ -242,6 +243,7 @@ module.exports = function run({
 		GIT_CONFIG_GLOBAL: '/dev/null'
 	});
 	let sourceControls = 0;
+	const symlinkCaseRuns = canRunSymlinkCase('logger42 CLI refuses a symlinked capture');
 	const sourceCheck = (callback) => {
 		callback();
 		sourceControls++;
@@ -471,28 +473,33 @@ module.exports = function run({
 					['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']
 				);
 				assert.equal(fs.existsSync(foreignView), false);
-				assert.equal(git(['rev-parse', '--show-toplevel']).trim(), fs.realpathSync(fixture));
-			});
-			sourceCheck(() => {
-				const link = path.join(evidence, 'capture-link');
-				fs.symlinkSync(captured, link);
+				// Git for Windows prints the root with forward slashes; compare real paths.
 				assert.equal(
-					cli(
-						judgeArgs(
-							fresh('link'),
-							candidate,
-							'12345',
-							'2',
-							'arm64',
-							'0',
-							'0',
-							link,
-							currentBefore
-						)
-					).status,
-					1
+					fs.realpathSync(git(['rev-parse', '--show-toplevel']).trim()),
+					fs.realpathSync(fixture)
 				);
 			});
+			if (symlinkCaseRuns)
+				sourceCheck(() => {
+					const link = path.join(evidence, 'capture-link');
+					fs.symlinkSync(captured, link);
+					assert.equal(
+						cli(
+							judgeArgs(
+								fresh('link'),
+								candidate,
+								'12345',
+								'2',
+								'arm64',
+								'0',
+								'0',
+								link,
+								currentBefore
+							)
+						).status,
+						1
+					);
+				});
 			sourceCheck(() => {
 				const invalid = path.join(evidence, 'invalid.log');
 				fs.writeFileSync(invalid, Buffer.from([0xff]), { flag: 'wx', mode: 0o600 });
@@ -581,7 +588,8 @@ module.exports = function run({
 			fs.rmSync(fixture, { recursive: true });
 		}
 	}
-	assert.equal(sourceControls, 48);
+	// Each of the two judges owns one symlink case.
+	assert.equal(sourceControls, symlinkCaseRuns ? 48 : 46);
 	console.log(
 		`PASS: unchanged logger42 parser-controls=${parserControls} selector-controls=${selectorControls} real-Git/CLI-controls=${sourceControls}; native42/native7 UNRUN.`
 	);

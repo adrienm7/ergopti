@@ -47,6 +47,17 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { isLocalWindowsHost, reportNotExecuted } = require('./lib/host-capabilities.cjs');
+
+// A checkout install compiles the Linux native archive helper before it copies
+// anything; Git Bash has no Linux C toolchain, so no scenario can complete.
+if (isLocalWindowsHost()) {
+	reportNotExecuted(
+		'Linux install.sh sandboxed real run (every scenario)',
+		'a checkout install compiles the Linux native archive helper, which needs a Linux C toolchain'
+	);
+	process.exit(0);
+}
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const INSTALLER = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'install.sh');
