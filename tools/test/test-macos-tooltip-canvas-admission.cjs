@@ -146,7 +146,21 @@ for (const step of [prepare, acquire, observe]) {
 	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 }
 assert.ok(prepare.includes('Pillow==11.3.0'));
-assert.ok(prepare.includes('node tools/test/run-macos-tooltip-canvas-tests.cjs'));
+const installObserverLua = prepare.indexOf('brew install lua@5.4');
+const exposeObserverLua = prepare.indexOf('export PATH="$(brew --prefix lua@5.4)/bin:$PATH"');
+const runObserverControls = prepare.indexOf('node tools/test/run-macos-tooltip-canvas-tests.cjs');
+assert.ok(
+	installObserverLua >= 0,
+	'the independent Mac role must provision its Lua observer runtime'
+);
+assert.ok(
+	exposeObserverLua > installObserverLua,
+	'the installed Lua bin must precede observer execution'
+);
+assert.ok(
+	runObserverControls > exposeObserverLua,
+	'the canonical resolver must see the provisioned runtime'
+);
 assert.ok(acquire.includes("--proto '=https' --proto-redir '=https'"));
 assert.ok(acquire.includes('11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa'));
 assert.ok(acquire.includes('codesign --verify --strict --deep'));
