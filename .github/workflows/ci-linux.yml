@@ -3686,11 +3686,29 @@ jobs:
         # unexercised while CI reported them green. The Flatpak compiles its
         # own luajit inside the sandbox.
         shell: bash
+        # The three packagers stage under their own build/linux/ subdirectory
+        # and only read the bundle, so they run at once (the Flatpak's luajit
+        # build dominates). Each log is printed whole, then any failure fails.
         run: |
           set -euo pipefail
-          bash tools/build/build-linux-deb.sh
-          bash tools/build/build-linux-rpm.sh
-          bash tools/build/build-linux-flatpak.sh
+          logs="$RUNNER_TEMP/linux-packagers"
+          mkdir -p "$logs"
+          bash tools/build/build-linux-deb.sh > "$logs/deb.log" 2>&1 & deb=$!
+          bash tools/build/build-linux-rpm.sh > "$logs/rpm.log" 2>&1 & rpm=$!
+          bash tools/build/build-linux-flatpak.sh > "$logs/flatpak.log" 2>&1 & flatpak=$!
+          failed=0
+          for name in deb rpm flatpak; do
+            status=0
+            wait "${!name}" || status=$?
+            echo "::group::$name packager (exit $status)"
+            cat "$logs/$name.log"
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              echo "::error::The $name packager failed (exit $status)."
+              failed=1
+            fi
+          done
+          exit "$failed"
 
       - name: The staged payload carries the driver and the shared data tree
         # The packager checks its own manifest; this checks the payload, which is
