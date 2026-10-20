@@ -140,6 +140,30 @@ TrayMenuSubmenuHandle(Handle, Position) {
 	return DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
 }
 
+; Reads the command identifier of a row of a captured native menu.
+; @param Handle {Integer} Captured HMENU.
+; @param Position {Integer} Zero-based row position.
+; @returns {Integer} Native item identifier, 0xFFFFFFFF for a submenu or a missing row.
+TrayMenuHandleItemId(Handle, Position) {
+	return DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+}
+
+; Reads the caption of a row of a captured native menu.
+; @param Handle {Integer} Captured HMENU.
+; @param Position {Integer} Zero-based row position.
+; @returns {String} Native UTF-16 caption, "" for a separator or a row without text.
+TrayMenuHandleItemCaption(Handle, Position) {
+	static MF_BYPOSITION := 0x0400
+	Required := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", MF_BYPOSITION, "int")
+	if Required <= 0
+		return ""
+	TextBuffer := Buffer((Required + 1) * 2, 0)
+	DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+		"ptr", TextBuffer, "int", Required + 1, "uint", MF_BYPOSITION, "int")
+	return StrGet(TextBuffer, "UTF-16")
+}
+
 ; Tells whether the row at a zero-based position of a native menu is a separator.
 ; @param TargetMenu {Menu} A rendered AHK menu.
 ; @param Position {Integer} Zero-based row position.
