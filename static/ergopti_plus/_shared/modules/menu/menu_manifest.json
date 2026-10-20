@@ -3594,6 +3594,15 @@
 					"i18n": "menu.layout.number_row_symbols"
 				}
 			]
+		},
+		{
+			"type": "check",
+			"id": "number_row_edges",
+			"path": "layout.number_row_reorder_edges",
+			"i18n": "menu.layout.number_row_edges",
+			"checked_when": [
+				"number_row_edges_enabled"
+			]
 		}
 	],
 	"apps_empty_rows": [

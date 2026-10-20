@@ -202,6 +202,10 @@ LayerEditor_CurrentEmulation() {
 _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS, ERGOPTI_NUMBER_ROW
 	Code := Integer("0x" . SubStr(Sc, 3))
+	; « Also reorder the three edge keys » types the other level.
+	Edge := NumberRowEdgeText(Code, false, NumberRowForegroundLayout(), false)
+	if Edge != ""
+		return Edge
 	if (Digits is String) && Digits == "symbols" {
 		Text := NumberRowSymbolsFirstText(Code, false, NumberRowForegroundLayout(), false)
 		if Text != ""

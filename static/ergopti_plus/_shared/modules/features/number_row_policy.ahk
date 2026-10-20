@@ -103,6 +103,31 @@ NumberRowPolicyEffective(Mode, Availability) {
 	return Reason == "" ? Map("mode", Mode, "reason", "") : Map("mode", "native", "reason", Reason)
 }
 
+/**
+ * Whether the three edge keys (left of 1, right of 0) can join the ordering:
+ * only while an ordering applies to the ten digit keys, and only when each
+ * edge key types something on both levels and not the same thing, so that
+ * swapping them changes what it types.
+ * @param {Array} Edges Three Map("plain", descriptor, "shift", descriptor).
+ * @param {String} Ordering The ordering in effect (NumberRowPolicyEffective).
+ * @returns {String} "" when they can, else no_ordering, edges_incomplete or edges_same.
+ */
+NumberRowPolicyEdgesAvailability(Edges, Ordering) {
+	if !(Edges is Array) || Edges.Length != 3
+		throw ValueError("The edge-key availability needs the three edge keys.")
+	if NumberRowPolicyMode(Ordering) == "" || NumberRowPolicyMode(Ordering) == "native"
+		return "no_ordering"
+	for Key in Edges {
+		Plain := Key is Map ? Key.Get("plain", 0) : 0
+		Shift := Key is Map ? Key.Get("shift", 0) : 0
+		if !_NumberRowPolicyDescriptor(Plain) || !_NumberRowPolicyDescriptor(Shift)
+			return "edges_incomplete"
+		if StrCompare(Plain["Kind"], Shift["Kind"], true) == 0 && Plain["Text"] == Shift["Text"]
+			return "edges_same"
+	}
+	return ""
+}
+
 NumberRowPolicyCapable(Platform, Mode, Symbols) {
 	if !(Platform is String) || NumberRowPolicyMode(Mode) == ""
 		return false

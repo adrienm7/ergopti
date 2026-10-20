@@ -180,6 +180,10 @@ _TapKeyEmulatedCharacter(Scancode) {
 	global Features
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout")
 		return ""
+	; « Also reorder the three edge keys » types the other level.
+	Reordered := NumberRowEdgeText(Scancode, false, NumberRowForegroundLayout(), GetKeyState("CapsLock", "T"))
+	if Reordered != ""
+		return Reordered
 	return NumberRowEmulatedBase(Format("SC{:03X}", Scancode))
 }
 

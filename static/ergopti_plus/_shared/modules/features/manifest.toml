@@ -3667,6 +3667,22 @@ type = "enum"
 enum_values = ["native", "digits", "symbols"]
 description_key = "menu.layout.number_row"
 
+# Whether « digits first » and « symbols first » also swap the two levels of the
+# three edge keys of the number row (left of 1, the two right of 0). Off: the
+# ordering moves the ten digit keys only and the edge keys type what the
+# effective layout types there. On: each edge key types its Shift level
+# unshifted and its base level with Shift, read from the effective layout,
+# while an ordering applies and each edge key can be swapped. Like the ordering
+# itself, only Windows applies it; macOS and Linux keep the native row.
+[[features.layout]]
+id = "number_row_reorder_edges"
+platforms = ["ahk", "hs", "linux"]
+default = false
+recommended = false
+input_altering = true
+type = "boolean"
+description_key = "menu.layout.number_row_edges"
+
 [[features.layout]]
 id = "ergopti_alt_gr"
 platforms = ["ahk"]
@@ -7365,6 +7381,15 @@ id = "number_row_mode"
 path = "layout.direct_access_digits"
 i18n = "menu.layout.number_row"
 choice_label_prefix = "menu.layout.number_row_"
+
+# « Also reorder the three edge keys », after the ordering it extends. Each
+# driver greys it with why where the edge keys cannot join the ordering.
+[[menu.number_row_policy_rows]]
+type = "check"
+id = "number_row_edges"
+path = "layout.number_row_reorder_edges"
+i18n = "menu.layout.number_row_edges"
+checked_when = ["number_row_edges_enabled"]
 
 [[menu.apps_empty_rows]]
 type = "label"

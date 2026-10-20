@@ -11,6 +11,14 @@
 
 #Requires AutoHotkey v2.0
 
+; The keymap module holding the number-row hotkeys, found through one of its
+; own functions rather than by its path, without its full-line comments.
+_NRP_LayoutSource() {
+	Source := _StripFullLineComments(FileRead(_DriverProductionFileForSymbol("RemapKey"), "UTF-8"))
+	AssertTrue(InStr(Source, "RegisterBuiltinNumberRow()") > 0, "the number-row hotkeys module must be found")
+	return Source
+}
+
 
 
 
@@ -95,6 +103,22 @@ _NRP_AvailabilityCorpus() {
 	AssertThrows(() => NumberRowPolicyAvailability([]), "the rule needs all ten keys")
 }
 Test("number row: options are offered only where they reorder all ten keys (number-row-availability)", _NRP_AvailabilityCorpus)
+
+/** The edge keys join an ordering only where swapping each of them changes it. */
+_NRP_EdgesCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\layouts\number_row_policy.json"))
+	AssertEqual(6, Corpus["edges"].Length, "every edge-key case of the rule is represented")
+	for Vec in Corpus["edges"] {
+		Edges := []
+		Loop 3
+			Edges.Push(Map("plain", _NRP_CorpusDescriptor(Vec["plain"][A_Index]),
+				"shift", _NRP_CorpusDescriptor(Vec["shift"][A_Index])))
+		AssertEqual(Vec["expected"], NumberRowPolicyEdgesAvailability(Edges, Vec["ordering"]), Vec["id"])
+	}
+	AssertThrows(() => NumberRowPolicyEdgesAvailability([], "digits"), "the rule needs the three edge keys")
+}
+Test("number row: the edge keys join an ordering only where swapping them changes them (number-row-edge-keys)", _NRP_EdgesCorpus)
 
 ; Runs Fn with the logger writing only to its ring buffer; returns the lines.
 _NRP_CaptureLog(Fn) {
@@ -260,7 +284,7 @@ _NRP_NativeSymbolsFirst() {
 		_NRP_WithAzertyShapedForeground((Hkl) => (
 			AssertEqual("native", NumberRowEffectiveMode(), "AZERTY already types its symbols unshifted"),
 			AssertEqual("", NumberRowSymbolsFirstText(0x02, false, Hkl, false), "an inert choice types nothing")))
-		Source := _StripFullLineComments(FileRead(_DriverDir . "\modules\keymap\layout.ahk", "UTF-8"))
+		Source := _NRP_LayoutSource()
 		Start := InStr(Source, '#HotIf NumberRowEffectiveMode() == "symbols" && !KeylayoutEmulation_LayerIsActive("ergopti_base")')
 		Finish := InStr(Source, "`n#HotIf`n", , Start)
 		AssertTrue(Start > 0 && Finish > Start, "the native symbols-first block must be found")
@@ -447,6 +471,117 @@ _NRP_EmulationChangesReevaluate() {
 Test("number row: an emulated layout change and the emulation on and off re-evaluate the stored choice (number-row-inert-choice)",
 	_KLT_WithEmulation.Bind(_NRP_EmulationChangesReevaluate))
 
+; Edge-key levels of a fake native profile: [plain, shift] for SC029, SC00C, SC00D.
+_NRP_EdgeProfile(Levels) {
+	Edges := Map()
+	for Index, Sc in [0x29, 0x0C, 0x0D]
+		Edges[Sc] := Map("plain", Levels[Index][1], "shift", Levels[Index][2])
+	return Edges
+}
+
+; « Also reorder the three edge keys »: off by default, the edge keys keep the
+; effective layout's levels on every layout; on, they swap the effective
+; layout's own levels where an ordering applies and each can be swapped, and
+; are greyed with why elsewhere; the stored choice is never rewritten
+; (number-row-edge-keys).
+_NRP_EdgeKeysFollowTheChoice() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, ConfigurationFile, _NumberRowEdgesLogged
+	global _NumberRowForegroundLayout, _DigitRowProfiles, KS_DIGIT_ROW_KEYS
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile, _NumberRowEdgesLogged,
+		_NumberRowForegroundLayout, _DigitRowProfiles]
+	Dir := _KLT_TempDir()
+	Native := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+		"ergopti_variant", "none", "direct_access_digits", "symbols")
+	Azerty := 0x7E57040C, Qwerty := 0x7E570409
+	Symbols := ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"]
+	AzPlain := Map(), AzShift := Map(), UsPlain := Map(), UsShift := Map()
+	for Index, Key in KS_DIGIT_ROW_KEYS {
+		AzPlain[Key[2]] := Chr(0x26), AzShift[Key[2]] := Mod(Index, 10) . ""
+		UsPlain[Key[2]] := Mod(Index, 10) . "", UsShift[Key[2]] := Symbols[Index]
+	}
+	Profiles := Map(
+		Azerty, Map("shifted", true, "symbols", AzPlain, "shift_symbols", AzShift,
+			"edges", _NRP_EdgeProfile([[Chr(0xB2), ""], [")", Chr(0xB0)], ["=", "+"]])),
+		Qwerty, Map("shifted", false, "symbols", UsPlain, "shift_symbols", UsShift,
+			"edges", _NRP_EdgeProfile([[Chr(0x60), "~"], ["-", "_"], ["=", "+"]])))
+	try {
+		_DigitRowProfiles := Profiles
+		_NumberRowEdgesLogged := ""
+		for Stored in [false, true] {
+			Layout := Native.Clone()
+			Layout["number_row_reorder_edges"] := Stored
+			; Off: the edge keys keep the layout's own levels on AZERTY, QWERTY and Ergopti.
+			for Vec in [[Azerty, "digits", false], [Qwerty, "symbols", false], [Qwerty, "symbols", true]] {
+				Layout["direct_access_digits"] := Vec[2]
+				Layout["ergopti_base"] := Vec[3]
+				_NRP_UseLayout(Layout)
+				KLE_Model := 0
+				KLE_Id := ""
+				_NumberRowForegroundLayout := Vec[1]
+				Where := Format("0x{:X} {} builtin={} stored={}", Vec[1], Vec[2], Vec[3], Stored)
+				State := NumberRowEdgesState()
+				AssertEqual(Stored, State["stored"], Where . ": the stored choice")
+				Applies := Stored && Vec[1] == Qwerty && !Vec[3]
+				AssertEqual(Applies, NumberRowEdgesEffective(), Where . ": applies only on the QWERTY row")
+				AssertEqual(Applies ? "~" : "", NumberRowEdgeText(0x29, false, Vec[1], false), Where . ": SC029 unshifted")
+				AssertEqual(Applies ? Chr(0x60) : "", NumberRowEdgeText(0x29, true, Vec[1], false), Where . ": SC029 with Shift")
+				AssertEqual(Applies ? "+" : "", NumberRowEdgeText(0x0D, false, Vec[1], false), Where . ": SC00D unshifted")
+				Expected := Vec[3] ? "no_ordering" : Vec[1] == Azerty ? "edges_incomplete" : ""
+				AssertEqual(Expected, State["reason"], Where . ": why the edge keys cannot join")
+				if !Applies
+					AssertEqual(Vec[3] ? "$" : "", NumberRowEmulatedBase(Format("SC{:03X}", 0x29)),
+						Where . ": an unswapped edge key keeps the effective layout's own character")
+			}
+		}
+		; The menu row: ticked and greyed with why, and « not applied », on AZERTY.
+		ConfigurationFile := Dir . "edges.toml"
+		Image := _CMJFixtureCurrentSource('[layout]`ndirect_access_digits = "digits"`nnumber_row_reorder_edges = true`n`n[category_enabled]`nlayout = true`n')
+		FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
+		AssertEqual("current", ConfigMigrateBoot(ConfigurationFile)["status"])
+		Layout := Native.Clone()
+		Layout["direct_access_digits"] := "digits"
+		Layout["number_row_reorder_edges"] := true
+		_NRP_UseLayout(Layout)
+		_NumberRowForegroundLayout := Azerty
+		Rows := _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)
+		AssertEqual(2, Rows.Length, "the ordering choice and the edge-key checkbox")
+		Edge := Rows[2]
+		AssertTrue(Edge["checked"], "the stored choice keeps its tick")
+		AssertTrue(Edge.Get("disabled", false), "and is greyed where it cannot apply")
+		AssertEqual("platform_reason.number_row_edges_incomplete", Edge.Get("disabled_reason_key", ""))
+		AssertEqual(t("menu.layout.number_row_edges") . t("menu.layout.number_row_not_applied"), Edge["label"])
+		AssertEqual(Image, FSReadUtf8Exact(ConfigurationFile), "the stored choice is byte-identical")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State := MasterGateState()
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		ConfigurationFile := Saved[5]
+		_NumberRowEdgesLogged := Saved[6]
+		_NumberRowForegroundLayout := Saved[7]
+		_DigitRowProfiles := Saved[8]
+		DirDelete(Dir, true)
+	}
+}
+Test("number row: the edge keys keep their levels unless the choice reorders them where it can (number-row-edge-keys)",
+	_KLT_WithEmulation.Bind(_NRP_EdgeKeysFollowTheChoice))
+
+; No driver source keeps a table of edge-key characters any more: every edge
+; key is read from the effective layout (number-row-edge-keys).
+_NRP_NoHardcodedEdgeTable() {
+	Source := _DriverSourceNoComments()
+	StrReplace(Source, "NumberRowEdgeText(", , , &Readers)
+	AssertTrue(Readers >= 5, "the edge-key readers must be found (" . Readers . ")")
+	for Pattern in ['0x29, "$"', '0x0C, "%"', '0x0D, "="', "ErgoptiNumberRowEdgeMapping"]
+		AssertEqual(0, InStr(Source, Pattern), "no hardcoded edge table: " . Pattern)
+	AssertEqual(0, RegExMatch(Source, '"\$"\s*,[^\n]*"%"\s*,[^\n]*"="'), "no « $ % = » literal list")
+}
+Test("number row: no hardcoded edge-key table remains (number-row-edge-keys)", _NRP_NoHardcodedEdgeTable)
+
 ; « Digits first » used to type Ergopti's « $ % = » on the edge keys on any
 ; layout. It reorders the ten digit keys only: the edges keep what the
 ; effective layout types there (number-row-effective-edges).
@@ -466,7 +601,7 @@ _NRP_DigitsFirstLeavesTheEdges() {
 			AssertFalse(_KLE_DigitsOwnKey("SC00C", false), "the first key right of 0 is not"),
 			AssertFalse(_KLE_DigitsOwnKey("SC00D", false), "the second key right of 0 is not"),
 			AssertEqual("", NumberRowEmulatedBase("SC029"), "no emulation: the OS layout types the edges")))
-		Source := _StripFullLineComments(FileRead(_DriverDir . "\modules\keymap\layout.ahk", "UTF-8"))
+		Source := _NRP_LayoutSource()
 		Start := InStr(Source, '#HotIf NumberRowEffectiveMode() == "digits"')
 		Finish := InStr(Source, "`n#HotIf`n", , Start)
 		AssertTrue(Start > 0 && Finish > Start, "the digits-first block must be found")
@@ -509,7 +644,7 @@ _NRP_BuiltinErgoptiOffersNoOrdering() {
 		Body := _StripFullLineComments(_DriverFuncBody("RegisterBuiltinNumberRow"))
 		AssertTrue(Body != "", "the built-in number row registration must exist")
 		AssertTrue(InStr(Body, 'ERGOPTI_SPEC["number_row_base"]') > 0, "it types the .keylayout's base level")
-		Layout := _StripFullLineComments(FileRead(_DriverDir . "\modules\keymap\layout.ahk", "UTF-8"))
+		Layout := _NRP_LayoutSource()
 		Direct := InStr(Layout, '#HotIf NumberRowEffectiveMode() == "digits"')
 		Own := InStr(Layout, "`nRegisterBuiltinNumberRow()")
 		AssertTrue(Direct > 0 && Own > Direct, "the direct-access hotkeys are created first, so they win where they apply")
@@ -656,7 +791,7 @@ _NRP_MenuNativeOwners() {
 			Before := _NRP_MenuFixture(ConfigurationFile)
 			Seen := Map("calls", 0, "refresh", 0, "changed", false)
 			Rows := _LAY_NumberRowRows(_NRP_MenuWriter.Bind(Mode, Seen), (*) => Seen["refresh"] += 1, (*) => true)
-			AssertEqual(1, Rows.Length, "the actual choice renderer must produce its canonical head")
+			AssertEqual(2, Rows.Length, "the actual choice renderer must produce its canonical head and the edge-key checkbox")
 			AssertEqual(3, Rows[1]["items"].Length)
 			AssertTrue(Rows[1]["items"][1]["checked"])
 			; Ergo-L already types its digits unshifted (number-row-availability).
@@ -752,7 +887,7 @@ _NRP_MenuShowsInertChoice() {
 		ConfigurationFile := Dir . "inert.toml"
 		_NRP_MenuFixture(ConfigurationFile, "digits")
 		Rows := _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)
-		AssertEqual(1, Rows.Length)
+		AssertEqual(2, Rows.Length, "the ordering choice and the edge-key checkbox")
 		Items := Rows[1]["items"]
 		AssertTrue(Items[2]["checked"], "the stored choice keeps its tick")
 		AssertTrue(Items[2].Get("disabled", false), "and is greyed where it does nothing")

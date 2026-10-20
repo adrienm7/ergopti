@@ -699,6 +699,7 @@ function M.build(ctx)
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands["number_row_mode"] = function() return false end
+	render_ctx.commands["number_row_edges"] = function() return false end
 	local function bundle_frame_rows()
 		local function system_provider() return latest and {bundle_rows[1]} or {} end
 		local function user_provider() return latest and {bundle_rows[2]} or {} end

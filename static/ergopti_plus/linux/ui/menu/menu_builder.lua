@@ -673,6 +673,7 @@ local function _build_layouts(ctx)
 
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands["number_row_mode"] = function() return false end
+	render_ctx.commands["number_row_edges"] = function() return false end
 	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)

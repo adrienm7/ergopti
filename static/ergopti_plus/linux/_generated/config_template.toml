@@ -612,6 +612,7 @@ tap_5 = "none"
 
 [layout]
 direct_access_digits = "native"
+number_row_reorder_edges = false
 
 
 

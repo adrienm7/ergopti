@@ -220,6 +220,10 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	if Features["hotstrings"]["magic_key"]["replace"]["enabled"]
 			&& StrUpper(Scan) == StrUpper(ScriptInformation["MagicKeySourceScan"])
 		return { Count: StrLen(ScriptInformation["MagicKey"]), Text: ScriptInformation["MagicKey"] }
+	; « Also reorder the three edge keys » types the other level.
+	Edge := NumberRowEdgeText(Numeric, false, NumberRowForegroundLayout(), false)
+	if Edge != ""
+		return { Count: StrLen(Edge), Text: Edge }
 	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
