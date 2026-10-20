@@ -1012,6 +1012,14 @@ function M.observe_capsword_state(value, expected_token)
 	return true, allocate_revision(CAPSWORD_LOGICAL_NAME, value)
 end
 
+--- Whether the newest local intent or observed native edge has CapsWord on, read
+--- from memory only: the keystroke path asks it before doing any CapsWord work,
+--- so it performs no lease status query and no write.
+--- @return boolean active
+function M.capsword_known_active()
+	return _logical_values[CAPSWORD_LOGICAL_NAME] == 1
+end
+
 --- Queues a CapsWord clear when the newest local intent or native edge activates it.
 --- This does not infer ownership from global Karabiner state, preserving personal
 --- CapsLock/Karabiner behavior when ErgoptiPlus has no activation in flight.

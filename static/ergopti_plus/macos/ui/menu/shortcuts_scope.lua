@@ -9,6 +9,13 @@ local Scope = require("infra.preferences_scope")
 
 local STATE_FIELDS = { "shortcuts", "chatgpt_url", "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
 
+-- [shortcuts.caps_word] and its pointer kinds belong to their settings owner,
+-- which names their state keys; the scope applies them through it.
+local CapsWordAutoOff = require("infra.capsword_auto_off")
+for _, key in ipairs({ CapsWordAutoOff.IDLE_KEY, CapsWordAutoOff.TERMINATORS_KEY, CapsWordAutoOff.POINTER_KEY }) do
+	STATE_FIELDS[#STATE_FIELDS + 1] = key
+end
+
 -- The rows of the script chords' submenu: their section, and the parameters
 -- of the bindings they dispatch under (modules/shortcuts/script_control.lua
 -- BINDING_PREFIX).
@@ -142,6 +149,8 @@ function M.new(options)
 			end
 			local desired = {}
 			for _, key in ipairs(STATE_FIELDS) do desired[key] = clone(state[key]) end
+			-- What CapsWord runs is its owner's, as each native posture above is.
+			for key, value in pairs(CapsWordAutoOff.current_values()) do desired[key] = value end
 			captured = { native = native, state = desired }
 			return captured
 		end,
@@ -172,6 +181,12 @@ function M.new(options)
 						else desired.script_control_shortcuts[row.key] = value end
 					elseif row.section == "shortcuts" and row.key == "enabled" then native.master, desired.shortcuts = value, value
 					elseif row.section == "shortcuts" and row.key == "chatgpt_url" then native.url, desired.chatgpt_url = value, value
+					elseif row.section == "shortcuts.caps_word.pointer" then
+						desired[CapsWordAutoOff.POINTER_KEY][row.key] = value
+					elseif row.section == "shortcuts.caps_word" then
+						local flat = Preferences.flat_key_for(row.section .. "." .. row.key)
+						assert(flat ~= nil, "CapsWord scope row has no settings owner: " .. row.key)
+						desired[flat] = value
 					else error("shortcut scope has no runtime owner: " .. row.section .. "." .. row.key) end
 				end
 			end
@@ -187,11 +202,18 @@ function M.new(options)
 			end
 			assert(type(desired.script_control_enabled) == "boolean", "invalid script chords switch in scope candidate")
 			native.script_chords_on = desired.script_control_enabled
-			if apply_native(native) ~= true then return false end
+			-- The CapsWord settings compile before any native publication; a
+			-- refused native step puts the previous ones back.
+			if CapsWordAutoOff.apply_state(desired) ~= true then return false end
+			if apply_native(native) ~= true then
+				CapsWordAutoOff.apply_state(captured.state)
+				return false
+			end
 			set_state(desired)
 			return true
 		end,
 		restore = function(snapshot)
+			if CapsWordAutoOff.apply_state(snapshot.state) ~= true then return false end
 			if apply_native(snapshot.native) ~= true then return false end
 			set_state(snapshot.state)
 			return true

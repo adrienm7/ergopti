@@ -395,6 +395,19 @@ front". Every window allows text entry; the factory refuses
 `allow_text_entry` and `tests/meta/runloop/test_windows_become_key.lua` forbids
 turning it off (`windows-become-key`).
 
+### project-capsword-json-is-a-frozen-anchor
+
+`platform/remap/data/capsword.json` is the rule every released graph was built
+from, so the legacy-graph proofs (`legacy_static_anchors.capsword`,
+`legacy_release_fixtures`) read it whole. The deployed CapsWord rule is that
+file minus the exits [shortcuts.caps_word] owns (Space, Enter, Tab, the
+Ergopti "." and "," keys g and v, the two clicks): `platform/remap/watchers.lua`
+ends CapsWord on the typed character and the checked pointer kind instead,
+switching CapsLock off synchronously for a keystroke cause. Action: change
+CapsWord exits in the generator's setting-exit filter or in the watcher, never
+in capsword.json, and re-pin `TAP_HOLDS_ON_PINS` only after proving the rules
+after the first one digest unchanged.
+
 ### project-karabiner-cli-reads-no-user-variables
 
 `karabiner_cli` can set variables (`--set-variables`) but has no option to
