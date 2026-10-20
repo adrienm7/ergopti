@@ -747,11 +747,22 @@ local function main()
 	-- refused for the session (_shared/lua/config_migrate.lua,
 	-- docs/adr/009-config-versioning.md). Required here, not at the top: main()
 	-- sits near LuaJIT's upvalue limit.
-	require("config_migrate").boot({
-		path          = require("infra.config_paths").config("config.toml"),
-		driver        = "linux",
-		registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
-	})
+	do
+		local migration = require("config_migrate").boot({
+			path          = require("infra.config_paths").config("config.toml"),
+			driver        = "linux",
+			registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+		})
+		-- A newer file stays read-only for the session: tell the user why their
+		-- changes do not stick. Block-local, as main() is near the upvalue limit.
+		local notice = require("config_migrate").read_only_notice_key(migration)
+		local notice_i18n = notice and RuntimeGuard.optional_require("infra.i18n")
+		if notice and notifier and notice_i18n then
+			notifier.send(notice_i18n.get(notice), { level = "warning" })
+		elseif notice then
+			Logger.error(LOG, "The newer-configuration notice was not shown: no notifier or translations.")
+		end
+	end
 	-- Hotstring choices earlier builds kept in storage.json become config.toml
 	-- leaves once, before any hotstring owner reads them: the canonical readers
 	-- resolve absence to off, which would silence an updated install.

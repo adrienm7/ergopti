@@ -366,6 +366,7 @@ local function register_boot(h, driver)
 				local again = Engine.run({ path = path, driver = driver, registry = registry,
 					stamp = "20990101-000001", logger = logger })
 				h.assert_eq(again.status, "current")
+				h.assert_nil(Engine.read_only_notice_key(again), "a current file earns no notice")
 				h.assert_eq(read_bytes(path), SCENARIO_CANDIDATE, "a current file is not rewritten")
 				h.assert_nil(read_bytes(Engine.backup_path(path, 3, "20990101-000001")),
 					"a current file is not backed up")
@@ -384,6 +385,8 @@ local function register_boot(h, driver)
 				h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), "nothing is backed up")
 				h.assert_eq(count_level(lines, "error"), 1, "the refusal is logged as ERROR")
 				h.assert_true(type(Engine.read_only_reason(path)) == "string", "the session is read-only")
+				h.assert_eq(Engine.read_only_notice_key(result), "config.read_only.newer_schema",
+					"the driver tells the user why settings do not stick")
 
 				local wrote = TomlWriter.batch_write(path, { { section = "gestures", key = "enabled", value = false } })
 				h.assert_true(wrote ~= true, "a later write through the shared writer is refused")
