@@ -439,12 +439,28 @@
 				"llm_toggle_ready"
 			],
 			"disabled_reason_key": "menu.llm.save_unavailable",
+			"disabled_reasons": [
+				{
+					"when": "config_newer_schema",
+					"reason_key": "menu.read_only.newer_schema"
+				}
+			],
 			"category": "LLM"
 		},
 		{
 			"type": "command",
 			"id": "scope_restore",
-			"i18n": "common.restore_recommended"
+			"i18n": "common.restore_recommended",
+			"disabled_when": [
+				"llm_scope_ready"
+			],
+			"disabled_reason_key": "menu.llm.save_unavailable",
+			"disabled_reasons": [
+				{
+					"when": "config_newer_schema",
+					"reason_key": "menu.read_only.newer_schema"
+				}
+			]
 		},
 		{
 			"type": "---"

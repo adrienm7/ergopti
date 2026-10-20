@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sWybrany model: %s",
 	"config.read_only.newer_schema": "Ta konfiguracja została zapisana przez nowszą wersję ErgoptiPlus. Twoje ustawienia zostały zachowane. Przed zmianą ustawień zaktualizuj ErgoptiPlus i wczytaj go ponownie.",
 	"menu.llm.save_unavailable": "Niedostępne: wznów ErgoptiPlus, jeśli jest wstrzymany, lub otwórz diagnostykę, aby sprawdzić, dlaczego nie można zapisać ustawień.",
+	"menu.read_only.newer_schema": "Zapisano w nowszej wersji: zaktualizuj ErgoptiPlus, a następnie załaduj go ponownie przed zmianą ustawień.",
 	"healthcheck.collection.start": "Zbierz diagnostykę Windows",
 	"healthcheck.collection.guided": "Kroki z klawiaturą i ekranem",
 	"healthcheck.collection.skip": "Pomiń kroki fizyczne",

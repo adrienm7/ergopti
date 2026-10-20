@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%s選択中のモデル：%s",
 	"config.read_only.newer_schema": "この設定は、より新しいバージョンの ErgoptiPlus で保存されています。設定内容は変更されていません。設定を変更する前に ErgoptiPlus を更新し、再読み込みしてください。",
 	"menu.llm.save_unavailable": "利用できません: ErgoptiPlus が一時停止中の場合は再開するか、診断を開いて設定を保存できない理由を確認してください。",
+	"menu.read_only.newer_schema": "新しいバージョンで保存済み：設定を変更する前に ErgoptiPlus を更新し、再読み込みしてください。",
 	"healthcheck.collection.start": "Windows 診断を収集",
 	"healthcheck.collection.guided": "キーボードと画面の確認手順",
 	"healthcheck.collection.skip": "物理的な確認をスキップ",

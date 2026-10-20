@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sGeselecteerd model: %s",
 	"config.read_only.newer_schema": "Deze configuratie is opgeslagen met een nieuwere versie van ErgoptiPlus. Je instellingen zijn behouden. Werk ErgoptiPlus bij en laad het opnieuw voordat je instellingen wijzigt.",
 	"menu.llm.save_unavailable": "Niet beschikbaar: hervat ErgoptiPlus als het gepauzeerd is, of open Diagnostiek om te zien waarom instellingen niet kunnen worden opgeslagen.",
+	"menu.read_only.newer_schema": "Opgeslagen door een nieuwere versie: werk ErgoptiPlus bij en laad het opnieuw voordat je instellingen wijzigt.",
 	"healthcheck.collection.start": "Windows-diagnostiek verzamelen",
 	"healthcheck.collection.guided": "Begeleide stappen met toetsenbord en scherm",
 	"healthcheck.collection.skip": "Fysieke stappen overslaan",

@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sSelected model: %s",
 	"config.read_only.newer_schema": "This configuration was saved by a newer version of ErgoptiPlus. Your settings have been preserved. Update ErgoptiPlus, then reload it before changing settings.",
 	"menu.llm.save_unavailable": "Unavailable: resume ErgoptiPlus if paused, or open Diagnostics to check why settings cannot be saved.",
+	"menu.read_only.newer_schema": "Saved by a newer version: update ErgoptiPlus, then reload it before changing settings.",
 	"healthcheck.collection.start": "Collect Windows diagnostics",
 	"healthcheck.collection.guided": "Guided keyboard and display steps",
 	"healthcheck.collection.skip": "Skip physical steps",

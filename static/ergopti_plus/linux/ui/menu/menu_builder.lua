@@ -3116,16 +3116,30 @@ local function _build_llm(ctx)
 	for key, value in pairs(ctx) do llm_ctx[key] = value end
 	llm_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
-	-- The restore alone: the AI menu's clear row was retired.
-	llm_ctx.commands["scope_restore"] = function()
-		if ctx.paused == true then return false end
-		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
-		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		return committed
-	end
 	local Preferences = require("infra.llm_preferences")
 	local function toggle_ready()
 		return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true
+	end
+	-- The AI rows that write config.toml: greyed, and their retained clicks
+	-- refused, while paused or while the configuration refuses writes.
+	local function scope_ready()
+		return Preferences.admit() == true and ctx.paused ~= true
+	end
+	-- A configuration saved by a newer version names its own cause on those rows.
+	local function newer_schema()
+		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
+	end
+	-- The restore alone: the AI menu's clear row was retired.
+	llm_ctx.commands["scope_restore"] = function()
+		-- A retained row rechecks what greyed it when it was built.
+		if not scope_ready() then
+			Logger.warn(LOG, "AI settings restore refused: %s.", ctx.paused == true and "the script is paused"
+				or "the configuration is protected from writes")
+			return false
+		end
+		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
+		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
 	end
 	llm_ctx.commands["llm_toggle"] = function()
 		if not toggle_ready() then return false end
@@ -3137,6 +3151,8 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
 	-- The same source/scope admission greys the row and fences retained clicks.
 	llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready
+	llm_ctx.state_getters["llm_scope_ready"] = scope_ready
+	llm_ctx.state_getters["config_newer_schema"] = newer_schema
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)

@@ -4251,6 +4251,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(linuxAiSo
 			],
 			['and Preferences.admit() == true', 'and true', 'withdrawn persistence admission'],
 			['and Preferences.admit() == true', 'and Preferences.admit()', 'untyped admission'],
+			['return Preferences.admit() == true and', 'return true and', 'withdrawn restore admission'],
 			[
 				'ctx.paused ~= true and Preferences.admit()',
 				'true and Preferences.admit()',
@@ -4297,7 +4298,7 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(linuxAiSo
 				'comment-only preference owner'
 			]
 		];
-		assert.equal(readonlyControls.length, 12, 'all read-only admission withdrawals are registered');
+		assert.equal(readonlyControls.length, 13, 'all read-only admission withdrawals are registered');
 		for (const [before, after, reason] of readonlyControls) {
 			assert.equal(readonlyBuilder.split(before).length - 1, 1, reason + ': actual source seam');
 			const changed = readonlyBuilder.replace(before, after);
@@ -8559,7 +8560,7 @@ function languageParentSource(source, driver) {
 		true,
 		'complete genuine original folder owner plus only two caption edits'
 	);
-	const marker = '_HS_RenderTree(Tree, Rows, OwnedMenus := unset) {';
+	const marker = '_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {';
 	const begin = source.indexOf(marker),
 		end = source.indexOf('\n; Release only returned native menus', begin);
 	assert(begin >= 0 && end > begin, 'nonempty actual complete folder native owner exists');

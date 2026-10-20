@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sالنموذج المحدد: %s",
 	"config.read_only.newer_schema": "حُفظ هذا الإعداد بإصدار أحدث من ErgoptiPlus. تم الاحتفاظ بإعداداتك. حدّث ErgoptiPlus ثم أعد تحميله قبل تغيير الإعدادات.",
 	"menu.llm.save_unavailable": "غير متاح: استأنف ErgoptiPlus إذا كان متوقفًا مؤقتًا، أو افتح التشخيص لمعرفة سبب تعذّر حفظ الإعدادات.",
+	"menu.read_only.newer_schema": "محفوظ بإصدار أحدث: حدّث ErgoptiPlus ثم أعد تحميله قبل تغيير الإعدادات.",
 	"healthcheck.collection.start": "جمع تشخيص Windows",
 	"healthcheck.collection.guided": "خطوات موجهة للوحة المفاتيح والشاشة",
 	"healthcheck.collection.skip": "تخطي الخطوات الفعلية",

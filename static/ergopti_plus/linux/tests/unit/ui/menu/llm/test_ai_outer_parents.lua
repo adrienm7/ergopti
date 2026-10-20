@@ -89,6 +89,55 @@ local function parent(ctx, kind)
 	return found
 end
 
+-- A configuration saved by a newer version is read-only for the session: the
+-- switch named only the generic "resume or open Diagnostics" cause, which it
+-- cannot lift, and a restore row kept from an earlier build still ran its
+-- scope transaction.
+helpers.describe("Linux AI persistence rows under a configuration saved by a newer version", function()
+	helpers.it("names the newer configuration on the greyed rows and refuses their retained commands", function()
+		with_world(function(ctx, renderer)
+			local Preferences = require("infra.llm_preferences")
+			local Scope = require("infra.llm_scope")
+			local Migrate = require("config_migrate")
+			local I18n = require("infra.i18n")
+			local old_admit, old_apply, old_status = Preferences.admit, Scope.apply, Migrate.read_only_status
+			local old_toggle, native_build = ctx.llm.toggle, renderer.build
+			local writable, applied, toggled, retained = true, 0, 0, nil
+			local ok, err = xpcall(function()
+				Preferences.admit = function() return writable end
+				Migrate.read_only_status = function() return (not writable) and "newer" or nil end
+				Scope.apply = function() applied = applied + 1; return true end
+				ctx.llm.toggle = function() toggled = toggled + 1 end
+				renderer.build = function(key, path, handlers, groups, context, providers)
+					if key == "llm_menu" then retained = context end
+					return native_build(key, path, handlers, groups, context, providers)
+				end
+				helpers.assert_type(parent(ctx, "llm"), "table", "the writable AI parent is built")
+				helpers.assert_type(retained, "table", "the AI child context is captured")
+				writable = false
+				helpers.assert_eq(retained.commands.scope_restore(), false, "a retained restore rechecks the configuration")
+				helpers.assert_eq(retained.commands.llm_toggle(), false, "a retained switch rechecks the configuration")
+				helpers.assert_eq(applied, 0, "no scope transaction runs on a read-only configuration")
+				helpers.assert_eq(toggled, 0, "the switch never reaches the engine")
+
+				local row = parent(ctx, "llm")
+				helpers.assert_type(row and row.menu, "table", "the read-only AI child stays navigable")
+				local reason = I18n.get("menu.read_only.newer_schema"):match("^([^:]+)"):gsub("%s+$", "")
+				for _, key in ipairs({ "menu.llm.enable", "common.restore_recommended" }) do
+					local title, found = I18n.get(key) .. " — " .. reason, nil
+					for _, child in ipairs(row.menu) do if child.title == title then found = child end end
+					helpers.assert_type(found, "table", key .. " names the newer configuration as its cause")
+					helpers.assert_eq(found.disabled, true, key .. " is greyed")
+					helpers.assert_nil(found.fn, key .. " has nothing to run")
+				end
+			end, debug.traceback)
+			Preferences.admit, Scope.apply, Migrate.read_only_status = old_admit, old_apply, old_status
+			ctx.llm.toggle, renderer.build = old_toggle, native_build
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
 helpers.describe("Linux shared AI outer parents with published available component source", function()
 	for _, kind in ipairs({ "llm", "agent" }) do
 		helpers.it("retains the genuine completed " .. kind .. " child and its callbacks", function()

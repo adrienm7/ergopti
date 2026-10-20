@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sModelo seleccionado: %s",
 	"config.read_only.newer_schema": "Esta configuración se guardó con una versión más reciente de ErgoptiPlus. Se han conservado tus ajustes. Actualiza ErgoptiPlus y vuelve a cargarlo antes de cambiar los ajustes.",
 	"menu.llm.save_unavailable": "No disponible: reanuda ErgoptiPlus si está en pausa o abre Diagnóstico para comprobar por qué no se pueden guardar los ajustes.",
+	"menu.read_only.newer_schema": "Guardada por una versión más reciente: actualiza ErgoptiPlus y vuelve a cargarlo antes de cambiar los ajustes.",
 	"healthcheck.collection.start": "Recopilar diagnóstico de Windows",
 	"healthcheck.collection.guided": "Pasos guiados con teclado y pantalla",
 	"healthcheck.collection.skip": "Omitir pasos físicos",

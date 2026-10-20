@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sSeçili model: %s",
 	"config.read_only.newer_schema": "Bu yapılandırma ErgoptiPlus’ın daha yeni bir sürümüyle kaydedildi. Ayarlarınız korundu. Ayarları değiştirmeden önce ErgoptiPlus’ı güncelleyin ve yeniden yükleyin.",
 	"menu.llm.save_unavailable": "Kullanılamıyor: ErgoptiPlus duraklatılmışsa devam ettirin veya ayarların neden kaydedilemediğini öğrenmek için Tanılama’yı açın.",
+	"menu.read_only.newer_schema": "Daha yeni bir sürümle kaydedildi: ayarları değiştirmeden önce ErgoptiPlus’ı güncelleyin ve yeniden yükleyin.",
 	"healthcheck.collection.start": "Windows tanılamasını topla",
 	"healthcheck.collection.guided": "Klavye ve ekran için rehberli adımlar",
 	"healthcheck.collection.skip": "Fiziksel adımları atla",

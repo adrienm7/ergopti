@@ -1772,6 +1772,7 @@ function closedLlmReadOnlyToggle(caller) {
 	const fragments = [
 		'local Preferences = require("infra.llm_preferences")',
 		'local function toggle_ready() return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true end',
+		'local function scope_ready() return Preferences.admit() == true and ctx.paused ~= true end',
 		'llm_ctx.commands["llm_toggle"] = function() if not toggle_ready() then return false end if llm.toggle then llm.toggle(ctx.on_menu_changed) end if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end',
 		'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready'
 	];
@@ -1830,6 +1831,8 @@ function closedLlmContext(caller) {
 		closedLlmReadOnlyToggle(caller)
 			? 'llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready'
 			: 'llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end',
+		'llm_ctx.state_getters["llm_scope_ready"] = scope_ready',
+		'llm_ctx.state_getters["config_newer_schema"] = newer_schema',
 		'llm_ctx[key] = value',
 		'ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)'
 	];

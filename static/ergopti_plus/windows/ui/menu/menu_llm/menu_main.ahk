@@ -218,7 +218,9 @@ LLM_Menu_BuildSubmenu() {
 _LLM_Menu_StateGetters() {
 	global _LLM_Menu
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
-		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist())
+		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"config_newer_schema", () => ConfigNewerSchemaReadOnly())
 }
 
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
@@ -581,6 +583,20 @@ _LLM_ScopeCommands(Options := unset) {
 }
 
 _LLM_ApplyScope(Mode, Options) {
+	global ConfigurationFile
+	; A retained row callback rechecks what greyed the row when it was built:
+	; a pause or a configuration refused for the session (a newer schema) stops
+	; it before any scope transaction.
+	Path := Options.Get("path", IsSet(ConfigurationFile) ? ConfigurationFile : "")
+	Refusal := (Path is String) && Path != "" ? TOML_WriteRefusal(Path) : "no configuration destination"
+	if A_IsSuspended || Refusal != "" {
+		if A_IsSuspended {
+			try LoggerWarn("LLM", "AI settings {1} scope refused: the script is paused.", Mode)
+		} else {
+			ConfigReportPersistenceFailure("the AI settings " . Mode . " scope", Options.Get("notify", 0), Refusal)
+		}
+		return Map("status", "refused", "scope", "llm", "mode", Mode)
+	}
 	CandidateOptions := Options.Clone()
 	CandidateOptions["supplement"] := _LLM_Menu_ScopeResetOperations
 	return ConfigScopeApply("llm", Mode, Map(), CandidateOptions)
