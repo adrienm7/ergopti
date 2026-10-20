@@ -46,6 +46,36 @@ helpers.describe("final response ETag observation", function()
 	end
 end)
 
+helpers.describe("final response rate-limit observation", function()
+	helpers.it("reads the final frame's GitHub rate-limit fields only", function()
+		local observed = Receipt.response_rate_limit("HTTP/1.1 200 Connection established\r\n"
+			.. "X-RateLimit-Remaining: 9\r\n\r\nHTTP/2 403\r\nx-ratelimit-remaining: 0\r\n"
+			.. "X-RateLimit-Reset: 1792470000 \r\n\r\n", 403)
+		helpers.assert_eq(observed, { remaining = "0", reset = "1792470000" })
+	end)
+	helpers.it("refuses a frame of another status, an incomplete one or one without the fields", function()
+		helpers.assert_nil(Receipt.response_rate_limit("HTTP/2 403\r\nX-RateLimit-Remaining: 0\r\n\r\n", 429))
+		helpers.assert_nil(Receipt.response_rate_limit("HTTP/2 403\r\nX-RateLimit-Remaining: 0\r\n", 403))
+		helpers.assert_nil(Receipt.response_rate_limit("HTTP/2 403\r\nServer: github\r\n\r\n", 403))
+	end)
+end)
+
+helpers.describe("updater.rate_limit: exhausted GitHub limit detail", function()
+	local RateLimit = require("updater.rate_limit")
+	helpers.it("names the limit and its UTC reset for a 403 or 429 with nothing left", function()
+		helpers.assert_eq(RateLimit.exhausted_detail(403, "0", "86400"),
+			"HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC")
+		helpers.assert_eq(RateLimit.exhausted_detail(429, 0, nil),
+			"HTTP 429: the GitHub API rate limit is exhausted")
+	end)
+	helpers.it("says nothing for calls left, another status or a malformed reset", function()
+		helpers.assert_nil(RateLimit.exhausted_detail(403, "12", "86400"))
+		helpers.assert_nil(RateLimit.exhausted_detail(500, "0", "86400"))
+		helpers.assert_eq(RateLimit.exhausted_detail(403, "0", "soon"),
+			"HTTP 403: the GitHub API rate limit is exhausted")
+	end)
+end)
+
 local function native_file(bytes, ambiguous_close)
 	local live, closes = {}, {}
 	local next_descriptor = 11

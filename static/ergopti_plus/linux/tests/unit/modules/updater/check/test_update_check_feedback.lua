@@ -112,6 +112,24 @@ helpers.describe("updater: a manual check answers the update-check window (Linux
 		helpers.assert_true(ok, tostring(err))
 		helpers.assert_eq(answers[1][4], "no_connection")
 	end)
+
+	helpers.it("names an exhausted GitHub rate limit and its reset time", function()
+		local M = helpers.load_module("modules.updater.manager")
+		local real_client = M._http_client
+		local answers = {}
+		M._http_client = { get = function(_, _, _, callback)
+			callback({ ok = false, status = 403, error = "HTTP 403",
+				rate_limit = { remaining = "0", reset = "86400" } })
+			return true
+		end }
+		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
+		local ok, err = pcall(M._fetch_releases, "dev", function(...) answers[#answers + 1] = { ... } end)
+		M._http_client = real_client
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(answers[1][4], "no_connection")
+		helpers.assert_contains(answers[1][3], "rate limit is exhausted")
+		helpers.assert_contains(answers[1][3], "1970-01-02 00:00:00 UTC")
+	end)
 end)
 
 helpers.describe("menu: the check row opens the update-check window (Linux)", function()

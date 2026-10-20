@@ -51,6 +51,7 @@ local NoReplaceMove = require("infra.no_replace_move")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
+local RateLimit = require("updater.rate_limit")
 local Channels  = require("updater.channels")
 local Schedule  = require("updater.schedule")
 local Installer = require("modules.updater.installer")
@@ -639,8 +640,14 @@ local function _fetch_releases(channel, callback)
 				end
 				Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s page %d; reusing the cached page.", channel, page)
 			elseif not result or result.ok ~= true then
-				if status == 403 then Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s page %d.", channel, page) end
-				finish(nil, status, result and result.error or "empty HTTP result", "no_connection")
+				local limit = result and type(result.rate_limit) == "table" and result.rate_limit or {}
+				local limited = RateLimit.exhausted_detail(status, limit.remaining, limit.reset)
+				if limited then
+					Logger.warn(LOG, "GitHub releases for channel %s page %d: %s.", channel, page, limited)
+				elseif status == 403 then
+					Logger.warn(LOG, "GitHub refused the releases request (HTTP 403) for channel %s page %d.", channel, page)
+				end
+				finish(nil, status, limited or result and result.error or "empty HTTP result", "no_connection")
 				return
 			else
 				all_unchanged = false

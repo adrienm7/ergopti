@@ -44,6 +44,7 @@ local JsonCodec = require("adapters.json_codec")
 local Schedule  = require("updater.schedule")
 local Parser    = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
+local RateLimit = require("updater.rate_limit")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
@@ -402,11 +403,9 @@ function M.new(opts)
 			store_list_cache(decoded, header_value(result.headers, "etag"))
 			return result.body
 		end
-		if (status == 403 or status == 429) and header_value(result.headers, "x-ratelimit-remaining") == "0" then
-			local reset = tonumber(header_value(result.headers, "x-ratelimit-reset"))
-			return nil, "no_connection", string.format("HTTP %d: the GitHub API rate limit is exhausted%s",
-				status, reset and (", it resets at " .. os.date("!%Y-%m-%d %H:%M:%S UTC", reset)) or "")
-		end
+		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
+			header_value(result.headers, "x-ratelimit-reset"))
+		if limited then return nil, "no_connection", limited end
 		return nil, "no_connection",
 			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
 	end
