@@ -109,22 +109,9 @@ UpdateCapsLockLED() {
 ; InputHook does not see: while their delimiter is checked they end CapsWord
 ; here. Unchecked, the criterion fails and the key stays native.
 #HotIf CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey("space")
-SC039::
-{
-	TextPressKey("Space", [])
-	; A lost key-up must not leave CapsWord active forever after the visible space
-	try {
-		KeyWait("SC039", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		DisableCapsWord()
-	}
-}
+SC039:: CapsWordAutoOffNativeKey("Space")
 
 ; Big Enter key
 #HotIf CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey("enter")
-SC01C::
-{
-	TextPressKey("Enter", [])
-	DisableCapsWord()
-}
+SC01C:: CapsWordAutoOffNativeKey("Enter")
 #HotIf

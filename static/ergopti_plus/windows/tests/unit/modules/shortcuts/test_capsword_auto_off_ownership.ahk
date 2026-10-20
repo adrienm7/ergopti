@@ -118,3 +118,99 @@ _CWAOO_Case(Route) {
 for _CWAOO_Route in ["snapshot", "pointer-log", "char-log", "idle"]
 	Test("CapsWord ownership: " . _CWAOO_Route . " cannot retire a replacement activation (capsword-auto-off-owner)",
 		_CWAOO_Case.Bind(_CWAOO_Route))
+
+
+; Drive the actual Space/Enter producer with passive send/wait ports. A real
+; timer replaces its CapsWord while the retained native operation is waiting.
+_CWAN_Send(State, Key, Mods) {
+	State.Sends.Push({Key: Key, Mods: Mods})
+	if InStr(State.Mode, "send-") {
+		_CWAOO_PauseForRearm(State)
+		if State.Mode == "send-error"
+			throw Error("Owned native send refusal")
+	}
+}
+
+_CWAN_Wait(State, Key, Options) {
+	State.Waits.Push({Key: Key, Options: Options})
+	if InStr(State.Mode, "wait-") {
+		_CWAOO_PauseForRearm(State)
+		if State.Mode == "wait-error"
+			throw Error("Owned native wait refusal")
+	}
+	; A lost physical release reaches the existing bounded timeout receipt.
+	return 0
+}
+
+_CWAN_Case(Key, Mode) {
+	global CapsWordEnabled, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC
+	AssertFalse(CapsWordAutoOff.Armed is Map, "the native-key fixture must own its CapsWord activation")
+	Saved := {Enabled: CapsWordEnabled, Configured: CapsWordAutoOff.Configured,
+		Subscribers: HookDispatcher._subscribers, Critical: A_IsCritical, Suspended: A_IsSuspended}
+	State := {Mode: Mode, Sends: [], Waits: [], Ends: [], Rearmed: false, Pauses: 0,
+		Error: 0, NewPolicy: _CWAOO_Policy(30)}
+	State.Timer := _CWAOO_Rearm.Bind(State)
+	try {
+		Critical("Off"), Suspend(false)
+		HookDispatcher._subscribers := Map()
+		CapsWordEnabled := true
+		Policy := CapsWordAutoOffCompile(Map("idle_timeout_seconds", 0,
+			"terminators", ["space", "enter"], "pointer", State.NewPolicy["pointer"]),
+			CapsWordAutoOffPointerKinds(), &Reason)
+		AssertTrue(Policy is Map, "the native delimiter policy must really compile: " . Reason)
+		CapsWordAutoOff.Configured := Policy
+		AssertTrue(CapsWordAutoOffArm(_CWAOO_End.Bind(State, "original")))
+		AssertTrue(CapsWordAutoOffEndsOnNativeKey(Key == "Space" ? "space" : "enter"),
+			"the actual native hotkey eligibility must admit this active policy")
+		Thrown := 0
+		try CapsWordAutoOffNativeKey(Key, _CWAN_Send.Bind(State), _CWAN_Wait.Bind(State))
+		catch as Err
+			Thrown := Err
+		if IsObject(State.Error)
+			throw State.Error
+		if InStr(Mode, "error") {
+			AssertTrue(Thrown is Error, "native operation errors must propagate after owned cleanup")
+			AssertEqual(Key == "Space" ? "Owned native wait refusal" : "Owned native send refusal", Thrown.Message)
+		} else
+			AssertFalse(Thrown is Error)
+		AssertEqual(1, State.Sends.Length)
+		AssertEqual(Key, State.Sends[1].Key)
+		AssertTrue(State.Sends[1].Mods is Array && State.Sends[1].Mods.Length == 0,
+			"the actual TextPressKey arguments must remain unchanged")
+		AssertEqual(Key == "Space" ? 1 : 0, State.Waits.Length)
+		if Key == "Space" {
+			AssertEqual("SC039", State.Waits[1].Key)
+			AssertEqual("T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC, State.Waits[1].Options,
+				"the wait must retain the shared stuck-release bound")
+		}
+		if Mode == "timeout" || Mode == "current" {
+			AssertFalse(CapsWordEnabled, "a current delimiter must still end CapsWord, including a lost key-up")
+			AssertEqual(1, State.Ends.Length)
+			AssertEqual("original", State.Ends[1])
+		} else {
+			AssertTrue(State.Rearmed, "the native timer must actually replace the original before its continuation")
+			AssertTrue(CapsWordEnabled, "an older native delimiter must leave the replacement active")
+			AssertTrue(CapsWordAutoOff.Armed == State.NewPolicy)
+			AssertEqual(0, State.Ends.Length, "neither the retired end function nor the replacement's may run for the old key")
+			AssertTrue(CapsWordAutoOff.IdleRunning)
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_CHAR, 0, "`t")
+			AssertFalse(CapsWordEnabled, "a fresh delimiter must still end the replacement")
+			AssertEqual(1, State.Ends.Length)
+			AssertEqual("replacement", State.Ends[1])
+		}
+	} finally {
+		SetTimer(State.Timer, 0)
+		State.Timer := 0
+		CapsWordAutoOffDisarm()
+		HookDispatcher._subscribers := Saved.Subscribers
+		CapsWordEnabled := Saved.Enabled, CapsWordAutoOff.Configured := Saved.Configured
+		Suspend(Saved.Suspended), Critical(Saved.Critical)
+	}
+}
+
+for _CWAN_Mode in ["timeout", "wait-replace", "wait-error"]
+	Test("CapsWord native key: Space " . _CWAN_Mode . " retires only its activation (capsword-native-key-owner)",
+		_CWAN_Case.Bind("Space", _CWAN_Mode))
+for _CWAN_Mode in ["current", "send-replace", "send-error"]
+	Test("CapsWord native key: Enter " . _CWAN_Mode . " retires only its activation (capsword-native-key-owner)",
+		_CWAN_Case.Bind("Enter", _CWAN_Mode))
