@@ -46,11 +46,36 @@ local function projected_maps(options, projection)
 	return maps.taps, maps.chords
 end
 
+--- Restricts cross-source collision isolation to configured runtime bindings.
+--- @param options table Original source-owned options.
+--- @param taps table|nil Runtime tap projection.
+--- @param chords table|nil Runtime chord projection.
+--- @return table codes Native codes participating in an active binding.
+local function participating_codes(options, taps, chords)
+	local codes = {}
+	if options.enabled ~= true then return codes end
+	for _, first in ipairs(options.keys) do
+		for _, second in ipairs(options.keys) do
+			if first ~= second then
+				local pair = Policy.pair(first, second)
+				if (taps and taps[pair] or Policy.NONE) ~= Policy.NONE
+					or (options.holds and options.holds[pair] or Policy.NONE) ~= Policy.NONE
+					or (options.chord_settings and chords and chords[pair] or Policy.NONE) ~= Policy.NONE then
+					codes[Engine.KEY_CODES[first]], codes[Engine.KEY_CODES[second]] = true, true
+				end
+			end
+		end
+	end
+	return codes
+end
+
 function M.new(base, options, buffered_ports, projection)
 	assert(type(base) == "table" and type(options.capture) == "function" and type(options.capture_action) == "function")
 	local runtime_taps, runtime_chords = projected_maps(options, projection)
+	local combination_codes = participating_codes(options, runtime_taps, runtime_chords)
 	local owner, policy, generation, pending, retirement, acting = {}, nil, nil, nil, nil, false
 	local presses, blocked, holds, serial = {}, {}, {}, 0
+	local native_presses = {}
 	local waiting, chords, chord_policy = nil, {}, nil
 	local processing, buffer_request = nil, nil
 	local original_by_code, acknowledged, runtime_guard = base.by_code, false, nil
@@ -147,6 +172,7 @@ local function revoke_event(code, source)
 		local taps, selected_chords = projected_maps(selected, selected_projection)
 		options, buffered_ports, chord_policy = selected, receivers, nil
 		runtime_taps, runtime_chords = taps, selected_chords
+		combination_codes = participating_codes(options, runtime_taps, runtime_chords)
 		epoch = epoch + 1; return true
 	end
 	function owner.set_tap_holds_enabled(_, enabled)
@@ -170,7 +196,14 @@ local function revoke_event(code, source)
 		if not physical(receipt) then return base_ports.process(base, code, value, at_ms, receipt) end
 		if generation ~= nil and generation ~= receipt.generation then return revoke_event(code, receipt.source) end
 		local source = receipt.source
-		if value == 1 then
+		local isolated = combination_codes[code] == true
+		-- Unrelated physical presses belong to Hook's per-source aggregation.
+		-- Retain them only to prevent a buffered chord starting while any is held.
+		if not isolated then
+			local stamp = source .. "\0" .. code
+			if value == 1 then native_presses[stamp] = true
+			elseif value == 0 then native_presses[stamp] = nil end
+		elseif value == 1 then
 			if presses[code] and presses[code] ~= source then
 				blocked[source .. "\0" .. code] = true
 				base_ports.activity(base)
@@ -194,7 +227,7 @@ local function revoke_event(code, source)
 		local guard = policy and runtime_guard or capture(options.capture)
 		if not guard or guard() ~= true then
 			if policy then return revoke_event(code, receipt.source) end
-			if value == 0 then presses[code] = nil end
+			if isolated and value == 0 then presses[code] = nil end
 			return base_ports.process(base, code, value, at_ms, receipt)
 		end
 		if not policy then
@@ -211,7 +244,7 @@ local function revoke_event(code, source)
 		end
 		local result = policy.process({ key = ids[code] or tostring(code), value = value, at_ms = at_ms,
 			physical = true, source = source, generation = generation, revision = options.revision, blocked_first = unavailable })
-		if value == 0 then presses[code] = nil end
+		if isolated and value == 0 then presses[code] = nil end
 		if not result.consumed then return base_ports.process(base, code, value, at_ms, receipt) end
 		local rows, action, binding, lifted, action_guard = {}, nil, nil, nil, guard
 		for _, effect in ipairs(result.effects) do
@@ -266,7 +299,7 @@ local function revoke_event(code, source)
 		return chord_policy and chord_policy.choose(first,second,elapsed) or nil
 	end
 	local function candidate(code)
-		if not ids[code] or not runtime_chords or not options.chord_settings or next(presses) or next(chords)
+		if not ids[code] or not runtime_chords or not options.chord_settings or next(presses) or next(native_presses) or next(chords)
 			or not source_settings_current()
 			or base_ports.combination_first_available(base,code) ~= true then return false end
 		for _, second in ipairs(options.keys) do if choose(ids[code],second,0) then return true end end
@@ -402,6 +435,7 @@ local function revoke_event(code, source)
 		if not retirement or accepted ~= true or acting or delivery or processing or exact_rows and exact_rows ~= retirement.rows then return false end
 		if policy and not policy.ack_retirement(retirement.policy_token, true) then return false end
 		pending, holds, presses, blocked, acknowledged = nil, {}, {}, {}, true
+		native_presses = {}
 		waiting, chords, chord_policy = nil, {}, nil
 		policy, generation, runtime_guard, retirement, disabled, epoch = nil, nil, nil, nil, true, epoch + 1
 		return true
