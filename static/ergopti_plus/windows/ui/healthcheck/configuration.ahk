@@ -15,6 +15,10 @@
 ;    leave the machine through this section.
 ; 3. Both ports replay
 ;    _shared/tests/corpus/healthcheck/configuration_vectors.json.
+; 4. HealthCheck_ConfigurationFiles and HealthCheck_CollectConfiguration report
+;    the state of each configuration file in the order they apply: ok, missing,
+;    unreadable or invalid. A file that cannot be read is named, never skipped,
+;    and nothing is cached or written.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -152,4 +156,79 @@ HealthCheck_ConfigurationRows(Features, Document, Driver, Limit) {
 		Sorted.Push(Rows[Path])
 	}
 	return Sorted
+}
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 3/ File States =======
+; ==============================
+; ==============================
+
+; Where each configuration file lives on this driver.
+; @param Id {String} A file id of the schema's configuration.files.
+; @returns {String}
+_HCConfig_PathOf(Id) {
+	global _ConfigDir, _AhkSubDir
+	Names := HealthCheck_Config()["schema"]["configuration"]["file_names"]
+	if !Names.Has(Id)
+		throw ValueError("Unknown configuration file: " . Id)
+	; The driver keeps its own settings in a subfolder; the layers file is shared
+	; between drivers and sits in the configuration folder itself.
+	return _ConfigDir . (Id == "layers" ? "" : _AhkSubDir) . Names[Id]
+}
+
+; Reads the configuration files in the order they apply and reports each state:
+; ok, missing, unreadable (a folder, a lock, a bad encoding) or invalid (the
+; config.toml that does not parse). Nothing is cached or written.
+; @param Ids {Array} File ids, defaults first.
+; @param PathOf {Func} Maps an id to its path.
+; @returns {Map} items (rows {id, state}) and document (typed config.toml or 0).
+HealthCheck_ConfigurationFiles(Ids, PathOf) {
+	Items := [], Document := 0
+	for Id in Ids {
+		State := "ok"
+		if Id != "defaults" {
+			Path := PathOf.Call(Id)
+			Attributes := FileExist(Path)
+			if Attributes == "" {
+				State := "missing"
+			} else if InStr(Attributes, "D") {
+				State := "unreadable"
+			} else {
+				try {
+					Content := FileRead(Path, "UTF-8")
+				} catch {
+					Content := false
+					State := "unreadable"
+				}
+				if Content is String && Id == "config" {
+					try {
+						Document := TOML_ParseDocument(Content)
+					} catch {
+						State := "invalid"
+					}
+				}
+			}
+		}
+		Items.Push(Map("id", Id, "state", State))
+	}
+	return Map("items", Items, "document", Document)
+}
+
+; Collects both configuration sections of the snapshot.
+; @param Schema {Map} The diagnostics schema.
+; @param PathOf {Func} Maps a file id to its path.
+; @returns {Map} files and settings, each a Map with its items.
+HealthCheck_CollectConfiguration(Schema, PathOf := _HCConfig_PathOf) {
+	global FEATURES_MANIFEST
+	Spec := Schema["configuration"]
+	Read := HealthCheck_ConfigurationFiles(Spec["files"]["windows"], PathOf)
+	Rows := Read["document"] is Map
+		? HealthCheck_ConfigurationRows(FEATURES_MANIFEST["features"], Read["document"], "windows", Spec["max_rows"])
+		: []
+	return Map("files", Map("items", Read["items"]), "settings", Map("items", Rows))
 }

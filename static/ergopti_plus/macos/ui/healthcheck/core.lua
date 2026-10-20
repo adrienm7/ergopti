@@ -717,6 +717,7 @@ function M.run(opts)
 		return value
 	end
 
+	local configuration = section("configuration", function() return H.collect_configuration(schema) end)
 	local sections = {
 		paths       = section("paths", function() return H.collect_paths(schema.report.subdir) end),
 		versions    = section("versions", H.collect_versions),
@@ -724,6 +725,8 @@ function M.run(opts)
 		system      = section("system", function() return H.collect_system(detailed, os.time() - _load_time) end),
 		input       = section("input", H.collect_input),
 		features    = section("features", function() return H.collect_features(_menu_state) end),
+		configuration_files = configuration.files or { items = {} },
+		configuration = configuration.settings or { items = {} },
 		unavailable = section("platform_coverage", H.collect_unavailable),
 		ai          = section("ai", H.collect_ai),
 		network     = section("network", H.collect_network),

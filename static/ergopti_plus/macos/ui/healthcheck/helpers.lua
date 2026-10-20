@@ -306,6 +306,20 @@ function H.collect_features(state)
 	return { items = items }
 end
 
+--- The configuration files and the reduced settings of the user's config.toml:
+--- booleans, numbers and manifest enum values exact, any other string only its
+--- length, any list only its item count.
+--- @param schema table The diagnostics schema.
+--- @return table { files = { items }, settings = { items } }
+function H.collect_configuration(schema)
+	local names = schema.configuration.file_names
+	local ConfigPaths = require("infra.config_paths")
+	return require("healthcheck.configuration").collect(schema, "macos",
+		require("infra.manifest_reader").features(),
+		function(id) return ConfigPaths.config(names[id]) end,
+		require("toml_codec").decode)
+end
+
 --- The network facts phase A can read: the Wi-Fi signal only. The network's
 --- name identifies a place, and a hash of it is reversed with a list of common
 --- names (no-network-identity); GitHub's reachability is a probe.

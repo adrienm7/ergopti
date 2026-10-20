@@ -387,6 +387,20 @@ local function collect_permissions(ids)
 	return { items = items }
 end
 
+--- The configuration files and the reduced settings of the user's config.toml:
+--- booleans, numbers and manifest enum values exact, any other string only its
+--- length, any list only its item count.
+--- @param schema table The diagnostics schema.
+--- @return table { files = { items }, settings = { items } }
+local function collect_configuration(schema)
+	local names = schema.configuration.file_names
+	local config_paths = require("infra.config_paths")
+	return require("healthcheck.configuration").collect(schema, M.DRIVER,
+		require("infra.manifest_reader").features(),
+		function(id) return config_paths.config(names[id]) end,
+		require("toml_codec").decode)
+end
+
 --- The keyboards, mice and touchpads the kernel lists: bus, kind and ids, and
 --- their names only when the user ticked "Include details". Virtual devices,
 --- including the daemon's own output keyboard, are left out.
@@ -500,6 +514,7 @@ function M.build_snapshot(state, detailed, extensive)
 	local permission_ids = {}
 	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
 	table.sort(permission_ids)
+	local configuration = collect("configuration", function() return collect_configuration(schema) end)
 	local sections = {
 		paths       = collect("paths", function() return collect_paths(schema) end),
 		versions    = collect("versions", function() return collect_versions(facts) end),
@@ -507,6 +522,8 @@ function M.build_snapshot(state, detailed, extensive)
 		system      = collect("system", function() return collect_system(facts, state) end),
 		input       = collect("input", function() return collect_input(state) end),
 		features    = collect("features", function() return collect_features(state) end),
+		configuration_files = configuration.files or { items = {} },
+		configuration = configuration.settings or { items = {} },
 		ai          = collect("ai", function() return collect_ai(state) end),
 		network     = {},
 		permissions = collect("permissions", function() return collect_permissions(permission_ids) end),
