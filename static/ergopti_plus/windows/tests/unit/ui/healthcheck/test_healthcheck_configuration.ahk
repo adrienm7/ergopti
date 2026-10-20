@@ -316,8 +316,10 @@ Test("diagnostics configuration: the local probe answers alone on a timer and ho
 ; repair the malformed byte that the diagnostic reader must refuse.
 _HCCfgT_EncodedBytes(Text, Encoding) {
 	Wide := Encoding == "utf16"
-	Encoded := Buffer(StrPut(Text, Wide ? "UTF-16" : "UTF-8") * (Wide ? 2 : 1), 0)
-	StrPut(Text, Encoded, Wide ? "UTF-16" : "UTF-8")
+	; StrPut's measurement and result are bytes for both encodings.
+	Encoded := Buffer(StrPut(Text, Wide ? "UTF-16" : "UTF-8"), 0)
+	AssertEqual(Encoded.Size, StrPut(Text, Encoded, Wide ? "UTF-16" : "UTF-8"),
+		"the fixture copies exactly its measured image, including one terminator")
 	Prefix := Wide ? 2 : (Encoding == "bom" ? 3 : 0)
 	Length := Encoded.Size - (Wide ? 2 : 1)
 	Bytes := Buffer(Prefix + Length, 0)
@@ -411,6 +413,9 @@ _HCCfgT_SeparateFileEncoding() {
 	Root := _HCCfgT_Fixture('[script]`nlog_level = "DEBUG"`n')
 	Text := '[tap_hold]`ninherit_defaults = false`n'
 	Bytes := _HCCfgT_EncodedBytes(Text, "utf16")
+	AssertEqual(2 + StrLen(Text) * 2, Bytes.Size, "the UTF-16 source owns only its BOM and text, without a NUL tail")
+	AssertEqual(0xFEFF, NumGet(Bytes, 0, "UShort"))
+	AssertEqual(0x000A, NumGet(Bytes, Bytes.Size - 2, "UShort"), "the fixture ends at its actual newline")
 	try {
 		DirDelete(Root . "\tap_hold.toml")
 		for Id in ["layers", "tap_hold"] {
