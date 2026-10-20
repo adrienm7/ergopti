@@ -98,6 +98,19 @@ class PACSourcePeerTests(unittest.TestCase):
         with self.assertRaises(ssl.SSLCertVerificationError):
             self.request("utf8", tls=True, host="localhost", context=context)
 
+    def test_stalled_handshake_never_delays_the_next_tls_request(self):
+        context = ssl.create_default_context(cafile=str(self.fixture.root / "ca.pem"))
+        stalled = socket.create_connection(
+            ("127.0.0.1", self.fixture.https.server_port), timeout=3
+        )
+        self.addCleanup(stalled.close)
+        started = time.monotonic()
+        body = self.request("utf8", tls=True, context=context).read()
+        elapsed = time.monotonic() - started
+        self.assertEqual(body, PEERS.SCRIPT.encode())
+        # The accept loop used to wait out the stalled client's 2 s timeout.
+        self.assertLess(elapsed, 1.0)
+
     def test_truncated_body_is_not_successful_eof(self):
         with self.assertRaises(http.client.IncompleteRead):
             self.request("truncated").read()
@@ -414,5 +427,5 @@ class PACSourcePeerTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    print("Planned cases: 14", flush=True)
+    print("Planned cases: 15", flush=True)
     unittest.main()

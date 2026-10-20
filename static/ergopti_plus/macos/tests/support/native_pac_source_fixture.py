@@ -199,7 +199,6 @@ class SourceFixture:
                     with owner.lock:
                         owner.connections.discard(raw)
                         owner.connections.add(connection)
-                    connection.do_handshake()
                     return connection, address
                 except BaseException:
                     if "connection" in locals():
@@ -207,6 +206,15 @@ class SourceFixture:
                     else:
                         self.close_request(raw)
                     raise
+
+            def finish_request(self, request, client_address):
+                # The handshake runs in this request's own thread. In
+                # get_request it held the accept loop, so one client stalled
+                # mid-handshake kept every later connection waiting for its
+                # two-second timeout. A refusal reaches handle_error, then
+                # shutdown_request closes the connection.
+                request.do_handshake()
+                super().finish_request(request, client_address)
 
         class Handler(http.server.BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"

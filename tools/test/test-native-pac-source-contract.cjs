@@ -709,8 +709,8 @@ if (process.platform !== 'win32') {
 	assert.equal(result.error, undefined);
 	assert.equal(result.signal, null);
 	assert.equal(result.status, 0, result.stderr || result.stdout);
-	assert.ok(result.stdout.includes('Planned cases: 14'));
-	assert.match(result.stderr, /Ran 14 tests in/);
+	assert.ok(result.stdout.includes('Planned cases: 15'));
+	assert.match(result.stderr, /Ran 15 tests in/);
 	assert.match(result.stderr, /\bOK\b/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 	process.stdout.write(result.stdout + result.stderr);
