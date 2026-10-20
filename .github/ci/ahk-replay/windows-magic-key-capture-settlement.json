@@ -1,0 +1,4 @@
+{
+	"expected_count": 14,
+	"filters": [{ "contains": "magic-key-capture-settlement", "expected_count": 14 }]
+}
