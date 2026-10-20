@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "This Windows collector is unavailable on macOS and Linux.",
 	"healthcheck.collection.guide": "Type the synthetic text below. Separately hold and release Ctrl, then Shift, while the text field is focused.",
 	"healthcheck.collection.visual": "I can clearly read the synthetic text.",
-	"healthcheck.collection.failed": "Collection failed. Review the local folder for incomplete operations."
+	"healthcheck.collection.failed": "Collection failed. Review the local folder for incomplete operations.",
+	"menu.caps_word.auto_off": "CapsWord: automatic deactivation",
+	"menu.caps_word.idle_timeout": "Deactivate after a pause",
+	"menu.caps_word.idle_timeout_never": "Never (infinite)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Deactivate on these delimiters",
+	"menu.caps_word.pointer_header": "Deactivate when the pointer is used",
+	"menu.caps_word.pointer.gesture": "Trackpad gesture or touch",
+	"menu.caps_word.pointer.pointer_motion": "Pointer movement or scrolling",
+	"menu.caps_word.pointer.left_click": "Left click",
+	"menu.caps_word.pointer.right_click": "Right click",
+	"menu.caps_word.pointer.middle_click": "Middle click",
+	"menu.caps_word.pointer.other_buttons": "Other mouse buttons",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Not on Windows: the system keeps touchpad gestures to itself and passes no touch on to Ergopti. Two-finger scrolling still counts as scrolling."
 }

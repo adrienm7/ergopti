@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Deze Windows-collector is niet beschikbaar op macOS en Linux.",
 	"healthcheck.collection.guide": "Typ de onderstaande testtekst. Houd Ctrl ingedrukt en laat los, daarna Shift afzonderlijk, met het tekstveld actief.",
 	"healthcheck.collection.visual": "Ik kan de testtekst duidelijk lezen.",
-	"healthcheck.collection.failed": "Het verzamelen is mislukt. Bekijk de lokale map voor onvoltooide bewerkingen."
+	"healthcheck.collection.failed": "Het verzamelen is mislukt. Bekijk de lokale map voor onvoltooide bewerkingen.",
+	"menu.caps_word.auto_off": "CapsWord: automatisch uitschakelen",
+	"menu.caps_word.idle_timeout": "Uitschakelen na een pauze",
+	"menu.caps_word.idle_timeout_never": "Nooit (oneindig)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Uitschakelen bij deze scheidingstekens",
+	"menu.caps_word.pointer_header": "Uitschakelen bij gebruik van de aanwijzer",
+	"menu.caps_word.pointer.gesture": "Trackpadgebaar of aanraking",
+	"menu.caps_word.pointer.pointer_motion": "Aanwijzerbeweging of scrollen",
+	"menu.caps_word.pointer.left_click": "Linkermuisklik",
+	"menu.caps_word.pointer.right_click": "Rechtermuisklik",
+	"menu.caps_word.pointer.middle_click": "Middelste muisklik",
+	"menu.caps_word.pointer.other_buttons": "Andere muisknoppen",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Niet op Windows: het systeem houdt touchpadgebaren voor zichzelf en geeft geen aanraking door aan Ergopti. Scrollen met twee vingers telt nog steeds als scrollen."
 }

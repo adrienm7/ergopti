@@ -610,6 +610,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-c-ahk-scan-code-precedence.cjs"],
 			"repro": "node tools/test/test-hardening-c-ahk-scan-code-precedence.cjs"
+		},
+		{
+			"id": "js-0447",
+			"ordinal": 447,
+			"name": "CapsWord auto-off settings are one declaration: delay presets, delimiter catalogue and pointer kinds",
+			"cmd": "node",
+			"args": ["tools/test/test-caps-word-auto-off-single-source.cjs"],
+			"repro": "npm run test:caps-word-auto-off-single-source"
 		}
 	]
 }

@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Este recopilador de Windows no está disponible en macOS y Linux.",
 	"healthcheck.collection.guide": "Escriba el texto de prueba de abajo. Mantenga y suelte Ctrl y luego Shift por separado, con el campo de texto activo.",
 	"healthcheck.collection.visual": "Puedo leer claramente el texto de prueba.",
-	"healthcheck.collection.failed": "La recopilación falló. Revise la carpeta local para ver las operaciones incompletas."
+	"healthcheck.collection.failed": "La recopilación falló. Revise la carpeta local para ver las operaciones incompletas.",
+	"menu.caps_word.auto_off": "CapsWord: desactivación automática",
+	"menu.caps_word.idle_timeout": "Desactivar tras una pausa",
+	"menu.caps_word.idle_timeout_never": "Nunca (infinito)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Desactivar con estos delimitadores",
+	"menu.caps_word.pointer_header": "Desactivar al usar el puntero",
+	"menu.caps_word.pointer.gesture": "Gesto o toque en el trackpad",
+	"menu.caps_word.pointer.pointer_motion": "Movimiento del puntero o desplazamiento",
+	"menu.caps_word.pointer.left_click": "Clic izquierdo",
+	"menu.caps_word.pointer.right_click": "Clic derecho",
+	"menu.caps_word.pointer.middle_click": "Clic central",
+	"menu.caps_word.pointer.other_buttons": "Otros botones del ratón",
+	"platform_reason.caps_word_gestures_stay_with_windows": "No en Windows: el sistema se reserva los gestos del panel táctil y no transmite ningún toque a Ergopti. El desplazamiento con dos dedos sigue contando como desplazamiento."
 }

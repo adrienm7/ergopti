@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Dieser Windows-Kollektor ist unter macOS und Linux nicht verfügbar.",
 	"healthcheck.collection.guide": "Tippen Sie den folgenden Testtext. Halten und lösen Sie Ctrl und danach Shift einzeln, während das Textfeld aktiv ist.",
 	"healthcheck.collection.visual": "Ich kann den Testtext klar lesen.",
-	"healthcheck.collection.failed": "Die Sammlung ist fehlgeschlagen. Prüfen Sie den lokalen Ordner auf unvollständige Vorgänge."
+	"healthcheck.collection.failed": "Die Sammlung ist fehlgeschlagen. Prüfen Sie den lokalen Ordner auf unvollständige Vorgänge.",
+	"menu.caps_word.auto_off": "CapsWord: automatische Deaktivierung",
+	"menu.caps_word.idle_timeout": "Nach einer Pause deaktivieren",
+	"menu.caps_word.idle_timeout_never": "Nie (unbegrenzt)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Bei diesen Trennzeichen deaktivieren",
+	"menu.caps_word.pointer_header": "Bei Verwendung des Zeigers deaktivieren",
+	"menu.caps_word.pointer.gesture": "Trackpad-Geste oder Berührung",
+	"menu.caps_word.pointer.pointer_motion": "Zeigerbewegung oder Scrollen",
+	"menu.caps_word.pointer.left_click": "Linksklick",
+	"menu.caps_word.pointer.right_click": "Rechtsklick",
+	"menu.caps_word.pointer.middle_click": "Mittelklick",
+	"menu.caps_word.pointer.other_buttons": "Andere Maustasten",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Nicht unter Windows: Das System behält Touchpad-Gesten für sich und gibt keine Berührung an Ergopti weiter. Scrollen mit zwei Fingern zählt weiterhin als Scrollen."
 }

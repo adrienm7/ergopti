@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "この Windows 収集機能は macOS と Linux では使用できません。",
 	"healthcheck.collection.guide": "下のテスト用テキストを入力してください。テキスト欄にフォーカスした状態で Ctrl を押して離し、次に Shift を押して離してください。",
 	"healthcheck.collection.visual": "テスト用テキストをはっきり読めます。",
-	"healthcheck.collection.failed": "収集に失敗しました。未完了の操作についてローカルフォルダーを確認してください。"
+	"healthcheck.collection.failed": "収集に失敗しました。未完了の操作についてローカルフォルダーを確認してください。",
+	"menu.caps_word.auto_off": "CapsWord：自動オフ",
+	"menu.caps_word.idle_timeout": "一時停止後にオフにする",
+	"menu.caps_word.idle_timeout_never": "しない（無制限）",
+	"menu.caps_word.idle_timeout_unit": "秒",
+	"menu.caps_word.terminators_header": "これらの区切り文字でオフにする",
+	"menu.caps_word.pointer_header": "ポインター操作でオフにする",
+	"menu.caps_word.pointer.gesture": "トラックパッドのジェスチャーまたはタッチ",
+	"menu.caps_word.pointer.pointer_motion": "ポインターの移動またはスクロール",
+	"menu.caps_word.pointer.left_click": "左クリック",
+	"menu.caps_word.pointer.right_click": "右クリック",
+	"menu.caps_word.pointer.middle_click": "中クリック",
+	"menu.caps_word.pointer.other_buttons": "その他のマウスボタン",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Windows では非対応：システムがタッチパッドのジェスチャーを自ら処理し、Ergopti にタッチを渡しません。2 本指スクロールは引き続きスクロールとして扱われます。"
 }

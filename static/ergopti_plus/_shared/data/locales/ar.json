@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "جامع تشخيص Windows غير متاح على macOS وLinux.",
 	"healthcheck.collection.guide": "اكتب النص التجريبي أدناه. اضغط Ctrl ثم حرره، ثم اضغط Shift وحرره بشكل منفصل، مع التركيز على حقل النص.",
 	"healthcheck.collection.visual": "يمكنني قراءة النص التجريبي بوضوح.",
-	"healthcheck.collection.failed": "فشل الجمع. راجع المجلد المحلي للتحقق من العمليات غير المكتملة."
+	"healthcheck.collection.failed": "فشل الجمع. راجع المجلد المحلي للتحقق من العمليات غير المكتملة.",
+	"menu.caps_word.auto_off": "CapsWord: إيقاف تلقائي",
+	"menu.caps_word.idle_timeout": "إيقاف بعد توقف",
+	"menu.caps_word.idle_timeout_never": "أبدًا (بلا حد)",
+	"menu.caps_word.idle_timeout_unit": "ث",
+	"menu.caps_word.terminators_header": "إيقاف عند هذه الفواصل",
+	"menu.caps_word.pointer_header": "إيقاف عند استخدام المؤشر",
+	"menu.caps_word.pointer.gesture": "إيماءة أو لمسة على لوحة اللمس",
+	"menu.caps_word.pointer.pointer_motion": "تحريك المؤشر أو التمرير",
+	"menu.caps_word.pointer.left_click": "النقر الأيسر",
+	"menu.caps_word.pointer.right_click": "النقر الأيمن",
+	"menu.caps_word.pointer.middle_click": "النقر الأوسط",
+	"menu.caps_word.pointer.other_buttons": "أزرار الفأرة الأخرى",
+	"platform_reason.caps_word_gestures_stay_with_windows": "ليس على Windows: يحتفظ النظام بإيماءات لوحة اللمس لنفسه ولا يمرر أي لمسة إلى Ergopti. يظل التمرير بإصبعين محسوبًا تمريرًا."
 }

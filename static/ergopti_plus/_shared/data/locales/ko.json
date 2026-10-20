@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "이 Windows 수집기는 macOS 및 Linux에서 사용할 수 없습니다.",
 	"healthcheck.collection.guide": "아래 시험 텍스트를 입력하세요. 텍스트 필드에 초점을 두고 Ctrl을 눌렀다 놓은 다음 Shift를 따로 눌렀다 놓으세요.",
 	"healthcheck.collection.visual": "시험 텍스트를 선명하게 읽을 수 있습니다.",
-	"healthcheck.collection.failed": "수집에 실패했습니다. 완료되지 않은 작업은 로컬 폴더에서 확인하세요."
+	"healthcheck.collection.failed": "수집에 실패했습니다. 완료되지 않은 작업은 로컬 폴더에서 확인하세요.",
+	"menu.caps_word.auto_off": "CapsWord: 자동 해제",
+	"menu.caps_word.idle_timeout": "일시 정지 후 해제",
+	"menu.caps_word.idle_timeout_never": "안 함(무제한)",
+	"menu.caps_word.idle_timeout_unit": "초",
+	"menu.caps_word.terminators_header": "다음 구분 문자에서 해제",
+	"menu.caps_word.pointer_header": "포인터를 사용하면 해제",
+	"menu.caps_word.pointer.gesture": "트랙패드 제스처 또는 터치",
+	"menu.caps_word.pointer.pointer_motion": "포인터 이동 또는 스크롤",
+	"menu.caps_word.pointer.left_click": "왼쪽 클릭",
+	"menu.caps_word.pointer.right_click": "오른쪽 클릭",
+	"menu.caps_word.pointer.middle_click": "가운데 클릭",
+	"menu.caps_word.pointer.other_buttons": "기타 마우스 버튼",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Windows 제외: 시스템이 터치패드 제스처를 직접 처리하고 Ergopti에 터치를 전달하지 않습니다. 두 손가락 스크롤은 여전히 스크롤로 간주됩니다."
 }

@@ -42,13 +42,15 @@ M.sections = {
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols" } },
+	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "caps_word", "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols" } },
 	["shortcuts.key_combination_taps"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, subsections = {  } },
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.personal"] = { description_key = "menu.shortcuts.personal", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts.wrap_symbols"] = { description_key = "menu.shortcuts.wrap_symbols", platforms = { "hs" }, subsections = {  } },
 	["shortcuts.tap_keys"] = { description_key = "menu.shortcuts.header_tap_keys", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
+	["shortcuts.caps_word"] = { description_key = "menu.caps_word.auto_off", platforms = { "ahk", "hs", "linux" }, subsections = { "pointer" } },
+	["shortcuts.caps_word.pointer"] = { description_key = "menu.caps_word.pointer_header", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs" }, subsections = {  } },
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
@@ -466,6 +468,30 @@ M.features = {
 	},
 	{
 		path = "shortcuts.tap_keys.number_row_right_2", id = "number_row_right_2", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_right_2", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+	},
+	{
+		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 0, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.terminators", id = "terminators", section = "shortcuts.caps_word", default = { "space", "tab", "enter" }, type = "array", description_key = "menu.caps_word.terminators_header", platforms = { "ahk", "hs", "linux" }, recommended = { "space", "tab", "enter" }, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.pointer.gesture", id = "gesture", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.gesture", platforms = { "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.pointer.pointer_motion", id = "pointer_motion", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.pointer_motion", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.pointer.left_click", id = "left_click", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.left_click", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.pointer.right_click", id = "right_click", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.right_click", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.pointer.middle_click", id = "middle_click", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.middle_click", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "shortcuts.caps_word.pointer.other_buttons", id = "other_buttons", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.other_buttons", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
 	},
 	{
 		path = "gestures.enabled", id = "enabled", section = "gestures", default = false, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,

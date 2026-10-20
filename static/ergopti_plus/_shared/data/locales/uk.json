@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Цей збирач Windows недоступний у macOS і Linux.",
 	"healthcheck.collection.guide": "Введіть тестовий текст нижче. В активному текстовому полі окремо утримайте й відпустіть Ctrl, а потім Shift.",
 	"healthcheck.collection.visual": "Я можу чітко прочитати тестовий текст.",
-	"healthcheck.collection.failed": "Збір завершився помилкою. Перевірте незавершені операції в локальній папці."
+	"healthcheck.collection.failed": "Збір завершився помилкою. Перевірте незавершені операції в локальній папці.",
+	"menu.caps_word.auto_off": "CapsWord: автоматичне вимкнення",
+	"menu.caps_word.idle_timeout": "Вимикати після паузи",
+	"menu.caps_word.idle_timeout_never": "Ніколи (без обмеження)",
+	"menu.caps_word.idle_timeout_unit": "с",
+	"menu.caps_word.terminators_header": "Вимикати на цих роздільниках",
+	"menu.caps_word.pointer_header": "Вимикати під час використання вказівника",
+	"menu.caps_word.pointer.gesture": "Жест або дотик до тачпада",
+	"menu.caps_word.pointer.pointer_motion": "Рух вказівника або прокручування",
+	"menu.caps_word.pointer.left_click": "Лівий клік",
+	"menu.caps_word.pointer.right_click": "Правий клік",
+	"menu.caps_word.pointer.middle_click": "Середній клік",
+	"menu.caps_word.pointer.other_buttons": "Інші кнопки миші",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Не в Windows: система залишає жести тачпада собі й не передає Ergopti жодного дотику. Прокручування двома пальцями й далі вважається прокручуванням."
 }

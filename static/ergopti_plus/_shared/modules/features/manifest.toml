@@ -221,7 +221,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols"]
+subsections = ["caps_word", "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols"]
 
 [sections.category_enabled]
 description_key = "menu.category_enabled"
@@ -266,6 +266,15 @@ platforms = ["hs"]
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
+platforms = ["ahk", "hs", "linux"]
+
+[sections.shortcuts.caps_word]
+description_key = "menu.caps_word.auto_off"
+platforms = ["ahk", "hs", "linux"]
+subsections = ["pointer"]
+
+[sections.shortcuts.caps_word.pointer]
+description_key = "menu.caps_word.pointer_header"
 platforms = ["ahk", "hs", "linux"]
 
 # ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
@@ -2417,6 +2426,113 @@ recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.tap_keys.number_row_right_2"
+
+
+
+# ======================================
+# ===== 3.5.10 shortcuts.caps_word =====
+# ======================================
+
+# What ends CapsWord on its own, the same settings on every driver; the policy
+# is _shared/lua/caps_word/auto_off.lua and its AHK port, both replaying
+# _shared/tests/corpus/caps_word/auto_off_vectors.json. These are parameters
+# of CapsWord, which only the user switches on, so none alters input by itself.
+#
+# Seconds without a keystroke after which CapsWord switches itself off. 0 is
+# « never », what every driver did before the setting existed, and stays the
+# default. The menu offers exactly `preset_values`; the drivers read the
+# stored number.
+[[features.shortcuts.caps_word]]
+id = "idle_timeout_seconds"
+platforms = ["ahk", "hs", "linux"]
+default = 0
+recommended = 0
+input_altering = false
+type = "number"
+preset_values = [0, 1, 3, 5, 10, 30, 60]
+description_key = "menu.caps_word.idle_timeout"
+
+# The word delimiters that end CapsWord, by their key in the hotstring
+# delimiter catalogue (_shared/core/domain/Terminators.spec.js), one checkbox
+# per entry in every driver's menu. Only the catalogue's built-in
+# entries are valid. Space and Enter ended CapsWord on every driver, Tab on
+# macOS and Linux; the three are the default on all of them. Each driver
+# matches the character typed, so a no-break space ends CapsWord only when its
+# own entry is checked.
+[[features.shortcuts.caps_word]]
+id = "terminators"
+platforms = ["ahk", "hs", "linux"]
+default = ["space", "tab", "enter"]
+recommended = ["space", "tab", "enter"]
+input_altering = false
+type = "array"
+description_key = "menu.caps_word.terminators_header"
+
+
+
+# ==============================================
+# ===== 3.5.11 shortcuts.caps_word.pointer =====
+# ==============================================
+
+# The pointer actions that end CapsWord: the hand has left the keyboard. One
+# entry per kind; this section is the list every driver maps its native events
+# to. All are on by default: macOS ended CapsWord on any of them, Windows on a
+# left or a right click. Windows never sees a touchpad gesture (the system
+# keeps it and sends at most the scrolling it produces), hence the platforms.
+[[features.shortcuts.caps_word.pointer]]
+id = "gesture"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.caps_word_gestures_stay_with_windows"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.gesture"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "pointer_motion"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.pointer_motion"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "left_click"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.left_click"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "right_click"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.right_click"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "middle_click"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.middle_click"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "other_buttons"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.other_buttons"
 
 
 

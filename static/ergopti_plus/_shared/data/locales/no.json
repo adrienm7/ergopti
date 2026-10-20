@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Denne Windows-innsamleren er ikke tilgjengelig på macOS og Linux.",
 	"healthcheck.collection.guide": "Skriv testteksten nedenfor. Hold og slipp Ctrl og deretter Shift hver for seg mens tekstfeltet har fokus.",
 	"healthcheck.collection.visual": "Jeg kan tydelig lese testteksten.",
-	"healthcheck.collection.failed": "Innsamlingen mislyktes. Se den lokale mappen for ufullførte handlinger."
+	"healthcheck.collection.failed": "Innsamlingen mislyktes. Se den lokale mappen for ufullførte handlinger.",
+	"menu.caps_word.auto_off": "CapsWord: automatisk deaktivering",
+	"menu.caps_word.idle_timeout": "Deaktiver etter en pause",
+	"menu.caps_word.idle_timeout_never": "Aldri (uendelig)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Deaktiver ved disse skilletegnene",
+	"menu.caps_word.pointer_header": "Deaktiver når pekeren brukes",
+	"menu.caps_word.pointer.gesture": "Bevegelse eller berøring på styreflaten",
+	"menu.caps_word.pointer.pointer_motion": "Pekerbevegelse eller rulling",
+	"menu.caps_word.pointer.left_click": "Venstreklikk",
+	"menu.caps_word.pointer.right_click": "Høyreklikk",
+	"menu.caps_word.pointer.middle_click": "Midtklikk",
+	"menu.caps_word.pointer.other_buttons": "Andre museknapper",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Ikke på Windows: systemet beholder styreflatebevegelsene selv og sender ingen berøring videre til Ergopti. Rulling med to fingre teller fortsatt som rulling."
 }
