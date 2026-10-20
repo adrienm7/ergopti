@@ -87,6 +87,8 @@ const CHORD_CONFIGS = {
 // hotstrings are on too: their owner was counted by the first render before its
 // module had initialised, and the boot died before ready.
 const REALISTIC_HOTSTRINGS_FIXTURE = 'realistic-hotstrings';
+// The paused boot keeps the AI on: its deferred AI hotkeys are the resume proof.
+const SUSPEND_MARKER_CONFIG = '[llm]\nenabled = true\n';
 const HOTSTRINGS_RENDER_BUDGET_MS = 2000;
 const REALISTIC_HOTSTRINGS_CONFIG =
 	'[category_enabled]\nhotstrings = true\n[hotstrings.dynamic.user_code]\nenabled = true\n';
@@ -108,6 +110,25 @@ function realisticPersonalHotstrings(file) {
 			toml += `"p${file}${section.slice(0, 3)}${entry}" = { output = "Personal output ${file} ${section} ${entry}", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }\n`;
 	}
 	return toml;
+}
+
+/**
+ * Whether a paused AI-on boot deferred its AI hotkeys and the resume activated
+ * them; without both lines the resume check in the driver proved nothing.
+ * @param {string} configRoot Exclusive startup fixture directory.
+ * @returns {string} The missing evidence, or '' when both lines were logged.
+ */
+function aiHotkeyResumeProblem(configRoot) {
+	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	let text = '';
+	if (fs.existsSync(logs))
+		for (const name of fs.readdirSync(logs))
+			if (/^ErgoptiPlus_\d/.test(name)) text += fs.readFileSync(path.join(logs, name), 'utf8');
+	if (!text.includes('AI hotkeys deferred to the resume: the driver is paused.'))
+		return 'the paused AI-on boot did not defer its AI hotkeys';
+	if (!text.includes('AI hotkeys deferred by the pause are active.'))
+		return 'the resume did not activate the AI hotkeys its pause deferred';
+	return '';
 }
 
 /**
@@ -551,6 +572,14 @@ async function main() {
 						realisticPersonalHotstrings(file)
 					);
 			}
+			if (fixture === 'suspend-marker') {
+				// ai-disabled-runtime-inert-2026-10-20 (#97): a boot with the AI off
+				// binds no AI hotkey, so only an AI-on paused boot still proves that
+				// the hotkeys its pause deferred are activated on resume.
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				fs.mkdirSync(config, { recursive: true });
+				fs.writeFileSync(path.join(config, 'config.toml'), SUSPEND_MARKER_CONFIG);
+			}
 			if (SEEDED_CONFIGS[fixture]) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
@@ -631,6 +660,10 @@ async function main() {
 			if (fixture === 'retired-metrics-config') {
 				const retiredMetrics = retiredMetricsProblem(configRoot);
 				if (retiredMetrics) return fail(fixture + ': ' + retiredMetrics);
+			}
+			if (markerBearing) {
+				const deferred = aiHotkeyResumeProblem(configRoot);
+				if (deferred) return fail(`${fixture}: ${deferred}`);
 			}
 			if (!fs.existsSync(path.join(configRoot, 'startup-pump.txt')))
 				return fail(
