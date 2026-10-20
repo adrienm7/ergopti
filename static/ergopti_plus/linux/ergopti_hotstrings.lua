@@ -1810,6 +1810,20 @@ local function main()
 		shortcuts.caps_word_observe_pointer(kind)
 	end
 
+	-- Text the daemon types itself (an expansion, the magic key's result, a
+	-- send_text, a consumed key typed in its place) never reaches on_char: the
+	-- injector reports it, and a checked delimiter in it ends CapsWord as if it
+	-- had been typed. This daemon is the observer's one owner; a restarted
+	-- session replaces the previous session's observer.
+	injector.set_output_observer(nil)
+	if not injector.set_output_observer(function(text)
+		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
+			shortcuts.caps_word_observe_text(text)
+		end
+	end) then
+		Logger.error(LOG, "CapsWord cannot observe the text the daemon types; injected delimiters will not end it.")
+	end
+
 	-- 8.7b) Restore the word-delimiter choices.
 	--
 	-- The shared catalogue keeps them in memory only, so without this every

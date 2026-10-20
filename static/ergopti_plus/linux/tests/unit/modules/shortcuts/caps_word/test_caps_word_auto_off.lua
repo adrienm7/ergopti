@@ -358,6 +358,34 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		helpers.assert_true(observe ~= nil and tab ~= nil and observe < tab, "the delimiter check precedes the Tab return")
 	end)
 
+	helpers.it("caps word auto-off, every typed character reaches the delimiter check, whatever produced it", function()
+		-- Layout keys, number-row levels and dead-key results are resolved by the
+		-- hook and handed to the character callback; tap-hold and layer outputs
+		-- are dispatched again through the same path; injected text is reported
+		-- by the injector (test_injector_output_observer).
+		local hook = source("adapters/keyboard_hook.lua")
+		helpers.assert_contains(hook, '_call_callback("character callback", _on_char, char, ev.code)')
+		helpers.assert_contains(hook, '_call_callback("text-control callback", _on_char, text_char, ev.code)')
+		helpers.assert_contains(hook, "else _dispatch_event(emitted_event, emitted_source) end")
+		local daemon = source("ergopti_hotstrings.lua")
+		helpers.assert_contains(daemon, "onChar  = on_char,")
+		helpers.assert_contains(daemon, "injector.set_output_observer(function(text)")
+	end)
+
+	helpers.it("caps word auto-off, a delimiter in the daemon's own output ends CapsWord", function()
+		with_caps_word(nil, function(c)
+			local observed = assert(source("ergopti_hotstrings.lua"):match(
+				"injector%.set_output_observer%(function%(text%)(.-)\n\tend%) then"), "the daemon's output observer is missing")
+			local observer = assert((loadstring or load)(
+				"return function(shortcuts) return function(text) " .. observed .. " end end"))()(c.manager)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			observer("BONJOUR")
+			helpers.assert_true(c.manager.is_caps_word_active(), "letters keep CapsWord")
+			observer("c'est-à-dire,")
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "an expansion ending in a comma ends CapsWord")
+		end)
+	end)
+
 	helpers.it("caps word auto-off, the hook hands every pointer press and EV_REL report to the callback", function()
 		local hook = source("adapters/keyboard_hook.lua")
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code)')
