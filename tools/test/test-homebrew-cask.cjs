@@ -763,7 +763,7 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 	}
 	const order = pipeline.steps(job).map((step) => step.name);
 	assert.ok(order.indexOf(setupName) < order.indexOf(admissionName));
-	assert.ok(order.indexOf(admissionName) < order.indexOf('Run Swift launcher tests'));
+	assert.ok(order.indexOf(admissionName) < order.indexOf('Run Swift launcher tests on macOS 26'));
 	const lines = pipeline.runOf(admission);
 	assert.equal(lines[0], "python3 - <<'PY'");
 	assert.equal(lines.at(-1), 'PY');
@@ -802,7 +802,7 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 check('archive artifacts bind only this step session independently of TIS', () => {
 	const pipeline = require('./ci-full-default.cjs');
 	const job = pipeline.job('package-macos');
-	const step = pipeline.step(job, 'Run Swift launcher tests');
+	const step = pipeline.step(job, 'Run Swift launcher tests on macOS 26');
 	const lines = pipeline.runOf(step).join('\n');
 	assert.match(
 		lines,

@@ -4620,8 +4620,8 @@ for (const [what, rel, from, to] of [
 	[
 		'if: false on the Swift XCTest step',
 		MACOS_BOX,
-		'      - name: Run Swift launcher tests\n',
-		'      - name: Run Swift launcher tests\n        if: false\n'
+		'      - name: Run Swift launcher tests on macOS 26\n',
+		'      - name: Run Swift launcher tests on macOS 26\n        if: false\n'
 	],
 	[
 		'a `- if: false` step head on the Hammerspoon suite',
@@ -4954,7 +4954,8 @@ function namingProblems(files) {
 								'e2e-hs': 'E2E tests',
 								'e2e-ahk': 'E2E tests',
 								'e2e-linux': 'E2E tests',
-								'package-macos': 'Build',
+								// The macOS Build states the macOS version it runs on.
+								'package-macos': 'Build (macOS 26)',
 								'package-windows': 'Build',
 								'package-linux': 'Build',
 								'package-flatpak': 'Flatpak',
@@ -4973,7 +4974,8 @@ function namingProblems(files) {
 				}
 				if (
 					entry.rel !== ENTRY &&
-					/\b(?:macOS|Linux|Windows(?! Defender))\b/.test(found.name) &&
+					// A macOS version ("macOS 26") states the cell's OS release, not the lane zone.
+					/\b(?:macOS(?! \d)|Linux|Windows(?! Defender))\b/.test(found.name) &&
 					!isRetainedQualification(entry, candidate, found) &&
 					!(
 						admittedTiming &&
@@ -5043,8 +5045,8 @@ for (const [what, rel, from, to] of [
 	[
 		'a repeated lane prefix',
 		MACOS_BOX,
-		'  package-macos:\n    name: Build\n',
-		"  package-macos:\n    name: 'macOS / Build'\n"
+		'  package-macos:\n    name: Build (macOS 26)\n',
+		"  package-macos:\n    name: 'macOS / Build (macOS 26)'\n"
 	],
 	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
 	['an extra root separator', ENTRY, "name: 'Release plan'", "name: 'Validate / Checks / Plan'"],
@@ -5924,7 +5926,7 @@ function sparkleToolProblems(files) {
 	const steps = job ? pipeline.steps(job.body) : [];
 	const tools = steps.filter((step) => step.name === 'Install Sparkle signing tool');
 	const toolAt = steps.findIndex((step) => step.name === 'Install Sparkle signing tool');
-	const nativeAt = steps.findIndex((step) => step.name === 'Run Swift launcher tests');
+	const nativeAt = steps.findIndex((step) => step.name === 'Run Swift launcher tests on macOS 26');
 	if (tools.length !== 1 || toolAt < 0 || nativeAt <= toolAt) {
 		problems.push('the actual pinned Sparkle tool installer must precede native XCTest');
 	} else if (
@@ -5943,7 +5945,10 @@ const sparkleToolBody = pipeline.step(
 	pipeline.job('package-macos'),
 	'Install Sparkle signing tool'
 );
-const sparkleNativeBody = pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests');
+const sparkleNativeBody = pipeline.step(
+	pipeline.job('package-macos'),
+	'Run Swift launcher tests on macOS 26'
+);
 for (const [what, from, to] of [
 	['missing native Sparkle tools', sparkleToolBody, ''],
 	[

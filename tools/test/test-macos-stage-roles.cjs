@@ -128,9 +128,9 @@ check('push E2E includes every mandatory role and both managed architectures', (
 		]
 	);
 	assert.deepEqual(roles.displayPlan('e2e', context).matrix.lot.slice(2, 5), [
-		'Managed Ollama (Apple silicon)',
-		'Managed Ollama (Intel)',
-		'Native XCTest (Intel)'
+		'Managed Ollama (macOS 15, Apple silicon)',
+		'Managed Ollama (macOS 15, Intel)',
+		'Native XCTest (macOS 15, Intel)'
 	]);
 	for (const [architecture, scenario] of [
 		['arm64', 'runtime'],
@@ -524,12 +524,12 @@ check('Unit lots are the module groups, each one complete stubbed cell', () => {
 check('E2E human lots retain native architectures and scoped manual roles', () => {
 	const push = [
 		'Virtual-keyboard replay (stubbed)',
-		'Tooltip canvas (Apple silicon)',
-		'Managed Ollama (Apple silicon)',
-		'Managed Ollama (Intel)',
-		'Native XCTest (Intel)',
-		'Managed Ollama build (Apple silicon)',
-		'Managed Ollama build (Intel)'
+		'Tooltip canvas (macOS 15, Apple silicon)',
+		'Managed Ollama (macOS 15, Apple silicon)',
+		'Managed Ollama (macOS 15, Intel)',
+		'Native XCTest (macOS 15, Intel)',
+		'Managed Ollama build (macOS 15, Apple silicon)',
+		'Managed Ollama build (macOS 15, Intel)'
 	];
 	assert.deepEqual(roles.displayPlan('e2e', context).matrix, { lot: push });
 	assert.deepEqual(
@@ -537,9 +537,9 @@ check('E2E human lots retain native architectures and scoped manual roles', () =
 		{
 			lot: [
 				...push,
-				'Archive update controls',
-				'Lease silence (Apple silicon)',
-				'Lease silence (Intel)'
+				'Archive update controls (macOS 26)',
+				'Lease silence (macOS 15, Apple silicon)',
+				'Lease silence (macOS 15, Intel)'
 			]
 		}
 	);
@@ -551,19 +551,19 @@ check('E2E human lots retain native architectures and scoped manual roles', () =
 check('installed-app lots expose every exact scenario and release architecture', () => {
 	assert.deepEqual(roles.displayPlan('testbuild', context).matrix, {
 		lot: [
-			'Installed app: clean (Apple silicon)',
-			'Installed app: karabiner config (Apple silicon)',
-			'Installed app: upgraded (Apple silicon)',
-			'Cold native bootstrap (Apple silicon)'
+			'Installed app: clean (macOS 15, Apple silicon)',
+			'Installed app: karabiner config (macOS 15, Apple silicon)',
+			'Installed app: upgraded (macOS 15, Apple silicon)',
+			'Cold native bootstrap (macOS 15, Apple silicon)'
 		]
 	});
 	assert.deepEqual(roles.displayPlan('testbuild', { ...context, release: true }).matrix, {
 		lot: [
-			'Installed app: clean, karabiner config (Apple silicon)',
-			'Installed app: upgraded (Apple silicon)',
-			'Installed app: clean, karabiner config (Intel)',
-			'Installed app: upgraded (Intel)',
-			'Cold native bootstrap (Apple silicon)'
+			'Installed app: clean, karabiner config (macOS 15, Apple silicon)',
+			'Installed app: upgraded (macOS 15, Apple silicon)',
+			'Installed app: clean, karabiner config (macOS 15, Intel)',
+			'Installed app: upgraded (macOS 15, Intel)',
+			'Cold native bootstrap (macOS 15, Apple silicon)'
 		]
 	});
 });
@@ -619,15 +619,20 @@ check(
 const lotContext = { ...context, event_name: 'workflow_dispatch', release: true };
 const lotStage = 'testbuild';
 const lotPlan = roles.displayPlan(lotStage, lotContext);
-const selectedLot = 'Installed app: clean, karabiner config (Apple silicon)';
+const selectedLot = 'Installed app: clean, karabiner config (macOS 15, Apple silicon)';
 for (const [name, mutate] of [
 	['missing selected lot', (map) => delete map[selectedLot]],
-	['missing unselected lot', (map) => delete map['Installed app: clean, karabiner config (Intel)']],
+	[
+		'missing unselected lot',
+		(map) => delete map['Installed app: clean, karabiner config (macOS 15, Intel)']
+	],
 	['foreign lot alias', (map) => (map.foreign = structuredClone(map[selectedLot]))],
 	[
 		'duplicate cell under another authored lot',
 		(map) =>
-			(map['Installed app: clean, karabiner config (Intel)'] = structuredClone(map[selectedLot]))
+			(map['Installed app: clean, karabiner config (macOS 15, Intel)'] = structuredClone(
+				map[selectedLot]
+			))
 	],
 	['wrong role', (map) => (map[selectedLot].role = 'cold-bootstrap-native')],
 	['wrong runner', (map) => (map[selectedLot].runner = 'macos-latest')],
@@ -820,7 +825,7 @@ check('recording refuses another valid cell under the selected human lot', () =>
 				context,
 				host(selected),
 				1,
-				'Managed Ollama (Apple silicon)',
+				'Managed Ollama (macOS 15, Apple silicon)',
 				displayed.metadata
 			),
 		/Selected human lot and receipt cell differ/
@@ -832,30 +837,36 @@ check('role labels retain the independent authored human names without runtime m
 		['unit', 'lua-unit-meta', 'stubbed', 'meta', 'meta'],
 		['unit', 'lua-unit-meta', 'stubbed', 'other', 'other'],
 		['e2e', 'e2e-hs', 'stubbed', '', 'Virtual-keyboard replay (stubbed)'],
-		['e2e', 'tooltip-canvas', 'arm64', '', 'Tooltip canvas (Apple silicon)'],
-		['e2e', 'managed-ollama-native', 'arm64', '', 'Managed Ollama (Apple silicon)'],
-		['e2e', 'managed-ollama-native', 'amd64', '', 'Managed Ollama (Intel)'],
-		['e2e', 'managed-ollama-build', 'arm64', '', 'Managed Ollama build (Apple silicon)'],
-		['e2e', 'managed-ollama-build', 'amd64', '', 'Managed Ollama build (Intel)'],
-		['e2e', 'item36-native', 'host', '', 'Archive update controls'],
-		['e2e', 'lease-silence-native', 'arm64', '', 'Lease silence (Apple silicon)'],
-		['e2e', 'lease-silence-native', 'amd64', '', 'Lease silence (Intel)'],
+		['e2e', 'tooltip-canvas', 'arm64', '', 'Tooltip canvas (macOS 15, Apple silicon)'],
+		['e2e', 'managed-ollama-native', 'arm64', '', 'Managed Ollama (macOS 15, Apple silicon)'],
+		['e2e', 'managed-ollama-native', 'amd64', '', 'Managed Ollama (macOS 15, Intel)'],
+		['e2e', 'managed-ollama-build', 'arm64', '', 'Managed Ollama build (macOS 15, Apple silicon)'],
+		['e2e', 'managed-ollama-build', 'amd64', '', 'Managed Ollama build (macOS 15, Intel)'],
+		['e2e', 'item36-native', 'host', '', 'Archive update controls (macOS 26)'],
+		['e2e', 'lease-silence-native', 'arm64', '', 'Lease silence (macOS 15, Apple silicon)'],
+		['e2e', 'lease-silence-native', 'amd64', '', 'Lease silence (macOS 15, Intel)'],
 		[
 			'testbuild',
 			'launch',
 			'arm64',
 			'karabiner_config',
-			'Installed app: karabiner config (Apple silicon)'
+			'Installed app: karabiner config (macOS 15, Apple silicon)'
 		],
-		['testbuild', 'launch', 'amd64', 'upgraded', 'Installed app: upgraded (Intel)'],
+		['testbuild', 'launch', 'amd64', 'upgraded', 'Installed app: upgraded (macOS 15, Intel)'],
 		[
 			'testbuild',
 			'launch',
 			'amd64',
 			'clean__karabiner_config',
-			'Installed app: clean, karabiner config (Intel)'
+			'Installed app: clean, karabiner config (macOS 15, Intel)'
 		],
-		['testbuild', 'cold-bootstrap-native', 'arm64', '', 'Cold native bootstrap (Apple silicon)']
+		[
+			'testbuild',
+			'cold-bootstrap-native',
+			'arm64',
+			'',
+			'Cold native bootstrap (macOS 15, Apple silicon)'
+		]
 	])
 		assert.equal(roles.roleLot(stage, role, architecture, scenario), expected);
 });
@@ -1548,5 +1559,55 @@ check(
 	}
 );
 assert.equal(controls, 190, 'all prior 189 controls and the launch lot control execute');
+
+// Every macOS cell, job and repeated step states its macOS version from HOSTS.
+check('macOS cells name their version from one host table and refuse another', () => {
+	assert.deepEqual(
+		Object.fromEntries(Object.entries(roles.HOSTS).map(([key, host]) => [key, host.runner])),
+		{ stubbed: 'ubuntu-latest', arm64: 'macos-15', amd64: 'macos-15-intel', host: 'macos-latest' }
+	);
+	const ctx = { ...context, event_name: 'workflow_dispatch' };
+	for (const stage of ['e2e', 'testbuild']) {
+		const displayed = roles.displayPlan(stage, ctx);
+		for (const lot of displayed.matrix.lot) {
+			const selected = displayed.metadata[lot];
+			assert.equal(selected.runner, roles.HOSTS[selected.architecture].runner);
+			if (roles.HOSTS[selected.architecture].macos)
+				assert.ok(lot.includes(roles.macosName(selected.architecture)), lot + ' names its macOS');
+		}
+	}
+	const build = roles.plan('build', context)[0];
+	const workflow = YAML.parse(
+		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
+	);
+	const packaging = workflow.jobs['package-macos'];
+	assert.equal(packaging['runs-on'], build.runner);
+	assert.equal(packaging.name, 'Build (' + roles.macosName(build.architecture) + ')');
+	assert.ok(
+		packaging.steps.some(
+			(step) => step.name === 'Run Swift launcher tests on ' + roles.macosName(build.architecture)
+		),
+		'the repeated Swift run names its macOS'
+	);
+	const source = fs.readFileSync(
+		path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'),
+		'utf8'
+	);
+	assert.match(
+		source,
+		/deliberate cross-version coverage, not\n# duplicated work; do not deduplicate it\./
+	);
+	roles.confirmMacosVersion(build, '26.0.1');
+	roles.confirmMacosVersion({ runner: 'macos-15-intel' }, '15.7');
+	for (const [selected, version] of [
+		[build, '15.6'],
+		[{ runner: 'macos-15' }, '26.0'],
+		[{ runner: 'ubuntu-latest' }, '15.6'],
+		[build, 'Sequoia'],
+		[build, '']
+	])
+		assert.throws(() => roles.confirmMacosVersion(selected, version));
+});
+assert.equal(controls, 191, 'all prior 190 controls and the macOS version control execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

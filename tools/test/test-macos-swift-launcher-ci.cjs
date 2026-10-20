@@ -152,7 +152,7 @@ check(
 // refuses a launcher log it did not start fresh, so the log goes in between.
 const PACKAGE_ORDER = [
 	'Build release launcher',
-	'Run Swift launcher tests',
+	'Run Swift launcher tests on macOS 26',
 	'Remove the launcher log the Swift tests wrote',
 	'Build ErgoptiPlus.app',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)'
@@ -293,10 +293,10 @@ check(
 	'a preceding independent native build must not replace the exact package launcher build'
 );
 
-const testStep = pipeline.step(swiftJob, 'Run Swift launcher tests');
+const testStep = pipeline.step(swiftJob, 'Run Swift launcher tests on macOS 26');
 check(
 	testStep.length > 100,
-	'`Run Swift launcher tests` is absent or too small to enforce a trustworthy XCTest verdict'
+	'`Run Swift launcher tests on macOS 26` is absent or too small to enforce a trustworthy XCTest verdict'
 );
 check(
 	/script -q \/dev\/null swift test\b/.test(testStep),
@@ -349,7 +349,7 @@ check(
 	/uses:\s*actions\/setup-node@v4/.test(nodeSetup) &&
 		/node-version-file:\s*'\.node-version'/.test(nodeSetup) &&
 		packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') <
-			packageStepNames.indexOf('Run Swift launcher tests'),
+			packageStepNames.indexOf('Run Swift launcher tests on macOS 26'),
 	'native generated-policy probes and XCTest evidence require the repository-owned Node version before XCTest'
 );
 check(
@@ -392,7 +392,7 @@ check(
 		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') >
 			packageStepNames.indexOf('Prepare Node for native policy fixtures and XCTest evidence') &&
 		packageStepNames.indexOf('Run owned program XCTest notice constructed-policy controls') <
-			packageStepNames.indexOf('Run Swift launcher tests'),
+			packageStepNames.indexOf('Run Swift launcher tests on macOS 26'),
 	'the independently authored owned-program policy corpus runs unconditionally before native XCTest'
 );
 const transcriptUpload = pipeline.step(swiftJob, 'Upload Swift launcher failure transcript');
@@ -406,7 +406,7 @@ check(
 		/path:\s*\$\{\{ runner\.temp \}\}\/swift-launcher-evidence/.test(transcriptUpload) &&
 		/if-no-files-found:\s*error/.test(transcriptUpload) &&
 		packageStepNames.indexOf('Upload Swift launcher failure transcript') >
-			packageStepNames.indexOf('Run Swift launcher tests'),
+			packageStepNames.indexOf('Run Swift launcher tests on macOS 26'),
 	'a failed native XCTest step must upload the retained transcript and exact verdict'
 );
 check(

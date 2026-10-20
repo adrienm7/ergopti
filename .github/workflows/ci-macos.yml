@@ -4,8 +4,14 @@
 # Build packages after Unit; the test build admits both E2E and Build, so the
 # verdict still proves all four stages. Native roles stay parallel inside their
 # authored stage matrices.
-# Lua unit and stubbed engine E2E tests run on Ubuntu. The Swift launcher tests
-# share the macOS packaging host. The launch matrix installs the exact uploaded
+# Lua unit and stubbed engine E2E tests run on Ubuntu. Every macOS cell names
+# its macOS version (tools/ci/macos-stage-roles.cjs HOSTS owns the runner
+# labels and versions, and each cell's admission refuses a runner of another
+# version): the E2E, launch and cold cells run on macOS 15 (Apple silicon
+# macos-15, Intel macos-15-intel), Build on macOS 26 (macos-latest). The Swift
+# launcher XCTest classes the E2E cells run on macOS 15 run again in Build on
+# macOS 26: that repetition is deliberate cross-version coverage, not
+# duplicated work; do not deduplicate it. The launch matrix installs the exact uploaded
 # archive over the canonical user-state profile on Apple silicon and, for a
 # release, Intel. The verdict checks every expected runner/scenario and commit.
 # Parent ci.yml owns concurrency; this workflow must not cancel its caller.
@@ -574,6 +580,7 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/api-wire-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/serve-lifecycle-controls.log
+      # Runs on macOS 15; Build runs these classes again on macOS 26 on purpose.
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         env:
           GOTOOLCHAIN: 'local'
@@ -1712,7 +1719,7 @@ jobs:
           overwrite: true
 
   package-macos:
-    name: Build
+    name: Build (macOS 26)
     # Reads this run's jobs and artifacts to wait for the qualified native
     # inputs that the E2E cells running beside it upload.
     permissions:
@@ -1901,7 +1908,10 @@ jobs:
           exit "$status"
         timeout-minutes: 5
 
-      - name: Run Swift launcher tests
+      # The full launcher XCTest run on macOS 26. The E2E cells run many of the
+      # same classes on macOS 15; keep both: they are deliberate cross-version
+      # coverage of one launcher, not duplicates to skip here.
+      - name: Run Swift launcher tests on macOS 26
         if: ${{ steps.stage-admission.outcome == 'success' }}
         id: swift-launcher-tests
         env:

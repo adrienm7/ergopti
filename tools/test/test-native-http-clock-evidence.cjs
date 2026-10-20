@@ -631,11 +631,11 @@ try {
 			run_attempt: 2,
 			head_sha: v.source.candidate,
 			status: 'completed',
-			name: 'macOS / E2E tests (Managed Ollama (Apple silicon))',
+			name: 'macOS / E2E tests (Managed Ollama (macOS 15, Apple silicon))',
 			conclusion: 'failure',
 			steps: [
 				{
-					name: 'Record actual stage role outcome — Managed Ollama (Apple silicon)',
+					name: 'Record actual stage role outcome — Managed Ollama (macOS 15, Apple silicon)',
 					number: 2,
 					status: 'completed',
 					conclusion: 'success'
@@ -681,10 +681,10 @@ try {
 		const amdArtifact = { ...artifact, name: 'native-http-clock-amd64-123-2' };
 		const amdJob = {
 			...job,
-			name: 'macOS / E2E tests (Managed Ollama (Intel))',
+			name: 'macOS / E2E tests (Managed Ollama (macOS 15, Intel))',
 			steps: [
 				{
-					name: 'Record actual stage role outcome — Managed Ollama (Intel)',
+					name: 'Record actual stage role outcome — Managed Ollama (macOS 15, Intel)',
 					number: 2,
 					status: 'completed',
 					conclusion: 'success'
@@ -757,7 +757,7 @@ try {
 			for (const [name, mutate, reason] of [
 				[
 					'wrong human lot',
-					(row) => (row.name = 'macOS / E2E tests (Tooltip canvas (Apple silicon))'),
+					(row) => (row.name = 'macOS / E2E tests (Tooltip canvas (macOS 15, Apple silicon))'),
 					/Official job consistency refused/
 				],
 				[
@@ -795,9 +795,9 @@ try {
 				[
 					'other managed architecture receipt marker',
 					(row) =>
-						(row.steps[0].name = row.steps[0].name.includes('(Intel)')
-							? 'Record actual stage role outcome — Managed Ollama (Apple silicon)'
-							: 'Record actual stage role outcome — Managed Ollama (Intel)'),
+						(row.steps[0].name = row.steps[0].name.includes('(macOS 15, Intel)')
+							? 'Record actual stage role outcome — Managed Ollama (macOS 15, Apple silicon)'
+							: 'Record actual stage role outcome — Managed Ollama (macOS 15, Intel)'),
 					/Official stage writer consistency refused/
 				],
 				[
