@@ -214,3 +214,50 @@ for _LRPW_Row in ["number", "top", "home", "bottom"]
 	for _LRPW_Mode in ["off", "on", "magic-source", "magic-other", "ordinary", "legacy"]
 		Test("layout Win fallback: " . _LRPW_Row . " row " . _LRPW_Mode . " (layout-row-win-fallback)",
 			_LRPS_LevelCustody.Bind(0, false, _LRPW_ChildSource, [_LRPW_Row, _LRPW_Mode], "PASS row-win-fallback"))
+
+
+; The existing real registration test supplies its captured Win broker rows.
+; Unlike native HotIf, the broker invokes these predicates with no arguments.
+_LRPR_AssertBrokerRows(Rows) {
+	_KLT_WithEmulation(_LRPR_AssertBrokerRowsLoaded.Bind(Rows))
+}
+
+_LRPR_AssertBrokerRowsLoaded(Rows) {
+	global Features, CategoryEnabled, LayerEnabled
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
+	try {
+		_NRP_UseLayout(Map("emulated_layout", "ergol", "ergopti_base", true,
+			"ergopti_alt_gr", false, "ergopti_variant", "none", "direct_access_digits", "symbols",
+			"emulate_number_row", true, "emulate_top_row", true, "emulate_home_row", true, "emulate_bottom_row", true))
+		_KLT_Load("ergol")
+		Corpus := _LRP_Corpus()
+		for DisabledRow in ["number_row", "top_row", "home_row", "bottom_row"] {
+			NativeScans := Map()
+			for Scan in Corpus["windows_scan_codes"][DisabledRow]
+				NativeScans[Scan] := true
+			Features["layout"]["emulate_" . DisabledRow] := false
+			SeenNative := 0
+			for Row in Rows {
+				Native := NativeScans.Has(Row["scan"])
+				SeenNative += Native ? 1 : 0
+				AssertEqual(!Native, Row["criterion"].Call(),
+					"zero-argument Win admission must retain " . Row["scan"] . " physical identity with " . DisabledRow . " native")
+			}
+			AssertEqual(NativeScans.Count, SeenNative, "the real Win cohort must include the whole independent corpus row")
+			Features["layout"]["emulate_" . DisabledRow] := true
+		}
+		for Row in Rows
+			AssertTrue(Row["criterion"].Call(), "reenabling the rows restores every registered Win fallback")
+		LayerEnabled := true
+		for Row in Rows
+			AssertFalse(Row["criterion"].Call(), "physical binding must retain the original navigation-layer gate")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+	}
+}
