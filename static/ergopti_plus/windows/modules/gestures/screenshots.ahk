@@ -119,7 +119,8 @@ _GestureScreenshotDefaultRollbackFile(Destination, Snapshot) {
 }
 
 _GestureScreenshotDefaultPublishClipboard(Stage) {
-	return CB_WriteBitmapFile(Stage)
+	Published := CB_WriteBitmapFile(Stage, &MutationSequence)
+	return Map("published", Published, "sequence", MutationSequence)
 }
 
 _GestureScreenshotDefaultDeleteFile(Path) {
@@ -603,10 +604,10 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 				"clipboard snapshot failed before publication")
 			return
 		}
-		BeforeSequence := _GestureScreenshotClipboardSequence()
-		Published := _GestureScreenshotPublishClipboard(Job["stage"])
-		PublishedSequence := _GestureScreenshotClipboardSequence()
-		ClipboardChanged := PublishedSequence != BeforeSequence
+		Publication := _GestureScreenshotPublishClipboard(Job["stage"])
+		Published := Publication["published"]
+		PublishedSequence := Publication["sequence"]
+		ClipboardChanged := PublishedSequence > 0
 		if !IsObject(_GestureDirectCaptureState(Epoch, WorkerId))
 				|| A_IsSuspended || Job["cancel_requested"] {
 			if ClipboardChanged
@@ -617,6 +618,7 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 			return
 		}
 		Ok := Published && ClipboardChanged
+			&& _GestureScreenshotClipboardSequence() == PublishedSequence
 			&& _GestureScreenshotClipboardHasImage()
 		if !Ok && ClipboardChanged
 			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,

@@ -564,7 +564,10 @@ CB_HasImage() {
 ; private file; the owning AHK generation calls this function after completion,
 ; so a canceled or orphaned child process cannot mutate the clipboard by itself.
 ; The HBITMAP ownership transfers to Windows only when SetClipboardData succeeds.
-CB_WriteBitmapFile(Path) {
+; The optional receipt captures even a partial mutation while the clipboard lock
+; still excludes foreign copies. A sequence sampled after return cannot own it.
+CB_WriteBitmapFile(Path, &MutationSequence := 0) {
+	MutationSequence := 0
 	if !_CB_ResolveRestoreDebtBeforeMutation()
 		return false
 	static IMAGE_BITMAP := 0
@@ -602,6 +605,8 @@ CB_WriteBitmapFile(Path) {
 			_CB_CancelOwnedMutation(MutationId)
 		; Release the global clipboard lock before file-backed logging can yield.
 		if ClipboardOpened {
+			if ClipboardMutated
+				MutationSequence := CB_GetSequenceNumber()
 			try DllCall("User32\CloseClipboard")
 			ClipboardOpened := false
 		}
@@ -612,8 +617,11 @@ CB_WriteBitmapFile(Path) {
 		try LoggerError("Clipboard", "CB_WriteBitmapFile failed for '{1}': {2}.", Path, Err.Message)
 		return false
 	} finally {
-		if ClipboardOpened
+		if ClipboardOpened {
+			if ClipboardMutated
+				MutationSequence := CB_GetSequenceNumber()
 			try DllCall("User32\CloseClipboard")
+		}
 		if BitmapHandle
 			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
 	}
