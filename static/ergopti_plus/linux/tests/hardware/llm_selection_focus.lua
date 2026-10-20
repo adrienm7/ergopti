@@ -166,12 +166,19 @@ for command in io.lines() do
 	elseif command == "offer" or command == "finish" then
 		assert(callback, "the controlled provider must have an actual pending request")
 		-- A real provider answers long after a focus change; replying within
-		-- milliseconds raced the resident watcher's new verdict, so the same
-		-- field read as "unknown" and its output was refused (dev CI of
-		-- October 20). A password settles to "secure" and stays refused.
-		local settle_deadline = Clock.now_ms() + 2000
-		while Detector.getVerdict() == "unknown" and Clock.now_ms() < settle_deadline do
-			uv.run("nowait"); Guard.refresh(true); uv.sleep(1)
+		-- milliseconds raced the resident watcher, so the same field read as
+		-- "unknown" and its output was refused (dev CI of October 20). The
+		-- refocus events can land after a first conclusive reading (the old
+		-- field's verdict), so the verdict must stay conclusive for a quiet
+		-- window. A password settles to "secure" and stays refused.
+		local settle_deadline = Clock.now_ms() + 3000
+		local quiet_since = nil
+		while Clock.now_ms() < settle_deadline do
+			uv.run("nowait"); Guard.refresh(true)
+			if Detector.getVerdict() == "unknown" then quiet_since = nil
+			elseif not quiet_since then quiet_since = Clock.now_ms()
+			elseif Clock.now_ms() - quiet_since >= 300 then break end
+			uv.sleep(1)
 		end
 		result.verdict_before_reply = Detector.getVerdict()
 		local text = mode == "tone" and "REWRITE: Merci pour votre aide."
