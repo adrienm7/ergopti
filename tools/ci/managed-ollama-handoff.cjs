@@ -19,6 +19,9 @@
  *   receive <dir>   wait for this run's build artifact of the cell's
  *                   architecture, download it into the empty <dir>, verify it
  *                   and install its files where the receiving steps read them
+ *   await-qualified wait, in the application build that runs beside E2E, until
+ *                   both "Managed Ollama (<architecture>)" cells succeeded and
+ *                   uploaded the qualified inputs the build packages
  * ============================================================================
  */
 
@@ -77,6 +80,18 @@ function artifactName(context) {
 function producerJobSuffix(architecture) {
 	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
 	return 'E2E tests (Managed Ollama build (' + LABELS[architecture] + '))';
+}
+
+/** The visible matrix cell name of the cell that qualifies one architecture's inputs. */
+function qualifierJobSuffix(architecture) {
+	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
+	return 'E2E tests (Managed Ollama (' + LABELS[architecture] + '))';
+}
+
+/** The qualified native inputs one qualifying cell uploads for the application build. */
+function qualifiedArtifactName(context, architecture) {
+	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
+	return ['managed-ollama-inputs', architecture, context.sha, context.runId].join('-');
 }
 
 function validateContext(context) {
@@ -310,6 +325,51 @@ function select(jobs, artifacts, context) {
 	return { state: 'wait' };
 }
 
+/**
+ * Lets the application build, which runs beside E2E, wait for the native
+ * inputs it packages. An architecture is ready only once its qualifying cell
+ * has completed successfully, so the build never packages an input whose
+ * model receiving is still running or failed; a successful cell that left no
+ * inputs, a failed one or a duplicate refuses at once instead of waiting.
+ * @param {Array<{name: string, status: string, conclusion: string|null, run_attempt: number}>} jobs
+ * @param {Array<{name: string, expired: boolean, id: number}>} artifacts
+ * @param {{sha: string, runId: string, attempt: number}} context The build job's run.
+ * @returns {{state: 'wait', waiting: string[]}|{state: 'ready', names: string[]}}
+ */
+function selectQualified(jobs, artifacts, context) {
+	validateContext({ ...context, architecture: 'arm64' });
+	const waiting = [];
+	const names = [];
+	for (const architecture of Object.keys(LABELS)) {
+		const suffix = qualifierJobSuffix(architecture);
+		const cells = jobs.filter(
+			(job) => job.name === suffix || String(job.name).endsWith(' / ' + suffix)
+		);
+		assert.ok(cells.length <= 1, 'Duplicate managed Ollama qualifying cells');
+		const cell = cells[0];
+		if (cell === undefined || cell.status !== 'completed') {
+			waiting.push(architecture);
+			continue;
+		}
+		assert.ok(
+			Number.isSafeInteger(cell.run_attempt) &&
+				cell.run_attempt > 0 &&
+				cell.run_attempt <= context.attempt,
+			'Invalid managed Ollama qualifying attempt'
+		);
+		if (cell.conclusion !== 'success')
+			throw new Error('The ' + suffix + ' cell concluded ' + cell.conclusion);
+		const name = qualifiedArtifactName(context, architecture);
+		const found = artifacts.filter((artifact) => artifact.name === name);
+		assert.ok(found.length <= 1, 'Duplicate qualified managed Ollama inputs');
+		if (found.length === 0)
+			throw new Error('The successful ' + suffix + ' cell uploaded no qualified inputs');
+		assert.equal(found[0].expired, false, 'The qualified managed Ollama inputs expired');
+		names.push(name);
+	}
+	return waiting.length > 0 ? { state: 'wait', waiting } : { state: 'ready', names };
+}
+
 async function api(route) {
 	const response = await fetch(process.env.GITHUB_API_URL + route, {
 		headers: {
@@ -331,15 +391,15 @@ async function listAll(route, key) {
 	}
 }
 
-async function awaitArtifact(context, deadlineMinutes) {
+async function awaitArtifact(context, deadlineMinutes, choose = select, what = 'build handoff') {
 	const run = '/repos/' + process.env.GITHUB_REPOSITORY + '/actions/runs/' + context.runId;
 	const deadline = Date.now() + deadlineMinutes * 60000;
 	for (;;) {
 		const jobs = await listAll(run + '/jobs?filter=latest', 'jobs');
 		const artifacts = await listAll(run + '/artifacts', 'artifacts');
-		const choice = select(jobs, artifacts, context);
+		const choice = choose(jobs, artifacts, context);
 		if (choice.state === 'ready') return choice;
-		if (Date.now() > deadline) throw new Error('The managed Ollama build handoff never arrived');
+		if (Date.now() > deadline) throw new Error('The managed Ollama ' + what + ' never arrived');
 		await new Promise((resolve) => setTimeout(resolve, POLL_MILLISECONDS));
 	}
 }
@@ -385,6 +445,17 @@ function fetchArtifact(id, directory) {
 
 async function main(args) {
 	const [command, directory] = args;
+	if (command === 'await-qualified') {
+		assert.equal(args.length, 1);
+		const run = {
+			sha: process.env.GITHUB_SHA,
+			runId: process.env.GITHUB_RUN_ID,
+			attempt: Number(process.env.GITHUB_RUN_ATTEMPT)
+		};
+		const choice = await awaitArtifact(run, 40, selectQualified, 'qualified inputs');
+		console.log('Qualified managed Ollama inputs ready: ' + choice.names.join(', '));
+		return;
+	}
 	const context = environmentContext();
 	if (command === 'seal') {
 		assert.equal(args.length, 2);
@@ -415,9 +486,12 @@ module.exports = {
 	members,
 	artifactName,
 	producerJobSuffix,
+	qualifierJobSuffix,
+	qualifiedArtifactName,
 	verify,
 	seal,
 	select,
+	selectQualified,
 	producerSources,
 	install,
 	MANIFEST

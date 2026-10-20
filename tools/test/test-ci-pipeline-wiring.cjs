@@ -3301,20 +3301,27 @@ for (const [rel, id, unit] of [
 ]) {
 	const prerequisite =
 		rel === MACOS_BOX
-			? `      actions: read\n    needs:\n      - ${unit}\n`
+			? `      actions: read\n    needs:\n      - ${unit}\n    runs-on: \${{ fromJSON(needs.${unit}`
 			: `    needs: [${unit}]\n`;
 	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
 		mustCatch(
 			`${id} must remain mandatory`,
 			rel,
 			prerequisite,
-			prerequisite + suffix,
+			rel === MACOS_BOX
+				? prerequisite.replace('    runs-on:', suffix + '    runs-on:')
+				: prerequisite + suffix,
 			graphProblems
 		);
 	}
 }
 
 errors.push(...graphProblems(pipeline.files()));
+// E2E and Build both read Actions evidence and need Unit; each anchor names its own runner.
+const MACOS_E2E_NEEDS =
+	'      actions: read\n    needs:\n      - test-hs\n    runs-on: ${{ fromJSON(needs.test-hs';
+const MACOS_BUILD_NEEDS =
+	'      actions: read\n    needs:\n      - test-hs\n    runs-on: macos-latest\n';
 for (const [what, rel, from, to] of [
 	[
 		'a second root in ci.yml',
@@ -3349,38 +3356,38 @@ for (const [what, rel, from, to] of [
 	[
 		'a sixth entry in the macOS lane',
 		MACOS_BOX,
-		'      actions: read\n    needs:\n      - test-hs\n',
-		'      actions: read\n'
+		MACOS_E2E_NEEDS,
+		MACOS_E2E_NEEDS.replace('    needs:\n      - test-hs\n', '')
 	],
 	[
 		'macOS packaging stops waiting for units',
 		MACOS_BOX,
-		'    name: Build\n    needs:\n      - test-hs\n',
-		'    name: Build\n    needs: []\n'
+		MACOS_BUILD_NEEDS,
+		MACOS_BUILD_NEEDS.replace('    needs:\n      - test-hs\n', '    needs: []\n')
 	],
 	[
 		'macOS packaging waits for E2E again',
 		MACOS_BOX,
-		'    name: Build\n    needs:\n      - test-hs\n',
-		'    name: Build\n    needs:\n      - e2e-hs\n'
+		MACOS_BUILD_NEEDS,
+		MACOS_BUILD_NEEDS.replace('      - test-hs\n', '      - e2e-hs\n')
 	],
 	[
 		'native canvas stops waiting for units',
 		MACOS_BOX,
-		'      actions: read\n    needs:\n      - test-hs\n',
-		'      actions: read\n    needs: []\n'
+		MACOS_E2E_NEEDS,
+		MACOS_E2E_NEEDS.replace('    needs:\n      - test-hs\n', '    needs: []\n')
 	],
 	[
 		'native canvas stops waiting for E2E',
 		MACOS_BOX,
-		'      actions: read\n    needs:\n      - test-hs\n',
-		'      actions: read\n    needs:\n      - package-macos\n'
+		MACOS_E2E_NEEDS,
+		MACOS_E2E_NEEDS.replace('      - test-hs\n', '      - package-macos\n')
 	],
 	[
 		'macOS E2E omits its unit prerequisite',
 		MACOS_BOX,
-		'      actions: read\n    needs:\n      - test-hs\n',
-		'      actions: read\n'
+		MACOS_E2E_NEEDS,
+		MACOS_E2E_NEEDS.replace('    needs:\n      - test-hs\n', '')
 	],
 	[
 		'macOS test build stops waiting for E2E',
@@ -3483,8 +3490,9 @@ function topJobProblems(files) {
 /**
  * Rejects permissions outside each exact role: three Common custody jobs, and
  * the macOS caller with its E2E stage (whose managed Ollama cells receive the
- * parallel clean build artifact), may read Actions evidence; release alone may
- * write repository contents.
+ * parallel clean build artifact) and its Build (which waits beside E2E for the
+ * qualified native inputs), may read Actions evidence; release alone may write
+ * repository contents.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
@@ -3495,7 +3503,8 @@ function permissionProblems(files) {
 		`${COMMON_BOX}:common-e2e`,
 		`${COMMON_BOX}:common-unit-verdict`,
 		`${ENTRY}:macos`,
-		`${MACOS_BOX}:e2e-hs`
+		`${MACOS_BOX}:e2e-hs`,
+		`${MACOS_BOX}:package-macos`
 	]);
 	for (const entry of files) {
 		const lines = entry.text.split('\n');

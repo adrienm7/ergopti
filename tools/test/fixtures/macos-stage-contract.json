@@ -480,6 +480,10 @@
 			"id": "package-macos",
 			"metadata": {
 				"name": "Build",
+				"permissions": {
+					"contents": "read",
+					"actions": "read"
+				},
 				"needs": ["test-hs"],
 				"runs-on": "macos-latest",
 				"timeout-minutes": 45,
@@ -679,6 +683,11 @@
 					"name": "Resolve the launch-gate scenario profile",
 					"id": "profile",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}"
+				},
+				{
+					"name": "Await both source-qualified native producer inputs",
+					"if": "${{ steps.stage-admission.outcome == 'success' }}",
+					"timeout-minutes": 40
 				},
 				{
 					"name": "Receive both source-qualified native producer inputs",

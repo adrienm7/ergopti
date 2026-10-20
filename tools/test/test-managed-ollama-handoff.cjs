@@ -442,6 +442,108 @@ assert.equal(
 controls++;
 
 // ─────────────────────────────────────────────────
+// The application build waits for both qualifying cells, never fewer
+// ─────────────────────────────────────────────────
+const RUN = { sha: SHA, runId: '42', attempt: 2 };
+const qualifier = (architecture, overrides = {}) => ({
+	name: 'macOS / ' + Handoff.qualifierJobSuffix(architecture),
+	status: 'completed',
+	conclusion: 'success',
+	run_attempt: 2,
+	...overrides
+});
+const inputs = (architecture, overrides = {}) => ({
+	name: Handoff.qualifiedArtifactName(RUN, architecture),
+	expired: false,
+	id: 9,
+	...overrides
+});
+const bothInputs = [inputs('arm64'), inputs('amd64')];
+for (const [label, jobs, artifacts, expected] of [
+	['no qualifying cell listed yet', [job()], [], { state: 'wait', waiting: ['arm64', 'amd64'] }],
+	[
+		'Intel still qualifying after Apple silicon succeeded',
+		[qualifier('arm64'), qualifier('amd64', { status: 'in_progress', conclusion: null })],
+		bothInputs,
+		{ state: 'wait', waiting: ['amd64'] }
+	],
+	[
+		'an uploaded input whose cell is still receiving models',
+		[qualifier('arm64', { status: 'in_progress', conclusion: null }), qualifier('amd64')],
+		bothInputs,
+		{ state: 'wait', waiting: ['arm64'] }
+	],
+	[
+		'both qualifying cells succeeded with their inputs',
+		[qualifier('arm64'), qualifier('amd64'), job()],
+		bothInputs,
+		{ state: 'ready', names: bothInputs.map((row) => row.name) }
+	],
+	[
+		'an earlier successful attempt kept by a partial rerun',
+		[qualifier('arm64', { run_attempt: 1 }), qualifier('amd64')],
+		bothInputs,
+		{ state: 'ready', names: bothInputs.map((row) => row.name) }
+	]
+]) {
+	assert.deepEqual(Handoff.selectQualified(jobs, artifacts, RUN), expected, label);
+	controls++;
+}
+for (const [label, jobs, artifacts, pattern] of [
+	[
+		'a failed qualifying cell',
+		[qualifier('arm64'), qualifier('amd64', { conclusion: 'failure' })],
+		bothInputs,
+		/Managed Ollama \(Intel\)\) cell concluded failure/
+	],
+	[
+		'a cancelled qualifying cell',
+		[qualifier('arm64', { conclusion: 'cancelled' }), qualifier('amd64')],
+		bothInputs,
+		/concluded cancelled/
+	],
+	[
+		'a successful qualifying cell without its inputs',
+		[qualifier('arm64'), qualifier('amd64')],
+		[inputs('arm64')],
+		/uploaded no qualified inputs/
+	],
+	[
+		'inputs of another commit',
+		[qualifier('arm64'), qualifier('amd64')],
+		[inputs('arm64'), inputs('amd64', { name: inputs('amd64').name.replace(SHA, 'd'.repeat(40)) })],
+		/uploaded no qualified inputs/
+	],
+	[
+		'duplicate qualifying cells',
+		[qualifier('arm64'), qualifier('arm64'), qualifier('amd64')],
+		bothInputs,
+		/Duplicate managed Ollama qualifying cells/
+	],
+	[
+		'duplicate qualified inputs',
+		[qualifier('arm64'), qualifier('amd64')],
+		[...bothInputs, inputs('amd64')],
+		/Duplicate qualified managed Ollama inputs/
+	],
+	[
+		'expired qualified inputs',
+		[qualifier('arm64'), qualifier('amd64')],
+		[inputs('arm64'), inputs('amd64', { expired: true })],
+		/expired/
+	],
+	[
+		'a qualifying attempt from the future',
+		[qualifier('arm64', { run_attempt: 3 }), qualifier('amd64')],
+		bothInputs,
+		/Invalid managed Ollama qualifying attempt/
+	]
+]) {
+	assert.throws(() => Handoff.selectQualified(jobs, artifacts, RUN), pattern, label);
+	controls++;
+}
+
+// ─────────────────────────────────────────────────
 // The workflow uploads and names exactly what the receiver waits for
 // ─────────────────────────────────────────────────
 const workflow = YAML.parse(
@@ -475,6 +577,41 @@ assert.ok(
 	'the clean build never restores a cache'
 );
 controls += 5;
+// The build that packages beside E2E waits for exactly the uploaded inputs.
+for (const architecture of ['arm64', 'amd64'])
+	assert.equal(
+		Handoff.qualifierJobSuffix(architecture),
+		'E2E tests (' + roleLot('e2e', 'managed-ollama-native', architecture, '') + ')'
+	);
+const qualifiedUpload = e2e.steps.find(
+	(step) => step.name === 'Upload qualified native inputs for the application catalogue'
+);
+assert.equal(
+	qualifiedUpload.with.name,
+	'managed-ollama-inputs-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}'
+);
+assert.equal(
+	Handoff.qualifiedArtifactName(RUN, 'amd64'),
+	['managed-ollama-inputs', 'amd64', SHA, '42'].join('-')
+);
+const build = workflow.jobs['package-macos'];
+assert.deepEqual(build.needs, ['test-hs'], 'the build runs beside E2E');
+assert.deepEqual(build.permissions, { contents: 'read', actions: 'read' });
+const names = build.steps.map((step) => step.name);
+const awaiting = names.indexOf('Await both source-qualified native producer inputs');
+const download = names.indexOf('Receive both source-qualified native producer inputs');
+assert.ok(awaiting > 0 && download === awaiting + 1, 'the build waits right before downloading');
+assert.equal(build.steps[awaiting].run, 'node tools/ci/managed-ollama-handoff.cjs await-qualified');
+assert.equal(build.steps[awaiting].env.GITHUB_TOKEN, '${{ github.token }}');
+assert.equal(
+	build.steps[download].with.pattern,
+	'managed-ollama-inputs-*-${{ github.sha }}-${{ github.run_id }}'
+);
+assert.ok(
+	names.indexOf('Build ErgoptiPlus.app') > download,
+	'the application is built from the qualified inputs only'
+);
+controls += 4;
 
 console.log(
 	`PASS: managed Ollama build handoff — ${controls} admission, refusal and wiring controls.`
