@@ -311,3 +311,120 @@ _HCCfgT_LocalProbeRun() {
 }
 Test("diagnostics configuration: the local probe answers alone on a timer and honours cancel (healthcheck-configuration-probe-run)",
 	_HCCfgT_LocalProbeRun)
+
+; Builds actual on-disk encodings without letting FileAppend add a BOM or
+; repair the malformed byte that the diagnostic reader must refuse.
+_HCCfgT_EncodedBytes(Text, Encoding) {
+	Wide := Encoding == "utf16"
+	Encoded := Buffer(StrPut(Text, Wide ? "UTF-16" : "UTF-8") * (Wide ? 2 : 1), 0)
+	StrPut(Text, Encoded, Wide ? "UTF-16" : "UTF-8")
+	Prefix := Wide ? 2 : (Encoding == "bom" ? 3 : 0)
+	Length := Encoded.Size - (Wide ? 2 : 1)
+	Bytes := Buffer(Prefix + Length, 0)
+	if Wide
+		NumPut("UShort", 0xFEFF, Bytes)
+	else if Prefix
+		NumPut("UChar", 0xEF, "UChar", 0xBB, "UChar", 0xBF, Bytes)
+	DllCall("ntdll\RtlMoveMemory", "Ptr", Bytes.Ptr + Prefix, "Ptr", Encoded, "UPtr", Length)
+	return Bytes
+}
+
+_HCCfgT_WriteBytes(Path, Bytes) {
+	File := FileOpen(Path, "w", "UTF-8-RAW")
+	AssertTrue(IsObject(File), "the encoding fixture owns its actual native file")
+	try AssertEqual(Bytes.Size, File.RawWrite(Bytes, Bytes.Size))
+	finally File.Close()
+}
+
+_HCCfgT_AssertBytes(Path, Expected) {
+	Observed := FSReadBytesStrict(Path)
+	AssertEqual(Expected.Size, Observed.Size, "diagnostics cannot change the source byte count")
+	AssertEqual(Expected.Size, DllCall("ntdll\RtlCompareMemory", "Ptr", Expected, "Ptr", Observed,
+		"UPtr", Expected.Size, "UPtr"), "diagnostics cannot rewrite or normalize the source bytes")
+}
+
+_HCCfgT_Encoding(Kind) {
+	Root := _HCCfgT_Fixture("")
+	Path := Root . "\config.toml", Lock := -1
+	Malformed := Kind == "bad-lead" || Kind == "bad-sequence"
+	Readable := !Malformed && Kind != "utf16" && Kind != "locked"
+	Value := Malformed ? "ENCODING_PRIVATE_CANARY@(" : (Kind == "replacement" ? Chr(0xFFFD) : "privé🦊")
+	Text := '[script]`nlog_level = "DEBUG"`nlocale = "' . Value . '"`n'
+	Bytes := _HCCfgT_EncodedBytes(Text, Kind)
+	if Malformed
+		NumPut("UChar", Kind == "bad-lead" ? 0xFF : 0xC3, Bytes, InStr(Text, "@") - 1)
+	try {
+		_HCCfgT_WriteBytes(Path, Bytes)
+		if Kind == "locked" {
+			Lock := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+				"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+			AssertTrue(Lock != -1, "a real exclusive native handle denies both configuration readers")
+		}
+		; This is the exact native reader pinned by ConfigMigrateBoot, not a
+		; reimplementation of the diagnostic's status classification.
+		Runtime := FSConfigReadUtf8Exact(Path)
+		AssertEqual(Readable, Runtime is String, "the runtime's actual byte admission defines readability")
+		if Readable {
+			AssertEqual(Kind == "bom" ? Chr(0xFEFF) . Text : Text, Runtime,
+				"the exact runtime image retains a physical UTF-8 BOM")
+			AssertEqual(Value, TOML_ParseDocument(Runtime)["script"]["locale"])
+		} else if Kind != "locked" {
+			Lenient := TOML_ParseDocument(FileRead(Path, "UTF-8"))
+			AssertTrue(Lenient.Has("script"), "the former diagnostic reader admits the repaired or transcoded image")
+			AssertEqual("DEBUG", Lenient["script"]["log_level"])
+		}
+		Schema := HealthCheck_Config()["schema"]
+		Result := HealthCheck_CollectConfiguration(Schema, (Id) => Root . "\" . Id . ".toml")
+		AssertEqual(Readable ? "ok" : "unreadable", Result["files"]["items"][2]["state"])
+		AssertEqual(Readable ? 2 : 0, Result["settings"]["items"].Length,
+			"a rejected byte image cannot publish even its otherwise valid setting")
+		if Readable {
+			Rows := Map()
+			for Row in Result["settings"]["items"]
+				Rows[Row["setting"]] := Row
+			AssertEqual("enum", Rows["script.log_level"]["type"])
+			AssertEqual("DEBUG", Rows["script.log_level"]["value"])
+			AssertEqual("text", Rows["script.locale"]["type"])
+			AssertEqual(Kind == "replacement" ? "1" : "6", Rows["script.locale"]["value"],
+				"valid Unicode is reduced by characters and a literal replacement scalar remains valid UTF-8")
+		}
+		Encoded := _HC_ValueToJson(Result)
+		AssertFalse(InStr(Encoded, "ENCODING_PRIVATE_CANARY") || InStr(Encoded, "privé") || InStr(Encoded, "🦊"),
+			"the encoding refusal and valid scalar reduction reveal no private text")
+		if Lock != -1 {
+			AssertTrue(DllCall("kernel32\CloseHandle", "Ptr", Lock, "Int"))
+			Lock := -1
+		}
+		_HCCfgT_AssertBytes(Path, Bytes)
+	} finally {
+		if Lock != -1
+			DllCall("kernel32\CloseHandle", "Ptr", Lock)
+		DirDelete(Root, true)
+	}
+}
+
+for _HCCfgT_EncodingKind in ["bad-lead", "bad-sequence", "utf16", "utf8", "bom", "replacement", "locked"]
+	Test("diagnostics configuration: " . _HCCfgT_EncodingKind . " follows runtime byte admission (healthcheck-config-encoding)",
+		_HCCfgT_Encoding.Bind(_HCCfgT_EncodingKind))
+
+_HCCfgT_SeparateFileEncoding() {
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "DEBUG"`n')
+	Text := '[tap_hold]`ninherit_defaults = false`n'
+	Bytes := _HCCfgT_EncodedBytes(Text, "utf16")
+	try {
+		DirDelete(Root . "\tap_hold.toml")
+		for Id in ["layers", "tap_hold"] {
+			Path := Root . "\" . Id . ".toml"
+			_HCCfgT_WriteBytes(Path, Bytes)
+			AssertEqual(Text, FSReadStrict(Path), "the separate-file native reader still admits its historical BOM")
+		}
+		Schema := HealthCheck_Config()["schema"]
+		Result := HealthCheck_CollectConfiguration(Schema, (Id) => Root . "\" . Id . ".toml")
+		for Row in Result["files"]["items"]
+			AssertEqual("ok", Row["state"], "config.toml's stricter admission does not change other file contracts")
+		_HCCfgT_AssertBytes(Root . "\layers.toml", Bytes)
+		_HCCfgT_AssertBytes(Root . "\tap_hold.toml", Bytes)
+	} finally DirDelete(Root, true)
+}
+Test("diagnostics configuration: separate files retain native BOM handling (healthcheck-config-encoding)",
+	_HCCfgT_SeparateFileEncoding)

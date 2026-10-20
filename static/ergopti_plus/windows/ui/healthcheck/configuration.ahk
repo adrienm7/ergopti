@@ -209,7 +209,11 @@ HealthCheck_ConfigurationFiles(Ids, PathOf) {
 				State := "unreadable"
 			} else {
 				try {
-					Content := FSReadStrict(Path)
+					; config.toml must match the runtime's exact UTF-8 admission:
+					; the general reader repairs malformed bytes and accepts native BOMs.
+					Content := Id == "config" ? FSReadUtf8Exact(Path) : FSReadStrict(Path)
+					if !(Content is String)
+						State := "unreadable"
 				} catch {
 					Content := false
 					State := "unreadable"
