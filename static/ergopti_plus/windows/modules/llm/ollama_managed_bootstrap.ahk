@@ -336,7 +336,14 @@ class OllamaManagedBootstrap {
 	}
 
 	RuntimeIdentityReady() {
-		if !(this.Target is Map) || !this.Runtime.HasOwner()
+		if !(this.Target is Map) || !this.Runtime.HasOwner() || !(this._RuntimeReadyRecord(this.Target) is Map)
+			return false
+		return this.Runtime.IdentityReady()
+	}
+
+	; This pure state predicate can also guard the short readiness publication.
+	_RuntimeReadyRecord(Target) {
+		if !(Target is Map) || !(this.Target is Map)
 			return false
 		Record := this.Runtime.Record
 		if !(Record is Map) || !this._True(Record.Get("accepted", false)) || !this._True(Record.Get("ready", false))
@@ -344,9 +351,9 @@ class OllamaManagedBootstrap {
 				|| !(Record.Get("terminal", "") is Integer) || Record["terminal"] != false || !(Record.Get("target", 0) is Map)
 			return false
 		for Name in ["origin", "runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256"]
-			if Record["target"].Get(Name, "") != this.Target[Name]
+			if Record["target"].Get(Name, "") != Target[Name] || Target[Name] != this.Target[Name]
 				return false
-		return this.Runtime.IdentityReady()
+		return Record
 	}
 
 	/** Exact borrowed enable writer successor; no arbitrary source recapture. */
@@ -519,9 +526,17 @@ class OllamaManagedBootstrap {
 	}
 
 	_ServerReady(Target, Receipt) {
-		this.ServerReady := true
-		this.Target["ready_file_identity"] := Receipt["ready_file_identity"]
-		this.Target["ready_image_sha256"] := this.Runtime.Record["ready_image_sha256"]
+		if !this._Current()
+			return this.Cancel()
+		PreviousCritical := Critical("On")
+		try {
+			Record := this._RuntimeReadyRecord(Target)
+			if this.Cancelled || this.Failed || !(Record is Map)
+				return false
+			this.ServerReady := true
+			this.Target["ready_file_identity"] := Receipt["ready_file_identity"]
+			this.Target["ready_image_sha256"] := Record["ready_image_sha256"]
+		} finally Critical(PreviousCritical)
 		if !this._Current()
 			return this.Cancel()
 		if this.Port is Map

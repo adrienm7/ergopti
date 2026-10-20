@@ -309,14 +309,15 @@ class OllamaRuntimeOwner {
 				|| !RegExMatch(Observation["image_sha256"], "^[0-9a-f]{64}$")
 			return false
 		Receipt := Observation.Get("receipt", 0)
-		if !(Receipt is Map) || Receipt.Count != 11 || !IsObject(Record["task"]) || !this._Current(Record)
+		Task := Record["task"]
+		if !(Receipt is Map) || Receipt.Count != 11 || !IsObject(Task) || !this._Current(Record)
 				|| !this._ReadyDeadline(Record)
 			return false
 		Target := Record["target"]
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
 			if !(Receipt.Get(Name, 0) is String) || !(Receipt[Name] == Target[Name])
 				return false
-		Pid := Record["task"].processId()
+		Pid := Task.processId()
 		if !(Pid is Integer) || Pid <= 0 || !(Receipt.Get("launcher_pid", 0) is Integer) || Receipt["launcher_pid"] != Pid
 				|| !(Receipt.Get("child_pid", 0) is Integer) || Receipt["child_pid"] <= 0
 				|| Receipt["child_pid"] == Pid || !(Receipt.Get("child_created_filetime", 0) is Integer)
@@ -326,7 +327,7 @@ class OllamaRuntimeOwner {
 			return false
 		PreviousCritical := Critical("On")
 		try {
-			if !this._Owns(Record) || Record["cancelled"] || Record["terminal"] || Record["ready"]
+			if !this._Owns(Record) || Record["task"] != Task || Record["cancelled"] || Record["terminal"] || Record["ready"]
 				return false
 			Record["ready"] := true
 			Record["process_receipt"] := Receipt.Clone()
@@ -373,7 +374,9 @@ class OllamaRuntimeOwner {
 		if !(Now is Integer)
 			throw TypeError("Runtime readiness requires an exact monotonic observation.")
 		Elapsed := Now - Record["target"]["started_tick"]
+		; A timer may retire this exact task while the clock is observed.
 		return Elapsed >= 0 && Elapsed < Record["target"]["deadline_ms"]
+			&& this._Owns(Record) && !Record["cancelled"] && !Record["terminal"] && !A_IsSuspended
 	}
 
 	_NativeReadReady(Target) {

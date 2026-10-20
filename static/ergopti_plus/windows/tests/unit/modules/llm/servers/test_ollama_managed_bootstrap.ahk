@@ -680,3 +680,5 @@ _G4B_EnableOwnerCase() {
 	_LEA_WithFixture(_G4B_EnableOwner)
 }
 Test("managed bootstrap: actual enable admission preserves exact READY successor (groups247-managed)", _G4B_EnableOwnerCase)
+
+#Include test_ollama_runtime_ready_cancellation.ahk
