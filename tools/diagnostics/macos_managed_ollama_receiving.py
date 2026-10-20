@@ -35,6 +35,10 @@ GGUF_SHA256 = "a85aba87b0e9e724d0b499d12d4dcb9fd2ede378c96ffad75a70a919f2c00c0a"
 # The pinned runner counts its first decode as prompt processing. A second
 # decode is required to observe positive native autoregressive evaluation time.
 INFERENCE_TOKENS = 2
+# Ollama 0.40.4 links each named manifest under manifests-v2/<host>/<namespace>/
+# <model>/<tag> and removes the legacy manifests/ entry after the write
+# (manifest/paths.go and writeManifestData in manifest/manifest.go).
+MANIFEST_STORE = "manifests-v2"
 
 
 def require(condition, reason):
@@ -79,6 +83,10 @@ RECEIVER_FAILURE_CODES = frozenset(
         "actual_retained_source_bytes",
         "native_receiving_input_changed",
         "native_receiving_source_changed",
+        # Create-stage outcomes, named for the same reason as the stage outcomes.
+        "independent_gguf_vector",
+        "actual_created_manifest",
+        "actual_created_blob",
         # Stage outcomes: without them every failed pull, inference or cancel
         # was published as the same opaque "unknown" receiver code.
         "actual_pull_success",
@@ -1223,7 +1231,7 @@ class Receiver:
         self.own_command(
             [str(self.binary), "create", "native-source", "-f", str(modelfile)], environment
         )
-        manifests = list((self.home / "producer-models/manifests").rglob("latest"))
+        manifests = list((self.home / "producer-models" / MANIFEST_STORE).rglob("latest"))
         require(len(manifests) == 1, "actual_created_manifest")
         manifest = manifests[0].read_bytes()
         value = json.loads(manifest)
@@ -1285,7 +1293,7 @@ class Receiver:
             self.retirement(owner)
         require(not owner.pending, "actual_pull_retired")
         receiving = self.home / ".ollama/models"
-        actual = list((receiving / "manifests").rglob("latest"))
+        actual = list((receiving / MANIFEST_STORE).rglob("latest"))
         require(
             len(actual) == 1 and actual[0].read_bytes() == manifest, "exact_manifest_publication"
         )
@@ -1317,7 +1325,7 @@ class Receiver:
             self.retirement(cancellation)
         require(not cancellation.pending, "actual_cancelled_operation_retired")
         require(
-            len(list((receiving / "manifests").rglob("latest"))) == 1,
+            len(list((receiving / MANIFEST_STORE).rglob("latest"))) == 1,
             "cancel_does_not_publish_partial_model",
         )
         snapshot = self.fixture.stats()
