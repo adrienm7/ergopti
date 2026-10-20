@@ -85,6 +85,40 @@ _HotstringsScopeRoundTrip() {
 }
 Test("hotstrings-scope: all stores publish together and restore exact bytes after native refusal", _HotstringsScopeRoundTrip)
 
+; A second name for the primary file (a hard link beside it) shares the clear's
+; lease: the clear neither refuses nor publishes the file twice, and a native
+; refusal restores the one physical file through either name.
+_HotstringsScopeHardLinkAlias() {
+	Fixture := _HotstringsScopeFixture()
+	Alias := Fixture.directory . "\alias.toml"
+	AssertTrue(DllCall("kernel32\CreateHardLinkW", "Str", Alias, "Str", Fixture.personal[1], "Ptr", 0, "Int"),
+		"the real hard-link alias must be created")
+	Fixture.catalogue.Push({ Key: "personal:alias", Path: Alias, IsPersonal: true, IsExtension: false })
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	Fixture.options["stamp"] := "clear"
+	try {
+		Receipt := (_HS_ScopeCommands(Fixture.options)["scope_clear"])()
+		AssertEqual(Receipt["status"], "pending", "the alias neither refuses nor duplicates the clear")
+		Personal := TOML_ParseFreshFile(Fixture.personal[1])
+		Assert(!Personal["_meta"].Has("delay"), "the primary file is cleared")
+		AssertEqual(FSReadUtf8Exact(Alias), FSReadUtf8Exact(Fixture.personal[1]), "both names still read one file")
+		Refusal.Call("native refusal")
+		AssertEqual(FSReadUtf8Exact(Fixture.personal[1]), Fixture.personalSource)
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("hotstrings-scope: a hard-link alias of the primary personal file neither refuses nor duplicates the clear",
+	_HotstringsScopeHardLinkAlias)
+
 ; Native categories are category_enabled.<group> on Windows; the macOS/Linux
 ; hotstrings.groups/modules spelling belongs to extension packs only. A restore
 ; that inventoried native categories there wrote keys the loader then ignored
