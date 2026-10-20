@@ -1572,6 +1572,34 @@ local function main()
 			return
 		end
 
+		-- A physical Backspace is a manual correction for the metrics. It arrives
+		-- here and never as text, so nothing recorded it and the error counts saw
+		-- only a hotstring's own deletions. Admitted like a character: the press's
+		-- own privacy verdict, or the current one for an auto-repeat, which
+		-- publishes no physical transition. Recorded before the undo below, which
+		-- returns: the press deleted a character whatever the daemon does next.
+		-- The code table is required here, not at file scope: main() and this
+		-- callback sit near LuaJIT's 60-upvalue limit.
+		if key_name == "backspace" then
+			local admission = physical_privacy_admission
+			physical_privacy_admission = nil
+			local admitted
+			if admission and admission.code == require("infra.evdev_codes").KEY_BACKSPACE then
+				admitted = admission.allowed
+			else
+				admitted = not secure_focus_guard.blocks_text()
+			end
+			if admitted then
+				local app_id = _cached_app_id or "Unknown"
+				if keylogger.is_password_app(app_id) then
+					keylogger.suppress()
+				else
+					keylogger.unsuppress()
+				end
+				keylogger.record_correction(app_id, math.floor(Monotonic.now_ms()))
+			end
+		end
+
 		-- A Backspace under Ctrl, Alt or Super deletes a word (or undoes, in some
 		-- applications): how much text went is unknown. It must neither undo an
 		-- expansion, whose erase count assumes one character went, nor edit the

@@ -29,6 +29,7 @@ local M = {}
 local Logger   = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local Timings   = require("infra.timings")
+local EvdevCodes = require("infra.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
 local Manifest      = require("infra.manifest_reader")
@@ -108,6 +109,10 @@ local LOG = "modules.keylogger.keylogger"
 -- same character macOS substitutes (keylogger/init.lua), so a database merged
 -- across a user's two machines redacts identically on both.
 local PRIVATE_PLACEHOLDER_CHAR = "\226\128\162"
+
+-- The token one deletion travels as in the portable events_json stream, the
+-- same bracket marker the Windows hook and the macOS event tap write.
+local BACKSPACE_MARKER = "[BS]"
 
 
 -- =========================================
@@ -487,11 +492,16 @@ end
 function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 	if not may_record() then return end
 
+	-- A correction is an input event but types nothing, so neither speed readout
+	-- counts it: the Windows widget is pushed for characters only and macOS
+	-- leaves Backspace out of its typing rings. Counting it would make every
+	-- held Backspace read as a burst of fast typing.
+	local is_correction = ch == BACKSPACE_MARKER
 	-- Forward to the base metrics collector if available.
-	if Metrics then
+	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
-	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+	if not is_correction and type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, 1, timestamp_ms)
 	end
 
@@ -530,6 +540,19 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 	end
 end
 
+--- Records one physical Backspace press as a manual correction.
+---
+--- The hook reports Backspace through its control callback, never as text, so
+--- before this entry point the daemon fed nothing for it: the walker's error
+--- counts, hourly corrections and backspace n-grams only ever saw the deletions
+--- a hotstring made. Every press counts, auto-repeat and Ctrl+Backspace
+--- included, as on Windows and macOS: each is one deletion the user asked for.
+--- @param app_id       string|nil Focused application identifier.
+--- @param timestamp_ms number     Monotonic wall-clock timestamp in ms.
+function M.record_correction(app_id, timestamp_ms)
+	M.on_keydown(BACKSPACE_MARKER, timestamp_ms, app_id, EvdevCodes.KEY_BACKSPACE)
+end
+
 
 -- =========================================
 -- =========================================
@@ -554,7 +577,7 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	app.last_key_at = timestamp_ms
 
 	-- A correction remains an input event, but contributes no typed character.
-	if ch ~= "[BS]" then app.keystroke_count = app.keystroke_count + 1 end
+	if ch ~= BACKSPACE_MARKER then app.keystroke_count = app.keystroke_count + 1 end
 	-- Against the window it was typed into, not the application. Both are useful
 	-- and only one of them was recorded.
 	if _current_title then
@@ -619,7 +642,7 @@ end
 --- @param is_private boolean|nil
 --- @return string
 local function recorded_char(char, is_private)
-	if is_private and char ~= "[BS]" then return PRIVATE_PLACEHOLDER_CHAR end
+	if is_private and char ~= BACKSPACE_MARKER then return PRIVATE_PLACEHOLDER_CHAR end
 	return char
 end
 
@@ -631,9 +654,9 @@ local function append_synthetic_events(app_id, text, source, deletes, is_private
 	-- reading a clock from a function that has never needed one.
 	local at = pending.last_key_at
 	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
-		pending.events[#pending.events + 1] = { "[BS]", 0, { s = 1, st = source } }
+		pending.events[#pending.events + 1] = { BACKSPACE_MARKER, 0, { s = 1, st = source } }
 		pending.times[#pending.events] = at
-		add_synthetic_ngram(_app_stats[app_id], "[BS]", source)
+		add_synthetic_ngram(_app_stats[app_id], BACKSPACE_MARKER, source)
 	end
 	if type(text) ~= "string" or text == "" then return end
 	local ok, len = pcall(utf8.len, text)
