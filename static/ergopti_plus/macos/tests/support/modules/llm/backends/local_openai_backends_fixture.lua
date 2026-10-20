@@ -149,7 +149,7 @@ local function with_panel(scenario)
 			}
 			local Panel = require("ui.menu.menu_llm.local_server_panel")
 			local ctx = {
-				state = { llm_backend = "ollama", llm_model = "" },
+				state = { llm_backend = "ollama", llm_model = "", llm_enabled = true },
 				paused = false,
 				is_paused = function() return false end,
 				keymap = {
