@@ -477,12 +477,6 @@ local FLUSH_EVERY_TICKS  = math.max(1,
 
 local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
--- How many candidates the preview asks the engine for. The panel itself caps the
--- rows it draws; this cap is about the WORK — the enumeration runs on every
--- keystroke, and a bucket for a common tail character holds hundreds of mappings.
--- Slightly above the panel's own limit so it never shows fewer than it could.
-local PREVIEW_MAX_CANDIDATES = 8
-
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
 	local ok, mod = pcall(require, "keymap.terminators")
@@ -714,6 +708,12 @@ local function main()
 	-- Keep main within older LuaJIT's 60-upvalue budget; these dependencies remain mandatory.
 	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 	local PreviewSettings = require("modules.hotstrings.preview_settings")
+	-- How many candidates the preview asks the engine for. The panel itself caps
+	-- the rows it draws; this cap is about the WORK — the enumeration runs on
+	-- every keystroke, and a bucket for a common tail character holds hundreds of
+	-- mappings. Slightly above the panel's own limit so it never shows fewer than
+	-- it could. A main() local, not a file-scope one, for the upvalue budget.
+	local PREVIEW_MAX_CANDIDATES = 8
 	local opts = parse_args()
 
 	if opts.help then
