@@ -94,14 +94,20 @@ jobs:
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 liblua5.4-dev luarocks lua-luv
           lua5.4 -e 'local uv = require("luv"); local a = uv.hrtime(); local b = uv.hrtime(); assert(type(a) == "number" and a >= 0 and b >= a, "native Lua wall clock is mandatory")'
 
-      - name: Install luacheck + luafilesystem
+      - name: Install luafilesystem
         # lfs is required by tests/run.lua for recursive test discovery;
         # --lua-version 5.4 ensures luarocks links the correct runtime.
-        run: |
-          sudo luarocks --lua-version 5.4 install luacheck
-          sudo luarocks --lua-version 5.4 install luafilesystem
+        run: sudo luarocks --lua-version 5.4 install luafilesystem
+
+      # The lint scans the whole tree, whatever the lot, and never fails the
+      # job, so seven identical copies only delayed the slowest Unit lot, which
+      # gates E2E. The catch-all lot runs almost no tests and carries it alone.
+      - name: Install luacheck
+        if: matrix.lot == 'other'
+        run: sudo luarocks --lua-version 5.4 install luacheck
 
       - name: Run luacheck (non-blocking)
+        if: matrix.lot == 'other'
         # Surface warnings without failing — pre-existing style issues
         # must not block the test step.
         run: |

@@ -796,6 +796,23 @@ function assertLiteralUnit(source) {
 		'The Unit row must run exactly its module group'
 	);
 	assert.equal(tests[0].run.split('tests/run.lua').length, 2, 'One Unit runner command');
+	// The whole-tree lint runs once, on the catch-all lot, so renaming that
+	// group cannot silently drop it and no other lot pays for it again.
+	const catchAll = roles.unitGroups().at(-1);
+	for (const name of ['Install luacheck', 'Run luacheck (non-blocking)']) {
+		const lint = job.steps.filter((step) => step.name === name);
+		assert.equal(lint.length, 1, 'Missing or duplicate Unit lint step');
+		assert.equal(
+			lint[0].if,
+			`matrix.lot == '${catchAll}'`,
+			'The Unit lint must run once, on the catch-all lot'
+		);
+	}
+	assert.equal(
+		job.steps.filter((step) => /luacheck/.test(step.run ?? '')).length,
+		2,
+		'Only the catch-all lint steps may install or run luacheck'
+	);
 	const selectAt = job.steps.findIndex((step) => step.id === 'stage-selection');
 	const testAt = job.steps.findIndex((step) => step.name === 'Run unit + meta tests');
 	const planAt = job.steps.findIndex((step) => step.id === 'stage-plan');
