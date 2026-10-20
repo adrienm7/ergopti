@@ -25,6 +25,8 @@ function M.new(options)
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return sources, {} end,
 		is_key_device = function() return true end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true end,
 	}
 	local Reader = helpers.load_module("adapters.evdev_reader")
 	Reader._set_backend({

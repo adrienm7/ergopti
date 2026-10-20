@@ -247,6 +247,8 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 		package.loaded["modules.hotstrings.device_finder"] = {
 			find_devices = function() return { keyboard }, { pointer } end,
 			is_key_device = function() return true, nil end,
+			-- Controlled keyboard sources have no REL/ABS axes.
+			is_interceptable_key_device = function() return true, nil end,
 		}
 		package.loaded["adapters.xkb_capture"] = {
 			is_ready = function() return true end,
@@ -497,6 +499,8 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 		package.loaded["modules.hotstrings.device_finder"] = {
 			find_devices = function() return { nodes.keyboard }, { nodes.mouse } end,
 			is_key_device = function() return true, nil end,
+			-- Controlled keyboard sources have no REL/ABS axes.
+			is_interceptable_key_device = function() return true, nil end,
 		}
 		package.loaded["adapters.xkb_capture"] = {
 			is_ready = function() return true end,

@@ -132,6 +132,8 @@ function M.with_session(options, body)
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return { paths.a, paths.b }, {} end,
 		is_key_device = function() return true end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true end,
 		physical_sources = function(devices)
 			local result = {}; for _, path in ipairs(devices) do result[#result + 1] = {
 				path = path, sysfs = "/controlled/source", name = "controlled", physical = s.virtual ~= true } end

@@ -211,6 +211,30 @@ function M.is_key_device(path, devices)
 	return false, path .. " is not listed in " .. PROC_INPUT_DEVICES
 end
 
+--- Whether the keyboard-only output can preserve a source under EVIOCGRAB.
+--- The grab owns every event on the node, including axes which the keyboard
+--- output cannot forward. Observe mode keeps using is_key_device instead.
+--- @param path string|nil An absolute device path.
+--- @param devices table|nil Pre-parsed descriptors; reads /proc once when omitted.
+--- @return boolean ok, string|nil reason Why interception was refused.
+function M.is_interceptable_key_device(path, devices)
+	local snapshot = type(devices) == "table" and devices or read_proc_devices()
+	local is_key, why = M.is_key_device(path, snapshot)
+	if not is_key then return false, why end
+	local basename = path:match("([^/]+)$")
+	for _, dev in ipairs(snapshot) do
+		for _, handler in ipairs(dev.handlers) do
+			if handler == basename then
+				if has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT) then
+					return false, path .. " reports EV_REL/EV_ABS axes that the keyboard output cannot forward"
+				end
+				return true, nil
+			end
+		end
+	end
+	return false, path .. " is not listed in " .. PROC_INPUT_DEVICES
+end
+
 --- Returns true when the device name looks like a keyboard.
 --- Prefers devices with "keyboard" or "kbd" in their name.
 --- @param name string Device name string.

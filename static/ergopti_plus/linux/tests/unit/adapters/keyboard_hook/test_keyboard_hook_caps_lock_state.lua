@@ -36,6 +36,8 @@ local function load_hook()
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_keyboard = function() return nil end,
 		is_key_device = function() return true, nil end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true, nil end,
 	}
 	return helpers.load_module("adapters.keyboard_hook"), function()
 		package.loaded["adapters.xkb_capture"] = saved.xkb

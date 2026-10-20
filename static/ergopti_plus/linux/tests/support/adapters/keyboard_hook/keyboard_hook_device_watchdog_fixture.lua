@@ -69,6 +69,8 @@ local function stub_device_finder(initial)
 		-- the stub answers for them; the check itself is covered against real
 		-- fixture text in test_device_finder_selection.lua.
 		is_key_device = function() return true, nil end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true, nil end,
 	}
 	return function(next_answer) answer = next_answer end, function() return calls end
 end
@@ -152,6 +154,8 @@ local function aggregate_consumer_session(streams, options)
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return desired, {} end,
 		is_key_device = function() return true end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true end,
 	}
 	local reader = helpers.load_module("adapters.evdev_reader")
 	local backend = multi_recorder(queues)
