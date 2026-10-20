@@ -350,7 +350,7 @@ global _NumberRowForegroundLayout := 0
  * @returns {String} "native", "digits" or "symbols".
  */
 NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
-	global Features, CategoryEnabled, _NumberRowForegroundLayout
+	global Features, CategoryEnabled
 	; Parse-time criteria can run during Bundle_Init, before category publication.
 	; Only the actual admitted Layout switch may enable a non-native policy.
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
@@ -371,10 +371,35 @@ NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
 			return "native"
 	}
 	if !IsSet(Hkl)
-		Hkl := _NumberRowForegroundLayout ? _NumberRowForegroundLayout : GetForegroundKeyboardLayout()
+		Hkl := NumberRowForegroundLayout()
 	Effective := NumberRowPolicyEffective(Mode, NumberRowAvailability(Hkl, Caps))
 	_NumberRowLogTransition(Mode, Effective)
 	return Effective["mode"]
+}
+
+; The layout of the foreground window, or the test seam's stand-in.
+NumberRowForegroundLayout() {
+	global _NumberRowForegroundLayout
+	return _NumberRowForegroundLayout ? _NumberRowForegroundLayout : GetForegroundKeyboardLayout()
+}
+
+/**
+ * What a digit key types under « symbols first » on a row no registry layout
+ * owns (the native or the built-in one): its Shift-level symbol unshifted, its
+ * digit with Shift. A dead Shift level types its accent.
+ * @param {Integer} Sc Scan code, 0x02 (the 1 key) to 0x0B (the 0 key).
+ * @param {Boolean} Shift Shift held.
+ * @param {Integer} Hkl Native layout of the press.
+ * @param {Boolean} Caps CapsLock state.
+ * @returns {String} "" when « symbols first » does not apply there.
+ */
+NumberRowSymbolsFirstText(Sc, Shift, Hkl, Caps) {
+	if Sc < 0x02 || Sc > 0x0B || NumberRowEffectiveMode(Hkl, Caps) != "symbols"
+		return ""
+	if Shift
+		return Mod(Sc - 1, 10) . ""
+	Level := _DigitRowEffectiveKey(Sc, Hkl, Caps)["shift"]
+	return Level is Map ? Level["Text"] : ""
 }
 
 ; Logs a stored choice turning inert on the effective layout, and applying again.
@@ -413,8 +438,15 @@ NumberRowSymbolsLevel(Sc, Caps) {
 	return Levels is Map ? NumberRowPolicySymbolsShift(Mod(Sc - 1, 10) . "", Levels["plain"], Levels["shift"]) : Refused
 }
 
-/** Every physical position must have a genuine source pair before offering symbols. */
+/**
+ * Whether « symbols first » can be emitted: a registry layout needs a genuine
+ * source pair at every position (its own action machine types the levels);
+ * the native and built-in rows are typed by NumberRowSymbolsFirstText. Where
+ * the row cannot be reordered, NumberRowAvailability keeps the choice inert.
+ */
 NumberRowSymbolsCapable(Caps) {
+	if !KeylayoutEmulation_LayerIsActive("ergopti_base")
+		return true
 	Loop 10 {
 		if !NumberRowSymbolsLevel(A_Index + 1, Caps)["supported"]
 			return false

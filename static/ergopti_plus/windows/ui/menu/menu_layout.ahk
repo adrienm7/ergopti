@@ -95,7 +95,7 @@ _LAY_NumberRowRuntime() {
 		Desired := IsSet(Features) && Features is Map ? MasterGateDesiredFeatures(Features) : Map()
 		Mode := Desired.Has("layout") && Desired["layout"] is Map ? NumberRowPolicyMode(Desired["layout"].Get("direct_access_digits", "")) : ""
 		Caps := GetKeyState("CapsLock", "T")
-		Hkl := GetForegroundKeyboardLayout()
+		Hkl := NumberRowForegroundLayout()
 		return Map("owner", IsSet(Features) ? Features : 0,
 			"source", IsSet(KLE_Model) && IsObject(KLE_Model) && KeylayoutEmulation_LayerIsActive("ergopti_base") ? KLE_Model : Hkl,
 			"native_owner", IsSet(_LayoutPollRetry) ? _LayoutPollRetry : 0,

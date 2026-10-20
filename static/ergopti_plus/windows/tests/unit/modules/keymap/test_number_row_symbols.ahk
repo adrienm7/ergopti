@@ -217,6 +217,89 @@ _NRP_WithAzertyShapedForeground(Fn) {
 	}
 }
 
+; Runs Fn with a US-QWERTY-shaped layout standing for the foreground one:
+; digits unshifted and « ! @ # $ % ^ & * ( ) » on Shift.
+_NRP_WithQwertyShapedForeground(Fn) {
+	global _NumberRowForegroundLayout, _DigitRowProfiles, KS_DIGIT_ROW_KEYS
+	Saved := [_NumberRowForegroundLayout, _DigitRowProfiles]
+	Hkl := 0x7E570409
+	Symbols := ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"]
+	Plain := Map(), Shifted := Map()
+	for Index, Key in KS_DIGIT_ROW_KEYS {
+		Plain[Key[2]] := Mod(Index, 10) . ""
+		Shifted[Key[2]] := Symbols[Index]
+	}
+	_DigitRowProfiles := Map(Hkl, Map("shifted", false, "symbols", Plain, "shift_symbols", Shifted))
+	_NumberRowForegroundLayout := Hkl
+	try Fn.Call(Hkl)
+	finally {
+		_NumberRowForegroundLayout := Saved[1]
+		_DigitRowProfiles := Saved[2]
+	}
+}
+
+; « Symbols first » needed a registry layout. It now reorders any row whose
+; keys have their digit unshifted and a symbol on Shift, the OS layout's
+; included, and stays inert elsewhere (number-row-native-symbols-first).
+_NRP_NativeSymbolsFirst() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, ConfigurationFile, _DriverDir
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile]
+	Dir := _KLT_TempDir()
+	try {
+		Native := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+			"ergopti_variant", "none", "direct_access_digits", "symbols")
+		_NRP_UseLayout(Native)
+		KLE_Model := 0
+		KLE_Id := ""
+		ConfigurationFile := Dir . "symbols.toml"
+		Image := _CMJFixtureCurrentSource('[layout]`ndirect_access_digits = "symbols"`n`n[category_enabled]`nlayout = true`n')
+		FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
+		AssertEqual("current", ConfigMigrateBoot(ConfigurationFile)["status"])
+		_NRP_WithQwertyShapedForeground(_NRP_AssertQwertySymbolsFirst)
+		_NRP_WithAzertyShapedForeground((Hkl) => (
+			AssertEqual("native", NumberRowEffectiveMode(), "AZERTY already types its symbols unshifted"),
+			AssertEqual("", NumberRowSymbolsFirstText(0x02, false, Hkl, false), "an inert choice types nothing")))
+		Source := _StripFullLineComments(FileRead(_DriverDir . "\modules\keymap\layout.ahk", "UTF-8"))
+		Start := InStr(Source, '#HotIf NumberRowEffectiveMode() == "symbols" && !KeylayoutEmulation_LayerIsActive("ergopti_base")')
+		Finish := InStr(Source, "`n#HotIf`n", , Start)
+		AssertTrue(Start > 0 && Finish > Start, "the native symbols-first block must be found")
+		Block := SubStr(Source, Start, Finish - Start)
+		Loop 10 {
+			Name := Format("SC{:03X}", A_Index + 1)
+			AssertTrue(InStr(Block, "`n" . Name . ":: _NumberRowSymbolsFirstSend(") > 0, Name . " is reordered unshifted")
+			AssertTrue(InStr(Block, "`n+" . Name . ":: _NumberRowSymbolsFirstSend(") > 0, Name . " is reordered with Shift")
+		}
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		ConfigurationFile := Saved[5]
+		DirDelete(Dir, true)
+	}
+}
+
+_NRP_AssertQwertySymbolsFirst(Hkl) {
+	AssertTrue(NumberRowSymbolsCapable(false), "no registry layout is needed")
+	AssertEqual("symbols", NumberRowEffectiveMode(), "symbols first applies on the QWERTY-shaped row")
+	AssertEqual("!", NumberRowSymbolsFirstText(0x02, false, Hkl, false), "the 1 key types its Shift symbol")
+	AssertEqual("1", NumberRowSymbolsFirstText(0x02, true, Hkl, false), "and its digit with Shift")
+	AssertEqual(")", NumberRowSymbolsFirstText(0x0B, false, Hkl, false), "the 0 key types its Shift symbol")
+	AssertEqual("0", NumberRowSymbolsFirstText(0x0B, true, Hkl, false))
+	AssertEqual("!", LayerEditor_CurrentEmulation()["character"].Call("SC002"), "the layer editor shows the swapped level")
+	Rows := _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)
+	Items := Rows[1]["items"]
+	AssertTrue(Items[3]["checked"], "the stored symbols-first choice is ticked")
+	AssertFalse(Items[3].Get("disabled", false), "and offered on the OS layout's row")
+	AssertEqual(t("menu.layout.number_row_symbols"), Items[3]["label"], "it applies: no suffix")
+	AssertEqual("platform_reason.number_row_already_digits_first", Items[2].Get("disabled_reason_key", ""))
+}
+Test("number row: symbols first reorders the OS layout's row without a registry layout (number-row-native-symbols-first)",
+	_KLT_WithEmulation.Bind(_NRP_NativeSymbolsFirst))
+
 ; « Digits first » used to type Ergopti's « $ % = » on the edge keys on any
 ; layout. It reorders the ten digit keys only: the edges keep what the
 ; effective layout types there (number-row-effective-edges).
