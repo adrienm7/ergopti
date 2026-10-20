@@ -802,7 +802,15 @@ function M.install(ctx)
 				return true
 			end
 			if not current_or_cancel() then return false end
+			local replacement_epoch = obj._server_transition_epoch
 			Logger.info(LOG, "MLX server identity changed — queueing replacement after exact predecessor settlement.")
+			if not current_or_cancel() then return false end
+			-- The diagnostic may have replaced this predecessor or its intent.
+			if obj._server_lifecycle_owner ~= lifecycle
+				or obj._server_transition_epoch ~= replacement_epoch then
+				settle_cancel("superseded")
+				return false
+			end
 
 			local replacement_opts = {}
 			if type(opts) == "table" then
@@ -948,8 +956,16 @@ function M.install(ctx)
 			-- [MLX-SERVER] downstream so it stands out from Hammerspoon's own
 			-- log entries.
 			local unified_log_file = Logger.today_log_path()
+			local launch_epoch = obj._server_transition_epoch
 			Logger.info(LOG, "Starting MLX server process for model %s — output prefixed [MLX-SERVER] in %s",
 				tostring(target_model), unified_log_file)
+			if not current_or_cancel() then return false end
+			-- A diagnostic continuation may already own a newer server or intent.
+			if obj._server_lifecycle_owner ~= lifecycle
+				or obj._server_transition_epoch ~= launch_epoch then
+				settle_cancel("superseded")
+				return false
+			end
 			local startup_confirmed = false
 			local startup_closed = false
 			-- A fresh server is not ready, and any waiter queued against the PREVIOUS
