@@ -171,20 +171,16 @@ global _TapKeyOsProbe := {
 	ToUnicode: KS_KeyTextNoStateChange,
 }
 
-; The character the Ergopti emulation gives this scancode on its base layer
-; while it remaps the digit row (« digits first » in effect, or the built-in
-; emulation, which types its own row: RegisterBuiltinNumberRow), or "" when
-; the key is the OS layout's.
+; The character the layout emulation gives this scancode on its base layer
+; (a registry layout or the built-in Ergopti row), or "" when the key is the
+; OS layout's. The number-row ordering never moves these edge keys.
 ; @param {Integer} Scancode
 ; @returns {String}
 _TapKeyEmulatedCharacter(Scancode) {
 	global Features
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout")
 		return ""
-	if NumberRowEffectiveMode() != "digits" && !BuiltinNumberRowIsActive()
-		return ""
-	Table := ErgoptiNumberRowEdgeMapping()
-	return Table.Has(Scancode) ? Table[Scancode] : ""
+	return NumberRowEmulatedBase(Format("SC{:03X}", Scancode))
 }
 
 ; The character a plain tap on the key produces right now.

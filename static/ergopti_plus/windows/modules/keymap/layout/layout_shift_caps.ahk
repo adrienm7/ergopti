@@ -221,6 +221,29 @@ RegisterBuiltinNumberRow() {
 	try LoggerSuccess("LayoutNumberRow", "Built-in Ergopti number row registered ({1} keys).", Count)
 }
 
+/**
+ * What the layout emulation types unshifted on a number-row key, edges
+ * included: the registry layout's neutral base level or the built-in Ergopti
+ * row; "" when no emulation types that key (the OS layout's then).
+ * @param {String} Sc Scan code name, "SC029" to "SC00D".
+ * @returns {String}
+ */
+NumberRowEmulatedBase(Sc) {
+	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex, ERGOPTI_SPEC, ERGOPTI_NUMBER_ROW
+	if !ERGOPTI_NUMBER_ROW.Has(Sc)
+		return ""
+	if KeylayoutEmulation_LayerIsActive("ergopti_base") {
+		if !KLE_KeyCodes.Has(Sc)
+			return ""
+		Level := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(false, false, false)], KLE_KeyCodes[Sc])
+		return Level["Text"]
+	}
+	if !BuiltinNumberRowIsActive() || !IsSet(ERGOPTI_SPEC) || !IsObject(ERGOPTI_SPEC)
+		return ""
+	Row := ERGOPTI_SPEC["number_row_base"]
+	return Row.Has(Sc) && Row[Sc].Has("text") ? Row[Sc]["text"] : ""
+}
+
 ; Whether the built-in Ergopti emulation is in force: the effective switch,
 ; which a selected registry layout supersedes (MasterGateDesiredFeatures).
 BuiltinNumberRowIsActive() {

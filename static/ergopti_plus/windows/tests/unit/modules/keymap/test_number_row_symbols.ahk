@@ -197,6 +197,64 @@ _NRP_StoredChoiceSurvivesLayouts() {
 Test("number row: a stored choice is inert where it cannot apply and applies again with no rewrite (number-row-inert-choice)",
 	_KLT_WithEmulation.Bind(_NRP_StoredChoiceSurvivesLayouts))
 
+; Runs Fn with an AZERTY-shaped layout standing for the foreground one:
+; symbols unshifted and digits on Shift on all ten keys.
+_NRP_WithAzertyShapedForeground(Fn) {
+	global _NumberRowForegroundLayout, _DigitRowProfiles, KS_DIGIT_ROW_KEYS
+	Saved := [_NumberRowForegroundLayout, _DigitRowProfiles]
+	Hkl := 0x7E57040C
+	Plain := Map(), Shifted := Map()
+	for Index, Key in KS_DIGIT_ROW_KEYS {
+		Plain[Key[2]] := Chr(0x26)
+		Shifted[Key[2]] := Mod(Index, 10) . ""
+	}
+	_DigitRowProfiles := Map(Hkl, Map("shifted", true, "symbols", Plain, "shift_symbols", Shifted))
+	_NumberRowForegroundLayout := Hkl
+	try Fn.Call(Hkl)
+	finally {
+		_NumberRowForegroundLayout := Saved[1]
+		_DigitRowProfiles := Saved[2]
+	}
+}
+
+; « Digits first » used to type Ergopti's « $ % = » on the edge keys on any
+; layout. It reorders the ten digit keys only: the edges keep what the
+; effective layout types there (number-row-effective-edges).
+_NRP_DigitsFirstLeavesTheEdges() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, _DriverDir
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
+	try {
+		_NRP_UseLayout(Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+			"ergopti_variant", "none", "direct_access_digits", "digits"))
+		KLE_Model := 0
+		KLE_Id := ""
+		_NRP_WithAzertyShapedForeground((Hkl) => (
+			AssertEqual("digits", NumberRowEffectiveMode(), "digits first applies on the AZERTY-shaped row"),
+			AssertTrue(_KLE_DigitsOwnKey("SC002", false), "the digit keys are reordered"),
+			AssertFalse(_KLE_DigitsOwnKey("SC029", false), "the key left of 1 is not"),
+			AssertFalse(_KLE_DigitsOwnKey("SC00C", false), "the first key right of 0 is not"),
+			AssertFalse(_KLE_DigitsOwnKey("SC00D", false), "the second key right of 0 is not"),
+			AssertEqual("", NumberRowEmulatedBase("SC029"), "no emulation: the OS layout types the edges")))
+		Source := _StripFullLineComments(FileRead(_DriverDir . "\modules\keymap\layout.ahk", "UTF-8"))
+		Start := InStr(Source, '#HotIf NumberRowEffectiveMode() == "digits"')
+		Finish := InStr(Source, "`n#HotIf`n", , Start)
+		AssertTrue(Start > 0 && Finish > Start, "the digits-first block must be found")
+		Block := SubStr(Source, Start, Finish - Start)
+		for Edge in ["SC029", "SC00C", "SC00D"]
+			AssertEqual(0, InStr(Block, "`n" . Edge . "::"), Edge . " has no digits-first hotkey")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+	}
+}
+Test("number row: digits first reorders the ten digit keys and leaves the edges to the layout (number-row-effective-edges)",
+	_KLT_WithEmulation.Bind(_NRP_DigitsFirstLeavesTheEdges))
+
 ; The built-in Ergopti row has its digits on both levels: neither ordering can
 ; make base differ from Shift, and leaving it as is types Ergopti's digits.
 _NRP_BuiltinErgoptiOffersNoOrdering() {
@@ -216,9 +274,8 @@ _NRP_BuiltinErgoptiOffersNoOrdering() {
 		for SC in _SHIFT_DIGIT_SCS
 			AssertEqual(Mod(Integer("0x" . SubStr(SC, 3)) - 1, 10) . "", ERGOPTI_SPEC["number_row_base"][SC]["text"],
 				SC . ": the built-in row types Ergopti's digit unshifted")
-		for Code, Text in ErgoptiNumberRowEdgeMapping()
-			AssertEqual(Text, ERGOPTI_SPEC["number_row_base"][Format("SC{:03X}", Code)]["text"],
-				"the tap-key labels' edge table is the built-in row's base level")
+		for SC, Text in Map("SC029", "$", "SC00C", "%", "SC00D", "=")
+			AssertEqual(Text, ERGOPTI_SPEC["number_row_base"][SC]["text"], SC . ": the built-in row types the .keylayout's edge")
 		Body := _StripFullLineComments(_DriverFuncBody("RegisterBuiltinNumberRow"))
 		AssertTrue(Body != "", "the built-in number row registration must exist")
 		AssertTrue(InStr(Body, 'ERGOPTI_SPEC["number_row_base"]') > 0, "it types the .keylayout's base level")

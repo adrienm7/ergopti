@@ -223,9 +223,6 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
-		Edges := ErgoptiNumberRowEdgeMapping()
-		if Edges.Has(Numeric)
-			return { Count: StrLen(Edges[Numeric]), Text: Edges[Numeric] }
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
 		Shift := false
@@ -240,6 +237,10 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 			Text: Step["Output"] }
 	}
 	if Features["layout"]["ergopti_base"] {
+		; The built-in emulation types its own number row (RegisterBuiltinNumberRow).
+		Row := NumberRowEmulatedBase(StrUpper(Scan))
+		if Row != ""
+			return { Count: StrLen(Row), Text: Row }
 		if ErgoptiBaseDeadKeys().Has(Scan)
 			return { Count: -1, Text: ErgoptiBaseDeadKeys()[Scan]["chain"] }
 		Base := ErgoptiBaseMapping()
