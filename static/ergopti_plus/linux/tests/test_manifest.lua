@@ -426,6 +426,7 @@ return {
 	"tests.unit.modules.hotstrings.catalogue.test_common_autocorrection_reference",
 	"tests.unit.modules.hotstrings.engine.test_delay_resolver",
 	"tests.unit.modules.hotstrings.engine.test_device_finder_selection",
+	"tests.unit.modules.dynamic_hotstrings.test_dynamic_destination",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_expansion_log_privacy",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_multibyte_trigger",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_rule_count_idempotence",

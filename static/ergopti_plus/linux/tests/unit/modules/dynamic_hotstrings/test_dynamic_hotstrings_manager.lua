@@ -100,12 +100,12 @@ helpers.describe("dynamic hotstrings manager", function()
   helpers.describe("on_trigger contract", function()
 
     helpers.it("on_trigger with empty buffer returns false", function()
-      local ok = dh.on_trigger("", "\\")
+      local ok = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "", "\\")
       helpers.assert_true(ok == false, "empty buffer → no match")
     end)
 
     helpers.it("on_trigger without trigger char in buffer returns false", function()
-      local ok = dh.on_trigger("hello", "\\")
+      local ok = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "hello", "\\")
       helpers.assert_true(ok == false, "no trigger in buffer → no match")
     end)
 
@@ -113,7 +113,7 @@ helpers.describe("dynamic hotstrings manager", function()
       -- Buffer "td\" should match the "td" → YYYY_MM_DD date rule.
       -- The backslash is the trigger character.
       dh.set_enabled(true)
-      local ok = dh.on_trigger("td\\", "\\", true)
+      local ok = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "td\\", "\\", true)
       -- This will try to inject via ydotool, which fails on test machines.
       -- We only verify it doesn't crash.
       helpers.assert_true(type(ok) == "boolean", "on_trigger returns boolean")
@@ -121,7 +121,7 @@ helpers.describe("dynamic hotstrings manager", function()
 
     helpers.it("on_trigger when disabled returns false", function()
       dh.set_enabled(false)
-      local ok = dh.on_trigger("td\\", "\\", true)
+      local ok = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "td\\", "\\", true)
       helpers.assert_true(ok == false, "disabled module → no match")
       dh.set_enabled(true)
     end)
@@ -129,7 +129,7 @@ helpers.describe("dynamic hotstrings manager", function()
     helpers.it("on_trigger with nil buffer is safe", function()
       -- Called directly: this runs on every keystroke, so a raise is a dead
       -- keyboard and should fail with its own error.
-      local out = dh.on_trigger(nil, "\\")
+      local out = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, nil, "\\")
       helpers.assert_true(out == nil or type(out) == "string" or type(out) == "boolean",
         "a nil buffer must answer nil or a documented value, never a half-value")
     end)
@@ -290,7 +290,7 @@ helpers.describe("dynamic hotstrings manager", function()
         end,
       }
 
-      local ok = dh.on_trigger("@n\\", "\\")
+      local ok = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@n\\", "\\")
 
       package.loaded["modules.hotstrings.injector"] = prev_injector
       os.remove(path)
@@ -338,10 +338,10 @@ helpers.describe("dynamic hotstrings manager", function()
       }
 
       local single_preview = dh.preview("@é\\", true)
-      local single_fired, single_event = dh.on_trigger("@é\\", "\\")
+      local single_fired, single_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@é\\", "\\")
       local fields = dh.resolve_combo("né")
       local rows = dh.preview_candidates("@né")
-      local combo_fired, combo_event = dh.on_trigger("@né\\", "\\")
+      local combo_fired, combo_event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@né\\", "\\")
 
       package.loaded["modules.hotstrings.injector"] = previous_injector
       os.remove(path)

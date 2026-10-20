@@ -50,7 +50,7 @@ helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 			local engine = require("dynamic_hotstrings")
 			helpers.assert_true(engine.add_rule("été", "date", function() return "X" end))
 
-			local fired, event = manager.on_trigger("zzété\\", "\\")
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(manager, "zzété\\", "\\")
 			helpers.assert_true(fired == true)
 			helpers.assert_not_nil(captured)
 			helpers.assert_eq(captured.count, 4,

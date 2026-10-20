@@ -1098,6 +1098,9 @@ local function main()
 			if not admission.allowed then return end
 		elseif secure_focus_guard.blocks_text() then return end
 
+		-- Retain this field before preview, metrics or prediction callbacks yield.
+		local destination = secure_focus_guard.capture_text_owner()
+
 		-- The preview describes the buffer as it was; the character being typed
 		-- now changes it. Dismissed here rather than redrawn, because the redraw
 		-- (if any) happens below once the engine has re-evaluated.
@@ -1193,9 +1196,8 @@ local function main()
 			end
 		end
 
-		-- Ordinary expansions retain their original field through clipboard I/O.
+		-- Ordinary and single-field dynamic expansions share the admitted field.
 		-- Tabs between explicitly configured fields keep their separate protocol.
-		local destination = result and secure_focus_guard.capture_text_owner()
 		if result and not destination then result = nil end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
@@ -1367,7 +1369,7 @@ local function main()
 			-- take precedence over dynamic expansions.
 			if dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
 				local ok_dh2, expanded, dynamic_event = pcall(function()
-					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary)
+					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary, destination)
 				end)
 				if ok_dh2 and expanded then
 					if dynamic_event and not dynamic_event.pending_user then
