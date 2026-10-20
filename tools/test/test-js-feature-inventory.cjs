@@ -294,7 +294,16 @@ try {
 							}
 						};
 					if (name === 'node:perf_hooks') return { performance: { now: () => ++clock } };
-					assert.ok(['path', 'node:fs', 'node:os'].includes(name), `unexpected import ${name}`);
+					assert.ok(
+						[
+							'path',
+							'node:fs',
+							'node:os',
+							'./lib/js-suite-spawn.cjs',
+							'./lib/host-capabilities.cjs'
+						].includes(name),
+						`unexpected import ${name}`
+					);
 					return require(name);
 				},
 				console: { log: (value) => output.push(String(value)) },
