@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import importlib.util
 import io
+import ipaddress
 import json
 import os
 import re
@@ -448,7 +449,9 @@ class BoundAliasOwnerControls(unittest.TestCase):
 
 class ActualPeerReceiving(unittest.TestCase):
     def setUp(self):
-        self.fixture = WIRE.WireFixture(native=False)
+        # The same origin shape as the native receiver, so these peers prove
+        # its PAC, redirect and TLS routing for an IP-literal registry.
+        self.fixture = WIRE.WireFixture(native=False, origin_address=RECEIVING.REGISTRY_ADDRESS)
         self.addCleanup(self.fixture.close)
         self.registry = RECEIVING.Registry(self.fixture)
         self.model = MODEL.model_bytes()
@@ -1200,6 +1203,20 @@ class NativeInferenceAccountingControls(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "^actual_created_manifest$"):
             self.receive("manifests/registry.ollama.ai/library/native/latest")
         self.assertIn("actual_created_manifest", RECEIVING.RECEIVER_FAILURE_CODES)
+
+    def test_registry_address_passes_the_ported_redirect_check(self):
+        # A .test name failed upstream ValidateRedirectTarget's local lookup and
+        # refused the pull; the literal must be an upstream public vector.
+        address = ipaddress.ip_address(RECEIVING.REGISTRY_ADDRESS)
+        vectors = (
+            ROOT / "static/ergopti_plus/_shared/go/native_http/address_policy_test.go"
+        ).read_text(encoding="utf-8")
+        self.assertIn(f'"{address}":', vectors)
+        self.assertRegex(vectors, rf'"{re.escape(str(address))}":\s+true,')
+        source = (ROOT / "tools/diagnostics/macos_managed_ollama_receiving.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("WireFixture(native=True, origin_address=REGISTRY_ADDRESS)", source)
 
     def receive(self, manifest_relative):
         with tempfile.TemporaryDirectory() as temporary:

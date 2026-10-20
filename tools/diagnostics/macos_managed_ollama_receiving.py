@@ -39,6 +39,15 @@ INFERENCE_TOKENS = 2
 # <model>/<tag> and removes the legacy manifests/ entry after the write
 # (manifest/paths.go and writeManifestData in manifest/manifest.go).
 MANIFEST_STORE = "manifests-v2"
+# Ollama 0.40.4 validates each blob redirect target (transfer.ValidateRedirectTarget
+# in server/download.go) and the port repeats it (address_policy.go): an IP
+# literal must pass isPublicIP, a name must resolve locally to public addresses.
+# The fixture's .test name resolves nowhere, so the registry is this TEST-NET-3
+# literal instead: the real check runs and accepts it (it is an upstream public
+# vector in address_policy_test.go), no DNS is involved, and the address is never
+# routed, so any request that bypassed the fixture proxies fails rather than
+# reaching a real host.
+REGISTRY_ADDRESS = "203.0.113.10"
 
 
 def require(condition, reason):
@@ -714,7 +723,7 @@ class Receiver:
             "ollama_real_native_peers", self.mac / "tests/support/native_http_wire_fixture.py"
         )
         self.prepare_phase = "peer_acquisition"
-        self.fixture = wire.WireFixture(native=True)
+        self.fixture = wire.WireFixture(native=True, origin_address=REGISTRY_ADDRESS)
         self.prepare_phase = "peer_registry"
         self.registry = Registry(self.fixture)
         self.http_app = self.work / "OwnedOutgoingHTTP.app"

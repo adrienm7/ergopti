@@ -11,6 +11,7 @@ The portable role exercises real peers without claiming native Apple acceptance.
 
 import http.server
 import importlib.util
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -60,12 +61,21 @@ class CommandInputOwner:
 
 
 class WireFixture:
-    def __init__(self, native=True):
+    def __init__(self, native=True, origin_address=None):
+        """Owns the origin, proxies and PAC peers.
+
+        origin_address replaces the unresolvable .test name with an IP literal
+        for callers whose client validates the destination address itself.
+        """
+        if origin_address is not None:
+            # Fail fast: a name here would silently bring back a DNS lookup.
+            ipaddress.ip_address(origin_address)
         self.native = native
         self.closed = False
         self.root = Path(tempfile.mkdtemp(prefix="ergopti-native-http-wire-"))
         os.chmod(self.root, 0o700)
-        self.host = "ergopti-native-" + uuid.uuid4().hex + ".test"
+        self.host = origin_address or "ergopti-native-" + uuid.uuid4().hex + ".test"
+        self.host_is_address = origin_address is not None
         self.ca = self.root / "ca.pem"
         self.command_file_debt = []
         self.command_group_debt = []
@@ -397,12 +407,13 @@ class WireFixture:
 
     def _certificates(self):
         config = self.root / "cert.conf"
+        origin = ("IP:" if self.host_is_address else "DNS:") + self.host
         config.write_text(
             "[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=ca\n"
             "[dn]\nCN=Ergopti owned native wire CA\n[ca]\nbasicConstraints=critical,CA:TRUE\n"
             "keyUsage=critical,keyCertSign,cRLSign\n[server]\nbasicConstraints=critical,CA:FALSE\n"
             "keyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n"
-            f"subjectAltName=DNS:{self.host},IP:127.0.0.1\n",
+            f"subjectAltName={origin},IP:127.0.0.1\n",
             encoding="utf-8",
         )
         openssl = "/usr/bin/openssl"
