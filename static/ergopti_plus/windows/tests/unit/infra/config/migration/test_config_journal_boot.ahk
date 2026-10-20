@@ -541,6 +541,60 @@ _CMJ_GenuineDenseArrayMutation(SnapshotSubject := false) {
 Test("config journal: genuine registry sparse cell cannot hide behind unchanged Length", _CMJ_GenuineDenseArrayMutation)
 Test("config journal: genuine published sparse row array retires to actual native reread", _CMJ_GenuineDenseArrayMutation.Bind(true))
 
+; One proof scope pays one deep registry comparison for every file guard, yet a
+; registry mutated before, during or after the scope is still refused.
+_CMJ_RegistryProofScope() {
+	global ConfigurationFile, ConfigMigrateRegistryDeepCompares
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Source := _CMJ_CurrentSource(), Dirs := [], Guards := []
+	Registry := ConfigMigrateShippedRegistry(), OriginalCurrent := Registry["current"]
+	AllHold() {
+		for Guard in Guards {
+			if !Guard.Call(Source, 1)
+				return false
+		}
+		return true
+	}
+	try {
+		loop 5 {
+			Dir := _CMG_NewDir(), Dirs.Push(Dir), Path := Dir . "\config.toml"
+			ConfigurationFile := Path
+			AssertTrue(FSWriteDurable(Path, Source))
+			AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+			Guards.Push(ConfigMigrateBoot(Path, "capture_noop"))
+		}
+		AssertTrue(AllHold(), "without a scope every guard admits the intact registry")
+		Before := ConfigMigrateRegistryDeepCompares
+		AssertTrue(ConfigMigrateWithRegistryProof(AllHold))
+		AssertEqual(1, ConfigMigrateRegistryDeepCompares - Before,
+			"five file guards in one scope share a single deep comparison")
+		Before := ConfigMigrateRegistryDeepCompares
+		AssertTrue(AllHold())
+		AssertEqual(5, ConfigMigrateRegistryDeepCompares - Before,
+			"the memo ends with its scope: guards outside it compare every time")
+		Registry["current"] := OriginalCurrent + 1
+		AssertFalse(ConfigMigrateWithRegistryProof(AllHold), "a registry mutated before the scope is refused inside it")
+		Registry["current"] := OriginalCurrent
+		MutateAfterFirst() {
+			Registry["current"] := OriginalCurrent + 1
+			return true
+		}
+		AssertTrue(ConfigMigrateWithRegistryProof(() => (Guards[1].Call(Source, 1) && MutateAfterFirst())))
+		AssertFalse(Guards[2].Call(Source, 1), "the scope memo never outlives the scope")
+		AssertFalse(AllHold(), "a mutation made while the scope ran is caught by the next fresh check")
+		Registry["current"] := OriginalCurrent
+		AssertTrue(AllHold(), "exact repair restores admission")
+		ConfigMigrateBoot(Dirs[1] . "\config.toml", "check_write")
+		AssertFalse(ConfigMigrateRegistryProofOpen(), "check_write closes the proof scope it opened")
+	} finally {
+		Registry["current"] := OriginalCurrent
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		for Dir in Dirs
+			_CMJ_Cleanup(Dir, Dir . "\config.toml")
+	}
+}
+Test("config journal: one registry proof scope serves every file guard and still refuses mutation", _CMJ_RegistryProofScope)
+
 _CMJ_BootRegistryWithdrawal(When := "prepared") {
 	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
 	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
