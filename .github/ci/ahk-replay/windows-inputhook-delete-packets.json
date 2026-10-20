@@ -1,0 +1,17 @@
+{
+	"expected_count": 6,
+	"filters": [
+		{
+			"contains": "inputhook-control-packet-abi",
+			"expected_count": 4
+		},
+		{
+			"contains": "scalar dispatch: one-shot delete keeps",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key delete keeps",
+			"expected_count": 1
+		}
+	]
+}
