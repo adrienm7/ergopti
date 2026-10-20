@@ -73,8 +73,8 @@ jobs:
           [
             meta,
             llm-servers-a,
-            llm-servers-b,
             llm-terminal,
+            llm-servers-b,
             llm,
             config-transition,
             config-scope-a,

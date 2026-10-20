@@ -594,20 +594,24 @@ Test(Name, Callback, Interactive := false) {
 ; partition the suite and a module's tests keep their relative order. Groups
 ; name the domain folders of unit/ (which mirror the driver tree); the
 ; heaviest folders are split by file so no group dominates the CI wall time.
+; The split follows measured per-file suite times (the execution manifests'
+; duration_ms), so a light group also carries a heavy file from elsewhere:
+; meta takes the scope cohort, gestures and keylogger, llm-terminal the
+; server panel. Re-measure before moving a file between groups.
 ; unit/test_updater.ahk, unit/updater/ and unit/test_config_scope_manifest.ahk
 ; keep their flat paths because the sealed updater source roster names them.
 global TEST_MODULE_GROUPS := [
-	["meta", "^meta/"],
-	["llm-servers-a", "^unit/modules/llm/servers/test_local_server_(panel|scope_cohort)"],
+	["meta", "^meta/|^unit/modules/llm/servers/test_local_server_scope_cohort|^unit/modules/(gestures|keylogger)/"],
+	["llm-servers-a", "^unit/modules/llm/servers/test_local_server_(panel_view_preparation|panel_discovery|source_operations|receipt_entry)"],
+	["llm-terminal", "^unit/modules/llm/nav_event_owner/|^unit/modules/llm/servers/test_local_server_panel\.ahk$"],
 	["llm-servers-b", "^unit/modules/llm/servers/"],
-	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
 	["llm", "^unit/modules/llm/"],
 	["config-transition", "^unit/infra/config/transition/"],
-	["config-scope-a", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm)\.ahk$"],
-	["config-scope-b", "^unit/infra/config/scope/|^unit/test_config_scope_manifest\.ahk$"],
+	["config-scope-a", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	["config-scope-b", "^unit/infra/config/scope/"],
 	["config", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
 	["hotstrings", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
-	["keymap", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	["keymap", "^unit/(platform/remap|modules/keymap)/"],
 	["core", ""]
 ]
 

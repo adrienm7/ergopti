@@ -41,7 +41,12 @@ Test("runner module: the module groups partition the suite in order (runner-modu
 
 _RSH_GroupRules() {
 	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\meta\test_x.ahk"))
-	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel.ahk"))
+	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel_view_preparation.ahk"))
+	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_receipt_entry.ahk"))
+	AssertEqual("llm-terminal", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel.ahk"))
+	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_scope_cohort.ahk"))
+	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\gestures\test_gestures.ahk"))
+	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\keylogger\test_keylogger_event_id.ahk"))
 	AssertEqual("llm-servers-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_join.ahk"))
 	AssertEqual("llm-terminal", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\nav_event_owner\test_terminal_route_metadata.ahk"))
 	AssertEqual("config-transition", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\transition\test_config_transition_windows_port.ahk"))
@@ -50,7 +55,8 @@ _RSH_GroupRules() {
 	AssertEqual("keymap", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
 	AssertEqual("config", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_updater.ahk"))
 	AssertEqual("config", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk"))
-	AssertEqual("config-scope-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_config_scope_manifest.ahk"))
+	AssertEqual("config-scope-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_config_scope_manifest.ahk"))
+	AssertEqual("config-scope-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_hotstrings_scope.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\adapters\shell_runner\test_shell_runner_tree_owned.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))
 	AssertThrows(() => _SelectModule([], "no-such-group"))
