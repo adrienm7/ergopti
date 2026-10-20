@@ -591,6 +591,9 @@ function renderLuaManifest(manifest, sections, features, platform) {
 // ======================================================
 // ======================================================
 
+const CONFIG_TOP_HEADER_SPACING = 5;
+const CONFIG_NESTED_HEADER_SPACING = 3;
+
 function tomlValueLiteral(value) {
 	if (typeof value === 'boolean') return value ? 'true' : 'false';
 	if (typeof value === 'number') {
@@ -640,6 +643,21 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 
 	const lines = [banner];
 
+	// House spacing shared with the Windows flat writer and the Lua codec
+	// (`toml_codec/codec.lua`): five blank lines before a top-level header,
+	// three before a nested one. The template must already carry it, otherwise
+	// the first save rewrites every separator of a fresh file.
+	const pushHeader = (header) => {
+		if (lines.length > 1) {
+			const spacing = header.includes('.')
+				? CONFIG_NESTED_HEADER_SPACING
+				: CONFIG_TOP_HEADER_SPACING;
+			// The previous block already ended with one blank line.
+			for (let i = 1; i < spacing; i++) lines.push('');
+		}
+		lines.push(`[${header}]`);
+	};
+
 	// Iterate sections in flatten order so the rendered TOML reflects the
 	// manifest's authored order. We render sections that have at least one
 	// feature for this platform; pure-metadata sections (no features) are
@@ -662,7 +680,7 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 		});
 
 		if (flatEntries.length > 0) {
-			lines.push(`[${sectionPath}]`);
+			pushHeader(sectionPath);
 			for (const e of flatEntries) {
 				lines.push(`${e.id} = ${tomlValueLiteral(resolveDefault(e, platform))}`);
 			}
@@ -670,7 +688,7 @@ function renderConfigTemplate(manifest, sections, features, platform) {
 		}
 
 		for (const e of tableEntries) {
-			lines.push(`[${sectionPath}.${e.id}]`);
+			pushHeader(`${sectionPath}.${e.id}`);
 			const def = resolveDefault(e, platform);
 			for (const [k, v] of Object.entries(def)) {
 				lines.push(`${k} = ${tomlValueLiteral(v)}`);

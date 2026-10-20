@@ -497,6 +497,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-terminator-labels-localized.cjs"],
 			"repro": "node tools/test/test-terminator-labels-localized.cjs"
+		},
+		{
+			"id": "js-0446",
+			"ordinal": 446,
+			"name": "generated config templates carry the 5/3 blank-line header spacing the writers render",
+			"cmd": "node",
+			"args": ["tools/test/test-config-template-spacing.cjs"],
+			"repro": "node tools/test/test-config-template-spacing.cjs"
 		}
 	]
 }
