@@ -29,7 +29,7 @@ helpers.describe("keylogger: tap-watchdog behavioral contract (C2)", function()
 		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		local src = helpers.read_driver_source("local function ensure_browser_window_watchers")
 		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 		return src
 	end

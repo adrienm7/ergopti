@@ -31,7 +31,7 @@ local _log_manager = nil
 local _settle_modifiers = nil
 
 --- Pause predicate injected by M.init(). The tracker's writers are driven by
---- OS watchers (hs.window.filter, the app watcher, the AX observer) that are
+--- OS watchers (the browser window watchers, the app watcher, the AX observer) that are
 --- torn down only by keylogger.M.stop() — pause never calls it — so without
 --- this predicate a paused script keeps recording window and app activity.
 local _is_paused   = nil
@@ -821,7 +821,7 @@ function M.update_private_status()
 	mark_context("window", false)
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). Window TITLES are the most identifying
-	-- payload this module handles, and hs.window.filter keeps firing while paused.
+	-- payload this module handles, and the browser window watchers keep firing while paused.
 	if _is_paused() then return end
 
 	local win = hs.window.focusedWindow()

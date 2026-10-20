@@ -48,7 +48,7 @@ helpers.describe("keylogger pause wiring — source-level invariant (e2e-pause-s
 		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		local src = helpers.read_driver_source("local function ensure_browser_window_watchers")
 		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 		helpers.assert_true(src:find("_script_control.is_paused", 1, true) ~= nil,
 			"keylogger/init.lua must poll _script_control.is_paused — the real silence mechanism")
@@ -81,7 +81,7 @@ helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2
 			local s = helpers.read_driver_source(selector)
 			return s
 		end
-		local init_src = read_src("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
+		local init_src = read_src("local function ensure_browser_window_watchers") -- modules/keylogger/init.lua
 		helpers.assert_true(init_src ~= nil, "keylogger/init.lua must be readable")
 		local watchers_src = read_src("local function poll_mouse_distance")
 		helpers.assert_true(watchers_src ~= nil, "keylogger/watchers.lua must be readable")

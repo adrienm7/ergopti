@@ -759,8 +759,12 @@ rewriting the tree, including Git, cloud sync, and rsync.
 
 ### project-macos-startup-winfilter-cost
 
-Never construct `hs.window.filter` on boot or first-key paths. Its native setup
-cost is observable typing latency.
+Never construct `hs.window.filter` anywhere in the driver. Its first instantiation
+enumerates every window of every app on the main thread: lazily built on the
+first browser activation it still froze Hammerspoon for 4.8 s and 3.3 s and cost
+the Karabiner lease (#95). Bind `app:newWatcher` and `win:newWatcher` to the one
+application and window that matter, as the keylogger browser watchers and the
+keymap ignored-window watchers do.
 
 ### project-touchdevice-dormancy-is-kernel
 
