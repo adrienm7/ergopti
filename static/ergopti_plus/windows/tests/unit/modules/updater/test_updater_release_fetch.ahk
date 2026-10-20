@@ -580,6 +580,7 @@ _UpdaterTest_BackgroundTickIsAsync() {
 Test("Updater: background poller dispatches asynchronously (regression: sync fetch froze remapping)", _UpdaterTest_BackgroundTickIsAsync)
 
 _UpdaterTest_RateLimitDetail() {
+	global _UpdaterFetchCache
 	AssertEqual("HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC",
 		_Updater_RateLimitDetail(403, "0", "86400"), "an exhausted limit names its UTC reset")
 	AssertEqual("HTTP 429: the GitHub API rate limit is exhausted",
