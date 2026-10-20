@@ -386,7 +386,8 @@ RegisterAltGrLayer(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShif
         ; A real Ctrl+Alt chord, never the AltGr key: under the AltGr gate above
         ; these needed the physical AltGr, which a Ctrl+Alt chord never holds,
         ; so they were dead on standard layouts and QWERTY.
-        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr())
+        HotIfFn.Call((Name := "", *) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr()
+            and LayoutRowIsEmulatedHotkey(Name))
         for SC, Combo in CTRL_ALT_NUMPAD {
             HotkeyFn.Call("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
         }
