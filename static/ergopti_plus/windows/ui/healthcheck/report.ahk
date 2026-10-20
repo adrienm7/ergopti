@@ -421,10 +421,10 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 ; @throws {Error} When clipboard, attachment completion or browser opening refuses.
 _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; Copy the complete reviewed report independently of its short metadata URL
+	; Copy the complete approved report independently of its short metadata URL
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
-	; The complete reviewed document stays in a local attachment, never the URL.
+	; The complete approved document stays in a local attachment, never the URL.
 	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
 	Fields := Map()
 	; Only the host-derived technical identity is stable enough to prefill.

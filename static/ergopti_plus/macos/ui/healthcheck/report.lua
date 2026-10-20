@@ -6,7 +6,7 @@
 --- What the diagnostics page's buttons do on this machine once
 --- healthcheck.actions accepted them: copy the report, save it as a Markdown
 --- file under the logs folder and reveal it, report it on GitHub (copy it,
---- then save a reviewed local attachment and open the short bug form), open a folder or a
+--- then save an approved local attachment and open the short bug form), open a folder or a
 --- settings page. Also the Debug menu's "Report a bug", which runs that same
 --- report action on a fresh snapshot without the window, and "Suggest a feature".
 ---
