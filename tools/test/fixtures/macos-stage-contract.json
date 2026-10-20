@@ -480,7 +480,7 @@
 			"id": "package-macos",
 			"metadata": {
 				"name": "Build",
-				"needs": ["e2e-hs"],
+				"needs": ["test-hs"],
 				"runs-on": "macos-latest",
 				"timeout-minutes": 45,
 				"outputs": {
@@ -780,7 +780,7 @@
 			"id": "launch",
 			"metadata": {
 				"name": "Install and launch",
-				"needs": ["package-macos"],
+				"needs": ["e2e-hs", "package-macos"],
 				"runs-on": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}",
 				"timeout-minutes": "${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}",
 				"strategy": {

@@ -1,7 +1,7 @@
 // tools/ci/macos-stage-roles.cjs
 'use strict';
 
-/** Keeps the five visible Mac stages complete without cross-stage dependency edges. */
+/** Keeps the five visible Mac stages complete through exact source-bound stage receipts. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -9,6 +9,42 @@ const { execFileSync } = require('node:child_process');
 const { parseClosedJson } = require('./dev-release-qualification.cjs');
 const STAGES = ['unit', 'e2e', 'build', 'testbuild'];
 const JOBS = ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
+/**
+ * The stages each stage admits directly. Build packages after Unit, beside
+ * E2E, and the test build admits both, so every receipt chain still names
+ * each earlier stage exactly once, in STAGES order, and the verdict proof
+ * covers all four stages.
+ */
+const PREDECESSORS = Object.freeze({
+	unit: Object.freeze([]),
+	e2e: Object.freeze(['unit']),
+	build: Object.freeze(['unit']),
+	testbuild: Object.freeze(['e2e', 'build'])
+});
+
+/** The stages a receipt of one stage carries before itself: its transitive predecessors, in STAGES order. */
+function priorStages(stage) {
+	assert.ok(STAGES.includes(stage), 'Unknown stage');
+	const found = new Set();
+	const visit = (name) => {
+		for (const predecessor of PREDECESSORS[name]) {
+			found.add(predecessor);
+			visit(predecessor);
+		}
+	};
+	visit(stage);
+	return STAGES.filter((name) => found.has(name));
+}
+
+/** A chain row without its attempts, which may differ after a legitimate partial rerun. */
+function meaning(row) {
+	return { stage: row.stage, cells: row.cells.map(({ attempt, ...value }) => value) };
+}
+
+/** The newest producer attempt of one chain row. */
+function newestAttempt(row) {
+	return Math.max(...row.cells.map((cell) => cell.attempt));
+}
 const fields = (value, names) =>
 	assert.deepEqual(
 		Object.keys(value).sort(),
@@ -181,14 +217,61 @@ function selectUnitLot(lot, context) {
 	return selectLot('unit', lot, displayPlan('unit', context).metadata, context);
 }
 
-/** Validate the receiver's complete lot map before admitting or reading prior receipts. */
-function admit(stage, lot, metadata, needs, context, currentAttempt, receive) {
-	assert.ok(['unit', 'e2e', 'build'].includes(stage), 'Unknown preceding stage');
-	const receiver = STAGES[STAGES.indexOf(stage) + 1];
+/**
+ * Validate the receiver's complete lot map, then every direct predecessor
+ * aggregate, before reading prior receipts. Each predecessor stage is admitted
+ * whole; a receipt of any other stage, a missing stage or two different
+ * histories of a shared earlier stage refuse.
+ */
+function admit(receiver, lot, metadata, needs, context, currentAttempt, receive) {
+	assert.ok(['e2e', 'build', 'testbuild'].includes(receiver), 'Unknown receiving stage');
 	if (receiver !== 'build') selectLot(receiver, lot, metadata, context);
-	const result = aggregate(needs, stage);
+	const predecessors = PREDECESSORS[receiver];
+	const result = aggregate(needs, predecessors);
 	assert.equal(typeof receive, 'function', 'Missing prior receipt reader');
-	return union(stage, receive(), result, context, currentAttempt);
+	const receipts = receive();
+	assert.ok(Array.isArray(receipts), 'Prior stage receipts must be a list');
+	for (const receipt of receipts)
+		assert.ok(
+			receipt !== null && typeof receipt === 'object' && predecessors.includes(receipt.stage),
+			'Foreign stage receipt'
+		);
+	const proofs = predecessors.map((stage) =>
+		union(
+			stage,
+			receipts.filter((receipt) => receipt.stage === stage),
+			result,
+			context,
+			currentAttempt
+		)
+	);
+	return join(receiver, proofs, context);
+}
+
+/** Joins admitted predecessor proofs into the receiver's exact prior chain. */
+function join(receiver, proofs, context) {
+	const byStage = new Map();
+	for (const proof of proofs) {
+		fields(proof, ['context', 'chain']);
+		assert.deepEqual(proof.context, context, 'Foreign source, run or expected role context');
+		for (const row of proof.chain) {
+			const known = byStage.get(row.stage);
+			if (known === undefined) {
+				byStage.set(row.stage, row);
+				continue;
+			}
+			assert.deepEqual(meaning(row), meaning(known), 'Conflicting predecessor receipt chain');
+			// Keep the earliest successful witness, as union does inside one stage.
+			if (newestAttempt(row) < newestAttempt(known)) byStage.set(row.stage, row);
+		}
+	}
+	const chain = priorStages(receiver).map((stage) => byStage.get(stage));
+	assert.ok(
+		chain.every(Boolean) && byStage.size === chain.length,
+		'Missing, repeated or reordered prior stage'
+	);
+	validateChain(chain, receiver, context);
+	return { context, chain };
 }
 
 /** Bind the visible lot to the original receipt cell without extending the receipt schema. */
@@ -239,36 +322,41 @@ function validateCells(stage, rows, context) {
 
 function validateChain(chain, beforeStage, context) {
 	assert.ok(Array.isArray(chain));
-	const expected = STAGES.slice(0, STAGES.indexOf(beforeStage));
 	assert.deepEqual(
-		chain.map((row) => row.stage),
-		expected,
+		chain.map((row) => row?.stage),
+		priorStages(beforeStage),
 		'Missing, repeated or reordered prior stage'
 	);
-	let priorAttempt = 0;
+	const newest = new Map();
 	for (const row of chain) {
 		fields(row, ['stage', 'cells']);
 		assert.deepEqual(row.cells, validateCells(row.stage, row.cells, context));
+		// A stage runs after its own predecessors, not after a parallel sibling.
+		const priorAttempt = Math.max(
+			0,
+			...PREDECESSORS[row.stage].map((stage) => newest.get(stage) ?? 0)
+		);
 		assert.ok(
 			row.cells.every((cell) => cell.attempt >= priorAttempt),
 			'Backward predecessor attempt lineage'
 		);
-		priorAttempt = Math.max(...row.cells.map((cell) => cell.attempt));
+		newest.set(row.stage, newestAttempt(row));
 	}
 	return chain;
 }
 
-/** The direct GitHub matrix aggregate is admitted before any receipt is consumed. */
-function aggregate(needs, stage) {
-	const index = STAGES.indexOf(stage);
-	assert.ok(index >= 0);
-	fields(needs, [JOBS[index]]);
-	assert.equal(
-		needs[JOBS[index]].result,
-		'success',
-		'Direct predecessor aggregate did not succeed'
+/** The direct GitHub matrix aggregates are admitted before any receipt is consumed. */
+function aggregate(needs, stages) {
+	const names = typeof stages === 'string' ? [stages] : stages;
+	assert.ok(
+		Array.isArray(names) && names.length > 0 && names.every((stage) => STAGES.includes(stage)),
+		'Unknown predecessor stage'
 	);
-	return needs[JOBS[index]].result;
+	const jobs = names.map((stage) => JOBS[STAGES.indexOf(stage)]);
+	fields(needs, jobs);
+	for (const job of jobs)
+		assert.equal(needs[job].result, 'success', 'Direct predecessor aggregate did not succeed');
+	return 'success';
 }
 
 function union(stage, receipts, result, context, currentAttempt) {
@@ -295,14 +383,9 @@ function union(stage, receipts, result, context, currentAttempt) {
 		if (prior === undefined) prior = receipt.prior;
 		else {
 			// Attempt metadata can differ after a legitimate partial rerun of the same source/run.
-			const meaning = (chain) =>
-				chain.map((row) => ({
-					stage: row.stage,
-					cells: row.cells.map(({ attempt, ...value }) => value)
-				}));
 			assert.deepEqual(
-				meaning(receipt.prior),
-				meaning(prior),
+				receipt.prior.map(meaning),
+				prior.map(meaning),
 				'Conflicting predecessor receipt chain'
 			);
 		}
@@ -484,7 +567,7 @@ function main(args) {
 			admit(
 				stage,
 				process.env.MACOS_STAGE_LOT,
-				stage === 'e2e' ? undefined : parseClosedJson(process.env.MACOS_STAGE_METADATA),
+				stage === 'build' ? undefined : parseClosedJson(process.env.MACOS_STAGE_METADATA),
 				parseClosedJson(process.env.MACOS_STAGE_NEEDS),
 				context,
 				Number(process.env.GITHUB_RUN_ATTEMPT),
@@ -532,6 +615,8 @@ module.exports = {
 	unitGroups,
 	STAGES,
 	JOBS,
+	PREDECESSORS,
+	priorStages,
 	plan,
 	humanLot,
 	roleLot,
@@ -543,6 +628,7 @@ module.exports = {
 	record,
 	aggregate,
 	union,
+	validateChain,
 	legacyNeeds,
 	readReceipts,
 	validateContext

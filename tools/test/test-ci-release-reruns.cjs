@@ -817,7 +817,11 @@ function assertMacLotSource(job) {
 	const matrixOutput = stage + '_matrix';
 	const metadataOutput = stage + '_metadata';
 	const map = 'needs.' + predecessor + '.outputs.' + metadataOutput;
-	assert.deepEqual(pipeline.needsOf(job.body), [predecessor]);
+	// The test build admits E2E beside the Build that supplies its lot plan.
+	assert.deepEqual(
+		pipeline.needsOf(job.body),
+		stage === 'testbuild' ? ['e2e-hs', predecessor] : [predecessor]
+	);
 	assert.equal(
 		pipeline.field(job.body, 'runs-on'),
 		'${{ fromJSON(' + map + ')[matrix.lot].runner }}'
@@ -852,7 +856,7 @@ function assertMacLotSource(job) {
 	assert.equal(pipeline.stepField(admission, 'id'), 'stage-admission');
 	assert.deepEqual(pipeline.runOf(admission), [
 		'node tools/ci/macos-stage-roles.cjs admit ' +
-			(stage === 'e2e' ? 'unit' : 'build') +
+			stage +
 			' "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"'
 	]);
 	const producer = pipeline.job(predecessor);

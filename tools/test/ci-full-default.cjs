@@ -641,10 +641,11 @@ function validateRaw(files) {
 		MACOS_STAGE_CELL: '${{ steps.stage-selection.outputs.cell }}',
 		MACOS_STAGE_RESULT: '${{ job.status }}'
 	});
+	// Each job names the stage it receives; Build admits Unit beside E2E.
 	for (const [id, prior] of [
-		['e2e-hs', 'unit'],
-		['package-macos', 'e2e'],
-		['launch', 'build']
+		['e2e-hs', 'e2e'],
+		['package-macos', 'build'],
+		['launch', 'testbuild']
 	]) {
 		const admissions = macJobs[id].steps.filter((step) => step.id === 'stage-admission');
 		assert.deepEqual(admissions, [

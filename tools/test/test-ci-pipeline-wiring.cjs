@@ -1241,7 +1241,10 @@ function lotTransport(source, rel) {
 		for (const [producer, consumer, id, matrix, metadata, name, run] of routes) {
 			const preceding = document.jobs[producer],
 				receiving = document.jobs[consumer];
-			assert.deepEqual(receiving.needs, [producer], 'Exact immediate lot predecessor required');
+			// The Mac test build also admits E2E, which runs beside Build.
+			const predecessors =
+				rel === MACOS_BOX && consumer === 'launch' ? ['e2e-hs', producer] : [producer];
+			assert.deepEqual(receiving.needs, predecessors, 'Exact immediate lot predecessor required');
 			const outputs =
 				id === 'site-plan' || id === 'install-plan' ? ['matrix', 'metadata'] : [matrix, metadata];
 			for (const [index, key] of [matrix, metadata].entries())
@@ -3018,14 +3021,15 @@ for (const candidate of topJobs) {
  * Each lane's jobs in file order, with the exact needs and the stage of each.
  * Stages follow one another except for declared parallel siblings: the Linux
  * Flatpak job builds from the package beside the install cells, and the
- * verdict waits for both.
+ * verdict waits for both; the macOS Build packages after Unit beside E2E, and
+ * the test build waits for both.
  */
 const LANE_GRAPHS = {
 	[MACOS_BOX]: [
 		['test-hs', [], 'unit'],
 		['e2e-hs', ['test-hs'], 'e2e'],
-		['package-macos', ['e2e-hs'], 'build'],
-		['launch', ['package-macos'], 'testbuild'],
+		['package-macos', ['test-hs'], 'build'],
+		['launch', ['e2e-hs', 'package-macos'], 'testbuild'],
 		['macos-ok', ['launch'], 'verdict']
 	],
 	[WINDOWS_BOX]: [
@@ -3296,7 +3300,9 @@ for (const [rel, id, unit] of [
 	[LINUX_BOX, 'e2e-linux', 'test-linux']
 ]) {
 	const prerequisite =
-		rel === MACOS_BOX ? `    needs:\n      - ${unit}\n` : `    needs: [${unit}]\n`;
+		rel === MACOS_BOX
+			? `      actions: read\n    needs:\n      - ${unit}\n`
+			: `    needs: [${unit}]\n`;
 	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
 		mustCatch(
 			`${id} must remain mandatory`,
@@ -3340,32 +3346,54 @@ for (const [what, rel, from, to] of [
 		'    needs: [publication-plan]\n',
 		'    needs: [macos, windows, linux]\n'
 	],
-	['a sixth entry in the macOS lane', MACOS_BOX, '    needs:\n      - test-hs\n', ''],
+	[
+		'a sixth entry in the macOS lane',
+		MACOS_BOX,
+		'      actions: read\n    needs:\n      - test-hs\n',
+		'      actions: read\n'
+	],
 	[
 		'macOS packaging stops waiting for units',
 		MACOS_BOX,
-		'    needs:\n      - e2e-hs\n',
-		'    needs: []\n'
+		'    name: Build\n    needs:\n      - test-hs\n',
+		'    name: Build\n    needs: []\n'
 	],
 	[
-		'macOS packaging stops waiting for E2E',
+		'macOS packaging waits for E2E again',
 		MACOS_BOX,
-		'    needs:\n      - e2e-hs\n',
-		'    needs:\n      - test-hs\n'
+		'    name: Build\n    needs:\n      - test-hs\n',
+		'    name: Build\n    needs:\n      - e2e-hs\n'
 	],
 	[
 		'native canvas stops waiting for units',
 		MACOS_BOX,
-		'    needs:\n      - test-hs\n',
-		'    needs: []\n'
+		'      actions: read\n    needs:\n      - test-hs\n',
+		'      actions: read\n    needs: []\n'
 	],
 	[
 		'native canvas stops waiting for E2E',
 		MACOS_BOX,
-		'    needs:\n      - test-hs\n',
+		'      actions: read\n    needs:\n      - test-hs\n',
+		'      actions: read\n    needs:\n      - package-macos\n'
+	],
+	[
+		'macOS E2E omits its unit prerequisite',
+		MACOS_BOX,
+		'      actions: read\n    needs:\n      - test-hs\n',
+		'      actions: read\n'
+	],
+	[
+		'macOS test build stops waiting for E2E',
+		MACOS_BOX,
+		'    needs:\n      - e2e-hs\n      - package-macos\n',
 		'    needs:\n      - package-macos\n'
 	],
-	['macOS E2E omits its unit prerequisite', MACOS_BOX, '    needs:\n      - test-hs\n', ''],
+	[
+		'macOS test build stops waiting for Build',
+		MACOS_BOX,
+		'    needs:\n      - e2e-hs\n      - package-macos\n',
+		'    needs:\n      - e2e-hs\n'
+	],
 	[
 		'a third entry in the Linux lane',
 		LINUX_BOX,
@@ -3394,7 +3422,7 @@ for (const [what, rel, from, to] of [
 	[
 		'a second exit in the macOS lane',
 		MACOS_BOX,
-		'    needs:\n      - package-macos\n',
+		'    needs:\n      - launch\n',
 		'    needs:\n      - test-hs\n'
 	],
 	[
@@ -5206,7 +5234,7 @@ function reporterLifecycleProblems(files) {
 			const admissionAt = steps.indexOf(admission),
 				downloadAt = steps.indexOf(download);
 			if (
-				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['e2e-hs']) ||
+				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['test-hs']) ||
 				pipeline.field(job.body, 'if') !== null ||
 				pipeline.field(job.body, 'continue-on-error') !== null ||
 				admissions.length !== 1 ||
@@ -5226,7 +5254,7 @@ function reporterLifecycleProblems(files) {
 			if (
 				admission.name !== 'Admit complete successful predecessor stage' ||
 				(pipeline.runOf(admission.body) ?? []).join('\n').trim() !==
-					'node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"' ||
+					'node tools/ci/macos-stage-roles.cjs admit build "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"' ||
 				!/^        env:\n          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}\n        run:/m.test(
 					admission.body
 				) ||
@@ -5237,7 +5265,7 @@ function reporterLifecycleProblems(files) {
 				['if', 'continue-on-error'].some(
 					(key) => pipeline.stepField(download.body, key) !== null
 				) ||
-				!/^          pattern: macos-stage-e2e-\*-\$\{\{ github\.run_id \}\}$/m.test(
+				!/^          pattern: macos-stage-unit-\*-\$\{\{ github\.run_id \}\}$/m.test(
 					download.body
 				) ||
 				!/^          path: \$\{\{ runner\.temp \}\}\/macos-stage-inputs$/m.test(download.body) ||
@@ -5358,7 +5386,7 @@ for (const [rel, shell] of [
 		],
 		[
 			'unknown reporter admission command',
-			(body) => body.replace(admission, admission.replace(' admit e2e ', ' admit unit '))
+			(body) => body.replace(admission, admission.replace(' admit build ', ' admit e2e '))
 		],
 		[
 			'manual-only reporter admission',
@@ -5386,12 +5414,12 @@ for (const [rel, shell] of [
 		],
 		[
 			'wrong reporter predecessor',
-			(body) => body.replace('    needs:\n      - e2e-hs', '    needs:\n      - test-hs')
+			(body) => body.replace('    needs:\n      - test-hs', '    needs:\n      - e2e-hs')
 		],
 		[
 			'transitive reporter predecessor',
 			(body) =>
-				body.replace('    needs:\n      - e2e-hs', '    needs:\n      - e2e-hs\n      - test-hs')
+				body.replace('    needs:\n      - test-hs', '    needs:\n      - test-hs\n      - e2e-hs')
 		],
 		[
 			'missing reporter predecessor metadata',
@@ -5400,7 +5428,7 @@ for (const [rel, shell] of [
 		['missing reporter receipt download', (body) => body.replace(download, '')],
 		[
 			'foreign reporter receipt download',
-			(body) => body.replace(download, download.replace('macos-stage-e2e-*', 'macos-stage-unit-*'))
+			(body) => body.replace(download, download.replace('macos-stage-unit-*', 'macos-stage-e2e-*'))
 		],
 		[
 			'forgiven reporter receipt download',
