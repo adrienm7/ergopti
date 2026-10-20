@@ -72,7 +72,7 @@ _CWAOP_KeyVectors() {
 	}
 	Policy := _CWAOP_Compile(Corpus, 0, ["space"], "all_true")
 	for Key in Corpus["unknown_keys"]
-		AssertThrows(() => CapsWordAutoOffEndsOnKey(Policy, Key), "unknown key '" . Key . "' must throw")
+		AssertThrows(CapsWordAutoOffEndsOnKey.Bind(Policy, Key), "unknown key '" . Key . "' must throw")
 }
 Test("caps-word auto-off policy: native keys answer by delimiter key, unknown keys throw", _CWAOP_KeyVectors)
 
@@ -85,7 +85,7 @@ _CWAOP_PointerVectors() {
 	}
 	Policy := _CWAOP_Compile(Corpus, 0, [], "all_true")
 	for Kind in Corpus["unknown_kinds"]
-		AssertThrows(() => CapsWordAutoOffEndsOnPointer(Policy, Kind), "undeclared kind '" . Kind . "' must throw")
+		AssertThrows(CapsWordAutoOffEndsOnPointer.Bind(Policy, Kind), "undeclared kind '" . Kind . "' must throw")
 }
 Test("caps-word auto-off policy: pointer kinds answer, undeclared kinds throw", _CWAOP_PointerVectors)
 
@@ -127,3 +127,22 @@ _CWAOP_TerminatorRows() {
 	AssertEqual(_CWAOP_Join(Corpus["terminator_rows"]), _CWAOP_Join(Drawn), "catalogue order and separators")
 }
 Test("caps-word auto-off policy: the delimiter rows are the generated catalogue", _CWAOP_TerminatorRows)
+
+; The hotstring engine appends a user's custom delimiter to its own Terminators
+; instance at run time, with a label and no label_key. The Linux port drew it
+; from the shared catalogue table and its menu raised (9597632f71); here the
+; policy reads a private instance, so a custom entry added anywhere else is
+; neither drawn, nor stored, nor a CapsWord delimiter.
+_CWAOP_CustomDelimiterStaysOut() {
+	Before := CapsWordAutoOffTerminatorRows().Length
+	Engine := Terminators()
+	AssertTrue(Engine.addCustom("custom_µ", ["µ"], "µ", false), "the fixture adds a custom delimiter")
+	Rows := CapsWordAutoOffTerminatorRows()
+	AssertEqual(Before, Rows.Length, "no custom row is drawn")
+	for Row in Rows
+		Assert(Row.Has("separator") || Type(Row["label_key"]) == "String", "every drawn row has a label key")
+	AssertFalse(CapsWordAutoOffIsTerminatorKey("custom_µ"), "a custom delimiter is not a CapsWord delimiter")
+	AssertEqual("", CapsWordAutoOffWithTerminator(["space"], "custom_µ", 1, &Reason), "a custom delimiter is not stored")
+	AssertEqual("unknown_terminator", Reason)
+}
+Test("caps-word auto-off policy: a custom hotstring delimiter stays out of the rows and the policy", _CWAOP_CustomDelimiterStaysOut)
