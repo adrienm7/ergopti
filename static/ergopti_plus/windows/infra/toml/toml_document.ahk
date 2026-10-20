@@ -44,14 +44,14 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 			Stop := RegExMatch(Text, Needle, , Position)
 			Stop := Stop ? Stop : Length + 1
 			if Stop > Position {
-				Run := SubStr(Text, Position, Stop - Position)
-				Solid := RTrim(Run, " `t`r`n")
+				UnquotedRun := SubStr(Text, Position, Stop - Position)
+				Solid := RTrim(UnquotedRun, " `t`r`n")
 				if Solid != "" {
 					if !SpanStart
-						SpanStart := Position + RegExMatch(Run, "[^ `t`r`n]") - 1
+						SpanStart := Position + RegExMatch(UnquotedRun, "[^ `t`r`n]") - 1
 					SpanEnd := Position + StrLen(Solid) - 1
 				}
-				Result .= Run
+				Result .= UnquotedRun
 				Position := Stop
 				continue
 			}
