@@ -94,7 +94,9 @@ const MANIFEST = path.join(
 // which manager.lua's own header calls a TODO. So the Linux half of that reason
 // would read "not coded yet", the one thing the model reason forbids, and 21
 // translated strings would have frozen it in place.
-const BASELINE = 104;
+// 2026-10-20: 104 → 103. The Layout menu's macOS-only separator before the
+// active input sources is a presentation, now classified unavailable = "hide".
+const BASELINE = 103;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -195,7 +197,6 @@ const KNOWN_UNEXPLAINED = new Set([
 	'["menu.gestures_menu","hs","---",null,null,null,null,14]',
 	'["menu.gestures_menu","linux","---",null,null,null,null,18]',
 	'["menu.hotstrings_menu","linux","---",null,null,null,null,18]',
-	'["menu.layout_menu","hs","---",null,null,null,null,11]',
 	'["menu.llm_menu","linux","---",null,null,null,null,6]',
 	'["menu.metrics_menu","linux","---",null,null,null,null,20]',
 	'["menu.tap_holds_menu","hs","---",null,null,null,null,5]',
