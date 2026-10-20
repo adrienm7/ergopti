@@ -237,20 +237,50 @@ CB_RetryRestoreDebt(*) {
 	}
 
 	Settled := false
+	; Critical excludes another script thread using the same native HWND. The
+	; native lease excludes other processes until ClipboardAll closes its setter.
+	RestoreLock := {Opened: false, Released: false, PreviousCritical: Critical("On")}
 	try {
+		; A same-HWND reopen is accepted by Windows, but a skipped attempt must
+		; not close a lease borrowed from its caller. Only that caller may release it.
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+			return false
+		try RestoreLock.Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		catch as Err {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
+			try LoggerWarn("Clipboard", "Restore debt from {1} could not acquire its native lock: {2}.",
+				Debt["source"], Err.Message)
+			return false
+		}
+		if !RestoreLock.Opened {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
+			if (Debt["attempts"] == 1 or Mod(Debt["attempts"], 20) == 0)
+				try LoggerWarn("Clipboard",
+					"Restore debt from {1} is still blocked after attempt {2}; retrying.",
+					Debt["source"], Debt["attempts"])
+			return false
+		}
 		try CurrentSequence := Debt["sequence_fn"].Call()
 		catch as Err {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerWarn("Clipboard",
 				"Restore debt from {1} could not read clipboard ownership: {2}.",
 				Debt["source"], Err.Message)
 			return false
 		}
+		if CBClipboardOwner.restore_debt != Debt
+			return false
 		; Without a recorded sequence, even the first rollback cannot prove that
 		; observable clipboard content still belongs to this producer. A positive
 		; sequence therefore wins before any restore attempt. The existing forced
 		; zero-sequence path remains unfenced and provides no ownership guarantee.
 		if (!Debt["expected_sequence"] and Debt["force"]
 				and CurrentSequence) {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerWarn("Clipboard",
 				"Unfenced restore debt from {1} yielded to observable clipboard content.",
 				Debt["source"])
@@ -259,6 +289,8 @@ CB_RetryRestoreDebt(*) {
 		}
 		if (Debt["expected_sequence"] and CurrentSequence
 				and CurrentSequence != Debt["expected_sequence"]) {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerDebug("Clipboard",
 				"Restore debt from {1} retired because a newer clipboard sequence won.",
 				Debt["source"])
@@ -268,15 +300,23 @@ CB_RetryRestoreDebt(*) {
 		if (Debt["expected_sequence"] and !CurrentSequence)
 			return false
 		if (!Debt["expected_sequence"] and !Debt["force"]) {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			Settled := _CB_SettleRestoreDebt(Debt)
 			return Settled
 		}
 		RestoreOk := false
 		try RestoreOk := Debt["restore_fn"].Call(Debt["saved"])
 		catch as Err {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerWarn("Clipboard", "Restore debt from {1} threw: {2}.",
 				Debt["source"], Err.Message)
 		}
+		if !_CB_ReleaseRestoreLock(RestoreLock)
+			return false
+		; Do not sample a post-setter sequence as ownership. Its internal close
+		; admits later user copies, which must survive this exact debt's retirement.
 		if RestoreOk {
 			Settled := _CB_SettleRestoreDebt(Debt)
 			return Settled
@@ -287,6 +327,7 @@ CB_RetryRestoreDebt(*) {
 				Debt["source"], Debt["attempts"])
 		return false
 	} finally {
+		_CB_ReleaseRestoreLock(RestoreLock)
 		if !Settled {
 			PreviousCritical := Critical("On")
 			try {
@@ -300,6 +341,24 @@ CB_RetryRestoreDebt(*) {
 			}
 		}
 	}
+}
+
+; The real ClipboardAll setter closes its internal open before returning.
+; Never close a later foreign process's lease, or log while our lease remains.
+_CB_ReleaseRestoreLock(Lock) {
+	if Lock.Released
+		return true
+	Critical("On")
+	try {
+		if Lock.Opened && DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+			if !DllCall("User32\CloseClipboard", "Int")
+				return false
+		Lock.Opened := false
+		Lock.Released := true
+		return true
+	} catch {
+		return false
+	} finally Critical(Lock.PreviousCritical)
 }
 
 ; Mutators call this before taking a new snapshot or publishing content. It
