@@ -63,7 +63,7 @@ class _SIC_CaptureHook {
 	}
 }
 
-InputHook(Options, EndKeys := "") {
+_SIC_CreateHook(Options, EndKeys := "") {
 	global _SIC_Hook, _SIC_Mode
 	_SIC_Require(InStr(Options, "L1") > 0 && InStr(Options, "T") > 0, "the real bounded capture options must reach the constructor")
 	_SIC_Hook := _SIC_CaptureHook(_SIC_Mode)

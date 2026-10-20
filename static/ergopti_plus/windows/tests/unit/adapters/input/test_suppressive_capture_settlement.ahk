@@ -11,6 +11,17 @@ _SICS_ChildSource() {
 	for Name in ["DeadKey", "OneShotShift", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine capture function must exist: " . Name)
+		if Name == "DeadKey" || Name == "OneShotShift" {
+			; InputHook is a built-in Class, so only bind its constructor call.
+			; Declaring a same-name function prevents the child from parsing.
+			FactoryAt := InStr(Definition, "InputHook(", true)
+			AssertTrue(FactoryAt > 0 && !InStr(Definition, "InputHook(", true, FactoryAt + 1),
+				Name . " must expose exactly one native construction boundary")
+			Definition := StrReplace(Definition, "InputHook(", "_SIC_CreateHook(", true, &Bindings)
+			AssertEqual(1, Bindings, "only the native factory may be bound for " . Name)
+			AssertTrue(InStr(Definition, "_SIC_CreateHook(") > 0,
+				"the passive factory must be wired into the genuine capture: " . Name)
+		}
 		Code .= Definition . "`n"
 	}
 	return Code . FileRead(_DriverDir . "\tests\fixtures\suppressive_capture_settlement_body.ahk", "UTF-8")
