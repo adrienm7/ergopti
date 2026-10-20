@@ -325,10 +325,11 @@ global _DigitRowProfiles := Map()
 ; @param Hkl {Integer} Keyboard layout handle.
 ; @return {Map} "shifted" {Boolean} and "symbols" {Map}.
 _DigitRowProfile(Hkl) {
-	global _DigitRowProfiles
+	global _DigitRowProfiles, NUMBER_ROW_EDGE_SCS
 	if !_DigitRowProfiles.Has(Hkl)
 		_DigitRowProfiles[Hkl] := Map("shifted", KS_LayoutDigitsAreShifted(Hkl),
-			"symbols", KS_LayoutDigitRowSymbols(Hkl), "shift_symbols", KS_LayoutDigitRowShiftedSymbols(Hkl))
+			"symbols", KS_LayoutDigitRowSymbols(Hkl), "shift_symbols", KS_LayoutDigitRowShiftedSymbols(Hkl),
+			"edges", KS_LayoutKeyLevels(Hkl, NUMBER_ROW_EDGE_SCS))
 	return _DigitRowProfiles[Hkl]
 }
 
@@ -435,7 +436,7 @@ NumberRowMenuSignature(Hkl, Caps) {
 		? NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", "")) : ""
 	Availability := NumberRowAvailability(Hkl, Caps)
 	return Stored . "|" . NumberRowEffectiveMode(Hkl, Caps) . "|" . Availability["digits"]
-		. "|" . Availability["symbols"]
+		. "|" . Availability["symbols"] . "|" . NumberRowEdgesState(Hkl, Caps)["reason"]
 }
 
 /**
@@ -527,8 +528,81 @@ _DigitRowEffectiveKey(Sc, Hkl, Caps) {
 	if Levels is Map
 		return Map("plain", Levels["plain"], "shift", Levels["shift"], "source", "builtin")
 	Profile := _DigitRowProfile(Hkl)
+	if Profile.Has("edges") && Profile["edges"].Has(Sc) {
+		Edge := Profile["edges"][Sc]
+		return Map("plain", _DigitRowNativeDescriptor(Edge["plain"]),
+			"shift", _DigitRowNativeDescriptor(Edge["shift"]), "source", "native")
+	}
 	return Map("plain", _DigitRowNativeDescriptor(Profile["symbols"].Get(Sc, "")),
 		"shift", _DigitRowNativeDescriptor(Profile["shift_symbols"].Get(Sc, "")), "source", "native")
+}
+
+; The three edge keys of the number row: left of 1, the two right of 0.
+global NUMBER_ROW_EDGE_SCS := [0x29, 0x0C, 0x0D]
+
+; The last edge-key state logged, so each switch between applied and inert is
+; logged once, as for the ordering itself.
+global _NumberRowEdgesLogged := ""
+
+/**
+ * The « also reorder the three edge keys » choice on layout Hkl: whether it is
+ * stored, whether it applies, and why not. It applies only while an ordering
+ * applies to the digit keys and each edge key can be swapped
+ * (NumberRowPolicyEdgesAvailability). The stored choice is never rewritten.
+ * @param {Integer} Hkl Native layout; the foreground one when omitted.
+ * @param {Boolean} Caps CapsLock state; the live one when omitted.
+ * @returns {Map} "stored", "applies" (Booleans) and "reason".
+ */
+NumberRowEdgesState(Hkl := unset, Caps := unset) {
+	global Features, NUMBER_ROW_EDGE_SCS
+	if !IsSet(Hkl)
+		Hkl := NumberRowForegroundLayout()
+	if !IsSet(Caps)
+		Caps := GetKeyState("CapsLock", "T")
+	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
+		&& Features["layout"].Has("number_row_reorder_edges") && Features["layout"]["number_row_reorder_edges"] == true
+	Edges := []
+	for _, Sc in NUMBER_ROW_EDGE_SCS {
+		Row := _DigitRowEffectiveKey(Sc, Hkl, Caps)
+		Edges.Push(Map("plain", Row["plain"], "shift", Row["shift"]))
+	}
+	Reason := NumberRowPolicyEdgesAvailability(Edges, NumberRowEffectiveMode(Hkl, Caps))
+	return Map("stored", Stored, "applies", Stored && Reason == "", "reason", Reason)
+}
+
+/** Whether the edge keys are reordered now, logging each change of that state. */
+NumberRowEdgesEffective(Hkl := unset, Caps := unset) {
+	global _NumberRowEdgesLogged
+	State := NumberRowEdgesState(Hkl?, Caps?)
+	if !State["stored"]
+		return false
+	Logged := State["applies"] ? "applies" : State["reason"]
+	if Logged != _NumberRowEdgesLogged {
+		First := _NumberRowEdgesLogged == ""
+		_NumberRowEdgesLogged := Logged
+		if !State["applies"] {
+			try LoggerInfo("NumberRow", "The edge keys are not reordered on this layout ({1}); the stored choice is kept.", Logged)
+		} else {
+			try LoggerInfo("NumberRow", First ? "The edge keys are reordered on this layout." : "The edge keys are reordered again on this layout.")
+		}
+	}
+	return State["applies"]
+}
+
+/**
+ * What an edge key types while the edge keys are reordered: its Shift level
+ * unshifted and its base level with Shift, read from the effective layout.
+ * @returns {String} "" when they are not reordered there.
+ */
+NumberRowEdgeText(Sc, Shift, Hkl, Caps) {
+	global NUMBER_ROW_EDGE_SCS
+	Known := false
+	for _, Edge in NUMBER_ROW_EDGE_SCS
+		Known := Known || Edge == Sc
+	if !Known || !NumberRowEdgesEffective(Hkl, Caps)
+		return ""
+	Level := _DigitRowEffectiveKey(Sc, Hkl, Caps)[Shift ? "plain" : "shift"]
+	return Level is Map ? Level["Text"] : ""
 }
 
 _DigitRowNativeDescriptor(Text) {

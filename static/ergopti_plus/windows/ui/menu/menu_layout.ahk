@@ -72,7 +72,8 @@ _LAY_LayoutFeatureBaseRows() {
 ; layout: a choice, not a switch, so no toggle row lists it.
 _LAY_LayoutFeatureAltGrRows() {
 	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true,
-		"direct_access_digits", true, "emulated_layout", true, "ergopti_variant", true)
+		"direct_access_digits", true, "emulated_layout", true, "ergopti_variant", true,
+		"number_row_reorder_edges", true)
 	Rows := []
 	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {
@@ -202,7 +203,7 @@ _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 	if !(Row is Map) || !Row.Has("items") || !(Row["items"] is Array)
 		return []
 	Definition := _MR_GetMenuDef("number_row_policy_rows")
-	if !(Definition is Array) || Definition.Length != 1 || !(Definition[1] is Map)
+	if !(Definition is Array) || Definition.Length != 2 || !(Definition[1] is Map)
 			|| !Definition[1].Has("choices") || !(Definition[1]["choices"] is Array)
 			|| Definition[1]["choices"].Length != 3
 			|| Definition[1]["choices"].Length != Row["items"].Length
@@ -235,7 +236,45 @@ _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 				Item["disabled_reason_key"] := "platform_reason.number_row_source_unavailable"
 		}
 	}
-	return [Row]
+	Edges := _LAY_NumberRowEdgesRow(Definition[2], Expected, RefreshFn)
+	return Edges is Map ? [Row, Edges] : [Row]
+}
+
+; The « also reorder the three edge keys » checkbox, declared after the ordering
+; choice. Greyed with why where the edge keys cannot join the ordering in
+; effect; while it is ticked there, its label says it is not applied. Its
+; state is read live, so a click needs no reload, only the menu refresh.
+; @param {Map} Declaration The shared declaration: "path" and "i18n".
+; @param {Map} Expected The number-row snapshot of this menu.
+; @param {Func} RefreshFn Rebuilds the menu; the tray rebuild when 0.
+; @returns {Map|String} The row, or "" for a malformed declaration.
+_LAY_NumberRowEdgesRow(Declaration, Expected, RefreshFn := 0) {
+	if !(Declaration is Map) || Declaration.Get("type", "") != "check" || Declaration.Get("id", "") != "number_row_edges"
+			|| Declaration.Get("path", "") != "layout.number_row_reorder_edges" || Declaration.Get("i18n", "") == ""
+		return ""
+	State := NumberRowEdgesState(Expected.Get("hkl", NumberRowForegroundLayout()), Expected.Get("caps", false))
+	Row := Map("label", t(Declaration["i18n"]), "checked", State["stored"],
+		"action", _LAY_NumberRowEdgesToggle.Bind(!State["stored"], RefreshFn))
+	if State["reason"] != "" {
+		Row["disabled"] := true
+		Row["disabled_reason_key"] := "platform_reason.number_row_" . State["reason"]
+		if State["stored"]
+			Row["label"] := Row["label"] . t("menu.layout.number_row_not_applied")
+	}
+	return Row
+}
+
+_LAY_NumberRowEdgesToggle(Value, RefreshFn, *) {
+	global Features
+	Written := WriteFeatureV2(Features, "layout.number_row_reorder_edges", Value)
+	if !(Written is Integer) || Written != true
+		return false
+	try LoggerInfo("Menu", "The edge keys of the number row are {1} the ordering.", Value ? "added to" : "removed from")
+	if HasMethod(RefreshFn, "Call")
+		RefreshFn.Call()
+	else
+		RebuildTrayMenu()
+	return true
 }
 
 /** Binds optional native ports without erasing the selected canonical value. */

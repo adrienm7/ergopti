@@ -700,6 +700,37 @@ SC00B:: _NumberRowSymbolsFirstSend(0x0B, false)
 +SC00B:: _NumberRowSymbolsFirstSend(0x0B, true)
 #HotIf
 
+; « Also reorder the three edge keys »: the edge keys swap their own two levels,
+; read from the effective layout, while an ordering applies and each edge key
+; can be swapped (NumberRowEdgesEffective). Off by default: they then keep the
+; effective layout's levels. The tap keys' hotkeys, created earlier, keep an
+; assigned edge key. A Kana AltGr is no modifier to AutoHotkey, so under it these
+; hotkeys would replace the layout's AltGr level: they stand down there.
+#HotIf NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld()
+SC029:: _NumberRowEdgeSend(0x29, false)
++SC029:: _NumberRowEdgeSend(0x29, true)
+SC00C:: _NumberRowEdgeSend(0x0C, false)
++SC00C:: _NumberRowEdgeSend(0x0C, true)
+SC00D:: _NumberRowEdgeSend(0x0D, false)
++SC00D:: _NumberRowEdgeSend(0x0D, true)
+#HotIf
+
+; A registry layout types the other level through its own action machine.
+_NumberRowEdgeSend(Sc, Shift, *) {
+	Hkl := GetForegroundKeyboardLayout()
+	Caps := GetKeyState("CapsLock", "T")
+	Text := NumberRowEdgeText(Sc, Shift, Hkl, Caps)
+	if Text == "" {
+		try LoggerWarn("Layout", "SC{1:03X}: the edge keys are no longer reordered on the layout of the press; nothing typed.", Sc)
+		return
+	}
+	if _DigitRowEffectiveKey(Sc, Hkl, Caps)["source"] == "emulated" {
+		_KLE_Emit(Format("SC{:03X}", Sc), !Shift, false)
+		return
+	}
+	_DigitShiftSend(Text)
+}
+
 ; The level is read again on the layout of the press: a layout switch between
 ; the criterion and this thread leaves nothing to type, which is logged.
 _NumberRowSymbolsFirstSend(Sc, Shift, *) {

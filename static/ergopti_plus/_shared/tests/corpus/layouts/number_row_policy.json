@@ -420,5 +420,55 @@
 			"effective": "native",
 			"reason": "mixed"
 		}
+	],
+	"edges": [
+		{
+			"id": "azerty",
+			"note": "AZERTY: the key left of 1 types nothing with Shift",
+			"ordering": "digits",
+			"plain": ["²", ")", "="],
+			"shift": ["", "°", "+"],
+			"expected": "edges_incomplete"
+		},
+		{
+			"id": "us_qwerty",
+			"note": "US QWERTY: every edge key types two symbols",
+			"ordering": "symbols",
+			"plain": ["`", "-", "="],
+			"shift": ["~", "_", "+"],
+			"expected": ""
+		},
+		{
+			"id": "ergopti",
+			"note": "the Ergopti row: $, % and = with their Shift symbols",
+			"ordering": "digits",
+			"plain": ["$", "%", "="],
+			"shift": ["€", "% ", "º"],
+			"expected": ""
+		},
+		{
+			"id": "dead_key",
+			"note": "a dead key counts as a symbol",
+			"ordering": "symbols",
+			"plain": ["dead:^", "-", "="],
+			"shift": ["~", "_", "+"],
+			"expected": ""
+		},
+		{
+			"id": "same_levels",
+			"note": "an edge key typing the same thing on both levels gains nothing",
+			"ordering": "digits",
+			"plain": ["$", "%", "="],
+			"shift": ["$", "€", "+"],
+			"expected": "edges_same"
+		},
+		{
+			"id": "no_ordering",
+			"note": "no ordering applies to the digit keys",
+			"ordering": "native",
+			"plain": ["`", "-", "="],
+			"shift": ["~", "_", "+"],
+			"expected": "no_ordering"
+		}
 	]
 }

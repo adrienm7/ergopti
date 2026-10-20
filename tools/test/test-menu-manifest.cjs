@@ -2412,8 +2412,13 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const assert = require('node:assert/strict');
 	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
 	const expectedChoices = ['native', 'digits', 'symbols'];
-	assert.equal(manifest.number_row_policy_rows.length, 1);
+	assert.equal(manifest.number_row_policy_rows.length, 2, 'the ordering and the edge-key checkbox');
 	const row = manifest.number_row_policy_rows[0];
+	const edges = manifest.number_row_policy_rows[1];
+	assert.equal(edges.type, 'check');
+	assert.equal(edges.id, 'number_row_edges');
+	assert.equal(edges.path, 'layout.number_row_reorder_edges');
+	assert.equal(edges.i18n, 'menu.layout.number_row_edges');
 	assert.equal(row.type, 'choice');
 	assert.equal(row.id, 'number_row_mode');
 	assert.equal(row.path, 'layout.direct_access_digits');
@@ -2445,7 +2450,11 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'menu.layout.number_row',
 			...expectedChoices.map((mode) => `menu.layout.number_row_${mode}`),
 			'platform_reason.number_row_override_unsupported',
-			'platform_reason.number_row_source_unavailable'
+			'platform_reason.number_row_source_unavailable',
+			'menu.layout.number_row_edges',
+			'platform_reason.number_row_no_ordering',
+			'platform_reason.number_row_edges_incomplete',
+			'platform_reason.number_row_edges_same'
 		]) {
 			assert.equal(typeof locale[key], 'string', name + ': ' + key);
 			assert(locale[key].trim().length > 0, name + ': nonempty translated value');

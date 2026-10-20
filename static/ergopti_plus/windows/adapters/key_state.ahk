@@ -476,6 +476,42 @@ KS_LayoutDigitRowShiftedSymbols(Hkl) {
 	return Symbols
 }
 
+; What each of the keys Scs types unshifted and with Shift on layout Hkl, read
+; as KS_LayoutDigitRowSymbols and KS_LayoutDigitRowShiftedSymbols read the
+; digit keys (the edge keys of the number row have no fixed virtual key, so
+; theirs is looked up on that layout). A level typing nothing is "".
+; @param Hkl {Integer} Keyboard layout handle; 0 gives empty levels.
+; @param Scs {Array} Scan codes.
+; @return {Map} Scan code -> Map("plain", String, "shift", String).
+KS_LayoutKeyLevels(Hkl, Scs) {
+	global KS_MAPVK_VK_TO_CHAR
+	Levels := Map()
+	State := Buffer(256, 0)
+	NumPut("UChar", 0x80, State, 0x10) ; VK_SHIFT
+	NumPut("UChar", 0x80, State, 0xA0) ; VK_LSHIFT
+	Chars := Buffer(32, 0)
+	for _, Sc in Scs {
+		Plain := "", Shift := ""
+		Vk := Hkl == 0 ? 0 : DllCall("MapVirtualKeyExW", "UInt", Sc, "UInt", 3, "Ptr", Hkl, "UInt")
+		if (Vk != 0) {
+			Char := DllCall("MapVirtualKeyExW", "UInt", Vk, "UInt", KS_MAPVK_VK_TO_CHAR, "Ptr", Hkl, "UInt") & 0xFFFF
+			if (Char >= 0x20)
+				Plain := Chr(Char)
+			Count := DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Sc, "Ptr", State,
+				"Ptr", Chars, "Int", 16, "UInt", 4, "Ptr", Hkl, "Int")
+			if (Count > 0)
+				Shift := StrGet(Chars, Count, "UTF-16")
+			else if (Count < 0)
+				Shift := StrGet(Chars, 1, "UTF-16")
+			; A control character (Ctrl-like output of some layouts) types nothing.
+			if (Shift != "" && Ord(Shift) < 0x20)
+				Shift := ""
+		}
+		Levels[Sc] := Map("plain", Plain, "shift", Shift)
+	}
+	return Levels
+}
+
 ; Translates a scancode into its virtual key under Hkl, distinguishing left and
 ; right keys (MAPVK_VSC_TO_VK_EX = 3).
 ; @param Scancode {Integer} The physical scancode.

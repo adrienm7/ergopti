@@ -638,6 +638,7 @@ tap_4 = "none"
 [layout]
 ergopti_base = false
 direct_access_digits = "native"
+number_row_reorder_edges = false
 ergopti_alt_gr = false
 ergopti_variant = "none"
 ctrl_magic_save = false
