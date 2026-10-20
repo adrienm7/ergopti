@@ -354,6 +354,30 @@ parity, and `tools/locale/check_locales.py --fix` performs manual backfill.
 Windows locale TSV is a gitignored, self-repairing cache generated from canonical
 JSON. Never edit or version it as source.
 
+### project-config-toml-spacing-is-five-and-three
+
+Five blank lines before a top-level `config.toml` header and three before a
+nested one is the house style of both codecs (`EnsureTrailingBlankLines(5)` in
+`toml_helpers.ahk`, `codec.lua`), decided by the maintainer on 2026-10-20. Runs
+of five blank lines are not accumulation.
+`windows/_generated/config_template.toml` follows the same spacing and changes
+only through `npm run build:manifest`.
+
+### project-newer-schema-is-read-only
+
+A configuration saved by a newer schema is never downgraded and its unknown keys
+are never offered for cleanup: boot keeps the migration refusal, refuses session
+writes and posts `config.read_only.newer_schema` (once after boot on macOS and
+Linux, on each refused save on Windows).
+
+### project-wizard-rerun-keeps-user-keys
+
+A wizard rerun reads each folder's existing tap-hold keys: user-owned keys are
+locked, backed up and never overwritten, a changed folder retires the prior
+intent, and Finish waits for the exact read response. A category created by a
+personal-hotstring editor save is enabled; it once took the neutral-off default
+of an undeclared section and never loaded (issue #96).
+
 ## Gestures and keymaps
 
 ### project-gestures-reversal-detection

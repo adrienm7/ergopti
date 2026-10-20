@@ -121,6 +121,89 @@ SQLite flush before advancing virtual time; a readable rollback is not a
 committed configuration snapshot. Shutdown assertions require actual native
 close acknowledgments, independently of the clock being simulated.
 
+## Linux native boundaries
+
+### project-linux-absence-needs-enoent
+
+Linux native ports admit absence only on a proven ENOENT; any other open refusal
+blocks the mutation (JSON store, backup chain, logger, SQLite) and never starts
+an empty store. A file write counts only with write and close success. FIFOs,
+sockets and directories are rejected for read, write, JSON and build-stamp reads
+through a pinned `O_NONBLOCK` descriptor plus a regular-file check, never by a
+blocking open. Embedded NUL is refused at every native boundary (spawn argv,
+`sh -c`, curl config, file path, SQLite script) through one argv validator;
+binary payloads travel as Base64 or hex.
+
+### project-linux-curl-argument-rules
+
+Every Linux curl call passes `--disable` first, turns URL globbing off, fences
+the scheme to HTTP and HTTPS, never downgrades HTTPS, and does not follow
+redirects for credentialed requests. Bodies go through `--data-raw` or an
+inherited anonymous pipe, never argv; an empty header value uses curl's `Name;`
+form; CR, LF or NUL in a header is refused before an incumbent request is
+cancelled. The Windows and macOS adapters do not all follow these rules yet (see
+the TODO parity backlog).
+
+### project-linux-libuv-and-replacement-rules
+
+Validate and compose a replacement request before cancelling the incumbent owner
+(HTTP, owned HTTP, digest); the updater and the layout registry own separate
+digest slots. Capture each libuv handle inside its protected constructor,
+require start receipts rather than `pcall` success, call `update_time` before
+arming a relative timer, pass durations through the shared finite-number
+predicate, and describe foreign error objects with `ErrorDescription`, never
+`tostring`. The event-loop reentry guard is separate from stop, and sleeps retry
+`nanosleep` after EINTR. libuv reports exit status and termination signal
+separately; a signal is a failure (SIGTERM is status 143), and ESRCH on a
+process group means already gone.
+
+### project-linux-sqlite-cli-invocation
+
+The Linux SQLite CLI runs with `-init /dev/null` and `-bail`, `-readonly` for
+dashboards, an explicit `./` prefix on relative database names, and an
+exit-status receipt appended to the stdin script. Scalars are emitted with
+`json_quote` and decoded by the shared lossless JSON codec; CR and NUL in SQL
+literals go through the shared `sqlite.literal` `char()` concatenation.
+Current-schema admission uses a shared deferred `BEGIN`; real writes keep
+`BEGIN IMMEDIATE`, and metrics event IDs are acknowledged only after COMMIT.
+
+### project-linux-json-store-publication
+
+The Linux JSON store requires an object root, creates `storage.json.tmp`
+exclusively (a foreign staging file blocks the mutation and is never removed
+automatically) and publishes backups by no-replace rename on LuaJIT or checked
+link and unlink on stock Lua. The updater downloads into the inode reserved by
+`os.tmpname`, publishes with no-replace, and reuses its cache on a 304 only
+after a completed-response receipt.
+
+### project-linux-process-and-locale-traps
+
+Query `pactl` under the C locale (a translated "oui" or "ja" broke mute
+detection). GNU `ps` comm output is headerless and keeps spaces, so parse it as
+bytes. `notify-send` and `gtk-launch` get an option terminator before caller
+text. On POSIX a backslash is filename data, the working directory comes from
+native `getcwd` rather than `$PWD`, and the at-rest key falls back to
+`/var/lib/dbus/machine-id`.
+
+### project-linux-ci-runner-prerequisites
+
+Linux fixtures depend on runner details: Dunst 1.9 history has no urgency field;
+Ubuntu runners need the PulseAudio gettext catalogs and `xkbcli`; Unix-socket
+tests fail under long `/tmp` paths, so use a short `/var/tmp` directory; E2E
+must wait for an Openbox round trip after `xrandr --setmonitor` before mapping
+owned X11 clients. Debian native compiles need `libc6-dev` (`Scrt1.o`,
+`crti.o`); Fedora and Alpine source installs need a compiler, `linux-headers`
+and a verified LuaJIT networking provider. Alpine's Lua 5.2 compatibility
+`os.execute` returns `true, "exit", 0` and its constants include NaN (compare
+identities with `rawequal`). LuaJIT folds the literal `-0.0` to +0 (use
+`tonumber("-0.0")`) and allows 60 captured upvalues per function.
+
+### project-flatpak-sdk-build-flags
+
+The Flatpak SDK build needs explicit commands for the MIT Kerberos build,
+`libdir=lib` for glib-networking and libproxy, and an explicit `libm` link for
+Duktape.
+
 ## Website and documentation
 
 ### project-site-i18n-gettext-french-key
@@ -349,3 +432,20 @@ trusting its "first error", which is only the first stderr line.
 When a cross-platform drift tool fails on Windows path/process semantics, use
 the repository's supported wrapper and preserve the failure as a test fixture;
 do not silently skip the guard.
+
+### project-ci-deferrals-are-dated-exceptions
+
+Every release-qualification deferral is a closed, dated, source-bound exception
+file in `.github/ci/` (for example
+`stable_v103_macos_native_qualification_exception.json` with
+`STABLE_V103_SCOPE_IDS` in `tools/ci/dev-release-qualification.cjs`). A deferred
+scope shows DEFERRED with `qualified: false` and never counts as a pass; expired
+exceptions are not renewed without the maintainer. Unsigned stable Windows
+releases are a standing authorisation (`stable_windows_signing_exception.json`)
+until SignPath signing is integrated.
+
+### project-site-cname-is-a-tracked-file
+
+The ergopti.fr custom domain lives in `static/CNAME` and is verified before each
+Pages deployment, because a deployed artifact without it would drop the custom
+domain.

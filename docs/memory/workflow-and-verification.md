@@ -44,6 +44,23 @@ numeric indices.
 This checkout may contain stashes created by other worktrees. Inspect stash
 parents and paths before applying or dropping one.
 
+### project-fix-branches-fast-forward-only
+
+The maintainer runs one agent per OS on `fix/windows`, `fix/macos` and
+`fix/linux`. Merge each into dev with `--no-ff`, validate, push dev, then
+fast-forward the `fix/*` branch to dev only when it is an ancestor (never a
+rewrite). A merge that touches `run_all.ahk`, `test_framework.ahk` or a sealed
+updater source requires resealing
+`tools/ci/windows-updater-original-diagnostic-cohort-inputs.json` with
+`tools/ci/seal-windows-updater-original-source.cjs`.
+
+### project-preserve-external-runtimes-during-tests
+
+Tests and probes never kill an external Ollama server, the personal locator or
+another live process, never download runtimes or models without authorization,
+and keep large artifacts on owned D: storage (C: ran out of space during site
+and runtime checks).
+
 ## Verification
 
 ### feedback-regression-tests
@@ -232,6 +249,23 @@ case variants in behavioral cache and history-seed tests.
 The Windows AHK suite runs on this machine even when the launcher returns before
 the child. Read the newest `%TEMP%/ergopti_test_results_*.txt`; do not declare the
 suite unavailable.
+
+### project-hosted-ci-evidence-limits
+
+GitHub shows only about ten error annotations per step, so CI emits one bounded
+aggregate notice; the hosted console log loses Unicode in test case names, so
+count results from the execution manifest, not the console. Manual `ci.yml`
+dispatches choose `os_lanes` (all, one OS or a pair), run under a per-run
+concurrency group, and never run Release / Publish, which stays push-only.
+
+### project-js-gate-host-limits-on-windows
+
+On a Windows host the full JS gate has a known set of host-bound reds that are
+not product defects: symlink-privilege refusals (error 1314), Linux-only archive
+assembly, the Linux installer sandbox service, drive-letter paths given to POSIX
+constructors and backslash `LUA_CPATH`. Classify them with
+`verify-change --all --diagnose` and compare with the hosted run before
+attributing a red to a change.
 
 ## Audit and documentation evidence
 

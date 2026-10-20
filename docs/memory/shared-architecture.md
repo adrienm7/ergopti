@@ -550,6 +550,32 @@ every driver's tables; the Linux keyboard hook names the Shift side
 on all three drivers with the `llm-tooltip-chords-consumed`,
 `llm-nav-left-right-windows` and `llm-accept-inserts` tests.
 
+### project-native-menu-row-census
+
+Menu rows belong in the shared manifest; rows still built in driver code are
+counted by `npm run test:native-menu-rows` against a non-increasing baseline.
+The scanner ignores dynamically supplied rows, so regenerate the baseline with
+its owning generator and never lower it by hand; counts quoted in notes drift
+with scanner variants. Reload, Quit and the top-level captions come from
+canonical native-platform variants.
+
+### project-github-release-api-rate-limit
+
+Update checks, the changelog window and the healthcheck share the
+unauthenticated GitHub API limit (60 requests per hour per IP), so frequent
+restarts exhaust it. macOS and Windows keep the release list and its ETag across
+restarts and send `If-None-Match`; every driver names an exhausted limit (403 or
+429 with `X-RateLimit-Remaining: 0`) with its UTC reset through one shared
+sentence (`_shared/lua/updater/rate_limit.lua`).
+
+### project-metrics-day-and-correction-semantics
+
+Metrics raw days use the local calendar day and "yesterday" is derived at noon
+so DST cannot skip a day. The `[BS]` correction marker counts as a correction
+but not as a typed character, ngram source labels other than hotstring, llm and
+none fall into "other", and the dashboard's NONE app selection excludes all
+input on every driver.
+
 ## Logging and observability
 
 ### errors-only-log-sink
@@ -591,6 +617,13 @@ expected segment and boot-stamp inventory before interpreting timings.
 Profiler labels and placeholders are schema. Producers and reports must use the
 same exact names so missing segments cannot masquerade as zero cost.
 
+### project-shared-export-schema-is-closed
+
+The shared diagnostic export carries typed technical facts only, in English,
+with no raw logs and no automatic upload; local log links stay out of
+attachments. A new field needs a schema change and a privacy decision, not a
+free-form string.
+
 ## Intentional asymmetries
 
 ### project-category-gating-ahk-only
@@ -628,3 +661,10 @@ may stay on top, each entry pinned to its exact site count; the overlay
 adapters are topmost by default, so every file loading one is listed. That
 gate scans the three drivers, the shared Lua, extensions and Ergopti's own
 vendor scripts.
+
+### project-streaming-multi-polarity
+
+The canonical `llm.display.streaming_multi = true` means progressive display on
+every driver. Windows inverts it only at its native engine field
+`show_all_at_once`; flipping the polarity anywhere else shows predictions all at
+once where the user asked for streaming.

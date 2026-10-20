@@ -9,17 +9,20 @@ and makes stale details harder to notice.
 ## Topics
 
 - [Workflow and verification](workflow-and-verification.md) — repository
-  safety, targeted gates, audit evidence, and generated artifacts.
+  safety, targeted gates, hosted CI evidence, audit evidence, and generated
+  artifacts.
 - [Shared architecture](shared-architecture.md) — ownership, shared data,
   logging, i18n, menus, and cross-driver invariants.
 - [Windows and AutoHotkey](windows-ahk.md) — AHK v2 syntax, startup, callbacks,
-  suspension, files, menus, and WebView2.
+  suspension, files, menus, WebView2, and the native DLL build.
 - [macOS and Hammerspoon](macos-hammerspoon.md) — event taps, lifecycle
-  ownership, timers, tasks, clipboard, Karabiner, and test isolation.
+  ownership, timers, tasks, clipboard, Karabiner, test isolation, packaging,
+  and AppleEvents.
 - [Text input and configuration](text-input-and-config.md) — hotstrings,
   synthetic input, typing order, TOML, caches, and locale data.
 - [Linux, web, and release](linux-web-release.md) — Linux input contracts,
-  website details, deployment, and release assets.
+  native port boundaries, CI runner prerequisites, website details,
+  deployment, and release assets.
 - [Rejected proposals](rejected_proposals.md) — measured ideas that should not
   be raised again without changed evidence.
 
