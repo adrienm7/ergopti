@@ -159,7 +159,14 @@ server must also never contact ollama.com: `managed_ollama_environment.json`
 (`OLLAMA_NO_CLOUD=1`) is embedded in the Go package and applied by the
 `RunServer` hook (`ApplyServeEnvironment`), passed by Windows to its launcher
 with a digest, and appended by Linux to the serve child; only the server a
-driver owns gets it (`test-managed-ollama-no-cloud.cjs`).
+driver owns gets it (`test-managed-ollama-no-cloud.cjs`). Since 0.40.4,
+`ollama create` against a loopback server first probes whether it shares the
+server's blob store by writing a blob into the client's own `$HOME/.ollama`
+models folder and removing only the blob, so the folder survives; a receiver
+that runs the client in an empty home then fails its empty-store check with a
+create stage that reads "unknown". Run such a client with
+`OLLAMA_CREATE_REMOTE=1` (upload through the server API) and keep every
+receiver failure code in its closed list.
 
 ### project-macos-ai-runtimes-install-on-selection
 
