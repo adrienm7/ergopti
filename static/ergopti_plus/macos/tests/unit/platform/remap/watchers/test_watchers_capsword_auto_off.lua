@@ -382,3 +382,37 @@ helpers.describe("CapsWord watcher: the shipped defaults end CapsWord on typed p
 		helpers.assert_true(timers_at(h, delay)[1] ~= nil, "the delay counts from the activation")
 	end)
 end)
+
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 6/ Driver-Typed Output =======
+-- ======================================
+-- ======================================
+
+helpers.describe("CapsWord watcher: text the driver types ends CapsWord on a delimiter", function()
+	helpers.it("a hotstring or replayed delimiter in the driver's output ends CapsWord", function()
+		local h = fresh_harness({ caps_word_terminators = { "period" } })
+		local Output = require("infra.capsword_output")
+		activate(h)
+		Output.report("BONJOUR")
+		helpers.assert_eq(h.supersede_calls, 0, "output without a checked delimiter keeps CapsWord")
+		Output.report("etc.")
+		helpers.assert_eq(#h.writers, 1, "a checked delimiter in the output ends CapsWord")
+		helpers.assert_eq(h.capslock, { false })
+	end)
+
+	helpers.it("the relay is inert without an active CapsWord and after the watcher stops", function()
+		local h = fresh_harness()
+		local Output = require("infra.capsword_output")
+		Output.report(" ")
+		helpers.assert_eq(h.supersede_calls, 0, "no active CapsWord, no write")
+		activate(h)
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+		Output.report(" ")
+		helpers.assert_eq(h.supersede_calls, 0, "a stopped watcher receives nothing")
+	end)
+end)

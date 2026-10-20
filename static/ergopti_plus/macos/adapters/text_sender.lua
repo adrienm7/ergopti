@@ -31,6 +31,7 @@ local Timings  = require("infra.timings")
 local Clipboard = require("adapters.clipboard")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local CapsWordOutput = require("infra.capsword_output")
 
 local LOG = "adapters.text_sender"
 
@@ -488,6 +489,10 @@ function M.send(text, opts, callback)
 
 	if not ok then
 		Logger.error(LOG, "send(): injection failed (mode=%s) — %s", mode, tostring(err))
+	else
+		-- A pasted or posted text may never cross the CapsWord watcher's tap:
+		-- its delimiters end CapsWord as typed output all the same.
+		CapsWordOutput.report(text)
 	end
 
 	if type(callback) == "function" then
