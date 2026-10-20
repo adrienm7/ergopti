@@ -72,6 +72,12 @@ local EVDEV_VALUE_DOWN   = 1
 -- the injector cannot disagree about which level means which key.
 local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 
+-- Told of the text every successful injection typed (an expansion, the magic
+-- key's result, a send_text, a consumed key typed in its place): such text
+-- never reaches the keyboard hook's character callback, yet CapsWord must end
+-- on a delimiter it contains. One owner, set by the daemon.
+local _output_observer = nil
+
 
 -- =========================================
 -- =========================================
@@ -744,6 +750,33 @@ function M._set_uinput(mod)
 	_uinput = mod
 end
 
+--- Sets the one observer told of each successful injection's typed text.
+--- A second observer is refused: two owners would each believe they see all
+--- output. Pass nil to clear it (tests, a stopped daemon).
+--- @param fn function|nil fn(text) called after the text was typed.
+--- @return boolean accepted
+function M.set_output_observer(fn)
+	if fn ~= nil and type(fn) ~= "function" then
+		Logger.error(LOG, "set_output_observer(): a function or nil is required, got %s.", type(fn))
+		return false
+	end
+	if fn ~= nil and _output_observer ~= nil and _output_observer ~= fn then
+		Logger.error(LOG, "set_output_observer(): an output observer is already installed.")
+		return false
+	end
+	_output_observer = fn
+	return true
+end
+
+--- Tells the observer of typed text; its failure is logged, never raised into
+--- an injection that already succeeded.
+--- @param text string Exactly what was typed.
+local function notify_output(text)
+	if not _output_observer or text == "" then return end
+	local ok, err = pcall(_output_observer, text)
+	if not ok then Logger.error(LOG, "The output observer failed: %s.", tostring(err)) end
+end
+
 --- Performs a hotstring injection: erases the trigger then types the replacement.
 ---
 --- This is the primary entry point called by the daemon on each match.
@@ -804,7 +837,10 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		end
 	end, publication, prepared)
 
-	if result.ok then Logger.done(LOG, "inject(): done (bc=%d).", backspace_count) end
+	if result.ok then
+		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
+		notify_output(replacement_text .. (replay_terminator or ""))
+	end
 	return result
 end
 
@@ -835,9 +871,11 @@ function M.type_directly(text)
 	if not (_uinput and _uinput.is_open()) then
 		return { ok = false, error = "no uinput channel", cleanup_ok = true }
 	end
-	return run_transaction("type_directly()", function(tx)
+	local result = run_transaction("type_directly()", function(tx)
 		if not send_text_native(tx, text) then error(tx.error() or "the key presses were refused", 0) end
 	end)
+	if result.ok then notify_output(text) end
+	return result
 end
 
 --- Types several values separated by a real Tab KEYSTROKE.
@@ -917,6 +955,7 @@ function M.inject_fields(backspace_count, values, is_private)
 
 	if result.ok then
 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
+		notify_output(table.concat(values, "\t"))
 	end
 	return result
 end

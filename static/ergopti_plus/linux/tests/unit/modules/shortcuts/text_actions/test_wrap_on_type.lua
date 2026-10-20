@@ -711,7 +711,9 @@ local function with_daemon_wrap(body, options)
 			engine = { reset = function() state.resets = state.resets + 1 end },
 			Monotonic = { now_ms = function() return 1000 end },
 			WordReset = { click_resets_word = function() return true end },
-			injector = { inject = function(_, text) state.typed[#state.typed + 1] = text; return { ok = true } end },
+			-- The span installs the CapsWord output observer; no CapsWord runs here.
+			injector = { inject = function(_, text) state.typed[#state.typed + 1] = text; return { ok = true } end,
+				set_output_observer = function() return true end },
 			script_chords = { on_key = function() return false end },
 			tap_keys = { on_key = function() return false end }, consume_bound_chord = function() return false end,
 		}
