@@ -60,9 +60,14 @@
 				"build-deb": 1,
 				"build-rpm": 1,
 				"build-appimage": 1,
-				"build-flatpak": 1,
-				"smoke-flatpak-run": 1,
 				"smoke-tarball-install": 1
+			}
+		},
+		"package-flatpak": {
+			"classification": "mandatory",
+			"subjects": {
+				"build-flatpak": 1,
+				"smoke-flatpak-run": 1
 			}
 		},
 		"install-linux": {

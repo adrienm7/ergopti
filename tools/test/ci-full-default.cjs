@@ -50,6 +50,7 @@ const JOBS = [
 		'package-linux',
 		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 	],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', null],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
 ];
@@ -449,14 +450,14 @@ const FULL_STEPS = [
 	],
 	[
 		'.github/workflows/ci-linux.yml',
-		'package-linux',
+		'package-flatpak',
 		'Install the Flatpak the way a user would',
 		null
 	],
-	['.github/workflows/ci-linux.yml', 'package-linux', 'Launch the Flatpak', null],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Launch the Flatpak', null],
 	[
 		'.github/workflows/ci-linux.yml',
-		'package-linux',
+		'package-flatpak',
 		'The sandboxed shared data tree resolves and opens',
 		null
 	],
@@ -475,6 +476,8 @@ const FULL_STEPS = [
 	],
 	['.github/workflows/ci-linux.yml', 'package-linux', 'Record mandatory package evidence', null],
 	['.github/workflows/ci-linux.yml', 'package-linux', 'Upload mandatory package evidence', null],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Record mandatory Flatpak evidence', null],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Upload mandatory Flatpak evidence', null],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'Download assertion evidence', null],
 	[
 		'.github/workflows/ci-linux.yml',

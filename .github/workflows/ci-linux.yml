@@ -9,6 +9,7 @@
 #                 domain rows                 5 archive installs     (evidence gate)
 #                                             9 first installs
 #                                             3 package runs
+#                                  \-> Flatpak (parallel to install and launch)
 #
 # The E2E column is one matrix job (e2e-linux) whose rows split its harnesses by
 # domain; tools/test/fixtures/linux-e2e-shards.json assigns each step to one row.
@@ -3568,11 +3569,13 @@ jobs:
       # successful unit admission retained through the E2E dependency. linux-ok
       # continues to reject every failed mandatory job and missing native subject.
       #
-      # The Flatpak and tarball smokes run here, on the build host, because neither
-      # needs a pristine machine: the build only runs `flatpak build-bundle`, so
-      # installing the bundle is still a first install, and the tarball installs
-      # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
-      # host must NOT already have, so they keep their own runners below.
+      # The tarball smoke runs here, on the build host, because it needs no
+      # pristine machine: the tarball installs under $HOME. The Flatpak is built
+      # and smoked by package-flatpak, a sibling job that starts from this job's
+      # assets-linux bundle and runs beside install-linux, because its sandbox
+      # luajit build alone took about four minutes of this job. The .deb, .rpm
+      # and AppImage smokes each prove a dependency the host must NOT already
+      # have, so they keep their own runners below.
       - name: Retain the source-bound linux-e2e-suite qualification
         if: ${{ always() && matrix.shard == 'desktop-webview' }}
         uses: actions/upload-artifact@v4
@@ -3674,30 +3677,24 @@ jobs:
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y rpm
           rpmbuild --version
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y flatpak flatpak-builder
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
-              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
 
-      - name: Build the .deb, the .rpm and the Flatpak
-        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild
-        # and flatpak-builder respectively, which is how the packagers stayed
-        # unexercised while CI reported them green. The Flatpak compiles its
-        # own luajit inside the sandbox.
+      - name: Build the .deb and the .rpm
+        # No --skip-* flag anywhere: those return before dpkg-deb and rpmbuild
+        # respectively, which is how the packagers stayed unexercised while CI
+        # reported them green. The Flatpak is built by its own parallel job,
+        # package-flatpak, from the bundle this job uploads.
         shell: bash
-        # The three packagers stage under their own build/linux/ subdirectory
-        # and only read the bundle, so they run at once (the Flatpak's luajit
-        # build dominates). Each log is printed whole, then any failure fails.
+        # The two packagers stage under their own build/linux/ subdirectory
+        # and only read the bundle, so they run at once. Each log is printed
+        # whole, then any failure fails.
         run: |
           set -euo pipefail
           logs="$RUNNER_TEMP/linux-packagers"
           mkdir -p "$logs"
           bash tools/build/build-linux-deb.sh > "$logs/deb.log" 2>&1 & deb=$!
           bash tools/build/build-linux-rpm.sh > "$logs/rpm.log" 2>&1 & rpm=$!
-          bash tools/build/build-linux-flatpak.sh > "$logs/flatpak.log" 2>&1 & flatpak=$!
           failed=0
-          for name in deb rpm flatpak; do
+          for name in deb rpm; do
             status=0
             wait "${!name}" || status=$?
             echo "::group::$name packager (exit $status)"
@@ -3709,25 +3706,6 @@ jobs:
             fi
           done
           exit "$failed"
-
-      - name: The staged payload carries the driver and the shared data tree
-        # The packager checks its own manifest; this checks the payload, which is
-        # the part a copy that silently did nothing would leave empty.
-        run: |
-          set -euo pipefail
-          fail=0
-          for f in build/linux/flatpak/org.ergopti.Ergopti.yml \
-                   build/linux/flatpak/payload/bin/ergopti \
-                   build/linux/flatpak/payload/lib/ergopti/ergopti_hotstrings.lua \
-                   build/linux/flatpak/payload/lib/ergopti/infra/paths.lua \
-                   build/linux/flatpak/payload/lib/ergopti/_shared/lua/logger/shim.lua \
-                   build/linux/flatpak/payload/lib/ergopti/_shared/data/locales/en.json; do
-              if [ ! -f "$f" ]; then
-                  echo "::error::the Flatpak payload is missing $f"
-                  fail=1
-              fi
-          done
-          exit $fail
 
       - name: Rename the packages to their stable asset names
         # Each packager names its output after the version in package.json, which
@@ -3752,8 +3730,6 @@ jobs:
               mv "$found" "$target"
               echo "  $kind -> $target ($(du -h "$target" | cut -f1))"
           }
-          rename_one "$(find build/linux -maxdepth 1 -name '*.flatpak' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-x86_64.flatpak "Flatpak"
           rename_one "$(find build/linux -maxdepth 1 -name '*.deb' -type f 2>/dev/null | head -1)" \
               build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
           rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
@@ -3773,38 +3749,6 @@ jobs:
           dpkg-deb --info build/linux/ErgoptiPlus-linux-amd64.deb
           rpm -qip build/linux/ErgoptiPlus-linux-noarch.rpm
           rpm -qlp build/linux/ErgoptiPlus-linux-noarch.rpm | sed -n '1,20p'
-
-      # The sandboxed path. `flatpak run` is what a user's launcher invokes, and
-      # it is the only one of the five formats that executes inside the
-      # confinement the manifest declares — so a permission the driver needs and
-      # the manifest forgot shows up here rather than on a user's machine. Flathub
-      # and the runtime are already installed by the toolchain step above.
-      - name: Install the Flatpak the way a user would
-        run: |
-          set -euo pipefail
-          bundle=build/linux/ErgoptiPlus-linux-x86_64.flatpak
-          if [ ! -f "$bundle" ]; then
-              echo "::error::no Flatpak bundle at $bundle — nothing to install."
-              exit 1
-          fi
-          flatpak install --user -y --bundle "$bundle"
-          flatpak list --user --app
-
-      - name: Launch the Flatpak
-        run: flatpak run --user org.ergopti.Ergopti --help
-
-      - name: The sandboxed shared data tree resolves and opens
-        # Run INSIDE the sandbox with --command, so this reads /app exactly as
-        # the daemon does. The check script is bound in read-only from the
-        # checkout because the package deliberately ships no tests.
-        run: |
-          set -euo pipefail
-          check_dir="$(pwd)/static/ergopti_plus/linux/tests/hardware"
-          flatpak run --user \
-              --filesystem="$check_dir:ro" \
-              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
-              --command=luajit org.ergopti.Ergopti \
-              "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
 
       # The no-root path the release notes point every other distribution at. It
       # is the only format whose installer is our own script rather than a
@@ -3871,10 +3815,9 @@ jobs:
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
             build/linux/ErgoptiPlus-x86_64.AppImage
-            build/linux/ErgoptiPlus-linux-x86_64.flatpak
 
       - name: Record mandatory package evidence
-        # One record for the six subjects this job proves. It is written only
+        # One record for the four subjects this job proves. It is written only
         # when every step above passed, so no subject can be claimed by a
         # packaging run that stopped halfway.
         run: |
@@ -3886,8 +3829,6 @@ jobs:
               --subject build-deb=1 \
               --subject build-rpm=1 \
               --subject build-appimage=1 \
-              --subject build-flatpak=1 \
-              --subject smoke-flatpak-run=1 \
               --subject smoke-tarball-install=1
 
       - name: Upload mandatory package evidence
@@ -3902,6 +3843,157 @@ jobs:
       - name: Plan every authored installation lot
         id: install-plan
         run: node tools/ci/linux-install-matrix.cjs
+
+  # ─────────────────────────────────────────────────
+  # 3a) Build and smoke the Flatpak, beside the install cells
+  # ─────────────────────────────────────────────────
+  # Built from the exact tarball package-linux uploaded in assets-linux (the
+  # driver bundle every other package was made from), unpacked into build/linux
+  # where build-linux-flatpak.sh expects it. It runs in parallel with
+  # install-linux; linux-ok needs both, and its published file travels in its
+  # own assets-linux-flatpak artifact, which the release collects through its
+  # assets-* pattern. A skipped package-linux skips this job, and linux-ok then
+  # fails on the missing result.
+  package-flatpak:
+    name: 'Flatpak'
+    runs-on: ubuntu-latest
+    needs: [package-linux]
+    env:
+      LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the driver bundle built above
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-linux
+          path: ${{ runner.temp }}/assets-linux
+
+      - name: Unpack the exact bundle the other packages were made from
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/assets-linux"
+          (cd "$src" && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
+          mkdir -p build/linux
+          tar -xzf "$src/$LINUX_BUNDLE_ASSET" -C build/linux
+          test -f build/linux/linux/ergopti_hotstrings.lua
+          bash tools/build/write_build_stamp.sh verify build/linux/_shared
+
+      - name: Install the Flatpak toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y flatpak flatpak-builder
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
+              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+
+      - name: Build the Flatpak
+        # No --skip-flatpak: that flag returns before flatpak-builder. The
+        # Flatpak compiles its own luajit inside the sandbox.
+        shell: bash
+        run: bash tools/build/build-linux-flatpak.sh
+
+      - name: The staged payload carries the driver and the shared data tree
+        # The packager checks its own manifest; this checks the payload, which is
+        # the part a copy that silently did nothing would leave empty.
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in build/linux/flatpak/org.ergopti.Ergopti.yml \
+                   build/linux/flatpak/payload/bin/ergopti \
+                   build/linux/flatpak/payload/lib/ergopti/ergopti_hotstrings.lua \
+                   build/linux/flatpak/payload/lib/ergopti/infra/paths.lua \
+                   build/linux/flatpak/payload/lib/ergopti/_shared/lua/logger/shim.lua \
+                   build/linux/flatpak/payload/lib/ergopti/_shared/data/locales/en.json; do
+              if [ ! -f "$f" ]; then
+                  echo "::error::the Flatpak payload is missing $f"
+                  fail=1
+              fi
+          done
+          exit $fail
+
+      - name: Rename the Flatpak to its stable asset name
+        # A published asset keeps ONE name across releases, see package-linux.
+        shell: bash
+        run: |
+          set -euo pipefail
+          found="$(find build/linux -maxdepth 1 -name '*.flatpak' -type f 2>/dev/null | head -1)"
+          if [ -z "$found" ]; then
+              echo "::error::the Flatpak packager produced no package — nothing to attach."
+              exit 1
+          fi
+          mv "$found" build/linux/ErgoptiPlus-linux-x86_64.flatpak
+          echo "  Flatpak -> build/linux/ErgoptiPlus-linux-x86_64.flatpak ($(du -h build/linux/ErgoptiPlus-linux-x86_64.flatpak | cut -f1))"
+
+      # The sandboxed path. `flatpak run` is what a user's launcher invokes, and
+      # it is the only one of the five formats that executes inside the
+      # confinement the manifest declares — so a permission the driver needs and
+      # the manifest forgot shows up here rather than on a user's machine. Flathub
+      # and the runtime are already installed by the toolchain step above.
+      - name: Install the Flatpak the way a user would
+        run: |
+          set -euo pipefail
+          bundle=build/linux/ErgoptiPlus-linux-x86_64.flatpak
+          if [ ! -f "$bundle" ]; then
+              echo "::error::no Flatpak bundle at $bundle — nothing to install."
+              exit 1
+          fi
+          flatpak install --user -y --bundle "$bundle"
+          flatpak list --user --app
+
+      - name: Launch the Flatpak
+        run: flatpak run --user org.ergopti.Ergopti --help
+
+      - name: The sandboxed shared data tree resolves and opens
+        # Run INSIDE the sandbox with --command, so this reads /app exactly as
+        # the daemon does. The check script is bound in read-only from the
+        # checkout because the package deliberately ships no tests.
+        run: |
+          set -euo pipefail
+          check_dir="$(pwd)/static/ergopti_plus/linux/tests/hardware"
+          flatpak run --user \
+              --filesystem="$check_dir:ro" \
+              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
+              --command=luajit org.ergopti.Ergopti \
+              "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
+
+      - name: Upload the Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-linux-flatpak
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          if-no-files-found: error
+          path: build/linux/ErgoptiPlus-linux-x86_64.flatpak
+
+      - name: Record mandatory Flatpak evidence
+        # Written only when every step above passed.
+        run: |
+          set -euo pipefail
+          node tools/test/linux-ci-evidence.cjs record \
+              --job package-flatpak --output "$RUNNER_TEMP/linux-ci-evidence/package-flatpak.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(flatpak --version)" \
+              --subject build-flatpak=1 \
+              --subject smoke-flatpak-run=1
+
+      - name: Upload mandatory Flatpak evidence
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: linux-ci-evidence-package-flatpak
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/package-flatpak.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 3) Install and run every Linux distribution and package
@@ -4509,7 +4601,7 @@ jobs:
   linux-ok:
     name: 'Verdict'
     runs-on: ubuntu-latest
-    needs: [install-linux]
+    needs: [install-linux, package-flatpak]
     if: always()
 
     steps:

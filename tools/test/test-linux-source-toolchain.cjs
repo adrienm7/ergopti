@@ -241,7 +241,11 @@ function sourceTransportControls(source, selectedPlan) {
 			'install_metadata: ${{ steps.install-plan.outputs.metadata }}',
 			'install_metadata: ${{ steps.install-plan.outputs.matrix }}'
 		],
-		['adjacent receiver', '    needs: [package-linux]\n', '    needs: [e2e-linux]\n'],
+		[
+			'adjacent receiver',
+			'    needs: [package-linux]\n    strategy:',
+			'    needs: [e2e-linux]\n    strategy:'
+		],
 		[
 			'matrix receiver',
 			'matrix: ${{ fromJSON(needs.package-linux.outputs.install_matrix) }}',
