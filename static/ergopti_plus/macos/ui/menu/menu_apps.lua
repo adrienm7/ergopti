@@ -50,10 +50,12 @@ local _scan_failures = {}
 --- @return table|nil paths Nil on failure, including partial command output.
 local function scan_paths(directory, pattern, category)
 	local ok, output, succeeded, kind, code = pcall(hs.execute, string.format(
-		"find %s -maxdepth 1 -name %s 2>/dev/null",
+		"find %s -maxdepth 1 -name %s -print0 2>/dev/null",
 		text_utils.shell_quote(directory), text_utils.shell_quote(pattern)
 	))
-	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0 then
+	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0
+		or (output ~= "" and output:sub(-1) ~= "\0")
+		or output:sub(1, 1) == "\0" or output:find("\0\0", 1, true) then
 		if not _scan_failures[category] then
 			_scan_failures[category] = true
 			Logger.warn(LOG, "Bundled app %s scan failed (details withheld; repeats suppressed).", category)
@@ -62,7 +64,8 @@ local function scan_paths(directory, pattern, category)
 	end
 	_scan_failures[category] = nil
 	local paths = {}
-	for path in output:gmatch("[^\n]+") do paths[#paths + 1] = path end
+	-- A native pathname may contain LF; only NUL is excluded by the filesystem.
+	for path in output:gmatch("([^%z]+)%z") do paths[#paths + 1] = path end
 	table.sort(paths)
 	return paths
 end

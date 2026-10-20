@@ -35,7 +35,7 @@ local function with_apps(callback)
 				execute = function(command)
 					state.calls[#state.calls + 1] = command
 					if command:find("*.icns", 1, true) then
-						if state.icon_failure then return "/private/Partial.icns\n", nil, "exit", 1 end
+						if state.icon_failure then return "/private/Partial.icns\0", nil, "exit", 1 end
 						return "", true, "exit", 0
 					end
 					state.app_scans = state.app_scans + 1
@@ -68,7 +68,7 @@ helpers.describe("Bundled app discovery outcome", function()
 	for _, mode in ipairs({ "exit", "signal", "throw", "invalid" }) do
 		helpers.it("(apps-discovery-outcome) retries after " .. mode .. " without caching partial output", function()
 			with_apps(function(module, state, ctx)
-				state.output = "/virtual/Partial.app\n"
+				state.output = "/virtual/Partial.app\0"
 				state.status = nil
 				state.code = 1
 				state.kind = mode == "signal" and "signal" or "exit"
@@ -82,7 +82,7 @@ helpers.describe("Bundled app discovery outcome", function()
 				helpers.assert_nil(state.warnings[1]:find("/private", 1, true))
 				helpers.assert_nil(state.warnings[1]:find("/virtual", 1, true))
 				state.throw, state.status, state.kind, state.code = false, true, "exit", 0
-				state.output = "/virtual/Zebra.app\n/virtual/Alpha.app\n"
+				state.output = "/virtual/Zebra.app\0/virtual/Alpha.app\0"
 				local rows = module.build(ctx).submenu
 				helpers.assert_eq(rows[1].label, "Alpha")
 				helpers.assert_eq(rows[2].label, "Zebra")
@@ -94,7 +94,7 @@ helpers.describe("Bundled app discovery outcome", function()
 	end
 	helpers.it("(apps-discovery-outcome) discards failed icon output without hiding valid apps", function()
 		with_apps(function(module, state, ctx)
-			state.output = "/virtual/First.app\n/virtual/Second.app\n"
+			state.output = "/virtual/First.app\0/virtual/Second.app\0"
 			state.icon_failure = true
 			local rows = module.build(ctx).submenu
 			helpers.assert_eq(#rows, 2)
@@ -212,7 +212,7 @@ local function with_native_apps_parent(language, body)
 		owner = { pending = function() return false end }
 		acquired = native.scope_acquire(owner); helpers.assert_eq(acquired, true)
 		receipt = assert(native.scope_capture(owner)); helpers.assert_eq(native.scope_apply(owner, receipt, language), true)
-		local state = { scans = 0, launches = 0, output = "/virtual/Apps/Zebra.app\n/virtual/Apps/Alpha.app\n" }
+		local state = { scans = 0, launches = 0, output = "/virtual/Apps/Zebra.app\0/virtual/Apps/Alpha.app\0" }
 		local old_attributes = hs.fs.attributes
 		hs.fs.attributes = function(path)
 			if path == "/virtual/Apps/apps" then return { mode = "directory" } end
