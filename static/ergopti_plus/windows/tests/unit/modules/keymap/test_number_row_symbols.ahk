@@ -582,6 +582,50 @@ _NRP_NoHardcodedEdgeTable() {
 }
 Test("number row: no hardcoded edge-key table remains (number-row-edge-keys)", _NRP_NoHardcodedEdgeTable)
 
+; A Kana AltGr (SC138 on VK_OEM_8) is no modifier to AutoHotkey, so a
+; number-row hotkey without a guard matched under it and typed its reordered
+; level where the layout's AltGr level belonged. Every number-row hotkey stands
+; down there: the static blocks' criteria and the digits-first Shift swap
+; (number-row-kana-altgr).
+_NRP_KanaAltGrStandsDown() {
+	global _ALTGR_KANA_FIXUP, _TapHoldModifierIsHeld, Features, CategoryEnabled, LayerEnabled
+	State := MasterGateState()
+	Restore := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
+	Source := _NRP_LayoutSource()
+	Criteria := 0
+	for Line in StrSplit(Source, "`n") {
+		if !RegExMatch(Line, "^#HotIf .*(NumberRowEffectiveMode|NumberRowEdgesEffective)\(")
+			continue
+		Criteria += 1
+		AssertTrue(InStr(Line, "!TapHoldKanaAltGrHeld()") > 0, "a number-row block stands down under a Kana AltGr: " . Line)
+	}
+	AssertEqual(3, Criteria, "digits first, symbols first and the edge keys")
+	Saved := [IsSet(_ALTGR_KANA_FIXUP) ? _ALTGR_KANA_FIXUP : 0, IsSet(_TapHoldModifierIsHeld) ? _TapHoldModifierIsHeld : 0]
+	try {
+		_NRP_UseLayout(Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+			"ergopti_variant", "none", "direct_access_digits", "digits"))
+		_NRP_WithAzertyShapedForeground(_NRP_KanaHeldSwap)
+	} finally {
+		_ALTGR_KANA_FIXUP := Saved[1]
+		_TapHoldModifierIsHeld := Saved[2]
+		Features := Restore[1]
+		CategoryEnabled := Restore[2]
+		LayerEnabled := Restore[3]
+		State.Clear()
+		for Key, Value in Restore[4]
+			State[Key] := Value
+	}
+}
+_NRP_KanaHeldSwap(Hkl) {
+	global _ALTGR_KANA_FIXUP, _TapHoldModifierIsHeld
+	AssertTrue(_DigitRowSwapIsLive(0x02, NumberRowForegroundLayout), "Shift+1 is swapped on the AZERTY-shaped row")
+	_ALTGR_KANA_FIXUP := true
+	_TapHoldModifierIsHeld := (*) => true
+	AssertFalse(_DigitRowSwapIsLive(0x02, NumberRowForegroundLayout), "and left to the layout under a held Kana AltGr")
+}
+Test("number row: every number-row hotkey stands down under a Kana AltGr (number-row-kana-altgr)",
+	_KLT_WithEmulation.Bind(_NRP_KanaAltGrStandsDown))
+
 ; The four row switches (layout.emulate_<row>): a row switched off is left to
 ; the OS layout by the registry emulation (its criteria), by the built-in one
 ; (pass-through variants created before its layers) and by the AltGr layer,

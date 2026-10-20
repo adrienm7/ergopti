@@ -368,7 +368,7 @@ _DDP_ChildSource(Scenario, ResultsPath) {
 		"Scenario := " . _DDP_Literal(Scenario), , &ScenarioCount)
 	if ScenarioCount != 1
 		throw Error("The closed digit producer scenario boundary changed.")
-	Body .= '`n#InputLevel 2`n#HotIf NumberRowEffectiveMode() == "digits"`n'
+	Body .= '`n#InputLevel 2`n#HotIf NumberRowEffectiveMode() == "digits" && !TapHoldKanaAltGrHeld()`n'
 		. ArrayJoin(Slots, "`n") . "`n#HotIf`n"
 	Source := StrReplace(Source, "`nRunTests()", "`n" . Body, , &EntryCount)
 	if EntryCount != 1
