@@ -2259,6 +2259,10 @@ def _admit_appleevent_boundary(children, repository):
     }
 
 
+# The core tap a cask install or upgrade requires once API installs are off.
+CORE_TAP = "Library/Taps/homebrew/homebrew-core"
+
+
 def admit_brew(children, source, host):
     """Copy only the actual entrypoint and own all mutable Brew namespaces."""
     root = children.root
@@ -2279,6 +2283,7 @@ def admit_brew(children, source, host):
         "bin",
         "Library",
         "Library/Taps/ergopti/homebrew-acceptance",
+        CORE_TAP,
         "Caskroom",
         "Cellar",
     ):
@@ -2333,6 +2338,11 @@ def admit_brew(children, source, host):
         "Actual Brew version is absent",
     )
     children.run(["/usr/bin/git", "-C", str(expected["tap"]), "init"], confined=True)
+    # With HOMEBREW_NO_INSTALL_FROM_API, a cask upgrade asks for the core tap
+    # and clones it from github.com when its directory is absent; the sandbox
+    # has no network, so the upgrade failed (dev run 39374014338). An owned
+    # empty repository satisfies Tap#ensure_installed! without a download.
+    children.run(["/usr/bin/git", "-C", str(prefix / CORE_TAP), "init"], confined=True)
     children.run(
         ["/usr/bin/git", "-C", str(expected["tap"]), "config", "user.name", "Owned acceptance"],
         confined=True,
