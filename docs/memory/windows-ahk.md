@@ -400,6 +400,20 @@ rows, and prune their registrations before clearing the parent; see
 dispatcher deliberately uses ownership beyond tray reachability, so clearing
 its global maps would hide a different bug.
 
+### project-clipboard-delayed-rendering-and-image-custody
+
+A clipboard sequence may change while a valid delayed image is materialized:
+[GetClipboardSequenceNumber](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber)
+explicitly defers its increment until rendering. Comparing it before and after
+`Clipboard.GetImage()` can therefore reject the selected image. Admit the expected
+sequence while holding `OpenClipboard`, acquire `GetClipboardData(CF_BITMAP)` and
+make the detached `Image.FromHbitmap` copy before `CloseClipboard`. The requester
+keeps that lock during `WM_RENDERFORMAT`; the rendering owner must call
+`SetClipboardData` without reopening it. Never delete the clipboard's borrowed
+HBITMAP. Serialize the detached copy after releasing the lock so later user
+copies remain independent. The native region custody fixture includes an actual
+hidden-window delayed renderer, a second-process lock probe and a pixel oracle.
+
 ### project-ahk-sendinput-falls-back-to-sendevent
 
 SendInput removes the script's own keyboard hook only while no other AutoHotkey

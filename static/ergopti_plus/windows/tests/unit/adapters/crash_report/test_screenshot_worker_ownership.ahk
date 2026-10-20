@@ -761,3 +761,5 @@ Test("screenshot-worker-ownership: every entry point and lifecycle boundary shar
 	_GSWO_AllEntryPointsShareOwnership)
 
 #Include test_screenshot_region_startup.ahk
+
+#Include test_screenshot_region_sequence.ahk

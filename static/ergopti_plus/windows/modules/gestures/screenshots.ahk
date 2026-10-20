@@ -842,14 +842,36 @@ _GestureRegionCaptureStartCurrent(Epoch) {
 		&& !IsObject(_GestureRegionCapture)
 }
 
-_GestureScreenshotRegionSaveScript(Stage, MaxEdge := 0) {
+; Delayed rendering may legitimately change the sequence during acquisition.
+; Hold the native clipboard lock from admission through the detached GDI+ copy,
+; then let later copies proceed independently of this captured image.
+_GestureScreenshotRegionSaveScript(Stage, ExpectedSequence, MaxEdge := 0) {
 	global DriverPid
+	if !(ExpectedSequence is Integer) || ExpectedSequence < 0 || ExpectedSequence > 0xFFFFFFFF
+		throw ValueError("A region image requires its captured clipboard sequence.")
 	EscapedStage := StrReplace(Stage, "'", "''")
-	return "Add-Type -AssemblyName System.Windows.Forms;"
+	return "$ErrorActionPreference = 'Stop';$ProgressPreference = 'SilentlyContinue';"
+		. "Add-Type -AssemblyName System.Windows.Forms;"
 		. "Add-Type -AssemblyName System.Drawing;"
-		. "$img = [System.Windows.Forms.Clipboard]::GetImage();"
-		. "if ($img) { " . _GestureScreenshotDownscaleScript("$img", MaxEdge)
-		. "$img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png) };"
+		. "Add-Type -TypeDefinition 'public static class ErgoptiScreenshotClipboard {"
+		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern uint GetClipboardSequenceNumber();'
+		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern bool OpenClipboard(System.IntPtr owner);'
+		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern bool CloseClipboard();'
+		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern System.IntPtr GetClipboardData(uint format);'
+		. "}';"
+		. "$expectedSequence = " . ExpectedSequence . ";$img = $null;"
+		. "if (-not [ErgoptiScreenshotClipboard]::OpenClipboard([System.IntPtr]::Zero)) {throw 'The region clipboard is busy.'};"
+		. "try {"
+		. "if ($expectedSequence -eq 0 -or [ErgoptiScreenshotClipboard]::GetClipboardSequenceNumber() -ne $expectedSequence) {throw 'Region clipboard content changed before image acquisition.'};"
+		. "$bitmapHandle = [ErgoptiScreenshotClipboard]::GetClipboardData(2);"
+		. "if ($bitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region clipboard contains no bitmap.'};"
+		; CF_BITMAP is borrowed from the clipboard. FromHbitmap makes its own
+		; copy; deleting the borrowed GDI handle would corrupt another process.
+		. "$img = [System.Drawing.Image]::FromHbitmap($bitmapHandle);"
+		. "} finally {if (-not [ErgoptiScreenshotClipboard]::CloseClipboard()) {if ($img) {$img.Dispose()};throw 'The region clipboard lock could not be released.'}};"
+		. "try {" . _GestureScreenshotDownscaleScript("$img", MaxEdge)
+		. "$img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png);"
+		. "} finally {$img.Dispose()};"
 		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
 		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
 }
@@ -879,7 +901,7 @@ GestureRegionCaptureStartSaveWorker(Epoch) {
 		Stage := A_Temp . "\ergopti_screenshot_region_" . DriverPid . "_" . Epoch . ".png"
 		WorkerId := _GestureScreenshotCreateWorker("region_save", Epoch, Stage,
 			_GestureScreenshotPowerShellArgs(
-				_GestureScreenshotRegionSaveScript(Stage, State.Get("max_edge", 0)), true),
+				_GestureScreenshotRegionSaveScript(Stage, State["clipboard_sequence"], State.Get("max_edge", 0)), true),
 			GestureRegionSaveWorkerDone.Bind(Epoch))
 		if WorkerId {
 			State["worker_id"] := WorkerId

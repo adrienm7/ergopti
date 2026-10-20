@@ -1,0 +1,4 @@
+{
+	"expected_count": 6,
+	"filters": [{ "contains": "region-image-sequence", "expected_count": 6 }]
+}
