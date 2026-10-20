@@ -4,7 +4,7 @@
 --- MODULE: Pinned Hybrid Input Capture
 --- DESCRIPTION:
 --- Runs the original Hook/Reader with controlled descriptors and real device
---- capability predicates. Axis-bearing nodes cannot be grabbed by a KEY-only
+--- capability predicates. Axis/switch nodes cannot be grabbed by a KEY-only
 --- output; explicit observe mode and KEY-only macroboards keep their contract.
 --- ==============================================================================
 
@@ -14,12 +14,15 @@ local Fixture = require("tests.support.adapters.keyboard_hook.keyboard_hook_devi
 --- Runs an isolated controlled input transport; no native authority is issued.
 --- @param mask string Printed kernel EV capability word.
 --- @param body function Receives the original consumer and mutable capabilities.
-local function with_device(mask, body)
+--- @param options table|nil Controlled transport and discovery options.
+local function with_device(mask, body, options)
+	options = options or {}
 	local names = { "modules.hotstrings.device_finder", "adapters.keyboard_hook", "adapters.evdev_reader",
 		"adapters.xkb_capture", "adapters.keyboard_layout", "adapters.uinput_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local node, hook, reader = Fixture.fake_node("controlled hybrid capabilities")
+	local writer, output_owner
 	local state = { mask = mask }
 	local called, detail = pcall(function()
 		-- Hook's private CapsWord constructor also loads Layout. Build that
@@ -42,6 +45,11 @@ local function with_device(mask, body)
 		-- through the real Finder, not a preselected admission boolean.
 		local finder = {
 			find_keyboard = function() error("an explicitly pinned source cannot use auto-discovery") end,
+			find_devices = function()
+				assert(options.auto, "an explicitly pinned source cannot use auto-discovery")
+				local selected = actual.select_keyboards(snapshot())
+				return #selected == 1 and { node } or {}, {}
+			end,
 			is_key_device = function(path)
 				assert(path == node)
 				return actual.is_key_device("/dev/input/event7", snapshot())
@@ -54,30 +62,73 @@ local function with_device(mask, body)
 		package.loaded["modules.hotstrings.device_finder"] = finder
 		reader = helpers.load_module("adapters.evdev_reader")
 		local backend, log = Fixture.recorder()
+		local Input = require("infra.input_event")
+		local queue = {}
+		if options.transport then
+			log.consumed, log.output = {}, {}
+			backend.read = function()
+				local bytes = table.remove(queue, 1)
+				if bytes then
+					local row = assert(Input.decode(bytes))
+					log.consumed[#log.consumed + 1] = { row.type, row.code, row.value }
+				end
+				return bytes
+			end
+		end
+		if options.refuse_open then
+			backend.open = function(path)
+				log.opens[#log.opens + 1] = path
+				return nil, "controlled permission refusal"
+			end
+		end
 		reader._set_backend(backend)
 		package.loaded["adapters.uinput_writer"] = nil
+		if options.transport then
+			writer = helpers.load_module("adapters.uinput_writer")
+			writer._set_backend({ open = function() return 42 end, ioctl = function() return true end,
+				write = function(_, bytes)
+					local row = assert(Input.decode(bytes))
+					log.output[#log.output + 1] = { row.type, row.code, row.value }
+					return true
+				end,
+				close = function() log.writer_closed = true; return true end })
+			assert(writer.open()); output_owner = assert(writer.capture_output())
+		end
 		hook = Fixture.load_hook()
 		state.hook, state.reader, state.log, state.finder, state.actual = hook, reader, log, finder, actual
 		function state.start(intercept)
-			return hook.start({ device = node, pinned = true, intercept = intercept,
-				onEmitRaw = function() return true end })
+			return hook.start({ device = not options.auto and node or nil, pinned = not options.auto, intercept = intercept,
+				onEmitRaw = function(code, value) return not writer or writer.emit(code, value) end })
+		end
+		function state.queue(rows)
+			for i, row in ipairs(rows) do queue[#queue + 1] = Input.encode(row[1], row[2], row[3], nil, i * 1000) end
 		end
 		function state.reappear(next_mask)
 			assert(reader.close("keyboard:" .. node))
 			state.mask = next_mask
 			Fixture.tick_until_check(hook, 1)
 		end
+		if options.missing then assert(os.remove(node)) end
 		body(state)
 	end)
 	if hook then hook.stop() end
-	if reader then reader._reset_backend() end
+	if reader then
+		assert(reader.close("keyboard:" .. node))
+		assert(not reader.is_open("keyboard:" .. node))
+		reader._reset_backend()
+	end
+	if writer then
+		assert(writer.close_owned(output_owner))
+		assert(state.log.writer_closed)
+		writer._reset_backend()
+	end
 	os.remove(node)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
 	if not called then error(detail, 0) end
 end
 
 helpers.describe("keyboard_hook: explicit pinned hybrid capture", function()
-	for _, row in ipairs({ { "EV_ABS", "b" }, { "EV_REL", "7" }, { "EV_REL and EV_ABS", "f" } }) do
+	for _, row in ipairs({ { "EV_ABS", "b" }, { "EV_REL", "7" }, { "EV_REL and EV_ABS", "f" }, { "EV_SW", "33" } }) do
 		local label, mask = row[1], row[2]
 		helpers.it("refuses " .. label .. " before any source open or grab", function()
 			with_device(mask, function(s)
@@ -166,6 +217,60 @@ helpers.describe("keyboard_hook: explicit pinned hybrid capture", function()
 			end)
 			package.loaded[layout_name], package.loaded[capture_name] = old_layout, old_capture
 			if not called then error(detail, 0) end
+		end)
+	end
+end)
+
+helpers.describe("keyboard_hook: mixed key and tablet switch transport", function()
+	-- Linux thinkpad_acpi registers KEY_WLAN and SW_TABLET_MODE on the same
+	-- ThinkPad Extra Buttons input_dev (EV=33); these are its actual key codes.
+	local mixed = { { 5, 1, 1 }, { 0, 0, 0 }, { 1, 238, 1 }, { 0, 0, 0 },
+		{ 1, 238, 0 }, { 0, 0, 0 }, { 5, 1, 0 }, { 0, 0, 0 } }
+	local keys = { { 1, 238, 1 }, { 0, 0, 0 }, { 1, 238, 0 }, { 0, 0, 0 } }
+
+	for _, auto in ipairs({ true, false }) do
+		helpers.it("refuses " .. (auto and "discovered" or "pinned") .. " switches without consuming their packets", function()
+			with_device("33", function(s)
+				s.queue(mixed); s.start(true); s.hook.pump()
+				helpers.assert_eq(s.hook.isRunning(), false)
+				helpers.assert_eq(s.log.opens, {})
+				helpers.assert_eq(s.log.ioctls, {})
+				helpers.assert_eq(s.log.consumed, {}, "both tablet transitions must remain on the ungrabbed source")
+				helpers.assert_eq(s.log.output, {})
+			end, { transport = true, auto = auto })
+		end)
+	end
+
+	helpers.it("decodes both tablet transitions in observe mode without grabbing or re-emitting", function()
+		with_device("33", function(s)
+			s.queue(mixed); s.start(false); s.hook.pump()
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(s.log.consumed, mixed)
+			helpers.assert_eq(s.log.ioctls, {})
+			helpers.assert_eq(s.log.output, {})
+		end, { transport = true })
+	end)
+
+	helpers.it("forwards a healthy KEY/MSC/LED/REP macroboard through the original Writer", function()
+		with_device("120013", function(s)
+			s.queue(keys); s.start(true); s.hook.pump()
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(s.log.ioctls, { 1 })
+			helpers.assert_eq(s.log.consumed, keys)
+			helpers.assert_eq(s.log.output, keys, "KEY_WLAN DOWN and UP must reach the original keyboard output")
+		end, { transport = true })
+	end)
+
+	for _, row in ipairs({ { "missing", "unreadable source", 0 }, { "refuse_open", "source permission refusal", 1 } }) do
+		helpers.it("keeps the " .. row[2] .. " guard before any grab", function()
+			with_device("120013", function(s)
+				s.queue(keys); s.start(true); s.hook.pump()
+				helpers.assert_eq(s.hook.isRunning(), false)
+				helpers.assert_eq(#s.log.opens, row[3])
+				helpers.assert_eq(s.log.ioctls, {})
+				helpers.assert_eq(s.log.consumed, {})
+				helpers.assert_eq(s.log.output, {})
+			end, { transport = true, [row[1]] = true })
 		end)
 	end
 end)

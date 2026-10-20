@@ -103,6 +103,15 @@ local LID_SWITCH = block({
 	handlers = "event1",
 })
 
+-- thinkpad_acpi and sparse-keymap register EV_KEY/EV_MSC and EV_SW on the
+-- same ThinkPad Extra Buttons input_dev on Tablet ThinkPads (Linux v6.12).
+local THINKPAD_BUTTONS = block({
+	name     = "ThinkPad Extra Buttons",
+	sysfs    = "/devices/platform/thinkpad_acpi/input/input7",
+	ev       = "33",
+	handlers = "event7",
+})
+
 --- Selects from a fixture, returning the path and the rule that chose it.
 --- @param text string Fixture file content.
 --- @return string|nil, string|nil
@@ -361,5 +370,41 @@ helpers.describe("device finder: acknowledged physical editor origins", function
 		helpers.assert_eq(origins[2].physical, false, "an upstream output does not prove its original physical key")
 		helpers.assert_eq(origins[3].physical, false, "missing sysfs identity is not positive hardware evidence")
 		helpers.assert_eq(origins[4].physical, false, "a retired device cannot qualify an old physical source")
+	end)
+end)
+
+helpers.describe("device finder: switches cannot share a keyboard-only grab", function()
+	helpers.it("keeps mixed ThinkPad keys available to explicit observe mode", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		helpers.assert_true(finder.is_key_device("/dev/input/event7", finder.parse_devices(THINKPAD_BUTTONS)))
+	end)
+
+	helpers.it("refuses mixed ThinkPad switches with a capability-specific intercept reason", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local ok, why = finder.is_interceptable_key_device("/dev/input/event7", finder.parse_devices(THINKPAD_BUTTONS))
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(type(why) == "string" and why:find("EV_SW", 1, true) ~= nil)
+	end)
+
+	helpers.it("excludes mixed switches from the unnamed-keyboard fallback roster", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local paths = finder.select_keyboards(finder.parse_devices(THINKPAD_BUTTONS .. POWER_BUTTON))
+		helpers.assert_eq(paths, { "/dev/input/event0" })
+		helpers.assert_eq(finder.select_keyboards(finder.parse_devices(THINKPAD_BUTTONS)), {})
+	end)
+
+	helpers.it("excludes switch-bearing nodes even when their name says keyboard", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local named = THINKPAD_BUTTONS:gsub("ThinkPad Extra Buttons", "Tablet Keyboard")
+		helpers.assert_eq(finder.select_keyboards(finder.parse_devices(named .. PHYSICAL_KEYBOARD)), { "/dev/input/event3" })
+	end)
+
+	helpers.it("preserves unnamed KEY/MSC/LED/REP macroboards beside mixed switches", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local macro = block({ name = "Unlabelled foot switch", sysfs = "/devices/pci0000:00/usb1/input/input9",
+			ev = "120013", handlers = "event9" })
+		local devices = finder.parse_devices(macro .. THINKPAD_BUTTONS)
+		helpers.assert_eq(finder.select_keyboards(devices), { "/dev/input/event9" })
+		helpers.assert_true(finder.is_interceptable_key_device("/dev/input/event9", devices))
 	end)
 end)

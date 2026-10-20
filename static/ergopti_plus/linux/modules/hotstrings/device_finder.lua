@@ -67,6 +67,9 @@ local EV_KEY_BIT = 0x2
 local EV_REL_BIT = 0x4
 local EV_ABS_BIT = 0x8
 
+-- EV_SW: tablet/lid/radio switches may share a node with extra keys.
+local EV_SW_BIT = 0x20
+
 
 -- =========================================
 -- =========================================
@@ -212,7 +215,7 @@ function M.is_key_device(path, devices)
 end
 
 --- Whether the keyboard-only output can preserve a source under EVIOCGRAB.
---- The grab owns every event on the node, including axes which the keyboard
+--- The grab owns every event on the node, including axes/switches the keyboard
 --- output cannot forward. Observe mode keeps using is_key_device instead.
 --- @param path string|nil An absolute device path.
 --- @param devices table|nil Pre-parsed descriptors; reads /proc once when omitted.
@@ -227,6 +230,9 @@ function M.is_interceptable_key_device(path, devices)
 			if handler == basename then
 				if has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT) then
 					return false, path .. " reports EV_REL/EV_ABS axes that the keyboard output cannot forward"
+				end
+				if has_bit(dev.ev_mask, EV_SW_BIT) then
+					return false, path .. " reports EV_SW switches that the keyboard output cannot forward"
 				end
 				return true, nil
 			end
@@ -285,7 +291,8 @@ end
 ---
 --- Selection rules, in order:
 ---   1. Every physical device whose name says "keyboard" or "kbd".
----   2. Every non-pointer physical EV_KEY device when none is keyboard-named.
+---   2. Every other physical EV_KEY device when none is keyboard-named.
+--- Axes and switches are excluded from both rules: the output cannot relay them.
 --- Synthetic devices never reach either rule — reading one means reading our
 --- own injections back.
 --- @param devices table Array of descriptors from parse_devices().
@@ -308,7 +315,7 @@ function M.select_keyboards(devices)
 		end
 
 		local is_pointer = has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT)
-		if is_pointer then goto next_dev end
+		if is_pointer or has_bit(dev.ev_mask, EV_SW_BIT) then goto next_dev end
 		Logger.debug(LOG, "Physical EV_KEY device: '%s' → %s", dev.name, path)
 
 		if is_likely_keyboard(dev.name) then
