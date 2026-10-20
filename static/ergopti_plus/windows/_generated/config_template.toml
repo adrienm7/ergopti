@@ -641,6 +641,10 @@ direct_access_digits = "native"
 number_row_reorder_edges = false
 ergopti_alt_gr = false
 ergopti_variant = "none"
+emulate_number_row = true
+emulate_top_row = true
+emulate_home_row = true
+emulate_bottom_row = true
 ctrl_magic_save = false
 emulated_layout = ""
 

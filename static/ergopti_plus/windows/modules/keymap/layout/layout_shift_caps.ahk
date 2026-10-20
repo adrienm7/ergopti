@@ -230,7 +230,8 @@ RegisterBuiltinNumberRow() {
  */
 NumberRowEmulatedBase(Sc) {
 	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex, ERGOPTI_SPEC, ERGOPTI_NUMBER_ROW
-	if !ERGOPTI_NUMBER_ROW.Has(Sc)
+	; A number row switched off is the OS layout's.
+	if !ERGOPTI_NUMBER_ROW.Has(Sc) || !LayoutRowIsEmulated(Sc)
 		return ""
 	if KeylayoutEmulation_LayerIsActive("ergopti_base") {
 		if !KLE_KeyCodes.Has(Sc)
@@ -242,6 +243,84 @@ NumberRowEmulatedBase(Sc) {
 		return ""
 	Row := ERGOPTI_SPEC["number_row_base"]
 	return Row.Has(Sc) && Row[Sc].Has("text") ? Row[Sc]["text"] : ""
+}
+
+; The hotkey names a built-in layer registers on one key: plain (CapsLock and
+; the accented alternatives), any modifier (the base remap), Shift, Ctrl, Alt.
+global LAYOUT_ROW_PASSTHROUGH_PREFIXES := ["", "*", "+", "^", "!"]
+
+/**
+ * Lets the keys of a row switched off reach the OS layout under the built-in
+ * Ergopti emulation. Its remaps are global variants and its layers criterion
+ * variants created after this, so a variant created first, whose criterion
+ * holds while the key's row is off, wins every press of that row, on every
+ * level, with no reload, and sends the physical key on to the OS layout. The
+ * registry emulation stands down through its own criteria instead, and the
+ * AltGr layer through its own (RegisterAltGrLayer). The magic key keeps its
+ * key: it is a feature of its own, not the layout's.
+ * @param {Func} HotkeyFn Hotkey(Name, Callback, Options).
+ * @param {Func} HotIfFn HotIf(Criterion?).
+ * @returns {Integer} The variants registered.
+ */
+RegisterLayoutRowPassthrough(HotkeyFn := Hotkey, HotIfFn := HotIf) {
+	global LAYOUT_ROW_PASSTHROUGH_PREFIXES
+	try LoggerStart("LayoutRows", "Registering the row switches of the built-in emulation…")
+	Count := 0
+	try {
+		for Row, Keys in LayoutEmulationRows() {
+			for Sc in Keys {
+				HotIfFn.Call(_LayoutRowPassthroughCriterion.Bind(Sc))
+				for Prefix in LAYOUT_ROW_PASSTHROUGH_PREFIXES {
+					HotkeyFn.Call(Prefix . Sc, _LayoutRowPassthrough.Bind(Sc), Prefix == "!" ? "I3" : "I2")
+					Count += 1
+				}
+			}
+		}
+	} catch as Err {
+		try LoggerError("LayoutRows", "The row switches could not be registered: {1}", Err.Message)
+		throw Err
+	} finally {
+		HotIfFn.Call() ; Reset to no condition
+	}
+	try LoggerSuccess("LayoutRows", "Row switches registered ({1} variants).", Count)
+	return Count
+}
+
+; Holds while the built-in emulation would type a key whose row is off.
+_LayoutRowPassthroughCriterion(Sc, *) {
+	global Features, ScriptInformation
+	if !BuiltinNumberRowIsActive() || LayoutRowIsEmulated(Sc)
+		return false
+	; The magic key's source keeps its key on every row.
+	return !(IsSet(ScriptInformation) && StrCompare(ScriptInformation["MagicKeySourceScan"], Sc, true) == 0
+		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"])
+}
+
+; LAYOUT_ROW_SEND_LEVEL is above every input level of the driver's hotkeys
+; (I2, I3), so the key sent on is ignored by all of them and typed by the OS
+; layout with the modifiers held ({Blind}); the hotstring input still sees it.
+global LAYOUT_ROW_SEND_LEVEL := 10
+
+_LayoutRowPassthrough(Sc, *) {
+	global LAYOUT_ROW_SEND_LEVEL
+	Previous := A_SendLevel
+	SendLevel(LAYOUT_ROW_SEND_LEVEL)
+	try {
+		SendEvent("{Blind}{" . Sc . "}")
+	} finally {
+		SendLevel(Previous)
+	}
+}
+
+/**
+ * Whether a registry layout types the number row: its emulation is active and
+ * the number row is switched on (LayoutRowsPolicyNumberRowSource). Its own
+ * action machine then types the row, « symbols first » included; otherwise the
+ * built-in or the OS layout's row is reordered by the driver's own hotkeys.
+ * @returns {Boolean}
+ */
+NumberRowRegistryOwnsRow() {
+	return LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive("ergopti_base"), LayoutRowSwitches()) == "emulated"
 }
 
 ; Whether the built-in Ergopti emulation is in force: the effective switch,
@@ -487,7 +566,7 @@ NumberRowSymbolsLevel(Sc, Caps) {
  * the row cannot be reordered, NumberRowAvailability keeps the choice inert.
  */
 NumberRowSymbolsCapable(Caps) {
-	if !KeylayoutEmulation_LayerIsActive("ergopti_base")
+	if !NumberRowRegistryOwnsRow()
 		return true
 	Loop 10 {
 		if !NumberRowSymbolsLevel(A_Index + 1, Caps)["supported"]
@@ -623,7 +702,7 @@ global _NumberRowAvailabilityCache := Map()
 NumberRowAvailability(Hkl, Caps) {
 	global _NumberRowAvailabilityCache, KLE_Model, KS_DIGIT_ROW_KEYS
 	Model := 0
-	if KeylayoutEmulation_LayerIsActive("ergopti_base") {
+	if NumberRowRegistryOwnsRow() {
 		Model := KLE_Model
 		Source := "emulated:" . ObjPtr(Model)
 	} else
@@ -656,6 +735,9 @@ _DigitRowBuiltinLevels(Sc, Caps) {
 	if !BuiltinNumberRowIsActive() || !IsSet(ERGOPTI_SPEC) || !IsObject(ERGOPTI_SPEC)
 		return 0
 	Name := Format("SC{:03X}", Sc)
+	; A number row switched off is the OS layout's, so is its ordering.
+	if !LayoutRowIsEmulated(Name)
+		return 0
 	Levels := ERGOPTI_SPEC["levels"]
 	PlainTable := Caps ? Levels["caps"] : ERGOPTI_SPEC["number_row_base"]
 	if !PlainTable.Has(Name) || !Levels["shift"].Has(Name)

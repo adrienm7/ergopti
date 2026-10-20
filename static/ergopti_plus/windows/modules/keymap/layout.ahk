@@ -677,7 +677,7 @@ SC00B Up:: _DigitRowUp("0")
 ; « Symbols first » on a row no registry layout owns (the OS layout's or the
 ; built-in Ergopti one): the registry emulation types its own levels swapped
 ; (keylayout_emulation.ahk), so these stand down while it owns the row.
-#HotIf NumberRowEffectiveMode() == "symbols" && !KeylayoutEmulation_LayerIsActive("ergopti_base")
+#HotIf NumberRowEffectiveMode() == "symbols" && !NumberRowRegistryOwnsRow()
 SC002:: _NumberRowSymbolsFirstSend(0x02, false)
 +SC002:: _NumberRowSymbolsFirstSend(0x02, true)
 SC003:: _NumberRowSymbolsFirstSend(0x03, false)
@@ -810,6 +810,9 @@ _DigitShiftSend(Symbol, *) {
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
 ; .keylayout) so the keylogger heatmap reads the same source of truth without drifting.
 if Features["layout"]["ergopti_base"] {
+	; A row switched off types what the OS layout types there: its keys pass
+	; through, through variants created before every built-in layer below.
+	RegisterLayoutRowPassthrough()
 	for sc_int, entry in ErgoptiBaseMapping() {
 		sc_str := Format("SC{:03X}", sc_int)
 		if (entry is String) {
