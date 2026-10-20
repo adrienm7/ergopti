@@ -60,6 +60,7 @@ _AOPR_CountFiles(Files) {
 	for FilePath in Files {
 		; A missing/locked source is an incomplete scan, never a lower count.
 		Src := FileRead(FilePath, "UTF-8")
+		Src := _DriverMaskBlockComments(&Src)
 		Loop Parse, Src, "`n", "`r" {
 			Line := Trim(A_LoopField)
 			if (SubStr(Line, 1, 1) == ";")
@@ -243,6 +244,7 @@ _AOPR_CountFamilies(Files) {
 	for FilePath in Files {
 		; Keep the same failure contract as the direct-OS-call counter.
 		Src := FileRead(FilePath, "UTF-8")
+		Src := _DriverMaskBlockComments(&Src)
 		Loop Parse, Src, "`n", "`r" {
 			Line := Trim(A_LoopField)
 			if (SubStr(Line, 1, 1) == ";")
