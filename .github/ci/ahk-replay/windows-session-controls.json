@@ -1,0 +1,7 @@
+{
+	"expected_count": 35,
+	"filters": [
+		{ "contains": "layout-row-control-admission", "expected_count": 10 },
+		{ "contains": "healthcheck-session-owner", "expected_count": 25 }
+	]
+}
