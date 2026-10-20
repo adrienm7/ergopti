@@ -3721,39 +3721,46 @@ superseded_reason_key = "menu.layout.superseded_ergopti_only"
 # (layout_rows_policy.ahk and .lua, tests/corpus/layouts/layout_rows.json).
 # Windows alone emulates a layout: macOS installs it as a system input source
 # and Linux remaps through kanata, so their menus grey these rows with why.
+# The switches only narrow an emulation that an empty configuration leaves off
+# (emulated_layout "", ergopti_variant "none", ergopti_base false): on their
+# own they alter no input, so they are parameters, not activations.
 [[features.layout]]
 id = "emulate_number_row"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = true
+input_altering = false
 type = "boolean"
 description_key = "menu.layout.emulate_number_row"
 
 [[features.layout]]
 id = "emulate_top_row"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = true
+input_altering = false
 type = "boolean"
 description_key = "menu.layout.emulate_top_row"
 
 [[features.layout]]
 id = "emulate_home_row"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = true
+input_altering = false
 type = "boolean"
 description_key = "menu.layout.emulate_home_row"
 
 [[features.layout]]
 id = "emulate_bottom_row"
 platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 default = true
 recommended = true
-input_altering = true
+input_altering = false
 type = "boolean"
 description_key = "menu.layout.emulate_bottom_row"
 
@@ -5868,6 +5875,7 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 [[menu.layout_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
 
 # The input sources macOS has enabled, under a header of their own (« Sources
 # de saisie »): without it the list read as more Ergopti settings.
