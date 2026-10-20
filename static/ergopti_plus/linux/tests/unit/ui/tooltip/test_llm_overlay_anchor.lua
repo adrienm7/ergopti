@@ -1,4 +1,4 @@
---- tests/unit/ui/llm/test_llm_overlay_anchor.lua
+--- tests/unit/ui/tooltip/test_llm_overlay_anchor.lua
 
 --- ==============================================================================
 --- MODULE: Where The AI Suggestions Appear
