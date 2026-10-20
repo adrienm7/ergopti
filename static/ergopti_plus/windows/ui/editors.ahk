@@ -37,17 +37,16 @@ MagicKeyEditor(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
-		GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
-		GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
-		GuiToShow.Show("Center")
-		IH := InputHook("L1 I", "{Escape}")
-		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 		_InheritedCritical := A_IsCritical
+		GuiToShow := 0, IH := 0
 		try {
-				; Publish + Start is one lifecycle transaction. If suspend lands before
-				; publication this gate refuses Start; if it lands afterwards, suspend
-				; owns this exact live hook and stops it synchronously.
+				GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
+				GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
+				GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
+				; Construct while hidden: native Close otherwise hides an unowned Gui
+				; before the later factory returns and starts an invisible capture.
+				IH := InputHook("L1 I", "{Escape}")
+				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
@@ -56,20 +55,34 @@ MagicKeyEditor(*) {
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
+						; Show pumps messages. Its Close handler must already own the
+						; started hook, with no later Start able to revive that capture.
+						GuiToShow.Show("Center")
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
 				} finally {
-						; Wait() pumps messages and may block indefinitely. It must never
-						; inherit a Critical menu caller after publication is complete.
+						; Wait must never inherit a Critical menu caller.
 						Critical("Off")
 				}
 				IH.Wait()
 		} finally {
-				CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
-				if (_MagicKeyEditorGui == GuiToShow)
-						_MagicKeyEditorGui := ""
-				; The Close event may already have destroyed the native window.
-				try GuiToShow.Destroy()
-				Critical(_InheritedCritical)
+				CaptureSettled := false
+				try {
+						if IsObject(IH)
+								CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
+				} finally {
+						if IsObject(GuiToShow) {
+								if (_MagicKeyEditorGui == GuiToShow)
+										_MagicKeyEditorGui := ""
+								; Close or a constructor failure may already retire this Gui.
+								try GuiToShow.Destroy()
+						}
+						Critical(_InheritedCritical)
+				}
 		}
+
 		; Close or a complete pause/resume may retire this exact owner while a
 		; completed native hook still retains its Max reason and input. Only the
 		; terminal path which actually retires that owner may persist its result.
@@ -256,20 +269,19 @@ MagicKeySourceCapture(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
-		GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
-		GuiToShow.Show("Center")
-		State := _MagicKeySourceCaptureState()
-		; L0: no text is collected, every key is reported to OnKeyDown (N) and
-		; kept from the application (S); T ends the wait on the shared timeout.
-		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
-		IH.KeyOpt("{All}", "NS")
-		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
-		MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
-		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 		_InheritedCritical := A_IsCritical
+		GuiToShow := 0, IH := 0, MagicKeyCapturePoll := 0
 		try {
-				; Publish + Start is one lifecycle transaction, as in MagicKeyEditor.
+				GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
+				GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
+				State := _MagicKeySourceCaptureState()
+				; Prepare the whole capture before showing an actionable dialog.
+				; L0 collects no text. NS reports and suppresses every physical key.
+				IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
+				IH.KeyOpt("{All}", "NS")
+				IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
+				MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
+				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
@@ -278,19 +290,36 @@ MagicKeySourceCapture(*) {
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
+						GuiToShow.Show("Center")
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
 				} finally {
 						Critical("Off")
 				}
 				SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))
 				IH.Wait()
 		} finally {
-				SetTimer(MagicKeyCapturePoll, 0)
-				CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
-				if (_MagicKeyEditorGui == GuiToShow)
-						_MagicKeyEditorGui := ""
-				try GuiToShow.Destroy()
-				Critical(_InheritedCritical)
+				try {
+						if HasMethod(MagicKeyCapturePoll, "Call")
+								SetTimer(MagicKeyCapturePoll, 0)
+				} finally {
+						CaptureSettled := false
+						try {
+								if IsObject(IH)
+										CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
+						} finally {
+								if IsObject(GuiToShow) {
+										if (_MagicKeyEditorGui == GuiToShow)
+												_MagicKeyEditorGui := ""
+										try GuiToShow.Destroy()
+								}
+								Critical(_InheritedCritical)
+						}
+				}
 		}
+
 		; A completed candidate can outlive external Close or pause/resume. Its
 		; retained Scan/Stopped result is valid only for the terminal owner.
 		if !CaptureSettled || A_IsSuspended
