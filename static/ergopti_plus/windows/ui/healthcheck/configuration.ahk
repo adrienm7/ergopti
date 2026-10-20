@@ -209,7 +209,7 @@ HealthCheck_ConfigurationFiles(Ids, PathOf) {
 				State := "unreadable"
 			} else {
 				try {
-					Content := FileRead(Path, "UTF-8")
+					Content := FSReadStrict(Path)
 				} catch {
 					Content := false
 					State := "unreadable"

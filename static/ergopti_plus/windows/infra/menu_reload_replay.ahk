@@ -154,7 +154,7 @@ _MenuReloadReplayFind(Handle, ItemId, Path, Seen) {
 	Count := _MenuReloadReplayCount(Handle)
 	Loop Count {
 		Position := A_Index - 1
-		Sub := DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+		Sub := TrayMenuSubmenuHandle(Handle, Position)
 		if Sub {
 			Label := _MenuReloadReplayLabel(Handle, Position)
 			if Label == ""
@@ -165,7 +165,7 @@ _MenuReloadReplayFind(Handle, ItemId, Path, Seen) {
 			Path.Pop()
 			continue
 		}
-		if DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint") != ItemId
+		if TrayMenuHandleItemId(Handle, Position) != ItemId
 			continue
 		Label := _MenuReloadReplayLabel(Handle, Position)
 		if Label == ""
@@ -196,7 +196,7 @@ MenuReloadReplay_Resolve(Path) {
 			Position := A_Index - 1
 			if _MenuReloadReplayLabel(Handle, Position) != Wanted
 				continue
-			Sub := DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+			Sub := TrayMenuSubmenuHandle(Handle, Position)
 			if Last ? !Sub : Sub {
 				Matches += 1
 				FoundPosition := Position
@@ -205,10 +205,10 @@ MenuReloadReplay_Resolve(Path) {
 		if Matches != 1
 			return false
 		if !Last {
-			Handle := DllCall("GetSubMenu", "ptr", Handle, "int", FoundPosition, "ptr")
+			Handle := TrayMenuSubmenuHandle(Handle, FoundPosition)
 			continue
 		}
-		ItemId := DllCall("GetMenuItemID", "ptr", Handle, "int", FoundPosition, "uint")
+		ItemId := TrayMenuHandleItemId(Handle, FoundPosition)
 		if !ItemId || ItemId == 0xFFFFFFFF
 			return false
 		return {ItemId: ItemId, Handle: Handle, Position: FoundPosition + 1, Label: Wanted}
@@ -217,22 +217,14 @@ MenuReloadReplay_Resolve(Path) {
 }
 
 _MenuReloadReplayCount(Handle) {
-	Count := DllCall("GetMenuItemCount", "ptr", Handle, "int")
+	Count := TrayMenuHandleItemCount(Handle)
 	if Count < 0
 		throw OSError(A_LastError, A_ThisFunc, "GetMenuItemCount failed for a tray menu.")
 	return Count
 }
 
 _MenuReloadReplayLabel(Handle, Position) {
-	static MF_BYPOSITION := 0x0400
-	Required := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
-		"ptr", 0, "int", 0, "uint", MF_BYPOSITION, "int")
-	if Required <= 0
-		return ""
-	Buf := Buffer((Required + 1) * 2, 0)
-	DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
-		"ptr", Buf, "int", Required + 1, "uint", MF_BYPOSITION, "int")
-	return StrGet(Buf, "UTF-16")
+	return TrayMenuHandleItemCaption(Handle, Position)
 }
 
 _MenuReloadReplayRequirePath(Path) {
