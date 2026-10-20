@@ -1,0 +1,25 @@
+{
+	"expected_count": 8,
+	"filters": [
+		{
+			"contains": "runtime-ready-delivery-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "Ollama runtime: exact source process receipt publishes once",
+			"expected_count": 1
+		},
+		{
+			"contains": "Ollama runtime: foreign or stale readiness receipt refuses",
+			"expected_count": 1
+		},
+		{
+			"contains": "Ollama runtime: cancellation withdraws readiness publication",
+			"expected_count": 1
+		},
+		{
+			"contains": "managed bootstrap: READY keeps source withdrawal retirement (groups247-managed)",
+			"expected_count": 1
+		}
+	]
+}
