@@ -246,7 +246,155 @@ function categoriesPage(host) {
 	return page;
 }
 
+/** Records generated pill markup and dispatches only the listeners bound by the real page. */
+function categoryPillPort() {
+	let markup = '';
+	const port = { buttons: [], writes: 0 };
+	const decode = (value) =>
+		value
+			.replace(/&quot;/g, '"')
+			.replace(/&#39;/g, "'")
+			.replace(/&lt;/g, '<')
+			.replace(/&gt;/g, '>')
+			.replace(/&amp;/g, '&');
+	Object.defineProperty(port, 'innerHTML', {
+		get: () => markup,
+		set(value) {
+			markup = value;
+			port.writes++;
+			port.buttons = [...value.matchAll(/<button\b([^>]*)>([^<]*)<\/button>/g)].map((match) => {
+				const category = /\bdata-cat="([^"]*)"/.exec(match[1]);
+				assert.ok(category, 'the real renderer supplies the category attribute');
+				const listeners = [];
+				return {
+					category: decode(category[1]),
+					textContent: decode(match[2]),
+					getAttribute(name) {
+						assert.equal(name, 'data-cat');
+						return this.category;
+					},
+					addEventListener(name, callback) {
+						assert.equal(name, 'click');
+						listeners.push(callback);
+					},
+					click() {
+						for (const callback of listeners) callback();
+					}
+				};
+			});
+		}
+	});
+	port.querySelectorAll = (selector) => {
+		assert.equal(selector, 'button[data-cat]');
+		return port.buttons;
+	};
+	return port;
+}
+
+/** Delivers through the real host handlers; the only substitutes are native transport and DOM ports. */
+function categoryPillsPage(host) {
+	const page = loadedPage(host);
+	const pills = categoryPillPort();
+	page.elements.set('category-filter-buttons', pills);
+	page.elements.set('weekday-filter-buttons', page.context.document.createElement('div'));
+	const manifest = {
+		'2026-10-20': {
+			Editor: { category: 'Productivity', app_time_ms: 1000 },
+			Browser: { category: 'Utilities', app_time_ms: 2000 }
+		}
+	};
+	page.sendCategories = (label, revision, initial = false) => {
+		const categories = { Editor: { type: label, score: 1 }, Browser: { type: 'Outils', score: 0 } };
+		if (host === 'macos') {
+			if (initial)
+				return page.context.publishMetricsAppsData(
+					manifest,
+					categories,
+					{},
+					{
+						manifest_revision: revision,
+						categories_revision: revision
+					}
+				);
+			return page.context.publishMetricsAppsCategories(categories, revision);
+		}
+		const blob = { metrics_manifest: manifest, user_categories: categories, app_icons: {} };
+		if (host === 'linux')
+			return page.context.__hostBridgeResponse(
+				'metrics_apps_bridge',
+				false,
+				encodeURIComponent(JSON.stringify(blob))
+			);
+		const listener = page.messageListeners.find(({ name }) => name === 'message');
+		assert.ok(listener, 'the real inline Windows handler must be installed');
+		return listener.callback({ data: { type: 'prefetch', blob } });
+	};
+	page.pills = pills;
+	page.clickCategory = (label) => {
+		const button = pills.buttons.find((candidate) => candidate.category === label);
+		assert.ok(button, `the current category must have a pill: ${label}`);
+		assert.equal(button.textContent, label);
+		button.click();
+	};
+	page.evaluate("currentPeriod = 'all'; currentWeekdayFilter = new Set([1]);");
+	page.sendCategories(customLabels[0], 1, true);
+	return page;
+}
+
 for (const host of ['macos', 'linux', 'windows']) {
+	loadedCases.push([
+		`${host}/live-category-pills`,
+		() => {
+			const page = categoryPillsPage(host);
+			assert.deepEqual(
+				page.pills.buttons.map((button) => button.category),
+				[customLabels[0], 'Outils']
+			);
+			page.sendCategories(customLabels[1], 2);
+			assert.deepEqual(
+				page.pills.buttons.map((button) => button.category),
+				[customLabels[1], 'Outils']
+			);
+			assert.equal(page.evaluate('JSON.stringify([...currentWeekdayFilter])'), '[1]');
+			if (host === 'macos') {
+				const writes = page.pills.writes;
+				assert.equal(page.sendCategories('Obsolete category', 1), false);
+				assert.equal(page.sendCategories('Duplicate revision', 2), false);
+				assert.equal(page.pills.writes, writes, 'refused revisions must not rebuild pills');
+			}
+			page.clickCategory('Outils');
+			assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor']);
+			page.context.updateUserCategories({ Editor: { type: 'Legacy update', score: 0 } });
+			assert.deepEqual(
+				page.pills.buttons.map((button) => button.category),
+				['Legacy update', 'Utilitaires']
+			);
+			assert.equal(page.evaluate('JSON.stringify([...currentWeekdayFilter])'), '[1]');
+		}
+	]);
+	loadedCases.push([
+		`${host}/renamed-filter-selection`,
+		() => {
+			const page = categoryPillsPage(host);
+			page.clickCategory('Outils');
+			assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor']);
+			page.sendCategories(customLabels[1], 2);
+			assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), []);
+			page.clickCategory(customLabels[1]);
+			assert.deepEqual(
+				Object.keys(page.context.getAggregatedData().apps),
+				['Editor'],
+				'one vanished category key cannot reactivate the excluded Outils category'
+			);
+			page.clickCategory('Outils');
+			assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['Editor', 'Browser']);
+			assert.equal(
+				page.evaluate('currentCategoryFilter'),
+				null,
+				'every current category is selected'
+			);
+		}
+	]);
 	loadedCases.push([
 		`${host}/dictionary-word-labels`,
 		() => {

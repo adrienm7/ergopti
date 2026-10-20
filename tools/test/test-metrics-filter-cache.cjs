@@ -24,7 +24,16 @@ function test(name, callback) {
 }
 
 function appsFixture() {
-	const context = vm.createContext({ window: {}, document: { addEventListener() {} }, console });
+	const context = vm.createContext({
+		window: {},
+		document: {
+			addEventListener() {},
+			getElementById() {
+				return null;
+			}
+		},
+		console
+	});
 	const index = read('metrics_apps/index.html');
 	vm.runInContext(read('host_bridge.js'), context);
 	for (const name of ['helpers.js', 'state.js', 'main.js']) {

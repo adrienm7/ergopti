@@ -140,7 +140,8 @@ function rebuildFilterButtons() {
 				}
 				if (currentCategoryFilter.has(cat)) currentCategoryFilter.delete(cat);
 				else currentCategoryFilter.add(cat);
-				if (currentCategoryFilter.size === catList.length) currentCategoryFilter = null;
+				if (catList.every((category) => currentCategoryFilter.has(category)))
+					currentCategoryFilter = null;
 				renderCats();
 				renderDashboard();
 			});
