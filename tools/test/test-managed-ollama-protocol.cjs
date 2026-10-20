@@ -411,8 +411,9 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
 	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 11]);
 	// Preserve the original 37 controls, seven atomic-result receiving laws and
-	// the failure summary that names a failed native Go test in the job log.
-	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 46]);
+	// the failure summary that names a failed native Go test in the job log,
+	// plus the frozen Linux receipt's refusal of the identities added since.
+	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 47]);
 	cases.push(['tools/test/managed_ollama_signal_pid_publication_test.py', 2]);
 } else {
 	process.stdout.write(
