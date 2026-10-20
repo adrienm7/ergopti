@@ -125,12 +125,17 @@ global _LayoutPollRetry := _LayoutPollNewRetry(0)
 ;   "reload"(RefusedFn) starts the poll's own reload and returns whether it
 ;   launched; "pending"() returns the pending reload record or false;
 ;   "veto_honored"() says whether OnExit could still refuse one more exit;
-;   "now"() returns the tick count; "notify"() tells the user a reload failed.
+;   "now"() returns the tick count; "notify"() tells the user a reload failed;
+;   "number_row"(Hkl), when present, re-evaluates the number-row choice.
 ; @returns {Boolean} True when this tick started a reload.
 LayoutPollTick(Hkl, Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleMs,
 		InputBusy, Port) {
 	global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL
 	_LayoutPollObserve(Hkl)
+	; The stored number-row choice is re-evaluated on every layout change, and
+	; the menu refreshed when what it shows changes (number-row-inert-choice).
+	if (Hkl != 0 && Hkl != _LAST_KEYBOARD_HKL && Port.Has("number_row"))
+		Port["number_row"].Call(Hkl)
 	; A layout the boot registrations already fit becomes the baseline at once:
 	; the AltGr family follows it without a reload, and nothing else would
 	; change. An unknown baseline (0) is still adopted by _ShouldReloadForHkl.

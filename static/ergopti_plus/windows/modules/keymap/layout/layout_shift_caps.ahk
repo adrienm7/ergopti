@@ -408,14 +408,55 @@ _NumberRowLogTransition(Mode, Effective) {
 	State := Mode . "|" . Effective["mode"] . "|" . Effective["reason"]
 	if State == _NumberRowEffectiveLogged
 		return
+	; The first state of a process is logged too: a reload (an emulation or
+	; scope change) starts one, so each switch leaves its line.
+	First := _NumberRowEffectiveLogged == ""
 	WasInert := StrSplit(_NumberRowEffectiveLogged . "||", "|")[3] != ""
 	_NumberRowEffectiveLogged := State
 	if Effective["reason"] != "" {
 		try LoggerInfo("NumberRow", "'{1}' is not applied on this layout ({2}); the stored choice is kept.",
 			Mode, Effective["reason"])
+	} else if First {
+		try LoggerInfo("NumberRow", "'{1}' applies on this layout.", Mode)
 	} else if WasInert {
 		try LoggerInfo("NumberRow", "'{1}' applies again on this layout.", Mode)
 	}
+}
+
+; What the number-row menu shows for layout Hkl: the stored choice, the
+; ordering in effect and why, and which choices can reorder the row. The menu
+; records it when it is built; NumberRowLayoutObserved refreshes the menu when
+; a layout change makes it differ.
+global _NumberRowMenuSignature := ""
+
+NumberRowMenuSignature(Hkl, Caps) {
+	global Features
+	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
+		? NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", "")) : ""
+	Availability := NumberRowAvailability(Hkl, Caps)
+	return Stored . "|" . NumberRowEffectiveMode(Hkl, Caps) . "|" . Availability["digits"]
+		. "|" . Availability["symbols"]
+}
+
+/**
+ * Re-evaluates the stored number-row choice when the foreground layout
+ * changes (the layout poll): logs a switch between applied and inert, and
+ * refreshes the menu when what it shows for the new layout differs.
+ * @param {Integer} Hkl The new foreground layout.
+ * @param {Func} RefreshFn Rebuilds the menu; the poll passes the tray rebuild.
+ * @returns {Boolean} Whether the menu was refreshed.
+ */
+NumberRowLayoutObserved(Hkl, RefreshFn) {
+	global _NumberRowMenuSignature
+	if Hkl == 0
+		return false
+	Signature := NumberRowMenuSignature(Hkl, GetKeyState("CapsLock", "T"))
+	if _NumberRowMenuSignature == "" || Signature == _NumberRowMenuSignature
+		return false
+	try LoggerInfo("NumberRow", "The number-row choices change on layout 0x{1:X}; refreshing the menu.", Hkl)
+	_NumberRowMenuSignature := Signature
+	RefreshFn.Call()
+	return true
 }
 
 /** Publishes capability only after the existing source owner returns exact true. */

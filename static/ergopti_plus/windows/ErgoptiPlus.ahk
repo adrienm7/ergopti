@@ -1619,7 +1619,8 @@ LayoutPollPort() {
 				"pending", ReloadTerminalHandoffPending,
 				"veto_honored", LifecycleShutdownVetoHonored,
 				"now", () => A_TickCount,
-				"notify", ReloadRefusedNotify)
+				"notify", ReloadRefusedNotify,
+				"number_row", (Hkl) => NumberRowLayoutObserved(Hkl, (*) => RebuildTrayMenu()))
 		return Port
 }
 
