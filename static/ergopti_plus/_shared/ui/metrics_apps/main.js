@@ -214,7 +214,7 @@ function updateCharts(appsArray, aggregatedData) {
 		// Pre-load icon images so the afterDraw plugin can paint them. Each loaded
 		// image triggers a chart redraw so icons appear as soon as they decode.
 		const iconImages = topApps.map((a) => {
-			if (!appIcons[a.name]) return null;
+			if (!Object.prototype.hasOwnProperty.call(appIcons, a.name) || !appIcons[a.name]) return null;
 			const img = new Image();
 			img.onload = () => {
 				if (appsBarChart) appsBarChart.draw();

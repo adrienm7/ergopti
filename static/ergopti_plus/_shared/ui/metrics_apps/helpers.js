@@ -37,7 +37,7 @@ let currentCompareEnabled = false;
 let currentCountAwake = false;
 
 // Dominant colour cache: app_name → '#rrggbb' (computed once per icon via Canvas)
-const _dominantColorCache = {};
+const _dominantColorCache = Object.create(null);
 
 let appsBarChart = null;
 let catPieChart = null;
