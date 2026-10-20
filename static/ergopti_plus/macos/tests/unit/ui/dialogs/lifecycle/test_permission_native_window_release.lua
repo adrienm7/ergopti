@@ -16,7 +16,7 @@ require("logger")
 --- @param scenario function Complete dialog and deferred native cleanup scenario.
 local function with_windows(scenario)
 	helpers.with_stub_scope({
-		"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work",
+		"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "adapters.timer_scheduler", "infra.deferred_work",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",

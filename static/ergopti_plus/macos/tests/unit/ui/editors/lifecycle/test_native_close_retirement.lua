@@ -111,7 +111,9 @@ local function with_window(module_name, scenario)
 			end
 			function h.close()
 				if module_name == "ui.layer_editor" or module_name == "ui.action_picker" then return window.close() end
-				h.bridges[#h.bridges].callback({ body = { action = module_name == "ui.layout_manager" and "close" or "cancel" } })
+				local bridge = h.bridges[#h.bridges]
+				bridge.callback({ name = bridge.name, webView = h.windows[#h.windows],
+					body = { action = module_name == "ui.layout_manager" and "close" or "cancel" } })
 				return true
 			end
 			function h.drain()
@@ -269,9 +271,9 @@ end
 --- @param controller table Prior native controller.
 --- @param before integer Acknowledgements before the healthy retry.
 local function assert_prior_callback_retired(module_name, h, controller, before)
-	if module_name == "ui.action_picker" then
+	if module_name == "ui.action_picker" or module_name == "ui.layout_manager" then
 		helpers.assert_true((h.ack_detaches or 0) > before, "old callback requires exact native acknowledgement")
-		helpers.assert_eq(#h.bridges, 1, "a new picker lease reuses the same retained native UCC")
+		helpers.assert_eq(#h.bridges, 1, "a new pooled lease reuses the same retained native UCC")
 		helpers.assert_type(h.script_refs[controller], "function", "the successor owns the rebound dispatcher")
 	else helpers.assert_nil(h.script_refs[controller]) end
 end
@@ -287,7 +289,8 @@ helpers.describe("editor native message callbacks retire independently of window
 					close_callback_editor(h, mode)
 					helpers.assert_nil(h.script_refs[controller], "native window GC does not unref UCC callbacks")
 					helpers.assert_true(h.show())
-					local successor = module_name == "ui.action_picker" and h.bridges[1] or h.bridges[2]
+					local pooled = module_name == "ui.action_picker" or module_name == "ui.layout_manager"
+					local successor = pooled and h.bridges[1] or h.bridges[2]
 					helpers.assert_type(h.script_refs[successor], "function")
 					previous({ body = { action = "cancel" } })
 					previous({ name = controller.name, webView = h.windows[1], body = { action = "cancel" } })

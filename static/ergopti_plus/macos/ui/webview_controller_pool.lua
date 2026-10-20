@@ -9,7 +9,11 @@
 --- ==============================================================================
 
 local M = {}
-local ROLE_PORTS = { action_picker = "action_picker_bridge" }
+local ROLE_PORTS = {
+	action_picker = "action_picker_bridge",
+	layout_manager = "layout_manager_bridge",
+	permission_dialog = "permission_dialog_bridge",
+}
 local LOG = "ui_builder"
 
 --- Creates a pool owned by one UI module, without eagerly accessing native APIs.

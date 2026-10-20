@@ -42,6 +42,9 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local ui_builder = require("ui.ui_builder")
+local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+	return hs.webview.usercontent.new(name)
+end, Logger)
 
 local LOG = "permission_dialog"
 
@@ -121,10 +124,10 @@ local function release_closed(session)
 	if session.releasing then return false end
 	if session.usercontent ~= nil then
 		session.releasing = true
-		local ok, err = pcall(function() session.usercontent:setCallback(nil) end)
+		local ok, err = ControllerPool.release(session.controller_lease)
 		session.releasing = false
 		if not ok then
-			Logger.error(LOG, "The %s permission dialog bridge release raised: %s.", session.kind, tostring(err))
+			Logger.error(LOG, "The %s permission dialog bridge release did not commit: %s.", session.kind, tostring(err))
 			return false
 		end
 		session.usercontent = nil
@@ -351,14 +354,15 @@ function M.show(spec)
 		Logger.error(LOG, "The %s permission dialog has no geometry in the apps manifest.", spec.kind)
 		return false
 	end
-	local ok_uc, usercontent = pcall(hs.webview.usercontent.new, M.BRIDGE)
-	if not ok_uc or usercontent == nil then
+	local controller_lease, usercontent = ControllerPool.reserve("permission_dialog")
+	if controller_lease == nil then
 		Logger.error(LOG, "The permission dialog bridge could not be created: %s.", tostring(usercontent))
 		return false
 	end
 	local session = {
 		kind          = spec.kind,
 		usercontent   = usercontent,
+		controller_lease = controller_lease,
 		open_settings = spec.open_settings,
 		on_closed     = spec.on_closed,
 		opening       = true,
@@ -366,10 +370,11 @@ function M.show(spec)
 	local floating = M.KINDS[spec.kind].floating == true
 	_session = session
 	local built, webview = xpcall(function()
-		usercontent:setCallback(function(message)
+		local bound, detail = ControllerPool.bind(controller_lease, function(message)
 			local body = type(message) == "table" and message.body or nil
 			on_action(session, type(body) == "table" and body.action or nil)
 		end)
+		if not bound then error("Permission dialog callback binding did not commit: " .. tostring(detail)) end
 		local content = M.content(spec.kind, spec.bundle_path)
 		return ui_builder.show_webview({
 			frame         = dialog_frame(geometry),
@@ -409,6 +414,10 @@ function M.show(spec)
 		return false
 	end
 	session.webview = webview
+	if not ControllerPool.attach(controller_lease, webview) or not ControllerPool.commit(controller_lease) then
+		M.close(session.kind)
+		return false
+	end
 	Logger.success(LOG, "The %s permission dialog is open.", spec.kind)
 	return true
 end
