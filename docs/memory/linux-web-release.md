@@ -121,18 +121,30 @@ SQLite flush before advancing virtual time; a readable rollback is not a
 committed configuration snapshot. Shutdown assertions require actual native
 close acknowledgments, independently of the clock being simulated.
 
-### project-linux-capsword-rewrites-the-buffer-only
+### project-linux-capsword-locks-the-desktop-capslock
 
-The tray CapsWord (`modules/shortcuts/manager.lua`, `toggle_caps_word`) only
-changes the character `handle_char` hands the hotstring engine: the key itself
-was already forwarded unchanged, so the application never receives a capital.
-The native CapsWord of `platform/remap/tap_hold_engine.lua`, which does emit
-capitals, stays publicly denied (catalogue action `caps_word` is AHK-only)
-until its source/output join is qualified, and keeps its fixed cancel controls.
-The [shortcuts.caps_word] auto-off settings end the tray session (delimiters,
-delay, pointer kinds through the hook's `onPointerEvent`). Action: wire the
-same policy into the native engine when that denial is lifted; do not mistake
-the tray toggle for working output.
+Until 2026-10-20 the Linux CapsWord only rewrote the character handed to the
+hotstring engine; the key was already forwarded, so no capital reached an
+application. A session of `modules/shortcuts/manager.lua` now locks CapsLock on
+the desktop, as Windows (`SetCapsLockState`) and macOS (Karabiner
+`caps_lock`) do: `keyboard_hook.lock_caps_for_word` first taps CapsLock in the
+capture state (a keymap whose CapsLock locks nothing, `ctrl:nocaps` or
+`caps:escape`, is refused before the desktop sees the key), then the session
+taps KEY_CAPSLOCK on the daemon's uinput keyboard. Letters arrive as the
+layout's CapsLock level types them (Ergopti's explicit Lock level keeps digits
+and punctuation); the injector already unlocks around the text it types. A
+CapsLock the user had is ridden and left on. The user's CapsLock press, a
+stop, an emergency stop and `while_released` end the hold, unlocking while the
+daemon still owns the keyboard; an LED reseed restores the session's lock,
+which the grabbed keyboard's LED never shows. The `caps_word` catalogue action
+(a keyboard slot, a key-combination tap such as Windows' LAlt then CapsLock, a
+tap-hold, a gesture) toggles the same session through the executor:
+`tap_hold_manager._run_tap` no longer hands it to the hook as intent, so the
+engine's per-letter owner (`adapters/caps_word.lua`, `arm_caps_word`) has no
+production caller, and chord slots still refuse it. Action: end a session only
+through `end_caps_word`, which unlocks; never type a capital of the daemon's
+own; a desktop that keeps one lock state per keyboard (sway without keyboard
+grouping, in `--no-grab` mode) needs a real-machine check.
 
 ## Linux native boundaries
 
@@ -179,6 +191,27 @@ exit-status receipt appended to the stdin script. Scalars are emitted with
 literals go through the shared `sqlite.literal` `char()` concatenation.
 Current-schema admission uses a shared deferred `BEGIN`; real writes keep
 `BEGIN IMMEDIATE`, and metrics event IDs are acknowledged only after COMMIT.
+
+### project-linux-sqlite-text-nul-traps
+
+SQLite itself, not only the CLI, cuts text at NUL in `json_group_object`
+(a merged `{"a\u0000b":1}` came back as a second `"a"` key) and in
+`length()`/`substr()`; the CLI's `-json` mode cuts every raw TEXT column.
+Rebuild merged maps from `json_quote(key)` with `group_concat`, and project
+any text that can hold NUL through `json_quote` and decode it in Lua. The
+shared `Json.decode_lossless` returns nil for malformed text instead of
+raising, so a `pcall` around it validates nothing: test the result's type.
+
+### project-linux-metrics-walk-context
+
+The Linux flush walks each application's buffered events from a per-app walk
+context (open word, sequence, correction, burst, session) taken from the last
+COMMIT and adopts the new one only on COMMIT, as Windows and macOS carry
+theirs. Buffered delays are capped at the pause threshold, so session gaps
+come from the keystroke stamps, and `AggregateWalker.settle` credits what a
+context holds once its own gap has passed (all of it at a new day or at
+shutdown). Action: a new cross-keystroke metric keeps its state in that
+context, never in walk locals, or every flush cuts it.
 
 ### project-linux-json-store-publication
 
