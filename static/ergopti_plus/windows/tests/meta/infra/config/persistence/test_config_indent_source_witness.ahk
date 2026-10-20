@@ -11,7 +11,11 @@
 
 _CPC_IndentSourceBound(Body) {
 	Read := InStr(Body, 'Content := FSReadUtf8Exact(Path)')
+	if !Read
+		return false
 	Guard := InStr(Body, 'if !(Content is String) || !_LLM_Menu_EnableSourceMatches(Expected["source"], _LLM_Menu_EnableReadSource())', true, Read)
+	if !Guard
+		return false
 	Refusal := InStr(Body, "return false", true, Guard)
 	Call := InStr(Body, 'return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned, Content, 1) : TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)')
 	return Read > 0 && Guard > Read && Refusal > Guard && Call > Refusal
@@ -21,6 +25,8 @@ _CPC_IndentSourceWitness() {
 	Body := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_IndentWrite"))
 	AssertTrue(Body != "", "the actual native indentation writer must exist")
 	AssertTrue(_CPC_IndentSourceBound(Body), "both actual terminal branches retain the admitted exact source")
+	AssertFalse(_CPC_IndentSourceBound(""), "a missing first link is a refusal, not an invalid search offset")
+	AssertFalse(_CPC_IndentSourceBound('Content := FSReadUtf8Exact(Path)'), "a truncated chain is refused before its dependent search")
 	Mutations := [
 		['Content := FSReadUtf8Exact(Path)', 'Content := ""'],
 		['!(Content is String)', 'false'],
