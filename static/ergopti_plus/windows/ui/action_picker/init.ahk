@@ -10,6 +10,13 @@
 ; their menu call sites are unaffected.
 ; ==============================================================================
 
+; Each native picker is constructed anew; default Close would only hide its
+; controls and their captured callbacks instead of retiring the owned window.
+_ActionPickerNativeClose(Window, *) {
+	Window.Destroy()
+	return true
+}
+
 ShowKeyboardSlotPicker(Prefix) {
 		global GESTURE_ACTIONS
 		Slots := []
@@ -36,6 +43,8 @@ ShowKeyboardSlotPicker(Prefix) {
 		for SlotId in Slots
 				SlotLabels.Push(_GestureActionLabel(SlotId))
 		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
+		W.OnEvent("Close", _ActionPickerNativeClose)
+		W.OnEvent("Escape", _ActionPickerNativeClose)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
@@ -109,6 +118,8 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 				}
 		}
 		W := Gui_Create("", Title)
+		W.OnEvent("Close", _ActionPickerNativeClose)
+		W.OnEvent("Escape", _ActionPickerNativeClose)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
