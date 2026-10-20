@@ -190,6 +190,12 @@ function M.walk(events, date_str, app, batch, clock)
 	-- character does not follow the previous one from the same hand.
 	local run = {}
 	local word, previous_word = "", nil
+	-- The two tokens before the current position, Backspace markers included,
+	-- for the bigrams and trigrams that END in a correction ("e[BS]",
+	-- "he[BS]", "e[BS][BS]"): which sequences the user goes back over, the
+	-- tokens Windows and macOS push. Kept apart from `run`, which a correction
+	-- breaks: nothing is chained AFTER a marker, so "[BS]x" is never a pair.
+	local before_last, last = nil, nil
 
 	local app_day_key = date_str .. SEPARATOR .. app
 	local classes = Helpers.gc(batch.chars_class, app_day_key, {
@@ -392,7 +398,17 @@ function M.walk(events, date_str, app, batch, clock)
 		local is_synthetic, source = synthetic_of(event)
 
 		if char == BACKSPACE_MARKER then
+			-- After a real pause the correction does not continue what came before.
+			if not is_synthetic and delay >= MAX_KEYSTROKE_DELAY_MS then before_last, last = nil, nil end
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
+			if last then
+				Helpers.push_ngram(batch, "ngram_bigrams", date_str, app, last .. char, delay, false, source)
+				if before_last then
+					Helpers.push_ngram(batch, "ngram_trigrams", date_str, app,
+						before_last .. last .. char, delay, false, source)
+				end
+			end
+			before_last, last = last, char
 			-- A correction. The run is broken because what follows continues from
 			-- a different character than it appears to, and the partial word is
 			-- abandoned rather than recorded — the user was not writing it.
@@ -419,6 +435,7 @@ function M.walk(events, date_str, app, batch, clock)
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, 0, false, source)
 			run = {}
 			word = ""
+			before_last, last = nil, nil
 			-- An expansion is not something the hands did, so it cannot extend a
 			-- same-finger run. Counting it would make the layout look worse the
 			-- more the driver types for the user, which is backwards.
@@ -448,9 +465,11 @@ function M.walk(events, date_str, app, batch, clock)
 				flush_word()
 				run = {}
 				previous_word = nil
+				before_last, last = nil, nil
 			end
 
 			run[#run + 1] = char
+			before_last, last = last, char
 			-- Only the last seven matter, and holding more would grow without bound
 			-- on a long session.
 			if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
