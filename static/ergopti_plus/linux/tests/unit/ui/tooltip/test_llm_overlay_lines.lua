@@ -1,4 +1,4 @@
---- tests/unit/ui/llm/test_llm_overlay_lines.lua
+--- tests/unit/ui/tooltip/test_llm_overlay_lines.lua
 
 --- ==============================================================================
 --- MODULE: What An AI Prediction Line Reads (Linux)
