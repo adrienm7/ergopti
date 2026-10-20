@@ -394,6 +394,21 @@ _CapsWordAutoOffEnd(Reason, Kind := "") {
 	EndFn.Call(Reason, Kind)
 }
 
+; Reports text the driver itself has put on screen: the layout emulation's
+; layers, AltGr and dead keys, a hotstring, the magic key or a correction, an
+; accepted prediction. Most of it goes out at SendLevel 0 or through
+; SendInput, which the auto-off InputHook never sees, so the emitters call this
+; where they record their output (the ring of sent characters, TextSend) and a
+; checked delimiter in it ends CapsWord as if typed. A temporary edit that the
+; ring does not record either (a poke later erased) is never reported.
+; @param Text {String} The literal characters that reached the screen.
+CapsWordAutoOffObserveOutput(Text) {
+	if Type(Text) != "String" || Text == "" || !_CapsWordAutoOffActive()
+		return
+	if CapsWordAutoOffEndsOnText(CapsWordAutoOff.Armed, Text)
+		_CapsWordAutoOffEnd("a delimiter in " . StrLen(Text) . " sent character(s)")
+}
+
 ; A readable name for a typed delimiter in the log.
 _CapsWordAutoOffDescribe(Text) {
 	Out := ""

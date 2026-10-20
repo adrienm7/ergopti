@@ -414,6 +414,11 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 		; unqualified pre-fix behaviour is correct.
 		if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
 				UpdateLastSentCharacter(SubStr(Text, -_TextTailCodeUnits(Text, 1)))
+				; The ring records the last character only; a delimiter anywhere in
+				; the literal text ends CapsWord. Key syntax ("{BackSpace}", "^v")
+				; is not text and says nothing about what reached the screen.
+				if OnlyText and IsSet(CapsWordAutoOffObserveOutput)
+						CapsWordAutoOffObserveOutput(Text)
 		}
 		return true
 }
@@ -423,13 +428,19 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 _SendFinalResultUnchecked(Text, OnlyText) {
 		if _SendHook {
 				Hook := _SendHook
-				return _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+				Sent := _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+		} else {
+				if OnlyText
+						SendInput("{Text}" Text)
+				else
+						SendInput(Text)
+				Sent := true
 		}
-		if OnlyText
-				SendInput("{Text}" Text)
-		else
-				SendInput(Text)
-		return true
+		; SendInput lifts the script's own hook, so the auto-off InputHook never
+		; sees this text: a checked delimiter in it ends CapsWord here.
+		if Sent and OnlyText and IsSet(CapsWordAutoOffObserveOutput)
+				CapsWordAutoOffObserveOutput(Text)
+		return Sent
 }
 
 ; @param DeclareBufferEffect {Boolean} True when Text is a caret/document edit
@@ -454,6 +465,14 @@ _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 		"hotstring_send_instant")
 }
 
+; SendInput lifts the script's own hook and a paste types nothing at all, so
+; the auto-off InputHook never sees what SendInstant puts on screen: a checked
+; delimiter in it ends CapsWord here, once the injection succeeded.
+_SendInstantReport(Text) {
+	if IsSet(CapsWordAutoOffObserveOutput)
+		CapsWordAutoOffObserveOutput(Text)
+}
+
 SendInstant(Text, Prefix := "") {
 	; Sends a large text through the clipboard while keeping Prefix (typically the
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
@@ -462,7 +481,10 @@ SendInstant(Text, Prefix := "") {
 	if _SendHook {
 		try {
 			Hook := _SendHook
-			return _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+			Sent := _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+			if Sent
+				_SendInstantReport(Text)
+			return Sent
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant hook failed: {1}", Err.Message)
 			return false
@@ -479,6 +501,7 @@ SendInstant(Text, Prefix := "") {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
+			_SendInstantReport(Text)
 			return true
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
@@ -499,6 +522,7 @@ SendInstant(Text, Prefix := "") {
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
+			_SendInstantReport(Text)
 			return true
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
@@ -528,6 +552,7 @@ SendInstant(Text, Prefix := "") {
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
 		SendInput(Prefix . "^v")
+		_SendInstantReport(Text)
 		return true
 	} catch as err {
 		; SendInput can fail after the restore timer was armed. Cancel that exact

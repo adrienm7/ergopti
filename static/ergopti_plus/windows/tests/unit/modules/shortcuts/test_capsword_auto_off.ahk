@@ -329,3 +329,97 @@ _CWAO_StoreRefusals() {
 	}
 }
 Test("capsword auto-off: refused or invalid changes publish nothing", _CWAO_StoreRefusals)
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 6/ Output the driver sends =======
+; ==========================================
+; ==========================================
+
+; Before the auto-off owned what the driver sends, a period, comma or
+; semicolon typed by the layout emulation's layers or dead keys, a hotstring,
+; the magic key or an accepted prediction went out at SendLevel 0, through
+; SendInput or a paste, and CapsWord stayed on: the InputHook never saw them.
+
+; Runs Emit with CapsWord armed on the shipped delimiters and every send seam
+; recording instead of typing; returns whether CapsWord survived.
+_CWAO_SurvivesEmit(Emit) {
+	global _SendHook, CapsWordEnabled
+	SavedHook := _SendHook
+	try {
+		_SendHook := (*) => true
+		_CWAO_ArmWith(ManifestDefaultFor("shortcuts.caps_word.terminators"))
+		Emit()
+		return CapsWordEnabled
+	} finally {
+		_SendHook := SavedHook
+		_CWAO_Reset()
+	}
+}
+
+_CWAO_ObservedOutput() {
+	for Text in [".", ",", ";"] {
+		AssertTrue(_CWAO_SurvivesEmit(() => 0), "nothing sent keeps CapsWord")
+		AssertFalse(_CWAO_SurvivesEmit(CapsWordAutoOffObserveOutput.Bind("etc" . Text)),
+			"sent output ending in '" . Text . "' ends CapsWord")
+	}
+	AssertTrue(_CWAO_SurvivesEmit(CapsWordAutoOffObserveOutput.Bind("ABC")), "letters keep CapsWord")
+	AssertTrue(_CWAO_SurvivesEmit(CapsWordAutoOffObserveOutput.Bind("Space")),
+		"a key name the ring records is no delimiter")
+}
+Test("capsword auto-off: a delimiter in the driver's own output ends CapsWord", _CWAO_ObservedOutput)
+
+_CWAO_SendNewResultEnds() {
+	AssertFalse(_CWAO_SurvivesEmit(() => SendNewResult("M.", true)),
+		"a layer, AltGr or dead-key emit through SendNewResult ends CapsWord on its period")
+	AssertTrue(_CWAO_SurvivesEmit(() => SendNewResult(" ", true, false)),
+		"a temporary poke the ring does not record (ActivateHotstrings) never ends it")
+	AssertTrue(_CWAO_SurvivesEmit(() => SendNewResult("{BackSpace}", false)), "key syntax is no text")
+}
+Test("capsword auto-off: SendNewResult's recorded text ends CapsWord", _CWAO_SendNewResultEnds)
+
+_CWAO_SendFinalResultEnds() {
+	AssertFalse(_CWAO_SurvivesEmit(() => SendFinalResult("a, b", true)),
+		"text sent through SendInput ends CapsWord on its comma")
+	AssertTrue(_CWAO_SurvivesEmit(() => SendFinalResult("!{Tab}", false)),
+		"a chord in key syntax is no exclamation mark")
+}
+Test("capsword auto-off: SendFinalResult's text ends CapsWord", _CWAO_SendFinalResultEnds)
+
+_CWAO_SendInstantEnds() {
+	AssertFalse(_CWAO_SurvivesEmit(() => SendInstant("voilà`; fin", "{BackSpace}")),
+		"a pasted expansion ends CapsWord on its semicolon")
+}
+Test("capsword auto-off: SendInstant's pasted text ends CapsWord", _CWAO_SendInstantEnds)
+
+_CWAO_TextSendEnds() {
+	AssertFalse(_CWAO_SurvivesEmit(() => TextSend("oui.", Map("mode", "direct"), 0)),
+		"TextSender output (magic key, correction, prediction) ends CapsWord on its period")
+	AssertTrue(_CWAO_SurvivesEmit(() => TextSend("oui", Map("mode", "direct"), 0)),
+		"TextSender letters keep CapsWord")
+}
+Test("capsword auto-off: TextSender output ends CapsWord", _CWAO_TextSendEnds)
+
+_CWAO_HotstringEffectEnds() {
+	Emit() {
+		Previous := Critical("On")
+		try _HSE_MirrorCanonicalEffectToLlm({ DeleteFromEnd: 3, InsertedText: "c'est-à-dire," })
+		finally Critical(Previous)
+	}
+	AssertFalse(_CWAO_SurvivesEmit(Emit), "a hotstring expansion ends CapsWord on the comma it inserts")
+}
+Test("capsword auto-off: a hotstring expansion's inserted text ends CapsWord", _CWAO_HotstringEffectEnds)
+
+; The ring owner the layout emulation feeds is stubbed in this runner, so its
+; reporting is held by source: every emit that reached the screen passes there.
+_CWAO_RingReportsOutput() {
+	Body := _StripFullLineComments(_DriverFuncBody("UpdateLastSentCharacter"))
+	Assert(Body != "", "UpdateLastSentCharacter must exist")
+	Assert(InStr(Body, "CapsWordAutoOffObserveOutput(Character)") > InStr(Body, "_LSCPush(Character)"),
+		"the ring of sent characters must report each recorded character to the CapsWord auto-off")
+}
+Test("capsword auto-off: the ring of sent characters reports to CapsWord", _CWAO_RingReportsOutput)
