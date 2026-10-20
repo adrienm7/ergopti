@@ -197,12 +197,22 @@ async function observe(source, root, scenario) {
 							// renders; the smoke requires both, within its budget.
 							const render = (ms) =>
 								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
+							// A paused AI-on boot defers its AI hotkeys and the resume
+							// activates them; the smoke requires both lines (#97).
+							let resume = '';
+							if (fixture === 'suspend-marker') {
+								if (scenario !== 'ai-deferral-missing')
+									resume += '[INFO] AI hotkeys deferred to the resume: the driver is paused.\n';
+								if (scenario !== 'ai-resume-missing')
+									resume += '[INFO] AI hotkeys deferred by the pause are active.\n';
+							}
 							fs.writeFileSync(
 								path.join(logs, 'ErgoptiPlus_20261004.log'),
 								warm && scenario === 'logged-error'
 									? '[ERROR] inert warm failure\n'
 									: render(15) +
 											render(scenario === 'slow-render' ? 3200 : 40) +
+											resume +
 											'[INFO] inert ready\n'
 							);
 							const receipt = {
@@ -649,6 +659,8 @@ async function check(source, root = ROOT) {
 		'retired-malformed',
 		'retired-duplicate',
 		'retired-missing',
+		'ai-deferral-missing',
+		'ai-resume-missing',
 		'slow-render',
 		'types-cold-pid',
 		'types-cold-level',
@@ -707,6 +719,16 @@ async function check(source, root = ROOT) {
 			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*no fresh readiness/);
 		if (scenario === 'logged-error')
 			assert.match(result.diagnostics.join('\n'), /reloaded-config reached ready with 1 error/);
+		if (scenario === 'ai-deferral-missing')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/suspend-marker: the paused AI-on boot did not defer its AI hotkeys/
+			);
+		if (scenario === 'ai-resume-missing')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/suspend-marker: the resume did not activate the AI hotkeys its pause deferred/
+			);
 		if (scenario.startsWith('retired-') || scenario === 'ready')
 			assert.equal(
 				result.retiredMetricsCalls,
