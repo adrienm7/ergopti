@@ -22,6 +22,7 @@ const metricsAppsPublications = {
 		userCategories = newCategories || {};
 		appliedCategoriesRevision = revision;
 		invalidateAggregationCache();
+		rebuildFilterButtons();
 		renderDashboard();
 		return true;
 	},
@@ -57,6 +58,7 @@ const metricsAppsPublications = {
 window.updateUserCategories = function (newCategories) {
 	userCategories = newCategories || {};
 	invalidateAggregationCache();
+	rebuildFilterButtons();
 	renderDashboard();
 };
 
