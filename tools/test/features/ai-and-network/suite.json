@@ -361,6 +361,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-model-browser-session.cjs"],
 			"repro": "npm run test:model-browser-session"
+		},
+		{
+			"id": "js-0448",
+			"ordinal": 448,
+			"name": "Ollama release pin parity (one 0.40.4 pin, no retired 0.24.0 pin or upstream seam)",
+			"cmd": "node",
+			"args": ["tools/test/test-ollama-release-pin-parity.cjs"],
+			"repro": "npm run test:ollama-release-pin-parity"
 		}
 	]
 }

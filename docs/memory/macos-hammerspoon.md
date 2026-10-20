@@ -139,6 +139,23 @@ GitHub. Failures use the shared classes (certificate, proxy, host_blocked,
 offline) and `network.failure.*` sentences with their actions. Never log the
 word "proxy" in a normal line: the shared classifier matches it bare.
 
+### project-managed-ollama-native-hooks-follow-the-pinned-source
+
+`tools/build/build-macos-managed-ollama.py` patches exact upstream snippets,
+gated by the SHA-256 preimages in `managed_ollama_runtime.json`; a release
+bump changes them all. Ollama 0.40.4 (needed for `qwen3.5`) removed
+`server/internal/client/ollama/registry.go`, moved `x/transfer` to
+`transfer/` and gave blob downloads a checked dialer (`transfer/redirect.go`)
+that refuses non-public addresses. The native worker and an explicit relay
+never reach that dialer, so both transfer seams use
+`nativehttp.WrapChecked`, which repeats the decision in `address_policy.go`;
+`transfer/redirect.go` is a preimage so an upstream policy change stops the
+build. For a bump, extract the tag tarball (`gh api
+repos/ollama/ollama/tarball/vX`) into an empty scratch folder, recompute the
+preimages, and run `python tools/test/macos_managed_ollama_source_test.py
+--source <folder>`, which applies the real hooks without Go
+(`test-ollama-release-pin-parity.cjs` refuses any retired pin).
+
 ### project-macos-ai-runtimes-install-on-selection
 
 Neither AI runtime ships in the app or downloads at boot, on AI enable with

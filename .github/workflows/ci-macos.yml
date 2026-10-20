@@ -2791,25 +2791,25 @@ jobs:
           import json
           from pathlib import Path
           release = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
-          assert release['version'] == '0.24.0'
+          assert release['version'] == '0.40.4'
           assert release['assets']['macos-universal'] == {
               'filename': 'ollama-darwin.tgz',
-              'sha256': 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
-              'bytes': 133395504,
+              'sha256': 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
+              'bytes': 167884528,
           }
           PY
           curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
             --output "$cold_ollama_archive" \
-            https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-darwin.tgz
+            https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-darwin.tgz
           python3 - "$cold_ollama_archive" <<'PY'
           import hashlib
           import sys
           from pathlib import Path
           archive = Path(sys.argv[1])
-          assert archive.stat().st_size == 133395504
+          assert archive.stat().st_size == 167884528
           with archive.open('rb') as stream:
               actual = hashlib.file_digest(stream, 'sha256').hexdigest()
-          assert actual == 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38'
+          assert actual == 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58'
           PY
           python3 tools/diagnostics/macos_cold_ollama_bootstrap.py \
             --app "$PWD/build/macos/ErgoptiPlus.app" \
@@ -2824,10 +2824,10 @@ jobs:
           from pathlib import Path
           receipt = json.loads(Path(sys.argv[1]).read_text())
           for key, expected in {
-              'version': 1, 'status': 'passed', 'client_version': '0.24.0',
+              'version': 1, 'status': 'passed', 'client_version': '0.40.4',
               'helpers_retired': True, 'native_helpers_absent': True, 'cleanup': True,
               'private_work_retired': True,
-              'official_archive_sha256': 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
+              'official_archive_sha256': 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
               'installed_tree': 'byte-and-link-identical to verified official archive',
               'selection': 'unmodified production runtime resolvers under inherited kernel sandbox',
               'daemon_validation': 'not-executed', 'model_validation': 'not-executed',

@@ -68,9 +68,9 @@ local function fixture()
 		explicit_consent = true, authorized = function() return f.current end,
 		timeout_ms = 120000, helper_timeout_ms = 10000,
 		asset = {
-			version = "0.24.0", name = "ollama-linux-amd64.tar.zst", bytes = 1198635318,
-			sha256 = "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb",
-			url = "https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-linux-amd64.tar.zst",
+			version = "0.40.4", name = "ollama-linux-amd64.tar.zst", bytes = 1436408810,
+			sha256 = "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a",
+			url = "https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-linux-amd64.tar.zst",
 		},
 	}
 	function f.start(options)
@@ -105,7 +105,7 @@ test("ordered receipts wait for every native retirement", function()
 	expect(f.cleanup_count == 1 and f.prepare_count == 1, "owned file cleanup once")
 	local http = f.calls[6].options
 	expect(http.https_only and http.follow_redirects and http.output_path == "/private/archive", "owned TLS archive path")
-	expect(http.max_download_bytes == 1198635318, "authoritative bound unchanged")
+	expect(http.max_download_bytes == 1436408810, "authoritative bound unchanged")
 	expect(type(http.owner) == "string" and http.owner == "llm-ollama-install:" .. f.files.directory, "existing HTTP ABI never falls back to default owner")
 	expect(f.calls[1].options.owner == http.owner and f.calls[9].options.owner == http.owner, "all native ports share the exact named transaction owner")
 end)
@@ -124,9 +124,9 @@ test("authorizer cannot mutate admitted official asset scalars", function()
 	end
 	local op = f.start() f.through(9)
 	expect(op:is_settled() and op.result.ok, "original admitted asset survives authorizer mutation")
-	expect(f.calls[6].args[1] == "https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-linux-amd64.tar.zst", "original authoritative URL frozen")
-	expect(f.calls[6].options.max_download_bytes == 1198635318 and f.last_size_asset.bytes == 1198635318, "pinned byte bound frozen")
-	expect(f.last_checksum_asset.sha256 == "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb", "pinned authoritative digest frozen")
+	expect(f.calls[6].args[1] == "https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-linux-amd64.tar.zst", "original authoritative URL frozen")
+	expect(f.calls[6].options.max_download_bytes == 1436408810 and f.last_size_asset.bytes == 1436408810, "pinned byte bound frozen")
+	expect(f.last_checksum_asset.sha256 == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a", "pinned authoritative digest frozen")
 end)
 
 test("caller cannot replace asset while preflight awaits retirement", function()
@@ -136,7 +136,7 @@ test("caller cannot replace asset while preflight awaits retirement", function()
 	f.options.timeout_ms, f.options.helper_timeout_ms = 1, 1
 	f.through(9)
 	expect(op:is_settled() and op.result.ok, "frozen constructor admission preserved")
-	expect(f.calls[6].options.max_download_bytes == 1198635318 and f.calls[6].options.timeout_ms == 120000, "archive limits frozen")
+	expect(f.calls[6].options.max_download_bytes == 1436408810 and f.calls[6].options.timeout_ms == 120000, "archive limits frozen")
 	expect(f.calls[9].options.timeout_ms == 10000, "helper deadline frozen")
 end)
 
