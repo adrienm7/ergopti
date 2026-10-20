@@ -225,6 +225,7 @@ _SICS_DecodeCase(Name) {
 	High := _SICS_RawUnits(0xD83D), Low := _SICS_RawUnits(0xDE00)
 	Hook := { Input: "", EndKey: "", EndReason: "EndKey" }
 	Kind := "invalid", Text := "", Control := "", Reason := "incomplete-scalar"
+	NamedKeys := "{BackSpace}{Enter}{Delete}{Numlock}{Insert}"
 	switch Name {
 		case "BMP":
 			Hook.EndKey := "a", Kind := "text", Text := "a", Reason := ""
@@ -236,6 +237,8 @@ _SICS_DecodeCase(Name) {
 			Hook.EndKey := "}", Kind := "text", Text := "}", Reason := ""
 		case "supplementary":
 			Hook.Input := High, Hook.EndKey := Low, Kind := "text", Text := Chr(0x1F600), Reason := ""
+		case "single-escape-list":
+			NamedKeys := "{Escape}", Hook.EndKey := "Escape", Kind := "control", Control := "Escape", Reason := ""
 		case "named-enter":
 			Hook.EndKey := "Enter", Kind := "control", Control := "Enter", Reason := ""
 		case "native-backspace-alias":
@@ -277,7 +280,7 @@ _SICS_DecodeCase(Name) {
 		default:
 			throw Error("Unknown scalar decoder vector.")
 	}
-	Result := _SIHO_ReadScalar(Hook, "{BackSpace}{Enter}{Delete}{Numlock}{Insert}")
+	Result := _SIHO_ReadScalar(Hook, NamedKeys)
 	AssertEqual(Kind, Result.Kind, "completion kind must follow the independent vector")
 	AssertEqual(Text, Result.Text, "only a complete scalar may enter text dispatch")
 	AssertEqual(Control, Result.Name, "controls stay named and allowlisted")
@@ -328,3 +331,6 @@ Test("scalar control: dead-key uses native canonical Insert spelling (inputhook-
 for _SICU_EditorMode in ["a", "AB", "surrogate", "open-brace", "close-brace", "punctuation"]
 	Test("Magic Key native scalar: " . _SICU_EditorMode . " captures through the genuine I1 editor (magic-key-native-scalar)",
 		_SICU_Case.Bind("magic-editor", _SICU_EditorMode))
+
+Test("scalar completion: single named Escape stays cancellation (inputhook-named-key-tokenization)",
+	_SICS_DecodeCase.Bind("single-escape-list"))
