@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Format: mods+key  (f.eks. cmd+shift+b)\nTilgængelige mods: cmd, alt, ctrl, shift\nLad være tom for at deaktivere",
 	"menu.profiles.shortcut_title": "Profilgenvej",
 	"menu.profiles.use_profile": "Brug dette profil",
+	"menu.reload_replay.lost": "Nogle menuvalg foretaget under genstarten kunne ikke anvendes igen. Vælg dem igen i menuen.",
+	"menu.reload_replay.lost_title": "Menuvalg blev ikke anvendt",
 	"menu.reloading": "Indlæser…",
 	"menu.reloading_files": "Filer ændret — Indlæser…",
 	"menu.script_control.title": "Scriptforbrug",

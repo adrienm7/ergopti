@@ -1574,6 +1574,8 @@
 	"menu.profiles.shortcut_prompt": "Format: mods+key  (e.g. cmd+shift+b)\nAvailable mods: cmd, alt, ctrl, shift\nLeave blank to disable",
 	"menu.profiles.shortcut_title": "Profile Shortcut",
 	"menu.profiles.use_profile": "Use this profile",
+	"menu.reload_replay.lost": "Some menu choices made during the restart could not be applied again. Choose them again in the menu.",
+	"menu.reload_replay.lost_title": "Menu choices not applied",
 	"menu.reloading": "Reloading…",
 	"menu.reloading_files": "Files changed — Reloading…",
 	"menu.script_control.title": "Script Control",

@@ -932,6 +932,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/ui/menu/test_tray_menu_separator_popup.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_hold_picker_options.ahk
 #Include unit/ui/menu/test_menu_command_deferral.ahk
+#Include unit/ui/menu/test_menu_reload_replay.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_roll.ahk
 #Include unit/infra/config/persistence/test_config_recovery_transactions.ahk
 #Include unit/infra/config/persistence/test_config_commit_gateway.ahk

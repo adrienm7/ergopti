@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Biçim: mod+tuş  (ör. cmd+shift+b)\nMevcut modlar: cmd, alt, ctrl, shift\nDevre dışı bırakmak için boş bırakın",
 	"menu.profiles.shortcut_title": "Profil Kısayolu",
 	"menu.profiles.use_profile": "Bu profili kullan",
+	"menu.reload_replay.lost": "Yeniden başlatma sırasında yapılan bazı menü seçimleri yeniden uygulanamadı. Bunları menüden tekrar seçin.",
+	"menu.reload_replay.lost_title": "Menü seçimleri uygulanmadı",
 	"menu.reloading": "Yeniden yükleniyor…",
 	"menu.reloading_files": "Dosyalar değişti — Yeniden yükleniyor…",
 	"menu.script_control.title": "Betik Kontrolü",

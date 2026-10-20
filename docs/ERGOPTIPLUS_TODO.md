@@ -26,7 +26,7 @@ The Linux container session stopped on October 20; the next session runs on the 
 PC (real AHK, native Windows suites without a CI round trip). Read the latest dev CI run first.
 
 Maintainer decisions of October 20, applied without asking again: retained menu clicks that meet a
-reload are replayed in the successor (open, below); the Windows release list and its ETag persist
+reload are replayed in the successor (done on Windows, below); the Windows release list and its ETag persist
 across restarts (done, 3d7b9d7481); `config.toml` keeps the 5/3 blank-line style and
 `windows/_generated/config_template.toml` changes only through `npm run build:manifest` (done,
 be30824e92); the three drivers share the structured personal info editor, the raw Linux
@@ -47,12 +47,15 @@ Session order (all four requested):
 
 ### Open Windows items
 
-- [ ] **Menu clicks that land after a reload.** [CODE] Tray clicks retained during a slow startup
-      run when the configuration write they waited for ends; when that write was a hotstring intent
-      that requests a reload, the terminal barrier owns every path and each retained toggle is
-      refused (`terminal_barrier_busy`, one error toast each). Decision: replay the retained intents
-      in the successor. `ConfigWriteLeaseBusy` deliberately ignores a terminal owner, so the fix
-      belongs in `MenuCommandRun` and the startup retention owner, not in the lease.
+- [x] **Menu clicks that land after a reload.** [CODE] Done (October 20): `MenuCommandRun` holds
+      a command that lands while a reload is pending, OnExit publishes its tray row path once
+      (`menu_reload_replay.json` beside `paths.toml`, `infra/menu_reload_replay.ahk`), and the
+      successor's startup owner consumes it at boot and replays the row after input readiness; a
+      refused reload runs it in place, and a row the successor cannot match once gets one localized
+      notice. Still open: check macOS and Linux for the same pending-reload window. Tray clicks
+      retained during a slow startup ran when the configuration write they waited for ended; when
+      that write was a hotstring intent that requests a reload, each retained toggle was refused
+      (`terminal_barrier_busy`, one error toast each).
 - [ ] **Slow configuration transactions: repeated registry liveness checks.** [CODE] `AllLive` in
       `config_transition_runtime.ahk` re-runs every destination guard before and after each native
       operation (`Dispatch`, `Read`, `Delete`, moves), and each guard deep-compares the shipped

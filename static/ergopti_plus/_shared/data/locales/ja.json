@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "形式: mods+キー  (例: cmd+shift+b)\n使用可能なmods: cmd, alt, ctrl, shift\n無効にするには空白のまま",
 	"menu.profiles.shortcut_title": "プロファイルショートカット",
 	"menu.profiles.use_profile": "このプロファイルを使用",
+	"menu.reload_replay.lost": "再起動中に行ったメニューの選択の一部を再適用できませんでした。メニューからもう一度選択してください。",
+	"menu.reload_replay.lost_title": "メニューの選択が適用されませんでした",
 	"menu.reloading": "リロード中…",
 	"menu.reloading_files": "ファイルが変更されました — リロード中…",
 	"menu.script_control.title": "スクリプト制御",

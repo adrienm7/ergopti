@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "الصيغة: معدّلات+مفتاح (مثال: cmd+shift+b)\nالمعدّلات المتاحة: cmd, alt, ctrl, shift\naتركه فارغًا للتعطيل",
 	"menu.profiles.shortcut_title": "اختصار الملف الشخصي",
 	"menu.profiles.use_profile": "استخدام هذا الملف الشخصي",
+	"menu.reload_replay.lost": "تعذّرت إعادة تطبيق بعض خيارات القائمة التي اخترتها أثناء إعادة التشغيل. اخترها مرة أخرى من القائمة.",
+	"menu.reload_replay.lost_title": "لم تُطبَّق خيارات القائمة",
 	"menu.reloading": "جارٍ إعادة التحميل…",
 	"menu.reloading_files": "الملفات تغيّرت — جارٍ إعادة التحميل…",
 	"menu.script_control.title": "التحكم بالنص البرمجي",

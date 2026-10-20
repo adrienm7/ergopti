@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Format: mods+key  (t.ex. cmd+shift+b)\nTillgängliga mods: cmd, alt, ctrl, shift\nLämna tomt för att inaktivera",
 	"menu.profiles.shortcut_title": "Profilgenväg",
 	"menu.profiles.use_profile": "Använd denna profil",
+	"menu.reload_replay.lost": "Vissa menyval som gjordes under omstarten kunde inte tillämpas igen. Välj dem igen i menyn.",
+	"menu.reload_replay.lost_title": "Menyval tillämpades inte",
 	"menu.reloading": "Laddar om…",
 	"menu.reloading_files": "Filer ändrade — Laddar om…",
 	"menu.script_control.title": "Skriptkontroll",

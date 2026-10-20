@@ -12,6 +12,10 @@
 
 global _MenuStartupCommands := false
 
+; Most selections one startup retains, also the most commands one reload hands
+; to its successor (infra/menu_reload_replay.ahk).
+global MENU_STARTUP_MAX_PENDING := 16
+
 /** Marks lifecycle commands whose existing owner supports incomplete startup. */
 class MenuStartupSafeCommand {
 	__New(Callback) {
@@ -67,11 +71,57 @@ class MenuStartupCommands {
 		this.Released := false
 		this.Canceled := false
 		this.Generation := 0
+		this.ReplayAdopted := false
+	}
+
+	/** Retains the rows a reloaded predecessor handed over, before any click. */
+	AdoptReplay(Paths) {
+		if !(Paths is Array)
+			throw TypeError("Handed-over menu commands must be an array of row paths")
+		if this.ReplayAdopted
+			throw Error("Handed-over menu commands were already adopted")
+		if this.Canceled || this.Released || this.Pending.Length > 0
+			throw Error("Handed-over menu commands precede every startup selection")
+		this.ReplayAdopted := true
+		for Path in Paths {
+			_MenuReloadReplayRequirePath(Path)
+			this.Pending.Push({Callback: 0, Args: [], Identity: 0, RepeatId: "", RepeatCallback: 0,
+				AcceptedAt: A_TickCount, ReplayPath: Path})
+		}
+		if Paths.Length > 0
+			try LoggerInfo("MenuDispatcher", "{1} menu command(s) from before the reload retained until input initialization completes.",
+				Paths.Length)
+		return true
+	}
+
+	/** Hands still-retained selections to an accepted reload as tray row paths, once. */
+	TakeForReload() {
+		if this.Canceled || this.Released
+			return []
+		Paths := []
+		for Entry in this.Pending {
+			if Entry.HasOwnProp("ReplayPath") {
+				Paths.Push(Entry.ReplayPath)
+				continue
+			}
+			Path := false
+			if IsObject(Entry.Identity) {
+				try Path := MenuReloadReplay_PathOf(Entry.Identity.ItemId)
+				catch as Err
+					try LoggerError("MenuDispatcher", "The tray could not be read for a retained startup selection: {1}.", Err.Message)
+			}
+			if Path is Array
+				Paths.Push(Path)
+			else
+				try LoggerError("MenuDispatcher", "A retained startup selection is not reachable from the tray; it cannot be handed to the reload successor.")
+		}
+		this.Pending := []
+		return Paths
 	}
 
 	/** Retains one explicitly accepted selection, independently of retry dispatch. */
 	Retain(Callback, Args, Registration := 0) {
-		static MAX_PENDING := 16
+		global MENU_STARTUP_MAX_PENDING
 		if !HasMethod(Callback, "Call") || !(Args is Array)
 			throw TypeError("A startup menu selection requires a callable and arguments")
 		PreviousCritical := Critical("On")
@@ -96,7 +146,7 @@ class MenuStartupCommands {
 					}
 				}
 			}
-			if this.Pending.Length >= MAX_PENDING
+			if this.Pending.Length >= MENU_STARTUP_MAX_PENDING
 				throw Error("Startup menu selection capacity was exceeded")
 			this.Pending.Push({Callback: Callback, Args: Args.Clone(), Identity: Identity,
 				RepeatId: RepeatId, RepeatCallback: RepeatCallback, AcceptedAt: A_TickCount})
@@ -143,6 +193,14 @@ class MenuStartupCommands {
 		for Entry in Entries {
 			if Generation != this.Generation
 				return false
+			if Entry.HasOwnProp("ReplayPath") {
+				if A_IsSuspended || (IsSet(_SuspendPending) && _SuspendPending) {
+					try LoggerWarn("MenuDispatcher", "Menu command from before the reload refused: the driver is paused.")
+					continue
+				}
+				MenuReloadReplay_Run(Entry.ReplayPath)
+				continue
+			}
 			Identity := Entry.Identity
 			if A_IsSuspended || (IsSet(_SuspendPending) && _SuspendPending) || (IsObject(Identity)
 					&& (!_MenuDispatchTokens.Has(Identity.ItemId)
@@ -181,12 +239,19 @@ MenuStartupCommands_Shutdown() {
 		_MenuStartupCommands.Cancel()
 }
 
-/** Starts exactly one admission owner before publishing the early full root. */
-MenuStartupCommands_Begin(ReadyFn) {
+/**
+ * Starts exactly one admission owner before publishing the early full root.
+ * @param {Func} ReadyFn Whether input initialization has completed.
+ * @param {Array} ReplayPaths Rows a reloaded predecessor handed over
+ *     (MenuReloadReplay_Consume), replayed first once input is ready.
+ */
+MenuStartupCommands_Begin(ReadyFn, ReplayPaths) {
 	global _MenuStartupCommands
 	if _MenuStartupCommands
 		throw Error("Startup menu command admission already has an owner")
-	_MenuStartupCommands := MenuStartupCommands(ReadyFn)
+	Owner := MenuStartupCommands(ReadyFn)
+	Owner.AdoptReplay(ReplayPaths)
+	_MenuStartupCommands := Owner
 }
 
 /** Tests the explicit startup owner; ordinary driver and test commands stay unchanged. */

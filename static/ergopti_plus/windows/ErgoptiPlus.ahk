@@ -1222,7 +1222,9 @@ if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
 global _DriverInputInitPending := true
 global _DriverMenuReady := false
-MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated)
+; Commands clicked while the previous instance's reload was pending are replayed
+; first, once input is ready (infra/menu_reload_replay.ahk).
+MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
 if !BuildTrayMenuDeferred()
 	throw Error("the configured startup menu could not be published")

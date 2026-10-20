@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Format: mods+key  (f.eks. cmd+shift+b)\nTilgjengelige mods: cmd, alt, ctrl, shift\nLa stå tomt for å deaktivere",
 	"menu.profiles.shortcut_title": "Profilsnarvei",
 	"menu.profiles.use_profile": "Bruk denne profilen",
+	"menu.reload_replay.lost": "Noen menyvalg gjort under omstarten kunne ikke brukes på nytt. Velg dem på nytt i menyen.",
+	"menu.reload_replay.lost_title": "Menyvalg ble ikke brukt",
 	"menu.reloading": "Laster inn på nytt…",
 	"menu.reloading_files": "Filer endret — Laster inn på nytt…",
 	"menu.script_control.title": "Skriptkontroll",

@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Format: Mods+Taste  (z. B. cmd+shift+b)\nVerfügbare Mods: cmd, alt, ctrl, shift\nLeer lassen zum Deaktivieren",
 	"menu.profiles.shortcut_title": "Profil-Tastenkombination",
 	"menu.profiles.use_profile": "Dieses Profil verwenden",
+	"menu.reload_replay.lost": "Einige während des Neustarts getroffene Menüauswahlen konnten nicht erneut übernommen werden. Wählen Sie sie im Menü erneut aus.",
+	"menu.reload_replay.lost_title": "Menüauswahl nicht übernommen",
 	"menu.reloading": "Neu laden…",
 	"menu.reloading_files": "Dateien geändert — Neu laden…",
 	"menu.script_control.title": "Skriptsteuerung",

@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Formát: modifikátory+klávesa  (např. cmd+shift+b)\nDostupné modifikátory: cmd, alt, ctrl, shift\nPonechte prázdné pro deaktivaci",
 	"menu.profiles.shortcut_title": "Zkratka profilu",
 	"menu.profiles.use_profile": "Použít tento profil",
+	"menu.reload_replay.lost": "Některé volby nabídky zvolené během restartu se nepodařilo znovu použít. Zvolte je v nabídce znovu.",
+	"menu.reload_replay.lost_title": "Volby nabídky nebyly použity",
 	"menu.reloading": "Načítám znovu…",
 	"menu.reloading_files": "Soubory změněny — Načítám znovu…",
 	"menu.script_control.title": "Správa skriptu",

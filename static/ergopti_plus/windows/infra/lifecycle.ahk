@@ -1270,6 +1270,13 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
+		; The reload is now certain: menu commands that waited for it go to the
+		; successor, read from the tray before any teardown retires its rows.
+		if (TerminalHandoff is Map) {
+			try MenuReloadReplay_Publish()
+			catch as Err
+				try LoggerError("Lifecycle", "Menu commands could not be handed to the reload successor: {1}.", Err.Message)
+		}
 		if (SupersededReload is Map)
 			try ReloadTerminalHandoffAbandon(SupersededReload, reason)
 		try ScreenBrightnessCancel("shutdown")

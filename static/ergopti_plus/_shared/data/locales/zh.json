@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "格式：mods+按键  (例：cmd+shift+b)\n可用修饰符：cmd, alt, ctrl, shift\n留空以禁用",
 	"menu.profiles.shortcut_title": "配置快捷键",
 	"menu.profiles.use_profile": "使用此配置",
+	"menu.reload_replay.lost": "重启期间所做的部分菜单选择无法重新应用。请在菜单中重新选择。",
+	"menu.reload_replay.lost_title": "菜单选择未应用",
 	"menu.reloading": "重新加载…",
 	"menu.reloading_files": "文件已修改 — 重新加载…",
 	"menu.script_control.title": "脚本控制",

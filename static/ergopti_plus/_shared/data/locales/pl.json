@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Format: mod+klawisz  (np. cmd+shift+b)\nDostępne mod: cmd, alt, ctrl, shift\nZostaw puste, aby wyłączyć",
 	"menu.profiles.shortcut_title": "Skrót profilu",
 	"menu.profiles.use_profile": "Użyj tego profilu",
+	"menu.reload_replay.lost": "Niektórych wyborów z menu dokonanych podczas ponownego uruchamiania nie udało się zastosować ponownie. Wybierz je ponownie w menu.",
+	"menu.reload_replay.lost_title": "Nie zastosowano wyborów z menu",
 	"menu.reloading": "Przeładowywanie…",
 	"menu.reloading_files": "Pliki zmienione — Przeładowywanie…",
 	"menu.script_control.title": "Kontrola skryptu",
