@@ -1519,7 +1519,9 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"default_backend", LLM_Defaults["llm_backend"],
 			"backend", _LLM_Menu["backend"], "active_id", _LLM_Menu["api_entry_id"],
 			"entries", LLM_Menu_DeepClone(_LLM_Menu["api_entries"]))
-		if !this._NativeCurrent(Held)
+		; Admit above ran the full schema/persistence admission; nothing but RAM
+		; reads separates it from this context fence.
+		if !this._NativeContextCurrent(Held)
 			return false
 		try {
 			ConfigImage := this._Snapshot(Held["config_path"])
@@ -1990,7 +1992,12 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; Classified second reads fence mutations during snapshot/hash/decrypt. This
 		; is current-at-check authority; the WAL owns the final expected-image claim.
 		Images := IsSet(Expected) ? Expected : Held
-		if !this._NativeCurrent(Held)
+		; The full schema/persistence admission (a fresh registry comparison,
+		; about 25 ms) closes the operation below, after every read: a refusal
+		; that appears while the files are read is still refused there. Opening
+		; with it too doubled the cost of every check, which a menu build pays
+		; seven times (llm-source-current-single-admission).
+		if !this._NativeContextCurrent(Held)
 			return false
 		loop 2 {
 			if !this._NativeContextCurrent(Held)
