@@ -682,3 +682,5 @@ _G4B_EnableOwnerCase() {
 Test("managed bootstrap: actual enable admission preserves exact READY successor (groups247-managed)", _G4B_EnableOwnerCase)
 
 #Include test_ollama_runtime_ready_cancellation.ahk
+
+#Include test_ollama_runtime_terminal_delivery.ahk
