@@ -332,8 +332,11 @@ _LRPN_ChildSource() {
 	}
 	Extra := Includes
 	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	; The extracted digit emitters share their real native/recorder selector.
+	; Only its final SendEvent boundary is the child's passive output port.
 	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
-		"KeylayoutEmulation_NumberRowLevels", "_KLE_MagicKeyOwnsKey", "GetCapsLockCondition", "_DigitShiftSend"] {
+		"KeylayoutEmulation_NumberRowLevels", "_KLE_MagicKeyOwnsKey", "GetCapsLockCondition",
+		"NumberRowSendEvent", "_DigitShiftSend"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the actual built-in row dependency must exist: " . Name)
 		Extra .= Definition . "`n"
