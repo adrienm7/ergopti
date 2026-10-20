@@ -383,7 +383,8 @@ _PICR_LivePersonalProvenanceMatchesPreview(Label, ProvenanceRouteMode := "temp")
 		AssertEqual("unavailable-owner", PersonalBindingRefusal)
 		AssertEqual(8, HSE_RegistryByGroup["default"].Length, "admission never mutates live specs or activation")
 		ExpectedTriggers := ["psx", "PSX", "Psx", "plx", "pcx" . ScriptInformation["MagicKey"], "pex", "PEX", "Pex"]
-		ExpectedOutputs := ["simple", "SIMPLE", "Simple", "Literal", "owned conform", "explicit", "EXPLICIT", "Explicit"]
+		; A cased family keeps the capitals its replacement was written with.
+		ExpectedOutputs := ["simple", "SIMPLE", "Simple", "Literal", "Owned conform", "Explicit", "EXPLICIT", "Explicit"]
 		Index := Map()
 		Set := Map()
 		AssertEqual(4, _RegisterExtPackTriggers(Path, Label, Index, Set, "", Packs[1]["PersonalSource"]))
