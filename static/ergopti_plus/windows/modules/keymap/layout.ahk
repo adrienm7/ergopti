@@ -234,6 +234,7 @@ _LockWorkstationEmit(*) {
 
 RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 	global RemappedList
+	static WinCriteria := Map()
 	InputLevel := "I2"
 
 	Hotkey(
@@ -264,10 +265,15 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 		_RemapEmit.Bind("!" Character, Character),
 		"I3" ; Needs to be higher to keep the Alt shortcuts
 	)
-	; One physical Win variant arbitrates ordinary assignments, the conditional
-	; magic editor and this exact layout fallback. Preserve Win+L's native owner.
+	; Win variants share a broker, so the earlier row passthrough cannot win
+	; their arbitration. Keep the same live row admission and magic exception
+	; on this fallback without withdrawing independent shortcut assignments.
+	; The magic-key producer may register this scan again: retain one context
+	; identity so its later callback replaces the earlier layout fallback.
+	if !WinCriteria.Has(ScanCode)
+		WinCriteria[ScanCode] := (*) => !_LayoutRowPassthroughCriterion(ScanCode)
 	MagicEditorRecordLayoutFallback(ScanCode, Character == "l" ? _LockWorkstationEmit
-		: _RemapEmit.Bind("#" Character, Character))
+		: _RemapEmit.Bind("#" Character, Character), WinCriteria[ScanCode])
 }
 
 ; Per-process UIA selection result caches.
