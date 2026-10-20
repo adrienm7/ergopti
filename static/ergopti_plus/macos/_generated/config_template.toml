@@ -536,8 +536,8 @@ number_row_right_2 = "none"
 
 
 [shortcuts.caps_word]
-idle_timeout_seconds = 0
-terminators = ["space", "tab", "enter"]
+idle_timeout_seconds = 10
+terminators = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
 
 
 

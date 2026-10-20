@@ -21,12 +21,16 @@ local function index_items(items, out)
 	return out
 end
 
-local function fresh(save_result)
+--- @param save_result boolean|nil False makes every save fail.
+--- @param shipped boolean|nil True keeps the manifest defaults, as a fresh install has them.
+local function fresh(save_result, shipped)
 	package.loaded["ui.menu.menu_caps_word"] = nil
 	package.loaded["infra.capsword_auto_off"] = nil
 	local Owner = require("infra.capsword_auto_off")
 	local state = {}
 	for key, value in pairs(Owner.DEFAULT_STATE) do state[key] = value end
+	-- A known stored list, so the clicks below do not depend on the defaults.
+	if not shipped then state.caps_word_terminators = { "space", "tab", "enter" } end
 	local h = { saves = 0, updates = 0, state = state, owner = Owner }
 	h.ctx = {
 		state = state,
@@ -59,7 +63,8 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 			end
 		end
 		local space = find(h.items, i18n.get("terminators.label_space"))
-		helpers.assert_true(space.checked == true, "Space is checked by default")
+		helpers.assert_true(space.checked == true, "a stored delimiter is checked")
+		helpers.assert_true(find(h.items, i18n.get("terminators.label_nbsp")).checked ~= true, "an unstored one is not")
 		local previous = 0
 		for _, entry in ipairs(require("infra.manifest_reader").declared_section_entries("shortcuts.caps_word.pointer")) do
 			local item, position = nil, nil
@@ -73,6 +78,26 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 		end
 		helpers.assert_true(find(h.items, i18n.get("menu.caps_word.idle_timeout_never")) ~= nil,
 			"the delay offers never")
+	end)
+
+	helpers.it("a fresh install ticks exactly the eight shipped delimiters and the 10 s delay", function()
+		local h = fresh(nil, true)
+		local i18n = require("infra.i18n")
+		local shipped = {}
+		for _, key in ipairs(require("infra.manifest_reader").default_for("shortcuts.caps_word.terminators")) do
+			shipped[key] = true
+		end
+		local ticked = {}
+		for _, row in ipairs(require("caps_word.auto_off").terminator_rows()) do
+			if not row.separator then
+				local item = find(h.items, i18n.get(row.label_key))
+				helpers.assert_eq(item.checked == true, shipped[row.key] == true, row.key .. " follows the shipped default")
+				if item.checked == true then ticked[#ticked + 1] = row.key end
+			end
+		end
+		helpers.assert_eq(table.concat(ticked, ","), "space,nbsp,nnbsp,tab,enter,comma,semicolon,period",
+			"the eight shipped delimiters (maintainer decision of 2026-10-20), in catalogue order")
+		helpers.assert_eq(h.state.caps_word_idle_timeout_seconds, 10, "the delay starts at 10 s")
 	end)
 
 	helpers.it("a pointer and a delimiter click apply and save; a refused save restores", function()

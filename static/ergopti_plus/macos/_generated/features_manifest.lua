@@ -470,10 +470,10 @@ M.features = {
 		path = "shortcuts.tap_keys.number_row_right_2", id = "number_row_right_2", section = "shortcuts.tap_keys", default = "none", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_right_2", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
-		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 0, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 0, input_altering = false,
+		path = "shortcuts.caps_word.idle_timeout_seconds", id = "idle_timeout_seconds", section = "shortcuts.caps_word", default = 10, type = "number", description_key = "menu.caps_word.idle_timeout", platforms = { "ahk", "hs", "linux" }, recommended = 10, input_altering = false,
 	},
 	{
-		path = "shortcuts.caps_word.terminators", id = "terminators", section = "shortcuts.caps_word", default = { "space", "tab", "enter" }, type = "array", description_key = "menu.caps_word.terminators_header", platforms = { "ahk", "hs", "linux" }, recommended = { "space", "tab", "enter" }, input_altering = false,
+		path = "shortcuts.caps_word.terminators", id = "terminators", section = "shortcuts.caps_word", default = { "space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period" }, type = "array", description_key = "menu.caps_word.terminators_header", platforms = { "ahk", "hs", "linux" }, recommended = { "space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period" }, input_altering = false,
 	},
 	{
 		path = "shortcuts.caps_word.pointer.gesture", id = "gesture", section = "shortcuts.caps_word.pointer", default = true, type = "boolean", description_key = "menu.caps_word.pointer.gesture", platforms = { "hs", "linux" }, recommended = true, input_altering = false,

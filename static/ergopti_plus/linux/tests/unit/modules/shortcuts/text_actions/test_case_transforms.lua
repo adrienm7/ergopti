@@ -29,7 +29,7 @@ local function with_manager(selected, body)
 		end,
 		read_checked = function() return true, "clipboard", nil end,
 	}
-	package.loaded[names.event_loop] = { sleep_ms = function() return true end }
+	package.loaded[names.event_loop] = { sleep_ms = function() return true end, defer = function() return true end }
 	package.loaded[names.combo] = { press = function() return true end }
 	package.loaded[names.injector] = { inject = function() return { ok = true } end }
 	package.loaded[names.keylogger] = { record_shortcut = function() return true end }

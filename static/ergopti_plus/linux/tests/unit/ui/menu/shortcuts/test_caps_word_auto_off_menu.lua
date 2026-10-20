@@ -91,11 +91,15 @@ helpers.describe("caps word auto-off menu (Linux)", function()
 	helpers.it("caps word auto-off menu, draws one checkbox per delimiter and per declared pointer kind", function()
 		with_menu(nil, function(c)
 			local rows = assert(c.build(), "the group builds")
+			local shipped = {}
+			for _, key in ipairs(require("infra.manifest_reader").default_for("shortcuts.caps_word.terminators")) do
+				shipped[key] = true
+			end
 			for _, row in ipairs(require("caps_word.auto_off").terminator_rows()) do
 				if not row.separator then
 					local item = find(rows, c.i18n(row.label_key))
 					helpers.assert_not_nil(item, "a row for the delimiter " .. row.key)
-					helpers.assert_eq(item.checked, row.key == "space" or row.key == "tab" or row.key == "enter",
+					helpers.assert_eq(item.checked, shipped[row.key] == true,
 						row.key .. " follows the stored default")
 				end
 			end
@@ -113,17 +117,18 @@ helpers.describe("caps word auto-off menu (Linux)", function()
 	helpers.it("caps word auto-off menu, a delimiter and a pointer checkbox publish their change", function()
 		with_menu(nil, function(c)
 			local rows = c.build()
-			local nbsp = assert(find(rows, c.i18n("terminators.label_nbsp")))
-			nbsp.fn()
+			local minus = assert(find(rows, c.i18n("terminators.label_minus")))
+			helpers.assert_eq(minus.checked, false, "the hyphen ships unchecked")
+			minus.fn()
 			local left = assert(find(rows, c.i18n("menu.caps_word.pointer.left_click")))
 			left.fn()
 			local text = read(c.path)
-			helpers.assert_contains(text, '"nbsp"')
+			helpers.assert_contains(text, '"minus"')
 			helpers.assert_contains(text, "left_click = false")
 			helpers.assert_eq(c.errors, 0)
 			helpers.assert_true(c.changes >= 2, "the menu is told about each change")
 			local rebuilt = c.build()
-			helpers.assert_eq(find(rebuilt, c.i18n("terminators.label_nbsp")).checked, true)
+			helpers.assert_eq(find(rebuilt, c.i18n("terminators.label_minus")).checked, true)
 			helpers.assert_eq(find(rebuilt, c.i18n("menu.caps_word.pointer.left_click")).checked, false)
 		end)
 	end)

@@ -2438,15 +2438,19 @@ description_key = "menu.shortcuts.tap_keys.number_row_right_2"
 # _shared/tests/corpus/caps_word/auto_off_vectors.json. These are parameters
 # of CapsWord, which only the user switches on, so none alters input by itself.
 #
-# Seconds without a keystroke after which CapsWord switches itself off. 0 is
-# « never », what every driver did before the setting existed, and stays the
-# default. The menu offers exactly `preset_values`; the drivers read the
-# stored number.
+# Seconds without a keystroke after which CapsWord switches itself off; 0 is
+# « never », what every driver did before the setting existed. The default is
+# 10 s by the maintainer's decision of 2026-10-20: a CapsWord left on by a
+# hand that walked away must not capitalise the next word typed minutes later.
+# It is a parameter of CapsWord, which only the user switches on, so a
+# non-zero default activates nothing; the preset and the neutral value are the
+# same, so restoring and clearing both give 10 s. The menu offers exactly
+# `preset_values`; the drivers read the stored number.
 [[features.shortcuts.caps_word]]
 id = "idle_timeout_seconds"
 platforms = ["ahk", "hs", "linux"]
-default = 0
-recommended = 0
+default = 10
+recommended = 10
 input_altering = false
 type = "number"
 preset_values = [0, 1, 3, 5, 10, 30, 60]
@@ -2455,15 +2459,19 @@ description_key = "menu.caps_word.idle_timeout"
 # The word delimiters that end CapsWord, by their key in the hotstring
 # delimiter catalogue (_shared/core/domain/Terminators.spec.js), one checkbox
 # per entry in every driver's menu. Only the catalogue's built-in
-# entries are valid. Space and Enter ended CapsWord on every driver, Tab on
-# macOS and Linux; the three are the default on all of them. Each driver
-# matches the character typed, so a no-break space ends CapsWord only when its
-# own entry is checked.
+# entries are valid, stored in catalogue order. Space and Enter ended CapsWord
+# on every driver, Tab on macOS and Linux. By the maintainer's decision of
+# 2026-10-20 the default adds the catalogue's no-break space (nbsp, U+00A0)
+# and narrow no-break space (nnbsp, U+202F), the spaces French typography puts
+# before punctuation, and the comma, semicolon and period, so these eight end a
+# word out of the box. Each driver matches the character typed, whatever key,
+# layer or dead key produced it, so each one ends CapsWord only while its own
+# entry is checked.
 [[features.shortcuts.caps_word]]
 id = "terminators"
 platforms = ["ahk", "hs", "linux"]
-default = ["space", "tab", "enter"]
-recommended = ["space", "tab", "enter"]
+default = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
+recommended = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
 input_altering = false
 type = "array"
 description_key = "menu.caps_word.terminators_header"
