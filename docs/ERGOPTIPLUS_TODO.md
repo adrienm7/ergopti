@@ -3029,7 +3029,7 @@ These are software implementations; final hardware verification remains below.
       expected until then.
       Windows session order (all four requested): run the AHK suites locally
       (config, managed network, artifact curl groups, then the full suite);
-      implement the click replay; persist the release list; reproduce the Windows
+      implement the click replay; reproduce the Windows
       reports on the real machine (key combinations after c89d74eb, number-row
       precedence, `TOML_ParseDocument` cost, prediction-key and script-chord
       stalls of item 114). Keep pinned ruff 0.15.8 and Prettier before every
@@ -3073,9 +3073,10 @@ These are software implementations; final hardware verification remains below.
       and Windows now name an exhausted limit with its UTC reset too, from
       one shared sentence (`_shared/lua/updater/rate_limit.lua`; the Linux
       curl adapter reads the final header frame it already captures, Windows
-      reads both headers). Still to do: Windows keeps the list ETag in memory
-      only (`_UpdaterFetchCache`), so each restart spends a full request.
-      Decision (October 20): persist the complete list JSON and its ETag.
+      reads both headers). Windows now keeps the complete list JSON and its
+      ETag in `release_list.cache` under the `ergopti_plus\updater` folder of
+      Local AppData (rewritten only when the ETag changes; a corrupt copy is
+      discarded and logged), so a 304 after a restart costs no quota.
       (4) Karabiner lease: repeated "timeout waiting for READY", "watchdog
       exited unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a
       Mac reproduction. (5) The shortcut on the key left of "1" still targets

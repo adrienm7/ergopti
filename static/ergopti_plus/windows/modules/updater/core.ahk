@@ -150,6 +150,17 @@ global UPDATER_BACKGROUND_ARM_MAX_ATTEMPTS := 2
 ; makes short intervals like 1m viable for background polling.
 global _UpdaterFetchCache          := Map()
 
+; On-disk copy of the complete release list and its ETag, so the first request
+; after a restart revalidates with If-None-Match and a 304 costs no API quota
+; (#95). The folder override is a test seam; "" means the user's Local AppData.
+; The load result is memoised, so the ETag compared before a rewrite is the one
+; on disk (or the last one saved).
+global UPDATER_LIST_CACHE_MAGIC     := "ergopti-release-list-v1"
+global UPDATER_LIST_CACHE_FILE      := "release_list.cache"
+global _UpdaterListCacheDir         := ""
+global _UpdaterListDiskLoaded       := false
+global _UpdaterListDiskEntry        := 0
+
 ; AHK v2 loosely equates the String "0" with false. Native and injected
 ; effect seams therefore acknowledge success only with a non-zero Integer.
 _Updater_ResultSucceeded(Result) {
@@ -2128,6 +2139,110 @@ _Updater_TryPublishFetchCache(Channel, Etag, Json, Request) {
 	return Published
 }
 
+; The folder of the on-disk release list copy.
+; @throws {Error} When Local AppData cannot be resolved.
+_Updater_ListCachePath() {
+	global _UpdaterListCacheDir, UPDATER_LIST_CACHE_FILE
+	Dir := _UpdaterListCacheDir
+	if (Dir == "") {
+		Root := ResolveLocalAppDataDir()
+		if (Root == "")
+			throw Error("Local AppData cannot be resolved for the release list copy.")
+		Dir := Root . "\" . AppDirsFolderName() . "\updater"
+	}
+	return RTrim(Dir, "\/") . "\" . UPDATER_LIST_CACHE_FILE
+}
+
+; Parses the stored copy: magic line, list URL, ETag, then the list verbatim.
+; @returns {Object|Integer} { Etag, Json }, or 0 when the text is not a whole
+;   copy of this list URL (wrong URL, empty ETag, truncated or foreign body).
+_Updater_ParseListCache(Text, Url) {
+	global UPDATER_LIST_CACHE_MAGIC
+	if !(Text is String)
+		return 0
+	Parts := StrSplit(Text, "`n", , 4)
+	if (Parts.Length != 4 || Parts[1] != UPDATER_LIST_CACHE_MAGIC || Parts[2] != Url || Parts[3] == "")
+		return 0
+	Body := Parts[4]
+	if (SubStr(LTrim(Body), 1, 1) != "[" || SubStr(RTrim(Body), -1) != "]")
+		return 0
+	return { Etag: Parts[3], Json: Body }
+}
+
+; The release list copy an earlier session saved, read once per process. A copy
+; that is not whole is discarded with a warning, so the next request is a full
+; one; an unreadable file is logged and left for a later start.
+; @returns {Object|Integer} { Etag, Json } or 0
+_Updater_LoadListDiskEntry(Url) {
+	global _UpdaterListDiskLoaded, _UpdaterListDiskEntry
+	if _UpdaterListDiskLoaded
+		return _UpdaterListDiskEntry
+	_UpdaterListDiskLoaded := true
+	try {
+		Path := _Updater_ListCachePath()
+		if !FileExist(Path)
+			return 0
+		Entry := _Updater_ParseListCache(FSReadStrict(Path), Url)
+		if IsObject(Entry) {
+			_UpdaterListDiskEntry := Entry
+			try LoggerDebug("Updater", "Loaded the stored release list copy ({1} bytes).", StrLen(Entry.Json))
+			return Entry
+		}
+		try LoggerWarn("Updater", "Discarded the corrupt or foreign release list copy '{1}'.", Path)
+		if !FSDelete(Path)
+			try LoggerError("Updater", "The corrupt release list copy '{1}' could not be removed.", Path)
+	} catch as Err {
+		try LoggerError("Updater", "The stored release list copy could not be read: {1}.", Err.Message)
+	}
+	return 0
+}
+
+; The conditional-GET entry of a channel: this session's, else the stored copy
+; of the real list URL (a restart). Other URLs never touch the disk.
+; @returns {Object|Integer} { Etag, Json } or 0
+_Updater_FetchCacheEntry(Channel, Url) {
+	global _UpdaterFetchCache
+	if _UpdaterFetchCache.Has(Channel)
+		return _UpdaterFetchCache[Channel]
+	if (Url != Updater_ReleaseApiUrl())
+		return 0
+	Entry := _Updater_LoadListDiskEntry(Url)
+	if IsObject(Entry)
+		_UpdaterFetchCache[Channel] := Entry
+	return Entry
+}
+
+; Saves the complete list with its validator, only when the ETag changed, in a
+; stage that replaces the previous copy in one rename. A refused save is logged
+; and this session keeps its in-memory copy; the next start sends a full request.
+; @returns {Boolean} True when the stored copy now holds this ETag.
+_Updater_PersistListCache(Url, Etag, Json) {
+	global UPDATER_LIST_CACHE_MAGIC, _UpdaterListDiskEntry
+	if (Url != Updater_ReleaseApiUrl() || SubStr(LTrim(Json), 1, 1) != "[")
+		return false
+	Current := _Updater_LoadListDiskEntry(Url)
+	if (IsObject(Current) && Current.Etag == Etag)
+		return true
+	Stage := ""
+	try {
+		Path := _Updater_ListCachePath()
+		FSEnsureDirectoryStrict(RegExReplace(Path, "[\\/][^\\/]*$"))
+		Stage := Path . "." . A_TickCount . ".tmp"
+		if !FSWriteDurable(Stage, UPDATER_LIST_CACHE_MAGIC . "`n" . Url . "`n" . Etag . "`n" . Json)
+			throw Error("the stage could not be written")
+		if !FSAtomicMoveReplace(Stage, Path)
+			throw Error("the stage could not replace the previous copy")
+		_UpdaterListDiskEntry := { Etag: Etag, Json: Json }
+		try LoggerDebug("Updater", "Saved the release list copy ({1} bytes).", StrLen(Json))
+		return true
+	} catch as Err {
+		if (Stage != "")
+			FSDelete(Stage)
+		try LoggerError("Updater", "The release list copy could not be saved; this session keeps it: {1}.", Err.Message)
+		return false
+	}
+}
+
 ; Drain one retained visible terminal per interrupted manual request after the
 ; driver has resumed. Optional callables are deterministic test seams.
 Updater_OnSuspendResume(NotifyFn := 0, IsSuspended := unset, RebuildFn := 0) {
@@ -2437,8 +2552,9 @@ Updater_FetchLatestJson(Channel) {
 		; the top of this file for the per-phase budget and the rationale.
 		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
-		if _UpdaterFetchCache.Has(Channel) {
-			Etag := _UpdaterFetchCache[Channel].Etag
+		Cached := _Updater_FetchCacheEntry(Channel, Url)
+		if IsObject(Cached) {
+			Etag := Cached.Etag
 			if (Etag is String and Etag != "")
 				Req.SetRequestHeader("If-None-Match", Etag)
 		}
@@ -2489,17 +2605,21 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, R
 	global _UpdaterFetchCache
 	Json := ""
 	if (Status == 304) {
-		if _UpdaterFetchCache.Has(Channel)
-			Json := _UpdaterFetchCache[Channel].Json
+		Cached := _Updater_FetchCacheEntry(Channel, Url)
+		if IsObject(Cached)
+			Json := Cached.Json
 		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
 	} else if (Status == 200) {
 		Json := Body
 		if (Etag is String and Etag != ""
 			and _Updater_JsonPayloadIsUsable(Json)) {
-			if IsSet(Request)
-				_Updater_TryPublishFetchCache(Channel, Etag, Json, Request)
-			else
+			if IsSet(Request) {
+				if _Updater_TryPublishFetchCache(Channel, Etag, Json, Request)
+					_Updater_PersistListCache(Url, Etag, Json)
+			} else {
 				_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
+				_Updater_PersistListCache(Url, Etag, Json)
+			}
 		}
 	} else if (Status == 403 || Status == 429) {
 		Detail := (RateLimit is Map)
@@ -2948,8 +3068,9 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
-	if _UpdaterFetchCache.Has(Record["channel"]) {
-		Etag := _UpdaterFetchCache[Record["channel"]].Etag
+	Cached := _Updater_FetchCacheEntry(Record["channel"], Record["url"])
+	if IsObject(Cached) {
+		Etag := Cached.Etag
 		if (Etag is String and Etag != "")
 			Req.SetRequestHeader("If-None-Match", Etag)
 	}
