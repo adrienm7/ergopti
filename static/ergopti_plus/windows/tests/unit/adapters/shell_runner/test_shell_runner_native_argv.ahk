@@ -104,3 +104,80 @@ _SRAV_RegisterLiteralPercentCases() {
 	}
 }
 _SRAV_RegisterLiteralPercentCases()
+
+_SRAV_PrivateEnvironment(Value) {
+	Entries := ["ERGOPTI_RAW_CHILD_VALUE=" . Value, "SystemRoot=" . A_WinDir]
+	Count := 1
+	for Entry in Entries
+		Count += StrLen(Entry) + 1
+	Environment := Buffer(Count * 2, 0)
+	Offset := 0
+	for Entry in Entries {
+		StrPut(Entry, Environment.Ptr + Offset, StrLen(Entry) + 1, "UTF-16")
+		Offset += (StrLen(Entry) + 1) * 2
+	}
+	return Environment
+}
+
+_SRAV_RawCommandCapturesPrivateEnvironment() {
+	Root := _FSWL_Path() . "_raw"
+	AssertFalse(DirExist(Root))
+	DirCreate(Root)
+	Task := 0, State := Map("done", false)
+	ParentValue := EnvGet("ERGOPTI_RAW_CHILD_VALUE")
+	try {
+		DirCreate(Root . "\scripts")
+		DirCreate(Root . "\cwd")
+		Child := Root . "\scripts\child.ahk", Receipt := Root . "\receipt.txt"
+		Code := '#Requires AutoHotkey v2.0`n#NoTrayIcon`n'
+			. 'FileAppend(EnvGet("ERGOPTI_RAW_CHILD_VALUE") . "``n" . A_WorkingDir, A_Args[1], "UTF-8-RAW")`nExitApp(37)`n'
+		FileAppend(Code, Child, "UTF-8")
+		Value := "captured-child-value é"
+		Environment := _SRAV_PrivateEnvironment(Value)
+		Command := _SR_BuildDirectCommandLine(A_AhkPath, ["/ErrorStdOut", Child, Receipt])
+		Directory := Root . "\cwd"
+		Task := ShellRunner_SpawnTreeOwnedCommand(A_AhkPath, Command, Environment, Directory, _SRAV_Done.Bind(State))
+		; The lazy task owns a snapshot, even if its caller reuses both inputs.
+		NumPut("UShort", Ord("X"), Environment, StrLen("ERGOPTI_RAW_CHILD_VALUE=") * 2)
+		Directory := A_Temp
+		AssertTrue(Task.start(), "the actual raw command must start with its captured native inputs")
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		while !State["done"] && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 10000
+			Sleep(10)
+		AssertTrue(State["done"], "the raw child must deliver its complete canonical native receipt")
+		AssertEqual(37, State["code"], "the canonical completion must preserve the actual native exit status")
+		AssertEqual("", State["errors"])
+		AssertEqual(Value . "`n" . Root . "\cwd", FileRead(Receipt, "UTF-8"),
+			"the actual child must receive the frozen Unicode environment and working directory")
+		AssertEqual(ParentValue, EnvGet("ERGOPTI_RAW_CHILD_VALUE"), "the private environment never mutates the parent")
+	} finally {
+		if IsObject(Task) {
+			Retired := Task.requestTerminate()
+			Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+			while !Retired && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 5000 {
+				Sleep(10)
+				Retired := Task.requestTerminate()
+			}
+			AssertTrue(Retired, "the raw fixture Job must retire before its private files")
+		}
+		DirDelete(Root, true)
+	}
+}
+Test("shell runner: raw command freezes private environment and cwd (shell-raw-tree-launch)",
+	_SRAV_RawCommandCapturesPrivateEnvironment)
+
+_SRAV_RawCommandRejectsInvalidNativeInputs() {
+	Environment := _SRAV_PrivateEnvironment("valid")
+	Command := _SR_BuildDirectCommandLine(A_ComSpec, ["/D", "/C", "exit /b 0"])
+	for Inputs in [[0, Command, Environment, ""], ["cmd.exe", Command, Environment, ""],
+		[A_ComSpec, 0, Environment, ""], [A_ComSpec, "", Environment, ""],
+		[A_ComSpec, Command, 0, ""], [A_ComSpec, Command, Buffer(3, 0), ""],
+		[A_ComSpec, Command, Buffer(4, 65), ""], [A_ComSpec, Command, Environment, 0],
+		[A_ComSpec, Command . Chr(0) . "unadmitted", Environment, ""],
+		[A_ComSpec, Command, Environment, "C:\" . Chr(0) . "unadmitted"]] {
+		AssertThrows(ShellRunner_SpawnTreeOwnedCommand.Bind(Inputs*),
+			"invalid raw launch input must refuse before any native child can exist")
+	}
+}
+Test("shell runner: raw command refuses malformed native inputs (shell-raw-tree-launch)",
+	_SRAV_RawCommandRejectsInvalidNativeInputs)
