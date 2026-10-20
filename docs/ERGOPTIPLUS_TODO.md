@@ -233,6 +233,21 @@ for anything that writes configuration.
 - [ ] **CI structure.** [CODE] Elapsed time per CI step, suite and test with a slowest-test summary;
       live Windows unit-log progress; four parallel lanes (Common/Windows/macOS/Linux: Unit, E2E,
       Build, Test-the-build) converging into Release.
+- [ ] **Clean CI layout: do right after the first green dev (maintainer, October 20).** [CODE] One
+      dedicated agent, separate commits, each validated on a `tmp/*` branch before dev, receipts and
+      the release verifier kept exact: (1) `ci.yml` only plans and calls: move release and
+      publication into `ci-release.yml`; (2) each lane (`ci-windows.yml`, `ci-macos.yml`,
+      `ci-linux.yml`, `ci-common.yml`; today 80 KB, 175 KB, 257 KB, 12 KB) delegates per stage
+      (unit, E2E, build, install, verdict) to small reusable workflows or composite actions, with
+      the stage and job names stating what they test and, on macOS, the runner OS version (macOS 15
+      E2E and macOS 26 Build run the same Swift classes on purpose); (3) delete the standalone
+      workflows that no longer serve after checking each one's callers, pins and tests:
+      `hs274-native.yml`, `hs274-producer-build.yml`, `hs274-shutdown.yml`, `hs274-transport.yml`,
+      `shortcuts-cold-cli-diagnostic.yml`, `windows-test-replay.yml`,
+      `metrics-reader-bench.yml`, `macos-keyboard-geometry.yml`, `macos-release-launch.yml`,
+      `linux-layout.yml`, `bench.yml`; keep `deploy-site.yml`. Windows unit shards are grouped by
+      test type with explicit names (a new test file with no category fails a gate), not by
+      duration.
 - [ ] **16/38. Final acceptance.** [CI] One complete non-release three-OS checkpoint on the final
       source (units, E2E, packaging, installation, launch) with exact receipts, then the physical
       tests. Mac checks (38): no "Lease-bound input startup failed" or spurious "Layout poll
