@@ -22,6 +22,7 @@ local text_utils    = require("infra.text_utils")
 local FileSystem    = require("adapters.file_system")
 local KeyState      = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
+local Clipboard     = require("adapters.clipboard")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
@@ -1566,6 +1567,7 @@ end)
 local _search_capture_in_flight = false
 local _search_parent = nil
 local _search_saved_clipboard = nil
+local _search_result_receipt = nil
 local _search_capture_generation = 0
 local _search_recovery_only = false
 local _search_capture_authorized = false
@@ -1645,6 +1647,7 @@ local function release_search_clipboard(generation)
 	_search_capture_in_flight = false
 	_search_parent = nil
 	_search_saved_clipboard = nil
+	_search_result_receipt = nil
 	_search_recovery_only = false
 	_search_capture_authorized = false
 	_search_deferred_retry_armed = false
@@ -1657,24 +1660,54 @@ local function restore_search_clipboard(generation)
 	if generation ~= _search_capture_generation or not _search_capture_in_flight then
 		return false, "stale search generation"
 	end
-	local saved = _search_saved_clipboard
-	local ok_restore, restore_result
+	if _search_mutation_depth > 0 then return false, "search clipboard boundary is active" end
 	_search_mutation_depth = _search_mutation_depth + 1
-	if type(saved) == "table" and next(saved) ~= nil then
-		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
-	else
-		-- The native clear primitive has no Lua success return.
-		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
-		if ok_restore then restore_result = true end
-	end
+	local called, settled, detail, outcome = xpcall(function()
+		local saved = _search_saved_clipboard
+		local ok_restore, restore_result
+		local receipt = _search_result_receipt
+		if receipt ~= nil then
+			-- A missing initial observation cannot be replaced with a later count:
+			-- that would adopt an unrelated user's clipboard generation.
+			if receipt.expected_count == nil then return false, "search result ownership count is unavailable" end
+			local expected = receipt.expected_count
+			local function revoke_snapshot()
+				Logger.info(LOG, "search_web clipboard ownership changed; revoking old snapshot without restoration.")
+				local released, release_error = release_search_clipboard(generation)
+				if released ~= true then return false, release_error end
+				return true, nil, "revoked"
+			end
+			local current_count, count_error = Clipboard._change_count()
+			if current_count == nil then return false, count_error end
+			if current_count ~= expected then return revoke_snapshot() end
+			-- The adapter rechecks immediately before mutation and captures the
+			-- resulting count before any Logger callback can change the clipboard.
+			ok_restore, restore_result = Clipboard.restore(next(saved or {}) ~= nil and saved or nil, receipt)
+			if receipt.count_ok == true and receipt.attempted == false and receipt.count ~= expected then
+				return revoke_snapshot()
+			end
+			if receipt.attempted == true and receipt.count_ok == true then receipt.expected_count = receipt.count end
+			if not ok_restore then return false, receipt.detail or "search clipboard restoration refused" end
+		else
+			-- Before the first result, retain the existing capture/cleanup contract;
+			-- native changeCount does not identify the author of asynchronous Cmd+C.
+			if type(saved) == "table" and next(saved) ~= nil then
+				ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+			else
+				ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+				if ok_restore then restore_result = true end
+			end
+			if not ok_restore or restore_result ~= true then
+				return false, ok_restore and "clipboard restore returned " .. tostring(restore_result) or restore_result
+			end
+		end
+		local released, release_error = release_search_clipboard(generation)
+		if released ~= true then return false, release_error end
+		return true, nil, "restored"
+	end, debug.traceback)
 	_search_mutation_depth = _search_mutation_depth - 1
-	if not ok_restore or restore_result ~= true then
-		return false, ok_restore and "clipboard restore returned " .. tostring(restore_result)
-			or restore_result
-	end
-	local released, release_error = release_search_clipboard(generation)
-	if released ~= true then return false, release_error end
-	return true, nil
+	if not called then return false, settled end
+	return settled, detail, outcome
 end
 
 local function arm_search_timer(slot, delay, label, generation, parent, callback)
@@ -1795,6 +1828,7 @@ local function cleanup_search_capture(parent)
 end
 
 sg("search_web", function(binding)
+	if _search_mutation_depth > 0 then return false end
 	local template = M.get_action_parameter(binding, "search_web")
 	if not M.validate_action_parameter("search_web", template) then return end
 	local parent = current_action_parent()
@@ -1830,6 +1864,7 @@ sg("search_web", function(binding)
 	end
 	if not aux_admission_open(parent) then return false end
 	_search_saved_clipboard = snapshot_or_error
+	_search_result_receipt = nil
 	_search_capture_in_flight = true
 	_search_parent = parent
 	_search_capture_authorized = true
@@ -1864,13 +1899,24 @@ sg("search_web", function(binding)
 	local timer_armed, timer_error = arm_search_timer(
 		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, parent, function()
 		if not search_capture_is_current(parent, my_generation) then return end
+		local count_before, count_error = Clipboard._change_count()
 		local ok_selected, selected = pcall(hs.pasteboard.getContents)
-		local restored, restore_error = restore_search_clipboard(my_generation)
+		local count_after, after_error = Clipboard._change_count()
+		if not search_capture_is_current(parent, my_generation) then return end
+		_search_result_receipt = { expected_count = count_before }
+		if count_before == nil or count_after == nil then
+			retain_search_restore_failure(my_generation, "result ownership observation refused", count_error or after_error)
+			return
+		end
+		local restored, restore_error, restore_outcome = restore_search_clipboard(my_generation)
+		if restore_outcome == "revoked" then return end
 		if not restored then
 			_search_recovery_only = true
 			Logger.error(LOG, "search_web clipboard restore refused; ownership retained: %s.",
 				tostring(restore_error))
+			if not search_capture_is_current(parent, my_generation) then return end
 			queue_search_restore_retry(my_generation)
+			if not search_capture_is_current(parent, my_generation) then return end
 		end
 		if not ok_selected or type(selected) ~= "string" or selected == "" then
 			Logger.error(LOG, "search_web selection copy produced no text: %s.", tostring(selected))

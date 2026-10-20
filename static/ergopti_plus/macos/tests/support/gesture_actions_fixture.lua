@@ -28,6 +28,7 @@ local OWNERS = {
 	"config_keyboard_publication",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
+	"adapters.clipboard",
 	"adapters.hotkey_registrar",
 	"adapters.json_codec",
 	"adapters.key_state",
@@ -104,6 +105,7 @@ local function fresh_actions(options)
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system_pixel",
 		"adapters.file_system",
+		"adapters.clipboard",
 		"adapters.key_state",
 		"adapters.synthetic_input",
 		"infra.termination_coordinator",
@@ -158,6 +160,7 @@ local function fresh_actions(options)
 	}
 	calls.controls = controls
 	local clipboard_data = { ["public.utf8-plain-text"] = "original" }
+	local clipboard_count = 0
 	local function clone_clipboard(data)
 		local copy = {}
 		for key, value in pairs(data or {}) do copy[key] = value end
@@ -631,6 +634,7 @@ local function fresh_actions(options)
 					clipboard_data = {
 						["public.utf8-plain-text"] = "selected words",
 					}
+					clipboard_count = clipboard_count + 1
 				end
 				calls.keys[#calls.keys + 1] = { mods = mods, key = key }
 			end
@@ -738,6 +742,7 @@ local function fresh_actions(options)
 			focusedWindow = function() return focused_window end,
 		},
 		pasteboard = {
+			changeCount = function() return clipboard_count end,
 			readAllData = function()
 				return clone_clipboard(clipboard_data)
 			end,
@@ -749,6 +754,7 @@ local function fresh_actions(options)
 				end
 				-- The native mutation occurs after the re-entrant cleanup returns.
 				clipboard_data = {}
+				clipboard_count = clipboard_count + 1
 				return true
 			end,
 			getContents = function()
@@ -763,7 +769,10 @@ local function fresh_actions(options)
 				end
 				local accepted = controlled_result(
 					controls.search_restore_mode, "clipboard restore exploded")
-				if accepted == true then clipboard_data = clone_clipboard(data) end
+				if accepted == true then
+					clipboard_data = clone_clipboard(data)
+					clipboard_count = clipboard_count + 1
+				end
 				return accepted
 			end,
 		},

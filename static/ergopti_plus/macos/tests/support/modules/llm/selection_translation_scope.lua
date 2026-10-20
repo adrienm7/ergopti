@@ -63,6 +63,7 @@ local OWNED = {
 	"wrap_pair",
 
 	"adapters.accessibility_permission",
+	"adapters.clipboard",
 	"adapters.event_provenance",
 	"adapters.file_system",
 	"adapters.http_client",
