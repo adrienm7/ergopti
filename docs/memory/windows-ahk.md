@@ -700,6 +700,20 @@ read still fixed at load is the magic key's source key without the Ergopti
 emulation; the layout poll reloads only when it differs
 (`LayoutRemapSignature`).
 
+### project-number-row-hotkeys-replay-headless
+
+The number-row hotkeys of `modules/keymap/layout.ahk` register at load, so
+neither runner includes that file; their handlers live in
+`layout/number_row_send.ahk` and emit through `NumberRowSendEvent`, which a
+harness's `_SendHook` records. `tests/e2e/test_e2e_number_row.ahk` replays
+them on the machine's real layouts (AZERTY, US QWERTY, every installed one)
+through the hotkeys' own criteria, pinned to the `#HotIf` lines. Action: a
+new number-row handler goes in that module and its criterion carries
+`!TapHoldKanaAltGrHeld()` (a Kana AltGr is no AutoHotkey modifier, so an
+unguarded hotkey replaces the layout's AltGr level); pass
+`NumberRowForegroundLayout` as `ForegroundFn` to the swap helpers in tests,
+never let them read the real foreground window.
+
 ### project-ahk-altgr-family-setting-defaults-to-the-probe
 
 `script.alt_gr_is_kana_remap` is a parameter (`input_altering = false`,
