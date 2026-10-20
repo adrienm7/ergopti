@@ -1,11 +1,17 @@
 {
-	"_comment": "Replayed by the three drivers' configuration reducers (_shared/lua/healthcheck/configuration.lua on macOS and Linux, windows/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. Every canary is a private value that must reach neither a row nor a shared document.",
+	"_comment": "Replayed by the three drivers' configuration reducers (_shared/lua/healthcheck/configuration.lua on macOS and Linux, windows/ui/healthcheck/configuration.ahk) and by the sharing projection (model.js, share.lua, report.ahk). A document is real TOML text, so each driver decodes it with its own reader. `features` mirrors the generated manifest entries the reducers read. Every canary is a private value that must reach neither a row nor a shared document. An enum row is only a declared string member, compared exactly: a manifest enum may also declare booleans (script.alt_gr_is_kana_remap), which the AHK JSON reader holds as 1 and 0, so a typed \"1\" or \"0\" stays text.",
 	"features": [
 		{
 			"path": "script.log_level",
 			"default": "INFO",
 			"platforms": ["ahk", "hs", "linux"],
 			"enum_values": ["DEBUG", "INFO", "ERROR"]
+		},
+		{
+			"path": "script.alt_gr_is_kana_remap",
+			"default": "auto",
+			"platforms": ["ahk", "hs", "linux"],
+			"enum_values": ["auto", true, false]
 		},
 		{ "path": "script.locale", "default": "fr", "platforms": ["ahk", "hs", "linux"] },
 		{ "path": "script.show_error_dialog", "default": true, "platforms": ["ahk"] },
@@ -44,6 +50,32 @@
 			"driver": "linux",
 			"toml": "[script]\nlog_level = \"a sentence typed by PRIVATE_USER_ZEBRA\"\n",
 			"expected": [{ "setting": "script.log_level", "type": "text", "value": "38" }]
+		},
+		{
+			"id": "enum-member-is-a-declared-string-exactly",
+			"driver": "windows",
+			"toml": "[script]\nalt_gr_is_kana_remap = \"1\"\nlog_level = \"debug\"\n",
+			"expected": [
+				{ "setting": "script.alt_gr_is_kana_remap", "type": "text", "value": "1" },
+				{ "setting": "script.log_level", "type": "text", "value": "5" }
+			]
+		},
+		{
+			"id": "enum-declared-boolean-member-stays-a-boolean",
+			"driver": "linux",
+			"toml": "[script]\nalt_gr_is_kana_remap = false\n",
+			"expected": [
+				{ "setting": "script.alt_gr_is_kana_remap", "type": "boolean", "value": "false" }
+			]
+		},
+		{
+			"id": "enum-declared-string-member-is-exact",
+			"driver": "macos",
+			"toml": "[script]\nalt_gr_is_kana_remap = \"0\"\nlog_level = \"ERROR\"\n",
+			"expected": [
+				{ "setting": "script.alt_gr_is_kana_remap", "type": "text", "value": "1" },
+				{ "setting": "script.log_level", "type": "enum", "value": "ERROR" }
+			]
 		},
 		{
 			"id": "paths-and-free-text-keep-only-their-length",
