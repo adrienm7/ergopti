@@ -30,6 +30,6 @@ opt-in details.
 
 ```ahk
 HealthCheck_ShowWindow()          ; Debug > Diagnostics
-HealthCheck_ReportBug()           ; Debug > Report a bug (opens the preview)
+HealthCheck_ReportBug()           ; Debug > Report a bug (the page's report action, no window)
 HealthCheck_SuggestFeature()      ; Debug > Suggest a feature
 ```

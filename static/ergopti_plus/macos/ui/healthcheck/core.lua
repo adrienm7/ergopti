@@ -688,12 +688,15 @@ end
 
 --- Collects the synchronous (phase A) snapshot: memory, Hammerspoon queries
 --- and small files only; the probes fill the rest.
---- @param opts table|nil { detailed = boolean }
+--- @param opts table|nil { detailed = boolean, extensive = boolean, state = menu state|nil }
 --- @return table The version 2 snapshot.
 function M.run(opts)
 	opts = type(opts) == "table" and opts or {}
 	local detailed = opts.detailed == true
 	local extensive = opts.extensive == true
+	-- Debug > Report a bug collects without the window, so it hands the menu
+	-- state here rather than to show_window
+	if type(opts.state) == "table" then _menu_state = opts.state end
 	Logger.start(LOG, "Collecting the diagnostics…")
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts

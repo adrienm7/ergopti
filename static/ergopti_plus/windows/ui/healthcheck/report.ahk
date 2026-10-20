@@ -7,8 +7,8 @@
 ; HealthCheck_ValidateAction accepted them: copy the report, save it as a
 ; Markdown file under the logs folder and select it in Explorer, report it on
 ; GitHub (copy, save and reveal its attachment, then open the bug template) and open
-; a folder. Also the Debug menu's "Report a bug", which opens the diagnostics
-; window at its preview, and "Suggest a feature".
+; a folder. Also the Debug menu's "Report a bug", which runs that same report
+; action on a fresh snapshot without the window, and "Suggest a feature".
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared output is rebuilt from the host snapshot through a closed typed
@@ -514,10 +514,34 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 ; =============================
 ; =============================
 
-; Opens the diagnostics window at its preview: the user reviews exactly what
-; is shared before the report button copies it and opens GitHub.
-HealthCheck_ReportBug() {
-	HealthCheck_ShowWindow("report")
+; Reports a bug exactly as the diagnostics page's report button does, without
+; the window: the approved report of a fresh snapshot is copied, saved and
+; selected in Explorer, then the bug form opens with the host version, OS and
+; driver prefilled. One path, HealthCheck_PerformAction, owns the policy.
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @returns {Boolean} Whether the bug form was opened.
+HealthCheck_ReportBug(Overrides := 0) {
+	LoggerStart("HealthCheckReport", "Reporting a bug from the Debug menu…")
+	Effects := _HCReport_Effects(Overrides)
+	Opened := false
+	try {
+		Config := HealthCheck_Config()
+		Snapshot := HealthCheck_Run()
+		Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+		Outcome := HealthCheck_PerformAction(Map("action", "report", "text", Document["text"],
+			"fields", Document["fields"]), Snapshot["sections"]["paths"], Config, Overrides, Snapshot)
+		Opened := Outcome["ok"] ? true : false
+		if !Opened
+			LoggerError("HealthCheckReport", "Bug report failed: the report action was refused.")
+	} catch as Err {
+		LoggerError("HealthCheckReport", "Bug report failed: {1}", Err.Message)
+	}
+	if !Opened {
+		Effects["notify"].Call(t("menu.debug.report_bug"), t("notify.github_report_failed"), "error")
+		return false
+	}
+	LoggerSuccess("HealthCheckReport", "Bug report form opened.")
+	return true
 }
 
 ; Opens the GitHub feature form with the version and the system prefilled.
