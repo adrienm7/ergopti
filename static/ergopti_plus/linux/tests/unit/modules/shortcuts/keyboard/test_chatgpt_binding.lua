@@ -58,7 +58,7 @@ local function with_binding(body, options)
 						files = require("adapters.file_system"), route = function() return path end,
 						is_paused = function() return false end,
 						actions = { is_assignable = function(action)
-							return action ~= "one_shot_shift" and action ~= "caps_word" and gestures.is_assignable(action) == true
+							return action ~= "one_shot_shift" and gestures.is_assignable(action) == true
 						end }, changed = function() return true end }))
 					local source = combinations.capture_edit_source()
 					helpers.assert_type(source, "table")

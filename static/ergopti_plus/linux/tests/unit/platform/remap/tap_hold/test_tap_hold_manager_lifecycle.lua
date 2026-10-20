@@ -586,12 +586,25 @@ helpers.describe("native OneShot Manager route", function()
 			helpers.assert_nil(s.arm_deadline())
 		end)
 	end)
-	helpers.it("keeps unknown actions and unwired CapsWord unavailable", function()
+	helpers.it("keeps an action outside the catalogue unavailable", function()
 		Fixture.with_manager_session({}, function(s)
-			for _, action in ipairs({ "caps_word", "not_a_catalogue_action" }) do
-				local valid = pcall(s.owner.configuration_candidate, { shortcuts = { key_combination_taps = { caps_lock_then_tab = action } } }, true)
-				helpers.assert_eq(valid, false)
-			end
+			local valid = pcall(s.owner.configuration_candidate,
+				{ shortcuts = { key_combination_taps = { caps_lock_then_tab = "not_a_catalogue_action" } } }, true)
+			helpers.assert_eq(valid, false)
+		end)
+	end)
+	-- The pair once handed CapsWord back to the hook as intent for the engine's
+	-- own per-letter mode, which no setting could reach: the Windows trigger
+	-- (LAlt then CapsLock) did nothing on Linux. It now toggles the shortcuts
+	-- manager's session through the executor, like the tray row.
+	helpers.it("(linux-caps-word-trigger) runs a CapsWord pair through the catalogue executor", function()
+		Fixture.with_manager_session({ action_names = { "copy", "caps_word" } }, function(s)
+			s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "caps_word"\n'
+			helpers.assert_true(s.manager.reload()); s.engine = s.manager.configuration_snapshot().engine
+			s.pair()
+			helpers.assert_eq(s.actions, { { "caps_word", "combination__caps_lock_then_tab" } })
+			helpers.assert_nil(s.engine:input_arm_state(), "no per-letter engine mode is armed beside the session")
+			helpers.assert_nil(s.arm_deadline())
 		end)
 	end)
 	helpers.it("does not grant a lease outside the exact Manager action frame", function()

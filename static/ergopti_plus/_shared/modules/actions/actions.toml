@@ -1258,7 +1258,9 @@ platform = "all"
 platform = "ahk"
 
 [sg_actions.caps_word]
-platform = "ahk"
+# Linux toggles the shortcuts manager's CapsWord, which locks CapsLock as
+# Windows does. macOS keeps its Karabiner rule, the separate `capsword` below.
+platform = "ahk,linux"
 
 [sg_actions.ctrl_backspace]
 platform = "ahk,linux"
