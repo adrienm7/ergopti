@@ -573,15 +573,15 @@ CB_WriteBitmapFile(Path, &MutationSequence := 0) {
 	static IMAGE_BITMAP := 0
 	static CF_BITMAP := 2
 	static LR_LOADFROMFILE := 0x10
-	static LR_CREATEDIBSECTION := 0x2000
 	MutationId := 0
 	BitmapHandle := 0
 	ClipboardOpened := false
 	ClipboardMutated := false
 	try {
+		; CF_BITMAP needs a DDB: a process-local DIB section cannot be pasted by another process.
 		BitmapHandle := DllCall("User32\LoadImageW", "Ptr", 0, "Str", Path,
 			"UInt", IMAGE_BITMAP, "Int", 0, "Int", 0,
-			"UInt", LR_LOADFROMFILE | LR_CREATEDIBSECTION, "Ptr")
+			"UInt", LR_LOADFROMFILE, "Ptr")
 		if !BitmapHandle
 			throw Error("LoadImageW could not load the staged bitmap")
 		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0

@@ -892,9 +892,9 @@ _GestureScreenshotRegionSaveScript(Stage, ExpectedSequence, MaxEdge := 0) {
 		. "if ($expectedSequence -eq 0 -or [ErgoptiScreenshotClipboard]::GetClipboardSequenceNumber() -ne $expectedSequence) {throw 'Region clipboard content changed before image acquisition.'};"
 		. "$bitmapHandle = [ErgoptiScreenshotClipboard]::GetClipboardData(2);"
 		. "if ($bitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region clipboard contains no bitmap.'};"
-		; A borrowed CF_BITMAP can be a foreign DIB section which GDI+ cannot
-		; read directly. Flags zero makes a new local DDB, never the borrowed
-		; handle; FromHbitmap then makes its detached managed copy.
+		; Copy the valid shared CF_BITMAP under its lock. Flags zero makes a
+		; private DDB, never the borrowed handle; FromHbitmap then makes its
+		; detached managed copy before the clipboard lock is released.
 		. "$localBitmapHandle = [System.IntPtr]::Zero;try {"
 		. "$localBitmapHandle = [ErgoptiScreenshotClipboard]::CopyImage($bitmapHandle,0,0,0,0);"
 		. "if ($localBitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region bitmap could not be copied.'};"
