@@ -277,6 +277,8 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/tooltip-provisioning"
           python3 -m pip install Pillow==11.3.0
+          brew install lua@5.4
+          export PATH="$(brew --prefix lua@5.4)/bin:$PATH"
           node tools/test/run-macos-tooltip-canvas-tests.cjs
       - name: Acquire the pinned official Hammerspoon runtime
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'tooltip-canvas' }}
