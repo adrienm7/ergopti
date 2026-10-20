@@ -159,7 +159,7 @@ helpers.describe("shared checked and section-header templates", function()
 		end)
 	end
 
-	helpers.it("retains all twelve existing id-less header declarations (template-header)", function()
+	helpers.it("retains all thirteen existing id-less header declarations (template-header)", function()
 		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
 		local manifest = assert(Json.decode(file:read("*a")))
 		file:close()
@@ -182,7 +182,7 @@ helpers.describe("shared checked and section-header templates", function()
 				end
 			end
 		end
-		helpers.assert_eq(count, 12, "independent existing-header count must not be silently reduced")
+		helpers.assert_eq(count, 13, "independent existing-header count must not be silently reduced")
 	end)
 
 	local invalid = {
