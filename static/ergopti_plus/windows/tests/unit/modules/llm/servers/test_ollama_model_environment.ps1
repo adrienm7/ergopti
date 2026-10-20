@@ -4,6 +4,7 @@
 param([switch]$BuilderOnly)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 if (-not $BuilderOnly -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 	throw 'Native Windows PowerShell is required for declaration admission.'
 }
@@ -31,10 +32,11 @@ $executable = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
 $models = Join-Path ([IO.Path]::GetTempPath()) 'ergopti-owned-models'
 function Assert-Environment([bool]$Condition, [string]$Message) { if (-not $Condition) { throw ('ASSERTION: ' + $Message) } }
 function Encode-EnvironmentCommand([string]$Code) { return [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Code)) }
-$leaf = '@{ cloud = $env:OLLAMA_NO_CLOUD; host = $env:OLLAMA_HOST; models = $env:OLLAMA_MODELS } | ConvertTo-Json -Compress'
+$leaf = '$ProgressPreference = ''SilentlyContinue''; @{ cloud = $env:OLLAMA_NO_CLOUD; host = $env:OLLAMA_HOST; models = $env:OLLAMA_MODELS } | ConvertTo-Json -Compress'
 $leafEncoded = Encode-EnvironmentCommand $leaf
 $childCode = @'
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 $start = [Diagnostics.ProcessStartInfo]::new([Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
 $start.UseShellExecute = $false
 $start.Arguments = '-NoLogo -NoProfile -NonInteractive -EncodedCommand __LEAF__'
