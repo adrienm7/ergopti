@@ -1,6 +1,7 @@
 # tools/diagnostics/macos_managed_ollama_receiving_test.py
 """Actual portable TLS registry peers; no native daemon or PAC credit."""
 
+import contextlib
 import hashlib
 import http.client
 import importlib.util
@@ -625,6 +626,21 @@ class FatalFailureObservationControls(unittest.TestCase):
             result["primary_failure"], {"family": "receiver", "code": "compatibility_source_copy"}
         )
         self.assertNotIn("cleanup_failure", result)
+
+    def test_failure_prints_only_the_closed_fields_to_the_job_log(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            status, result = self.run_main(
+                cleanup=PermissionError(13, "private-message", "/private/key-path")
+            )
+        self.assertEqual(status, 1)
+        line = stderr.getvalue()
+        self.assertTrue(line.startswith("native model receiving refused: "), line)
+        printed = json.loads(line.split(": ", 1)[1])
+        self.assertEqual(printed["reason"], result["reason"])
+        self.assertEqual(printed["cleanup_failure"], {"family": "os", "code": "permission"})
+        self.assertEqual(printed["profile"], "pac-inline")
+        self.assertNotIn("private", line)
 
     def test_cleanup_only_reports_closed_os_code_without_private_filename(self):
         status, result = self.run_main(
