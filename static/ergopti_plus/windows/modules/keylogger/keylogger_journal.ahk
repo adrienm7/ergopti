@@ -305,6 +305,25 @@ KL_FlushShutdownReady(Port := 0, FlushBufferFn := KL_FlushBuffer, &Reason := "")
 	return false
 }
 
+; True once neither a detached flush nor a journal handoff holds persistence:
+; the two refusals of KL_FlushShutdownReady that settle on their own.
+KL_FlushHandoffSettled(Port := 0) {
+	PreviousCritical := Critical("On")
+	try return !Keylogger._flush_in_progress && !IsObject(_KL_JournalOwnerFor(Port)._Token)
+	finally Critical(PreviousCritical)
+}
+
+; Calls OnSettled once the flush handoff settles, polling every PollMs, or
+; OnExpired when A_TickCount reaches DeadlineTick first. Exactly one of them
+; runs, once. ArmFn(Callback, DelayMs) schedules the next poll.
+KL_AwaitFlushHandoff(OnSettled, OnExpired, DeadlineTick, PollMs, ArmFn := TimerArmOneShotMs, Port := 0) {
+	if KL_FlushHandoffSettled(Port)
+		return OnSettled.Call()
+	if (A_TickCount >= DeadlineTick)
+		return OnExpired.Call()
+	ArmFn.Call(KL_AwaitFlushHandoff.Bind(OnSettled, OnExpired, DeadlineTick, PollMs, ArmFn, Port), PollMs)
+}
+
 ; Publishes the current RAM queue to the append-only JSONL journal. A true
 ; result proves every detached entry crossed the OS-visible flush boundary.
 ; Failed or unflushed entries are restored ahead of entries accepted while the

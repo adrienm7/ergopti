@@ -73,6 +73,13 @@ global _LifecycleShutdownVetoAttempts := 0
 global _LifecycleShutdownReason := ""
 ; Exact private AI attempt owned by this noninterruptible OnExit call.
 global _LifecycleAiShutdownAttempt := 0
+;
+; A user exit refused only because a keylogger flush or journal handoff was
+; running is retried once that settles, so one Quit is enough. The poll costs no
+; shutdown veto: only the retried ExitApp passes through the gates again.
+global LIFECYCLE_FLUSH_EXIT_POLL_MS := 100
+global LIFECYCLE_FLUSH_EXIT_BUDGET_MS := 10000
+global _LifecycleFlushExitRetryArmed := false
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -907,6 +914,42 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	return 0
 }
 
+; Arms the retry of the same user exit after a transient keylogger refusal.
+; Reloads and system exits keep their own owners; one retry is armed at most.
+; @param Reason {String} The refused OnExit reason.
+; @param Code {Integer} The refused exit code, reused by the retry.
+_LifecycleArmFlushExitRetry(Reason, Code) {
+	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_POLL_MS
+	global LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	if _LifecycleFlushExitRetryArmed || !(Reason = "Exit" || Reason = "Menu")
+		return
+	_LifecycleFlushExitRetryArmed := true
+	Deadline := A_TickCount + LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	; The first poll runs after OnExit returns: ExitApp never re-enters it.
+	try TimerArmOneShotMs(() => KL_AwaitFlushHandoff(_LifecycleRetryExitNow.Bind(Code),
+		_LifecycleAbandonExitRetry, Deadline, LIFECYCLE_FLUSH_EXIT_POLL_MS),
+		LIFECYCLE_FLUSH_EXIT_POLL_MS)
+	catch as Err {
+		_LifecycleFlushExitRetryArmed := false
+		try LoggerError("Lifecycle", "Deferred exit retry could not be armed: {1}.", Err.Message)
+	}
+}
+
+_LifecycleRetryExitNow(Code, *) {
+	global _LifecycleFlushExitRetryArmed
+	_LifecycleFlushExitRetryArmed := false
+	try LoggerInfo("Lifecycle", "Keylogger flush settled; retrying the deferred exit.")
+	ExitApp(Code)
+}
+
+_LifecycleAbandonExitRetry(*) {
+	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	_LifecycleFlushExitRetryArmed := false
+	try LoggerError("Lifecycle",
+		"Deferred exit abandoned: the keylogger flush did not settle within {1} ms.",
+		LIFECYCLE_FLUSH_EXIT_BUDGET_MS)
+}
+
 ; This admission protects only the exact unsettled successor retirement.
 _LifecycleRefuseNativeRetirement(Gate) {
 	return _LifecycleRefuseShutdown(Gate, true)
@@ -1044,12 +1087,13 @@ Ergopti_OnShutdown(reason, code) {
 		catch as Err
 			try LoggerError("Lifecycle", "Keylogger flush shutdown preflight failed: {1}.", Err.Message)
 		if !KeyloggerFlushReady {
-			; A flush or journal handoff in progress settles on its own: the user
-			; quits again once it ends, which is no fault of the persistence.
+			; A flush or journal handoff in progress settles on its own, so the
+			; same exit is retried once it ends instead of asking the user again.
 			; Braces: a one-line try would claim this else as its own clause.
 			if (KeyloggerFlushReason == "flush_in_progress" || KeyloggerFlushReason == "journal_busy") {
 				try LoggerInfo("Lifecycle",
 					"Shutdown deferred while a keylogger flush settles ({1}).", KeyloggerFlushReason)
+				_LifecycleArmFlushExitRetry(reason, code)
 			} else {
 				try LoggerError("Lifecycle",
 					"Shutdown refused because keylogger persistence debt is not durable yet ({1}).",
