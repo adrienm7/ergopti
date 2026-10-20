@@ -1029,54 +1029,72 @@ local function assemble_blocks(state, reserved_count)
 	local prefix_selected, prefix_unselected = LlmLine.prefixes(
 		state.indent, display_count, ui.active_prefix, ui.inactive_align_char)
 
-	local styled_prefix_unselected = hs.styledtext.new(prefix_unselected, { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.invis })
-	local styled_prefix_empty = hs.styledtext.new("", { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.invis })
 	local styled_gap = hs.styledtext.new("\n", { font = { name = Config.fonts.main, size = Config.sizes.gap }, color = Config.colors.invis })
 
-	local assembled_result = nil
+	-- The shortcut column (_shared/modules/tooltip/constants.toml [llm_ui]): every
+	-- prediction row shows the chord that inserts it, muted, right-aligned on a
+	-- tab stop label_gap past the widest line. The widest line is measured over
+	-- both renderings of every row, so navigating never moves the column. The
+	-- tab stop rides on each line's prefix, its first character, which is what
+	-- gives a paragraph its style.
+	local validation_mods = parse_validation_shortcut(state.shortcut_mod)
+	local label_attributes = { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.cmd_dim }
+	local function prefix_of(selected, paragraph)
+		local attributes = { font = { name = Config.fonts.main, size = Config.sizes.main },
+			color = selected and Config.colors.cursor or Config.colors.invis, paragraphStyle = paragraph }
+		return hs.styledtext.new(selected and prefix_selected or prefix_unselected, attributes)
+	end
+	local rows = {}
+	local measured_lines = nil
 
 	for i = 1, display_count do
 		local prediction = state.raw_predictions[i]
 		local is_selected = (i == state.current_index and prediction ~= nil)
-		
-		local prefix_block = is_selected
-			and hs.styledtext.new(prefix_selected, { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.cursor })
-			or (prefix_unselected ~= "" and styled_prefix_unselected or styled_prefix_empty)
 
-		local body_block
 		if prediction ~= nil then
-			body_block = build_line(prediction, is_selected)
+			local body_block = build_line(prediction, is_selected)
 			if not body_block then
 				body_block = hs.styledtext.new("…", { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.unsel_gray })
 			end
+			local label = validation_mods and LlmLine.shortcut_label(i, validation_mods, ui.shortcut_spec) or ""
+			rows[#rows + 1] = { selected = is_selected, body = body_block, label = label }
+			if label ~= "" then
+				local both = prefix_of(is_selected) .. body_block .. styled_gap
+					.. prefix_of(not is_selected) .. (build_line(prediction, not is_selected) or body_block)
+				measured_lines = measured_lines and (measured_lines .. styled_gap .. both) or both
+			end
 		else
-			local placeholder_prefix = prefix_unselected ~= "" and styled_prefix_unselected or styled_prefix_empty
-			body_block = hs.styledtext.new(ui.slot_placeholder, { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.loading })
-			assembled_result = assembled_result and (assembled_result .. styled_gap .. (placeholder_prefix .. body_block)) or (placeholder_prefix .. body_block)
-			goto continue
+			rows[#rows + 1] = { selected = false, label = "",
+				body = hs.styledtext.new(ui.slot_placeholder, { font = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } }, color = Config.colors.loading }) }
 		end
+	end
 
-		local shortcut_string = ""
-		if display_count > 1 and state.shortcut_mod ~= "none" then
-			local modifier_symbol = tostring(state.shortcut_mod):gsub("cmd", "⌘"):gsub("ctrl", "⌃"):gsub("alt", "⌥"):gsub("shift", "⇧"):gsub("%+", "")
-			if modifier_symbol == "" or modifier_symbol == "nil" then modifier_symbol = "⌥" end
-			
-			local sc_gap = ui.shortcut_label_gap
-			if i <= 9 then shortcut_string = sc_gap .. modifier_symbol .. i
-			elseif i == 10 then shortcut_string = sc_gap .. modifier_symbol .. "0"
+	local paragraph, styled_tab = nil, nil
+	if measured_lines then
+		if not Renderer.canvas then error("the prediction tooltip canvas is unavailable") end
+		local labels_block = nil
+		local label_break = hs.styledtext.new("\n", label_attributes)
+		for _, row in ipairs(rows) do
+			if row.label ~= "" then
+				local styled_label = hs.styledtext.new(row.label, label_attributes)
+				labels_block = labels_block and (labels_block .. label_break .. styled_label) or styled_label
 			end
 		end
+		local column_end = Renderer.canvas:minimumTextSize(3, measured_lines).w
+			+ Config.layout.label_gap + Renderer.canvas:minimumTextSize(3, labels_block).w
+		paragraph = { tabStops = { { location = column_end, tabStopType = "right" } } }
+		styled_tab = hs.styledtext.new("\t", { font = { name = Config.fonts.main, size = Config.sizes.main }, color = Config.colors.invis })
+	end
 
+	local assembled_result = nil
+	for _, row in ipairs(rows) do
 		local full_line
-		if shortcut_string ~= "" then
-			local shortcut_segment = hs.styledtext.new(shortcut_string, { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = is_selected and Config.colors.cmd_sel or Config.colors.cmd_dim })
-			full_line = prefix_block .. body_block .. shortcut_segment
+		if paragraph and row.label ~= "" then
+			full_line = prefix_of(row.selected, paragraph) .. row.body .. styled_tab .. hs.styledtext.new(row.label, label_attributes)
 		else
-			full_line = prefix_block .. body_block
+			full_line = prefix_of(row.selected) .. row.body
 		end
-
 		assembled_result = assembled_result and (assembled_result .. styled_gap .. full_line) or full_line
-		::continue::
 	end
 
 	local space_divider = ui.footer_space_divider

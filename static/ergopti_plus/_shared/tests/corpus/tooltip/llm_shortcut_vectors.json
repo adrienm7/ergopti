@@ -1,0 +1,214 @@
+{
+	"description": "Cross-driver vectors of the AI prediction tooltip shortcut column: the chord each prediction row shows, from the validation modifiers (in any stored order) and the row index, under each OS native labels. The rule is _shared/lua/tooltip/llm_line.lua shortcut_label, read by macOS and Linux and ported by windows/ui/tooltip/llm.ahk; the labels, order and joiners are the [llm_ui] shortcut_* keys of _shared/modules/tooltip/constants.toml, which each driver test reads through its own configuration loader.",
+	"vectors": [
+		{
+			"id": "bare_digit_row_1",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 1,
+			"expected": {
+				"ahk": "1",
+				"hs": "1",
+				"linux": "1"
+			}
+		},
+		{
+			"id": "bare_digit_row_2",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 2,
+			"expected": {
+				"ahk": "2",
+				"hs": "2",
+				"linux": "2"
+			}
+		},
+		{
+			"id": "bare_digit_row_3",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 3,
+			"expected": {
+				"ahk": "3",
+				"hs": "3",
+				"linux": "3"
+			}
+		},
+		{
+			"id": "bare_digit_row_4",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 4,
+			"expected": {
+				"ahk": "4",
+				"hs": "4",
+				"linux": "4"
+			}
+		},
+		{
+			"id": "bare_digit_row_5",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 5,
+			"expected": {
+				"ahk": "5",
+				"hs": "5",
+				"linux": "5"
+			}
+		},
+		{
+			"id": "bare_digit_row_6",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 6,
+			"expected": {
+				"ahk": "6",
+				"hs": "6",
+				"linux": "6"
+			}
+		},
+		{
+			"id": "bare_digit_row_7",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 7,
+			"expected": {
+				"ahk": "7",
+				"hs": "7",
+				"linux": "7"
+			}
+		},
+		{
+			"id": "bare_digit_row_8",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 8,
+			"expected": {
+				"ahk": "8",
+				"hs": "8",
+				"linux": "8"
+			}
+		},
+		{
+			"id": "bare_digit_row_9",
+			"description": "No validation modifier: the bare digit.",
+			"modifiers": [],
+			"index": 9,
+			"expected": {
+				"ahk": "9",
+				"hs": "9",
+				"linux": "9"
+			}
+		},
+		{
+			"id": "bare_digit_row_10",
+			"description": "No validation modifier: the bare digit, 0 for the tenth row.",
+			"modifiers": [],
+			"index": 10,
+			"expected": {
+				"ahk": "0",
+				"hs": "0",
+				"linux": "0"
+			}
+		},
+		{
+			"id": "single_ctrl",
+			"description": "One modifier, under each OS native label.",
+			"modifiers": ["ctrl"],
+			"index": 2,
+			"expected": {
+				"ahk": "Ctrl+2",
+				"hs": "⌃2",
+				"linux": "Ctrl+2"
+			}
+		},
+		{
+			"id": "single_alt",
+			"description": "One modifier, under each OS native label.",
+			"modifiers": ["alt"],
+			"index": 2,
+			"expected": {
+				"ahk": "Alt+2",
+				"hs": "⌥2",
+				"linux": "Alt+2"
+			}
+		},
+		{
+			"id": "single_shift",
+			"description": "One modifier, under each OS native label.",
+			"modifiers": ["shift"],
+			"index": 2,
+			"expected": {
+				"ahk": "Shift+2",
+				"hs": "⇧2",
+				"linux": "Shift+2"
+			}
+		},
+		{
+			"id": "single_cmd",
+			"description": "One modifier, under each OS native label.",
+			"modifiers": ["cmd"],
+			"index": 2,
+			"expected": {
+				"ahk": "Win+2",
+				"hs": "⌘2",
+				"linux": "Super+2"
+			}
+		},
+		{
+			"id": "tenth_row_with_modifier",
+			"description": "The tenth row is chosen with 0.",
+			"modifiers": ["alt"],
+			"index": 10,
+			"expected": {
+				"ahk": "Alt+0",
+				"hs": "⌥0",
+				"linux": "Alt+0"
+			}
+		},
+		{
+			"id": "configuration_order_ignored",
+			"description": "The modifiers follow the shared order, not the stored one.",
+			"modifiers": ["shift", "alt", "ctrl"],
+			"index": 3,
+			"expected": {
+				"ahk": "Ctrl+Alt+Shift+3",
+				"hs": "⌃⌥⇧3",
+				"linux": "Ctrl+Alt+Shift+3"
+			}
+		},
+		{
+			"id": "all_four",
+			"description": "Every modifier at once.",
+			"modifiers": ["cmd", "shift", "alt", "ctrl"],
+			"index": 4,
+			"expected": {
+				"ahk": "Ctrl+Alt+Shift+Win+4",
+				"hs": "⌃⌥⇧⌘4",
+				"linux": "Ctrl+Alt+Shift+Super+4"
+			}
+		},
+		{
+			"id": "beyond_tenth_row",
+			"description": "Rows past the tenth have no digit, so no chord.",
+			"modifiers": ["alt"],
+			"index": 11,
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"linux": ""
+			}
+		},
+		{
+			"id": "row_zero",
+			"description": "There is no row 0.",
+			"modifiers": [],
+			"index": 0,
+			"expected": {
+				"ahk": "",
+				"hs": "",
+				"linux": ""
+			}
+		}
+	]
+}

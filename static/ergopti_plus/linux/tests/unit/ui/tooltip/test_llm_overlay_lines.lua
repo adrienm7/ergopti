@@ -11,7 +11,9 @@
 ---
 --- The rule itself is _shared/lua/tooltip/llm_line.lua; the first half replays
 --- the cross-driver corpus against it, the second drives the overlay's rows
---- (llm-line-style).
+--- (llm-line-style). The last part pins the shortcut column: the chord that
+--- inserts each line, right-aligned and muted, bare digits included, from the
+--- shared shortcut corpus (llm-shortcut-column).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -106,7 +108,7 @@ helpers.describe("AI overlay: a line reads as on macOS (llm-line-style)", functi
 		for index = 1, 3 do
 			helpers.assert_eq(row.segments[index].color, chrome.colors.typed, "piece " .. index)
 		end
-		helpers.assert_eq(row.segments[4].color, chrome.colors.label_unselected)
+		helpers.assert_eq(#row.segments, 3, "the shortcut is the right column, not a piece of the line")
 	end)
 
 	helpers.it("(llm-line-style) a plain continuation is orange, without its joining space", function()
@@ -138,5 +140,43 @@ helpers.describe("AI overlay: a line reads as on macOS (llm-line-style)", functi
 		local rows = overlay.build_rows({ CORRECTING, CONTINUING }, 1, {})
 		helpers.assert_eq(rows[1].prefix, chrome.mark)
 		helpers.assert_eq(rows[2].prefix, "  " .. chrome.align)
+	end)
+end)
+
+local shortcut_corpus_path = shared_root .. "/tests/corpus/tooltip/llm_shortcut_vectors.json"
+
+--- Reads the shortcut corpus, or raises: a missing cross-driver contract must fail.
+--- @return table
+local function read_shortcut_corpus()
+	local fh = assert(io.open(shortcut_corpus_path, "r"), "cannot open corpus at " .. shortcut_corpus_path)
+	local raw = fh:read("*a")
+	fh:close()
+	return require("json").decode(raw)
+end
+
+helpers.describe("AI overlay: the shortcut column (llm-shortcut-column)", function()
+	local shortcuts = read_shortcut_corpus()
+
+	helpers.it("(llm-shortcut-column) the corpus covers every prediction row", function()
+		helpers.assert_true(#shortcuts.vectors >= 10, "shortcut vectors")
+	end)
+
+	for _, vector in ipairs(shortcuts.vectors) do
+		helpers.it("(llm-shortcut-column) label: " .. vector.id, function()
+			local chrome = require("ui.tooltip.config").llm_line()
+			helpers.assert_eq(LlmLine.shortcut_label(vector.index, vector.modifiers, chrome.shortcut_spec),
+				vector.expected.linux, vector.id)
+		end)
+	end
+
+	helpers.it("(llm-shortcut-column) every line carries its chord, muted, bare digits and a lone line included", function()
+		local overlay, chrome = overlay_with_indent(0)
+		local rows = overlay.build_rows({ CORRECTING, CONTINUING }, 1, { validation_modifiers = {} })
+		helpers.assert_eq(rows[1].label, "1")
+		helpers.assert_eq(rows[2].label, "2")
+		helpers.assert_eq(rows[1].label_color, chrome.colors.label, "the selected row is muted too")
+		helpers.assert_eq(rows[2].label_color, chrome.colors.label)
+		rows = overlay.build_rows({ CONTINUING }, 1, { validation_modifiers = { "shift", "ctrl" } })
+		helpers.assert_eq(rows[1].label, "Ctrl+Shift+1")
 	end)
 end)
