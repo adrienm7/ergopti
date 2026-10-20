@@ -11,6 +11,52 @@
 
 local helpers = require("tests.helpers")
 
+--- Executes Main's actual admission expression against the independent truth table.
+--- @param control_body string Actual control callback containing its dispatch table.
+local function check_shortcut_gate(control_body)
+  helpers.assert_true(type(control_body) == "string" and control_body:match("%S") ~= nil,
+    "the actual control callback must not be empty")
+  local gate = assert(control_body:find("local shortcuts_on =", 1, true), "master query declaration is missing")
+  local dispatch = assert(control_body:find("pcall(keyboard_shortcuts.dispatch, detail, {", 1, true),
+    "actual keyboard dispatch is missing")
+  helpers.assert_true(gate < dispatch, "the master switch is queried before dispatch")
+  local call = assert(control_body:sub(dispatch):match("^(pcall%b())"), "dispatch call is incomplete")
+  local expression = assert(call:match("only_script%s*=%s*([^\n]+)"), "actual dispatch admission is missing")
+  expression = expression:gsub(",%s*$", "")
+  helpers.assert_true(expression:match("%S") ~= nil, "the admission expression must not be empty")
+  local source = control_body:sub(gate, dispatch - 1) .. call
+  local states = {
+    { false, false, false, true }, { false, false, true, false },
+    { false, true, false, true }, { false, true, true, true },
+    { true, false, false, true }, { true, false, true, true },
+    { true, true, false, true }, { true, true, true, true },
+  }
+  for index, state in ipairs(states) do
+    local events, queries, calls, observed, argument, detail = {}, 0, 0, nil, nil, {}
+    local environment = {
+      pcall = pcall, opts = { dry_run = state[1] }, detail = detail,
+      shortcuts = { is_enabled = function()
+        queries = queries + 1; events[#events + 1] = "master"; return state[3]
+      end },
+      script_actions = { is_paused = function() events[#events + 1] = "pause"; return state[2] end },
+      keyboard_shortcuts = { dispatch = function(value, options)
+        calls = calls + 1; events[#events + 1] = "dispatch"
+        argument, observed = value, options.only_script
+      end },
+    }
+    local compiled
+    if loadstring then compiled = assert(loadstring(source)); setfenv(compiled, environment)
+    else compiled = assert(load(source, "actual Main shortcut admission", "t", environment)) end
+    compiled()
+    helpers.assert_eq(queries, 1, "state " .. index .. " queries the real master expression once")
+    helpers.assert_eq(calls, 1, "state " .. index .. " reaches the actual dispatch once")
+    helpers.assert_true(rawequal(argument, detail), "dispatch retains the original chord")
+    helpers.assert_eq({ events[1], events[#events] }, { "master", "dispatch" },
+      "master observation precedes dispatch in every state")
+    helpers.assert_eq(observed, state[4], "state " .. index .. " keeps only script controls when narrowed")
+  end
+end
+
 -- We test the argument parser and module structure by loading the daemon
 -- module. The daemon has a main() call at the bottom, so we must be careful
 -- to only test individual functions or the --help path.
@@ -141,17 +187,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local control_start = assert(src:find("local function handle_control", 1, true))
       local click_start = assert(src:find("local function on_click", control_start, true))
       local control_body = src:sub(control_start, click_start - 1)
-      -- The switch and the pause both narrow dispatch to the script-control
-      -- actions (keyboard_shortcuts' only_script), which is how the user resumes;
-      -- test_script_actions proves only_script holds Ctrl+G and assignments back.
-      local gate = control_body:find("shortcuts.is_enabled()", 1, true)
-      local dispatch = control_body:find("pcall(keyboard_shortcuts.dispatch, detail, {", 1, true)
-      local narrowed = control_body:find(
-        "only_script = script_actions.is_paused() or not shortcuts_on", 1, true)
-
-      helpers.assert_true(gate ~= nil and dispatch ~= nil and gate < dispatch and narrowed ~= nil,
-        "the shortcuts master toggle must guard keyboard dispatch; disabling the "
-          .. "feature cannot leave Ctrl+G and user assignments active")
+      -- Dry-run, pause and the disabled master each retain only script controls.
+      -- Execute their real joined expression rather than pinning its old spelling.
+      check_shortcut_gate(control_body)
     end)
 
     -- A physical Backspace reaches the control callback, never on_char, and the

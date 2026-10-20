@@ -559,6 +559,8 @@ return {
 	"tests.unit.modules.shortcuts.text_actions.test_llm_language_parameter_vectors",
 	"tests.unit.modules.shortcuts.text_actions.test_send_input_parameter_vectors",
 	"tests.unit.modules.shortcuts.text_actions.test_tap_keys",
+	"tests.unit.modules.shortcuts.text_actions.test_dry_run_action_dispatch",
+	"tests.unit.modules.shortcuts.text_actions.test_dry_run_remap_dispatch",
 	"tests.unit.modules.shortcuts.keyboard.test_script_chords",
 	"tests.unit.modules.shortcuts.text_actions.test_wrap_on_type",
 	"tests.unit.modules.gestures.config.test_gesture_binding_transaction",
