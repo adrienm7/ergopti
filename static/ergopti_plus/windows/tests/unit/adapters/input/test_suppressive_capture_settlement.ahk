@@ -154,7 +154,8 @@ _SICU_Case(Owner, Mode) {
 		}
 		AssertTrue(RegExMatch(State.Output, "m)^RECEIPT source_scope=parent_execution_manifest .*case=" . CaseName . " ") > 0,
 			"the exact native case requires its UTF-16 capture receipt: " . State.Output)
-		Ack := Owner == "prototype" ? "native-inputhook-endchars-prototype" : "native-inputhook-unicode-capture"
+		Ack := Owner == "prototype" ? "native-inputhook-endchars-prototype"
+			: (Owner == "packet" ? "inputhook-control-packet-abi" : "native-inputhook-unicode-capture")
 		AssertTrue(RegExMatch(State.Output, "m)^PASS " . Ack . "\r?$") > 0,
 			"the complete scalar and independent-letter goldens must pass: " . State.Output)
 		AssertTrue(RegExMatch(State.Output, "m)^NATURAL_EXIT code=0 native_input_debt=false\r?$") > 0,
@@ -334,3 +335,7 @@ for _SICU_EditorMode in ["a", "AB", "surrogate", "open-brace", "close-brace", "p
 
 Test("scalar completion: single named Escape stays cancellation (inputhook-named-key-tokenization)",
 	_SICS_DecodeCase.Bind("single-escape-list"))
+
+for _SICU_PacketMode in ["delete", "enter", "backspace", "unicode"]
+	Test("control packet ABI: " . _SICU_PacketMode . " preserves physical and Unicode identity (inputhook-control-packet-abi)",
+		_SICU_Case.Bind("packet", _SICU_PacketMode))

@@ -28,7 +28,8 @@ _UNC_Allowed := Map("one-shot-a", true, "one-shot-AB", true, "one-shot-surrogate
 	"dead-key-enter", true, "dead-key-pair-B", true,
 	"one-shot-backspace", true, "one-shot-delete", true, "dead-key-backspace", true, "dead-key-delete", true,
 	"magic-editor-a", true, "magic-editor-AB", true, "magic-editor-surrogate", true,
-	"magic-editor-open-brace", true, "magic-editor-close-brace", true, "magic-editor-punctuation", true)
+	"magic-editor-open-brace", true, "magic-editor-close-brace", true, "magic-editor-punctuation", true,
+	"packet-delete", true, "packet-enter", true, "packet-backspace", true, "packet-unicode", true)
 if !_UNC_Allowed.Has(A_Args[2]) {
 	FileAppend("REFUSED: unknown native Unicode capture case.`n", "**")
 	ExitApp(2)
@@ -45,7 +46,7 @@ global OneShotShiftEnabled := false, InDeadKeySequence := false
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
 global _UNC := { Case: A_Args[2], Gui: 0, Edit: 0, Hwnd: 0, EditHwnd: 0, Thread: 0,
 	Pid: DllCall("GetCurrentProcessId", "UInt"), Guard: 0, Observer: 0, Target: 0, Token: 0,
-	Units: [], ExpectedObserved: 0, Observed: [], Tail: [], Emits: [], Controls: [], Persisted: [], Ups: 0, UpVk: 0xE7, Calls: 0, Inserted: -1,
+	Units: [], ExpectedObserved: 0, Observed: [], Tail: [], Emits: [], Controls: [], Persisted: [], Ups: 0, UpScs: [], UpVk: 0xE7, Calls: 0, Inserted: -1,
 	PrototypeInjectedAt: 0,
 	Debt: false, Injected: false, Cancelled: false, Error: 0, Logs: 0, Activations: 0, ArmedAt: 0 }
 OnExit(_UNC_Exit)
@@ -176,6 +177,7 @@ _UNC_Up(Hook, Vk, Sc) {
 		_UNC.Error := Error("Unexpected native key entered the explicit fixture.")
 		return
 	}
+	_UNC.UpScs.Push(Sc)
 	_UNC.Ups += 1
 }
 
@@ -190,7 +192,9 @@ _UNC_Packets(Units, Vk := 0) {
 			NumPut("UInt", 1, Packets, Offset)
 			; A named Enter control uses genuine virtual-key down/up packets.
 			; The default Unicode path keeps the original INPUT40 representation.
-			Flags := Vk ? (Up ? 2 : 0) : (Up ? 6 : 4)
+			; Delete's E0 identity distinguishes it from NumpadDel despite the
+			; same VK. Both down and up must carry KEYEVENTF_EXTENDEDKEY.
+			Flags := Vk ? ((Up ? 2 : 0) | (Vk == 0x2E ? 1 : 0)) : (Up ? 6 : 4)
 			NumPut("UShort", Vk, "UShort", Vk ? 0 : Unit, "UInt", Flags, Packets, Offset + 8)
 			NumPut("UInt64", 0x4552475054524D31, Packets, Offset + 24)
 		}
@@ -589,12 +593,15 @@ _UNC_Run() {
 		. " input=" . _UNC_Hex(_UNC.Units) . " observed=" . _UNC_Hex(_UNC.Observed)
 		. " input_buffer=" . _UNC_Hex(InputUnits) . " end_key=" . _UNC_Hex(EndUnits)
 		. " target=" . _UNC_Hex(TargetUnits) . " end_reason=" . _UNC.Target.EndReason . " tail=" . _UNC_Hex(_UNC.Tail)
-		. " ups=" . _UNC.Ups . " native_calls=" . _UNC.Calls . " inserted=" . _UNC.Inserted
+		. " ups=" . _UNC.Ups . " up_scs=" . _UNC_Hex(_UNC.UpScs) . " native_calls=" . _UNC.Calls . " inserted=" . _UNC.Inserted
 		. " scope=native_capture_and_observed_emission application_receiving=false`n", "*")
 	for Index, Units in _UNC.Emits
 		FileAppend("EMIT " . Index . " utf16=" . _UNC_Hex(Units) . "`n", "*")
 	if IsObject(CaptureError)
 		throw CaptureError
+	if Kind == "delete"
+		_UNC_Require(_UNC.UpScs.Length == 1 && _UNC.UpScs[1] == 0x153,
+			"The native Delete up must be SC153, not the NumpadDel SC053 alias sharing VK2E.")
 	_UNC_Require(_UNC.Target.EndReason == "EndKey" && !_UNC.Target.InProgress
 		&& SIHO_Count() == 0 && !_SIHO_Owners.Has(_UNC.Token),
 		"The real product owner must settle capture and retire its exact native token without timeout.")
@@ -670,16 +677,51 @@ _UNC_RunEditor() {
 		"The safety guard owns the independent tail, with no hidden error or application emit.")
 }
 
+_UNC_RunPacketAbi() {
+	global _UNC
+	Mode := SubStr(_UNC.Case, 8)
+	Units := [0], Vk := 0, ExpectedFlags := [], ExpectedScans := []
+	switch Mode {
+		case "delete":
+			Vk := 0x2E, ExpectedFlags := [1, 3], ExpectedScans := [0, 0]
+		case "enter":
+			Vk := 0x0D, ExpectedFlags := [0, 2], ExpectedScans := [0, 0]
+		case "backspace":
+			Vk := 0x08, ExpectedFlags := [0, 2], ExpectedScans := [0, 0]
+		case "unicode":
+			Units := [0xD83D, 0xDE00], ExpectedFlags := [4, 6, 4, 6], ExpectedScans := [0xD83D, 0xD83D, 0xDE00, 0xDE00]
+		default:
+			throw Error("Unknown direct control packet ABI vector.")
+	}
+	Packets := _UNC_Packets(Units, Vk)
+	_UNC_Require(Packets.Size == ExpectedFlags.Length * 40, "The real packet builder must retain exact INPUT40 count and stride.")
+	for Index, Flags in ExpectedFlags {
+		Offset := (Index - 1) * 40
+		_UNC_Require(NumGet(Packets, Offset, "UInt") == 1 && NumGet(Packets, Offset + 8, "UShort") == Vk
+			&& NumGet(Packets, Offset + 10, "UShort") == ExpectedScans[Index]
+			&& NumGet(Packets, Offset + 12, "UInt") == Flags
+			&& NumGet(Packets, Offset + 24, "UInt64") == 0x4552475054524D31,
+			"The actual serialized type/VK/scan/flags/marker must match the independent Win32 ABI golden.")
+	}
+	_UNC_Require(_UNC.Calls == 0 && !_UNC.Debt && !IsObject(_UNC.Guard) && !IsObject(_UNC.Target),
+		"The direct packet regression must not arm a native hook or insert input.")
+	FileAppend("RECEIPT source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case
+		. " packet_count=" . ExpectedFlags.Length . " vk=" . Format("{:04X}", Vk) . " flags=" . _UNC_Csv(ExpectedFlags)
+		. " native_calls=0 scope=actual_packet_builder_no_native_input`n", "*")
+}
+
 FileAppend("BEGIN source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case . "`n", "*")
 try {
 	Prototype := InStr(_UNC.Case, "prototype-") == 1
 	if Prototype
 		_UNC_RunPrototype()
+	else if InStr(_UNC.Case, "packet-") == 1
+		_UNC_RunPacketAbi()
 	else if InStr(_UNC.Case, "magic-editor-") == 1
 		_UNC_RunEditor()
 	else
 		_UNC_Run()
-	FileAppend("PASS " . (Prototype ? "native-inputhook-endchars-prototype" : "native-inputhook-unicode-capture") . "`n", "*")
+	FileAppend("PASS " . (Prototype ? "native-inputhook-endchars-prototype" : (InStr(_UNC.Case, "packet-") == 1 ? "inputhook-control-packet-abi" : "native-inputhook-unicode-capture")) . "`n", "*")
 	ExitApp(0)
 } catch as Err {
 	FileAppend("FAIL " . Err.Message . "`n" . Err.Stack . "`n", "**")
