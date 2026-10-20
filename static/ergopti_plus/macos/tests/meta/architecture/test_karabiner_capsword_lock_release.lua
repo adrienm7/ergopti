@@ -1,21 +1,16 @@
 --- tests/meta/architecture/test_karabiner_capsword_lock_release.lua
 
 --- ==============================================================================
---- MODULE: Karabiner CapsWord Lock Release Meta Test
+--- MODULE: Karabiner CapsWord Pointer Watcher Meta Test
 --- DESCRIPTION:
---- Static source guard for the "karabiner-capsword-lock-leak" audit finding in
---- platform/remap/watchers.lua.
+--- Static source guard for platform/remap/watchers.lua.
 ---
 --- ROOT CAUSE ENCODED:
---- The `deactivate_capsword` function set `_capsword_check_pending = true` and
---- then immediately called `hs.task.new(...):start()` via method chaining. If
---- `task:start()` returned false (e.g., the karabiner-cli binary was missing or
---- permissions changed), the callback that resets `_capsword_check_pending = false`
---- would never fire — leaving the guard permanently true and silently blocking all
---- future CapsWord deactivation for the entire session.
----
---- The fix splits task creation from start, checks the return value, and releases
---- the lock immediately when start fails.
+--- The CapsWord pointer watcher used to spawn karabiner_cli --get-variable
+--- to learn whether Karabiner had CapsWord on. No karabiner_cli has that option
+--- (cxxopts answers exit 2), so the probe failed on every Mac, warned at every
+--- boot and carried a task, watchdog and lock-leak machinery of its own. A
+--- pointer event now cancels only a CapsWord the driver knows about.
 ---
 --- This test also verifies the inputSourceChanged single-owner fix: Hammerspoon's
 --- setter unsets its predecessor and has no getter, so every consumer must use
@@ -43,60 +38,22 @@ local function strip_comments(src)
 end
 
 
--- ============================================================
--- ============================================================
--- ======= 1/ CapsWord lock released on task:start() failure ==
--- ============================================================
--- ============================================================
+-- ====================================================
+-- ====================================================
+-- ======= 1/ No karabiner_cli variable reader ========
+-- ====================================================
+-- ====================================================
 
-helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsword-lock-leak)", function()
+helpers.describe("karabiner/watchers.lua: CapsWord pointer watcher spawns no reader", function()
 
-	helpers.it("task construction is protected and stored before calling :start()", function()
+	helpers.it("(capsword-no-cli-reader) the watcher never runs karabiner_cli", function()
 		local src = strip_comments(read_source("local function parse_layout_name"))
-		helpers.assert_true(src:match("local task%s*\n") ~= nil,
-			"the callback must forward-declare its GC-pinned task handle")
-		helpers.assert_true(src:find("TaskLifecycle.native", 1, true) ~= nil,
-			"native task construction and callbacks must be protected before the lock is released")
-		helpers.assert_true(src:find("task = task_or_err", 1, true) ~= nil,
-			"the protected constructor result must become the exact retained handle")
-	end)
-
-	helpers.it("_capsword_check_pending is released when task:start() returns false", function()
-		local src = strip_comments(read_source("local function parse_layout_name"))
-		helpers.assert_true(src:find("TaskLifecycle.start(task, \"CapsWord variable probe\")", 1, true) ~= nil,
-			"task:start() can raise as well as return false and must be protected")
-		helpers.assert_true(src:find("abandon_probe(task,", 1, true) ~= nil,
-			"both start failure modes must invalidate the generation and release the lock")
-	end)
-
-	-- F-L6: hs.task fires its callback only on process EXIT, so a started-but-hung
-	-- karabiner_cli would leave _capsword_check_pending true forever. A watchdog timer
-	-- must force-release the lock after a timeout (and the callback must cancel it).
-	--
-	-- The watchdog is scheduled via the TimerScheduler adapter (not raw hs.timer.doAfter)
-	-- per PF-1 — routing this OS call through adapters/ keeps the hs.* purity ratchet
-	-- meta-test (test_port_adapter_coverage.lua) from re-flagging it as a violation.
-	helpers.it("a watchdog releases the lock if the started task never completes (F-L6)", function()
-		local src = strip_comments(read_source("local function parse_layout_name"))
-		helpers.assert_true(src:find("_capsword_probe_watchdog", 1, true) ~= nil,
-			"deactivate_capsword must arm a watchdog timer (_capsword_probe_watchdog)")
-		helpers.assert_true(src:find("CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
-			"the watchdog must use a named timeout constant, not a magic number")
-		local watchdog_arm = src:find(
-			"pcall%s*%(%s*TimerScheduler%.after,%s*CAPSWORD_PROBE_TIMEOUT_SEC"
-		)
-		helpers.assert_true(watchdog_arm ~= nil,
-			"the watchdog must be scheduled via the TimerScheduler adapter, not raw hs.timer.doAfter (PF-1)")
-		-- The timeout callback routes through the one abandonment helper that both
-		-- releases the lock and retires the task generation. Merely finding an
-		-- unrelated assignment later in the file was a false-green.
-		local watchdog_body = src:sub(watchdog_arm, watchdog_arm + 900)
-		helpers.assert_true(watchdog_body:find("abandon_probe(task, nil)", 1, true) ~= nil,
-			"the watchdog callback must abandon the exact in-flight probe")
-		local abandon_at = src:find("local function abandon_probe", 1, true)
-		helpers.assert_true(abandon_at ~= nil
-			and src:sub(abandon_at, abandon_at + 900):find("_capsword_check_pending = false", 1, true) ~= nil,
-			"the shared abandonment path must release _capsword_check_pending")
+		helpers.assert_true(src:find("get-variable", 1, true) == nil,
+			"karabiner_cli has no --get-variable option; the watcher must not spawn it")
+		helpers.assert_true(src:find("platform.remap.ke_paths", 1, true) == nil,
+			"the pointer watcher needs no Karabiner executable path")
+		helpers.assert_true(src:find("KeVariables.supersede_capsword_activation", 1, true) ~= nil,
+			"a pointer event still cancels the CapsWord the driver knows about")
 	end)
 
 end)

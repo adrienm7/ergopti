@@ -6,17 +6,16 @@
 --- Guards the fix for F-HIGH-7: M.start_gesture_watcher's eventtap callback
 --- (mouseMoved, scrollWheel, gesture, all three mouse-button events — the
 --- hottest possible eventtap) called deactivate_capsword() with NO
---- pcall/Logger.pcall, even though that function contains an unguarded
---- hs.task.new(...) call. Every sibling eventtap added in the same refactor
+--- pcall/Logger.pcall. Every sibling eventtap added in the same refactor
 --- window wraps its callback body in Logger.pcall; this one instance was
---- missed, so an exception thrown mid-callback (e.g. hs.task.new erroring)
---- would propagate out of the eventtap callback uncaught.
+--- missed, so an exception thrown mid-callback would propagate out of the
+--- eventtap callback uncaught.
 ---
 --- Two layers of coverage:
 ---   1. Source-position check: the eventtap callback body must call
 ---      deactivate_capsword() only via Logger.pcall, never bare.
----   2. Behavioral: drive the captured callback with hs.task.new stubbed to
----      throw, and assert the callback itself never raises.
+---   2. Behavioral: drive the captured callback with the CapsWord writer stubbed
+---      to throw, and assert the callback itself never raises.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -67,20 +66,20 @@ end)
 
 
 
+
 -- ===========================================================
 -- ===========================================================
--- ======= 2/ Behavioral: throwing hs.task.new is contained ==
+-- ======= 2/ Behavioral: the raising writer is caught =======
 -- ===========================================================
 -- ===========================================================
 
 helpers.describe("karabiner.watchers: eventtap callback survives a throwing deactivate_capsword (F-HIGH-7)", function()
 
 	-- Builds a fresh watchers module with hs.eventtap.new stubbed to capture the
-	-- pointer-event callback, and hs.task.new replaced with a function that raises
-	-- (simulating any unguarded exception inside deactivate_capsword). The clock
-	-- is fixed comfortably past the CapsWord interval so the monotonic throttle
-	-- does not short-circuit before reaching hs.task.new on the first call.
-	local function make_watchers_with_throwing_task()
+	-- pointer-event callback, and the CapsWord writer replaced with a function
+	-- that raises. The clock is fixed comfortably past the CapsWord interval so
+	-- the monotonic throttle does not short-circuit before the first call.
+	local function make_watchers_with_throwing_writer()
 		package.loaded["platform.remap.watchers"] = nil
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
@@ -90,20 +89,18 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	}
 		package.loaded["adapters.shell_runner"] = nil
 		package.loaded["adapters.timer_scheduler"] = nil
-		-- TaskLifecycle captures `hs` at require time, so every fresh watcher
-		-- harness must reload it beside the watcher and ShellRunner siblings.
-		package.loaded["adapters.task_lifecycle"] = nil
-		package.loaded["platform.remap.ke_variables"] = {
-			supersede_capsword_activation = function() return false, 0 end,
-			capsword_revision = function() return 0 end,
-			set_if_revision = function() return false, 0 end,
-		}
-
 		local captured = { cb = nil }
 		local state = {
 			wall_now = 1000,
 			monotonic_ns = 1000000000,
-			task_attempts = 0,
+			writer_attempts = 0,
+		}
+		package.loaded["platform.remap.ke_variables"] = {
+			supersede_capsword_activation = function()
+				state.writer_attempts = state.writer_attempts + 1
+				error("boom: injected CapsWord writer failure")
+			end,
+			capsword_revision = function() return 0 end,
 		}
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
 			eventtap = {
@@ -116,12 +113,6 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 					leftMouseDown = 4, rightMouseDown = 5, otherMouseDown = 6,
 				} },
 			},
-			task = {
-				new = function()
-					state.task_attempts = state.task_attempts + 1
-					error("boom: injected hs.task.new failure")
-				end,
-			},
 			timer = {
 				secondsSinceEpoch = function() return state.wall_now end,
 				absoluteTime = function() return state.monotonic_ns end,
@@ -132,7 +123,7 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	end
 
 	helpers.it("invoking the captured callback does not raise even when deactivate_capsword throws", function()
-		local _watchers, captured = make_watchers_with_throwing_task()
+		local _watchers, captured = make_watchers_with_throwing_writer()
 		local dummy_event = {}
 
 		local ok_start, watcher_or_err = pcall(
@@ -151,11 +142,11 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		helpers.assert_true(type(cb_err) == "boolean" or cb_err == nil,
 			"and must answer whether it consumed the event")
 		helpers.assert_true(ok_cb,
-			"the eventtap callback must not raise even when deactivate_capsword's hs.task.new throws (F-HIGH-7)")
+			"the eventtap callback must not raise even when the CapsWord writer throws (F-HIGH-7)")
 	end)
 
 	helpers.it("the callback returns false (never consumes the pointer event) even when it throws internally", function()
-		local _watchers, captured = make_watchers_with_throwing_task()
+		local _watchers, captured = make_watchers_with_throwing_writer()
 		_watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
 
 		local ok, result = pcall(captured.cb, {})
@@ -163,8 +154,8 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		helpers.assert_eq(result, false, "the watcher must never consume the pointer event")
 	end)
 
-	helpers.it("a throwing task constructor releases the probe lock for the next event", function()
-		local watchers, captured, state = make_watchers_with_throwing_task()
+	helpers.it("a throwing writer releases the pending guard for the next event", function()
+		local watchers, captured, state = make_watchers_with_throwing_writer()
 		watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
 
 		captured.cb({})
@@ -172,12 +163,12 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		state.monotonic_ns = state.monotonic_ns + 1000000000
 		captured.cb({})
 
-		helpers.assert_eq(state.task_attempts, 2,
-			"each post-throttle pointer event must retry after task creation raises")
+		helpers.assert_eq(state.writer_attempts, 2,
+			"each post-throttle pointer event must retry after the writer raises")
 	end)
 
 	helpers.it("uses elapsed monotonic time when the wall clock moves backward", function()
-		local watchers, captured, state = make_watchers_with_throwing_task()
+		local watchers, captured, state = make_watchers_with_throwing_writer()
 		watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
 
 		captured.cb({})
@@ -185,13 +176,13 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		state.monotonic_ns = state.monotonic_ns + 1000000000
 		captured.cb({})
 
-		helpers.assert_eq(state.task_attempts, 2,
-			"a backward wall-clock adjustment must not suppress a due CapsWord probe")
+		helpers.assert_eq(state.writer_attempts, 2,
+			"a backward wall-clock adjustment must not suppress a due CapsWord check")
 
 		state.wall_now = state.wall_now - 3600
 		state.monotonic_ns = state.monotonic_ns + 1000000
 		captured.cb({})
-		helpers.assert_eq(state.task_attempts, 2,
+		helpers.assert_eq(state.writer_attempts, 2,
 			"the monotonic throttle must still suppress a pointer event inside the interval")
 	end)
 end)

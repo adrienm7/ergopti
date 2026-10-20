@@ -1042,42 +1042,4 @@ function M.supersede_capsword_activation(on_done)
 	return accepted, clear_revision or revision
 end
 
---- Writes only if no newer logical operation has superseded a captured probe.
---- @param name string Runtime logical name.
---- @param value number|string Desired value.
---- @param expected_revision number Revision captured before asynchronous work.
---- @param on_done function|nil Optional fn(ok, reason, revision) callback.
---- @return boolean accepted True when the conditional write was accepted.
---- @return number|nil revision Current or newly allocated logical revision.
-function M.set_if_revision(name, value, expected_revision, on_done)
-	if type(expected_revision) ~= "number" or expected_revision < 0
-		or expected_revision ~= math.floor(expected_revision) then
-		Logger.error(LOG, "set_if_revision(): expected revision must be a non-negative integer.")
-		return false, type(name) == "string" and _logical_revisions[name] or nil
-	end
-	if on_done ~= nil and type(on_done) ~= "function" then
-		Logger.error(LOG, "set_if_revision(): callback must be a function or nil.")
-		return false, type(name) == "string" and _logical_revisions[name] or nil
-	end
-
-	local status_ok, phase, snapshot = pcall(LeaseController.status)
-	if not status_ok then
-		Logger.error(LOG, "set_if_revision(): exact Karabiner lease status failed: %s", tostring(phase))
-		return false, type(name) == "string" and _logical_revisions[name] or nil
-	end
-	local token = type(snapshot) == "table" and snapshot.token or nil
-	if LeaseContract.is_valid_token(token) and synchronize_token(token) ~= true then
-		Logger.error(LOG, "set_if_revision(): lease generation changed during synchronization.")
-		local interrupted_revision = type(name) == "string" and (_logical_revisions[name] or 0) or nil
-		invoke_callback(on_done, false, "generation-changed", interrupted_revision)
-		return false, interrupted_revision
-	end
-	local current_revision = type(name) == "string" and (_logical_revisions[name] or 0) or nil
-	if current_revision ~= expected_revision then
-		invoke_callback(on_done, false, "stale-revision", current_revision)
-		return false, current_revision
-	end
-	return M.set(name, value, on_done)
-end
-
 return M

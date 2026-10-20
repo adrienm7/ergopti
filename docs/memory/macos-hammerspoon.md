@@ -402,7 +402,9 @@ read one: the CapsWord pointer probe called `--get-variable`, and cxxopts
 answers any unknown option with exit status 2 ("error parsing options"). Its
 real option list is in Karabiner-Elements `src/bin/cli/src/main.cpp`; check
 it before passing a new flag. User variables are only visible in
-EventViewer, not to the CLI.
+EventViewer, not to the CLI. The probe is gone: a pointer event cancels only a
+CapsWord the driver activated or saw through its Karabiner control signal
+(`KeVariables.supersede_capsword_activation`); never reintroduce a variable read.
 
 ### project-hs-native-task-lifecycle-contract
 
