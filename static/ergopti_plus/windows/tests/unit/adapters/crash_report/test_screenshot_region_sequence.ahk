@@ -38,6 +38,21 @@ _GSQ_ReplaceOnce(Text, Needle, Replacement) {
 	return Result
 }
 
+; The immediate image must exercise the DIB section produced by the real
+; clipboard adapter, which the cross-process GDI+ reader used to reject.
+_GSQ_RequireDibSection() {
+	AssertTrue(DllCall("OpenClipboard", "Ptr", A_ScriptHwnd, "Int"))
+	try {
+		Bitmap := DllCall("GetClipboardData", "UInt", 2, "Ptr")
+		AssertTrue(Bitmap != 0, "the real immediate clipboard bitmap must exist")
+		Info := Buffer(A_PtrSize == 8 ? 32 : 24, 0)
+		AssertEqual(Info.Size, DllCall("Gdi32\GetObjectW", "Ptr", Bitmap,
+			"Int", Info.Size, "Ptr", Info, "Int"), "the native BITMAP must be observable")
+		AssertTrue(NumGet(Info, A_PtrSize == 8 ? 24 : 20, "Ptr") != 0,
+			"the immediate source must be a DIB section, not only the passing delayed DDB control")
+	} finally AssertTrue(DllCall("CloseClipboard", "Int"))
+}
+
 ; WM_RENDERFORMAT must publish without reopening the clipboard held by its
 ; requester. The clipboard owns the bitmap after a successful SetClipboardData.
 _GSQ_Render(Owner, Format, LParam, Msg, Hwnd) {
@@ -93,6 +108,7 @@ _GSQ_Receive(Mode) {
 			OwnedSequence := CB_GetSequenceNumber()
 		} else {
 			AssertTrue(CB_WriteBitmapFile(RedPath), "the selected red bitmap must reach the native clipboard")
+			_GSQ_RequireDibSection()
 			OwnedSequence := CB_GetSequenceNumber()
 		}
 		AssertTrue(OwnedSequence > 0)

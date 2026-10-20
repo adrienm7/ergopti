@@ -881,6 +881,8 @@ _GestureScreenshotRegionSaveScript(Stage, ExpectedSequence, MaxEdge := 0) {
 		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern bool OpenClipboard(System.IntPtr owner);'
 		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern bool CloseClipboard();'
 		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern System.IntPtr GetClipboardData(uint format);'
+		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern System.IntPtr CopyImage(System.IntPtr image,uint type,int width,int height,uint flags);'
+		. '[System.Runtime.InteropServices.DllImport("gdi32.dll")]public static extern bool DeleteObject(System.IntPtr image);'
 		. "}';"
 		. "$expectedSequence = " . ExpectedSequence . ";$img = $null;"
 		. "if (-not [ErgoptiScreenshotClipboard]::OpenClipboard([System.IntPtr]::Zero)) {throw 'The region clipboard is busy.'};"
@@ -888,9 +890,14 @@ _GestureScreenshotRegionSaveScript(Stage, ExpectedSequence, MaxEdge := 0) {
 		. "if ($expectedSequence -eq 0 -or [ErgoptiScreenshotClipboard]::GetClipboardSequenceNumber() -ne $expectedSequence) {throw 'Region clipboard content changed before image acquisition.'};"
 		. "$bitmapHandle = [ErgoptiScreenshotClipboard]::GetClipboardData(2);"
 		. "if ($bitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region clipboard contains no bitmap.'};"
-		; CF_BITMAP is borrowed from the clipboard. FromHbitmap makes its own
-		; copy; deleting the borrowed GDI handle would corrupt another process.
-		. "$img = [System.Drawing.Image]::FromHbitmap($bitmapHandle);"
+		; A borrowed CF_BITMAP can be a foreign DIB section which GDI+ cannot
+		; read directly. Flags zero makes a new local DDB, never the borrowed
+		; handle; FromHbitmap then makes its detached managed copy.
+		. "$localBitmapHandle = [System.IntPtr]::Zero;try {"
+		. "$localBitmapHandle = [ErgoptiScreenshotClipboard]::CopyImage($bitmapHandle,0,0,0,0);"
+		. "if ($localBitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region bitmap could not be copied.'};"
+		. "$img = [System.Drawing.Image]::FromHbitmap($localBitmapHandle);"
+		. "} finally {if ($localBitmapHandle -ne [System.IntPtr]::Zero -and -not [ErgoptiScreenshotClipboard]::DeleteObject($localBitmapHandle)) {if ($img) {$img.Dispose();$img=$null};throw 'The private region bitmap could not be released.'}};"
 		. "} finally {if (-not [ErgoptiScreenshotClipboard]::CloseClipboard()) {if ($img) {$img.Dispose()};throw 'The region clipboard lock could not be released.'}};"
 		. "try {" . _GestureScreenshotDownscaleScript("$img", MaxEdge)
 		. "$img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png);"

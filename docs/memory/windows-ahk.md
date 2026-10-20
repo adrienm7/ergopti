@@ -414,6 +414,15 @@ HBITMAP. Serialize the detached copy after releasing the lock so later user
 copies remain independent. The native region custody fixture includes an actual
 hidden-window delayed renderer, a second-process lock probe and a pixel oracle.
 
+`CF_BITMAP` can be a DIB section which GDI+ `Image.FromHbitmap` rejects with a
+generic error when another process reads it. While still holding the admitted
+clipboard lock, use
+[CopyImage](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-copyimage)
+with `IMAGE_BITMAP`, zero dimensions and zero flags to create a new local DDB.
+Keep `LR_COPYRETURNORG`, `LR_COPYDELETEORG` and `LR_CREATEDIBSECTION` absent;
+delete only that private handle after making the managed copy. Test both a real
+immediate DIB section and a real delayed-rendered DDB.
+
 ### project-ahk-sendinput-falls-back-to-sendevent
 
 SendInput removes the script's own keyboard hook only while no other AutoHotkey
