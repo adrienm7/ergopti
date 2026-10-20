@@ -58,3 +58,37 @@ _AOPRI_MissingTree() {
 		"one readable tree must not hide another requested tree's absence")
 }
 Test("OS purity inputs: reject a missing requested tree (os-purity-tree-failure)", _AOPRI_MissingTree)
+
+_AOPRI_BlockCommentsPreserveNativeCode() {
+	Root := A_Temp . "\ergopti_purity_blocks_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertTrue(DllCall("kernel32\CreateDirectoryW", "Str", Root, "Ptr", 0, "Int"),
+		"the lexer fixture must exclusively acquire its source directory")
+	try {
+		Source := Root . "\source.ahk"
+		Prose := "/**`n * KeyWait SetTimer Hotkey() Gui() Run() WinExist`n"
+		Prose .= ' * DllCall("documentation") ComObject("documentation") FileRead("documentation")' . "`n */`n"
+		FileAppend(Prose, Source, "UTF-8")
+		Direct := _AOPR_CountFiles([Source])
+		AssertEqual(0, Direct["DllCall"] + Direct["COM"] + Direct["FileIO"],
+			"JSDoc cannot add native impurity to any direct-call category")
+		AssertEqual(0, _AOPR_FamilyTotal(_AOPR_CountFamilies([Source])),
+			"JSDoc cannot spend a platform-family allowance")
+		Code := 'Marker := "/*"' . "`nWaitFn := KeyWait`nTimerFn := SetTimer`nRows := Menu()`n"
+		Code .= 'Hotkey("F24", Handler)' . "`n" . 'Run("fixture")' . "`nWindowFn := WinExist`n"
+		Code .= 'Result := DllCall("kernel32\GetCurrentProcessId", "UInt")' . "`n"
+		Code .= 'Object := ComObject("fixture")' . "`n" . 'Data := FileRead("fixture")' . "`n"
+		Code .= 'NativeName := "KeyWait"' . "`n" . 'Marker := "*/"' . "`n"
+		FileAppend(Code, Source, "UTF-8")
+		Direct := _AOPR_CountFiles([Source])
+		AssertEqual(1, Direct["DllCall"], "the actual DllCall token and its native name must remain visible")
+		AssertEqual(1, Direct["COM"])
+		AssertEqual(1, Direct["FileIO"])
+		Families := _AOPR_CountFamilies([Source])
+		for Category in ["Timer", "Binding", "GuiMenu", "Process", "Window"]
+			AssertEqual(1, Families[Category], "quoted comment markers cannot hide actual " . Category . " code")
+		AssertEqual(2, Families["KeyState"],
+			"the existing counter must retain both a native function reference and a quoted native name")
+	} finally DirDelete(Root, true)
+}
+Test("OS purity inputs: JSDoc is excluded while native code and names remain counted (os-purity-block-comments)",
+	_AOPRI_BlockCommentsPreserveNativeCode)
