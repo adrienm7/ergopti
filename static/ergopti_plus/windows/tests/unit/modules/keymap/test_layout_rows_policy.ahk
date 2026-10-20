@@ -314,11 +314,23 @@ for _LRPCM_Row in ["number", "top", "home", "bottom"]
 
 _LRPN_ChildSource() {
 	global _DriverDir, _SharedDir
-	Extra := ""
-	for Relative in ["adapters\key_state.ahk", "modules\keymap\keylayout\keylayout_parser.ahk",
-		"modules\keymap\keylayout\keylayout_tables.ahk", "modules\keymap\layout\layout_ergopti.ahk",
-		"modules\keymap\layout\accented_shortcuts.ahk", "modules\keymap\layout\digit_row_bindings.ahk"]
-		Extra .= "#Include " . _DriverDir . "\" . Relative . "`n"
+	static Includes := ""
+	if Includes == "" {
+		Resolved := "", Seen := Map()
+		; Resolve whole owners, preserving their real globals and private helpers
+		; without pinning their current paths or rereading the catalogue per child.
+		for Name in ["KS_IsDown", "Keylayout_Parse", "KeylayoutTables_Build", "ErgoptiLayout_BuildSpec",
+			"AccentedShortcutTargetLetter", "_DigitRowDown"] {
+			Owner := _DriverProductionFileForSymbol(Name)
+			AssertTrue(Owner != "" && FileExist(Owner), "the actual dependency owner must exist: " . Name)
+			if !Seen.Has(Owner) {
+				Seen[Owner] := true
+				Resolved .= "#Include " . Owner . "`n"
+			}
+		}
+		Includes := Resolved
+	}
+	Extra := Includes
 	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
 	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
 		"KeylayoutEmulation_NumberRowLevels", "_KLE_MagicKeyOwnsKey", "GetCapsLockCondition", "_DigitShiftSend"] {
