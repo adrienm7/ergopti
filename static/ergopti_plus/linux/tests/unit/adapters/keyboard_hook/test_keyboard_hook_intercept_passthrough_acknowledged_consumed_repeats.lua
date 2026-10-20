@@ -137,6 +137,7 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 			local queue, at = {}, 0
 			for i, value in ipairs({ 1, 2, 0 }) do queue[i] = Input.encode(1, 36, value, Input.native_size()) end
 			Reader._set_backend({
+				read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 				open = function() return 1 end, ioctl = function() return true end,
 				read = function() at = at + 1; return queue[at] end,
 				poll = function() return queue[at + 1] ~= nil end, close = function() return true end,
@@ -146,6 +147,7 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 				is_key_device = function() return true end,
 				-- Controlled keyboard sources have no REL/ABS axes.
 				is_interceptable_key_device = function() return true end,
+				is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 				physical_sources = function(paths)
 					observed.origins = observed.origins + 1
 					return { { path = paths[1], sysfs = "/fixture/native-keyboard",
@@ -252,6 +254,7 @@ helpers.describe("keyboard hook: recovery repeat ownership", function()
 				streams[paths[2]] = { {}, { { 1, 3000 }, { 2, 5000 }, { 0, 6000 } } }
 			end
 			Reader._set_backend({
+				read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 				open = function(path)
 					observed.opens = observed.opens + 1
 					handles[observed.opens] = { path = path, phase = phase, at = 0 }
@@ -304,6 +307,7 @@ helpers.describe("keyboard hook: recovery repeat ownership", function()
 				is_key_device = function() return true end,
 				-- Controlled keyboard sources have no REL/ABS axes.
 				is_interceptable_key_device = function() return true end,
+				is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 				physical_sources = function(current)
 					observed.origins = observed.origins + 1
 					local sources = {}

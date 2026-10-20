@@ -53,7 +53,7 @@ local RuntimeGuard = require("infra.runtime_guard")
 local original_reader_load = package.loaded["adapters.evdev_reader"] == nil
 local EvdevReader = require("adapters.evdev_reader")
 local INPUT_READER_PORT_NAMES = { "capture_event", "event_view", "event_current", "source_current", "reconcile_sources",
-	"capture_source_owner", "source_owner_current", "retire_source", "open", "close", "grab", "ungrab", "use_ffi_backend", "_set_backend", "_reset_backend" }
+	"capture_source_owner", "source_owner_current", "retire_source", "open", "close", "grab", "ungrab", "event_capabilities", "use_ffi_backend", "_set_backend", "_reset_backend" }
 local _input_reader_ports = {}
 for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 	_input_reader_ports[name] = rawget(EvdevReader, name)
@@ -3319,6 +3319,26 @@ local function _acquire(paths, force_path, tx)
 			opened[#opened + 1] = path
 			if tx and not _capture_source_member(tx, path, keyboard_slot, false) then
 				return false, "original source cleanup authority refused"
+			end
+			if _intercept then
+				-- Discovery is a pathname snapshot. Only the opened fd identifies
+				-- the complete stream this grab would take from the desktop.
+				local query = _input_reader_ports.event_capabilities
+				local finder = package.loaded["modules.hotstrings.device_finder"]
+				local policy = type(finder) == "table" and rawget(finder, "is_interceptable_event_mask")
+				local called, mask = false, nil
+				if type(query) == "function" and rawget(EvdevReader, "event_capabilities") == query then
+					called, mask = pcall(query, slot)
+				end
+				local checked, allowed = false, false
+				if called and mask ~= nil and type(policy) == "function" then checked, allowed = pcall(policy, mask) end
+				if not checked or allowed ~= true or rawget(EvdevReader, "event_capabilities") ~= query
+					or package.loaded["modules.hotstrings.device_finder"] ~= finder
+					or rawget(finder, "is_interceptable_event_mask") ~= policy
+					or tx and not _source_transaction_current(tx) then
+					_close_paths(opened, keyboard_slot, tx)
+					return false, "opened device cannot be intercepted by the keyboard output"
+				end
 			end
 			if _intercept and not EvdevReader.grab(slot) then
 				_close_paths(opened, keyboard_slot, tx)

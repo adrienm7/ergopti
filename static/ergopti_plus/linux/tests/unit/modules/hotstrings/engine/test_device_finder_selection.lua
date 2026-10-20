@@ -408,3 +408,18 @@ helpers.describe("device finder: switches cannot share a keyboard-only grab", fu
 		helpers.assert_true(finder.is_interceptable_key_device("/dev/input/event9", devices))
 	end)
 end)
+
+helpers.describe("device_finder: shared descriptor mask policy", function()
+	for _, mask in ipairs({ 0x2, 0x3, 0x120013, 0x80000002 }) do
+		helpers.it("accepts a key-only event mask " .. mask, function()
+			local finder = helpers.load_module("modules.hotstrings.device_finder")
+			helpers.assert_true(finder.is_interceptable_event_mask(mask))
+		end)
+	end
+	for _, mask in ipairs({ 0, 1, 7, 11, 0x33, -1, 0x100000002, 2.5, "2", false }) do
+		helpers.it("refuses an unsupported or invalid event mask " .. tostring(mask), function()
+			local finder = helpers.load_module("modules.hotstrings.device_finder")
+			helpers.assert_eq(finder.is_interceptable_event_mask(mask), false)
+		end)
+	end
+end)

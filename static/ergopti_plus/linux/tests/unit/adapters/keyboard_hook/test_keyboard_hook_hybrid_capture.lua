@@ -23,7 +23,7 @@ local function with_device(mask, body, options)
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	local node, hook, reader = Fixture.fake_node("controlled hybrid capabilities")
 	local writer, output_owner
-	local state = { mask = mask }
+	local state = { mask = mask, fd_mask = options.fd_mask or mask }
 	local called, detail = pcall(function()
 		-- Hook's private CapsWord constructor also loads Layout. Build that
 		-- dependency with its real producer before the controlled XKB is installed,
@@ -50,18 +50,31 @@ local function with_device(mask, body, options)
 				local selected = actual.select_keyboards(snapshot())
 				return #selected == 1 and { node } or {}, {}
 			end,
+			is_interceptable_event_mask = actual.is_interceptable_event_mask,
 			is_key_device = function(path)
 				assert(path == node)
 				return actual.is_key_device("/dev/input/event7", snapshot())
 			end,
 			is_interceptable_key_device = function(path)
 				assert(path == node)
-				return actual.is_interceptable_key_device("/dev/input/event7", snapshot())
+				local admitted, why = actual.is_interceptable_key_device("/dev/input/event7", snapshot())
+				if options.after_validation then options.after_validation(state) end
+				return admitted, why
 			end,
 		}
 		package.loaded["modules.hotstrings.device_finder"] = finder
 		reader = helpers.load_module("adapters.evdev_reader")
 		local backend, log = Fixture.recorder()
+		log.capabilities = {}
+		backend.read_event_bits = function(fd, request, count)
+			assert(request == 0x80044520 and count == 4)
+			log.capabilities[#log.capabilities + 1] = fd
+			if options.query then return options.query(state, backend) end
+			local value = assert(tonumber(state.fd_mask, 16))
+			return string.char(value % 256, math.floor(value / 256) % 256,
+				math.floor(value / 65536) % 256, math.floor(value / 16777216) % 256)
+		end
+		if options.missing_query then backend.read_event_bits = nil end
 		local Input = require("infra.input_event")
 		local queue = {}
 		if options.transport then
@@ -96,6 +109,7 @@ local function with_device(mask, body, options)
 		end
 		hook = Fixture.load_hook()
 		state.hook, state.reader, state.log, state.finder, state.actual = hook, reader, log, finder, actual
+		state.backend = backend
 		function state.start(intercept)
 			return hook.start({ device = not options.auto and node or nil, pinned = not options.auto, intercept = intercept,
 				onEmitRaw = function(code, value) return not writer or writer.emit(code, value) end })
@@ -105,7 +119,7 @@ local function with_device(mask, body, options)
 		end
 		function state.reappear(next_mask)
 			assert(reader.close("keyboard:" .. node))
-			state.mask = next_mask
+			state.mask, state.fd_mask = next_mask, next_mask
 			Fixture.tick_until_check(hook, 1)
 		end
 		if options.missing then assert(os.remove(node)) end
@@ -113,7 +127,10 @@ local function with_device(mask, body, options)
 	end)
 	if hook then hook.stop() end
 	if reader then
-		assert(reader.close("keyboard:" .. node))
+		local closed, reason = reader.close("keyboard:" .. node)
+		if options.expect_close_debt then
+			assert(closed == false and type(reason) == "string", "unknown retirement must remain a failure")
+		else assert(closed) end
 		assert(not reader.is_open("keyboard:" .. node))
 		reader._reset_backend()
 	end
@@ -271,6 +288,152 @@ helpers.describe("keyboard_hook: mixed key and tablet switch transport", functio
 				helpers.assert_eq(s.log.consumed, {})
 				helpers.assert_eq(s.log.output, {})
 			end, { transport = true, [row[1]] = true })
+		end)
+	end
+end)
+
+helpers.describe("keyboard_hook: descriptor capability admission", function()
+	local mixed = { { 5, 1, 1 }, { 0, 0, 0 }, { 1, 238, 1 }, { 0, 0, 0 },
+		{ 1, 238, 0 }, { 0, 0, 0 }, { 5, 1, 0 }, { 0, 0, 0 } }
+	for _, row in ipairs({ { "EV_REL", "7" }, { "EV_ABS", "b" }, { "EV_SW", "33" }, { "no EV_KEY", "1" } }) do
+		for _, auto in ipairs({ true, false }) do
+			helpers.it("refuses opened " .. row[1] .. " after a stale " .. (auto and "discovery" or "pin") .. " snapshot", function()
+				with_device("120013", function(s)
+					s.queue(mixed); s.start(true); s.hook.pump()
+					helpers.assert_eq(s.hook.isRunning(), false)
+					helpers.assert_eq(#s.log.opens, 1, "the actual successor must be opened to identify its fd")
+					helpers.assert_eq(s.log.capabilities, { 1 })
+					helpers.assert_eq(s.log.ioctls, {}, "a stale pathname admission cannot authorize EVIOCGRAB")
+					helpers.assert_eq(s.log.consumed, {}, "unsupported desktop packets must remain unread")
+					helpers.assert_eq(s.log.output, {})
+					helpers.assert_eq(s.log.closes, 1, "the rejected successor must retire exactly once")
+				end, { transport = true, auto = auto, fd_mask = row[2] })
+			end)
+		end
+	end
+
+	helpers.it("rejects an eventN successor that changes after the original pin predicate returns", function()
+		with_device("120013", function(s)
+			s.queue(mixed); s.start(true); s.hook.pump()
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.mask, "33")
+			helpers.assert_eq(s.log.ioctls, {})
+			helpers.assert_eq(s.log.consumed, {})
+		end, { transport = true, after_validation = function(s) s.mask, s.fd_mask = "33", "33" end })
+	end)
+
+	helpers.it("checks the opened successor again during pinned reacquisition", function()
+		with_device("120013", function(s)
+			s.start(true); helpers.assert_true(s.hook.isRunning())
+			s.backend.open = function(path)
+				s.log.opens[#s.log.opens + 1] = path; s.fd_mask = "33"; return #s.log.opens
+			end
+			s.reappear("120013")
+			helpers.assert_eq(#s.log.opens, 2)
+			helpers.assert_eq(s.log.capabilities, { 1, 2 })
+			helpers.assert_eq(s.log.ioctls, { 1, 0 }, "only the retired keyboard may ever have been grabbed")
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.log.closes, 2)
+		end)
+	end)
+
+	for _, row in ipairs({
+		{ "missing query", { missing_query = true } },
+		{ "query error", { query = function() error("controlled ioctl failure") end } },
+		{ "negative acknowledgement", { query = function() return nil, "query refused" end } },
+		{ "short bitset", { query = function() return string.char(19, 0, 18) end } },
+		{ "long bitset", { query = function() return string.char(19, 0, 18, 0, 0) end } },
+		{ "changed query port", { query = function(_, backend)
+			backend.read_event_bits = function() return string.char(19, 0, 18, 0) end
+			return string.char(19, 0, 18, 0)
+		end } },
+	}) do
+		helpers.it("rolls back the opened descriptor on " .. row[1], function()
+			with_device("120013", function(s)
+				s.start(true)
+				helpers.assert_eq(s.hook.isRunning(), false)
+				helpers.assert_eq(s.log.ioctls, {})
+				helpers.assert_eq(s.log.closes, 1)
+			end, row[2])
+		end)
+	end
+
+	helpers.it("refuses interception without the shared fd mask policy", function()
+		with_device("120013", function(s)
+			s.finder.is_interceptable_event_mask = nil
+			s.start(true)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.log.ioctls, {})
+		end)
+	end)
+
+	helpers.it("does not require a capabilities ioctl for non-grabbing observe mode", function()
+		with_device("33", function(s)
+			s.queue(mixed); s.start(false); s.hook.pump()
+			helpers.assert_true(s.hook.isRunning())
+			helpers.assert_eq(s.log.capabilities, {})
+			helpers.assert_eq(s.log.consumed, mixed)
+			helpers.assert_eq(s.log.ioctls, {})
+		end, { transport = true, missing_query = true })
+	end)
+end)
+
+helpers.describe("keyboard_hook: rejected descriptor retirement", function()
+	helpers.it("does not claim or retry a rejected descriptor whose close is not acknowledged", function()
+		with_device("120013", function(s)
+			s.backend.close = function() s.log.closes = s.log.closes + 1; return false, "controlled close uncertainty" end
+			s.start(true)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.log.ioctls, {})
+			helpers.assert_eq(s.log.closes, 1)
+			local closed, reason = s.reader.close("keyboard:" .. s.log.opens[1])
+			helpers.assert_eq(closed, false)
+			helpers.assert_type(reason, "string")
+			s.start(true)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(#s.log.opens, 1, "unknown retirement must fence the old source slot")
+			helpers.assert_eq(s.log.closes, 1, "retrying close could affect a recycled numeric fd")
+		end, { fd_mask = "33", expect_close_debt = true })
+	end)
+end)
+
+helpers.describe("keyboard_hook: original capability query port", function()
+	helpers.it("does not substitute a changed Reader query export", function()
+		with_device("120013", function(s)
+			s.reader.event_capabilities = function() return 0x120013 end
+			s.start(true)
+			helpers.assert_eq(s.hook.isRunning(), false)
+			helpers.assert_eq(s.log.ioctls, {})
+			helpers.assert_eq(s.log.closes, 1)
+		end)
+	end)
+end)
+
+helpers.describe("keyboard_hook: original fd cleanup authority", function()
+	for _, row in ipairs({
+		{ "switch capability", { event_bits = string.char(51, 0, 0, 0) } },
+		{ "incomplete ioctl ACK", { event_result = 0 } },
+		{ "unknown native close", { event_result = -1, fail_reader_close = true } },
+	}) do
+		helpers.it("retires the exact original open after " .. row[1] .. " refuses admission", function()
+			local options = {}
+			require("tests.support.input_owner_fixture").with_session(options, function(s)
+				assert(s.hook.stop() ~= false)
+				local closes = s.source_closes
+				for key, value in pairs(row[2]) do options[key] = value end
+				helpers.assert_eq(s.hook.start(s.start_options), false)
+				helpers.assert_eq(s.hook.isRunning(), false)
+				helpers.assert_eq(s.hook.capture_input_owner(), nil)
+				helpers.assert_eq(s.reader.is_open("keyboard:" .. s.paths.a), false)
+				helpers.assert_eq(s.reader.is_open("keyboard:" .. s.paths.b), false)
+				helpers.assert_eq(s.source_closes - closes, 1, "only the rejected original fd must be closed, exactly once")
+				helpers.assert_eq(s.reader.has_native_origin_debt(), options.fail_reader_close == true)
+				if options.fail_reader_close then
+					helpers.assert_eq(s.reader._reset_backend(), false)
+					helpers.assert_eq(s.hook.start(s.start_options), false)
+					helpers.assert_eq(s.source_closes - closes, 1, "unknown native retirement cannot be retried")
+				end
+			end)
 		end)
 	end
 end)
