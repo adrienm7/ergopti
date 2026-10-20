@@ -559,17 +559,32 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 	} finally Critical(PreviousCritical)
 }
 
-_LLM_Menu_RemoveActiveApiEntry() {
+_LLM_Menu_RemoveActiveApiEntry(Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _LLM_Menu_RemoveActiveApiEntry()
+		try return _LLM_Menu_RemoveActiveApiEntry(Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("API entry removal requires an optional native port Map.")
+	Options := Port is Map ? Port : Map()
+	ConfirmFn := Options.Get("confirm", Ui_MsgBox)
+	if !HasMethod(ConfirmFn, "Call")
+		throw TypeError("The API entry confirmation port is not callable.")
+	SourceOptions := Options.Get("source_options", Map())
+	if !(SourceOptions is Map)
+		throw TypeError("API entry source options must be a native Map.")
+	Owner := LLM_Menu_ApiPrivateSourceOwner(SourceOptions)
+	NotifyFn := Options.Get("notify", SourceOptions.Get("notify", 0))
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration is unavailable")
 	active_id := _LLM_Menu["api_entry_id"]
 	if (active_id == "")
-		return
+		return false
 	; Confirm before destroying the entry — the saved token is gone for
 	; good once we delete it. Worth one extra click, especially because
 	; the user is one stray click away in a small menu.
@@ -581,16 +596,26 @@ _LLM_Menu_RemoveActiveApiEntry() {
 		}
 	}
 	entry_name := (active_entry != "") ? _LLM_Menu_ApiEntryDisplayName(active_entry) : active_id
-	confirm := Ui_MsgBox(
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration changed before confirmation")
+	confirm := ConfirmFn.Call(
 		t("menu.llm.api_remove_confirm_body"),
 		StrReplace(t("menu.llm.api_remove_confirm_title"), "%s", entry_name),
 		"4 48"  ; Yes/No + warning icon
 	)
 	if (confirm != "Yes")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration changed during confirmation")
 	return LLM_Menu_CommitApiEntriesMutation("the LLM API-entry removal",
 		(Candidate) => _LLM_Menu_RemoveApiEntryCandidate(Candidate, active_id),
-		_LLM_Menu_ApplyApiEntriesCommitted)
+		SourceOptions.Get("apply", _LLM_Menu_ApplyApiEntriesCommitted), Owner.Port,
+		NotifyFn, SourceOptions.Get("acquire", 0), SourceOptions.Get("settle", 0),
+		SourceOptions.Get("collect", 0), SourceOptions.Get("build_config", 0),
+		SourceOptions.Get("serialize", 0), SourceOptions.Get("pause", 0),
+		Receipt, Owner, (*) => true)
 }
 
 _LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {
