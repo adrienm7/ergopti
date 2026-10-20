@@ -425,6 +425,19 @@ can never win over a static one. The number-row tap keys
 scancodes; a `#HotIf` that answers false hands the key to the emulation or the
 OS. `tools/test/test-tap-keys-single-source.cjs` pins that order.
 
+### project-capsword-sees-only-what-the-inputhook-sees
+
+CapsWord's auto-off (`modules/shortcuts/capsword_auto_off.ahk`) reads typed
+delimiters from the HookDispatcher InputHook, whose `I1` ignores level-0
+input: TextSender output, capsword.ahk's own Space/Enter sends and every
+tap-hold tap are invisible to it, while the layout emulation (level 2) is
+seen. So the Space/Enter hotkeys gate on `CapsWordAutoOffEndsOnNativeKey` in
+their `#HotIf` (unchecked, the key stays native and the InputHook sees it) and
+`_TapHoldTapEndsCapsWord` asks the same function for the tapped key id.
+Action: a new path that types a delimiter at level 0 must ask
+`CapsWordAutoOffEndsOnNativeKey` itself; the headless runner stubs
+DisableCapsWord, so tests arm through `CapsWordAutoOffArm` with a recorder.
+
 ### project-ahk-scan-code-hotkey-shadows-the-key-name
 
 One `SCnnn::` hotkey makes the hook resolve that physical key by its scan code

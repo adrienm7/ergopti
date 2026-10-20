@@ -524,6 +524,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/modules/features/number_row_policy.ahk
+#Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
@@ -1383,6 +1384,8 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 #Include modules/keymap/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
+; [shortcuts.caps_word], read before the first activation arms its listeners.
+CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")

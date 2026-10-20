@@ -1288,19 +1288,18 @@ _TH_HoldMakesShortcuts(ModKey) {
 	return false
 }
 
-; Tap-hold keys whose tap output is a word terminator, and therefore ends
-; CapsWord. Mirrors the keys capsword.ahk binds for the same purpose; anything
-; else (Backspace, Escape, Delete, CapsLock…) leaves CapsWord latched, which is
-; what makes it usable for a whole word.
-global TAP_HOLD_CAPSWORD_TERMINATORS := Map("space", true, "enter", true)
-
+; Whether a tap-hold key's tap ends CapsWord: its id names a word delimiter of
+; the hotstring catalogue ("space", "enter", "tab") that the CapsWord auto-off
+; settings check. The tap is sent at level 0, which the auto-off InputHook
+; never sees, so the dispatcher asks here. Any other key (Backspace, Escape,
+; Delete, CapsLock…) leaves CapsWord latched, which is what makes it usable for
+; a whole word.
 _TapHoldTapEndsCapsWord(KeyId) {
-	global TAP_HOLD_CAPSWORD_TERMINATORS
-	if !TAP_HOLD_CAPSWORD_TERMINATORS.Has(KeyId)
-		return false
 	; IsSet-guarded: the tap-hold layer is reachable in contexts where
 	; shortcuts/capsword.ahk is not loaded (standalone tests, tools).
-	return IsSet(CapsWordEnabled) and CapsWordEnabled and IsSet(DisableCapsWord)
+	if !IsSet(CapsWordEnabled) or !CapsWordEnabled or !IsSet(DisableCapsWord)
+		return false
+	return CapsWordAutoOffIsTerminatorKey(KeyId) and CapsWordAutoOffEndsOnNativeKey(KeyId)
 }
 
 ; Invoke the configured GESTURE_ACTIONS callback without applying guards. This

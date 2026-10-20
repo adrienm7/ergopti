@@ -21,13 +21,21 @@
 _CPTC_CallbackViaStaticAccessor() {
 	AccBody := _DriverFuncBody("_CapsWord_Callback")
 	Assert(AccBody != "", "capsword must expose a _CapsWord_Callback() accessor")
-	Assert(InStr(AccBody, "static Bound := _CapsWord_HandleMouseDown.Bind()") > 0,
+	Assert(InStr(AccBody, "static Bound := _CapsWord_HandleAutoOff.Bind()") > 0,
 		"_CapsWord_Callback must lazily bind via a static initializer (resolvable any time after parse, identity-stable)")
+
+	; The auto-off listeners are bound the same way: one static map of callbacks.
+	Listeners := _DriverFuncBody("_CapsWordAutoOffCallbacks")
+	Assert(Listeners != "", "capsword_auto_off must expose a _CapsWordAutoOffCallbacks() accessor")
+	Assert(InStr(Listeners, "static Bound := _CapsWordAutoOffBindCallbacks()") > 0,
+		"the auto-off listeners must bind via a static initializer, identity-stable for Unregister")
 
 	Toggle := _DriverFuncBody("ToggleCapsWord")
 	Disable := _DriverFuncBody("DisableCapsWord")
-	Assert(InStr(Toggle, "_CapsWord_Callback()") > 0 && InStr(Disable, "_CapsWord_Callback()") > 0,
-		"ToggleCapsWord and DisableCapsWord must register/unregister via the accessor, not a module-scope global")
+	Assert(InStr(Toggle, "CapsWordAutoOffArm(_CapsWord_Callback())") > 0,
+		"ToggleCapsWord must arm the listeners with the accessor, not a module-scope global")
+	Assert(InStr(Toggle, "CapsWordAutoOffDisarm()") > 0 && InStr(Disable, "CapsWordAutoOffDisarm()") > 0,
+		"ToggleCapsWord and DisableCapsWord must both disarm the listeners")
 
 	Src := _DriverSourceNoComments()
 	Assert(InStr(Src, "_CapsWord_OnMouseDown") = 0,
