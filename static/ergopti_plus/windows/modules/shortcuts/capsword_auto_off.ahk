@@ -396,6 +396,25 @@ CapsWordAutoOffEndsOnNativeKey(Key) {
 ; =================================
 ; =================================
 
+/**
+ * Sends the native CapsWord delimiter and retires only its original activation.
+ * Space keeps its bounded release wait; neither the send nor wait is Critical.
+ * @param Key {String} Space or Enter, selected by the native hotkey.
+ * @param SendFn {Func} TextPressKey boundary; tests retain it without OS output.
+ * @param WaitFn {Func} KeyWait boundary; tests control the pending release.
+ */
+CapsWordAutoOffNativeKey(Key, SendFn := TextPressKey, WaitFn := KeyWait) {
+	global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC
+	Generation := CapsWordAutoOff.Generation
+	try {
+		SendFn.Call(Key, [])
+		if Key == "Space"
+			WaitFn.Call("SC039", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	} finally {
+		_CapsWordAutoOffEnd(Generation, "native " . Key)
+	}
+}
+
 ; Whether an armed listener still speaks for an active CapsWord. A flag cleared
 ; without DisableCapsWord leaves listeners that disarm themselves here.
 _CapsWordAutoOffActive(Generation) {
