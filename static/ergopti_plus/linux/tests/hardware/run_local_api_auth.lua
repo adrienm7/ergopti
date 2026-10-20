@@ -158,7 +158,7 @@ check(discovery_calls == 1 and #Servers.detected() == 4 and Servers.result("omlx
 local backend, writes = "ollama", 0
 local rows = require("ui.menu.local_server_rows").rows({
 	get_backend = function() return backend end,
-	can_configure_local_servers = function() return true end,
+	can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 	set_backend = function(value) backend, writes = value, writes + 1; return true end,
 }, { prompt = function() return nil end, error = function() end }, function() end,
 	{ is_paused = function() return false end })
@@ -227,7 +227,7 @@ for index, configured in ipairs(configured_entries) do
 		configured.provider .. " actual configured discovery retains its exact optional authentication")
 	local configured_rows = require("ui.menu.local_server_rows").rows({
 		get_backend = function() return backend end,
-		can_configure_local_servers = function() return true end,
+		can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 		set_backend = function(value) backend, writes = value, writes + 1; return true end,
 	}, { prompt = function() return nil end, error = function() end }, function() end,
 		{ is_paused = function() return false end })
@@ -280,7 +280,7 @@ end
 check(#Servers.detected() == 6, "empty model lists retain all actual reachable server views")
 local empty_rows = require("ui.menu.local_server_rows").rows({
 	get_backend = function() return backend end,
-	can_configure_local_servers = function() return true end,
+	can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 	set_backend = function() error("empty model rows cannot acquire the backend setter") end,
 }, { prompt = function() return nil end, error = function() end }, function() end,
 	{ is_paused = function() return false end })
