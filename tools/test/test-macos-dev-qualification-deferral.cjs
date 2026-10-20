@@ -600,8 +600,7 @@ function sourceProblems(pkg, mac, rootCaller) {
 		'Smoke test built ErgoptiPlus.app',
 		'Sign declared archives with Sparkle EdDSA key',
 		'Generate Sparkle appcast',
-		'Install the package the way a user does',
-		'Launch over the user state and judge it'
+		'Install, launch and judge every scenario of the lot'
 	])
 		requireText(mac, name, 'preserved-' + name);
 	const callerStart = rootCaller.indexOf('    uses: ./.github/workflows/ci-macos.yml\n');

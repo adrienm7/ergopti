@@ -39,6 +39,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const pipeline = require('./ci-full-default.cjs');
 const Mac = require('./fixtures/macos-stage-source.cjs');
+// The macOS launch job installs, launches and records every scenario of its lot in one step.
+const LOT_STEP = 'Install, launch and judge every scenario of the lot';
 
 const root = path.resolve(__dirname, '..', '..');
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
@@ -1813,10 +1815,10 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 		const launchSteps = ownerPipeline.steps(launchJob).map((candidate) => candidate.name);
 		if (
 			launchSteps.indexOf('Download the independent CI archive source') >=
-			launchSteps.indexOf('Install the package the way a user does')
+			launchSteps.indexOf(LOT_STEP)
 		)
 			problems.push('download_order');
-		const install = script(launchJob, 'Install the package the way a user does');
+		const install = script(launchJob, LOT_STEP);
 		if (
 			!install.includes('--ci-install "$RUNNER_TEMP/package" /Applications "$stamp"') ||
 			install.includes('ditto -x -k') ||
@@ -1826,8 +1828,14 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			!install.includes('test ! -e /Applications/ErgoptiPlus.app')
 		)
 			problems.push('launch_install');
-		const evidence = script(launchJob, 'Record mandatory launch evidence');
-		if (!evidence.includes('"$MACOS_INSTALL_ARCHIVE"') || evidence.includes('ErgoptiPlus.app.zip'))
+		// The evidence of each scenario names the archive that scenario installed.
+		const evidence = script(launchJob, LOT_STEP);
+		if (
+			!/record-macos \\\n\s+"\$output\/result\.json" \\\n\s+"\$MACOS_INSTALL_ARCHIVE" \\\n/.test(
+				evidence
+			) ||
+			evidence.includes('ErgoptiPlus.app.zip')
+		)
 			problems.push('installed_evidence');
 		return problems;
 	}
@@ -1851,8 +1859,8 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 		],
 		[
 			'installed_evidence',
-			'"$MACOS_INSTALL_ARCHIVE"',
-			'"$RUNNER_TEMP/package/ErgoptiPlus.app.zip"'
+			'"$output/result.json" \\\n                "$MACOS_INSTALL_ARCHIVE"',
+			'"$output/result.json" \\\n                "$RUNNER_TEMP/package/ErgoptiPlus.app.zip"'
 		],
 		[
 			'source_download',

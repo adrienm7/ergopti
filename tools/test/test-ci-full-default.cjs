@@ -1435,7 +1435,10 @@ check('v101 Shortcuts keeps portable/full work and publishes its validated exact
 check('v101 AppleEvents records only exact transport rows and preserves installed launch', () => {
 	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'launch');
-	const code = Raw.runOf(Raw.step(job.body, 'Record the launch qualification scope')).join('\n');
+	// One lot launches several scenarios; each records and validates its own receipt first.
+	const code = Raw.runOf(
+		Raw.step(job.body, 'Install, launch and judge every scenario of the lot')
+	).join('\n');
 	assert(
 		code.includes(
 			'policy.validateLaunchQualificationReceipt(receipt, scenario, runner, process.env.GITHUB_SHA, policy.environmentContext())'
@@ -1450,7 +1453,7 @@ check('v101 AppleEvents records only exact transport rows and preserves installe
 		Raw.stepField(upload, 'if'),
 		macRole.condition(
 			'launch',
-			"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+			"${{ contains(format('__{0}__', matrix.scenario), '__clean__') || contains(format('__{0}__', matrix.scenario), '__karabiner_config__') }}"
 		)
 	);
 	assert(
@@ -1458,14 +1461,18 @@ check('v101 AppleEvents records only exact transport rows and preserves installe
 			'name: assets-qualification-launch-macos-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}'
 		)
 	);
+	for (const scenario of ['clean', 'karabiner_config'])
+		assert(
+			upload.includes(
+				`\${{ runner.temp }}/stable-macos-launch-appleevents-${scenario}-\${{ env.MACOS_STAGE_RUNNER }}.json`
+			)
+		);
 	assert(upload.includes('if-no-files-found: error'));
-	const launch = Raw.runOf(Raw.step(job.body, 'Launch over the user state and judge it')).join(
-		'\n'
-	);
 	assert(
-		launch.includes('python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app')
+		code.includes('python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app')
 	);
-	assert(launch.includes('--qualification-receipt "$RUNNER_TEMP/launch-qualification.json"'));
+	assert(code.includes('--qualification-receipt "$receipt"'));
+	assert(code.indexOf('--scope macos-launch-appleevents') < code.indexOf('macos_launch_gate.py'));
 	assert(entry.text.includes('node tools/build/macos-release-archives.cjs --ci-install'));
 });
 

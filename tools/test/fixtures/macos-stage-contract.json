@@ -837,25 +837,17 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
-					"name": "Install the package the way a user does",
+					"name": "Record the fresh runner state before the first launch",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
-					"name": "Record the launch qualification scope",
+					"name": "Install, launch and judge every scenario of the lot",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
 				},
 				{
 					"name": "Retain source-bound AppleEvent launch qualification receipt",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config') }}"
-				},
-				{
-					"name": "Launch over the user state and judge it",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
-				},
-				{
-					"name": "Record mandatory launch evidence",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__clean__') || contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__karabiner_config__')) }}"
 				},
 				{
 					"name": "Retain launch evidence",

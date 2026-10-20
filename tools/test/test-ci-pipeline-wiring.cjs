@@ -654,7 +654,7 @@ const STEP_CONDITIONS = [
 		MACOS_BOX,
 		'launch',
 		'Retain source-bound AppleEvent launch qualification receipt',
-		"${{ env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config' }}"
+		"${{ contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__clean__') || contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__karabiner_config__') }}"
 	],
 	[
 		MACOS_BOX,
@@ -1429,7 +1429,13 @@ for (const [producer, consumer, stage, roleStep, role] of [
 		'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)',
 		'e2e-hs'
 	],
-	['package-macos', 'launch', 'testbuild', 'Launch over the user state and judge it', 'launch']
+	[
+		'package-macos',
+		'launch',
+		'testbuild',
+		'Install, launch and judge every scenario of the lot',
+		'launch'
+	]
 ]) {
 	const key = stage + '_matrix';
 	const reference = 'needs.' + producer + '.outputs.' + key;

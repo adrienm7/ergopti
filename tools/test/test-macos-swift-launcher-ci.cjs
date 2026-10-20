@@ -799,11 +799,16 @@ for (const release of [false, true]) {
 			scenarios
 		})
 		.filter((cell) => cell.role === 'launch');
+	// Each runner launches every scenario exactly once, in canonical order, across its lots.
 	const expected = (release ? ['macos-15', 'macos-15-intel'] : ['macos-15']).flatMap((runner) =>
 		scenarios.map((scenario) => [runner, scenario])
 	);
 	check(
-		JSON.stringify(cells.map((cell) => [cell.runner, cell.scenario])) === JSON.stringify(expected),
+		JSON.stringify(
+			cells.flatMap((cell) =>
+				macPlans.lotScenarios(cell.scenario).map((scenario) => [cell.runner, scenario])
+			)
+		) === JSON.stringify(expected),
 		'(symlinked-config-dir) every scenario retains the exact per-profile native runner matrix'
 	);
 }
@@ -854,7 +859,8 @@ check(
 );
 // The judge is the gate itself: it must run the verdict script on the installed
 // app for this leg's scenario, and neither skip nor forgive a red verdict.
-const judge = pipeline.step(launch, 'Launch over the user state and judge it');
+// One lot judges each of its scenarios in turn, inside one installed-app step.
+const judge = pipeline.step(launch, 'Install, launch and judge every scenario of the lot');
 check(
 	pipeline.stepField(judge, 'if') === macRole.condition('launch') &&
 		pipeline.stepField(judge, 'continue-on-error') === null,
@@ -867,10 +873,11 @@ check(
 	'the installed-app judge scenario must come from the complete adjacent Build metadata'
 );
 const JUDGE_RUN =
-	/^python3 tools\/diagnostics\/macos_launch_gate\.py \/Applications\/ErgoptiPlus\.app "\$RUNNER_TEMP\/launch-gate" "\$\{\{ env\.MACOS_STAGE_SCENARIO \}\}"(?:\s|$)/;
+	/^ {12}python3 tools\/diagnostics\/macos_launch_gate\.py \/Applications\/ErgoptiPlus\.app \\\n {16}"\$output" "\$scenario" --seed-tag "\$SEED_TAG" \\\n/m;
+const LOT_SCENARIOS = /^ {10}read -r -a scenarios <<< "\$\{MACOS_STAGE_SCENARIO\/\/__\/ \}"$/m;
 check(
-	JUDGE_RUN.test(pipeline.stepField(judge, 'run') ?? ''),
-	'(symlinked-config-dir) the launch verdict step must run macos_launch_gate.py on the installed app for the matrix scenario'
+	JUDGE_RUN.test(judge) && LOT_SCENARIOS.test(judge),
+	'(symlinked-config-dir) the launch verdict step must run macos_launch_gate.py on the installed app for every scenario of its lot'
 );
 check(
 	!fs.existsSync(path.join(ROOT, '.github', 'workflows', 'macos-launch-gate.yml')),

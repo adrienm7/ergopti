@@ -135,14 +135,63 @@ function plan(stage, context) {
 	}
 	if (stage === 'build') return [cell('package-macos', 'macos-latest', 'host', 45)];
 	assert.equal(stage, 'testbuild');
+	const runners = context.release ? ['macos-15', 'macos-15-intel'] : ['macos-15'];
 	return [
-		...(context.release ? ['macos-15', 'macos-15-intel'] : ['macos-15']).flatMap((runner) =>
-			context.scenarios.map((scenario) =>
-				cell('launch', runner, runner === 'macos-15' ? 'arm64' : 'amd64', 12, scenario)
+		...runners.flatMap((runner) =>
+			launchLots(context.scenarios, runners.length).map((lot) =>
+				cell(
+					'launch',
+					runner,
+					runner === 'macos-15' ? 'arm64' : 'amd64',
+					LAUNCH_SETUP_MINUTES + LAUNCH_SCENARIO_MINUTES * lot.length,
+					lot.join(LOT_SEPARATOR)
+				)
 			)
 		),
 		cell('cold-bootstrap-native', 'macos-15', 'arm64', 90)
 	];
+}
+
+/**
+ * The launch jobs of one run. The account runs five macOS jobs at a time, so
+ * four launch lots beside the cold bootstrap start together instead of one
+ * scenario per job in waves of five.
+ */
+const LAUNCH_LOTS = 4;
+const LAUNCH_SETUP_MINUTES = 6;
+const LAUNCH_SCENARIO_MINUTES = 5;
+// A lot is its scenarios in canonical order, joined; no scenario name holds it.
+const LOT_SEPARATOR = '__';
+
+/** Splits the canonical scenarios into contiguous, balanced, non-empty lots per runner. */
+function launchLots(scenarios, runnerCount) {
+	assert.ok([1, 2].includes(runnerCount), 'Unknown launch runner count');
+	assert.ok(
+		scenarios.every((name) => !name.includes(LOT_SEPARATOR)),
+		'A scenario name holds the lot separator'
+	);
+	const count = LAUNCH_LOTS / runnerCount;
+	const lots = [];
+	for (let index = 0; index < count; index++) {
+		const lot = scenarios.slice(
+			Math.round((index * scenarios.length) / count),
+			Math.round(((index + 1) * scenarios.length) / count)
+		);
+		if (lot.length > 0) lots.push(lot);
+	}
+	assert.deepEqual(lots.flat(), scenarios, 'Every scenario belongs to exactly one lot');
+	return lots;
+}
+
+/** The scenarios of one launch lot, each a canonical scenario name. */
+function lotScenarios(scenario) {
+	const names = scenario.split(LOT_SEPARATOR);
+	assert.ok(
+		names.every((name) => /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/.test(name)),
+		'Invalid launch lot'
+	);
+	assert.equal(new Set(names).size, names.length, 'Duplicate launch lot scenario');
+	return names;
 }
 
 /** Gives an admitted cell one human label without changing its runtime identity. */
@@ -165,8 +214,8 @@ function roleLot(stage, role, architecture, scenario) {
 		return scenario;
 	}
 	if (stage === 'testbuild' && role === 'launch') {
-		assert.match(scenario, /^[a-z][a-z0-9_]*$/);
-		return 'Installed app: ' + scenario.replace(/_/g, ' ') + ' (' + native() + ')';
+		const names = lotScenarios(scenario).map((name) => name.replace(/_/g, ' '));
+		return 'Installed app: ' + names.join(', ') + ' (' + native() + ')';
 	}
 	if (
 		stage === 'e2e' &&
@@ -631,6 +680,8 @@ module.exports = {
 	PREDECESSORS,
 	priorStages,
 	plan,
+	launchLots,
+	lotScenarios,
 	humanLot,
 	roleLot,
 	displayPlan,
