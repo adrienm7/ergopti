@@ -712,6 +712,32 @@ async function modelMain(f, code, options = {}) {
 		});
 		refuses(() => f.api.candidateSourceReceipt(f.context), /Ambiguous/);
 	});
+	control('a Windows path stat without a device still names the acquired file', () => {
+		// Node on Windows 11 reports st_dev 0 for a path stat and the volume
+		// serial for a handle stat; the sealer refused every valid checkout.
+		const f = fixture();
+		const handle = { dev: 3491086904n };
+		assert.equal(f.api.sameNamedDevice({ dev: 0n }, handle, 'win32'), true);
+		assert.equal(f.api.sameNamedDevice({ dev: 3491086904n }, handle, 'win32'), true);
+		assert.equal(f.api.sameNamedDevice({ dev: 7n }, handle, 'win32'), false);
+		for (const platform of ['linux', 'darwin'])
+			assert.equal(f.api.sameNamedDevice({ dev: 0n }, handle, platform), false);
+		const file = path.join(f.directory, 'native-identity.bin');
+		fs.writeFileSync(file, 'independent native identity bytes');
+		const descriptor = fs.openSync(file, 'r');
+		try {
+			const named = fs.lstatSync(file, { bigint: true });
+			const acquired = fs.fstatSync(descriptor, { bigint: true });
+			assert.equal(named.ino, acquired.ino);
+			assert.equal(f.api.sameNamedDevice(named, acquired), true);
+		} finally {
+			fs.closeSync(descriptor);
+		}
+		assert.equal(
+			f.api.readSourceFile(file).identity.ino,
+			String(fs.lstatSync(file, { bigint: true }).ino)
+		);
+	});
 	control('strong acquired bytes identity and maximum are actual filesystem facts', () => {
 		const f = fixture(),
 			file = path.join(f.directory, 'reader-vector.bin');
@@ -995,7 +1021,7 @@ async function modelMain(f, code, options = {}) {
 			'2b00c32567273c9e671b3460fe54b52059032b0188f10103076523d58b59eb01'
 		);
 	});
-	assert.equal(records.length, 22);
+	assert.equal(records.length, 23);
 	assert.equal(
 		records.every((x) => x.status === 'PASS' || x.status === 'SKIP'),
 		true
@@ -1018,7 +1044,7 @@ async function modelMain(f, code, options = {}) {
 			2
 		) + '\n'
 	);
-	process.stdout.write('WINDOWS_UPDATER_SOURCE controls=22 native=false official=false\n');
+	process.stdout.write('WINDOWS_UPDATER_SOURCE controls=23 native=false official=false\n');
 })().catch((error) => {
 	fs.writeFileSync(
 		path.join(root, 'source-controls.first-failure.json'),

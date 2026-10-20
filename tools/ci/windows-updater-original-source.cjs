@@ -36,6 +36,14 @@ const SOURCE_ROOTS = Object.freeze([
 	'package.json',
 	'package-lock.json'
 ]);
+// Node's path stat on current Windows 11 builds (libuv's by-name file query)
+// leaves st_dev at 0 while a handle stat reports the volume serial, so every
+// receiving refused on a valid Windows checkout. There the named identity
+// rests on the file index, unique per volume, and the handle's device stays
+// pinned across the receiving; every other platform compares devices exactly.
+function sameNamedDevice(named, acquired, platform = process.platform) {
+	return named.dev === acquired.dev || (platform === 'win32' && named.dev === 0n);
+}
 function readSourceFile(file, maximum = 33554432) {
 	const named = fs.lstatSync(file, { bigint: true });
 	demand(
@@ -54,7 +62,7 @@ function readSourceFile(file, maximum = 33554432) {
 			acquired.isFile() &&
 				acquired.nlink === 1n &&
 				acquired.size <= BigInt(maximum) &&
-				acquired.dev === named.dev &&
+				sameNamedDevice(named, acquired) &&
 				acquired.ino === named.ino,
 			'Source/image acquisition refused.'
 		);
@@ -76,7 +84,7 @@ function readSourceFile(file, maximum = 33554432) {
 				finalNamed.nlink === 1n &&
 				final.dev === acquired.dev &&
 				final.ino === acquired.ino &&
-				finalNamed.dev === acquired.dev &&
+				sameNamedDevice(finalNamed, acquired) &&
 				finalNamed.ino === acquired.ino &&
 				final.size === acquired.size &&
 				BigInt(bytes.length) === acquired.size &&
@@ -313,4 +321,9 @@ function localInvocation(args) {
 	};
 }
 
-module.exports = { readSourceFile, candidateSourceReceipt: receiveSourceReceipt, localInvocation };
+module.exports = {
+	readSourceFile,
+	sameNamedDevice,
+	candidateSourceReceipt: receiveSourceReceipt,
+	localInvocation
+};
