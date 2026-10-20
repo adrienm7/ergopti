@@ -26,6 +26,7 @@ from macos_physical_shortcuts_close import qualify as qualify_physical_shortcuts
 from macos_action_picker_pool import qualify as qualify_action_picker_pool
 from macos_layout_manager_pool import qualify as qualify_layout_manager_pool
 from macos_permission_dialog_pool import qualify as qualify_permission_dialog_pool
+from macos_metrics_apps_page import qualify as qualify_metrics_apps_page
 
 
 def require(condition, message):
@@ -347,6 +348,8 @@ def run(repo, app, output):
             "macos_permission_dialog_pool.py",
             "macos_permission_dialog_pool.lua",
             "macos_permission_dialog_pool_observer.lua",
+            "macos_metrics_apps_page.py",
+            "macos_metrics_apps_page.lua",
             "hs_native_bootstrap_probe.py",
             "hs_native_bootstrap.lua",
             "hs_script_scope_native.lua",
@@ -465,6 +468,16 @@ def run(repo, app, output):
             owner.NativeProcessGroups(),
         )
         report["native_permission_dialog_pool"] = qualify_permission_dialog_pool(
+            repo,
+            executable,
+            scratch,
+            output,
+            version,
+            unchanged,
+            owned_observation,
+            owner.NativeProcessGroups(),
+        )
+        report["native_metrics_apps_page"] = qualify_metrics_apps_page(
             repo,
             executable,
             scratch,

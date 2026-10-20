@@ -33,7 +33,8 @@ function run({
 		['macos_physical_shortcuts_close_test.py', 23],
 		['macos_action_picker_pool_test.py', 19],
 		['macos_layout_manager_pool_test.py', 22],
-		['macos_permission_dialog_pool_test.py', 23]
+		['macos_permission_dialog_pool_test.py', 23],
+		['macos_metrics_apps_page_test.py', 23]
 	]) {
 		const result = spawn(
 			python,
@@ -53,7 +54,8 @@ function run({
 			Number(count[1]) < minimum ||
 			!/^OK$/m.test(output) ||
 			((pattern === 'macos_layout_manager_pool_test.py' ||
-				pattern === 'macos_permission_dialog_pool_test.py') &&
+				pattern === 'macos_permission_dialog_pool_test.py' ||
+				pattern === 'macos_metrics_apps_page_test.py') &&
 				(count[1] !== String(minimum) ||
 					(output.match(/^Ran /gm) || []).length !== 1 ||
 					(output.match(/^OK$/gm) || []).length !== 1 ||
