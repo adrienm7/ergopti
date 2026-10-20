@@ -1445,6 +1445,7 @@ local function main()
 			triggers      = { "//", ";;", "--" },
 			overlay       = llm_overlay,
 			apply_prediction = function(candidate, context, authorized)
+				if opts.dry_run then return false, "dry_run" end
 				if type(context) ~= "table" or type(context.focus) ~= "string" or context.focus == ""
 					or type(authorized) ~= "function" or not authorized() then return false end
 				local destination = secure_focus_guard.capture_text_owner(context.focus)

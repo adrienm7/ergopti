@@ -23,7 +23,8 @@ local function scenario(action, phase, body)
 		for _, name in ipairs({ "modules.keylogger.focus_guard", "modules.keylogger.keylogger", "adapters.secure_field_detector",
 			"adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end
 		local state = { bus = ":1.23", path = "/field/original", role = 61, now = 1000,
-			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false }
+			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
+			owner_captures = 0, apply_admissions = 0, clipboard_reads = 0 }
 		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
 		logger.set_sink(function() end)
 		logger.set_error_observer(function(_, template) state.errors[#state.errors + 1] = template end)
@@ -63,6 +64,11 @@ local function scenario(action, phase, body)
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,
 		})
+		local capture_text_owner = guard.capture_text_owner
+		guard.capture_text_owner = function(...)
+			state.owner_captures = state.owner_captures + 1
+			return capture_text_owner(...)
+		end
 		local function transition(point)
 			if not state.armed or state.triggered or phase ~= point then return end
 			state.triggered = true
@@ -82,7 +88,10 @@ local function scenario(action, phase, body)
 		local commands = {}
 		package.loaded["adapters.shell_runner"] = {
 			has_command = function() return true end,
-			exec_checked = function() transition("read"); return true, "SAVED" end,
+			exec_checked = function()
+				state.clipboard_reads = state.clipboard_reads + 1
+				transition("read"); return true, "SAVED"
+			end,
 			with_exact_stdin = function(_, text)
 				local command = "controlled-prediction-clipboard-" .. (#commands + 1)
 				commands[#commands + 1] = { command = command, text = text }; return command
@@ -120,7 +129,14 @@ local function scenario(action, phase, body)
 		local last = assert(source:find("\n\t\t\tend,", first, true))
 		local expression = source:sub(first + #"\t\t\tapply_prediction = ", last + #"\n\t\t\tend" - 1)
 		local compile = loadstring or load
-		local apply = assert(compile("return function(injector, secure_focus_guard) return " .. expression .. " end"))()(injector, guard)
+		local main_apply = assert(compile("return function(injector, secure_focus_guard, opts) return " .. expression .. " end"))()(
+			injector, guard, { dry_run = action == "dry-run" })
+		local function apply(candidate, context, authorized)
+			return main_apply(candidate, context, function()
+				state.apply_admissions = state.apply_admissions + 1
+				return authorized()
+			end)
+		end
 		local scheduler = require("tests.fakes").timer_scheduler()
 		engine.init({ scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 			engine = { current_buffer = function() return "btw" end, reset = function() state.resets = state.resets + 1 end },
@@ -148,6 +164,7 @@ local function scenario(action, phase, body)
 			assert(engine.has_suggestions(), "the real parser admits the six-word response")
 		end
 		state.offer(); state.armed = true
+		state.before_accept_resets = state.resets
 		local accepted = engine.accept(1, function(committed) state.completed = committed end)
 		helpers.assert_eq(state.held, {}, "the exact original native key cleanup is balanced")
 		body(accepted, state, engine, guard)
@@ -162,9 +179,26 @@ end
 
 helpers.describe("AI continuation retains its injection authority", function()
 	for _, route in ipairs({ "native", "clipboard" }) do
+		helpers.it("refuses a dry-run " .. route .. " prediction before output", function()
+			scenario("dry-run", route, function(accepted, state)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(state.completed, false)
+				helpers.assert_eq(state.owner_captures, 0)
+				helpers.assert_eq(state.apply_admissions, 0)
+				helpers.assert_eq(state.clipboard_reads, 0)
+				helpers.assert_eq(state.rows, {})
+				helpers.assert_eq(state.writes, {})
+				helpers.assert_eq(state.output, 0)
+				helpers.assert_eq(state.resets, state.before_accept_resets)
+				helpers.assert_eq(state.stopped, 0)
+				helpers.assert_eq(state.errors, {}, "dry-run refusal is an expected diagnostic outcome")
+			end)
+		end)
 		helpers.it("commits the original current " .. route .. " prediction", function()
 			scenario("stable", route, function(accepted, state)
 				helpers.assert_true(accepted and state.completed)
+				helpers.assert_true(state.owner_captures > 0)
+				helpers.assert_true(state.apply_admissions > 0)
 				helpers.assert_eq(state.output, 1)
 				helpers.assert_eq(state.stopped, 0)
 				helpers.assert_eq(state.errors, {})
