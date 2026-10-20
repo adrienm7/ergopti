@@ -65,6 +65,7 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 	Row := Map(
 		"label",   MenuTitle,
 		"action",  (*) => ToggleFeatureV2(V2Path),
+		"replay_id", _MR_ReplayIdentity("@feature", V2Path),
 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 
 	; The master controls activation; its children remain configurable. Pause
@@ -121,6 +122,7 @@ MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
 	Row := Map(
 		"label",   MenuTitle,
 		"action",  (*) => ToggleFeatureV2(V2Path),
+		"replay_id", _MR_ReplayIdentity("@feature", V2Path),
 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 	return Row
 }

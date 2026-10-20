@@ -160,6 +160,7 @@ MenuDispatcher_Reset() {
 		_MenuDispatchCallbacks := Map()
 		_MenuDispatchLastFire  := Map()
 		_MenuDispatchTokens    := Map()
+		MenuReloadReplay_ClearIdentities()
 		_MenuDispatchClickSequences := Map()
 		; Nothing is tracked any more, so the ownership set must go with it —
 		; otherwise handles from the retired generation keep being walked forever.
@@ -283,6 +284,7 @@ MenuDispatcher_PruneMenu(MenuObj) {
 		}
 		for Id in DeadIds {
 				_MenuDispatchCallbacks.Delete(Id)
+				MenuReloadReplay_ForgetIdentity(Id)
 				if _MenuDispatchLastFire.Has(Id) {
 						_MenuDispatchLastFire.Delete(Id)
 				}
@@ -428,7 +430,9 @@ MenuDispatcher_Shutdown(RootMenu := unset) {
 ; click. Returns 1 on successful tracking, 0 if the item was added but
 ; its ID could not be discovered (in which case AHK's native dispatch is
 ; the only path — same behavior as before the bypass was installed).
-RegisterMenuItem(MenuObj, ItemName, Callback) {
+RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {
+		if !(ReplayIdentity is String)
+				throw TypeError("A menu replay identity must be a String.")
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
 		; To avoid the double-Add penalty (placeholder then replace), we use a
@@ -470,6 +474,7 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
 		_MenuDispatchCallbacks[ItemId] := Callback
 		_MenuDispatchLastFire[ItemId]  := 0
 		_MenuDispatchTokens[ItemId]    := TrackedObj.Token
+		MenuReloadReplay_RegisterIdentity(ItemId, TrackedObj.Token, ReplayIdentity)
 		_MenuDispatchTrackOwner(MenuObj)
 		return 1
 }
@@ -623,7 +628,9 @@ _MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, Registration := 0, Hel
 ;
 ; BeforeItem accepts AHK's standard syntax: "Nname" / "&n" / "Nn&" — see
 ; AHK 2.0 Menu.Insert docs.
-RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
+RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback, ReplayIdentity := "") {
+		if !(ReplayIdentity is String)
+				throw TypeError("A menu replay identity must be a String.")
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
 		; Keep the same registration identity as RegisterMenuItem. _TrackedDispatch
@@ -670,6 +677,7 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
 		_MenuDispatchCallbacks[ItemId] := Callback
 		_MenuDispatchLastFire[ItemId]  := 0
 		_MenuDispatchTokens[ItemId]    := TrackedObj.Token
+		MenuReloadReplay_RegisterIdentity(ItemId, TrackedObj.Token, ReplayIdentity)
 		_MenuDispatchTrackOwner(MenuObj)
 		return 1
 }

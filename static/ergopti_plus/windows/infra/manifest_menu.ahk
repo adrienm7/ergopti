@@ -486,6 +486,8 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 				_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1, PopulationOwner)
 				_MR_NormalizeSeparators(SubMenu)
 			}
+			if Row.Has("replay_group")
+				MenuReloadReplay_SetMenuIdentity(SubMenu, Row["replay_group"])
 			TargetMenu.Add(Label, SubMenu)
 		} else if (Row.Has("submenu") and Row["submenu"] is Menu) {
 			; A submenu this driver has ALREADY built as a native Menu.
@@ -500,11 +502,13 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 			; It is deliberately NOT `items`: a caller must say which of the two it
 			; is handing over, so a Menu passed where row data was expected fails
 			; here instead of rendering an empty submenu.
+			if Row.Has("replay_group")
+				MenuReloadReplay_SetMenuIdentity(Row["submenu"], Row["replay_group"])
 			TargetMenu.Add(Label, Row["submenu"])
 		} else if (Row.Has("action") and (Row["action"] is Func
 				or Row["action"] is MenuStartupUiCommand
 				or Row["action"] is MenuStartupRepeatableToggleCommand) and !Greyed) {
-			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"])
+			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))
 			if RequireTracking && Tracked != 1
 				throw Error("Native leaf command registration was refused")
 		} else {
@@ -599,6 +603,24 @@ _MR_PlainUnicodeCaption(Caption) {
 	return true
 }
 
+; Length-prefixed canonical parts survive locale and live-caption changes.
+; Native values qualify choices by type; their display text never names an action.
+_MR_ReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {
+	Parts := [ManifestKey, RowId, Kind]
+	if IsSet(Value) {
+		if !(Value is String || Value is Integer || Value is Float)
+			throw TypeError("A menu replay choice requires a scalar value.")
+		Parts.Push(Type(Value), String(Value))
+	}
+	Key := ""
+	for Index, Part in Parts {
+		if !(Part is String) || (Index <= 3 && Part == "")
+			throw ValueError("A menu replay identity requires nonempty canonical parts.")
+		Key .= StrLen(Part) . ":" . Part
+	}
+	return Key
+}
+
 ; Renders the same declared command/check in full and native-built menus.
 _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 	if !_MR_CommandLiteralPrefix(Item, &Prefix) {
@@ -636,7 +658,8 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 		return Map("label", Label, "disabled", true, "disabled_reason_key", ReasonKey)
 	if Disabled && ReasonKey != ""
 		return Map("label", t(I18nKey), "disabled", true, "disabled_reason_key", ReasonKey)
-	Row := Map("label", IsSet(Label) ? Label : t(I18nKey), "action", Commands[CmdId])
+	Row := Map("label", IsSet(Label) ? Label : t(I18nKey), "action", Commands[CmdId],
+		"replay_id", _MR_ReplayIdentity(ManifestKey, Id))
 	if Disabled
 		Row["disabled"] := true
 	if ItemType == "check"
@@ -918,6 +941,9 @@ MenuRenderer_GroupRow(ManifestKey, RowId, NativeChild, StateGetters := unset) {
 		Label := _MR_CaptionFormat(Label, Value, &HasSlot)
 	}
 	Row := Map("label", Label, "submenu", NativeChild)
+	ReplayGroup := _MR_DeclaredReplayGroupIdentity(Selected, ManifestKey)
+	if ReplayGroup != ""
+		Row["replay_group"] := ReplayGroup
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, RowId, Getters) {
 		Row["disabled"] := true
 		if Selected.Has("disabled_reason_key")
@@ -1225,6 +1251,9 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 			if !(Items is Array)
 				return false
 			Row := Map("label", IsSet(Label) ? Label : t(_MR_Get(Item, "i18n")), "items", Items)
+			ReplayGroup := _MR_DeclaredReplayGroupIdentity(Item, ManifestKey)
+			if ReplayGroup != ""
+				Row["replay_group"] := ReplayGroup
 			if Item.Has("icon_getter") {
 				IconGetter := Item["icon_getter"]
 				if Type(IconGetter) != "String" || IconGetter == "" || !(StateGetters is Map)
@@ -1790,12 +1819,14 @@ _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 	Row := Map(
 		"label",   t(I18nKey),
 		"action",  Commands[CmdId],
+		"replay_id", _MR_ReplayIdentity(ManifestKey, Id),
 		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 		if ReasonKey != "" {
 			Row["disabled_reason_key"] := ReasonKey
 			Row.Delete("action")
+			Row.Delete("replay_id")
 		}
 	}
 	return Row
@@ -1855,7 +1886,8 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 		Rows.Push(Map(
 			"label",   ChoiceLabel,
 			"checked", HasCurrent and Current == Value,
-			"action",  ((V) => (*) => Command(V))(Value)))
+			"action",  ((V) => (*) => Command(V))(Value),
+			"replay_id", _MR_ReplayIdentity(ManifestKey, Id, "choice", Value)))
 	}
 	; An open catalogue closes its presets with a free-entry row whose command
 	; prompts natively; it carries the tick when the stored value is no preset.
@@ -1872,7 +1904,8 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 		Rows.Push(Map(
 			"label",   t(CustomI18n),
 			"checked", CustomCurrent,
-			"action",  ((Fn) => (*) => Fn())(Commands[CustomId])))
+			"action",  ((Fn) => (*) => Fn())(Commands[CustomId]),
+			"replay_id", _MR_ReplayIdentity(ManifestKey, Id, "custom", CustomId)))
 		if (CustomCurrent and IsNumber(Current)) {
 			CurrentLabel := _MR_FormatFreeNumber(Current)
 			UnitI18n := _MR_Get(Item, "custom_unit_i18n")
@@ -1886,7 +1919,7 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 			CurrentLabel := String(Current)
 		Label := StrReplace(Label, _MR_Get(Item, "current_choice_placeholder", "{1}"), CurrentLabel)
 	}
-	Row := Map("label", Label, "items", Rows)
+	Row := Map("label", Label, "items", Rows, "replay_group", _MR_ReplayIdentity(ManifestKey, Id, "container"))
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 	}
@@ -2134,6 +2167,22 @@ _MR_ReasonedGroupCurrent(Receipt, Seen := unset) {
 	return true
 }
 
+; A child template can serve several files. Only its declared parent owns the
+; route identity; bounded counts are cosmetic, while contextual captions keep
+; their literal owner in the route.
+_MR_DeclaredReplayGroupIdentity(Item, ManifestKey) {
+	if _MR_Get(Item, "type") != "group" || Type(_MR_Get(Item, "i18n")) != "String" || _MR_Get(Item, "i18n") == ""
+		return ""
+	for Field in ["caption_source", "caption_getters", "caption_getter", "caption_format",
+		"caption_layout", "caption_joiner", "label_prefix"] {
+		if Item.Has(Field)
+			return ""
+	}
+	if Item.Has("caption_count_policy") && !_MR_TranslatedCountPolicy(Item)
+		return ""
+	return _MR_ReplayIdentity(ManifestKey, _MR_Get(Item, "id"), "container")
+}
+
 _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "", Disabled := unset) {
 	if Item.Has("disabled_reason_key") {
 		Root := _MR_GetManifestRoot(), SourceRows := _MR_GetMenuDef(ManifestKey)
@@ -2193,6 +2242,9 @@ _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := ""
 	; Existing unspecified/scalar group captions retain their prior byte behavior.
 	if Item.Has("caption_source") || Item.Has("caption_getters") || Item.Has("caption_format") || Item.Has("caption_count_policy")
 		Label := StrReplace(Label, "&", "&&")
+	ReplayGroup := _MR_DeclaredReplayGroupIdentity(Item, ManifestKey)
+	if ReplayGroup != ""
+		MenuReloadReplay_SetMenuIdentity(Sub, ReplayGroup)
 	ResultMenu.Add(Label, Sub)
 	if IsSet(Disabled) && Disabled
 		ResultMenu.Disable(Label)
@@ -2488,7 +2540,7 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 		return false
 	Active[Identity] := true
 	Fields := Map("label", true, "separator", true, "action", true, "items", true,
-		"submenu", true, "checked", true, "disabled", true, "disabled_reason_key", true, "icon", true)
+		"submenu", true, "checked", true, "disabled", true, "disabled_reason_key", true, "icon", true, "replay_id", true, "replay_group", true)
 	loop Rows.Length {
 		if !Rows.Has(A_Index)
 			return false
@@ -2506,6 +2558,12 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 				|| (Row[BooleanKey] != 0 && Row[BooleanKey] != 1))
 				return false
 		}
+		for ReplayField in ["replay_id", "replay_group"] {
+			if Row.Has(ReplayField) && (Type(Row[ReplayField]) != "String" || Row[ReplayField] == "")
+				return false
+		}
+		if (Row.Has("replay_id") && !Row.Has("action")) || (Row.Has("replay_group") && !Row.Has("items") && !Row.Has("submenu"))
+			return false
 		if Row.Has("icon") && Type(Row["icon"]) != "String"
 			return false
 		if Row.Has("disabled_reason_key") && Type(Row["disabled_reason_key"]) != "String"
@@ -3013,7 +3071,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 _MR_FrameLeafAdmitted(Data) {
 	if !_MR_AppendTemplateRowsAdmitted(Data, 1, Map())
 		return false
-	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true)
+	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true, "replay_id", true)
 	for Row in Data {
 		for Name in Row
 			if !Allowed.Has(Name)
