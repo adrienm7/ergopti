@@ -202,6 +202,8 @@ function M.new(opts)
 	local latest = nil         -- { tag, channel } offered by the last check
 	local active = false
 	local generation = 0
+	-- Manual answers survive channel changes, but not a retired schedule owner.
+	local manual_generation = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
@@ -481,18 +483,20 @@ function M.new(opts)
 	--- one the About row names, and a later automatic check does not announce
 	--- it again: the window already showed it.
 	--- @param channel string Registry channel id to check.
-	--- @param on_result function(result) Receives the check result, exactly once.
+	--- @param on_result function(result) Receives one result unless the owner stops or restarts.
 	--- @return boolean dispatched
 	function owner.check_now(channel, on_result)
+		local request_generation = manual_generation
 		local base = { channel = channel, current = current_version() }
 		local answered = false
 		local function answer(result)
-			if answered then return end
+			if answered or request_generation ~= manual_generation then return end
 			answered = true
 			local ok, err = pcall(on_result, result)
 			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
 		end
 		local function fail(reason, detail)
+			if answered or request_generation ~= manual_generation then return end
 			save_record(Schedule.record_check(load_record(), opts.now(), false))
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
 			answer(CheckResult.failure(base, reason, detail))
@@ -504,7 +508,7 @@ function M.new(opts)
 			return false
 		end
 		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
-			if answered then return end
+			if answered or request_generation ~= manual_generation then return end
 			local body, reason, detail = read_response(response)
 			if not body then return fail(reason, detail) end
 			local result = CheckResult.classify(body, {
@@ -557,6 +561,7 @@ function M.new(opts)
 			return false
 		end
 		generation = generation + 1
+		manual_generation = manual_generation + 1
 		in_flight = false
 		active = true
 		if not evaluate() then
@@ -570,6 +575,7 @@ function M.new(opts)
 	--- Stops the schedule; a completion still in flight is discarded.
 	--- @return boolean stopped
 	function owner.stop()
+		manual_generation = manual_generation + 1
 		active = false
 		generation = generation + 1
 		in_flight = false
