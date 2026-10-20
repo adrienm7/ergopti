@@ -320,7 +320,28 @@ _LayoutRowPassthrough(Sc, *) {
  * @returns {Boolean}
  */
 NumberRowRegistryOwnsRow() {
-	return LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive("ergopti_base"), LayoutRowSwitches()) == "emulated"
+	; A parse-time #HotIf reads this during the first pump, before the emulation
+	; and the manifest exist: contained, the row is then not the registry's.
+	Owned := false
+	try _NumberRowRegistryOwnsRowRead(&Owned)
+	catch as Err
+		_NumberRowContainedFailure("registry ownership of the row", Err)
+	return Owned
+}
+
+_NumberRowRegistryOwnsRowRead(&Owned) {
+	Owned := LayoutRowsPolicyNumberRowSource(KeylayoutEmulation_LayerIsActive("ergopti_base"), LayoutRowSwitches()) == "emulated"
+}
+
+; A number-row criterion that throws once the driver is ready is a bug, not the
+; first pump: it is logged, and the row keeps its native behaviour instead of
+; raising inside the #HotIf evaluator, where an error is fatal.
+; @param What {String} The state that could not be read.
+; @param Err {Error} The contained failure.
+_NumberRowContainedFailure(What, Err) {
+	global _DriverBootPhase
+	if IsSet(_DriverBootPhase) && _DriverBootPhase == "ready"
+		try LoggerError("NumberRow", "The {1} could not be read; the row stays native: {2}", What, Err.Message)
 }
 
 ; Whether the built-in Ergopti emulation is in force: the effective switch,
@@ -450,11 +471,20 @@ NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
 		if !Supported
 			return "native"
 	}
+	; The row read walks the layout sources, unpublished during the first pump as
+	; well: contained the same way, it leaves the row native.
+	Effective := ""
+	try _NumberRowEffectiveRead(Mode, Caps, &Effective, Hkl?)
+	catch as Err
+		_NumberRowContainedFailure("effective number-row ordering", Err)
+	return Effective is Map ? Effective["mode"] : "native"
+}
+
+_NumberRowEffectiveRead(Mode, Caps, &Effective, Hkl := unset) {
 	if !IsSet(Hkl)
 		Hkl := NumberRowForegroundLayout()
 	Effective := NumberRowPolicyEffective(Mode, NumberRowAvailability(Hkl, Caps))
 	_NumberRowLogTransition(Mode, Effective)
-	return Effective["mode"]
 }
 
 ; The layout of the foreground window, or the test seam's stand-in.
@@ -652,12 +682,18 @@ NumberRowEdgesState(Hkl := unset, Caps := unset) {
 /** Whether the edge keys are reordered now, logging each change of that state. */
 NumberRowEdgesEffective(Hkl := unset, Caps := unset) {
 	global _NumberRowEdgesLogged
-	State := NumberRowEdgesState(Hkl?, Caps?)
-	if !State["stored"]
+	; A parse-time #HotIf reads this during the first pump, before the edge keys
+	; and the layout sources exist: contained, the edge keys stay native.
+	State := ""
+	try _NumberRowEdgesStateRead(&State, Hkl?, Caps?)
+	catch as Err
+		_NumberRowContainedFailure("edge-key reordering", Err)
+	if !(State is Map) || !State["stored"]
 		return false
 	Logged := State["applies"] ? "applies" : State["reason"]
-	if Logged != _NumberRowEdgesLogged {
-		First := _NumberRowEdgesLogged == ""
+	Previous := IsSet(_NumberRowEdgesLogged) ? _NumberRowEdgesLogged : ""
+	if Logged != Previous {
+		First := Previous == ""
 		_NumberRowEdgesLogged := Logged
 		if !State["applies"] {
 			try LoggerInfo("NumberRow", "The edge keys are not reordered on this layout ({1}); the stored choice is kept.", Logged)
@@ -666,6 +702,10 @@ NumberRowEdgesEffective(Hkl := unset, Caps := unset) {
 		}
 	}
 	return State["applies"]
+}
+
+_NumberRowEdgesStateRead(&State, Hkl := unset, Caps := unset) {
+	State := NumberRowEdgesState(Hkl?, Caps?)
 }
 
 /**
@@ -742,16 +782,21 @@ _DigitRowBuiltinLevels(Sc, Caps) {
 	PlainTable := Caps ? Levels["caps"] : ERGOPTI_SPEC["number_row_base"]
 	if !PlainTable.Has(Name) || !Levels["shift"].Has(Name)
 		return 0
-	return Map("plain", _DigitRowBuiltinDescriptor(PlainTable[Name]),
-		"shift", _DigitRowBuiltinDescriptor(Levels["shift"][Name]))
+	Terminators := ERGOPTI_SPEC["terminators"]
+	return Map("plain", _DigitRowBuiltinDescriptor(PlainTable[Name], Terminators),
+		"shift", _DigitRowBuiltinDescriptor(Levels["shift"][Name], Terminators))
 }
 
-; A built-in Ergopti descriptor (_ErgoptiDescribe) in the registry shape.
-_DigitRowBuiltinDescriptor(Descriptor) {
-	global ERGOPTI_SPEC
+; A built-in Ergopti descriptor (_ErgoptiDescribe) in the registry shape. The
+; caller passes the spec's terminators it has already IsSet-guarded: this helper
+; is reachable from a parse-time #HotIf, so it reads no boot-time global itself.
+; @param Descriptor {Map} One _ErgoptiDescribe level descriptor.
+; @param Terminators {Map} ERGOPTI_SPEC["terminators"], dead key name to text.
+; @return {Map} "Kind", "Text", "State" and "Action".
+_DigitRowBuiltinDescriptor(Descriptor, Terminators) {
 	if Descriptor.Has("dead") {
 		Name := Descriptor["dead"]
-		return Map("Kind", "dead", "Text", ERGOPTI_SPEC["terminators"][Name], "State", Name, "Action", Name)
+		return Map("Kind", "dead", "Text", Terminators[Name], "State", Name, "Action", Name)
 	}
 	for Field in ["text", "word", "wrap"]
 		if Descriptor.Has(Field)
