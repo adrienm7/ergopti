@@ -24,8 +24,12 @@ const EXTRA_INPUTS = Object.freeze([
 	'tools/diagnostics/native_pac_source_evidence.cjs',
 	'tools/ci/dev-release-qualification.cjs'
 ]);
-const METHOD_SHA = '0e8145115807b7c94c8ba4d6a91a16e8826894b73ae2232074da94571d2c8c32';
+const METHOD_SHA = '9289fa2f2f551078546745ec87b55335526ebec189d0f165206440fa89dea519';
 const ROLE_SHA = '3504a31d99ddefcc411e3772e0f747f441727f2d02f9c7e844ce3029dd05caf8';
+// The native case asserts at least its five-second heartbeat plus the
+// production silence slack (2.5 s private command budget + 10 s host stall
+// allowance, RemapLeaseWorker.swift); a shorter case ran another budget.
+const NATIVE_SILENCE_SECONDS = 17.5;
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
 /** Admits only canonical original process exit statuses. */
@@ -75,7 +79,8 @@ function evaluate(text, swiftStatus, captureStatus) {
 			if (next === 4) {
 				const match = /^Test Case '.+' passed \(([0-9]+(?:\.[0-9]+)?) seconds?\)\.$/.exec(line);
 				duration = match ? Number(match[1]) : null;
-				if (duration === null || duration < 6.75 || duration > 60) reject('native-duration');
+				if (duration === null || duration < NATIVE_SILENCE_SECONDS || duration > 60)
+					reject('native-duration');
 				if (line.startsWith(frames[4]) && match) terminals++;
 			}
 			next++;
