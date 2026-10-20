@@ -80,6 +80,9 @@ let kPrivateCommandAckTimeoutSeconds = kCLITimeoutSeconds + kPrivateCommandSettl
 let kHostStallAllowanceSeconds: TimeInterval = 10
 /// Silence beyond the heartbeat interval after which the inner fences.
 let kLeaseInnerSilenceSlackSeconds = kPrivateCommandAckTimeoutSeconds + kHostStallAllowanceSeconds
+/// Private command round trips at least this long are reported on stderr, so a
+/// slow karabiner_cli shows in the driver log before it costs a lease.
+let kSlowPrivateCommandReportSeconds: TimeInterval = 1.0
 private let kPrivateFenceAckTimeoutSeconds: TimeInterval = 3.75
 let kFenceConfirmationGraceSeconds: TimeInterval = 0.25
 private let kRequiredFenceTransportCount = 2
@@ -1040,6 +1043,13 @@ private func reportLeaseWorkerFenceExhaustion() {
 		"remap lease worker exhausted its bounded fence recovery; "
 			+ "leaving the durable record for guardian reconciliation."
 	)
+}
+
+/// Writes one worker diagnostic to stderr, which the Lua lease controller logs
+/// as a warning next to the lease token; stdout stays the protocol stream.
+/// - Parameter message: Privacy-safe text without token, path or payload.
+func writeLeaseWorkerDiagnostic(_ message: String) {
+	_ = writeLeaseLine("lease worker: " + message, to: STDERR_FILENO)
 }
 
 /// Reports one nonblocking diagnostic-pipe drain operation.
@@ -2307,11 +2317,16 @@ final class KarabinerLeaseOuterRuntime {
 	private let poller: LeasePolling
 	private let boundaryPoller: LeaseDescriptorPolling
 	private let beforeLiveAcknowledgementPublish: () -> Void
+	private let diagnostic: (String) -> Void
+	private let diagnosticClock: () -> TimeInterval
 	private var inner: SpawnedLeaseInner?
 	private var parentDecoder = BoundedLeaseLineDecoder()
 	private var machine: LeaseOuterStateMachine
 	private var commandDeadline = LeasePrivateCommandDeadline()
 	private var liveTransportGateHeld = false
+	private var lastPrivateCommandLine: String?
+	private var lastPrivateCommandSentAt: TimeInterval?
+	private var lossReported = false
 
 	/// Creates the only role allowed to retain Hammerspoon stdin/stdout.
 	/// - Parameters:
@@ -2327,6 +2342,9 @@ final class KarabinerLeaseOuterRuntime {
 	///   - poller: Descriptor wait primitive, injectable for boundary-race tests.
 	///   - boundaryPoller: Zero-delay single-descriptor poll seam after private reads.
 	///   - beforeLiveAcknowledgementPublish: Test seam inside the shared transport gate.
+	///   - diagnostic: Receives each privacy-safe loss or latency fact.
+	///   - diagnosticClock: Monotonic clock for those facts only, kept apart from
+	///     `uptime` so diagnostics never change the deadline clock's read order.
 	init(
 		identity: LeaseIdentity,
 		detached: Bool,
@@ -2344,7 +2362,11 @@ final class KarabinerLeaseOuterRuntime {
 			}
 		},
 		boundaryPoller: @escaping LeaseDescriptorPolling = pollLeaseDescriptor,
-		beforeLiveAcknowledgementPublish: @escaping () -> Void = {}
+		beforeLiveAcknowledgementPublish: @escaping () -> Void = {},
+		diagnostic: @escaping (String) -> Void = writeLeaseWorkerDiagnostic,
+		diagnosticClock: @escaping () -> TimeInterval = {
+			ProcessInfo.processInfo.systemUptime
+		}
 	) {
 		self.identity = identity
 		self.detached = detached
@@ -2357,6 +2379,8 @@ final class KarabinerLeaseOuterRuntime {
 		self.poller = poller
 		self.boundaryPoller = boundaryPoller
 		self.beforeLiveAcknowledgementPublish = beforeLiveAcknowledgementPublish
+		self.diagnostic = diagnostic
+		self.diagnosticClock = diagnosticClock
 		machine = LeaseOuterStateMachine(initialMode: identity.initialMode)
 	}
 
@@ -2365,6 +2389,7 @@ final class KarabinerLeaseOuterRuntime {
 	func run() -> Int32 {
 		if detached {
 			guard recoverFenceWithinWorkerBudget() else {
+				diagnostic("the detached fence exhausted its budget; the guardian keeps the durable record.")
 				return LeaseWorkerExit.innerFailed.rawValue
 			}
 			return LeaseWorkerExit.success.rawValue
@@ -2384,7 +2409,7 @@ final class KarabinerLeaseOuterRuntime {
 
 		while true {
 			guard let current = inner else {
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(machine.innerLost(), reason: "no supervised inner remained")
 			}
 			var descriptors = [
 				pollfd(
@@ -2402,7 +2427,10 @@ final class KarabinerLeaseOuterRuntime {
 			let pollResult = poller(&descriptors, timeout)
 			if pollResult == -1 {
 				if errno == EINTR { continue }
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(
+					machine.innerLost(),
+					reason: "supervision poll failed with errno \(errno)"
+				)
 			}
 			if pollResult > 0 {
 				// Parent STOP/EOF has priority over any stale live-mode ACK in the
@@ -2432,7 +2460,10 @@ final class KarabinerLeaseOuterRuntime {
 			let boundaryPollResult = poller(&descriptors, 0)
 			if boundaryPollResult == -1 {
 				if errno == EINTR { continue }
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(
+					machine.innerLost(),
+					reason: "boundary poll failed with errno \(errno)"
+				)
 			}
 			if boundaryPollResult > 0 {
 				if descriptors[0].revents != 0 {
@@ -2454,7 +2485,10 @@ final class KarabinerLeaseOuterRuntime {
 			let now = uptime()
 			if commandDeadline.isExpired(at: now) {
 				commandDeadline.clear()
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(
+					machine.innerLost(),
+					reason: "the private command deadline expired"
+				)
 			}
 		}
 	}
@@ -2501,7 +2535,10 @@ final class KarabinerLeaseOuterRuntime {
 		case .malformed:
 			return perform(machine.receiveParent(line: "MALFORMED"))
 		case .guardianLost:
-			return finishAfterRecovery(machine.innerLost())
+			return finishAfterRecovery(
+				machine.innerLost(),
+				reason: "the remap guardian generation was gone when Hammerspoon's input arrived"
+			)
 		case .live:
 			break
 		}
@@ -2524,7 +2561,10 @@ final class KarabinerLeaseOuterRuntime {
 			)
 			let boundaryResult = pollLeaseBoundary(&boundary, poller: boundaryPoller)
 			if boundaryResult == -1 {
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(
+					machine.innerLost(),
+					reason: "the private socket boundary poll failed"
+				)
 			}
 			if boundaryResult > 0 && leasePollReportsTerminal(boundary.revents) {
 				return consumeTerminalInnerLines(lines)
@@ -2533,7 +2573,10 @@ final class KarabinerLeaseOuterRuntime {
 		case .eof(let lines):
 			return consumeTerminalInnerLines(lines)
 		case .invalid:
-			return finishAfterRecovery(machine.innerLost())
+			return finishAfterRecovery(
+				machine.innerLost(),
+				reason: "the inner sent an invalid private read"
+			)
 		case .retry:
 			break
 		}
@@ -2552,7 +2595,10 @@ final class KarabinerLeaseOuterRuntime {
 		case .lines(let lines), .eof(let lines):
 			return consumeTerminalInnerLines(lines)
 		case .invalid, .retry:
-			return finishAfterRecovery(machine.innerLost())
+			return finishAfterRecovery(
+				machine.innerLost(),
+				reason: "the inner's closing private read was unreadable"
+			)
 		}
 	}
 
@@ -2562,11 +2608,18 @@ final class KarabinerLeaseOuterRuntime {
 	private func consumeInnerLines(_ lines: [String]) -> Int32? {
 		for line in lines {
 			guard let acknowledgement = LeaseInnerAcknowledgement.parse(line: line) else {
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(
+					machine.innerLost(),
+					reason: "the inner sent an unparsable acknowledgement"
+				)
 			}
 			let previousCommand = machine.inFlight
 			let actions = machine.receiveInner(acknowledgement)
-			if machine.inFlight != previousCommand { commandDeadline.clear() }
+			if machine.inFlight != previousCommand {
+				commandDeadline.clear()
+				reportSlowAcknowledgement(acknowledgement)
+			}
+			reportLossIfFencing(actions, reason: innerAcknowledgementLossReason(acknowledgement))
 			if let terminal = perform(actions) { return terminal }
 		}
 		return nil
@@ -2581,7 +2634,10 @@ final class KarabinerLeaseOuterRuntime {
 		var failureCount = 0
 		for line in lines {
 			guard let acknowledgement = LeaseInnerAcknowledgement.parse(line: line) else {
-				return finishAfterRecovery(machine.innerLost())
+				return finishAfterRecovery(
+					machine.innerLost(),
+					reason: "the inner closed its socket after an unparsable acknowledgement"
+				)
 			}
 			switch acknowledgement {
 			case .fenced:
@@ -2601,10 +2657,20 @@ final class KarabinerLeaseOuterRuntime {
 		if !machine.stopping, fenceCount == 0, failureCount == 1,
 			let failureCode {
 			commandDeadline.clear()
-			return perform(machine.receiveInner(.failed(failureCode)))
-				?? LeaseWorkerExit.innerFailed.rawValue
+			let actions = machine.receiveInner(.failed(failureCode))
+			reportLossIfFencing(actions, reason: innerAcknowledgementLossReason(.failed(failureCode)))
+			return perform(actions) ?? LeaseWorkerExit.innerFailed.rawValue
 		}
-		return finishAfterRecovery(machine.innerLost())
+		// An inner that fenced on its own exits zero without a final line: it saw
+		// no private command for its silence budget, which Hammerspoon's PINGs
+		// renew. The elapsed time tells that apart from a crash.
+		return finishAfterRecovery(
+			machine.innerLost(),
+			reason: String(
+				format: "the inner closed its socket without FENCED (inner silence budget %.2f s)",
+				identity.heartbeatSeconds + kLeaseInnerSilenceSlackSeconds
+			)
+		)
 	}
 
 	/// Performs state-machine actions while converting channel loss into a fence.
@@ -2618,33 +2684,50 @@ final class KarabinerLeaseOuterRuntime {
 					guard !liveTransportGateHeld,
 						guardianRegistration?.beginLiveTransport() == true
 					else {
-						return finishAfterRecovery(machine.innerLost())
+						return finishAfterRecovery(
+							machine.innerLost(),
+							reason: "the remap guardian refused the live transport for \(command.line)"
+						)
 					}
 					liveTransportGateHeld = true
 				}
 				guard inner?.send(command) == true else {
-					return finishAfterRecovery(machine.innerLost())
+					return finishAfterRecovery(
+						machine.innerLost(),
+						reason: "\(command.line) could not be written to the inner"
+					)
 				}
 				commandDeadline.arm(
 					for: command,
 					now: uptime()
 				)
+				lastPrivateCommandLine = command.line
+				lastPrivateCommandSentAt = diagnosticClock()
 			case .publish(let line), .publishLive(let line):
 				if case .publishLive = action {
 					guard !liveTransportGateHeld,
 						guardianRegistration?.beginLiveTransport() == true
 					else {
-						return finishAfterRecovery(machine.innerLost())
+						return finishAfterRecovery(
+							machine.innerLost(),
+							reason: "the remap guardian refused the live transport for \(line)"
+						)
 					}
 					liveTransportGateHeld = true
 				}
 				if liveTransportGateHeld, isLeaseLiveAcknowledgementLine(line) {
 					guard guardianRegistration?.guardianStillPresent() == true else {
-						return finishAfterRecovery(machine.innerLost())
+						return finishAfterRecovery(
+							machine.innerLost(),
+							reason: "the remap guardian generation was gone before \(line) was published"
+						)
 					}
 					beforeLiveAcknowledgementPublish()
 					guard liveInnerTransportStillPresent() else {
-						return finishAfterRecovery(machine.innerLost())
+						return finishAfterRecovery(
+							machine.innerLost(),
+							reason: "the inner socket closed before \(line) was published"
+						)
 					}
 				}
 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
@@ -2657,6 +2740,9 @@ final class KarabinerLeaseOuterRuntime {
 				retireCurrentAfterSupervisionLoss()
 				endLiveTransportIfNeeded()
 				guard recoverFenceWithinWorkerBudget() else {
+					diagnostic(
+						"the replacement fence exhausted its budget; the guardian keeps the durable record."
+					)
 					return LeaseWorkerExit.innerFailed.rawValue
 				}
 				if publishStopped {
@@ -2705,10 +2791,75 @@ final class KarabinerLeaseOuterRuntime {
 	}
 
 	/// Completes a recovery action produced outside the normal action executor.
-	/// - Parameter actions: Terminal recovery action list.
+	/// - Parameters:
+	///   - actions: Terminal recovery action list.
+	///   - reason: Privacy-safe cause reported when the recovery ends the lease.
 	/// - Returns: Final exit code.
-	private func finishAfterRecovery(_ actions: [LeaseOuterAction]) -> Int32 {
+	private func finishAfterRecovery(_ actions: [LeaseOuterAction], reason: String) -> Int32 {
+		reportLossIfFencing(actions, reason: reason)
 		return perform(actions) ?? LeaseWorkerExit.innerFailed.rawValue
+	}
+
+	/// Reports the first cause that turns this lease into a failure exit. Every
+	/// such exit used to be a bare 73, which Hammerspoon logged with an empty
+	/// detail (issue #95). STOP and Hammerspoon EOF are not failures.
+	/// - Parameters:
+	///   - actions: Actions about to be performed.
+	///   - reason: Privacy-safe cause, without token, path or payload.
+	private func reportLossIfFencing(_ actions: [LeaseOuterAction], reason: String) {
+		guard !lossReported else { return }
+		for action in actions {
+			guard case .fenceAndFinish(let exitCode, _) = action,
+				exitCode != LeaseWorkerExit.success.rawValue
+			else { continue }
+			lossReported = true
+			diagnostic("lease lost (exit \(exitCode)): \(reason); \(privateTransportDescription()).")
+			return
+		}
+	}
+
+	/// Reports a private round trip slow enough to approach its deadline.
+	/// - Parameter acknowledgement: Inner answer that settled the last command.
+	private func reportSlowAcknowledgement(_ acknowledgement: LeaseInnerAcknowledgement) {
+		guard let line = lastPrivateCommandLine,
+			let sentAt = lastPrivateCommandSentAt
+		else { return }
+		let elapsed = diagnosticClock() - sentAt
+		guard elapsed >= kSlowPrivateCommandReportSeconds else { return }
+		diagnostic(String(
+			format: "%@ answered %@ after %.2f s (deadline %.2f s).",
+			line,
+			acknowledgement.line,
+			elapsed,
+			kPrivateCommandAckTimeoutSeconds
+		))
+	}
+
+	/// Names the inner answer that made the outer fence.
+	/// - Parameter acknowledgement: Inner answer that ended the lease.
+	/// - Returns: Privacy-safe cause text.
+	private func innerAcknowledgementLossReason(
+		_ acknowledgement: LeaseInnerAcknowledgement
+	) -> String {
+		if case .failed(let code) = acknowledgement {
+			let name = LeaseWorkerExit(rawValue: code).map { "\($0)" } ?? "unknown"
+			return "the inner reported FAILED \(code) (\(name))"
+		}
+		return "the inner answered \(acknowledgement.line) out of sequence"
+	}
+
+	/// Describes the last private command and how long ago it was sent.
+	/// - Returns: Privacy-safe transport state text.
+	private func privateTransportDescription() -> String {
+		guard let line = lastPrivateCommandLine,
+			let sentAt = lastPrivateCommandSentAt
+		else { return "no private command was sent" }
+		return String(
+			format: "last private command %@ sent %.2f s earlier, %@",
+			line,
+			diagnosticClock() - sentAt,
+			machine.inFlight == nil ? "answered" : "unanswered"
+		)
 	}
 
 	/// Kills the failed inner's exact private group before its leader can be reused.
