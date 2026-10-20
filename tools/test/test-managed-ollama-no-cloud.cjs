@@ -22,6 +22,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const vm = require('node:vm');
+const { createRequire } = require('node:module');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -91,7 +94,7 @@ check(
 		const collector = read('tools/test/test-managed-ollama-protocol.cjs');
 		assert.match(collector, /\['test_ollama_model_pull\.ps1', 8\]/);
 		assert.match(collector, /\['test_ollama_model_environment\.ps1', 3\]/);
-		assert.equal(collector.split('\n\treceiveWindowsModelEnvironment();').length - 1, 2);
+		assert.equal(collector.split('\n\treceiveWindowsModelEnvironment();').length - 1, 3);
 	}
 );
 
@@ -147,6 +150,93 @@ check('no driver keeps its own OLLAMA_NO_CLOUD literal', () => {
 		return !bytes.includes(0) && bytes.toString('utf8').includes('OLLAMA_NO_CLOUD=');
 	});
 	assert.deepEqual(offenders, []);
+});
+
+check('Windows model-only receiving bypasses unrelated component prerequisites', () => {
+	const file = path.join(ROOT, 'tools/test/test-managed-ollama-protocol.cjs');
+	const collector = fs.readFileSync(file, 'utf8');
+	const owned = path.join(os.tmpdir(), 'controlled-model-port-no-files');
+	const boundary = new Error('controlled model child boundary; no PowerShell executed');
+	const calls = [];
+	const diagnostics = [];
+	const sourceRequire = createRequire(file);
+	const modelFs = Object.create(fs);
+	modelFs.mkdtempSync = (prefix) => {
+		assert.equal(prefix, path.join(os.tmpdir(), 'ergopti-model-environment-'));
+		return owned;
+	};
+	const childProcess = {
+		spawnSync(command, args, options) {
+			const psHome = path.join('C:\\Windows', 'System32/WindowsPowerShell/v1.0');
+			assert.equal(command, path.join(psHome, 'powershell.exe'));
+			assert.equal(path.basename(args[args.indexOf('-File') + 1]), 'test_ollama_model_pull.ps1');
+			assert.equal(options.cwd, owned);
+			assert.equal(options.env.PSModulePath, path.join(psHome, 'Modules'));
+			assert.equal(options.env.TEMP, owned);
+			assert.equal(options.env.TMP, owned);
+			assert.ok(!args.includes('-BuilderOnly'));
+			assert.deepEqual(diagnostics, []);
+			calls.push(command);
+			throw boundary;
+		}
+	};
+	assert.throws(
+		() =>
+			vm.runInNewContext(
+				collector,
+				{
+					require(name) {
+						if (name === 'node:fs') return modelFs;
+						if (name === 'node:child_process') return childProcess;
+						assert.notEqual(name, 'yaml', 'model receiving must not require npm packages');
+						if (name === '../lib/python.cjs')
+							return {
+								pythonExecutable() {
+									throw new Error('model-only receiving must not enter Python fixtures');
+								}
+							};
+						return sourceRequire(name);
+					},
+					__dirname: path.dirname(file),
+					__filename: file,
+					Buffer,
+					process: {
+						argv: [process.execPath, file, '--windows-model-port'],
+						platform: 'win32',
+						execPath: process.execPath,
+						env: { SystemRoot: 'C:\\Windows', PSModulePath: 'foreign-modules' },
+						stdout: { write: (value) => diagnostics.push(value) },
+						stderr: { write: (value) => diagnostics.push(value) },
+						exit(code) {
+							throw new Error('unexpected exit before model child: ' + code);
+						}
+					}
+				},
+				{ filename: file }
+			),
+		(error) => error === boundary
+	);
+	assert.equal(calls.length, 1, 'the existing helper must reach its actual child boundary');
+	const route =
+		"if (args[0] === '--windows-model-port') {\n\treceiveWindowsModelEnvironment();\n\tprocess.exit(0);\n}";
+	const position = collector.indexOf(route);
+	assert.ok(position > 0, 'the model-only helper must terminate through an explicit early route');
+	assert.equal(collector.lastIndexOf(route), position, 'the route must have one owner');
+	for (const sibling of [
+		"if (process.platform === 'win32') receiveWindowsComponentShellSetup();",
+		'\nreceiveFileFixtureProducer();',
+		'\n\treceiveWindowsFilePort();',
+		'\n\treceiveWindowsRuntimeHandoff();'
+	]) {
+		assert.ok(collector.indexOf(sibling) > position, 'the early route must precede ' + sibling);
+	}
+	const workflow = read('.github/workflows/windows-test-replay.yml');
+	assert.equal(
+		workflow.split('node tools/test/test-managed-ollama-protocol.cjs --windows-model-port').length -
+			1,
+		1,
+		'the Windows replay must invoke the model-only route once'
+	);
 });
 
 console.log(`# passed: ${checks}/${checks}`);

@@ -11,11 +11,12 @@ const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
 
-// The standalone selector is the existing collector's Windows component lane;
+// Standalone selectors reuse the existing Windows component receivers;
 // the default still receives every original platform control below.
 const args = process.argv.slice(2);
 assert.ok(
-	args.length === 0 || (args.length === 1 && args[0] === '--windows-file-port'),
+	args.length === 0 ||
+		(args.length === 1 && ['--windows-file-port', '--windows-model-port'].includes(args[0])),
 	'Unknown managed Ollama receiving selector.'
 );
 function assertNativeHTTPClockWorkflow(workflow, expected) {
@@ -387,6 +388,10 @@ function receiveWindowsModelEnvironment() {
 		else assert.match(stdout, /^RESULT passed=3 failed=0 builder_only=false$/m);
 	}
 	process.stdout.write('WINDOWS-MODEL-ENVIRONMENT controls=11 native_children=true ollama=false\n');
+}
+if (args[0] === '--windows-model-port') {
+	receiveWindowsModelEnvironment();
+	process.exit(0);
 }
 if (process.platform === 'win32') receiveWindowsComponentShellSetup();
 receiveFileFixtureProducer();
