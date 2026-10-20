@@ -3433,9 +3433,9 @@ These are software implementations; final hardware verification remains below.
   files remain deletable when their parent permits unlink. Native regressions
   failed before the fix with and without optional LuaFileSystem; the ten-case
   real permissions/symlink matrix and nine portable receipt cases pass after it.
-  Windows already classifies DeleteFileW receipts. macOS still has the analogous
-  ambiguous existence guard before its native removal owner; removing that guard
-  and reproducing denied-path/broken-link controls is a deferred native diagnosis.
+  Windows already classifies DeleteFileW receipts. macOS no longer has the
+  analogous existence guard: `FileSystem.delete` removes the path itself and
+  admits only ENOENT through `remove_path_or_absent` (checked October 20).
   No macOS files, conditional TOML owner or manual CI were changed or executed.
 - [~] **L10.** Linux timer cancellation ownership: the scheduler now retains
   every armed token strongly until firing or accepted cancellation. Dropping a
@@ -15837,7 +15837,12 @@ test precondition failure, not a Lua defect or a successful permission grant.
   37996719619 completed successfully, retained the root CNAME, and served
   HTTP 200 after publication. This closes that specific domain-loss defect.
 
-- [ ] **135.** Remove the deprecated Homebrew macOS dependency syntax.
+- [x] **135.** Remove the deprecated Homebrew macOS dependency syntax.
+
+  Done (checked October 20): `tools/build/homebrew-cask.cjs` emits
+  `depends_on macos: :big_sur`, `test-homebrew-cask.cjs` refuses any other
+  form, the published casks carry it, and `macos/README.md` documents the
+  dev/stable switch (uninstall one cask, install the other, settings kept).
 
   The cask generator emits a quoted comparison for the minimum macOS version.
   Use the supported unquoted minimum-version symbol for every channel and
