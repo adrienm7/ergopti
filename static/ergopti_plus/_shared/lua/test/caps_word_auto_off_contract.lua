@@ -113,6 +113,29 @@ function M.run(helpers, corpus_path)
 			helpers.assert_eq(table.concat(drawn, ","), table.concat(corpus.terminator_rows, ","),
 				"catalogue order")
 		end)
+
+		-- keymap.terminators appends a user's custom delimiter to this same
+		-- catalogue table at run time. It has a label, no label_key, and the
+		-- CapsWord rows offer the built-in delimiters only: drawing it raised
+		-- in the Linux menu once a custom delimiter existed.
+		helpers.it("draws and stores no custom delimiter appended to the catalogue at run time", function()
+			local Catalogue = require("keymap.terminators_catalogue")
+			local before = #Policy.terminator_rows()
+			Catalogue[#Catalogue + 1] = { key = "custom_µ", chars = { "µ" }, label = "µ", consume = false,
+				default_enabled = true, custom = true }
+			local ok, failure = pcall(function()
+				local rows = Policy.terminator_rows()
+				helpers.assert_eq(#rows, before, "no custom row is drawn")
+				for _, row in ipairs(rows) do
+					helpers.assert_true(row.separator or type(row.label_key) == "string", tostring(row.key))
+				end
+				local out, reason = Policy.with_terminator({ "space" }, "custom_µ", true)
+				helpers.assert_nil(out, "a custom delimiter is not a CapsWord delimiter")
+				helpers.assert_eq(reason, "unknown_terminator")
+			end)
+			Catalogue[#Catalogue] = nil
+			if not ok then error(failure, 0) end
+		end)
 	end)
 end
 
