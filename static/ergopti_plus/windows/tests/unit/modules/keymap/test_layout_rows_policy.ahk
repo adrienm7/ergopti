@@ -114,3 +114,83 @@ _LRP_RegistryNumberRowOff() {
 
 Test("layout rows: a registry layout's number row switched off is reordered on the OS row (layout-row-scopes)",
 	_KLT_WithEmulation.Bind(_LRP_RegistryNumberRowOff))
+
+; Exercise the actual registration -> criterion -> callback -> emission path.
+; The child shadows SendEvent, so no user window can receive a fixture key.
+_LRPS_ChildSource() {
+	global _DriverDir, _SharedDir
+	; Other entry points in the included module name services this narrow child
+	; never calls. Runtime unset reads still throw; only load-time warnings stop.
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
+	Code .= "#Include " . _DriverDir . "\infra\json.ahk`n"
+	Code .= "#Include " . _DriverDir . "\adapters\file_system.ahk`n"
+	Code .= "#Include " . _SharedDir . "\modules\features\layout_rows_policy.ahk`n"
+	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
+	AssertTrue(Owner != "", "the genuine row sender must have one production owner")
+	Code .= "#Include " . Owner . "`n"
+	for Name in ["LayoutEmulationRows", "LayoutRowOf", "LayoutRowSwitches",
+		"LayoutRowsAllEmulated", "LayoutRowIsEmulated"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "the real row policy helper must exist: " . Name)
+		Code .= Definition . "`n"
+	}
+	Code .= FileRead(_DriverDir . "\tests\fixtures\layout_row_passthrough_body.ahk", "UTF-8")
+	return Code
+}
+
+_LRPS_Completion(State, Code, Output, ErrorText) {
+	State.Code := Code
+	State.Output := Output
+	State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_LRPS_LevelCustody(CallerLevel, Throws) {
+	global _SharedDir
+	Stem := A_Temp . "\ergopti_row_passthrough_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	Script := Stem . ".ahk"
+	AssertFalse(FileExist(Script), "the isolated row sender requires a fresh owned path")
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _LRPS_ChildSource()) != 0)
+	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }
+	Handle := 0, Primary := 0
+	PreviousCritical := Critical("Off")
+	try {
+		Observer := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, String(CallerLevel), Throws ? "throw" : "success", _SharedDir, String(Observer.MinSendLevel)],
+			_LRPS_Completion.Bind(State))
+		AssertTrue(Handle.start(), "the exact production row sender child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 10000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "the row sender child must settle once")
+		AssertEqual(0, State.Code, "the row sender refused: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "no native child error may be hidden")
+		AssertEqual("PASS row-passthrough-level-custody", State.Output)
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	try {
+		if Retired && !IsObject(Primary)
+			FileDelete(Script)
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "the exact child must retire before its source is removed")
+}
+
+for _LRPS_CallerLevel in [0, 2, 3]
+	for _LRPS_Throws in [false, true]
+		Test("layout row sender: caller level " . _LRPS_CallerLevel . " survives " . (_LRPS_Throws ? "refusal" : "success")
+			. " without rehooking (layout-row-send-level)", _LRPS_LevelCustody.Bind(_LRPS_CallerLevel, _LRPS_Throws))
