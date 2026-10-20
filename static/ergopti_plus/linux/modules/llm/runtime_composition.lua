@@ -21,7 +21,8 @@ local function current(fn)
 	local ok,value=pcall(fn); return ok and value==true
 end
 --- deps: source, resolver, installed, file_factory, admission, install_phase,
---- process (single finite/service bridge), http, owned_timer, timings, environment.
+--- process (single finite/service bridge), http, owned_timer, timings, environment,
+--- serve_environment (rows of the shared managed_ollama_environment.json).
 --- `source` owns captured enable/app source proofs and existing writer ACK.
 function M.new(deps)
 	assert(type(deps)=='table', 'runtime composition unavailable')
@@ -40,6 +41,14 @@ function M.new(deps)
 	local admission_new=d.admission.new
 	local environment=d.environment
 	assert(type(environment)=='function', 'captured native environment port unavailable')
+	-- The shared serve environment keeps the owned daemon on local models only.
+	local serve_environment,owned_names={},{}
+	assert(type(d.serve_environment)=='table' and #d.serve_environment>0, 'managed serve environment unavailable')
+	for _,row in ipairs(d.serve_environment) do
+		local name=type(row)=='string' and row:match('^([A-Z][A-Z0-9_]*)=')
+		assert(name and name~='OLLAMA_HOST' and not row:find('\0',1,true), 'managed serve environment invalid')
+		serve_environment[#serve_environment+1]=row;owned_names[name]=true
+	end
 	local p={current=s.current,publish=s.publish,app_capture=s.app_capture,app_current=s.app_current, compensate=s.compensate,
 		after=d.owned_timer.after, now_ms=d.owned_timer.now_ms}
 	function p.resolve(snapshot)
@@ -74,9 +83,11 @@ function M.new(deps)
 			end
 			-- The configured loopback origin is the exact bind address. Existing
 			-- process environment is otherwise preserved, including library paths.
-			if not item:match('^OLLAMA_HOST=') then env[#env+1]=item end
+			local name=item:match('^([^=]+)=')
+			if name~='OLLAMA_HOST' and not owned_names[name] then env[#env+1]=item end
 		end
 		env[#env+1]='OLLAMA_HOST=' .. options.host
+		for _,row in ipairs(serve_environment) do env[#env+1]=row end
 		if not current(authorized) then return empty('runtime_source_changed',done) end
 		return serve_start(executable,args,{owner=options.owner,authorized=authorized,
 			timeout_ms=false,env=env,capture_tail=true},done)

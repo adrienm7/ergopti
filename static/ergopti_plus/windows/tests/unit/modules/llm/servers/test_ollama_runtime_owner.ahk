@@ -5,6 +5,8 @@
 Test("Ollama runtime: cancellation captures exact file cleanup without READY", _ORT_CancelReceipt)
 Test("Ollama runtime: foreign cancellation receipt cannot grant file cleanup", _ORT_CancelForeignReceipt)
 Test("Ollama runtime: canonical lazy task adopted before start", _ORT_Adoption)
+Test("Ollama runtime: every launch carries the shared serve environment", _ORT_ServeEnvironment)
+Test("Ollama runtime: owner refuses a launch without the shared serve environment", _ORT_ServeEnvironmentRequired)
 Test("Ollama runtime: failed start strict physical ACK without callback", _ORT_FailedStart)
 Test("Ollama runtime: nonBoolean termination cannot release leases", _ORT_FalseAck)
 Test("Ollama runtime: retained file retirement debt blocks successors", _ORT_RetirementDebt)
@@ -47,6 +49,8 @@ class _ORT_Fixture {
 		this.Authority := Map("authorize", ObjBindMethod(this, "Authorize"), "is_current", ObjBindMethod(this, "Current"))
 		this.Owner := OllamaRuntimeOwner(Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
 			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"environment", "C:\bundled\managed_ollama_environment.json",
+			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 			"spawn", ObjBindMethod(this, "Spawn"), "read_ready", ObjBindMethod(this, "Read"),
 			"clock", ObjBindMethod(this, "Clock"),
 			"on_retired", ObjBindMethod(this, "Retire"), "on_error", ObjBindMethod(this, "Error")))
@@ -137,6 +141,34 @@ _ORT_Adoption() {
 	AssertEqual(F.Starts, 1, "Only one exact task starts.")
 	Assert(InStr(_ORT_Args(F.Arguments), "-ManifestSha256"), "The source manifest is passed to the actual launcher.")
 	Assert(F.Owner.Stop(), "Strict physical ACK releases owner.")
+}
+
+; OLLAMA_NO_CLOUD reaches the launcher only through this captured declaration.
+_ORT_ServeEnvironment() {
+	F := _ORT_Fixture()
+	Assert(F.Run(), "Actual start is admitted.")
+	Args := _ORT_Args(F.Arguments)
+	Assert(InStr(Args, "-ServeEnvironmentPath`nC:\bundled\managed_ollama_environment.json`n"),
+		"The shared serve environment path reaches the launcher.")
+	Assert(InStr(Args, "-ServeEnvironmentSha256`ncccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc`n"),
+		"The captured serve environment digest reaches the launcher.")
+	Assert(F.Owner.Stop(), "Strict physical ACK releases owner.")
+}
+
+_ORT_ServeEnvironmentRequired() {
+	for Name in ["environment", "environment_sha256"] {
+		Options := Map("launcher", "C:\bundled\runtime.ps1", "helper", "C:\bundled\files.ps1",
+			"helper_sha256", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"environment", "C:\bundled\managed_ollama_environment.json",
+			"environment_sha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+			"on_retired", (*) => true)
+		Options.Delete(Name)
+		Refused := false
+		try OllamaRuntimeOwner(Options)
+		catch TypeError
+			Refused := true
+		Assert(Refused, "A launch without the captured serve environment is refused: " . Name)
+	}
 }
 
 _ORT_FailedStart() {

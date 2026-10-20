@@ -11,6 +11,7 @@ const root = path.resolve(__dirname, '../..');
 const shared = path.join(root, 'static/ergopti_plus/_shared/modules');
 const bootstrap = fs.readFileSync(path.join(shared, 'llm/managed_ollama_bootstrap.json'));
 const proxy = fs.readFileSync(path.join(shared, 'network/proxy_policy.json'));
+const serveEnvironment = fs.readFileSync(path.join(shared, 'llm/managed_ollama_environment.json'));
 const generated = fs.readFileSync(
 	path.join(
 		root,
@@ -297,11 +298,14 @@ for (const [area, field, value] of [
 
 // Go default setup discovers a real module and every compile-time embed input.
 const goRoot = path.join(root, 'static/ergopti_plus/_shared/go/native_http');
-const goSource = fs.readFileSync(path.join(goRoot, 'network_bootstrap.go'), 'utf8');
+const goSource = ['network_bootstrap.go', 'serve_environment.go']
+	.map((name) => fs.readFileSync(path.join(goRoot, name), 'utf8'))
+	.join('\n');
 const goModule = fs.readFileSync(path.join(goRoot, 'go.mod'), 'utf8');
 const canonicalEmbeds = new Map([
 	['managed_ollama_bootstrap.json', bootstrap],
-	['proxy_policy.json', proxy]
+	['proxy_policy.json', proxy],
+	['managed_ollama_environment.json', serveEnvironment]
 ]);
 function admitGoClosure(moduleText, inputs) {
 	assert.match(
@@ -324,14 +328,17 @@ const goInputs = new Map(
 );
 admitGoClosure(goModule, goInputs);
 const { renderOutputs } = require('../codegen/codegen-managed-bootstrap.cjs');
-const ownerOutputs = renderOutputs(bootstrap, proxy);
+const ownerOutputs = renderOutputs(bootstrap, proxy, serveEnvironment);
 for (const [name, bytes] of goInputs)
 	assert.deepEqual(ownerOutputs.get(path.join(goRoot, name)), bytes);
 assert.equal(
 	ownerOutputs.size,
-	3,
-	'Swift and both Go embed outputs share the existing generator owner'
+	4,
+	'Swift and the three Go embed outputs share the existing generator owner'
 );
+assert.throws(() => renderOutputs(bootstrap, proxy));
+// The managed server only serves local models: no ollama.com contact.
+assert.equal(JSON.parse(serveEnvironment).serve_environment.OLLAMA_NO_CLOUD, '1');
 for (const name of canonicalEmbeds.keys()) {
 	const absent = new Map(goInputs);
 	absent.delete(name);

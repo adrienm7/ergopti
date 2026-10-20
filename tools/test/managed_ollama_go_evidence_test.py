@@ -80,6 +80,13 @@ ADDRESS_POLICY_IDENTITIES = [
     "TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer",
     "TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
 ]
+# Literal identities of the shared serve environment (OLLAMA_NO_CLOUD) the
+# managed server applies before it reads its configuration.
+SERVE_ENVIRONMENT_IDENTITIES = [
+    "TestServeEnvironmentDisablesOllamaCloud",
+    "TestServeEnvironmentRefusesInvalidDeclarations",
+]
+ADDED_IDENTITIES = ADDRESS_POLICY_IDENTITIES + SERVE_ENVIRONMENT_IDENTITIES
 FROZEN = ROOT / "tools/test/fixtures/managed-ollama-go/linux-44.jsonl"
 PACKAGE = "ergopti/nativehttp"
 
@@ -128,7 +135,7 @@ class NativeGoEvidenceTests(unittest.TestCase):
         added = identities["required_failure_stage_subtests"]
         self.assertEqual(len(original), 74)
         self.assertEqual(len(set(original)), 74)
-        subjects = original + ADDRESS_POLICY_IDENTITIES
+        subjects = original + ADDED_IDENTITIES
         self.assertEqual(len(added), 17)
         self.assertEqual(len(set(added)), 17)
         events = [{"Action": "start", "Package": PACKAGE}]
@@ -143,10 +150,10 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (78, 43, 35)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (80, 45, 35)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
-        for name in added + ADDRESS_POLICY_IDENTITIES:
+        for name in added + ADDED_IDENTITIES:
             for mutation in (
                 "missing",
                 "fail",
@@ -199,18 +206,18 @@ class NativeGoEvidenceTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.receive(required=REQUIRED + [name])
 
-    def testFrozenLinux44CannotQualifyAddedDestinationPolicyIdentities(self):
+    def testFrozenLinux44CannotQualifyAddedDestinationAndServeEnvironmentIdentities(self):
         self.assertEqual(
-            [name for name in POLICY["required_passes"] if name in ADDRESS_POLICY_IDENTITIES],
-            ADDRESS_POLICY_IDENTITIES,
+            [name for name in POLICY["required_passes"] if name in ADDED_IDENTITIES],
+            ADDED_IDENTITIES,
         )
         observed = {
             event["Test"]
             for event in self.events
             if event.get("Action") == "pass" and "Test" in event
         }
-        self.assertTrue(observed.isdisjoint(ADDRESS_POLICY_IDENTITIES))
-        for name in ADDRESS_POLICY_IDENTITIES:
+        self.assertTrue(observed.isdisjoint(ADDED_IDENTITIES))
+        for name in ADDED_IDENTITIES:
             with self.subTest(identity=name):
                 with self.assertRaises(ValueError):
                     self.receive(required=REQUIRED + [name])

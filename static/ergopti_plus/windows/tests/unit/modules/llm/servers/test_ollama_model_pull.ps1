@@ -55,6 +55,24 @@ try {
 	Case 'changed admitted model source is refused before import' {
 		Refuse { Open-OllamaModelSource $launcherPath ('f' * 64) }
 	}
+	# The literal is the product decision (local models only): the managed
+	# server must never contact ollama.com, whatever the parent environment says.
+	Case 'managed serve child carries the shared OLLAMA_NO_CLOUD declaration' {
+		$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+		$digest = (Get-FileHash -LiteralPath $declaration -Algorithm SHA256).Hash.ToLowerInvariant()
+		$environment = Read-OllamaServeEnvironment $declaration $digest
+		Assert-Model ($environment['OLLAMA_NO_CLOUD'] -ceq '1') 'The shared declaration disables Ollama cloud contact.'
+		[Environment]::SetEnvironmentVariable('OLLAMA_NO_CLOUD', '0', 'Process')
+		try {
+			$start = New-OllamaRuntimeStart 'C:\captured\versions\current\ollama.exe' 18148 'C:\captured\models' $environment
+		} finally { [Environment]::SetEnvironmentVariable('OLLAMA_NO_CLOUD', $null, 'Process') }
+		Assert-Model ($start.EnvironmentVariables['OLLAMA_NO_CLOUD'] -ceq '1') 'The managed server cannot inherit cloud contact.'
+		Assert-Model ($start.EnvironmentVariables['OLLAMA_HOST'] -ceq '127.0.0.1:18148') 'The launcher keeps the loopback listener.'
+		Assert-Model ($start.EnvironmentVariables['OLLAMA_MODELS'] -ceq 'C:\captured\models') 'The launcher keeps the model store.'
+		Assert-Model ($start.Arguments -ceq 'serve' -and -not $start.UseShellExecute) 'The child is the exact serve command.'
+		Refuse { Read-OllamaServeEnvironment $declaration ('f' * 64) }
+		Refuse { New-OllamaRuntimeStart 'C:\captured\ollama.exe' 18148 'C:\captured\models' $null }
+	}
 	Case 'model child uses captured executable/tag/environment only' {
 		[Environment]::SetEnvironmentVariable('OLLAMA_HOST', 'https://unowned.invalid:4444', 'Process')
 		[Environment]::SetEnvironmentVariable('OLLAMA_MODELS', 'C:\unowned-personal-models', 'Process')

@@ -16,10 +16,11 @@ local function run_registered()
 -- own independent causal suite. Capture only the ports sent to that owner.
 package.loaded['llm.runtime_repair']={new=function(ports,policy)return{ports=ports,policy=policy}end}
 local Compose = helpers.load_module("modules.llm.runtime_composition")
+local ManagedEnvironment = helpers.load_module("modules.llm.managed_ollama_environment")
 local function eq(a,b)assert(a==b,'expected '..tostring(b)..' got '..tostring(a))end
 local function test(name, body) helpers.it(name .. " (ollama-runtime)", body) end
 local function fixture()
-	local w={authorized=true,ancestry=true,left=100,env={'PATH=/usr/bin','OLLAMA_HOST=https://remote:443'},op={token='exact native operation'}}
+	local w={authorized=true,ancestry=true,left=100,env={'PATH=/usr/bin','OLLAMA_HOST=https://remote:443','OLLAMA_NO_CLOUD=0'},op={token='exact native operation'}}
 	local source={current=function()return w.authorized end,publish=function()end,app_capture=function()end,app_current=function()end,compensate=function()return true end}
 	local resolver={plan=function()return{asset=w.asset}end,current=function()return w.ancestry end}
 	w.asset={name='independent-pinned-fixture'};w.descriptor={};w.file_owner={}
@@ -34,7 +35,8 @@ local function fixture()
 	end}
 	w.factory={}
 	w.controller=Compose.new({source=source,resolver=resolver,installed=installed,file_factory=w.factory,admission=admission,
-		install_phase=phase,process=process,http=http,owned_timer=timer,timings=timings,environment=function()return w.env end})
+		install_phase=phase,process=process,http=http,owned_timer=timer,timings=timings,environment=function()return w.env end,
+		serve_environment=w.serve_environment or ManagedEnvironment.load()})
 	w.budget={remaining_ms=function()return w.left end}
 	w.authorizer=function()if w.on_authorized then w.on_authorized()end;return w.authorized end
 	w.options={authorized=w.authorizer,owner='originating-service',host='127.0.0.1:12345'}
@@ -55,6 +57,32 @@ test('owned serve explicit no-deadline port keeps configured loopback host',func
 	local hosts,paths=0,0
 	for _,entry in ipairs(w.service.opts.env)do if entry:match('^OLLAMA_HOST=')then hosts=hosts+1;eq(entry,'OLLAMA_HOST=127.0.0.1:12345')end;if entry=='PATH=/usr/bin'then paths=paths+1 end end
 	eq(hosts,1);eq(paths,1);eq(w.env[2],'OLLAMA_HOST=https://remote:443')
+end)
+-- The literal is the product decision (local models only): the owned daemon
+-- never contacts ollama.com, whatever the inherited environment says.
+test('owned serve applies the shared OLLAMA_NO_CLOUD declaration over inherited values',function()
+	local w=fixture();w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	local rows={}
+	for _,entry in ipairs(w.service.opts.env)do if entry:match('^OLLAMA_NO_CLOUD=')then rows[#rows+1]=entry end end
+	eq(#rows,1);eq(rows[1],'OLLAMA_NO_CLOUD=1');eq(w.env[3],'OLLAMA_NO_CLOUD=0')
+end)
+test('composition refuses a missing or invalid serve environment',function()
+	for _,rows in ipairs({{},{'lower=1'},{'OLLAMA_HOST=0.0.0.0:1'},{false}})do
+		local ok=pcall(function()local w={serve_environment=rows};Compose.new({source={current=function()return true end,publish=function()end,app_capture=function()end,app_current=function()end},
+			resolver={plan=function()end,current=function()end},installed={capture=function()end},file_factory={},admission={new=function()end},
+			install_phase={start=function()end},process={start_service=function()end},http={get_owned=function()end},
+			owned_timer={after=function()end,now_ms=function()return 0 end},timings={ms=function()return 1 end},
+			environment=function()return{}end,serve_environment=w.serve_environment})end)
+		eq(ok,false)
+	end
+end)
+test('shared serve environment declaration decodes and refuses owner-held names',function()
+	local rows=assert(ManagedEnvironment.load());eq(rows[1],'OLLAMA_NO_CLOUD=1')
+	for _,data in ipairs({'{"schema_version":1,"serve_environment":{}}','{"schema_version":2,"serve_environment":{"OLLAMA_NO_CLOUD":"1"}}',
+		'{"schema_version":1,"serve_environment":{"OLLAMA_MODELS":"/tmp"}}','{"schema_version":1,"serve_environment":{"OLLAMA_NO_CLOUD":1}}',
+		'{"schema_version":1,"serve_environment":{"OLLAMA_NO_CLOUD":"1"},"extra":true}','not json'})do
+		eq(ManagedEnvironment.decode(data),nil)
+	end
 end)
 test('source canceled during environment capture dispatches no process',function()
 	local w=fixture();local n=0;w.on_authorized=function()n=n+1;if n==2 then w.authorized=false end end

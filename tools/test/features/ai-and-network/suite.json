@@ -369,6 +369,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-ollama-release-pin-parity.cjs"],
 			"repro": "npm run test:ollama-release-pin-parity"
+		},
+		{
+			"id": "js-0449",
+			"ordinal": 449,
+			"name": "managed Ollama no-cloud parity (every owned server gets the shared OLLAMA_NO_CLOUD)",
+			"cmd": "node",
+			"args": ["tools/test/test-managed-ollama-no-cloud.cjs"],
+			"repro": "npm run test:managed-ollama-no-cloud"
 		}
 	]
 }
