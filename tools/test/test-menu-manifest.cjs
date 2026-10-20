@@ -6047,6 +6047,19 @@ console.log(
 	{
 		const nativeFile = 'windows/adapters/tray_menu.ahk';
 		const original = physicalPersonalSources[nativeFile];
+		const nativeDeclaration = 'TrayMenuFrameNative(Operation, Target := false, Handle := 0) {';
+		const nativeNextDeclaration = '\n_TrayBootstrapNoOp(*) {';
+		assert.equal(original.split(nativeDeclaration).length - 1, 1, 'one actual native frame owner');
+		assert.equal(
+			original.split(nativeNextDeclaration).length - 1,
+			1,
+			'one actual native owner boundary'
+		);
+		const nativeStart = original.indexOf(nativeDeclaration);
+		const nativeEnd = original.indexOf(nativeNextDeclaration, nativeStart);
+		assert.ok(nativeStart >= 0 && nativeEnd > nativeStart + nativeDeclaration.length);
+		const nativeOwner = original.slice(nativeStart, nativeEnd);
+		assert.ok(nativeOwner.trim().endsWith('}'), 'the actual native frame owner is complete');
 		assert.equal(
 			physicalPersonalFrameDataPublication(
 				physicalPersonalSources,
@@ -6077,7 +6090,11 @@ console.log(
 				'if Operation == "capture" {',
 				'if false && Operation == "capture" {'
 			],
-			['native state changed', '"uint", 0x400, "uint")', '"uint", 0, "uint")'],
+			[
+				'native state changed',
+				'State := NativeDll.Call("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")',
+				'State := NativeDll.Call("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0, "uint")'
+			],
 			[
 				'native command identity changed',
 				'Id := NativeDll.Call("GetMenuItemID"',
@@ -6117,6 +6134,12 @@ console.log(
 				'throw ValueError("Unknown owned native menu operation")\n\tTrayMenuFrameNative := Foreign.Native'
 			]
 		]) {
+			if (label === 'native state changed')
+				assert.equal(
+					nativeOwner.split(before).length - 1,
+					1,
+					label + ': actual frame owner preimage'
+				);
 			assert.equal(original.split(before).length - 1, 1, label + ': actual native preimage');
 			const changed = original.replace(before, after);
 			assert.notEqual(changed, original, label + ': actual source changed');
