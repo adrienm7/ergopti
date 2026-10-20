@@ -281,7 +281,7 @@ function updateCharts(appsArray, aggregatedData) {
 	}
 
 	// 2. Category Pie Chart (Colored by fixed category dictionary)
-	const catGroups = {};
+	const catGroups = Object.create(null);
 	appsArray.forEach((a) => {
 		if (!catGroups[a.category]) catGroups[a.category] = { timeMs: 0, score: a.score };
 		catGroups[a.category].timeMs += a.timeMs;
