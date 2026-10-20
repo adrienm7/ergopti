@@ -962,7 +962,11 @@ function uploadedLayout(channel) {
 					assert.equal(candidate.name, 'Upload the actual managed native release asset');
 					assert.equal(
 						pipeline.stepField(candidate.body, 'if'),
-						MacStage.condition('managed-ollama-native', 'inputs.release')
+						// The Intel XCTest cell never uploads the runtime asset.
+						MacStage.condition(
+							'managed-ollama-native',
+							"${{ inputs.release && matrix.scenario != 'xctest' }}"
+						)
 					);
 					assert(
 						job.body.includes('      matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}')
