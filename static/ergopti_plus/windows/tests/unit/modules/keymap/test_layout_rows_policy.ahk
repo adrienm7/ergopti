@@ -363,7 +363,7 @@ _LRCC_ChildSource(BodyName := "layout_row_control_body.ahk", AdditionalSource :=
 			; token, leaving the complete production expression unchanged.
 			Expression := StrReplace(Match[1], "A_ThisHotkey", "Name")
 			Extra .= "_LRCC_Gate" . Gates . "(Name) => " . Expression . "`n"
-		} else if RegExMatch(Line, "^([^;\s]+):: (.+?)(?: ;.*)?$", &Match) {
+		} else if RegExMatch(Line, "^([^;\s]+):: (.+?)(?:\x20;.*)?$", &Match) {
 			Index := Plan.Length + 1
 			Extra .= "_LRCC_Callback" . Index . "(*) {`n" . Match[2] . "`n}`n"
 			Plan.Push('Map("name", "' . Match[1] . '", "criterion", _LRCC_Gate' . Gates
