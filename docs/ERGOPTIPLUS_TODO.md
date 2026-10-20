@@ -3191,7 +3191,14 @@ These are software implementations; final hardware verification remains below.
       jobs compile clean, `test-ci-pipeline-wiring.cjs`), so the gain is a
       separate Flatpak job built from the same bundle artifact, letting the
       other install cells start about four minutes earlier. Decision
-      (October 20): do it, validated on a `tmp/*` branch first. Next steps: build the Linux
+      (October 20): do it, validated on a `tmp/*` branch first. Prepared
+      locally (not pushed): `package-flatpak` in `ci-linux.yml` unpacks the
+      `assets-linux` tarball, builds and smokes the Flatpak beside
+      `install-linux`, uploads `assets-linux-flatpak` (collected by the
+      release's `assets-*` pattern); `linux-ok` needs both, the evidence
+      manifest and `ci-stage-status.cjs` carry the new sibling. Validate on a
+      `tmp/*` run: Flatpak job green, install cells start right after Build,
+      and a release-like run still lists the .flatpak asset. Next steps: build the Linux
       packages per format in parallel (keeping every install cell bound to the
       exact bytes it installs), and keep the graph symmetric (one row per OS,
       the same columns). All unit suites are already sharded by module group:

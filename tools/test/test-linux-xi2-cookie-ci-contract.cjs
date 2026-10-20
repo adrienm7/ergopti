@@ -109,8 +109,8 @@ function verify(subject) {
 	assert.strictEqual(pipeline.field(gate.body, 'if'), 'always()');
 	assert.deepStrictEqual(
 		pipeline.needsOf(gate.body),
-		['install-linux'],
-		'the verdict waits for the latest aggregate testbuild'
+		['install-linux', 'package-flatpak'],
+		'the verdict waits for the latest aggregate testbuild and the parallel Flatpak'
 	);
 	for (const [id, prior] of [
 		['e2e-linux', 'test-linux'],
@@ -635,7 +635,11 @@ for (const [name, before, replacement] of [
 		'      ci_predecessors: ${{ toJSON(needs) }}',
 		'      ci_predecessors: success'
 	],
-	['verdict omits E2E', '    needs: [package-linux]\n', '    needs: []\n'],
+	[
+		'verdict omits E2E',
+		'    needs: [package-linux]\n    strategy:',
+		'    needs: []\n    strategy:'
+	],
 	[
 		'verdict ignores actual results',
 		'          NEEDS: ${{ toJSON(needs) }}',

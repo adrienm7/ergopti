@@ -1381,7 +1381,7 @@ assert.strictEqual(
 );
 // The immediate Testbuild dependency forwards the genuine complete scheduler
 // chain; the unchanged evidence verifier still requires every manifest job.
-assert.deepStrictEqual(pipeline.needsOf(GATE.body), ['install-linux']);
+assert.deepStrictEqual(pipeline.needsOf(GATE.body), ['install-linux', 'package-flatpak']);
 assert.match(
 	pipeline
 		.runOf(pipeline.step(GATE.body, 'Assert all mandatory subjects ran and passed'))
@@ -1390,7 +1390,7 @@ assert.match(
 );
 assert.deepStrictEqual(
 	Object.keys(MANIFEST.jobs).sort(),
-	['test-linux', 'e2e-linux', 'package-linux', 'install-linux'].sort()
+	['test-linux', 'e2e-linux', 'package-linux', 'package-flatpak', 'install-linux'].sort()
 );
 for (const job of Object.keys(MANIFEST.jobs)) {
 	assert.strictEqual(
@@ -1455,15 +1455,10 @@ assert.ok(
 	subjectCount >= MIN_SUBJECTS,
 	`.github/linux-ci-coverage.json requires ${subjectCount} subject(s); the floor is ${MIN_SUBJECTS}`
 );
-// The six subjects of the former packaging jobs, now all proved by package-linux.
-const PACKAGE_SUBJECTS = [
-	'build-appimage',
-	'build-deb',
-	'build-flatpak',
-	'build-rpm',
-	'smoke-flatpak-run',
-	'smoke-tarball-install'
-];
+// The six subjects of the former packaging jobs: four proved by package-linux and
+// two by package-flatpak, which runs beside the install cells.
+const PACKAGE_SUBJECTS = ['build-appimage', 'build-deb', 'build-rpm', 'smoke-tarball-install'];
+const FLATPAK_SUBJECTS = ['build-flatpak', 'smoke-flatpak-run'];
 
 // One graph block still owns every former installation and package-run row.
 // Pin both the subjects and their execution environments: Docker first-run
@@ -1618,7 +1613,7 @@ assert.deepStrictEqual(
 		.jobs(LINUX_BOX)
 		.map((job) => job.id)
 		.sort(),
-	['e2e-linux', 'install-linux', 'linux-ok', 'package-linux', 'test-linux']
+	['e2e-linux', 'install-linux', 'linux-ok', 'package-flatpak', 'package-linux', 'test-linux']
 );
 for (const [id] of INSTALL_ROWS) {
 	rejects(({ evidence }) => {
@@ -1879,7 +1874,19 @@ for (const step of pipeline.steps(installJob)) {
 assert.deepStrictEqual(
 	Object.keys(MANIFEST.jobs['package-linux']?.subjects ?? {}).sort(),
 	PACKAGE_SUBJECTS,
-	'package-linux must be the mandatory owner of the six packaging subjects'
+	'package-linux must be the mandatory owner of its four packaging subjects'
+);
+assert.deepStrictEqual(
+	Object.keys(MANIFEST.jobs['package-flatpak']?.subjects ?? {}).sort(),
+	FLATPAK_SUBJECTS,
+	'package-flatpak must be the mandatory owner of the Flatpak subjects'
+);
+assert.strictEqual(MANIFEST.jobs['package-flatpak'].classification, 'mandatory');
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('package-flatpak')), ['package-linux']);
+assert.strictEqual(
+	pipeline.field(pipeline.job('package-flatpak'), 'if'),
+	null,
+	'a failed or skipped package job must skip the Flatpak'
 );
 // Manual diagnostics can qualify packages after failed E2E receiving, while
 // both the mandatory verdict and automatic release admission remain strict.
@@ -1958,6 +1965,17 @@ for (const subject of PACKAGE_SUBJECTS) {
 		packageRecord,
 		new RegExp(`--subject ${subject}=1\\b`),
 		`package-linux must record the ${subject} subject`
+	);
+}
+const flatpakRecord = pipeline.step(
+	pipeline.job('package-flatpak'),
+	'Record mandatory Flatpak evidence'
+);
+for (const subject of FLATPAK_SUBJECTS) {
+	assert.match(
+		flatpakRecord,
+		new RegExp(`--subject ${subject}=1\\b`),
+		`package-flatpak must record the ${subject} subject`
 	);
 }
 

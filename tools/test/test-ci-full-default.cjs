@@ -252,7 +252,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
 		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
 	);
-	assert.equal(jobs, 28);
+	assert.equal(jobs, 29);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))

@@ -36,6 +36,17 @@ function run(platform, results = {}) {
 		}
 		prior = { [names[platform][index]]: { result: results[index] || 'success', outputs } };
 	}
+	// The Linux Flatpak job runs beside the install job, from the same package job.
+	if (platform === 'linux')
+		prior['package-flatpak'] = {
+			result: results.flatpak || 'success',
+			outputs: {
+				ci_source_sha: current.sourceSha,
+				ci_run_id: current.runId,
+				ci_attempt: '1',
+				ci_predecessors: prior['install-linux'].outputs.ci_predecessors
+			}
+		};
 	return prior;
 }
 function check(callback) {
@@ -49,7 +60,12 @@ for (const platform of Object.keys(names)) {
 	check(() =>
 		assert.deepEqual(
 			complete(platform, JSON.stringify(run(platform)), current),
-			Object.fromEntries(names[platform].map((name) => [name, { result: 'success' }]))
+			Object.fromEntries(
+				[...names[platform], ...(platform === 'linux' ? ['package-flatpak'] : [])].map((name) => [
+					name,
+					{ result: 'success' }
+				])
+			)
 		)
 	);
 	for (const result of ['failure', 'cancelled', 'skipped', 'unknown'])
@@ -98,6 +114,47 @@ for (const platform of Object.keys(names)) {
 		refuse(value, platform);
 	});
 }
+// The Flatpak sibling is mandatory, genuine, and bound to the same package job.
+for (const result of ['failure', 'cancelled', 'skipped', 'unknown'])
+	check(() => refuse(run('linux', { flatpak: result }), 'linux'));
+check(() => {
+	const value = run('linux');
+	delete value['package-flatpak'];
+	refuse(value, 'linux');
+});
+for (const field of ['ci_source_sha', 'ci_run_id', 'ci_attempt', 'ci_predecessors'])
+	check(() => {
+		const value = run('linux');
+		delete value['package-flatpak'].outputs[field];
+		refuse(value, 'linux');
+	});
+check(() => {
+	const value = run('linux');
+	value['package-flatpak'].outputs.ci_source_sha = 'b'.repeat(40);
+	refuse(value, 'linux');
+});
+check(() => {
+	const value = run('linux');
+	value['package-flatpak'].outputs.ci_run_id = '124';
+	refuse(value, 'linux');
+});
+check(() => {
+	const value = run('linux');
+	value['package-flatpak'].outputs.ci_attempt = '3';
+	refuse(value, 'linux');
+});
+check(() => {
+	const value = run('linux');
+	value['package-flatpak'].outputs.foreign = 'success';
+	refuse(value, 'linux');
+});
+check(() => {
+	const value = run('linux');
+	const foreign = JSON.parse(value['package-flatpak'].outputs.ci_predecessors);
+	foreign['package-linux'].outputs.ci_run_id = '999';
+	value['package-flatpak'].outputs.ci_predecessors = JSON.stringify(foreign);
+	refuse(value, 'linux');
+});
 check(() => {
 	const value = run('linux', { 1: 'failure' });
 	const packageJob = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux'];
@@ -505,7 +562,10 @@ function validateWorkflow(platform, workflow) {
 		assert.equal(job.outputs.ci_attempt, '${{ github.run_attempt }}');
 	}
 	const verdict = workflow.jobs[platform + '-ok'];
-	assert.deepEqual(verdict.needs, [names[platform][3]]);
+	assert.deepEqual(
+		verdict.needs,
+		platform === 'linux' ? [names[platform][3], 'package-flatpak'] : [names[platform][3]]
+	);
 	assert.equal(verdict.if, 'always()');
 	assert.ok(
 		verdict.steps.some((step) =>
@@ -521,6 +581,22 @@ function validateWorkflow(platform, workflow) {
 		)
 	);
 	if (platform === 'linux') {
+		// The Flatpak job is the install job's sibling: same package predecessor,
+		// same custody outputs, and no other consumer than the verdict.
+		const flatpak = workflow.jobs['package-flatpak'];
+		assert.deepEqual(flatpak.needs, ['package-linux']);
+		assert.deepEqual(Object.keys(flatpak.outputs).sort(), [
+			'ci_attempt',
+			'ci_predecessors',
+			'ci_run_id',
+			'ci_source_sha'
+		]);
+		assert.equal(flatpak.outputs.ci_predecessors, '${{ toJSON(needs) }}');
+		assert.equal(flatpak.outputs.ci_source_sha, '${{ github.sha }}');
+		assert.equal(flatpak.outputs.ci_run_id, '${{ github.run_id }}');
+		assert.equal(flatpak.outputs.ci_attempt, '${{ github.run_attempt }}');
+		assert.equal(flatpak.if, undefined, 'a failed or skipped package job must skip the Flatpak');
+		assert.deepEqual(workflow.jobs['install-linux'].needs, ['package-linux']);
 		assert.equal(
 			build.outputs.install_matrix,
 			'${{ steps.install-plan.outputs.matrix }}',
@@ -574,6 +650,26 @@ for (const platform of Object.keys(names)) {
 			mutate(changed);
 			assert.throws(() => validateWorkflow(platform, changed));
 		});
+	if (platform === 'linux')
+		for (const mutate of [
+			(value) => {
+				value.jobs['linux-ok'].needs = ['install-linux'];
+			},
+			(value) => {
+				value.jobs['package-flatpak'].needs = ['e2e-linux'];
+			},
+			(value) => {
+				value.jobs['package-flatpak'].outputs.ci_run_id = '123';
+			},
+			(value) => {
+				value.jobs['install-linux'].needs = ['package-linux', 'package-flatpak'];
+			}
+		])
+			check(() => {
+				const changed = structuredClone(workflow);
+				mutate(changed);
+				assert.throws(() => validateWorkflow(platform, changed));
+			});
 	if (platform === 'linux')
 		check(() => {
 			const changed = structuredClone(workflow);
