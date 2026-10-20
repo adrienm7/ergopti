@@ -349,3 +349,44 @@ for _LRPN_Scan in ["SC002", "SC029", "SC00C", "SC00D"]
 				_LRPS_LevelCustody.Bind(0, false, _LRPN_ChildSource,
 					[_LRPN_Scan, _LRPN_Emulated ? "on" : "off", _LRPN_Caps ? "on" : "off", _StaticDir, _DriverDir],
 					"PASS builtin-number-row-magic-owner"))
+
+
+_LRCC_ChildSource() {
+	Source := FileRead(_DriverProductionFileForSymbol("RemapKey"), "UTF-8")
+	Start := InStr(Source, "; ======= 7/ CONTROL LAYER")
+	AssertTrue(Start > 0, "the actual control layer must be found")
+	Extra := "", Plan := [], Gates := 0
+	for Line in StrSplit(SubStr(Source, Start), "`n") {
+		if RegExMatch(Line, "^#HotIf (.+)$", &Match) {
+			Gates += 1
+			; A_ThisHotkey is AHK's read-only evaluation input. Port only that
+			; token, leaving the complete production expression unchanged.
+			Expression := StrReplace(Match[1], "A_ThisHotkey", "Name")
+			Extra .= "_LRCC_Gate" . Gates . "(Name) => " . Expression . "`n"
+		} else if RegExMatch(Line, "^([^;\s]+):: (.+?)(?: ;.*)?$", &Match) {
+			Index := Plan.Length + 1
+			Extra .= "_LRCC_Callback" . Index . "(*) {`n" . Match[2] . "`n}`n"
+			Plan.Push('Map("name", "' . Match[1] . '", "criterion", _LRCC_Gate' . Gates
+				. ', "callback", _LRCC_Callback' . Index . ')')
+		}
+	}
+	AssertEqual(2, Gates, "both actual control-layer contexts must be exercised")
+	AssertEqual(5, Plan.Length, "all five actual control-layer callbacks must be exercised")
+	Items := ""
+	for Item in Plan
+		Items .= (Items == "" ? "" : ",") . Item
+	Extra .= "_LRCC_Plan() => [" . Items . "]`n"
+	for Name in ["_RemapEmit", "LayoutRowIsEmulatedHotkey"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "the actual control-layer dependency must exist: " . Name)
+		Extra .= Definition . "`n"
+	}
+	return _LRPS_ChildSource("layout_row_control_body.ahk", Extra)
+}
+
+for _LRCC_Entry in [1, 2, 3, 4, 5]
+	for _LRCC_Enabled in [false, true]
+		Test("layout controls: cohort " . _LRCC_Entry . " row " . (_LRCC_Enabled ? "on" : "off")
+			. " preserves native shortcuts and live admission (layout-row-control-admission)",
+			_LRPS_LevelCustody.Bind(0, false, _LRCC_ChildSource,
+				[String(_LRCC_Entry), _LRCC_Enabled ? "on" : "off"], "PASS layout-row-control-admission"))

@@ -1022,14 +1022,16 @@ _RegisterRollsAltGrHotkeys()
 ; Both emit through _RemapEmit: a SendEvent at this hotkey's SendLevel 2 that the
 ; keylogger's paste observer (level 1 and above) sees. SendInput removes the
 ; script's own hook while it sends, so the paste it typed was never observed.
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"]
+; These static contexts precede the dynamic row passthrough: each must stand
+; down itself when its row belongs to the OS, including modified zoom chords.
+#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey)
 ^SC02F:: _RemapEmit("^v", "v")
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can't use Numpad + to zoom
-#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and MicrosoftApps()
+#HotIf IsSet(Features) and Features["layout"]["ergopti_base"] and LayoutRowIsEmulatedHotkey(A_ThisHotkey) and MicrosoftApps()
 *^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
 *^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf
