@@ -804,23 +804,49 @@ _LLM_Menu_FormatBillions(n) {
  * LLM_OllamaListModels_Async — F24). The tray rebuild happens in the
  * completion callback so it never fires before the daemon actually answers.
  */
-_LLM_Menu_PromptDeleteCachedModel(name) {
+_LLM_Menu_PromptDeleteCachedModel(name, ConfirmFn := Ui_MsgBox, TransportPort := 0) {
+	global _LLM_Menu
+	MenuOwner := _LLM_Menu
+	if A_IsSuspended || !(MenuOwner is Map) || MenuOwner.Get("backend", "") != "ollama"
+		return false
 	tag := LLM_ResolveOllamaTag(name)
 	if (tag == "")
-		return
-	title := t("menu.llm.delete_model_title")
-	body  := StrReplace(t("menu.llm.delete_model_body"), "%s", name)
-	choice := Ui_MsgBox(body, title, "YesNo Icon!")
-	if (choice != "Yes")
-		return
-	Owner := _LLM_Menu_BeginOllamaAux("menu_delete:" . tag, tag)
-	_LLM_Menu_RecordDeleteReconcile(Owner, name, tag)
-	try LLM_OllamaDeleteModel_Async(tag,
-		(ok) => _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok, Owner), 0, Owner)
-	catch {
-		_LLM_Menu_ClearDeleteReconcile(Owner)
-		LLM_AuxFinish(Owner)
+		return false
+	; The question authorizes this daemon and this request, not a replacement
+	; selected while the native modal loop is pumping lifecycle callbacks.
+	Custody := LLM_OllamaCaptureOriginCustody()
+	Owner := _LLM_Menu_BeginOllamaAux("menu_delete:" . tag, tag, Custody)
+	HandedOff := false
+	try {
+		title := t("menu.llm.delete_model_title")
+		body := StrReplace(t("menu.llm.delete_model_body"), "%s", name)
+		if !_LLM_Menu_DeleteConfirmationCurrent(Owner, MenuOwner)
+			return false
+		choice := ConfirmFn.Call(body, title, "YesNo Icon!")
+		if choice != "Yes" || !_LLM_Menu_DeleteConfirmationCurrent(Owner, MenuOwner)
+			return false
+		_LLM_Menu_RecordDeleteReconcile(Owner, name, tag)
+		try LLM_OllamaDeleteModel_Async(tag,
+			(ok) => _LLM_Menu_OnDeleteCachedModelDone(name, tag, ok, Owner), TransportPort, Owner)
+		catch
+			return false
+		HandedOff := true
+		return true
+	} finally {
+		if !HandedOff || !LLM_OllamaOriginCustodyCurrent(Custody, Owner["endpoint"]) {
+			_LLM_Menu_ClearDeleteReconcile(Owner)
+			_LLM_AuxRetireOwner(Owner, true)
+		}
 	}
+}
+
+_LLM_Menu_DeleteConfirmationCurrent(Owner, MenuOwner) {
+	global _LLM_Menu
+	return !A_IsSuspended && _LLM_Menu == MenuOwner
+		&& _LLM_Menu_DeleteOwnerIsCurrent(Owner)
+		&& LLM_OllamaOriginCustodyCurrent(Owner["origin_custody"], Owner["endpoint"])
+		&& !A_IsSuspended && _LLM_Menu == MenuOwner
+		&& _LLM_Menu_DeleteOwnerIsCurrent(Owner)
 }
 
 
