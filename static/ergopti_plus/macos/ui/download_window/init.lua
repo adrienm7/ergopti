@@ -454,6 +454,7 @@ end
 --- @return boolean committed
 function M.hide()
 		if _is_hiding then return false end
+		if _javascript_context then JavaScript.retire(_javascript_context) end
 		_is_hiding = true
 		local owned = _wv
 		local owner = _owner
@@ -538,6 +539,7 @@ function M.show(opts)
 		Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
 
 		-- New occupant: invalidate any deferred hide armed by the previous one.
+		if _javascript_context then JavaScript.retire(_javascript_context) end
 		_session = _session + 1
 		local session = _session
 		_javascript_context = JavaScript.new_context(session, opts.kind)
