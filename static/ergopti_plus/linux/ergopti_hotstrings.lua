@@ -184,8 +184,6 @@ local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
--- Names the CapsWord pointer kind of a native event; the manager loads it.
-local CapsWordAutoOff = shortcuts and require("modules.shortcuts.caps_word_auto_off") or nil
 
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
 local window_info = RuntimeGuard.optional_require("adapters.window_info")
@@ -958,6 +956,8 @@ local function main()
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keylogger.cancel_hold_intervals() end
 			if paused and gestures then gestures.release_clicks() end
+			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
+			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
 			if paused then MagicKeySource.cancel_capture() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
@@ -1106,13 +1106,6 @@ local function main()
 		-- Kept this narrow deliberately: an undo that survived a word of typing
 		-- would insert a trigger in a place the user had moved on from.
 		_undoable = nil
-
-		-- CapsWord: process BEFORE the engine so the capitalized character
-		-- enters the buffer correctly (not as a duplicate after the original).
-		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
-			local cap_ch = shortcuts.process_caps_word(ch)
-			if cap_ch then ch = cap_ch end
-		end
 
 		-- Monotonic wall clock: the keylogger derives real inter-keystroke delays
 		-- from this. The CPU clock barely advances between keystrokes on Linux, so
@@ -1801,13 +1794,11 @@ local function main()
 	-- A pointer event of a checked kind ends CapsWord: the hand has left the
 	-- keyboard. The hook reports every press of an observed pointer (a button or
 	-- a touchpad contact) and every EV_REL report (a movement or a wheel turn),
-	-- so this returns at once while CapsWord is off.
+	-- so this returns at once while CapsWord is off. The manager names the
+	-- event's pointer kind: main() is at LuaJIT's 60-upvalue limit.
 	local function on_pointer_event(kind_of_event, code)
 		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
-		local kind
-		if kind_of_event == "press" then kind = CapsWordAutoOff.pointer_kind_of_button(code)
-		else kind = CapsWordAutoOff.pointer_kind_of_motion() end
-		shortcuts.caps_word_observe_pointer(kind)
+		shortcuts.caps_word_observe_pointer_event(kind_of_event, code)
 	end
 
 	-- Text the daemon types itself (an expansion, the magic key's result, a

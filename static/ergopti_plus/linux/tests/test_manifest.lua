@@ -152,6 +152,7 @@ return {
 	"tests.unit.adapters.keyboard_hook.test_evdev_reader_controlled_fresh_native",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_seed",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_lock_state",
+	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_caps_word_lock",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_device_watchdog_reacquisition",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_device_watchdog_aggregate_modifier_contract",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_device_watchdog_managed_source_cohort",

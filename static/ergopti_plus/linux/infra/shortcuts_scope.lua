@@ -252,7 +252,7 @@ function M.new(options)
 		return snapshot
 	end
 	local function apply_state(state)
-		local stopped = { enabled = false, wrap = false, caps_word_active = false, caps_word_triggered = false }
+		local stopped = { enabled = false, wrap = false, caps_word_active = false }
 		if manager.apply_configuration(owner, stopped) ~= true then return false end
 		if keyboard.apply_configuration(owner, state.keyboard) ~= true then return false end
 		if taps.apply_configuration(owner, state.taps) ~= true then return false end

@@ -96,7 +96,7 @@ local function with_owner(body, managed, prepare)
 		end
 		if prepare then prepare(state) end
 		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
-			manager=ordinary({enabled=true,wrap=false,caps_word_active=false,caps_word_triggered=false}),
+			manager=ordinary({enabled=true,wrap=false,caps_word_active=false}),
 			keyboard=ordinary({assignments={},explicit_assignments={}}), taps=ordinary({}), chords=ordinary({}), url=ordinary({}),
 			is_paused=function() return state.paused end})
 		body(state)
