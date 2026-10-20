@@ -42,6 +42,11 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_eq(state.pumps, 1)
 		helpers.assert_eq(state.pump_services, true)
 		helpers.assert_eq(state.loop_after_complete, false)
+		-- The local reload control starts once ready, on the tray's reload owner,
+		-- and SIGUSR1 rings it.
+		helpers.assert_eq(state.driver_control and state.driver_control.pid, 4242)
+		helpers.assert_type(state.driver_control.reload, "function")
+		helpers.assert_type(state.callbacks.on_usr1, "function")
 	end)
 	helpers.it("(startup-late-grab) preserves the onboarding capture gate through the first pump", function()
 		local state = MainStartup.run()

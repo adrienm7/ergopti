@@ -222,6 +222,12 @@ local runtime_shutdown_ack = not prediction_engine
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
 		{
+			name = "local reload control",
+			stop = function()
+				return not privacy_owners.driver_control or privacy_owners.driver_control:stop() == true
+			end,
+		},
+		{
 			name = "tray action authority",
 			stop = function()
 				return not privacy_owners.menu_rebuild or privacy_owners.menu_rebuild.stop() == true
@@ -594,23 +600,27 @@ end
 --- item logged success and reloaded nothing. There is no reason to leave the
 --- process to signal itself: the menu now calls this directly.
 --- @param trigger string What asked for the reload, for the log line.
+--- @return boolean reloaded
+--- @return string|nil why "postponed" or "failed" when not reloaded; the local
+---   reload control reports it, the other callers only log.
 local function perform_reload(trigger)
 	if gestures and gestures.stop_window_switches() ~= true then
 		Logger.warn(LOG, "Reload postponed while a window operation owns native cleanup debt.")
-		return false
+		return false, "postponed"
 	end
 	if gestures and gestures.stop_programs() ~= true then
 		Logger.warn(LOG, "Reload postponed while a user program owns native cleanup debt.")
-		return false
+		return false, "postponed"
 	end
 	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
 	local ok, count = pcall(function() return hotstrings_config.reload() end)
 	if ok then
 		Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
-	else
-		Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
+		return true
 	end
+	Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
+	return false, "failed"
 end
 
 --- Starts the release the updater just installed in place of this daemon: an
@@ -691,6 +701,15 @@ local function install_signal_handlers()
 		on_term = on_term,
 		on_hup = function()
 			if not shutdown.is_requested() then perform_reload("SIGHUP") end
+		end,
+		-- The local reload control rings here; its session checks the token.
+		on_usr1 = function()
+			if shutdown.is_requested() then return end
+			if privacy_owners.driver_control then
+				privacy_owners.driver_control:handle()
+			else
+				Logger.warn(LOG, "Reload control rang, but the local reload control is not running.")
+			end
 		end,
 	})
 end
@@ -2809,6 +2828,9 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil
+	-- Optional: a control that cannot start is logged and the daemon runs on.
+	privacy_owners.driver_control = require("infra.driver_control").start({
+		pid = require("luv").os_getpid(), reload = perform_reload })
 	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end

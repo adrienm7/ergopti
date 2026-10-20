@@ -34,6 +34,7 @@ return {
 	"tests.unit.modules.keylogger.privacy.test_focus_guard_async",
 	"tests.unit.modules.keylogger.privacy.test_pointer_focus_privacy",
 	"tests.unit.infra.lifecycle.test_session_lock",
+	"tests.unit.infra.control.test_driver_control",
 	"tests.unit.modules.updater.install.test_production_dispatch_refusal",
 	"tests.unit.modules.updater.install.test_production_manager_owners",
 	"tests.unit.infra.native_artifacts.test_ollama_pinned_artifact",

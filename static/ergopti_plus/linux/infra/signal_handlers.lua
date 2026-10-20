@@ -47,11 +47,13 @@ M.stop = stop
 
 --- Installs one terminal/reload callback set after CLI admission. A refusal keeps
 --- any acquired handles reachable through stop()/is_settled() until close ACKs.
---- @param opts table { on_term, on_hup }
+--- @param opts table { on_term, on_hup, on_usr1? }; on_usr1 rings the local
+---   reload control.
 --- @return boolean admitted, string|nil error
 function M.start(opts)
 	if active then return false, "Signal installation is already owned or retiring" end
-	if type(opts) ~= "table" or type(opts.on_term) ~= "function" or type(opts.on_hup) ~= "function" then
+	if type(opts) ~= "table" or type(opts.on_term) ~= "function" or type(opts.on_hup) ~= "function"
+		or (opts.on_usr1 ~= nil and type(opts.on_usr1) ~= "function") then
 		return false, "Signal callbacks are incomplete"
 	end
 	local loaded, uv = pcall(require, "luv")
@@ -63,7 +65,9 @@ function M.start(opts)
 	end
 	local owner = { entries = {}, native = native, admitted = false }
 	active = owner
-	for _, spec in ipairs({ { "sigint", opts.on_term, 2 }, { "sigterm", opts.on_term, 15 }, { "sighup", opts.on_hup, 1 } }) do
+	local specs = { { "sigint", opts.on_term, 2 }, { "sigterm", opts.on_term, 15 }, { "sighup", opts.on_hup, 1 } }
+	if opts.on_usr1 then specs[#specs + 1] = { "sigusr1", opts.on_usr1, 10 } end
+	for _, spec in ipairs(specs) do
 		local allocated, handle = pcall(native.new_signal)
 		if not allocated or handle == nil or handle == false then
 			-- A constructor that raises supplies no handle proving whether it
