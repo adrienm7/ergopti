@@ -213,6 +213,11 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_eq(prompt.spec.min, context.min)
 				helpers.assert_eq(prompt.spec.max, context.max)
 				helpers.assert_eq(prompt.spec.value, context.current)
+				if context.name == "debounce_ms" then
+					-- Headed by the declared caption of the AI trigger group, not a
+					-- title the driver labels itself (native-menu-rows census).
+					helpers.assert_eq(prompt.spec.title, f.strings["menu.llm.trigger_menu_title"])
+				end
 				helpers.assert_true(prompt.spec.on_save(context.candidate))
 				local owner = context.name == "debounce_ms" and f.trigger or f.settings
 				helpers.assert_eq(owner.get(context.name), context.saved)
