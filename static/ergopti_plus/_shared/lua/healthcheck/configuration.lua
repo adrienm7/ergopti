@@ -8,7 +8,8 @@
 --- the user invented (a model name, a custom delimiter) never becomes a row.
 ---
 --- FEATURES & RATIONALE:
---- 1. Booleans, numbers and manifest enum values are reported exactly.
+--- 1. Booleans, numbers and manifest enum values are reported exactly; an
+---    enum row is only a declared string member, compared exactly.
 --- 2. Every other string is reduced to its length in characters, and every
 ---    array to its item count: a path or a sentence typed into a text setting
 ---    cannot leave the machine through this section.
@@ -80,8 +81,10 @@ local function reduce(path, value, enum_values)
 		return text and { setting = path, type = "number", value = text } or nil
 	end
 	if type(value) == "string" then
+		-- Only a declared string member, compared exactly: an enum may also
+		-- declare booleans (script.alt_gr_is_kana_remap)
 		for _, accepted in ipairs(enum_values or {}) do
-			if value == accepted then return { setting = path, type = "enum", value = value } end
+			if type(accepted) == "string" and value == accepted then return { setting = path, type = "enum", value = value } end
 		end
 		return { setting = path, type = "text", value = tostring(character_count(value)) }
 	end

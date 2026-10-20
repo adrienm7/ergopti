@@ -9,7 +9,8 @@
 ; never becomes a row.
 ;
 ; FEATURES & RATIONALE:
-; 1. Booleans, numbers and manifest enum values are reported exactly.
+; 1. Booleans, numbers and manifest enum values are reported exactly; an enum
+;    row is only a declared string member, compared exactly.
 ; 2. Every other string is reduced to its length in characters, and every array
 ;    to its item count: a path or a sentence typed into a text setting cannot
 ;    leave the machine through this section.
@@ -87,9 +88,12 @@ _HCConfig_Reduce(Path, Value, EnumValues) {
 		return Text == "" ? 0 : Map("setting", Path, "type", "number", "value", Text)
 	}
 	if Value is String {
+		; Only a declared string member, compared exactly: an enum may also
+		; declare booleans, which the manifest holds as 1 and 0, and a typed
+		; "1" is not one of them
 		if EnumValues is Array {
 			for Accepted in EnumValues
-				if StrCompare(Value, Accepted, true) == 0
+				if Accepted is String && StrCompare(Value, Accepted, true) == 0
 					return Map("setting", Path, "type", "enum", "value", Value)
 		}
 		return Map("setting", Path, "type", "text", "value", String(_HCConfig_CharacterCount(Value)))
