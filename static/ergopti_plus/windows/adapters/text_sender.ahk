@@ -811,6 +811,14 @@ _TextSenderHostTakesTextByPaste() {
 	return OutputHostTakesTextByPaste(OutputHostResolve())
 }
 
+; TextSender emits at SendLevel 0 (or through SendInput or a paste), which the
+; CapsWord auto-off InputHook never sees: a checked delimiter in text it types
+; or has queued to type ends CapsWord as if typed.
+_TextSenderReportOutput(Text) {
+	if IsSet(CapsWordAutoOffObserveOutput)
+		CapsWordAutoOffObserveOutput(Text)
+}
+
 ; Inserts text at the current insertion point.
 ; Uses the Clipboard port (CB_SaveAll / CB_Write / CB_RestoreAll) for the clipboard
 ; path so the interaction is mockable and the driver has one canonical clipboard
@@ -846,6 +854,7 @@ TextSend(Text, Opts, Callback) {
 
 	if Mode = "native" {
 		_TextSenderQueueNative(Text, Opts, Callback)
+		_TextSenderReportOutput(Text)
 		return
 	}
 
@@ -862,6 +871,7 @@ TextSend(Text, Opts, Callback) {
 		RequestOpts := (Opts is Map) ? Opts.Clone() : Opts
 		_TEXT_CLIPBOARD_QUEUE.Push({ Text: Text, Callback: Callback, Opts: RequestOpts })
 		SetTimer(_TextSenderStartClipboard, -1)
+		_TextSenderReportOutput(Text)
 	} else {
 		; SendText uses the "Text" mode that bypasses hotkey triggers and sends
 		; Unicode characters as raw keystrokes — the safest injection path.
@@ -878,6 +888,8 @@ TextSend(Text, Opts, Callback) {
 			}
 			Result := _TextSenderRunAtomicOutput(
 				_AHK_SendInput.Bind(ErasePrefix . "{Text}" . Text), Opts, "direct-mode SendInput text")
+			if Result.Ok
+				_TextSenderReportOutput(Text)
 			_TextSenderInvokeCallback(Callback, Result.Ok, Result.ErrorMessage)
 		} else {
 			Ok := true
@@ -889,6 +901,8 @@ TextSend(Text, Opts, Callback) {
 				Ok := false
 				ErrorMessage := Err.Message
 			}
+			if Ok
+				_TextSenderReportOutput(Text)
 			_TextSenderInvokeCallback(Callback, Ok, ErrorMessage)
 		}
 	}

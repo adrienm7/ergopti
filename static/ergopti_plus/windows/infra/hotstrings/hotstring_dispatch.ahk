@@ -902,6 +902,11 @@ _HSE_MirrorCanonicalEffectToLlm(Effect) {
 		if !(IsObject(Effect) and Effect.HasOwnProp("DeleteFromEnd")
 				and Effect.HasOwnProp("InsertedText"))
 				throw Error("Canonical hotstring effect is missing DeleteFromEnd or InsertedText.")
+		; Every canonical hotstring edit passes here with its exact inserted text,
+		; which the auto-off InputHook never sees (SendLevel 0, SendInput, paste):
+		; a checked delimiter in an expansion ends CapsWord as if typed.
+		if IsSet(CapsWordAutoOffObserveOutput)
+				CapsWordAutoOffObserveOutput(Effect.InsertedText)
 		if (IsSet(_LLM_Bridge_Active) and _LLM_Bridge_Active
 				and IsSet(_LLM_Bridge_ApplyBufferEdit)) {
 				if (Effect.HasOwnProp("ClearAll") and Effect.ClearAll)

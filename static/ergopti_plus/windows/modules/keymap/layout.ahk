@@ -114,6 +114,12 @@ UpdateLastSentCharacter(Character) {
 	; timestamp write (AppState_TouchLastSentKey).
 	_LSCPush(Character)
 	AppState_TouchLastSentKey(Character)
+	; Every emit that reached the screen passes here (layers, AltGr, dead keys,
+	; the shifted digit row, a hotstring's last character), much of it invisible
+	; to the auto-off InputHook: a checked delimiter ends CapsWord as if typed.
+	; Key names ("Space", "LControl") hold no delimiter character.
+	if IsSet(CapsWordAutoOffObserveOutput)
+		CapsWordAutoOffObserveOutput(Character)
 }
 
 ; Serialized remap emit — the callback every remapped key fires. SendMode is
