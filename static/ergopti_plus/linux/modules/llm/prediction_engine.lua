@@ -512,6 +512,8 @@ end
 --- Initialises the engine and its explicit side-effect seams.
 --- @param opts table|nil Optional privacy_guard returns false only for admitted
 --- ownership; privacy_context returns its joined { app_id, title, native_identity }.
+--- apply_prediction acknowledges committed output with true; false, "dry_run"
+--- refuses diagnostic output without treating it as a transport failure.
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
 	Collision.construction = nil
@@ -2809,7 +2811,7 @@ local function accept_candidate(index, complete)
 		return false
 	end
 	if not current() then return false end
-	local ok, committed
+	local ok, committed, reason
 	if candidate.on_accept then
 		-- An agent action: its connector runs, nothing is typed.
 		ok, committed = pcall(candidate.on_accept)
@@ -2868,9 +2870,13 @@ local function accept_candidate(index, complete)
 			if current() then M.dismiss() end
 			return false
 		end
-		ok, committed = pcall(continuation_apply, candidate, continuation_context, continuation_current)
+		ok, committed, reason = pcall(continuation_apply, candidate, continuation_context, continuation_current)
 	end
 	if not ok or committed ~= true then
+		if ok and committed == false and reason == "dry_run" then
+			Logger.debug(LOG, "Prediction not inserted: dry-run mode.")
+			return false
+		end
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
 		return false
 	end
