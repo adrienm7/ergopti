@@ -673,7 +673,7 @@ _KLE_StepCapturedResetObserver(Proof, Event, State) {
 _KLE_Emit(Sc, Shift, Option) {
 	_AtCrit := Critical("On")
 	try {
-		Output := KeylayoutEmulation_Press(Sc, Shift, GetKeyState("CapsLock", "T"), Option)
+		Output := KeylayoutEmulation_Press(Sc, Shift, KS_CapsLockToggleState(), Option)
 		if (Output != "")
 			SendNewResult(Output)
 	} finally {
@@ -684,9 +684,9 @@ _KLE_Emit(Sc, Shift, Option) {
 _KLE_OnKey(Sc, Shift, *) {
 	global _SHIFT_DIGIT_SCS
 	if NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
-			&& NumberRowSymbolsCapable(GetKeyState("CapsLock", "T")) {
+			&& NumberRowSymbolsCapable(KS_CapsLockToggleState()) {
 		Code := Integer("0x" . SubStr(Sc, 3))
-		Level := NumberRowSymbolsLevel(Code, GetKeyState("CapsLock", "T"))
+		Level := NumberRowSymbolsLevel(Code, KS_CapsLockToggleState())
 		if Level["supported"] {
 			; Walk the same original source action machine, including pending dead
 			; keys and repeats. Ctrl/AltGr registrations retain their own levels.
@@ -711,7 +711,7 @@ _KLE_OnKey(Sc, Shift, *) {
 	}
 	_AtCrit := Critical("On")
 	try {
-		Step := KeylayoutEmulation_PressNative(Sc, Shift, GetKeyState("CapsLock", "T"), GetForegroundKeyboardLayout())
+		Step := KeylayoutEmulation_PressNative(Sc, Shift, KS_CapsLockToggleState(), GetForegroundKeyboardLayout())
 		if Step["Output"] != ""
 			SendNewResult(Step["Output"])
 		if Step["Native"]
@@ -768,8 +768,8 @@ _KLE_PendingDeadKeyCriterion(*) {
  * They stay inert until a layout is loaded. Must run before the Ergopti
  * layers register theirs (see the module header).
  * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
- * @param {Func} HotkeyFn - Hotkey(Name, Callback, Options) implementation.
- * @param {Func} HotIfFn - HotIf(Criterion?) implementation.
+ * @param {Func} HotkeyFn - The Hotkey built-in, or a stand-in taking Name, Callback, Options.
+ * @param {Func} HotIfFn - The HotIf built-in, or a stand-in taking an optional Criterion.
  * @param {Func|Integer} ForegroundFn Foreground layout reader; native by default.
  * @returns {Integer} Number of hotkeys registered.
  * @throws {Error} On a second registration.

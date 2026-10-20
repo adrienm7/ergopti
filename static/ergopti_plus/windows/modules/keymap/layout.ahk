@@ -849,7 +849,7 @@ RegisterBuiltinNumberRow()
 ; =================================
 
 GetCapsLockCondition() {
-	return GetKeyState("CapsLock", "T") and not LayerEnabled
+	return KS_CapsLockToggleState() and not LayerEnabled
 }
 
 ; CapsLock layer — bindings registered table-driven via modules/keymap/layout/layout_shift_caps.ahk.

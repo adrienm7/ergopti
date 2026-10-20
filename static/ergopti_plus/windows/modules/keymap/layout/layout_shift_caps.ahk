@@ -258,8 +258,8 @@ global LAYOUT_ROW_PASSTHROUGH_PREFIXES := ["", "*", "+", "^", "!"]
  * registry emulation stands down through its own criteria instead, and the
  * AltGr layer through its own (RegisterAltGrLayer). The magic key keeps its
  * key: it is a feature of its own, not the layout's.
- * @param {Func} HotkeyFn Hotkey(Name, Callback, Options).
- * @param {Func} HotIfFn HotIf(Criterion?).
+ * @param {Func} HotkeyFn The Hotkey built-in, or a stand-in taking Name, Callback, Options.
+ * @param {Func} HotIfFn The HotIf built-in, or a stand-in taking an optional Criterion.
  * @returns {Integer} The variants registered.
  */
 RegisterLayoutRowPassthrough(HotkeyFn := Hotkey, HotIfFn := HotIf) {
@@ -462,7 +462,7 @@ NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
 	if Mode == "" || Mode == "native"
 		return "native"
 	if !IsSet(Caps)
-		Caps := GetKeyState("CapsLock", "T")
+		Caps := KS_CapsLockToggleState()
 	; Capability dependencies are also unpublished during the first pump. A
 	; contained admission leaves native input authoritative on an unset source.
 	if Mode == "symbols" {
@@ -560,7 +560,7 @@ NumberRowLayoutObserved(Hkl, RefreshFn) {
 	global _NumberRowMenuSignature
 	if Hkl == 0
 		return false
-	Signature := NumberRowMenuSignature(Hkl, GetKeyState("CapsLock", "T"))
+	Signature := NumberRowMenuSignature(Hkl, KS_CapsLockToggleState())
 	if _NumberRowMenuSignature == "" || Signature == _NumberRowMenuSignature
 		return false
 	try LoggerInfo("NumberRow", "The number-row choices change on layout 0x{1:X}; refreshing the menu.", Hkl)
@@ -617,7 +617,7 @@ _DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
 	if Sc < 0x02 || Sc > 0x0B
 		return Map("swap", false, "source", "native", "descriptor", 0)
 	if !IsSet(Caps)
-		Caps := GetKeyState("CapsLock", "T")
+		Caps := KS_CapsLockToggleState()
 	Row := _DigitRowEffectiveKey(Sc, Hkl, Caps)
 	; « Digits first » applies only where every key of the row has a symbol
 	; unshifted and its digit on Shift (NumberRowPolicyAvailability), so an
@@ -667,7 +667,7 @@ NumberRowEdgesState(Hkl := unset, Caps := unset) {
 	if !IsSet(Hkl)
 		Hkl := NumberRowForegroundLayout()
 	if !IsSet(Caps)
-		Caps := GetKeyState("CapsLock", "T")
+		Caps := KS_CapsLockToggleState()
 	Stored := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
 		&& Features["layout"].Has("number_row_reorder_edges") && Features["layout"]["number_row_reorder_edges"] == true
 	Edges := []

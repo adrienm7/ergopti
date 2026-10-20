@@ -316,7 +316,7 @@ CapsWordAutoOffArm(EndFn) {
 		HookDispatcher.Register(Pair[1], Pair[2])
 	CapsWordAutoOff.Subscriptions := Subscriptions
 	if Policy["idle_ms"] > 0 {
-		SetTimer(Callbacks["idle"], -Policy["idle_ms"])
+		TimerArmOneShotMs(Callbacks["idle"], Policy["idle_ms"])
 		CapsWordAutoOff.IdleRunning := true
 	}
 	if CapsWordAutoOffEndsOnPointer(Policy, CapsWordAutoOffPolledKind()) {
@@ -338,11 +338,11 @@ CapsWordAutoOffDisarm() {
 		HookDispatcher.Unregister(Pair[1], Pair[2])
 	CapsWordAutoOff.Subscriptions := []
 	if CapsWordAutoOff.IdleRunning {
-		SetTimer(Callbacks["idle"], 0)
+		TimerSetCallback(Callbacks["idle"], 0)
 		CapsWordAutoOff.IdleRunning := false
 	}
 	if CapsWordAutoOff.MotionRunning {
-		SetTimer(Callbacks["motion"], 0)
+		TimerSetCallback(Callbacks["motion"], 0)
 		CapsWordAutoOff.MotionRunning := false
 	}
 	CapsWordAutoOff.Armed := ""
@@ -427,8 +427,8 @@ _CapsWordAutoOff_OnChar(Hook, Char) {
 _CapsWordAutoOff_OnKeyDown(Hook, Vk, Sc) {
 	if !_CapsWordAutoOffActive() || !CapsWordAutoOff.IdleRunning
 		return
-	; A keystroke restarts the delay; SetTimer replaces the pending period.
-	SetTimer(_CapsWordAutoOffCallbacks()["idle"], -CapsWordAutoOff.Armed["idle_ms"])
+	; A keystroke restarts the delay: re-arming the same callback replaces its pending period.
+	TimerArmOneShotMs(_CapsWordAutoOffCallbacks()["idle"], CapsWordAutoOff.Armed["idle_ms"])
 }
 
 _CapsWordAutoOff_OnIdle() {
