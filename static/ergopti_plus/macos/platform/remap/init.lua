@@ -3535,6 +3535,14 @@ function M.get_enabled()
 	return _state.enabled == true
 end
 
+--- The virtual keyboard form the generator deploys while the integration is
+--- on, read from memory: input callbacks resolve the ISO pair with it.
+--- @return string|nil form "ansi" or "iso"; nil when off or not yet resolved.
+function M.virtual_keyboard_form()
+	if not _state or _state.enabled ~= true then return nil end
+	return _state.virtual_keyboard_type
+end
+
 --- The remap guardian's state for the diagnostics permissions table, read
 --- from memory without any native observation or side effect.
 --- @return string state `ready`, `requires_approval`, `unavailable`,
