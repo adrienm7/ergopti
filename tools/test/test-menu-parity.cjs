@@ -738,6 +738,8 @@ const OPENS_SUBMENU = {
 	},
 	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
+	// « CapsWord : désactivation automatique », the same submenu on the three drivers.
+	caps_word_auto_off: 'caps_word_auto_off_group',
 	accented_letters: 'accented_letters_group',
 	hotstring_extensions: [
 		{
@@ -6397,7 +6399,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // The three Word Expander controls now share one declared child menu.
 // The common AI Info Bar check delegates to a shared display child menu.
 // Linux 19 → 20: navigation and validation now use their declared list providers.
-const RENDERED_THROUGH_SHARED = { hs: 22, linux: 20 };
+const RENDERED_THROUGH_SHARED = { hs: 23, linux: 21 };
 
 const DRIVER_ROOTS = {
 	hs: path.join(SP, 'macos'),

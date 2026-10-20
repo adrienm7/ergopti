@@ -51,8 +51,9 @@ _BuildShortcutsSubmenu() {
 	Getters := _SC_Getters()
 
 	GroupBuilders := Map(
-		"key_combinations", () => _SC_KeyCombinationsSubmenu(),
-		"script_control",   () => _SC_ScriptControlSubmenu())
+		"key_combinations",   () => _SC_KeyCombinationsSubmenu(),
+		"caps_word_auto_off", () => _SC_CapsWordAutoOffSubmenu(),
+		"script_control",     () => _SC_ScriptControlSubmenu())
 
 	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters, , , DeclaredFrames)
 }
@@ -85,6 +86,94 @@ _SC_KeyCombinationCommands(Options := unset) {
 		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
+}
+
+; « CapsWord : désactivation automatique », declared by caps_word_auto_off_group:
+; the delay choice, one checkbox per delimiter of the hotstring catalogue and
+; one per pointer kind of [shortcuts.caps_word.pointer]. Every row stores
+; through CapsWordAutoOffStore, which the next activation reads; no reload.
+_SC_CapsWordAutoOffSubmenu() {
+	Commands := Map("caps_word_idle_timeout",
+		(Seconds, *) => CapsWordAutoOffStore("shortcuts.caps_word.idle_timeout_seconds", Seconds))
+	Getters := Map("shortcuts.caps_word.idle_timeout_seconds",
+		() => CapsWordAutoOffValues()["idle_timeout_seconds"])
+	ListProviders := Map(
+		"caps_word_terminators", () => _SC_CapsWordTerminatorRows(),
+		"caps_word_pointer_kinds", () => _SC_CapsWordPointerRows())
+	return MenuRenderer_Build("caps_word_auto_off_group", "Shortcuts", "", "", ListProviders, Commands, Getters)
+}
+
+; One checkbox per pointer kind the manifest declares for Windows, in its
+; order, then each kind it declares for other platforms only, greyed with the
+; kind's own reason and nothing to run (the touchpad gesture). The generated
+; manifest keeps no label key or position for a feature this platform lacks,
+; so such a row reads the kinds' shared key spelling,
+; menu.caps_word.pointer.<kind>.
+_SC_CapsWordPointerRows() {
+	global FEATURES_MANIFEST
+	Pointer := CapsWordAutoOffValues()["pointer"]
+	Rows := []
+	for Entry in ManifestFeaturesForSection("shortcuts.caps_word.pointer") {
+		Rows.Push(Map(
+			"label", t(Entry["description_key"]),
+			"checked", Pointer[Entry["id"]] == 1,
+			"action", _SC_CapsWordPointerToggle.Bind(Entry["id"])))
+	}
+	if !ManifestEnsureLoaded()
+		return Rows
+	for Entry in FEATURES_MANIFEST["unavailable"] {
+		if Entry["section"] != "shortcuts.caps_word.pointer"
+			continue
+		Kind := SubStr(Entry["path"], StrLen("shortcuts.caps_word.pointer.") + 1)
+		Rows.Push(Map(
+			"label", t("menu.caps_word.pointer." . Kind),
+			"disabled", true,
+			"disabled_reason_key", Entry["reason_key"]))
+	}
+	return Rows
+}
+
+_SC_CapsWordPointerToggle(Kind, *) {
+	return CapsWordAutoOffStore("shortcuts.caps_word.pointer." . Kind,
+		CapsWordAutoOffValues()["pointer"][Kind] != 1)
+}
+
+; One checkbox per catalogue delimiter, in its order, with its separators and
+; its translated label; a click stores the list with that delimiter flipped.
+_SC_CapsWordTerminatorRows() {
+	Current := CapsWordAutoOffValues()["terminators"]
+	Checked := Map()
+	for Key in Current
+		Checked[Key] := true
+	Rows := []
+	for Row in CapsWordAutoOffTerminatorRows() {
+		if Row.Has("separator") {
+			Boundary := MenuRenderer_TemplateRows("hotstrings_parameter_boundary", Map(), Map(), Map())
+			if !(Boundary is Array)
+				return []
+			for Separator in Boundary
+				Rows.Push(Separator)
+			continue
+		}
+		Rows.Push(Map(
+			"label", t(Row["label_key"]),
+			"checked", Checked.Has(Row["key"]),
+			"action", _SC_CapsWordTerminatorToggle.Bind(Row["key"])))
+	}
+	return Rows
+}
+
+_SC_CapsWordTerminatorToggle(Key, *) {
+	Current := CapsWordAutoOffValues()["terminators"]
+	Wanted := 1
+	for Existing in Current {
+		if Existing == Key
+			Wanted := 0
+	}
+	Next := CapsWordAutoOffWithTerminator(Current, Key, Wanted, &Reason)
+	if !(Next is Array)
+		throw ValueError("CapsWord delimiter '" . Key . "' refused: " . Reason)
+	return CapsWordAutoOffStore("shortcuts.caps_word.terminators", Next)
 }
 
 ; « Raccourcis de gestion du script », declared by script_control_group: its

@@ -1420,6 +1420,11 @@
 		},
 		{
 			"type": "group",
+			"id": "caps_word_auto_off",
+			"i18n": "menu.caps_word.auto_off"
+		},
+		{
+			"type": "group",
 			"id": "script_control",
 			"i18n": "menu.shortcuts.script_shortcuts",
 			"checked_when": [
@@ -1899,6 +1904,74 @@
 		{
 			"type": "list",
 			"id": "script_control_shortcuts"
+		}
+	],
+	"caps_word_auto_off_group": [
+		{
+			"type": "choice",
+			"id": "caps_word_idle_timeout",
+			"path": "shortcuts.caps_word.idle_timeout_seconds",
+			"i18n": "menu.caps_word.idle_timeout",
+			"show_current_choice": true,
+			"current_choice_suffix": ": {1}",
+			"choices": [
+				{
+					"value": 0,
+					"i18n": "menu.caps_word.idle_timeout_never"
+				},
+				{
+					"value": 1,
+					"i18n": "menu.caps_word.idle_timeout_unit",
+					"label_prefix": "1 "
+				},
+				{
+					"value": 3,
+					"i18n": "menu.caps_word.idle_timeout_unit",
+					"label_prefix": "3 "
+				},
+				{
+					"value": 5,
+					"i18n": "menu.caps_word.idle_timeout_unit",
+					"label_prefix": "5 "
+				},
+				{
+					"value": 10,
+					"i18n": "menu.caps_word.idle_timeout_unit",
+					"label_prefix": "10 "
+				},
+				{
+					"value": 30,
+					"i18n": "menu.caps_word.idle_timeout_unit",
+					"label_prefix": "30 "
+				},
+				{
+					"value": 60,
+					"i18n": "menu.caps_word.idle_timeout_unit",
+					"label_prefix": "60 "
+				}
+			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.caps_word.terminators_header"
+		},
+		{
+			"type": "list",
+			"id": "caps_word_terminators"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.caps_word.pointer_header"
+		},
+		{
+			"type": "list",
+			"id": "caps_word_pointer_kinds"
 		}
 	],
 	"metrics_menu": [

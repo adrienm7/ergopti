@@ -167,6 +167,7 @@ return {
 	"tests.unit.modules.keymap.test_number_row_policy",
 	"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy",
 	"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
+	"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu",
 	"tests.unit.adapters.layout.test_keyboard_layout_sources",
 	"tests.unit.adapters.layout.test_layout_cohort_fixture",
 	"tests.unit.adapters.processes.test_program_providers",

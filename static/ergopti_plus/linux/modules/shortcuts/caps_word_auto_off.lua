@@ -104,6 +104,24 @@ function M.pointer_kinds()
 	return copy
 end
 
+--- Every pointer kind the manifest declares, Linux or not, in manifest order,
+--- for the menu: a kind this driver cannot see keeps its declared reason.
+--- @return table Dense array of { kind, label_key, available, reason_key }.
+function M.pointer_kind_rows()
+	local rows = {}
+	for _, entry in ipairs(Manifest.features()) do
+		if entry.section == POINTER_SECTION then
+			local linux = false
+			for _, platform in ipairs(entry.platforms or {}) do
+				if platform == "linux" then linux = true end
+			end
+			rows[#rows + 1] = { kind = entry.id, label_key = entry.description_key, available = linux,
+				reason_key = not linux and entry.reason_key or nil }
+		end
+	end
+	return rows
+end
+
 --- The pointer kind of an evdev EV_KEY press from an observed pointer.
 --- @param code integer evdev code.
 --- @return string|nil kind nil for a code that is no pointer button or contact.

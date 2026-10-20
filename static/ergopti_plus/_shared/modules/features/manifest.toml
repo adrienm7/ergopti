@@ -5019,6 +5019,12 @@ i18n = "menu.shortcuts.key_combinations"
 checked_when = ["key_combinations_enabled"]
 platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
+# « CapsWord : désactivation automatique »: what ends CapsWord on its own, the
+# same submenu on the three drivers. Its rows are caps_word_auto_off_group.
+[[menu.shortcuts_menu]]
+type = "group"
+id = "caps_word_auto_off"
+i18n = "menu.caps_word.auto_off"
 # « Raccourcis de gestion du script »: the script chords, a group whose title
 # is ticked while its first-row switch is on. Its rows are
 # script_control_group, the same on the three drivers.
@@ -5392,6 +5398,46 @@ type = "---"
 [[menu.script_control_group]]
 type = "list"
 id = "script_control_shortcuts"
+
+# « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.
+# The delay is one choice row whose values the caps_word.idle_timeout registry
+# projects from the feature's preset_values. The delimiter rows are provider
+# data: each driver draws one checkbox per entry of the hotstring delimiter
+# catalogue, in its order and with its separators and labels, never a list of
+# its own. The pointer rows are provider data too: one checkbox per
+# [shortcuts.caps_word.pointer] kind, labelled by its description_key; a
+# driver the kind's platforms leave out draws it greyed with its reason_key
+# (disabled_reason_key), so the user sees why.
+[[menu.caps_word_auto_off_group]]
+type = "choice"
+id = "caps_word_idle_timeout"
+path = "shortcuts.caps_word.idle_timeout_seconds"
+i18n = "menu.caps_word.idle_timeout"
+choice_registry = "caps_word.idle_timeout"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+
+[[menu.caps_word_auto_off_group]]
+type = "---"
+
+[[menu.caps_word_auto_off_group]]
+type = "section_header"
+i18n = "menu.caps_word.terminators_header"
+
+[[menu.caps_word_auto_off_group]]
+type = "list"
+id = "caps_word_terminators"
+
+[[menu.caps_word_auto_off_group]]
+type = "---"
+
+[[menu.caps_word_auto_off_group]]
+type = "section_header"
+i18n = "menu.caps_word.pointer_header"
+
+[[menu.caps_word_auto_off_group]]
+type = "list"
+id = "caps_word_pointer_kinds"
 
 # Unrestricted: every driver draws this row from the declaration and registers
 # only what the click does. Windows used to insert its own master row by hand in
