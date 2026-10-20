@@ -140,10 +140,11 @@ check(
 	!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
 	'`package-macos` must be gating, not continue-on-error'
 );
-// Fail fast: a red Hammerspoon suite spends no macOS minutes.
+// Fail fast: a red Hammerspoon Unit suite spends no macOS minutes. Packaging
+// runs beside E2E (c5c56c1726); the launch job admits both before any release.
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
-	`package-macos must need unit/E2E suites and both managed native producers, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
+	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['test-hs']),
+	`package-macos must need exactly the Unit suite it admits, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
 );
 
 // The launcher build and XCTest precede the app build. LauncherLogTests append
