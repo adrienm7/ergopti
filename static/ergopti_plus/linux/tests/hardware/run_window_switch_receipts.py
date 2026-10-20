@@ -281,6 +281,19 @@ def main():
             command("xrandr", "--setmonitor", "LEFT", "1000/300x800/240+0+0", "screen")
             command("xrandr", "--setmonitor", "RIGHT", "1000/300x800/240+1000+0", "none")
             assert "Monitors: 2" in command("xrandr", "--listmonitors").stdout
+            # Openbox advertises itself before it has handled the RandR changes:
+            # a client mapped right away stayed an unmanaged, unmapped root child
+            # past the deadline (dev run 39375032517). A desktop round trip proves
+            # its event loop runs before any owned client exists.
+            for desktop in ("1", "0"):
+                command("xdotool", "set_desktop", desktop)
+                wait(
+                    lambda desktop=desktop: re.search(
+                        r"^_NET_CURRENT_DESKTOP\(CARDINAL\) = " + desktop + r"$",
+                        command("xprop", "-root", "_NET_CURRENT_DESKTOP", check=False).stdout,
+                        re.MULTILINE,
+                    )
+                )
             ids = {}
             for name, x in [("active", 100), ("right", 1100), ("left", 100)]:
                 title = "owned111_" + name
