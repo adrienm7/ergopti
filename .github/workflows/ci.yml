@@ -216,8 +216,8 @@ jobs:
               else
                   range="${last_stable}..HEAD"
               fi
+              request_range="$range"
               IFS='.' read -r maj min pat <<< "${last_stable#v}"
-              patch_version="${maj}.${min}.$((pat+1))"
               bump="patch"
               # --format=%s ends every subject with a newline. --pretty=format:
               # left the last one, the oldest commit of the range, unterminated,
@@ -249,9 +249,11 @@ jobs:
                   | grep -E "$series_re" | head -1 || true)
               if [ -z "$last_dev" ]; then
                   next_n=1
+                  request_range="HEAD"
               else
                   last_n="${last_dev##*.}"
                   next_n=$((last_n + 1))
+                  request_range="${last_dev}..HEAD"
               fi
               tag="v0.0.0-dev.${next_n}"
               prerelease="true"
@@ -284,21 +286,70 @@ jobs:
               exit 0
           fi
 
-          # A maintainer can classify the current release as the next patch
-          # with a Release-As trailer on the publication commit. Read HEAD
-          # only, so an earlier request never carries into another release.
-          # Breaking changes still require the normal major bump. This runs
-          # after the ancestry guard so rerunning a published request is inert.
-          if [ "$branch" = "main" ]; then
-              release_as=$(git log -1 --format='%(trailers:key=Release-As)')
-              if [ -n "$release_as" ]; then
-                  if [ "$release_as" != "Release-As: $patch_version" ] || [ "$bump" = "major" ]; then
-                      echo "::error::Release-As must name the next patch and cannot override a breaking change." >&2
+          # A maintainer forces the next stable version with a line of its own
+          # in a commit message since the last stable tag:
+          #
+          #     Release-As: 1.0.4
+          #
+          # (git commit --trailer 'Release-As: 1.0.4' writes it). The newest
+          # commit carrying one wins, and it replaces the version computed from
+          # the subjects, breaking or not. It must be MAJOR.MINOR.PATCH without
+          # a v prefix or leading zeros, strictly greater than the last stable
+          # tag, and not a tag already: anything else fails the plan rather
+          # than publishing the computed number the maintainer overrode. Once
+          # the tag exists the range starts after it, so a request never
+          # carries into a later release, and this runs after the ancestry
+          # guard so rerunning a published request stays inert. dev ignores it:
+          # its numbering is a counter, not a version.
+          messages=$(git log "$request_range" --format='@@release-as-commit %H%n%B')
+          request=""
+          request_commit=""
+          current=""
+          while IFS= read -r line; do
+              line="${line%$'\r'}"
+              if [[ "$line" == "@@release-as-commit "* ]]; then
+                  current="${line#@@release-as-commit }"
+                  [ -n "$request_commit" ] && [ "$current" != "$request_commit" ] && break
+                  continue
+              fi
+              if [[ "$line" =~ ^[Rr][Ee][Ll][Ee][Aa][Ss][Ee]-[Aa][Ss]:[[:space:]]*(.*)$ ]]; then
+                  value="${BASH_REMATCH[1]}"
+                  value="${value%"${value##*[![:space:]]}"}"
+                  if [ -z "$request_commit" ]; then
+                      request_commit="$current"
+                      request="$value"
+                  elif [ "$value" != "$request" ]; then
+                      echo "::error::Commit ${request_commit:0:12} holds two different Release-As lines ('$request' and '$value'); keep one."
                       exit 1
                   fi
-                  tag="v${patch_version}"
-                  title="Ergopti ${tag}"
               fi
+          done <<< "$messages"
+          if [ -n "$request_commit" ] && [ "$branch" != "main" ]; then
+              echo "::notice::Release-As '$request' in commit ${request_commit:0:12} applies to main only: dev keeps $tag."
+          elif [ -n "$request_commit" ]; then
+              number='(0|[1-9][0-9]{0,8})'
+              if [[ ! "$request" =~ ^${number}\.${number}\.${number}$ ]]; then
+                  echo "::error::Release-As '$request' in commit ${request_commit:0:12} is not MAJOR.MINOR.PATCH (digits only, no v prefix, no leading zeros)."
+                  exit 1
+              fi
+              r_maj="${BASH_REMATCH[1]}"; r_min="${BASH_REMATCH[2]}"; r_pat="${BASH_REMATCH[3]}"
+              IFS='.' read -r s_maj s_min s_pat <<< "${last_stable#v}"
+              if ! (( r_maj > s_maj || (r_maj == s_maj && (r_min > s_min || (r_min == s_min && r_pat > s_pat))) )); then
+                  echo "::error::Release-As $request in commit ${request_commit:0:12} is not greater than the last stable tag $last_stable."
+                  exit 1
+              fi
+              requested_tag="v${request}"
+              # Captured, never piped: under pipefail a failing ls-remote must
+              # fail the step, not read as "tag free".
+              local_tag=$(git tag --list "$requested_tag")
+              remote_tag=$(git ls-remote --tags origin "refs/tags/$requested_tag")
+              if [ -n "$local_tag" ] || [ -n "$remote_tag" ]; then
+                  echo "::error::Release-As $request in commit ${request_commit:0:12} names $requested_tag, which already exists as a tag."
+                  exit 1
+              fi
+              echo "::notice::Release-As $request in commit ${request_commit:0:12} replaces the computed $tag ($bump bump)."
+              tag="$requested_tag"
+              title="Ergopti ${tag}"
           fi
 
           # Skip if the tag already exists (duplicate push guard). The listing is
