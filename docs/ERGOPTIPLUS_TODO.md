@@ -3323,6 +3323,12 @@ These are software implementations; final hardware verification remains below.
       local object is released. Ask for the tester's log: its
       `[KeyCombinations] Pair` lines, `AHK drop detected` lines and
       `Menu command refused` lines.
+      Likely cause fixed (c89d74eb): the pair menu was the driver's only
+      `Menu` shown from a local, released when the function returned, while
+      AHK runs the chosen item's callback after `Show` returns. It is now
+      retained until the next pair menu. macOS and Linux build their pair
+      rows into the persistent tray menu, so they have no such transient.
+      Confirm with the tester on the next dev build.
 - [ ] **Slow Windows tests: repeated deep registry liveness checks.** Profiled
       on October 17 with `tools/diagnostics/ahk-line-sampler.ahk`: one
       `local server panel` test (35 s) made about 2 000 `RegistryLive` calls of
