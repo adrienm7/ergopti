@@ -144,6 +144,17 @@ evidence does not justify shipping it. Reconsider only with a changed mechanism
 and matched moving-position controls. See the
 [native border experiment](../audits/performance/ahk/2026_09_08/border_position/report.md).
 
+## Moving the Karabiner lease token out of the rule text
+
+Do not try to stop lease recoveries from redeploying `karabiner.json` by keeping
+one rule set and passing the fresh lease token through a variable. Karabiner's
+`variable_if` conditions compare a variable only to a fixed value written in the
+rule, so the token has to be in the rule text and every new token is a new file
+(and a reload of every rule). A replay of the maintainer's 2026-10-19 log (28 of
+33 deploys were recoveries) also showed that the deploy count falls only when
+lease failures do. Recovery deploys instead wait for a typing pause and log one
+INFO "Karabiner deploy decision" line each.
+
 ## Differential updates at current release sizes
 
 The maintainer withdrew differential update packages on 2026-10-04. Reported

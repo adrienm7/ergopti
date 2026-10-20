@@ -320,6 +320,17 @@ never did; the Linux updater `init` now returns before
 owner). Action: a new row an installed build needs follows the same shape;
 `update-rows-greyed-on-local-2026-10-01` holds the three trays.
 
+### project-an-inert-choice-stays-ticked-and-greyed
+
+Maintainer rule (2026-10-20, number-row ordering and edge keys): a stored
+choice that the current layout makes meaningless is never rewritten. The menu
+keeps its tick, greys it with the reason and suffixes the label with
+`menu.layout.number_row_not_applied` (« — non appliqué »); the choice applies
+again with no user action on a layout where it can, and each switch between
+applied and inert is logged once (`windows/ui/menu/menu_layout.ahk`, pinned by
+`test_number_row_symbols.ahk`). Action: a layout-dependent setting you add
+follows the same shape instead of resetting or hiding the user's choice.
+
 ### project-a-composite-scope-composes-revertible-owners
 
 The global restore/clear never writes category keys itself. On the Lua
