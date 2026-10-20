@@ -224,17 +224,17 @@ check(
 // 7. Native InputBox fallback preserved, gated behind the webview TryOpen.
 check(
 	'create profile tries the webview first',
-	/_PromptEdWeb_TryOpen\(0\)/.test(menu),
-	'LLM_Menu_PromptCreateProfile must call _PromptEdWeb_TryOpen(0) before InputBox.'
+	/_PromptEdWeb_TryOpen\(0,\s*Source\)/.test(menu),
+	'LLM_Menu_PromptCreateProfile must pass the opening source to _PromptEdWeb_TryOpen before the native fallback.'
 );
 check(
 	'edit profile tries the webview first',
-	/_PromptEdWeb_TryOpen\(profile\)/.test(menu),
-	'LLM_Menu_PromptEditProfile must call _PromptEdWeb_TryOpen(profile) before InputBox.'
+	/_PromptEdWeb_TryOpen\(profile,\s*Source\)/.test(menu),
+	'LLM_Menu_PromptEditProfile must pass the profile and its opening source to _PromptEdWeb_TryOpen before the native fallback.'
 );
 check(
 	'native InputBox wizard is still present (fallback)',
-	menu.includes('InputBox('),
+	menu.includes('Options.Get("input", Ui_InputBox)') && menu.includes('InputFn.Call('),
 	'The native InputBox wizard must remain as a fallback when WebView2 is absent.'
 );
 
