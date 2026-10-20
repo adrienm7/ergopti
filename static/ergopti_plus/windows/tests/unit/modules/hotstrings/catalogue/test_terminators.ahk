@@ -474,3 +474,141 @@ _HTRI_ProtectedRefusal(InlineUpdates, InlinePrefixes := []) {
 Test("terminator-inline: the canonical writer cannot replace records with a collapsed flat leaf", _HTRI_ProtectedRefusal.Bind([{ Section: "hotstrings", Key: "terminators", Value: [] }]))
 Test("terminator-inline: a native case alias cannot acquire the closed parent", _HTRI_ProtectedRefusal.Bind([{ Section: "HOTSTRINGS", Key: "custom_pref", Value: "new" }]))
 Test("terminator-inline: namespace replacement cannot delete unknown parent members", _HTRI_ProtectedRefusal.Bind([], ["hotstrings"]))
+
+
+; This fresh child reuses the established native config graph and observes only
+; the external reload action. Every durable config and matcher owner is real.
+_MKTB_ChildSource() {
+	global _DriverDir, _SharedDir
+	Support := _DriverDir . "\tests\support\feature_state_boot_smoke.ahk"
+	Source := FileRead(Support, "UTF-8")
+	Boundary := InStr(Source, "`ntry {`n    if (A_Args.Length", true)
+	AssertTrue(Boundary > 0, "the real startup fixture must expose its pre-execution graph")
+	Prefix := SubStr(Source, 1, Boundary - 1)
+	for Name, Expression in Map("_ConfigDir", 'A_Args[5] . "\"', "_DriverDir", "A_Args[4]", "_SharedDir", "A_Args[3]") {
+		Prefix := RegExReplace(Prefix, "m)^global " . Name . " :=[^`n]+", "global " . Name . " := " . Expression, &Count)
+		AssertEqual(1, Count, "only the private child root declaration may change: " . Name)
+	}
+	SplitPath(Support, , &SupportDir)
+	Code := ""
+	for Line in StrSplit(Prefix, "`n") {
+		if RegExMatch(Line, "^#Include\s+(.+)$", &Match)
+			Line := "#Include " . SupportDir . "\" . Match[1]
+		Code .= Line . "`n"
+	}
+	; Reuse the suite's actual generated-class/data-owner include paths. These
+	; owners contain initialization, so a function-only extraction is insufficient.
+	Suite := FileRead(A_ScriptDir . "\run_all.ahk", "UTF-8")
+	for Basename in ["terminators.ahk", "hotstrings_config.ahk"] {
+		Found := 0
+		for Line in StrSplit(Suite, "`n") {
+			if !RegExMatch(Line, "^#Include\s+(.+)$", &Match)
+				continue
+			SplitPath(Match[1], &Filename)
+			if Filename != Basename
+				continue
+			Code .= "#Include " . A_ScriptDir . "\" . Match[1] . "`n"
+			Found += 1
+		}
+		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Basename)
+	}
+	for Symbol in ["_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned", "HotstringsTerminatorRestore"] {
+		Owner := _DriverProductionFileForSymbol(Symbol, Symbol == "HotstringsTerminatorRestore" ? _SharedDir : _DriverDir)
+		AssertTrue(Owner != "", "the real round-trip dependency requires its unique owner: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	NativeSend := _DriverFuncBody("_LLM_TerminalOutputSendInputNative")
+	AssertTrue(NativeSend != "", "the native serializer consumer must remain the actual primitive")
+	Code .= NativeSend . "`n"
+	; Keep the exact current boot seam, including a future publication call,
+	; after validated script config and before category seeding. Profiling is an observer.
+	EntryOwner := _DriverProductionFileForSymbol("LayoutPollPort")
+	AssertTrue(EntryOwner != "", "the actual startup owner must be discoverable")
+	Entry := FileRead(EntryOwner, "UTF-8")
+	Start := InStr(Entry, "`nReadScriptConfig(_IniCache)`n", true)
+	End := InStr(Entry, "`nHotstringsSeedLanguageCategoryGates(", true)
+	AssertTrue(Start > 0 && End > Start, "the actual entry must retain its validated config publication window")
+	Code .= "_MKTB_ReadBoot(Snapshot) {`n global _IniCache`n _IniCache := Snapshot.Cache`n"
+		. SubStr(Entry, Start + 1, End - Start) . "`n}`n"
+	; The existing native INPUT40 builder and custody helpers are imported intact.
+	NativeFixture := FileRead(_DriverDir . "\tests\fixtures\suppressive_capture_unicode_body.ahk", "UTF-8")
+	for Symbol in ["_UNC_Require", "_UNC_Units", "_UNC_Hex", "_UNC_Same", "_UNC_Identity", "_UNC_Admit", "_UNC_Observed", "_UNC_Tail", "_UNC_Up", "_UNC_Packets", "_UNC_Drain", "_UNC_Close", "_UNC_OpenCapture", "_UNC_FocusCapture"] {
+		Definition := _DriverFindFunctionDefinition(&NativeFixture, Symbol)
+		AssertTrue(IsObject(Definition), "the native fixture dependency must exist: " . Symbol)
+		Code .= _DriverExtractDefinedBody(&NativeFixture, Definition) . "`n"
+	}
+	return Code . FileRead(_DriverDir . "\tests\fixtures\magic_key_terminator_boot_body.ahk", "UTF-8")
+}
+
+_MKTB_Complete(State, Code, Output, ErrorText) {
+	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText, State.Calls += 1
+}
+
+_MKTB_Case(Mode) {
+	global _SharedDir, _DriverDir
+	static RetirementDebt := 0, CachedSource := ""
+	if IsObject(RetirementDebt)
+		throw Error("An earlier terminator child remains unretired. Further native input is refused.")
+	if CachedSource == ""
+		CachedSource := _MKTB_ChildSource()
+	Directory := A_Temp . "\ergopti_magic_terminator_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
+	AssertFalse(DirExist(Directory), "the child requires a fresh owned directory")
+	DirCreate(Directory)
+	Script := Directory . "\subject.ahk"
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . CachedSource) != 0)
+	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0
+	PreviousCritical := Critical("Off")
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
+			["/ErrorStdOut=UTF-8", Script, "--allow-explicit-user32-sendinput", Mode, _SharedDir, _DriverDir, Directory], _MKTB_Complete.Bind(State))
+		AssertTrue(Handle.start(), "the exact round-trip child must start")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 30000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "the exact child must settle once: " . State.ErrorText . State.Output)
+		for Line in StrSplit(State.Output, "`n", "`r")
+			if InStr(Line, "RECEIPT ") == 1
+				_TestPrint("# magic-terminator " . Line)
+		AssertEqual(0, State.Code, "the round-trip child failed: " . State.ErrorText . State.Output)
+		AssertEqual("", State.ErrorText, "no native parse/runtime error may be hidden: " . State.Output)
+		AssertTrue(InStr(State.Output, "PASS magic-key-terminator-boot " . Mode, true) > 0,
+			"the independent config/default/matcher goldens must all complete")
+		AssertTrue(InStr(State.Output, "NATURAL_EXIT code=0 native_input_debt=false", true) > 0,
+			"no native packet debt may survive child success")
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try {
+		Started := A_TickCount
+		loop {
+			Result := IsObject(Handle) ? Handle.terminate() : 1
+			Retired := (Result is Integer) && Result == 1
+			if Retired || TickElapsed(Started) >= 5000
+				break
+			_SR_TreePoll()
+			Sleep(10)
+		}
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if !Retired
+		RetirementDebt := IsObject(Handle) ? Handle : { source: Script }
+	try {
+		if Retired && !IsObject(Primary)
+			DirDelete(Directory, true)
+	} catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	} finally Critical(PreviousCritical)
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "the exact child must retire before its source directory is removed")
+}
+
+for _MKTB_Mode in ["default-star", "default-section", "default-astral", "historical-controls", "custom-controls", "custom-collision", "restore-section", "native-astral", "native-shared-high"]
+	Test("Magic-key terminator boot: " . _MKTB_Mode . " preserves configured ownership (magic-key-terminator-boot)",
+		_MKTB_Case.Bind(_MKTB_Mode))

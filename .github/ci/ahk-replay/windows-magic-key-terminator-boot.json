@@ -1,0 +1,9 @@
+{
+	"expected_count": 9,
+	"filters": [
+		{
+			"contains": "magic-key-terminator-boot",
+			"expected_count": 9
+		}
+	]
+}
