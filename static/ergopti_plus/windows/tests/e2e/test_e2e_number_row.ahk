@@ -100,7 +100,7 @@ _E2ENR_Press(Sc, Shift) {
 	} else if Digit && Shift && _DigitRowSwapIsLive(Sc, NumberRowForegroundLayout) {
 		_DigitRowSwapSend(Sc, NumberRowForegroundLayout)
 		Ran := true
-	} else if !Digit && NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld() {
+	} else if !Digit && NumberRowEffectiveMode() != "native" && NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld() {
 		_NumberRowEdgeSend(Sc, Shift)
 		Ran := true
 	}
@@ -123,7 +123,7 @@ _E2ENR_CriteriaMatchTheHotkeys() {
 	Source := FileRead(_DriverProductionFileForSymbol("RemapKey", _DriverDir), "UTF-8")
 	for Criterion in ['NumberRowEffectiveMode() == "digits" && !TapHoldKanaAltGrHeld()',
 			'NumberRowEffectiveMode() == "symbols" && !NumberRowRegistryOwnsRow() && !TapHoldKanaAltGrHeld()',
-			'NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld()']
+			'NumberRowEffectiveMode() != "native" && NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld()']
 		AssertTrue(InStr(Source, "`n#HotIf " . Criterion . "`n") > 0, "the keymap module declares #HotIf " . Criterion)
 	AssertTrue(InStr(Source, "HotIf(_DigitRowSwapIsLive.Bind(") > 0, "the Shift swap is decided by _DigitRowSwapIsLive")
 }
