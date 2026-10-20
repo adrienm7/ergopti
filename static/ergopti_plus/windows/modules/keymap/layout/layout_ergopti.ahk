@@ -265,8 +265,9 @@ _ErgoptiAltGrTables(Plain, Shifted, Keys, WrapSet, Names, Pairs) {
  * @param {Map} KeyDeviations - Per-table key deviations (ERGOPTI_KEY_DEVIATIONS by default).
  * @param {Map} DeadKeyDeviations - Per-dead-key deviations (ERGOPTI_DEAD_KEY_DEVIATIONS by default).
  * @returns {Map} "levels" (table -> scan code -> descriptor), "dead_keys"
- *   (name -> character -> result) and "terminators" (name -> what the dead key
- *   types alone). A descriptor types "text" (after committing the hotstring when
+ *   (name -> character -> result), "terminators" (name -> what the dead key
+ *   types alone) and "number_row_base" (the number row's base level, which
+ *   no layer remaps: the direct-access option orders it). A descriptor types "text" (after committing the hotstring when
  *   "hotstrings" is set), types "word" and the space-around-symbols setting,
  *   wraps the selection ("wrap", "left", "right"), starts the dead key "dead"
  *   (typing "chain" inside a sequence), or does nothing ("none"); a base key
@@ -322,9 +323,14 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 
 	Spec := Map()
 	Base := Map()
+	; The number row's base level is not remapped here, but it is the row the
+	; direct-access option orders (_DigitRowSwapResolution), so it is kept.
+	BaseNumberRow := Map()
 	for Sc, Entry in Levels["base"] {
-		if ERGOPTI_NUMBER_ROW.Has(Sc)
+		if ERGOPTI_NUMBER_ROW.Has(Sc) {
+			BaseNumberRow[Sc] := _ErgoptiDescribe(Entry, NoWrap, false, false, Names, Pairs)
 			continue
+		}
 		Descriptor := _ErgoptiDescribe(Entry, NoWrap, false, false, Names, Pairs)
 		if Descriptor.Has("text") && ShortcutFeatures.Has(Descriptor["text"])
 			Descriptor["shortcut_feature"] := ShortcutFeatures[Descriptor["text"]]
@@ -381,7 +387,8 @@ ErgoptiLayout_BuildSpec(ErgoptiModel, PlusModel, KeyCodes, WrapPairs, KeyDeviati
 			Spec[Table][Sc] := Descriptor.Clone()
 		}
 	}
-	return Map("levels", Spec, "dead_keys", DeadKeys, "terminators", Terminators)
+	return Map("levels", Spec, "dead_keys", DeadKeys, "terminators", Terminators,
+		"number_row_base", BaseNumberRow)
 }
 
 /**
