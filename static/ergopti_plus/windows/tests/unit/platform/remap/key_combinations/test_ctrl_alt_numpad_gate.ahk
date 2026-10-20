@@ -57,3 +57,73 @@ _CANG_RegisteredUnderTheirOwnGate() {
 }
 Test("ctrl-alt numpad: registered under their own gate, not the AltGr layer's (ctrl-alt-numpad-gate-2026-09-26)",
 	_CANG_RegisteredUnderTheirOwnGate)
+
+
+; Capture the genuine producer and run only admitted Ctrl+Alt callbacks through
+; the sender's recording hook. No host hotkey or keyboard output is created.
+_CANG_RegisteredRowPolicy(Family, Emulated) {
+	global Features, ALTGR_PLUS_OVERRIDES, ALTGR_NUMBER_ROW, ALTGR_BASE_ROWS, CTRL_ALT_NUMPAD
+	global _OB_ALTGR_PASSTHROUGH, _SendHook, _Stub_RecordedSends
+	_TestEnsureErgoptiLayout()
+	Saved := [Features, ALTGR_PLUS_OVERRIDES, ALTGR_NUMBER_ROW, ALTGR_BASE_ROWS, CTRL_ALT_NUMPAD,
+		_OB_ALTGR_PASSTHROUGH, _SendHook, _Stub_RecordedSends]
+	PreviousFamily := _TestSetAltGrFamily(Family == "kana", Family == "altgr")
+	Criterion := 0, Registrations := [], Chords := Map()
+	SetCriterion(Fn := unset) {
+		Criterion := IsSet(Fn) ? Fn : 0
+	}
+	Capture(Name, Callback, Options) {
+		Registration := { Name: Name, Callback: Callback, Criterion: Criterion, Options: Options }
+		Registrations.Push(Registration)
+		if SubStr(Name, 1, 2) == "^!"
+			Chords[Name] := Registration
+	}
+	try {
+		Features := Map("layout", Map("ergopti_base", false, "ergopti_alt_gr", true,
+			"ergopti_variant", "none", "emulated_layout", "", "emulate_number_row", Emulated,
+			"emulate_top_row", false, "emulate_home_row", false, "emulate_bottom_row", false))
+		_OB_ALTGR_PASSTHROUGH := false
+		AssertFalse(GetKeyState(KS_AltGrKeyName(), "P"), "this passive Ctrl+Alt fixture requires the physical AltGr key up")
+		_SendHook := _HOOK_RecordSend
+		_Stub_RecordedSends := []
+		RegisterAltGrLayer(Capture, SetCriterion, (*) => 0, (*) => false)
+		AssertEqual(0, Criterion, "the actual producer must release its registration context")
+		AssertEqual(ALTGR_PLUS_OVERRIDES.Count + ALTGR_NUMBER_ROW.Count + ALTGR_BASE_ROWS.Count + CTRL_ALT_NUMPAD.Count,
+			Registrations.Length, "all four original cohorts must be registered")
+		AssertEqual(10, Chords.Count, "every actual Ctrl+Alt digit must be captured")
+		for Index in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
+			Name := Format("^!SC{:03X}", Index + 1)
+			Registration := Chords[Name]
+			AssertEqual("I2", Registration.Options)
+			Admitted := Registration.Criterion.Call(Name)
+			AssertEqual(Emulated, Admitted, "a native number row must retain " . Name . " on " . Family)
+			if Admitted
+				Registration.Callback.Call(Name)
+			Features["layout"]["emulate_number_row"] := !Emulated
+			AssertEqual(!Emulated, Registration.Criterion.Call(Name), "the existing criterion must follow a row toggle")
+			Features["layout"]["emulate_number_row"] := true
+			Features["layout"]["ergopti_alt_gr"] := false
+			AssertFalse(Registration.Criterion.Call(Name), "a row switch cannot enable a disabled AltGr feature")
+			Features["layout"]["ergopti_alt_gr"] := true
+			_OB_ALTGR_PASSTHROUGH := true
+			AssertFalse(Registration.Criterion.Call(Name), "onboarding must keep the chord native")
+			_OB_ALTGR_PASSTHROUGH := false
+			Features["layout"]["emulate_number_row"] := Emulated
+		}
+		AssertEqual(Emulated ? 10 : 0, _Stub_RecordedSends.Length, "only admitted callbacks may reach the sender")
+		for Index, Emission in _Stub_RecordedSends {
+			AssertEqual("SendFinalResult", Emission.fn, "the actual Ctrl+Alt dispatcher must retain its final sender")
+			AssertEqual("^!{Numpad" . Mod(Index, 10) . "}", Emission.args[1], "the real callback must retain the exact digit")
+		}
+	} finally {
+		Features := Saved[1], ALTGR_PLUS_OVERRIDES := Saved[2], ALTGR_NUMBER_ROW := Saved[3]
+		ALTGR_BASE_ROWS := Saved[4], CTRL_ALT_NUMPAD := Saved[5], _OB_ALTGR_PASSTHROUGH := Saved[6]
+		_SendHook := Saved[7], _Stub_RecordedSends := Saved[8]
+		_TestRestoreAltGrFamily(PreviousFamily)
+	}
+}
+
+for _CANG_Family in ["plain", "altgr", "kana"]
+	for _CANG_Emulated in [false, true]
+		Test("ctrl-alt numpad: " . _CANG_Family . " number row " . (_CANG_Emulated ? "emulated" : "native")
+			. " preserves its registered owner (ctrl-alt-numpad-row-scope)", _CANG_RegisteredRowPolicy.Bind(_CANG_Family, _CANG_Emulated))

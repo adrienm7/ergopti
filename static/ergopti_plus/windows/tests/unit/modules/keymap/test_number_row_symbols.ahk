@@ -689,7 +689,7 @@ _NRP_RowScopes() {
 			"the pass-through variants are created before the base remaps and the built-in layers")
 		AltGr := _StripFullLineComments(_DriverFuncBody("RegisterAltGrLayer"))
 		StrReplace(AltGr, "LayoutRowIsEmulatedHotkey(Name)", , , &AltGrGates)
-		AssertEqual(3, AltGrGates, "the three AltGr tables stand down on a row switched off")
+		AssertEqual(4, AltGrGates, "the three AltGr tables and Ctrl+Alt cohort stand down on a row switched off")
 		; The ordering reads the OS layout's row when the number row is off.
 		Layout["ergopti_base"] := true
 		Layout["direct_access_digits"] := "digits"
