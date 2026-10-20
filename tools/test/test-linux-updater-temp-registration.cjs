@@ -965,3 +965,60 @@ assert.equal(cryptoCount, 7, 'Independent native digest prerequisite source/mode
 console.log(
 	'[OK] Linux native digest prerequisite: 7 source/model controls passed; no native credit.'
 );
+
+// The cffi-lua clone is the provider's one network boundary: an exited failure
+// is retried at most twice with a log line, the last attempt refuses as before.
+async function cloneRetryControls() {
+	const failed = { status: 128, signal: null, stdout: '', stderr: "fatal: unable to access 'x'\n" };
+	const cloned = { status: 0, signal: null, stdout: '', stderr: '' };
+	function ports(results) {
+		const calls = [];
+		const logs = [];
+		let discards = 0;
+		return {
+			calls,
+			logs,
+			discards: () => discards,
+			attempt: async (allowFailure) => {
+				calls.push(allowFailure);
+				const result = results[calls.length - 1];
+				if (!allowFailure && result.status !== 0) throw new Error('child refused');
+				return result;
+			},
+			discard: () => discards++,
+			log: (line) => logs.push(line)
+		};
+	}
+	let count = 0;
+	const first = ports([cloned]);
+	assert.equal(await Provider.cloneWithRetry(first), cloned);
+	assert.deepEqual([first.calls, first.logs.length, first.discards()], [[true], 0, 0]);
+	count++;
+	const second = ports([failed, cloned]);
+	assert.equal(await Provider.cloneWithRetry(second), cloned);
+	assert.deepEqual([second.calls, second.discards()], [[true, true], 1]);
+	assert.match(
+		second.logs[0],
+		/^\[RETRY\] cffi-lua clone exited 128 \(fatal: unable to access 'x'\); retry 1\/2$/
+	);
+	count++;
+	const last = ports([failed, failed, failed]);
+	await assert.rejects(Provider.cloneWithRetry(last), /child refused/);
+	assert.deepEqual([last.calls, last.logs.length, last.discards()], [[true, true, false], 2, 2]);
+	assert.equal(Provider.CLONE_RETRIES, 2, 'the clone retry bound stays at two');
+	count++;
+	await assert.rejects(Provider.cloneWithRetry({ attempt: null, discard() {}, log() {} }));
+	count++;
+	assert.match(
+		providerSource,
+		/await\s+cloneWithRetry\(\{\s*async\s+attempt\(allowFailure\)/,
+		'the real clone goes through the bounded retry'
+	);
+	count++;
+	assert.equal(count, 5, 'Independent clone retry floor changed');
+	console.log('[OK] Linux Lua54 provider clone retry: 5 controls passed; no native credit.');
+}
+cloneRetryControls().catch((error) => {
+	console.error(error);
+	process.exitCode = 1;
+});

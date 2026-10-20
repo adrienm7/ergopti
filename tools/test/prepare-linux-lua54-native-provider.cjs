@@ -143,6 +143,39 @@ function providerCpath(build, nativeLua54Path) {
 	// Capture only the versioned native Lua54 path; do not borrow generic/JIT paths.
 	return path.join(build, '?.so') + ';' + (nativeLua54Path === undefined ? ';' : nativeLua54Path);
 }
+// The GitHub clone is the only network boundary of this prerequisite and has
+// failed transiently on hosted runners ("unable to access"). A clone that
+// exits non-zero is retried at most this many times, each retry logged; the
+// final attempt is refused by the caller's child with git's own stderr. A
+// timeout or signal is never retried: the child refuses it at once.
+const CLONE_RETRIES = 2;
+/**
+ * Runs a clone attempt, retrying an exited failure at most CLONE_RETRIES times.
+ * @param {{attempt: (allowFailure: boolean) => Promise<object>, discard: () => void,
+ *   log: (line: string) => void}} ports Attempt (the child result), partial
+ *   checkout removal and the retry log.
+ * @returns {Promise<object>} The successful clone result.
+ */
+async function cloneWithRetry({ attempt, discard, log }) {
+	if (typeof attempt !== 'function' || typeof discard !== 'function' || typeof log !== 'function')
+		refused();
+	for (let retry = 1; retry <= CLONE_RETRIES; retry++) {
+		const result = await attempt(true);
+		if (result && !result.error && result.signal == null && result.status === 0) return result;
+		const tail = String((result && result.stderr) || '')
+			.trim()
+			.split('\n')
+			.pop()
+			.slice(0, 200);
+		log(
+			`[RETRY] cffi-lua clone exited ${result && result.status}` +
+				(tail ? ` (${tail})` : '') +
+				`; retry ${retry}/${CLONE_RETRIES}`
+		);
+		discard();
+	}
+	return attempt(false);
+}
 async function prepareLua54Provider({ child, current, env, work, lua54, compiler, sourceRoot }) {
 	if (
 		typeof child !== 'function' ||
@@ -196,13 +229,23 @@ async function prepareLua54Provider({ child, current, env, work, lua54, compiler
 		return result;
 	}
 	const source = path.join(directory, 'source');
-	await phase(tools.git, [
-		'clone',
-		'--no-checkout',
-		'--',
-		'https://github.com/q66/cffi-lua.git',
-		source
-	]);
+	await cloneWithRetry({
+		async attempt(allowFailure) {
+			admit();
+			const result = await child(
+				tools.git,
+				['clone', '--no-checkout', '--', 'https://github.com/q66/cffi-lua.git', source],
+				env,
+				directory,
+				120000,
+				allowFailure
+			);
+			admit();
+			return result;
+		},
+		discard: () => fs.rmSync(source, { recursive: true, force: true }),
+		log: (line) => console.error(line)
+	});
 	await phase(tools.git, ['-C', source, 'checkout', '--detach', COMMIT]);
 	const head = await phase(tools.git, ['-C', source, 'rev-parse', 'HEAD']);
 	const tree = await phase(tools.git, ['-C', source, 'rev-parse', 'HEAD^{tree}']);
@@ -383,6 +426,8 @@ async function prepareLua54Provider({ child, current, env, work, lua54, compiler
 }
 module.exports = {
 	prepareLua54Provider,
+	cloneWithRetry,
+	CLONE_RETRIES,
 	bindMeson,
 	vendorReceipt,
 	sameProvider,
