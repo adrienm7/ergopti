@@ -7,12 +7,12 @@
 --- fails CI instead of only showing up as a sluggish driver on the user's machine.
 ---
 --- WHY THIS EXISTS:
----  1. keylogger-winfilter-lazy — hs.window.filter's FIRST instantiation makes
----     Hammerspoon enumerate every window of every app (multi-second on machines
----     with many apps / a VPN). The keylogger used to build its browser filter
----     eagerly at engine start (in a doAfter(0)), so the engine took seconds to
----     settle. It is now created lazily on the first browser activation; per
----     app-switch private detection runs independently via app_watcher_cb.
+---  1. keylogger-no-window-filter — hs.window.filter's FIRST instantiation makes
+---     Hammerspoon enumerate every window of every app on the main thread. Built
+---     eagerly at start it delayed the engine; built lazily on the first browser
+---     activation it still froze Hammerspoon for 4.8 s and 3.3 s and cost the
+---     Karabiner lease (issue #95). The keylogger now binds Accessibility
+---     watchers to the active browser and its focused window only.
 ---  2. gestures-prewarm-no-reinit — gestures.start()'s dependency pre-warm
 ---     re-called Actions.init()/Engine.init(), which are already run at module
 ---     load. The guard turned each into a no-op that logged a spurious
@@ -46,35 +46,29 @@ end
 
 
 
--- ===================================================
--- ===================================================
--- ======= 1/ Keylogger browser filter is lazy =======
--- ===================================================
--- ===================================================
+-- ======================================================
+-- ======================================================
+-- ======= 1/ Keylogger creates no window filters =======
+-- ======================================================
+-- ======================================================
 
-helpers.describe("startup: keylogger creates its window.filter lazily (keylogger-winfilter-lazy)", function()
-	local src = read_code("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
+helpers.describe("startup: keylogger watches browsers without hs.window.filter (keylogger-no-window-filter)", function()
+	local src = read_code("local function ensure_browser_window_watchers") -- modules/keylogger/init.lua
 
-	helpers.it("hs.window.filter.new appears exactly once, in the lazy helper", function()
-		local count = select(2, src:gsub("hs%.window%.filter%.new", ""))
-		helpers.assert_eq(count, 1,
-			"keylogger must instantiate hs.window.filter exactly once (in ensure_browser_window_filter)")
+	helpers.it("(keylogger-no-window-filter) the keylogger never instantiates hs.window.filter", function()
+		helpers.assert_true(src:find("hs.window.filter", 1, true) == nil,
+			"hs.window.filter enumerates every window of every app on the main thread")
 	end)
 
-	helpers.it("the lazy helper exists and is gated by a browser activation", function()
-		helpers.assert_true(src:find("function ensure_browser_window_filter", 1, true) ~= nil,
-			"ensure_browser_window_filter must exist — the browser filter must be created lazily")
-		-- The helper is only invoked when an activated app is a known browser.
-		helpers.assert_true(src:match("BROWSER_APP_SET%[app_name%].-ensure_browser_window_filter") ~= nil,
-			"ensure_browser_window_filter must be called only on a browser activation (BROWSER_APP_SET gate)")
-	end)
-
-	helpers.it("the browser filter is NOT built eagerly at engine start", function()
-		-- The old slow path created the filter inside a doAfter(0) during M.start.
-		helpers.assert_true(src:match("doAfter%(0,%s*function%(%).-hs%.window%.filter%.new") == nil,
-			"keylogger must not create hs.window.filter eagerly in a doAfter(0) at start")
+	helpers.it("the browser watchers are bound only on a browser activation", function()
+		helpers.assert_true(src:match("BROWSER_APP_SET%[app_name%].-ensure_browser_window_watchers") ~= nil,
+			"ensure_browser_window_watchers must be called only on a browser activation (BROWSER_APP_SET gate)")
+		helpers.assert_true(src:find("app_object:newWatcher", 1, true) ~= nil
+			and src:find("win:newWatcher", 1, true) ~= nil,
+			"focus and title changes come from watchers on one application and one window")
 	end)
 end)
+
 
 
 

@@ -51,7 +51,7 @@ Results are cached per-HWND with a 500 ms TTL to bound the UIA round-trip cost.
 if CoreState.private_filter_enabled and CoreState.is_private_window then return end
 ```
 
-`is_private_window` is updated by a `hs.window.filter` subscriber watching browser focus and title changes.
+`is_private_window` is updated by Accessibility watchers bound to the active browser (focused-window changes) and its focused window (title changes).
 
 **AHK driver:** `MF_ShouldFilter()` runs regex patterns against window titles, matching localised private-mode strings for Chrome, Firefox, Edge, Safari, Brave, and Opera across EN/FR/DE.
 
