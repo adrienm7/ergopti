@@ -172,6 +172,16 @@ local _flushed_app_holds = {}
 local _flushed_app_ngrams = {}
 local _flushed_app_scancodes = {}
 local _flushed_app_sources = {}
+-- Each application's aggregate-walk context as of the last COMMIT: the word,
+-- sequence, correction, burst and session still open when that flush was cut.
+-- A flush adopts its successor only on COMMIT, so a refused one re-walks its
+-- restored events from exactly this state.
+local _walker_contexts = {}
+-- The monotonic stamp of each application's last manual keystroke. Kept
+-- across flushes: a fresh pending buffer has none, and its first keystroke
+-- then read as zero milliseconds after the previous one, however long ago
+-- that was, and every expansion typed first in a flush had no stamp at all.
+local _typing_last_key_at = {}
 
 -- Persisted manifest cache keyed by SQLite's monotonic revision. The live
 -- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
@@ -513,14 +523,15 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 		M.record_app_key(resolved_app, ch, timestamp_ms)
 		local pending = _pending_typing_events[resolved_app]
 		if not pending then
-			pending = { text = {}, events = {}, times = {}, last_key_at = nil }
+			pending = { text = {}, events = {}, times = {} }
 			_pending_typing_events[resolved_app] = pending
 		end
 		local delay = 0
-		if type(pending.last_key_at) == "number" then
-			delay = math.max(0, math.min(timestamp_ms - pending.last_key_at, MAX_TYPING_INTERVAL_MS))
+		local previous_at = _typing_last_key_at[resolved_app]
+		if type(previous_at) == "number" and type(timestamp_ms) == "number" then
+			delay = math.max(0, math.min(timestamp_ms - previous_at, MAX_TYPING_INTERVAL_MS))
 		end
-		pending.last_key_at = timestamp_ms
+		_typing_last_key_at[resolved_app] = timestamp_ms
 		pending.text[#pending.text + 1] = ch
 		-- [text, inter-key delay, metadata] is the portable events_json shape
 		-- consumed by the macOS/Windows projectors. `sk` deliberately identifies
@@ -614,7 +625,7 @@ end
 local function ensure_pending(app_id)
 	local pending = _pending_typing_events[app_id]
 	if pending then return pending end
-	pending = { text = {}, events = {}, times = {}, last_key_at = nil }
+	pending = { text = {}, events = {}, times = {} }
 	_pending_typing_events[app_id] = pending
 	return pending
 end
@@ -652,7 +663,7 @@ local function append_synthetic_events(app_id, text, source, deletes, is_private
 	-- An expansion fires within a keystroke of its trigger, so it belongs in the
 	-- same minute. Taking the trigger's stamp keeps the two together without
 	-- reading a clock from a function that has never needed one.
-	local at = pending.last_key_at
+	local at = _typing_last_key_at[app_id]
 	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
 		pending.events[#pending.events + 1] = { BACKSPACE_MARKER, 0, { s = 1, st = source } }
 		pending.times[#pending.events] = at
@@ -1557,6 +1568,7 @@ local function capture_flush()
 	local _flushed_app_ngrams = copy_flush_value(_flushed_app_ngrams)
 	local _flushed_app_scancodes = copy_flush_value(_flushed_app_scancodes)
 	local _flushed_app_sources = copy_flush_value(_flushed_app_sources)
+	local walker_contexts = copy_flush_value(_walker_contexts)
 	-- 1. Compose buffered physical key events and their matching aggregates. This is
 	-- the canonical, replayable source shared with the macOS/AHK drivers.
 	local typing_batch = {}
@@ -1580,9 +1592,10 @@ local function capture_flush()
 				wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
 				events_json = _to_json(pending.events),
 			}
+			walker_contexts[app_id] = walker_contexts[app_id] or {}
 			local ok_walk, walked = pcall(AggregateWalker.walk,
 				pending.events, date, dashboard_app_name(app_id), ngram_batch,
-				{ times = pending.times, wall_offset_ms = wall_offset_ms })
+				{ times = pending.times, wall_offset_ms = wall_offset_ms }, walker_contexts[app_id])
 			if ok_walk then
 				ngram_batch = walked
 			else
@@ -1592,6 +1605,18 @@ local function capture_flush()
 				return nil, "Typing aggregate derivation failed; pending source remains unacknowledged"
 			end
 		end
+	end
+	-- What each context still holds is credited once its own gap has passed,
+	-- and all of it on a new day or at shutdown, so a session ends where the
+	-- user stopped rather than where a flush happened to land.
+	local now_ms = math.floor(Monotonic.now_ms())
+	for _, context in pairs(walker_contexts) do
+		local ok_settle, settled = pcall(AggregateWalker.settle, context, now_ms, ngram_batch,
+			_flush_stopping or (context.date ~= nil and context.date ~= date))
+		if not ok_settle then
+			return nil, "Typing aggregate settlement failed; pending source remains unacknowledged"
+		end
+		ngram_batch = settled
 	end
 	payload.raw.typing = typing_batch
 	if ngram_batch then
@@ -1759,6 +1784,7 @@ local function capture_flush()
 		watermarks = {
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
+			walker = walker_contexts,
 		},
 	}
 end
@@ -1826,6 +1852,7 @@ function M.pump_flush()
 			local marks = state.snapshot.watermarks
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
+			_walker_contexts = marks.walker
 			_manifest_cache = { revision = nil, manifest = nil }
 			_last_flush_committed, _flush_state = true, nil
 			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")
@@ -2046,6 +2073,8 @@ function M.reset_session()
 	_flushed_app_ngrams     = {}
 	_flushed_app_scancodes  = {}
 	_flushed_app_sources    = {}
+	_walker_contexts        = {}
+	_typing_last_key_at     = {}
 	_manifest_cache         = { revision = nil, manifest = nil }
 	_pending_typing_events  = {}
 	_pending_hotstring_events = {}

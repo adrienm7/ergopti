@@ -726,6 +726,110 @@ helpers.describe("physical-backspace-corrections", function()
   end)
 end)
 
+-- The flush walked each buffer on its own and credited everything still open
+-- at its end: on the flush cadence every few seconds of typing was a session,
+-- a word cut by a flush was two words, and the first key of a flush read as
+-- typed zero milliseconds after the previous one.
+helpers.describe("linux-cross-flush-walk", function()
+  it("linux-cross-flush-walk: the flushes carry one session, one word and the pair across the cut", function()
+    local Monotonic = require("infra.monotonic")
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local previous_now = Monotonic.now_ms
+    local now = 10000
+    local sessions, words, bigrams, typing = {}, {}, {}, {}
+    local refuse_next = false
+    local writer = setmetatable({
+      insert_typing_events = function(_, events)
+        for _, row in ipairs(events) do typing[#typing + 1] = row end
+        return true
+      end,
+      upsert_session = function(_, row) sessions[#sessions + 1] = row; return true end,
+      upsert_ngrams = function(_, _, _, ngrams, table_name)
+        local target = (table_name == "ngram_words" and words) or (table_name == "ngram_bigrams" and bigrams) or nil
+        if target then
+          for token, value in pairs(ngrams) do target[token] = (target[token] or 0) + value.c end
+        end
+        return true
+      end,
+    }, { __index = function() return function() return true end end })
+    require("tests.support.sqlite_flush_fake").attach(writer)
+    local start_flush = writer.start_flush
+    writer.start_flush = function(...)
+      if refuse_next then refuse_next = false; return nil end
+      return start_flush(...)
+    end
+    package.loaded["modules.keylogger.sqlite_writer"] = writer
+    local ok, err = pcall(function()
+      Monotonic.now_ms = function() return now end
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      require("tests.support.metrics_consent_fixture").enable(kl)
+      local function type_text(text, at)
+        for index = 1, #text do kl.on_keydown(text:sub(index, index), at + (index - 1) * 100, "owned-cross") end
+        return at + (#text - 1) * 100
+      end
+      local last = type_text("hel", 10000)
+      now = last + 50
+      helpers.assert_true(kl.flush(), "the first flush commits")
+      last = type_text("lo ", last + 100)
+      now = last + 50
+      refuse_next = true
+      helpers.assert_eq(kl.flush(), false, "a refused flush restores its events")
+      helpers.assert_true(kl.flush(), "the retry commits")
+      helpers.assert_eq(#sessions, 0, "a session still open is credited when it ends, not at each flush")
+      helpers.assert_eq(words.hello, 1, "the word cut by the flush is one word")
+      helpers.assert_nil(words.hel)
+      helpers.assert_nil(words.lo, "the refused snapshot's context was never adopted")
+      helpers.assert_eq(bigrams.ll, 1, "the pair across the cut is counted once")
+      helpers.assert_eq(require("json").decode(typing[2].events_json)[1][2], 100,
+        "the first key of a flush keeps its delay after the previous flush's last key")
+      now = last + 300001
+      helpers.assert_true(kl.flush(), "the settled session commits")
+      helpers.assert_eq(#sessions, 1)
+      helpers.assert_eq(sessions[1].count_total, 1, "six keys across three flushes are one session")
+      helpers.assert_eq(sessions[1].longest_chars, 6)
+      helpers.assert_true(kl.flush())
+      helpers.assert_eq(#sessions, 1, "a credited session is never credited again")
+    end)
+    Monotonic.now_ms = previous_now
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    package.loaded["modules.keylogger.keylogger"] = nil
+    keylogger = helpers.load_module("modules.keylogger.keylogger")
+    if not ok then error(err, 0) end
+  end)
+  it("linux-cross-flush-walk: shutdown credits the session still open", function()
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local sessions = {}
+    local writer = setmetatable({
+      upsert_session = function(_, row) sessions[#sessions + 1] = row; return true end,
+    }, { __index = function() return function() return true end end })
+    require("tests.support.sqlite_flush_fake").attach(writer)
+    package.loaded["modules.keylogger.sqlite_writer"] = writer
+    local ok, err = pcall(function()
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      require("tests.support.metrics_consent_fixture").enable(kl)
+      local Monotonic = require("infra.monotonic")
+      local at = math.floor(Monotonic.now_ms())
+      kl.on_keydown("a", at, "owned-stop")
+      kl.on_keydown("b", at + 100, "owned-stop")
+      helpers.assert_true(kl.flush())
+      helpers.assert_eq(#sessions, 0, "the session is still open")
+      helpers.assert_true(kl.stop(), "shutdown settles")
+      helpers.assert_eq(#sessions, 1, "the open session is credited at shutdown")
+      helpers.assert_eq(sessions[1].longest_chars, 2)
+    end)
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    package.loaded["modules.keylogger.keylogger"] = nil
+    keylogger = helpers.load_module("modules.keylogger.keylogger")
+    if not ok then error(err, 0) end
+  end)
+end)
+
 helpers.describe("live-source-projection", function()
 	local function fresh_live()
 		keylogger.init({ sqlite_path = fresh_db() })
