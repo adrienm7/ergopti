@@ -877,10 +877,13 @@ function M.upsert_errors(device_id, row)
 end
 
 --- Merges cumulative numeric histogram deltas using the existing burst SQL policy.
+--- The object is spelled with json_quote rather than json_group_object, which
+--- cuts a key at an embedded NUL: "a\u0000b" came back as "a", merged into a
+--- second "a" key and the stored map stopped describing what was counted.
 --- @param column string Owned histogram column.
 --- @return string
 local function number_map_merge_sql(column)
-	return column .. " = (SELECT json_group_object(k, v) FROM ("
+	return column .. " = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}') FROM ("
 		.. "SELECT key AS k, SUM(value) AS v FROM ("
 		.. "SELECT key, value FROM json_each(" .. column .. ") "
 		.. "UNION ALL SELECT key, value FROM json_each(excluded." .. column .. ")"

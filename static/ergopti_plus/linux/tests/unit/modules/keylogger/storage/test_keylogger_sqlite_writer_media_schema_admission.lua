@@ -266,7 +266,9 @@ helpers.describe("sqlite_writer", function()
 				hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5,
 			})
 			helpers.assert_contains(sql, "ON CONFLICT(device_id, date, app, token) DO UPDATE SET")
-			helpers.assert_contains(sql, "esrc_json = (SELECT json_group_object(k, v)")
+			-- Rebuilt with json_quote keys (linux-sqlite-nul-map-keys), never json_group_object.
+			helpers.assert_contains(sql,
+				"esrc_json = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}')")
 			helpers.assert_contains(sql, "SELECT key AS k, SUM(value) AS v")
 			helpers.assert_contains(sql, "SELECT key, value FROM json_each(esrc_json)")
 			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(excluded.esrc_json)")
