@@ -1192,6 +1192,16 @@ class NativeCommandExitControls(unittest.TestCase):
 
 class NativeInferenceAccountingControls(unittest.TestCase):
     def test_run_publishes_validated_inference_after_cancellation_retirement(self):
+        self.receive("manifests-v2/registry.invalid/library/native/latest")
+
+    def test_legacy_manifest_store_is_not_an_ollama_0_40_4_create(self):
+        # 0.40.4 writes only manifests-v2 on create; reading the legacy tree
+        # failed the native Mac cells at the create stage with an unnamed code.
+        with self.assertRaisesRegex(RuntimeError, "^actual_created_manifest$"):
+            self.receive("manifests/registry.ollama.ai/library/native/latest")
+        self.assertIn("actual_created_manifest", RECEIVING.RECEIVER_FAILURE_CODES)
+
+    def receive(self, manifest_relative):
         with tempfile.TemporaryDirectory() as temporary:
             subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
             subject.root = ROOT
@@ -1216,7 +1226,7 @@ class NativeInferenceAccountingControls(unittest.TestCase):
             ).encode()
 
             def publish(store):
-                manifest_path = store / "manifests/library/native/latest"
+                manifest_path = store / manifest_relative
                 manifest_path.parent.mkdir(parents=True)
                 manifest_path.write_bytes(manifest)
                 blob_path = store / "blobs" / blob_name.replace(":", "-")
