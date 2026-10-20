@@ -899,6 +899,7 @@ local function main()
 	local action_catalogue = gestures
 	TapHold.init({
 		keyboard_hook = keyboard_hook,
+		dry_run = opts.dry_run,
 		execute_action = function(action, binding)
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
 			action_catalogue.execute_action(action, binding)
@@ -1551,7 +1552,7 @@ local function main()
 			-- all », which switches the shortcuts feature off.
 			local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 			pcall(keyboard_shortcuts.dispatch, detail, {
-				only_script = script_actions.is_paused() or not shortcuts_on,
+				only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
 			})
 		end
 		if script_actions.is_paused() then return end
@@ -1718,7 +1719,7 @@ local function main()
 	-- paused daemon can always be resumed from the keyboard.
 	local script_chords = require("modules.shortcuts.script_chords")
 	script_chords.init({
-		is_paused = function() return script_actions.is_paused() end,
+		is_paused = function() return opts.dry_run or script_actions.is_paused() end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
 
@@ -1727,8 +1728,9 @@ local function main()
 	-- the consumption callback below, before wrap-on-type sees the key.
 	local tap_keys = require("modules.shortcuts.tap_keys")
 	tap_keys.init({
-		is_active = function()
+		is_active = function(action)
 			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
+				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").is_script_action(action))
 		end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
@@ -1932,13 +1934,15 @@ local function main()
 	-- The press is recorded for the metrics exactly as the control callback
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
+	-- Dry-run refuses before the hook claims a chord, and again at deferred
+	-- delivery through the live master gate. Script lifecycle actions stay live.
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 		local consumed = keyboard_shortcuts.consume(detail, {
-			only_script = script_actions.is_paused() or not shortcuts_on,
+			only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
 			defer = function(fn) return event_loop.defer(fn) end,
 			admission = function()
-				return { master = shortcuts ~= nil and shortcuts.is_enabled() == true and shortcuts.configuration_admitted(),
+				return { master = not opts.dry_run and shortcuts ~= nil and shortcuts.is_enabled() == true and shortcuts.configuration_admitted(),
 					paused = script_actions.is_paused() == true, inhibited = input_capture_gate.blocks_text() == true }
 			end,
 		})
@@ -2385,7 +2389,7 @@ local function main()
 		gestures.init({
 			persist = true,
 			action_handlers = ActionHandlers.compose(script_actions.handlers, shortcuts, prediction_engine),
-			is_paused = script_actions.is_paused,
+			is_paused = function() return opts.dry_run or script_actions.is_paused() end,
 		})
 		Logger.info(LOG, "Gestures manager initialised.")
 	end

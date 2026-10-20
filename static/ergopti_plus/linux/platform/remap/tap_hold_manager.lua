@@ -39,6 +39,7 @@ local original_pair_constructor = CombinationEngine.new
 local Timings = require("infra.timings")
 local HoldOptions = require("tap_hold.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
+local ScriptActions = require("modules.shortcuts.script_actions")
 local Json = require("json")
 local Paths = require("infra.paths")
 local NavLayer = require("platform.remap.nav_layer")
@@ -120,6 +121,7 @@ local _initialized = false
 local _hook = nil            -- The keyboard hook the engine is installed in.
 local _native_hook = nil     -- Request receiver only; no native authority snapshot.
 local _execute_action = nil  -- Runs a catalogue action by name.
+local _dry_run = false       -- Keeps native remaps while refusing catalogue payloads.
 local _action_names = nil    -- The action catalogue's ids.
 local _on_text_injected = nil -- Told of text the injector typed for a one-shot.
 local _defaults_path = nil
@@ -262,6 +264,14 @@ local function fields_equal(value,captured)
  for key in pairs(value) do if captured[key]==nil then return false end end
  return true
 end
+
+--- Whether this action is a physical remap or an admitted lifecycle command.
+--- @param action string Configured action id.
+--- @return boolean admitted
+local function action_admitted(action)
+	return not _dry_run or action == "" or action == "none" or action == "one_shot_shift" or action == "caps_word"
+		or Engine.KEY_TAPS[action] ~= nil or EmitActions[action] ~= nil or ScriptActions.is_script_action(action)
+end
 local original_engine_key_codes = copy_fields(rawget(Engine, "KEY_CODES"))
 local catalogue_snapshot=copy_fields(rawget(NativeCatalogue,"actions"))
 local function managed_owner_current(loaded,combinations)
@@ -319,7 +329,15 @@ local function pair_options(loaded,combinations)
  managed_options[configured]={owner=combinations,loaded=loaded,catalogue=copy_fields(loaded.catalog),
   keys=copy_fields(loaded.keys),holds=copy_fields(loaded.hold_picker),options_getter=issuer.engine_options,
   action_names=_action_names,execute_action=_execute_action}
- return configured
+ -- Original options are sealed by their source owner. A separate projection
+ -- can remove payloads before consumption without changing their authority.
+ local projection
+ if _dry_run then
+  projection={taps={},chords=configured.chords and {} or nil}
+  for pair,action in pairs(configured.taps) do projection.taps[pair]=action_admitted(action) and action or "none" end
+  for pair,action in pairs(configured.chords or {}) do projection.chords[pair]=action_admitted(action) and action or "none" end
+ end
+ return configured,projection
 end
 --- Observes only an original Manager-created configuration after installation.
 --- @param owner table Original private combinations owner.
@@ -373,11 +391,13 @@ local function _apply()
 	if _combinations and not managed_owner_current(_loaded,_combinations) then return false end
 	if _engine and _combinations and _combinations.has_bindings() and not _engine.has_combinations then
 		if _hook.set_remapper(nil) == false then return false end
-		_engine = CombinationEngine.new(_engine, pair_options(_loaded,_combinations), _buffered_ports())
+		local configured, projection = pair_options(_loaded,_combinations)
+		_engine = CombinationEngine.new(_engine, configured, _buffered_ports(), projection)
 	end
 	if _engine and _engine.has_combinations then
 		if _hook.set_remapper(nil) ~= true then return false end
-		if _engine:configure(pair_options(_loaded,_combinations), _buffered_ports()) ~= true then return false end
+		local configured, projection = pair_options(_loaded,_combinations)
+		if _engine:configure(configured, _buffered_ports(), projection) ~= true then return false end
 		if _engine:set_tap_holds_enabled(_enabled and _loaded.enabled) ~= true then return false end
 	end
 	if _active() then
@@ -477,8 +497,17 @@ local function _build(loaded, boot)
 	for _, key in pairs(loaded.keys) do
 		if key.enabled ~= false then count = count + 1 end
 	end
+	local runtime_keys = loaded.keys
+	if _dry_run then
+		runtime_keys = copy_fields(loaded.keys)
+		for _, key in pairs(runtime_keys) do
+			-- Empty tap already means the original physical key. Its hold, layer,
+			-- release accounting and no-hold pass-through stay in the native engine.
+			if not action_admitted(key.tap_action or "") then key.tap_action = "" end
+		end
+	end
 	local engine = original_engine_constructor({
-		keys = loaded.keys,
+		keys = runtime_keys,
 		roll_keys = loaded.roll_keys,
 		nav_layer = nav_layer,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
@@ -507,7 +536,8 @@ local function _build(loaded, boot)
 	issued.engine_options=rawget(combinations,"engine_options")
  managed_owners[combinations]=issued
 	if combinations.has_bindings() then
-		engine = CombinationEngine.new(engine, pair_options(loaded,combinations), _buffered_ports())
+		local configured, projection = pair_options(loaded,combinations)
+		engine = CombinationEngine.new(engine, configured, _buffered_ports(), projection)
 		nav_wrapped = true
 	end
 	local nav_record = { unavailable = true }
@@ -560,10 +590,11 @@ end
 --- Loads the configuration and installs the engine.
 --- @param opts table { keyboard_hook, execute_action(action, binding),
 ---   action_names() -> ids, on_text_injected(text), told of each one-shot
----   result the injector typed, defaults_path, user_path }
+---   result the injector typed, defaults_path, user_path, dry_run = boolean|nil }
 function M.init(opts)
 	if _initialized then error("tap-hold manager already initialised", 2) end
 	if type(opts) ~= "table" then error("tap-hold manager options must be a table", 2) end
+	if opts.dry_run ~= nil and type(opts.dry_run) ~= "boolean" then error("tap-hold dry_run must be a boolean", 2) end
 	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function"
 		or type(opts.keyboard_hook.key_text) ~= "function"
 		or type(opts.keyboard_hook.held_modifiers) ~= "function"
@@ -585,6 +616,7 @@ function M.init(opts)
 	_native_hook = package.loaded["adapters.keyboard_hook"]
 	Logger.start(LOG, "Initialising tap-holds…")
 	_hook = opts.keyboard_hook
+	_dry_run = opts.dry_run == true
 	_execute_action = opts.execute_action
 	_action_names = opts.action_names
 	_on_text_injected = opts.on_text_injected
@@ -888,6 +920,7 @@ function M._reset_for_test()
 	_on_text_injected = nil
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
+	_dry_run = false
 	return true
 end
 
