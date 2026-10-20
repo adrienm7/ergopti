@@ -3127,7 +3127,13 @@ These are software implementations; final hardware verification remains below.
       hit a deadline, likely the same proxy fallback. - Shortcuts discovery, launch AppleEvents and the 27 owned-runtime XCTest
       methods: fixes are committed but never reached a fully green Build
       and Install-and-launch run, because a plain dispatch keeps the
-      deferred E2E scopes red and skips Build. Validate them through a
+      deferred E2E scopes red and skips Build. The owned-runtime methods
+      failed in milliseconds with "protection" (dev run 39375032517): every
+      check read a NULL `acl_get_fd_np` as a refusal, but Apple's Libc
+      returns NULL/ENOENT for a file without an extended ACL; 0b7428c8
+      reads that as the empty ACL at all nine sites. PAC/WPAD/bootstrap wire
+      methods: green on dev runs 39374014338 and 39375032517. Managed model
+      receiving: green on both architectures on the same two runs. Validate them through a
       release-like run.
       When a scope is green, remove it from the v1.0.3 profile constants and
       JSON; with none left, the next tag publishes with no profile (tested).
