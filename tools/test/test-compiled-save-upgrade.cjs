@@ -550,8 +550,16 @@ if (require.main === module) {
 			fs.writeFileSync(file, prefix + changed);
 			assert.throws(() => inspectNativePriorProfile(file, 6), assert.AssertionError);
 		}
+		// The prior's sparse writer may already have dropped the default false.
+		fs.writeFileSync(file, prefix.replace('metrics_enabled = false\n', '') + valid);
+		assert.equal(inspectNativePriorProfile(file, 6).metrics_enabled, false);
+		fs.writeFileSync(
+			file,
+			prefix.replace('metrics_enabled = false', 'metrics_enabled = true') + valid
+		);
+		assert.throws(() => inspectNativePriorProfile(file, 6), assert.AssertionError);
 		console.log(
-			'Native prior dashboard own-data equality and four TOML mutations passed (Win32 unexecuted).'
+			'Native prior dashboard own-data equality, four TOML mutations and the sparse default passed (Win32 unexecuted).'
 		);
 	} finally {
 		fs.rmSync(owned, { recursive: true });

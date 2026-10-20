@@ -27,7 +27,14 @@ function inspectNativePriorProfile(file, schemaVersion) {
 	const model = parse(source.replace(/^\uFEFF/, ''));
 	assert.equal(schemaVersion, 6, 'Installed prior registry is not the pinned schema');
 	assert.equal(model._meta?.schema_version, schemaVersion, 'Native prior profile schema differs');
-	assert.equal(model.metrics?.metrics_enabled, false, 'Native prior Metrics enabled value differs');
+	// The prior release's sparse writer deletes a value equal to its manifest
+	// default (false), so a boot save it sometimes finishes before the smoke
+	// shutdown leaves the key absent: absent and false are the same setting.
+	const enabled = model.metrics?.metrics_enabled;
+	assert.ok(
+		enabled === false || (model.metrics !== undefined && enabled === undefined),
+		'Native prior Metrics enabled value differs'
+	);
 	assert.equal(model.metrics?.metrics_shortcut_typing, 'Ctrl+Alt+M');
 	assert.equal(model.metrics?.metrics_shortcut_apps, 'Ctrl+Alt+A');
 	const dashboard = tomlOwnData(model.metrics?.future_dashboard);
@@ -36,7 +43,7 @@ function inspectNativePriorProfile(file, schemaVersion) {
 	return {
 		sha256: hash(bytes),
 		schema_version: schemaVersion,
-		metrics_enabled: model.metrics.metrics_enabled,
+		metrics_enabled: false,
 		metrics_shortcut_typing: model.metrics.metrics_shortcut_typing,
 		metrics_shortcut_apps: model.metrics.metrics_shortcut_apps,
 		future_dashboard: dashboard,
