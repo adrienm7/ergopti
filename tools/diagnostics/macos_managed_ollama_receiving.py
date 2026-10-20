@@ -1537,6 +1537,24 @@ def main():
     with (owner.output / "native-receiving.json").open("x", encoding="utf-8") as output:
         json.dump(owner.receipt, output, indent=2, sort_keys=True)
         output.write("\n")
+    if failure is not None:
+        # The receipt stays in the runner's output folder; the job log showed
+        # only an exit status. Only the closed failure fields leave it.
+        closed = {
+            key: owner.receipt[key]
+            for key in (
+                "reason",
+                "failed_stage",
+                "prepare_phase",
+                "primary_failure",
+                "cleanup_failure",
+            )
+            if key in owner.receipt
+        }
+        closed["profile"] = options.profile
+        print(
+            "native model receiving refused: " + json.dumps(closed, sort_keys=True), file=sys.stderr
+        )
     return 0 if failure is None else 1
 
 
