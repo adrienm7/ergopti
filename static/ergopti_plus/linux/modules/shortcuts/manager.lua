@@ -4,7 +4,7 @@
 --- MODULE: Shortcuts Manager (Linux)
 --- DESCRIPTION:
 --- Text-manipulation shortcuts for Linux: wrap symbols (brackets, quotes),
---- CapsWord (auto-capitalize first letter of each word), and text transforms
+--- CapsWord (the next word typed in capitals), and text transforms
 --- (uppercase, lowercase, title case) through the session clipboard and uinput.
 ---
 --- Wrap and text transforms use the display-server-aware clipboard adapter and
@@ -18,12 +18,15 @@
 ---    modules/shortcuts/wrap_on_type.lua, run from the keyboard hook's
 ---    consumption callback; this module owns its switch
 ---    (shortcuts.wrap_text_if_selected) and the wrap-pair catalogue.
---- 2. CapsWord: toggled via menu or shortcut. When active, the next word's
----    first letter is capitalized. It switches itself off on what
----    [shortcuts.caps_word] names (a delay without a keystroke, a checked
+--- 2. CapsWord: toggled via menu, shortcut or tap action. While it is on,
+---    CapsLock is locked on the desktop (adapters/keyboard_hook,
+---    lock_caps_for_word), as Windows and macOS light theirs, so every letter
+---    reaches the application as a capital and the digits and punctuation
+---    stay what the layout's CapsLock level types. It switches itself off on
+---    what [shortcuts.caps_word] names (a delay without a keystroke, a checked
 ---    delimiter, a checked pointer kind), through the shared policy and
----    modules/shortcuts/caps_word_auto_off. Hooked into the daemon's on_char,
----    control-key and pointer callbacks.
+---    modules/shortcuts/caps_word_auto_off, and on a CapsLock press. Hooked
+---    into the daemon's on_char, control-key and pointer callbacks.
 --- 3. Text transforms: clipboard-based transforms that copy the selection,
 ---    apply a transform function, paste the result, and restore the clipboard.
 --- ==============================================================================
@@ -359,7 +362,6 @@ end
 -- =========================================
 
 local _caps_word_active = false
-local _caps_word_triggered = false  -- true after first letter capitalized, waiting for word end
 -- What ends this CapsWord session on its own (modules/shortcuts/caps_word_auto_off),
 -- compiled when it was switched on; nil while CapsWord is off.
 local _caps_word_policy = nil
@@ -379,14 +381,29 @@ end
 -- luv the clock counts whole seconds, and two keys typed together would read a
 -- second apart (project-linux-coarse-clock-overstates-a-gap).
 
---- Ends the current CapsWord session, naming why once.
+--- Presses and releases CapsLock on the daemon's device: the key a CapsWord
+--- session locks and unlocks the desktop's Caps Lock with.
+--- @return boolean True when the press and the release were written.
+local function press_caps_lock()
+	return (ComboEmitter.press_codes({}, { EvdevCodes.KEY_CAPSLOCK }, "CapsWord CapsLock")) == true
+end
+
+--- Clears the session state, naming why once.
 --- @param reason string What ended it, for the log.
-local function end_caps_word(reason)
-	if not _caps_word_active then return end
-	_caps_word_active, _caps_word_triggered = false, false
+local function clear_caps_word(reason)
+	_caps_word_active = false
 	_caps_word_policy, _caps_word_last_ms = nil, nil
 	_caps_word_session = _caps_word_session + 1
 	Logger.info(LOG, "CapsWord: OFF (%s).", reason)
+end
+
+--- Ends the current CapsWord session and unlocks the CapsLock it locked.
+--- @param reason string What ended it, for the log.
+local function end_caps_word(reason)
+	if not _caps_word_active then return end
+	clear_caps_word(reason)
+	-- The hook logs an unlock it could not emit; the session is over either way.
+	require("adapters.keyboard_hook").release_caps_word_lock()
 end
 
 --- Queues the idle check of one session on the daemon loop: it ends the
@@ -419,8 +436,20 @@ local function start_caps_word()
 		Logger.error(LOG, "CapsWord refused: its auto-off settings do not compile: %s.", tostring(policy))
 		return false
 	end
-	_caps_word_session = _caps_word_session + 1
-	_caps_word_active, _caps_word_triggered = true, false
+	-- The capitals come from CapsLock, locked on the desktop as Windows and
+	-- macOS light it: the application receives what the layout's CapsLock
+	-- level types. The hook ends the hold itself when the user presses
+	-- CapsLock, when it stops and before a dialog takes the keyboard.
+	local session = _caps_word_session + 1
+	local locked, refusal = require("adapters.keyboard_hook").lock_caps_for_word(press_caps_lock, function(reason)
+		if session == _caps_word_session and _caps_word_active then clear_caps_word(reason) end
+	end)
+	if not locked then
+		Logger.error(LOG, "CapsWord refused: CapsLock could not be locked: %s.", tostring(refusal))
+		return false
+	end
+	_caps_word_session = session
+	_caps_word_active = true
 	_caps_word_policy, _caps_word_last_ms = policy, Monotonic.now_ms()
 	local delay = CapsWordPolicy.idle_delay_ms(policy)
 	if delay then schedule_idle_check(_caps_word_session, delay) end
@@ -493,38 +522,25 @@ function M.caps_word_observe_pointer(kind)
 	return false
 end
 
---- Processes a character for CapsWord.
---- Called from the daemon's on_char hook.
---- CapsWord logic: when active, capitalize the first letter of the next word,
---- then disengage until the next word boundary.
---- @param ch string The character just typed.
---- @return string|nil Modified character (upper-cased), or nil to pass through.
-function M.process_caps_word(ch)
-	if _configuration_owner ~= nil then return nil end
-	if not _caps_word_active then return nil end
-	if not TextCase.is_single_character(ch) then return nil end
+--- Ends CapsWord on a native pointer event of a checked kind, named here so
+--- the daemon's main() captures no pointer-kind table of its own (it sits at
+--- LuaJIT's 60-upvalue limit).
+--- @param kind_of_event string "press" (a button) or "motion" (an EV_REL report).
+--- @param code integer The button's evdev code for a press.
+--- @return boolean ended
+function M.caps_word_observe_pointer_event(kind_of_event, code)
+	if not _caps_word_active then return false end
+	local kind
+	if kind_of_event == "press" then kind = CapsWordAutoOff.pointer_kind_of_button(code)
+	else kind = CapsWordAutoOff.pointer_kind_of_motion() end
+	return M.caps_word_observe_pointer(kind)
+end
 
-	-- Word boundaries: Unicode whitespace and punctuation.
-	local is_boundary = TextCase.is_word_boundary(ch)
-
-	if is_boundary then
-		-- Word boundary reached — prepare for next word.
-		_caps_word_triggered = false
-		return nil
-	end
-
-	if not _caps_word_triggered then
-		-- First letter of new word — capitalize and disengage for this word.
-		_caps_word_triggered = true
-		local upper = TextCase.upper(ch)
-		if upper == ch then
-			return nil  -- already uppercase, no change needed
-		end
-		Logger.debug(LOG, "CapsWord: '%s' → '%s'.", ch, upper)
-		return upper
-	end
-
-	return nil
+--- Ends a running CapsWord session from outside its own rules (a script
+--- pause), unlocking the CapsLock it locked.
+--- @param reason string What ended it, for the log.
+function M.cancel_caps_word(reason)
+	end_caps_word(reason)
 end
 
 -- =========================================
@@ -810,9 +826,8 @@ function M.init(opts)
 	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
 		error("shortcuts enabled override must be a boolean")
 	end
-	-- Reset CapsWord state so init() gives a clean slate for tests.
-	_caps_word_active = false
-	_caps_word_triggered = false
+	-- A clean slate: a session still running unlocks its CapsLock first.
+	end_caps_word("shortcuts re-initialised")
 	_caps_word_policy, _caps_word_last_ms = nil, nil
 	_caps_word_session = _caps_word_session + 1
 	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
@@ -899,7 +914,7 @@ function M.configuration_candidate(document)
 	if enabled == nil then enabled = Manifest.default_for(ENABLED_PATH) end
 	if wrap == nil then wrap = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY) end
 	assert(type(enabled) == "boolean" and type(wrap) == "boolean", "shortcut switches must be boolean")
-	return { enabled = enabled, wrap = wrap, caps_word_active = false, caps_word_triggered = false }
+	return { enabled = enabled, wrap = wrap, caps_word_active = false }
 end
 
 --- Captures the exact manager state without touching clipboard or input devices.
@@ -907,22 +922,24 @@ end
 --- @return table|nil state
 function M.configuration_snapshot(owner)
 	if _configuration_owner ~= owner then return nil end
-	return { enabled = _enabled, wrap = _wrap_on_type,
-		caps_word_active = _caps_word_active, caps_word_triggered = _caps_word_triggered }
+	return { enabled = _enabled, wrap = _wrap_on_type, caps_word_active = _caps_word_active }
 end
 
 --- Applies a validated runtime state without invoking independent setters.
+--- A state with CapsWord off ends a running session and unlocks its CapsLock.
+--- One with CapsWord on never starts a session: a lock is the desktop's state,
+--- not a value to restore, so a transaction that stopped CapsWord leaves it off.
 --- @param owner table Exact transaction token.
 --- @param state table Candidate or saved state.
 --- @return boolean acknowledged
 function M.apply_configuration(owner, state)
 	if _configuration_owner ~= owner or type(state) ~= "table" then return false end
-	for _, key in ipairs({ "enabled", "wrap", "caps_word_active", "caps_word_triggered" }) do
+	for _, key in ipairs({ "enabled", "wrap", "caps_word_active" }) do
 		if type(state[key]) ~= "boolean" then return false end
 	end
 	collision_generation = collision_generation + 1
 	_enabled, _wrap_on_type = state.enabled, state.wrap
-	_caps_word_active, _caps_word_triggered = state.caps_word_active, state.caps_word_triggered
+	if not state.caps_word_active then end_caps_word("shortcut configuration applied") end
 	return true
 end
 

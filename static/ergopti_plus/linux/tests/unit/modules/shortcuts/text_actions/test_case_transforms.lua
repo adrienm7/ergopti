@@ -17,6 +17,7 @@ local function with_manager(selected, body)
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keylogger = "modules.keylogger.keylogger",
+		hook = "adapters.keyboard_hook",
 	}
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end
@@ -33,6 +34,8 @@ local function with_manager(selected, body)
 	package.loaded[names.combo] = { press = function() return true end }
 	package.loaded[names.injector] = { inject = function() return { ok = true } end }
 	package.loaded[names.keylogger] = { record_shortcut = function() return true end }
+	-- No keyboard is captured here: a CapsWord session locks a fake CapsLock.
+	package.loaded[names.hook] = require("tests.support.caps_word_lock_hook_fake").new()
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()
@@ -69,15 +72,6 @@ helpers.describe("shortcut case transforms", function()
 		with_manager("ÉTÉ STRAẞE", function(manager, state)
 			helpers.assert_true(manager.transform_lowercase())
 			helpers.assert_eq(state.replacement, "été straße")
-		end)
-	end)
-
-	helpers.it("capitalizes a non-ASCII CapsWord character after Unicode punctuation", function()
-		with_manager("unused", function(manager)
-			manager.toggle_caps_word()
-			helpers.assert_eq(manager.process_caps_word("é"), "É")
-			helpers.assert_eq(manager.process_caps_word("—"), nil)
-			helpers.assert_eq(manager.process_caps_word("я"), "Я")
 		end)
 	end)
 end)
@@ -219,7 +213,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 			helpers.assert_eq(observed.acquired, true)
 			helpers.assert_eq(manager.is_caps_word_active(), false)
 			helpers.assert_eq(returned, false)
-			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_triggered, false)
+			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_active, false)
 			helpers.assert_eq(changed.count, 0)
 			helpers.assert_eq(manager.release_configuration(owner), true)
 			package.loaded["modules.keylogger.keylogger"].record_shortcut = function() end

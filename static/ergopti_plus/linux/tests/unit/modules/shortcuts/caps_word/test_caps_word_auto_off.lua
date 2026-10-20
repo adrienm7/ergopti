@@ -12,7 +12,9 @@
 --- Covered: the settings owner (defaults, outdated values, sparse persistence,
 --- the declared pointer kinds), the evdev code -> kind map, the manager's
 --- session (delimiter, unchecked delimiter, no-break space, delay, pointer
---- kinds) and the daemon and hook wiring.
+--- kinds), the CapsLock every session locks and every ending unlocks (through
+--- a fake hook: tests/support/caps_word_lock_hook_fake.lua) and the daemon and
+--- hook wiring.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -57,6 +59,9 @@ local function with_caps_word(source, body)
 					if entry.due <= context.now then entry.fn() else context.deferred[#context.deferred + 1] = entry end
 				end
 			end
+			-- No keyboard is captured here: the session's CapsLock goes to a fake hook.
+			context.hook = require("tests.support.caps_word_lock_hook_fake").new()
+			package.loaded["adapters.keyboard_hook"] = context.hook
 			package.loaded["modules.shortcuts.caps_word_auto_off"] = nil
 			package.loaded["modules.shortcuts.manager"] = nil
 			context.AutoOff = require("modules.shortcuts.caps_word_auto_off")
@@ -325,6 +330,87 @@ helpers.describe("caps word auto-off: the manager session", function()
 			helpers.assert_eq(c.manager.caps_word_observe_text(","), true)
 		end)
 	end)
+
+	helpers.it("caps word auto-off, a session locks CapsLock and every way it ends unlocks it", function()
+		-- The tray CapsWord once changed only the buffer's copy of a character:
+		-- with no CapsLock locked, no capital ever reached the application.
+		for _, ending in ipairs({
+			{ name = "toggle", run = function(c) helpers.assert_true(c.manager.toggle_caps_word()) end },
+			{ name = "delimiter", run = function(c) helpers.assert_true(c.manager.caps_word_observe_text(" ")) end },
+			{ name = "pointer", run = function(c) helpers.assert_true(c.manager.caps_word_observe_pointer("left_click")) end },
+			{ name = "pause", run = function(c) c.manager.cancel_caps_word("script paused") end },
+			{ name = "shortcuts off", run = function(c) helpers.assert_true(c.manager.disable()) end },
+			{ name = "delay", run = function(c) c.now = c.now + 10000; c.run_due() end },
+		}) do
+			-- The delay is spelled out: this case is about the unlock, not the default.
+			with_caps_word('[shortcuts.caps_word]\nidle_timeout_seconds = 10\n', function(c)
+				helpers.assert_true(c.manager.toggle_caps_word())
+				helpers.assert_eq(c.hook.locks, 1, ending.name .. ": the session locks CapsLock")
+				helpers.assert_true(c.hook.held)
+				ending.run(c)
+				helpers.assert_eq(c.manager.is_caps_word_active(), false, ending.name .. " ends the session")
+				helpers.assert_eq(c.hook.releases, 1, ending.name .. " unlocks CapsLock once")
+				helpers.assert_eq(c.hook.held, false)
+			end)
+		end
+	end)
+
+	helpers.it("caps word auto-off, a CapsLock that cannot be locked refuses the session", function()
+		with_caps_word(nil, function(c)
+			c.hook.refuse = "the keymap's CapsLock key does not toggle Caps Lock"
+			helpers.assert_eq(c.manager.toggle_caps_word(), false)
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "no session without capitals to give")
+			helpers.assert_eq(#c.deferred, 0, "a refused session arms no idle check")
+		end)
+	end)
+
+	helpers.it("caps word auto-off, a hold the hook ends ends the session without a second unlock", function()
+		with_caps_word(nil, function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			c.hook.lose("CapsLock pressed")
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_eq(c.hook.releases, 0, "the user's CapsLock press is never toggled back")
+			helpers.assert_true(c.manager.toggle_caps_word(), "a new session can start at once")
+			helpers.assert_eq(c.hook.locks, 2)
+		end)
+	end)
+
+	helpers.it("caps word auto-off, the session presses the CapsLock key on the daemon's device", function()
+		with_caps_word(nil, function(c)
+			local Emitter = require("modules.gestures.combo_emitter")
+			local original, pressed = Emitter.press_codes, nil
+			Emitter.press_codes = function(mods, keys) pressed = { mods = mods, keys = keys }; return true end
+			local called, result = pcall(function()
+				helpers.assert_true(c.manager.toggle_caps_word())
+				return c.hook.emit()
+			end)
+			Emitter.press_codes = original
+			helpers.assert_true(called, tostring(result))
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(pressed, { mods = {}, keys = { require("infra.evdev_codes").KEY_CAPSLOCK } })
+		end)
+	end)
+
+	helpers.it("caps word auto-off, a shortcut configuration transaction ends the session and unlocks", function()
+		with_caps_word(nil, function(c)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			local owner = {}
+			c.manager.init({ enabled = true, persist = true, config_path = c.path })
+			helpers.assert_eq(c.hook.releases, 1, "a re-initialisation unlocks a running session")
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_true(c.manager.acquire_configuration(owner))
+			local snapshot = c.manager.configuration_snapshot(owner)
+			helpers.assert_eq(snapshot.caps_word_active, true)
+			helpers.assert_true(c.manager.apply_configuration(owner, { enabled = true, wrap = false, caps_word_active = false }))
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
+			helpers.assert_eq(c.hook.releases, 2)
+			helpers.assert_true(c.manager.apply_configuration(owner, snapshot), "restoring the snapshot is acknowledged")
+			helpers.assert_eq(c.manager.is_caps_word_active(), false, "a lock is never restored from a value")
+			helpers.assert_eq(c.hook.locks, 2)
+			helpers.assert_true(c.manager.release_configuration(owner))
+		end)
+	end)
+
 end)
 
 
@@ -349,13 +435,19 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		local daemon = source("ergopti_hotstrings.lua")
 		helpers.assert_contains(daemon, "shortcuts.caps_word_observe_text(ch)")
 		helpers.assert_contains(daemon, "shortcuts.caps_word_observe_control(key_name)")
-		helpers.assert_contains(daemon, "CapsWordAutoOff.pointer_kind_of_button(code)")
-		helpers.assert_contains(daemon, "CapsWordAutoOff.pointer_kind_of_motion()")
+		helpers.assert_contains(daemon, "shortcuts.caps_word_observe_pointer_event(kind_of_event, code)")
 		helpers.assert_contains(daemon, "onPointerEvent = on_pointer_event")
 		-- The bare Tab returns early; the delimiter check must come before it.
 		local observe = daemon:find("shortcuts.caps_word_observe_text(ch)", 1, true)
 		local tab = daemon:find('if ch == "\\t" then', 1, true)
 		helpers.assert_true(observe ~= nil and tab ~= nil and observe < tab, "the delimiter check precedes the Tab return")
+	end)
+
+	helpers.it("caps word auto-off, the daemon types no capital of its own and a pause ends the session", function()
+		local daemon = source("ergopti_hotstrings.lua")
+		helpers.assert_eq(daemon:find("process_caps_word", 1, true), nil,
+			"the capitals come from the locked CapsLock, never from rewriting the buffer's copy")
+		helpers.assert_contains(daemon, 'if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end')
 	end)
 
 	helpers.it("caps word auto-off, every typed character reaches the delimiter check, whatever produced it", function()
@@ -393,26 +485,27 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		helpers.assert_contains(hook, "_on_pointer_event = options.onPointerEvent")
 	end)
 
-	helpers.it("caps word auto-off, the daemon maps a press and a motion to their declared kinds", function()
-		local daemon = source("ergopti_hotstrings.lua")
-		local body = assert(daemon:match("local function on_pointer_event%(kind_of_event, code%)(.-)\n\tend\n"),
-			"the pointer callback is missing")
-		local factory = assert((loadstring or load)(
-			"return function(shortcuts, CapsWordAutoOff) return function(kind_of_event, code) " .. body .. " end end"))()
-		local seen = {}
-		local fake_shortcuts = {
-			is_caps_word_active = function() return true end,
-			caps_word_observe_pointer = function(kind) seen[#seen + 1] = tostring(kind) end,
-		}
-		with_caps_word(nil, function(c)
+	helpers.it("caps word auto-off, the manager maps a native press and motion to their declared kinds", function()
+		with_caps_word('[shortcuts.caps_word.pointer]\nmiddle_click = false\n', function(c)
 			local Codes = require("infra.evdev_codes")
-			local callback = factory(fake_shortcuts, c.AutoOff)
-			callback("press", Codes.BTN_MIDDLE)
-			callback("motion", 0x00)
-			callback("press", 30)
+			helpers.assert_true(c.manager.toggle_caps_word())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("press", Codes.BTN_MIDDLE), false,
+				"an unchecked middle click keeps CapsWord on")
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("press", 30), false,
+				"a keyboard code pressed on a pointer is no kind, never a motion")
+			helpers.assert_true(c.manager.is_caps_word_active())
+			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("motion", 0x00), true)
+			helpers.assert_eq(c.manager.is_caps_word_active(), false)
 		end)
-		helpers.assert_eq(table.concat(seen, ","), "middle_click,pointer_motion,nil",
-			"a keyboard code pressed on a pointer is no kind, never a motion")
+	end)
+
+	helpers.it("caps word auto-off, the daemon's main() stays within LuaJIT's 60 upvalues", function()
+		-- The pointer-kind table once captured by main() pushed it to 61: CI's
+		-- LuaJIT refused to compile the daemon at all. test_parse_coverage owns
+		-- the budget; this pins the CapsWord side of it.
+		local daemon = source("ergopti_hotstrings.lua")
+		helpers.assert_eq(daemon:find("CapsWordAutoOff", 1, true), nil,
+			"main() reaches the pointer kinds through the manager")
 	end)
 end)
 
