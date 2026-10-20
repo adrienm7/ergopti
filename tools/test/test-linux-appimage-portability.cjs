@@ -266,7 +266,11 @@ if (process.platform === 'linux') {
 }
 passed++;
 
-// One asset name, with no "linux" in it, wherever the release names it.
+// One asset name, with no "linux" in it, wherever the release names it. The
+// AppImage catalog (appimage.github.io, PR #10422) refuses an AppImage whose
+// file name contains "Linux" in any case: ErgoptiPlus-linux-x86_64.AppImage was
+// rejected for v1.0.1. The other Linux assets (.deb, .rpm, .flatpak) keep their
+// "linux-" prefix; only the AppImage must stay without it.
 for (const [relative, minimum] of [
 	['.github/workflows/ci-linux.yml', 2],
 	['.github/workflows/ci.yml', 3],
@@ -274,13 +278,22 @@ for (const [relative, minimum] of [
 	['src/routes/ergopti-plus/Hero.svelte', 0],
 	['src/routes/ergopti-plus/Platforms.svelte', 0],
 	['src/routes/ergopti-plus/StickyCta.svelte', 0],
-	['tools/test/browser/site-artifact-smoke.playwright.cjs', 1]
+	['tools/test/browser/site-artifact-smoke.playwright.cjs', 1],
+	['tools/test/test-site-github-release.cjs', 1],
+	['tools/build/build-linux-appimage.sh', 0],
+	['tools/build/appimage-oldest-lts.sh', 0],
+	[
+		'static/ergopti_plus/linux/tests/unit/modules/updater/check/test_updater_manager_module_loads_without.lua',
+		1
+	]
 ]) {
 	const text = read(relative);
-	assert.ok(
-		!/ErgoptiPlus-linux-[A-Za-z0-9_]+\.AppImage/.test(text),
-		`${relative} still names the old AppImage`
-	);
+	for (const name of text.match(/[A-Za-z0-9_.${}-]+\.AppImage\b/gi) ?? []) {
+		assert.ok(
+			!/linux/i.test(name),
+			`${relative} names the AppImage "${name}"; the AppImage catalog refuses "linux" in it`
+		);
+	}
 	assert.ok(
 		text.split(APPIMAGE_ASSET).length - 1 >= minimum,
 		`${relative} names ${APPIMAGE_ASSET}`

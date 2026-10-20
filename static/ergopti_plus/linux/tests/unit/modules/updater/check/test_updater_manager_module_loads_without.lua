@@ -103,7 +103,7 @@ helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("fails closed when the canonical Linux bundle is absent", function()
 		local body = '{"tag_name":"v4.0.0","assets":['
 			.. '{"name":"ergopti-plus-linux.tar.gz.sig","browser_download_url":"https://example.invalid/deceptive"},'
-			.. '{"name":"ErgoptiPlus-linux-noarch.rpm","browser_download_url":"https://example.invalid/wrong.rpm"},'
+			.. '{"name":"ErgoptiPlus-linux-x86_64.rpm","browser_download_url":"https://example.invalid/wrong.rpm"},'
 			.. '{"name":"unrelated.zip","browser_download_url":"https://example.invalid/first.zip"}'
 			.. ']}'
 

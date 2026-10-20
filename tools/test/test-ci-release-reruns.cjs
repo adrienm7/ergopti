@@ -1566,11 +1566,11 @@ check('release assets are verified while draft before publication can make them 
 });
 
 check('a silently lost RPM is reuploaded by name before publication', () => {
-	const result = createRelease('true', { missing: 'ErgoptiPlus-linux-noarch.rpm' });
+	const result = createRelease('true', { missing: 'ErgoptiPlus-linux-x86_64.rpm' });
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	const uploads = result.calls.filter((call) => call.startsWith('release upload '));
 	assert.deepEqual(uploads, [
-		`release upload v0.0.0-dev.30 release-assets/ErgoptiPlus-linux-noarch.rpm --repo ${REPOSITORY} --clobber`
+		`release upload v0.0.0-dev.30 release-assets/ErgoptiPlus-linux-x86_64.rpm --repo ${REPOSITORY} --clobber`
 	]);
 	assert.equal(result.state.isDraft, false);
 	assert.equal(result.state.assets.length, requiredAssets('dev').length);
@@ -1612,13 +1612,13 @@ check('a wrong-size uploaded file must be replaced and read back before publicat
 check('a permanently lost RPM stays a draft after the bounded repair attempts', () => {
 	const result = createRelease('true', {
 		mode: 'permanent-loss',
-		missing: 'ErgoptiPlus-linux-noarch.rpm'
+		missing: 'ErgoptiPlus-linux-x86_64.rpm'
 	});
 	assert.equal(result.status, 1);
 	assert.equal(result.state.isDraft, true);
 	assert.equal(result.calls.filter((call) => call.startsWith('release upload ')).length, 2);
 	assert.equal(result.calls.filter((call) => call.startsWith('release edit ')).length, 0);
-	assert.match(result.stderr, /Release remains a draft.*ErgoptiPlus-linux-noarch\.rpm/);
+	assert.match(result.stderr, /Release remains a draft.*ErgoptiPlus-linux-x86_64.rpm/);
 });
 
 for (const mode of [
@@ -1648,7 +1648,7 @@ check('an already published release is not granted draft repair or a second publ
 check('a refused repair stops before publication', () => {
 	const result = createRelease('true', {
 		mode: 'upload-refusal',
-		missing: 'ErgoptiPlus-linux-noarch.rpm'
+		missing: 'ErgoptiPlus-linux-x86_64.rpm'
 	});
 	assert.equal(result.status, 1);
 	assert.equal(result.state.isDraft, true);

@@ -148,7 +148,8 @@ sed 's|^ExecStart=.*|ExecStart=/usr/bin/ergopti --service --tray|' \
 # The package carries the x86_64 native archive backend
 # (bin/libergopti_archive_publication.so), like the amd64 .deb, so it is
 # built for that architecture: rpmbuild refuses arch-dependent binaries in a
-# noarch package. The release asset keeps its historical file name.
+# noarch package. The release asset carries the same architecture in its
+# name, ErgoptiPlus-linux-$ARCH.rpm (ci-linux.yml renames the rpmbuild output).
 cat > "$RPM_ROOT/SPECS/ergopti.spec" << SPEC_EOF
 Name:           $PACKAGE_NAME
 Version:        $VERSION
