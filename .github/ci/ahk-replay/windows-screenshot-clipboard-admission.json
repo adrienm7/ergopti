@@ -1,0 +1,8 @@
+{
+	"expected_count": 24,
+	"filters": [
+		{ "contains": "screenshot-clipboard-admission", "expected_count": 8 },
+		{ "contains": "screenshot-clipboard-publication-custody", "expected_count": 6 },
+		{ "contains": "screenshot-worker-ownership:", "expected_count": 10 }
+	]
+}
