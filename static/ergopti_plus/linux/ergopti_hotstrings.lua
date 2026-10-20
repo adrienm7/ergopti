@@ -1367,7 +1367,7 @@ local function main()
 			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
 			-- Must run AFTER the static hotstring matcher so explicit triggers
 			-- take precedence over dynamic expansions.
-			if dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
+			if not opts.dry_run and dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
 				local ok_dh2, expanded, dynamic_event = pcall(function()
 					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary, destination)
 				end)
