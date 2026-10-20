@@ -1,0 +1,189 @@
+{
+	"expected_count": 46,
+	"filters": [
+		{
+			"contains": "capture settlement: one-shot end-key keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot completed-revoked keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot stop-reentrant keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key text keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key completed-revoked keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key stop-reentrant keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key stop-refusal keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: one-shot surrogate (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: dead-key a (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: dead-key surrogate (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: close-brace keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: punctuation keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: enter keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot punctuation keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot close-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot enter keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot delete keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key close-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key enter keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key pair-B keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: open-brace validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: unknown-control validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: joined-controls validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: empty-timeout validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: high-timeout validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: low-alone validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: high-alone validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: high-high validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: high-BMP validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: BMP-low validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: long-prefix validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: stopped-is-not-completion validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: empty-end-key validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar startup: existing boot warms the table before configured capture admission (inputhook-scalar-prewarm)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot invalid-low never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot invalid-high-BMP never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot partial-timeout never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: dead-key invalid-high-BMP never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: dead-key partial-timeout never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: dead-key control-after-high never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar control: dead-key uses native canonical Insert spelling (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: natural preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: incumbent-special preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: revoked-during-start preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: successor-disabled-during-start preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout: DeadKey InputHook has a timeout and finally block (deadkey-inputhook-blocks-thread)",
+			"expected_count": 1
+		}
+	]
+}

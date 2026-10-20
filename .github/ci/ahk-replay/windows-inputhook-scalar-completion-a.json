@@ -1,0 +1,185 @@
+{
+	"expected_count": 45,
+	"filters": [
+		{
+			"contains": "input hooks: refused one-shot preserves a different owner's disabled latch (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot text keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot timeout keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot stopped-resumed keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot stop-refusal keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key end-key keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key timeout keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key stopped-resumed keeps exact admission (suppressive-capture-settlement)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: one-shot a (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: one-shot AB (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Unicode scalar capture: dead-key AB (inputhook-unicode-capture)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: a keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: AB keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: surrogate keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: open-brace keeps one scalar and reports cost (inputhook-endchars-prototype)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot open-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot backspace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot pair-B keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key punctuation keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key open-brace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key backspace keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key delete keeps text and controls distinct (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot magic-astral preserves the complete scalar (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot disabled-surrogate preserves the complete scalar (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot disabled-magic-astral preserves the complete scalar (inputhook-scalar-dispatch)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: BMP validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: punctuation validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: close-brace validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: supplementary validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: named-enter validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: named-after-high validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: native-backspace-alias validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: native-insert validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: native-numlock-alias validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: named-delete validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar completion: max-is-not-completion validates units and named controls (inputhook-scalar-reader)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot control-after-high never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: dead-key invalid-low never emits partial text (inputhook-scalar-rejection)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: incumbent-letter preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: incumbent-disabled preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "one-shot rearm: paused-during-start preserves current admission (one-shot-rearm-admission)",
+			"expected_count": 1
+		},
+		{
+			"contains": "SIHO boot window: the owner count answers before its registry exists (siho-count-before-include)",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout: DeadKey re-sends ih.EndKey after InputHook so EndKeys are not swallowed (deadkey-endkey-consumed)",
+			"expected_count": 1
+		},
+		{
+			"contains": "tap-holds: OneShotShift re-emits consumed Backspace/Enter/Delete end keys",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout: DeadKey else branch emits base char before unmapped PressedKey (deadkey-unmapped-absorbs-base-char)",
+			"expected_count": 1
+		}
+	]
+}
