@@ -1019,12 +1019,21 @@ _HC_HandleMessage(WindowEpoch, Raw) {
 	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session, _HC_Controller, _HC_OpenStarted
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
 		return
+	Session := _HC_Session
 	if (Raw == "ready") {
+		Controller := _HC_Controller
 		LoggerInfo("Healthcheck", "Diagnostics page ready in {1} ms.",
 			Round(_HealthCheck_NowMs() - _HC_OpenStarted, 2))
 		try {
-			_HC_Send(WindowEpoch, _HC_InitJson(_HC_Session))
-			_HC_Controller.IsVisible := true
+			Json := _HC_InitJson(Session)
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			_HC_Send(WindowEpoch, Json)
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			Controller.IsVisible := true
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
 			_HC_RestartProbes(WindowEpoch)
 		} catch as Err {
 			LoggerError("Healthcheck", "The diagnostics page could not be initialised: {1}", Err.Message)
@@ -1085,6 +1094,15 @@ _HC_ArchiveCleanupMetadata(Session) {
 ; @param Config {Map} From HealthCheck_Config().
 _HC_PerformPageAction(WindowEpoch, Action, Config) {
 	global _HC_Session
+	; Native collection controls outlive the page; no other action has epoch zero.
+	CollectionAction := Map("collect_windows", 1, "collection_cancel", 1,
+		"collection_guided", 1, "collection_skip", 1, "collection_open", 1).Has(Action["action"])
+	if WindowEpoch != 0 || !CollectionAction {
+		Session := _HC_Session
+		if !_HC_SessionCurrent(WindowEpoch, Session)
+			return
+		Snapshot := Session["snapshot"]
+	}
 	switch Action["action"] {
 		case "collect_windows":
 			HealthCheck_CollectWindows()
@@ -1102,35 +1120,47 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
 		case "export_snapshot":
-			if !HealthCheck_CapturePageChecks(_HC_Session["snapshot"], Action) {
+			if !HealthCheck_CapturePageChecks(Snapshot, Action) {
 				_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot", "ok", false,
 					"export_sequence", Action["export_sequence"])))
 				return
 			}
 			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
-				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", _HC_Session["snapshot"],
-				"share_text", HealthCheck_ShareDocument(_HC_Session["snapshot"], Config["schema"])["text"])))
+				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", Snapshot,
+				"share_text", HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"])))
 		case "cancel":
-			HealthCheck_CancelProbes()
-			for CancelledProbe in _HC_Session["snapshot"]["probes"] {
-				ProbeResult := _HC_Session["snapshot"]["probes"][CancelledProbe]
+			HealthCheck_CancelProbes(_HC_SessionCurrent.Bind(WindowEpoch, Session))
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			for CancelledProbe in Snapshot["probes"] {
+				ProbeResult := Snapshot["probes"][CancelledProbe]
 				if ProbeResult.Get("state", "") == "pending"
-					_HC_Session["snapshot"]["probes"][CancelledProbe] := Map("state", "cancelled", "cleanup", "pending")
+					Snapshot["probes"][CancelledProbe] := Map("state", "cancelled", "cleanup", "pending")
 			}
-			_HC_Send(WindowEpoch, '{"type":"action","action":"cancel","ok":true,"snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
+			_HC_Send(WindowEpoch, '{"type":"action","action":"cancel","ok":true,"snapshot":' . _HC_ValueToJson(Snapshot) . '}')
 		case "refresh":
-			HealthCheck_CancelProbes()
-			_HC_ArchiveCleanupMetadata(_HC_Session)
-			_HC_Session["extensive"] := Action["extensive"]
-			_HC_Session["detailed"] := Action["detailed"]
-			Revision := _HC_Session["snapshot"].Get("export_revision", 1) + 1
-			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"], Action["extensive"])
-			_HC_Session["snapshot"]["export_revision"] := Revision
-			_HC_Session["snapshot"]["retired_probes"] := _HC_Session.Get("cleanup_history", [])
-			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
+			HealthCheck_CancelProbes(_HC_SessionCurrent.Bind(WindowEpoch, Session))
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			_HC_ArchiveCleanupMetadata(Session)
+			if !_HC_SessionCurrent(WindowEpoch, Session)
+				return
+			Revision := Snapshot.Get("export_revision", 1) + 1
+			Fresh := HealthCheck_Run(Action["detailed"], Action["extensive"])
+			Fresh["export_revision"] := Revision
+			Fresh["retired_probes"] := Session.Get("cleanup_history", [])
+			PreviousCritical := Critical("On")
+			try {
+				if !_HC_SessionCurrent(WindowEpoch, Session)
+					return
+				Session["extensive"] := Action["extensive"]
+				Session["detailed"] := Action["detailed"]
+				Session["snapshot"] := Fresh
+			} finally Critical(PreviousCritical)
+			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(Fresh) . '}')
 			_HC_RestartProbes(WindowEpoch)
 		default:
-			Outcome := HealthCheck_PerformAction(Action, _HC_Session["snapshot"]["sections"]["paths"], Config, 0, _HC_Session["snapshot"])
+			Outcome := HealthCheck_PerformAction(Action, Snapshot["sections"]["paths"], Config, 0, Snapshot)
 			Json := '{"type":"action","action":' . _HC_JsStr(Action["action"])
 				. ',"ok":' . (Outcome["ok"] ? "true" : "false")
 			if Outcome.Has("path")
@@ -1164,10 +1194,18 @@ _HC_Send(WindowEpoch, Json) {
 	global _HC_WebView, _HC_WindowEpoch, _HC_ResetDone, _HC_Session
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView) || !(_HC_Session is Map)
 		return
-	WebView_RunScriptAsync(_HC_WebView,
-		"if(location.href===" . JsonStringLiteral(_HC_Session["page_url"])
-			. "&&window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")",
-		"HealthCheck")
+	Session := _HC_Session, WebView := _HC_WebView
+	Script := "if(location.href===" . JsonStringLiteral(Session["page_url"])
+		. "&&window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")"
+	if _HC_SessionCurrent(WindowEpoch, Session)
+		WebView_RunScriptAsync(WebView, Script, "HealthCheck")
+}
+
+/** Tests the exact window owner again after calls that can dispatch messages. */
+_HC_SessionCurrent(WindowEpoch, Session) {
+	global _HC_Session, _HC_WindowEpoch, _HC_ResetDone
+	return WindowEpoch != 0 && !_HC_ResetDone && WindowEpoch == _HC_WindowEpoch
+		&& Session is Map && _HC_Session == Session
 }
 
 ; Restarts the probes of the window's snapshot; each answer is kept in the
@@ -1175,23 +1213,29 @@ _HC_Send(WindowEpoch, Json) {
 ; @param WindowEpoch {Integer}
 _HC_RestartProbes(WindowEpoch, StartFn := unset) {
 	global _HC_Session
-	HealthCheck_CancelProbes()
-	Selected := _HC_Session.Get("extensive", false)
+	Session := _HC_Session
+	if !_HC_SessionCurrent(WindowEpoch, Session)
+		return false
+	Selected := Session.Get("extensive", false)
 	if !(Selected is Integer) || (Selected != 0 && Selected != 1)
 		throw TypeError("The diagnostics session has an invalid extensive selection.")
+	Schema := HealthCheck_Config()["schema"]
+	if !_HC_SessionCurrent(WindowEpoch, Session)
+		return false
 	if !Selected {
 		; Without the extensive opt-in only the local probes run (the configuration)
 		if !IsSet(StartFn)
-			HealthCheck_StartProbes(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe, true)
+			HealthCheck_StartProbes(WindowEpoch, Schema, _HC_PublishProbe, true, 0,
+				_HC_SessionCurrent.Bind(WindowEpoch, Session))
 		return false
 	}
 	if IsSet(StartFn) {
 		if !HasMethod(StartFn, "Call")
 			throw TypeError("The diagnostics starter must be callable.")
-		return StartFn.Call(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
+		return StartFn.Call(WindowEpoch, Schema, _HC_PublishProbe)
 	}
-	HealthCheck_StartProbes(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
-	return true
+	return HealthCheck_StartProbes(WindowEpoch, Schema, _HC_PublishProbe, false, 0,
+		_HC_SessionCurrent.Bind(WindowEpoch, Session))
 }
 
 ; Publishes one probe's answer into its window.

@@ -383,7 +383,7 @@ _THPA_TemplateOnlyReport() {
 Test("Diagnostics stable host metadata URL preserves complete local output", _THPA_TemplateOnlyReport)
 
 _THPA_PageObservations() {
-	global _HC_Session, _HC_ResetDone
+	global _HC_Session, _HC_ResetDone, _HC_WindowEpoch, _HC_WebView
 	Config := HealthCheck_Config(), Rows := Map()
 	for Spec in Config["schema"]["diagnostic_checks"]["items"]
 		Rows[Spec["id"]] := Spec.Has("reason") ? Map("state", "not_run", "scope", Spec["scope"], "reason", Spec["reason"])
@@ -401,21 +401,24 @@ _THPA_PageObservations() {
 	AssertContains(Doc["text"], "page_check_observations.results.redaction.ms")
 	AssertEqual("not_run", Doc["snapshot"]["page_check_observations"]["results"]["driver_suites"]["state"])
 	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
+	SavedEpoch := _HC_WindowEpoch, HadView := IsSet(_HC_WebView), SavedView := HadView ? _HC_WebView : 0
 	try {
-		_HC_ResetDone := true ; The actual sender refuses before any WebView operation.
+		_HC_ResetDone := false, _HC_WindowEpoch := 71
+		_HC_WebView := unset ; The actual sender refuses before any WebView operation.
 		Current := _THPA_Snapshot(false), Current["export_revision"] := 1
 		_HC_Session := Map("snapshot", Current)
 		Action["action"] := "export_snapshot", Action["export_sequence"] := 1
 		Action["snapshot_revision"] := 2
-		_HC_PerformPageAction(0, Action, Config)
+		_HC_PerformPageAction(71, Action, Config)
 		AssertFalse(Current.Has("page_check_observations"), "The real host rejects a stale generation")
 		Action["snapshot_revision"] := 1
-		_HC_PerformPageAction(0, Action, Config)
+		_HC_PerformPageAction(71, Action, Config)
 		AssertTrue(Current.Has("page_check_observations"), "The real host retains current observations before formatting")
 		AssertEqual(3, Current["page_check_observations"]["results"]["redaction"]["ms"])
 	} finally {
 		_HC_Session := SavedSession
 		_HC_ResetDone := SavedReset
+		_HC_WindowEpoch := SavedEpoch, _HC_WebView := HadView ? SavedView : unset
 	}
 	Rows["redaction"]["text"] := "PRIVATE_TEXT"
 	AssertFalse(HealthCheck_PageChecks(Rows, Config["schema"]))
