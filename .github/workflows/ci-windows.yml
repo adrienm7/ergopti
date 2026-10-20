@@ -268,6 +268,8 @@ jobs:
           node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr
           $modelsExit = $LASTEXITCODE
           Get-Content -LiteralPath $modelsOut
+          # The failing assertion is on stderr; print it so the job log names the cause.
+          if ($modelsExit -ne 0) { Get-Content -LiteralPath $modelsErr }
           if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }
           $windowsPowerShellDirectory = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
           $oldModulePath = $env:PSModulePath
