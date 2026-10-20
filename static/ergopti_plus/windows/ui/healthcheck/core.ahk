@@ -617,13 +617,13 @@ global _HC_Gui := unset
 global _HC_ResetDone := false
 
 ; The page session of the open window: its epoch, its snapshot, whether
-; details are included and the mode it opened in (0 when closed).
+; details are included (0 when closed).
 global _HC_Session := 0
 ; One retained controller; navigation renews the document and every session.
 global _HC_ReuseKey := ""
 global _HC_OpenStarted := 0
 global _HC_Opening := false
-global _HC_PendingMode := unset
+global _HC_PendingOpen := false
 global _HC_RequestSerial := 0
 global _HC_PendingSerial := 0
 global _HC_CloseDuringOpen := false
@@ -637,11 +637,11 @@ _HC_CanReuse(Key) {
 }
 
 /** A newer open or close supersedes a request queued during native setup. */
-_HC_ResumePending(Mode, Serial) {
+_HC_ResumePending(Serial) {
 	global _HC_RequestSerial
 	if Serial != _HC_RequestSerial
 		return
-	HealthCheck_ShowWindow(Mode)
+	HealthCheck_ShowWindow()
 }
 
 ; Keep native title construction with the GUI owner, independent of diagnostics collection.
@@ -666,17 +666,16 @@ _HC_OpenTimingMark(Phase, Timing) {
 }
 
 ; Opens the diagnostics window, replacing any previous one.
-; @param Mode {String} "report" opens it at the preview and the report button.
-HealthCheck_ShowWindow(Mode := "") {
+HealthCheck_ShowWindow() {
 	global _VendorDir, _SharedDir, _I18nLocale, HC_WIDTH, HC_HEIGHT, HC_VHOST, HC_HOST_ACCESS_ALLOW
 	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone, _HC_Gui
 	global _HC_WindowEpoch, _HC_Session, _HC_ReuseKey, _HC_OpenStarted
 
-	global _HC_Opening, _HC_PendingMode, _HC_CloseDuringOpen, _HC_Retiring
+	global _HC_Opening, _HC_PendingOpen, _HC_CloseDuringOpen, _HC_Retiring
 	global _HC_RequestSerial, _HC_PendingSerial
 	_HC_RequestSerial += 1
 	if _HC_Opening || _HC_Retiring {
-		_HC_PendingMode := Mode
+		_HC_PendingOpen := true
 		_HC_PendingSerial := _HC_RequestSerial
 		LoggerDebug("Healthcheck", "Diagnostics opening already in progress; latest request retained.")
 		return
@@ -753,7 +752,7 @@ HealthCheck_ShowWindow(Mode := "") {
 				WindowEpoch := _HC_WindowEpoch
 				PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
 				Snapshot["export_revision"] := 1
-				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false, "mode", Mode,
+				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false,
 					"page_url", PageUrl)
 
 				try {
@@ -798,10 +797,9 @@ HealthCheck_ShowWindow(Mode := "") {
 		if IsSet(Timing)
 			HotPath_RecordLatency("Diagnostics.total", _HealthCheck_NowMs() - _HC_OpenStarted, 5)
 		_HC_Opening := false
-		if IsSet(_HC_PendingMode) {
-			PendingMode := _HC_PendingMode
-			_HC_PendingMode := unset
-			TimerArmOneShotMs(_HC_ResumePending.Bind(PendingMode, _HC_PendingSerial), 1)
+		if _HC_PendingOpen {
+			_HC_PendingOpen := false
+			TimerArmOneShotMs(_HC_ResumePending.Bind(_HC_PendingSerial), 1)
 		}
 	}
 }
@@ -948,13 +946,13 @@ _HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
 
 _HealthCheck_CloseGui(G, UserRequest := true) {
 	global _HC_Gui, _HC_Controller, _HC_MsgSub, _HC_WindowEpoch, _HC_Session
-	global _HC_Opening, _HC_CloseDuringOpen, _HC_Retiring, _HC_PendingMode
+	global _HC_Opening, _HC_CloseDuringOpen, _HC_Retiring, _HC_PendingOpen
 	global _HC_RequestSerial, _HC_PendingSerial
 	if !IsSet(_HC_Gui) || !(G == _HC_Gui) || _HC_Retiring
 		return 1
 	if UserRequest {
 		_HC_RequestSerial += 1
-		_HC_PendingMode := unset
+		_HC_PendingOpen := false
 	}
 	if _HC_Opening && UserRequest
 		_HC_CloseDuringOpen := true
@@ -974,10 +972,9 @@ _HealthCheck_CloseGui(G, UserRequest := true) {
 		throw Err
 	} finally {
 		_HC_Retiring := false
-		if !_HC_Opening && IsSet(_HC_PendingMode) {
-			PendingMode := _HC_PendingMode
-			_HC_PendingMode := unset
-			TimerArmOneShotMs(_HC_ResumePending.Bind(PendingMode, _HC_PendingSerial), 1)
+		if !_HC_Opening && _HC_PendingOpen {
+			_HC_PendingOpen := false
+			TimerArmOneShotMs(_HC_ResumePending.Bind(_HC_PendingSerial), 1)
 		}
 	}
 	return 1
@@ -1145,8 +1142,7 @@ _HC_InitJson(Session) {
 	return '{"type":"init","collection":' . _HC_ValueToJson(Collection) . ',"config":{"schema":' . Config["raw_schema"]
 		. ',"redaction":' . Config["raw_redaction"]
 		. ',"context":{"home":' . _HC_JsStr(Context["home"]) . ',"user":' . _HC_JsStr(Context["user"])
-		. ',"case_insensitive":true},"mode":' . _HC_JsStr(Session["mode"])
-		. '},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
+		. ',"case_insensitive":true}},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
 }
 
 ; Sends one message into the window's page.

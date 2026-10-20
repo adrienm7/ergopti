@@ -191,16 +191,16 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 		end)
 	end)
 
-	helpers.it("replaces an open window, in report mode", function()
+	helpers.it("replaces an open window", function()
 		with_bridge(nil, function(bridge, context)
 			local manager = package.loaded["ui.webview_manager"]
 			local hidden, shown = {}, {}
 			manager.hide = function(app, epoch) hidden[#hidden + 1] = app .. "#" .. tostring(epoch); return true end
 			manager.show = function(app) shown[#shown + 1] = app; return true end
-			helpers.assert_eq(bridge.open("report"), true)
+			helpers.assert_eq(bridge.open(), true)
 			helpers.assert_eq(hidden, { "healthcheck#7" }, "the open page must be closed, not brought forward")
 			helpers.assert_eq(shown, { "healthcheck" })
-			helpers.assert_eq(bridge.on_message("ready", {}, page(context)).config.mode, "report")
+			helpers.assert_eq(bridge.on_message("ready", {}, page(context)).config.mode, nil, "the page has no report mode")
 		end)
 	end)
 

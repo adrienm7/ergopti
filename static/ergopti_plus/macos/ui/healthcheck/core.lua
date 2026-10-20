@@ -828,7 +828,6 @@ local function init_message(session)
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
-			mode      = session.mode,
 		},
 		snapshot = session.snapshot,
 	}
@@ -943,7 +942,7 @@ local function inject_strings(webview)
 end
 
 --- Opens the diagnostics window. Replaces any existing window (singleton).
---- @param opts table|nil { mode = "report"|nil, state = menu state|nil }
+--- @param opts table|nil { state = menu state|nil }
 --- @return boolean opened
 function M.show_window(opts)
 	if NativeClose.retry_cleanup() ~= true then return false end
@@ -1016,7 +1015,6 @@ function M.show_window(opts)
 		controller = controller,
 		snapshot   = snapshot,
 		detailed   = false,
-		mode       = opts.mode,
 	}
 	_session = session
 	local function abandon_open_window(label, detail)
