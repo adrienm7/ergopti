@@ -124,7 +124,7 @@ _THRD_KeyRowsReturnData() {
 	Assert(RegExMatch(_DriverFuncBody("_MR_CommandRowData"),
 		Chr(34) . "action" . Chr(34) . "\s*,\s*Commands\[CmdId\]"),
 		"canonical command data must retain its callback as an action field (HIGH-07)")
-	Assert(InStr(_DriverFuncBody("_MR_RenderRows"), 'RegisterMenuItem(TargetMenu, Label, Row["action"])') > 0,
+	Assert(InStr(_DriverFuncBody("_MR_RenderRows"), 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))') > 0,
 		"the actual native renderer must register action data through the WM_COMMAND retry owner")
 	_THRD_KeyRowsPolicy(Owners)
 	Mutant := Owners.Clone()
@@ -147,6 +147,22 @@ _THRD_KeyRowsReturnData() {
 		'"action", Commands[CmdId]', '"action", Commands[Id]', true, &Changed)
 	AssertEqual(1, Changed, "the wrong renderer action mutation must change the actual row constructor")
 	_THRD_KeyRowsRefuses(Mutant, "the declared command must construct the renderer action")
+	; Replay metadata accompanies the same reliable native callback. Neither an
+	; old three-argument registration nor another declaration's identity suffices.
+	for Vector in [
+		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))',
+			'RegisterMenuItem(TargetMenu, Label, Row["action"])',
+			"the shared renderer must register the row action with reliable dispatch"],
+		["_MR_RenderRows", 'Row.Get("replay_id", "")', 'Row.Get("foreign", "")',
+			"the shared renderer must register the row action with reliable dispatch"],
+		["_MR_CommandRowData", "_MR_ReplayIdentity(ManifestKey, Id)", '_MR_ReplayIdentity("foreign", Id)',
+			"the declared command must construct the renderer action"]
+	] {
+		Mutant := Owners.Clone()
+		Mutant[Vector[1]] := StrReplace(Owners[Vector[1]], Vector[2], Vector[3], true, &Changed)
+		AssertEqual(1, Changed, "each replay mutation must change its one actual owner binding")
+		_THRD_KeyRowsRefuses(Mutant, Vector[4])
+	}
 }
 
 /** Pins shared child-template callbacks and state to reliable native dispatch. */
@@ -184,11 +200,14 @@ _THRD_KeyRowsPolicy(Owners) {
 		"the provider must consume the command map through the declared row owner")
 	Data := Owners["_MR_CommandRowData"]
 	Assert(_THRD_ExecutablePattern(Data,
-		'i)Map\(\s*"label"\s*,\s*IsSet\(\s*Label\s*\)\s*\?\s*Label\s*:\s*t\(I18nKey\)\s*,\s*"action"\s*,\s*Commands\[CmdId\]\s*\)', "Map"),
+		'i)Map\(\s*"label"\s*,\s*IsSet\(\s*Label\s*\)\s*\?\s*Label\s*:\s*t\(I18nKey\)\s*,'
+		. '\s*"action"\s*,\s*Commands\[CmdId\]\s*,\s*"replay_id"\s*,'
+		. '\s*_MR_ReplayIdentity\(\s*ManifestKey\s*,\s*Id\s*\)\s*\)', "Map"),
 		"the declared command must construct the renderer action")
 	Renderer := Owners["_MR_RenderRows"]
 	Assert(_THRD_ExecutablePattern(Renderer,
-		'i)RegisterMenuItem\(\s*TargetMenu\s*,\s*Label\s*,\s*Row\["action"\]\s*\)', "RegisterMenuItem"),
+		'i)RegisterMenuItem\(\s*TargetMenu\s*,\s*Label\s*,\s*Row\["action"\]\s*,'
+		. '\s*Row\.Get\(\s*"replay_id"\s*,\s*""\s*\)\s*\)', "RegisterMenuItem"),
 		"the shared renderer must register the row action with reliable dispatch")
 }
 
@@ -268,9 +287,10 @@ _THRD_GlobalAndLocalTokenBoundaries() {
 			"the command factory must forward the actual owner callback map"],
 		["_TH_KeyRows", 'MenuRenderer_TemplateRows("tap_hold_key_rows"',
 			"native and tap callbacks plus configured state must reach the child template"],
-		["_MR_CommandRowData", 'Map("label", IsSet(Label) ? Label : t(I18nKey), "action", Commands[CmdId])',
+		["_MR_CommandRowData", 'Map("label", IsSet(Label) ? Label : t(I18nKey), "action", Commands[CmdId],'
+			. "`n`t`t" . '"replay_id", _MR_ReplayIdentity(ManifestKey, Id))',
 			"the declared command must construct the renderer action"],
-		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"])',
+		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))',
 			"the shared renderer must register the row action with reliable dispatch"],
 		["_MR_TemplateRows", "Row := MenuRenderer_CommandRow(ManifestKey, Id, Commands, StateGetters)",
 			"the child template must materialize callbacks through the command owner"],
