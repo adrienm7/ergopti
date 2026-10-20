@@ -3144,6 +3144,18 @@ These are software implementations; final hardware verification remains below.
       macOS Go test `TestIdleDeadlinePhysicallyRetiresPeer` (100 ms idle clock
       started with the peer process; raised to 1 s in ad03a898). Root-cause
       each from its next failure output rather than re-running.
+      Since then: the desktop-webview receipt had no `target` (the verdict
+      was still "unknown" right after the refocus), so the fixture now waits
+      for the watcher's verdict before replying (3a0ef8a9); the updater gate
+      now names the refused command and its stderr tail (bbfbfa78); the
+      PAC source fixture's TLS handshake left the accept loop (9267439a).
+- [ ] **Deploy site fails after every CI run until dev reaches main.**
+      `workflow_run` always reads `deploy-site.yml` from the default branch.
+      Main still lacks the job guard of 53c94136 (start the receiver only for
+      a successful push producer), so each completed dev or cancelled run
+      starts the receiver, whose admission correctly refuses it ("event must
+      be a completed successful push"): runs 39329918239 to 39369769211.
+      Promoting dev to main fixes it; nothing to change on dev.
 - [ ] **Integrate the maintainer's fix branches regularly.** The maintainer
       runs one agent per OS on `fix/windows`, `fix/macos` and `fix/linux`.
       Regularly: `git fetch`, merge each into `dev` (`--no-ff`, resolve
@@ -3184,6 +3196,10 @@ These are software implementations; final hardware verification remains below.
       item 5, `linux/ui/personal_info_editor/bridge_toml.lua` is registered in
       no `webview_manager.lua` BRIDGE_MODULES entry and only its own tests load
       it: retire it with those tests, or wire it, before adding coverage.
+      Duplicate 5: only the logger pair was a real duplicate (folded into
+      `test_logger_file_sinks.lua`); the other three pairs test different
+      owners. Duplicate 8: the five macOS absence-only files are deleted;
+      the Windows ones were already gone. Duplicate 4 is already gone.
       Next come Windows dynamic hotstrings and capsword behaviour. It also lists verbatim duplicate Lua test files to delete,
       absence ratchets for deleted code, and one tidy `tests/` tree to adopt
       on Windows, macOS and Linux.
@@ -3229,6 +3245,14 @@ These are software implementations; final hardware verification remains below.
       writer alone is stable, so another writer adds one blank per pass.
       Reproduce with the full-save, scope and cleanup writers in sequence on a
       copy, then keep one separator per section.
+      Finding (October 20): five is not growth but the house spacing. The
+      flat Windows writer renders `EnsureTrailingBlankLines(5)` before every
+      section (`toml_helpers.ahk`), and the shared Lua codec does the same
+      (`codec.lua`: five blank lines before a top-level header, three
+      before a nested one), while `windows/_generated/config_template.toml`
+      uses one. Header-only sections then read as runs of five. Maintainer
+      decision: keep the five-line style or render one separator in every
+      writer (both codecs, template and their corpora).
 
 - [ ] **Maintainer request, October 13: configuration in diagnostic reports.**
       Include the user's TOML configuration files and their resolution order in
