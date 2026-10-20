@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Formato: mods+tecla  (ex.: cmd+shift+b)\nMods disponíveis: cmd, alt, ctrl, shift\nDeixe em branco para desativar",
 	"menu.profiles.shortcut_title": "Atalho de perfil",
 	"menu.profiles.use_profile": "Usar este perfil",
+	"menu.reload_replay.lost": "Algumas opções do menu escolhidas durante o reinício não puderam ser aplicadas novamente. Escolha-as de novo no menu.",
+	"menu.reload_replay.lost_title": "Opções do menu não aplicadas",
 	"menu.reloading": "Recarregando…",
 	"menu.reloading_files": "Arquivos alterados — Recarregando…",
 	"menu.script_control.title": "Controle de script",

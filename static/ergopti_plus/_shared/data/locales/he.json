@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "פורמט: mods+key  (לדוגמה cmd+shift+b)\nMods זמינים: cmd, alt, ctrl, shift\nהשאר ריק להשבתה",
 	"menu.profiles.shortcut_title": "קיצור פרופיל",
 	"menu.profiles.use_profile": "השתמש בפרופיל זה",
+	"menu.reload_replay.lost": "לא ניתן היה להחיל מחדש חלק מהבחירות שנעשו בתפריט במהלך ההפעלה מחדש. בחרו אותן שוב בתפריט.",
+	"menu.reload_replay.lost_title": "בחירות התפריט לא הוחלו",
 	"menu.reloading": "טוען מחדש…",
 	"menu.reloading_files": "קבצים השתנו — טוען מחדש…",
 	"menu.script_control.title": "בקרת סקריפט",

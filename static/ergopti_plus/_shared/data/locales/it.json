@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Formato: mod+tasto (es. cmd+shift+b)\nMod disponibili: cmd, alt, ctrl, shift\nLascia vuoto per disabilitare",
 	"menu.profiles.shortcut_title": "Scorciatoia profilo",
 	"menu.profiles.use_profile": "Usa questo profilo",
+	"menu.reload_replay.lost": "Alcune scelte del menu fatte durante il riavvio non sono state riapplicate. Ripetile dal menu.",
+	"menu.reload_replay.lost_title": "Scelte del menu non applicate",
 	"menu.reloading": "Ricaricamento…",
 	"menu.reloading_files": "File modificati — Ricaricamento…",
 	"menu.script_control.title": "Controllo script",

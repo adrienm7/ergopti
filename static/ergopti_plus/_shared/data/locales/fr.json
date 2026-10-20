@@ -1574,6 +1574,8 @@
 	"menu.profiles.shortcut_prompt": "Format : mods+touche  (ex : cmd+shift+b)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
 	"menu.profiles.shortcut_title": "Raccourci du profil",
 	"menu.profiles.use_profile": "Utiliser ce profil",
+	"menu.reload_replay.lost": "Certains choix faits dans le menu pendant le redémarrage n’ont pas pu être appliqués à nouveau. Refaites-les depuis le menu.",
+	"menu.reload_replay.lost_title": "Choix du menu non appliqués",
 	"menu.reloading": "Rechargement…",
 	"menu.reloading_files": "Fichiers modifiés — Rechargement…",
 	"menu.script_control.title": "Contrôle du script",

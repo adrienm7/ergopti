@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "प्रारूप: mods+key  (उदा. cmd+shift+b)\nउपलब्ध mods: cmd, alt, ctrl, shift\nअक्षम करने के लिए खाली छोड़ें",
 	"menu.profiles.shortcut_title": "प्रोफ़ाइल शॉर्टकट",
 	"menu.profiles.use_profile": "इस प्रोफ़ाइल का उपयोग करें",
+	"menu.reload_replay.lost": "पुनरारंभ के दौरान चुने गए कुछ मेनू विकल्प फिर से लागू नहीं हो सके। उन्हें मेनू में फिर से चुनें।",
+	"menu.reload_replay.lost_title": "मेनू विकल्प लागू नहीं हुए",
 	"menu.reloading": "पुनः लोड हो रहा है…",
 	"menu.reloading_files": "फ़ाइलें बदली गईं — पुनः लोड हो रहा है…",
 	"menu.script_control.title": "स्क्रिप्ट नियंत्रण",

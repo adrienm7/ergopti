@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Формат: модификаторы+клавиша  (напр. cmd+shift+b)\nДоступные модификаторы: cmd, alt, ctrl, shift\nОставьте пустым для отключения",
 	"menu.profiles.shortcut_title": "Сочетание для профиля",
 	"menu.profiles.use_profile": "Использовать этот профиль",
+	"menu.reload_replay.lost": "Некоторые пункты меню, выбранные во время перезапуска, не удалось применить повторно. Выберите их в меню ещё раз.",
+	"menu.reload_replay.lost_title": "Выбор в меню не применён",
 	"menu.reloading": "Перезагрузка…",
 	"menu.reloading_files": "Файлы изменены — Перезагрузка…",
 	"menu.script_control.title": "Управление скриптом",

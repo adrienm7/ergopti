@@ -1562,6 +1562,8 @@
 	"menu.profiles.shortcut_prompt": "Indeling: mod+toets  (bijv. cmd+shift+b)\nBeschikbare mods: cmd, alt, ctrl, shift\nLeeg laten om uit te schakelen",
 	"menu.profiles.shortcut_title": "Profielsneltoets",
 	"menu.profiles.use_profile": "Dit profiel gebruiken",
+	"menu.reload_replay.lost": "Sommige menukeuzes die tijdens het herstarten zijn gemaakt, konden niet opnieuw worden toegepast. Kies ze opnieuw in het menu.",
+	"menu.reload_replay.lost_title": "Menukeuzes niet toegepast",
 	"menu.reloading": "Herladen…",
 	"menu.reloading_files": "Bestanden gewijzigd — Herladen…",
 	"menu.script_control.title": "Scriptbeheer",
