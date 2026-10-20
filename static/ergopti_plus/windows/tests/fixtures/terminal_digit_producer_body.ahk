@@ -291,6 +291,17 @@ _DDPR_Production(Scenario) {
 try {
 	Features := Map("layout", Map("direct_access_digits", "digits"))
 	CategoryEnabled := Map("Layout", true)
+	; Digits first applies only on a row with symbols unshifted and digits on
+	; Shift (number-row-availability): pin an AZERTY-shaped foreground layout
+	; rather than read whatever layout this machine's foreground window has.
+	_DDPR_AzertyShaped := 0x7E57040C
+	_DDPR_Plain := Map(), _DDPR_Shifted := Map()
+	for _DDPR_Index, _DDPR_Key in KS_DIGIT_ROW_KEYS {
+		_DDPR_Plain[_DDPR_Key[2]] := Chr(0x26)
+		_DDPR_Shifted[_DDPR_Key[2]] := Mod(_DDPR_Index, 10) . ""
+	}
+	_DigitRowProfiles[_DDPR_AzertyShaped] := Map("shifted", true, "symbols", _DDPR_Plain, "shift_symbols", _DDPR_Shifted)
+	_NumberRowForegroundLayout := _DDPR_AzertyShaped
 	_DDPR_Require(NumberRowEffectiveMode() == "digits", "PRECONDITION: policy did not admit digits")
 	_DDPR_Require(DigitRow_RegisterBindings() == 20, "PRECONDITION: genuine twenty-slot registration did not complete")
 	_DDPR_Require(DigitRow_BindingSource() is BoundFunc, "PRECONDITION: original factory not issued")

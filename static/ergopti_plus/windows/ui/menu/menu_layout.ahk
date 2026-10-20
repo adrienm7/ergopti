@@ -104,7 +104,8 @@ _LAY_NumberRowRuntime() {
 			"hkl", Hkl, "platform", "ahk", "mode", Mode,
 			"master", IsCategoryGated("Layout") ? true : false,
 			"paused", A_IsSuspended ? true : false, "blocked", false,
-			"symbols", NumberRowSymbolsCapable(Caps), "caps", Caps)
+			"symbols", NumberRowSymbolsCapable(Caps), "caps", Caps,
+			"availability", NumberRowAvailability(Hkl, Caps))
 	} catch {
 		return Map("mode", "", "symbols", false, "blocked", true)
 	}
@@ -212,9 +213,19 @@ _LAY_NumberRowRows(WriterFn := 0, RefreshFn := 0, NotifyFn := 0) {
 				|| !(Choice.Get("value", 0) is String) || StrCompare(Choice["value"], Value, true) != 0
 			return []
 	}
+	Availability := Expected.Get("availability", 0)
 	for Index, Item in Row["items"] {
 		Value := Definition[1]["choices"][Index]["value"]
-		if !NumberRowPolicyReady(Expected, Value) {
+		; An ordering that cannot make the row's base level differ from its
+		; Shift level on this layout is greyed with why; the stored choice keeps
+		; its tick and says it is not applied (number-row-availability).
+		Reason := Value != "native" && Availability is Map ? Availability[Value] : ""
+		if Reason != "" {
+			Item["disabled"] := true
+			Item["disabled_reason_key"] := "platform_reason.number_row_" . Reason
+			if StrCompare(Value, Expected["mode"], true) == 0
+				Item["label"] := Item["label"] . t("menu.layout.number_row_not_applied")
+		} else if !NumberRowPolicyReady(Expected, Value) {
 			Item["disabled"] := true
 			if Value == "symbols" && !Expected["symbols"]
 				Item["disabled_reason_key"] := "platform_reason.number_row_source_unavailable"

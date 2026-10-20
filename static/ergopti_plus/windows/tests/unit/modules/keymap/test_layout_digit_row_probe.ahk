@@ -516,9 +516,17 @@ _LDRP_TypedSourceSwap() {
 		Modifiers := '<keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect>'
 			. '<keyMapSelect mapIndex="1"><modifier keys="anyShift caps?"/></keyMapSelect>'
 			. '<keyMapSelect mapIndex="2"><modifier keys="caps"/></keyMapSelect>'
-		Maps := '<keyMap index="0"><key code="18" action="row_dead"/><key code="12" action="letter"/></keyMap>'
-			. '<keyMap index="1"><key code="18" output="1"/></keyMap>'
-			. '<keyMap index="2"><key code="18" output="&#xA7;"/></keyMap>'
+		; Digits first applies only when all ten keys have a symbol unshifted and
+		; their digit on Shift (number-row-availability): keys 2 to 0 do too.
+		Plain := "", Shifted := "", Capped := ""
+		for Index, Code in [19, 20, 21, 23, 22, 26, 28, 25, 29] {
+			Plain .= '<key code="' . Code . '" output="&#x2A;"/>'
+			Shifted .= '<key code="' . Code . '" output="' . Mod(Index + 1, 10) . '"/>'
+			Capped .= '<key code="' . Code . '" output="&#x2A;"/>'
+		}
+		Maps := '<keyMap index="0"><key code="18" action="row_dead"/><key code="12" action="letter"/>' . Plain . '</keyMap>'
+			. '<keyMap index="1"><key code="18" output="1"/>' . Shifted . '</keyMap>'
+			. '<keyMap index="2"><key code="18" output="&#xA7;"/>' . Capped . '</keyMap>'
 		Actions := '<action id="row_dead"><when state="none" next="circumflex"/></action>'
 			. '<action id="letter"><when state="none" output="a"/><when state="circumflex" output="&#xE2;"/></action>'
 		Text := _KLT_Doc(_KLT_Layouts(), Modifiers, Maps, Actions)

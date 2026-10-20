@@ -172,14 +172,16 @@ global _TapKeyOsProbe := {
 }
 
 ; The character the Ergopti emulation gives this scancode on its base layer
-; while it remaps the digit row, or "" when the key is the OS layout's.
+; while it remaps the digit row (« digits first » in effect, or the built-in
+; emulation, which types its own row: RegisterBuiltinNumberRow), or "" when
+; the key is the OS layout's.
 ; @param {Integer} Scancode
 ; @returns {String}
 _TapKeyEmulatedCharacter(Scancode) {
 	global Features
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout")
 		return ""
-	if NumberRowEffectiveMode() != "digits"
+	if NumberRowEffectiveMode() != "digits" && !BuiltinNumberRowIsActive()
 		return ""
 	Table := ErgoptiNumberRowEdgeMapping()
 	return Table.Has(Scancode) ? Table[Scancode] : ""

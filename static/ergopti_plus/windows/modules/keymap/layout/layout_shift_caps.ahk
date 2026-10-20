@@ -184,6 +184,53 @@ RegisterShiftLayer() {
 		SHIFTED_LETTERS.Count + SHIFT_SYMBOLS.Count)
 }
 
+; The built-in Ergopti emulation's own unshifted number row: « $ », the digits,
+; « % » and « = ». It used to leave that level to « Chiffres en accès direct »,
+; so wherever that choice does not apply (the Ergopti row has its digits on
+; both levels, which nothing can reorder) the native row typed instead:
+; AZERTY's « ² & é " … ».
+; The direct-access hotkeys (modules/keymap/layout.ahk) are created first, so
+; they still win where their choice applies; CapsLock keeps its own layer.
+RegisterBuiltinNumberRow() {
+	global ERGOPTI_SPEC, ERGOPTI_NUMBER_ROW
+	Row := ERGOPTI_SPEC["number_row_base"]
+	try LoggerStart("LayoutNumberRow", "Registering the built-in Ergopti number row…")
+	Count := 0
+	try {
+		HotIf((*) => BuiltinNumberRowIsActive() and !GetCapsLockCondition())
+		for SC in ERGOPTI_NUMBER_ROW {
+			if !Row.Has(SC) || !Row[SC].Has("text")
+				throw Error("The Ergopti number row has no text on " . SC . ".")
+			Text := Row[SC]["text"]
+			; Digits press and release like the direct-access digits (OTP boxes);
+			; the edge keys type like theirs. The tap keys' hotkeys, created
+			; earlier, keep an assigned edge key.
+			if RegExMatch(Text, "^[0-9]$") {
+				Hotkey(SC, _DigitRowDown.Bind(Text), "I2")
+				Hotkey(SC . " Up", _DigitRowUp.Bind(Text), "I2")
+			} else
+				Hotkey(SC, _DigitShiftSend.Bind(Text), "I2")
+			Count += 1
+		}
+	} catch as Err {
+		try LoggerError("LayoutNumberRow", "The built-in Ergopti number row could not be registered: {1}", Err.Message)
+		throw Err
+	} finally {
+		HotIf() ; Reset to no condition
+	}
+	try LoggerSuccess("LayoutNumberRow", "Built-in Ergopti number row registered ({1} keys).", Count)
+}
+
+; Whether the built-in Ergopti emulation is in force: the effective switch,
+; which a selected registry layout supersedes (MasterGateDesiredFeatures).
+BuiltinNumberRowIsActive() {
+	global Features
+	; Indexed, not Get: the number-row policy reads its stored choice once
+	; through Get, and the producer fixtures count exactly that read.
+	return IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
+		&& Features["layout"].Has("ergopti_base") && Features["layout"]["ergopti_base"] == true
+}
+
 RegisterCapsLockLayer() {
 	; Tables are reused from RegisterShiftLayer if it ran first; otherwise build now.
 	if !IsObject(SHIFTED_LETTERS) {
@@ -258,13 +305,29 @@ _DigitRowProfile(Hkl) {
 	global _DigitRowProfiles
 	if !_DigitRowProfiles.Has(Hkl)
 		_DigitRowProfiles[Hkl] := Map("shifted", KS_LayoutDigitsAreShifted(Hkl),
-			"symbols", KS_LayoutDigitRowSymbols(Hkl))
+			"symbols", KS_LayoutDigitRowSymbols(Hkl), "shift_symbols", KS_LayoutDigitRowShiftedSymbols(Hkl))
 	return _DigitRowProfiles[Hkl]
 }
 
-/** Returns typed effective intent; category masking never treats a string as a switch. */
-NumberRowEffectiveMode() {
-	global Features, CategoryEnabled
+; The last stored choice, effective ordering and reason logged, so each switch
+; between applied and inert is logged once.
+global _NumberRowEffectiveLogged := ""
+
+; Test seam: a layout handle standing for the foreground window's layout in
+; NumberRowEffectiveMode (0, always in production, reads the real one).
+global _NumberRowForegroundLayout := 0
+
+/**
+ * The ordering in effect: the stored choice where it can reorder the effective
+ * row, else "native". The stored choice itself is never rewritten: a choice
+ * that is inert on one layout applies again on a layout where it can.
+ * Category masking never treats a string as a switch.
+ * @param {Integer} Hkl Native layout; the foreground window's when omitted.
+ * @param {Boolean} Caps CapsLock state; the live one when omitted.
+ * @returns {String} "native", "digits" or "symbols".
+ */
+NumberRowEffectiveMode(Hkl := unset, Caps := unset) {
+	global Features, CategoryEnabled, _NumberRowForegroundLayout
 	; Parse-time criteria can run during Bundle_Init, before category publication.
 	; Only the actual admitted Layout switch may enable a non-native policy.
 	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
@@ -272,15 +335,39 @@ NumberRowEffectiveMode() {
 			|| !(CategoryEnabled["Layout"] is Integer) || CategoryEnabled["Layout"] != true
 		return "native"
 	Mode := NumberRowPolicyMode(Features["layout"].Get("direct_access_digits", ""))
+	if Mode == "" || Mode == "native"
+		return "native"
+	if !IsSet(Caps)
+		Caps := GetKeyState("CapsLock", "T")
 	; Capability dependencies are also unpublished during the first pump. A
 	; contained admission leaves native input authoritative on an unset source.
 	if Mode == "symbols" {
 		Supported := false
-		try NumberRowSymbolsAdmission(GetKeyState("CapsLock", "T"), &Supported)
+		try NumberRowSymbolsAdmission(Caps, &Supported)
 		if !Supported
 			return "native"
 	}
-	return Mode
+	if !IsSet(Hkl)
+		Hkl := _NumberRowForegroundLayout ? _NumberRowForegroundLayout : GetForegroundKeyboardLayout()
+	Effective := NumberRowPolicyEffective(Mode, NumberRowAvailability(Hkl, Caps))
+	_NumberRowLogTransition(Mode, Effective)
+	return Effective["mode"]
+}
+
+; Logs a stored choice turning inert on the effective layout, and applying again.
+_NumberRowLogTransition(Mode, Effective) {
+	global _NumberRowEffectiveLogged
+	State := Mode . "|" . Effective["mode"] . "|" . Effective["reason"]
+	if State == _NumberRowEffectiveLogged
+		return
+	WasInert := StrSplit(_NumberRowEffectiveLogged . "||", "|")[3] != ""
+	_NumberRowEffectiveLogged := State
+	if Effective["reason"] != "" {
+		try LoggerInfo("NumberRow", "'{1}' is not applied on this layout ({2}); the stored choice is kept.",
+			Mode, Effective["reason"])
+	} else if WasInert {
+		try LoggerInfo("NumberRow", "'{1}' applies again on this layout.", Mode)
+	}
 }
 
 /** Publishes capability only after the existing source owner returns exact true. */
@@ -321,29 +408,69 @@ NumberRowSymbolsCapable(Caps) {
 ; @param Caps {Boolean} Explicit CapsLock state, or the live state when omitted.
 ; @return {Map} Swap, Source and Descriptor; inspection never changes KLE_State.
 _DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
-	global Features
-	if NumberRowEffectiveMode() != "digits" || Sc < 0x02 || Sc > 0x0B
+	if Sc < 0x02 || Sc > 0x0B
 		return Map("swap", false, "source", "native", "descriptor", 0)
 	if !IsSet(Caps)
 		Caps := GetKeyState("CapsLock", "T")
+	Row := _DigitRowEffectiveKey(Sc, Hkl, Caps)
+	; « Digits first » applies only where every key of the row has a symbol
+	; unshifted and its digit on Shift (NumberRowPolicyAvailability), so an
+	; applied choice swaps each key; elsewhere it is inert and swaps nothing.
+	return Map("swap", NumberRowEffectiveMode(Hkl, Caps) == "digits", "source", Row["source"],
+		"descriptor", Row["plain"])
+}
+
+; One digit key of the effective layout: the registry emulation's levels, the
+; built-in Ergopti emulation's, or the native layout's, with which one it is.
+; @return {Map} "plain" and "shift" descriptors (0 for a level typing nothing), "source".
+_DigitRowEffectiveKey(Sc, Hkl, Caps) {
 	Levels := KeylayoutEmulation_NumberRowLevels(Sc, Caps)
-	Source := "emulated"
-	if !(Levels is Map) {
-		Levels := _DigitRowBuiltinLevels(Sc, Caps)
-		Source := "builtin"
-	}
-	if Levels is Map {
-		Plain := Levels["plain"]
-		Shift := Levels["shift"]
-		Digit := Mod(Sc - 1, 10) . ""
-		Swap := !(Plain["Kind"] == "text" && StrCompare(Plain["Text"], Digit, true) == 0)
-			&& Shift["Kind"] == "text" && StrCompare(Shift["Text"], Digit, true) == 0
-		return Map("swap", Swap, "source", Source, "descriptor", Plain)
-	}
+	if Levels is Map
+		return Map("plain", Levels["plain"], "shift", Levels["shift"], "source", "emulated")
+	Levels := _DigitRowBuiltinLevels(Sc, Caps)
+	if Levels is Map
+		return Map("plain", Levels["plain"], "shift", Levels["shift"], "source", "builtin")
 	Profile := _DigitRowProfile(Hkl)
-	Text := Profile["symbols"].Get(Sc, "")
-	return Map("swap", Profile["shifted"] && Text != "", "source", "native",
-		"descriptor", Map("Kind", "text", "Text", Text, "State", "", "Action", ""))
+	return Map("plain", _DigitRowNativeDescriptor(Profile["symbols"].Get(Sc, "")),
+		"shift", _DigitRowNativeDescriptor(Profile["shift_symbols"].Get(Sc, "")), "source", "native")
+}
+
+_DigitRowNativeDescriptor(Text) {
+	return Text == "" ? 0 : Map("Kind", "text", "Text", Text, "State", "", "Action", "")
+}
+
+; Source identity -> Map("model", the registry model it was read from, "availability").
+global _NumberRowAvailabilityCache := Map()
+
+/**
+ * Which ordering options can reorder the effective row (NumberRowPolicyAvailability),
+ * read from the emulated layout while one owns the row, else from layout Hkl.
+ * A source's row does not change while it is loaded, so each one is read once.
+ * @param {Integer} Hkl Native keyboard layout.
+ * @param {Boolean} Caps CapsLock state.
+ * @returns {Map} "digits" and "symbols": "" when usable, else the reason.
+ */
+NumberRowAvailability(Hkl, Caps) {
+	global _NumberRowAvailabilityCache, KLE_Model, KS_DIGIT_ROW_KEYS
+	Model := 0
+	if KeylayoutEmulation_LayerIsActive("ergopti_base") {
+		Model := KLE_Model
+		Source := "emulated:" . ObjPtr(Model)
+	} else
+		Source := _DigitRowBuiltinLevels(0x02, Caps) is Map ? "builtin" : "native:" . Hkl
+	Key := Source . "|" . (Caps ? 1 : 0)
+	Entry := _NumberRowAvailabilityCache.Get(Key, 0)
+	; The entry holds its model, so a freed model's address is never reused here.
+	if !(Entry is Map) || Entry["model"] !== Model {
+		Levels := []
+		for _, DigitKey in KS_DIGIT_ROW_KEYS {
+			Row := _DigitRowEffectiveKey(DigitKey[2], Hkl, Caps)
+			Levels.Push(Map("plain", Row["plain"], "shift", Row["shift"]))
+		}
+		Entry := Map("model", Model, "availability", NumberRowPolicyAvailability(Levels))
+		_NumberRowAvailabilityCache[Key] := Entry
+	}
+	return Entry["availability"]
 }
 
 ; The built-in Ergopti emulation's own levels of one row key, in the registry
@@ -355,10 +482,8 @@ _DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
 ; @param Caps {Boolean} CapsLock state: its unshifted level is the CapsLock layer.
 ; @return {Map|Integer} "plain" and "shift" descriptors, or 0.
 _DigitRowBuiltinLevels(Sc, Caps) {
-	global Features, ERGOPTI_SPEC
-	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
-			|| Features["layout"].Get("ergopti_base", false) != true
-			|| !IsSet(ERGOPTI_SPEC) || !IsObject(ERGOPTI_SPEC)
+	global ERGOPTI_SPEC
+	if !BuiltinNumberRowIsActive() || !IsSet(ERGOPTI_SPEC) || !IsObject(ERGOPTI_SPEC)
 		return 0
 	Name := Format("SC{:03X}", Sc)
 	Levels := ERGOPTI_SPEC["levels"]

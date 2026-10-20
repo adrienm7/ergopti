@@ -32,6 +32,54 @@ function M.symbols_shift(digit, plain, shifted)
 	return plain_digit
 end
 
+-- What one level of a row key holds: "d" its own digit, "s" another character
+-- or a dead key, "n" nothing.
+local function level_class(digit, value)
+	if not descriptor(value) then return "n" end
+	return (value.Kind == "text" and value.Text == digit) and "d" or "s"
+end
+
+local AVAILABILITY = {
+	sd = { digits = "", symbols = "already_symbols_first" },
+	ds = { digits = "already_digits_first", symbols = "" },
+	dd = { digits = "digits_on_both", symbols = "digits_on_both" },
+	ss = { digits = "symbols_on_both", symbols = "symbols_on_both" },
+	dn = { digits = "incomplete", symbols = "incomplete" },
+	nd = { digits = "incomplete", symbols = "incomplete" },
+}
+
+--- Which ordering options can make the row's base level differ from Shift,
+--- from the ten digit keys of the effective layout (keys 1 to 0, each
+--- { plain = descriptor, shift = descriptor }). "" means usable; otherwise the
+--- refusal reason. Keys that disagree are "mixed" and refuse both options.
+function M.availability(levels)
+	if type(levels) ~= "table" or #levels ~= 10 then
+		error("The number-row availability needs the ten digit keys.")
+	end
+	local first, mixed = nil, false
+	for index, key in ipairs(levels) do
+		local digit = tostring(index % 10)
+		local plain = type(key) == "table" and key.plain or nil
+		local shift = type(key) == "table" and key.shift or nil
+		local class = level_class(digit, plain) .. level_class(digit, shift)
+		if first == nil then first = class elseif class ~= first then mixed = true end
+	end
+	if mixed then return { digits = "mixed", symbols = "mixed" } end
+	local found = AVAILABILITY[first]
+	if found then return { digits = found.digits, symbols = found.symbols } end
+	return { digits = "no_digits", symbols = "no_digits" }
+end
+
+--- The ordering that applies on the effective layout: the stored choice, or
+--- "native" while it cannot reorder this layout (it stays stored).
+function M.effective(mode, availability)
+	mode = M.mode(mode)
+	if mode == nil or mode == "native" then return { mode = "native", reason = "" } end
+	local reason = availability[mode]
+	if reason == "" then return { mode = mode, reason = "" } end
+	return { mode = "native", reason = reason }
+end
+
 function M.capable(platform, mode, symbols)
 	if not M.mode(mode) then return false end
 	if mode == "native" then return platform == "ahk" or platform == "hs" or platform == "linux" end

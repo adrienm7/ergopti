@@ -499,7 +499,9 @@ _KLT_IndependentLayersCase() {
 		AssertFalse(KeylayoutEmulation_LayerIsActive("ergopti_alt_gr"))
 		AssertFalse(Capture.Rows["SC138 & SC010"].Call(), "disabled AltGr must not capture its key")
 		Features["layout"]["direct_access_digits"] := "digits"
-		AssertFalse(Capture.Rows["SC002"].Call(), "direct digits own their unshifted row")
+		; Ergo-L already types its digits unshifted: digits first is inert there
+		; and the emulation keeps its own row (number-row-availability).
+		AssertTrue(Capture.Rows["SC002"].Call(), "an inert digits-first choice leaves the row to the emulation")
 		AssertTrue(Capture.Rows["SC010"].Call(), "direct digits do not disable letters")
 		CategoryEnabled["Layout"] := false
 		AssertFalse(Capture.Rows["SC010"].Call(), "the master still gates effective behavior")

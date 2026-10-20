@@ -192,10 +192,17 @@ _KLE_MagicKeyOwnsKey(Sc) {
 
 _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
 	global Features, _SHIFT_DIGIT_SCS
-	if NumberRowEffectiveMode() != "digits"
+	; The ordering in effect on the layout of the press (the seam's in tests).
+	if IsObject(ForegroundFn) {
+		Hkl := ForegroundFn.Call()
+		Effective := NumberRowEffectiveMode(Hkl)
+	} else
+		Effective := NumberRowEffectiveMode()
+	if Effective != "digits"
 		return false
 	if Shift {
-		Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
+		if !IsSet(Hkl)
+			Hkl := GetForegroundKeyboardLayout()
 		Code := Integer("0x" . SubStr(Sc, 3))
 		return _SHIFT_DIGIT_SCS.Has(Sc) && _DigitRowSwapResolution(Code, Hkl)["swap"]
 	}
@@ -389,7 +396,7 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE, Features
 	Code := Integer("0x" . SubStr(Sc, 3))
 	Native := KS_KeyTextNoStateChange(KS_ScancodeToVk(Code, Hkl), Code, Hkl, Shift, Caps)
-	if NumberRowEffectiveMode() == "digits" {
+	if NumberRowEffectiveMode(Hkl, Caps) == "digits" {
 		if !Shift && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: Mod(Code - 1, 10) . ""}
 		else if !Shift && ErgoptiNumberRowEdgeMapping().Has(Code)

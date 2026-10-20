@@ -70,7 +70,7 @@ AccentedShortcutKeysForLayout(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode,
 	; behind Shift (AZERTY, BÉPO): its accents then need Shift, so they are no
 	; longer direct and Ctrl+that key must stay Ctrl+digit.
 	if !IsSet(DigitAccess)
-		DigitAccess := _AccentedShortcutDigitAccessEnabled()
+		DigitAccess := _AccentedShortcutDigitAccessEnabled(Hkl)
 	DigitRowSwapped := DigitAccess
 		&& ScanCodeFn.Call("1", Hkl) == 0
 	Keys := Map()
@@ -85,16 +85,18 @@ AccentedShortcutKeysForLayout(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode,
 	return Keys
 }
 
-_AccentedShortcutDigitAccessEnabled() {
+; Whether « digits first » is in effect on layout Hkl (it is inert where it
+; cannot reorder that layout's row).
+_AccentedShortcutDigitAccessEnabled(Hkl) {
 	global Features
 	return IsSet(Features) && Features.Has("layout")
-		&& NumberRowEffectiveMode() == "digits"
+		&& NumberRowEffectiveMode(Hkl) == "digits"
 }
 
 _AccentedShortcutKeysCached(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode, DigitAccess := unset) {
 	global _AccentedShortcutLayoutCache
 	if !IsSet(DigitAccess)
-		DigitAccess := _AccentedShortcutDigitAccessEnabled()
+		DigitAccess := _AccentedShortcutDigitAccessEnabled(Hkl)
 	; The policy changes live, including when the Layout master switches off.
 	; One HKL can therefore own two different effective shortcut maps.
 	CacheKey := Hkl . "|" . (DigitAccess ? "digits" : "native")
