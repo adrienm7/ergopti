@@ -411,13 +411,13 @@ check(
 	bodyOf(read('infra/lifecycle.ahk'), 'Ergopti_OnSuspendEnter').includes('"llm-live-mode"'),
 	'pausing must turn live mode off'
 );
-const menuEmit = bodyOf(read('ui/menu/menu_llm/menu_main.ahk'), '_LLM_Menu_EmitRow');
 const menuSettings = read('ui/menu/menu_llm/menu_settings.ahk');
+// Judged by the retired id across the whole AI menu, not by one dispatch
+// spelling: the declared groups left the row dispatch for a builder map.
+const menuMain = read('ui/menu/menu_llm/menu_main.ahk');
 check(
-	menuEmit !== '' &&
-		!menuEmit.includes('case "llm_live_mode":') &&
-		!menuEmit.includes('Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)'),
-	'the genuine AI menu emitter must not reintroduce a duplicate live selector'
+	bodyOf(menuMain, '_LLM_Menu_GroupBuilders') !== '' && !menuMain.includes('llm_live_mode'),
+	'the genuine AI menu must not reintroduce a duplicate live selector'
 );
 for (const name of [
 	'LLM_Menu_BuildLiveModeMenu',

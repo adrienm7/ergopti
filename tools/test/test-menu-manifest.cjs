@@ -12932,17 +12932,22 @@ console.log(
 		root.llm_menu.some((row) => row.id === 'llm_live_mode'),
 		false
 	);
-	for (const [platform, path, binding] of [
-		['macos', 'ui/menu/menu_llm/init.lua', 'child_group_for("llm_live_mode"'],
-		['linux', 'ui/menu/menu_builder.lua', 'group_builders["llm_live_mode"]'],
-		['windows', 'ui/menu/menu_llm/menu_main.ahk', 'case "llm_live_mode":']
-	]) {
-		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', platform, path), 'utf8');
-		assert.equal(
-			source.includes(binding),
-			false,
-			platform + ' cannot bind the retired visible selector'
-		);
+	// The retired selector is judged by its id, not by the spelling of one native
+	// binding: those spellings changed (a Windows row dispatch case became a group
+	// builder entry) and a guard on the old one passed whatever the new code did.
+	// No production source of any driver may name it.
+	const { readdirSync } = require('node:fs');
+	const productionSources = (dir) =>
+		readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+			const full = resolve(dir, entry.name);
+			if (entry.isDirectory()) return entry.name === 'tests' ? [] : productionSources(full);
+			return /\.(?:ahk|lua)$/.test(entry.name) ? [full] : [];
+		});
+	for (const platform of ['macos', 'linux', 'windows']) {
+		const files = productionSources(resolve(REPO_ROOT, 'static/ergopti_plus', platform));
+		assert.ok(files.length > 100, platform + ' production sources must be scanned');
+		const binding = files.find((file) => readFileSync(file, 'utf8').includes('llm_live_mode'));
+		assert.equal(binding, undefined, platform + ' cannot bind the retired visible selector');
 	}
 }
 
