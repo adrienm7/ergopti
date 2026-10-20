@@ -348,16 +348,58 @@ function receiveWindowsRuntimeHandoff() {
 	process.stdout.write(stdout);
 	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=9 native_runtime=false http=false\n');
 }
+function receiveWindowsModelEnvironment() {
+	assert.equal(process.platform, 'win32', 'Model admission requires production Windows PS5.');
+	const repository = path.resolve(__dirname, '../..');
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-model-environment-'));
+	const psHome = path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0');
+	const env = { ...process.env, TEMP: owned, TMP: owned };
+	const moduleKey = Object.keys(env).find((key) => key.toLowerCase() === 'psmodulepath');
+	if (moduleKey) delete env[moduleKey];
+	env.PSModulePath = path.join(psHome, 'Modules');
+	for (const [script, count] of [
+		['test_ollama_model_pull.ps1', 8],
+		['test_ollama_model_environment.ps1', 3]
+	]) {
+		const result = spawnSync(
+			path.join(psHome, 'powershell.exe'),
+			[
+				'-NoLogo',
+				'-NoProfile',
+				'-NonInteractive',
+				'-File',
+				path.join(repository, 'static/ergopti_plus/windows/tests/unit/modules/llm/servers', script)
+			],
+			{ cwd: owned, env, encoding: 'utf8', timeout: 60000, windowsHide: true }
+		);
+		// Preserve the actual child diagnostics before a failed receipt is rejected.
+		process.stdout.write(result.stdout || '');
+		process.stderr.write(result.stderr || '');
+		assert.equal(result.error, undefined, `Model acceptance must start; retained ${owned}`);
+		assert.equal(result.signal, null, `Model acceptance must retire; retained ${owned}`);
+		assert.equal(result.status, 0, `Model acceptance refused: ${script}`);
+		const stdout = result.stdout.replace(/\r\n?/g, '\n');
+		assert.equal(result.stderr, '');
+		assert.equal(stdout.split('\n').filter((line) => line.startsWith('PASS ')).length, count);
+		assert.doesNotMatch(stdout, /^FAIL /m);
+		if (count === 8)
+			assert.match(stdout, /^Managed model import acceptance: 8 passed, 0 failed\.$/m);
+		else assert.match(stdout, /^RESULT passed=3 failed=0 builder_only=false$/m);
+	}
+	process.stdout.write('WINDOWS-MODEL-ENVIRONMENT controls=11 native_children=true ollama=false\n');
+}
 if (process.platform === 'win32') receiveWindowsComponentShellSetup();
 receiveFileFixtureProducer();
 if (args.length === 1) {
 	receiveWindowsFilePort();
 	receiveWindowsRuntimeHandoff();
+	receiveWindowsModelEnvironment();
 	process.exit(0);
 }
 if (process.platform === 'win32') {
 	receiveWindowsFilePort();
 	receiveWindowsRuntimeHandoff();
+	receiveWindowsModelEnvironment();
 }
 
 const cases = [

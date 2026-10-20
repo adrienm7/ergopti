@@ -63,6 +63,38 @@ check('Windows passes the captured declaration to every managed serve launch', (
 	);
 });
 
+check(
+	'Windows model CLI inherits the captured serve policy before it can start descendants',
+	() => {
+		const bootstrap = read('static/ergopti_plus/windows/modules/llm/ollama_managed_bootstrap.ahk');
+		assert.match(bootstrap, /"-ServeEnvironmentPath", this\.Plan\["environment"\]/);
+		assert.match(bootstrap, /"-ServeEnvironmentSha256", this\.Plan\["environment_sha256"\]/);
+		const worker = read('static/ergopti_plus/windows/modules/llm/ollama-model-pull.ps1');
+		assert.match(
+			worker,
+			/environment = \$ServeEnvironmentPath; environment_hash = \$ServeEnvironmentSha256/
+		);
+		assert.match(
+			worker,
+			/Read-OllamaServeEnvironment \$request\.environment \$request\.environment_hash/
+		);
+		assert.match(
+			worker,
+			/New-OllamaRuntimeStart \$Executable \$Port \$ModelsPath \$ServeEnvironment/
+		);
+		assert.match(worker, /New-OllamaModelStart [^\n]+ \$request\.model \$environment/);
+		assert.doesNotMatch(
+			worker,
+			/\.EnvironmentVariables\[/,
+			'the CLI must share the actual serve environment owner'
+		);
+		const collector = read('tools/test/test-managed-ollama-protocol.cjs');
+		assert.match(collector, /\['test_ollama_model_pull\.ps1', 8\]/);
+		assert.match(collector, /\['test_ollama_model_environment\.ps1', 3\]/);
+		assert.equal(collector.split('\n\treceiveWindowsModelEnvironment();').length - 1, 2);
+	}
+);
+
 check('Linux loads the declaration and applies it to the owned serve child', () => {
 	const factory = read('static/ergopti_plus/linux/modules/llm/runtime_factory.lua');
 	assert.match(factory, /require\("modules\.llm\.managed_ollama_environment"\)\.load\(\)/);

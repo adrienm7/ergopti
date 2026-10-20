@@ -6,6 +6,8 @@ param(
 	[Parameter(Mandatory = $true)][string]$ManagedHelperSha256,
 	[Parameter(Mandatory = $true)][string]$RuntimeLauncherPath,
 	[Parameter(Mandatory = $true)][string]$RuntimeLauncherSha256,
+	[Parameter(Mandatory = $true)][string]$ServeEnvironmentPath,
+	[Parameter(Mandatory = $true)][string]$ServeEnvironmentSha256,
 	[Parameter(Mandatory = $true)][string]$ManagedRoot,
 	[Parameter(Mandatory = $true)][string]$RootIdentity,
 	[Parameter(Mandatory = $true)][string]$PublishedPath,
@@ -38,15 +40,14 @@ function Open-OllamaModelSource([string]$Path, [string]$ExpectedHash) {
 	} catch { $stream.Dispose(); throw }
 }
 
-function New-OllamaModelStart([string]$Executable, [string]$ModelsPath, [int]$Port, [string]$Model) {
+function New-OllamaModelStart([string]$Executable, [string]$ModelsPath, [int]$Port, [string]$Model, $ServeEnvironment) {
 	if ($Model -cnotmatch '^[A-Za-z0-9_][A-Za-z0-9_./:-]*\z' -or $Port -lt 1 -or $Port -gt 65535) {
 		throw 'The model child requires a canonical literal request.'
 	}
-	$start = [Diagnostics.ProcessStartInfo]::new($Executable)
-	$start.UseShellExecute = $false
+	# The CLI can start Ollama descendants if its server disappears at heartbeat.
+	# Reuse the server builder so that every such child inherits the same policy.
+	$start = New-OllamaRuntimeStart $Executable $Port $ModelsPath $ServeEnvironment
 	$start.Arguments = 'pull "' + $Model + '"'
-	$start.EnvironmentVariables['OLLAMA_HOST'] = '127.0.0.1:' + $Port
-	$start.EnvironmentVariables['OLLAMA_MODELS'] = $ModelsPath
 	return $start
 }
 
@@ -65,7 +66,7 @@ function Invoke-OllamaManagedModelPull {
 	$request = @{ root = $ManagedRoot; root_identity = $RootIdentity; path = $PublishedPath;
 		identity = $StageIdentity; ticket = $TicketId; manifest = $ManifestSha256;
 		runtime = $RuntimeTicket; ready_identity = $ReadyFileIdentity; ready_image = $ReadyImageSha256;
-		port = $Port; model = $Model }
+		port = $Port; model = $Model; environment = $ServeEnvironmentPath; environment_hash = $ServeEnvironmentSha256 }
 	$helper = $null; $launcher = $null; $root = $null; $stage = $null
 	$handle = [IntPtr]::Zero; $ready = $null; $server = $null; $child = $null
 	try {
@@ -81,6 +82,7 @@ function Invoke-OllamaManagedModelPull {
 		} | ForEach-Object { $_.Extent.Text })
 		if ($functions.Count -eq 0) { throw 'The runtime source exposes no native library functions.' }
 		. ([ScriptBlock]::Create(($functions -join "`n")))
+		$environment = Read-OllamaServeEnvironment $request.environment $request.environment_hash
 		Initialize-OllamaRuntimeObservation
 		if ([Ergopti.Ollama.RuntimeObservation]::ActiveProcesses() -ne 1) { throw 'The model worker requires its sole canonical job.' }
 		$root = Open-OllamaManagedRoot $request.root $false
@@ -99,7 +101,7 @@ function Invoke-OllamaManagedModelPull {
 		$server = [Diagnostics.Process]::GetProcessById($receipt.child_pid)
 		$null = $server.Handle
 		Assert-OllamaModelProcess $server $receipt.child_created_filetime $request.port
-		$start = New-OllamaModelStart ([IO.Path]::Combine($stage.path, 'ollama.exe')) ([IO.Path]::Combine($root.path, 'models')) $request.port $request.model
+		$start = New-OllamaModelStart ([IO.Path]::Combine($stage.path, 'ollama.exe')) ([IO.Path]::Combine($root.path, 'models')) $request.port $request.model $environment
 		Assert-OllamaModelProcess $server $receipt.child_created_filetime $request.port
 		$child = Start-OllamaRuntimeProcess $start
 		$null = $child.Handle
