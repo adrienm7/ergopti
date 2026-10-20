@@ -6,9 +6,9 @@
 ; singleton owner decide whether either genuine editor may persist that result.
 if A_Args.Length != 7 || !Map("character", true, "source", true).Has(A_Args[1])
 	ExitApp(2)
-Modes := Map("live", true, "cancel", true, "completed-close", true, "completed-paused-resumed", true,
+_MESC_Modes := Map("live", true, "cancel", true, "completed-close", true, "completed-paused-resumed", true,
 	"completed-close-successor", true, "stop-refusal", true, "stop-reentrant", true)
-if !Modes.Has(A_Args[2])
+if !_MESC_Modes.Has(A_Args[2])
 	ExitApp(2)
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
 global HOTKEY_MODIFIER_VKS := Map()
@@ -259,21 +259,21 @@ try {
 	_MESC_Open()
 	if IsObject(_MESC.Failure)
 		throw _MESC.Failure
-	Hook := _MESC.Hooks[1]
-	Expected := _MESC.Mode == "live" ? 1 : 0
+	_MESC_Original := _MESC.Hooks[1]
+	_MESC_Expected := _MESC.Mode == "live" ? 1 : 0
 	FileAppend("RECEIPT editor=" . _MESC.Editor . " mode=" . _MESC.Mode . " publish_calls=" . _MESC.Calls
-		. " expected=" . Expected . " stops=" . Hook.Stops . " reason=" . Hook.EndReason . "`n", "*")
-	_MESC_Require(Hook.Starts == 1 && _MESC.Calls == Expected,
+		. " expected=" . _MESC_Expected . " stops=" . _MESC_Original.Stops . " reason=" . _MESC_Original.EndReason . "`n", "*")
+	_MESC_Require(_MESC_Original.Starts == 1 && _MESC.Calls == _MESC_Expected,
 		"Only an uninterrupted completed editor may reach its real persistence route.")
-	if Expected
+	if _MESC_Expected
 		_MESC_Require(_MESC.Value == (_MESC.Editor == "character" ? "a" : _MESC.Code), "A live capture must retain its exact value.")
 	if _MESC.Mode == "stop-refusal" || _MESC.Mode == "completed-close-successor" || _MESC.Mode == "stop-reentrant" {
-		Retained := _MESC.Mode == "stop-refusal" ? Hook : _MESC.Hooks[2]
-		_MESC_Require(_MagicKeyEditorInputHook == Retained && _MagicKeyEditorStopDebt && _MESC.Errors == 1,
+		_MESC_Retained := _MESC.Mode == "stop-refusal" ? _MESC_Original : _MESC.Hooks[2]
+		_MESC_Require(_MagicKeyEditorInputHook == _MESC_Retained && _MagicKeyEditorStopDebt && _MESC.Errors == 1,
 			"A refused terminal Stop must keep only its exact original or successor owner and debt.")
-		_MESC_Require(Retained.Stops == Retained.TerminalStop, "An older finally must never retry a successor's native Stop.")
-		_MESC_Require(_MagicKeyEditorStopOwned(Retained), "The actual cleanup retry must retire only this retained owner.")
-		_MESC_Require(Retained.Stops == Retained.TerminalStop + 1 && !_MagicKeyEditorStopDebt,
+		_MESC_Require(_MESC_Retained.Stops == _MESC_Retained.TerminalStop, "An older finally must never retry a successor's native Stop.")
+		_MESC_Require(_MagicKeyEditorStopOwned(_MESC_Retained), "The actual cleanup retry must retire only this retained owner.")
+		_MESC_Require(_MESC_Retained.Stops == _MESC_Retained.TerminalStop + 1 && !_MagicKeyEditorStopDebt,
 			"One successful retry must settle the exact native cleanup debt.")
 	} else {
 		_MESC_Require(!IsObject(_MagicKeyEditorInputHook) && !_MagicKeyEditorStopDebt && _MESC.Errors == 0,
@@ -283,7 +283,7 @@ try {
 		_MESC_Require(_MESC.CloseAcks == 1, "The refusal must cross exactly one actual native Close event.")
 	FileAppend("PASS magic-key-capture-settlement " . _MESC.Editor . " " . _MESC.Mode . "`n", "*")
 	ExitApp(0)
-} catch as Err {
-	FileAppend("FAIL " . Err.Message . "`n" . Err.Stack . "`n", "**")
+} catch as _MESC_Primary {
+	FileAppend("FAIL " . _MESC_Primary.Message . "`n" . _MESC_Primary.Stack . "`n", "**")
 	ExitApp(1)
 }
