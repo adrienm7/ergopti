@@ -6,6 +6,14 @@
 --- Resolves a Quartz event's keyboard model through the launcher's Carbon map.
 --- Input callbacks only consult immutable memory; the current input source or
 --- the last connected keyboard cannot identify another keyboard's event.
+---
+--- FEATURES & RATIONALE:
+--- 1. Behind Karabiner every grabbed keyboard reaches Quartz through its virtual
+---    keyboard, whose ISO or ANSI product decides the 0x35/0x64 exchange in
+---    IOHIDFamily. The event's keyboard model then describes neither the
+---    physical keyboard nor, reliably, that exchange: issue #95 saw the key
+---    left of 1 resolve to the extra ISO key behind the ISO virtual keyboard.
+---    While the integration deploys a virtual form, that form decides.
 --- ==============================================================================
 
 local M = {}
@@ -15,7 +23,9 @@ local LOG = "adapters.keyboard_geometry"
 local ENVIRONMENT_KEY = "ERGOPTI_KEYBOARD_GEOMETRY_V1"
 local MAXIMUM = 32767 -- KBGetLayoutType takes a nonnegative signed Int16 model.
 local FORMS = { ansi = true, iso = true, jis = true, unknown = true }
+local VIRTUAL_FORMS = { ansi = true, iso = true }
 local _initialized, _ranges = false, nil
+local _virtual_form_source = nil
 local property = hs.eventtap.event.properties.keyboardEventKeyboardType
 
 local function integer(value)
@@ -69,6 +79,27 @@ function M.initialize()
 	return true
 end
 
+--- Registers the reader of the virtual keyboard form Karabiner applies to every
+--- keyboard it grabs. The reader runs inside input callbacks, so it may only
+--- consult memory; it answers nil while no Ergopti virtual form is deployed.
+--- @param source function () -> "ansi"|"iso"|nil
+function M.set_virtual_form_source(source)
+	assert(type(source) == "function", "the virtual keyboard form source must be a function")
+	assert(_virtual_form_source == nil, "the virtual keyboard form source is already registered")
+	_virtual_form_source = source
+	Logger.info(LOG, "Virtual keyboard form source registered.")
+end
+
+--- The deployed virtual keyboard form, or nil when events keep their own model.
+--- @return string|nil form
+local function virtual_form()
+	if _virtual_form_source == nil then return nil end
+	local form = _virtual_form_source()
+	if form == nil then return nil end
+	assert(VIRTUAL_FORMS[form] == true, "the virtual keyboard form source answered " .. tostring(form))
+	return form
+end
+
 --- Returns the actual event's model identifier, never the global keyboard type.
 --- @param event table|userdata Quartz event.
 --- @return integer|nil keyboard_type
@@ -96,13 +127,14 @@ function M.form(keyboard_type)
 end
 
 --- Selects one physical key's virtual code for this event's keyboard geometry.
+--- A deployed Karabiner virtual form takes precedence over the event's model.
 --- @param primary integer ANSI virtual code from the shared registry.
 --- @param iso integer ISO virtual code from the same registry.
 --- @param keyboard_type integer|nil Event model identifier.
 --- @return integer|nil code
 function M.native_code(primary, iso, keyboard_type)
 	if primary == iso then return primary end
-	local form = M.form(keyboard_type)
+	local form = virtual_form() or M.form(keyboard_type)
 	if form == "ansi" then return primary end
 	if form == "iso" then return iso end
 	-- The registry does not establish the swapped pair on JIS/unknown models.

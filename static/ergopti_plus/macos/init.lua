@@ -1055,7 +1055,8 @@ end
 
 -- Now safe to load modules that depend on config_dir
 -- The native map is immutable for this VM; every key event supplies its own
--- model identifier, including events from Karabiner's virtual keyboard.
+-- model identifier. Behind Karabiner that model does not decide the ISO pair:
+-- the virtual keyboard form the bridge deploys does (registered below).
 require("adapters.keyboard_geometry").initialize()
 local file_system        = require("adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
@@ -1069,6 +1070,11 @@ if not ok_karabiner then
 	Logger.error(LOG, "platform.remap failed to load: %s — the Karabiner bridge is "
 		.. "disabled for this session; everything else continues.", tostring(karabiner))
 	karabiner = nil
+else
+	local bridge = karabiner
+	require("adapters.keyboard_geometry").set_virtual_form_source(function()
+		return bridge.virtual_keyboard_form()
+	end)
 end
 local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
