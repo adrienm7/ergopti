@@ -675,12 +675,17 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'e2e-ahk', 'Retain E2E native streams', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
 	// The whole-driver boot gates do not depend on the module group: one runner.
-	[WINDOWS_BOX, 'test-ahk', 'Run the full-driver startup smoke', "matrix.module == 'hotstrings'"],
+	[
+		WINDOWS_BOX,
+		'test-ahk',
+		'Run the full-driver startup smoke',
+		"matrix.module == 'hotstrings-shortcuts'"
+	],
 	[
 		WINDOWS_BOX,
 		'test-ahk',
 		'Test fresh Git clone bootstrap and warm startup',
-		"matrix.module == 'hotstrings'"
+		"matrix.module == 'hotstrings-shortcuts'"
 	],
 	[
 		WINDOWS_BOX,
