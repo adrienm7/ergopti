@@ -258,6 +258,19 @@ count results from the execution manifest, not the console. Manual `ci.yml`
 dispatches choose `os_lanes` (all, one OS or a pair), run under a per-run
 concurrency group, and never run Release / Publish, which stays push-only.
 
+### project-macos-lane-runner-budget
+
+Hosted macOS jobs share five concurrent runners across the account; a sixth
+queues. Measured 2026-10-20, the lane was bound by that budget and by long
+cells, not by test time: Build now starts after Unit beside E2E and waits in
+`managed-ollama-handoff.cjs await-qualified` for both qualified native
+inputs, the Intel managed native role runs its XCTest cohorts in a second
+cell, and the test build runs four launch lots (scenarios in turn, a proved
+fresh runner between them via `macos_launch_reset.py`) beside the cold
+bootstrap. Action: count macOS jobs per stage against the five-runner budget
+before splitting a cell, and keep the test build admitting both E2E and Build;
+the receipt chain refuses a missing stage.
+
 ### project-js-gate-host-limits-on-windows
 
 On a Windows host the full JS gate has a known set of host-bound reds that are
