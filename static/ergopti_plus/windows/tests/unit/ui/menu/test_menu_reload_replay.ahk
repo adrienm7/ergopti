@@ -60,7 +60,8 @@ _MRR_Run(Body) {
 	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
 	global _ReloadTerminalHandoff, _MenuStartupCommands, _TrayStartupCommands, _SuspendPending
 	global _MenuReloadReplayHeld, _MenuReloadReplayNextKey, _MenuReloadReplayPublished
-	global _MenuReloadReplayConsumed, _MenuReloadReplayRoot
+	global _MenuReloadReplayConsumed, _MenuReloadReplayRoot, _MenuReloadReplayIdentities
+	global _MenuPopulationPublished, _MenuPopulationBuilding
 	AssertTrue((_MenuStartupCommands is Integer) && _MenuStartupCommands == 0,
 		"the fixture cannot adopt live startup selections")
 	AssertFalse(ReloadTerminalHandoffActive(), "the fixture cannot adopt a live reload")
@@ -69,19 +70,22 @@ _MRR_Run(Body) {
 		Handles: _MenuDispatchOwnerHandles, Handoff: _ReloadTerminalHandoff,
 		Held: _MenuReloadReplayHeld, NextKey: _MenuReloadReplayNextKey,
 		Published: _MenuReloadReplayPublished, Consumed: _MenuReloadReplayConsumed,
-		Root: _MenuReloadReplayRoot,
+		Root: _MenuReloadReplayRoot, Identities: _MenuReloadReplayIdentities,
+		Population: _MenuPopulationPublished, Building: _MenuPopulationBuilding,
 		Tray: IsSet(_TrayStartupCommands) ? _TrayStartupCommands : false,
 		Pause: IsSet(_SuspendPending) ? _SuspendPending : false}
 	Dir := A_Temp . "\ergopti_mrr_" . A_ScriptHwnd . "_" . A_TickCount
 	DirCreate(Dir)
 	Fixture := {Runs: [], Menus: [], Armed: [], Notices: [], Dir: Dir,
-		File: Dir . "\menu_reload_replay.json"}
+		File: Dir . "\menu_reload_replay.json", Populations: []}
 	try {
 		_MenuDispatchCallbacks := _MenuDispatchCallbacks.Clone()
 		_MenuDispatchLastFire := _MenuDispatchLastFire.Clone()
 		_MenuDispatchTokens := _MenuDispatchTokens.Clone()
 		_MenuDispatchClickSequences := _MenuDispatchClickSequences.Clone()
 		_MenuDispatchOwnerHandles := _MenuDispatchOwnerHandles.Clone()
+		_MenuReloadReplayIdentities := _MenuReloadReplayIdentities.Clone()
+		_MenuPopulationPublished := false, _MenuPopulationBuilding := false
 		_MenuReloadReplayHeld := Map()
 		_MenuReloadReplayPublished := false
 		_MenuReloadReplayConsumed := false
@@ -93,10 +97,16 @@ _MRR_Run(Body) {
 		_MenuStartupCommands := 0
 		_ReloadTerminalHandoff := Saved.Handoff
 		_MenuReloadReplayRoot := Saved.Root
+		for Population in Fixture.Populations {
+			Population.Stop()
+			Population.Pending.Clear()
+		}
+		_MenuPopulationPublished := Saved.Population, _MenuPopulationBuilding := Saved.Building
 		for NativeMenu in Fixture.Menus {
 			NativeMenu.Delete()
 			MenuDispatcher_PruneMenu(NativeMenu)
 		}
+		_MenuReloadReplayIdentities := Saved.Identities
 		_MenuDispatchCallbacks := Saved.Callbacks
 		_MenuDispatchLastFire := Saved.LastFire
 		_MenuDispatchTokens := Saved.Tokens
@@ -347,3 +357,5 @@ _MRR_WiringBody() {
 }
 Test("menu reload replay: OnExit publishes, boot consumes and every dispatch meets the hand-off",
 	_MRR_WiringBody)
+
+#Include test_menu_reload_replay_identity.ahk

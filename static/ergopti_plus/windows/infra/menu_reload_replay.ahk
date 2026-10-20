@@ -7,8 +7,8 @@
 ; From the launch of the successor to this instance's exit, the terminal barrier
 ; owns every configuration path, so a command run here could only be refused
 ; (`terminal_barrier_busy`, one error toast per click, the click lost). Such a
-; command is held instead and identified by the labels of its row from the tray
-; root. When OnExit accepts the reload, the held rows are published once beside
+; command is held instead and identified by its canonical action when declared, with its labels
+; retained for diagnostics and undeclared rows. When OnExit accepts the reload, the held rows are published once beside
 ; the configuration locator; the successor consumes that file once at startup
 ; and its startup owner replays each row against its own published tray after
 ; input readiness. A reload refused later lets the held commands run here.
@@ -17,13 +17,16 @@
 #Requires AutoHotkey v2.0
 
 global MENU_RELOAD_REPLAY_FILENAME := "menu_reload_replay.json"
-global MENU_RELOAD_REPLAY_SCHEMA := "ergopti.menu_reload_replay.v1"
+global MENU_RELOAD_REPLAY_SCHEMA := "ergopti.menu_reload_replay.v2"
+global MENU_RELOAD_REPLAY_MENU_PROPERTY := "__ErgoptiReplayMenuIdentity"
 
 ; Held rows in click order, keyed by an increasing integer.
 global _MenuReloadReplayHeld := Map()
 global _MenuReloadReplayNextKey := 0
 global _MenuReloadReplayPublished := false
 global _MenuReloadReplayConsumed := false
+; Canonical action keys belong to one registration token, never a recyclable ID.
+global _MenuReloadReplayIdentities := Map()
 
 ; Test seam: the Menu standing for the tray root; 0 means A_TrayMenu.
 global _MenuReloadReplayRoot := 0
@@ -129,6 +132,54 @@ MenuReloadReplay_Describe(Path) {
 ; ====================================
 ; ====================================
 
+/** Attaches declared parent identity to its actual Menu lifetime, not its handle. */
+MenuReloadReplay_SetMenuIdentity(NativeMenu, Identity) {
+	global MENU_RELOAD_REPLAY_MENU_PROPERTY
+	if !(NativeMenu is Menu) || !(Identity is String) || Identity == ""
+		throw TypeError("A declared replay parent requires a native menu and its identity.")
+	Object.Prototype.DefineProp.Call(NativeMenu, MENU_RELOAD_REPLAY_MENU_PROPERTY, {Value: Identity})
+}
+
+_MenuReloadReplayContextPart(Sub, Label) {
+	global MENU_RELOAD_REPLAY_MENU_PROPERTY
+	NativeMenu := MenuFromHandle(Sub)
+	if NativeMenu is Menu && Object.Prototype.HasOwnProp.Call(NativeMenu, MENU_RELOAD_REPLAY_MENU_PROPERTY) {
+		Descriptor := Object.Prototype.GetOwnPropDesc.Call(NativeMenu, MENU_RELOAD_REPLAY_MENU_PROPERTY)
+		if Descriptor.HasOwnProp("Value") && Descriptor.Value is String && Descriptor.Value != ""
+			return "I" . Descriptor.Value
+	}
+	return "L" . Label
+}
+
+/** Keeps the renderer's canonical action separate from its visible caption. */
+MenuReloadReplay_RegisterIdentity(ItemId, Token, Identity) {
+	global _MenuReloadReplayIdentities
+	if !(Identity is String)
+		throw TypeError("A menu replay identity must be a String.")
+	MenuReloadReplay_ForgetIdentity(ItemId)
+	if Identity != ""
+		_MenuReloadReplayIdentities[ItemId] := {Token: Token, Identity: Identity}
+}
+
+MenuReloadReplay_ForgetIdentity(ItemId) {
+	global _MenuReloadReplayIdentities
+	if _MenuReloadReplayIdentities.Has(ItemId)
+		_MenuReloadReplayIdentities.Delete(ItemId)
+}
+
+MenuReloadReplay_ClearIdentities() {
+	global _MenuReloadReplayIdentities
+	_MenuReloadReplayIdentities := Map()
+}
+
+_MenuReloadReplayIdentityOf(ItemId) {
+	global _MenuReloadReplayIdentities, _MenuDispatchTokens
+	if !_MenuReloadReplayIdentities.Has(ItemId) || !_MenuDispatchTokens.Has(ItemId)
+		return ""
+	Entry := _MenuReloadReplayIdentities[ItemId]
+	return Entry.Token == _MenuDispatchTokens[ItemId] ? Entry.Identity : ""
+}
+
 _MenuReloadReplayRootMenu() {
 	global _MenuReloadReplayRoot
 	return _MenuReloadReplayRoot is Menu ? _MenuReloadReplayRoot : A_TrayMenu
@@ -142,12 +193,18 @@ _MenuReloadReplayRootMenu() {
 MenuReloadReplay_PathOf(ItemId) {
 	if !(ItemId is Integer) || ItemId <= 0
 		throw TypeError("A menu row path requires a positive native item identifier.")
-	Path := []
-	return _MenuReloadReplayFind(_MenuReloadReplayRootMenu().Handle, ItemId, Path, Map())
-		? Path : false
+	Path := [], Context := []
+	if !_MenuReloadReplayFind(_MenuReloadReplayRootMenu().Handle, ItemId, Path, Context, Map())
+		return false
+	Identity := _MenuReloadReplayIdentityOf(ItemId)
+	if Identity != "" {
+		Path.ReplayIdentity := Identity
+		Path.ReplayContext := Context
+	}
+	return Path
 }
 
-_MenuReloadReplayFind(Handle, ItemId, Path, Seen) {
+_MenuReloadReplayFind(Handle, ItemId, Path, Context, Seen) {
 	if Seen.Has(Handle)
 		return false
 	Seen[Handle] := true
@@ -160,9 +217,10 @@ _MenuReloadReplayFind(Handle, ItemId, Path, Seen) {
 			if Label == ""
 				continue
 			Path.Push(Label)
-			if _MenuReloadReplayFind(Sub, ItemId, Path, Seen)
+			Context.Push(_MenuReloadReplayContextPart(Sub, Label))
+			if _MenuReloadReplayFind(Sub, ItemId, Path, Context, Seen)
 				return true
-			Path.Pop()
+			Path.Pop(), Context.Pop()
 			continue
 		}
 		if TrayMenuHandleItemId(Handle, Position) != ItemId
@@ -185,6 +243,59 @@ _MenuReloadReplayFind(Handle, ItemId, Path, Seen) {
 MenuReloadReplay_Resolve(Path) {
 	global _MenuPopulationPublished
 	_MenuReloadReplayRequirePath(Path)
+	if !Path.HasOwnProp("ReplayIdentity")
+		return _MenuReloadReplayResolveLabels(Path)
+	Identity := Path.ReplayIdentity
+	if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation
+		_MenuPopulationPublished.CompleteReplayIdentity(Identity)
+	Matches := []
+	_MenuReloadReplayFindIdentity(_MenuReloadReplayRootMenu().Handle, Identity, Path.ReplayContext, [], Matches, Map())
+	if Matches.Length == 1
+		return Matches[1]
+	; Context is part of identity even when only one matching declaration
+	; survived. Otherwise a removed file's command could target another file.
+	return false
+}
+
+_MenuReloadReplayFindIdentity(Handle, Identity, WantedContext, Context, Matches, Seen) {
+	if Seen.Has(Handle)
+		return
+	Seen[Handle] := true
+	try {
+		Loop _MenuReloadReplayCount(Handle) {
+			Position := A_Index - 1
+			Flags := DllCall("GetMenuState", "Ptr", Handle, "UInt", Position, "UInt", 0x400, "UInt")
+			if Flags == 0xFFFFFFFF
+				throw OSError(A_LastError, A_ThisFunc, "The replay row's current state could not be read.")
+			if Flags & 0x3
+				continue
+			Sub := DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+			if Sub {
+				Context.Push(_MenuReloadReplayContextPart(Sub, _MenuReloadReplayLabel(Handle, Position)))
+				_MenuReloadReplayFindIdentity(Sub, Identity, WantedContext, Context, Matches, Seen)
+				Context.Pop()
+				continue
+			}
+			ItemId := DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+			if _MenuReloadReplayIdentityOf(ItemId) == Identity && _MenuReloadReplayContextMatches(Context, WantedContext)
+				Matches.Push({ItemId: ItemId, Handle: Handle, Position: Position + 1,
+					Label: _MenuReloadReplayLabel(Handle, Position)})
+		}
+	} finally Seen.Delete(Handle)
+}
+
+_MenuReloadReplayContextMatches(Left, Right) {
+	if Left.Length != Right.Length
+		return false
+	for Index, Part in Left {
+		if !(Part == Right[Index])
+			return false
+	}
+	return true
+}
+
+_MenuReloadReplayResolveLabels(Path) {
+	global _MenuPopulationPublished
 	Handle := _MenuReloadReplayRootMenu().Handle
 	for Index, Wanted in Path {
 		Last := Index == Path.Length
@@ -233,6 +344,15 @@ _MenuReloadReplayRequirePath(Path) {
 	for Label in Path {
 		if !(Label is String) || Label == ""
 			throw ValueError("A menu row path holds only non-empty labels.")
+	}
+	if Path.HasOwnProp("ReplayIdentity") {
+		if !(Path.ReplayIdentity is String) || Path.ReplayIdentity == "" || !Path.HasOwnProp("ReplayContext")
+				|| !(Path.ReplayContext is Array) || Path.ReplayContext.Length != Path.Length - 1
+			throw ValueError("A canonical menu replay identity requires its exact parent context.")
+		for Part in Path.ReplayContext {
+			if !(Part is String) || Part == ""
+				throw ValueError("A canonical replay context must hold nonempty String parts.")
+		}
 	}
 }
 
@@ -310,7 +430,15 @@ _MenuReloadReplayEncode(Paths) {
 		Labels := ""
 		for Label in Path
 			Labels .= (Labels == "" ? "" : ",") . JsonStringLiteral(Label)
-		Commands .= (Commands == "" ? "" : ",") . "[" . Labels . "]"
+		Encoded := "[" . Labels . "]"
+		if Path.HasOwnProp("ReplayIdentity") {
+			Context := ""
+			for Part in Path.ReplayContext
+				Context .= (Context == "" ? "" : ",") . JsonStringLiteral(Part)
+			Encoded := '{"labels":' . Encoded . ',"identity":' . JsonStringLiteral(Path.ReplayIdentity)
+				. ',"context":[' . Context . ']}'
+		}
+		Commands .= (Commands == "" ? "" : ",") . Encoded
 	}
 	return '{"schema":' . JsonStringLiteral(MENU_RELOAD_REPLAY_SCHEMA)
 		. ',"commands":[' . Commands . ']}' . "`n"
@@ -386,9 +514,22 @@ _MenuReloadReplayDecode(Text) {
 	Commands := Document["commands"]
 	if !(Commands is Array) || Commands.Length == 0 || Commands.Length > MENU_STARTUP_MAX_PENDING
 		throw ValueError("the command list must hold 1 to " . MENU_STARTUP_MAX_PENDING . " rows")
-	for Path in Commands
+	Paths := []
+	for Command in Commands {
+		if Command is Map {
+			if Command.Count != 3 || !Command.Has("labels") || !Command.Has("identity") || !Command.Has("context")
+					|| !(Command["identity"] is String) || Command["identity"] == ""
+				throw ValueError("a canonical command requires labels and its nonempty identity")
+			Path := Command["labels"]
+			_MenuReloadReplayRequirePath(Path)
+			Path.ReplayIdentity := Command["identity"]
+			Path.ReplayContext := Command["context"]
+		} else
+			Path := Command
 		_MenuReloadReplayRequirePath(Path)
-	return Commands
+		Paths.Push(Path)
+	}
+	return Paths
 }
 
 /**
