@@ -2187,6 +2187,9 @@ local function queue_guardian_regeneration(context)
 			and retained.enabled_transaction == context.enabled_transaction
 		if equivalent and not retained.settled then
 			join_guardian_regeneration_context(retained, context)
+			Logger.info(LOG,
+				"Karabiner deploy decision: coalesced (a %s regeneration joined the one waiting for its guardian proof; one build, at most one reload).",
+				tostring(context.intent))
 			return true
 		end
 	end
@@ -5955,7 +5958,8 @@ function M.regenerate(
 			if type(on_done) == "function" then
 				retained.callbacks[#retained.callbacks + 1] = on_done
 			end
-			Logger.debug(LOG, "Joined retained %s regeneration after a layout change.",
+			Logger.info(LOG,
+				"Karabiner deploy decision: coalesced (joined the %s regeneration retained until the layout change settles).",
 				tostring(retained.intent))
 			return true
 		end

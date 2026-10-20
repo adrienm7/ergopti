@@ -3377,10 +3377,10 @@ function M.merge_and_deploy_config(
 			Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 			return false, detail, 0
 		end
-		Logger.debug(
-			LOG,
-			"Karabiner managed rules are unchanged; publication skipped after exact source revalidation."
-		)
+		-- One INFO line per decision: each publication makes Karabiner reload
+		-- every rule, so the log must show how often that happens and why.
+		Logger.info(LOG,
+			"Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).")
 		return true, "unchanged", 0
 	end
 
@@ -3403,6 +3403,10 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
+	Logger.info(LOG,
+		"Karabiner deploy decision: deployed (%s; %d bytes; Karabiner reloads every rule).",
+		source_snapshot.status == "absent" and "no karabiner.json yet"
+			or "the managed rules on disk differ", #content)
 	return true, deploy_detail or "ok", 1
 end
 
