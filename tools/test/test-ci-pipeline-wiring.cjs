@@ -3014,6 +3014,37 @@ for (const candidate of topJobs) {
  */
 // Exact intended independent receiver from the previously reviewed manual enrollment design.
 
+/**
+ * Each lane's jobs in file order, with the exact needs and the stage of each.
+ * Stages follow one another except for declared parallel siblings: the Linux
+ * Flatpak job builds from the package beside the install cells, and the
+ * verdict waits for both.
+ */
+const LANE_GRAPHS = {
+	[MACOS_BOX]: [
+		['test-hs', [], 'unit'],
+		['e2e-hs', ['test-hs'], 'e2e'],
+		['package-macos', ['e2e-hs'], 'build'],
+		['launch', ['package-macos'], 'testbuild'],
+		['macos-ok', ['launch'], 'verdict']
+	],
+	[WINDOWS_BOX]: [
+		['test-ahk', [], 'unit'],
+		['e2e-ahk', ['test-ahk'], 'e2e'],
+		['package-windows', ['e2e-ahk'], 'build'],
+		['launch-windows', ['package-windows'], 'testbuild'],
+		['windows-ok', ['launch-windows'], 'verdict']
+	],
+	[LINUX_BOX]: [
+		['test-linux', [], 'unit'],
+		['e2e-linux', ['test-linux'], 'e2e'],
+		['package-linux', ['e2e-linux'], 'build'],
+		['package-flatpak', ['package-linux'], 'build'],
+		['install-linux', ['package-linux'], 'testbuild'],
+		['linux-ok', ['install-linux', 'package-flatpak'], 'verdict']
+	]
+};
+
 function graphProblems(files) {
 	const problems = [];
 	const topLevel = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY);
@@ -3075,27 +3106,22 @@ function graphProblems(files) {
 			continue;
 		}
 		const jobs = pipeline.jobsOfText(entry.text, rel);
-		const sequence = {
-			[MACOS_BOX]: ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
-			[WINDOWS_BOX]: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
-			[LINUX_BOX]: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
-		}[rel];
-		const exposed = sequence;
-		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(exposed)) {
+		const graph = LANE_GRAPHS[rel];
+		const sequence = graph.map(([id]) => id);
+		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(sequence)) {
 			problems.push(
 				`${rel} must expose unit tests, E2E, package, installed launch and verdict in order`
 			);
 		}
-		for (const [index, id] of sequence.entries()) {
+		for (const [id, expected, stage] of graph) {
 			const job = jobs.find((candidate) => candidate.id === id);
-			const expected = index === 0 ? [] : [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
-			if (job && rel !== MACOS_BOX && index > 0 && index < 4) {
+			if (job && rel !== MACOS_BOX && stage !== 'unit' && stage !== 'verdict') {
 				const expectedOutputs = [
 					'    outputs:',
-					...(rel === LINUX_BOX && index === 2
+					...(id === 'package-linux'
 						? [
 								'      install_matrix: ${{ steps.install-plan.outputs.matrix }}',
 								'      install_metadata: ${{ steps.install-plan.outputs.metadata }}'
@@ -3105,9 +3131,7 @@ function graphProblems(files) {
 					'      ci_source_sha: ${{ github.sha }}',
 					'      ci_run_id: ${{ github.run_id }}',
 					'      ci_attempt: ${{ github.run_attempt }}',
-					...(rel === LINUX_BOX && index === 1
-						? ['      ci_unit_result: ${{ needs.test-linux.result }}']
-						: [])
+					...(id === 'e2e-linux' ? ['      ci_unit_result: ${{ needs.test-linux.result }}'] : [])
 				].join('\n');
 				const blocks = [...job.body.matchAll(/^ {4}outputs:\n((?: {6}[^\n]*(?:\n|$)|\n)*)/gm)];
 				if (blocks.length !== 1 || blocks[0][0].trimEnd() !== expectedOutputs)
@@ -3117,7 +3141,7 @@ function graphProblems(files) {
 				problems.push(`${rel} ${id} must remain a mandatory phase`);
 			}
 			const expectedCondition =
-				index === 4
+				stage === 'verdict'
 					? 'always()'
 					: rel === LINUX_BOX && id === 'package-linux'
 						? "${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
@@ -3141,7 +3165,7 @@ function graphProblems(files) {
 			.map((candidate) => candidate.id);
 		if (JSON.stringify(entries) !== JSON.stringify([sequence[0]]))
 			problems.push(rel + ' must retain exactly its unit entry.');
-		if (JSON.stringify(exits) !== JSON.stringify([sequence[4]]))
+		if (JSON.stringify(exits) !== JSON.stringify([sequence.at(-1)]))
 			problems.push(rel + ' must retain exactly its final verdict exit.');
 		for (const [id, needs] of needsOfJob) {
 			for (const need of needs) {
@@ -3376,7 +3400,7 @@ for (const [what, rel, from, to] of [
 	[
 		'a second exit in the Linux lane',
 		LINUX_BOX,
-		'    needs: [install-linux]\n    if: always()\n',
+		'    needs: [install-linux, package-flatpak]\n    if: always()\n',
 		'    if: always()\n'
 	]
 ]) {
@@ -4884,6 +4908,7 @@ function namingProblems(files) {
 								'package-macos': 'Build',
 								'package-windows': 'Build',
 								'package-linux': 'Build',
+								'package-flatpak': 'Flatpak',
 								launch: 'Install and launch',
 								'launch-windows': 'Install and launch',
 								'install-linux': 'Install and launch',
