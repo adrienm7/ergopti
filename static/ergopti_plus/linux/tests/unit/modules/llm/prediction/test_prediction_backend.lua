@@ -11,6 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
 
@@ -55,15 +56,16 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		end,
 	}
 	package.loaded["modules.llm.api_entries"] = { active = function() return entry end }
-	package.loaded["modules.llm.profiles"] = {
-		init = function() end,
+	local profiles = ProfilesFixture.without_inventory({
+		init = function() return true end,
 		is_enabled = function() return true end,
 		get_current_model = function() if not without_local_model then return "ollama-model" end end,
 		set_model = function(name, source, admission)
 			return require("infra.llm_preferences").set_many({ ["llm.models.ollama"] = name }, source, admission)
 		end,
 		get_base_url = function() return "http://127.0.0.1:11434" end,
-	}
+	})
+	package.loaded["modules.llm.profiles"] = profiles
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 3 end end,
 		resolve = function()
@@ -112,6 +114,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		package.loaded["modules.llm.prediction_engine"] = nil
 		package.loaded["modules.llm.settings"] = nil
+		profiles.assert_no_inventory()
 	end
 end
 

@@ -82,7 +82,7 @@ local _runtime_owner, _runtime_request = nil, nil
 local retire_runtime_request, stop_runtime_app
 local _request_epoch = 0
 local Collision = { navigation = NavigationSettings.capture_collision_configuration,
-	api_selections = setmetatable({}, { __mode = "k" }) }
+	api_selections = setmetatable({}, { __mode = "k" }), inventory = {} }
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
 -- tells the user it was refused (a desktop notification in the daemon).
@@ -523,6 +523,7 @@ function M.init(opts)
 	_enable_generation = _enable_generation + 1
 	local collision_revision, collision_construction = _enable_generation
 	local options = type(opts) == "table" and opts or {}
+	local on_models_changed = type(options.on_models_changed) == "function" and options.on_models_changed or nil
 	_engine = options.engine
 	_keyboard_hook = options.keyboard_hook
 	_overlay = type(options.overlay) == "table" and options.overlay or nil
@@ -574,7 +575,9 @@ function M.init(opts)
 
 	local profiles = get_profiles()
 	if profiles then
-		profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT })
+		if profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT, on_models_changed = on_models_changed }) == false then return false end
+		Collision.inventory.profiles, Collision.inventory.cancel, Collision.inventory.pending =
+			profiles, profiles.cancel_model_inventory, profiles.model_inventory_pending
 		if _runtime_closed or _scope_owner then return false end
 		if type(profiles.is_enabled) == "function" then
 			local enabled = profiles.is_enabled()
@@ -3046,9 +3049,13 @@ end
 stop_runtime_app = function()
 	_runtime_app_epoch = _runtime_app_epoch + 1
 	local owner = _runtime_owner
+	local profiles = Collision.inventory.profiles
+	local inventory_closed = not profiles or package.loaded["modules.llm.profiles"] == profiles
+		and profiles.cancel_model_inventory == Collision.inventory.cancel and type(Collision.inventory.cancel) == "function"
+		and Collision.inventory.cancel() == true
 	local retired = retire_runtime_request()
 	local stopped = not owner or owner.controller:stop_app() == true
-	return retired and stopped and _runtime_owner == owner
+	return inventory_closed and retired and stopped and _runtime_owner == owner
 		and (not owner or not owner.controller:has_debt())
 end
 --- Stops only this app's Ollama service for pause, scope or app shutdown.
@@ -3118,7 +3125,11 @@ end
 --- Reports retained runtime repair or app-service cleanup ownership.
 --- @return boolean pending
 function M.runtime_pending()
-	return (_runtime_request ~= nil and not _runtime_request:is_settled())
+	local profiles = Collision.inventory.profiles
+	local inventory_pending = profiles ~= nil and (package.loaded["modules.llm.profiles"] ~= profiles
+		or profiles.model_inventory_pending ~= Collision.inventory.pending or type(Collision.inventory.pending) ~= "function"
+		or Collision.inventory.pending() ~= false)
+	return inventory_pending or (_runtime_request ~= nil and not _runtime_request:is_settled())
 		or (_runtime_owner ~= nil and _runtime_owner.controller:has_debt())
 end
 --- Builds native composition lazily and classifies construction refusal.
@@ -3621,6 +3632,13 @@ function M.get_models()
 	return profiles and type(profiles.get_models) == "function" and profiles.get_models() or {}
 end
 
+--- Projects validated installed models without starting network work.
+--- @return table models Immediate array projection.
+function M.get_cached_models()
+	local profiles = get_profiles()
+	return profiles and type(profiles.get_cached_models) == "function" and profiles.get_cached_models() or {}
+end
+
 function M.get_current_model()
 	local profiles = get_profiles()
 	return profiles and type(profiles.get_current_model) == "function" and profiles.get_current_model() or nil
@@ -3673,8 +3691,14 @@ function M.download_model(model_tag, label, on_done)
 	return (Download.start(base_url, model_tag, label, function(succeeded, tag)
 		if not current() then return end
 		if succeeded then
-			M.refresh_models()
-			if not M.set_model(tag) then succeeded = false end
+			local profiles = get_profiles()
+			if not current() then return end
+			if not profiles or type(profiles.refresh_models_after_mutation) ~= "function" then succeeded = false
+			else
+				profiles.refresh_models_after_mutation()
+				if not current() then return end
+				if not M.set_model(tag) then succeeded = false end
+			end
 		end
 		if _runtime_closed or _scope_owner then return end
 		if type(on_done) == "function" then on_done(succeeded, tag) end

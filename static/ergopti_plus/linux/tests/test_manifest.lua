@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.downloads.test_model_browser_inventory_owner",
 	"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner",
 	"tests.unit.ui.editors.numeric_prompt.test_request_lifetime",
 	"tests.unit.modules.diagnostics.test_crash_privacy",
@@ -78,6 +79,7 @@ return {
 	"tests.meta.harness.test_prepared_native_port_import_isolation",
 	"tests.unit.adapters.network.test_curl_identity_helper",
 	"tests.unit.adapters.network.test_managed_http_public",
+	"tests.unit.adapters.network.test_http_failure_log_level",
 	"tests.unit.adapters.network.test_http_get_operation",
 	"tests.unit.adapters.network.test_managed_get_redirect_boundaries",
 	"tests.unit.adapters.network.test_managed_get_redirect_policy",
@@ -279,6 +281,7 @@ return {
 	"tests.unit.ui.editors.test_dashboard_bridge_actions",
 	"tests.unit.modules.dynamic_hotstrings.test_dynamic_hotstrings_manager",
 	"tests.meta.harness.test_e2e_contract",
+	"tests.unit.infra.lifecycle.test_startup_inventory_soak",
 	"tests.unit.modules.hotstrings.engine.test_engine_current_buffer",
 	"tests.meta.boot.test_error_dialog_wiring",
 	"tests.unit.adapters.runtime.test_event_loop_adapter",
