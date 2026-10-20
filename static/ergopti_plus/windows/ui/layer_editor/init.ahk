@@ -216,6 +216,9 @@ _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 				return Chr(Key[1])
 		}
 	}
+	; A row switched off is the OS layout's (LayoutRowIsEmulated).
+	if !LayoutRowIsEmulated(Sc)
+		return ""
 	if Registry {
 		Shift := false
 		if NumberRowEffectiveMode() == "symbols" && NumberRowSymbolsCapable(false) {

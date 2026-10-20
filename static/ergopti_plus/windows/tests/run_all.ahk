@@ -292,6 +292,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../../_shared/modules/features/number_row_policy.ahk
+#Include ../../_shared/modules/features/layout_rows_policy.ahk
 #Include ../../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
@@ -1896,6 +1897,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/platform/remap/altgr/test_altgr_probe_real_layouts.ahk
 #Include unit/modules/keymap/test_layout_digit_row_probe.ahk
 #Include unit/modules/keymap/test_number_row_symbols.ahk
+#Include unit/modules/keymap/test_layout_rows_policy.ahk
 #Include unit/modules/keymap/test_number_row_native_hkl.ahk
 #Include meta/platform/remap/altgr/test_altgr_kana_taphold_entry.ahk
 #Include meta/platform/remap/altgr/test_altgr_prefix_arms_on_press.ahk

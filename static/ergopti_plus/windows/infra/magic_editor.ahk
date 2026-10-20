@@ -245,7 +245,7 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 		return { Count: Step["Next"] != "" && Step["Next"] != KEYLAYOUT_NEUTRAL_STATE ? -1 : StrLen(Step["Output"]),
 			Text: Step["Output"] }
 	}
-	if Features["layout"]["ergopti_base"] {
+	if Features["layout"]["ergopti_base"] && LayoutRowIsEmulated(Scan) {
 		; The built-in emulation types its own number row (RegisterBuiltinNumberRow).
 		Row := NumberRowEmulatedBase(StrUpper(Scan))
 		if Row != ""

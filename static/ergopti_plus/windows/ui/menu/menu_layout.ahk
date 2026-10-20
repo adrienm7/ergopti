@@ -73,7 +73,8 @@ _LAY_LayoutFeatureBaseRows() {
 _LAY_LayoutFeatureAltGrRows() {
 	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true,
 		"direct_access_digits", true, "emulated_layout", true, "ergopti_variant", true,
-		"number_row_reorder_edges", true)
+		"number_row_reorder_edges", true, "emulate_number_row", true, "emulate_top_row", true,
+		"emulate_home_row", true, "emulate_bottom_row", true)
 	Rows := []
 	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {

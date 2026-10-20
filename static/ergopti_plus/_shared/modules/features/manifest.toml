@@ -3705,6 +3705,50 @@ enum_values = ["none", "ergopti", "ergopti_plus"]
 description_key = "menu.layout.ergopti_plus"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
+# The physical rows the layout emulation (a registry layout or the built-in
+# Ergopti one) types, each behind its own switch, all on: a row switched off
+# types what the OS layout types there, on every level the emulation covers,
+# and the number-row ordering then reads the OS layout's row. Which keys each
+# row holds is read from the shared physical-key registry by the shared policy
+# (layout_rows_policy.ahk and .lua, tests/corpus/layouts/layout_rows.json).
+# Windows alone emulates a layout: macOS installs it as a system input source
+# and Linux remaps through kanata, so their menus grey these rows with why.
+[[features.layout]]
+id = "emulate_number_row"
+platforms = ["ahk"]
+default = true
+recommended = true
+input_altering = true
+type = "boolean"
+description_key = "menu.layout.emulate_number_row"
+
+[[features.layout]]
+id = "emulate_top_row"
+platforms = ["ahk"]
+default = true
+recommended = true
+input_altering = true
+type = "boolean"
+description_key = "menu.layout.emulate_top_row"
+
+[[features.layout]]
+id = "emulate_home_row"
+platforms = ["ahk"]
+default = true
+recommended = true
+input_altering = true
+type = "boolean"
+description_key = "menu.layout.emulate_home_row"
+
+[[features.layout]]
+id = "emulate_bottom_row"
+platforms = ["ahk"]
+default = true
+recommended = true
+input_altering = true
+type = "boolean"
+description_key = "menu.layout.emulate_bottom_row"
+
 [[features.layout]]
 id = "ctrl_magic_save"
 platforms = ["ahk"]
@@ -5761,6 +5805,47 @@ type = "list"
 id = "layout_features_altgr"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
+
+# The rows the emulation types, one checkbox each (the layout.emulate_<row>
+# switches). The other drivers emulate no layout: they draw each row greyed
+# with why, in the custom-layout section, without this header.
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.header_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_number_row"
+i18n = "menu.layout.emulate_number_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_top_row"
+i18n = "menu.layout.emulate_top_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_home_row"
+i18n = "menu.layout.emulate_home_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_bottom_row"
+i18n = "menu.layout.emulate_bottom_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # The menubar icon, ONE row with its variants beneath it, last of the Ergopti
 # section. It was two sibling rows, one per variant, stored in hs.settings.

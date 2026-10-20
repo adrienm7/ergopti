@@ -524,6 +524,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/modules/features/number_row_policy.ahk
+#Include ../_shared/modules/features/layout_rows_policy.ahk
 #Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk

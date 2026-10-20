@@ -1163,6 +1163,18 @@ M.unavailable = {
 		path = "layout.ergopti_variant", section = "layout", reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys", platforms = { "ahk" },
 	},
 	{
+		path = "layout.emulate_number_row", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.emulate_top_row", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.emulate_home_row", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "layout.emulate_bottom_row", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
 		path = "layout.ctrl_magic_save", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{

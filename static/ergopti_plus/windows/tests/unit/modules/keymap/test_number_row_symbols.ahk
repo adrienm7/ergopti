@@ -266,7 +266,7 @@ _NRP_WithQwertyShapedForeground(Fn) {
 ; keys have their digit unshifted and a symbol on Shift, the OS layout's
 ; included, and stays inert elsewhere (number-row-native-symbols-first).
 _NRP_NativeSymbolsFirst() {
-	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, ConfigurationFile, _DriverDir
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, ConfigurationFile
 	State := MasterGateState()
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), ConfigurationFile]
 	Dir := _KLT_TempDir()
@@ -285,7 +285,7 @@ _NRP_NativeSymbolsFirst() {
 			AssertEqual("native", NumberRowEffectiveMode(), "AZERTY already types its symbols unshifted"),
 			AssertEqual("", NumberRowSymbolsFirstText(0x02, false, Hkl, false), "an inert choice types nothing")))
 		Source := _NRP_LayoutSource()
-		Start := InStr(Source, '#HotIf NumberRowEffectiveMode() == "symbols" && !KeylayoutEmulation_LayerIsActive("ergopti_base")')
+		Start := InStr(Source, '#HotIf NumberRowEffectiveMode() == "symbols" && !NumberRowRegistryOwnsRow()')
 		Finish := InStr(Source, "`n#HotIf`n", , Start)
 		AssertTrue(Start > 0 && Finish > Start, "the native symbols-first block must be found")
 		Block := SubStr(Source, Start, Finish - Start)
@@ -582,11 +582,97 @@ _NRP_NoHardcodedEdgeTable() {
 }
 Test("number row: no hardcoded edge-key table remains (number-row-edge-keys)", _NRP_NoHardcodedEdgeTable)
 
+; The four row switches (layout.emulate_<row>): a row switched off is left to
+; the OS layout by the registry emulation (its criteria), by the built-in one
+; (pass-through variants created before its layers) and by the AltGr layer,
+; and the number-row ordering reads the OS layout's row then
+; (layout-row-scopes).
+_NRP_RowScopes() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id
+	global LAYOUT_ROW_PASSTHROUGH_PREFIXES, ScriptInformation
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
+	try {
+		Total := 0
+		for Row, Keys in LayoutEmulationRows()
+			Total += Keys.Length
+		AssertEqual(48, Total, "13 number-row keys, 12 top-row, 12 home-row and 11 bottom-row keys")
+		AssertEqual("top_row", LayoutRowOf("sc010"), "a scan code name is read case-insensitively")
+		AssertEqual("", LayoutRowOf("SC039"), "the space bar belongs to no row")
+		; The registry emulation: Ergo-L with the top row switched off.
+		Layout := Map("emulated_layout", "ergol", "ergopti_base", true, "ergopti_alt_gr", true,
+			"ergopti_variant", "none", "direct_access_digits", "native", "emulate_number_row", true,
+			"emulate_top_row", false, "emulate_home_row", true, "emulate_bottom_row", true)
+		_NRP_UseLayout(Layout)
+		_KLT_Load("ergol")
+		AssertFalse(LayoutRowIsEmulated("SC010"), "the top row is switched off")
+		AssertTrue(LayoutRowIsEmulated("SC01E"), "the home row stays emulated")
+		AssertTrue(LayoutRowIsEmulated("SC039"), "a key outside the rows stays emulated")
+		AssertFalse(_KLE_BaseCriterion("SC010", false), "the registry emulation leaves a top-row key to the OS")
+		AssertFalse(_KLE_BaseCriterion("SC010", true), "and its Shift level")
+		AssertTrue(_KLE_BaseCriterion("SC01E", false), "while it keeps a home-row key")
+		AssertFalse(_KLE_ShortcutCriterion("^SC010"), "the shortcut chords of the top row are the OS layout's")
+		AssertTrue(_KLE_ShortcutCriterion("^SC01E"))
+		AssertFalse(LayoutRowIsEmulatedHotkey("SC138 & SC010"), "the AltGr level of a top-row key is the OS layout's")
+		AssertTrue(LayoutRowIsEmulatedHotkey("SC138 & SC01E"))
+		; The built-in emulation: the pass-through variants, created first.
+		Layout["emulated_layout"] := ""
+		Layout["ergopti_base"] := true
+		_NRP_UseLayout(Layout)
+		KLE_Model := 0
+		KLE_Id := ""
+		Names := Map()
+		Criteria := Map()
+		Current := {Criterion: 0}
+		Count := RegisterLayoutRowPassthrough((Name, Callback, Options) => (Names[Name] := Options, Criteria[Name] := Current.Criterion),
+			(Args*) => Current.Criterion := Args.Length ? Args[1] : 0)
+		AssertEqual(Total * LAYOUT_ROW_PASSTHROUGH_PREFIXES.Length, Count, "every level of every row key")
+		AssertEqual("I3", Names["!SC010"], "the Alt level keeps the Alt input level")
+		AssertTrue(Criteria["*SC010"].Call(), "a top-row key passes through to the OS layout")
+		AssertTrue(Criteria["+SC010"].Call(), "on its Shift level too")
+		AssertFalse(Criteria["*SC01E"].Call(), "a home-row key stays with the emulation")
+		Magic := ScriptInformation["MagicKeySourceScan"]
+		if LayoutRowOf(Magic) == "top_row" && Features["hotstrings"]["magic_key"]["replace"]["enabled"]
+			AssertFalse(Criteria["*" . StrUpper(Magic)].Call(), "the magic key keeps its key")
+		Layout["ergopti_base"] := false
+		_NRP_UseLayout(Layout)
+		AssertFalse(Criteria["*SC010"].Call(), "without the built-in emulation nothing passes through")
+		Source := _NRP_LayoutSource()
+		Passthrough := InStr(Source, "RegisterLayoutRowPassthrough()")
+		Remaps := InStr(Source, "for sc_int, entry in ErgoptiBaseMapping()")
+		Shift := InStr(Source, "`nRegisterShiftLayer()")
+		AssertTrue(Passthrough > 0 && Passthrough < Remaps && Remaps < Shift,
+			"the pass-through variants are created before the base remaps and the built-in layers")
+		AltGr := _StripFullLineComments(_DriverFuncBody("RegisterAltGrLayer"))
+		StrReplace(AltGr, "LayoutRowIsEmulatedHotkey(Name)", , , &AltGrGates)
+		AssertEqual(3, AltGrGates, "the three AltGr tables stand down on a row switched off")
+		; The ordering reads the OS layout's row when the number row is off.
+		Layout["ergopti_base"] := true
+		Layout["direct_access_digits"] := "digits"
+		_NRP_UseLayout(Layout)
+		_NRP_WithAzertyShapedForeground((Hkl) => (
+			AssertEqual("native", NumberRowEffectiveMode(), "the built-in Ergopti row cannot be reordered"),
+			Features["layout"]["emulate_number_row"] := false,
+			AssertEqual("digits", NumberRowEffectiveMode(), "its number row switched off, the AZERTY row decides"),
+			AssertEqual("", NumberRowEmulatedBase("SC029"), "and the edge keys are the OS layout's"),
+			AssertEqual("native", _DigitRowSwapResolution(0x02, Hkl, false)["source"])))
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+	}
+}
+Test("layout rows: a row switched off is left to the OS layout by every emulation (layout-row-scopes)",
+	_KLT_WithEmulation.Bind(_NRP_RowScopes))
+
 ; « Digits first » used to type Ergopti's « $ % = » on the edge keys on any
 ; layout. It reorders the ten digit keys only: the edges keep what the
 ; effective layout types there (number-row-effective-edges).
 _NRP_DigitsFirstLeavesTheEdges() {
-	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, _DriverDir
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id
 	State := MasterGateState()
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
 	try {
@@ -623,7 +709,7 @@ Test("number row: digits first reorders the ten digit keys and leaves the edges 
 ; The built-in Ergopti row has its digits on both levels: neither ordering can
 ; make base differ from Shift, and leaving it as is types Ergopti's digits.
 _NRP_BuiltinErgoptiOffersNoOrdering() {
-	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, ERGOPTI_SPEC, _SHIFT_DIGIT_SCS, _DriverDir
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, ERGOPTI_SPEC, _SHIFT_DIGIT_SCS
 	State := MasterGateState()
 	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone()]
 	try {
