@@ -3133,6 +3133,17 @@ These are software implementations; final hardware verification remains below.
       `tests/support/module_groups.lua` (7), Linux
       `tests/support/module_groups.lua` (6); the matrix gates check that each
       CI matrix equals its groups.
+- [ ] **Intermittent native CI fixtures (dev runs of October 19-20).** Each
+      run fails a different one, and each passed on the run before:
+      Windows `config` group (managed-network fixture state budget, then the
+      artifact curl full-duplex relay control; its fixture output is now
+      shown on failure), Linux `updater` (genuine-lua54-provider-preparation,
+      which clones cffi-lua from GitHub at test time), Linux
+      `desktop-webview` (run_llm_selection_focus.py "tone same-field": output
+      not offered, `cached_verdict` "unknown", 20 ms focus barrier) and the
+      macOS Go test `TestIdleDeadlinePhysicallyRetiresPeer` (100 ms idle clock
+      started with the peer process; raised to 1 s in ad03a898). Root-cause
+      each from its next failure output rather than re-running.
 - [ ] **Integrate the maintainer's fix branches regularly.** The maintainer
       runs one agent per OS on `fix/windows`, `fix/macos` and `fix/linux`.
       Regularly: `git fetch`, merge each into `dev` (`--no-ff`, resolve
