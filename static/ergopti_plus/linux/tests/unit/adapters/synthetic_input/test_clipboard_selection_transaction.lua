@@ -92,7 +92,7 @@ helpers.describe("clipboard selection transaction", function()
 			helpers.assert_true(ok, "the Wayland transform must succeed")
 			helpers.assert_true(shell.reads[1]:find("wl-paste", 1, true) ~= nil,
 				"Wayland reads must not fall back to an X11 tool")
-			helpers.assert_eq(shell.writes[1].command, "wl-copy",
+			helpers.assert_eq(shell.writes[1].command, "timeout 1 wl-copy",
 				"Wayland writes must stay on the selected backend")
 		end)
 	end)

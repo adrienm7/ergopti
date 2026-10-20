@@ -32,7 +32,7 @@
 --- 3. The paste keystroke goes through uinput like everything else, so it obeys
 ---    the same grab and the same ordering as the rest of an injection.
 --- 4. Bounded waits everywhere. A clipboard tool with no selection owner blocks
----    forever by design; every read is given a timeout so an expansion cannot
+---    forever by design; every read and write has a timeout so an expansion cannot
 ---    wedge the daemon.
 --- ==============================================================================
 
@@ -54,10 +54,9 @@ local LOG = "adapters.clipboard"
 -- ===============================================
 -- ===============================================
 
--- Seconds a clipboard read may take before it is abandoned. `xclip -o` with no
--- selection owner blocks forever rather than returning empty, and a blocked read
--- on the injection path is a frozen daemon.
-local READ_TIMEOUT_S = 1
+-- Seconds a clipboard operation may take before it is abandoned. A stalled
+-- display can block setters as well as readers and freeze the injection path.
+local IO_TIMEOUT_S = 1
 
 -- Milliseconds to let the target application register the new clipboard content
 -- before the paste keystroke arrives. A paste that races the set pastes what was
@@ -100,12 +99,12 @@ local function backend()
 				name  = "wl-clipboard",
 				-- --no-newline: wl-paste appends one, and an expansion that grows a
 				-- trailing newline every time it round-trips is a corruption.
-				read  = string.format("timeout %d wl-paste --no-newline 2>/dev/null", READ_TIMEOUT_S),
+				read  = string.format("timeout %d wl-paste --no-newline 2>/dev/null", IO_TIMEOUT_S),
 				write = "wl-copy",
 				-- A file manager publishes a copied selection under this target
 				-- (RFC 2483); the plain read gets its text form, if any.
 				read_uri_list = string.format(
-					"timeout %d wl-paste --no-newline --type text/uri-list 2>/dev/null", READ_TIMEOUT_S),
+					"timeout %d wl-paste --no-newline --type text/uri-list 2>/dev/null", IO_TIMEOUT_S),
 			}
 		end
 		return nil
@@ -115,16 +114,16 @@ local function backend()
 		if Shell.has_command("xclip") then
 			return {
 				name  = "xclip",
-				read  = string.format("timeout %d xclip -selection clipboard -o 2>/dev/null", READ_TIMEOUT_S),
+				read  = string.format("timeout %d xclip -selection clipboard -o 2>/dev/null", IO_TIMEOUT_S),
 				write = "xclip -selection clipboard -in",
 				read_uri_list = string.format(
-					"timeout %d xclip -selection clipboard -t text/uri-list -o 2>/dev/null", READ_TIMEOUT_S),
+					"timeout %d xclip -selection clipboard -t text/uri-list -o 2>/dev/null", IO_TIMEOUT_S),
 			}
 		end
 		if Shell.has_command("xsel") then
 			return {
 				name  = "xsel",
-				read  = string.format("timeout %d xsel --clipboard --output 2>/dev/null", READ_TIMEOUT_S),
+				read  = string.format("timeout %d xsel --clipboard --output 2>/dev/null", IO_TIMEOUT_S),
 				write = "xsel --clipboard --input",
 			}
 		end
@@ -170,7 +169,8 @@ end
 --- @param text string
 --- @return boolean
 local function write_backend_checked(selected_backend, text)
-	local ok, command = pcall(Shell.with_exact_stdin, selected_backend.write, text or "")
+	local bounded = string.format("timeout %d %s", IO_TIMEOUT_S, selected_backend.write)
+	local ok, command = pcall(Shell.with_exact_stdin, bounded, text or "")
 	if not ok then return false end
 	local ran, result = pcall(Shell.run, command)
 	return ran and result == true
@@ -208,16 +208,16 @@ end
 local function primary_read_command()
 	if DisplayServer.is_wayland() then
 		if Shell.has_command("wl-paste") then
-			return string.format("timeout %d wl-paste --primary --no-newline 2>/dev/null", READ_TIMEOUT_S)
+			return string.format("timeout %d wl-paste --primary --no-newline 2>/dev/null", IO_TIMEOUT_S)
 		end
 		return nil
 	end
 	if DisplayServer.is_x11() then
 		if Shell.has_command("xclip") then
-			return string.format("timeout %d xclip -selection primary -o 2>/dev/null", READ_TIMEOUT_S)
+			return string.format("timeout %d xclip -selection primary -o 2>/dev/null", IO_TIMEOUT_S)
 		end
 		if Shell.has_command("xsel") then
-			return string.format("timeout %d xsel --primary --output 2>/dev/null", READ_TIMEOUT_S)
+			return string.format("timeout %d xsel --primary --output 2>/dev/null", IO_TIMEOUT_S)
 		end
 	end
 	return nil
