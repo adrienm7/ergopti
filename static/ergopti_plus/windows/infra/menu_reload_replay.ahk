@@ -267,19 +267,19 @@ _MenuReloadReplayFindIdentity(Handle, Identity, WantedContext, Context, Matches,
 	try {
 		Loop _MenuReloadReplayCount(Handle) {
 			Position := A_Index - 1
-			Flags := DllCall("GetMenuState", "Ptr", Handle, "UInt", Position, "UInt", 0x400, "UInt")
+			Flags := TrayMenuHandleItemState(Handle, Position)
 			if Flags == 0xFFFFFFFF
 				throw OSError(A_LastError, A_ThisFunc, "The replay row's current state could not be read.")
 			if Flags & 0x3
 				continue
-			Sub := DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+			Sub := TrayMenuSubmenuHandle(Handle, Position)
 			if Sub {
 				Context.Push(_MenuReloadReplayContextPart(Sub, _MenuReloadReplayLabel(Handle, Position)))
 				_MenuReloadReplayFindIdentity(Sub, Identity, WantedContext, Context, Matches, Seen)
 				Context.Pop()
 				continue
 			}
-			ItemId := DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+			ItemId := TrayMenuHandleItemId(Handle, Position)
 			if _MenuReloadReplayIdentityOf(ItemId) == Identity && _MenuReloadReplayContextMatches(Context, WantedContext)
 				Matches.Push({ItemId: ItemId, Handle: Handle, Position: Position + 1,
 					Label: _MenuReloadReplayLabel(Handle, Position)})
@@ -310,7 +310,7 @@ _MenuReloadReplayResolveLabels(Path) {
 			Position := A_Index - 1
 			if _MenuReloadReplayLabel(Handle, Position) != Wanted
 				continue
-			Flags := DllCall("GetMenuState", "Ptr", Handle, "UInt", Position, "UInt", 0x400, "UInt")
+			Flags := TrayMenuHandleItemState(Handle, Position)
 			if Flags == 0xFFFFFFFF
 				throw OSError(A_LastError, A_ThisFunc, "The replay row's current state could not be read.")
 			if Flags & 0x3
