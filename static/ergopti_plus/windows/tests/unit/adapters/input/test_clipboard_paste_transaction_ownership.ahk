@@ -653,3 +653,5 @@ for Entry in ["GesturePastePlain", "PasteWithoutFormatting"] {
 			_PPH_ActualPlainPaste.Bind(Entry, Mode))
 	}
 }
+
+#Include test_clipboardall_external_lock.ahk
