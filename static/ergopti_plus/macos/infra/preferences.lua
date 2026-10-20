@@ -73,6 +73,7 @@ local Agent     = require("llm.agent")
 local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
+local CapsWordPolicy = require("caps_word.auto_off")
 local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
@@ -177,6 +178,8 @@ local KEY_MAP = {
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
 	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "chords_enabled" },
+	caps_word_idle_timeout_seconds       = { sec = "shortcuts", path = "caps_word", key = "idle_timeout_seconds" },
+	caps_word_terminators                = { sec = "shortcuts", path = "caps_word", key = "terminators" },
 
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
@@ -225,6 +228,8 @@ local NESTED_KEY_MAP = {
 	-- Shortcuts nested tables
 	shortcut_keys            = { sec = "shortcuts",  key = "keys"                       },
 	script_control_shortcuts = { sec = "shortcuts",  key = "script_control"             },
+	-- One boolean per manifest pointer kind (infra/capsword_auto_off).
+	caps_word_pointer        = { sec = "shortcuts",  key = "caps_word.pointer"          },
 	wrap_symbol_states       = WrapPreferences.locations.wrap_symbol_states,
 	custom_wrap_symbols      = WrapPreferences.locations.custom_wrap_symbols,
 }
@@ -237,6 +242,7 @@ local NESTED_KEY_MAP = {
 local MANIFEST_CHILD_TABLES = {
 	shortcut_keys            = true,
 	script_control_shortcuts = true,
+	caps_word_pointer        = true,
 	gesture_modes            = true,
 	gesture_sensitivities    = true,
 }
@@ -540,6 +546,16 @@ local SCALAR_VALUE_RULES = {
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
 	end,
 }
+-- The CapsWord delay and delimiters follow the shared policy's rules.
+SCALAR_VALUE_RULES.caps_word_idle_timeout_seconds = function(value)
+	if CapsWordPolicy.validate_idle_timeout(value) then return true end
+	return false, "the CapsWord delay is not a finite non-negative number of seconds"
+end
+SCALAR_VALUE_RULES.caps_word_terminators = function(value)
+	local valid, reason = CapsWordPolicy.validate_terminators(value)
+	if valid then return true end
+	return false, "the CapsWord delimiters are not distinct catalogue keys (" .. tostring(reason) .. ")"
+end
 
 --- Whether a persisted scalar still holds a value its owner accepts: its own
 --- rule, or membership of its manifest enum (ui.menubar_icon). A retired value
@@ -2043,7 +2059,8 @@ function M.merge_saved_data(state, saved)
 	local exclude_keys = { 
 		section_states = true, gesture_actions = true, 
 		gesture_modes = true, gesture_sensitivities = true, gesture_action_parameters = true,
-		shortcut_keys = true, hotstrings = true, script_control_shortcuts = true 
+		shortcut_keys = true, hotstrings = true, script_control_shortcuts = true,
+		caps_word_pointer = true,
 	}
 
 	for k, v in pairs(saved) do
@@ -2069,6 +2086,16 @@ function M.merge_saved_data(state, saved)
 
 	if type(saved.terminator_states) == "table" then
 		state.terminator_states = saved.terminator_states
+	end
+
+	-- A stored pointer kind overlays its default; an absent one keeps it.
+	if type(saved.caps_word_pointer) == "table" then
+		local merged = {}
+		for kind, enabled in pairs(type(state.caps_word_pointer) == "table" and state.caps_word_pointer or {}) do
+			merged[kind] = enabled
+		end
+		for kind, enabled in pairs(saved.caps_word_pointer) do merged[kind] = enabled end
+		state.caps_word_pointer = merged
 	end
 end
 

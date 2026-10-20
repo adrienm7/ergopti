@@ -16,6 +16,12 @@ local helpers = require("tests.helpers")
 local TOKEN_A = "0123456789abcdef0123456789abcdef"
 local TOKEN_B = "fedcba9876543210fedcba9876543210"
 
+--- A pointer event the watcher classifies; pointer motion ends CapsWord by default.
+--- @return table event
+local function mouse_moved()
+	return { getType = function() return 1 end }
+end
+
 
 -- =========================================
 -- =========================================
@@ -198,7 +204,7 @@ local function pointer(h, index)
 	h.clock = h.clock + 1
 	local callback = h.pointer_callbacks[index or #h.pointer_callbacks]
 	helpers.assert_true(type(callback) == "function", "a running watcher must expose its pointer callback")
-	callback({})
+	callback(mouse_moved())
 end
 
 --- Settles one captured serialized write exactly like ke_variables does.
@@ -378,7 +384,7 @@ helpers.describe("watchers CapsWord fences stale asynchronous callbacks", functi
 		helpers.assert_true(watcher_b ~= nil, "lease B must start")
 
 		h.clock = h.clock + 1
-		pointer_a({})
+		pointer_a(mouse_moved())
 		touch_a()
 		helpers.assert_eq(h.supersede_calls, 0, "queued lease A callbacks are inert")
 
@@ -429,7 +435,7 @@ helpers.describe("watchers CapsWord resource failures are fail-closed", function
 		helpers.assert_eq(h.watcher_stops, 1, "the exact partial tap is reclaimed")
 		helpers.assert_eq(#h.hook_calls, 0, "no touch-only half-feature remains")
 		h.clock = h.clock + 1
-		h.pointer_callbacks[1]({})
+		h.pointer_callbacks[1](mouse_moved())
 		helpers.assert_eq(h.supersede_calls, 0,
 			"a callback already queued by the refused tap is lifecycle-fenced")
 	end)

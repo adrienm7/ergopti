@@ -1020,6 +1020,14 @@ sg("capsword", function()
 			return
 		end
 		Logger.pcall(LOG, KeyState.set_capslock, true)
+		-- This write raises no Karabiner control signal: start the inactivity
+		-- delay that the watcher otherwise starts from the signal.
+		local watchers_ok, watchers = pcall(require, "platform.remap.watchers")
+		if not watchers_ok then
+			Logger.error(LOG, "CapsWord gesture cannot start the inactivity delay: %s.", tostring(watchers))
+			return
+		end
+		Logger.pcall(LOG, watchers.note_capsword_activated)
 	end
 	if not ke.set(KE_CAPSWORD_VARIABLE, KE_CAPSWORD_ACTIVE, finish_activation) then return end
 	-- A keystroke cannot toggle CapsLock: macOS delivers it as a flagsChanged

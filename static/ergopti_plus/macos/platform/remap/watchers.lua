@@ -3,18 +3,20 @@
 --- ==============================================================================
 --- MODULE: Karabiner Bridge Watchers
 --- DESCRIPTION:
---- Three event handlers for the Karabiner bridge: a pointer-event watcher that
---- deactivates CapsWord when the user reaches for the trackpad (any touch,
---- scroll, gesture, or click), a debounced input-source watcher that fires a
---- callback on each keyboard layout change, and a hotkey that cycles through
---- windows of the frontmost application.
+--- Three event handlers for the Karabiner bridge: a CapsWord watcher that ends
+--- CapsWord on what [shortcuts.caps_word] checks (a typed delimiter, the
+--- inactivity delay, a pointer kind: touch, gesture, motion, scroll or click),
+--- a debounced input-source watcher that fires a callback on each keyboard
+--- layout change, and a hotkey that cycles through windows of the frontmost
+--- application.
 ---
 --- FEATURES & RATIONALE:
---- 1. CapsWord Safety: Any pointer event signals the user has left the keyboard,
----    so CapsWord is cancelled automatically. Two complementary layers are used:
----    hs.eventtap catches clicks, scrolls, and cursor movement; the undocumented
----    MultitouchSupport frameCallback catches bare finger touches that eventtap
----    cannot see. A 100 ms subprocess throttle prevents CPU spikes.
+--- 1. CapsWord Auto-Off: the settings come from infra/capsword_auto_off and the
+---    shared policy decides each event. hs.eventtap catches keystrokes, clicks,
+---    scrolls, gestures and cursor movement; the undocumented MultitouchSupport
+---    frameCallback catches bare finger touches that eventtap cannot see. A
+---    100 ms throttle keeps pointer motion cheap; a typed delimiter and the
+---    delay switch CapsLock off at once, before the next letter.
 --- 2. Layout Awareness: macOS can emit two input-source notifications in rapid
 ---    succession during a layout switch. Debouncing coalesces them into a
 ---    single callback so the caller does not rebuild the KE config twice.
@@ -40,6 +42,8 @@ local MouseControl   = require("adapters.mouse_control")
 local Registrar      = require("adapters.hotkey_registrar")
 local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
+local CapsWordAutoOff = require("infra.capsword_auto_off")
+local AutoOffPolicy  = require("caps_word.auto_off")
 -- Layout observation does not own keyboard-control resources. Acquire this
 -- dependency only when the CapsWord generation starts its gesture watcher.
 local ControlSentinels = nil
@@ -66,6 +70,11 @@ local INPUT_SOURCE_DEBOUNCE_SEC = Timings.sec("debounce", "input_source_ms")
 local NANOSECONDS_PER_SECOND = 1000000000
 local CAPSWORD_CHECK_INTERVAL_NS = Timings.sec("ui", "capsword_check_interval_ms")
 	* NANOSECONDS_PER_SECOND
+local NANOSECONDS_PER_MILLISECOND = 1000000
+local MILLISECONDS_PER_SECOND = 1000
+-- otherMouseDown carries the button number: 2 is the middle button (0 and 1
+-- are the left and right buttons, which have event types of their own).
+local MIDDLE_BUTTON_NUMBER = 2
 
 -- Holds the pending debounce timer so consecutive notifications within the
 -- window supersede the previous one instead of triggering parallel rebuilds.
@@ -147,6 +156,11 @@ local _capsword_timer_cleanup_backlog = {}
 -- watcher closure owns an event queued before stop/restart.
 local _capsword_watcher_gen = 0
 
+-- CapsWord inactivity: the one-shot check timer, and the monotonic clock of the
+-- activation or keystroke it measures from. Declared above their closures.
+local _capsword_idle_timer = nil
+local _capsword_last_activity_ns = 0
+
 -- Partial starts return nil to their caller, so this module must retain any
 -- eventtap whose rollback failed; no outer layer ever received that capability.
 local _capsword_watcher_backlog = {}
@@ -218,7 +232,8 @@ end
 --- @param ok boolean Variable-write settlement.
 --- @param reason string Settlement reason.
 --- @param revision number Logical CapsWord revision settled by the writer.
-local function complete_capsword_clear(watcher_gen, ok, reason, revision)
+--- @param cause string What ended CapsWord, for the log.
+local function complete_capsword_clear(watcher_gen, ok, reason, revision, cause)
 	if watcher_gen ~= _capsword_watcher_gen then return end
 	_capsword_check_pending = false
 	if ok ~= true then
@@ -276,7 +291,16 @@ local function complete_capsword_clear(watcher_gen, ok, reason, revision)
 		return
 	end
 	_capsword_led_timer = timer_or_err
-	Logger.done(LOG, "CapsWord deactivated via pointer event.")
+	Logger.debug(LOG, "CapsWord clear settled (%s).", tostring(cause))
+end
+
+--- Cancels the inactivity timer, retaining a refused handle for the teardown.
+local function cancel_capsword_idle_timer()
+	if not _capsword_idle_timer then return end
+	if not cancel_scheduled_timer(_capsword_idle_timer, "CapsWord inactivity timer") then
+		retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_idle_timer)
+	end
+	_capsword_idle_timer = nil
 end
 
 --- Stops one native watcher without dropping a failed capability.
@@ -336,9 +360,14 @@ end
 --- whose Karabiner control signal it observed. karabiner_cli has no option to
 --- read a variable (no --get-variable), so no other activation can be detected
 --- and none is cleared. The clear is serialized and asynchronous; a throttle and
---- a pending flag keep pointer events from queuing duplicates.
+--- a pending flag keep pointer events from queuing duplicates. A keystroke cause
+--- (a checked delimiter, the inactivity delay) is never throttled and switches
+--- CapsLock off at once, before the event reaches the application: waiting for
+--- the asynchronous clear would capitalise the next letters.
 --- @param watcher_gen number Watcher lifecycle generation.
-local function deactivate_capsword(watcher_gen)
+--- @param cause string What ends CapsWord, for the log.
+--- @param immediate boolean|nil True for a keystroke cause.
+local function deactivate_capsword(watcher_gen, cause, immediate)
 	if watcher_gen ~= _capsword_watcher_gen then return end
 	if not drain_scheduled_backlog(_capsword_timer_cleanup_backlog,
 		"CapsWord timer backlog") then
@@ -347,7 +376,7 @@ local function deactivate_capsword(watcher_gen)
 	end
 	-- Throttle: mouseMoved fires at display refresh rate.
 	local now_ns = TimerScheduler.now_ns()
-	if now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
+	if not immediate and now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
 	-- Skip while an accepted clear is still settling.
 	if _capsword_check_pending then return end
 	_capsword_last_check_ns   = now_ns
@@ -355,7 +384,7 @@ local function deactivate_capsword(watcher_gen)
 	local supersede_callback_fired = false
 	local function finish_superseded_activation(ok, reason, revision)
 		supersede_callback_fired = true
-		complete_capsword_clear(watcher_gen, ok, reason, revision)
+		complete_capsword_clear(watcher_gen, ok, reason, revision, cause)
 	end
 	local supersede_ok, superseded_or_err = pcall(
 		KeVariables.supersede_capsword_activation,
@@ -368,11 +397,118 @@ local function deactivate_capsword(watcher_gen)
 		return
 	end
 	-- An accepted clear, or one that already settled, owns the pending flag.
-	if superseded_or_err == true or supersede_callback_fired then return end
+	if superseded_or_err == true or supersede_callback_fired then
+		if superseded_or_err == true then
+			Logger.info(LOG, "CapsWord deactivated: %s.", tostring(cause))
+			cancel_capsword_idle_timer()
+			if immediate then Logger.pcall(LOG, KeyState.set_capslock, false) end
+		end
+		return
+	end
 	_capsword_check_pending = false
 	if superseded_or_err ~= false then
 		Logger.error(LOG, "CapsWord activation supersession returned an invalid result: %s.",
 			tostring(superseded_or_err))
+	end
+end
+
+-- Forward declaration: the check and the scheduler call each other.
+local schedule_capsword_idle_check
+
+--- Ends CapsWord once the delay has passed since its activation or its last
+--- keystroke, or looks again when the remaining time is due.
+--- @param watcher_gen number Watcher lifecycle generation.
+--- @param handle table Exact timer this check belongs to.
+local function capsword_idle_check(watcher_gen, handle)
+	if watcher_gen ~= _capsword_watcher_gen or _capsword_idle_timer ~= handle then return end
+	_capsword_idle_timer = nil
+	if not KeVariables.capsword_known_active() then return end
+	local delay_ms = AutoOffPolicy.idle_delay_ms(CapsWordAutoOff.policy())
+	if not delay_ms then return end
+	local now_ms = TimerScheduler.now_ns() / NANOSECONDS_PER_MILLISECOND
+	local last_ms = _capsword_last_activity_ns / NANOSECONDS_PER_MILLISECOND
+	if AutoOffPolicy.idle_expired(CapsWordAutoOff.policy(), last_ms, now_ms) then
+		deactivate_capsword(watcher_gen,
+			string.format("no keystroke for %g s", delay_ms / MILLISECONDS_PER_SECOND), true)
+		return
+	end
+	schedule_capsword_idle_check(watcher_gen, (delay_ms - (now_ms - last_ms)) / MILLISECONDS_PER_SECOND)
+end
+
+--- Arms the one inactivity check of this watcher generation.
+--- @param watcher_gen number Watcher lifecycle generation.
+--- @param seconds number Delay before the check.
+schedule_capsword_idle_check = function(watcher_gen, seconds)
+	cancel_capsword_idle_timer()
+	local handle = nil
+	local fired_before_return = false
+	local ok, handle_or_err, committed = pcall(TimerScheduler.after, seconds, function()
+		if handle == nil then
+			fired_before_return = true
+			return
+		end
+		Logger.pcall(LOG, capsword_idle_check, watcher_gen, handle)
+	end)
+	handle = handle_or_err
+	if not ok or committed ~= true or type(handle_or_err) ~= "table" or fired_before_return then
+		if type(handle_or_err) == "table"
+			and not cancel_scheduled_timer(handle_or_err, "Rejected CapsWord inactivity timer") then
+			retain_cleanup_handle(_capsword_timer_cleanup_backlog, handle_or_err)
+		end
+		Logger.error(LOG, "CapsWord inactivity timer could not be armed: %s.",
+			tostring(ok and "timer unavailable" or handle_or_err))
+		return
+	end
+	_capsword_idle_timer = handle_or_err
+end
+
+--- Starts measuring inactivity from now, when a delay is configured.
+--- @param watcher_gen number Watcher lifecycle generation.
+local function start_capsword_idle_clock(watcher_gen)
+	cancel_capsword_idle_timer()
+	local delay_ms = AutoOffPolicy.idle_delay_ms(CapsWordAutoOff.policy())
+	if not delay_ms then return end
+	_capsword_last_activity_ns = TimerScheduler.now_ns()
+	schedule_capsword_idle_check(watcher_gen, delay_ms / MILLISECONDS_PER_SECOND)
+end
+
+--- Names the declared pointer kind of one pointer event.
+--- @param event table hs.eventtap.event of a watched pointer type.
+--- @param types table hs.eventtap.event.types.
+--- @return string kind
+local function capsword_pointer_kind(event, types)
+	local event_type = event:getType()
+	if event_type == types.mouseMoved or event_type == types.scrollWheel then return "pointer_motion" end
+	if event_type == types.gesture then return "gesture" end
+	if event_type == types.leftMouseDown then return "left_click" end
+	if event_type == types.rightMouseDown then return "right_click" end
+	if event_type == types.otherMouseDown then
+		local button = event:getProperty(hs.eventtap.event.properties.mouseEventButtonNumber)
+		return button == MIDDLE_BUTTON_NUMBER and "middle_click" or "other_buttons"
+	end
+	error("CapsWord watcher received an unwatched event type " .. tostring(event_type))
+end
+
+--- Handles one watched event: a keystroke while CapsWord is on resets the
+--- inactivity clock and ends CapsWord on a checked delimiter; a pointer event
+--- ends it when its kind is checked.
+--- @param watcher_gen number Watcher lifecycle generation.
+--- @param event table hs.eventtap.event.
+--- @param types table hs.eventtap.event.types.
+local function handle_capsword_event(watcher_gen, event, types)
+	if event:getType() == types.keyDown then
+		-- Every keystroke reaches this tap; only an active CapsWord costs anything.
+		if not KeVariables.capsword_known_active() then return end
+		_capsword_last_activity_ns = TimerScheduler.now_ns()
+		local text = event:getCharacters()
+		if AutoOffPolicy.ends_on_text(CapsWordAutoOff.policy(), text) then
+			deactivate_capsword(watcher_gen, "delimiter typed", true)
+		end
+		return
+	end
+	local kind = capsword_pointer_kind(event, types)
+	if AutoOffPolicy.ends_on_pointer(CapsWordAutoOff.policy(), kind) then
+		deactivate_capsword(watcher_gen, "pointer " .. kind)
 	end
 end
 
@@ -402,11 +538,19 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 	end
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
 	local watcher_gen = _capsword_watcher_gen
-	local function deactivate_current_capsword()
-		return deactivate_capsword(watcher_gen)
-	end
 	local ev = hs.eventtap.event.types
+	local function handle_current_event(event)
+		return handle_capsword_event(watcher_gen, event, ev)
+	end
+	-- A bare finger on the trackpad is a gesture kind for the CapsWord settings.
+	local function touch_current_capsword()
+		if AutoOffPolicy.ends_on_pointer(CapsWordAutoOff.policy(), "gesture") then
+			return deactivate_capsword(watcher_gen, "pointer gesture")
+		end
+	end
 	local watcher
+	-- Every type is armed and the settings filter each event: a menu change
+	-- applies at the next event without restarting this lease-owned tap.
 	local create_ok, watcher_or_err = pcall(hs.eventtap.new,
 		{
 			ev.mouseMoved,
@@ -415,12 +559,13 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 			ev.leftMouseDown,
 			ev.rightMouseDown,
 			ev.otherMouseDown,
+			ev.keyDown,
 		},
-		function(_event)
+		function(event)
 			if watcher_gen ~= _capsword_watcher_gen then return false end
 			-- This is the hottest eventtap. Keep the full entry guarded even though
 			-- each asynchronous clear settlement also has its own file-log boundary.
-			Logger.pcall(LOG, deactivate_current_capsword)
+			Logger.pcall(LOG, handle_current_event, event)
 			return false
 		end
 	)
@@ -449,7 +594,7 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		_gestures_engine = gestures_engine
 		local hook_ok, hook_err = pcall(
 			gestures_engine.set_any_touch_hook,
-			deactivate_current_capsword
+			touch_current_capsword
 		)
 		if not hook_ok then
 			_capsword_watcher_gen = _capsword_watcher_gen + 1
@@ -480,7 +625,15 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 			if watcher_gen ~= _capsword_watcher_gen then return end
 			local value = signal == ControlSentinels.CAPSWORD_ACTIVATED and 1
 				or (signal == ControlSentinels.CAPSWORD_DEACTIVATED and 0 or nil)
-			if value ~= nil then KeVariables.observe_capsword_state(value, lease_token) end
+			if value == nil then return end
+			if KeVariables.observe_capsword_state(value, lease_token) ~= true then return end
+			-- The inactivity delay counts from the activation; a Karabiner exit
+			-- (Escape, an arrow, CapsLock) leaves nothing to time out.
+			if value == 1 then
+				Logger.pcall(LOG, start_capsword_idle_clock, watcher_gen)
+			else
+				cancel_capsword_idle_timer()
+			end
 		end)
 	end
 	if not registered then
@@ -498,6 +651,16 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 	end
 	_capsword_listener_owned = true
 	return watcher
+end
+
+--- Starts the inactivity delay of a CapsWord this driver switched on itself (a
+--- gesture's CapsWord action writes the Karabiner variable, which raises no
+--- control signal). A no-op without a running watcher.
+--- @return boolean armed True when a running watcher took the activation.
+function M.note_capsword_activated()
+	if not _capsword_listener_owned then return false end
+	start_capsword_idle_clock(_capsword_watcher_gen)
+	return true
 end
 
 --- Stops every CapsWord pointer resource owned by this remap generation.
@@ -533,6 +696,14 @@ function M.stop_gesture_watcher(watcher)
 			all_stopped = false
 		end
 	end
+	if _capsword_idle_timer then
+		if cancel_scheduled_timer(_capsword_idle_timer, "CapsWord inactivity timer") then
+			_capsword_idle_timer = nil
+		else
+			all_stopped = false
+		end
+	end
+	_capsword_last_activity_ns = 0
 	for index = #_capsword_timer_cleanup_backlog, 1, -1 do
 		if cancel_scheduled_timer(_capsword_timer_cleanup_backlog[index],
 			"CapsWord timer backlog") then
