@@ -234,6 +234,7 @@ jobs:
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.navigation.outcome == 'success' }}
         shell: pwsh
         env:
+          ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
           ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-fixes.json' }}
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'ahk-replay-evidence'
