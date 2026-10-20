@@ -1704,6 +1704,11 @@ jobs:
 
   package-macos:
     name: Build
+    # Reads this run's jobs and artifacts to wait for the qualified native
+    # inputs that the E2E cells running beside it upload.
+    permissions:
+      contents: read
+      actions: read
     needs:
       - test-hs
     runs-on: macos-latest
@@ -2234,6 +2239,15 @@ jobs:
       # grants survive an update; without it the build signs ad hoc and every
       # update costs users each permission. A release still builds without it
       # until the secrets exist, but says so with a warning on the run.
+      # Build runs beside E2E, so the qualified native inputs it packages may
+      # still be in their "Managed Ollama" cells here. Wait until both cells
+      # succeeded and uploaded them; a failed cell stops the build at once.
+      - name: Await both source-qualified native producer inputs
+        if: ${{ steps.stage-admission.outcome == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/ci/managed-ollama-handoff.cjs await-qualified
+        timeout-minutes: 40
       - name: Receive both source-qualified native producer inputs
         if: ${{ steps.stage-admission.outcome == 'success' }}
         uses: actions/download-artifact@v4
