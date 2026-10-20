@@ -3123,7 +3123,8 @@ These are software implementations; final hardware verification remains below.
       with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade failed where
       Homebrew clones `homebrew/core` ("Could not resolve host": the
       acceptance sandbox has no network and API installs are off). 3d298e30
-      gives the owned prefix an empty core tap repository. - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
+      gives the owned prefix an empty core tap repository; the method passed
+      on dev run 39379134161 (139 s). - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
       hit a deadline, likely the same proxy fallback. - Shortcuts discovery, launch AppleEvents and the 27 owned-runtime XCTest
       methods: fixes are committed but never reached a fully green Build
       and Install-and-launch run, because a plain dispatch keeps the
@@ -3144,7 +3145,12 @@ These are software implementations; final hardware verification remains below.
       now Linux: Build (~7 min, one packaging step builds every format) then the installed-archive install cells (~5 min).
       The installed-archive cells now run their unit suite as parallel
       module groups (04159f1c): 4-5 min each before, 2 min on run 39332388305
-      (unit step 95-120 s instead of about 250 s). Next steps: build the Linux
+      (unit step 95-120 s instead of about 250 s). Running the .deb, .rpm and
+      Flatpak packagers at once (ef64441e) left the step at 292 s (289 s
+      before): the Flatpak build alone sets it. A builder cache is out (package
+      jobs compile clean, `test-ci-pipeline-wiring.cjs`), so the gain is a
+      separate Flatpak job built from the same bundle artifact, letting the
+      other install cells start about four minutes earlier. Next steps: build the Linux
       packages per format in parallel (keeping every install cell bound to the
       exact bytes it installs), and keep the graph symmetric (one row per OS,
       the same columns). All unit suites are already sharded by module group:
