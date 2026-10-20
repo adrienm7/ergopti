@@ -148,7 +148,11 @@ final class OwnedRuntimeInstallTree {
 		try aclProtection(descriptor)
 	}
 	private func aclProtection(_ descriptor: Int32) throws {
-		guard let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else { throw OwnedRuntimeInstallFailure.protection }
+		errno = 0
+		guard let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else {
+			if errno == ENOENT { return } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
+			throw OwnedRuntimeInstallFailure.protection
+		}
 		defer { acl_free(UnsafeMutableRawPointer(acl)) }
 		guard acl_valid(acl) == 0 else { throw OwnedRuntimeInstallFailure.protection }
 		var entry: acl_entry_t?; errno = 0
