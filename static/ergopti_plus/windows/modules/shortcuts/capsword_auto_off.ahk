@@ -46,6 +46,10 @@ class CapsWordAutoOff {
 	static Values := ""
 	; Policy of the active CapsWord, "" while disarmed.
 	static Armed := ""
+	; Monotonic authority: a retired callback cannot borrow a later activation.
+	static Generation := 0
+	; Callback identities retained for this activation and its exact cleanup.
+	static Callbacks := Map()
 	; What ends CapsWord: called with the reason and the pointer kind ("" otherwise).
 	static EndFn := ""
 	; [event type, callback] pairs registered on HookDispatcher.
@@ -266,22 +270,21 @@ CapsWordAutoOffPolledKind() {
 	return "pointer_motion"
 }
 
-; Stable bound callbacks: HookDispatcher.Unregister compares identities, and a
-; static initializer resolves at any time after parse (no include-position
-; global), as capsword.ahk's own accessor does.
+; Each activation owns distinct bound callbacks. HookDispatcher may already
+; hold a snapshot when its old subscriptions are removed. The class fields are
+; initialized on first access, including before this file's include position.
 _CapsWordAutoOffCallbacks() {
-	static Bound := _CapsWordAutoOffBindCallbacks()
-	return Bound
+	return CapsWordAutoOff.Callbacks
 }
 
-_CapsWordAutoOffBindCallbacks() {
+_CapsWordAutoOffBindCallbacks(Generation) {
 	Bound := Map(
-		"char", _CapsWordAutoOff_OnChar.Bind(),
-		"key_down", _CapsWordAutoOff_OnKeyDown.Bind(),
-		"idle", _CapsWordAutoOff_OnIdle.Bind(),
-		"motion", _CapsWordAutoOff_OnMotionPoll.Bind())
+		"char", _CapsWordAutoOff_OnChar.Bind(Generation),
+		"key_down", _CapsWordAutoOff_OnKeyDown.Bind(Generation),
+		"idle", _CapsWordAutoOff_OnIdle.Bind(Generation),
+		"motion", _CapsWordAutoOff_OnMotionPoll.Bind(Generation))
 	for Event, Kind in CapsWordAutoOffPointerEvents()
-		Bound[Event] := _CapsWordAutoOff_OnPointer.Bind(Kind)
+		Bound[Event] := _CapsWordAutoOff_OnPointer.Bind(Generation, Kind)
 	return Bound
 }
 
@@ -298,13 +301,12 @@ _CapsWordAutoOffBindCallbacks() {
 ; Arms the listeners of one active CapsWord.
 ; @param EndFn {Func} Ends CapsWord; called with the reason and the pointer kind.
 CapsWordAutoOffArm(EndFn) {
+	global CapsWordEnabled
 	if !HasMethod(EndFn, "Call")
 		throw TypeError("CapsWordAutoOffArm needs the function that ends CapsWord.")
-	CapsWordAutoOffDisarm()
+	Generation := CapsWordAutoOffDisarm()
 	Policy := CapsWordAutoOffCurrentPolicy()
-	Callbacks := _CapsWordAutoOffCallbacks()
-	CapsWordAutoOff.Armed := Policy
-	CapsWordAutoOff.EndFn := EndFn
+	Callbacks := _CapsWordAutoOffBindCallbacks(Generation)
 	Subscriptions := [[HookDispatcherConst.EVT_KB_CHAR, Callbacks["char"]]]
 	if Policy["idle_ms"] > 0
 		Subscriptions.Push([HookDispatcherConst.EVT_KB_DOWN, Callbacks["key_down"]])
@@ -312,43 +314,63 @@ CapsWordAutoOffArm(EndFn) {
 		if CapsWordAutoOffEndsOnPointer(Policy, Kind)
 			Subscriptions.Push([Event, Callbacks[Event]])
 	}
-	for Pair in Subscriptions
-		HookDispatcher.Register(Pair[1], Pair[2])
-	CapsWordAutoOff.Subscriptions := Subscriptions
-	if Policy["idle_ms"] > 0 {
-		TimerArmOneShotMs(Callbacks["idle"], Policy["idle_ms"])
-		CapsWordAutoOff.IdleRunning := true
-	}
-	if CapsWordAutoOffEndsOnPointer(Policy, CapsWordAutoOffPolledKind()) {
-		CapsWordAutoOff.LastPointer := _CapsWordAutoOffPointerPosition()
-		SetTimer(Callbacks["motion"], TimingsGet("ui", "capsword_check_interval_ms"))
-		CapsWordAutoOff.MotionRunning := true
-	}
+	Motion := CapsWordAutoOffEndsOnPointer(Policy, CapsWordAutoOffPolledKind())
+	Position := Motion ? _CapsWordAutoOffPointerPosition() : ""
+	PreviousCritical := Critical("On")
+	try {
+		if Generation != CapsWordAutoOff.Generation || !IsSet(CapsWordEnabled) || !CapsWordEnabled
+			return false
+		CapsWordAutoOff.Armed := Policy
+		CapsWordAutoOff.EndFn := EndFn
+		CapsWordAutoOff.Callbacks := Callbacks
+		CapsWordAutoOff.Subscriptions := Subscriptions
+		for Pair in Subscriptions
+			HookDispatcher.Register(Pair[1], Pair[2])
+		if Policy["idle_ms"] > 0 {
+			TimerArmOneShotMs(Callbacks["idle"], Policy["idle_ms"])
+			CapsWordAutoOff.IdleRunning := true
+		}
+		if Motion {
+			CapsWordAutoOff.LastPointer := Position
+			SetTimer(Callbacks["motion"], TimingsGet("ui", "capsword_check_interval_ms"))
+			CapsWordAutoOff.MotionRunning := true
+		}
+	} finally Critical(PreviousCritical)
 	LoggerDebug("CapsWord", "Auto-off armed: {1} subscription(s), delay={2} ms, motion poll={3}.",
-		Subscriptions.Length, Policy["idle_ms"], CapsWordAutoOff.MotionRunning ? "on" : "off")
+		Subscriptions.Length, Policy["idle_ms"], Motion ? "on" : "off")
+	return true
 }
 
-; Removes every listener of the active CapsWord. Safe when nothing is armed.
-CapsWordAutoOffDisarm() {
-	if !(CapsWordAutoOff.Armed is Map) && CapsWordAutoOff.Subscriptions.Length == 0
-			&& !CapsWordAutoOff.IdleRunning && !CapsWordAutoOff.MotionRunning
-		return
-	Callbacks := _CapsWordAutoOffCallbacks()
-	for Pair in CapsWordAutoOff.Subscriptions
-		HookDispatcher.Unregister(Pair[1], Pair[2])
-	CapsWordAutoOff.Subscriptions := []
-	if CapsWordAutoOff.IdleRunning {
-		TimerSetCallback(Callbacks["idle"], 0)
+; Detach authority before unregistering or logging. Cleanup uses only callbacks
+; of the retired activation, so an interruption cannot cancel its successor.
+; @param ExpectedGeneration {Integer} Optional originating callback authority.
+; @returns {Integer|Boolean} Retirement generation, or false for an old callback.
+CapsWordAutoOffDisarm(ExpectedGeneration := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(ExpectedGeneration) && ExpectedGeneration != CapsWordAutoOff.Generation
+			return false
+		Generation := ++CapsWordAutoOff.Generation
+		Callbacks := _CapsWordAutoOffCallbacks()
+		Subscriptions := CapsWordAutoOff.Subscriptions
+		Idle := CapsWordAutoOff.IdleRunning, Motion := CapsWordAutoOff.MotionRunning
+		HadOwner := CapsWordAutoOff.Armed is Map
+		CapsWordAutoOff.Subscriptions := []
 		CapsWordAutoOff.IdleRunning := false
-	}
-	if CapsWordAutoOff.MotionRunning {
-		TimerSetCallback(Callbacks["motion"], 0)
 		CapsWordAutoOff.MotionRunning := false
-	}
-	CapsWordAutoOff.Armed := ""
-	CapsWordAutoOff.EndFn := ""
-	CapsWordAutoOff.LastPointer := ""
-	LoggerDebug("CapsWord", "Auto-off disarmed.")
+		CapsWordAutoOff.Armed := ""
+		CapsWordAutoOff.EndFn := ""
+		CapsWordAutoOff.LastPointer := ""
+	} finally Critical(PreviousCritical)
+	for Pair in Subscriptions
+		HookDispatcher.Unregister(Pair[1], Pair[2])
+	if Idle
+		TimerSetCallback(Callbacks["idle"], 0)
+	if Motion
+		TimerSetCallback(Callbacks["motion"], 0)
+	if HadOwner || Subscriptions.Length || Idle || Motion
+		LoggerDebug("CapsWord", "Auto-off disarmed.")
+	return Generation
 }
 
 ; Whether a key the driver binds itself, typing the delimiter Key, ends the
@@ -376,22 +398,32 @@ CapsWordAutoOffEndsOnNativeKey(Key) {
 
 ; Whether an armed listener still speaks for an active CapsWord. A flag cleared
 ; without DisableCapsWord leaves listeners that disarm themselves here.
-_CapsWordAutoOffActive() {
+_CapsWordAutoOffActive(Generation) {
 	global CapsWordEnabled
-	if !(CapsWordAutoOff.Armed is Map)
+	if Generation != CapsWordAutoOff.Generation || !(CapsWordAutoOff.Armed is Map)
 		return false
 	if IsSet(CapsWordEnabled) && CapsWordEnabled
 		return true
-	CapsWordAutoOffDisarm()
+	CapsWordAutoOffDisarm(Generation)
 	return false
 }
 
 ; Disarms, logs the reason once, and ends CapsWord through its owner.
-_CapsWordAutoOffEnd(Reason, Kind := "") {
+_CapsWordAutoOffEnd(Generation, Reason, Kind := "") {
+	if !_CapsWordAutoOffActive(Generation)
+		return
 	EndFn := CapsWordAutoOff.EndFn
-	CapsWordAutoOffDisarm()
+	Retired := CapsWordAutoOffDisarm(Generation)
+	if !Retired
+		return
 	LoggerInfo("CapsWord", "CapsWord switched off automatically ({1}).", Reason)
-	EndFn.Call(Reason, Kind)
+	PreviousCritical := Critical("On")
+	try {
+		; The terminal callback clears CapsWordEnabled. Keep its authority check
+		; and that publication together; a new activation must survive old logs.
+		if CapsWordAutoOff.Generation == Retired
+			EndFn.Call(Reason, Kind)
+	} finally Critical(PreviousCritical)
 }
 
 ; Reports text the driver itself has put on screen: the layout emulation's
@@ -403,10 +435,11 @@ _CapsWordAutoOffEnd(Reason, Kind := "") {
 ; ring does not record either (a poke later erased) is never reported.
 ; @param Text {String} The literal characters that reached the screen.
 CapsWordAutoOffObserveOutput(Text) {
-	if Type(Text) != "String" || Text == "" || !_CapsWordAutoOffActive()
+	Generation := CapsWordAutoOff.Generation
+	if Type(Text) != "String" || Text == "" || !_CapsWordAutoOffActive(Generation)
 		return
 	if CapsWordAutoOffEndsOnText(CapsWordAutoOff.Armed, Text)
-		_CapsWordAutoOffEnd("a delimiter in " . StrLen(Text) . " sent character(s)")
+		_CapsWordAutoOffEnd(Generation, "a delimiter in " . StrLen(Text) . " sent character(s)")
 }
 
 ; A readable name for a typed delimiter in the log.
@@ -417,31 +450,40 @@ _CapsWordAutoOffDescribe(Text) {
 	return Out
 }
 
-_CapsWordAutoOff_OnChar(Hook, Char) {
-	if !_CapsWordAutoOffActive()
+_CapsWordAutoOff_OnChar(Generation, Hook, Char) {
+	if !_CapsWordAutoOffActive(Generation)
 		return
 	if CapsWordAutoOffEndsOnText(CapsWordAutoOff.Armed, Char)
-		_CapsWordAutoOffEnd("delimiter " . _CapsWordAutoOffDescribe(Char))
+		_CapsWordAutoOffEnd(Generation, "delimiter " . _CapsWordAutoOffDescribe(Char))
 }
 
-_CapsWordAutoOff_OnKeyDown(Hook, Vk, Sc) {
-	if !_CapsWordAutoOffActive() || !CapsWordAutoOff.IdleRunning
+_CapsWordAutoOff_OnKeyDown(Generation, Hook, Vk, Sc) {
+	if !_CapsWordAutoOffActive(Generation) || !CapsWordAutoOff.IdleRunning
 		return
-	; A keystroke restarts the delay: re-arming the same callback replaces its pending period.
-	TimerArmOneShotMs(_CapsWordAutoOffCallbacks()["idle"], CapsWordAutoOff.Armed["idle_ms"])
+	; A keystroke restarts the delay; the timer adapter replaces its pending period.
+	PreviousCritical := Critical("On")
+	try {
+		if Generation == CapsWordAutoOff.Generation && CapsWordAutoOff.Armed is Map
+			TimerArmOneShotMs(_CapsWordAutoOffCallbacks()["idle"], CapsWordAutoOff.Armed["idle_ms"])
+	} finally Critical(PreviousCritical)
 }
 
-_CapsWordAutoOff_OnIdle() {
-	CapsWordAutoOff.IdleRunning := false
-	if A_IsSuspended || !_CapsWordAutoOffActive()
+_CapsWordAutoOff_OnIdle(Generation) {
+	PreviousCritical := Critical("On")
+	try {
+		if Generation != CapsWordAutoOff.Generation
+			return
+		CapsWordAutoOff.IdleRunning := false
+	} finally Critical(PreviousCritical)
+	if A_IsSuspended || !_CapsWordAutoOffActive(Generation)
 		return
-	_CapsWordAutoOffEnd("no keystroke for " . CapsWordAutoOff.Armed["idle_ms"] . " ms")
+	_CapsWordAutoOffEnd(Generation, "no keystroke for " . CapsWordAutoOff.Armed["idle_ms"] . " ms")
 }
 
-_CapsWordAutoOff_OnPointer(Kind, *) {
-	if !_CapsWordAutoOffActive()
+_CapsWordAutoOff_OnPointer(Generation, Kind, *) {
+	if !_CapsWordAutoOffActive(Generation)
 		return
-	_CapsWordAutoOffEnd("pointer " . Kind, Kind)
+	_CapsWordAutoOffEnd(Generation, "pointer " . Kind, Kind)
 }
 
 ; The pointer position in screen coordinates, as "x,y". CoordMode is
@@ -452,11 +494,11 @@ _CapsWordAutoOffPointerPosition() {
 	return X . "," . Y
 }
 
-_CapsWordAutoOff_OnMotionPoll() {
-	if A_IsSuspended || !_CapsWordAutoOffActive()
+_CapsWordAutoOff_OnMotionPoll(Generation) {
+	if A_IsSuspended || !_CapsWordAutoOffActive(Generation)
 		return
 	Position := _CapsWordAutoOffPointerPosition()
 	if Position == CapsWordAutoOff.LastPointer
 		return
-	_CapsWordAutoOffEnd("pointer " . CapsWordAutoOffPolledKind(), CapsWordAutoOffPolledKind())
+	_CapsWordAutoOffEnd(Generation, "pointer " . CapsWordAutoOffPolledKind(), CapsWordAutoOffPolledKind())
 }
