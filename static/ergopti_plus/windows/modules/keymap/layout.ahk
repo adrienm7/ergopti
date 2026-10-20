@@ -642,7 +642,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; =============================
 
 
-#HotIf NumberRowEffectiveMode() == "digits"
+#HotIf NumberRowEffectiveMode() == "digits" && !TapHoldKanaAltGrHeld()
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
 ; Otherwise, there is a problem of digit password boxes that skips to the n+2 box instead of n+2 because two down key events are sent by key
@@ -682,8 +682,10 @@ SC00B Up:: _DigitRowUp("0")
 
 ; « Symbols first » on a row no registry layout owns (the OS layout's or the
 ; built-in Ergopti one): the registry emulation types its own levels swapped
-; (keylayout_emulation.ahk), so these stand down while it owns the row.
-#HotIf NumberRowEffectiveMode() == "symbols" && !NumberRowRegistryOwnsRow()
+; (keylayout_emulation.ahk), so these stand down while it owns the row. Every
+; number-row hotkey also stands down under a held Kana AltGr, which AutoHotkey
+; does not count as a modifier: the layout's AltGr level must stay its own.
+#HotIf NumberRowEffectiveMode() == "symbols" && !NumberRowRegistryOwnsRow() && !TapHoldKanaAltGrHeld()
 SC002:: _NumberRowSymbolsFirstSend(0x02, false)
 +SC002:: _NumberRowSymbolsFirstSend(0x02, true)
 SC003:: _NumberRowSymbolsFirstSend(0x03, false)
@@ -721,33 +723,6 @@ SC00D:: _NumberRowEdgeSend(0x0D, false)
 +SC00D:: _NumberRowEdgeSend(0x0D, true)
 #HotIf
 
-; A registry layout types the other level through its own action machine.
-_NumberRowEdgeSend(Sc, Shift, *) {
-	Hkl := GetForegroundKeyboardLayout()
-	Caps := GetKeyState("CapsLock", "T")
-	Text := NumberRowEdgeText(Sc, Shift, Hkl, Caps)
-	if Text == "" {
-		try LoggerWarn("Layout", "SC{1:03X}: the edge keys are no longer reordered on the layout of the press; nothing typed.", Sc)
-		return
-	}
-	if _DigitRowEffectiveKey(Sc, Hkl, Caps)["source"] == "emulated" {
-		_KLE_Emit(Format("SC{:03X}", Sc), !Shift, false)
-		return
-	}
-	_DigitShiftSend(Text)
-}
-
-; The level is read again on the layout of the press: a layout switch between
-; the criterion and this thread leaves nothing to type, which is logged.
-_NumberRowSymbolsFirstSend(Sc, Shift, *) {
-	Text := NumberRowSymbolsFirstText(Sc, Shift, GetForegroundKeyboardLayout(), GetKeyState("CapsLock", "T"))
-	if Text == "" {
-		try LoggerWarn("Layout", "SC{1:03X}: symbols first no longer applies on the layout of the press; nothing typed.", Sc)
-		return
-	}
-	_DigitShiftSend(Text)
-}
-
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),
 ; while the unshifted key already sends the digit via the block above.
@@ -765,52 +740,8 @@ try {
 } finally {
 	HotIf()
 }
-
-_DigitRowSwapIsLive(Sc, ForegroundFn := 0, *) {
-	Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
-	return _DigitRowSwapResolution(Sc, Hkl)["swap"]
-}
-
-; The symbol is read again on the layout of the press: a layout switch between
-; the criterion and this thread leaves nothing to type, which is logged.
-_DigitRowSwapSend(Sc, ForegroundFn := 0, *) {
-	Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
-	Resolution := _DigitRowSwapResolution(Sc, Hkl)
-	if !Resolution["swap"] {
-		try LoggerWarn("Layout", "Shift+SC{1:03X}: the foreground layout changed during the press; nothing typed.", Sc)
-		return
-	}
-	if Resolution["source"] == "emulated" {
-		; A real press, unlike the neutral-state probe, advances the source's own
-		; action/dead-key machine on its effective unshifted level.
-		_KLE_Emit(Format("SC{:03X}", Sc), false, false)
-		return
-	}
-	if Resolution["source"] == "builtin" && Resolution["descriptor"]["Kind"] != "text" {
-		; The shipped Ergopti rows type text; a dead key here has no emitter.
-		try LoggerError("Layout", "Shift+SC{1:03X}: the built-in row's unshifted level is not text ({2}); nothing typed.",
-			Sc, Resolution["descriptor"]["Kind"])
-		return
-	}
-	; Native symbols retain the established Unicode path and emission timing.
-	_DigitShiftSend(Resolution["descriptor"]["Text"])
-}
-
-; Top-level helper for the shifted-symbol send — must be at module scope so
-; AHK v2 hoists it before the if-block above executes.
-_DigitShiftSend(Symbol, *) {
-	; Critical("On") so this shifted-symbol emit shares the one atomicity
-	; contract with _RemapEmit / _DigitRowDown and cannot interleave with a
-	; neighbouring remap's SendEvent (remap-emit-critical-uneven).
-	Critical("On")
-	; SendEvent {Text} bypasses the keyboard hook and sends the Unicode
-	; character directly, so the SC002–SC00B digit remaps never interfere.
-	SendEvent("{Text}" . Symbol)
-	; Same rule as _RemapEmit: an armed dead-key hook eats this character, so it
-	; must not be recorded as having reached the screen.
-	if _EmitReachedScreen()
-		UpdateLastSentCharacter(Symbol)
-}
+; The handlers these hotkeys run live in layout/number_row_send.ahk, which the
+; headless E2E harness replays on the real layouts of the machine.
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the

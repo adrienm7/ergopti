@@ -528,6 +528,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk
+#Include modules/keymap/layout/number_row_send.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
 ; and the Ergopti tables are read by modules/keymap/layout.ahk.

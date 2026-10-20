@@ -295,6 +295,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../../_shared/modules/features/layout_rows_policy.ahk
 #Include ../../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
+#Include ../modules/keymap/layout/number_row_send.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
 #Include ../modules/keymap/keylayout/keylayout_parser.ahk

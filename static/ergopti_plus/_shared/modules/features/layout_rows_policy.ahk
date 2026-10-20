@@ -37,9 +37,9 @@ LayoutRowsPolicyKeys(Registry) {
 		Columns[Row] := []
 	for Code, Key in Registry["keys"] {
 		; A character key has a null Send name (JSON null decodes to a sentinel object).
-		Send := Key is Map ? Key.Get("ahk_send", "") : ""
+		SendName := Key is Map ? Key.Get("ahk_send", "") : ""
 		if !(Key is Map) || Key.Get("kind", "") != "key" || Key.Get("group", "") != "alphanumeric"
-				|| (Send is String && Send != "") || !(Key.Get("geometry", 0) is Map)
+				|| (SendName is String && SendName != "") || !(Key.Get("geometry", 0) is Map)
 			continue
 		Iso := Key["geometry"].Get("iso", 0)
 		if !(Iso is Map) || !(Iso.Get("row", 0) is Integer) || Iso["row"] < 1 || Iso["row"] > LAYOUT_ROWS_POLICY_IDS.Length
