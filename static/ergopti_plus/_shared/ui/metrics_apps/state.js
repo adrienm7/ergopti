@@ -63,7 +63,7 @@ window.updateUserCategories = function (newCategories) {
 };
 
 function getAppCategory(appName, nativeCategory) {
-	if (userCategories[appName]) {
+	if (Object.prototype.hasOwnProperty.call(userCategories, appName) && userCategories[appName]) {
 		const uc = userCategories[appName];
 		return { type: translateCategory(uc.type), score: uc.score };
 	}
@@ -126,7 +126,7 @@ function getAggregatedData() {
 /** Builds one query without mutating the source manifest or a retained projection. */
 function buildAggregatedData() {
 	const result = {
-		apps: {},
+		apps: Object.create(null),
 		_sys: { wifi: {}, power: {}, sleep: 0, unlock: 0, spaces: 0 },
 		// Rich, manifest-wide rollup. Populated alongside the per-app pass below
 		// so every future card / chart / drill-down can read the same shape.
@@ -336,7 +336,7 @@ function buildAggregatedData() {
 			}
 
 			if (!result.apps[appName]) {
-				result.apps[appName] = { time_ms: 0, typing_time: 0, switches: {} };
+				result.apps[appName] = { time_ms: 0, typing_time: 0, switches: Object.create(null) };
 			}
 
 			// Per-app keep-awake correction: when the toggle is OFF (default),

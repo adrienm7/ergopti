@@ -343,6 +343,134 @@ function categoryPillsPage(host) {
 
 for (const host of ['macos', 'linux', 'windows']) {
 	loadedCases.push([
+		`${host}/app-name-keys`,
+		() => {
+			const page = loadedPage(host);
+			const names = ['Editor', 'constructor', 'toString', '__proto__'];
+			const manifest = JSON.parse(
+				'{"2026-10-20":{' +
+					names
+						.map(
+							(name, index) =>
+								JSON.stringify(name) +
+								':' +
+								JSON.stringify({
+									category: 'Productivity',
+									app_time_ms: (index + 1) * 1000,
+									chars: index + 1,
+									switches_to: JSON.parse('{"constructor":2,"toString":3,"__proto__":4}')
+								})
+						)
+						.join(',') +
+					'}}'
+			);
+			const original = JSON.stringify(manifest);
+			const prototypes =
+				'JSON.stringify([Object.getOwnPropertyNames(Object), Object.getOwnPropertyNames(Object.prototype), Object.getOwnPropertyNames(Object.prototype.toString)])';
+			const before = page.evaluate(prototypes);
+			for (const name of names) {
+				assert.deepEqual(
+					{ ...page.context.getAppCategory(name, 'Productivity') },
+					{ type: 'Productivité', score: 0 }
+				);
+				assert.equal(typeof page.context.getAppColor(name, 0), 'string');
+				assert.equal(page.context.getAppColor(name, 1), '#30D158');
+			}
+			page.context.bootstrapMetricsAppsData(manifest, {}, {});
+			const aggregate = page.context.getAggregatedData();
+			assert.deepEqual(Object.keys(aggregate.apps), names);
+			for (const [index, name] of names.entries()) {
+				assert.ok(Object.hasOwn(manifest['2026-10-20'], name));
+				assert.ok(Object.hasOwn(aggregate.apps, name));
+				assert.equal(aggregate.apps[name].time_ms, (index + 1) * 1000);
+				assert.deepEqual(
+					{ ...aggregate.apps[name].switches },
+					JSON.parse('{"constructor":2,"toString":3,"__proto__":4}')
+				);
+			}
+			assert.equal(page.elements.get('apps-tbody').children.length, names.length);
+			assert.equal(JSON.stringify(manifest), original);
+			assert.equal(
+				page.evaluate(prototypes),
+				before,
+				'aggregation must not mutate inherited native objects'
+			);
+			const overrides = JSON.parse('{"__proto__":{"type":"Mon équipe","score":2}}');
+			page.context.updateUserCategories(overrides);
+			assert.deepEqual(
+				{ ...page.context.getAppCategory('__proto__', 'Productivity') },
+				{ type: 'Mon équipe', score: 2 }
+			);
+			const accepted = page.context.getAggregatedData();
+			assert.throws(() => page.context.publishMetricsAppsCategories({}, -1), /revision/);
+			assert.strictEqual(
+				page.context.getAggregatedData(),
+				accepted,
+				'refused publication must preserve the accepted query'
+			);
+			assert.equal(page.context.getAppCategory('__proto__').type, 'Mon équipe');
+			page.evaluate("currentCategoryFilter = new Set(['Mon équipe']);");
+			assert.deepEqual(Object.keys(page.context.getAggregatedData().apps), ['__proto__']);
+			page.evaluate('currentCategoryFilter = null;');
+			const images = [];
+			page.context.Image = class ImagePort {
+				constructor() {
+					images.push(this);
+				}
+				set src(value) {
+					this.value = value;
+				}
+			};
+			page.context.Chart = class ChartPort {
+				destroy() {}
+				draw() {}
+			};
+			const canvas = page.context.document.createElement('canvas');
+			canvas.getContext = () => ({});
+			page.elements.set('apps_bar_chart', canvas);
+			page.context.renderDashboard();
+			assert.equal(
+				images.length,
+				0,
+				'absent own icons must not consume inherited functions as image URLs'
+			);
+			const create = page.context.document.createElement;
+			page.context.document.createElement = (tag) => {
+				const node = create(tag);
+				if (tag === 'canvas')
+					node.getContext = () => ({
+						drawImage() {},
+						getImageData: () => ({ data: [255, 0, 0, 255] })
+					});
+				return node;
+			};
+			const icons = JSON.parse(
+				'{' +
+					names.map((name) => JSON.stringify(name) + ':"data:image/png;base64,AA=="').join(',') +
+					'}'
+			);
+			page.context.bootstrapMetricsAppsData(manifest, {}, icons);
+			assert.equal(
+				images.length,
+				8,
+				'four real chart consumers and four color samplers must admit own icons'
+			);
+			assert.ok(images.every((image) => image.value === 'data:image/png;base64,AA=='));
+			images[4].onerror();
+			for (const image of images.slice(5)) image.onload();
+			assert.equal(
+				page.context.getAppColor('Editor', 0),
+				page.evaluate("CHART_PALETTE[paletteIndex('Editor')]")
+			);
+			page.context.precomputeIconColors();
+			assert.equal(images.length, 9, 'only the failed color sample should retry');
+			images[8].onload();
+			for (const name of names) assert.equal(page.context.getAppColor(name, 0), '#ff0000');
+			assert.equal(page.evaluate(prototypes), before);
+			assert.equal(page.diagnostics.filter(({ level }) => level === 'error').length, 0);
+		}
+	]);
+	loadedCases.push([
 		`${host}/live-category-pills`,
 		() => {
 			const page = categoryPillsPage(host);
