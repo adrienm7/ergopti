@@ -668,82 +668,170 @@ check('main: fixes and chores only bump the patch version', () => {
 	releases(mainBump('patch-only', ['fix: a bug', 'chore: tidy']), 'v1.2.4');
 });
 
-check('main: an explicit patch trailer classifies the publication commit', () => {
+/** Asserts a plan run that fails before emitting anything, with `error` on stdout. */
+function refuses(result, error) {
+	assert.notEqual(result.status, 0, `plan must fail: ${result.stdout}`);
+	assert.match(result.stdout, error);
+	assert.deepEqual(result.outputs, {}, 'a refused plan must not emit release');
+}
+
+check('main: a valid Release-As replaces the computed minor bump', () => {
+	const result = mainBump('release-as-valid', [
+		'feat: improve diagnostics',
+		'chore(release): publish\n\nRelease-As: 1.2.4'
+	]);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.deepEqual(result.outputs, {
+		release: 'true',
+		tag: 'v1.2.4',
+		version: '1.2.4',
+		title: 'Ergopti v1.2.4',
+		prerelease: 'false',
+		channel: 'main'
+	});
+	assert.match(
+		result.stdout,
+		/::notice::Release-As 1\.2\.4 in commit [0-9a-f]{12} replaces the computed v1\.3\.0 \(minor bump\)\./
+	);
+});
+
+check('main: Release-As on an older commit of the range still applies', () => {
 	releases(
-		mainBump('explicit-patch', [
-			'feat: improve diagnostics',
-			'chore(release): publish\n\nRelease-As: 1.2.4'
-		]),
+		mainBump('release-as-older', ['fix: a bug\n\nRelease-As: 1.2.4', 'feat: a later feature']),
 		'v1.2.4'
 	);
 });
 
-check('main: an older patch request does not override a later publication commit', () => {
+check('main: Release-As may jump ahead and may override a breaking change', () => {
+	releases(mainBump('release-as-jump', ['fix: a bug\n\nRelease-As: 3.0.0']), 'v3.0.0');
 	releases(
-		mainBump('old-patch-request', [
-			'feat: improve diagnostics\n\nRelease-As: 1.2.4',
-			'fix: next change'
+		mainBump('release-as-breaking', ['feat!: drop an API', 'chore: publish\n\nRelease-As: 1.2.4']),
+		'v1.2.4'
+	);
+});
+
+check('main: the newest Release-As of the range wins', () => {
+	releases(
+		mainBump('release-as-newest-lower', [
+			'fix: one\n\nRelease-As: 1.4.0',
+			'fix: two\n\nRelease-As: 1.2.4'
 		]),
+		'v1.2.4'
+	);
+	releases(
+		mainBump('release-as-newest-higher', [
+			'fix: one\n\nRelease-As: 1.2.4',
+			'fix: two\n\nRelease-As: 1.4.0',
+			'fix: three'
+		]),
+		'v1.4.0'
+	);
+});
+
+check(
+	'main: the key is matched case-insensitively and a repeated identical line is accepted',
+	() => {
+		releases(mainBump('release-as-case', ['fix: one\n\nrelease-as: 1.2.4']), 'v1.2.4');
+		releases(
+			mainBump('release-as-repeat', ['fix: one\n\nRelease-As: 1.2.4\nRelease-As: 1.2.4']),
+			'v1.2.4'
+		);
+	}
+);
+
+check('main: a Release-As line inside prose is not a request', () => {
+	releases(
+		mainBump('release-as-indented', ['feat: document it\n\n  Release-As: 9.9.9 is the syntax']),
 		'v1.3.0'
 	);
 });
 
-check('main: invalid, duplicate and non-next patch requests refuse publication', () => {
-	for (const [index, value] of [
-		'1.2.3',
-		'1.2.5',
-		'1.3.0',
-		'v1.2.4',
-		'1.2.04',
-		'$(exit 99)',
-		'1.2.4\nRelease-As: 1.2.4'
-	].entries()) {
-		const result = mainBump(`invalid-patch-${index}`, [`fix: a change\n\nRelease-As: ${value}`]);
-		assert.notEqual(result.status, 0, `request ${index} must fail`);
-		assert.match(result.stderr, /Release-As must name the next patch/);
-		assert.equal(result.outputs.release, undefined);
+check('main: two different Release-As lines in one commit refuse publication', () => {
+	refuses(
+		mainBump('release-as-conflict', ['fix: one\n\nRelease-As: 1.2.4\nRelease-As: 1.3.0']),
+		/::error::Commit [0-9a-f]{12} holds two different Release-As lines \('1\.2\.4' and '1\.3\.0'\)/
+	);
+});
+
+check('main: a Release-As equal to or lower than the last stable tag refuses publication', () => {
+	for (const [index, value] of ['1.2.3', '1.2.2', '1.1.9', '0.9.9'].entries()) {
+		refuses(
+			mainBump(`release-as-not-greater-${index}`, [`feat: a change\n\nRelease-As: ${value}`]),
+			new RegExp(
+				`::error::Release-As ${value.replaceAll('.', '\\.')} in commit [0-9a-f]{12} is not greater than the last stable tag v1\\.2\\.3\\.`
+			)
+		);
 	}
 });
 
-check('main: an empty explicit patch trailer refuses publication', () => {
-	const result = mainBump('empty-patch-request', ['fix: change\n\nRelease-As:']);
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /Release-As must name the next patch/);
-	assert.equal(result.outputs.release, undefined);
+check('main: a Release-As naming an existing tag refuses publication', () => {
+	const repo = repository('release-as-taken', 'main');
+	git(repo, 'tag', 'v1.2.3', commit(repo, 'chore: base'));
+	const head = commit(repo, 'fix: a bug\n\nRelease-As: 1.3.0');
+	// Published from another commit and never fetched here: only origin knows it.
+	git(repo, 'tag', 'v1.3.0', head);
+	git(repo, 'push', '--quiet', 'origin', 'refs/tags/v1.3.0');
+	git(repo, 'tag', '-d', 'v1.3.0');
+	commit(repo, 'chore: next');
+	refuses(
+		plan(repo, git(repo, 'rev-parse', 'HEAD'), 'refs/heads/main'),
+		/::error::Release-As 1\.3\.0 in commit [0-9a-f]{12} names v1\.3\.0, which already exists as a tag\./
+	);
 });
 
-check('main: an empty duplicate cannot disappear through command substitution', () => {
-	const result = mainBump('empty-duplicate-request', [
-		'feat: change\n\nRelease-As: 1.2.4\nRelease-As:'
-	]);
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /Release-As must name the next patch/);
-	assert.equal(result.outputs.release, undefined);
+check('main: a malformed Release-As refuses publication', () => {
+	for (const [index, value] of [
+		'',
+		'v1.2.4',
+		'1.2.04',
+		'01.2.4',
+		'1.2',
+		'1.2.4.5',
+		'1.2.4-rc.1',
+		'1.2.4 please',
+		'1234567890.0.0',
+		'$(exit 99)'
+	].entries()) {
+		refuses(
+			mainBump(`release-as-malformed-${index}`, [`fix: a change\n\nRelease-As: ${value}`]),
+			/::error::Release-As '.*' in commit [0-9a-f]{12} is not MAJOR\.MINOR\.PATCH/
+		);
+	}
 });
 
-check('main: a patch request cannot conceal a breaking change', () => {
-	const result = mainBump('breaking-patch-request', [
-		'feat!: remove an API',
-		'chore(release): publish\n\nRelease-As: 1.2.4'
-	]);
-	assert.notEqual(result.status, 0);
-	assert.match(result.stderr, /cannot override a breaking change/);
-	assert.equal(result.outputs.release, undefined);
+check('main: a Release-As already covered by the last stable tag never carries over', () => {
+	const repo = repository('release-as-carried', 'main');
+	git(repo, 'tag', 'v1.2.3', commit(repo, 'chore: publish\n\nRelease-As: 1.2.3'));
+	releases(plan(repo, commit(repo, 'fix: a bug'), 'refs/heads/main'), 'v1.2.4');
 });
 
-check('main: rerunning a published explicit patch never publishes it again', () => {
-	const work = repository('published-explicit-patch', 'main');
+check('main: rerunning a published Release-As never publishes it again', () => {
+	const work = repository('published-release-as', 'main');
 	git(work, 'tag', 'v1.2.3', commit(work, 'chore: base'));
 	const source = commit(work, 'feat: improve diagnostics\n\nRelease-As: 1.2.4');
 	git(work, 'tag', 'v1.2.4', source);
 	noRelease(plan(work, source, 'refs/heads/main'), /already part of v1\.2\.4/);
 });
 
-check('dev: a stable patch request never changes the prerelease series', () => {
-	const work = repository('dev-explicit-patch', 'dev');
-	releases(
-		plan(work, commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'), 'refs/heads/dev'),
-		'v0.0.0-dev.1'
+check('dev: a Release-As, even a malformed one, is ignored with a notice', () => {
+	const work = repository('dev-release-as', 'dev');
+	const result = plan(
+		work,
+		commit(work, 'feat: diagnostics\n\nRelease-As: 1.2.4'),
+		'refs/heads/dev'
+	);
+	releases(result, 'v0.0.0-dev.1');
+	assert.equal(result.outputs.prerelease, 'true');
+	assert.match(
+		result.stdout,
+		/::notice::Release-As '1\.2\.4' in commit [0-9a-f]{12} applies to main only: dev keeps v0\.0\.0-dev\.1\./
+	);
+	git(work, 'tag', 'v0.0.0-dev.1', 'HEAD');
+	const malformed = plan(work, commit(work, 'fix: x\n\nRelease-As: v9'), 'refs/heads/dev');
+	releases(malformed, 'v0.0.0-dev.2');
+	assert.match(
+		malformed.stdout,
+		/::notice::Release-As 'v9' in commit [0-9a-f]{12} applies to main only/
 	);
 });
 
