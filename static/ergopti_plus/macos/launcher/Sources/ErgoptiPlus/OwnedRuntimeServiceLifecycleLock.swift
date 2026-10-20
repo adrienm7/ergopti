@@ -96,12 +96,14 @@ final class OwnedRuntimeServiceLifecycleLock {
 		#endif
 	}
 	private static func emptyACL(_ descriptor: Int32) throws {
-		guard let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else { throw OwnedRuntimeInstallFailure.protection }
-		defer { acl_free(UnsafeMutableRawPointer(acl)) }
-		var entry: acl_entry_t?; errno = 0
-		guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
-			throw OwnedRuntimeInstallFailure.protection
-		}
+		errno = 0
+		if let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) {
+			defer { acl_free(UnsafeMutableRawPointer(acl)) }
+			var entry: acl_entry_t?; errno = 0
+			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
+				throw OwnedRuntimeInstallFailure.protection
+			}
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 	}
 	private func verify(checkAdmission: Bool = true) throws {
 		guard !revoked, !closeRefused else { throw OwnedRuntimeInstallFailure.cleanupPending }

@@ -110,9 +110,11 @@ final class OwnedRuntimeCoreProvisionOwner {
 				value.st_dev == named.st_dev, value.st_ino == named.st_ino,
 				value.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR), value.st_mode & 0o6022 == 0,
 				!protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
-			guard let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) else { throw OwnedRuntimeInstallFailure.protection }
-			defer { acl_free(UnsafeMutableRawPointer(acl)) }; var entry: acl_entry_t?; errno = 0
-			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else { throw OwnedRuntimeInstallFailure.protection }
+			errno = 0
+			if let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) {
+				defer { acl_free(UnsafeMutableRawPointer(acl)) }; var entry: acl_entry_t?; errno = 0
+				guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else { throw OwnedRuntimeInstallFailure.protection }
+			} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 			owned = false; return fd
 		}
 		let data = try directory(parent: root, name: "RemapRuntime")
