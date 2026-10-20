@@ -17,11 +17,11 @@
 ; =================================
 
 OneShotShift() {
+		global OneShotShiftEnabled
 		; Skip entirely when the script is suspended — an in-flight InputHook would
 		; intercept keystrokes that belong to other applications while AHK is paused
 		if A_IsSuspended
 				return
-		global OneShotShiftEnabled := True
 		TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
 		; The characters with a result of their own, and the magic key, end the
 		; capture: _shared/tap_hold/one_shot_shift.json, which Linux reads too.
@@ -29,8 +29,20 @@ OneShotShift() {
 		ihvText := InputHook("L1 T" . TimeoutSec . " E", TapHoldOneShotEndKeys(MagicKey))
 		ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
 		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
-		if !OwnerToken {
-				OneShotShiftEnabled := False
+		; Refusing a second exclusive capture must leave the admitted capture's
+		; latch alone, including an explicit OneShotShiftFix from a chord.
+		if !OwnerToken
+				return
+		; Start may pump teardown before returning. Publish only while this exact
+		; token/hook still owns capture, atomically with the suspension check.
+		PreviousCritical := Critical("On")
+		try {
+				Admitted := SIHO_IsOwned(OwnerToken, ihvText) && !A_IsSuspended
+				if Admitted
+						OneShotShiftEnabled := True
+		} finally Critical(PreviousCritical)
+		if !Admitted {
+				SIHO_StopOwned(OwnerToken, ihvText)
 				return
 		}
 		try {

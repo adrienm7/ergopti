@@ -1,0 +1,9 @@
+{
+	"expected_count": 8,
+	"filters": [
+		{
+			"contains": "one-shot-rearm-admission",
+			"expected_count": 8
+		}
+	]
+}
