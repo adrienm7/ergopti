@@ -1,6 +1,7 @@
 # tools/diagnostics/macos_managed_ollama_receiving_test.py
 """Actual portable TLS registry peers; no native daemon or PAC credit."""
 
+import ast
 import contextlib
 import hashlib
 import http.client
@@ -1144,6 +1145,7 @@ class NativeCommandExitControls(unittest.TestCase):
                         register(operation)
 
                 subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+                subject.receipt = {}
                 subject.fixture = SimpleNamespace(
                     groups=Acquisition(), native_groups=operation.native
                 )
@@ -1185,12 +1187,62 @@ class NativeCommandExitControls(unittest.TestCase):
                             ),
                             b"owned-command-output",
                         )
+                if status != 0 and not refusal and timeout != 0:
+                    self.assertEqual(
+                        subject.receipt["native_command_failure"],
+                        {"command": "unknown", "exit": 7, "output_tail": ["owned-command-output"]},
+                    )
+                else:
+                    self.assertNotIn("native_command_failure", subject.receipt)
                 if not refusal:
                     self.assertTrue(operation.reaped)
                     self.assertEqual(process.returncode, status)
                     self.assertEqual(process.wait_calls, 1)
                     self.assertLess(events.index("reserved_observation"), events.index("reap"))
                 self.assertEqual(operation.signals, [])
+
+
+class NativeCommandFailureControls(unittest.TestCase):
+    def test_failure_tail_is_bounded_redacted_and_printable(self):
+        private_home = "/private/var/receiver-home"
+        output = (
+            "\x1b[?25lgathering model components \x1b[K\r"
+            + "".join(f"copying file line {index}\n" for index in range(20))
+            + f"Error: open {private_home}/.ollama/models/blobs: denied\x07\n"
+        ).encode()
+        failure = RECEIVING.native_command_failure(
+            ["/private/ollama", "create", "native-source"], 1, output, (private_home, "")
+        )
+        self.assertEqual(failure["command"], "create")
+        self.assertEqual(failure["exit"], 1)
+        self.assertEqual(len(failure["output_tail"]), RECEIVING.NATIVE_COMMAND_TAIL_LINES)
+        self.assertEqual(
+            failure["output_tail"][-1], "Error: open <private>/.ollama/models/blobs: denied"
+        )
+        self.assertNotIn(private_home, json.dumps(failure))
+        self.assertNotIn("\\u001b", json.dumps(failure))
+        long_line = RECEIVING.native_command_failure(["x", "foreign"], 2, b"y" * 999, ())
+        self.assertEqual(long_line["command"], "unknown")
+        self.assertEqual(len(long_line["output_tail"][0]), RECEIVING.NATIVE_COMMAND_LINE_LIMIT)
+
+    def test_every_receiver_code_has_a_closed_receipt_name(self):
+        # An unlisted code reaches the receipt as "unknown": the 0.40.4 create
+        # stage hid empty_default_receiving_store that way for two CI runs.
+        source = (ROOT / "tools/diagnostics/macos_managed_ollama_receiving.py").read_text(
+            encoding="utf-8"
+        )
+        raised = set()
+        for node in ast.walk(ast.parse(source)):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+                continue
+            if node.func.id in ("require", "RuntimeError") and node.args:
+                code = node.args[-1]
+                if isinstance(code, ast.Constant) and isinstance(code.value, str):
+                    raised.add(code.value)
+        # Raised by main() before any Receiver or receipt exists.
+        raised.discard("genuine_macos_required")
+        self.assertGreater(len(raised), 30)
+        self.assertEqual(raised - RECEIVING.RECEIVER_FAILURE_CODES, set())
 
 
 class NativeInferenceAccountingControls(unittest.TestCase):
@@ -1218,7 +1270,15 @@ class NativeInferenceAccountingControls(unittest.TestCase):
         )
         self.assertIn("WireFixture(native=True, origin_address=REGISTRY_ADDRESS)", source)
 
-    def receive(self, manifest_relative):
+    def test_create_client_leaves_the_default_receiving_store_absent(self):
+        # Without OLLAMA_CREATE_REMOTE the 0.40.4 client probes a loopback
+        # server by writing into its own default store; the receiver refused it
+        # under an unnamed code at the create stage.
+        with self.assertRaisesRegex(RuntimeError, "^empty_default_receiving_store$"):
+            self.receive("manifests-v2/registry.invalid/library/native/latest", create_remote=False)
+        self.assertIn("empty_default_receiving_store", RECEIVING.RECEIVER_FAILURE_CODES)
+
+    def receive(self, manifest_relative, create_remote=True):
         with tempfile.TemporaryDirectory() as temporary:
             subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
             subject.root = ROOT
@@ -1250,9 +1310,20 @@ class NativeInferenceAccountingControls(unittest.TestCase):
                 blob_path.parent.mkdir()
                 blob_path.write_bytes(blob)
 
-            subject.own_command = Mock(
-                side_effect=lambda *_: publish(subject.home / "producer-models")
-            )
+            def create(arguments, environment):
+                self.assertEqual(arguments[1:3], ["create", "native-source"])
+                if not create_remote:
+                    environment = dict(environment)
+                    environment.pop("OLLAMA_CREATE_REMOTE")
+                # Ollama 0.40.4 sharedBlobStore (cmd/cmd.go): a loopback create
+                # writes a probe blob below the client's own store, whose
+                # folder outlives the probe, unless OLLAMA_CREATE_REMOTE is set.
+                if environment.get("OLLAMA_CREATE_REMOTE") != "1":
+                    store = Path(environment.get("OLLAMA_MODELS", subject.home / ".ollama/models"))
+                    (store / "blobs").mkdir(parents=True, exist_ok=True)
+                publish(subject.home / "producer-models")
+
+            subject.own_command = Mock(side_effect=create)
             subject.registry = Mock(held_digest="sha256:held-native-body")
             subject.registry.pac.return_value = "function FindProxyForURL() {}"
             subject.fixture = SimpleNamespace(

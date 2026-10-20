@@ -96,6 +96,16 @@ RECEIVER_FAILURE_CODES = frozenset(
         "independent_gguf_vector",
         "actual_created_manifest",
         "actual_created_blob",
+        "actual_receiver_start_state",
+        "actual_listener_worker_changed",
+        "actual_model_layer",
+        "actual_model_bytes",
+        "peer_model_not_ready",
+        "empty_default_receiving_store",
+        "receiving_catalogue_assets",
+        "receiving_catalogue_input",
+        "receiving_catalogue_publication",
+        "receiving_catalogue_source",
         # Stage outcomes: without them every failed pull, inference or cancel
         # was published as the same opaque "unknown" receiver code.
         "actual_pull_success",
@@ -135,6 +145,33 @@ PULL_ERROR_CLASSES = (
 # Ollama's progress statuses are fixed vocabulary; only digests vary and they
 # belong to the generated fixture model, so they are masked, never published.
 PULL_STATUS_LIMIT = 16
+# A failed native command keeps only its last output lines: Ollama prints the
+# reason as a final "Error: ..." line after its progress spinner.
+NATIVE_COMMAND_TAIL_BYTES = 4096
+NATIVE_COMMAND_TAIL_LINES = 4
+NATIVE_COMMAND_LINE_LIMIT = 240
+NATIVE_SUBCOMMANDS = frozenset({"create", "serve", "pull", "list", "show"})
+ANSI_SEQUENCE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def native_command_failure(arguments, status, tail, private):
+    """Bound a failed native command to its subcommand, exit status and redacted tail."""
+    text = ANSI_SEQUENCE.sub("", tail.decode("utf-8", "replace"))
+    for value in private:
+        if value:
+            text = text.replace(value, "<private>")
+    lines = [
+        "".join(character if character.isprintable() else " " for character in line).strip()
+        for line in text.splitlines()
+    ]
+    subcommand = arguments[1] if len(arguments) > 1 else None
+    return {
+        "command": subcommand if subcommand in NATIVE_SUBCOMMANDS else "unknown",
+        "exit": status if type(status) is int else None,
+        "output_tail": [line[:NATIVE_COMMAND_LINE_LIMIT] for line in lines if line][
+            -NATIVE_COMMAND_TAIL_LINES:
+        ],
+    }
 
 
 def fixture_pull_errors(rows, private):
@@ -581,7 +618,24 @@ class Receiver:
                 owner.wait_for_exit(timeout)
                 # WNOWAIT retains the PID; only exact retirement publishes status.
                 require(owner.settle(), "native_command_retirement")
-                require(owner.process.returncode == 0, "actual_native_command")
+                status = owner.process.returncode
+                if status != 0:
+                    # The closed code alone never said why `ollama create`
+                    # failed; keep its exit status and a redacted output tail.
+                    size = output.seek(0, os.SEEK_END)
+                    output.seek(max(0, size - NATIVE_COMMAND_TAIL_BYTES))
+                    fixture_host = getattr(self.fixture, "host", None)
+                    self.receipt["native_command_failure"] = native_command_failure(
+                        arguments,
+                        status,
+                        output.read(),
+                        (
+                            str(getattr(self, "home", "")),
+                            str(getattr(self, "work", "")),
+                            fixture_host if isinstance(fixture_host, str) else "",
+                        ),
+                    )
+                require(status == 0, "actual_native_command")
                 output.seek(0)
                 return output.read(65536)
             finally:
@@ -1236,7 +1290,14 @@ class Receiver:
             f"FROM {gguf}\nPARAMETER num_predict {INFERENCE_TOKENS}\nPARAMETER num_ctx 64\nPARAMETER num_gpu 0\nPARAMETER temperature 0\n"
         )
         self.start(producer=True)
-        environment = self.clean | {"OLLAMA_HOST": "127.0.0.1:" + str(self.port)}
+        # Ollama 0.40.4's create client probes a loopback server for a shared
+        # blob store (cmd/cmd.go, sharedBlobStore) by writing into its own
+        # $HOME/.ollama/models/blobs, which then outlives the probe and breaks
+        # the empty receiving store. Upload through the server API instead.
+        environment = self.clean | {
+            "OLLAMA_HOST": "127.0.0.1:" + str(self.port),
+            "OLLAMA_CREATE_REMOTE": "1",
+        }
         self.own_command(
             [str(self.binary), "create", "native-source", "-f", str(modelfile)], environment
         )
@@ -1565,6 +1626,7 @@ def main():
                 "prepare_phase",
                 "primary_failure",
                 "cleanup_failure",
+                "native_command_failure",
             )
             if key in owner.receipt
         }
