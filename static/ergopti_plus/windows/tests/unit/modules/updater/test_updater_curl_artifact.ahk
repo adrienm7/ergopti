@@ -539,7 +539,7 @@ _ArtifactNtlmFullDuplexRetirementControls() {
 		; The fixture names its failing control on stdout/stderr; carry it into
 		; the job log instead of a bare exit status.
 		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
-		AssertEqual("ARTIFACT_TUNNEL_RETIREMENT_CONTROLS:6", Trim(Observed[1]["stdout"], "`r`n "))
+		AssertEqual("ARTIFACT_TUNNEL_RETIREMENT_CONTROLS:7",Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
 		if IsObject(Handle)
