@@ -1,0 +1,4 @@
+{
+	"expected_count": 14,
+	"filters": [{ "contains": "screenshot-file-publication-custody", "expected_count": 14 }]
+}

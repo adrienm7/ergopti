@@ -159,6 +159,7 @@ graph TD
         WINDOWS_crypto["Crypto.ahk"]
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
+        WINDOWS_file_publication["FilePublication.ahk"]
         WINDOWS_file_system["FileSystem.ahk"]
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
         WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
