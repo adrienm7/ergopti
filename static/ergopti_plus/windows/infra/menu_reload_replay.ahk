@@ -97,11 +97,12 @@ MenuReloadReplay_Hold(HeldKey, Registration, &RefusedPath := unset) {
 			Registration.ItemId)
 		return 0
 	}
-	_MenuReloadReplayNextKey += 1
-	_MenuReloadReplayHeld[_MenuReloadReplayNextKey] := Path
+	; A later click may interrupt diagnostics before this call returns its receipt.
+	Key := ++_MenuReloadReplayNextKey
+	_MenuReloadReplayHeld[Key] := Path
 	try LoggerInfo("MenuDispatcher", "Menu command '{1}' waits for the reload successor; {2} held.",
 		MenuReloadReplay_Describe(Path), _MenuReloadReplayHeld.Count)
-	return _MenuReloadReplayNextKey
+	return Key
 }
 
 /** Withdraws a held command whose next look could not be scheduled. */
