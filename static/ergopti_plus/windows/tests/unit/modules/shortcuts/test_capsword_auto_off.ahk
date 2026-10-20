@@ -423,3 +423,5 @@ _CWAO_RingReportsOutput() {
 		"the ring of sent characters must report each recorded character to the CapsWord auto-off")
 }
 Test("capsword auto-off: the ring of sent characters reports to CapsWord", _CWAO_RingReportsOutput)
+
+#Include test_capsword_auto_off_ownership.ahk
