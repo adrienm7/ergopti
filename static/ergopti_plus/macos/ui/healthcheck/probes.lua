@@ -27,6 +27,10 @@
 ---    is the whole peripherals list, USB devices first.
 --- 6. A run is cancelled as a whole when the window closes or refreshes, and a
 ---    late answer of a cancelled run publishes nothing.
+--- 7. configuration reads and reduces the user's configuration files on a
+---    timer after phase A. It reads only local files, so it also runs without
+---    the extensive opt-in (local_only), and an answer past its timeout_ms is a
+---    timeout without sections.
 --- ==============================================================================
 
 local M = {}
@@ -394,6 +398,28 @@ function M.bluetooth_devices(json, detailed)
 	return items
 end
 
+--- The user's configuration files and settings, read on a timer after phase A:
+--- local files only, so it needs no opt-in. Its answer is the two sections;
+--- one that arrives after its timeout is discarded as a timeout.
+--- @param schema table
+--- @param overrides table|nil Replacements for tests (see helpers.configuration_context).
+--- @return function Probe body.
+local function configuration(schema, overrides)
+	return function(done, on_cancel)
+		local Timers = require("adapters.timer_scheduler")
+		local handle = Timers.after(0.001, function()
+			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
+			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			if not ok then
+				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
+				return
+			end
+			done(result, sections)
+		end)
+		on_cancel(function() Timers.cancel(handle) end)
+	end
+end
+
 --- The Bluetooth input devices, after the USB ones phase A listed.
 --- @param usb_items table The snapshot's peripherals items.
 --- @param detailed boolean
@@ -429,11 +455,24 @@ end
 --- @param snapshot table The phase A snapshot: its paths, its peripherals and
 ---   whether details are included.
 --- @param publish function(id, result, sections) Receives each answer once.
+--- @param options table|nil { local_only = true runs only the probes that read
+---   local files; overrides = test replacements for the configuration probe }
 --- @return table run { cancel = function() } Cancels every probe still running.
-function M.start(schema, snapshot, publish)
+function M.start(schema, snapshot, publish, options)
+	options = options or {}
 	local run = { cancelled = false, finishers = {}, actors = {}, results = {}, watchdogs = {}, publish = publish }
 	local config = schema.probes
 	local sections = snapshot.sections
+	start_probe(run, "configuration", config.configuration.timeout_ms, configuration(schema, options.overrides))
+	if options.local_only == true then
+		function run.refresh_cleanup() end
+		function run.has_pending_cleanup() return false end
+		function run.cancel()
+			run.cancelled = true
+			for _, finisher in ipairs(run.finishers) do finisher() end
+		end
+		return run
+	end
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
 	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
 	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(sections.paths.logs_dir))

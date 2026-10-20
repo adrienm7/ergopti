@@ -379,7 +379,8 @@ _HealthCheck_PendingProbes(Schema, Selected := true) {
 	Probes := Map()
 	for Id, Probe in Schema["probes"]
 		if _HealthCheck_Applies(Probe)
-			Probes[Id] := Selected ? Map("state", "pending") : Map("state", "not_run", "reason", "opt_in_required")
+			; A local probe reads only the user's own files: it needs no opt-in
+			Probes[Id] := (Selected || Probe.Get("local", false) == true) ? Map("state", "pending") : Map("state", "not_run", "reason", "opt_in_required")
 	return Probes
 }
 
@@ -422,8 +423,6 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
 	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
 	Features    := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
-	Configuration := _HealthCheck_Collect("configuration", () => HealthCheck_CollectConfiguration(Schema),
-		Map("files", Map("items", []), "settings", Map("items", [])))
 	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
 	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
 	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
@@ -437,8 +436,10 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 		"system",      System,
 		"input",       Input,
 		"features",    Features,
-		"configuration_files", Configuration["files"],
-		"configuration", Configuration["settings"],
+		; Filled by the configuration probe: reading and parsing the files is far
+		; over the phase A budget
+		"configuration_files", Map("items", []),
+		"configuration", Map("items", []),
 		"ai",          Ai,
 		"network",     Map(),
 		"peripherals", Peripherals,
@@ -794,6 +795,8 @@ HealthCheck_ShowWindow() {
 		}
 
 		ContentCtl.Visible := false
+		; No page runs probes here: the configuration is collected now
+		HealthCheck_CompleteConfiguration(Snapshot, HealthCheck_Config()["schema"])
 		_HC_ShowNativeSnapshot(G, Snapshot)
 		_HC_OpenTimingMark("native_controls", Timing)
 		LoggerSuccess("Healthcheck", "Diagnostics window opened with structured native controls.")
@@ -1056,7 +1059,12 @@ _HC_HandleMessage(WindowEpoch, Raw) {
 ; @param Session {Map} The exact window session being refreshed.
 _HC_ArchiveCleanupMetadata(Session) {
 	Rows := Map()
+	Declared := HealthCheck_Config()["schema"]["probes"]
 	for Id, Result in Session["snapshot"]["probes"] {
+		; A local probe owns nothing outside the process (a timer and file
+		; reads), so its cancellation leaves no cleanup to remember
+		if Declared.Has(Id) && Declared[Id].Get("local", false) == true
+			continue
 		if Result.Get("state", "") == "pending" {
 			Result := Result.Clone()
 			Result["state"] := "cancelled"
@@ -1171,8 +1179,12 @@ _HC_RestartProbes(WindowEpoch, StartFn := unset) {
 	Selected := _HC_Session.Get("extensive", false)
 	if !(Selected is Integer) || (Selected != 0 && Selected != 1)
 		throw TypeError("The diagnostics session has an invalid extensive selection.")
-	if !Selected
+	if !Selected {
+		; Without the extensive opt-in only the local probes run (the configuration)
+		if !IsSet(StartFn)
+			HealthCheck_StartProbes(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe, true)
 		return false
+	}
 	if IsSet(StartFn) {
 		if !HasMethod(StartFn, "Call")
 			throw TypeError("The diagnostics starter must be callable.")

@@ -22,6 +22,10 @@
 ---    loop with a synchronous fallback.
 --- 6. A run is cancelled as a whole when the page refreshes or closes, and a
 ---    late answer of a cancelled run publishes nothing.
+--- 7. configuration reads and reduces the user's configuration files on a
+---    timer after phase A. It reads only local files, so it also runs without
+---    the extensive opt-in (local_only), and an answer past its timeout_ms is a
+---    timeout without sections.
 --- ==============================================================================
 
 local M = {}
@@ -295,6 +299,33 @@ local function cpu_load(config, run)
 	end
 end
 
+--- The user's configuration files and settings, read on a libuv timer after
+--- phase A: local files only, so it needs no opt-in. Its answer is the two
+--- sections; one that arrives after its timeout is discarded as a timeout.
+--- @param schema table
+--- @param run table
+--- @param overrides table|nil Replacements for tests (see bridge.configuration_context).
+--- @return function
+local function configuration(schema, run, overrides)
+	return function(done)
+		local Timers = require("adapters.timer_scheduler")
+		if not Timers.HAS_ASYNC then
+			done({ state = "unsupported" })
+			return
+		end
+		local handle = Timers.after(0.001, function()
+			local context = require("ui.healthcheck.bridge").configuration_context(schema, overrides)
+			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			if not ok then
+				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
+				return
+			end
+			done(result, sections)
+		end)
+		run.cancellers[#run.cancellers + 1] = function() Timers.cancel(handle) end
+	end
+end
+
 
 
 
@@ -310,15 +341,15 @@ end
 --- @param paths table The snapshot's paths section.
 --- @param state table Daemon state.
 --- @param publish function(id, result, sections) Receives each answer once.
+--- @param options table|nil { local_only = true runs only the probes that read
+---   local files; overrides = test replacements for the configuration probe }
 --- @return table run { cancel = function() }
-function M.start(schema, paths, state, publish)
+function M.start(schema, paths, state, publish, options)
+	options = options or {}
 	local run = { cancelled = false, cancellers = {}, publish = publish }
 	local config = schema.probes
-	start_probe(run, "github_api", github_api(config.github_api, run))
-	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
-	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
-	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
-	function run.cancel()
+	start_probe(run, "configuration", configuration(schema, run, options.overrides))
+	local function stop()
 		if run.cancelled then return end
 		run.cancelled = true
 		for index = #run.cancellers, 1, -1 do
@@ -326,6 +357,15 @@ function M.start(schema, paths, state, publish)
 			if not ok then Logger.error(LOG, "A diagnostics probe could not be cancelled: %s.", tostring(err)) end
 		end
 	end
+	if options.local_only == true then
+		run.cancel = stop
+		return run
+	end
+	start_probe(run, "github_api", github_api(config.github_api, run))
+	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
+	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
+	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
+	run.cancel = stop
 	return run
 end
 

@@ -562,6 +562,8 @@ HealthCheck_ReportBug(Overrides := 0) {
 	try {
 		Config := HealthCheck_Config()
 		Snapshot := HealthCheck_Run()
+		; A report from the Debug menu has no page to keep responsive
+		HealthCheck_CompleteConfiguration(Snapshot, Config["schema"])
 		Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
 		Outcome := HealthCheck_PerformAction(Map("action", "report", "text", Document["text"],
 			"fields", Document["fields"]), Snapshot["sections"]["paths"], Config, Overrides, Snapshot)

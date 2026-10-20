@@ -6,7 +6,8 @@
 --- Drives the real diagnostics bridge the way the shared page and the webview
 --- manager call it:
 --- 1. "ready" answers with the page's configuration and the first version 2
----    snapshot, and starts the probes of that page;
+---    snapshot, and starts that page's local probes only (the configuration)
+---    until the extensive checks are chosen;
 --- 2. an action the allowlist refuses changes nothing and is logged;
 --- 3. copy writes the redacted report through the clipboard adapter, and a
 ---    refused clipboard is answered as a failure;
@@ -35,9 +36,10 @@ local function load_bridge(controls)
 		package.loaded[name] = nil
 	end
 	package.loaded["ui.healthcheck.probes"] = {
-		start = function(_, _, _, publish)
+		start = function(_, _, _, publish, options)
 			context.starts = context.starts + 1
 			context.publish = publish
+			context.local_only = options and options.local_only
 			return { cancel = function() context.cancels = context.cancels + 1 end }
 		end,
 	}
@@ -100,7 +102,7 @@ local function page(context)
 end
 
 helpers.describe("diagnostics bridge (linux): the page's messages", function()
-	helpers.it("answers ready with a quick version 2 snapshot without starting probes", function()
+	helpers.it("answers ready with a quick version 2 snapshot starting only the local probes", function()
 		with_bridge(nil, function(bridge, context)
 			local answer = bridge.on_message("ready", {}, page(context))
 			helpers.assert_eq(answer.type, "init")
@@ -109,7 +111,9 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 			helpers.assert_eq(answer.config.context.case_insensitive, false)
 			helpers.assert_eq(answer.snapshot.driver, "linux")
 			helpers.assert_eq(answer.snapshot.schema_version, 2)
-			helpers.assert_eq(context.starts, 0)
+			helpers.assert_eq(context.starts, 1)
+			helpers.assert_eq(context.local_only, true, "only the configuration probe runs without the opt-in")
+			helpers.assert_eq(answer.snapshot.probes.configuration.state, "pending")
 			helpers.assert_eq(answer.snapshot.extensive, false)
 		end)
 	end)
@@ -159,8 +163,9 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 			local answer = bridge.on_message({ action = "refresh", detailed = true, extensive = true }, {}, page(context))
 			helpers.assert_eq(answer.type, "snapshot")
 			helpers.assert_eq(answer.snapshot.detailed, true)
-			helpers.assert_eq(context.starts, 1)
-			helpers.assert_eq(context.cancels, 0)
+			helpers.assert_eq(context.starts, 2)
+			helpers.assert_eq(context.local_only, false)
+			helpers.assert_eq(context.cancels, 1, "the local run of the quick page is replaced")
 		end)
 	end)
 
@@ -170,7 +175,7 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 			bridge.on_message({ action = "refresh", extensive = true }, {}, page(context))
 			helpers.assert_nil(bridge.on_message({ action = "close" }, {}, page(context)))
 			helpers.assert_eq(context.closed, 1)
-			helpers.assert_eq(context.cancels, 1)
+			helpers.assert_eq(context.cancels, 2)
 		end)
 	end)
 
@@ -220,13 +225,14 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 end)
 
 helpers.describe("diagnostics bridge (linux): extensive admission", function()
-	helpers.it("privacy-only refresh remains quick without creating a probe owner", function()
+	helpers.it("privacy-only refresh remains quick and starts only the local probes", function()
 		with_bridge(nil, function(bridge, context)
 			bridge.on_message("ready", {}, page(context))
 			local answer = bridge.on_message({ action = "refresh", detailed = true }, {}, page(context))
 			helpers.assert_eq(answer.snapshot.detailed, true)
 			helpers.assert_eq(answer.snapshot.extensive, false)
-			helpers.assert_eq(context.starts, 0)
+			helpers.assert_eq(context.starts, 2)
+			helpers.assert_eq(context.local_only, true)
 			helpers.assert_eq(answer.snapshot.probes.github_api.state, "not_run")
 		end)
 	end)
@@ -236,8 +242,8 @@ helpers.describe("diagnostics bridge (linux): extensive admission", function()
 			bridge.on_message({ action = "refresh", extensive = true }, {}, page(context))
 			context.publish("github_api", { state = "ok", ms = 12 })
 			local answer = bridge.on_message({ action = "cancel" }, {}, page(context))
-			helpers.assert_eq(context.starts, 1)
-			helpers.assert_eq(context.cancels, 1)
+			helpers.assert_eq(context.starts, 2)
+			helpers.assert_eq(context.cancels, 2)
 			helpers.assert_eq(answer.snapshot.probes.github_api.state, "ok")
 			helpers.assert_eq(answer.snapshot.probes.github_api.ms, 12)
 			helpers.assert_eq(answer.snapshot.probes.ai_health.state, "cancelled")
@@ -247,11 +253,12 @@ helpers.describe("diagnostics bridge (linux): extensive admission", function()
 	helpers.it("export observation returns the exact owned snapshot without any export side effect", function()
 		with_bridge(nil, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
+			local starts = context.starts
 			local answer = bridge.on_message({ action = "export_snapshot", export_sequence = 12 }, {}, page(context))
 			helpers.assert_true(answer.snapshot == ready.snapshot)
 			helpers.assert_eq(answer.export_sequence, 12)
 			helpers.assert_eq(answer.action, "export_snapshot")
-			helpers.assert_eq(context.starts, 0)
+			helpers.assert_eq(context.starts, starts)
 			helpers.assert_eq(#context.copied, 0)
 		end)
 	end)
@@ -276,8 +283,9 @@ helpers.describe("diagnostics bridge (linux): cleanup history", function()
 			helpers.assert_eq(rows.github_api.ms, 23)
 			helpers.assert_eq(rows.ai_health.state, "cancelled")
 			helpers.assert_eq(rows.ai_health.cleanup, "pending")
-			helpers.assert_eq(context.starts, 1)
-			helpers.assert_eq(context.cancels, 1)
+			helpers.assert_nil(rows.configuration, "a local probe owns nothing to clean up")
+			helpers.assert_eq(context.starts, 4)
+			helpers.assert_eq(context.cancels, 3)
 			helpers.assert_eq(#context.copied, 0)
 		end)
 	end)

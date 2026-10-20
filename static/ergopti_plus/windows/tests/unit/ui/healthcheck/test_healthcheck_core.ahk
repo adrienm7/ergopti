@@ -583,7 +583,13 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 		AssertEqual(23, Rows["github_api"]["ms"])
 		AssertEqual("cancelled", Rows["ai_health"]["state"])
 		AssertEqual("pending", Rows["ai_health"]["cleanup"])
+		if Refresh
+			AssertFalse(Encoded["retired_probes"][1]["probes"].Has("configuration"),
+				"a local probe owns nothing to clean up")
 	} finally {
+		; A quick refresh starts the local configuration probe: its run is the
+		; fixture's to stop
+		HealthCheck_CancelProbes()
 		_HC_Session := SavedSession
 		_HC_ResetDone := SavedReset
 		AssertEqual(SavedProbeRun, _HC_ProbeRun, "the fixture retains the exact idle probe owner after session/reset restoration")

@@ -175,6 +175,48 @@ exports.run = function run(root) {
 					label
 				);
 		}
+	// The configuration comes from a probe: until it answers, and whenever it
+	// does not, the report says so explicitly instead of showing empty sections.
+	const probeStates = [
+		['pending', {}, 'healthcheck.probe.pending'],
+		['not_run', { reason: 'opt_in_required' }, 'healthcheck.probe.not_run'],
+		[
+			'timeout',
+			{ detail: 'deadline_expired', cleanup: 'settled', ms: 2100 },
+			'healthcheck.probe.timeout'
+		],
+		[
+			'error',
+			{ cleanup: 'settled', detail: 'C:\\Users\\PRIVATE_USER_ZEBRA\\notes' },
+			'healthcheck.probe.error'
+		],
+		['ok', { cleanup: 'settled', ms: 12 }, 'healthcheck.value.none']
+	];
+	for (const driver of ['windows', 'macos', 'linux'])
+		for (const [state, extra, note] of probeStates) {
+			const snapshot = {
+				schema_version: 2,
+				driver,
+				generated_at: '2026-10-20T10:00:00Z',
+				detailed: false,
+				extensive: false,
+				sections: { configuration: { items: [] }, configuration_files: { items: [] } },
+				probes: { configuration: Object.assign({ state }, extra) }
+			};
+			const label = driver + ': configuration probe ' + state;
+			const safe = model.shareSnapshot(snapshot, schema);
+			assert.equal(safe.probes.configuration.state, state, label);
+			const text = model.formatShareable(snapshot, schema, (key) => key);
+			assert.ok(text.includes('| probes.configuration.state | ' + state + ' |'), label);
+			assert.ok(!text.includes('PRIVATE_USER_ZEBRA'), label + ' leaked a path');
+			const page = model.formatMarkdown(snapshot, schema, (key) => key);
+			assert.ok(page.includes(note), label + ' shows ' + note);
+		}
+	assert.equal(schema.probes.configuration.local, true, 'the configuration probe is local');
+	assert.ok(
+		schema.probes.configuration.timeout_ms <= 5000,
+		'the configuration deadline is bounded'
+	);
 	const crowded = Array.from({ length: 801 }, (_, index) => ({
 		setting: 'script.k' + index,
 		type: 'boolean',

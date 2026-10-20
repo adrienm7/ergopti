@@ -18,6 +18,11 @@
 --- 4. read_files and collect report the state of each configuration file in
 ---    the order they apply: ok, missing, unreadable or invalid. A file that
 ---    cannot be read is named, never skipped, and nothing is cached or written.
+--- 5. probe and complete run that collection as the local `configuration`
+---    probe of the schema, against its deadline: phase A only publishes empty
+---    sections and a pending probe, so reading and decoding the files never
+---    counts against its budget. Menu reports, which have no page to keep
+---    responsive, call complete instead.
 --- ==============================================================================
 
 local M = {}
@@ -179,6 +184,43 @@ function M.collect(schema, driver, features, path_of, decode, open_fn)
 	local items, document = M.read_files(spec.files[driver], path_of, decode, open_fn)
 	local rows = document and M.rows(features, document, driver, spec.max_rows) or {}
 	return { files = { items = items }, settings = { items = rows } }
+end
+
+--- The configuration probe: one collection against its deadline. An answer
+--- later than the probe's timeout_ms is discarded as a timeout, so a slow
+--- disk is reported, never silently waited for or half published.
+--- @param context table { schema, driver, features = function, path_of,
+---   decode, open_fn = function|nil, clock = function returning ms }
+--- @return table result The probe result { state, cleanup, ms, detail? }.
+--- @return table|nil sections The values the probe fills, by section id.
+function M.probe(context)
+	local started = context.clock()
+	local collected = M.collect(context.schema, context.driver, context.features(), context.path_of,
+		context.decode, context.open_fn)
+	local elapsed = context.clock() - started
+	local ms = math.floor(elapsed + 0.5)
+	if elapsed > context.schema.probes.configuration.timeout_ms then
+		return { state = "timeout", detail = "deadline_expired", cleanup = "settled", ms = ms }, nil
+	end
+	return { state = "ok", cleanup = "settled", ms = ms },
+		{ configuration_files = collected.files, configuration = collected.settings }
+end
+
+--- Completes a snapshot's configuration sections at once, for the flows that
+--- have no page to keep responsive (a report from the Debug menu). A collection
+--- that raises leaves the sections empty and the probe in the error state.
+--- @param snapshot table A phase A snapshot.
+--- @param context table See M.probe.
+--- @return string|nil err The raised message, for the caller to log.
+function M.complete(snapshot, context)
+	local ok, result, sections = pcall(M.probe, context)
+	if not ok then
+		snapshot.probes.configuration = { state = "error", cleanup = "settled", ms = 0 }
+		return tostring(result)
+	end
+	snapshot.probes.configuration = result
+	for id, values in pairs(sections or {}) do snapshot.sections[id] = values end
+	return nil
 end
 
 return M

@@ -20,6 +20,11 @@
 ;    the state of each configuration file in the order they apply: ok, missing,
 ;    unreadable or invalid. A file that cannot be read is named, never skipped,
 ;    and nothing is cached or written.
+; 5. HealthCheck_ConfigurationProbe runs that collection as the local
+;    `configuration` probe of the schema, against its deadline: phase A only
+;    publishes empty sections and a pending probe. Flows without a page (the
+;    Debug menu's report, the native fallback window) call
+;    HealthCheck_CompleteConfiguration instead.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -235,4 +240,55 @@ HealthCheck_CollectConfiguration(Schema, PathOf := _HCConfig_PathOf) {
 		? HealthCheck_ConfigurationRows(FEATURES_MANIFEST["features"], Read["document"], "windows", Spec["max_rows"])
 		: []
 	return Map("files", Map("items", Read["items"]), "settings", Map("items", Rows))
+}
+
+
+
+
+
+; ============================
+; ============================
+; ======= 4/ The Probe =======
+; ============================
+; ============================
+
+; One collection against the probe's deadline. An answer later than the probe's
+; timeout_ms is discarded as a timeout, so a slow disk is reported, never
+; silently waited for or half published.
+; @param Schema {Map} The diagnostics schema.
+; @param Overrides {Map|Integer} Replacements for tests: path_of, clock.
+; @returns {Map} result ({ state, cleanup, ms, detail? }) and sections.
+HealthCheck_ConfigurationProbe(Schema, Overrides := 0) {
+	PathOf := (Overrides is Map && Overrides.Has("path_of")) ? Overrides["path_of"] : _HCConfig_PathOf
+	Clock := (Overrides is Map && Overrides.Has("clock")) ? Overrides["clock"] : _HealthCheck_NowMs
+	Started := Clock.Call()
+	Collected := HealthCheck_CollectConfiguration(Schema, PathOf)
+	Elapsed := Clock.Call() - Started
+	Ms := Round(Elapsed)
+	if Elapsed > Schema["probes"]["configuration"]["timeout_ms"]
+		return Map("result", Map("state", "timeout", "detail", "deadline_expired", "cleanup", "settled", "ms", Ms),
+			"sections", Map())
+	return Map("result", Map("state", "ok", "cleanup", "settled", "ms", Ms),
+		"sections", Map("configuration_files", Collected["files"], "configuration", Collected["settings"]))
+}
+
+; Completes a snapshot's configuration sections at once, for the flows that have
+; no page to keep responsive (a report from the Debug menu). A collection that
+; raises leaves the sections empty and the probe in the error state.
+; @param Snapshot {Map} A phase A snapshot.
+; @param Schema {Map} The diagnostics schema.
+; @param Overrides {Map|Integer} See HealthCheck_ConfigurationProbe.
+; @returns {Boolean} Whether the collection answered.
+HealthCheck_CompleteConfiguration(Snapshot, Schema, Overrides := 0) {
+	try {
+		Answer := HealthCheck_ConfigurationProbe(Schema, Overrides)
+	} catch as Err {
+		LoggerError("Healthcheck", "The configuration could not be collected: {1}", Err.Message)
+		Snapshot["probes"]["configuration"] := Map("state", "error", "cleanup", "settled", "ms", 0)
+		return false
+	}
+	Snapshot["probes"]["configuration"] := Answer["result"]
+	for Id, Values in Answer["sections"]
+		Snapshot["sections"][Id] := Values
+	return Answer["result"]["state"] == "ok"
 }

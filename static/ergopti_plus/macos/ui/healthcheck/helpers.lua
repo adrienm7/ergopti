@@ -306,18 +306,24 @@ function H.collect_features(state)
 	return { items = items }
 end
 
---- The configuration files and the reduced settings of the user's config.toml:
---- booleans, numbers and manifest enum values exact, any other string only its
---- length, any list only its item count.
+--- What the configuration probe works with: where the files live, the
+--- manifest, the decoder and a clock. The sections are filled by the probe
+--- (ui.healthcheck.probes), never by phase A.
 --- @param schema table The diagnostics schema.
---- @return table { files = { items }, settings = { items } }
-function H.collect_configuration(schema)
+--- @param overrides table|nil Replacements for tests: features, path_of, open_fn, clock.
+--- @return table
+function H.configuration_context(schema, overrides)
+	overrides = overrides or {}
 	local names = schema.configuration.file_names
-	local ConfigPaths = require("infra.config_paths")
-	return require("healthcheck.configuration").collect(schema, "macos",
-		require("infra.manifest_reader").features(),
-		function(id) return ConfigPaths.config(names[id]) end,
-		require("toml_codec").decode)
+	return {
+		schema   = schema,
+		driver   = "macos",
+		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
+		decode   = require("toml_codec").decode,
+		open_fn  = overrides.open_fn,
+		clock    = overrides.clock or function() return hs.timer.absoluteTime() / 1e6 end,
+	}
 end
 
 --- The network facts phase A can read: the Wi-Fi signal only. The network's
