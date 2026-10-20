@@ -61,11 +61,22 @@ end
 --- @return table stub, function restore
 local function stub_clipboard(succeeds)
 	local previous = package.loaded["adapters.clipboard"]
-	local stub = { calls = {} }
-	stub.is_available = function() return succeeds end
+	local stub = require("tests.fakes").clipboard({ available = succeeds })
+	stub.calls = {}
 	stub.paste_text = function(text)
 		stub.calls[#stub.calls + 1] = text
 		return succeeds
+	end
+	local factory = stub.new_paste_stage
+	stub.new_paste_stage = function(text, ...)
+		local stage = factory(text, ...)
+		local paste = stage.paste
+		stage.paste = function(channel)
+			local issued = paste(channel)
+			if issued then stub.calls[#stub.calls + 1] = text end
+			return issued
+		end
+		return stage
 	end
 	package.loaded["adapters.clipboard"] = stub
 	return stub, function() package.loaded["adapters.clipboard"] = previous end
@@ -382,11 +393,11 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 		clip.is_available = function() return true end
 		local ok, why = pcall(function()
 			local result = load_injector(fake_channel(true)).inject(3, "señor")
-			helpers.assert_eq(#clip.calls, 1, "the available backend reaches the actual paste boundary")
+			helpers.assert_eq(#clip.calls, 0, "a refused snapshot never reaches the paste boundary")
 			helpers.assert_eq(result.ok, false, "backend availability is not an output commit")
 			helpers.assert_eq(result.cleanup_ok, true)
-			-- This later failure may follow erasure. Clipboard snapshot preparation
-			-- is a separate transaction; this preflight cannot promise its rollback.
+			helpers.assert_eq(result.failed_phase, "replacement preflight",
+				"actual clipboard preparation now precedes erasure")
 		end)
 		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
 		if not ok then error(why, 0) end
@@ -483,7 +494,10 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 			helpers.assert_eq(plans, 1, "retain the original plan result instead of replanning after erasure")
 			helpers.assert_eq(#clip.calls, route == "native" and 0 or 1)
 			if route == "native" then helpers.assert_eq(table.concat(typed, " "), "31 18 24 19")
-			else helpers.assert_eq(clip.calls[1], text); helpers.assert_eq(#typed, 0) end
+			else
+				helpers.assert_eq(clip.calls[1], text)
+				helpers.assert_eq(typed, { 29, 47 }, "the prepared clipboard emits only the Ctrl+V chord")
+			end
 			restore()
 		end)
 	end
