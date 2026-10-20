@@ -1,5 +1,5 @@
 {
-	"expected_count": 12,
+	"expected_count": 68,
 	"filters": [
 		{
 			"contains": "llm-deferred-hotkeys-enable-owner",
@@ -7,6 +7,30 @@
 		},
 		{
 			"contains": "layout-row-send-level",
+			"expected_count": 6
+		},
+		{
+			"contains": "capsword-auto-off-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "layout-row-win-fallback",
+			"expected_count": 24
+		},
+		{
+			"contains": "layout-row-win-registry",
+			"expected_count": 1
+		},
+		{
+			"contains": "capsword-native-key-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "menu-replay-canonical-identity",
+			"expected_count": 15
+		},
+		{
+			"contains": "ctrl-alt-numpad-row-scope",
 			"expected_count": 6
 		}
 	]
