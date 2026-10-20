@@ -19,6 +19,18 @@ Native qualification remains distinct from integration: if the maintainer
 explicitly requests integration before device receiving, preserve the missing
 receiving in TODO and the handover rather than reporting a native pass.
 
+### project-stable-version-release-as
+
+ci.yml's `Compute tag and version` numbers the next stable tag from the
+subjects since the last one: any `feat` bumps the minor, `!:` or `BREAKING:`
+the major. To force a version, put a line of its own `Release-As: 1.0.4` in a
+commit message after the last stable tag (`git commit --trailer
+'Release-As: 1.0.4'`); the newest such commit wins. It must be MAJOR.MINOR.PATCH
+with no `v` or leading zeros, strictly greater than the last stable tag and not
+an existing tag, or the plan fails rather than falling back to the computed
+bump. dev ignores it with a notice. Never write such a line in prose: an
+explanatory commit that starts a line with `Release-As:` reaches main too.
+
 ### project-explicit-dev-fetch-tracking
 
 A cloud checkout can have `remote.origin.fetch` limited to main. In that case,
