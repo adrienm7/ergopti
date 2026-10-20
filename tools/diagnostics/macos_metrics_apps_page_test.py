@@ -419,6 +419,13 @@ class MetricsAppsPageControls(unittest.TestCase):
         self.assertEqual(
             probe.page_contract(repo), ("typeof window.publishMetricsAppsData", "4.4.9")
         )
+        alias = self.root / "source-parent-alias"
+        alias.symlink_to(repo.parent.resolve(), target_is_directory=True)
+        aliased_repo = alias / repo.name
+        self.assertNotEqual(aliased_repo, aliased_repo.resolve())
+        self.assertEqual(probe.source_identity(aliased_repo), (sources, digest))
+        self.assertEqual(probe.source_identity(repo.resolve()), (sources, digest))
+        self.assertTrue(all(not Path(name).is_absolute() for name in sources))
 
     def test_missing_or_remote_asset_cannot_be_accepted(self):
         repo = self.source_fixture()

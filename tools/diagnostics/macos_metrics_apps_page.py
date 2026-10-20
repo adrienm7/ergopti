@@ -53,6 +53,7 @@ class PageAssets(HTMLParser):
 
 def source_identity(repo):
     """Pin the real factory, caller query, declared assets and native locale seed."""
+    repo = repo.resolve()
     page = repo / PAGE
     parser = PageAssets()
     parser.feed(page.read_text(encoding="utf-8"))
@@ -66,7 +67,7 @@ def source_identity(repo):
         declared = page.parent / name
         require(declared.is_file() and not declared.is_symlink(), "declared page asset redirected")
         path = declared.resolve()
-        require(path.is_relative_to(repo.resolve()), "page asset escaped source root")
+        require(path.is_relative_to(repo), "page asset escaped source root")
         paths.add(path)
     sources = {}
     for path in sorted(paths):
