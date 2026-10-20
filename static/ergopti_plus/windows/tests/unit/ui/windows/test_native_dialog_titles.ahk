@@ -592,3 +592,5 @@ _NDT_ActualNativeFolderPickerCaptionsAndResults() {
 }
 Test("native folder picker: actual captions, leases and retirement follow customized shared policy (shared-window-titles)",
 	_NDT_ActualNativeFolderPickerCaptionsAndResults)
+
+#Include test_native_picker_retirement.ahk
