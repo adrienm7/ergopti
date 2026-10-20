@@ -778,7 +778,21 @@ class OllamaManagedBootstrap {
 	}
 
 	_ServerExited(ExitCode, Target) {
-		this._Fail("runtime_exit")
+		; Runtime terminal delivery deliberately has no live task. Revalidate the
+		; bootstrap's source and captured target, not runtime READY currentness.
+		Captured := this.Target
+		if !(Target is Map) || !(Captured is Map)
+			return false
+		for Name in ["origin", "runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256"]
+			if !(Target.Get(Name, 0) is String) || !(Target[Name] == Captured[Name])
+				return false
+		if !this._Current() {
+			this.Cancel()
+			return false
+		}
+		if this.Target != Captured
+			return false
+		return this._Fail("runtime_exit")
 	}
 
 	/** Adopts exact terminal file evidence before any logical continuation. */
@@ -916,18 +930,37 @@ class OllamaManagedBootstrap {
 
 	_Fail(Phase) {
 		global _LLM_Deps_Epoch
+		if this.Cancelled || A_IsSuspended || this.Epoch != _LLM_Deps_Epoch {
+			this.Cancel()
+			return false
+		}
 		if !this.Failed {
-			if !(this.Port is Map) && !this.Cancelled && this.Epoch == _LLM_Deps_Epoch && !A_IsSuspended
+			if !(this.Port is Map)
 				this._Ui("ollama.runtime_repair_failed")
-			this.Failed := true
+			; UI can call the real cancellation path. Claim only current failure
+			; state under Critical; native cleanup and file-backed logs stay out.
+			Claimed := false
+			PreviousCritical := Critical("On")
+			try {
+				if !this.Cancelled && !this.Failed && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
+					this.Failed := true
+					Claimed := true
+				}
+			} finally Critical(PreviousCritical)
+			if !Claimed {
+				this.Cancel()
+				return false
+			}
 			LoggerError("LLM.managed", "Managed bootstrap failed at {1}; retained owners remain explicit.", Phase)
-			if this.Epoch == _LLM_Deps_Epoch {
-				if !(this.Port is Map) && this.UiShown && !A_IsSuspended
+			if !this.Cancelled && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
+				if !(this.Port is Map) && this.UiShown
 					OllamaWV_SetError(t("ollama.runtime_repair_failed"))
-				if HasMethod(this.OnFailed, "Call")
-					_LLM_Deps_PublishFailure(t("ollama.runtime_repair_failed"), this.OnFailed, this.Epoch)
-				else
-					_LLM_Deps_PublishFailure(t("ollama.runtime_repair_failed"), , this.Epoch)
+				if !this.Cancelled && !A_IsSuspended && this.Epoch == _LLM_Deps_Epoch {
+					if HasMethod(this.OnFailed, "Call")
+						_LLM_Deps_PublishFailure(t("ollama.runtime_repair_failed"), this.OnFailed, this.Epoch)
+					else
+						_LLM_Deps_PublishFailure(t("ollama.runtime_repair_failed"), , this.Epoch)
+				}
 			}
 		}
 		this.Cancel()
