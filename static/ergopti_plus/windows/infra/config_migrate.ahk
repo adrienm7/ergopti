@@ -962,10 +962,42 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 ; Number of deep registry liveness checks run in this process (diagnostics only).
 global ConfigMigrateRegistryChecks := 0
 
+; Number of those checks that really compared the registry (diagnostics only).
+global ConfigMigrateRegistryDeepCompares := 0
+
+; Memo of one synchronous proof scope: the shipped registry and the private
+; shadow whose deep comparison already succeeded inside the open scope.
+global ConfigMigrateRegistryProof := { depth: 0, registry: 0, shadow: 0 }
+
+; True while a proof scope is open (the caller already runs under Critical).
+ConfigMigrateRegistryProofOpen() {
+	global ConfigMigrateRegistryProof
+	return ConfigMigrateRegistryProof.depth > 0
+}
+
+; Runs Body with one deep registry comparison per private shadow instead of one
+; per liveness check. The scope holds Critical, so no other thread can use the
+; memo or mutate state between two checks, and it is dropped when the outermost
+; scope ends. Callers close the proof with one fresh check (RegistryLive with
+; Fresh) after the scope, so a mutation made while Body ran is still refused.
+ConfigMigrateWithRegistryProof(Body) {
+	global ConfigMigrateRegistryProof
+	PreviousCritical := Critical("On")
+	ConfigMigrateRegistryProof.depth += 1
+	try return Body.Call()
+	finally {
+		ConfigMigrateRegistryProof.depth -= 1
+		if !ConfigMigrateRegistryProof.depth
+			ConfigMigrateRegistryProof.registry := 0, ConfigMigrateRegistryProof.shadow := 0
+		Critical(PreviousCritical)
+	}
+}
+
 ; One private issuer owns both read-only preparation and actual boot completion.
 ; Query requests expose checking closures, never mutable rows or phase setters.
 ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle := unset) {
 	static Destinations := Map()
+	static SharedShadow := 0
 	static Native := {
 		exists: FSStrictExists, read: FSConfigReadUtf8Exact, generic_read: FSReadUtf8Exact, load_registry: ConfigMigrateLoadRegistry,
 		registry_path: ConfigMigrateRegistryPath, registry: ConfigMigrateShippedRegistry,
@@ -1062,17 +1094,29 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		return Native.same.Call(Left, Right)
 	}
 
-	RegistryLive(Row) {
-		global ConfigMigrateRegistryChecks
-		; Each check deep-compares the whole shipped registry (about 17 ms); the
+	RegistryLive(Row, Fresh := false) {
+		global ConfigMigrateRegistryChecks, ConfigMigrateRegistryProof, ConfigMigrateRegistryDeepCompares
+		; Each check deep-compares the whole shipped registry (about 10 ms); the
 		; count lets performance tests see how many a transaction pays for.
 		ConfigMigrateRegistryChecks += 1
 		if !NativeLive()
 			return false
 		try {
 			CurrentRegistry := Native.registry.Call()
-			return CurrentRegistry == Row.registry
-				&& SameRegistry(CurrentRegistry, Row.registry_shadow)
+			if CurrentRegistry != Row.registry
+				return false
+			Proof := ConfigMigrateRegistryProof
+			; Inside a proof scope a shadow already compared equal to this very
+			; registry is not compared again; a Fresh check always is.
+			if !Fresh && Proof.depth && Proof.registry == CurrentRegistry
+					&& Proof.shadow == Row.registry_shadow
+				return true
+			ConfigMigrateRegistryDeepCompares += 1
+			if !SameRegistry(CurrentRegistry, Row.registry_shadow)
+				return false
+			if Proof.depth
+				Proof.registry := CurrentRegistry, Proof.shadow := Row.registry_shadow
+			return true
 		} catch {
 			return false
 		}
@@ -1303,7 +1347,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			Row.registry := Native.registry.Call()
 			if !SameRegistry(FreshRegistry, Row.registry)
 				throw Error("The default registry differs from its native source")
-			Row.registry_shadow := Native.clone.Call(FreshRegistry)
+			; Rows built from the same registry source share one private shadow,
+			; so a proof scope compares the live registry with it only once.
+			if !(SharedShadow is Map) || !SameRegistry(FreshRegistry, SharedShadow)
+				SharedShadow := Native.clone.Call(FreshRegistry)
+			Row.registry_shadow := SharedShadow
 			if !RegistryLive(Row)
 				throw Error("The default registry does not match its native source")
 			Image := ReadImage()
@@ -1449,6 +1497,9 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 		return Result
 	}
 
+	; The three checks of one write admission share a single deep comparison.
+	if Request == "check_write" && !ConfigMigrateRegistryProofOpen()
+		return ConfigMigrateWithRegistryProof(ConfigMigrateBoot.Bind(FilePath, Request))
 	if !RegistryLive(Row) || !(Row.image is Object)
 		return false
 	if Request == "capture_read" {
@@ -1563,7 +1614,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			&& (Present is Integer) && Present == ExpectedNoopPresent
 	}
 	if Request == "check_write"
-		return RegistryLive(Row) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
+		return RegistryLive(Row, true) && OwnerLive() && TOML_WriteRefusal(FilePath) == ""
 	if !IsSet(Candidate)
 		return false
 	if IsSet(Candidate) {
