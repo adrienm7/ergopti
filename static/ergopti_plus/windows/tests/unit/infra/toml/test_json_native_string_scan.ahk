@@ -3,8 +3,9 @@
 ; ==============================================================================
 ; MODULE: JSON Native String Scan Tests
 ; DESCRIPTION:
-; JsonParse finds the end of each plain string run with one native PCRE scan,
-; and JsonArrayElementSpans validates, decodes and records spans in one pass.
+; JsonParse finds the end of each plain string run with one native code-unit
+; scan (NativeTextSpanExcluding), and JsonArrayElementSpans validates, decodes
+; and records spans in one pass.
 ; Both are performance changes: they must decode exactly what the former
 ; per-character scan decoded, including raw lone surrogates (which PCRE refuses
 ; to scan from) and every refused control character. Native before/after
