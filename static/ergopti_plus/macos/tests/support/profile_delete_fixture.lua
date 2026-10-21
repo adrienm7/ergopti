@@ -18,6 +18,8 @@ local MODULES = {
 	"adapters.timer_scheduler",
 	-- The real timer scheduler describes callback failures through this pure owner.
 	"error_description",
+	-- The timer scheduler admits delays through this pure owner.
+	"number_policy",
 	"chord",
 	"infra.app_picker",
 	"infra.dialog_util",
