@@ -2,17 +2,20 @@
 
 # Tap-hold actions open the shared action picker
 
-The maintainer's rule (October 21): choosing a tap-hold key's action never
-opens a submenu of actions; it opens the shared "all actions" picker
-(`_shared/ui/action_picker/`) that gestures and keyboard shortcuts use, on
-every system.
+The maintainer's rule (October 21): choosing a tap-hold key's action, or a
+key combination's, never opens a submenu of actions; it opens the shared "all
+actions" picker (`_shared/ui/action_picker/`) that gestures and keyboard
+shortcuts use, on every system.
 
 ## Done
 
-Committed on local dev as 61ab0fb351 (not pushed).
+Keys: 61ab0fb351 (on origin/dev, pushed by another agent). Key combinations:
+1eb85e2b6b, and b4ce3759b6 for the live lease-transition tests that still
+picked through the old submenus (CI run 39678425941, seven
+`live-tap-hold-transition` reds); both local, not pushed.
 
 - **macOS.** A key's « Tap → … » and « Hold → … » rows are now commands that
-  open the shared picker (`open_key_slot_picker` in
+  open the shared picker (`open_slot_picker` in
   `macos/ui/menu/menu_tap_holds.lua`). The picker lists the remap catalogue
   the slot accepts (the tap: every tappable action; the hold: the holdable
   ones, that is modifiers, chords, sticky keys and the layer), one heading
@@ -34,6 +37,17 @@ Committed on local dev as 61ab0fb351 (not pushed).
   (`_TH_TapPickerFnObj` → `ShowActionPicker`); unchanged.
 - **Linux.** Already opened the shared picker for the tap through its webview
   bridge (`pick_tap` → `ui.action_picker.bridge`); unchanged.
+- **macOS key combinations.** Under Shortcuts, a pair's three slots (chord,
+  hold 1 + tap 2, hold 1 + hold 2) open the same picker through
+  `open_slot_picker`, titled « <slot> — <pair> » (presentations
+  `key_combination_chord_action`, `key_combination_tap_action`,
+  `key_combination_hold_action`; their prefixes are the slot captions without
+  the arrow, in all 21 locales), and save through `set_combo_*_action`. The
+  last action submenu builder (`build_action_picker`, its manifest frame
+  `tap_hold_action_picker_frame` and `MenuUtils.build_action_picker`) is
+  removed. Windows opens the picker for a pair's tap and Linux for its tap and
+  chord; their pair hold is the seven hold options (a submenu on Windows, a
+  list dialog on Linux), so neither has an action submenu left.
 - **Tests.** macOS `test_menu_tap_holds_hand_sections.lua`
   (« the macOS key slots open the shared action picker », cases named
   `tap-hold-action-picker`): both rows open the picker with the key's
@@ -41,22 +55,21 @@ Committed on local dev as 61ab0fb351 (not pushed).
   persisted through the key's setter and regenerates; false, nil, truthy or
   throwing setters keep it open with no regeneration; an action the slot does
   not offer is refused; a picker that does not open is reported; no key row
-  builds an action row any more. The head, corpus and title tests on the
-  three drivers follow the new declarations.
+  builds an action row any more. « the macOS key-combination slots open the
+  shared action picker » (`key-combination-action-picker`) does the same for
+  the three pair slots, and the HS-019 picker routes of
+  `test_karabiner_bulk_commands_transaction_manifest_commands.lua` now pick
+  through the picker for the five slots. The head, corpus and title tests on
+  the three drivers follow the new declarations.
 
 ## Remaining
 
 - **Windows and Linux hold.** Their « Hold → … » row still opens a submenu,
   but of the seven shared hold options (`[tap_hold.hold_picker]`: none, five
-  modifiers, the navigation layer), not of actions; the shared picker lists
+  modifiers, the navigation layer), not of actions (the same for a pair's
+  hold, a list dialog on Linux); the shared picker lists
   actions with a parameter editor and has no notion of a hold option. Kept on
   purpose and asked in `docs/questions-for-maintainer.md`.
-- **macOS key combinations.** The three slots of a key pair (chord, hold 1 +
-  tap 2, hold 1 + hold 2) under Shortcuts still open action submenus
-  (`build_action_picker`), whereas Windows opens the shared picker for the
-  pair's tap. Not in this change's scope (they are Shortcuts rows); moving
-  them to the picker also removes the menu's largest build cost (182 pairs ×
-  three submenus).
 - The macOS tap catalogue is Karabiner's (`platform/remap/data/actions.json`):
   it has no action with a parameter, so the picker's parameter editor never
   shows there. Windows' tap offers the gesture catalogue instead; giving a
@@ -76,3 +89,8 @@ Committed on local dev as 61ab0fb351 (not pushed).
    check that holding the key acts as Ctrl.
 5. Reopen « Tap → … » and pick « ∅ »: the tap goes back to the key's own
    character.
+6. Menu bar → Shortcuts → « Combinaisons de touches » → a pair (for example
+   Left Shift + Right Shift) → each of its three slots: a window titled with
+   the slot and the pair opens (no submenu); the hold slot lists only
+   holdable actions. Pick an action in « Hold 1 + tap 2 », check the pair row
+   shows it, then hold the first key and tap the second.
