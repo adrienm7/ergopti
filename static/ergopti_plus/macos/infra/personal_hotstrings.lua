@@ -25,6 +25,7 @@ local M = {}
 
 local hs               = hs
 local JsonCodec        = require("adapters.json_codec")
+local NativePath = require("native_path")
 local Logger           = require("infra.logger")
 local fs_dir           = require("infra.fs_dir")
 local menu_paths       = require("infra.config_paths")
@@ -116,7 +117,7 @@ function M.load(ctx)
 
 		-- Canonicalise so two spellings of the same directory collapse to one key;
 		-- a re-visit means we are inside a cycle and must stop.
-		local canonical = dir:gsub("[/\\]+$", ""):lower()
+		local canonical = NativePath.without_trailing_separators(dir):lower()
 		if visited[canonical] then
 			Logger.warn(LOG, "Personal ext scan revisited '%s' — skipping to break a directory cycle.", dir)
 			return
@@ -168,14 +169,14 @@ function M.load(ctx)
 		end
 	end
 
-	scan_recursive(hs_dir:gsub("[/\\]+$", ""), "", 1, {})
+	scan_recursive(NativePath.without_trailing_separators(hs_dir), "", 1, {})
 	_unavailable_directories = blocked
 	_cohort_probe = function()
 		if _probing then return nil end
 		_probing = true
 		local previous_discovered, previous_visited, previous_blocked = discovered, visited, blocked
 		discovered, visited, blocked = {}, {}, {}
-		local ok = pcall(scan_recursive, hs_dir:gsub("[/\\]+$", ""), "", 1, {})
+		local ok = pcall(scan_recursive, NativePath.without_trailing_separators(hs_dir), "", 1, {})
 		local fresh = discovered
 		discovered, visited, blocked, _probing = previous_discovered, previous_visited, previous_blocked, false
 		return ok and fresh or nil

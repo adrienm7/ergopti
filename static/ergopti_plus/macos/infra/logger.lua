@@ -53,6 +53,7 @@
 local M = {}
 
 local Redact = require("diagnostics.redact")
+local NativePath = require("native_path")
 local Json = require("json")
 local ErrorDescription = require("error_description")
 local _redact_message = nil
@@ -570,7 +571,7 @@ function M.init_log_path(log_dir, max_age_days)
 	if type(log_dir) ~= "string" or log_dir == "" then
 		return false, "log_dir must be a non-empty string"
 	end
-	if not log_dir:match("[/\\]$") then log_dir = log_dir .. "/" end
+	log_dir = NativePath.with_trailing_separator(log_dir)
 
 	-- Created in-process, not by forking /bin/sh.
 	--
