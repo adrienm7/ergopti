@@ -11,6 +11,10 @@
 --- ==============================================================================
 
 require("compat.utf8").install()
+-- A refused AI action reports its reason only in the log. The receipts go to
+-- stdout, so the log goes to stderr (worker.log), which the harness prints
+-- when an assertion fails.
+require("logger").set_sink(function(line) io.stderr:write(line, "\n") end)
 local Json = require("json")
 local Shell = require("adapters.shell_runner")
 local source_path = os.getenv("ERGOPTI_AI_DAEMON_SOURCE") or "ergopti_hotstrings.lua"
@@ -52,7 +56,12 @@ package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,
 } })
-package.loaded["modules.llm.profiles"] = { init = function() end, is_enabled = function() return true end }
+-- Every case re-initializes the engine, which first retires the previous
+-- Profiles inventory: without these ports each re-initialization was refused
+-- and the next case ran on the first case's scheduler and pacing clock.
+package.loaded["modules.llm.profiles"] = require("tests.support.llm_profiles_fixture").without_inventory({
+	init = function() end, is_enabled = function() return true end,
+})
 package.loaded["modules.llm.api_entries"] = { active = function()
 	return { id = "owned", provider = "openai_compat", model = "fixture-model" }
 end }
@@ -101,7 +110,7 @@ local function initialize()
 		if ok then applied = applied + 1 end
 		return ok == true
 	end
-	Engine.init({
+	local initialized = Engine.init({
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 		focus_id = focus_id,
 		privacy_guard = Guard.blocks_text, privacy_context = Guard.current_context,
@@ -118,6 +127,8 @@ local function initialize()
 		end,
 		apply_prediction = function(candidate) return type_text(candidate.to_type) end,
 	})
+	-- A refusal returns false and keeps the previous case's state.
+	assert(initialized ~= false, "the prediction engine must accept every case's re-initialization")
 	Guard.prime()
 	await_join()
 end

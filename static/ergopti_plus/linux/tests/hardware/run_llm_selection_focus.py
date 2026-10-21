@@ -418,7 +418,17 @@ def main():
         gtk(pathlib.Path(sys.argv[-1]))
         return 0
     if "--session" in sys.argv:
-        session(pathlib.Path(sys.argv[-1]))
+        root = pathlib.Path(sys.argv[-1])
+        try:
+            session(root)
+        except AssertionError:
+            # A receipt says what the engine did, not why it refused: the worker's
+            # log holds that reason, and the temporary session folder dies with us.
+            worker_log = root / "worker.log"
+            if worker_log.exists():
+                print("--- worker.log (last 200 lines) ---", file=sys.stderr)
+                print("\n".join(worker_log.read_text().splitlines()[-200:]), file=sys.stderr)
+            raise
         return 0
     for tool in ("xvfb-run", "dbus-run-session", "openbox", "xdotool", "luajit"):
         if shutil.which(tool) is None:
