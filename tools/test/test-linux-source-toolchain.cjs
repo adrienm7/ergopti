@@ -190,7 +190,7 @@ bash ${quote(path.join(clone, builderRelative))} --source-directory ${quote(actu
 assert.equal(data.archive_build_packages.xbps, null);
 assert.equal(data.network_runtime.providers.dnf, null);
 assert.ok(data.network_runtime.source_luv_build_packages.dnf.includes('luajit-devel'));
-const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-linux.yml'), 'utf8');
+const workflow = require('./ci-pipeline.cjs').inlineLaneAt(root, '.github/workflows/ci-linux.yml');
 const { plan } = linuxInstall.read(root, workflow);
 function sourcePrerequisites(source, selectedPlan, recipe) {
 	const { job } = linuxInstall.admit(source, selectedPlan);
@@ -243,8 +243,8 @@ function sourceTransportControls(source, selectedPlan) {
 		],
 		[
 			'adjacent receiver',
-			'    needs: [package-linux]\n    strategy:',
-			'    needs: [e2e-linux]\n    strategy:'
+			'    needs: [package-linux]\n    runs-on: ubuntu-latest\n    strategy:',
+			'    needs: [e2e-linux]\n    runs-on: ubuntu-latest\n    strategy:'
 		],
 		[
 			'matrix receiver',

@@ -1,0 +1,321 @@
+# .github/workflows/ci-linux-build.yml
+#
+# Linux build stage: builds the .deb, .rpm, AppImage, tarball and XKB
+# packages once, installs the tarball the way a user would, and plans the
+# installation lots.
+# Called by ci-linux.yml as its package-linux stage.
+
+name: 'Linux build'
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when this run publishes a release; only sets artifact retention
+        required: true
+        type: boolean
+      version:
+        description: Release version stamped into the Linux tree, empty outside a release
+        required: true
+        type: string
+      tag:
+        description: Exact release tag from the validated release plan
+        required: true
+        type: string
+      prerelease:
+        description: Exact prerelease string from the validated release plan
+        required: true
+        type: string
+      channel:
+        description: Exact update channel from the validated release plan
+        required: true
+        type: string
+      linux_bundle:
+        description: Linux tarball asset name from the updater release contract
+        required: true
+        type: string
+      predecessors:
+        description: The lane's needs context for this stage (e2e-linux), as JSON
+        required: true
+        type: string
+    outputs:
+      install_matrix:
+        description: package-linux's install_matrix output, read by the lane's later stages
+        value: ${{ jobs.package-linux.outputs.install_matrix }}
+      install_metadata:
+        description: package-linux's install_metadata output, read by the lane's later stages
+        value: ${{ jobs.package-linux.outputs.install_metadata }}
+      ci_predecessors:
+        description: package-linux's ci_predecessors output, read by the lane's later stages
+        value: ${{ jobs.package-linux.outputs.ci_predecessors }}
+      ci_source_sha:
+        description: package-linux's ci_source_sha output, read by the lane's later stages
+        value: ${{ jobs.package-linux.outputs.ci_source_sha }}
+      ci_run_id:
+        description: package-linux's ci_run_id output, read by the lane's later stages
+        value: ${{ jobs.package-linux.outputs.ci_run_id }}
+      ci_attempt:
+        description: package-linux's ci_attempt output, read by the lane's later stages
+        value: ${{ jobs.package-linux.outputs.ci_attempt }}
+
+permissions:
+  contents: read
+
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
+jobs:
+  package-linux:
+    name: '.deb, .rpm, AppImage and archive'
+    runs-on: ubuntu-latest
+    env:
+      ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
+      LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
+
+    outputs:
+      install_matrix: ${{ steps.install-plan.outputs.matrix }}
+      install_metadata: ${{ steps.install-plan.outputs.metadata }}
+      ci_predecessors: ${{ inputs.predecessors }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Admit genuine preceding scheduler results
+        shell: bash
+        env:
+          NEEDS: ${{ inputs.predecessors }}
+        run: node tools/ci/ci-stage-status.cjs admit-build linux
+
+      - name: Install LuaJIT
+        # The assembly smoke below boots the driver with it and the tarball
+        # smoke runs the installed tree with it. The AppImage bundles the
+        # luajit of its own build container instead, see the next step.
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv curl binutils pkg-config \
+            libglib2.0-dev glib-networking dconf-gsettings-backend \
+            gsettings-desktop-schemas
+
+      - name: Assemble the driver bundle
+        shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
+        run: bash tools/build/build-linux-driver.sh
+
+      - name: Build the native files and the AppImage on the oldest supported LTS
+        # In an ubuntu:22.04 container, the release the AppImage catalogue tests
+        # on: built here, the bundled luajit needed GLIBC_2.38 and the image
+        # died there before showing its tray. The container also rebuilds the
+        # driver's archive backend in the bundle, before every package below
+        # is made from it. check-elf-glibc-ceiling.cjs refuses a newer need.
+        shell: bash
+        run: bash tools/build/appimage-oldest-lts.sh build
+
+      - name: Package latest XKB files
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
+          dir_name=$(basename "$latest_dir")
+          mkdir -p build/linux/xkb
+          (cd static/ergopti/linux && zip -r "../../../build/linux/xkb/Ergopti_xkb.zip" "$dir_name")
+          echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
+
+      # A tarball, because the release used to publish install.sh, one wrapper
+      # and ONE Lua file — so a user who downloaded it had an installer, no
+      # driver and no shared tree, and could not install anything. The daemon
+      # resolves _shared as a SIBLING of the driver, so the archive preserves
+      # that layout rather than flattening it.
+      - name: Package the installable bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/build/write_build_stamp.sh verify build/linux/_shared
+          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh
+          (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
+          (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
+          echo "Bundle contents:"
+          tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | sed -n '1,20p'
+          bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
+          echo "... $bundle_entries entries"
+
+      - name: Install the packaging toolchains
+        # rpmbuild is not on the runner image. appimagetool runs in the AppImage
+        # build container above.
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y rpm
+          rpmbuild --version
+
+      - name: Build the .deb and the .rpm
+        # No --skip-* flag anywhere: those return before dpkg-deb and rpmbuild
+        # respectively, which is how the packagers stayed unexercised while CI
+        # reported them green. The Flatpak is built by its own parallel job,
+        # package-flatpak, from the bundle this job uploads.
+        shell: bash
+        # The two packagers stage under their own build/linux/ subdirectory
+        # and only read the bundle, so they run at once. Each log is printed
+        # whole, then any failure fails.
+        run: |
+          set -euo pipefail
+          logs="$RUNNER_TEMP/linux-packagers"
+          mkdir -p "$logs"
+          bash tools/build/build-linux-deb.sh > "$logs/deb.log" 2>&1 & deb=$!
+          bash tools/build/build-linux-rpm.sh > "$logs/rpm.log" 2>&1 & rpm=$!
+          failed=0
+          for name in deb rpm; do
+            status=0
+            wait "${!name}" || status=$?
+            echo "::group::$name packager (exit $status)"
+            cat "$logs/$name.log"
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              echo "::error::The $name packager failed (exit $status)."
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Rename the packages to their stable asset names
+        # Each packager names its output after the version in package.json, which
+        # is not the release tag. A published asset must keep ONE name across
+        # releases: the notes are static text and the website resolves its
+        # download buttons by exact asset name (getGitHubRelease.js).
+        #
+        # It also closes a silent-skip hole. build-linux-appimage.sh exits 0 with
+        # only the AppDir staged when appimagetool is absent, and the .rpm script
+        # does the same without rpmbuild — so demanding the file here is what
+        # turns "no package was produced" into a failure instead of a green run
+        # with one asset missing.
+        shell: bash
+        run: |
+          set -euo pipefail
+          rename_one() {
+              local found="$1" target="$2" kind="$3"
+              if [ -z "$found" ]; then
+                  echo "::error::the $kind packager produced no package — nothing to attach."
+                  exit 1
+              fi
+              mv "$found" "$target"
+              echo "  $kind -> $target ($(du -h "$target" | cut -f1))"
+          }
+          rename_one "$(find build/linux -maxdepth 1 -name '*.deb' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
+          rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-x86_64.rpm ".rpm"
+          rename_one "$(find build/linux -maxdepth 1 -name '*.AppImage' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-x86_64.AppImage "AppImage"
+
+      - name: Log the package metadata
+        # dpkg-deb --info, rpm -qip and rpm -qlp put the metadata and the file
+        # list in the log, where a wrong control field or %files stanza is
+        # visible without a Debian or Fedora box. sed rather than head: head
+        # exits after its lines, and under pipefail the SIGPIPE it leaves rpm
+        # with would fail a listing that succeeded.
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb --info build/linux/ErgoptiPlus-linux-amd64.deb
+          rpm -qip build/linux/ErgoptiPlus-linux-x86_64.rpm
+          rpm -qlp build/linux/ErgoptiPlus-linux-x86_64.rpm | sed -n '1,20p'
+
+      # The no-root path the release notes point every other distribution at. It
+      # is the only format whose installer is our own script rather than a
+      # package manager, so it is the only one where a broken install.sh is
+      # invisible everywhere else. --no-deps because the runner has what it needs
+      # and the dependency install is the distro matrix's job, not this one's.
+      # The archive installed is the very file uploaded below, not a twin.
+      - name: Unpack and install the tarball the way a user would
+        # --no-deps because package installs are the distro matrix's job, and
+        # --no-service because a runner has no user session bus for a
+        # systemd --user unit to register with. The permission setup DOES run:
+        # it is the half every packaged format leaves to install.sh, so skipping
+        # it would leave the one script nobody else exercises unexercised.
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          tar -xzf "build/linux/$LINUX_BUNDLE_ASSET" -C "$RUNNER_TEMP/unpacked"
+          cd "$RUNNER_TEMP/unpacked"
+          test -f install.sh
+          bash install.sh --no-deps --no-service || {
+              echo "::error::install.sh failed on a clean unpack of the release tarball."
+              exit 1
+          }
+
+      - name: Launch what the tarball installed
+        run: |
+          set -euo pipefail
+          launcher="$HOME/.local/bin/ergopti-hotstrings"
+          if [ ! -x "$launcher" ]; then
+              echo "::error::install.sh left no executable launcher at $launcher"
+              ls -la "$HOME/.local/bin" || true
+              exit 1
+          fi
+          "$launcher" --help
+
+      - name: The installed shared data tree resolves and opens
+        run: |
+          set -euo pipefail
+          root="$HOME/.local/lib/ergopti"
+          if [ ! -d "$root/linux" ]; then
+              echo "::error::no driver tree at $root/linux — install.sh moved its install root."
+              ls -la "$root" || true
+              exit 1
+          fi
+          export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              "$root/_shared"
+
+      - name: Upload packages
+        # The one Linux artifact of the run: the smoke jobs below install from
+        # it, and on a release run ci.yml's release job attaches every file in
+        # it. Kept 7 days on a release run so that a next-day "Re-run failed
+        # jobs" still finds it, 1 day otherwise.
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-linux
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          if-no-files-found: error
+          path: |
+            build/linux/xkb/Ergopti_xkb.zip
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
+            build/linux/ErgoptiPlus-linux-amd64.deb
+            build/linux/ErgoptiPlus-linux-x86_64.rpm
+            build/linux/ErgoptiPlus-x86_64.AppImage
+
+      - name: Record mandatory package evidence
+        # One record for the four subjects this job proves. It is written only
+        # when every step above passed, so no subject can be claimed by a
+        # packaging run that stopped halfway.
+        run: |
+          set -euo pipefail
+          node tools/test/linux-ci-evidence.cjs record \
+              --job package-linux --output "$RUNNER_TEMP/linux-ci-evidence/package-linux.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject build-deb=1 \
+              --subject build-rpm=1 \
+              --subject build-appimage=1 \
+              --subject smoke-tarball-install=1
+
+      - name: Upload mandatory package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: linux-ci-evidence-package-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/package-linux.json
+          if-no-files-found: error
+
+      - name: Plan every authored installation lot
+        id: install-plan
+        run: node tools/ci/linux-install-matrix.cjs

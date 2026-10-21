@@ -110,6 +110,15 @@ for (const file of [
 	'.github/workflows/ci-release.yml'
 ])
 	assert(selectGates([file]).has('js'), `${file}: workflow contract tests run in test:js`);
+// The Linux native gates select every file of the Linux lane, the same files
+// the pipeline loader finds the lane calling.
+{
+	const { LINUX_LANE_WORKFLOWS } = require('./verify-change.cjs');
+	const lane = require('./ci-pipeline.cjs').real().laneFiles('.github/workflows/ci-linux.yml');
+	assert.deepEqual([...LINUX_LANE_WORKFLOWS].sort(), [...lane].sort());
+	for (const file of LINUX_LANE_WORKFLOWS)
+		assert(selectGates([file]).has('linux-runtime-native'), `${file}: Linux native gates`);
+}
 
 assert.equal(GATE_COMMANDS['linux-http-stream'].npm, 'test:linux:http-stream');
 for (const file of [

@@ -28,7 +28,8 @@ const scripts = JSON.parse(read('package.json')).scripts;
 const suite = loadInventory(ROOT);
 const exceptions = read('tools/test/test-npm-aliases-match-the-suite.cjs');
 const catalogue = JSON.parse(read('.github/linux-ci-coverage.json'));
-const workflow = read('.github/workflows/ci-linux.yml');
+// The Linux lane, read inlined with its stage files.
+const workflow = Pipeline.inlineLaneAt(ROOT, '.github/workflows/ci-linux.yml');
 const expected = {
 	ownership: 'Preserve native updater temporary-file ownership',
 	allocation: 'Acknowledge native updater temporary-allocation refusals'

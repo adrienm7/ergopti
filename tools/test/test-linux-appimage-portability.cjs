@@ -187,7 +187,8 @@ assert.ok(
 	'launched with no arguments, as a desktop does'
 );
 assert.ok(container.includes('runuser -u "$SMOKE_USER"'), 'launched outside the input group');
-const workflow = read('.github/workflows/ci-linux.yml');
+// The Linux lane, read inlined with its stage files.
+const workflow = require('./ci-pipeline.cjs').file('.github/workflows/ci-linux.yml');
 const packageJob = workflow.slice(
 	workflow.indexOf('\n  package-linux:\n'),
 	workflow.indexOf('\n  install-linux:\n')
@@ -287,7 +288,10 @@ for (const [relative, minimum] of [
 		1
 	]
 ]) {
-	const text = read(relative);
+	// A pipeline workflow is read through the loader, a lane with its stage files.
+	const text = relative.startsWith('.github/workflows/')
+		? require('./ci-pipeline.cjs').file(relative)
+		: read(relative);
 	for (const name of text.match(/[A-Za-z0-9_.${}-]+\.AppImage\b/gi) ?? []) {
 		assert.ok(
 			!/linux/i.test(name),

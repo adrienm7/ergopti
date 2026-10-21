@@ -218,7 +218,7 @@ function verify(subject) {
 	);
 }
 const subject = {
-	workflow: fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8'),
+	workflow: require('./ci-pipeline.cjs').inlineLaneAt(ROOT, '.github/workflows/ci-linux.yml'),
 	c: fs.readFileSync(path.join(ROOT, HARDWARE + 'xi2_property_cookie.c'), 'utf8'),
 	header: fs.readFileSync(path.join(ROOT, HARDWARE + 'xi2_property_types.h'), 'utf8'),
 	family: fs.readFileSync(path.join(ROOT, HARDWARE + 'native_fixture_family.py'), 'utf8'),
@@ -637,8 +637,8 @@ for (const [name, before, replacement] of [
 	],
 	[
 		'verdict omits E2E',
-		'    needs: [package-linux]\n    strategy:',
-		'    needs: []\n    strategy:'
+		'    needs: [package-linux]\n    runs-on: ubuntu-latest\n    strategy:',
+		'    needs: []\n    runs-on: ubuntu-latest\n    strategy:'
 	],
 	[
 		'verdict ignores actual results',

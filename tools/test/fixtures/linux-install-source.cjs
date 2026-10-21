@@ -105,7 +105,7 @@ function admit(source, plan) {
 /** Read through the production canonical loader; a detached metadata file is not sufficient. */
 function read(
 	root,
-	source = fs.readFileSync(path.join(root, '.github/workflows/ci-linux.yml'), 'utf8')
+	source = require('../ci-pipeline.cjs').inlineLaneAt(root, '.github/workflows/ci-linux.yml')
 ) {
 	return admit(source, loadPlan(root));
 }

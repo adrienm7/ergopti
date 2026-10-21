@@ -500,7 +500,13 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			'package-flatpak',
 			'install-linux',
 			'linux-ok'
-		]
+		],
+		'ci-linux-unit.yml': ['test-linux'],
+		'ci-linux-e2e.yml': ['e2e-linux'],
+		'ci-linux-build.yml': ['package-linux'],
+		'ci-linux-flatpak.yml': ['package-flatpak'],
+		'ci-linux-install.yml': ['install-linux'],
+		'ci-linux-verdict.yml': ['linux-ok']
 	};
 	const ordinaryConditions = {
 		macos: "needs.validate.outputs.lane_macos == 'true'",
@@ -600,8 +606,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 39);
-	assert.equal(jobs, 40);
+	assert.equal(jobs - 1, 45);
+	assert.equal(jobs, 46);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');

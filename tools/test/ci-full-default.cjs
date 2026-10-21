@@ -65,7 +65,13 @@ const JOBS = [
 	],
 	['.github/workflows/ci-linux.yml', 'package-flatpak', null],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
-	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
+	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()'],
+	['.github/workflows/ci-linux-unit.yml', 'test-linux', null],
+	['.github/workflows/ci-linux-e2e.yml', 'e2e-linux', null],
+	['.github/workflows/ci-linux-build.yml', 'package-linux', null],
+	['.github/workflows/ci-linux-flatpak.yml', 'package-flatpak', null],
+	['.github/workflows/ci-linux-install.yml', 'install-linux', null],
+	['.github/workflows/ci-linux-verdict.yml', 'linux-ok', null]
 ];
 const FULL_STEPS = [
 	[
@@ -117,13 +123,13 @@ const FULL_STEPS = [
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-unit.yml',
 		'test-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
 		"${{ !cancelled() && matrix.group == 'meta' }}"
 	],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-unit.yml',
 		'test-linux',
 		'Retain actual LuaJIT XI2 diagnostic evidence',
 		"${{ always() && matrix.group == 'meta' }}"
@@ -462,38 +468,63 @@ const FULL_STEPS = [
 		null
 	],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-flatpak.yml',
 		'package-flatpak',
 		'Install the Flatpak the way a user would',
 		null
 	],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Launch the Flatpak', null],
+	['.github/workflows/ci-linux-flatpak.yml', 'package-flatpak', 'Launch the Flatpak', null],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-flatpak.yml',
 		'package-flatpak',
 		'The sandboxed shared data tree resolves and opens',
 		null
 	],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-build.yml',
 		'package-linux',
 		'Unpack and install the tarball the way a user would',
 		null
 	],
-	['.github/workflows/ci-linux.yml', 'package-linux', 'Launch what the tarball installed', null],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-build.yml',
+		'package-linux',
+		'Launch what the tarball installed',
+		null
+	],
+	[
+		'.github/workflows/ci-linux-build.yml',
 		'package-linux',
 		'The installed shared data tree resolves and opens',
 		null
 	],
-	['.github/workflows/ci-linux.yml', 'package-linux', 'Record mandatory package evidence', null],
-	['.github/workflows/ci-linux.yml', 'package-linux', 'Upload mandatory package evidence', null],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Record mandatory Flatpak evidence', null],
-	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Upload mandatory Flatpak evidence', null],
-	['.github/workflows/ci-linux.yml', 'linux-ok', 'Download assertion evidence', null],
 	[
-		'.github/workflows/ci-linux.yml',
+		'.github/workflows/ci-linux-build.yml',
+		'package-linux',
+		'Record mandatory package evidence',
+		null
+	],
+	[
+		'.github/workflows/ci-linux-build.yml',
+		'package-linux',
+		'Upload mandatory package evidence',
+		null
+	],
+	[
+		'.github/workflows/ci-linux-flatpak.yml',
+		'package-flatpak',
+		'Record mandatory Flatpak evidence',
+		null
+	],
+	[
+		'.github/workflows/ci-linux-flatpak.yml',
+		'package-flatpak',
+		'Upload mandatory Flatpak evidence',
+		null
+	],
+	['.github/workflows/ci-linux-verdict.yml', 'linux-ok', 'Download assertion evidence', null],
+	[
+		'.github/workflows/ci-linux-verdict.yml',
 		'linux-ok',
 		'Assert all mandatory subjects ran and passed',
 		null

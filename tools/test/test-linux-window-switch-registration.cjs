@@ -644,7 +644,7 @@ async function main() {
 				/actual dispatcher routing/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace(
 						'Qualify actual cursor-display window switching',
@@ -653,7 +653,7 @@ async function main() {
 				/Qualify actual cursor-display/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace(
 						'npm run test:linux:window-switch | tee',
@@ -662,7 +662,7 @@ async function main() {
 				/test:linux:window-switch/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace(
 						'Qualify actual cursor-display window switching\n        if: ' +
@@ -675,7 +675,7 @@ async function main() {
 				/native step must run/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace(
 						'Qualify actual cursor-display window switching\n',
@@ -684,18 +684,18 @@ async function main() {
 				/native errors cannot be forgiven/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) => source.replace('coreutils xfonts-base', 'coreutils'),
 				/xfonts-base: native prerequisite/
 			],
 
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) => source.replace(COUNT_LINE, 'window_switch_assertions=34'),
 				/native count must come/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace(
 						'--subject "window-switch-receipts=$window_switch_assertions"',
@@ -709,7 +709,7 @@ async function main() {
 				/native family assertion floor/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) => source.replace(FAMILY_COUNT_LINE, 'native_family_assertions=5'),
 				/native family count comes/
 			],
