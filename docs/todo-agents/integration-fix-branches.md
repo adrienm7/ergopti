@@ -42,7 +42,13 @@ fast-forwarded from the branch only by the maintainer or on the maintainer's own
    `fix/windows`). Once dev holds the branch, every line prints `-` except the two adapted macOS
    commits, whose patch ids differ by design.
 3. The dev reds listed under Validation belong to dev's own newer commits (the same jobs fail on dev
-   alone); they are not caused by this integration and are left to their owners.
+   alone); they are not caused by this integration and are left to their owners. On the branch
+   rebased onto dev `101837c0ed` (tip `2ae4560db5`, run 39627729075) the remaining reds are:
+   macOS fixture residue of `adapters.running_application`, `test_menu_hotstring_classification`
+   after dev's backslash path commits, a stale `architecture.md` and the driver config surface
+   ratchet, the Windows `require_state` baseline (28 against 27) and `Updater_ParseBody`
+   single-decoder meta (both also red on dev alone), a runner `pwsh.exe` spawn timeout in
+   `llm-terminal`, and the site verdict skipped behind them.
 
 ## Resolved during the integration
 
