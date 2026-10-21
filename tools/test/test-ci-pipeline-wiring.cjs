@@ -6279,10 +6279,11 @@ const DISTRO_UNIT_HELPER = fs.readFileSync(
 	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
 	'utf8'
 );
-// Every module group runs at once under the ordinary user, each in its own TMPDIR.
+// Every module group runs at once under the ordinary user, each in its own TMPDIR
+// and HOME: with a shared HOME one group's writes reached another group's fixture.
 const DISTRO_UNIT_SUITE =
 	'\tsudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n' +
-	'\t\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" "$interpreter" tests/run.lua --module="$unit_group" \\\n' +
+	'\t\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" HOME="$group_home" "$interpreter" tests/run.lua --module="$unit_group" \\\n' +
 	'\t\t>"$unit_logs/$unit_group.log" 2>&1 &\n';
 // A group's exit, its order and its header reach the workflow diagnostic.
 const DISTRO_UNIT_GROUP_TAIL = [
