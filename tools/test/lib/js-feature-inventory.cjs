@@ -105,6 +105,12 @@ function loadInventory(root) {
 				text(check.name) && !names.has(check.name),
 				'duplicate or invalid check name'
 			);
+			// run-js-suite.cjs prints check names in every run; the uppercase
+			// marker must stay unique to its summary of cases that did not run.
+			requireInventory(
+				!check.name.includes('NOT EXECUTED'),
+				'a check name cannot carry the NOT EXECUTED summary marker'
+			);
 			requireInventory(
 				['node', 'npm', '$NODE_EXECUTABLE'].includes(check.cmd),
 				'unknown command owner'
