@@ -210,14 +210,17 @@ _MWCP_OwnedCase(Mode) {
 	World.NextEntry := Map("epoch", 83, "webview", World.NextView, "navigation_url", World.Url . "&next=83",
 		"metrics_dir", World.NextRoot, "full_build_done", true)
 	World.Manifest := Map("private-cache", true), World.ReaderSizes := Map("private-reader", 17)
-	Args := _MWCP_Args(World), Installed := false, Owned := false, Primary := 0, CleanupError := 0
+	Args := _MWCP_Args(World), CreatedPaths := []
+	Installed := false, Owned := false, Primary := 0, CleanupError := 0
 	try {
 		AssertFalse(A_IsSuspended, "the fixture cannot borrow a paused driver's scheduler")
 		AssertFalse(KLPF_ReloadKeepsWorkersOut(), "the fixture cannot replace an active reload owner")
 		FSCreateDirectoryExclusiveStrict(Root), Owned := true
 		FSCreateDirectoryExclusiveStrict(World.OldRoot), FSCreateDirectoryExclusiveStrict(World.NextRoot)
 		AssertTrue(FSWriteCreateDurable(World.Path, "old-disk"))
+		CreatedPaths.Push(World.Path)
 		AssertTrue(FSWriteCreateDurable(World.ForeignPath, "foreign-disk"))
+		CreatedPaths.Push(World.ForeignPath)
 		_ResetLogger()
 		LOGGER_SUB_FILES := [], _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false, _LOGGER_CLOCK_FN := 0, _LOGGER_STAMP_FN := 0
@@ -240,6 +243,13 @@ _MWCP_OwnedCase(Mode) {
 				KLWV.windows := Map()
 				AssertTrue(KLPF_CancelAll(), "cleanup must retire every exact private job")
 				AssertEqual(0, KLPFWorker.jobs.Count)
+			}
+			; Store sidecars are hashed files in A_Temp, outside the private
+			; metrics-directory tree. Retire only confirmed fixture creations.
+			for Path in CreatedPaths {
+				if FSStrictExists(Path)
+					AssertTrue(FSDelete(Path), "cleanup must remove its private store sidecar")
+				AssertFalse(FSStrictExists(Path))
 			}
 		} catch as Failure {
 			CleanupError := Failure
