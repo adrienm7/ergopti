@@ -747,3 +747,5 @@ TestHSE_PlainSpaceColonDDoesNotFire() {
 }
 Test("HSE plain-space colon-D does not fire the comma hotstring (':D' emoji preserved)",
     TestHSE_PlainSpaceColonDDoesNotFire)
+
+#Include test_hotstring_scalar_continuation.ahk

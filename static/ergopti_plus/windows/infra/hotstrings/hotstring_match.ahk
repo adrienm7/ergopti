@@ -410,7 +410,9 @@ _HSE_IndexStarPrefixes(Spec) {
 		Prefix := ""
 		loop (Len - 1) {
 				Prefix .= SubStr(TriggerText, A_Index, 1)
-				NextChar := SubStr(TriggerText, A_Index + 1, 1)
+				; END arbitration queries a complete scalar, including a consumed pair.
+				NextPosition := A_Index + 1
+				NextChar := SubStr(TriggerText, NextPosition, _TextCodepointWidth(TriggerText, NextPosition, Len))
 				if !Set.Has(Prefix) {
 						Set[Prefix] := Map()
 				}
