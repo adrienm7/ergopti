@@ -594,7 +594,11 @@ function detect(driver, src) {
 			'linux.popup',
 			/\bGtk\s*\.\s*Window\s*(?:\.\s*new\s*)?\(\s*\{[^}]*?\btype\s*=(?!\s*(?:Gtk\s*\.\s*WindowType\s*\.\s*TOPLEVEL\b|["']TOPLEVEL["']|0\b))/g
 		);
-		scan('linux.popup', /\bgtk_window_new\s*\((?!\s*(?:0\b|GTK_WINDOW_TOPLEVEL\b))/g);
+		// A C prototype in an FFI cdef declares the call and builds no window.
+		scan(
+			'linux.popup',
+			/\bgtk_window_new\s*\((?!\s*(?:0\b|GTK_WINDOW_TOPLEVEL\b|int\s+\w+\s*\)))/g
+		);
 	}
 	if (driver === 'linux' || driver === 'shell') {
 		scan(
@@ -789,6 +793,8 @@ const CLEAN_FIXTURES = [
 	['linux', 'window:set_keep_above(false)'],
 	['linux', 'C.gtk_window_set_keep_above(win, false)'],
 	['linux', 'Gtk.Window({ type = Gtk.WindowType.TOPLEVEL })'],
+	['linux', 'GtkWidget* gtk_window_new(int type);'],
+	['linux', 'local window = lib.gtk.gtk_window_new(GTK_WINDOW_TOPLEVEL)'],
 	['linux', 'timeout 2 wmctrl -s "$t"'],
 	['shell', '# wmctrl -b add,above would pin it'],
 	['linux', 'window:set_type_hint(Gdk.WindowTypeHint.NORMAL)']

@@ -461,8 +461,8 @@ end
 -- GtkWindowType TOPLEVEL and GtkWindowPosition CENTER. Centred because,
 -- without a window manager, a window maps at 0,0, which is where an XEmbed
 -- tray such as stalonetray docks the icon: the window would cover it.
-local WINDOW_TOPLEVEL = 0
-local WINDOW_POS_CENTER = 1
+local GTK_WINDOW_TOPLEVEL = 0
+local GTK_WIN_POS_CENTER = 1
 
 --- Shows a plain window carrying a message, or brings the existing one back.
 ---
@@ -478,13 +478,13 @@ function M.show_window(title, text)
 	local lib = bind()
 	if not lib then return false end
 	if _window == nil then
-		local window = lib.gtk.gtk_window_new(WINDOW_TOPLEVEL)
+		local window = lib.gtk.gtk_window_new(GTK_WINDOW_TOPLEVEL)
 		if window == nil then
 			Logger.error(LOG, "gtk_window_new returned nothing — no status window.")
 			return false
 		end
 		lib.gtk.gtk_window_set_title(window, tostring(title))
-		lib.gtk.gtk_window_set_position(window, WINDOW_POS_CENTER)
+		lib.gtk.gtk_window_set_position(window, GTK_WIN_POS_CENTER)
 		lib.gtk.gtk_window_set_default_size(window, 420, -1)
 		lib.gtk.gtk_container_set_border_width(window, 18)
 		local label = lib.gtk.gtk_label_new(tostring(text))
