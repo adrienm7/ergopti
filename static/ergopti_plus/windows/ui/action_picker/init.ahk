@@ -20,20 +20,10 @@ _ActionPickerNativeClose(Window, *) {
 ShowKeyboardSlotPicker(Prefix) {
 		global GESTURE_ACTIONS
 		Slots := []
-		static _SpecialOrder := ["space", "enter", "period", "comma", "sc029"]
-		Letters := "abcdefghijklmnopqrstuvwxyz"
-		loop StrLen(Letters) {
-				SlotId := Prefix . SubStr(Letters, A_Index, 1)
-				if GESTURE_ACTIONS.Has(SlotId)
-						Slots.Push(SlotId)
-		}
-		loop 10 {
-				SlotId := Prefix . SubStr("0123456789", A_Index, 1)
-				if GESTURE_ACTIONS.Has(SlotId)
-						Slots.Push(SlotId)
-		}
-		for Sk in _SpecialOrder {
-				SlotId := Prefix . Sk
+		; The keys come from the input owner's published slot domain, so a slot
+		; the picker creates is always one the owner binds and the loader keeps.
+		for Key in KeyboardSlotDeclaration()["keys"] {
+				SlotId := Prefix . Key
 				if GESTURE_ACTIONS.Has(SlotId)
 						Slots.Push(SlotId)
 		}
