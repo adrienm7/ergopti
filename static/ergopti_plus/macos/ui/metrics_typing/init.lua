@@ -499,9 +499,9 @@ local function compute_full(pacer)
 	-- Initial range pre-fetch (first_date → today).
 	local initial_data_json = "null"
 	if session and first_date then
-		local history_complete
-		initial_data_json, history_complete = session.range(first_date, today, all_apps_list)
-		assert(history_complete == true, "Typing metrics historical n-gram prefetch was incomplete")
+		local range_complete
+		initial_data_json, range_complete = session.range(first_date, today, all_apps_list)
+		assert(range_complete == true, "Typing metrics n-gram prefetch was incomplete")
 	end
 
 	return {
@@ -535,8 +535,8 @@ local function compute_range(query, pacer)
 	local apps = type(query.apps) == "table" and query.apps or nil
 	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	local payload, history_complete = session.range(query.start_date, query.end_date, apps)
-	assert(history_complete == true, "Typing metrics historical n-gram range read was incomplete")
+	local payload, range_complete = session.range(query.start_date, query.end_date, apps)
+	assert(range_complete == true, "Typing metrics n-gram range read was incomplete")
 	return payload
 end
 
