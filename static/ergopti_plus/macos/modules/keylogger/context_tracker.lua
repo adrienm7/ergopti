@@ -783,7 +783,9 @@ function M.split_active_app_at_midnight(previous_date)
 	end
 	local now = hs.timer.absoluteTime() / 1000000
 	local wall = os.date("*t")
-	local elapsed_today_ms = ((wall.hour * 3600) + (wall.min * 60) + wall.sec) * 1000
+	-- Midnight can have a different DST offset from the current local instant.
+	local midnight = { year = wall.year, month = wall.month, day = wall.day, hour = 0, min = 0, sec = 0 }
+	local elapsed_today_ms = os.difftime(os.time(wall), os.time(midnight)) * 1000
 	local total_elapsed_ms = math.max(0, math.floor(now - _state.active_app_start))
 	local previous_day_ms = math.max(0, total_elapsed_ms - elapsed_today_ms)
 	if previous_day_ms > 0 and type(_log_manager.log_app_switch) == "function" then
@@ -796,7 +798,8 @@ function M.split_active_app_at_midnight(previous_date)
 	-- Keep tracking the same foreground app from this calendar day's boundary.
 	-- Maintenance can be delayed while Ergopti is paused: resetting to `now`
 	-- would silently drop every foreground minute since midnight in that case.
-	_state.active_app_start = now - elapsed_today_ms
+	-- A retried rollover cannot move a newer application interval into its past.
+	_state.active_app_start = math.max(_state.active_app_start, now - elapsed_today_ms)
 	return previous_day_ms > 0
 end
 

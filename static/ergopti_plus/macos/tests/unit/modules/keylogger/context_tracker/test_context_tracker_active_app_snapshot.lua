@@ -71,7 +71,7 @@ helpers.describe("context_tracker: active app snapshot", function()
 		local real_date = os.date
 		local ok, err = pcall(function()
 			os.date = function(format)
-				if format == "*t" then return { hour = 0, min = 0, sec = 5 } end
+				if format == "*t" then return { year = 2026, month = 10, day = 20, hour = 0, min = 0, sec = 5 } end
 				return real_date(format)
 			end
 			helpers.assert_true(tracker.split_active_app_at_midnight("2026-07-17"))
