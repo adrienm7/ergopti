@@ -105,7 +105,8 @@ function check(text) {
 module.exports = { checkWorkflow, check };
 if (require.main === module) {
 	const refused = check(
-		fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8')
+		// The Windows lane, read inlined with its stage files.
+		pipeline.file('.github/workflows/ci-windows.yml')
 	);
 	const pwsh = process.platform === 'win32' ? 'pwsh.exe' : 'pwsh';
 	// The version probe only proves pwsh starts. A cold start on a loaded hosted runner can

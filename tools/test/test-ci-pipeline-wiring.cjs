@@ -5195,6 +5195,13 @@ const STAGE_LAYOUT = {
 		['common-build', 'build', 'Build', '${{ matrix.lot }}'],
 		['common-testbuild', 'install', 'Install and launch', '${{ matrix.lot }}'],
 		['common-unit-verdict', 'verdict', 'Verdict', 'Production site receipts']
+	],
+	[WINDOWS_BOX]: [
+		['test-ahk', 'unit', 'Unit tests', '${{ matrix.module }}'],
+		['e2e-ahk', 'e2e', 'E2E tests', 'Engine E2E corpus'],
+		['package-windows', 'build', 'Build', 'ErgoptiPlus.exe and layout installer'],
+		['launch-windows', 'install', 'Install and launch', 'Compiled ErgoptiPlus.exe'],
+		['windows-ok', 'verdict', 'Verdict', 'Mandatory jobs and launch evidence']
 	]
 };
 // The scripts that find a stage job by its rendered name, with the prefix

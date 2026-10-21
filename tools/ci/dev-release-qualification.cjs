@@ -197,7 +197,7 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 		args: ['e2e-hs', 'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)']
 	},
 	'windows-native-desktop': {
-		path: '.github/workflows/ci-windows.yml',
+		path: '.github/workflows/ci-windows-unit.yml',
 		args: ['test-ahk', 'Run native desktop AHK cohorts']
 	},
 	'linux-simultaneous-native': {

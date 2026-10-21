@@ -195,7 +195,7 @@
 			"protocol": 5
 		},
 		{
-			"file": ".github/workflows/ci-windows.yml",
+			"file": ".github/workflows/ci-windows-unit.yml",
 			"job": "test-ahk",
 			"step": "Run native desktop AHK cohorts",
 			"protocol": 6
@@ -1176,7 +1176,7 @@
 			"body": "      - name: Retain source-bound e2e-hs qualification receipts\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-e2e-hs-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
-			"file": ".github/workflows/ci-windows.yml",
+			"file": ".github/workflows/ci-windows-unit.yml",
 			"job": "test-ahk",
 			"name": "Retain the source-bound Windows qualification receipt",
 			"condition": "always()",

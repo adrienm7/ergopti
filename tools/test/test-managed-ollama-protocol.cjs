@@ -89,8 +89,9 @@ function receiveNativeHTTPClockWorkflow() {
 if (args.length === 0) receiveNativeHTTPClockWorkflow();
 function receiveWindowsComponentShellSetup() {
 	const YAML = require('yaml');
+	// The Windows lane, read inlined with its stage files.
 	const workflow = YAML.parse(
-		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-windows.yml'), 'utf8')
+		require('./ci-pipeline.cjs').file('.github/workflows/ci-windows.yml')
 	);
 	const steps = workflow.jobs['test-ahk'].steps.filter(
 		(step) => step.name === 'Receive managed Ollama file component'

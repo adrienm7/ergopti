@@ -1,0 +1,320 @@
+# .github/workflows/ci-windows-build.yml
+#
+# Windows build stage: builds the native helpers, compiles ErgoptiPlus.exe,
+# signs it on a release run, and uploads it with the layout installer.
+# Called by ci-windows.yml as its package-windows stage.
+
+name: 'Windows build'
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when ci.yml's plan resolved a free release tag
+        required: true
+        type: boolean
+      version:
+        description: Release version without the leading v; empty unless release
+        required: true
+        type: string
+      tag:
+        description: Release tag; empty unless release
+        required: true
+        type: string
+      prerelease:
+        description: "'true' for a dev prerelease; empty unless release"
+        required: true
+        type: string
+      channel:
+        description: Update channel stamped into the exe, main or dev
+        required: true
+        type: string
+      predecessors:
+        description: The lane's needs context for this stage (e2e-ahk), as JSON
+        required: true
+        type: string
+    outputs:
+      ci_predecessors:
+        description: package-windows's ci_predecessors output, read by the lane's later stages
+        value: ${{ jobs.package-windows.outputs.ci_predecessors }}
+      ci_source_sha:
+        description: package-windows's ci_source_sha output, read by the lane's later stages
+        value: ${{ jobs.package-windows.outputs.ci_source_sha }}
+      ci_run_id:
+        description: package-windows's ci_run_id output, read by the lane's later stages
+        value: ${{ jobs.package-windows.outputs.ci_run_id }}
+      ci_attempt:
+        description: package-windows's ci_attempt output, read by the lane's later stages
+        value: ${{ jobs.package-windows.outputs.ci_attempt }}
+    secrets:
+      WINDOWS_SIGNING_CERTIFICATE_BASE64:
+        description: Code-signing PFX, base64; passed on release runs only
+        required: false
+      WINDOWS_SIGNING_CERTIFICATE_PASSWORD:
+        description: Password of the code-signing PFX; passed on release runs only
+        required: false
+      WINDOWS_SIGNER_SUBJECT:
+        description: Expected Authenticode subject; passed on release runs only
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
+jobs:
+  package-windows:
+    name: 'ErgoptiPlus.exe and layout installer'
+    runs-on: windows-latest
+
+    outputs:
+      ci_predecessors: ${{ inputs.predecessors }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
+    steps:
+      # A shallow clone: no step of this job reads git history.
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Admit genuine preceding scheduler results
+        shell: bash
+        env:
+          NEEDS: ${{ inputs.predecessors }}
+        run: node tools/ci/ci-stage-status.cjs admit-build windows
+
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build and test native full-URL PAC evaluator
+        shell: pwsh
+        run: ./tools/build/build_windows_network_pac.ps1 -Publish
+
+      - name: Install Node dependencies
+        run: npm ci
+        shell: bash
+
+      - name: Generate features manifest
+        run: npm run build:manifest
+        shell: bash
+
+      - name: Build static asset bundle
+        run: python tools/build/build_static_bundle.py
+        shell: bash
+
+      - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version || '0.0.0-dev' }}"
+          $tag     = "${{ inputs.tag }}"
+          if (-not $tag) { $tag = $version }
+          # ci.yml's plan owns the one prerelease-to-channel rule. The updater
+          # silently treats an empty or unknown channel as dev, so a bad input
+          # would put a stable exe on the dev feed without any error.
+          $channel = "${{ inputs.channel }}"
+          if ($channel -cne 'main' -and $channel -cne 'dev') {
+              throw "inputs.channel must be 'main' or 'dev', got '$channel'."
+          }
+          $owner   = "${{ github.repository_owner }}"
+          $repo    = "${{ github.event.repository.name }}"
+          $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
+          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\infra\bundle.ahk"
+          $text = Get-Content -Raw -Path $bundlePath
+          $text = $text.Replace("__BUNDLE_VERSION__",     $version)
+          $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
+          $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
+          $text = $text.Replace("__BUNDLE_COMMIT__",      "${{ github.sha }}")
+          [IO.File]::WriteAllText($bundlePath, $text, [Text.UTF8Encoding]::new($true))
+          Write-Host "BUNDLE_COMMIT      stamped: ${{ github.sha }}"
+          Write-Host "BUNDLE_VERSION     stamped: $version"
+          Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
+          Write-Host "BUNDLE_CHANNEL     stamped: $channel"
+
+      - name: Download the authenticated compiler toolchain
+        shell: pwsh
+        run: |
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          $runtimeUrl = $contract.runtime.url
+          $runtimeSha256 = $contract.runtime.sha256
+          $compilerTag = $contract.compiler.tag
+          $compilerAsset = $contract.compiler.asset
+          $compilerUrl = $contract.compiler.url
+          $compilerSha256 = $contract.compiler.sha256
+          $runtimeArchive = "$env:TEMP\$($contract.runtime.asset)"
+          $compilerArchive = "$env:TEMP\$compilerAsset"
+
+          Invoke-WebRequest -Uri $runtimeUrl -OutFile $runtimeArchive -UseBasicParsing
+          Invoke-WebRequest -Uri $compilerUrl -OutFile $compilerArchive -UseBasicParsing
+          $runtimeActual = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $compilerActual = (Get-FileHash -LiteralPath $compilerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($runtimeActual -cne $runtimeSha256) {
+              throw "AutoHotkey v$($contract.runtime.version) archive digest mismatch: $runtimeActual"
+          }
+          if ($compilerActual -cne $compilerSha256) {
+              throw "Ahk2Exe $compilerTag archive digest mismatch: $compilerActual"
+          }
+
+          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath "$env:TEMP\AutoHotkey" -Force
+          Expand-Archive -LiteralPath $compilerArchive -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+          if (-not (Test-Path -LiteralPath "$env:TEMP\AutoHotkey\AutoHotkey64.exe" -PathType Leaf)) {
+              throw "The authenticated AutoHotkey archive has no expected runtime."
+          }
+          if (-not (Test-Path -LiteralPath "$env:TEMP\Ahk2Exe\Ahk2Exe.exe" -PathType Leaf)) {
+              throw "The authenticated Ahk2Exe archive has no expected compiler."
+          }
+          Write-Host "Authenticated compiler toolchain: AutoHotkey v$($contract.runtime.version) + $compilerTag"
+
+      - name: Compile ErgoptiPlus.ahk
+        shell: pwsh
+        # Without it, -Wait below would hold a stuck compiler until the job's
+        # six-hour default timeout.
+        timeout-minutes: 5
+        run: |
+          $ahk2exe = "$env:TEMP\Ahk2Exe\Ahk2Exe.exe"
+          $runtime = "$env:TEMP\AutoHotkey\AutoHotkey64.exe"
+          $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
+          $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $icon = "${{ github.workspace }}\static\favicon.ico"
+          $stdout = "$env:RUNNER_TEMP\ahk2exe_stdout.txt"
+          $stderr = "$env:RUNNER_TEMP\ahk2exe_stderr.txt"
+          # /silent suppresses any Ahk2Exe GUI dialogs that would block
+          # indefinitely on a headless runner and cause a silent non-zero exit.
+          # Start-Process -Wait -PassThru, not the call operator: Ahk2Exe is a
+          # GUI-subsystem binary, so `& $ahk2exe` returned before it finished
+          # and left $LASTEXITCODE unset. The former `exit $LASTEXITCODE` guard
+          # then exited 0 before the output check below, so a failed compile
+          # passed. Both output streams are printed so a failure shows the
+          # compiler's own message.
+          $proc = Start-Process -FilePath $ahk2exe `
+              -ArgumentList @("/in", "`"$in`"", "/out", "`"$out`"", "/base", "`"$runtime`"", "/icon", "`"$icon`"", "/silent") `
+              -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout | Write-Host }
+          if (Test-Path -LiteralPath $stderr) { Get-Content -LiteralPath $stderr | Write-Host }
+          if ($proc.ExitCode -ne 0) {
+              Write-Error "Ahk2Exe failed with exit code $($proc.ExitCode)."
+              exit 1
+          }
+          # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+          # compilation warning without writing the output file.
+          if (-not (Test-Path -LiteralPath $out -PathType Leaf) -or (Get-Item -LiteralPath $out).Length -eq 0) {
+              Write-Error "Ahk2Exe exited 0 but $out is missing or empty."
+              exit 1
+          }
+          Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item -LiteralPath $out).Length) bytes)"
+
+      - name: Sign and verify ErgoptiPlus.exe
+        if: inputs.release
+        shell: pwsh
+        env:
+          ERGOPTI_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+          WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
+        run: |
+          $required = @(
+              "WINDOWS_SIGNING_CERTIFICATE_BASE64",
+              "WINDOWS_SIGNING_CERTIFICATE_PASSWORD",
+              "WINDOWS_SIGNER_SUBJECT")
+          $missing = @($required | Where-Object {
+              [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+
+          if ($missing.Count -eq $required.Count) {
+              if ($env:ERGOPTI_RELEASE_PRERELEASE -ceq "true") {
+                  Write-Warning "Publishing an unsigned Windows artifact for the dev prerelease channel."
+                  exit 0
+              }
+              $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+              $signature = Get-AuthenticodeSignature -LiteralPath $exe
+              if ($signature.Status -ne 'NotSigned' -or $null -ne $signature.SignerCertificate) {
+                  throw "The unsigned exception refuses an invalid or existing signature."
+              }
+              $env:ERGOPTI_WINDOWS_AUTHENTICODE_STATUS = 'NotSigned'
+              $env:ERGOPTI_UNSIGNED_ARTIFACT_SHA256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+              $receipt = & node tools/ci/windows-stable-signing.cjs --receipt
+              if ($LASTEXITCODE -ne 0) { throw "Stable Windows releases require every signing secret." }
+              [IO.File]::WriteAllText("${{ github.workspace }}\static\ergopti_plus\windows\windows-signing-qualification.json",
+                  ($receipt -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+              Write-Warning "Publishing the explicitly authorized unsigned stable artifact with public signature disclosure; all tests remain mandatory."
+              exit 0
+          }
+          if ($missing.Count -gt 0) {
+              throw "Partial Windows signing configuration; missing: $($missing -join ', ')."
+          }
+
+          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $pfx = "$env:RUNNER_TEMP\ergopti-windows-signing.pfx"
+          $signTools = @(Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Recurse -Filter "signtool.exe" -File |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object FullName -Descending)
+          if ($signTools.Count -eq 0) {
+              throw "No x64 signtool.exe was found on the Windows runner."
+          }
+          $signTool = $signTools[0].FullName
+
+          try {
+              [IO.File]::WriteAllBytes(
+                  $pfx,
+                  [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+              & $signTool sign /fd SHA256 /td SHA256 `
+                  /tr "https://timestamp.digicert.com" `
+                  /f $pfx /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD $exe
+              if ($LASTEXITCODE -ne 0) {
+                  throw "signtool failed with exit code $LASTEXITCODE."
+              }
+          } finally {
+              Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($signature.Status -ne 'Valid') {
+              throw "ErgoptiPlus.exe Authenticode status is '$($signature.Status)', expected 'Valid'."
+          }
+          if ($null -eq $signature.SignerCertificate -or
+              $signature.SignerCertificate.Subject -cne $env:WINDOWS_SIGNER_SUBJECT) {
+              throw "Unexpected Authenticode publisher '$($signature.SignerCertificate.Subject)'."
+          }
+          Write-Host "Verified Authenticode publisher: $($signature.SignerCertificate.Subject)"
+
+      - name: Rename the keyboard layout for upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
+          cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
+
+      - name: Upload the application and layout
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-windows
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/ErgoptiPlus.exe
+            static/ergopti_plus/windows/windows-signing-qualification.json
+            static/ergopti/windows/Ergopti_windows.exe

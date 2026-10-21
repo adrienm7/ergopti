@@ -103,8 +103,9 @@ function checkWorkflow(body) {
 /** Validate every retained wrapper before inspecting this raw native owner. */
 function admittedNativeWorkflow(files) {
 	const admitted = require('./ci-full-default.cjs').fromFiles(files);
-	const file = admitted
-		.rawFiles()
+	// The raw Windows lane, its stage files inlined as one workflow.
+	const file = pipeline
+		.inlinePipeline(admitted.rawFiles())
 		.find((entry) => entry.rel === '.github/workflows/ci-windows.yml');
 	const jobs = pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'test-ahk');
 	assert.equal(jobs.length, 1);
