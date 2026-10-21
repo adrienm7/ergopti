@@ -215,9 +215,12 @@ _NRP_UnicodeRepeat(Buffer, Expected, KnownStart := true, Magic := "★") {
 	SavedTerminators := HSE_WORD_TERMINATORS
 	try {
 		HSE_WORD_TERMINATORS := SavedTerminators . Chr(0x1F600)
-		HSE_Buffer := Buffer . Magic
+		RawBuffer := Buffer . Magic
+		HSE_Buffer := RawBuffer
 		HSE_StartIsWordBoundary := KnownStart
 		Spec := HSE_TryRepeatKey(Magic)
+		AssertTrue(HSE_Buffer == RawBuffer,
+			"repeat admission preserves every raw UTF16 unit without rewriting the buffer")
 		if Expected == "" {
 			AssertEqual("", Spec, "no confirmed second character means no repeat")
 			return
@@ -278,7 +281,13 @@ Test("boundary unicode-boundary-owner: empty predecessor retains unknown-start r
 	_NRP_UnicodeBoundary("", false, false, false))
 Test("boundary unicode-boundary-owner: ordinary punctuation retains word admission", (*) =>
 	_NRP_UnicodeBoundary(".", false, true))
-Test("repeat unicode-boundary-owner: an unpaired low surrogate retains unit semantics", (*) =>
-	_NRP_UnicodeRepeat("a" . Chr(0xDC01), Chr(0xDC01) . Chr(0xDC01)))
-Test("repeat unicode-boundary-owner: an unpaired high surrogate retains unit semantics", (*) =>
-	_NRP_UnicodeRepeat("a" . Chr(0xD801), Chr(0xD801) . Chr(0xD801)))
+; Unit iteration preserves malformed UTF16 as raw data. Repeat admission must
+; still refuse an incomplete character rather than duplicating it into output.
+Test("repeat unicode-boundary-owner: an unpaired low surrogate stays raw and cannot double", (*) =>
+	_NRP_UnicodeRepeat("a" . Chr(0xDC01), ""))
+Test("repeat unicode-boundary-owner: an unpaired high surrogate stays raw and cannot double", (*) =>
+	_NRP_UnicodeRepeat("a" . Chr(0xD801), ""))
+Test("repeat unicode-boundary-owner: an unpaired low predecessor cannot license doubling", (*) =>
+	_NRP_UnicodeRepeat(Chr(0xDC01) . "a", ""))
+Test("repeat unicode-boundary-owner: an unpaired high predecessor cannot license doubling", (*) =>
+	_NRP_UnicodeRepeat(Chr(0xD801) . "a", ""))
