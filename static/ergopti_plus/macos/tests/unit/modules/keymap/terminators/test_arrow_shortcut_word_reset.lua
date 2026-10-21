@@ -8,9 +8,11 @@
 --- hotstring typed right after either stayed silent. Both now follow
 --- hotstrings.arrow_resets_word and hotstrings.shortcut_resets_word (default
 --- on): on, the next run starts a new word; off, the buffer and the word-start
---- state are left untouched and the word continues. Cmd/Option+Backspace stay
---- an unconditional reset to an unknown boundary, and Option or Shift + letter
---- stay typing.
+--- state are left untouched and the word continues. Cmd/Ctrl+Backspace stay
+--- an unconditional reset to an unknown boundary, Option+Backspace (delete the
+--- previous word) always starts a word, and Option or Shift + letter stay
+--- typing. The last section pins what erasing the typed text does
+--- (bs-word-start).
 ---
 --- The fixture registers TOML-shaped entries through the real load_toml path:
 --- `r` -> `R` flagged word-start and `z` -> `Z` not flagged, and drives the
@@ -183,6 +185,7 @@ local function with_keymap(body)
 		body({
 			keymap = Keymap, state = state, effects = effects,
 			press = press,
+			pause = function(seconds) now = now + seconds end,
 			settle = function() drain_immediate_timers(hs_stub) end,
 		})
 	end, debug.traceback)
@@ -370,22 +373,162 @@ helpers.describe("typing chords and deletions are not governed", function()
 	end)
 
 	for _, chord in ipairs({
-		{ name = "Cmd+Backspace", flags = { cmd = true, ctrl = false, alt = false, shift = false } },
-		{ name = "Option+Backspace", flags = { cmd = false, ctrl = false, alt = true, shift = false } },
-		{ name = "Ctrl+Backspace", flags = { cmd = false, ctrl = true, alt = false, shift = false } },
+		{ name = "Cmd+Backspace", flags = { cmd = true, ctrl = false, alt = false, shift = false }, starts = false },
+		{ name = "Option+Backspace", flags = { cmd = false, ctrl = false, alt = true, shift = false }, starts = true },
+		{ name = "Ctrl+Backspace", flags = { cmd = false, ctrl = true, alt = false, shift = false }, starts = false },
 	}) do
-		helpers.it(chord.name .. " still empties the buffer at an unknown boundary with both options off", function()
+		helpers.it(chord.name .. " empties the buffer with both options off", function()
 			with_keymap(function(f)
 				helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
 				helpers.assert_eq(f.keymap.set_arrow_resets_word(false), true)
 				f.press("a")
 				f.press("", chord.flags, KEYCODE_BACKSPACE)
 				helpers.assert_eq(f.state.buffer, "", "the deletion empties the buffer whatever the options")
-				helpers.assert_eq(f.state.start_is_word_boundary, false,
-					"an unknown amount of text was deleted: the boundary is unknown")
+				helpers.assert_eq(f.state.start_is_word_boundary, chord.starts, chord.starts
+					and "Option+Backspace deleted the previous word: the caret is at a word start (bs-word-start)"
+					or "an unknown amount of text was deleted: the boundary is unknown")
 			end)
 		end)
 	end
+end)
+
+local KEYCODE_HOME = 115
+local KEYCODE_RETURN = 36
+local OPTION = { cmd = false, ctrl = false, alt = true, shift = false }
+local CMD = { cmd = true, ctrl = false, alt = false, shift = false }
+
+--- Makes the focused application the one named.
+--- @param bundle string Bundle identifier.
+--- @param name string Application name.
+local function focus_app(bundle, name)
+	require("adapters.text_sender").focusedAppIdentity = function() return bundle, name, {} end
+end
+
+--- Presses Backspace `count` times.
+local function backspaces(f, count)
+	for _ = 1, count do f.press("", nil, KEYCODE_BACKSPACE) end
+end
+
+--- Types `r` and returns what fired.
+local function then_r(f)
+	f.press("r")
+	f.settle()
+	local emitted = table.concat(f.effects.emitted)
+	f.effects.emitted = {}
+	return emitted
+end
+
+helpers.describe("erasing what was typed (bs-word-start)", function()
+	helpers.it("bs-word-start: the Backspace that erases every typed letter starts a word", function()
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("", nil, KEYCODE_HOME)
+			f.press("a")
+			f.press("b")
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "R", "« ab » erased after an unknown start, then « r »")
+		end)
+	end)
+
+	helpers.it("bs-word-start: a correction keeps the word open", function()
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("", nil, KEYCODE_HOME)
+			f.press("a")
+			f.press("b")
+			backspaces(f, 1)
+			helpers.assert_eq(then_r(f), "", "« ar » is inside a word")
+		end)
+	end)
+
+	helpers.it("bs-word-start: a Backspace past the typed letters leaves an unknown start", function()
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("a")
+			f.press("b")
+			-- The fixture typed a space first: three Backspaces erase « ab » and
+			-- that space, back to where the buffer started; the fourth goes past it.
+			backspaces(f, 4)
+			helpers.assert_eq(then_r(f), "", "the fourth Backspace deleted text the buffer never held")
+		end)
+	end)
+
+	helpers.it("bs-word-start: a pause before the Backspaces keeps the word they erase", function()
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("", nil, KEYCODE_HOME)
+			f.press("a")
+			f.press("b")
+			f.pause(10)
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "R", "« ab », a pause, both erased: a word start")
+			f.press(" ")
+			f.press("a")
+			f.press("b")
+			f.pause(10)
+			backspaces(f, 1)
+			helpers.assert_eq(then_r(f), "", "« ab », a pause, one erased: still inside the word")
+		end)
+	end)
+
+	helpers.it("bs-word-start: Option+Backspace starts a word", function()
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("", nil, KEYCODE_HOME)
+			f.press("a")
+			f.press("", OPTION, KEYCODE_BACKSPACE)
+			helpers.assert_eq(then_r(f), "R")
+		end)
+	end)
+
+	helpers.it("bs-word-start: a terminal prompt after Return keeps its word start", function()
+		with_keymap(function(f)
+			focus_app("com.apple.Terminal", "Terminal")
+			f.press("a")
+			f.press("\r", nil, KEYCODE_RETURN)
+			f.pause(10)
+			f.press("a")
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "R", "the extra Backspace hit the empty prompt and deleted nothing")
+		end)
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("a")
+			f.press("\r", nil, KEYCODE_RETURN)
+			f.press("a")
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "", "in an editor the extra Backspace joined the lines")
+		end)
+	end)
+
+	helpers.it("bs-word-start: Cmd+A and a browser's Cmd+L leave an empty field", function()
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("a")
+			f.press("a", CMD, KEYCODE_LETTER)
+			backspaces(f, 2)
+			helpers.assert_eq(then_r(f), "R", "Cmd+A then Backspace empties the field")
+		end)
+		with_keymap(function(f)
+			focus_app("com.apple.Terminal", "Terminal")
+			f.press("a")
+			f.press("a", CMD, KEYCODE_LETTER)
+			backspaces(f, 1)
+			helpers.assert_eq(then_r(f), "", "Cmd+A in a terminal selects the scrollback, not the prompt")
+		end)
+		with_keymap(function(f)
+			focus_app("com.apple.Safari", "Safari")
+			f.press("l", CMD, KEYCODE_LETTER)
+			backspaces(f, 1)
+			helpers.assert_eq(then_r(f), "R", "Cmd+L selects the whole address")
+		end)
+		with_keymap(function(f)
+			focus_app("com.apple.TextEdit", "TextEdit")
+			f.press("l", CMD, KEYCODE_LETTER)
+			backspaces(f, 1)
+			helpers.assert_eq(then_r(f), "", "Cmd+L outside a browser promises no empty field")
+		end)
+	end)
 end)
 
 return true

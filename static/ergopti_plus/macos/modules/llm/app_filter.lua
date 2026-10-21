@@ -59,6 +59,14 @@ local BROWSER_BUNDLE_IDS = {
 	["company.thebrowser.Browser"]      = true,  -- Arc
 }
 
+--- Whether an application is one of the known browsers. The keymap reads it
+--- for Cmd+L, which selects the whole address of the address bar.
+--- @param bundle_id string|nil macOS bundle identifier.
+--- @return boolean
+function M.is_browser_bundle(bundle_id)
+	return type(bundle_id) == "string" and BROWSER_BUNDLE_IDS[bundle_id] == true
+end
+
 
 --- =============================================
 --- =============================================

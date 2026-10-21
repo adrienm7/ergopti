@@ -112,10 +112,10 @@ function M.isTerminalInputHost(bundle_id, app_name)
 	return TERMINAL_BUNDLE_IDS[bundle] == true or TERMINAL_APP_NAMES[name] == true
 end
 
---- Returns the focused terminal application to use for targeted paced output.
---- A nil result keeps the ordinary callback-return batch path.
+--- The application that receives typing: the focused window's, else the
+--- frontmost one.
 --- @return userdata|table|nil app
-function M.terminalInputTarget()
+local function focused_application()
 	local app = nil
 	local ok_window, window = pcall(function()
 		return hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
@@ -131,11 +131,27 @@ function M.terminalInputTarget()
 		end)
 		if ok_front then app = front end
 	end
-	if app == nil then return nil end
+	return app
+end
 
+--- The identity of the application that receives typing.
+--- @return string|nil bundle_id
+--- @return string|nil app_name
+--- @return userdata|table|nil app Nil when no application could be read.
+function M.focusedAppIdentity()
+	local app = focused_application()
+	if app == nil then return nil, nil, nil end
 	local ok_bundle, bundle = pcall(function() return app:bundleID() end)
 	local ok_name, name = pcall(function() return app:name() end)
-	if M.isTerminalInputHost(ok_bundle and bundle or "", ok_name and name or "") then
+	return ok_bundle and bundle or nil, ok_name and name or nil, app
+end
+
+--- Returns the focused terminal application to use for targeted paced output.
+--- A nil result keeps the ordinary callback-return batch path.
+--- @return userdata|table|nil app
+function M.terminalInputTarget()
+	local bundle, name, app = M.focusedAppIdentity()
+	if app ~= nil and M.isTerminalInputHost(bundle or "", name or "") then
 		return app
 	end
 	return nil
