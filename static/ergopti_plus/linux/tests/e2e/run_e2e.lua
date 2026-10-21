@@ -706,11 +706,15 @@ do
 	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
-	if ChildCapture.accepted(rows_output, rows_status, false) and rows and rows > 100 and rows <= MENU_ROW_CEILING then
+	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
+	if rows_child_accepted and rows and rows > 100 and rows <= MENU_ROW_CEILING then
 		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
 	else
-		fail("the real tray menu stays navigable", string.format("100 < rows <= %d", MENU_ROW_CEILING),
-			tostring(rows))
+		-- A count inside the bounds still fails when the child itself failed, so
+		-- the receipt names the child's verdict rather than the count alone.
+		fail("the real tray menu stays navigable", string.format("100 < rows <= %d and an accepted child", MENU_ROW_CEILING),
+			string.format("rows=%s child=%s%s", tostring(rows), rows_child_accepted and "accepted" or "failed",
+				rows_child_accepted and "" or ": " .. rows_output:sub(-300)))
 	end
 
 	os.remove(device)
