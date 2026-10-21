@@ -125,6 +125,7 @@ graph TD
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
         MACOS_program_providers["ProgramProviders.lua"]
         MACOS_python_interpreter["PythonInterpreter.lua"]
+        MACOS_running_application["RunningApplication.lua"]
         MACOS_screen_capture["ScreenCapture.lua"]
         MACOS_secure_field_detector["SecureFieldDetector.lua"]
         MACOS_shell_runner["ShellRunner.lua"]
