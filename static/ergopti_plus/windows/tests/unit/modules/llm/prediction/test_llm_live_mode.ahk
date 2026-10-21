@@ -29,7 +29,7 @@
 ; =================================
 
 global LLV_SENTENCE := "on se voit demain"
-global LLV_BINDING := "keyboard__live_test"
+global LLV_BINDING := "keyboard__ctrl_shift_l"
 
 ; The menu of test_llm_prompt_prediction.ahk, and an engine whose debounce and
 ; minimum word count differ from live.json's so each request shows whose it is.

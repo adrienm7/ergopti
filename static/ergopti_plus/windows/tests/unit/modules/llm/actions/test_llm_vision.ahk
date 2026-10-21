@@ -401,7 +401,7 @@ _LVS_Run(Menu, Body) {
 ; Stores a binding's llm_vision value and runs its action.
 _LVS_Invoke(ActionId, Value) {
 	global GestureActionParameters
-	Binding := "keyboard__vision_test"
+	Binding := "keyboard__ctrl_shift_i"
 	GestureActionParameters[GestureActionParameterKey(Binding, ActionId)] := Value
 	return GestureInvokeAction(ActionId, Binding)
 }
