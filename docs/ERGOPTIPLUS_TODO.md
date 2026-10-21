@@ -2,9 +2,9 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-21. Latest stable:
-[v1.0.3](https://github.com/adrienm7/ergopti/releases/tag/v1.0.3) (tagged 2026-10-18, with deferred
-macOS native scopes, see [below](#next-release-with-nothing-deferred)). Open work only: a finished
+Updated: 2026-10-21 midday. Latest stable:
+[v1.0.4](https://github.com/adrienm7/ergopti/releases/tag/v1.0.4) (tagged 2026-10-21, nothing
+deferred: every macOS native scope qualified). Open work only: a finished
 item is removed, its lessons go to [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Groups follow
 the [parallel work contract](handovers/2026-10-04-parallel-containers/PARALLEL-WORK.md).
@@ -20,29 +20,27 @@ command); there is no Linux machine.
 
 ## State on October 21
 
-- origin/dev is at 330cbe4c04; CI run 39509331307 decides whether the night's Windows CI fixes hold:
-  a20c879b2e, 5204933fbb, d24ac409cd, the artifact relay that ends its request copy on a disposed
-  client (440bdd1297), the quadratic TOML render and the deterministic batch admission test
-  (fd031f8613), the updater source sealer working on Windows (3e1dbf303b) and the phase A test
-  without a clock (8b9508fed9). The CI errors of dev stay owned by the coordinator.
-- **Codex agents push directly to dev** with the maintainer's credentials: about 50 commits on the
-  evening of October 20 (`test(windows)` / `fix(windows)` replay, clipboard and diagnostics work, and
-  some Linux and macOS fixes). The merge commit 330cbe4c04 integrated them with the local October 20
-  work. Fetch and read `git log origin/dev` before any integration: a local branch can be behind
-  without anyone having pushed it from here. The `commit-and-push` skill says dev and main stay
-  linear, while [Integration](#integration-items-16-38) merges `fix/*` with `--no-ff`: see question
-  9 in [questions for the maintainer](questions-for-maintainer.md) (default: merge commits
-  tolerated).
-- Landed overnight, software side closed, residual checks kept at their items: 112 prediction chord
-  insert and the shared muted shortcut column (af5cb11b84, a9e1f997c1); 124 Live selector retired,
-  guarded by its id on every driver (ce9791f68e); 143 AI toggle reusing its child (0c5006c863,
-  9fac7fcb66); 141 greyed AI persistence rows (449ccd4fd3, 9f6ec6b9a5, 2e8a9fb02a); 142 local reload
-  command on the three OS (9c30266410, 9ad640d327, 0ada3403db); 102 Windows adoption gate
-  (ae040558d8); 129 Linux reset sites (8302ea9269); the priority-100 uppercase report (cf29c35e5f);
-  115 JS suite on a Windows host (f2aebecb94, d66010e82c); TOML fuzz semantic oracles with a mutation
-  check (b60ce76756, item removed); item 30 Linux magic key against a tap action (407db5fd50); `.rpm`
-  asset renamed `ErgoptiPlus-linux-x86_64.rpm` (1b4b8250f9); Windows unit shards in 14 named test
-  categories (0418ac3ea8) and macOS jobs named by macOS version (3e0dd21f98).
+- **v1.0.4 is released** (bf419b8dd6, then 4a12db2fae) with no deferred scope, so the
+  "next release with nothing deferred" plan is closed. A `Release-As: X.Y.Z` trailer now forces any
+  later stable version (8b8d3abf77, documented in 11b07fc897 and in
+  [memory](memory/workflow-and-verification.md#project-stable-version-release-as)).
+- **Issues #84, #95, #96 and #97 are closed without a reply** (the maintainer's choice). Their open
+  physical checks stay at their items: oMLX listing, ISO key left of "1", Karabiner lease timings and
+  dropped letters, all on the Mac.
+- origin/dev is at 9432f4d963; its CI run 39596425717 was queued at 14:02 (Paris). The last
+  `tmp/preflight-dev` run (39591820398) was green in 36 min. The CI errors of dev stay owned by the
+  coordinator.
+- **Codex agents push directly to dev** with the maintainer's credentials. Fetch and rebase before
+  any push; dev and main stay linear (no merge commits, answered October 21). Preflight before
+  pushing dev: push HEAD to `tmp/preflight-dev`, run
+  `gh workflow run ci.yml --ref tmp/preflight-dev -f os_lanes=all`, and push dev only after it is
+  green.
+- Landed since the October 20 evening, residual checks kept at their items: the clean CI layout
+  (d1862ef26b..3ea8b6d69e); the Windows parity backlog (01b9d6aa2d..72d2125c5d) and the macOS one
+  (45d74ee3e1..4fa3f50d54); Linux L69, L77, L103, L126 and the finite no-luv period of L105
+  (84707de17c, c6896fac9d, c7178bb5bd, c876362759, a6e229a59f, d276bacfe0); the Linux metrics reader
+  keeps NUL in its projections and credits a session a crash left open (1bdc2a31cc, b0381e5afa); a
+  NOT EXECUTED outcome for AHK cases the host cannot run (edd13547d0).
 
 ## Priority 0: Windows
 
@@ -53,8 +51,7 @@ round trip). Read the latest dev CI run first. Maintainer decisions of October 2
 the release list and its ETag persist across restarts; `config.toml` keeps the 5/3 blank-line style
 everywhere (templates and the Windows writer) and `windows/_generated/config_template.toml` changes
 only through `npm run build:manifest`; the three drivers share the structured personal info editor;
-dev reaches main only with the next release, so Deploy site failures on main are expected until
-then.
+dev reaches main only with a release (main last moved with v1.0.4).
 
 1. Run the AHK suites locally: `config`, managed network and artifact curl groups, then the full
    suite (sharded, `--only` or `--shard=K/N`).
@@ -66,6 +63,19 @@ then.
 
 ### Open Windows items
 
+- [ ] **Windows managed-network software (item 62): NTLM-only proxies are unserved.** [CODE]
+      Microsoft's `System32\curl.exe` 8.21.0 (Windows image 20261018) no longer lists NTLM, so the
+      managed transport refuses an NTLM-only company proxy on an up-to-date Windows
+      ([memory](memory/windows-ahk.md#project-windows-system32-curl-has-no-ntlm)). The three cases
+      that need NTLM report NOT EXECUTED on such a host (f2cad38252, 90c42fbaa9); that is a gate,
+      not a fix. Real fix: ship an owned, pinned, SSPI-capable curl (size, signing, updater impact)
+      or move the transport to WinHTTP/.NET; question 6 for the maintainer. Also open: WinHTTP route
+      vector shape, updater route/trust classification, the Job/child cleanup ack, and the
+      PowerShell 5 fetch (`Source44`) exception with no known cause.
+- [ ] **Windows parity remainders.** [CODE] The updater still processes the release list on the AHK
+      thread for about 4 s even with the strict JSON owner and the native string scan (ffa4ee7c21,
+      b17bf3d0a4): move it off the thread or shorten it from a measurement. L124 (a NUL histogram
+      key merged by `json_group_object`) has not been checked on Windows.
 - [ ] **Semantic TOML parse cost: one parse per transaction.** [CODE] The tokenizer reads unquoted
       runs and blank lines in one step (33a320cf01, about twice as fast). Still open: every
       document-mode write parses source, expected model and final candidate, and every start pays
@@ -125,9 +135,6 @@ then.
       (`0xC0000374`); later builds exit 0, but no final installed build is recorded. Installed
       Diagnostics UIA/render probes fail intermittently (`native_probe_error`) and a cold WebView
       can time out.
-- [ ] **Windows managed-network software (item 62).** [CODE] SSPI/NTLM in the owned curl, WinHTTP
-      route vector shape, updater route/trust classification and Job/child cleanup ack; the
-      PowerShell 5 fetch (`Source44`) exception has no known cause.
 - [ ] **Windows updater production coupling (item 36).** [CODE] The interpreted-AHK "original23"
       updater collector stays inactive
       (`docs/handovers/2026-10-12-group6-ci/INACTIVE-ORIGINAL23-SOURCE.md`) until its role, runtime,
@@ -189,41 +196,18 @@ for anything that writes configuration.
 
 ## Integration (items 16, 38)
 
-- [ ] **GitHub issue #96 (Windows, v1.0.3): fixed on dev, release and answer.** An editor-created
-      category took the neutral-off default of an undeclared personal section (d31776170a). Restore
-      no longer touches personal hotstrings on the three drivers (20a9858f3d, dc8421f3). After the
-      next release, reply: the reporter ticks "metiers" once, or updates.
-- [ ] **GitHub issue #97 (AI off must be inert).** Windows keeps the AI runtime inert, stops local
-      server discovery, survives refused AI hotkeys and logs arbiter failures under their own tag;
-      macOS and Linux sweep no local server while the AI is off. Still open on macOS [CODE]: profile
-      shortcuts are still bound, `ollama list` still runs and the MLX download still resumes with
-      the AI off. The reply is drafted (session scratchpad `issue97/reply.md`), not posted.
-- [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log).**
-  - (1) oMLX added by hand: fixed (c67d70f1fe).
-  - (2) oMLX running but never seen: the sweep ran inside the menu build, which holds the run loop
-    about a second, so the 1.5 s probe deadline expired before any answer was read. The sweep now
-    starts once the build returns (15ab2ac6f3). [PHYS-M] Confirm on the Mac that a running oMLX is
-    listed.
-  - (3) "Check for updates" HTTP 403: the unauthenticated GitHub API limit, named with its UTC reset;
-    macOS and Windows keep the release list ETag across restarts. Done; release and answer.
-  - (4) Karabiner lease timeouts (READY, PONG, watchdog exit 73): the lease budgets are ordered so a
-    slow CLI keeps the lease, every exit 73 names its cause, the browser window watch no longer
-    builds an `hs.window.filter`, the CapsWord CLI probe is gone, and each deploy decision is one
-    INFO line (recovery deploys wait for a typing pause; no `karabiner.json` equal to the file on
-    disk is published). Needs a Mac reproduction with the new log lines (items 117/140).
-  - (5) The tap key left of "1" fired on the extra ISO key: it now follows the deployed virtual
-    keyboard's ISO/ANSI form (97ec406f4b). [PHYS-M] Check on the maintainer's ISO Mac (item 118).
-  - Lower-noise logs (gesture conflict once per posture, logger stall, changelog Atom fallback at
-    INFO) are in. Reply after the next release.
-
+- [ ] **AI off must be inert on macOS.** [CODE] Windows keeps the AI runtime inert, stops local
+      server discovery and survives refused AI hotkeys; macOS and Linux sweep no local server while
+      the AI is off. Still open on macOS: profile shortcuts are still bound, `ollama list` still
+      runs and the MLX download still resumes with the AI off.
 - [ ] **Report-a-bug locale wording.** [CODE] Debug > Report a bug opens the prefilled bug form on
       the three OS, with the report copied to the clipboard and saved as a file. The rewording of
-      `notify.report_bug_body` in the 21 locales is still uncommitted in the working tree: finish it
-      through the `i18n` skill and commit.
+      `notify.report_bug_body` in the 21 locales was never committed and is no longer in the working
+      tree: redo it through the `i18n` skill and commit.
 - [ ] **AppImage catalog.** [CI] 3c4209e947 bundles libayatana-appindicator3 for the catalog's
-      tray-less runner. Watch `install-linux` on dev, release, comment `/retest` on
-      AppImage/appimage.github.io#10422 and fix what the bot reports. Polish: with no keyboard
-      device the notice still names input groups.
+      tray-less runner. `/retest` is posted on AppImage/appimage.github.io#10422 against v1.0.4: wait
+      for the bot's result and fix what it reports. Polish: with no keyboard device the notice still
+      names input groups.
 - [ ] **CI duration.** [CI] Four of the five planned optimisations are in (macOS packaging after
       Unit beside E2E, Build waiting beside E2E for qualified inputs, the Intel XCTest cohorts in
       their own cell, several installed-app scenarios per job, Windows unit shards rebalanced from
@@ -238,12 +222,12 @@ for anything that writes configuration.
       have bounded, logged retries: close each after it stays green, and root-cause any relapse from
       the logged attempt. Still unexplained: Windows `config` group (managed-network budget,
       artifact curl relay) and macOS Go `TestIdleDeadlinePhysicallyRetiresPeer` (ad03a898).
-- [ ] **Integrate the fix branches.** Merge `fix/windows`, `fix/macos`, `fix/linux` into dev with
-      `--no-ff`, validate, push dev only with authorisation, then fast-forward each `fix/*` only
-      when it is an ancestor of dev. Codex agents now also push straight to dev (see
-      [State](#state-on-october-21)): fetch first and merge origin/dev rather than overwrite it.
-      Whether dev tolerates merge commits is question 9 for the maintainer. After a merge touching
-      `run_all.ahk`, `test_framework.ahk` or a sealed source, reseal
+- [ ] **Integrate the fix branches.** `origin/fix/windows`, `fix/macos` and `fix/linux` still hold
+      commits that are not ancestors of dev (113, 12 and 3 on October 21, many of them pre-rewrite
+      copies of commits already on dev). Bring only the genuinely missing ones onto dev by rebase or
+      cherry-pick (dev stays linear, never `git merge`), preflight, push dev only with
+      authorisation, then fast-forward each `fix/*` only when it is an ancestor of dev. After a
+      change touching `run_all.ahk`, `test_framework.ahk` or a sealed source, reseal
       `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json`.
 - [ ] **Menu clicks during a reload on macOS and Linux.** [CODE] Windows holds a click that lands
       while a reload is pending and replays it in the successor (85a926ba27). Check the Lua drivers
@@ -253,46 +237,19 @@ for anything that writes configuration.
       remaining verbatim duplicate Lua test files, absence ratchets for deleted code, and one tidy
       `tests/` tree on the three drivers.
 - [ ] **CI structure.** [CODE] Elapsed time per CI step, suite and test with a slowest-test summary;
-      live Windows unit-log progress; four parallel lanes (Common/Windows/macOS/Linux: Unit, E2E,
-      Build, Test-the-build) converging into Release.
-- [x] **Clean CI layout: do right after the first green dev (maintainer, October 20).** [CODE] One
-      dedicated agent, separate commits, each validated on a `tmp/*` branch before dev, receipts and
-      the release verifier kept exact: (1) `ci.yml` only plans and calls: move release and
-      publication into `ci-release.yml`; (2) each lane (`ci-windows.yml`, `ci-macos.yml`,
-      `ci-linux.yml`, `ci-common.yml`; today 80 KB, 175 KB, 257 KB, 12 KB) delegates per stage
-      (unit, E2E, build, install, verdict) to small reusable workflows or composite actions, with
-      the stage and job names stating what they test and, on macOS, the runner OS version (macOS 15
-      E2E and macOS 26 Build run the same Swift classes on purpose); (3) delete the standalone
-      workflows that no longer serve after checking each one's callers, pins and tests:
-      `hs274-native.yml`, `hs274-producer-build.yml`, `hs274-shutdown.yml`, `hs274-transport.yml`,
-      `shortcuts-cold-cli-diagnostic.yml`, `windows-test-replay.yml`,
-      `metrics-reader-bench.yml`, `macos-keyboard-geometry.yml`, `macos-release-launch.yml`,
-      `linux-layout.yml`, `bench.yml`; keep `deploy-site.yml`. Already done: the Windows unit shards
-      run by 14 named test categories (0418ac3ea8) and every macOS cell is named by its macOS
-      version (3e0dd21f98).
+      live Windows unit-log progress. The lane layout itself is done (d1862ef26b..3ea8b6d69e):
+      `ci.yml` plans and calls, release and publication live in `ci-release.yml`, each lane calls
+      one reusable workflow per stage with three-part check names, and eight one-off diagnostic
+      workflows are deleted; `linux-layout.yml`, `bench.yml`, `windows-test-replay.yml` and
+      `deploy-site.yml` are kept on purpose.
+- [ ] **CI layout follow-ups.** [CODE] The HS-274 Python and Swift tools lost their workflows with
+      the `hs274-*.yml` deletion: retire them, or give them a lane. The site deploy reads its
+      receiver from main, so it lags dev until the next release: decide whether that is wanted.
 - [ ] **16/38. Final acceptance.** [CI] One complete non-release three-OS checkpoint on the final
       source (units, E2E, packaging, installation, launch) with exact receipts, then the physical
       tests. Mac checks (38): no "Lease-bound input startup failed" or spurious "Layout poll
       detected change"; Right Option + Return/Delete/Backspace/Escape run script actions; no Python
       or Rosetta notice at launch; MLX behind a proxy; Versions rollback.
-
-### Next release with nothing deferred
-
-[CI] v1.0.3 deferred the macOS native scopes
-(`.github/ci/stable_v103_macos_native_qualification_exception.json`, `STABLE_V103_SCOPE_IDS` in
-`tools/ci/dev-release-qualification.cjs`); the maintainer wants the next release with no deferral.
-When a scope is green twice on both architectures, remove it from the constants and the JSON; with
-none left the next tag publishes with no profile (tested). Items 128 and 133 close with this.
-
-- PAC/WPAD/bootstrap wire methods: green twice since the refused-proxy fix (ca778f39). Confirm
-  `test01` (HTTP wire) before dropping `macos-native-http` and `macos-native-pac`.
-- Brew archive acceptance: green once (empty core tap, 3d298e30).
-- Managed model receiving: green twice on both architectures before Ollama 0.40.4; the receiver now
-  reads its manifests-v2 store and the fixture registry is served from a public test address. The
-  red create stage on 0.40.4 came from its shared-blob-store probe and is fixed with
-  `OLLAMA_CREATE_REMOTE=1` (460b96dd1f): re-qualify on the new pin on macOS CI.
-- Shortcuts discovery, launch AppleEvents, owned-runtime XCTest (ACL fix 0b7428c8): validate through
-  a release-like run with Build and Install-and-launch green.
 
 ## config-menus (items 5, 7, 33, 42, 54, 81)
 
@@ -432,7 +389,7 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
 - [ ] **Ollama 0.40.4: compile and qualify.** [CI] Every driver pins 0.40.4 (662ed3714b) with the
       checked dialer and native HTTP hooks ported, and every managed server runs with
       `OLLAMA_NO_CLOUD=1` (b06c421923). The Mac receiving create stage runs its client with
-      `OLLAMA_CREATE_REMOTE=1` (460b96dd1f), pending a green macOS CI. The Go side has not been
+      `OLLAMA_CREATE_REMOTE=1` (460b96dd1f) and qualified for v1.0.4. The Go side has not been
       compiled anywhere yet (the source test applies the hooks without Go).
       Product decision for the maintainer, needs a Go toolchain: whether a download host that does
       not resolve is left to the proxy or the native worker, which reverses an assertion in
@@ -455,8 +412,11 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       Ollama process termination on macOS stays debt.
 - [ ] **137. Publish the selected provider before model loading (macOS).** [CI] Hosted
       qualification.
-- [ ] **Configured local servers (issue 94 follow-up).** [PHYS-M] Native acceptance of configured
-      local discovery with a real oMLX install.
+- [ ] **Configured local servers (issues 94 and 95).** [PHYS-M] Native acceptance of configured
+      local discovery with a real oMLX install. A running oMLX was never seen because the sweep ran
+      inside the menu build, which holds the run loop about a second past the 1.5 s probe deadline;
+      the sweep now starts once the build returns (15ab2ac6f3). Measure on the Mac that the probe
+      no longer times out and that a running oMLX is listed.
 
 ## macos-input (items 13, 24, 30, 31, 35, 40, 43, 44)
 
@@ -466,11 +426,15 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       bug right when a letter disappears, then look near that time for "typed key(s) swallowed"
       against a lease failure or a Karabiner deploy.
 - [ ] **117/140. Karabiner lease failures on Apple silicon.** [PHYS-M] Exit 73, PONG/READY timeouts
-      since dev.155. The causes are now logged (see #95 point 4); the only workaround is
-      Configuration > Ergopti uses Karabiner > Off. Replaying the 2026-10-19 log shows that
-      recovery deploys (28 of 33 that day) cannot be reduced without fewer lease failures.
-- [ ] **118. ANSI/ISO positions distinct.** [PHYS-M] Real ISO/ANSI typing and the final package
-      (issue #95 point 5).
+      since dev.155. The lease budgets are ordered so a slow CLI keeps the lease, every exit 73
+      names its cause, and each deploy decision is one INFO line (recovery deploys wait for a typing
+      pause; an unchanged `karabiner.json` is never republished). Reproduce on the Mac with these
+      log lines and read the lease timings; the only workaround is Configuration > Ergopti uses
+      Karabiner > Off. Replaying the 2026-10-19 log shows that recovery deploys (28 of 33 that day)
+      cannot be reduced without fewer lease failures.
+- [ ] **118. ANSI/ISO positions distinct.** [PHYS-M] Real ISO/ANSI typing and the final package.
+      The tap key left of "1" fired on the extra ISO key; it now follows the deployed virtual
+      keyboard's ISO/ANSI form (97ec406f4b): check it on the maintainer's ISO Mac.
 - [ ] **Issue 94 native acceptance.** [PHYS-M] Tap-hold menu change refusal, clipboard retention in
       symbol wrapping, ANSI/ISO layout captured once: portable fixes only.
 - [ ] **13/35. Guardian lifecycle.** [PHYS-M] [CI] Signed helper ServiceManagement registration,
@@ -496,6 +460,10 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
 - [ ] **44. CapsWord and pointer with Karabiner.** [PHYS-M] Pointer cancellation on the final
       installed source (the CLI pointer probe was removed: `karabiner_cli` cannot read user
       variables).
+- [ ] **Tap-binding "malformed source" tests pass for the wrong reason.** [CODE] The shared macOS and
+      Linux contract tests reach the refusal through a size mismatch in their fake `io.open`, not
+      through the malformed source they claim to test. Make the fake faithful and prove each test
+      fails without the refusal (`false-green-tests` skill).
 - [ ] **127. VS Code bridge retirement.** [PHYS-M] Installed startup.
 - [ ] **Carbon and daemon-report Swift.** [CI] Carbon fixture compilation and both-architecture
       receipts; daemon-report Swift allocation compiler failures on Intel and Apple silicon.
@@ -523,49 +491,33 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
 
 ## Cross-OS parity backlog
 
-Source-only proposals found while hardening Linux (items L5-L145). Each owner reproduces natively
-first; none is a confirmed defect.
+The Windows (01b9d6aa2d..72d2125c5d) and macOS (45d74ee3e1..4fa3f50d54) backlogs of source-only
+proposals found while hardening Linux are worked through. Not defects after native review: L48, L83
+and the release-notes CR handling on Windows (L128 was already fixed); L30, L85, L88 and L18 on
+macOS. The Windows remainders are under [Open Windows items](#open-windows-items). Still open on
+macOS:
 
-- **Windows**: curl `--disable` as the first argument (L49); URL globbing off (L83); empty header
-  value serialization (L98); initial scheme fence on the async curl (L48); sync WinHTTP header
-  CR/LF/NUL and replacement validation before cancelling (L45, L46); release parsing by raw regex
-  for tag, publication time, prerelease and the array brace scan, and the notes wrapper/CR handling,
-  instead of the strict shared JSON decoder (L102, L104, L107, L108, L110); `SQLite_Utf8ToStr` uses
-  a length-unaware `StrGet` (L128); UTF-16 ceiling in the provider error prefix (L117); missing
-  launch/quit app events (L25); manifests omit `switches_to` (L133); public NUL guards on file paths
-  and spawn bridges (L15, L40); embedded NUL in SQL literals (L55); `json_group_object` merges a NUL
-  histogram key (Linux fixed, L124).
-- **macOS**: NUL boundaries in the sync shell, task bridge, text SHA-256, OpenSSL heredoc and
-  exact-input pipelines (L12, L20, L35-L39, L44, L54, L55); initial URL bridging (L41); public
-  native-follow HTTPS downgrade (L43); cancel-before-validate on replacement (L45); logger ignores
-  write/flush returns (L23); raw protected-exception text in logs (L30); dashboard partial side
-  effects on exception (L29); file-existence fallback without `hs.fs` (L31); direct append lacks
-  non-regular-file admission (L94); diagnostics report close unchecked (L85); dashboard opens SQLite
-  with default flags before `query_only` (L56); device registration uses REPLACE and loses import
-  metadata (L88); cached event cursor and numeric bounds (L82); UTF-8 byte cut in the provider error
-  prefix (L117); timer error formatting (L112); parent traversal treats both separators (L64);
-  manifests omit `switches_to` (L133); `hs.task` descendants and forceful kill (L18).
+- [ ] **One path-separator owner.** [CODE] About 85 `[/\\]` sites still treat both separators on
+      their own (L64 fixed the bootstrap walk only); give them one owner.
+- [ ] **Smaller macOS findings.** [CODE] `ui/changelog` `asyncGet` follows redirects; the at-rest
+      cipher puts its plaintext in the `sh -c` argv. [PHYS-M] Confirm on the Mac: `pipefail` and
+      `printf %b` under bash 3.2, the native HTTPS downgrade refusal, `hs.fs.attributes` on a FIFO,
+      and the read-only dashboard open with a hot journal.
 
 ## Linux hardening: open items
 
-The other Linux hardening items (L5-L145) are delivered apart from the generic caveat; the metrics
-items L121, L124, L130, L134, L135, L140, L143 and L145 are done. The items below still need
-software work.
+The other Linux hardening items (L5-L145) are delivered apart from the generic caveat. L69, L77,
+L103 and L126 are done (84707de17c, d276bacfe0, c6896fac9d, c7178bb5bd, a6e229a59f), and macOS
+direct append admits only regular files (L94, 5e524b9658). The items below still need software
+work.
 
-| Item | Subject                         | Remaining work                                                                   |
-| ---- | ------------------------------- | -------------------------------------------------------------------------------- |
-| L69  | `FileSystem.read` special files | `read_with_status` and the shared TOML reader are still FIFO-unsafe (TOML owner) |
-| L77  | Event-loop wait EINTR           | The reserved injector wait has the same unfixed EINTR diagnosis                  |
-| L94  | File write endpoint admission   | macOS direct append lacks non-regular admission (macOS owner)                    |
-| L103 | Event-loop reentry guard        | No-luv periodic clock issue diagnosed, left unmodified pending coordination      |
-| L105 | Finite timer admission          | Native huge-range timer and no-luv clock diagnoses unmodified                    |
-| L115 | Provider error envelope guard   | Unprinted callback-recorder failure in the unchanged HTTP fixture, cause unknown |
-| L126 | Callback diagnostics            | Vision object and outer HTTP diagnostics unmeasured                              |
+| Item | Subject                       | Remaining work                                                                                                                                                   |
+| ---- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L105 | Finite timer admission        | The no-luv finite period is done (c876362759). Decided: refuse a delay above about 2^53 ms on every runtime (LuaJIT arms a timer that never fires): to implement |
+| L115 | Provider error envelope guard | Instrumented (1f103733aa): the fixture now prints the swallowed traceback; cause still unknown                                                                   |
 
 Metrics follow-ups:
 
-- [ ] **Linux metrics reader.** [CODE] Raw fields containing NUL are still projected through the
-      SQLite CLI; an open session is lost when the daemon crashes before its flush.
 - [ ] **Correction bigrams and trigrams.** Linux counts the n-grams that end in a correction
       differently from Windows and macOS, which push `x[BS]` and `yx[BS]` for every Backspace.
       Maintainer decision: align Linux, or align the other two.
