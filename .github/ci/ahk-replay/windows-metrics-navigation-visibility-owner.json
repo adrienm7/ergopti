@@ -1,0 +1,9 @@
+{
+	"expected_count": 8,
+	"filters": [
+		{
+			"contains": "metrics-navigation-visibility-owner",
+			"expected_count": 8
+		}
+	]
+}
