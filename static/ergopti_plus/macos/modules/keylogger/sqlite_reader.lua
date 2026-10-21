@@ -864,6 +864,7 @@ end
 --- @param pacer table|nil Pacer from `infra.paced_job`.
 --- @param today_str string|nil Current day; defaults to the local date.
 --- @return table today_idx {app→{c=,…}}.
+--- @return boolean complete True when excluded or every requested today query succeeded.
 function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pacer, today_str)
 	today_str = today_str or os.date("%Y-%m-%d")
 	local includes_today = M.split_bounds(start_date, end_date, today_str).includes_today
@@ -871,7 +872,13 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 	-- caller's requested date interval.
 	local today_idx = {}
 	local db = includes_today and _open(sqlite_path) or nil
+	local complete = not includes_today
 	if db then
+		complete = true
+		local safe_query = _safe_query
+		local function _safe_query(label, fn, query_pacer)
+			if safe_query(label, fn, query_pacer) ~= true then complete = false end
+		end
 		local app_clause = ""
 		if selected_apps and #selected_apps > 0 then
 			local quoted = {}
@@ -968,7 +975,7 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 		db:close()
 	end
 
-	return today_idx
+	return today_idx, complete
 end
 
 --- Convenience wrapper: returns { historical = …, today = today_app_idx }
@@ -980,14 +987,15 @@ end
 --- @param selected_apps table|nil
 --- @param pacer table|nil Pacer from `infra.paced_job`.
 --- @return table { historical = {c=,…}, today = {app→{c=,…}} }.
+--- @return boolean complete All requested historical and today reads succeeded.
 function M.read_range_split_today(sqlite_path, start_date, end_date, selected_apps, pacer)
 	local today_str = os.date("%Y-%m-%d")
 	local bounds = M.split_bounds(start_date, end_date, today_str)
-	local historical = M.read_ngrams(sqlite_path, start_date, bounds.historical_end,
+	local historical, history_complete = M.read_ngrams(sqlite_path, start_date, bounds.historical_end,
 		selected_apps, pacer)
-	local today_idx = M.read_today_split(sqlite_path, start_date, end_date, selected_apps,
+	local today_idx, today_complete = M.read_today_split(sqlite_path, start_date, end_date, selected_apps,
 		pacer, today_str)
-	return { historical = historical, today = today_idx }
+	return { historical = historical, today = today_idx }, history_complete == true and today_complete == true
 end
 
 

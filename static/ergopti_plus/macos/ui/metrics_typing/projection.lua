@@ -208,8 +208,7 @@ function M.session(reader, sqlite_path, today, pacer)
 	--- @param end_date string|nil Inclusive upper bound.
 	--- @param apps table|nil Requested apps.
 	--- @return string json Encoded { historical, today }.
-	--- @return boolean history_complete All historical bounds and row queries succeeded.
-	--- Today is projected independently; this receipt does not certify its reads.
+	--- @return boolean range_complete All requested historical and today reads succeeded.
 	function session.range(start_date, end_date, apps)
 		if start_date == "" then start_date = nil end
 		if end_date == "" then end_date = nil end
@@ -260,8 +259,8 @@ function M.session(reader, sqlite_path, today, pacer)
 			end
 			historical_json = json
 		end
-		local today_idx = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
-		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer) .. "}", history_complete == true
+		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
+		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer) .. "}", history_complete == true and today_complete == true
 	end
 
 	return session

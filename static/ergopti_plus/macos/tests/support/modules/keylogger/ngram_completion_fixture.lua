@@ -46,12 +46,14 @@ function M.new(options)
 	options = options or {}
 	local state = { failure = options.failure, target = options.target or "ngram_chars",
 		opens = 0, closes = 0, errors = {}, warnings = {}, reads = {}, histories = {}, pauses = 0 }
+	local dates = { M.PAST, M.NEXT }
+	if options.today then dates[#dates + 1] = M.TODAY end
 	local tables = { agg_app_day = {} }
 	for _, family in ipairs(M.FAMILIES) do
 		local rows = {}
 		tables[family.table] = rows
 		if not options.empty then
-			for day_index, date in ipairs({ M.PAST, M.NEXT }) do
+			for day_index, date in ipairs(dates) do
 				for slot = 1, 2 do
 					rows[#rows + 1] = { date = date, app = "Editor",
 						token = slot == 1 and (day_index == 1 and "a" or "b") or (day_index == 1 and "x" or "y"),
@@ -63,10 +65,10 @@ function M.new(options)
 		end
 	end
 	if not options.empty then
-		tables.agg_app_day = {
-			{ date = M.PAST, app = "Editor", chars = 7 },
-			{ date = M.NEXT, app = "Editor", chars = 11 },
-		}
+		tables.agg_app_day = {}
+		for index, date in ipairs(dates) do
+			tables.agg_app_day[#tables.agg_app_day + 1] = { date = date, app = "Editor", chars = index == 1 and 7 or 11 }
+		end
 	end
 	local native = FakeSqlite.new(tables)
 	local sqlite = { OK = native.OK }
@@ -84,8 +86,11 @@ function M.new(options)
 			local fingerprint = sql:find("COUNT(*) AS n", 1, true) ~= nil
 			local bounds = sql:find("SELECT (SELECT MIN(date)", 1, true) ~= nil
 			state.reads[#state.reads + 1] = { source = source, fingerprint = fingerprint,
-				bounds = bounds, first = sql:match("date >= '([%d%-]+)'"), last = sql:match("date <= '([%d%-]+)'") }
+				bounds = bounds, day = sql:match("date = '([%d%-]+)'"), first = sql:match("date >= '([%d%-]+)'"), last = sql:match("date <= '([%d%-]+)'") }
+			local today_query = sql:match("date = '([%d%-]+)'") == M.TODAY
 			local refused = source == state.target and not fingerprint and state.failure ~= nil
+				and (not options.today_only or today_query)
+				and (not options.history_only or not today_query)
 			if refused and state.failure == "bounds" and bounds then error("controlled SQLITE_BUSY bounds refusal") end
 			if refused and not bounds and state.failure == "rows" then error("controlled SQLITE_BUSY row refusal") end
 			local rows
