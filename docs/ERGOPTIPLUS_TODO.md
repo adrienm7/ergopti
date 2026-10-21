@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-21 midday. Latest stable:
+Updated: 2026-10-21 evening. Latest stable:
 [v1.0.4](https://github.com/adrienm7/ergopti/releases/tag/v1.0.4) (tagged 2026-10-21, nothing
 deferred: every macOS native scope qualified). Open work only: a finished
 item is removed, its lessons go to [docs/memory](memory/README.md), and the history stays in Git
@@ -64,12 +64,10 @@ Do these once, in order, right after a release that contains the fixes below is 
 
 Each item below was decided by the maintainer; none needs a new question.
 
-1. **Windows exe metadata, in English.** `FileDescription` = "Ergopti+: hotstrings and shortcuts to type faster and
-   more ergonomically" (Ahk2Exe splits directive parameters on commas: no comma in the text). The website goes in the
-   `Comments` property (`https://ergopti.fr`); Windows has no dedicated website field. The directive `SetComments` is
-   REFUSED by the local Ahk2Exe ("Invalid directive"): find a supported way (another directive, `;@Ahk2Exe-AddResource`
-   with a version `.res`, or a post-compile resource edit in the build) and keep the version-info test
-   (`tools/ci/windows-exe-version-info.cjs`, js-0451) reading the field back.
+1. **Windows exe metadata, in English: done** (965ff7569b). `FileDescription` = "Ergopti+: hotstrings and shortcuts to
+   type faster and more ergonomically"; the website rides in the copyright line (`... (MIT License) -
+https://ergopti.fr`) because Ahk2Exe refuses `SetComments` and Windows has no website field. The version-info test
+   (js-0451) reads both back. Optional later: a real `Comments` field through a version `.res` resource.
 2. **macOS ISO/ANSI selector.** Add a choice in the Ergopti macOS menu to select manually the Karabiner virtual
    keyboard type (Automatic, ISO, ANSI), stored in config, declared once in the shared manifest, i18n in 21 locales,
    with the four-combination table test. On the maintainer's Mac the key left of "1" only works with Karabiner set
@@ -101,16 +99,21 @@ Each item below was decided by the maintainer; none needs a new question.
     shows a standalone instance using `~/.config/ergopti_plus` aborting while its timers kept writing to the shared
     log). If a stale Ergopti-owned instance exists, replace it (only ours).
 
-## Handoff: work in flight (October 21, 16:45 Paris)
+## Handoff: state at the end of October 21 (clean, nothing in flight)
 
-Everything the coordinating session knew (rules, procedures, relaunch prompts for the agents still in flight, open decisions) is in [todo-agents/COORDINATOR-MEMORY.md](todo-agents/COORDINATOR-MEMORY.md): read it first. The maintainer's weekly quota is nearly exhausted. Every agent below works on `dev` in the main
-repository (no worktree, no feature branch), commits small and atomic, pushes `dev` fast-forward
-only after `git fetch` and `git rebase origin/dev`, then cancels the automatic CI run of that SHA
-(`gh run list --commit <sha>`, `gh run cancel <id>`). Each agent keeps a handoff file in
-[`docs/todo-agents/`](todo-agents/) with what is done, what remains and the exact next step: read
-the file first, then continue. A backup of the working tree at 16:29 (uncommitted patch, untracked
-files, bundle of the local commits, this TODO) sits outside the repository in
-`C:\Users\admin\ergopti_wip_backup_20261021_1629`.
+No agent is running and nothing is unpublished: everything is on `origin/dev`, and a continuing agent (a container is
+fine) starts from it. GitHub holds only `main`, `dev`, `gh-pages` and `sparkle-appcasts` (plus Dependabot's own
+branch). The `fix/*`, `tmp/*` and `ccr-*` branches were deleted after checking that every commit is on dev (same patch,
+or same subject after the linear rebase); the scratch clones `D:\_int`, `D:\_lin` and `D:\_chk_*` are gone. A recovery
+bundle of the deleted branches stays on the maintainer's PC only
+(`C:\Users\admin\ergopti_wip_backup_20261021_1629\remote_branches_before_cleanup.bundle`), needed only if a commit is
+ever found missing.
+
+**Next task: release 1.0.5.** Run `gh workflow run ci.yml --ref dev -f os_lanes=all`, fix every red (rerun a known
+flake once first), push the green dev tip to `main` with a `Release-As: 1.0.5` trailer, then do the "After the next
+release" checklist above. Rules and procedures are in
+[todo-agents/COORDINATOR-MEMORY.md](todo-agents/COORDINATOR-MEMORY.md); each piece of work below keeps its leftovers
+in its handoff file in [`docs/todo-agents/`](todo-agents/).
 
 | Work                                                                                               | Handoff file                                                                               | State at hand-over                                                                                                                                                                                                                                                      |
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -118,18 +121,14 @@ files, bundle of the local commits, this TODO) sits outside the repository in
 | Issue #99 (macOS 1.0.4): Karabiner lease, swallowed keys, ISO key, event tap                       | [issue99-karabiner-input.md](todo-agents/issue99-karabiner-input.md)                       | Root cause found: `hs.application.get` falls back to `hs.window.find` and froze the main thread 13 s; fixed by a running-application adapter; READY deadline 11.5 s; ISO fix needs a Mac check                                                                          |
 | Issue #99: AI startup, oMLX, update flow                                                           | [issue99-ai-startup-updater.md](todo-agents/issue99-ai-startup-updater.md)                 | IPv4 loopback probe, Atom-feed fallback, refused-install warning committed; rest in the file                                                                                                                                                                            |
 | Shared Lua: timer ceiling, tap-binding tests, POSIX separator owner                                | [lua-shared-timers-separators.md](todo-agents/lua-shared-timers-separators.md)             | Ceiling and tap-binding tests committed; separator conversion in batches (grep for `[/\\]` in `macos/`)                                                                                                                                                                 |
-| Windows: updater release-list freeze, last 3 native menu rows                                      | [windows-updater-freeze-menu-census.md](todo-agents/windows-updater-freeze-menu-census.md) | Uncommitted files were blocking the repo-wide lint: first priority is to commit them clean                                                                                                                                                                              |
+| Windows: updater release-list freeze, last 3 native menu rows                                      | [windows-updater-freeze-menu-census.md](todo-agents/windows-updater-freeze-menu-census.md) | Release-list freeze fix on dev (8a43bd805c, seal still valid per dev-red-fixes.md); the last three native menu rows are not started                                                                                                                                     |
 | Config policy items 33 and 42                                                                      | [config-policy-33-42.md](todo-agents/config-policy-33-42.md)                               | Reproduce first, fix at the root, per sub-item                                                                                                                                                                                                                          |
 | Windows `ErgoptiPlus.exe` v1.0.4 flagged as a virus by a corporate proxy (Netskope, Airbus tester) | [windows-exe-flagged-by-proxy.md](todo-agents/windows-exe-flagged-by-proxy.md)             | Screenshot: 'ERR00: ErgoptiPlus.exe a peut-etre ete infecte par un virus'. v1.0.0 and v1.0.3 pass; v1.0.4 is flagged. No binary changed between the tags (only AHK source +7446 lines). Investigation of candidate triggers and the false-positive playbook in the file |
 
-**Known red on dev at f0fb919379** (found by the integration agent on a run of dev alone, 39623459261; not caused by the
-Codex integration): macOS test fixtures leave `adapters.running_application` loaded after they finish (scope-residue
-checks); a macOS hotstring-classification test fails after the path-separator commits; a stale
-`static/ergopti_plus/docs/architecture.md` (regenerate through its generator); the Windows `require_state` meta count
-is 28 against a baseline of 27; the Windows `Updater_ParseBody` single-decoder meta test fails after the release-list
-decode change. Also open from the integration: the macOS typing dashboard now refuses a history whose database reads
-were incomplete (Codex's design) instead of showing partial counts: review. Run `gh workflow run ci.yml --ref dev -f
-os_lanes=all`, then fix these first.
+**The dev reds of f0fb919379 are fixed** (architecture.md, macOS fixture residue, `require_state` back to 27,
+`Updater_ParseBody`, number-row fixture: see [dev-red-fixes.md](todo-agents/dev-red-fixes.md)); no full run has
+qualified the tip yet. Still to review from the integration: the macOS typing dashboard now refuses a history whose
+database reads were incomplete (Codex's design) instead of showing partial counts.
 
 Rules every continuing agent must keep: dev and main stay linear (never `git merge`); a release is a
 push to `main` carrying a `Release-As: X.Y.Z` trailer; a hook failure caused by someone else's dirty
