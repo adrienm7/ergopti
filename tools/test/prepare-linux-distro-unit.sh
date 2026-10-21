@@ -96,18 +96,22 @@ assert(Path.cwd() == working)
 print("Native ordinary-user fixture writes: 2 directories admitted")
 '
 # The module groups of tests/support/module_groups.lua run at once, each with
-# a private TMPDIR: the whole suite in one process held every archive cell for
-# about four minutes. Logs print whole, in group order, under one header each,
-# so the workflow diagnostic still reads one runner summary per group.
+# a private TMPDIR and HOME: the whole suite in one process held every archive
+# cell for about four minutes. A shared HOME let one group's writes to the
+# user's ~/.config/ergopti_plus reach another group's fixture that proves its
+# parent bootstrap stays untouched. Logs print whole, in group order, under one
+# header each, so the workflow diagnostic still reads one runner summary per
+# group.
 mapfile -t unit_groups < <("$interpreter" -e 'for _, group in ipairs(dofile("tests/support/module_groups.lua").GROUPS) do print(group.name) end')
 test "${#unit_groups[@]}" -gt 0
 unit_logs="$(mktemp -d "$native_root/logs.XXXXXXXX")"
 unit_pids=()
 for unit_group in "${unit_groups[@]}"; do
 	group_tmp="$(mktemp -d "$native_root/unit-$unit_group.XXXXXXXX")"
-	chown ergopti-ci "$group_tmp"
+	group_home="$(mktemp -d "$native_root/home-$unit_group.XXXXXXXX")"
+	chown ergopti-ci "$group_tmp" "$group_home"
 	sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
-		LUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" "$interpreter" tests/run.lua --module="$unit_group" \
+		LUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" HOME="$group_home" "$interpreter" tests/run.lua --module="$unit_group" \
 		>"$unit_logs/$unit_group.log" 2>&1 &
 	unit_pids+=("$!")
 done
