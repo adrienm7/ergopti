@@ -252,12 +252,26 @@ package.preload.luv = function() return uv end
 package.preload['logger.shim'] = function() return {
  debug = function() end,
  info = function() end,
+ warn = function(_, _, detail)
+  assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
+ end,
  error = function(_, format, detail)
   assert(not tostring(detail):find(os.getenv('GITHUB_TOKEN'), 1, true), 'native logger exposed CI authentication')
   if format == 'HTTP terminal callback raised: %s.' then native.callback_error = detail end
  end,
 } end
 package.preload['adapters.shell_runner'] = function() return { validate_spawn_args = function() return '' end } end
+-- The simulated luv above owns no descriptors, so the native regular-file
+-- admission cannot classify a source here. The only TOML source this client
+-- loads is the checked-in timings registry, a regular file: admit it through
+-- stdio and refuse any other path.
+package.preload['infra.regular_file_reader'] = function() return {
+ open = function(path)
+  assert(path:gsub('\\\\', '/'):find('/_shared/modules/timings/constants%.toml$'),
+   'the simulated backend admits only the checked-in timings registry: ' .. tostring(path))
+  return io.open(path, 'r')
+ end,
+} end
 local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')
 package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. package.path
 local Client = dofile(os.getenv('UPDATER_NATIVE_CLIENT'))
