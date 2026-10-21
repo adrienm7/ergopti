@@ -808,6 +808,22 @@ the Karabiner lease (#95). Bind `app:newWatcher` and `win:newWatcher` to the one
 application and window that matter, as the keylogger browser watchers and the
 keymap ignored-window watchers do.
 
+### project-hs-application-get-scans-every-window
+
+`hs.application.get(name)` is `find(name, false, true)`: when no running
+application matches, it calls `hs.window.find(name)`, i.e.
+`hs.window.allWindows()`, an Accessibility read of every window of every
+application on the main thread with six seconds allowed per application.
+The tell in a log is the console line "Some applications have alternate
+names…", which `find()` prints (once per Lua state) just before that
+fallback. The keylogger's per-flush category lookup of a quit application
+froze Hammerspoon 13.4 s and cost the Karabiner lease (#99). Resolve
+applications through `adapters/running_application.lua` (exact name, bundle
+identifier, PID); `tests/meta/runloop/test_app_lookup_never_scans_windows.lua`
+admits no new direct `get`/`find` call. A timer callback that holds the main
+thread over a second is now named by the runtime capture ("held the main
+thread for N ms"): read that line first when taps restart or a lease fences.
+
 ### project-touchdevice-dormancy-is-kernel
 
 macOS touch-device readiness is gated by the kernel until first physical touch.
@@ -1403,7 +1419,14 @@ worker writes its cause to stderr, which the lease controller logs as
 `lease worker: lease lost …`, and reports every private round trip of 1 s or
 more. The worker, guardian and Lua deadlines are pinned against each other by
 `tests/meta/architecture/test_native_lease_budget_parity.lua`: change one only
-with the others. Configuration > Ergopti uses Karabiner > Off stays the
+with the others. Lua's READY deadline also covers two launches of the
+launcher executable (outer, then inner), about 2 s each on a loaded Mac
+(#99). When the driver fails a lease on an ACK deadline it logs the wait and
+the timer's lateness (late means its own run loop was held), the outer
+reports "Hammerspoon closed its input without STOP" with the last private
+command, and the worker's exit is logged afterwards: an on-time deadline with
+an unanswered command names a slow worker, an answered one a PING that never
+left Hammerspoon. Configuration > Ergopti uses Karabiner > Off stays the
 workaround that preserves personal Karabiner rules. Do not infer guardian
 retirement from a signal, a missing handle or a hidden dialog.
 
