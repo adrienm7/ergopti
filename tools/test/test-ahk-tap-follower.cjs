@@ -108,11 +108,20 @@ if (require.main === module) {
 		fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8')
 	);
 	const pwsh = process.platform === 'win32' ? 'pwsh.exe' : 'pwsh';
-	const discovered = spawnSync(
-		pwsh,
-		['-NoProfile', '-NonInteractive', '-Command', '$PSVersionTable.PSVersion.ToString()'],
-		{ encoding: 'utf8', timeout: 10000 }
-	);
+	// The version probe only proves pwsh starts. A cold start on a loaded hosted runner can
+	// exceed any short deadline (run 39538166684: ETIMEDOUT at 10 s), so a timeout alone is
+	// retried, at most twice, with each retry logged. A missing executable (ENOENT) or a failing
+	// probe is never retried.
+	let discovered;
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		discovered = spawnSync(
+			pwsh,
+			['-NoProfile', '-NonInteractive', '-Command', '$PSVersionTable.PSVersion.ToString()'],
+			{ encoding: 'utf8', timeout: 60000 }
+		);
+		if (!discovered.error || discovered.error.code !== 'ETIMEDOUT') break;
+		console.warn(`${pwsh} version probe timed out (attempt ${attempt}/3); retrying.`);
+	}
 	assert.equal(discovered.error, undefined, `Required PowerShell executable unavailable: ${pwsh}`);
 	assert.equal(discovered.status, 0, discovered.stdout + discovered.stderr);
 	const result = spawnSync(
