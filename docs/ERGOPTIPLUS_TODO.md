@@ -43,6 +43,23 @@ command); there is no Linux machine.
   keeps NUL in its projections and credits a session a crash left open (1bdc2a31cc, b0381e5afa); a
   NOT EXECUTED outcome for AHK cases the host cannot run (edd13547d0).
 
+## After the next release (checklist, maintainer actions)
+
+Do these once, in order, right after a release that contains the fixes below is published:
+
+1. **Post `/retest` on AppImage/appimage.github.io#10422** to re-run the catalog test on the new release. Post it
+   from **PowerShell** (`gh pr comment 10422 -R AppImage/appimage.github.io --body '/retest'`): Git Bash
+   rewrites `/retest` into a file path. Needed for the Linux status window and tray menu fix (98d41e630b), so the
+   catalog screenshot shows more than the icon. Then read the bot's answer (screenshot, warnings).
+2. **Ask the Windows tester (Airbus, Netskope) to retry the download** of `ErgoptiPlus.exe` with the new release
+   and report which of the T1-T4 downloads pass ([matrix](todo-agents/windows-exe-flagged-by-proxy.md)); give
+   the new SHA-256 to VirusTotal and submit it to Microsoft Defender as a false positive if flagged.
+3. **Ask the Mac testing** to run the checks listed at the issue #99 items (ISO key left of 1 in
+   Karabiner-EventViewer, `memory_pressure | tail -1` during lease errors, `scutil --proxy`, oMLX probe line).
+4. **Read the CI of the release run** and rerun failed jobs once before treating a red job as real (known
+   flakes in [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md)).
+5. Cut the release with a `Release-As: X.Y.Z` trailer on the commit pushed to `main`.
+
 ## Handoff: work in flight (October 21, 16:45 Paris)
 
 Everything the coordinating session knew (rules, procedures, relaunch prompts for the agents still in flight, open decisions) is in [todo-agents/COORDINATOR-MEMORY.md](todo-agents/COORDINATOR-MEMORY.md): read it first. The maintainer's weekly quota is nearly exhausted. Every agent below works on `dev` in the main
