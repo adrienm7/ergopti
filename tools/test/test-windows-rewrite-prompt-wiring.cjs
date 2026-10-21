@@ -367,11 +367,13 @@ check(
 	'the local server must accept a caller-written chat body'
 );
 const screenshots = read('modules/gestures/screenshots.ahk');
+// The GDI and GDI+ calls live at the native boundary, beside the owner.
+const screenCapture = read('adapters/screen_capture.ahk');
 check(
-	bodyOf(screenshots, '_GestureScreenshotCaptureScreenGdip').includes(
+	bodyOf(screenCapture, '_GestureScreenshotCaptureScreenGdip').includes(
 		'_GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge)'
 	) &&
-		bodyOf(screenshots, '_GestureScreenshotCaptureClipboardImage').includes(
+		bodyOf(screenCapture, '_GestureScreenshotCaptureClipboardImage').includes(
 			'_GestureScreenshotGdipWrite(&Image, Stage, GESTURE_SCREENSHOT_PNG_ENCODER, MaxEdge)'
 		),
 	'both in-process captures must shrink the image to the requested longest edge'

@@ -181,6 +181,7 @@ graph TD
         WINDOWS_process_lifecycle["ProcessLifecycle.ahk"]
         WINDOWS_program_providers["ProgramProviders.ahk"]
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
+        WINDOWS_screen_capture["ScreenCapture.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_shell_runner["ShellRunner.ahk"]
         WINDOWS_sqlite_native["SqliteNative.ahk"]
