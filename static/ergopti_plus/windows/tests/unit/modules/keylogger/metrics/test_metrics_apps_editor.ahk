@@ -255,19 +255,28 @@ _MAE_CheckResult(World) {
 	}
 }
 
+; Setup snapshots and private constructors can fail before the inner I/O
+; transaction starts. Always return the caller's Critical mode on those paths.
 _MAE_Case(Mode) {
+	PreviousCritical := Critical("On")
+	try return _MAE_CaseOwned(Mode, PreviousCritical)
+	finally Critical(PreviousCritical)
+}
+
+_MAE_CaseOwned(Mode, PreviousCritical) {
 	global _AppPickerOwnerEpochs, _AppPickerActiveReceipts, KLPF_LAST_JSON, _SharedDir
 	static Serial := 0
-	PreviousCritical := Critical("On")
 	SavedCategory := Map()
 	for Key in ["categories", "file_path", "dirty", "save_fn", "write_owner", "store_model"]
 		if KLAppCat.HasOwnProp(Key)
 			SavedCategory[Key] := KLAppCat.%Key%
+	HadResidentDir := Keylogger.HasOwnProp("metrics_dir")
 	Saved := { Windows: KLWV.windows, MetricsDir: KLWV.metrics_dir, Jobs: KLPFWorker.jobs,
 		Generation: KLPFWorker.generation, Spawn: KLPFWorker.spawn_fn, Publish: KLPFWorker.publish_fn,
 		Push: KLWV.first_paint_push_fn, FullTimer: KLWV.full_build_timer_fn,
 		PickerEpochs: _AppPickerOwnerEpochs, PickerReceipts: _AppPickerActiveReceipts,
-		Dir: Keylogger.metrics_dir, App: KLHook.prev_app, Suspended: A_IsSuspended,
+		HadDir: HadResidentDir, Dir: HadResidentDir ? Keylogger.metrics_dir : 0,
+		App: KLHook.prev_app, Suspended: A_IsSuspended,
 		Shared: IsSet(_SharedDir) ? _SharedDir : 0, HadShared: IsSet(_SharedDir),
 		Json: IsSet(KLPF_LAST_JSON) ? KLPF_LAST_JSON : 0, HadJson: IsSet(KLPF_LAST_JSON) }
 	Root := A_Temp . "\ergopti_apps_editor_" . A_ScriptHwnd . "_" . ++Serial
@@ -337,7 +346,10 @@ _MAE_Case(Mode) {
 				KLWV.first_paint_push_fn := Saved.Push, KLWV.full_build_timer_fn := Saved.FullTimer
 				KLPFWorker.jobs := Saved.Jobs, KLPFWorker.generation := Saved.Generation
 				KLPFWorker.spawn_fn := Saved.Spawn, KLPFWorker.publish_fn := Saved.Publish
-				Keylogger.metrics_dir := Saved.Dir
+				if Saved.HadDir
+					Keylogger.metrics_dir := Saved.Dir
+				else if Keylogger.HasOwnProp("metrics_dir")
+					Keylogger.DeleteProp("metrics_dir")
 				KLHook.prev_app := Saved.App, KLPF_LAST_JSON := Saved.HadJson ? Saved.Json : unset
 				_SharedDir := Saved.HadShared ? Saved.Shared : unset
 				_AppPickerOwnerEpochs := Saved.PickerEpochs, _AppPickerActiveReceipts := Saved.PickerReceipts
