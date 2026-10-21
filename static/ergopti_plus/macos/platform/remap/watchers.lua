@@ -120,6 +120,7 @@ local _layout_poll_handle = nil
 -- A timeout whose exact ShellRunner termination was refused must be retried
 -- before a later tick may construct a successor read.
 local _layout_poll_termination_pending = false
+local _layout_read_observed = setmetatable({}, { __mode = "k" })
 
 -- Identity of the CURRENT layout read. Bumped when a read starts, and again
 -- whenever one is abandoned (watchdog timeout, watcher stop), so a completion
@@ -911,6 +912,34 @@ local function rollback_input_source_subscription(reason)
 	return not _input_source_callback_owned
 end
 
+--- Requests retirement without confusing a signal acknowledgement with exit.
+--- SIGTERM acceptance leaves the native task and its GC pin owned until exit.
+--- @param handle table Exact ShellRunner read handle.
+--- @return boolean settled
+--- @return any detail
+local function retire_layout_read(handle)
+	local function released()
+		if _layout_poll_handle ~= handle then return end
+		_layout_poll_handle = nil
+		_layout_poll_pending = false
+		_layout_poll_termination_pending = false
+	end
+	local settled_ok, settled = pcall(handle.isSettled)
+	if settled_ok and settled == true then released(); return true end
+	if not _layout_read_observed[handle] then
+		local observed_ok, observed = pcall(handle.onSettled, released)
+		if observed_ok and observed == true then _layout_read_observed[handle] = true end
+	end
+	local stopped, stop_result = pcall(handle.terminate)
+	settled_ok, settled = pcall(handle.isSettled)
+	if settled_ok and settled == true then released(); return true end
+	if _layout_poll_handle == handle then
+		_layout_poll_pending = true
+		_layout_poll_termination_pending = true
+	end
+	return false, stopped and stop_result == true and "native exit pending" or stop_result
+end
+
 --- Retries the exact layout-read termination retained by a prior refusal.
 --- @param reason string Stable cleanup context for diagnostics.
 --- @return boolean settled True only when no termination debt remains.
@@ -918,14 +947,13 @@ local function retry_layout_read_termination(reason)
 	if not _layout_poll_termination_pending then return true end
 	local abandoned = _layout_poll_handle
 	if abandoned then
-		local stopped, stop_result = pcall(abandoned.terminate)
-		if not stopped or stop_result ~= true then
+		local settled, stop_result = retire_layout_read(abandoned)
+		if not settled then
 			Logger.error(LOG,
 				"%s; retained layout read termination retry failed: %s.",
 				reason, tostring(stop_result))
 			return false
 		end
-		if _layout_poll_handle == abandoned then _layout_poll_handle = nil end
 	end
 	_layout_poll_pending = false
 	_layout_poll_termination_pending = false
@@ -1051,8 +1079,6 @@ function M.start_input_source_watcher(on_change)
 				if _layout_poll_pending then
 					_layout_poll_pending = false
 					-- Terminate the abandoned read, don't just stop waiting for it.
-					-- handle.terminate() releases the GC pin as well as killing the
-					-- process, so neither the subprocess nor its pin outlives the timeout.
 					-- Retire the generation BEFORE terminating: terminate() only asks the
 					-- OS to kill the process, and its exit callback still arrives later.
 					-- Without this the abandoned read comes back to clear the NEXT
@@ -1060,15 +1086,10 @@ function M.start_input_source_watcher(on_change)
 					_layout_read_generation = _layout_read_generation + 1
 					if _layout_poll_handle then
 						local stale = _layout_poll_handle
-						local stopped, stop_result = pcall(stale.terminate)
-						if stopped and stop_result == true then
-							if _layout_poll_handle == stale then _layout_poll_handle = nil end
-							_layout_poll_pending = false
-							_layout_poll_termination_pending = false
+						local settled, stop_result = retire_layout_read(stale)
+						if settled then
 							Logger.warn(LOG, "Layout poll read timed out — terminated the read and released the guard so the next tick can retry.")
 						else
-							_layout_poll_pending = true
-							_layout_poll_termination_pending = true
 							Logger.error(LOG,
 								"Timed-out layout read termination failed; retaining the exact handle: %s.",
 								tostring(stop_result))
@@ -1260,12 +1281,8 @@ function M.stop_input_source_watcher()
 	_layout_read_generation = _layout_read_generation + 1
 	if _layout_poll_handle then
 		local handle = _layout_poll_handle
-		local stopped, stop_result = pcall(handle.terminate)
-		if stopped and stop_result == true then
-			if _layout_poll_handle == handle then _layout_poll_handle = nil end
-			_layout_poll_termination_pending = false
-		else
-			_layout_poll_termination_pending = true
+		local settled, stop_result = retire_layout_read(handle)
+		if not settled then
 			Logger.error(LOG, "In-flight layout read termination failed; retained for retry: %s.",
 				tostring(stop_result))
 			all_stopped = false
