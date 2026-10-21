@@ -1198,6 +1198,15 @@ _LLMRemote_PollRequest(req_id) {
         _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
+    ; The managed facade repairs malformed UTF-8 into U+FFFD while reading the
+    ; body; repaired bytes must never become a successful JSON completion.
+    if entry.Has("transport") && entry["transport"] == "managed_curl" && !http.ResponseEncodingValid {
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
+        try LoggerWarn("LLM.remote", "Response body for req_id={1} is not valid UTF-8 — rejected.", req_id)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("invalid_encoding", status, "", NetworkReport))
+        return
+    }
     Classified := _LLMRemoteClassifyTerminal(entryFormat,
         Map("exit", 0, "status", status, "body_read", true, "body", body),
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")

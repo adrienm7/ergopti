@@ -486,6 +486,9 @@ class CurlAsyncRequest {
 		this.CleanupPending := false
 		this.Status := 0
 		this.ResponseText := ""
+		; False once a managed body's bytes are not strict UTF-8. ResponseText keeps
+		; the legacy FileRead repair for generic callers; JSON consumers must refuse.
+		this.ResponseEncodingValid := true
 		this.ResponseHeaders := Map()
 		; The transport writes its private request files before it starts curl. File
 		; I/O can pump a competing cancellation callback, so tests need a deterministic
@@ -714,6 +717,10 @@ class CurlAsyncRequest {
 				if Valid && this.OutputPath == "" {
 					if FileGetSize(this.BodyPath) > HTTP_CURL_MAX_RESPONSE_BYTES
 						throw Error("The managed response exceeded the canonical byte bound.")
+					; FileRead repairs malformed UTF-8 into U+FFFD, so the raw bytes are
+					; judged first; a genuine U+FFFD (EF BF BD) stays valid.
+					Raw := FileRead(this.BodyPath, "RAW")
+					this.ResponseEncodingValid := Raw.Size == 0 || HTTPIsValidUtf8(Raw, Raw.Size)
 					Body := FileRead(this.BodyPath, "UTF-8-RAW")
 				}
 			}
