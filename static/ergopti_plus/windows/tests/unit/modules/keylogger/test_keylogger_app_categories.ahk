@@ -481,3 +481,5 @@ Test("keylogger_app_categories: shutdown persists discoveries before the deferre
 #Include test_keylogger_app_category_edit_contract.ahk
 
 #Include test_keylogger_app_category_stage_retry.ahk
+
+#Include test_keylogger_app_category_reload_read_admission.ahk
