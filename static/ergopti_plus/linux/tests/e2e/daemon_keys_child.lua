@@ -582,7 +582,9 @@ package.preload["adapters.event_loop"] = function()
 				active_signals = active_signals + 1
 			end
 		end)
-		assert(not signals.is_settled() and active_signals == 3, "expected real native signal ownership")
+		-- SIGINT, SIGTERM, SIGHUP and the reload control's SIGUSR1.
+		assert(not signals.is_settled() and active_signals == 4,
+			"expected real native signal ownership, found " .. active_signals .. " active signal handle(s)")
 		play(loop)
 		-- The scripted loop cannot acknowledge libuv close callbacks by returning.
 		-- Deliver the real terminal signal, then let the actual loop retire every

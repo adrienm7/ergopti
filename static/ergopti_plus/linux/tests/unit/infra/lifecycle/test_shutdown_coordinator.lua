@@ -48,6 +48,39 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_type(state.driver_control.reload, "function")
 		helpers.assert_type(state.callbacks.on_usr1, "function")
 	end)
+	helpers.it("(signal-census) the E2E children expect every native signal Main installs", function()
+		-- The E2E children count the active libuv signal handles before playing a
+		-- scenario. Adding SIGUSR1 to Main without updating that count killed
+		-- every daemon scenario on Linux CI, which only the E2E lane could see.
+		local state = MainStartup.run()
+		helpers.assert_true(state.ok, tostring(state.error))
+		local started = {}
+		local fake_luv = {
+			new_signal = function() return {} end,
+			signal_start = function(_, name) started[#started + 1] = name; return 0 end,
+			signal_stop = function() return 0 end,
+			is_closing = function() return false end,
+			close = function(_, on_closed) on_closed() end,
+		}
+		local saved_luv, saved_signals = package.loaded["luv"], package.loaded["infra.signal_handlers"]
+		package.loaded["luv"], package.loaded["infra.signal_handlers"] = fake_luv, nil
+		local ran, err = pcall(function()
+			local Signals = require("infra.signal_handlers")
+			helpers.assert_true(Signals.start(state.callbacks), "Main's signal callbacks must install")
+			helpers.assert_true(Signals.stop(), "the census installation must retire")
+		end)
+		package.loaded["luv"], package.loaded["infra.signal_handlers"] = saved_luv, saved_signals
+		if not ran then error(err, 0) end
+		helpers.assert_eq(table.concat(started, ","), "sigint,sigterm,sighup,sigusr1")
+		for _, child in ipairs({ "daemon_keys_child", "startup_child" }) do
+			local path = helpers.driver_root() .. "/tests/e2e/" .. child .. ".lua"
+			local file = assert(io.open(path, "rb"))
+			local source = assert(file:read("*a"))
+			file:close()
+			local expected = tonumber(source:match("active_signals == (%d+)"))
+			helpers.assert_eq(expected, #started, child .. " must expect every signal handle Main installs")
+		end
+	end)
 	helpers.it("(startup-late-grab) preserves the onboarding capture gate through the first pump", function()
 		local state = MainStartup.run()
 		helpers.assert_true(state.ok, tostring(state.error))
