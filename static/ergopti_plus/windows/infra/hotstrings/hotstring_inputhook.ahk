@@ -2596,7 +2596,10 @@ _PrefixCollectCandidates(ContentGeneration := unset,
 	if !IsSet(InputContextGeneration)
 		InputContextGeneration := _PrefixInputContextGeneration
 
-	EndCompletion := SubStr(HSE_WORD_TERMINATORS, 1, 1)
+	; Delimiter selection is by scalar; a UTF-16 high half cannot complete an END body.
+	EndCompletion := HSE_WORD_TERMINATORS == "" ? ""
+		: SubStr(HSE_WORD_TERMINATORS, 1, _TextCodepointWidth(
+			HSE_WORD_TERMINATORS, 1, StrLen(HSE_WORD_TERMINATORS)))
 	if EndCompletion != "" {
 		EndDecision := HSE_PreviewNextDecision(HSE_Buffer, EndCompletion)
 		if !_PrefixDecisionIsDoubling(EndDecision) {
