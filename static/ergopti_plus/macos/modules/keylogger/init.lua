@@ -252,6 +252,8 @@ local CoreState = {
 	active_app_path              = nil,
 	active_app_pid               = nil,
 	is_private_window            = false,
+	-- A refused foreground refresh revokes persistence independently of preferences.
+	foreground_refresh_pending   = false,
 	-- Whether privacy context detection filters are active (user-configurable)
 	private_filter_enabled            = true,
 	secure_field_filter_enabled       = true,
@@ -2367,18 +2369,27 @@ end
 --- a pause never updated the cached context — and nothing else re-syncs it.
 --- @return boolean True when the context was re-synchronised.
 function M.resync_context()
-	return _physical_lifecycle.run("resync", function()
+	CoreState.foreground_refresh_pending = true
+	local results = table.pack(pcall(_physical_lifecycle.run, "resync", function()
 		-- Paused releases already retired their own timestamps. Only keys still
 		-- held cross this boundary; cancel their entire duration and suppress the
 		-- next release without swallowing a later fresh press.
-		if settle_physical_modifiers() ~= true then return false end
+		if settle_physical_modifiers() ~= true then
+			CoreState.foreground_refresh_pending = true
+			return false
+		end
 		local ok, res = pcall(ContextTracker.resync_context)
 		if not ok then
+			CoreState.foreground_refresh_pending = true
 			Logger.error(LOG, "resync_context() failed: %s.", tostring(res))
 			return false
 		end
+		if res ~= true then CoreState.foreground_refresh_pending = true end
 		return res == true
-	end, physical_lifecycle_snapshot)
+	end, physical_lifecycle_snapshot))
+	if not results[1] or results[2] ~= true then CoreState.foreground_refresh_pending = true end
+	if not results[1] then error(results[2], 0) end
+	return table.unpack(results, 2, results.n)
 end
 
 --- Halts all tracking, stops all timers and watchers, and flushes the buffer.
