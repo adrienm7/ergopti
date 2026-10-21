@@ -1206,7 +1206,8 @@ _PrefixApplyIdleReset(NowTick) {
 	if !HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds)
 		return false
 	; Nothing to forget: keep the generations and the tooltip owner untouched.
-	if (HSE_Buffer == "" and _PrefixBuffer == "" and HSE_StartIsWordBoundary)
+	if (HSE_Buffer == "" and _PrefixBuffer == "" and HSE_StartIsWordBoundary
+		and !_PrefixHasIncompleteFragment())
 		return false
 	_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
 	if LoggerIsDebugEnabled()
