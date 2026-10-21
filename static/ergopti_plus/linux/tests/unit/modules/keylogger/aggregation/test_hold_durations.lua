@@ -296,7 +296,9 @@ local function run_hold(transition, expected, options)
 		environment.input_capture_gate = gate
 		local pause_body = assert(main:match("on_pause_change = function(.-)\n\t\tend,"))
 		local on_pause = source_callback(pause_body, environment)
-		local reset_body = assert(main:match("ScriptActions.new%({%s*reset = function(.-)\n\t\tend,"))
+		-- The constructor may open with comment lines; the field itself anchors
+		-- the body, not its position as the table's first token.
+		local reset_body = assert(main:match("ScriptActions.new%({\n.-\n\t\treset = function(.-)\n\t\tend,"))
 		local reset = source_callback(reset_body, environment)
 		state.pause_callbacks = {}
 		local controller
