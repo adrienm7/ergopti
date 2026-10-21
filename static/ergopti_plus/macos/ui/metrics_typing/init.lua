@@ -452,7 +452,9 @@ local function compute_full(pacer)
 	local sqlite_path = readable_sqlite_path()
 	if sqlite_path then
 		session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path, today, pacer)
-		manifest, manifest_json = session.manifest()
+		local manifest_complete
+		manifest, manifest_json, manifest_complete = session.manifest()
+		assert(manifest_complete == true, "Typing metrics manifest prefetch was incomplete")
 	end
 
 	-- App icons + apps list + first_date computed from manifest. The apps list
@@ -521,7 +523,8 @@ local function compute_live(pacer)
 	if not sqlite_path then return '{"manifest":{}}' end
 	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	local _, manifest_json = session.manifest()
+	local _, manifest_json, manifest_complete = session.manifest()
+	assert(manifest_complete == true, "Typing metrics live manifest read was incomplete")
 	return '{"manifest":' .. manifest_json .. "}"
 end
 

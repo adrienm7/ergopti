@@ -169,6 +169,7 @@ function M.session(reader, sqlite_path, today, pacer)
 	--- Projects the manifest.
 	--- @return table manifest Decoded manifest (date→app→cell).
 	--- @return string json Encoded manifest.
+	--- @return boolean manifest_complete All requested manifest queries succeeded.
 	function session.manifest()
 		-- The new watermark is fingerprinted before anything is read
 		local target_fp = fingerprint(yesterday)
@@ -200,7 +201,7 @@ function M.session(reader, sqlite_path, today, pacer)
 		else
 			_manifest = nil
 		end
-		return days, assemble_object(encoded)
+		return days, assemble_object(encoded), complete == true
 	end
 
 	--- Projects one range request exactly as `read_range_split_today` would.
