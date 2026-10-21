@@ -89,3 +89,5 @@ for _OWMO_Mode in ["replace-ready", "replace-retry", "replace-cancel", "current-
 	"current-cancel", "wrong-sender", "entry-paused", "pause-on-read", "epoch-on-read", "cancel-callback-swap", "logger-replacement"]
 	Test("Ollama message owner: " . _OWMO_Mode . " preserves the admitted session (ollama-message-read-owner)",
 		_OWMO_Case.Bind(_OWMO_Mode))
+
+#Include test_ollama_webview_flush_owner.ahk
