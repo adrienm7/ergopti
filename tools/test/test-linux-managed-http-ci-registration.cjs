@@ -152,7 +152,9 @@ function job(text, id, rel) {
 	assert.equal(found.length, 1);
 	return found[0].body;
 }
-function validateWorkflow(text, entry) {
+// Release runs in ci-release.yml, called by ci.yml's publication job.
+const releaseWorkflow = Pipeline.file('.github/workflows/ci-release.yml');
+function validateWorkflow(text, entry, release = releaseWorkflow) {
 	const body = job(text, 'e2e-linux', '.github/workflows/ci-linux.yml');
 	for (const name of [SETUP, NATIVE]) {
 		const step = Pipeline.step(body, name);
@@ -242,7 +244,7 @@ function validateWorkflow(text, entry) {
 	assert.equal(Pipeline.field(linux, 'if'), "needs.validate.outputs.lane_linux == 'true'");
 	assert.equal(Pipeline.field(linux, 'uses'), './.github/workflows/ci-linux.yml');
 	assert.equal(
-		Pipeline.field(job(entry, 'release', '.github/workflows/ci.yml'), 'if'),
+		Pipeline.field(job(release, 'release', '.github/workflows/ci-release.yml'), 'if'),
 		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
 }
@@ -306,15 +308,22 @@ for (const [needle, replacement] of [
 	assert.throws(() => validateWorkflow(mutated, entry));
 	passed++;
 }
-for (const [needle, replacement] of [
-	["if: needs.validate.outputs.lane_linux == 'true'", 'if: true'],
-	[
+{
+	const mutated = uniqueReplace(
+		entry,
+		"if: needs.validate.outputs.lane_linux == 'true'",
+		'if: true'
+	);
+	assert.throws(() => validateWorkflow(workflow, mutated));
+	passed++;
+}
+{
+	const mutated = uniqueReplace(
+		releaseWorkflow,
 		"if: github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
 		'if: true'
-	]
-]) {
-	const mutated = uniqueReplace(entry, needle, replacement);
-	assert.throws(() => validateWorkflow(workflow, mutated));
+	);
+	assert.throws(() => validateWorkflow(workflow, entry, mutated));
 	passed++;
 }
 

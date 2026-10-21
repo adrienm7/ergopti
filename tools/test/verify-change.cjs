@@ -414,7 +414,8 @@ const RULES = [
 		why: 'port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only',
 		match: (f) =>
 			!isPerformanceReport(f) &&
-			(f === '.github/workflows/ci-macos.yml' ||
+			// Every workflow's contract tests (pipeline wiring, receipts, release) run in test:js.
+			(f.startsWith('.github/workflows/') ||
 				f.includes('/adapters/') ||
 				f.includes('_shared/') ||
 				f.startsWith('static/ergopti_plus/macos/launcher/') ||
