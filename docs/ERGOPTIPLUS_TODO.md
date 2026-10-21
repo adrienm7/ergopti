@@ -255,7 +255,7 @@ for anything that writes configuration.
 - [ ] **CI structure.** [CODE] Elapsed time per CI step, suite and test with a slowest-test summary;
       live Windows unit-log progress; four parallel lanes (Common/Windows/macOS/Linux: Unit, E2E,
       Build, Test-the-build) converging into Release.
-- [ ] **Clean CI layout: do right after the first green dev (maintainer, October 20).** [CODE] One
+- [x] **Clean CI layout: do right after the first green dev (maintainer, October 20).** [CODE] One
       dedicated agent, separate commits, each validated on a `tmp/*` branch before dev, receipts and
       the release verifier kept exact: (1) `ci.yml` only plans and calls: move release and
       publication into `ci-release.yml`; (2) each lane (`ci-windows.yml`, `ci-macos.yml`,
