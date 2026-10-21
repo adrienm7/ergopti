@@ -112,32 +112,85 @@ function M.register(helpers, driver)
 			helpers.assert_eq(policy.tap_binding_catalogue({ { id = "one" }, { id = "two" } }),
 				{ prefix = "tap_key__", slots = { one = true, two = true } })
 		end)
-		for _, invalid in ipairs({
-			'{"keys":[]}',
-			'{"keys":[{"id":"same","hs":[50],"linux":41},{"id":"same","hs":[27],"linux":12}]}',
-			'{"keys":[{"id":"nested__slot","hs":[50],"linux":41}]}',
-		}) do
-			local source = invalid
-			helpers.it("refuses malformed actual native source before publishing: " .. source, function()
+		-- Each source is written to a REAL file: a faked io.open returned fewer
+		-- bytes than the real file, so the file-system size check refused the read
+		-- before JSON was parsed and every vector passed on the read failure.
+		local MALFORMED = " is malformed"
+		local INVALID_IDENTITY = "config_binding_identity: invalid native tap-key catalogue"
+		local malformed_sources = {
+			{ source = "not json", expected = MALFORMED },
+			{ source = '{"keys":[]}', expected = MALFORMED },
+			{ source = '{"keys":{}}', expected = MALFORMED },
+			{ source = '{"entries":[{"id":"slot","hs":[50],"linux":41}]}', expected = MALFORMED },
+			{ source = '{"keys":[{"id":"same","hs":[50],"linux":41},{"id":"same","hs":[27],"linux":12}]}',
+				expected = INVALID_IDENTITY },
+			{ source = '{"keys":[{"id":"nested__slot","hs":[50],"linux":41}]}', expected = INVALID_IDENTITY },
+		}
+		--- Publishes one source from a real file and reports whether the owner
+		--- refused it with exactly the expected outcome, then repairs the file.
+		--- @param owner table Native tap-key owner under test.
+		--- @param row table { source, expected }.
+		--- @return boolean refused_as_expected
+		--- @return string detail Observed outcome.
+		local function refuses_real_source(owner, row)
+			local paths = require("infra.paths")
+			local original_shared = paths.shared
+			local path = os.tmpname()
+			local file = assert(io.open(path, "wb")); assert(file:write(row.source)); assert(file:close())
+			paths.shared = function(relative)
+				if relative == "modules/actions/tap_keys.json" then return path end
+				return original_shared(relative)
+			end
+			local okay, verdict, detail = pcall(function()
+				local admitted, reason = pcall(publish, owner)
+				local text = tostring(reason)
+				local exact = not admitted and text:find(row.expected, 1, true) ~= nil
+					and text:find("cannot complete read", 1, true) == nil
+					and owner.published_binding_catalogue() == nil
+					and bytes(path) == row.source
+				-- Manual repair publishes: the refusal is not a sticky state.
+				local actual = bytes(original_shared("modules/actions/tap_keys.json"))
+				local repair = assert(io.open(path, "wb")); assert(repair:write(actual)); assert(repair:close())
+				local repaired = pcall(publish, owner)
+				return exact and repaired, admitted and "published" or text
+			end)
+			paths.shared = original_shared
+			os.remove(path)
+			if not okay then error(verdict, 0) end
+			return verdict, detail
+		end
+		for _, vector in ipairs(malformed_sources) do
+			local row = vector
+			helpers.it("refuses malformed actual native source before publishing: " .. row.source, function()
 				scope(function()
-					local owner = fresh_catalogue()
-					local original_open, closes = io.open, 0
-					io.open = function(path)
-						-- Count only the catalogue handle: the driver logger may open (and retire) its own.
-						local catalogue = is_catalogue(path)
-						return { read = function() return source end, close = function() if catalogue then closes = closes + 1 end; return true end }
-					end
-					local okay, detail = pcall(publish, owner)
-					io.open = original_open
-					helpers.assert_eq(okay, false)
-					helpers.assert_true(tostring(detail):find("tap_keys:", 1, true) ~= nil
-						or tostring(detail):find("config_binding_identity: invalid", 1, true) ~= nil)
-					helpers.assert_eq(closes, 1)
-					helpers.assert_nil(owner.published_binding_catalogue())
-					helpers.assert_true(type(publish(owner)) == "table")
+					local refused, detail = refuses_real_source(fresh_catalogue(), row)
+					helpers.assert_true(refused, "expected '" .. row.expected .. "', observed: " .. tostring(detail))
 				end)
 			end)
 		end
+		helpers.it("a native owner without its malformed-source branch fails the malformed vectors (mutation)", function()
+			scope(function()
+				local file_path = assert(package.searchpath(native, package.path), "native tap-key source unavailable")
+				local source = bytes(file_path)
+				local first, last = source:find('error("tap_keys: " .. tostring(path) .. "' .. MALFORMED .. '")', 1, true)
+				assert(first, "the malformed-source branch must exist in " .. file_path)
+				assert(not source:find('" is malformed")', last + 1, true), "the malformed-source branch must be unique")
+				local mutant_source = source:sub(1, first - 1) .. "local _ = nil" .. source:sub(last + 1)
+				local compile = loadstring or load
+				local mutant = assert(compile(mutant_source, "@" .. file_path .. " (mutant)"))()
+				package.loaded[native] = mutant
+				local malformed, caught = 0, 0
+				for _, row in ipairs(malformed_sources) do
+					if row.expected == MALFORMED then
+						malformed = malformed + 1
+						mutant._reset()
+						if not refuses_real_source(mutant, row) then caught = caught + 1 end
+					end
+				end
+				helpers.assert_true(malformed >= 4, "the malformed vectors must stay in the corpus")
+				helpers.assert_eq(caught, malformed, "every malformed vector must fail once its branch is removed")
+			end)
+		end)
 		helpers.it("refuses an actual duplicate-ID file and publishes only after manual repair", function()
 			scope(function()
 				local owner = fresh_catalogue()
@@ -198,8 +251,8 @@ function M.register(helpers, driver)
 					local okay, detail = pcall(publish, owner)
 					io.open = original_open
 					helpers.assert_eq(okay, false)
-					helpers.assert_true(tostring(detail):find("cannot complete read", 1, true) ~= nil
-						or tostring(detail):find("unreadable or malformed", 1, true) ~= nil)
+					helpers.assert_contains(tostring(detail), "cannot complete read",
+						"a failed read is reported as a read failure, never as malformed content")
 					helpers.assert_eq(closes, 1, "failed read still retires its exact handle")
 					helpers.assert_nil(owner.published_binding_catalogue())
 					helpers.assert_true(type(publish(owner)) == "table")
