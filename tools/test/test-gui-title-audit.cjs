@@ -1415,7 +1415,12 @@ try {
 		tap_hold_action: {
 			kind: 'contextual_title',
 			title_key: 'tap_hold.picker.title_prefix',
-			platforms: ['linux']
+			platforms: ['linux', 'hs']
+		},
+		tap_hold_hold_action: {
+			kind: 'contextual_title',
+			title_key: 'tap_hold.picker.hold_title_prefix',
+			platforms: ['hs']
 		}
 	};
 	for (const [id, declaration] of Object.entries(expected)) {
@@ -1481,7 +1486,11 @@ try {
 	);
 	assert.match(
 		after.lua,
-		/kind = "contextual_title", title_key = "tap_hold.picker.title_prefix", platforms = \{"linux"\}/
+		/kind = "contextual_title", title_key = "tap_hold.picker.title_prefix", platforms = \{"linux", "hs"\}/
+	);
+	assert.match(
+		after.lua,
+		/kind = "contextual_title", title_key = "tap_hold.picker.hold_title_prefix", platforms = \{"hs"\}/
 	);
 	assert.match(
 		after.lua,

@@ -258,16 +258,17 @@ helpers.describe("the declared complete per-key head", function()
 		end)
 	end
 
-	helpers.it("retains both picker subtrees and the native delay tail (tap-hold-key-head)", function()
+	helpers.it("opens the shared picker from both slot rows and keeps the native delay tail (tap-hold-key-head)", function()
 		with_head(nil, function(rows, observed)
 			helpers.assert_eq(#rows, 6, "four shared head rows, native separator and delay")
 			helpers.assert_eq(rows[1].title, "menu.tapholds.nothing_tap_hold")
 			helpers.assert_eq(rows[2].title, "-")
-			helpers.assert_eq(rows[3].title, "menu.tapholds.tap_arrow")
-			helpers.assert_eq(rows[4].title, "menu.tapholds.hold_arrow")
-			helpers.assert_type(rows[3].menu, "table")
-			helpers.assert_type(rows[4].menu, "table")
-			helpers.assert_nil(rows[3].fn, "macOS tap still opens a submenu")
+			helpers.assert_eq(rows[3].title, "tap_hold.picker.tap")
+			helpers.assert_eq(rows[4].title, "tap_hold.picker.hold")
+			helpers.assert_type(rows[3].fn, "function", "the tap row is a command")
+			helpers.assert_type(rows[4].fn, "function", "the hold row is a command")
+			helpers.assert_nil(rows[3].menu, "the tap row builds no submenu of actions")
+			helpers.assert_nil(rows[4].menu, "the hold row builds no submenu of actions")
 			helpers.assert_eq(rows[5].title, "-")
 			helpers.assert_eq(rows[6].title, "menu.tapholds.key_tap_delay")
 			helpers.assert_eq(#observed.calls, 0)
@@ -275,56 +276,193 @@ helpers.describe("the declared complete per-key head", function()
 	end)
 
 	helpers.it("follows shared Tap/Hold order in the actual per-key provider (tap-hold-key-head)", function()
-		with_head(function(head) head[4], head[6] = head[6], head[4] end, function(rows)
-			helpers.assert_eq(rows[3].title, "menu.tapholds.hold_arrow")
-			helpers.assert_eq(rows[4].title, "menu.tapholds.tap_arrow")
-			helpers.assert_type(rows[3].menu, "table")
-			helpers.assert_type(rows[4].menu, "table")
+		with_head(function(head) head[3], head[5] = head[5], head[3] end, function(rows)
+			helpers.assert_eq(rows[3].title, "tap_hold.picker.hold")
+			helpers.assert_eq(rows[4].title, "tap_hold.picker.tap")
+			helpers.assert_type(rows[3].fn, "function")
+			helpers.assert_type(rows[4].fn, "function")
 		end)
 	end)
 
-	helpers.it("reads a shared caption mutation without changing the native subtree (tap-hold-key-head)", function()
-		with_head(function(head) head[4].i18n = "menu.tapholds.hold_arrow" end, function(rows)
-			helpers.assert_eq(rows[3].title, "menu.tapholds.hold_arrow")
-			helpers.assert_type(rows[3].menu, "table")
-			helpers.assert_true(#rows[3].menu > 0, "the original action picker payload survives")
+	helpers.it("reads a shared caption mutation without changing the native command (tap-hold-key-head)", function()
+		with_head(function(head) head[3].i18n = "menu.shortcuts.title" end, function(rows)
+			helpers.assert_eq(rows[3].title, "menu.shortcuts.title")
+			helpers.assert_type(rows[3].fn, "function", "the tap command survives a caption change")
 		end)
 	end)
 
 	helpers.it("honors declared platform hiding in the actual provider (tap-hold-key-head)", function()
-		with_head(function(head) head[4].platforms = { "ahk", "linux" } end, function(rows)
+		with_head(function(head) head[3].platforms = { "ahk", "linux" } end, function(rows)
 			helpers.assert_eq(#rows, 5)
 			helpers.assert_eq(rows[2].title, "-")
-			helpers.assert_eq(rows[3].title, "menu.tapholds.hold_arrow")
-			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_eq(rows[3].title, "tap_hold.picker.hold")
+			helpers.assert_type(rows[3].fn, "function")
 			helpers.assert_eq(rows[4].title, "-", "the native delay separator still follows the shared fragment")
 		end)
 	end)
 end)
 
-helpers.describe("declared head retains the macOS picker mutation owners", function()
-	for _, receipt in ipairs({ { name = "true", value = true }, { name = "false", value = false },
-		{ name = "nil" }, { name = "truthy", value = "accepted" } }) do
-		helpers.it("keeps native " .. receipt.name .. " setter receipts for both slots (tap-hold-key-head)", function()
-			helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "infra.i18n",
-				"infra.logger", "ui.menu.menu_utils" }, function()
-				local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
-				local native, calls, regenerations, refreshes = remap_double(), {}, 0, 0
-				native.set_tap_action = function(kid, aid) calls[#calls + 1] = { "tap", kid, aid }; return receipt.value end
-				native.set_hold_action = function(kid, aid) calls[#calls + 1] = { "hold", kid, aid }; return receipt.value end
-				native.regenerate = function() regenerations = regenerations + 1; return true end
-				local built = menu.build({ karabiner = native, updateMenu = function() refreshes = refreshes + 1 end }).submenu
-				local key = assert(built[key_index(built, "tap_hold.group.left_shift")])
-				helpers.assert_type(key.menu[3].menu[1].fn, "function")
-				helpers.assert_type(key.menu[4].menu[1].fn, "function")
-				helpers.assert_eq(key.menu[3].menu[1].fn(), receipt.value == true)
-				helpers.assert_eq(key.menu[4].menu[1].fn(), receipt.value == true)
-				helpers.assert_eq(calls, { { "tap", "left_shift", "none" }, { "hold", "left_shift", "none" } })
-				helpers.assert_eq(regenerations, receipt.value == true and 2 or 0, "refused persistence cannot regenerate")
-				helpers.assert_eq(refreshes, receipt.value == true and 2 or 0)
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 3/ Shared Action Picker ==========
+-- ==========================================
+-- ==========================================
+
+-- The catalogue the slot pickers read: a tap-only, two hold-and-tap and a
+-- hold-only action, plus the catalogue's own "none".
+local SLOT_CATALOGUE = {
+	{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
+	{ id = "escape", label = "Escape", category = "Navigation", holdable = false, tappable = true },
+	{ id = "enter", label = "Enter", category = "Navigation" },
+	{ id = "shift", label = "Shift", category = "Modifiers", holdable = true, tappable = false },
+}
+
+--- Drives the actual per-key rows with the shared picker window replaced by a
+--- recorder of what it was opened with and of its confirmation callback.
+--- @param body function Receives the key's rows, the observations and the rebuild.
+local function with_slot_picker(body)
+	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "infra.i18n",
+		"infra.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
+		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
+		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0,
+			receipt = true, open_result = true }
+		package.loaded["ui.action_picker"] = {
+			open = function(opts, on_confirm)
+				observed.opened[#observed.opened + 1] = { opts = opts, confirm = on_confirm }
+				return observed.open_result
+			end,
+		}
+		local native = remap_double()
+		native.AVAILABLE_ACTIONS = SLOT_CATALOGUE
+		native.get_tap_action = function(kid) return kid == "left_shift" and "escape" or "none" end
+		native.get_hold_action = function(kid) return kid == "left_shift" and "shift" or "none" end
+		local function setter(slot)
+			return function(kid, aid)
+				observed.calls[#observed.calls + 1] = { slot, kid, aid }
+				if observed.receipt == "throws" then error("independent setter refusal", 0) end
+				return observed.receipt
+			end
+		end
+		native.set_tap_action = setter("tap")
+		native.set_hold_action = setter("hold")
+		native.regenerate = function() observed.regenerations = observed.regenerations + 1; return true end
+		local built = menu.build({ karabiner = native,
+			updateMenu = function() observed.refreshes = observed.refreshes + 1 end }).submenu
+		local key = assert(built[key_index(built, "tap_hold.group.left_shift")])
+		body(key.menu, observed, built)
+	end)
+end
+
+helpers.describe("the macOS key slots open the shared action picker", function()
+	helpers.it("opens the tap picker for the key's tap, its current action marked (tap-hold-action-picker)", function()
+		with_slot_picker(function(rows, observed)
+			helpers.assert_eq(#observed.opened, 0, "building the menu opens no window")
+			helpers.assert_true(rows[3].fn(), "the click reports the opened picker")
+			helpers.assert_eq(#observed.opened, 1)
+			local opts = observed.opened[1].opts
+			helpers.assert_eq(opts.presentation_id, "tap_hold_action", "the tap slot's shared title")
+			helpers.assert_eq(opts.presentation_suffix, "tap_hold.group.left_shift", "the title names the key")
+			helpers.assert_eq(opts.current, "escape", "the current tap is the picker's marked choice")
+			helpers.assert_eq(opts.items, {
+				{ type = "heading", level = 1, text = "Navigation" },
+				{ type = "action", id = "escape", label = "Escape" },
+				{ type = "action", id = "enter", label = "Enter" },
+			}, "every tappable action under its category; the picker draws its own none")
+			helpers.assert_eq(#observed.calls, 0, "opening the picker writes nothing")
+		end)
+	end)
+
+	helpers.it("opens the hold picker for the key's hold with the holdable actions (tap-hold-action-picker)", function()
+		with_slot_picker(function(rows, observed)
+			helpers.assert_true(rows[4].fn())
+			local opts = observed.opened[1].opts
+			helpers.assert_eq(opts.presentation_id, "tap_hold_hold_action", "the hold slot's shared title")
+			helpers.assert_eq(opts.presentation_suffix, "tap_hold.group.left_shift")
+			helpers.assert_eq(opts.current, "shift")
+			helpers.assert_eq(opts.items, {
+				{ type = "heading", level = 1, text = "Modifiers" },
+				{ type = "action", id = "shift", label = "Shift" },
+			})
+		end)
+	end)
+
+	helpers.it("persists a picked action through the key's own setter, then regenerates (tap-hold-action-picker)", function()
+		with_slot_picker(function(rows, observed)
+			rows[3].fn()
+			rows[4].fn()
+			local tap, hold = observed.opened[1].confirm, observed.opened[2].confirm
+			helpers.assert_true(tap("enter"))
+			helpers.assert_true(hold("shift"))
+			helpers.assert_true(tap("none"), "the picker's own none clears the tap")
+			helpers.assert_eq(observed.calls, { { "tap", "left_shift", "enter" },
+				{ "hold", "left_shift", "shift" }, { "tap", "left_shift", "none" } })
+			helpers.assert_eq(observed.regenerations, 3)
+			helpers.assert_eq(observed.refreshes, 3)
+		end)
+	end)
+
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "truthy", value = "accepted" }, { name = "throwing", value = "throws" } }) do
+		helpers.it("keeps the picker open on a " .. receipt.name .. " setter receipt (tap-hold-action-picker)", function()
+			with_slot_picker(function(rows, observed)
+				observed.receipt = receipt.value
+				rows[3].fn()
+				rows[4].fn()
+				helpers.assert_eq(observed.opened[1].confirm("enter"), false, "a refusal keeps the picker retryable")
+				helpers.assert_eq(observed.opened[2].confirm("shift"), false)
+				helpers.assert_eq(observed.calls, { { "tap", "left_shift", "enter" }, { "hold", "left_shift", "shift" } })
+				helpers.assert_eq(observed.regenerations, 0, "refused persistence cannot regenerate")
+				helpers.assert_eq(observed.refreshes, 0)
 			end)
 		end)
 	end
+
+	helpers.it("refuses an action its slot does not offer (tap-hold-action-picker)", function()
+		with_slot_picker(function(rows, observed)
+			rows[3].fn()
+			rows[4].fn()
+			local tap, hold = observed.opened[1].confirm, observed.opened[2].confirm
+			helpers.assert_eq(tap("shift"), false, "a hold-only modifier is no tap")
+			helpers.assert_eq(hold("escape"), false, "a tap-only key is no hold")
+			helpers.assert_eq(tap("unknown"), false)
+			helpers.assert_eq(tap(nil), false)
+			helpers.assert_eq(#observed.calls, 0, "nothing reaches the setters")
+			helpers.assert_eq(observed.regenerations, 0)
+		end)
+	end)
+
+	helpers.it("reports a picker that did not open (tap-hold-action-picker)", function()
+		with_slot_picker(function(rows, observed)
+			observed.open_result = false
+			helpers.assert_eq(rows[3].fn(), false)
+			helpers.assert_eq(rows[4].fn(), false)
+		end)
+	end)
+
+	helpers.it("builds no submenu of actions under any key (tap-hold-action-picker)", function()
+		with_slot_picker(function(_, observed, built)
+			local labels = {}
+			for _, action in ipairs(SLOT_CATALOGUE) do labels[action.label] = true end
+			local function walk(rows)
+				for _, row in ipairs(rows or {}) do
+					helpers.assert_nil(labels[row.title], "an action row was built: " .. tostring(row.title))
+					walk(row.menu)
+				end
+			end
+			local keys = 0
+			for _, row in ipairs(built) do
+				if type(row.title) == "string" and row.title:match("^tap_hold%.group%.") then
+					keys = keys + 1
+					walk(row.menu)
+				end
+			end
+			helpers.assert_eq(keys, #engine_keys(), "every key row was inspected")
+			helpers.assert_eq(#observed.opened, 0)
+		end)
+	end)
 end)
 
 --- Drives the actual provider with only native ports controlled. Each build

@@ -30,19 +30,10 @@ local COMMAND_CASES = {
 	},
 }
 
+-- The key combinations' slot submenus. A key's own tap and hold open the
+-- shared action picker instead; test_menu_tap_holds_hand_sections holds their
+-- setter receipts (tap-hold-action-picker).
 local PICKER_ROUTE_CASES = {
-	{
-		setter = "set_tap_action",
-		parent_prefix = "tap_hold.group.left_shift  :",
-		picker_label = "menu.tapholds.tap_arrow",
-		expected_id = "left_shift",
-	},
-	{
-		setter = "set_hold_action",
-		parent_prefix = "tap_hold.group.left_shift  :",
-		picker_label = "menu.tapholds.hold_arrow",
-		expected_id = "left_shift",
-	},
 	{
 		setter = "set_combo_combo_action",
 		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",

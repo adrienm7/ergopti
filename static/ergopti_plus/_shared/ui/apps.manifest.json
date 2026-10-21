@@ -52,7 +52,12 @@
 				"tap_hold_action": {
 					"kind": "contextual_title",
 					"title_key": "tap_hold.picker.title_prefix",
-					"platforms": ["linux"]
+					"platforms": ["linux", "hs"]
+				},
+				"tap_hold_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "tap_hold.picker.hold_title_prefix",
+					"platforms": ["hs"]
 				}
 			}
 		},

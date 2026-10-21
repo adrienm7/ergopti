@@ -471,6 +471,14 @@ description_key = "menu.hotstrings.repeat_key_enabled"
 # buffer is kept forever, the behaviour before 2026-10). The menu offers the
 # `preset_values` plus a free entry for any other non-negative value.
 # A pure parameter of the matcher: it types nothing by itself.
+# Fixed Backspace rules, the same on every driver and without a setting: the
+# Backspace that erases the last character typed since the word started puts
+# the caret back at a word start (« ab », Backspace, Backspace, « c★ »
+# expands), a correction that leaves letters keeps the word, and a Backspace
+# right after the pause still edits the word typed before it. A Backspace
+# past the buffer's start makes the start unknown, except on an empty line: a
+# terminal prompt after a bare Enter, a field whose whole text Ctrl+A (Cmd+A)
+# or a browser's Ctrl+L (Cmd+L) selected, where it deletes nothing.
 [[features.hotstrings]]
 id = "idle_reset_seconds"
 default = 3
@@ -508,8 +516,10 @@ description_key = "menu.hotstrings.arrow_resets_word"
 # Whether a shortcut starts a new word: a key struck with Ctrl, Alt or Win held
 # (Cmd or Ctrl on macOS, where Option types characters), Shift added or not.
 # AltGr and Shift alone are typing. Off, Ctrl+V or Ctrl+Z leave the word in
-# progress open. Ctrl+Backspace and its siblings delete text by an unknown
-# amount and forget the word either way.
+# progress open. Ctrl+Backspace (Option+Backspace on macOS) deletes the
+# previous word and always starts a new one; its siblings (Alt+Backspace,
+# Cmd+Backspace) delete text by an unknown amount and forget the word either
+# way.
 [[features.hotstrings]]
 id = "shortcut_resets_word"
 default = true
@@ -7423,16 +7433,7 @@ type = "command"
 id = "tap_hold_key_tap"
 i18n = "tap_hold.picker.tap"
 caption_getter = "tap_hold_key_tap_caption"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
-[[menu.tap_hold_key_head]]
-type = "group"
-id = "tap_hold_key_tap_picker"
-i18n = "menu.tapholds.tap_arrow"
-caption_getter = "tap_hold_key_tap_caption"
-platforms = ["hs"]
-unavailable = "hide"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.tap_hold_key_head]]
 type = "group"
@@ -7442,10 +7443,13 @@ caption_getter = "tap_hold_key_hold_caption"
 platforms = ["ahk", "linux"]
 unavailable = "hide"
 
+# macOS holds take actions of its remap catalogue (modifiers, chords, sticky
+# keys, the layer), so its hold opens the shared action picker like the tap;
+# Windows and Linux hold one of the seven [tap_hold.hold_picker] options.
 [[menu.tap_hold_key_head]]
-type = "group"
-id = "tap_hold_key_hold_picker"
-i18n = "menu.tapholds.hold_arrow"
+type = "command"
+id = "tap_hold_key_hold_action"
+i18n = "tap_hold.picker.hold"
 caption_getter = "tap_hold_key_hold_caption"
 platforms = ["hs"]
 unavailable = "hide"

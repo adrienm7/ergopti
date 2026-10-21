@@ -33,7 +33,8 @@ local PRESENTATIONS = {
 	["action_picker"] = {
 		["keyboard_slot_action"] = { kind = "contextual_title", title_key = "dialog.keyboard_shortcut.title_prefix", platforms = {"hs"} },
 		["keyboard_slot_selection"] = { title_key = "dialog.keyboard_shortcut.title_prefix", label_key = "dialog.keyboard_shortcut.prompt", platforms = {"hs"} },
-		["tap_hold_action"] = { kind = "contextual_title", title_key = "tap_hold.picker.title_prefix", platforms = {"linux"} },
+		["tap_hold_action"] = { kind = "contextual_title", title_key = "tap_hold.picker.title_prefix", platforms = {"linux", "hs"} },
+		["tap_hold_hold_action"] = { kind = "contextual_title", title_key = "tap_hold.picker.hold_title_prefix", platforms = {"hs"} },
 	},
 	["token_prompt"] = {
 		["hf_login"] = { kind = "window_title", title_key = "mlx.hf_login_title", platforms = {"hs"} },

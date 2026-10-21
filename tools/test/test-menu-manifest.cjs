@@ -2568,8 +2568,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'macos/ui/menu/menu_tap_holds.lua',
 			'ManifestMenu.template_rows',
 			'tap_hold_key_no_action',
-			'tap_hold_key_tap_picker',
-			'tap_hold_key_hold_picker',
+			'tap_hold_key_tap',
+			'tap_hold_key_hold_action',
 			'local function build_one_tap_hold_item(',
 			'--- Builds the tap / hold rows of one hand'
 		],

@@ -449,7 +449,7 @@ helpers.describe("declared complete per-key head", function()
 	end)
 
 	helpers.it("follows declared Tap/Hold order with original payload (tap-hold-key-head)", function()
-		with_head(function(rows) rows[3], rows[5] = rows[5], rows[3] end, function(rows, calls, picked)
+		with_head(function(rows) rows[3], rows[4] = rows[4], rows[3] end, function(rows, calls, picked)
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_type(rows[3].menu, "table")
 			helpers.assert_type(rows[4].fn, "function")
@@ -501,12 +501,11 @@ helpers.describe("declared complete per-key head", function()
 						tap_hold_key_native = function() calls[#calls + 1] = "native"; return true end,
 						tap_hold_key_no_action = function() calls[#calls + 1] = "none"; return true end,
 						tap_hold_key_tap = function() calls[#calls + 1] = "tap"; return true end,
+						tap_hold_key_hold_action = function() calls[#calls + 1] = "hold"; return true end,
 					}, { tap_hold_key_configured = function() return configured end,
 						tap_hold_key_tap_caption = function() return "copy 100%" end,
 						tap_hold_key_hold_caption = function() return "Ctrl / {}" end }, {
-						tap_hold_key_tap_picker = { { label = "tap-child" } },
 						tap_hold_key_hold = { { label = "hold-child" } },
-						tap_hold_key_hold_picker = { { label = "hold-child" } },
 					})
 					local expected = corpus.platforms[platform]
 					helpers.assert_eq(#rows, 4, code .. ": " .. platform)
@@ -516,7 +515,8 @@ helpers.describe("declared complete per-key head", function()
 					helpers.assert_eq(rows[3].label, string.format(strings[expected.tap_label], "copy 100%"))
 					helpers.assert_eq(rows[4].label, string.format(strings[expected.hold_label], "Ctrl / {}"))
 					helpers.assert_eq(type(rows[3][expected.tap_kind]), expected.tap_kind == "action" and "function" or "table")
-					helpers.assert_eq(rows[4].items[1].label, "hold-child")
+					helpers.assert_eq(type(rows[4][expected.hold_kind]), expected.hold_kind == "action" and "function" or "table")
+					if expected.hold_kind == "items" then helpers.assert_eq(rows[4].items[1].label, "hold-child") end
 					helpers.assert_eq(#calls, 0)
 					configured = false
 					helpers.assert_eq(rows[1].action(), false, "included retained callback rechecks the original gate")
@@ -577,6 +577,7 @@ helpers.describe("declared complete per-key delay tail", function()
 						tap_hold_key_native = function() return true end,
 						tap_hold_key_no_action = function() return true end,
 						tap_hold_key_tap = function() return true end,
+						tap_hold_key_hold_action = function() return true end,
 						tap_hold_key_delay_set = function() calls[#calls + 1] = "set" end,
 						tap_hold_key_delay_use_global = function() calls[#calls + 1] = "reset"; return true end,
 					}
@@ -591,8 +592,7 @@ helpers.describe("declared complete per-key delay tail", function()
 					}
 					local delay = assert(renderer.template_rows(corpus.children_section, commands, getters))
 					local rows = assert(renderer.template_rows(corpus.complete_section, commands, getters, {
-						tap_hold_key_delay = delay, tap_hold_key_tap_picker = {},
-						tap_hold_key_hold_picker = {}, tap_hold_key_hold = {},
+						tap_hold_key_delay = delay, tap_hold_key_hold = {},
 					}))
 					local expected = corpus.platforms[platform]
 					helpers.assert_eq(#rows, expected.key_rows, code .. ": " .. platform)
