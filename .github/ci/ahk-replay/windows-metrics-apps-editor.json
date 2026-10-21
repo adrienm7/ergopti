@@ -1,0 +1,65 @@
+{
+	"expected_count": 69,
+	"filters": [
+		{
+			"contains": "KLAppCatConst.DEFAULTS:",
+			"expected_count": 9
+		},
+		{
+			"contains": "KeyloggerAppCategories:",
+			"expected_count": 1
+		},
+		{
+			"contains": "KL_AppCat_Get:",
+			"expected_count": 8
+		},
+		{
+			"contains": "keylogger_app_categories:",
+			"expected_count": 9
+		},
+		{
+			"contains": "KL_SortArray: sorts ordinary alphabetic app-name strings without throwing",
+			"expected_count": 1
+		},
+		{
+			"contains": "app-category-set-durability",
+			"expected_count": 2
+		},
+		{
+			"contains": "app-category-set-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "metrics-app-category-host",
+			"expected_count": 27
+		},
+		{
+			"contains": "metrics-cached-ready",
+			"expected_count": 4
+		},
+		{
+			"contains": "keylogger: synchronous start completion wins exactly once for range and full-prefetch jobs",
+			"expected_count": 1
+		},
+		{
+			"contains": "keylogger: stale prefetch-worker completion cannot evict a newer job",
+			"expected_count": 1
+		},
+		{
+			"contains": "keylogger prefetch: build handle publication is cancellation-atomic (AHK-058)",
+			"expected_count": 1
+		},
+		{
+			"contains": "keylogger: false/throwing start, worker, and publish failures reach typed terminals",
+			"expected_count": 1
+		},
+		{
+			"contains": "metrics-native-worker-exit",
+			"expected_count": 2
+		},
+		{
+			"contains": "app-category-projection",
+			"expected_count": 1
+		}
+	]
+}
