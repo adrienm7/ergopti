@@ -636,12 +636,14 @@ end
 --- @param start_date string|nil Inclusive lower bound.
 --- @param end_date string|nil Inclusive upper bound.
 --- @return table days Ascending YYYY-MM-DD strings.
+--- @return boolean complete False when any bounds query failed.
 local function _ngram_days(db, start_date, end_date)
 	local lo, hi = nil, nil
+	local complete = true
 	local tables = { table.unpack(NGRAM_STANDALONE_TABLES) }
 	for _, tbl in pairs(NGRAM_TYPE_TABLE) do tables[#tables + 1] = tbl end
 	for _, tbl in ipairs(tables) do
-		_safe_query(tbl .. "(bounds)", function()
+		local accepted = _safe_query(tbl .. "(bounds)", function()
 			-- Two scalar subqueries keep SQLite's single-MIN/MAX index shortcut
 			for r in db:nrows(string.format(
 				"SELECT (SELECT MIN(date) FROM %s) AS lo, (SELECT MAX(date) FROM %s) AS hi", tbl, tbl)) do
@@ -649,17 +651,18 @@ local function _ngram_days(db, start_date, end_date)
 				if r.hi and (not hi or r.hi > hi) then hi = r.hi end
 			end
 		end)
+		if accepted ~= true then complete = false end
 	end
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local days = {}
-	if not lo or not hi then return days end
+	if not lo or not hi then return days, complete end
 	local day = lo
 	while day <= hi do
 		days[#days + 1] = day
 		day = M.next_day(day)
 	end
-	return days
+	return days, complete
 end
 
 --- Adds one date window of every n-gram table into `out`. The row handlers are
@@ -670,7 +673,12 @@ end
 --- @param end_date string|nil Inclusive upper bound.
 --- @param selected_apps table|nil Array of allowed apps (nil = all).
 --- @param pacer table|nil Pacer from `infra.paced_job`.
+--- @return boolean complete False when any n-gram query failed.
 local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, pacer)
+	local complete = true
+	local function query(label, fn, query_pacer)
+		if _safe_query(label, fn, query_pacer) ~= true then complete = false end
+	end
 	local function build_filter(extra_app)
 		local clauses = {}
 		if start_date and start_date ~= "" then
@@ -695,7 +703,7 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 	-- Wrapped per-table: a schema mismatch on one ngram table must not abort
 	-- the projection for the other eight (F-MED-28).
 	for code, tbl in pairs(NGRAM_TYPE_TABLE) do
-		_safe_query(tbl, function()
+		query(tbl, function()
 			for r in _rows(db, string.format([[
 				SELECT token,
 				       SUM(c)  AS c,
@@ -741,14 +749,14 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 	end
 
 	-- Shortcuts (counts only).
-	_safe_query("ngram_shortcuts", function()
+	query("ngram_shortcuts", function()
 		for r in _rows(db, string.format([[
 			SELECT token, SUM(c) AS c FROM ngram_shortcuts %s GROUP BY token
 		]], where), pacer) do
 			add_count(out.sc, r.token, r.c)
 		end
 	end, pacer)
-	_safe_query("ngram_shortcut_bigrams", function()
+	query("ngram_shortcut_bigrams", function()
 		for r in _rows(db, string.format([[
 			SELECT token, SUM(c) AS c FROM ngram_shortcut_bigrams %s GROUP BY token
 		]], where), pacer) do
@@ -756,13 +764,14 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 		end
 	end, pacer)
 	-- Keycodes.
-	_safe_query("ngram_keycodes", function()
+	query("ngram_keycodes", function()
 		for r in _rows(db, string.format([[
 			SELECT keycode, SUM(c) AS c FROM ngram_keycodes %s GROUP BY keycode
 		]], where), pacer) do
 			add_count(out.kc, tostring(r.keycode), r.c)
 		end
 	end, pacer)
+	return complete
 end
 
 --- Build a {c, bg, tg, …} dict matching the legacy `today_idx[app]` shape,
@@ -774,21 +783,26 @@ end
 --- @param selected_apps table|nil Array of allowed apps (nil = all).
 --- @param pacer table|nil Pacer from `infra.paced_job`; reads one day per window.
 --- @return table { c={tok→{c,t,e,hs,llm,o}}, bg=…, … }.
+--- @return boolean complete True only when the open and every query succeeded;
+---   a cache must never certify a partial dict.
 function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps, pacer)
 	local out = _new_ngram_dict()
 	local db = _open(sqlite_path)
-	if not db then return out end
+	if not db then return out, false end
+	local complete = true
 	if pacer then
 		-- One all-time GROUP BY sorts every row in its first step; a day keeps each
 		-- statement short enough to sit between two pauses.
-		for _, day in ipairs(_ngram_days(db, start_date, end_date)) do
-			_accumulate_ngrams(db, out, day, day, selected_apps, pacer)
+		local days, bounds_complete = _ngram_days(db, start_date, end_date)
+		if bounds_complete ~= true then complete = false end
+		for _, day in ipairs(days) do
+			if _accumulate_ngrams(db, out, day, day, selected_apps, pacer) ~= true then complete = false end
 		end
 	else
-		_accumulate_ngrams(db, out, start_date, end_date, selected_apps, nil)
+		complete = _accumulate_ngrams(db, out, start_date, end_date, selected_apps, nil) == true
 	end
 	db:close()
-	return out
+	return out, complete
 end
 
 --- Adds every entry of `from` into `into`, using the same additive fields as

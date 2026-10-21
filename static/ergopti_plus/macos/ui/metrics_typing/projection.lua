@@ -217,23 +217,33 @@ function M.session(reader, sqlite_path, today, pacer)
 			local open_ended = through == yesterday
 			local key = range_key(start_date, open_ended, through, apps)
 			local target_fp = fingerprint(through)
-			local entry = find_range(key)
-			if still_valid(entry, through) then
-				if entry.through < through then
-					local added = reader.read_ngrams(sqlite_path, reader.next_day(entry.through), through, apps, pacer)
-					reader.merge_ngrams(entry.data, added)
-					entry.json = PacedJson.encode(entry.data, pacer)
-					Logger.info(LOG, "N-gram history extended from %s to %s.", entry.through, through)
+			local cached = find_range(key)
+			-- The cached entry is never mutated: the next one is built aside and
+			-- published only after every pausable step, so a job abandoned at a
+			-- pause cannot leave merged days under the previous watermark.
+			local data, json, complete
+			if still_valid(cached, through) then
+				data, json, complete = cached.data, cached.json, true
+				if cached.through < through then
+					local added, added_complete = reader.read_ngrams(
+						sqlite_path, reader.next_day(cached.through), through, apps, pacer)
+					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data), added)
+					json = PacedJson.encode(data, pacer)
+					complete = added_complete == true
+					Logger.info(LOG, "N-gram history extended from %s to %s.", cached.through, through)
 				end
 			else
 				Logger.info(LOG, "N-gram history projected from scratch through %s (%s).", through,
-					entry and "past data changed" or "no cached projection")
-				local data = reader.read_ngrams(sqlite_path, start_date, through, apps, pacer)
-				entry = { key = key, start = start_date, data = data, json = PacedJson.encode(data, pacer) }
+					cached and "past data changed" or "no cached projection")
+				local read_complete
+				data, read_complete = reader.read_ngrams(sqlite_path, start_date, through, apps, pacer)
+				json = PacedJson.encode(data, pacer)
+				complete = read_complete == true
 			end
-			entry.through = through
-			entry.fingerprint = target_fp
-			if target_fp then
+			local entry = { key = key, start = start_date, data = data, json = json,
+				through = through, fingerprint = target_fp }
+			-- A fingerprint certifies stored rows, not a projection's successful reads.
+			if target_fp and complete then
 				remember_range(entry)
 			else
 				for index = #_ranges, 1, -1 do
