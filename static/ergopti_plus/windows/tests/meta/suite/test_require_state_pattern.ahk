@@ -80,7 +80,14 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; It exists precisely BECAUSE the previous design had no such variable and
 	; re-derived the hardware intent from GetKeyState — the bit the same function
 	; writes — which made the CapsLock LED self-latching.
-	"modules/shortcuts/capsword.ahk", true
+	"modules/shortcuts/capsword.ahk", true,
+	; _DriverControl — the session owner handle, not injected state read by
+	; public functions. Its only readers are its two lifecycle entries, which
+	; already guard it: DriverControl_Start refuses a second owner and
+	; DriverControl_Stop returns when none is held, both with IsObject(), an
+	; idiom the `if !_x` predicate does not see. Every other function takes its
+	; declaration and session as arguments.
+	"infra/driver_control.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
