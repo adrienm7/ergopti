@@ -159,7 +159,7 @@
 	],
 	"slots": [
 		{
-			"file": ".github/workflows/ci-common.yml",
+			"file": ".github/workflows/ci-common-unit.yml",
 			"job": "shared-validation",
 			"step": "Run shared validation suite",
 			"protocol": 0
@@ -1141,14 +1141,14 @@
 	},
 	"retained_steps": [
 		{
-			"file": ".github/workflows/ci-common.yml",
+			"file": ".github/workflows/ci-common-unit.yml",
 			"job": "shared-validation",
 			"name": "Retain shared validation timings, including interrupted runs",
 			"condition": "always() && steps.common-lot.outputs.suite == 'js'",
 			"body": "      - name: Retain shared validation timings, including interrupted runs\n        if: always() && steps.common-lot.outputs.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: core-js-timings-${{ steps.common-lot.outputs.feature }}\n          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson\n          if-no-files-found: warn\n          overwrite: true"
 		},
 		{
-			"file": ".github/workflows/ci-common.yml",
+			"file": ".github/workflows/ci-common-unit.yml",
 			"job": "shared-validation",
 			"name": "Retain the source-bound Core JavaScript qualification",
 			"condition": "always() && steps.common-lot.outputs.suite == 'js' && steps.common-lot.outputs.feature == 'test-infrastructure'",
@@ -1206,11 +1206,11 @@
 	],
 	"receipt_consumers": [
 		{
-			"file": ".github/workflows/ci-common.yml",
+			"file": ".github/workflows/ci-common-e2e.yml",
 			"job": "common-e2e",
 			"step": "Require every declared check exactly once",
 			"scope": "core-js-suite",
-			"issuer_file": ".github/workflows/ci-common.yml",
+			"issuer_file": ".github/workflows/ci-common-unit.yml",
 			"issuer_job": "shared-validation",
 			"issuer_step": "Run shared validation suite",
 			"body": "set -euo pipefail\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)\"\nif [ \"$mode\" = full ]; then\n    node tools/ci/validate-js-feature-results.cjs feature-timings\nelif [ \"$mode\" = deferred ]; then\n    node tools/ci/validate-js-feature-results.cjs --admit-jobs\n    echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'\nelse\n    exit 1\nfi",

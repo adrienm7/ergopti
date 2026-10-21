@@ -19,11 +19,18 @@ const JOBS = [
 	['.github/workflows/ci.yml', 'validate', null],
 	['.github/workflows/ci.yml', 'core', null],
 	['.github/workflows/ci.yml', 'prepare-common', null],
+	// Common: each stage caller keeps its stage job's id and predicate; the
+	// stage job in its own file runs whenever its caller does.
 	['.github/workflows/ci-common.yml', 'shared-validation', null],
 	['.github/workflows/ci-common.yml', 'common-unit-verdict', 'always()'],
 	['.github/workflows/ci-common.yml', 'common-e2e', null],
 	['.github/workflows/ci-common.yml', 'common-build', null],
 	['.github/workflows/ci-common.yml', 'common-testbuild', null],
+	['.github/workflows/ci-common-unit.yml', 'shared-validation', null],
+	['.github/workflows/ci-common-e2e.yml', 'common-e2e', null],
+	['.github/workflows/ci-common-build.yml', 'common-build', null],
+	['.github/workflows/ci-common-install.yml', 'common-testbuild', null],
+	['.github/workflows/ci-common-verdict.yml', 'common-unit-verdict', null],
 	['.github/workflows/ci.yml', 'macos', "needs.validate.outputs.lane_macos == 'true'"],
 	['.github/workflows/ci.yml', 'windows', "needs.validate.outputs.lane_windows == 'true'"],
 	['.github/workflows/ci.yml', 'linux', "needs.validate.outputs.lane_linux == 'true'"],
@@ -57,19 +64,19 @@ const JOBS = [
 ];
 const FULL_STEPS = [
 	[
-		'.github/workflows/ci-common.yml',
+		'.github/workflows/ci-common-unit.yml',
 		'shared-validation',
 		'Check hotstring TOML files are sorted and formatted',
 		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
 	],
 	[
-		'.github/workflows/ci-common.yml',
+		'.github/workflows/ci-common-build.yml',
 		'common-build',
 		'Build and seal production site — ${{ matrix.lot }}',
 		null
 	],
 	[
-		'.github/workflows/ci-common.yml',
+		'.github/workflows/ci-common-install.yml',
 		'common-testbuild',
 		'Test received production site — ${{ matrix.lot }}',
 		null

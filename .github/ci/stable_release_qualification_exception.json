@@ -86,7 +86,7 @@
 		},
 		"core-js-suite": {
 			"kind": "command",
-			"path": ".github/workflows/ci-common.yml",
+			"path": ".github/workflows/ci-common-unit.yml",
 			"args": ["shared-validation", "npm run test:js"],
 			"reason": "Six hosted JavaScript guards fail on the approved wrapper shapes; the JS suite is explicitly unqualified, not inferred passed. Properties, mutation, build/package/integrity and install remain mandatory."
 		},

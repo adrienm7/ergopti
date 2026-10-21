@@ -170,7 +170,8 @@ async function selectSiteJobs(identity, readApi) {
 		targets.map((target) => ({
 			stage,
 			target,
-			name: name + ' (' + siteLot(target) + ')',
+			// GitHub names a lane's stage job 'Lane / Stage / Job'; each job is named by its lot.
+			name: name + ' / ' + siteLot(target),
 			writer: writer + ' — ' + siteLot(target)
 		}))
 	);

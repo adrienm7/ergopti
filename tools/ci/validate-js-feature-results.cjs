@@ -45,9 +45,10 @@ function selectUnitJobs(plan, jobs, identity) {
 		'invalid API identity'
 	);
 	fail(Array.isArray(jobs) && jobs.length <= 1000, 'invalid job census');
+	// GitHub names a lane's stage job 'Lane / Stage / Job'; each Unit job is named by its lot.
 	const prefix = 'YAML, shared code & web / Unit tests';
 	const expected = new Map(
-		Object.entries(plan.metadata).map(([lot, row]) => [prefix + ' (' + lot + ')', row])
+		Object.entries(plan.metadata).map(([lot, row]) => [prefix + ' / ' + lot, row])
 	);
 	const ids = new Set();
 	for (const job of jobs) {

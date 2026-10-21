@@ -167,7 +167,7 @@ assert.throws(() =>
 );
 
 checkRunner(runner);
-const body = admittedNativeWorkflow(pipeline.files());
+const body = admittedNativeWorkflow(pipeline.real().files());
 checkWorkflow(body);
 for (const stepName of ['Run native desktop AHK cohorts', 'Publish native desktop AHK evidence']) {
 	const early = pipeline.step(body, stepName);
@@ -180,7 +180,7 @@ for (const [before, after] of [
 	['  macos:', '  omitted-macos:'],
 	['  core:', '  omitted-core:']
 ]) {
-	const files = pipeline.files();
+	const files = pipeline.real().files();
 	const caller = files.find((file) => file.rel === '.github/workflows/ci.yml');
 	assert.equal(caller.text.split(before).length, 2);
 	const changed = files.map((file) =>

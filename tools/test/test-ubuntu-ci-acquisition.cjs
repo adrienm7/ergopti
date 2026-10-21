@@ -197,7 +197,11 @@ for (const terminal of [
 
 for (const [file, floor] of scopes) {
 	const rel = '.github/workflows/' + file;
-	const text = fs.readFileSync(path.join(root, rel), 'utf8');
+	// A pipeline lane is read inlined, its stage files included; any other
+	// workflow as it is.
+	const text = pipeline.files().some((entry) => entry.rel === rel)
+		? pipeline.file(rel)
+		: fs.readFileSync(path.join(root, rel), 'utf8');
 	assert.deepEqual(problems(text, rel, floor), [], rel);
 	if (file === 'ci-linux.yml') {
 		const owned = pipeline

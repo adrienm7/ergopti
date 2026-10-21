@@ -1,0 +1,75 @@
+# .github/workflows/ci-common-install.yml
+#
+# Common install-and-launch stage: serves each sealed production site and
+# tests it in real browsers, retaining the browser proof.
+# Called by ci-common.yml as its common-testbuild stage.
+
+name: 'Common install and launch'
+
+on:
+  workflow_call:
+    inputs:
+      site_matrix:
+        description: site_matrix output of common-build, the stage this one follows
+        required: true
+        type: string
+      site_metadata:
+        description: site_metadata output of common-build, the stage this one follows
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  common-testbuild:
+    name: '${{ matrix.lot }}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.site_matrix) }}
+    env:
+      SITE_LOT: ${{ matrix.lot }}
+      SITE_METADATA: ${{ inputs.site_metadata }}
+      ERGOPTI_SITE_TARGET: ${{ fromJSON(inputs.site_metadata)[matrix.lot].target }}
+      BASE_PATH: ${{ fromJSON(inputs.site_metadata)[matrix.lot].base_path }}
+      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Admit the complete production site map
+        id: site-plan
+        run: node tools/ci/site-matrix.cjs admit
+
+      - name: Install production site browsers
+        run: node tools/ci/install-playwright.cjs chromium webkit
+
+      - name: Receive exact production site
+        uses: actions/download-artifact@v4
+        with:
+          name: common-site-build-${{ env.ERGOPTI_SITE_TARGET }}
+          path: ${{ runner.temp }}/received-site
+
+      - name: Test received production site — ${{ matrix.lot }}
+        run: |
+          set -euo pipefail
+          node tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"
+          mkdir "$RUNNER_TEMP/site-proof"
+          cp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"
+          cp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"
+
+      - name: Retain production browser proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: common-site-testbuild-${{ env.ERGOPTI_SITE_TARGET }}
+          path: ${{ runner.temp }}/site-proof/
+          if-no-files-found: error
+          overwrite: true

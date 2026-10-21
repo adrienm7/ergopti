@@ -481,6 +481,11 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			'common-testbuild',
 			'common-unit-verdict'
 		],
+		'ci-common-unit.yml': ['shared-validation'],
+		'ci-common-e2e.yml': ['common-e2e'],
+		'ci-common-build.yml': ['common-build'],
+		'ci-common-install.yml': ['common-testbuild'],
+		'ci-common-verdict.yml': ['common-unit-verdict'],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 		'ci-macos.yml': ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
 		'ci-linux.yml': [
@@ -507,9 +512,21 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	let jobs = 0,
 		steps = 0;
+	// Every file the pipeline runs, stage files included, and no other.
+	assert.deepEqual(
+		pipeline
+			.real()
+			.files()
+			.map((entry) => entry.rel.replace('.github/workflows/', ''))
+			.sort(),
+		Object.keys(workflows).sort(),
+		'the full inventory names every pipeline file'
+	);
 	for (const [file, required] of Object.entries(workflows)) {
 		const relative = '.github/workflows/' + file;
 		const source = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+		// A stage job's caller owns its admission; the stage job runs whenever called.
+		const staged = pipeline.laneOf(relative) !== relative;
 		assert.doesNotMatch(
 			source,
 			/fast_prerelease|ERGOPTI_FAST_PRERELEASE|--fast-action/,
@@ -526,7 +543,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			assert.notEqual(job.body.trim(), '', job.id + ': job evidence cannot be empty');
 			assert.equal(
 				pipeline.field(job.body, 'if'),
-				ordinaryConditions[job.id] ?? null,
+				staged ? null : (ordinaryConditions[job.id] ?? null),
 				job.id + ': only the original ordinary admission may select this full job'
 			);
 			assert.equal(
@@ -578,8 +595,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 29);
-	assert.equal(jobs, 30);
+	assert.equal(jobs - 1, 34);
+	assert.equal(jobs, 35);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');

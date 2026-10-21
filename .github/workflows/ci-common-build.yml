@@ -1,0 +1,78 @@
+# .github/workflows/ci-common-build.yml
+#
+# Common build stage: builds and seals each production site target once.
+# Called by ci-common.yml as its common-build stage.
+
+name: 'Common build'
+
+on:
+  workflow_call:
+    inputs:
+      site_matrix:
+        description: site_matrix output of common-e2e, the stage this one follows
+        required: true
+        type: string
+      site_metadata:
+        description: site_metadata output of common-e2e, the stage this one follows
+        required: true
+        type: string
+    outputs:
+      site_matrix:
+        description: common-build's site_matrix output, read by the lane's later stages
+        value: ${{ jobs.common-build.outputs.site_matrix }}
+      site_metadata:
+        description: common-build's site_metadata output, read by the lane's later stages
+        value: ${{ jobs.common-build.outputs.site_metadata }}
+
+permissions:
+  contents: read
+
+jobs:
+  common-build:
+    name: '${{ matrix.lot }}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.site_matrix) }}
+    outputs:
+      site_matrix: ${{ steps.site-plan.outputs.matrix }}
+      site_metadata: ${{ steps.site-plan.outputs.metadata }}
+    env:
+      SITE_LOT: ${{ matrix.lot }}
+      SITE_METADATA: ${{ inputs.site_metadata }}
+      ERGOPTI_SITE_TARGET: ${{ fromJSON(inputs.site_metadata)[matrix.lot].target }}
+      BASE_PATH: ${{ fromJSON(inputs.site_metadata)[matrix.lot].base_path }}
+      ERGOPTI_SITE_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Admit the complete production site map
+        id: site-plan
+        run: node tools/ci/site-matrix.cjs admit
+
+      - name: Build and seal production site — ${{ matrix.lot }}
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/common-site-$ERGOPTI_SITE_TARGET"
+          mkdir "$bundle"
+          npm run build
+          cmp -- static/CNAME build/CNAME
+          mv build "$bundle/site"
+          node tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"
+
+      - name: Retain exact production site
+        uses: actions/upload-artifact@v4
+        with:
+          name: common-site-build-${{ env.ERGOPTI_SITE_TARGET }}
+          path: ${{ runner.temp }}/common-site-${{ env.ERGOPTI_SITE_TARGET }}/
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
