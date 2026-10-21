@@ -2644,6 +2644,7 @@ end
 --- @param delay number|nil Legacy Hammerspoon delay in microseconds.
 --- @param explicit_tx table|nil Transaction override.
 --- @return boolean success
+--- @return table batch Opaque exact batch for on_dispatched identity checks.
 function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 	local collector = _callback_stack[#_callback_stack]
 	local tx, implicit = resolve_emission_transaction(explicit_tx, collector == nil)
@@ -2657,8 +2658,9 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 		error(arguments_err, 0)
 	end
 	if collector then
+		local batch
 		local ok, err = xpcall(function()
-			local batch = collector_batch(collector, tx)
+			batch = collector_batch(collector, tx)
 			M.keyStroke(batch, modifiers, key)
 		end, debug.traceback)
 		if not ok then
@@ -2666,7 +2668,7 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 			error(err, 0)
 		end
 		if implicit and not tx.cancelled then collector.implicit_transactions[tx] = true end
-		return true
+		return true, batch
 	end
 	local token = nil
 	if tx.sealed then
@@ -2690,7 +2692,7 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 	end
 	if not scheduled then cancel_failed_emission(tx, "key-stroke") end
 	if implicit and not tx.cancelled then M.seal(tx) end
-	return scheduled
+	return scheduled, batch
 end
 
 

@@ -66,6 +66,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		text_sender_paste = 'SyntheticInput.begin("text_sender.clipboard", "action", {',
 		apps_copy = 'SyntheticInput.begin("shortcuts.apps.copy", "action", {',
 		search_copy = 'SyntheticInput.begin("gestures.search.copy", "action", {',
+		standalone_tokens = 'SyntheticInput.begin("keymap.tokens", "action")',
 	}
 
 	helpers.it("Search joins its exact native copy before capture or cleanup", function()
@@ -84,13 +85,25 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		helpers.assert_not_nil(source:find("if dispatch.pending then dispatch.timer_elapsed = true; return end", 1, true))
 	end)
 
+	helpers.it("standalone token output owns scoped construction and terminal sealing", function()
+		local source = read_unit("function M.emit_tokens(tokens)")
+		local begin_pos = source:find(producers.standalone_tokens, 1, true)
+		helpers.assert_not_nil(begin_pos)
+		local scope_pos = source:find("SyntheticInput.with_transaction(transaction", begin_pos, true)
+		local seal_pos = source:find("pcall(SyntheticInput.seal, transaction)", begin_pos, true)
+		local cancel_pos = source:find("pcall(SyntheticInput.cancel, transaction)", begin_pos, true)
+		helpers.assert_true(scope_pos and seal_pos and cancel_pos)
+		helpers.assert_true(begin_pos < scope_pos and scope_pos < seal_pos)
+		helpers.assert_not_nil(source:find("return table.unpack(results, 2, results.n)", seal_pos, true))
+	end)
+
 	helpers.it("enumerates the complete non-vacuous class", function()
 		local all = strip_line_comments(helpers.read_driver_source())
 		local producer_names = {}
 		for name in pairs(producers) do producer_names[#producer_names + 1] = name end
 		table.sort(producer_names)
-		helpers.assert_eq(#producer_names, 9,
-			"the explicit producer inventory must name all nine reviewed owners")
+		helpers.assert_eq(#producer_names, 10,
+			"the explicit producer inventory must name all ten reviewed owners")
 		helpers.assert_eq(count_literal(all, "SyntheticInput.begin(") + count_literal(all, "input.begin("), #producer_names,
 			"a new explicit producer needs a lifecycle assertion in this inventory")
 		for _, name in ipairs(producer_names) do
