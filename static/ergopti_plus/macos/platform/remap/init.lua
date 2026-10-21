@@ -3571,8 +3571,9 @@ function M.get_enabled()
 	return _state.enabled == true
 end
 
---- The virtual keyboard form the generator deploys while the integration is
---- on, read from memory: input callbacks resolve the ISO pair with it.
+--- The keycode convention keys arrive in while the integration is on: the
+--- active layout's, which the deployed ANSI virtual keyboard passes through
+--- (issue #99). Read from memory: input callbacks resolve the ISO pair with it.
 --- @return string|nil form "ansi" or "iso"; nil when off or not yet resolved.
 function M.virtual_keyboard_form()
 	if not _state or _state.enabled ~= true then return nil end

@@ -268,18 +268,28 @@ helpers.describe("Shipped graph declared input-source convention (iso-consumer-m
 				local graph, err = build(env, "recommended", true, true)
 				helpers.assert_not_nil(graph, err)
 				local virtual = graph.profiles[1].virtual_hid_keyboard.keyboard_type_v2
-				helpers.assert_eq(virtual, scenario.form)
+				-- Issue #99: the ANSI product passes the ISO pair through; the ISO
+				-- product swapped it on the maintainer's Apple ISO keyboard.
+				helpers.assert_eq(virtual, "ansi")
 				local snapshot = require("modules.keymap.layout_registry").snapshot()
 				local entry = assert(require("layouts.registry").find_entry(snapshot.index, scenario.id))
 				local xml = SourceFile.read(helpers.shared("../../layouts/registry/" .. entry.file))
-				-- Independently authored USB usage to Carbon positions, never the
-				-- production registry's hs or Karabiner translation table.
-				local receiving = { iso = { extra = 50, top = 10 }, ansi = { extra = 10, top = 50 } }
-				helpers.assert_eq(base_character(xml, receiving[virtual].extra), scenario.extra)
-				helpers.assert_eq(base_character(xml, receiving[virtual].top), scenario.top)
-				local other = virtual == "iso" and "ansi" or "iso"
-				helpers.assert_true(base_character(xml, receiving[other].extra) ~= scenario.extra,
-					"the swapped-form receiving control must actually change the character")
+				-- Independently authored, never the production tables: the usage the
+				-- keyboard of the layout's form reports (an ISO keyboard sends 0x64 left
+				-- of 1 and 0x35 left of Z), and what each product types for a usage.
+				local reported = {
+					iso = { extra = "grave_accent_and_tilde", top = "non_us_backslash" },
+					ansi = { extra = "non_us_backslash", top = "grave_accent_and_tilde" },
+				}
+				local product = {
+					ansi = { grave_accent_and_tilde = 50, non_us_backslash = 10 },
+					iso = { grave_accent_and_tilde = 10, non_us_backslash = 50 },
+				}
+				local keys = reported[scenario.form]
+				helpers.assert_eq(base_character(xml, product[virtual][keys.extra]), scenario.extra)
+				helpers.assert_eq(base_character(xml, product[virtual][keys.top]), scenario.top)
+				helpers.assert_true(base_character(xml, product.iso[keys.extra]) ~= scenario.extra,
+					"the ISO-product control must actually change the character")
 			end, nil, scenario.id)
 		end)
 	end
