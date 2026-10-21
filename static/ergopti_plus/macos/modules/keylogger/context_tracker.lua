@@ -180,6 +180,26 @@ local function run_context_write(source, writer, ...)
 	return complete_context_write(source, writer, ...)
 end
 
+--- A refused foreground writer cannot restore cached persistence permission.
+local function run_foreground_context_write(source, writer, ...)
+	if _state and source == "resync" then _state.foreground_refresh_pending = true end
+	local results = table.pack(pcall(run_context_write, source, writer, ...))
+	if not results[1] then
+		if _state then _state.foreground_refresh_pending = true end
+		error(results[2], 0)
+	end
+	if _state and results[2] == false then _state.foreground_refresh_pending = true end
+	return table.unpack(results, 2, results.n)
+end
+
+--- A complete native identity can recover a previously refused foreground refresh.
+local function identified_foreground(app_name, bundle, path, pid)
+	return type(app_name) == "string" and app_name ~= ""
+		and (bundle == nil or type(bundle) == "string")
+		and (path == nil or type(path) == "string")
+		and math.type(pid) == "integer" and pid > 0
+end
+
 local function bind_context_observer(owner, capacity, receive, on_refused, may_persist, correlated)
 	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function"
 		and type(may_persist) == "function", "Invalid physical context subscriber")
@@ -265,7 +285,8 @@ function M.sample_physical_context(owner, token)
 		binding.channel.mark_window_pid(ticket, nil)
 		local keys = { "is_enabled", "active_app_name", "active_app_bundle", "active_app_path",
 			"active_app_pid", "active_app_start", "private_filter_enabled", "secure_field_filter_enabled",
-			"system_auth_filter_enabled", "disabled_apps", "is_private_window", "is_secure_field", "ax_observer" }
+			"system_auth_filter_enabled", "disabled_apps", "is_private_window", "is_secure_field",
+			"foreground_refresh_pending", "ax_observer" }
 		local original = {}
 		for _, key in ipairs(keys) do original[key] = rawget(state, key) end
 		local function stable()
@@ -312,7 +333,8 @@ function M.sample_physical_context(owner, token)
 		native_probe = require("adapters.physical_context_probe").snapshot()
 		-- Bounded guards belong only to this explicit sample, never a pause poller.
 		sampling, binding.sample_guard = true, fence
-		local observed = { private_filter_enabled = original.private_filter_enabled,
+		local observed = { foreground_refresh_pending = original.foreground_refresh_pending,
+			private_filter_enabled = original.private_filter_enabled,
 			secure_field_filter_enabled = original.secure_field_filter_enabled,
 			system_auth_filter_enabled = original.system_auth_filter_enabled, disabled_apps = original.disabled_apps }
 		local ok_app, app = read(function() return native_probe.frontmost_application() end)
@@ -940,15 +962,20 @@ end
 --- @param app_object table The hs.application object for the new app.
 function M.app_watcher_cb(app_name, event_type, app_object)
 	if not activation_event(event_type) then return end
-	if not app_object then
-		Logger.warn(LOG, "app_watcher_cb() received nil app_object for '%s'.", tostring(app_name))
-		return
-	end
 	if not _state or not _log_manager or not _is_paused then return end  -- called before init — silently skip
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). ProcessLifecycle.onAppActivate keeps
 	-- delivering activations while paused, so the gate has to live here.
 	if _is_paused() then return end
+	if not app_object then
+		_state.foreground_refresh_pending = true
+		Logger.warn(LOG, "app_watcher_cb() received nil app_object for '%s'.", tostring(app_name))
+		return
+	end
+	if type(app_name) ~= "string" or app_name == "" then
+		_state.foreground_refresh_pending = true
+		return
+	end
 
 	local now = hs.timer.absoluteTime() / 1000000
 	-- Recovery recaptures metadata without beginning a new foreground interval.
@@ -978,6 +1005,9 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	local new_bundle, ok_bundle = read_active_app_property(app_object, "bundleID", app_name)
 	local new_path, ok_path = read_active_app_property(app_object, "path", app_name)
 	local new_pid, ok_pid = read_active_app_property(app_object, "pid", app_name)
+	local identified = ok_bundle and ok_path and ok_pid
+		and identified_foreground(app_name, new_bundle, new_path, new_pid)
+	if not identified then _state.foreground_refresh_pending = true end
 
 	_state.active_app_name   = app_name
 	_state.active_app_start  = interval_start
@@ -1011,6 +1041,9 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 
 	invoke_context_writer(M.update_private_status)
 	invoke_context_writer(M.update_ax_observer, new_pid)
+	if identified then
+		_state.foreground_refresh_pending = false
+	end
 end
 
 --- Re-synchronises the cached context with the app that is frontmost RIGHT NOW,
@@ -1074,6 +1107,10 @@ function M.resync_context()
 
 	Logger.debug(LOG, "Context re-synchronised on resume (app '%s', secure=%s).",
 		app_name, tostring(_state.is_secure_field))
+	if ok_bundle and ok_path and ok_pid
+		and identified_foreground(app_name, _state.active_app_bundle, _state.active_app_path, new_pid) then
+		_state.foreground_refresh_pending = false
+	end
 	return true
 end
 
@@ -1136,20 +1173,21 @@ function M.init(core_state, log_manager_mod, is_paused_fn, settle_modifiers_fn)
 	return true
 end
 
-local function observe_writer(name, source)
+local function observe_writer(name, source, foreground)
 	local writer = M[name]
-	M[name] = function(...) return run_context_write(source, writer, ...) end
+	local execute = foreground and run_foreground_context_write or run_context_write
+	M[name] = function(...) return execute(source, writer, ...) end
 end
 
 observe_writer("update_ax_observer", "secure_setup")
 observe_writer("update_private_status", "private")
 observe_writer("close_active_app", "closure")
-observe_writer("capture_frontmost_app", "capture")
-observe_writer("resync_context", "resync")
+observe_writer("capture_frontmost_app", "capture", true)
+observe_writer("resync_context", "resync", true)
 local app_writer = M.app_watcher_cb
 M.app_watcher_cb = function(app_name, event_type, app_object)
-	if not _physical_context_binding or not activation_event(event_type) then return app_writer(app_name, event_type, app_object) end
-	return run_context_write("activation", app_writer, app_name, event_type, app_object)
+	if not activation_event(event_type) then return app_writer(app_name, event_type, app_object) end
+	return run_foreground_context_write("activation", app_writer, app_name, event_type, app_object)
 end
 
 return M

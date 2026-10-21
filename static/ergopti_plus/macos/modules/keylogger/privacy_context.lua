@@ -11,6 +11,7 @@ local SYSTEM_AUTH_BUNDLE_IDS = {
 ---@param state table Keylogger context and filter configuration.
 ---@return boolean allowed
 function M.allows_logging(state)
+	if state.foreground_refresh_pending then return false end
 	if state.private_filter_enabled and state.is_private_window then return false end
 	if state.secure_field_filter_enabled and state.is_secure_field then return false end
 	if state.system_auth_filter_enabled and state.active_app_bundle
