@@ -18,44 +18,18 @@ Everything the coordinating session knew, so a fresh session or agent can contin
 - **Maintainer's quota:** the weekly budget was nearly exhausted on October 21. Be economical: small
   targeted agents, no full-CI loops unless needed.
 
-## In-flight agents when this session was closed (relaunch these)
+## Agents (none in flight since the evening of October 21)
 
-Relaunch an agent by giving a fresh agent the prompt below plus "read docs/todo-agents/<file> first".
-
-1. **Integration of the Codex fix branches** (file `integration-fix-branches.md`, which at hand-over lives on
-   branch `tmp/integrate-final`, 133 commits above dev, 15 behind). Status: `fix/linux` (3), `fix/macos`
-   (12) and `fix/windows` (113) are rebased there in a scratch clone `D:\_int`, with hosted-CI evidence
-   recorded; uncommitted fixes sit in `D:\_int` (`tools/test/prepare-linux-distro-unit.sh`,
-   `tools/test/test-ci-pipeline-wiring.cjs`). NOT yet on dev. Next: `cd D:\_int`, commit the pending fixes,
-   `git fetch origin`, `git rebase origin/dev` (resolve conflicts keeping both intents; Codex tests are never
-   dropped), run the cheap local gates, push `HEAD:refs/heads/dev` fast-forward only, cancel the automatic
-   run of that SHA, and apply the same to the main checkout's local dev (`git fetch && git reset --keep
-origin/dev` only when the working tree has no conflicting changes). Prompt: "Integrate
-   origin/tmp/integrate-final into dev linearly (no merge commits, no squash) per
-   docs/todo-agents/COORDINATOR-MEMORY.md; finish, then delete the tmp/integrate-\* branches."
-2. **Windows image capture without PowerShell + exe metadata** (file `windows-exe-flagged-by-proxy.md`).
-   Context: a tester behind Netskope (Airbus) gets "ErgoptiPlus.exe a peut-etre ete infecte par un virus" for
-   v1.0.4 only (v1.0.0 and v1.0.3 pass). Strongest suspect: the hidden PowerShell clipboard-image stage
-   `_GestureScreenshotRegionSaveScript` in `windows/modules/gestures/screenshots.ahk` (new in 1.0.4).
-   Tasks, one atomic commit each: (a) revert the size budget gate (422ce140fd: the maintainer wants no
-   forced size threshold; just keep files small); (b) replace the PowerShell/C# capture with GDI/GDI+ via
-   DllCall in the driver, same behavior and logging, keep the robustness fixes and their tests, add a guard
-   test against spawning powershell there, list other hidden PowerShell launchers; (c) add real PE version
-   info (product, description, company, copyright, original filename, version from the CI plan version) to
-   the Ahk2Exe build with a test; (d) update the handoff file. Physical check on the maintainer's PC after.
-   Still open afterwards: reproducible PAC helper build (/Brepro), code signing (SignPath, item 132),
-   VirusTotal/Defender submission with the new hash, the tester's download matrix T1-T4.
-
-3. **Linux tray menu visible in the AppImage catalog environment** (file `linux-tray-menu-catalog.md`, written by
-   the agent). The catalog test passed on v1.0.4 but its screenshot shows only the tray icon: a click opened
-   nothing visible. Task: publish a real menu in the no-keyboard degraded state (status reason, diagnostics,
-   report a bug, quit), make left and right click open it in an XEmbed tray without SNI watcher, extend the
-   ubuntu:22.04 AppImage smoke to click the icon and assert a menu window appears, i18n, logger. After the
-   next release containing it, the maintainer posts `/retest` on AppImage/appimage.github.io#10422 from
-   PowerShell (never Git Bash).
-
-Finished agents' leftovers are in their files: `issue99-karabiner-input.md`, `issue99-ai-startup-updater.md`,
+Every agent of October 21 finished and its work is on dev: the Codex fix-branch integration (128 commits,
+f0fb919379), the Windows image capture without PowerShell plus exe version info (03d9c017ed..1965c2ffac, exe text
+965ff7569b), the Linux status window and tray menu for the AppImage catalog (98d41e630b, 3061ae1160), and the dev red
+fixes (40e283e555..b0d4acd718; that agent stopped on an API error after recording its work). The `tmp/*`, `fix/*`
+branches and the `D:\_int`, `D:\_lin` clones are deleted. Leftovers live in the handoff files:
+`integration-fix-branches.md`, `windows-exe-flagged-by-proxy.md` (PAC helper /Brepro, signing, VirusTotal and T1-T4),
+`linux-tray-menu-catalog.md`, `dev-red-fixes.md`, `issue99-karabiner-input.md`, `issue99-ai-startup-updater.md`,
 `lua-shared-timers-separators.md`, `windows-updater-freeze-menu-census.md`, `config-policy-33-42.md`.
+
+Next: release 1.0.5 (full CI on dev, fix the reds, push to main with `Release-As: 1.0.5`).
 
 ## Maintainer rules and decisions (all sessions)
 
