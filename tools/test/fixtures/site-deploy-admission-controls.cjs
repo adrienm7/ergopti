@@ -2,6 +2,7 @@
 
 /** Recording API controls for exact completed-CI admission; no hosted or native actors. */
 'use strict';
+const { API_PAGE_SIZE } = require('../../ci/github-api-page.cjs');
 
 const assert = require('node:assert/strict');
 const subject = require('../../ci/site-deploy-admission.cjs');
@@ -97,7 +98,9 @@ function reader(model) {
 						prefix +
 						'runs/123/' +
 						field +
-						'\\?(?:filter=(all|latest)&)?per_page=100&page=([1-9][0-9]*)$'
+						'\\?(?:filter=(all|latest)&)?per_page=' +
+						API_PAGE_SIZE +
+						'&page=([1-9][0-9]*)$'
 				).exec(endpoint);
 				if (match) {
 					const page = Number(match[2]);
@@ -107,7 +110,7 @@ function reader(model) {
 							: model[field];
 					return {
 						total_count: model[field + 'Total'] ?? rows.length,
-						[field]: structuredClone(rows.slice((page - 1) * 100, page * 100))
+						[field]: structuredClone(rows.slice((page - 1) * API_PAGE_SIZE, page * API_PAGE_SIZE))
 					};
 				}
 			}
@@ -508,10 +511,16 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 	);
 	const api = reader(paginated);
 	assert.equal((await owner.admitProducer(paginated.selection, api.readApi)).run_id, '123');
-	assert.ok(
-		api.calls.some((endpoint) => endpoint.includes('/jobs?filter=all&per_page=100&page=2'))
-	);
-	assert.ok(api.calls.some((endpoint) => endpoint.includes('/artifacts?per_page=100&page=2')));
+	// 101 extra records span three pages of 50: the census reads every one.
+	assert.equal(API_PAGE_SIZE, 50, 'GitHub answers 502 for heavier jobs pages');
+	for (const page of [2, 3]) {
+		assert.ok(
+			api.calls.some((endpoint) => endpoint.endsWith('/jobs?filter=all&per_page=50&page=' + page))
+		);
+		assert.ok(
+			api.calls.some((endpoint) => endpoint.endsWith('/artifacts?per_page=50&page=' + page))
+		);
+	}
 	controls++;
 	assert.equal(controls, 56, 'every declared metadata and retained-role control must execute');
 	for (const [name, mutate, reason] of [
