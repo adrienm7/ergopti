@@ -33,12 +33,13 @@ _MAD_Source(Root) {
 	Source .= "#Include " . ButtonHelper . "`n"
 	Seen := Map()
 	for Symbol in ["LocaleTableData", "WindowTitle", "LoggerTrace", "WallClockTimestamp", "Redact_Apply", "JsonParse",
-		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "ConfigTransitionNormalizeConfigDir",
-		"ConfigTransitionPrepare", "ReloadTerminalHandoffActive", "ShellRunner_SpawnTreeOwned", "WMHandleExists",
+		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "WebView_RunScriptAsync", "ConfigTransitionNormalizeConfigDir",
+		"ConfigTransitionPrepare", "ReloadTerminalHandoffActive", "ShellRunner_SpawnTreeOwned",
+		"PLC_CreateProcessWithInheritedHandles", "WMHandleExists",
 		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared", "t", "I18nGetLocale", "Gui_Create", "AppPicker_Show",
 		"KL_WriteAtomic", "KL_AppCat_Init", "SQLite_Open", "KeyloggerWalkerLoadTimings", "KLW_WalkTypingEntry",
 		"KLW_BuildBatchSql", "KLR_ListLedgerPaths", "KLR_BuildDatabase", "KLR_CacheAttach",
-		"KLR_BuildColdCandidateAuto", "KLR_BuildManifestJson", "KLR_BuildRangeSplitTodayJson",
+		"KLR_BuildColdCandidateAuto", "KLR_ReadManifest", "KLR_BuildManifestJson", "KLR_BuildRangeSplitTodayJson",
 		"KLPF_RequestBuild", "KLWV_OnWebMessage", "TimerSetCallback", "HotPath_Now"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "the native integration requires one actual owner: " . Symbol)
