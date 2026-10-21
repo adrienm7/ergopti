@@ -168,6 +168,7 @@ class KLAppCat {
 		static file_path   := ""
 		static dirty       := false   ; new apps were seen and need a save
 		static save_fn     := unset   ; bound timer ref for deferred save
+		static write_owner := 0       ; serialises edits with deferred persistence
 }
 
 
@@ -276,12 +277,19 @@ KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 KL_AppCat_Reload(ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 		if !KL_AppCat_RequireInit("KL_AppCat_Reload")
 				return false
-		cats := Map()
-		if !KL_AppCat_Load(KLAppCat.file_path, &cats, ReadFn, ExistsFn, CreateFn)
+		Owner := _KL_AppCat_AcquireWrite()
+		if !IsObject(Owner)
 				return false
-		KLAppCat.categories := cats
-		KLAppCat.dirty := false
-		return true
+		try {
+				cats := Map()
+				if !KL_AppCat_Load(Owner["path"], &cats, ReadFn, ExistsFn, CreateFn)
+						return false
+				KLAppCat.categories := cats
+				KLAppCat.dirty := false
+				return true
+		} finally {
+				_KL_AppCat_ReleaseWrite(Owner)
+		}
 }
 
 _KL_AppCat_SnapshotContent() {
@@ -309,14 +317,43 @@ _KL_AppCat_ScheduleDeferredSave() {
 		}
 }
 
+; An edit stages a detached candidate while classification keeps reading the
+; proven map. Deferred persistence must not replace that candidate from old RAM.
+_KL_AppCat_AcquireWrite() {
+		PreviousCritical := Critical("On")
+		try {
+				if KLAppCat.file_path = "" || IsObject(KLAppCat.write_owner)
+						return false
+				Snapshot := Map()
+				for Key, Value in KLAppCat.categories
+						Snapshot[Key] := Value
+				Owner := Map("path", KLAppCat.file_path,
+						"categories", KLAppCat.categories, "snapshot", Snapshot)
+				KLAppCat.write_owner := Owner
+				return Owner
+		} finally Critical(PreviousCritical)
+}
+
+_KL_AppCat_ReleaseWrite(Owner) {
+		PreviousCritical := Critical("On")
+		try {
+				if KLAppCat.write_owner == Owner
+						KLAppCat.write_owner := 0
+		} finally Critical(PreviousCritical)
+}
+
 KL_AppCat_Save(WriteFn := 0) {
-		if (KLAppCat.file_path = "")
+		Owner := _KL_AppCat_AcquireWrite()
+		if !IsObject(Owner) {
+				if KLAppCat.file_path != "" && KLAppCat.dirty
+						_KL_AppCat_ScheduleDeferredSave()
 				return false
+		}
 		if !IsObject(WriteFn)
 				WriteFn := KL_WriteAtomic
 		try {
 				Content := _KL_AppCat_SnapshotContent()
-				WriteFn.Call(KLAppCat.file_path, Content)
+				WriteFn.Call(Owner["path"], Content)
 				PreviousCritical := Critical("On")
 				try {
 						Pending := _KL_AppCat_SnapshotContent() != Content
@@ -340,6 +377,8 @@ KL_AppCat_Save(WriteFn := 0) {
 				if (KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn))
 						_KL_AppCat_ScheduleDeferredSave()
 				return false
+		} finally {
+				_KL_AppCat_ReleaseWrite(Owner)
 		}
 }
 
@@ -348,6 +387,9 @@ KL_AppCat_Save(WriteFn := 0) {
 ; and re-arms the normal retry, so the caller can reject exit without losing the
 ; discovery or permanently disabling future saves.
 KL_AppCat_PrepareShutdown(WriteFn := 0) {
+		; A detached explicit edit can own staging while the proven map is clean.
+		if IsObject(KLAppCat.write_owner)
+				return false
 		if KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn)
 				try SetTimer(KLAppCat.save_fn, 0)
 		if !KLAppCat.dirty
@@ -415,13 +457,46 @@ KL_AppCat_Get(app_name) {
 		return "unknown"
 }
 
-; Allows the future settings UI or a user script to override a category.
+; Publish the category only after its detached candidate is durable. The
+; ordinary classifier remains available while native staging pumps messages.
+; @param app_name {String} Process name; lookup is case-insensitive.
+; @param category {String} Nonempty category label.
+; @return {Boolean} True only after the new value is durable and published.
 KL_AppCat_Set(app_name, category) {
-	if !KL_AppCat_RequireInit("KL_AppCat_Set")
-		return
-		key := StrLower(app_name)
-		KLAppCat.categories[key] := category
-		KL_AppCat_Save()
+		if !KL_AppCat_RequireInit("KL_AppCat_Set")
+				return false
+		if !(app_name is String) || app_name = "" || !(category is String) || category = ""
+				return false
+		Owner := _KL_AppCat_AcquireWrite()
+		if !IsObject(Owner)
+				return false
+		try {
+				Candidate := Map()
+				for Key, Value in Owner["snapshot"]
+						Candidate[Key] := Value
+				Key := StrLower(app_name)
+				Candidate[Key] := category
+				Content := KL_JsonEncodeObject(Candidate)
+				KL_WriteAtomic(Owner["path"], Content)
+				PreviousCritical := Critical("On")
+				try {
+						if KLAppCat.write_owner != Owner || KLAppCat.file_path != Owner["path"]
+								|| KLAppCat.categories != Owner["categories"]
+								return false
+						KLAppCat.categories[Key] := category
+						; A new application discovered during the write was not in this
+						; durable image. Preserve its ordinary deferred-save obligation.
+						KLAppCat.dirty := _KL_AppCat_SnapshotContent() != Content
+				} finally Critical(PreviousCritical)
+				if KLAppCat.dirty
+						_KL_AppCat_ScheduleDeferredSave()
+				return true
+		} catch as Err {
+				try LoggerError("KLAppCat", "Category edit did not commit: {1}.", Err.Message)
+				return false
+		} finally {
+				_KL_AppCat_ReleaseWrite(Owner)
+		}
 }
 
 
