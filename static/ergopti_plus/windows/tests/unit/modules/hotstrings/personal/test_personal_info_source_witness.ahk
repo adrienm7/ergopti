@@ -109,6 +109,39 @@ _PISW_Run(Mode, Path) {
 	}
 }
 
+_PISW_Utf16Run(Path) {
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	global HSE_RuntimeDecisionGeneration
+	Generation := HSE_RuntimeDecisionGeneration
+	Source := _PISW_Image("Zoë", "Native BOM")
+	try {
+		File := FSOpenStrict(Path, "w", "UTF-16")
+		AssertTrue(IsObject(File), "the native UTF-16 fixture writer must open")
+		try File.Write(Source)
+		finally File.Close()
+		Bytes := FSReadBytesStrict(Path)
+		AssertEqual(2 + StrLen(Source) * 2, Bytes.Size,
+			"the fixture must contain one BOM and exactly the UTF-16 source")
+		AssertEqual(0xFEFF, NumGet(Bytes, 0, "UShort"),
+			"the positive control must exercise native BOM detection")
+		ReadPersonalInfoToml(Path)
+		AssertEqual("Zoë", PersonalInformation["first_name"],
+			"the existing public reader admits the UTF-16 identity")
+		Result := PersonalInfoCommitValues(Path, Map("first_name", "Édited"))
+		AssertTrue(Result is Integer && Result == 1,
+			"adding a source witness must retain an admitted native-BOM source")
+		AssertEqual("Édited", PersonalInformation["first_name"])
+		AssertEqual("Native BOM", PersonalInformation["last_name"])
+		AssertEqual("first_name", PersonalInformationLetters["p"])
+		AssertFalse(_ReadPersonalInfoTomlCache)
+		ReadPersonalInfoToml(Path)
+		AssertEqual("Édited", PersonalInformation["first_name"],
+			"the actual native publisher must remain readable after the edit")
+		AssertEqual("Native BOM", PersonalInformation["last_name"])
+		AssertEqual("first_name", PersonalInformationLetters["p"])
+	} finally HSE_RuntimeDecisionGeneration := Generation
+}
+
 _PISW_Case(Mode) {
 	global PersonalInformation, PersonalInformationLetters
 	global _ReadPersonalInfoTomlCache, ScriptInformation, _TomlUnreadableFiles
@@ -130,7 +163,10 @@ _PISW_Case(Mode) {
 		PersonalInformationLetters := Map("p", "first_name", "n", "last_name")
 		_ReadPersonalInfoTomlCache := false
 		ScriptInformation["PersonalInfoTomlPath"] := Path
-		_PISW_Run(Mode, Path)
+		if Mode == "utf16"
+			_PISW_Utf16Run(Path)
+		else
+			_PISW_Run(Mode, Path)
 	} finally {
 		PersonalInformation := HadInformation ? OldInformation : unset
 		PersonalInformationLetters := HadLetters ? OldLetters : unset
@@ -153,3 +189,5 @@ Test("personal info source: external deletion during staging is retained (person
 	_PISW_Case.Bind("delete"))
 Test("personal info source: uninterrupted native save publishes and reloads (personal-info-source-witness)",
 	_PISW_Case.Bind("live"))
+Test("personal info source: admitted UTF-16 BOM identity still saves and reloads (personal-info-source-witness)",
+	_PISW_Case.Bind("utf16"))
