@@ -32,7 +32,7 @@ local has_native_reader = package.searchpath(NATIVE_READER, package.path) ~= nil
 --- @return string|nil detail Failure detail.
 --- @return number|string|nil errno Native errno; 2 proves absence.
 function M.open(path)
-	if has_native_reader then return require(NATIVE_READER).open(path) end
+	if has_native_reader then return require(NATIVE_READER).open_source(path) end
 	return io.open(path, "r")
 end
 

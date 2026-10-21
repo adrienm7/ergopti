@@ -263,6 +263,41 @@ helpers.describe("TOML source read admission", function()
 			helpers.assert_eq(closes, 2)
 		end)
 	end)
+	-- Stock Lua without luv has no descriptor API at all. Refusing there left the
+	-- timings registry empty and the daemon unable to start; classify instead.
+	for _, case in ipairs({
+		{ name = "regular", exists = true, regular = true, status = "ok", opens = 1 },
+		{ name = "fifo", exists = true, regular = false, status = "error", opens = 0 },
+		{ name = "missing", exists = false, regular = false, status = "absent", opens = 0 },
+	}) do
+		helpers.it("linux-toml-read-special: a runtime without descriptors classifies a " .. case.name .. " source", function()
+			local previous_uv, previous_ffi, previous_execute, previous_open = package.loaded.luv, package.loaded.ffi, os.execute, io.open
+			local previous_preload = package.preload.ffi
+			local probes, opens = {}, 0
+			-- LuaJIT preloads FFI: hide the loader too, as the stock-Lua runtime lacks it.
+			package.loaded.luv, package.loaded.ffi = {}, nil
+			package.preload.ffi = function() error("stock Lua has no FFI") end
+			os.execute = function(command)
+				probes[#probes + 1] = command
+				local flag = command:match("^test (%-%a) ")
+				return (flag == "-e" and case.exists) or (flag == "-f" and case.regular) or nil, "exit", 1
+			end
+			io.open = function(path, mode)
+				helpers.assert_eq(path, "/synthetic/plain-" .. case.name)
+				helpers.assert_eq(mode, "r")
+				opens = opens + 1
+				return { read = function() return "k = 1\n" end, close = function() return true end }
+			end
+			local ok, content, status = pcall(fs.read_with_status, "/synthetic/plain-" .. case.name)
+			package.loaded.luv, package.loaded.ffi, os.execute, io.open = previous_uv, previous_ffi, previous_execute, previous_open
+			package.preload.ffi = previous_preload
+			helpers.assert_true(ok, tostring(content))
+			helpers.assert_eq(status, case.status)
+			helpers.assert_eq(content, case.status == "ok" and "k = 1\n" or nil)
+			helpers.assert_eq(opens, case.opens, "stdio only ever opens a classified regular file")
+			helpers.assert_true(#probes >= 1 and probes[1]:find("/synthetic/plain-" .. case.name, 1, true) ~= nil)
+		end)
+	end
 	if package.config:sub(1, 1) == "/" and (pcall(require, "luv") or pcall(require, "ffi")) then
 		helpers.it("linux-toml-read-special: actual FIFO, FIFO symlink and controls never wait", function()
 			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
