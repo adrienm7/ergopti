@@ -281,10 +281,12 @@ local function load_active_remap(options)
 end
 
 --- Runs the actual action-picker callbacks over one exact active remap facade.
+--- The slot row opens the shared action picker, replaced here by a recorder
+--- whose confirmation is the user's pick.
 --- The deployment port records its input; it does not acknowledge native reload.
 --- @param run function Receives remap, protocol observations and a menu pick function.
 local function with_live_picker(run)
-	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "ui.menu.menu_utils" }, function()
+	helpers.with_fresh_modules({ "ui.menu.menu_tap_holds", "ui.menu.menu_utils", "ui.action_picker" }, function()
 		local remap, calls = load_active_remap({ actions = {
 			{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
 			{ id = "escape", label = "Escape", category = "Spécial", holdable = false, tappable = true },
@@ -296,14 +298,17 @@ local function with_live_picker(run)
 		local function pick(slot, title)
 			local trees = menu._build_picker_trees(remap, update, true)
 			local key = assert(trees.left[1], "the active fixture key must be offered")
-			local slot_title = "menu.tapholds." .. slot .. "_arrow"
+			local slot_title = "tap_hold.picker." .. slot
 			for _, row in ipairs(key.items) do
 				if row.label == slot_title then
-					for _, choice in ipairs(row.items) do
-						if choice.label == title then
-							helpers.assert_eq(type(choice.action), "function")
-							return choice.action()
-						end
+					helpers.assert_eq(type(row.action), "function")
+					local offered, confirm = nil, nil
+					package.loaded["ui.action_picker"] = {
+						open = function(opts, on_confirm) offered, confirm = opts, on_confirm; return true end,
+					}
+					helpers.assert_true(row.action(), "the slot row opens the shared action picker")
+					for _, choice in ipairs(offered.items) do
+						if choice.label == title then return confirm(choice.id) end
 					end
 				end
 			end
