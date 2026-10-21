@@ -28,6 +28,7 @@
 #Requires Autohotkey v2.0+
 #Include keylogger_webview_range_script.ahk
 #Include keylogger_webview_range_mount.ahk
+#Include keylogger_apps_editor.ahk
 
 
 
@@ -466,6 +467,7 @@ KLWV_Hide(which, GuiObj) {
 	KLWV.retiring[which] := Pending
 	try {
 		KLWV.windows.Delete(which)
+		KLWV_RetireAppsEditor(Entry)
 		KLWV_DisarmRebuildWatch(Entry)
 		KLWV_RetireRangeStage(Entry)
 		if Entry.Has("msg_sub")
@@ -534,6 +536,7 @@ KLWV_Close(which) {
 		; resolve by ``which``; deleting this generation first makes every stale
 		; callback inert instead of allowing it to target a just-reopened dashboard.
 		KLWV.windows.Delete(which)
+		KLWV_RetireAppsEditor(entry)
 		KLWV_DisarmRebuildWatch(entry)
 		KLWV_RetireRangeStage(entry)
 		udir := entry.Has("udir") ? entry["udir"] : ""
@@ -624,9 +627,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		_KLWV_LogBridgeReceipt(which, msg)
 		if (msg = "")
 				return
-		; Tiny ad-hoc parser for the action verb — the only field we need
-		; right now is "action". Full payload parsing is deferred until we
-		; add filter pushdown commands.
+		; Route by the action verb; owners of typed commands validate the full
+		; JSON payload before performing their own state or filesystem work.
 		action := ""
 		if RegExMatch(msg, '"action"\s*:\s*"([^"]+)"', &m)
 				action := m[1]
@@ -637,6 +639,9 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		if A_IsSuspended && (action != "range") && (action != "range_consumed")
 				return
 		switch action {
+		case "pick", "edit":
+			if which == "apps"
+				KLWV_QueueAppsEditor(entry, Epoch, msg)
 		case "range_consumed":
 			KLWV_ConsumeRangeStage(which, Epoch, entry, msg)
 				case "ready":
