@@ -26,6 +26,7 @@
 #Requires AutoHotkey v2.0
 
 #Include number.ahk
+#Include ../adapters/native_text.ahk
 
 
 
@@ -421,19 +422,16 @@ _JsonParseString(&text, &pos, ObjectKey := false) {
 			; delimiter (" / \ / backtick) in one slice instead of appending one
 			; char at a time — the per-char ``out .= c`` is O(n^2) over the long
 			; unescaped spans that dominate locale strings (parsed once at boot
-			; for every i18n value). One native code-unit scan (wcspbrk) finds the
-			; run end; a per-character AHK loop made a 6 MB GitHub release list
-			; take 33 s. PCRE is not used here: in UTF-16 mode it reads a lone
-			; high surrogate as half of a pair and swallows the delimiter after
-			; it. Behaviour is identical: the run stops on the same delimiters
-			; the outer switch handles, and on a control character, which is
-			; refused; wcspbrk stops at an embedded NUL, which is refused too.
+			; for every i18n value). One native code-unit scan finds the run end;
+			; a per-character AHK loop made a 6 MB GitHub release list take 33 s.
+			; PCRE is not used here: in UTF-16 mode it reads a lone high
+			; surrogate as half of a pair and swallows the delimiter after it.
+			; Behaviour is identical: the run stops on the same delimiters the
+			; outer switch handles, and on a control character, which is
+			; refused; the scan stops at an embedded NUL, which is refused too.
 			runStart := pos
-			Base := StrPtr(text)
-			Found := DllCall("msvcrt\wcspbrk", "Ptr", Base + (pos - 1) * 2,
-				"Ptr", _JsonStringRunDelimiters(), "Cdecl Ptr")
-			pos := Found ? (Found - Base) // 2 + 1
-				: pos + DllCall("msvcrt\wcslen", "Ptr", Base + (pos - 1) * 2, "Cdecl UPtr")
+			pos += NativeTextSpanExcluding(StrPtr(text) + (pos - 1) * 2,
+				_JsonStringRunDelimiters())
 			if (pos <= len && Ord(SubStr(text, pos, 1)) < 0x20)
 				throw Error("JSON: unescaped control character at position " . pos . ".", -1)
 			out .= SubStr(text, runStart, pos - runStart)
