@@ -134,15 +134,24 @@ const watcher = stripComments(
 	read(path.join(WIN, 'infra', 'hotstrings', 'hotstring_inputhook.ahk'))
 );
 const onChar = bodyOf(watcher, '_OnPrefixChar').text;
+const STAMP = '_PrefixStampCompletedInput';
+const stamp = bodyOf(watcher, STAMP).text;
+const completeAt = stamp.indexOf('_TextCompleteTailScalar(DeliveredChar) != ""');
+const touchAt = stamp.indexOf(`${OWNER}(DeliveredChar, ObservedTick)`);
 const ensureAt = onChar.indexOf('_PrefixEnsureInputContext()');
-const stampAt = onChar.indexOf(`${OWNER}(Char)`);
+const stampAt = onChar.indexOf(`${STAMP}(Char)`);
 const feedAt = onChar.indexOf('HSEMatch := HSE_FeedChar(Char, true)');
 check(
-	stampAt > 0,
-	`_OnPrefixChar must stamp every observed character through ${OWNER}: a key typed through the OS layout was never timed, so every delayed hotstring was refused and no bubble showed`
+	onChar !== '' &&
+		stamp !== '' &&
+		stamp.includes('for DeliveredChar in _TextCodepoints(Observed)') &&
+		completeAt > 0 &&
+		touchAt > completeAt &&
+		stampAt > 0,
+	`_OnPrefixChar must call the actual ${STAMP} helper, which stamps completed scalars through ${OWNER} and refuses orphan units`
 );
 check(
-	ensureAt > 0 && feedAt > 0 && ensureAt < stampAt && stampAt < feedAt,
+	onChar !== '' && ensureAt > 0 && feedAt > 0 && ensureAt < stampAt && stampAt < feedAt,
 	'_OnPrefixChar must stamp the character after verifying its control and before feeding the engine'
 );
 
