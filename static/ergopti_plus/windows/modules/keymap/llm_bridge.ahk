@@ -1080,8 +1080,9 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
 	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
 		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
 		return
-	if vk != 0x08 && ((vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E
-		|| vk == 0x09 || vk == 0x0D || vk == 0x1B)
+	if (vk != 0x08 && ((vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E
+		|| vk == 0x09 || vk == 0x0D || vk == 0x1B))
+		|| (!_PrefixIsModifierVK(vk) && _PrefixShortcutModifierHeld())
 		_PrefixRevokeIncompleteFragments()
 	LLM_Bridge_FeedKeyDownIfActive(vk)
 }

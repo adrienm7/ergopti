@@ -861,3 +861,5 @@ Test("prefix: a key typed after the verified Notepad edit follows the expansion 
 #Include test_prefix_scalar_framing.ahk
 
 #Include test_prefix_bridge_idle_fragment.ahk
+
+#Include test_prefix_bridge_shortcut_fragment.ahk
