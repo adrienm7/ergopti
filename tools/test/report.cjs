@@ -7,7 +7,10 @@
  * Wraps a test runner, streams its output unchanged, then parses pass/fail
  * results from EITHER format the repo uses:
  *   - strict TAP (AHK run_all.ahk):  "ok N - name" / "not ok N - name [ - diag]"
- *                                    plus the "# N passed, M failed" plan footer.
+ *                                    plus the "# N passed, M failed" plan footer;
+ *                                    "ok N - name # SKIP NOT EXECUTED: why" and the
+ *                                    footer's ", K not executed" are counted apart,
+ *                                    shown as NOT EXECUTED and never as passed.
  *   - the macOS Lua runner:          "  ok   name" / "  FAIL name — err" plus the
  *                                    "Passed tests:  N" / "Failed tests:  M" block.
  * On GitHub Actions it emits one ::error:: annotation per failing test and a
@@ -27,6 +30,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const { StringDecoder } = require('node:string_decoder');
+const { NOT_EXECUTED_MARKER } = require('./validate-ahk-suite-manifest.cjs');
 
 // =====================================
 // ======= 1/ Argument parsing =========
@@ -96,7 +100,15 @@ function parseResults(out, timingOutput = out) {
 			continue;
 		}
 	}
+	const not_executed = [];
 	for (const line of lines) {
+		// TAP: "ok 12 - some test # SKIP NOT EXECUTED: reason" did not run here.
+		const skipped = line.match(/^ok\s+\d+\s+-\s+(.+)$/);
+		if (skipped && skipped[1].includes(NOT_EXECUTED_MARKER)) {
+			not_executed.push(skipped[1].replace(NOT_EXECUTED_MARKER, ': ').trim());
+			format = 'tap';
+			continue;
+		}
 		// TAP: "not ok 12 - some test - diag"
 		const tap = line.match(/^not ok\s+\d+\s+-\s+(.+)$/);
 		if (tap) {
@@ -114,7 +126,7 @@ function parseResults(out, timingOutput = out) {
 	}
 
 	// Counts: prefer the authoritative footers.
-	const tapPlan = out.match(/#\s*(\d+)\s+passed,\s+(\d+)\s+failed/);
+	const tapPlan = out.match(/#\s*(\d+)\s+passed,\s+(\d+)\s+failed(?:,\s+(\d+)\s+not executed)?/);
 	if (tapPlan) {
 		passed = Number(tapPlan[1]);
 		failed = Number(tapPlan[2]);
@@ -141,6 +153,9 @@ function parseResults(out, timingOutput = out) {
 		failures: uniqueFailures,
 		passed: counts_available ? passed : null,
 		failed: counts_available ? failed : null,
+		not_executed,
+		not_executed_count:
+			tapPlan && tapPlan[3] !== undefined ? Number(tapPlan[3]) : not_executed.length,
 		format,
 		counts_available,
 		timings,
@@ -200,8 +215,10 @@ function failureNotice(failures) {
 }
 
 function emit(opts, res, code, signal = null) {
+	const notExecutedCount = res.not_executed_count || 0;
 	const counts = res.counts_available
-		? `${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed`
+		? `${formatCount(res.passed)} passed, ${formatCount(res.failed)} failed` +
+			(notExecutedCount ? `, ${formatCount(notExecutedCount)} NOT EXECUTED` : '')
 		: 'terminal counts unavailable';
 	const onGitHub = !!process.env.GITHUB_ACTIONS;
 	const timingSummary = res.timing_errors.length
@@ -221,6 +238,11 @@ function emit(opts, res, code, signal = null) {
 		for (const f of res.failures) {
 			process.stdout.write(`::error title=${ghEscape(opts.name)} test failed::${ghEscape(f)}\n`);
 		}
+		for (const skipped of res.not_executed || []) {
+			process.stdout.write(
+				`::warning title=${ghEscape(opts.name)} test NOT EXECUTED::${ghEscape(skipped)}\n`
+			);
+		}
 		if (res.failures.length)
 			process.stdout.write(
 				`::notice title=${ghEscape(opts.name)} all failures::${ghEscape(failureNotice(res.failures))}\n`
@@ -234,8 +256,14 @@ function emit(opts, res, code, signal = null) {
 		if (process.env.GITHUB_STEP_SUMMARY) {
 			const md =
 				(res.counts_available
-					? `### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n`
+					? `### ${opts.name}\n\n- ✅ ${formatCount(res.passed)} passed\n- ${res.failed > 0 ? '❌' : '✅'} ${formatCount(res.failed)} failed\n` +
+						(notExecutedCount
+							? `- ⚠️ ${formatCount(notExecutedCount)} NOT EXECUTED on this host (not passed)\n`
+							: '')
 					: `### ${opts.name}\n\n- INCOMPLETE: terminal counts unavailable (exit ${code}).\n`) +
+				(res.not_executed && res.not_executed.length
+					? `\n<details open><summary>Not executed</summary>\n\n${res.not_executed.map((f) => `- ${f}`).join('\n')}\n</details>\n`
+					: '') +
 				(res.failures.length
 					? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n`
 					: '') +
@@ -255,6 +283,8 @@ function emit(opts, res, code, signal = null) {
 			counts_available: res.counts_available,
 			passed: res.passed,
 			failed: res.failed,
+			not_executed: notExecutedCount,
+			not_executed_cases: res.not_executed || [],
 			exit_code: code,
 			...(signal ? { signal } : {}),
 			failures: res.failures,
@@ -272,9 +302,11 @@ function emit(opts, res, code, signal = null) {
 	const tag =
 		res.failed > 0 || res.failures.length > 0 || code !== 0
 			? '\x1b[31mFAIL\x1b[0m'
-			: res.counts_available
-				? '\x1b[32mPASS\x1b[0m'
-				: '\x1b[33mINCOMPLETE\x1b[0m';
+			: !res.counts_available
+				? '\x1b[33mINCOMPLETE\x1b[0m'
+				: notExecutedCount
+					? '\x1b[33mNOT EXECUTED\x1b[0m'
+					: '\x1b[32mPASS\x1b[0m';
 	process.stdout.write(
 		`\n[report:${opts.name}] ${tag} — ${counts} (exit ${code}, format ${res.format}).\n`
 	);
