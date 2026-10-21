@@ -118,11 +118,13 @@ helpers.describe("keylogger SQL literals survive the sqlite3_exec C string (sql-
 		local Literal = require("sqlite.literal")
 		local escaped = "'" .. Literal.escape(SENTINEL) .. "'"
 		helpers.assert_eq(evaluate_literal(escaped), SENTINEL)
+		-- Each quoting helper's own declaration selects its file (aggregator,
+		-- outbox, reader, writer) without naming a path a move would break.
 		for _, symbol in ipairs({
-			"modules/keylogger/aggregator/sql.lua",
-			"modules/keylogger/log_manager.lua",
-			"modules/keylogger/sqlite_reader.lua",
-			"modules/keylogger/sqlite_writer.lua",
+			"local function sq(s)",
+			"local function _sq(s)",
+			"local function _q(s)",
+			"local function _sql_str(s)",
 		}) do
 			local source = helpers.read_driver_source(symbol)
 			helpers.assert_true(source ~= nil and source ~= "", symbol .. " must be readable")
