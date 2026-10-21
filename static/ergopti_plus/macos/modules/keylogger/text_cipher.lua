@@ -23,6 +23,11 @@
 ---    command line: an argument would publish it in the process table.
 --- 3. Fail CLOSED on encryption, OPEN on decryption — identical to Linux, so a
 ---    database written on one machine reads on the other.
+--- 4. Bytes and receipts are exact. Every value reaches openssl through
+---    ShellRunner.exact_stdin_pipeline, which carries NUL through a C-string
+---    command (a heredoc truncated it and stored the prefix's ciphertext), and
+---    every result needs a zero exit of the whole pipeline: a failed openssl
+---    prints partial blocks, and a failed producer delivers partial input.
 --- ==============================================================================
 
 local M = {}
@@ -30,7 +35,6 @@ local M = {}
 local Logger     = require("infra.logger")
 local Shell      = require("adapters.shell_runner")
 local Crypto     = require("adapters.crypto")
-local Heredoc    = require("shell.heredoc")
 local TextCrypto = require("keylogger.text_crypto")
 
 local LOG = "keylogger.text_cipher"
@@ -94,6 +98,16 @@ function M._set_machine_id_command(command)
 	_derivation_failed = false
 end
 
+--- Runs one openssl command with exact stdin and returns stdout after exit 0.
+--- @param cmd string Composed openssl command.
+--- @param input string Exact standard-input bytes.
+--- @return string|nil output, string|nil reason
+local function run_with_stdin(cmd, input)
+	local command, reason = Shell.exact_stdin_pipeline(cmd, input)
+	if not command then return nil, reason end
+	return Shell.exec_checked(command)
+end
+
 --- Derives and caches the session key. Runs at most once per process.
 --- @return string|nil The 64-hex key, or nil when it cannot be derived.
 local function ensure_key()
@@ -120,10 +134,12 @@ local function ensure_key()
 	-- PBKDF2("<uuid>\n") here and PBKDF2("<uuid>") on Linux and Windows. Same
 	-- machine id, three different keys — which quietly falsifies the "identical
 	-- format everywhere" claim the parity gate exists to protect.
-	local key = TextCrypto.parse_derived_key(Shell.exec(Heredoc.with_exact_stdin(derive, machine_id)))
+	local output, failure = run_with_stdin(derive, machine_id)
+	local key = TextCrypto.parse_derived_key(output)
 	if not key then
 		_derivation_failed = true
-		Logger.error(LOG, "Key derivation produced no usable key — is openssl available?")
+		Logger.error(LOG, "Key derivation produced no usable key — is openssl available? (%s)",
+			failure or "no key in its output")
 		return nil
 	end
 
@@ -189,12 +205,12 @@ function M.encrypt(device_id, event_id, plaintext)
 		return nil
 	end
 
-	-- Byte-exact stdin, never the plain heredoc: that one normalises the payload's
-	-- trailing newlines away, so "line\n\n" would be stored as the ciphertext of
-	-- "line" and read back as a value the user never typed.
-	local ciphertext = Shell.exec(Heredoc.with_exact_stdin(cmd, plaintext))
+	-- Byte-exact stdin: trailing newlines and NUL are part of the typed value, so
+	-- "line\n\n" must never be stored as the ciphertext of "line".
+	local ciphertext, failure = run_with_stdin(cmd, plaintext)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
-		Logger.error(LOG, "Encryption produced no output — refusing to store plaintext.")
+		Logger.error(LOG, "Encryption refused (%s) — refusing to store plaintext.",
+			failure or "no output")
 		return nil
 	end
 
@@ -220,8 +236,11 @@ function M.decrypt(value)
 		return ""
 	end
 
-	local plaintext = Shell.exec(Heredoc.with_exact_stdin(cmd, ciphertext))
-	if type(plaintext) ~= "string" then return "" end
+	local plaintext, failure = run_with_stdin(cmd, ciphertext)
+	if type(plaintext) ~= "string" then
+		Logger.error(LOG, "Encrypted row cannot be read: decryption refused (%s).", failure)
+		return ""
+	end
 	return plaintext
 end
 
