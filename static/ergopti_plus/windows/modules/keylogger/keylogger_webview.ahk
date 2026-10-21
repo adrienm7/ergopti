@@ -1598,7 +1598,7 @@ KLWV_QueueFullBuildRetry(which, Epoch, attempt, RetryOwner := 0) {
 				RetryOwner := Map("revision", entry.Get("ingest_revision", 0), "attempt", attempt)
 		if entry.Has("pending_full_build_retry") {
 				pending := entry["pending_full_build_retry"]
-				if pending["attempt"] >= attempt
+				if pending["owner"] == RetryOwner && pending["attempt"] >= attempt
 						&& entry.Get("full_build_retry_revision", 0) = RetryOwner["revision"]
 						return false
 		}
@@ -1714,6 +1714,7 @@ KLWV_OnSuspendResume() {
 ; Record durable input without starting a worker while the keyboard is busy.
 ; This revision is a notification identity, never an event ID or byte offset.
 KLWV_RecordCommittedIngest() {
+		ColdRetries := []
 		PreviousCritical := Critical("On")
 		try {
 				for which, entry in KLWV.windows {
@@ -1721,8 +1722,21 @@ KLWV_RecordCommittedIngest() {
 								continue
 						entry["ingest_revision"] := entry.Get("ingest_revision", 0) + 1
 						KLWV_MarkIngestDirty(which, entry.Get("epoch", 0), "live")
+						; Busy and idle commits share this admission point. A cold window
+						; cannot use the painted-window drain after its old budget expired.
+						if !entry.Get("first_paint_done", false) && !entry.Get("full_build_done", false)
+								&& entry.Get("full_build_retry_exhausted", false)
+								&& !entry.Has("full_build_retry_owner")
+								&& entry.Get("full_build_retry_revision", 0) != entry["ingest_revision"]
+								ColdRetries.Push({Which: which, Entry: entry, Epoch: entry.Get("epoch", 0),
+										MetricsDir: entry.Get("metrics_dir", ""), Revision: entry["ingest_revision"]})
 				}
 		} finally Critical(PreviousCritical)
+		; Only publish a debt and arm its existing timer here, never launch a
+		; worker on the busy keyboard path. The queue revalidates each exact tuple.
+		for Pending in ColdRetries
+				KLWV_QueueWarmWindow(Pending.Which, Pending.Entry, Pending.Epoch,
+						Pending.MetricsDir, "committed", 0, Pending.Revision)
 }
 
 ; Manifest signals refresh KPIs without certifying a durable append. Live/full
@@ -1964,11 +1978,15 @@ KLWV_OnWarmTerminal(which, Index, MetricsDir, status, *) {
 	if Entry is Map {
 		Epoch := Entry.Get("epoch", 0)
 		if KLWV_WarmSameStore(Entry.Get("metrics_dir", ""), MetricsDir)
-			KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, status)
+			; This background job had no window budget at launch. Start that
+			; window's budget explicitly at its current revision and attempt zero.
+			KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, status,
+				0, Entry.Get("ingest_revision", 0))
 		else
 			; Its first-paint timer may already have stood down for this job.
 			; An old store can retire, but cannot certify this window's history.
-			KLWV_QueueWarmWindow(which, Entry, Epoch, Entry.Get("metrics_dir", ""), "canceled")
+			KLWV_QueueWarmWindow(which, Entry, Epoch, Entry.Get("metrics_dir", ""),
+				"canceled", 0, Entry.Get("ingest_revision", 0))
 	}
 	if (Index < KLWV.WARM_ORDER.Length) && KLWV_WarmLaunchCurrent(MetricsDir)
 		KLWV_ArmWarmTimer(KLWV_WarmRun.Bind(Index + 1, MetricsDir), 1)
@@ -1996,22 +2014,39 @@ KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner := 0) {
 
 ; Retry state contains data only. The timer captures the exact Entry, while a
 ; paused retry remains attached to that Entry through the existing pending map.
-KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Reason, Attempt := 0) {
+KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Reason, Attempt, BudgetRevision) {
 	PreviousCritical := Critical("On")
 	try {
 		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
-			|| Entry.Get("full_build_done", false) || KLWV_FullRetryBlocksIngest(Entry)
+			|| Entry.Get("full_build_done", false) || Entry.Has("full_build_retry_owner")
+			|| KLWV_FullRetryBlocksIngest(Entry)
 			return false
-		NextAttempt := KLWV_NextRetryAttempt(Attempt, Reason)
+		Revision := Entry.Get("ingest_revision", 0)
+		if Reason == "committed" {
+			; A fresh committed notification may reopen only an older exhausted
+			; cold budget. Staged tuples never revoke newer work or a painted window.
+			if BudgetRevision != Revision || Entry.Get("first_paint_done", false)
+				|| !Entry.Get("full_build_retry_exhausted", false)
+				|| Entry.Get("full_build_retry_revision", 0) == Revision
+				return false
+			NextAttempt := 0
+		} else
+			; Keep the actual terminal outcome. Failure of older input cannot
+			; consume the first attempt belonging to a newer committed revision.
+			NextAttempt := BudgetRevision != Revision ? 0 : KLWV_NextRetryAttempt(Attempt, Reason)
+		if KLPFWorker.jobs.Has(which) && !KLPFWorker.jobs[which].Get("terminal_claimed", false)
+			return false
 		if NextAttempt > KLWV.FULL_BUILD_MAX_RETRIES {
-			Entry["full_build_retry_revision"] := Entry.Get("ingest_revision", 0)
+			Entry["full_build_retry_revision"] := Revision
 			Entry["full_build_retry_exhausted"] := true
 			return false
 		}
-		Owner := Map("revision", Entry.Get("ingest_revision", 0),
+		Owner := Map("revision", Revision,
 			"attempt", NextAttempt, "warm_store", MetricsDir)
 		Entry["full_build_retry_owner"] := Owner
 		Entry["full_build_retry_revision"] := Owner["revision"]
+		if Entry.Has("full_build_retry_exhausted")
+			Entry.Delete("full_build_retry_exhausted")
 		if A_IsSuspended
 			return KLWV_QueueFullBuildRetry(which, Epoch, Owner["attempt"], Owner)
 	} finally Critical(PreviousCritical)
@@ -2050,9 +2085,13 @@ KLWV_ResumeWarmWindow(which, Entry, Epoch, Owner) {
 			if Job["destination"] == Destination && Job["epoch"] == Epoch {
 				if Owner.Get("generation", 0) == Job["generation"]
 					return true
-				return KLWV_RetireWarmWindow(Entry, Owner)
 			}
-			Rearm := true ; The other store's terminal has not retired yet.
+			if Job.Get("terminal_claimed", false)
+				Rearm := true ; Fresh debt waits for this terminal's reserved slot.
+			else if Job["destination"] == Destination && Job["epoch"] == Epoch
+				return KLWV_RetireWarmWindow(Entry, Owner)
+			else
+				Rearm := true ; The other store's active work retains its slot.
 		}
 		Revision := Entry.Get("ingest_revision", 0)
 		if Owner["revision"] != Revision {
@@ -2106,10 +2145,11 @@ KLWV_OnWarmWindowTerminal(which, Entry, Epoch, MetricsDir, Owner, Status, *) {
 	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
 		return KLWV_RetireWarmWindow(Entry, Owner)
 	KLWV_RetireWarmWindow(Entry, Owner)
-	return KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Owner["attempt"])
+	return KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status,
+		Owner["attempt"], Owner["revision"])
 }
 
-KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt := 0) {
+KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt, BudgetRevision) {
 	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
 		return false
 	KLWV_SettleRebuildProgress(which, Epoch, Status)
@@ -2117,18 +2157,18 @@ KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt := 0) {
 		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
 			return false
 		if A_IsSuspended || Status != "ok"
-			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt)
+			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt, BudgetRevision)
 		Pushed := KLWV_FirstPaintPush(which, Epoch)
 		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
 			return false
 		if !Pushed
-			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, "push failed", Attempt)
+			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, "push failed", Attempt, BudgetRevision)
 		PreviousCritical := Critical("On")
 		try {
 			if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
 				return false
 			if A_IsSuspended
-				return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, "ok", Attempt)
+				return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, "ok", Attempt, BudgetRevision)
 			return KLWV_CommitPaint(which, Epoch, true)
 		} finally Critical(PreviousCritical)
 	} finally {
