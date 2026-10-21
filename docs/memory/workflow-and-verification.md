@@ -59,9 +59,14 @@ parents and paths before applying or dropping one.
 ### project-fix-branches-fast-forward-only
 
 The maintainer runs one agent per OS on `fix/windows`, `fix/macos` and
-`fix/linux`. Merge each into dev with `--no-ff`, validate, push dev, then
-fast-forward the `fix/*` branch to dev only when it is an ancestor (never a
-rewrite). A merge that touches `run_all.ahk`, `test_framework.ahk` or a sealed
+`fix/linux`, and Codex agents also push straight to dev with the maintainer's
+credentials. dev and main stay linear (maintainer, 2026-10-21): bring a
+`fix/*` branch's missing commits onto dev by rebase or cherry-pick, never
+`git merge`, then fast-forward the `fix/*` branch to dev only when it is an
+ancestor (never a rewrite). Fetch and rebase onto origin/dev right before any
+push. Preflight before pushing dev: push HEAD to `tmp/preflight-dev` and run
+`gh workflow run ci.yml --ref tmp/preflight-dev -f os_lanes=all`; push dev
+only once that run is green. A change that touches `run_all.ahk`, `test_framework.ahk` or a sealed
 updater source requires resealing
 `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json` with
 `tools/ci/seal-windows-updater-original-source.cjs`.
