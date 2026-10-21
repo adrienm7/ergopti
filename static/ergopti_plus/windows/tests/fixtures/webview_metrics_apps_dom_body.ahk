@@ -66,12 +66,18 @@ _MAD_Worker() {
 	OnExit(_MAD_WorkerReceipt)
 	; The actual function decodes timing argv, rebuilds SQLite, serializes its
 	; real stage and exits. No copy of the production entry/body or fake process.
+	try _MAD_WorkerDiagnostic("before-main")
+	catch as Failure
+		FileAppend("Worker diagnostic failed: " . Failure.Message . "`n", "**", "UTF-8-RAW")
 	KLPF_WorkerMain()
 	throw Error("The genuine worker unexpectedly returned.")
 }
 
 _MAD_WorkerReceipt(Reason, Code) {
 	global _MAD, _MAD_Root
+	try _MAD_WorkerDiagnostic("exit", Code)
+	catch as Failure
+		FileAppend("Worker exit diagnostic failed: " . Failure.Message . "`n", "**", "UTF-8-RAW")
 	try {
 		Receipt := Map("pid", DllCall("GetCurrentProcessId", "UInt"), "exit_code", Code,
 			"script_sha256", _MVSP_Hash(A_ScriptFullPath), "runtime_sha256", _MVSP_Hash(A_AhkPath),
@@ -83,7 +89,53 @@ _MAD_WorkerReceipt(Reason, Code) {
 		_MVSP_Require(FSWriteCreateDurable(Path, KL_JsonEncode(Receipt)), "The real worker exit receipt could not be published.")
 	} catch as Failure {
 		FileAppend("Actual worker receipt failed: " . Failure.Message . "`n", "**", "UTF-8-RAW")
+		try _MAD_WorkerDiagnostic("receipt-error", Code, Failure.Message . "`n" . Failure.Stack)
+		catch as DiagnosticFailure
+			FileAppend("Receipt error diagnostic failed: " . DiagnosticFailure.Message . "`n", "**", "UTF-8-RAW")
 	}
+}
+
+; Diagnostic text files never match the successful worker receipt glob.
+_MAD_WorkerDiagnostic(Phase, Code := -1, Detail := "") {
+	global _MAD, _MAD_Root
+	Data := Map("phase", Phase, "pid", DllCall("GetCurrentProcessId", "UInt"), "code", Code,
+		"critical", A_IsCritical, "argv", A_Args, "stage", _MAD.WorkerStage,
+		"stage_exists", FSStrictExists(_MAD.WorkerStage), "source_sha256", _MVSP_Hash(A_ScriptFullPath),
+		"runtime_sha256", _MVSP_Hash(A_AhkPath), "detail", SubStr(Detail, 1, 2048))
+	Path := _MAD_Root . "\native-workers\worker." . Data["pid"] . "." . Phase . ".diagnostic.txt"
+	_MVSP_Require(FSWriteCreateDurable(Path, KL_JsonEncode(Data)), "The actual worker diagnostic could not be created.")
+}
+
+_MAD_FailureDiagnostic() {
+	global _MAD, _MAD_Root, _MVSP
+	Count := 0, Traces := [], Tail := []
+	Loop Files _MAD_Root . "\native-workers\*.json", "F"
+		Count += 1
+	Job := KLPFWorker.jobs.Get("apps", 0)
+	Data := Map("phase", _MVSP.Phase, "critical", A_IsCritical, "receipt_count", Count,
+		"job_present", Job is Map, "last_wait", _MAD.HasOwnProp("LastWait") ? _MAD.LastWait : 0)
+	if Job is Map {
+		for Key in ["generation", "epoch", "stage", "destination", "mode", "terminal_claimed", "cancel_requested"]
+			Data[Key] := Job.Get(Key, "absent")
+		Handle := Job.Get("handle", 0)
+		Data["handle_type"] := Type(Handle)
+		Data["process_id"] := IsObject(Handle) && HasMethod(Handle, "processId") ? Handle.processId() : 0
+		Data["stage_exists"] := FSStrictExists(Job["stage"])
+	}
+	Ring := LoggerRingBufferSnapshot()
+	for Index, Line in Ring
+		if Index > Ring.Length - 16
+			Tail.Push(SubStr(Line, 1, 512))
+	Data["logger_tail"] := Tail
+	Loop Files _MAD_Root . "\native-workers\*.diagnostic.txt", "F" {
+		if Traces.Length == 4
+			break
+		Reader := FSOpenStrict(A_LoopFileFullPath, "r", "UTF-8")
+		try Traces.Push(Reader.Read(8192))
+		finally Reader.Close()
+	}
+	Data["worker_diagnostics"] := Traces
+	FileAppend("APPS_DOM_FAILURE_DIAGNOSTIC " . KL_JsonEncode(Data) . "`n", "*", "UTF-8-RAW")
 }
 
 _MAD_CopyShared() {
@@ -224,13 +276,18 @@ _MAD_WaitRow(Expected := "") {
 }
 
 _MAD_WaitWorkers(ExpectedCount) {
-	global _MAD_Root
+	global _MAD_Root, _MAD
 	Started := A_TickCount
+	_MAD.LastWait := Map("expected", ExpectedCount, "entry_critical", A_IsCritical, "entry_tick", Started)
 	loop {
 		_MAD_Check()
 		Count := 0
 		Loop Files _MAD_Root . "\native-workers\*.json", "F"
 			Count += 1
+		_MAD.LastWait["receipt_count"] := Count
+		_MAD.LastWait["job_present"] := KLPFWorker.jobs.Has("apps")
+		_MAD.LastWait["critical"] := A_IsCritical
+		_MAD.LastWait["elapsed_ms"] := TickElapsed(Started)
 		if Count == ExpectedCount && !KLPFWorker.jobs.Has("apps")
 			return
 		_MVSP_Require(TickElapsed(Started) < 15000, "The actual detached projection did not settle with its native worker receipt.")
@@ -383,6 +440,9 @@ _MAD_Main() {
 			"scope", "native DOM-dialog-store-worker integration, not resident boot E2E")
 	} catch as Failure {
 		Primary := Failure
+		try _MAD_FailureDiagnostic()
+		catch as DiagnosticFailure
+			FileAppend("Apps failure diagnostic failed: " . DiagnosticFailure.Message . "`n", "**", "UTF-8-RAW")
 	}
 	try _MAD_Close()
 	catch as Failure {
