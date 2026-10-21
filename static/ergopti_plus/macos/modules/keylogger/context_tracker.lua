@@ -948,6 +948,10 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	if _is_paused() then return end
 
 	local now = hs.timer.absoluteTime() / 1000000
+	-- Recovery recaptures metadata without beginning a new foreground interval.
+	local continues_interval = _state.active_app_name == app_name
+		and type(_state.active_app_start) == "number"
+	local interval_start = continues_interval and _state.active_app_start or now
 
 	-- Log time spent in the previous app before switching context
 	if _state.active_app_name and _state.active_app_name ~= app_name then
@@ -973,7 +977,7 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	local new_pid, ok_pid = read_active_app_property(app_object, "pid", app_name)
 
 	_state.active_app_name   = app_name
-	_state.active_app_start  = now
+	_state.active_app_start  = interval_start
 	_state.active_app_bundle = new_bundle
 	_state.active_app_path   = new_path
 	_state.active_app_pid    = new_pid
@@ -983,8 +987,11 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	-- keystroke in this app will compute (now - focus_pending_at) and feed the
 	-- focus_to_first_key_* manifest counters. Cleared after the first hit so
 	-- subsequent keystrokes don't all count as zero-latency.
-	_state.focus_pending_at  = now
-	_state.focus_pending_app = app_name
+	-- A recovery refresh must neither restart nor rearm the first-key sample.
+	if not continues_interval then
+		_state.focus_pending_at  = now
+		_state.focus_pending_app = app_name
+	end
 
 	-- Refresh the portable secure-field guard before attaching the richer AX
 	-- observer. This closes the short activation-to-observer gap for known vaults
