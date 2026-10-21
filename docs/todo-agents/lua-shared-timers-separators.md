@@ -2,7 +2,7 @@
 
 # Lua timers ceiling, tap-binding malformed sources, POSIX separator owner
 
-## Done (local dev, not pushed by this agent)
+## Done (local dev, not pushed by this agent: the task forbids pushing)
 
 - `d5c520ce94` fix(timers): refuse a delay above 2^53 ms on every Lua timer boundary (L105). One
   ceiling, `MAX_TIMER_DELAY_MS = 2 ^ 53`, in `_shared/lua/number_policy.lua`, with
@@ -21,6 +21,8 @@
   missed `platform/remap/init.lua` at the 200-local limit).
 - `2f52d000cb`, `1b764309b5`, `e1ad4c2c2a`, `e3a7eb6814`: infra/bootstrap, modules, remap and ui
   sites converted. The nav_layer and generator conversions landed inside `356d14a3f3`.
+- `49c2a8e6be`, `afa00020a6`: macOS module-scope fixtures own `native_path` and `number_policy`
+  (their residue checks failed once the real modules loaded them).
 - `9fb40dd50f`, `2ef09cbfa7`: guard `macos/tests/meta/lua_safety/test_posix_path_separator_owner.lua`
   (empty baseline, floors of 300 files and 60 owner calls).
 
