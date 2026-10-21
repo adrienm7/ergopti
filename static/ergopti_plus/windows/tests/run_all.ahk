@@ -2199,6 +2199,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/modules/shortcuts/test_program_providers.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_launch_cleanup.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_argv.ahk
+#Include unit/adapters/shell_runner/test_shell_runner_nul_arguments.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_exit_code.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_exit_query_failure.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_ownership.ahk
