@@ -638,7 +638,7 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
 		; retries, and the health tick re-probes, so a slow first answer self-heals.
-		curlCmd := '"' . curl_exe . '" -s -m 2 '
+		curlCmd := '"' . curl_exe . '" --disable -s -m 2 '
 			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
 			. _Q(Origin . (Structured ? LLM_EnableVersionPath() : "/api/version"))
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
@@ -861,7 +861,7 @@ LLM_OllamaListModels_Async(on_result, Owner := 0, Strict := false) {
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: a local daemon lists installed tags in well under a second; a slower
 		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
-		curlCmd := '"' . curl_exe . '" -s -m 2 '
+		curlCmd := '"' . curl_exe . '" --disable -s -m 2 '
 			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
 			. _Q(Origin . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
@@ -1001,7 +1001,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		}
 		Stage := "command_build"
 		curl_exe := A_WinDir . "\System32\curl.exe"
-		curlCmd := '"' . curl_exe . '" -s -S -m '
+		curlCmd := '"' . curl_exe . '" --disable -s -S -m '
 			. (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' '
 			. _LLM_CurlMaxFileSizeArg() . '-X DELETE '
 			. '-H "Content-Type: application/json" '
