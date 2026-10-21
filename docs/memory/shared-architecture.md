@@ -581,6 +581,18 @@ restarts and send `If-None-Match`; every driver names an exhausted limit (403 or
 429 with `X-RateLimit-Remaining: 0`) with its UTC reset through one shared
 sentence (`_shared/lua/updater/rate_limit.lua`).
 
+### project-loopback-probes-use-the-ipv4-literal
+
+Every local AI endpoint the drivers probe is an IPv4 literal: Ollama and MLX
+(`127.0.0.1`) and the local servers of `_shared/modules/llm/local_servers.json`
+(oMLX, LM Studio, llama.cpp / LocalAI, Jan), which all bind `127.0.0.1` by
+default. The name `localhost` may resolve to `::1` first, where they do not
+listen, follow the system proxy, or answer slowly on Windows; with it the macOS
+sweep of #99 found no running oMLX. A configured entry may still say
+`localhost`: endpoint affinity compares scheme, port and path, never the host
+(`_shared/lua/llm/local_server_auth.lua`). Action: a new local backend default
+uses `127.0.0.1`, and a sweep logs each server's answer, not only the total.
+
 ### project-metrics-day-and-correction-semantics
 
 Metrics raw days use the local calendar day and "yesterday" is derived at noon

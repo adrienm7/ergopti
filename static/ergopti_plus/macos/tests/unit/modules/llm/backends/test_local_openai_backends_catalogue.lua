@@ -52,11 +52,16 @@ helpers.describe("Local OpenAI-compatible servers: catalogue (local-openai-backe
 			local catalogue = read_json("modules/llm/local_servers.json")
 			helpers.assert_eq(table.concat(catalogue.server_order, ","), table.concat(SERVERS, ","))
 			local expected = {
-				omlx = "http://localhost:8000/v1", lmstudio = "http://localhost:1234/v1",
-				llamacpp = "http://localhost:8080/v1", jan = "http://localhost:1337/v1",
+				omlx = "http://127.0.0.1:8000/v1", lmstudio = "http://127.0.0.1:1234/v1",
+				llamacpp = "http://127.0.0.1:8080/v1", jan = "http://127.0.0.1:1337/v1",
 			}
 			local providers = read_json("modules/llm/api_providers.json").providers
 			for id, base_url in pairs(expected) do
+				-- The IPv4 literal every server binds by default, never the name
+				-- localhost, which may resolve to ::1 first or follow the system
+				-- proxy: the Mac of #99 never saw a running oMLX through it
+				helpers.assert_true(catalogue.servers[id].base_url:match("^http://127%.0%.0%.1:%d+/v1$") ~= nil,
+					id .. " is probed at the IPv4 loopback literal (local-servers-ipv4-loopback-99)")
 				helpers.assert_eq(catalogue.servers[id].base_url, base_url, id .. " default address")
 				helpers.assert_true(type(catalogue.servers[id]._source) == "string", id .. " names its source")
 				helpers.assert_eq(providers[id], nil, id .. " must not be a remote provider id")
@@ -102,10 +107,10 @@ helpers.describe("Local OpenAI-compatible servers: detection (local-openai-backe
 				helpers.assert_eq(LocalServers.is_stale(), true, "nothing was swept yet")
 				helpers.assert_eq(api.detect_local_servers(function(changed) done[#done + 1] = changed end), true)
 				helpers.assert_eq(#world.probes, 4, "every server is probed at once")
-				helpers.assert_eq(world.probe("omlx").url, "http://localhost:8000/v1/models")
-				helpers.assert_eq(world.probe("lmstudio").url, "http://localhost:1234/v1/models")
-				helpers.assert_eq(world.probe("llamacpp").url, "http://localhost:8080/v1/models")
-				helpers.assert_eq(world.probe("jan").url, "http://localhost:1337/v1/models")
+				helpers.assert_eq(world.probe("omlx").url, "http://127.0.0.1:8000/v1/models")
+				helpers.assert_eq(world.probe("lmstudio").url, "http://127.0.0.1:1234/v1/models")
+				helpers.assert_eq(world.probe("llamacpp").url, "http://127.0.0.1:8080/v1/models")
+				helpers.assert_eq(world.probe("jan").url, "http://127.0.0.1:1337/v1/models")
 				helpers.assert_eq(world.probe("omlx").headers.Authorization, nil, "no key unless the user gives one")
 				helpers.assert_true(LocalServers.is_sweeping())
 
@@ -178,7 +183,7 @@ helpers.describe("Local OpenAI-compatible servers: requests (local-openai-backen
 			helpers.assert_eq(#world.posts, 1, "a keyless local entry is sent")
 			local post = world.posts[1]
 			helpers.assert_eq(post.client, "_infer_client")
-			helpers.assert_eq(post.url, "http://localhost:1234/v1/chat/completions")
+			helpers.assert_eq(post.url, "http://127.0.0.1:1234/v1/chat/completions")
 			helpers.assert_eq(post.headers.Authorization, nil)
 			helpers.assert_eq(post.headers["Content-Type"], "application/json")
 			helpers.assert_eq(post.body.model, "qwen2.5-7b-instruct")
@@ -207,7 +212,7 @@ helpers.describe("Local OpenAI-compatible servers: requests (local-openai-backen
 				function(text) texts[#texts + 1] = text end, function() end), true)
 			local post = world.posts[1]
 			helpers.assert_eq(post.client, "_vision_client")
-			helpers.assert_eq(post.url, "http://localhost:8000/v1/chat/completions")
+			helpers.assert_eq(post.url, "http://127.0.0.1:8000/v1/chat/completions")
 			helpers.assert_eq(post.headers.Authorization, nil)
 			helpers.assert_eq(post.body.model, "Qwen3-8B-4bit")
 			post.callback(completion_answer("ACTIONS: []"))
@@ -445,7 +450,7 @@ helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backend
 			helpers.assert_eq(world.menus, 1, "a changed verdict redraws the menu")
 			rows = Panel.rows(ctx)
 			helpers.assert_eq(#world.probes, 4, "fresh verdicts are not swept again")
-			local omlx = row_starting(rows, "oMLX 🖥️ — localhost:8000")
+			local omlx = row_starting(rows, "oMLX 🖥️ — 127.0.0.1:8000")
 			helpers.assert_true(omlx ~= nil, "the answering server is listed")
 			helpers.assert_true(row_starting(rows, "LM Studio") == nil, "a silent server is not")
 			helpers.assert_eq(omlx.items[1].label, "Qwen3-8B-4bit")
