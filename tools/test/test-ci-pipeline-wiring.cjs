@@ -6182,8 +6182,10 @@ const DISTRO_UNIT_HELPER = fs.readFileSync(
 );
 // Every module group runs at once under the ordinary user, each in its own TMPDIR
 // and HOME: with a shared HOME one group's writes reached another group's fixture.
+// openSUSE's pam_env exports XDG_*_HOME from the account home, which outranks HOME.
 const DISTRO_UNIT_SUITE =
 	'\tsudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n' +
+	'\t\t-u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u XDG_STATE_HOME \\\n' +
 	'\t\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" HOME="$group_home" "$interpreter" tests/run.lua --module="$unit_group" \\\n' +
 	'\t\t>"$unit_logs/$unit_group.log" 2>&1 &\n';
 // A group's exit, its order and its header reach the workflow diagnostic.
