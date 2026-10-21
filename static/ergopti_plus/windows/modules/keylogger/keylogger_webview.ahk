@@ -714,6 +714,8 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						if KLWV_IsCurrent(which, Epoch)
 								KLWV.windows[which]["full_build_done"] := false
 						try LoggerDebug("Keylogger", "KLWV_OnWebMessage: dashboard caches purged.")
+						if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
+								return
 						; Projection runs in a detached worker; a late pre-clear result is
 						; fenced by the generation held by KLPF_RequestBuild.
 						KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
