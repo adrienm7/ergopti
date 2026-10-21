@@ -220,6 +220,12 @@ jobs:
           }
           Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item -LiteralPath $out).Length) bytes)"
 
+      # The budget lives in tools/ci/windows-exe-size-budget.cjs, so a sudden
+      # growth of the exe fails here instead of reaching a release unnoticed.
+      - name: Check the ErgoptiPlus.exe size budget
+        shell: bash
+        run: node tools/ci/windows-exe-size-budget.cjs static/ergopti_plus/windows/ErgoptiPlus.exe
+
       - name: Sign and verify ErgoptiPlus.exe
         if: inputs.release
         shell: pwsh
