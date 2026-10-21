@@ -264,13 +264,17 @@ package.preload['adapters.shell_runner'] = function() return { validate_spawn_ar
 -- The simulated luv above owns no descriptors, so the native regular-file
 -- admission cannot classify a source here. The only TOML source this client
 -- loads is the checked-in timings registry, a regular file: admit it through
--- stdio and refuse any other path.
+-- stdio and refuse any other path. Both public entries are modeled, strict
+-- (open) and configuration-source (open_source), so a caller switching
+-- between them keeps the same stand-in instead of a missing function.
+local function admit_timings_registry(path)
+ assert(path:gsub('\\\\', '/'):find('/_shared/modules/timings/constants%.toml$'),
+  'the simulated backend admits only the checked-in timings registry: ' .. tostring(path))
+ return io.open(path, 'r')
+end
 package.preload['infra.regular_file_reader'] = function() return {
- open = function(path)
-  assert(path:gsub('\\\\', '/'):find('/_shared/modules/timings/constants%.toml$'),
-   'the simulated backend admits only the checked-in timings registry: ' .. tostring(path))
-  return io.open(path, 'r')
- end,
+ open = admit_timings_registry,
+ open_source = admit_timings_registry,
 } end
 local driver = assert(arg[1], 'authentication fixture needs the explicit driver root')
 package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. package.path
