@@ -142,7 +142,7 @@ _LLM_Ollama_ParseStreamLine(line) {
 		if obj.Has("error") {
 			ProviderError := obj["error"]
 			Result["error"] := Type(ProviderError) = "String" && ProviderError != ""
-				? "Ollama stream error: " . SubStr(ProviderError, 1, 200)
+				? "Ollama stream error: " . TextHeadWithinUnits(ProviderError, 200)
 				: "Ollama reported a stream error."
 			return Result
 		}
@@ -174,7 +174,7 @@ LLM_ParseOllamaChatResponse(raw) {
 		return ""
 	try obj := JsonParse(raw)
 	catch as e {
-		err_substr := SubStr(raw, 1, 200)
+		err_substr := TextHeadWithinUnits(raw, 200)
 		try LoggerError("LLM.ollama", "JSON parse failed in ChatResponse: {1}. Raw (200c): {2}", e.Message, err_substr)
 		return Map("error", true, "message", "JSON parse failed: " . e.Message)
 	}
@@ -183,7 +183,7 @@ LLM_ParseOllamaChatResponse(raw) {
 	if obj.Has("error") {
 		ProviderError := obj["error"]
 		return Map("error", true, "message", ProviderError is String && ProviderError != ""
-			? "Ollama error: " . SubStr(ProviderError, 1, 200) : "Ollama reported an error.")
+			? "Ollama error: " . TextHeadWithinUnits(ProviderError, 200) : "Ollama reported an error.")
 	}
 	; A canonical chat message owns an empty result too. Reasoning is not an
 	; assistant answer, and a legacy-looking field elsewhere cannot replace it.

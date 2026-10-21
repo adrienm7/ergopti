@@ -1142,7 +1142,7 @@ _LLM_Ollama_StreamFailHint(stdout_path) {
 		if (raw == "")
 			return "Stdout empty."
 		if InStr(raw, '"error"')
-			return "Ollama error: " . SubStr(raw, 1, 200)
+			return "Ollama error: " . TextHeadWithinUnits(raw, 200)
 		if InStr(raw, '"thinking"') and !InStr(raw, '"response":"') 
 			return "Model returned thinking-only tokens (enable think:false)."
 		return "Stdout snippet: " . SubStr(raw, 1, 120)

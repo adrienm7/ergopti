@@ -675,6 +675,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_ollama.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_streaming.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_curl_personal_config.ahk
+#Include unit/modules/llm/api/test_llm_provider_error_prefix.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_local_presence.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_warmup.ahk
 #Include unit/modules/llm/prediction/test_llm_engine_read_guarded_in_timer.ahk
