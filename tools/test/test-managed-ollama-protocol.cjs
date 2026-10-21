@@ -139,13 +139,20 @@ if ($observedDirectory -cne $ExpectedDirectory) { throw 'Native PS5 directory bi
 if (-not $env:PSModulePath.StartsWith($ExpectedModules + ';')) { throw 'Native PS5 modules are not selected first.' }
 if ($observedExecutable -cne $ExpectedExecutable) { throw 'Native executable binding differs.' }
 if ($PSHOME -cne $capturedAutomaticDirectory) { throw 'The interpreter automatic directory was changed.' }
-Write-Output 'COMPONENT-SHELL-SETUP PASS native_calls=0'
+'probe-complete'
 '@
 $expected = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
 $previousModules = $env:PSModulePath
+# While Windows PowerShell modules lead the path, a cmdlet that autoloads a core
+# module (Write-Output) imports it through a compatibility session, which launches
+# powershell.exe and took over 15 s on hosted runners. The probe therefore only
+# returns a value; output waits until the original path is restored.
 try {
-    & ([ScriptBlock]::Create($probe)) $expected (Join-Path $expected 'Modules') "$expected/powershell.exe"
+    $verdict = & ([ScriptBlock]::Create($probe)) $expected (Join-Path $expected 'Modules') "$expected/powershell.exe"
 } finally { $env:PSModulePath = $previousModules }
+if ($verdict -cne 'probe-complete') { throw 'The setup probe did not complete.' }
+if (@(Get-PSSession).Count -ne 0) { throw 'The setup probe launched Windows PowerShell through a compatibility session.' }
+Write-Output 'COMPONENT-SHELL-SETUP PASS native_calls=0'
 `
 			.replace(/\\\$/g, '$')
 			.replace(/\\n/g, '\n')
