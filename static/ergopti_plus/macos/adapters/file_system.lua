@@ -2355,6 +2355,23 @@ function M.append(path, content)
 	end
 	content = type(content) == "string" and content or ""
 
+	-- Admit only a regular file or an absent path, as write_atomic does: opening
+	-- a FIFO without a reader blocks the main thread, and with a reader the bytes
+	-- leave for another process. The metadata follows a symlink to its target.
+	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+		Logger.error(LOG, "append(): destination metadata is unavailable; refusing to open it.")
+		return false
+	end
+	local probe_ok, attributes = pcall(hs.fs.attributes, path)
+	if not probe_ok then
+		Logger.error(LOG, "append(): cannot inspect the destination — %s", tostring(attributes))
+		return false
+	end
+	if type(attributes) == "table" and attributes.mode ~= "file" then
+		Logger.error(LOG, "append(): destination is not a regular file (%s).", tostring(attributes.mode))
+		return false
+	end
+
 	local ok, result = pcall(function()
 		local fh, err = io.open(path, "a")
 		if not fh then
