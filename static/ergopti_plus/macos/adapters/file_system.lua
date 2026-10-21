@@ -2411,12 +2411,16 @@ function M.exists(path)
 		return ok and attrs ~= nil
 	end
 
-	-- Fallback: try to open as a file
-	local ok, fh = pcall(io.open, path, "r")
-	if ok and fh then
-		fh:close()
-		return true
+	-- Fallback: stat through test(1). Opening the path instead reported an
+	-- unreadable file as absent and blocked on a FIFO without a writer.
+	if path:find("\0", 1, true) or not hs or type(hs.execute) ~= "function" then
+		Logger.error(LOG, "exists(): no metadata probe can classify the path.")
+		return false
 	end
+	local call_ok, _, _, exit_type, rc = pcall(hs.execute, "/bin/test -e " .. TextUtils.shell_quote(path), false)
+	if call_ok and exit_type == "exit" and (rc == 0 or rc == 1) then return rc == 0 end
+	Logger.error(LOG, "exists(): the test(1) probe failed (type=%s, rc=%s).",
+		tostring(call_ok and exit_type), tostring(call_ok and rc))
 	return false
 end
 
