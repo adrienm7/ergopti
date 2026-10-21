@@ -22,6 +22,9 @@ helpers.describe("FileSystem append outcomes", function()
 					end
 					package.loaded["infra.logger"] = logger
 					local adapter = helpers.load_with_stubs("adapters.file_system")
+					-- Destination admission is covered by test_file_system_append_admission;
+					-- here the destination is a proven-absent path, so open is reached.
+					hs.fs.attributes = function() return nil, "No such file or directory" end
 					local file = {}
 					function file:write(value)
 						writes, content = writes + 1, value
