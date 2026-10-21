@@ -67,8 +67,9 @@ Test("update check window: Update runs the existing install (update-check-window
 
 _TUCM_OtherChannelsKeptBeforeSelection() {
 	Body := _DriverFuncBody("_Updater_InterpretResponse")
-	RecordAt := InStr(Body, "_Updater_RecordOtherChannels(Request, Json, Channel)")
-	SelectAt := InStr(Body, "_Updater_SelectChannelRelease(Json, Channel)")
+	; Both readers share the one index of the whole list (release list freeze).
+	RecordAt := InStr(Body, "_Updater_RecordOtherChannels(Request, Json, Channel, Index)")
+	SelectAt := InStr(Body, "_Updater_SelectChannelRelease(Json, Channel, Index)")
 	Assert(RecordAt > 0 and SelectAt > RecordAt,
 		"the other channels are read from the whole list before the checked channel's release is selected")
 	Record := _DriverFuncBody("_Updater_RecordOtherChannels")
