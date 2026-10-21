@@ -42,6 +42,10 @@ function M.register(helpers, driver)
 	local function publish(owner)
 		return owner.keys()
 	end
+	local function is_catalogue(path)
+		return type(path) == "string"
+			and (path:gsub("\\", "/")):find("modules/actions/tap_keys.json", 1, true) ~= nil
+	end
 	local function shared_file(relative)
 		if driver == "macos" then return helpers.shared(relative) end
 		return require("infra.paths").shared(relative)
@@ -118,8 +122,10 @@ function M.register(helpers, driver)
 				scope(function()
 					local owner = fresh_catalogue()
 					local original_open, closes = io.open, 0
-					io.open = function()
-						return { read = function() return source end, close = function() closes = closes + 1; return true end }
+					io.open = function(path)
+						-- Count only the catalogue handle: the driver logger may open (and retire) its own.
+						local catalogue = is_catalogue(path)
+						return { read = function() return source end, close = function() if catalogue then closes = closes + 1 end; return true end }
 					end
 					local okay, detail = pcall(publish, owner)
 					io.open = original_open
@@ -168,7 +174,9 @@ function M.register(helpers, driver)
 					local owner = fresh_catalogue()
 					local source = bytes(shared_file("modules/actions/tap_keys.json"))
 					local original_open, closes = io.open, 0
-					io.open = function()
+					io.open = function(path)
+						-- Count only the catalogue handle: the driver logger may open (and retire) its own.
+						local catalogue = is_catalogue(path)
 						return {
 							read = function()
 								if mode == "read_throw" then error("controlled read failure") end
@@ -178,7 +186,7 @@ function M.register(helpers, driver)
 								return source
 							end,
 							close = function()
-								closes = closes + 1
+								if catalogue then closes = closes + 1 end
 								if mode == "close_throw" then error("controlled close failure") end
 								if mode == "close_nil" then return nil end
 								if mode == "close_false" then return false end

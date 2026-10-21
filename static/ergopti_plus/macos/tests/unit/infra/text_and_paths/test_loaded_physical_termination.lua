@@ -42,6 +42,8 @@ local function fixture(options)
 		return timer
 	end
 	local library_env = setmetatable({ hs = native_hs, require = function(name)
+		-- The scheduler describes caught failures through the pure shared owner.
+		if name == "error_description" then return require(name) end
 		assert(name == "infra.logger", "only actual library logger dependency is modeled")
 		return logger
 	end }, { __index = _G })
