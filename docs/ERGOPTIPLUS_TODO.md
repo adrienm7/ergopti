@@ -251,6 +251,13 @@ for anything that writes configuration.
       tray-less runner. `/retest` is posted on AppImage/appimage.github.io#10422 against v1.0.4: wait
       for the bot's result and fix what it reports. Polish: with no keyboard device the notice still
       names input groups.
+      October 21: the catalog test PASSED on v1.0.4 (it runs the AppImage offline with no keyboard and
+      tests it as a tray application); its screenshot shows only a close-up of the tray icon, because a
+      click on the icon opened nothing visible there. The request (#10422) stays open for the catalog
+      maintainers' review. Optional polish: render the tray menu, or show a minimal status window, when
+      no keyboard device is available, and embed AppImage update information (`appimagetool -u` plus the
+      `.zsync` file). Each release is re-tested by the catalog by itself; post `/retest` (from PowerShell,
+      not Git Bash) only after fixing a reported failure.
 - [ ] **CI duration.** [CI] Four of the five planned optimisations are in (macOS packaging after
       Unit beside E2E, Build waiting beside E2E for qualified inputs, the Intel XCTest cohorts in
       their own cell, several installed-app scenarios per job, Windows unit shards rebalanced from
