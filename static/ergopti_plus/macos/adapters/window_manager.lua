@@ -20,11 +20,22 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local RunningApplication = require("adapters.running_application")
 
 local LOG = "adapters.window_manager"
 
 -- Sentinel HWND used when no real handle is available (matches AHK convention).
 local INVALID_HWND = 0
+
+--- Resolves a running application named by bundle identifier or exact name.
+--- Never hs.application.get: when nothing runs under that name it searches every
+--- window of every application through Accessibility on the main thread, up to
+--- six seconds per application that does not answer (issue #99).
+--- @param spec string Bundle identifier or application name.
+--- @return userdata|table|nil app The running application, or nil.
+local function running_app(spec)
+	return RunningApplication.by_bundle_id(spec) or RunningApplication.by_name(spec)
+end
 
 --- Rejects a chainable focus result after the window's application has exited.
 --- The native Lua focus method returns self even when application() is nil.
@@ -50,7 +61,7 @@ end
 function M.activate(hwnd_or_spec)
 	local ok, result = pcall(function()
 		if type(hwnd_or_spec) == "string" then
-			local app = hs.application.get(hwnd_or_spec)
+			local app = running_app(hwnd_or_spec)
 			if app then
 				return app:activate() == true
 			end
@@ -77,7 +88,7 @@ end
 function M.exists(spec)
 	local ok, result = pcall(function()
 		if type(spec) ~= "string" then return false end
-		local app = hs.application.get(spec)
+		local app = running_app(spec)
 		if app then return true end
 		local wins = hs.window and hs.window.allWindows and hs.window.allWindows() or {}
 		for _, w in ipairs(wins) do
@@ -101,7 +112,7 @@ end
 function M.kill(spec)
 	local ok, result = pcall(function()
 		if type(spec) ~= "string" then return false end
-		local app = hs.application.get(spec)
+		local app = running_app(spec)
 		if not app then return false end
 		app:kill()
 		return true
@@ -140,7 +151,7 @@ end
 function M.getTitle(hwnd_or_spec)
 	local ok, result = pcall(function()
 		if type(hwnd_or_spec) == "string" then
-			local app = hs.application.get(hwnd_or_spec)
+			local app = running_app(hwnd_or_spec)
 			if app then
 				local win = app:mainWindow()
 				if win then
