@@ -34,6 +34,13 @@
  * It also pinned the exact internal whitespace of each line
  * ('_HsEdWeb_MsgSub     := unset'), so a reformat broke it with "line not found"
  * rather than a behaviour signal. Matching is whitespace-insensitive now.
+ *
+ * EACH CLOSE IS PAIRED WITH ITS OWN SUBSCRIPTIONS:
+ * A host may close a half-built local `Controller` in its open path, above the
+ * teardown that releases its `_X_MsgSub` globals before `_X_Controller.Close()`.
+ * Comparing every release with every Close flagged that correct teardown, so a
+ * release now counts only for the controller of the same name prefix, and a
+ * controller whose own subscriptions are stored but never released fails.
  * ==============================================================================
  */
 
@@ -76,6 +83,16 @@ function walk(dir, acc = []) {
 		}
 	}
 	return acc;
+}
+
+/**
+ * The owner prefix of a subscription handle: `_PiEdWeb_MsgSub` -> `_PiEdWeb_`,
+ * a local or `this.` `NavSub` -> ``.
+ * @param {string} name Handle name without `this.`.
+ * @returns {string} Prefix shared with its controller's name.
+ */
+function subscriptionOwner(name) {
+	return name.replace(/[A-Z]?[a-z]*Sub$/, '');
 }
 
 let total_pass = 0;
@@ -140,7 +157,31 @@ for (const abs of walk(WINDOWS_DIR)) {
 	}
 
 	for (const close of closes) {
-		const late = releases.filter((r) => r.line > close.line);
+		// A subscription belongs to the controller of the same owner: `_X_MsgSub` to
+		// `_X_Controller`, a local `MsgSub` to a local `Controller`. A host can close a
+		// half-built local controller in its open path long before the teardown
+		// releases its globals, and that earlier Close says nothing about them.
+		const owner = close.name.replace(/controller$/i, '');
+		const own = releases.filter((r) => subscriptionOwner(r.name) === owner);
+		if (own.length === 0) {
+			const stores = lines.some(
+				(l, i) =>
+					i > firstFuncLine &&
+					!l.trim().startsWith(';') &&
+					[...l.matchAll(/(?<![\w.])(\w*Sub)\s*:=/g)].some((m) => subscriptionOwner(m[1]) === owner)
+			);
+			if (stores) {
+				fail(
+					`${rel}:${close.line + 1} — ${close.name}.Close() releases its own subscriptions`,
+					`The file stores subscriptions of ${close.name} but releases none of them. ` +
+						'Each must be dropped (:= unset) while the controller is still alive.'
+				);
+			} else {
+				pass(`${rel} — ${close.name}.Close() owns no subscription handle`);
+			}
+			continue;
+		}
+		const late = own.filter((r) => r.line > close.line);
 		if (late.length > 0) {
 			for (const r of late) {
 				fail(
@@ -151,7 +192,7 @@ for (const abs of walk(WINDOWS_DIR)) {
 				);
 			}
 		} else {
-			const names = [...new Set(releases.map((r) => r.name))].join(', ');
+			const names = [...new Set(own.map((r) => r.name))].join(', ');
 			pass(`${rel} — ${names} released before ${close.name}.Close()`);
 		}
 	}
