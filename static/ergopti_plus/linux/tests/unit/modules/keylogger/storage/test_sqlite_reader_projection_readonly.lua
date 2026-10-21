@@ -871,3 +871,66 @@ helpers.describe("linux-sqlite-switch-projection", function()
 	end)
 end)
 
+
+helpers.describe("linux-sqlite-text-nul", function()
+	-- Raw TEXT the sqlite3 CLI's JSON mode would cut at the first NUL byte.
+	local TEXT = { app = "Fire\0fox", title = "Doc\0A", layout = "fr\0x", app_to = "Term\0inal" }
+
+	--- Answers like the CLI: json_quote keeps every byte, a raw column is cut at NUL.
+	local function cli(sql)
+		if sql:find("media", 1, true) then return "[]" end
+		local row = { date = "2026-10-21", hour = 9, slot = 3, bucket_ms = 100, keycode = 30, scancode = 30,
+			c = 1, count = 1, chars = 1, ms = 5, td = 1, e = 0, source_rows = 1, token_json = '"a"' }
+		for column, value in pairs(TEXT) do
+			if sql:find("json_quote(" .. column .. ") AS " .. column .. "_json", 1, true) then
+				row[column .. "_json"] = '"' .. value:gsub("%z", "\\u0000") .. '"'
+			else
+				row[column] = value:match("^[^%z]*")
+			end
+		end
+		return Json.encode({ row })
+	end
+
+	helpers.it("linux-sqlite-text-nul: app, title, layout and destination keep their bytes past a NUL", function()
+		local manifest, complete
+		local statements = with_stubbed_sqlite(cli, function(reader)
+			manifest, complete = reader.read_manifest("/db/metrics.sqlite", "2026-10-21", "2026-10-21", {})
+		end)
+		helpers.assert_eq(complete, true)
+		local day = manifest["2026-10-21"]
+		helpers.assert_nil(day["Fire"], "a NUL-cut application id is a different application")
+		local entry = day[TEXT.app]
+		helpers.assert_true(entry ~= nil, "the complete application id keys the manifest")
+		helpers.assert_true(entry.titles[TEXT.title] ~= nil and entry.titles["Doc"] == nil)
+		helpers.assert_true(entry.layouts_seen[TEXT.layout] ~= nil and entry.layouts_seen["fr"] == nil)
+		helpers.assert_true(entry.switches_to[TEXT.app_to] ~= nil and entry.switches_to["Term"] == nil)
+		for _, sql in ipairs(statements) do
+			helpers.assert_nil(sql:match("SELECT date, app,"), "no projection may carry app as raw TEXT: " .. sql)
+		end
+	end)
+
+	helpers.it("linux-sqlite-text-nul: today's per-application n-grams keep the complete application id", function()
+		local range
+		with_stubbed_sqlite(cli, function(reader)
+			range = reader.read_range_split_today("/db/metrics.sqlite", "2026-10-21", "2026-10-21", {}, "2026-10-21")
+		end)
+		helpers.assert_true(range.today[TEXT.app] ~= nil)
+		helpers.assert_nil(range.today["Fire"])
+		helpers.assert_eq(range.today[TEXT.app].c.a.c, 1)
+		helpers.assert_eq(range.today[TEXT.app].sc_kb["30"].c, 1)
+	end)
+
+	helpers.it("linux-sqlite-text-nul: a malformed or NULL quoted text refuses the projection instead of guessing", function()
+		for _, quoted in ipairs({ "null", '"unterminated', "42" }) do
+			local manifest, complete
+			with_stubbed_sqlite(function(sql)
+				if not sql:find("FROM agg_app_day%s") and not sql:find("FROM agg_app_day GROUP") then return "[]" end
+				return Json.encode({ { date = "2026-10-21", chars = 1, app_json = quoted } })
+			end, function(reader)
+				manifest, complete = reader.read_manifest("/db/metrics.sqlite", "2026-10-21", "2026-10-21", {})
+			end)
+			helpers.assert_eq(complete, false, quoted)
+			helpers.assert_nil(next(manifest), quoted)
+		end
+	end)
+end)
