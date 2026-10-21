@@ -245,3 +245,5 @@ _HPS_WatcherStampsBeforeFeeding() {
 }
 Test("meta hotstrings: the prefix watcher stamps each observed character before feeding the engine (hotstring-preview-shows)",
 	_HPS_WatcherStampsBeforeFeeding)
+
+#Include test_hotstring_preview_end_scalar.ahk
