@@ -1577,8 +1577,16 @@ KLWV_QueueFullBuildRetry(which, Epoch, attempt, RetryOwner := 0) {
 
 KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, Period) {
 		try {
-				if !KLWV_ArmFullBuildTimer(
-						KLWV_DelayedFullBuild.Bind(which, Epoch, Owner["attempt"], Owner), Period)
+				if Owner.Has("warm_store") {
+						Entry := KLWV.windows.Get(which, 0)
+						if !KLWV_WarmOwnsWindow(which, Entry, Epoch, Owner["warm_store"], Owner)
+								return false
+						Callback := KLWV_ResumeWarmWindow.Bind(which, Entry, Epoch, Owner)
+				} else
+						Callback := KLWV_DelayedFullBuild.Bind(which, Epoch, Owner["attempt"], Owner)
+				Armed := Owner.Has("warm_store") ? KLWV_ArmWarmTimer(Callback, Period)
+						: KLWV_ArmFullBuildTimer(Callback, Period)
+				if !Armed
 						throw Error("Full metrics retry scheduler refused the timer.")
 				return true
 		} catch as Err {
@@ -1872,7 +1880,7 @@ KLWV_ArmWarmTimer(Callback, DelayMs) {
 ; run one after another (the terminal chains the next) so two projections never
 ; compete for the same SQLite ledger.
 ; @returns {Boolean} True when a background build was started.
-KLWV_WarmRun(Index := 1, *) {
+KLWV_WarmRun(Index := 1, ExpectedStore := "", *) {
 	if A_IsSuspended {
 		try LoggerDebug("Keylogger", "Metrics sidecar warm-up skipped while suspended.")
 		return false
@@ -1884,9 +1892,11 @@ KLWV_WarmRun(Index := 1, *) {
 		return false
 	}
 	MetricsDir := KLWV.warm_metrics_dir
-	if (MetricsDir = "")
+	if (MetricsDir = "") || (ExpectedStore != "" && !KLWV_WarmSameStore(MetricsDir, ExpectedStore))
 		return false
 	while (Index <= KLWV.WARM_ORDER.Length) {
+		if !KLWV_WarmLaunchCurrent(MetricsDir)
+			return false
 		which := KLWV.WARM_ORDER[Index]
 		if KLWV.windows.Has(which) || KLPFWorker.jobs.Has(which) {
 			try LoggerDebug("Keylogger", "Metrics sidecar warm-up leaves '{1}' to its current owner.", which)
@@ -1894,8 +1904,15 @@ KLWV_WarmRun(Index := 1, *) {
 			continue
 		}
 		try LoggerInfo("Keylogger", "Metrics sidecar warm-up started for '{1}'.", which)
+		; Diagnostics can open a dashboard, rearm another store, or pause.
+		if !KLWV_WarmLaunchCurrent(MetricsDir)
+			return false
+		if KLWV.windows.Has(which) || KLPFWorker.jobs.Has(which) {
+			Index += 1
+			continue
+		}
 		return KLPF_RequestBuild(which, MetricsDir, "full", 0,
-			KLWV_OnWarmTerminal.Bind(which, Index), false)
+			KLWV_OnWarmTerminal.Bind(which, Index, MetricsDir), false)
 	}
 	return false
 }
@@ -1904,17 +1921,154 @@ KLWV_WarmRun(Index := 1, *) {
 ; full-build steps stand down while a job exists), so the result is delivered as
 ; that window's full build. The next key starts one turn later, after this job
 ; has retired from the registry.
-KLWV_OnWarmTerminal(which, Index, status, *) {
+KLWV_OnWarmTerminal(which, Index, MetricsDir, status, *) {
 	if (status = "ok") {
 		try LoggerInfo("Keylogger", "Metrics sidecar warm-up published '{1}'.", which)
 	} else {
 		try LoggerWarn("Keylogger", "Metrics sidecar warm-up for '{1}' ended: {2}.", which, status)
 	}
-	if KLWV.windows.Has(which) {
-		entry := KLWV.windows[which]
-		KLWV_OnFullBuildTerminal(which, entry.Get("epoch", 0), 0, status)
+	Entry := KLWV.windows.Get(which, 0)
+	if Entry is Map {
+		Epoch := Entry.Get("epoch", 0)
+		if KLWV_WarmSameStore(Entry.Get("metrics_dir", ""), MetricsDir)
+			KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, status)
+		else
+			; Its first-paint timer may already have stood down for this job.
+			; An old store can retire, but cannot certify this window's history.
+			KLWV_QueueWarmWindow(which, Entry, Epoch, Entry.Get("metrics_dir", ""), "canceled")
 	}
-	if (Index < KLWV.WARM_ORDER.Length)
-		KLWV_ArmWarmTimer(KLWV_WarmRun.Bind(Index + 1), 1)
+	if (Index < KLWV.WARM_ORDER.Length) && KLWV_WarmLaunchCurrent(MetricsDir)
+		KLWV_ArmWarmTimer(KLWV_WarmRun.Bind(Index + 1, MetricsDir), 1)
 	return true
+}
+
+; Store comparison follows the same path grammar as sidecar identity. Preserve
+; case: Windows can host case-sensitive directories beneath an ordinary drive.
+KLWV_WarmSameStore(Left, Right) {
+	Normalized := ConfigTransitionNormalizeConfigDir(Left)
+	return (Normalized is String) && Normalized == ConfigTransitionNormalizeConfigDir(Right)
+}
+
+KLWV_WarmLaunchCurrent(MetricsDir) {
+	return !A_IsSuspended && !KLPF_ReloadKeepsWorkersOut()
+		&& KLWV_WarmSameStore(MetricsDir, KLWV.warm_metrics_dir)
+}
+
+KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner := 0) {
+	return _KLWV_OwnsDelivery(which, Entry, Epoch)
+		&& Entry.Get("epoch", 0) == Epoch
+		&& KLWV_WarmSameStore(MetricsDir, Entry.Get("metrics_dir", ""))
+		&& (!Owner || Entry.Get("full_build_retry_owner", 0) == Owner)
+}
+
+; Retry state contains data only. The timer captures the exact Entry, while a
+; paused retry remains attached to that Entry through the existing pending map.
+KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Reason, Attempt := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
+			|| Entry.Get("full_build_done", false) || KLWV_FullRetryBlocksIngest(Entry)
+			return false
+		NextAttempt := KLWV_NextRetryAttempt(Attempt, Reason)
+		if NextAttempt > KLWV.FULL_BUILD_MAX_RETRIES {
+			Entry["full_build_retry_revision"] := Entry.Get("ingest_revision", 0)
+			Entry["full_build_retry_exhausted"] := true
+			return false
+		}
+		Owner := Map("revision", Entry.Get("ingest_revision", 0),
+			"attempt", NextAttempt, "warm_store", MetricsDir)
+		Entry["full_build_retry_owner"] := Owner
+		Entry["full_build_retry_revision"] := Owner["revision"]
+		if A_IsSuspended
+			return KLWV_QueueFullBuildRetry(which, Epoch, Owner["attempt"], Owner)
+	} finally Critical(PreviousCritical)
+	return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
+}
+
+KLWV_RetireWarmWindow(Entry, Owner) {
+	PreviousCritical := Critical("On")
+	try {
+		if Entry.Get("full_build_retry_owner", 0) != Owner
+			return false
+		Entry.Delete("full_build_retry_owner")
+		if Entry.Has("pending_full_build_retry") && Entry["pending_full_build_retry"]["owner"] == Owner
+			Entry.Delete("pending_full_build_retry")
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+KLWV_ResumeWarmWindow(which, Entry, Epoch, Owner) {
+	MetricsDir := Owner["warm_store"]
+	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
+		return KLWV_RetireWarmWindow(Entry, Owner)
+	if Entry.Get("full_build_done", false) || Owner["revision"] != Entry.Get("ingest_revision", 0)
+		return KLWV_RetireWarmWindow(Entry, Owner)
+	if A_IsSuspended
+		return KLWV_QueueFullBuildRetry(which, Epoch, Owner["attempt"], Owner)
+	if Owner.Get("launching", false)
+		return true
+	if KLPF_ReloadKeepsWorkersOut()
+		return KLWV_RetireWarmWindow(Entry, Owner)
+	Destination := KLPF_PrefetchPath(which, MetricsDir)
+	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
+		return KLWV_RetireWarmWindow(Entry, Owner)
+	if KLPFWorker.jobs.Has(which) {
+		Job := KLPFWorker.jobs[which]
+		if Job["destination"] == Destination && Job["epoch"] == Epoch {
+			if Owner.Get("generation", 0) == Job["generation"]
+				return true ; This recovery's own terminal now owns completion.
+			if !Owner.Get("launching", false)
+				return KLWV_RetireWarmWindow(Entry, Owner)
+		}
+		; A terminal is called BEFORE its reservation retires. Keep the debt
+		; when a timer fires early, rather than losing the waiting window.
+		return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
+	}
+	Entry["full_build_requested_revision"] := Owner["revision"]
+	Owner["launching"] := true
+	try Started := KLPF_RequestBuild(which, MetricsDir, "full", Epoch,
+		KLWV_OnWarmWindowTerminal.Bind(which, Entry, Epoch, MetricsDir, Owner), false)
+	finally Owner.Delete("launching")
+	if KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner) {
+		if Started && KLPFWorker.jobs.Has(which)
+			Owner["generation"] := KLPFWorker.jobs[which]["generation"]
+		if !Started
+			return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
+	}
+	return Started
+}
+
+KLWV_OnWarmWindowTerminal(which, Entry, Epoch, MetricsDir, Owner, Status, *) {
+	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
+		return KLWV_RetireWarmWindow(Entry, Owner)
+	KLWV_RetireWarmWindow(Entry, Owner)
+	return KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Owner["attempt"])
+}
+
+KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt := 0) {
+	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
+		return false
+	KLWV_SettleRebuildProgress(which, Epoch, Status)
+	try {
+		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
+			return false
+		if A_IsSuspended || Status != "ok"
+			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt)
+		Pushed := KLWV_FirstPaintPush(which, Epoch)
+		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
+			return false
+		if !Pushed
+			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, "push failed", Attempt)
+		PreviousCritical := Critical("On")
+		try {
+			if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
+				return false
+			if A_IsSuspended
+				return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, "ok", Attempt)
+			return KLWV_CommitPaint(which, Epoch, true)
+		} finally Critical(PreviousCritical)
+	} finally {
+		if KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
+			KLWV_ScheduleIngestDrain(which, Epoch)
+	}
 }
