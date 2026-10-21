@@ -10,6 +10,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../../../../fixtures/native_owned_button.ahk
+
 class _MAOG_Controller {
 	__New() {
 		this.Closed := 0, this.IsVisible := true
@@ -82,11 +84,15 @@ _MAOG_ControlSnapshot(Hwnd, RequestedClassNN := "") {
 _MAOG_TraceButton(World, ClassNN, Hwnd) {
 	try {
 		ButtonHwnd := ControlGetHwnd(ClassNN, "ahk_id " . Hwnd)
-		_MAOG_Trace(World, "click-before", _MAOG_ControlSnapshot(ButtonHwnd, ClassNN))
+		Snapshot := _MAOG_ControlSnapshot(ButtonHwnd, ClassNN)
+		Snapshot["transport"] := "semantic-native-bm-click"
+		_MAOG_Trace(World, "click-before", Snapshot)
+		return ButtonHwnd
 	} catch as Failure {
 		_MAOG_Trace(World, "click-probe-error", Map("requested_classnn", ClassNN,
 			"parent_hwnd", Hwnd, "error_type", Type(Failure)))
 	}
+	return 0
 }
 
 ; A bare return leaves WM_COMMAND unconsumed. Observe only BN_CLICKED from
@@ -153,20 +159,20 @@ _MAOG_Act(World) {
 			if World.Shown.Length == 1 {
 				ControlSetText("Native category 😀", "Edit1", "ahk_id " . Hwnd)
 				AssertEqual("Native category 😀", ControlGetText("Edit1", "ahk_id " . Hwnd))
-				_MAOG_TraceButton(World, "Button1", Hwnd)
-				ControlClick("Button1", "ahk_id " . Hwnd)
-				_MAOG_Trace(World, "click-return", Map("requested_classnn", "Button1", "parent_hwnd", Hwnd))
+				ButtonHwnd := _MAOG_TraceButton(World, "Button1", Hwnd)
+				ClickReceipt := _TestClickOwnedNativeButton(World.NativeGui, ButtonHwnd)
+				_MAOG_Trace(World, "click-return", ClickReceipt)
 			} else {
 				AssertEqual(2, World.Shown.Length, "accepting the category must reach exactly one real score prompt")
 				AssertEqual("0", ControlGetText("Edit1", "ahk_id " . Hwnd))
-				_MAOG_TraceButton(World, "Button2", Hwnd)
-				ControlClick("Button2", "ahk_id " . Hwnd)
-				_MAOG_Trace(World, "click-return", Map("requested_classnn", "Button2", "parent_hwnd", Hwnd))
+				ButtonHwnd := _MAOG_TraceButton(World, "Button2", Hwnd)
+				ClickReceipt := _TestClickOwnedNativeButton(World.NativeGui, ButtonHwnd)
+				_MAOG_Trace(World, "click-return", ClickReceipt)
 			}
 		} else if World.Mode == "picker-cancel" {
-			_MAOG_TraceButton(World, "Button2", Hwnd)
-			ControlClick("Button2", "ahk_id " . Hwnd)
-			_MAOG_Trace(World, "click-return", Map("requested_classnn", "Button2", "parent_hwnd", Hwnd))
+			ButtonHwnd := _MAOG_TraceButton(World, "Button2", Hwnd)
+			ClickReceipt := _TestClickOwnedNativeButton(World.NativeGui, ButtonHwnd)
+			_MAOG_Trace(World, "click-return", ClickReceipt)
 		} else {
 			_MAOG_RetirePage(World)
 		}
