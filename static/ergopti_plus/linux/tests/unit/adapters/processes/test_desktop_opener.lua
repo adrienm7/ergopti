@@ -29,7 +29,10 @@ local function with_opener(options, body)
 			if not options.no_exepath then return "/native/lua" end
 		end,
 		worker = function() boundary("worker"); return "/driver/adapters/desktop_opener_worker.lua" end,
-		timeout = function() boundary("timeout"); return options.float_timeout and 30000.0 or 30000 end,
+		timeout = function()
+			boundary("timeout")
+			return options.timeout_value or (options.float_timeout and 30000.0 or 30000)
+		end,
 		update_time = function() boundary("clock") end,
 		start = function(executable, argv, settings, complete)
 			state.constructing = true
@@ -101,6 +104,18 @@ h.describe("desktop-confirmation physical admission", function()
 			h.assert_eq(true, request.is_settled())
 			s.native[1]:logical(); s.native[1]:ack(); h.assert_eq(1, s.callbacks)
 		end)
+	end)
+	h.it("desktop-confirmation refuses a deadline above the shared timer ceiling before acquisition (timer-delay-ceiling)", function()
+		for _, case in ipairs({ { value = 2 ^ 53, admitted = true }, { value = 2 ^ 53 + 2, admitted = false },
+			{ value = 2 ^ 63, admitted = false } }) do
+			with_opener({ timeout_value = case.value }, function(Open, s)
+				local request, reason = s.open()
+				h.assert_eq(case.admitted, request ~= nil)
+				h.assert_eq(case.admitted and 1 or 0, #s.native, "a refused deadline never reaches the helper")
+				if not case.admitted then h.assert_contains(tostring(reason), "timer ceiling") end
+				h.assert_eq(case.admitted, Open.shutdown() == false)
+			end)
+		end
 	end)
 	for _, label in ipairs({ "exepath", "worker", "timeout", "clock" }) do
 		h.it("desktop-confirmation parks shutdown during " .. label .. " and never acquires afterward", function()

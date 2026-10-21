@@ -68,7 +68,11 @@ M.HAS_LUV = (luv ~= nil)
 --- @param ms number Milliseconds to wait.
 --- @return boolean True when the wait completed.
 function M.sleep_ms(ms)
-	if type(ms) ~= "number" or ms < 0 then return false end
+	if not NumberPolicy.within_timer_ceiling(ms) then
+		Logger.error(LOG, "sleep_ms() delay must be finite and within the timer ceiling — got %s; refused.", tostring(ms))
+		return false
+	end
+	if ms < 0 then return false end
 	local ok = pcall(nap, ms / 1000)
 	return ok
 end
@@ -171,12 +175,9 @@ end
 --- @param periodSec number Resolved duration in seconds.
 --- @return number milliseconds Finite, not yet clamped.
 local function _periodic_ms(periodSec)
-	if not NumberPolicy.is_finite(periodSec) then
-		error("Event loop periodic duration must be finite", 0)
-	end
-	local milliseconds = periodSec * 1000
-	if not NumberPolicy.is_finite(milliseconds) then
-		error("Event loop periodic milliseconds must be finite", 0)
+	local milliseconds = NumberPolicy.timer_delay_ms(periodSec)
+	if milliseconds == nil then
+		error("Event loop periodic duration must be finite and within the timer ceiling", 0)
 	end
 	return milliseconds
 end
@@ -407,7 +408,8 @@ end
 --- For work that must not hold up what the current callback returns: a bridge
 --- answers a window with what it already has and refreshes it after the page
 --- has painted. Runs on the daemon's own loop, with or without luv, so it needs
---- no timer backend. Fail-fast: a non-function, non-finite or negative delay is refused.
+--- no timer backend. Fail-fast: a non-function, negative, non-finite or
+--- above-ceiling delay is refused.
 --- @param fn function Zero-arity callback.
 --- @param delay_ms number|nil Minimum delay in milliseconds (default 0).
 --- @return boolean True when the callback was queued.
@@ -417,8 +419,8 @@ function M.defer(fn, delay_ms)
 		return false
 	end
 	local delay = delay_ms == nil and 0 or delay_ms
-	if not NumberPolicy.is_finite(delay) or delay < 0 then
-		Logger.error(LOG, "defer() delay must be a finite non-negative number — got %s; ignoring.", tostring(delay_ms))
+	if not NumberPolicy.within_timer_ceiling(delay) or delay < 0 then
+		Logger.error(LOG, "defer() delay must be non-negative and within the timer ceiling — got %s; ignoring.", tostring(delay_ms))
 		return false
 	end
 	_deferred[#_deferred + 1] = { fn = fn, due_ms = Monotonic.now_ms() + delay }

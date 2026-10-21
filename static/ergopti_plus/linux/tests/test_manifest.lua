@@ -388,6 +388,7 @@ return {
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_writer",
 	"tests.unit.modules.hotstrings.terminators.test_terminator_no_fallback",
 	"tests.unit.adapters.runtime.test_timer_scheduler_adapter",
+	"tests.unit.adapters.runtime.test_timer_delay_ceiling",
 	"tests.unit.infra.logger.test_timings_reader",
 	"tests.unit.infra.config.test_toml_codec_shared_decode",
 	"tests.unit.infra.config.test_toml_codec_shapes",
