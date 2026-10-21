@@ -2122,9 +2122,9 @@ _Updater_ReleaseNotificationReservation(Reservation) {
 	return Released
 }
 
-_Updater_TryPublishFetchCache(Channel, Etag, Json, Request) {
+_Updater_TryPublishFetchCache(Channel, Etag, Json, Request, Index := 0) {
 	global _UpdaterFetchCache, UPDATER_REQUEST_POLICY_ALLOW
-	Entry := { Etag: Etag, Json: Json }
+	Entry := _Updater_NewFetchCacheEntry(Etag, Json, Index)
 	PreviousCritical := A_IsCritical
 	Published := false
 	Critical("On")
@@ -2218,7 +2218,7 @@ _Updater_FetchCacheEntry(Channel, Url) {
 ; @returns {Boolean} True when the stored copy now holds this ETag.
 _Updater_PersistListCache(Url, Etag, Json) {
 	global UPDATER_LIST_CACHE_MAGIC, _UpdaterListDiskEntry
-	if (Url != Updater_ReleaseApiUrl() || SubStr(LTrim(Json), 1, 1) != "[")
+	if (Url != Updater_ReleaseApiUrl() || !_Updater_JsonIsList(Json))
 		return false
 	Current := _Updater_LoadListDiskEntry(Url)
 	if (IsObject(Current) && Current.Etag == Etag)
@@ -2604,20 +2604,27 @@ _Updater_RateLimitDetail(Status, Remaining, Reset) {
 _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, RateLimit := 0) {
 	global _UpdaterFetchCache
 	Json := ""
+	; The list is decoded once per response (once per cached entry on a 304)
+	; and both readers below share that index.
+	Index := 0
 	if (Status == 304) {
 		Cached := _Updater_FetchCacheEntry(Channel, Url)
-		if IsObject(Cached)
+		if IsObject(Cached) {
 			Json := Cached.Json
+			Index := _Updater_CachedListIndex(Cached)
+		}
 		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
 	} else if (Status == 200) {
 		Json := Body
 		if (Etag is String and Etag != ""
 			and _Updater_JsonPayloadIsUsable(Json)) {
+			if _Updater_JsonIsList(Json)
+				Index := _Updater_ReleaseListIndex(Json)
 			if IsSet(Request) {
-				if _Updater_TryPublishFetchCache(Channel, Etag, Json, Request)
+				if _Updater_TryPublishFetchCache(Channel, Etag, Json, Request, Index)
 					_Updater_PersistListCache(Url, Etag, Json)
 			} else {
-				_UpdaterFetchCache[Channel] := { Etag: Etag, Json: Json }
+				_UpdaterFetchCache[Channel] := _Updater_NewFetchCacheEntry(Etag, Json, Index)
 				_Updater_PersistListCache(Url, Etag, Json)
 			}
 		}
@@ -2636,13 +2643,44 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, R
 	; downstream parser receives a single-object JSON string. A manual check also
 	; keeps, on its request, the other channels with a newer release: the
 	; update-check window lists them.
-	if (_Updater_JsonPayloadIsUsable(Json)
-		and SubStr(LTrim(Json), 1, 1) == "[") {
+	if (_Updater_JsonPayloadIsUsable(Json) and _Updater_JsonIsList(Json)) {
+		if !IsObject(Index)
+			Index := _Updater_ReleaseListIndex(Json)
 		if IsSet(Request)
-			_Updater_RecordOtherChannels(Request, Json, Channel)
-		Json := _Updater_SelectChannelRelease(Json, Channel)
+			_Updater_RecordOtherChannels(Request, Json, Channel, Index)
+		Json := _Updater_SelectChannelRelease(Json, Channel, Index)
 	}
 	return Json
+}
+
+; Reports whether a payload's first significant character opens an array,
+; without copying the payload.
+_Updater_JsonIsList(Json) {
+	return Json is String && RegExMatch(Json, "^[ \t\r\n]*\[") > 0
+}
+
+; A conditional-GET entry: the list, its validator and, when already decoded,
+; the list's index (_Updater_CachedListIndex).
+_Updater_NewFetchCacheEntry(Etag, Json, Index := 0) {
+	Entry := { Etag: Etag, Json: Json }
+	if IsObject(Index)
+		Entry.Index := Index
+	return Entry
+}
+
+; The index of a conditional-GET entry's list, decoded on first use. An entry's
+; Json never changes (a new response replaces the whole entry), so its index
+; stays valid for the entry's life and a 304 decodes nothing.
+_Updater_CachedListIndex(Entry) {
+	if !Entry.HasOwnProp("Index")
+		Entry.Index := _Updater_ReleaseListIndex(Entry.Json)
+	return Entry.Index
+}
+
+; The members of each listed release the update check reads: its tag, and its
+; publication time for the other channels' notices.
+_Updater_ReleaseListIndex(Json) {
+	return _Updater_DecodeReleaseList(Json, ["tag_name", "published_at"])
 }
 
 ; Keeps on a manual request the other channels whose latest release in the list
@@ -2650,15 +2688,18 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset, R
 ; @param Request {Object} The request context; only a manual one is annotated.
 ; @param Json {String} The release list.
 ; @param Channel {String} The checked channel.
-_Updater_RecordOtherChannels(Request, Json, Channel) {
+; @param Index {Array} The list's index when already decoded.
+_Updater_RecordOtherChannels(Request, Json, Channel, Index := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if (Type(Request) != "Object") || !Request.HasProp("Origin")
 		|| (Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
 		return
+	if !IsObject(Index)
+		Index := _Updater_ReleaseListIndex(Json)
 	Releases := []
-	for _, Span in _Updater_DecodeReleaseList(Json)
-		Releases.Push(Map("tag", _Updater_ReleaseString(Span["value"], "tag_name"),
-			"published_at", _Updater_ReleaseString(Span["value"], "published_at")))
+	for _, Span in Index
+		Releases.Push(Map("tag", _Updater_ReleaseString(Span["members"], "tag_name"),
+			"published_at", _Updater_ReleaseString(Span["members"], "published_at")))
 	Request.OtherChannels := UpdateChannels_NewerElsewhere(Releases, Channel, Updater_CurrentVersion())
 }
 
@@ -2673,18 +2714,19 @@ _Updater_RequestOtherChannels(Request) {
 ; chosen by the shared registry's tag rule and semver order (GitHub lists by
 ; publish date, so a later stable must not hide a higher dev build or the
 ; reverse), or UPDATER_NO_CHANNEL_RELEASE when the list holds none.
-_Updater_SelectChannelRelease(Json, Channel) {
+; @param Index {Array} The list's index when already decoded.
+_Updater_SelectChannelRelease(Json, Channel, Index := 0) {
 	global UPDATER_NO_CHANNEL_RELEASE
-	Releases := _Updater_DecodeReleaseList(Json)
+	Releases := IsObject(Index) ? Index : _Updater_ReleaseListIndex(Json)
 	Tags := []
 	for _, Span in Releases
-		Tags.Push(_Updater_ReleaseString(Span["value"], "tag_name"))
+		Tags.Push(_Updater_ReleaseString(Span["members"], "tag_name"))
 	Best := UpdateChannels_PickLatest(Tags, Channel)
 	if !Best {
 		try LoggerInfo("Updater", "No release of channel '{1}' among the {2} listed.", Channel, Releases.Length)
 		return UPDATER_NO_CHANNEL_RELEASE
 	}
-	return Releases[Best]["text"]
+	return SubStr(Json, Releases[Best]["start"], Releases[Best]["length"])
 }
 
 ; Reports whether a fetch answered that its channel has no release yet.
@@ -3557,23 +3599,23 @@ _Updater_ReleaseString(Release, Key) {
 	return Value is String ? Value : ""
 }
 
-; Decodes a complete release list once: the exact raw span of every root
-; object, in publication order, with its decoded value. A document that is not
-; an array of objects offers no release at all: a nested array, a scalar or a
-; string that only looks like a release object never reaches version selection.
+; Decodes a complete release list once: the exact span of every root object,
+; in publication order, with the decoded values of only the named members of
+; each release. The whole list is validated, but nothing a reader does not name
+; is built: the assets, author and notes of a 6 MB list are never decoded (the
+; release list freeze). A document that is not an array of objects offers no
+; release at all: a nested array, a scalar or a string that only looks like a
+; release object never reaches version selection.
 ; @param Json {String} The release list returned by the GitHub API.
-; @returns {Array} Maps with "text" (raw object span) and "value" (decoded Map).
-_Updater_DecodeReleaseList(Json) {
-	if _Updater_JsonPayloadIsFailure(Json) || SubStr(LTrim(Json, " `t`r`n"), 1, 1) != "["
+; @param Members {Array} The release members to decode.
+; @returns {Array} Maps with "start" and "length" (the raw object span in Json)
+;   and "members" (a Map of the named members present).
+_Updater_DecodeReleaseList(Json, Members) {
+	if _Updater_JsonPayloadIsFailure(Json) || !_Updater_JsonIsList(Json)
 		return []
-	try Spans := JsonArrayElementSpans(Json)
+	try return JsonArrayObjectMembers(Json, Members)
 	catch
 		return []
-	for _, Span in Spans {
-		if !(Span["value"] is Map)
-			return []
-	}
-	return Spans
 }
 
 ; Splits the top-level JSON array of releases into the exact raw text of each
@@ -3581,8 +3623,8 @@ _Updater_DecodeReleaseList(Json) {
 ; _Updater_DecodeReleaseList for what is refused).
 _Updater_SplitReleasesArray(Json) {
 	out := []
-	for _, Span in _Updater_DecodeReleaseList(Json)
-		out.Push(Span["text"])
+	for _, Span in _Updater_DecodeReleaseList(Json, [])
+		out.Push(SubStr(Json, Span["start"], Span["length"]))
 	return out
 }
 
@@ -3610,7 +3652,18 @@ _Updater_ParseHtmlUrl(Json) {
 ; Extracts the release object's own "published_at" timestamp, decoded once.
 ; Timestamp validation stays with its consumers.
 _Updater_ParsePublishedAt(Json) {
-	return _Updater_ReleaseString(_Updater_DecodeRelease(Json), "published_at")
+	return _Updater_ReleaseMember(Json, "published_at")
+}
+
+; One string member of a single release object, validated whole but with only
+; that member decoded (a release carries about 60 KB of assets and notes); ""
+; when the document is not a complete object or the member is not a string.
+_Updater_ReleaseMember(Json, Key) {
+	if _Updater_JsonPayloadIsFailure(Json)
+		return ""
+	try return _Updater_ReleaseString(JsonObjectMembers(Json, [Key]), Key)
+	catch
+		return ""
 }
 
 ; Build an array of release records from the raw JSON list. With a ViewChannel,
@@ -3622,25 +3675,38 @@ _Updater_ParsePublishedAt(Json) {
 ; API order is preserved (GitHub returns most-recent first) so callers do not
 ; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
 ; can resolve the authenticated asset via _Updater_FindAsset (AHK-07). The list
-; is decoded once; no consumer reads a per-release prerelease flag here.
+; is decoded once; no consumer reads a per-release prerelease flag here. A
+; release's Body is decoded from its RawJson on first read: a window lists every
+; release but shows one release's notes at a time.
 Updater_ParseReleasesList(Json, ViewChannel := "") {
 	out := []
-	for _, Span in _Updater_DecodeReleaseList(Json) {
-		Release := Span["value"]
+	for _, Span in _Updater_DecodeReleaseList(Json, ["tag_name", "published_at"]) {
+		Members := Span["members"]
+		Tag := _Updater_ReleaseString(Members, "tag_name")
+		if (Tag == "")
+			continue
+		if (ViewChannel != "" and !UpdateChannels_VisibleIn(ViewChannel, Tag))
+			continue
+		RawJson := SubStr(Json, Span["start"], Span["length"])
 		rec := {
-			Tag:         _Updater_ReleaseString(Release, "tag_name"),
-			Body:        _Updater_ReleaseString(Release, "body"),
-			HtmlUrl:     _Updater_ParseHtmlUrl(Span["text"]),
-			PublishedAt: _Updater_ReleaseString(Release, "published_at"),
-			RawJson:     Span["text"]
+			Tag:         Tag,
+			HtmlUrl:     _Updater_ParseHtmlUrl(RawJson),
+			PublishedAt: _Updater_ReleaseString(Members, "published_at"),
+			RawJson:     RawJson
 		}
-		if (rec.Tag == "")
-			continue
-		if (ViewChannel != "" and !UpdateChannels_VisibleIn(ViewChannel, rec.Tag))
-			continue
+		rec.DefineProp("Body", { get: _Updater_ReleaseRecordBody })
 		out.Push(rec)
 	}
 	return out
+}
+
+; The Body getter of a listed release: its own "body", decoded from its RawJson
+; once, then kept as the record's plain value. RawJson is a span of the list
+; already validated whole, so decoding it cannot fail.
+_Updater_ReleaseRecordBody(Record) {
+	Body := _Updater_ReleaseString(JsonObjectMembers(Record.RawJson, ["body"]), "body")
+	Record.DefineProp("Body", { value: Body })
+	return Body
 }
 
 ; Extracts the release object's own "tag_name", decoded once.
@@ -3649,6 +3715,8 @@ Updater_ParseReleasesList(Json, ViewChannel := "") {
 Updater_ParseTagName(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""
+	if !_Updater_JsonIsList(Json)
+		return _Updater_ReleaseMember(Json, "tag_name")
 	Release := _Updater_DecodeRelease(Json)
 	if Release is Array
 		Release := Release.Length ? Release[1] : 0
@@ -3663,7 +3731,7 @@ Updater_ParseTagName(Json) {
 Updater_ParseBody(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""
-	return _Updater_ReleaseString(_Updater_DecodeRelease(Json), "body")
+	return _Updater_ReleaseMember(Json, "body")
 }
 
 _Updater_AttachManagedNetworkFailure(Owner) {
