@@ -369,3 +369,5 @@ Test("personal-info-global-barrier-20260813: inherited Critical cannot wrap disk
 	_PIPT20260813_InheritedCritical)
 
 #Include test_personal_info_source_witness.ahk
+
+#Include test_personal_info_editor_source.ahk
