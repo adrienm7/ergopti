@@ -72,8 +72,13 @@ helpers.describe("test module groups (macos-test-shards)", function()
 		for _, group in ipairs(ModuleGroups.GROUPS) do
 			for _, prefix in ipairs(group.prefixes) do
 				local found = false
+				-- A folder prefix ends in "/"; an integration file entry names one whole file.
+				local suffix = prefix:sub(-4) == ".lua" and ".lua" or "/"
 				for _, name in ipairs(modules) do
-					if (name:gsub("%.", "/") .. "/"):sub(1, #prefix) == prefix then found = true; break end
+					local path = name:gsub("%.", "/") .. suffix
+					if (suffix == ".lua" and path == prefix) or (suffix == "/" and path:sub(1, #prefix) == prefix) then
+						found = true; break
+					end
 				end
 				helpers.assert_true(found, group.name .. " prefix matches no test file: " .. prefix)
 			end
