@@ -197,21 +197,79 @@ _LVS_Base64OfAFile() {
 }
 Test("LLM vision: a screenshot file is sent as base64", _LVS_Base64OfAFile)
 
-_LVS_DownscaleScript() {
-	AssertEqual("", _GestureScreenshotDownscaleScript("$bmp", 0), "no limit, no resize")
-	Script := _GestureScreenshotDownscaleScript("$bmp", 1568)
-	AssertContains(Script, "-gt 1568", "only a larger image is shrunk")
-	AssertContains(Script, "HighQualityBicubic", "with GDI+ resampling")
-	AssertContains(Script, "$bmp = $dsImg", "and replaces the captured bitmap")
-	Direct := _GestureScreenshotDirectScript(0, 0, 3000, 2000, "save", "C:\t.png", 1568)
-	AssertTrue(InStr(Direct, Script) > 0 && InStr(Direct, Script) < InStr(Direct, "$bmp.Save("),
-		"the full-screen capture shrinks before saving")
-	Region := _GestureScreenshotRegionSaveScript("C:\t.png", 123, 1568)
-	AssertTrue(InStr(Region, _GestureScreenshotDownscaleScript("$img", 1568)) > 0,
-		"the region capture shrinks the selection before saving")
-	AssertThrows(() => _GestureScreenshotDownscaleScript("$bmp", -1), "a negative edge is a caller bug")
+; Writes a Width x Height GDI+ bitmap through the capture's own writer and
+; reads back the saved dimensions.
+; @returns {String} "WxH" of the saved file.
+_LVS_WriteSized(Width, Height, MaxEdge, Encoder) {
+	return _GestureScreenshotWithGdiplus(_LVS_WriteSizedGdip.Bind(Width, Height, MaxEdge, Encoder))
 }
-Test("LLM vision: the capture scripts shrink the image to the longest edge", _LVS_DownscaleScript)
+
+_LVS_WriteSizedGdip(Width, Height, MaxEdge, Encoder) {
+	Path := A_Temp . "\ergopti_test_vision_size_" . A_TickCount . "_" . Random(1000, 999999)
+	Image := 0, Saved := 0
+	_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipCreateBitmapFromScan0", "Int", Width, "Int", Height,
+		"Int", 0, "Int", GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB, "Ptr", 0, "Ptr*", &Image, "Int"),
+		"GdipCreateBitmapFromScan0")
+	try {
+		_GestureScreenshotGdipWrite(&Image, Path, Encoder, MaxEdge)
+		_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipLoadImageFromFile", "WStr", Path,
+			"Ptr*", &Saved, "Int"), "GdipLoadImageFromFile")
+		SavedWidth := 0, SavedHeight := 0
+		DllCall("gdiplus\GdipGetImageWidth", "Ptr", Saved, "UInt*", &SavedWidth)
+		DllCall("gdiplus\GdipGetImageHeight", "Ptr", Saved, "UInt*", &SavedHeight)
+		return SavedWidth . "x" . SavedHeight
+	} finally {
+		_GestureScreenshotGdipDispose(Saved)
+		_GestureScreenshotGdipDispose(Image)
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+
+_LVS_DownscaleCapture() {
+	Png := GESTURE_SCREENSHOT_PNG_ENCODER
+	AssertEqual("3000x2000", _LVS_WriteSized(3000, 2000, 0, Png), "no limit, no resize")
+	AssertEqual("1568x1045", _LVS_WriteSized(3000, 2000, 1568, Png), "a larger image is shrunk to the longest edge")
+	AssertEqual("800x600", _LVS_WriteSized(800, 600, 1568, Png), "a smaller image keeps its size")
+	AssertEqual("523x1568", _LVS_WriteSized(1000, 3000, 1568, Png), "a portrait image is shrunk by its height")
+	AssertEqual("1568x1045", _LVS_WriteSized(3000, 2000, 1568, GESTURE_SCREENSHOT_BMP_ENCODER),
+		"the clipboard stage is shrunk the same way")
+	AssertThrows(() => _GestureScreenshotRequireMaxEdge(-1), "a negative edge is a caller bug")
+	AssertThrows(() => _GestureScreenshotRegionCapture("C:\t.png", 123, -1),
+		"the region capture refuses a negative edge before any worker exists")
+	Direct := _DriverFuncBody("_GestureScreenshotCaptureScreenGdip")
+	Region := _DriverFuncBody("_GestureScreenshotCaptureClipboardImage")
+	AssertTrue(InStr(Direct, "_GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge)") > 0,
+		"the full-screen capture shrinks through the shared writer")
+	AssertTrue(InStr(Region, "_GestureScreenshotGdipWrite(&Image, Stage, GESTURE_SCREENSHOT_PNG_ENCODER, MaxEdge)") > 0,
+		"the region capture shrinks the selection through the shared writer")
+}
+Test("LLM vision: the capture shrinks the image to the longest edge", _LVS_DownscaleCapture)
+
+_LVS_ScreenCaptureWritesTheRectangle() {
+	Stage := A_Temp . "\ergopti_test_vision_screen_" . A_TickCount . "_" . Random(1000, 999999) . ".png"
+	try {
+		_GestureScreenshotCaptureScreen(0, 0, 32, 24, GESTURE_SCREENSHOT_PNG_ENCODER, Stage, 0)
+		AssertTrue(FileExist(Stage) != "", "the in-process screen capture must write its stage")
+		Header := FileRead(Stage, "RAW m8")
+		AssertEqual(0x474E5089, NumGet(Header, 0, "UInt"), "the stage must be a PNG")
+		Info := Buffer(8)
+		File := FileOpen(Stage, "r")
+		try {
+			File.Seek(16)
+			File.RawRead(Info, 8)
+		} finally File.Close()
+		Width := (NumGet(Info, 0, "UChar") << 24) | (NumGet(Info, 1, "UChar") << 16)
+			| (NumGet(Info, 2, "UChar") << 8) | NumGet(Info, 3, "UChar")
+		Height := (NumGet(Info, 4, "UChar") << 24) | (NumGet(Info, 5, "UChar") << 16)
+			| (NumGet(Info, 6, "UChar") << 8) | NumGet(Info, 7, "UChar")
+		AssertEqual("32x24", Width . "x" . Height, "the stage must hold the requested rectangle")
+	} finally {
+		if FileExist(Stage)
+			FileDelete(Stage)
+	}
+}
+Test("LLM vision: the in-process screen capture writes the requested rectangle", _LVS_ScreenCaptureWritesTheRectangle)
 
 _LVS_ParameterKind() {
 	global LLM_API_PROVIDER_ORDER, LLM_API_PROVIDERS

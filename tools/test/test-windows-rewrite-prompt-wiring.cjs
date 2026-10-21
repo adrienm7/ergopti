@@ -368,13 +368,13 @@ check(
 );
 const screenshots = read('modules/gestures/screenshots.ahk');
 check(
-	bodyOf(screenshots, '_GestureScreenshotDirectScript').includes(
-		'_GestureScreenshotDownscaleScript("$bmp", MaxEdge)'
+	bodyOf(screenshots, '_GestureScreenshotCaptureScreenGdip').includes(
+		'_GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge)'
 	) &&
-		bodyOf(screenshots, '_GestureScreenshotRegionSaveScript').includes(
-			'_GestureScreenshotDownscaleScript("$img", MaxEdge)'
+		bodyOf(screenshots, '_GestureScreenshotCaptureClipboardImage').includes(
+			'_GestureScreenshotGdipWrite(&Image, Stage, GESTURE_SCREENSHOT_PNG_ENCODER, MaxEdge)'
 		),
-	'both capture scripts must shrink the image to the requested longest edge'
+	'both in-process captures must shrink the image to the requested longest edge'
 );
 check(
 	bodyOf(screenshots, 'GestureRegionCaptureFinish').includes(
