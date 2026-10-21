@@ -176,6 +176,105 @@ helpers.describe("generic file read admission", function()
 	end
 end)
 
+--- Replaces the native admission and stdio for one TOML source read.
+--- @param receipt table { stream = table|nil, detail = string|nil, errno = number|nil }
+--- @param body function Receives the observation record.
+local function with_toml_source(receipt, body)
+	local Reader = require("infra.regular_file_reader")
+	local real_reader, real_open = Reader.open, io.open
+	local seen = { inspected = 0, opened = 0 }
+	Reader.open = function(path)
+		seen.inspected, seen.path = seen.inspected + 1, path
+		return receipt.stream, receipt.detail, receipt.errno
+	end
+	io.open = function(path, mode)
+		seen.opened = seen.opened + 1
+		if path:sub(1, 10) ~= "/synthetic" then return real_open(path, mode) end
+		-- Stands for stdio opening the special file: the bytes are never real.
+		return { read = function() return "unclassified = 1\n" end, write = function() return true end,
+			lines = function() return ("unclassified = 1\n"):gmatch("([^\n]*)\n") end,
+			close = function() return true end }
+	end
+	local ok, err = xpcall(function() body(seen) end, debug.traceback)
+	Reader.open, io.open = real_reader, real_open
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("TOML source read admission", function()
+	for _, kind in ipairs({ "fifo", "directory", "socket" }) do
+		local refusal = { detail = "source is not a regular file", errno = 22 }
+		helpers.it("linux-toml-read-special: read_with_status refuses " .. kind .. " before stdio opens", function()
+			with_toml_source(refusal, function(seen)
+				local content, status = fs.read_with_status("/synthetic/" .. kind)
+				helpers.assert_nil(content)
+				helpers.assert_eq(status, "error", "a special file is neither content nor a creatable absence")
+				helpers.assert_eq(seen.inspected, 1)
+				helpers.assert_eq(seen.path, "/synthetic/" .. kind)
+				helpers.assert_eq(seen.opened, 0, "stdio would wait on a FIFO with no writer")
+			end)
+		end)
+		helpers.it("linux-toml-read-special: shared TOML reader refuses " .. kind .. " before stdio opens", function()
+			with_toml_source(refusal, function(seen)
+				local document, committed = require("toml_codec.reader").parse("/synthetic/" .. kind)
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(next(document.sections), nil)
+				helpers.assert_eq(seen.inspected, 1)
+				helpers.assert_eq(seen.opened, 0, "stdio would wait on a FIFO with no writer")
+			end)
+		end)
+		helpers.it("linux-toml-read-special: unchanged publication refuses a " .. kind .. " source", function()
+			with_toml_source(refusal, function(seen)
+				local committed = require("toml_codec.writer").publish_if_unchanged(
+					"/synthetic/" .. kind, "candidate = 1\n", nil, { status = "absent" })
+				helpers.assert_eq(committed, false, "a special file is not the absence a create requires")
+				helpers.assert_eq(seen.inspected, 1)
+			end)
+		end)
+	end
+	helpers.it("linux-toml-read-special: native ENOENT remains a proven absence", function()
+		with_toml_source({ detail = "native open refused", errno = 2 }, function(seen)
+			local content, status = fs.read_with_status("/synthetic/missing")
+			helpers.assert_nil(content)
+			helpers.assert_eq(status, "absent")
+			helpers.assert_eq(seen.opened, 0)
+		end)
+	end)
+	helpers.it("linux-toml-read-special: other native refusals stay errors", function()
+		with_toml_source({ detail = "native open refused", errno = 13 }, function()
+			local _, status = fs.read_with_status("/synthetic/denied")
+			helpers.assert_eq(status, "error")
+		end)
+	end)
+	helpers.it("linux-toml-read-special: an admitted regular stream keeps its exact bytes", function()
+		local closes = 0
+		local stream = {
+			read = function(_, mode) helpers.assert_eq(mode, "*a"); return "a = \"\0é\"\r\n" end,
+			lines = function() return ("[s]\nk = \"v\"\n"):gmatch("([^\n]*)\n") end,
+			close = function() closes = closes + 1; return true end,
+		}
+		with_toml_source({ stream = stream }, function(seen)
+			local content, status = fs.read_with_status("/synthetic/regular")
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(content, "a = \"\0é\"\r\n")
+			local _, committed = require("toml_codec.reader").parse("/synthetic/regular")
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(seen.inspected, 2)
+			helpers.assert_eq(seen.opened, 0)
+			helpers.assert_eq(closes, 2)
+		end)
+	end)
+	if package.config:sub(1, 1) == "/" and (pcall(require, "luv") or pcall(require, "ffi")) then
+		helpers.it("linux-toml-read-special: actual FIFO, FIFO symlink and controls never wait", function()
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_toml_fifo_source.lua"
+			-- A regression blocks in open(2); the deadline turns it into a failure.
+			local result = os.execute("timeout 20 " .. quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native TOML FIFO fixture must finish green")
+		end)
+	end
+end)
+
 helpers.describe("file read and close receipts", function()
 	local cases = {
 		{ name = "healthy", content = "payload", closed = true, expected = "payload" },

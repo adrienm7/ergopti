@@ -496,7 +496,9 @@ helpers.describe("tap-hold writer: classified source refusal", function()
 			if from == path .. ".tmp" and to == path then observed.renames = observed.renames + 1 end
 			return real_rename(from, to)
 		end
+		local release_source = helpers.route_source_through_stdio(path)
 		local call_ok, accepted = pcall(invoke, writer, path)
+		release_source()
 		io.open, os.rename = real_open, real_rename
 		if owned_handle then pcall(owned_handle.close, owned_handle) end
 		local unchanged, staged = read_or_nil(path), read_or_nil(path .. ".tmp")

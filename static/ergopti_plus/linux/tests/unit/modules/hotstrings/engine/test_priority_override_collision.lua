@@ -94,6 +94,7 @@ helpers.describe("hotstring priority overrides", function()
 			return match and match.replacement or nil
 		end
 
+		local release_source = helpers.route_source_through_stdio(override_path, true)
 		local ok, failure = xpcall(function()
 			package.loaded["adapters.storage"] = require("tests.fakes").storage()
 			package.loaded["infra.config_paths"] = {
@@ -274,6 +275,7 @@ helpers.describe("hotstring priority overrides", function()
 			end
 		end, debug.traceback)
 
+		release_source()
 		io.open = previous_open
 		os.rename = previous_rename
 		os.remove = previous_remove
@@ -416,8 +418,10 @@ helpers.describe("hotstring override leaf ownership", function()
 		for _, kind in ipairs({ "read_error", "malformed", "absent" }) do
 			local bytes = kind == "malformed" and "[broken\n" or (kind == "read_error" and source or nil)
 			local old_open = io.open
+			local release_source = function() end
 			with_owner(bytes, function(config, path, read, _, changes)
 				io.open = old_open
+				release_source()
 				if kind == "absent" then
 					helpers.assert_true(config.clear_override("fresh", nil))
 					local handle, _, code = io.open(path, "r")
@@ -430,12 +434,14 @@ helpers.describe("hotstring override leaf ownership", function()
 				if kind ~= "absent" then helpers.assert_eq(read(), bytes) end
 			end, function(path)
 				if kind == "read_error" then
+					release_source = helpers.route_source_through_stdio(path)
 					io.open = function(name, mode)
 						if name == path and mode == "r" then return nil, "owned permission refusal", 13 end
 						return old_open(name, mode)
 					end
 				end
 			end)
+			release_source()
 		end
 	end)
 

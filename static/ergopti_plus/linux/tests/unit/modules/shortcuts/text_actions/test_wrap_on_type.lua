@@ -517,6 +517,7 @@ local function with_wrap_inventory(body, options)
 	local name = "modules.shortcuts.manager"
 	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
 	local catalogue_path = os.tmpname()
+	local release_source = function() end
 	local original = assert(open(shared("modules/wrap_symbols/wrap_symbols.json"), "rb"))
 	local original_bytes = assert(original:read("*a")); assert(original:close() == true)
 	Sandbox.write_bytes(catalogue_path, original_bytes)
@@ -529,6 +530,7 @@ local function with_wrap_inventory(body, options)
 			end
 			if options.close_target then
 				local target = options.close_target == "catalogue" and catalogue_path or path
+				release_source = helpers.route_source_through_stdio(target)
 				io.open = function(file, mode)
 					local handle, detail, code = open(file, mode)
 					if file ~= target or not handle then return handle, detail, code end
@@ -541,9 +543,11 @@ local function with_wrap_inventory(body, options)
 			local manager = helpers.load_module(name)
 			manager.init({ persist = true, config_path = path })
 			io.open = open
+			release_source()
 			body(manager, path, catalogue_path, Sandbox)
 		end)
 	end)
+	release_source()
 	io.open, Routes.config, Paths.shared, package.loaded[name] = open, route, shared, prior
 	local removed, detail = os.remove(catalogue_path)
 	helpers.assert_eq(removed, true, "owned catalogue cleanup: " .. tostring(detail))

@@ -1070,7 +1070,9 @@ local function register_schema_admission(h, driver)
 					end
 					return file, detail, code
 				end
+				local release_source = h.route_source_through_stdio(path)
 				local called, result = pcall(admitted, path)
+				release_source()
 				io.open = open
 				h.assert_true(called)
 				h.assert_true(injected)
@@ -1094,8 +1096,10 @@ local function register_schema_admission(h, driver)
 					end
 					return file, detail, code
 				end
+				local release_source = h.route_source_through_stdio(path)
 				local called, wrote = pcall(TomlWriter.publish_if_unchanged, path, current(true), nil,
 					{ status = 'ok', content = current(false) })
+				release_source()
 				io.open = open
 				h.assert_true(called)
 				h.assert_true(injected)
