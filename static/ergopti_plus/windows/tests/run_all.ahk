@@ -1138,6 +1138,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keylogger/test_keylogger_app_categories.ahk
 #Include unit/modules/keylogger/reader/test_keylogger_reader.ahk
 #Include unit/modules/keylogger/reader/test_keylogger_reader_manifest_contract.ahk
+#Include unit/modules/keylogger/reader/test_klr_manifest_switches_to.ahk
 #Include unit/modules/keylogger/test_keylogger_llm_accepted_metrics.ahk
 #Include unit/modules/keylogger/metrics/test_metrics_sqlite_fixture_cleanup.ahk
 #Include unit/modules/keylogger/test_keylogger_shortcut_projection.ahk

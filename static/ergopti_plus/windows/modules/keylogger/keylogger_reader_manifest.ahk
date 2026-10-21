@@ -63,8 +63,23 @@ KLR_ReadManifestBase(db, start_date := "", end_date := "", IncludeTitles := true
 		KLR__SumMedia(db, manifest, where)
 		if IncludeTitles
 				KLR__SumTitles(db, manifest, where)
+		KLR__SumSwitchesTo(db, manifest, where)
 		KLR__SumSystemDay(db, manifest, where)
 		return manifest
+}
+
+; Directed application transitions, summed across devices, under the source
+; application's cell. Both dashboards read switches_to (switch counts and the
+; app pair affinity); an app without any transition keeps the field absent.
+KLR__SumSwitchesTo(db, manifest, where) {
+		sql := "SELECT date, app_from, app_to, COALESCE(SUM(count), 0) AS count"
+				. " FROM agg_app_day_switches_to" . where . " GROUP BY date, app_from, app_to"
+		for r in SQLite_Query(db, sql) {
+				a := KLR_GetCell(manifest, r["date"], r["app_from"])
+				if !a.Has("switches_to")
+						a["switches_to"] := Map()
+				a["switches_to"][r["app_to"]] := r["count"]
+		}
 }
 
 ; System counters belong to the reserved daily pseudo-app consumed by both
