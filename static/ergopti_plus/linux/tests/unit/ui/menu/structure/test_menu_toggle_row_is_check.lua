@@ -69,8 +69,10 @@ end
 --- @param toggle table The toggle row.
 --- @param state boolean What every checked_when getter answers.
 --- @param ready boolean|nil Explicit AI action availability, true by default.
+--- @param newer boolean|nil Whether a newer version saved the configuration,
+---   false by default: it picks a greyed row's reason, never its state.
 --- @return table rendered, function command
-local function render(key, toggle, state, ready)
+local function render(key, toggle, state, ready, newer)
 	package.loaded["menu.renderer"] = nil
 	local R = require("menu.renderer").new({
 		platform      = PLATFORM,
@@ -83,6 +85,7 @@ local function render(key, toggle, state, ready)
 	local answer = setmetatable({}, { __index = function(_, name)
 		return function()
 			if name == "llm_toggle_ready" then return ready ~= false end
+			if name == "config_newer_schema" then return newer == true end
 			return state
 		end
 	end })
@@ -139,6 +142,22 @@ helpers.describe("menu: a category toggle is a checkbox with one label (linux)",
 		for _, state in ipairs({ true, false }) do
 			local rows = render("llm_menu", toggle, state, false)
 			helpers.assert_eq(rows[1].title, toggle.i18n .. " — " .. toggle.disabled_reason_key)
+			helpers.assert_eq(rows[1].checked, state)
+			helpers.assert_eq(rows[1].disabled, true)
+			helpers.assert_nil(rows[1].fn, "a refused row cannot retain a native callback")
+		end
+	end)
+
+	helpers.it("an AI toggle greyed by a newer configuration names that cause instead", function()
+		local toggle = linux_toggles(manifest_root()).llm_menu
+		local newer_key
+		for _, case in ipairs(toggle.disabled_reasons or {}) do
+			if case.when == "config_newer_schema" then newer_key = case.reason_key end
+		end
+		helpers.assert_eq(newer_key, "menu.read_only.newer_schema")
+		for _, state in ipairs({ true, false }) do
+			local rows = render("llm_menu", toggle, state, false, true)
+			helpers.assert_eq(rows[1].title, toggle.i18n .. " — " .. newer_key)
 			helpers.assert_eq(rows[1].checked, state)
 			helpers.assert_eq(rows[1].disabled, true)
 			helpers.assert_nil(rows[1].fn, "a refused row cannot retain a native callback")
