@@ -32,6 +32,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local LeaseHelper    = require("platform.remap.lease_helper")
+local KeystrokeIntegrity = require("infra.keystroke_integrity")
 
 local LOG = "karabiner.lease"
 
@@ -59,6 +60,8 @@ local READY_ACK_TIMEOUT_SEC = WORKER_LAUNCH_ALLOWANCE_SEC + WORKER_GUARDIAN_ARM_
 	+ WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local COMMAND_ACK_TIMEOUT_SEC = WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local STOP_ACK_TIMEOUT_SEC = 7.0
+-- READY slower than this is reported with its duration (it is usually 0.25 s).
+local SLOW_READY_REPORT_SEC = 1.0
 -- An ACK timeout that fires this much later than due was held by a parked run
 -- loop (a modal dialog, a busy main thread). The worker's answer may be waiting
 -- in the pipe behind it, so the deadline is extended once by ACK_GRACE_SEC of
@@ -762,6 +765,12 @@ local function fail_generation(generation, reason)
 	set_phase(generation, "fencing")
 	Logger.error(LOG, "Karabiner lease %s failed; fencing before publishing failure: %s",
 		generation.token, tostring(reason))
+	-- The fence switches every Ergopti rule off under the user's fingers; a key
+	-- held across it loses its Karabiner manipulation (issue #99: swallowed keys
+	-- and no drop the driver itself could see).
+	if generation.ready then
+		KeystrokeIntegrity.note_exposure("a Karabiner lease fence that switched Ergopti's rules off")
+	end
 	if _state.current == generation then
 		_state.current = nil
 		_state.retiring[generation.token] = generation
@@ -808,7 +817,8 @@ end
 --- @param generation table Generation awaiting the ACK.
 --- @param expected string Expected protocol line.
 --- @param grace boolean|nil Whether this is the one extension after a parked run loop.
-local function arm_ack_timer(generation, expected, grace)
+--- @param awaited_since number|nil When the first deadline for this ACK was armed.
+local function arm_ack_timer(generation, expected, grace, awaited_since)
 	cancel_ack_timer(generation)
 	generation.awaiting = expected
 	local timeout = COMMAND_ACK_TIMEOUT_SEC
@@ -816,6 +826,7 @@ local function arm_ack_timer(generation, expected, grace)
 	if expected == "STOPPED" then timeout = STOP_ACK_TIMEOUT_SEC end
 	if grace then timeout = ACK_GRACE_SEC end
 	local armed_at = TimerScheduler.awake_time()
+	local since = awaited_since or armed_at
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
@@ -830,13 +841,22 @@ local function arm_ack_timer(generation, expected, grace)
 		if generation.ack_timer ~= timer
 			or generation.awaiting ~= expected or generation.failed then return end
 		generation.ack_timer = nil
-		if not grace and TimerScheduler.awake_time() - armed_at - timeout > PARKED_RUN_LOOP_LATENESS_SEC then
+		local fired_at = TimerScheduler.awake_time()
+		local lateness = fired_at - armed_at - timeout
+		if not grace and lateness > PARKED_RUN_LOOP_LATENESS_SEC then
 			Logger.debug(LOG,
 				"Karabiner lease %s: %s timeout fired late after a parked run loop; reading the pipe first.",
 				generation.token, expected)
-			arm_ack_timer(generation, expected, true)
+			arm_ack_timer(generation, expected, true, since)
 			return
 		end
+		-- The wait and the timer's own lateness tell a silent worker (on time,
+		-- nothing in the pipe) from a held Hammerspoon run loop (late), which the
+		-- bare reason could not: issue #99 logged six of them without either. The
+		-- reason itself stays exact: the diagnostics report parses it.
+		Logger.warn(LOG,
+			"Karabiner lease %s waited %.2f s for %s; the deadline timer fired %.2f s late.",
+			generation.token, fired_at - since, expected, math.max(0, lateness))
 		fail_generation(generation, "timeout waiting for " .. expected)
 	end)
 	if schedule_ok then timer = timer_or_err end
@@ -1105,6 +1125,15 @@ local function process_line(generation, line)
 		set_phase(generation, ready_phase)
 		Logger.info(LOG, "Karabiner lease %s activated %s by watchdog READY.",
 			generation.token, generation.initial_paused and "paused" or "active")
+		-- READY spans two launcher process launches, the guardian ARM and one
+		-- karabiner_cli write. Issue #99 saw it take 3.4 to 6.0 s where 0.25 s is
+		-- usual, then time out at the deadline with nothing to say which part.
+		local ready_after = type(generation.launched_at) == "number"
+			and TimerScheduler.awake_time() - generation.launched_at or nil
+		if ready_after and ready_after >= SLOW_READY_REPORT_SEC then
+			Logger.info(LOG, "Karabiner lease %s READY arrived %.2f s after launch (deadline %.1f s).",
+				generation.token, ready_after, READY_ACK_TIMEOUT_SEC)
+		end
 		settle_callbacks("lease.start", generation.start_callbacks, true, ready_reason)
 		generation.reconciling_command = nil
 		if queued and queued.kind == (ready_phase == "paused" and "pause" or "resume")
@@ -1763,6 +1792,7 @@ local function start_generation(initial_paused, on_done)
 
 	Logger.start(LOG, "Starting Karabiner lease watchdog %s…", generation.token)
 	set_phase(generation, "starting")
+	generation.launched_at = TimerScheduler.awake_time()
 	local handle, helper_error = spawn_current_helper(
 		{
 			WORKER_FLAG,
@@ -1775,6 +1805,17 @@ local function start_generation(initial_paused, on_done)
 		},
 		function(exit_code, stdout, stderr)
 			generation.completed = true
+			if generation.failed and not generation.stop_requested then
+				-- fail_generation() already ran (an ACK deadline), so the line below
+				-- would be dropped. How the worker then ended tells a worker that was
+				-- alive and fenced on stdin EOF (exit 0) from one that had lost its
+				-- inner (73) or never answered at all.
+				local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
+				Logger.info(LOG, "Karabiner lease %s worker exited (exit %s) after the driver had failed it%s",
+					generation.token, tostring(exit_code),
+					detail ~= "" and (": " .. detail) or ".")
+				return
+			end
 			if not generation.stop_requested then
 				-- Completion status is authoritative. A final buffered READY from a
 				-- process that exited non-zero must never settle activation true.

@@ -861,4 +861,103 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			helpers.assert_true(callback_ok == false)
 		end)
 	end)
+
+	-- Issue #99 logged six bare "timeout waiting for PONG 1" / "READY" failures:
+	-- nothing said how long the driver had waited, whether its own run loop had
+	-- held the deadline, or how the worker ended afterwards (lease-timeout-evidence).
+	helpers.it("(lease-timeout-evidence) an ACK timeout names its wait and the timer's lateness", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "fencing")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG 1"), 1,
+				"the failure reason stays exact: the diagnostics report parses it")
+			helpers.assert_eq(level_lines(ctx, "warn", "waited 4.50 s for PONG 1; the deadline timer fired 0.00 s late"), 1,
+				"an on-time deadline means the worker was silent, not that Hammerspoon held it")
+		end)
+	end)
+
+	helpers.it("(lease-timeout-evidence) a deadline past the parked-loop grace reports the whole wait", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 10
+			ctx.fire_latest_timer()
+			ctx.clock = ctx.clock + 1
+			ctx.fire_latest_timer()
+			helpers.assert_eq(level_lines(ctx, "warn", "waited 11.00 s for PONG 1"), 1,
+				"the grace extension must not restart the reported wait")
+		end)
+	end)
+
+	helpers.it("(lease-timeout-evidence) the worker's exit after a driver-side failure is logged", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_latest_timer()
+			ctx.spawns[1].on_done(0, "", "lease worker: Hammerspoon closed its input without STOP\n")
+			helpers.assert_eq(level_lines(ctx, "info",
+				"worker exited (exit 0) after the driver had failed it: lease worker: Hammerspoon closed its input without STOP"), 1,
+				"how the worker ended tells a live worker from a lost one")
+			helpers.assert_eq(level_lines(ctx, "error", "watchdog exited unexpectedly"), 0,
+				"the exit of an already failed worker is not a second failure")
+		end)
+	end)
+
+	helpers.it("(lease-timeout-evidence) a slow READY reports how long it took", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.clock = ctx.clock + 4.1
+			ctx.chunk(1, "READY\n")
+			helpers.assert_eq(level_lines(ctx, "info", "READY arrived 4.10 s after launch (deadline 11.5 s)"), 1)
+			local quick, quick_ctx = load_controller()
+			quick.init()
+			quick.start()
+			quick_ctx.clock = quick_ctx.clock + 0.25
+			quick_ctx.chunk(1, "READY\n")
+			helpers.assert_eq(level_lines(quick_ctx, "info", "READY arrived"), 0,
+				"a usual READY is not news")
+		end)
+	end)
+
+	helpers.it("(keystroke-exposure-report) fencing a live lease names the keys typed across it", function()
+		local saved = package.loaded["infra.keystroke_integrity"]
+		local causes = {}
+		local ok, err = pcall(with_fixture, function(load_controller)
+			package.loaded["infra.keystroke_integrity"] = {
+				note_exposure = function(cause) causes[#causes + 1] = cause; return true end,
+			}
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.clock = ctx.clock + 11.5
+			ctx.fire_latest_timer()
+			helpers.assert_eq(#causes, 0, "a lease that never answered READY switched no rule off")
+			local live, live_ctx = load_controller()
+			live.init()
+			live.start()
+			live_ctx.chunk(1, "READY\n")
+			live_ctx.fire_heartbeat_timer()
+			live_ctx.clock = live_ctx.clock + 4.5
+			live_ctx.fire_latest_timer()
+		end)
+		package.loaded["infra.keystroke_integrity"] = saved
+		if not ok then error(err, 0) end
+		helpers.assert_eq(causes, { "a Karabiner lease fence that switched Ergopti's rules off" },
+			"the live lease's fence is the transition a held key can be lost across")
+	end)
 end)
