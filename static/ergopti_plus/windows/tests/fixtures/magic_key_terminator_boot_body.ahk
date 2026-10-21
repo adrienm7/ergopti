@@ -97,7 +97,16 @@ _MKTB_Boot() {
 	_UNC_Require(Before is Object && Before.Source is String, "The original durable snapshot must be real.")
 	; Only the post-commit external process launch is observed. The native writer,
 	; conditional journal, byte comparisons and in-memory publisher stay genuine.
-	_UNC_Require(ModifyMagicKey(0, Magic, 0, _MKTB_Notify, _MKTB_Reload), "The real editor commit was refused.")
+	Committed := ModifyMagicKey(0, Magic, 0, _MKTB_Notify, _MKTB_Reload)
+	if !Committed {
+		FileAppend("EDITOR_FAILURE notifications=" . _MKTB.Notifications.Length
+			. " reloads=" . _MKTB.Reloads . "`n", "**")
+		; The real logger has a bounded ring even before LoggerInit. Preserve the
+		; underlying writer/admission cause instead of replacing the failing API.
+		for Line in LoggerRingBufferSnapshot()
+			FileAppend("EDITOR_LOG " . Line . "`n", "**")
+	}
+	_UNC_Require(Committed, "The real editor commit was refused.")
 	Snapshot := ConfigTomlReadSnapshot(ConfigurationFile)
 	_UNC_Require(Snapshot is Object && Snapshot.Source is String, "The persisted scalar must be readable.")
 	_UNC_Require(Snapshot.Cache["hotstrings"]["trigger_char"] == Magic, "The typed file lost the complete configured scalar.")

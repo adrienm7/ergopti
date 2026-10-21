@@ -530,7 +530,7 @@ _MKTB_ChildSource() {
 		}
 		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Basename)
 	}
-	for Symbol in ["_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned", "HotstringsTerminatorRestore"] {
+	for Symbol in ["HotPath_Now", "_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned", "HotstringsTerminatorRestore"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, Symbol == "HotstringsTerminatorRestore" ? _SharedDir : _DriverDir)
 		AssertTrue(Owner != "", "the real round-trip dependency requires its unique owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
@@ -557,6 +557,21 @@ _MKTB_ChildSource() {
 	}
 	return Code . FileRead(_DriverDir . "\tests\fixtures\magic_key_terminator_boot_body.ahk", "UTF-8")
 }
+
+_MKTB_WriterProfilerGraph() {
+	Code := _MKTB_ChildSource()
+	Writer := _DriverFuncBody("_TOML_BatchWriteImpl")
+	AssertTrue(Writer != "", "the native writer body must remain genuine and discoverable")
+	for Symbol in ["HotPath_Now", "HotPath_LogIfSlow"] {
+		AssertTrue(InStr(Writer, Symbol . "(", true) > 0, "the regression must cover the real writer dependency: " . Symbol)
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "the profiler requires its actual complete owner: " . Symbol)
+		StrReplace(Code, "#Include " . Owner . "`n", "", true, &Count)
+		AssertEqual(1, Count, "the generated child must import the whole native profiler owner once")
+	}
+}
+Test("Magic-key terminator child: actual writer retains its native profiler (magic-terminator-writer-graph)",
+	_MKTB_WriterProfilerGraph)
 
 _MKTB_Complete(State, Code, Output, ErrorText) {
 	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText, State.Calls += 1
