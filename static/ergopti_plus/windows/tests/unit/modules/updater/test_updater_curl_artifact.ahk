@@ -225,6 +225,9 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 }
 
 _ArtifactCurlActualSspiAndStaging() {
+	; Its first proxy offers NTLM alone, so staging needs a curl that lists
+	; NTLM. A curl that lists it, or an unknown one, runs the case.
+	TestRequireHostCurlNtlm()
 	Tls := _UpdaterNativeTransportOwner()
 	Proxy := 0
 	try {

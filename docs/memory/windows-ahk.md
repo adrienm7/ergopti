@@ -1112,9 +1112,12 @@ and, when its capability receipt has no NTLM, refuses a proxy that offers NTLM
 alone (`ergopti_curl_attempt.ps1`, "The observed proxy authentication feature
 is unavailable"). A user behind an NTLM-only company proxy therefore gets no
 managed request on an up-to-date Windows; Negotiate proxies are unaffected.
-The two `test_managed_remote_sspi.ahk` cases report NOT EXECUTED through
-`TestRequireHostCurlNtlm` on such a host and still run, and fail, on a curl
-that lists NTLM or whose features are unknown. Action: ship an owned
+Every case whose proxy offers NTLM alone (the two `test_managed_remote_sspi.ahk`
+cases and the artifact staging case of `test_updater_curl_artifact.ahk`)
+reports NOT EXECUTED through `TestRequireHostCurlNtlm` on such a host and
+still runs, and fails, on a curl that lists NTLM or whose features are
+unknown. Hosted jobs land on either image for a while, so compare the
+`Runner Image` version of a passing and a failing job before blaming code. Action: ship an owned
 SSPI-capable curl (TODO item 62), then confirm both cases execute again.
 
 ### project-windows-tls-fixture-git-prefix
