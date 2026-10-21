@@ -259,3 +259,5 @@ _MWS_RegisterWarmSidecarCases()
 #Include test_metrics_warm_reload_recovery.ahk
 
 #Include test_metrics_warm_ingest_recovery.ahk
+
+#Include test_metrics_warm_terminal_budget.ahk
