@@ -45,22 +45,27 @@ function M.run(options)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
+	local clipboard_generation = 0
+	hs_stub.pasteboard.changeCount = function() return clipboard_generation end
 	local clipboard_writes = {}
 	local clipboard_value = "original"
 	local clipboard_restores = 0
 	hs_stub.pasteboard.getContents = function() return clipboard_value end
 	hs_stub.pasteboard.readAllData = function() return { text = clipboard_value } end
 	hs_stub.pasteboard.setContents = function(value)
+		clipboard_generation = clipboard_generation + 1
 		clipboard_writes[#clipboard_writes + 1] = value
 		clipboard_value = value
 		return true
 	end
 	hs_stub.pasteboard.writeAllData = function(data)
+		clipboard_generation = clipboard_generation + 1
 		clipboard_restores = clipboard_restores + 1
 		clipboard_value = type(data) == "table" and data.text or nil
 		return true
 	end
 	hs_stub.pasteboard.clearContents = function()
+		clipboard_generation = clipboard_generation + 1
 		clipboard_restores = clipboard_restores + 1
 		clipboard_value = nil
 	end
