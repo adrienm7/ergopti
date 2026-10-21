@@ -342,3 +342,5 @@ Test("lifecycle transition: real programmable cancellation debt gates suspend ac
 	_LT_UserHotstringsCancellationDebt)
 
 #Include ../../modules/llm/servers/test_ollama_webview_pause_readiness.ahk
+
+#Include ../../modules/llm/servers/test_ollama_webview_deferred_delivery.ahk
