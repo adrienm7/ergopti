@@ -409,6 +409,7 @@ local function perform_paste(value, handoff)
 		return false
 	end
 	local guarded_count = nil
+	local builtin_snapshot_count = nil
 	if transaction and transaction.publication then
 		guarded_count = clipboard_change_count()
 		if guarded_count == nil then return false end
@@ -452,6 +453,13 @@ local function perform_paste(value, handoff)
 			return false
 		end
 	else
+		if guarded_count == nil then
+			builtin_snapshot_count = clipboard_change_count()
+			if builtin_snapshot_count == nil then
+				Logger.error(LOG, "Clipboard paste snapshot ownership is unavailable.")
+				return false
+			end
+		end
 		-- Preserve all clipboard types (images, RTF, etc.), not just plain text.
 		local ok_snapshot, snapshot_or_error = pcall(function()
 			return hs.pasteboard.readAllData()
@@ -461,6 +469,10 @@ local function perform_paste(value, handoff)
 			return false
 		end
 		if guarded_count ~= nil and clipboard_change_count() ~= guarded_count then return false end
+		if builtin_snapshot_count ~= nil and clipboard_change_count() ~= builtin_snapshot_count then
+			Logger.error(LOG, "Clipboard paste snapshot ownership changed during acquisition.")
+			return false
+		end
 		_paste_saved_original = snapshot_or_error
 		local debt_acquired, debt_error = acquire_paste_debt()
 		if not debt_acquired then
@@ -487,7 +499,8 @@ local function perform_paste(value, handoff)
 	local builtin_before = nil
 	if _paste_publication_lease == nil then
 		builtin_before = clipboard_change_count()
-		if builtin_before == nil or (_paste_owns_clipboard and builtin_before ~= _paste_builtin_count) then
+		if builtin_before == nil or (_paste_owns_clipboard and builtin_before ~= _paste_builtin_count)
+			or (builtin_snapshot_count ~= nil and builtin_before ~= builtin_snapshot_count) then
 			if not _paste_owns_clipboard or builtin_before ~= nil then
 				release_paste_ownership()
 			else
