@@ -256,7 +256,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
 		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
 	);
-	assert.equal(jobs, 30);
+	assert.equal(jobs, 35);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
@@ -379,7 +379,7 @@ check('mandatory default predicates are the actual workflow predicates', () => {
 	);
 });
 check('Common TOML receiving retains its owned step, identity and check command', () => {
-	const rel = '.github/workflows/ci-common.yml';
+	const rel = '.github/workflows/ci-common-unit.yml';
 	const original = source.find((entry) => entry.rel === rel);
 	const job = Raw.jobsOfText(original.text, rel).find((entry) => entry.id === 'shared-validation');
 	const step = Raw.step(job.body, 'Check hotstring TOML files are sorted and formatted');
@@ -522,17 +522,17 @@ for (const lane of ['macos', 'windows', 'linux']) {
 }
 for (const [rel, id, name] of [
 	[
-		'.github/workflows/ci-common.yml',
+		'.github/workflows/ci-common-unit.yml',
 		'shared-validation',
 		'Check hotstring TOML files are sorted and formatted'
 	],
 	[
-		'.github/workflows/ci-common.yml',
+		'.github/workflows/ci-common-build.yml',
 		'common-build',
 		'Build and seal production site — ${{ matrix.lot }}'
 	],
 	[
-		'.github/workflows/ci-common.yml',
+		'.github/workflows/ci-common-install.yml',
 		'common-testbuild',
 		'Test received production site — ${{ matrix.lot }}'
 	],

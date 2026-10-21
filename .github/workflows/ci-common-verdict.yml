@@ -1,0 +1,49 @@
+# .github/workflows/ci-common-verdict.yml
+#
+# Common verdict stage: requires both exact Build and browser receipts.
+# Called by ci-common.yml as its common-unit-verdict stage.
+
+name: 'Common verdict'
+
+on:
+  workflow_call:
+    inputs:
+      predecessor_result:
+        description: Result of common-testbuild, the stage this one follows
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  common-unit-verdict:
+    name: 'Production site receipts'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      SITE_PREDECESSOR_RESULT: ${{ inputs.predecessor_result }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Receive stable production browser proof
+        uses: actions/download-artifact@v4
+        with:
+          name: common-site-testbuild-main
+          path: site-proof/main
+
+      - name: Receive development production browser proof
+        uses: actions/download-artifact@v4
+        with:
+          name: common-site-testbuild-dev
+          path: site-proof/dev
+
+      - name: Require both exact Build and browser receipts
+        run: node tools/ci/site-verdict.cjs verify site-proof

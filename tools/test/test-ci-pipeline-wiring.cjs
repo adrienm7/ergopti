@@ -160,8 +160,12 @@ function macStageProblems(source) {
 	}
 }
 function isRetainedQualification(entry, candidate, step) {
+	// The contract names the real file; the inlined view shows it in its lane.
 	const owner = scoped.contract.retained_steps.find(
-		(owner) => owner.file === entry.rel && owner.job === candidate.id && owner.name === step.name
+		(owner) =>
+			[owner.file, pipeline.laneOf(owner.file)].includes(entry.rel) &&
+			owner.job === candidate.id &&
+			owner.name === step.name
 	);
 	if (!owner) return false;
 	assert.equal(
@@ -502,7 +506,7 @@ const STEP_CONDITIONS = [
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
 	...scoped.contract.retained_steps.map((owner) => [
-		owner.file,
+		pipeline.laneOf(owner.file),
 		owner.job,
 		owner.name,
 		owner.condition
@@ -2976,32 +2980,40 @@ for (const [what, file, from, to] of [
 ])
 	mustCatch(what, file, from, to, commonProblems);
 
-/** Reject additional issuers, missing consumers and changed readonly union commands. */
+/**
+ * Reject additional issuers, missing consumers and changed readonly union
+ * commands. The Unit stage file issues the receipt; the E2E stage file reads it.
+ */
 function checkCommonReceiptConsumer() {
-	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_BOX);
+	const COMMON_UNIT = '.github/workflows/ci-common-unit.yml';
+	const COMMON_E2E = '.github/workflows/ci-common-e2e.yml';
+	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_E2E);
 	assert.equal(owners.length, 1);
 	const owner = owners[0];
 	assert.equal(owner.job, 'common-e2e');
 	assert.equal(owner.scope, 'core-js-suite');
+	assert.equal(owner.issuer_file, COMMON_UNIT);
 	assert.equal(owner.issuer_job, 'shared-validation');
 	assert.equal(owner.issuer_step, 'Run shared validation suite');
 	assert.equal(owner.issuer_command, 'npm run test:js');
-	const source = pipeline.rawFiles().find((entry) => entry.rel === COMMON_BOX).text;
-	const job = pipeline.jobsOfText(source, COMMON_BOX).find((entry) => entry.id === owner.job);
+	const source = pipeline.rawFiles().find((entry) => entry.rel === COMMON_E2E).text;
+	const unit = pipeline.rawFiles().find((entry) => entry.rel === COMMON_UNIT).text;
+	const job = pipeline.jobsOfText(source, COMMON_E2E).find((entry) => entry.id === owner.job);
 	const step = pipeline.step(job.body, owner.step);
 	assert.equal(pipeline.runOf(step).join('\n'), owner.body);
-	assert.ok(scoped.projectScopedSteps(source, COMMON_BOX));
-	const retained = scoped.contract.retained_steps.filter((entry) => entry.file === COMMON_BOX);
+	assert.ok(scoped.projectScopedSteps(source, COMMON_E2E));
+	assert.ok(scoped.projectScopedSteps(unit, COMMON_UNIT));
+	const retained = scoped.contract.retained_steps.filter((entry) => entry.file === COMMON_UNIT);
 	assert.equal(retained.length, 2);
 	for (const entry of retained) {
 		const child = pipeline
-			.jobsOfText(source, COMMON_BOX)
+			.jobsOfText(unit, COMMON_UNIT)
 			.find((candidate) => candidate.id === entry.job);
 		const transport = pipeline.step(child.body, entry.name).replace(/\n+$/, '');
 		assert.match(transport, /^ {10}overwrite: true$/m);
 		assert.equal(
 			isRetainedQualification(
-				{ rel: COMMON_BOX },
+				{ rel: COMMON_UNIT },
 				{ id: entry.job },
 				{ name: entry.name, body: transport }
 			),
@@ -3011,7 +3023,7 @@ function checkCommonReceiptConsumer() {
 		assert.notEqual(missingOverwrite, transport);
 		assert.throws(() =>
 			isRetainedQualification(
-				{ rel: COMMON_BOX },
+				{ rel: COMMON_UNIT },
 				{ id: entry.job },
 				{ name: entry.name, body: missingOverwrite }
 			)
@@ -3031,12 +3043,12 @@ function checkCommonReceiptConsumer() {
 	]) {
 		const changed = source.replace(before, after);
 		assert.notEqual(changed, source);
-		assert.throws(() => scoped.projectScopedSteps(changed, COMMON_BOX));
+		assert.throws(() => scoped.projectScopedSteps(changed, COMMON_E2E));
 	}
-	assert.throws(() => scoped.projectScopedSteps(source.replace(step, ''), COMMON_BOX));
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, ''), COMMON_E2E));
 	const unknown =
 		'      - name: Unknown receipt reader\n        run: node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json\n';
-	assert.throws(() => scoped.projectScopedSteps(source.replace(step, step + unknown), COMMON_BOX));
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, step + unknown), COMMON_E2E));
 }
 checkCommonReceiptConsumer();
 
@@ -5167,6 +5179,114 @@ for (const [what, rel, from, to] of [
 	mustCatch(what, rel, from, to, namingProblems);
 }
 
+// =============================================
+// =============================================
+// ======= 7b/ One Reusable Workflow Per Stage ==
+// =============================================
+// =============================================
+
+// GitHub renders a stage job as 'Lane / Stage / Job': the lane caller's name in
+// ci.yml, the stage caller's name in the lane, then the job's own name, which
+// says what the job tests. Each lane stage runs in ci-<lane>-<stage>.yml.
+const STAGE_LAYOUT = {
+	[COMMON_BOX]: [
+		['shared-validation', 'unit', 'Unit tests', '${{ matrix.lot }}'],
+		['common-e2e', 'e2e', 'E2E tests', 'Shared UI rendering'],
+		['common-build', 'build', 'Build', '${{ matrix.lot }}'],
+		['common-testbuild', 'install', 'Install and launch', '${{ matrix.lot }}'],
+		['common-unit-verdict', 'verdict', 'Verdict', 'Production site receipts']
+	]
+};
+// The scripts that find a stage job by its rendered name, with the prefix
+// each one composes.
+const RENDERED_NAME_READERS = [
+	['tools/ci/validate-js-feature-results.cjs', 'shared-validation'],
+	['tools/ci/site-deploy-admission.cjs', 'common-build'],
+	['tools/ci/site-deploy-admission.cjs', 'common-testbuild']
+];
+
+/** Lists how the real files could stop running one stage per reusable workflow. */
+function stageLayoutProblems(files) {
+	const problems = [];
+	const real = pipeline.view(() => files);
+	const unquote = (value) => (value ?? '').replace(/^(['"])(.*)\1$/, '$2');
+	for (const [lane, stages] of Object.entries(STAGE_LAYOUT)) {
+		const base = lane.replace(/\.yml$/, '');
+		const callers = real.jobs(lane);
+		if (JSON.stringify(callers.map((job) => job.id)) !== JSON.stringify(stages.map(([id]) => id)))
+			problems.push(`${lane} must call exactly its stages, in order`);
+		for (const [id, stage, stageName, jobName] of stages) {
+			const rel = `${base}-${stage}.yml`;
+			const caller = callers.find((job) => job.id === id);
+			if (!caller || pipeline.field(caller.body, 'uses') !== `./${rel}`) {
+				problems.push(`${lane} job ${id} must call ${rel}`);
+				continue;
+			}
+			if (unquote(pipeline.field(caller.body, 'name')) !== stageName)
+				problems.push(`${lane} job ${id} must be named for its stage: ${stageName}`);
+			const entry = files.find((file) => file.rel === rel);
+			if (!entry || !entry.text.startsWith(`# ${rel}\n`)) {
+				problems.push(`${rel} must exist and open with its own path`);
+				continue;
+			}
+			const inner = pipeline.jobsOfText(entry.text, rel);
+			if (inner.length !== 1 || inner[0].id !== id) {
+				problems.push(`${rel} must define ${id} as its only job`);
+				continue;
+			}
+			if (unquote(pipeline.field(inner[0].body, 'name')) !== jobName)
+				problems.push(`${rel} job ${id} must say what it tests: ${jobName}`);
+		}
+	}
+	const laneName = (lane) =>
+		unquote(
+			pipeline.field(
+				real.jobs(ENTRY).find((job) => pipeline.field(job.body, 'uses') === `./${lane}`).body,
+				'name'
+			)
+		);
+	for (const [script, id] of RENDERED_NAME_READERS) {
+		const lane = Object.keys(STAGE_LAYOUT).find((rel) =>
+			STAGE_LAYOUT[rel].some(([stage]) => stage === id)
+		);
+		const stageName = STAGE_LAYOUT[lane].find(([stage]) => stage === id)[2];
+		const prefix = `${laneName(lane)} / ${stageName}`;
+		const source = fs.readFileSync(path.resolve(__dirname, '../..', script), 'utf8');
+		if (!source.includes(`'${prefix}'`) || !source.includes("' / '"))
+			problems.push(`${script} must find ${id} as '${prefix} / <job>', the name GitHub renders`);
+	}
+	return problems;
+}
+errors.push(...stageLayoutProblems(pipeline.real().files()));
+for (const [what, rel, from, to] of [
+	[
+		'a stage caller renamed away from its stage',
+		COMMON_BOX,
+		"  common-build:\n    name: 'Build'\n",
+		"  common-build:\n    name: 'Site'\n"
+	],
+	[
+		'a stage job named for its stage instead of its subject',
+		'.github/workflows/ci-common-e2e.yml',
+		"    name: 'Shared UI rendering'\n",
+		"    name: 'E2E tests'\n"
+	],
+	[
+		'a stage moved into another file name',
+		COMMON_BOX,
+		'    uses: ./.github/workflows/ci-common-verdict.yml\n',
+		'    uses: ./.github/workflows/ci-common-gate.yml\n'
+	]
+]) {
+	const files = pipeline.real().files();
+	const source = files.find((file) => file.rel === rel).text;
+	assert.equal(source.split(from).length, 2, what + ' has one real source seam');
+	const changed = files.map((file) =>
+		file.rel === rel ? { ...file, text: source.replace(from, () => to) } : file
+	);
+	assert.ok(stageLayoutProblems(changed).length > 0, what);
+}
+
 /** Keeps the approved root group as the pipeline's only concurrency owner. */
 function concurrencyProblems(files) {
 	const problems = [];
@@ -6985,7 +7105,7 @@ function nativePacSourceProblems(files) {
 }
 errors.push(...nativePacSourceProblems(pipeline.files()));
 // The actual raw Source10 condition remains mandatory after the retired fast route.
-const rawSourceFiles = require('./ci-pipeline.cjs').files();
+const rawSourceFiles = require('./ci-pipeline.cjs').real().files();
 const rawSourceStep = PAC_SOURCE_STEP;
 assert.doesNotThrow(() => pipeline.validateRaw(rawSourceFiles));
 for (const [replacement, error] of [
@@ -7740,7 +7860,7 @@ for (const [label, before, after] of [
 
 // The Darwin receiver is mandatory raw work, never a deferred qualification alias.
 {
-	const files = require('./ci-pipeline.cjs').files();
+	const files = require('./ci-pipeline.cjs').real().files();
 	const name = 'Receive selected-release shell corpus and native guardian cancellation';
 	const head = `      - name: ${name}\n`;
 	const body = pipeline.step(macRole.body(pipeline.file(MACOS_BOX), 'managed-ollama-native'), name);
