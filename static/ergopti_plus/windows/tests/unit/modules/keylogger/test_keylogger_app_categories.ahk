@@ -467,3 +467,5 @@ TestKLAppCat_ShutdownPersistsPendingDiscovery() {
 }
 Test("keylogger_app_categories: shutdown persists discoveries before the deferred save (AHK-063)",
 	TestKLAppCat_ShutdownPersistsPendingDiscovery)
+
+#Include test_keylogger_app_category_set_durability.ahk
