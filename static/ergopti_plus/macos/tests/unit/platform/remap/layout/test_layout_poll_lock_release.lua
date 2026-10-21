@@ -43,12 +43,20 @@ local function load_watchers_with_dead_spawn()
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(_executable, _args, _on_done)
 			ctx.spawns = ctx.spawns + 1
+			local settled, observer = false, nil
 			-- Deliberately drop _on_done: this models a task that started and hung.
 			-- terminate() is counted rather than ignored, so the test can tell
 			-- "stopped waiting for the read" apart from "reclaimed the read".
 			return {
 				start     = function() return true end,
-				terminate = function() ctx.terminates = ctx.terminates + 1; return true end,
+				terminate = function()
+					ctx.terminates = ctx.terminates + 1
+					settled = true
+					if observer then observer() end
+					return true, "settled"
+				end,
+				isSettled = function() return settled end,
+				onSettled = function(callback) observer = callback; return true end,
 			}
 		end,
 		_active_tasks = {},

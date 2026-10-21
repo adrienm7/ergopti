@@ -176,7 +176,14 @@ local function fresh_harness()
 				start_attempts = 0,
 				terminate_attempts = 0,
 				terminated = false,
+				settlement_observers = {},
 			}
+			function handle.isSettled() return handle.terminated end
+			function handle.onSettled(observer)
+				if handle.terminated then observer()
+				else handle.settlement_observers[#handle.settlement_observers + 1] = observer end
+				return true
+			end
 			function handle.start()
 				handle.start_attempts = handle.start_attempts + 1
 				if h.fail_read_start then
@@ -195,7 +202,10 @@ local function fresh_harness()
 				end
 				h.read_lifecycle[#h.read_lifecycle + 1] = "terminate-true-" .. tostring(read_index)
 				handle.terminated = true
-				return true
+				local observers = handle.settlement_observers
+				handle.settlement_observers = {}
+				for _, observer in ipairs(observers) do observer() end
+				return true, "settled"
 			end
 			h.reads[#h.reads + 1] = handle
 			return handle
