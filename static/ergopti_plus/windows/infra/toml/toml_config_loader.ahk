@@ -224,8 +224,21 @@ TomlConfigTapSlotCatalogue() {
 	return Map("prefix", "tap_key__", "slots", Captured["slots"].Clone())
 }
 
+; Returns the keyboard input owner's complete published slot domain, or false
+; while it is unavailable (an unloaded manifest cannot prove retirement).
+TomlConfigKeyboardSlotCatalogue() {
+	Ids := KeyboardSlotCatalogueIds()
+	if !(Ids is Array)
+		return false
+	return ConfigBindingIdentityKeyboardCatalogue(Ids)
+}
+
 ; Judges native bindings only against their actual acknowledged publication.
 TomlConfigParameterBindingStatus(BindingId, Catalogue?) {
+	if Type(BindingId) == "String" && SubStr(BindingId, 1, 10) == "keyboard__" {
+		KeyboardCatalogue := TomlConfigKeyboardSlotCatalogue()
+		return KeyboardCatalogue is Map ? ConfigBindingIdentityKeyboardStatus(BindingId, KeyboardCatalogue) : "unjudged"
+	}
 	if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__" {
 		TapCatalogue := TomlConfigTapSlotCatalogue()
 		return TapCatalogue is Map ? ConfigBindingIdentityTapStatus(BindingId, TapCatalogue) : "unjudged"
@@ -279,6 +292,7 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 	} finally Critical(PreviousCritical)
 	Reason := SubStr(Key, 1, 8) == "script__" ? ConfigBindingIdentityScriptRetiredReason()
 		: SubStr(Key, 1, 9) == "tap_key__" ? ConfigBindingIdentityTapRetiredReason()
+		: SubStr(Key, 1, 10) == "keyboard__" ? ConfigBindingIdentityKeyboardRetiredReason()
 		: "no gesture slot of this build has this name"
 	try LoggerWarn("TomlConfigLoader", "Outdated configuration entry '[action_parameters].{1}' in '{2}' ignored "
 		. "({3}); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath, Reason)
@@ -306,11 +320,10 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	if SectionPath == "action_parameters" && TomlConfigActionParameterIsOwned(Key)
 		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
-	; Admit exactly the prefixes and keys that ShowKeyboardSlotPicker can create;
-	; a broad section exemption would hide misspellings such as win_cc forever.
-	if (SectionPath == "shortcuts.keyboard"
-			&& RegExMatch(Key,
-				"^(?:alt|ctrl|ctrl_shift|win)_(?:[a-z0-9]|space|enter|period|comma|sc029)$"))
+	; Admit exactly the slots the keyboard input owner binds (its published
+	; domain); a broad section exemption would hide misspellings such as win_cc
+	; forever, and a narrower rule would offer a live physical slot for removal.
+	if (SectionPath == "shortcuts.keyboard" && KeyboardSlotIsCatalogued(Key))
 		return "ConfigIO"
 	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
 	; « first_then_second » (infra/key_combinations.ahk); the manifest declares

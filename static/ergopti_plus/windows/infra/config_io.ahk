@@ -2278,6 +2278,99 @@ _KeyboardSlotChord(SlotId) {
 }
 
 /**
+ * The keyboard slot domain of this build's input owner: the chord groups the
+ * tray offers (KEYBOARD_SLOT_GROUPS), the keys each group binds and the
+ * shipped manifest slots. A function, not a global, because the boot loader
+ * judges slots before this file's include position has run.
+ * @returns {Map} "groups" (slot prefixes) and "keys" (slot suffixes), in order.
+ */
+KeyboardSlotDeclaration() {
+		static Declaration := _KeyboardSlotBuildDeclaration()
+		return Declaration
+}
+
+_KeyboardSlotBuildDeclaration() {
+		Keys := []
+		loop Parse "abcdefghijklmnopqrstuvwxyz0123456789"
+				Keys.Push(A_LoopField)
+		for Special in ["space", "enter", "period", "comma", "sc029"]
+				Keys.Push(Special)
+		return Map("groups", ["alt_", "ctrl_", "ctrl_shift_", "win_"], "keys", Keys)
+}
+
+/**
+ * Resolves a physical Win slot (win_SC03A, any letter case) to its canonical
+ * scan when the shipped physical key registry has that key.
+ * @param {String} Slot Persisted slot id.
+ * @returns {String} Canonical "SCnnn", or "" when Slot is no physical slot.
+ */
+KeyboardSlotPhysicalScan(Slot) {
+		if !(Slot is String) || !RegExMatch(Slot, "i)^win_(SC[0-9a-f]{3})$", &Match)
+				return ""
+		Scan := StrUpper(Match[1])
+		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+				if StrUpper(Key["ahk"]) == Scan
+						return Scan
+		}
+		return ""
+}
+
+; The exact ordinary slot ids, or 0 while the manifest is unavailable: without
+; its slots the set is incomplete and must judge nothing.
+_KeyboardSlotOrdinarySet() {
+		Manifest := ManifestFeaturesForSection("shortcuts.keyboard")
+		if !(Manifest is Array) || Manifest.Length == 0
+				return 0
+		Slots := Map()
+		Slots.CaseSense := "On"
+		for Entry in Manifest
+				Slots[Entry["id"]] := true
+		Declaration := KeyboardSlotDeclaration()
+		for Prefix in Declaration["groups"] {
+				for Key in Declaration["keys"]
+						Slots[Prefix . Key] := true
+		}
+		return Slots
+}
+
+/**
+ * Whether the keyboard input owner binds this persisted slot. The boot loader,
+ * the unused-key cleanup and ReadKeyboardShortcutsConfig all ask this one
+ * rule, so a slot is either live and owned or unused and offered for cleanup.
+ * @param {String} Slot Persisted slot id (case-exact, physical slots aside).
+ * @returns {Boolean}
+ */
+KeyboardSlotIsCatalogued(Slot) {
+		if !(Slot is String) || Slot == ""
+				return false
+		if KeyboardSlotPhysicalScan(Slot) != ""
+				return true
+		Slots := _KeyboardSlotOrdinarySet()
+		return (Slots is Map) && Slots.Has(Slot)
+}
+
+/**
+ * The complete published slot inventory for parameter-binding judgment: the
+ * ordinary slots plus the canonical and lowercase spelling of every physical
+ * Win slot. Returns 0 while the manifest is unavailable (nothing is judged).
+ * @returns {Array|Integer}
+ */
+KeyboardSlotCatalogueIds() {
+		Slots := _KeyboardSlotOrdinarySet()
+		if !(Slots is Map)
+				return 0
+		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+				Scan := StrUpper(Key["ahk"])
+				Slots["win_" . Scan] := true
+				Slots["win_" . StrLower(Scan)] := true
+		}
+		Ids := []
+		for Slot in Slots
+				Ids.Push(Slot)
+		return Ids
+}
+
+/**
  * Collects keyboard settings without materializing implicit neutral defaults.
  * @param {Array} Updates Existing acknowledged writer's speculative rows.
  * @param {Map} Assignments Resolved runtime assignments.
@@ -2315,6 +2408,14 @@ ReadKeyboardShortcutsConfig() {
 		}
 
 		for Slot, _ in SlotsToRead {
+				; A slot this build's owner does not bind (a hand-written ctrl_f1, a
+				; case variant, an unknown physical key) is the unused key the boot
+				; loader already warned about: it stays on disk for the cleanup and
+				; must never become a live hotkey.
+				if !KEYBOARD_SHORTCUT_DEFAULTS.Has(Slot) && !KeyboardSlotIsCatalogued(Slot) {
+						try LoggerInfo("Shortcuts", "Keyboard slot '{1}' is not a slot of this build; it is left for the configuration cleanup.", Slot)
+						continue
+				}
 				Value := IniCacheGet(_IniCache, "shortcuts.keyboard", Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						KeyboardShortcutAssignments[Slot] := Value
