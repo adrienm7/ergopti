@@ -79,10 +79,13 @@ function artifactName(context) {
 	].join('-');
 }
 
-/** The visible matrix cell name of the producer; the lane prefix may differ. */
+/**
+ * The visible name of the producer cell under its stage, 'E2E tests / <lot>';
+ * GitHub renders it after the lane prefix, 'macOS / E2E tests / <lot>'.
+ */
 function producerJobSuffix(architecture) {
 	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
-	return 'E2E tests (' + roleLot('e2e', 'managed-ollama-build', architecture, '') + ')';
+	return 'E2E tests / ' + roleLot('e2e', 'managed-ollama-build', architecture, '');
 }
 
 /** The visible matrix cell name of the cell that qualifies one architecture's inputs. */
@@ -90,7 +93,7 @@ function qualifierJobSuffix(architecture) {
 	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
 	// The Intel role runs as two cells; its runtime cell uploads the inputs.
 	const scenario = architecture === 'amd64' ? 'runtime' : '';
-	return 'E2E tests (' + roleLot('e2e', 'managed-ollama-native', architecture, scenario) + ')';
+	return 'E2E tests / ' + roleLot('e2e', 'managed-ollama-native', architecture, scenario);
 }
 
 /** The qualified native inputs one qualifying cell uploads for the application build. */

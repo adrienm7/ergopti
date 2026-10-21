@@ -1027,7 +1027,7 @@ check('shared native process ownership controls remain registered and mandatory'
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 	const workflow = require('yaml').parse(
-		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+		require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml')
 	);
 	const expectedClockSteps = require('yaml').parse(
 		fs.readFileSync(
@@ -1759,7 +1759,7 @@ check(
 
 check('profile-bound native HTTP routing preserves mandatory owners and closed refusals', () => {
 	const workflow = require('yaml').parse(
-		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+		require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml')
 	);
 	const script = workflow.jobs[macRole.stage['managed-ollama-native']].steps.find(
 		(step) => step.name === 'Receive actual independent managed HTTP native clients'

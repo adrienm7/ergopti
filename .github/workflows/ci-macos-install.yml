@@ -1,0 +1,453 @@
+# .github/workflows/ci-macos-install.yml
+#
+# macOS install-and-launch stage: installs and launches the exact built
+# application over every scenario lot, beside the cold native bootstrap.
+# Called by ci-macos.yml as its launch stage.
+
+name: 'macOS install and launch'
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when ci.yml's plan resolved a free release tag
+        required: true
+        type: boolean
+      version:
+        description: Release version without the leading v; empty unless release, so the build stamps 0.0.0-dev
+        required: true
+        type: string
+      tag:
+        description: Exact release tag from the canonical plan; empty unless release
+        required: true
+        type: string
+      prerelease:
+        description: Exact prerelease string from the canonical plan; empty unless release
+        required: true
+        type: string
+      channel:
+        description: Sparkle update channel stamped into the app and the appcast, main or dev
+        required: true
+        type: string
+      testbuild_metadata:
+        description: testbuild_metadata output of package-macos, the stage this one follows
+        required: true
+        type: string
+      testbuild_matrix:
+        description: testbuild_matrix output of package-macos, the stage this one follows
+        required: true
+        type: string
+      predecessors:
+        description: The lane's needs context for this stage (e2e-hs, package-macos), as JSON
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
+jobs:
+  launch:
+    name: '${{ matrix.lot }}'
+    runs-on: ${{ fromJSON(inputs.testbuild_metadata)[matrix.lot].runner }}
+    timeout-minutes: ${{ fromJSON(inputs.testbuild_metadata)[matrix.lot].timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.testbuild_matrix) }}
+    env:
+      MACOS_STAGE_LOT: ${{ matrix.lot }}
+      MACOS_STAGE_METADATA: ${{ inputs.testbuild_metadata }}
+      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(inputs.testbuild_metadata)[matrix.lot]) }}
+      MACOS_STAGE_ROLE: ${{ fromJSON(inputs.testbuild_metadata)[matrix.lot].role }}
+      MACOS_STAGE_RUNNER: ${{ fromJSON(inputs.testbuild_metadata)[matrix.lot].runner }}
+      MACOS_STAGE_ARCHITECTURE: ${{ fromJSON(inputs.testbuild_metadata)[matrix.lot].architecture }}
+      MACOS_STAGE_SCENARIO: ${{ fromJSON(inputs.testbuild_metadata)[matrix.lot].scenario }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact prior stage receipts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-stage-{e2e,build}-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/macos-stage-inputs
+      - name: Admit complete successful predecessor stage
+        id: stage-admission
+        env:
+          MACOS_STAGE_NEEDS: ${{ inputs.predecessors }}
+        run: node tools/ci/macos-stage-roles.cjs admit testbuild "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
+      # Retained original role: launch
+      - uses: actions/checkout@v4
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+
+      - name: Fetch the older release whose files seed the user state
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+        run: git fetch --no-tags --depth=1 origin "+refs/tags/$SEED_TAG:refs/tags/$SEED_TAG"
+
+      - name: Download the package built by this run
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-macos
+          path: ${{ runner.temp }}/package
+
+      - name: Download the independent CI archive source
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-macos-archive-source
+          path: ${{ runner.temp }}/package
+
+      # One job launches the scenarios of its lot in turn. Each still starts
+      # from a fresh runner: the state recorded here, before the first install,
+      # is restored and proved again after every scenario, and a runner that
+      # cannot be proved fresh stops the lot (macos_launch_reset.py).
+      - name: Record the fresh runner state before the first launch
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/macos_launch_reset_test.py
+          python3 tools/diagnostics/macos_launch_reset.py snapshot "$RUNNER_TEMP/launch-fresh-runner.json"
+
+      # Reproduce a browser download: the archive and everything unpacked from
+      # it carry com.apple.quarantine until the user runs the documented xattr
+      # command from the release notes. Per scenario: install, record the launch
+      # qualification scope, launch over the seeded user state and judge it,
+      # record the mandatory evidence, then reset the runner. A failed scenario
+      # does not hide the others; the step fails if any of them failed.
+      - name: Install, launch and judge every scenario of the lot
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+        run: |
+          set -euo pipefail
+          launch_one() {
+            local scenario="$1"
+            local output="$RUNNER_TEMP/launch-gate/$scenario"
+            local receipt="$RUNNER_TEMP/launch-qualification-$scenario.json"
+            test ! -e /Applications/ErgoptiPlus.app
+            stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+            node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
+                > "$RUNNER_TEMP/package-install-$scenario.json"
+            node - "$RUNNER_TEMP/package-install-$scenario.json" > "$RUNNER_TEMP/package-install-$scenario.env" <<'NODE'
+          const fs = require('node:fs');
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (typeof receipt.archive !== 'string' || /[\r\n]/.test(receipt.archive)) throw Error('Invalid installed archive path');
+          process.stdout.write('MACOS_INSTALL_ARCHIVE=' + receipt.archive + '\n');
+          NODE
+            MACOS_INSTALL_ARCHIVE="$(sed -n 's/^MACOS_INSTALL_ARCHIVE=//p' "$RUNNER_TEMP/package-install-$scenario.env")"
+            test -n "$MACOS_INSTALL_ARCHIVE"
+            xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+            xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+            if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
+                echo "::error::the documented quarantine removal left an attribute behind"
+                exit 1
+            fi
+            lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+            echo "runner machine: $(uname -m)"
+            node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents \
+                --scenario "$scenario" --runner "$MATRIX_RUNNER" \
+                --receipt "$receipt"
+            node - "$receipt" "$scenario" "$MATRIX_RUNNER" <<'NODE'
+          const fs = require('node:fs');
+          const policy = require('./tools/ci/dev-release-qualification.cjs');
+          const scenario = process.argv[3], runner = process.argv[4];
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          policy.validateLaunchQualificationReceipt(receipt, scenario, runner, process.env.GITHUB_SHA, policy.environmentContext());
+          fs.writeFileSync(
+            require('node:path').join(process.env.RUNNER_TEMP, 'stable-macos-launch-appleevents-' + scenario + '-' + runner + '.json'),
+            JSON.stringify(receipt) + '\n', { flag: 'wx' }
+          );
+          NODE
+            python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app \
+                "$output" "$scenario" --seed-tag "$SEED_TAG" \
+                --qualification-receipt "$receipt"
+            node tools/test/desktop-ci-evidence.cjs record-macos \
+                "$output/result.json" \
+                "$MACOS_INSTALL_ARCHIVE" \
+                "$output/evidence.json"
+          }
+          read -r -a scenarios <<< "${MACOS_STAGE_SCENARIO//__/ }"
+          test "${#scenarios[@]}" -gt 0
+          lot_status=0
+          for scenario in "${scenarios[@]}"; do
+            echo "::group::Installed app: $scenario"
+            set +e
+            (set -euo pipefail; launch_one "$scenario")
+            scenario_status=$?
+            set -e
+            echo "::endgroup::"
+            if [ "$scenario_status" -ne 0 ]; then
+                echo "::error::Installed app: $scenario failed with status $scenario_status"
+                lot_status=1
+            fi
+            python3 tools/diagnostics/macos_launch_reset.py restore "$RUNNER_TEMP/launch-fresh-runner.json"
+          done
+          exit "$lot_status"
+
+      - name: Retain source-bound AppleEvent launch qualification receipt
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__clean__') || contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__karabiner_config__')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-launch-macos-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}
+          path: |
+            ${{ runner.temp }}/stable-macos-launch-appleevents-clean-${{ env.MACOS_STAGE_RUNNER }}.json
+            ${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-${{ env.MACOS_STAGE_RUNNER }}.json
+          if-no-files-found: error
+
+      - name: Retain launch evidence
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-gate-${{ inputs.release && 'release' || 'ci' }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}
+          overwrite: true
+          path: ${{ runner.temp }}/launch-gate
+          if-no-files-found: warn
+
+      # Test-build acceptance follows the mandatory package gate. A fresh signed
+      # app receives the cold runtime; this job never publishes a release.
+      # Retained original role: cold-bootstrap-native
+      - uses: actions/checkout@v4
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+
+      - uses: actions/setup-node@v4
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        with:
+          node-version-file: '.node-version'
+
+      - uses: actions/setup-python@v5
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        with:
+          python-version: '3.13'
+
+      - name: Require actual arm64 cold runtime prerequisites
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          test -x /usr/bin/sandbox-exec
+          xcode-select -p
+          swift --version
+          node --version
+
+      - name: Build independent signed cold application
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        id: cold-app
+        shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
+          ERGOPTI_VERSION: ${{ inputs.version }}
+          ERGOPTI_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_RELEASE: 'false'
+          HAMMERSPOON_VERSION: '1.1.1'
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          # A real ad-hoc signature suffices for native receiving. The fresh
+          # Sparkle key is used only in this unpublished test application.
+          export SPARKLE_PUBLIC_KEY="$(python3 -c 'import base64,secrets;print(base64.b64encode(secrets.token_bytes(32)).decode())')"
+          bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/cold-bootstrap-application-build.log"
+          codesign --verify --deep --strict build/macos/ErgoptiPlus.app 2>&1 | tee -a "$RUNNER_TEMP/cold-bootstrap-application-build.log"
+
+      - name: Receive actual isolated cold native MLX bootstrap
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' }}
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/macos_cold_bootstrap.py \
+            --app "$PWD/build/macos/ErgoptiPlus.app" \
+            --output "$RUNNER_TEMP/native-cold-bootstrap"
+          node tools/test/desktop-ci-evidence.cjs record-cold-macos \
+            "$RUNNER_TEMP/native-cold-bootstrap/receipt.json" \
+            "$RUNNER_TEMP/native-cold-bootstrap/cold-bootstrap-evidence.json"
+
+      # The official runtime boot is separate from the optional rebuilt daemon
+      # model receiver. It still runs if the preceding MLX cold boot refuses.
+      - name: Receive actual official cold Ollama without stock Python
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (!cancelled() && steps.cold-app.outcome == 'success') }}
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          cold_ollama_asset_root="$(mktemp -d "$RUNNER_TEMP/official-cold-ollama-inputs.XXXXXX")"
+          cold_ollama_archive="$cold_ollama_asset_root/ollama-darwin.tgz"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          assert release['version'] == '0.40.4'
+          assert release['assets']['macos-universal'] == {
+              'filename': 'ollama-darwin.tgz',
+              'sha256': 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
+              'bytes': 167884528,
+          }
+          PY
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
+            --output "$cold_ollama_archive" \
+            https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-darwin.tgz
+          python3 - "$cold_ollama_archive" <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+          archive = Path(sys.argv[1])
+          assert archive.stat().st_size == 167884528
+          with archive.open('rb') as stream:
+              actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert actual == 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58'
+          PY
+          python3 tools/diagnostics/macos_cold_ollama_bootstrap.py \
+            --app "$PWD/build/macos/ErgoptiPlus.app" \
+            --official-archive "$cold_ollama_archive" \
+            --repository "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/native-cold-ollama-bootstrap"
+          python3 - "$RUNNER_TEMP/native-cold-ollama-bootstrap/receipt.json" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          receipt = json.loads(Path(sys.argv[1]).read_text())
+          for key, expected in {
+              'version': 1, 'status': 'passed', 'client_version': '0.40.4',
+              'helpers_retired': True, 'native_helpers_absent': True, 'cleanup': True,
+              'private_work_retired': True,
+              'official_archive_sha256': 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
+              'installed_tree': 'byte-and-link-identical to verified official archive',
+              'selection': 'unmodified production runtime resolvers under inherited kernel sandbox',
+              'daemon_validation': 'not-executed', 'model_validation': 'not-executed',
+          }.items():
+              assert type(receipt[key]) is type(expected) and receipt[key] == expected, key
+          sources = (
+              'macos/modules/llm/network-retry.sh', 'macos/modules/llm/ensure-ollama-deps.sh',
+              'macos/modules/llm/ollama_deps_checker.lua', 'macos/modules/llm/ollama_binary.lua',
+              'macos/modules/llm/ollama-release.sh', 'macos/adapters/native_bootstrap_pty.lua',
+              'macos/adapters/task_lifecycle.lua', 'macos/adapters/python_interpreter.lua',
+              '_shared/lua/core/llm/native_pty_receipt.lua',
+              '_shared/modules/network/proxy_policy.json', '_shared/modules/llm/ollama_release.json',
+          )
+          assert set(receipt['sources']) == set(sources)
+          repository = Path(os.environ['GITHUB_WORKSPACE'])
+          for source in sources:
+              actual = hashlib.sha256((repository / 'static/ergopti_plus' / source).read_bytes()).hexdigest()
+              assert receipt['sources'][source] == actual, source
+          assert receipt['isolation']['kind'] == 'native-scoped-sandbox'
+          assert receipt['caller']['python_resolver'] == 'unmodified production resolver'
+          assert receipt['caller']['ollama_resolver'] == 'unmodified production resolver'
+          assert receipt['caller']['python_state'] == 'python_missing'
+          assert type(receipt['caller']['native_python_candidates_count']) is int
+          assert receipt['caller']['native_python_candidates_count'] == 0
+          print('Official cold Ollama native installation passed; daemon/model validation not executed here.')
+          PY
+
+      - name: Retain official cold Ollama receipt only
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: cold-ollama-official-${{ inputs.release && 'release' || 'ci' }}-macos-15
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/native-cold-ollama-bootstrap/receipt.json
+
+      - name: Retain native cold bootstrap evidence
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'cold-bootstrap-native' && (always()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-macos-15
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/cold-bootstrap-application-build.log
+            ${{ runner.temp }}/native-cold-bootstrap/receipt.json
+            ${{ runner.temp }}/native-cold-bootstrap/result.json
+            ${{ runner.temp }}/native-cold-bootstrap/launch.log
+            ${{ runner.temp }}/native-cold-bootstrap/cold-runtime.sb
+            ${{ runner.temp }}/native-cold-bootstrap/cold-bootstrap-evidence.json
+
+      - name: Record actual stage role outcome — ${{ matrix.lot }}
+        if: always()
+        env:
+          MACOS_STAGE_CELL: ${{ env.MACOS_STAGE_CELL }}
+          MACOS_STAGE_RESULT: ${{ job.status }}
+        run: node tools/ci/macos-stage-roles.cjs record testbuild "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"
+      - name: Retain exact stage role outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-stage-testbuild-${{ env.MACOS_STAGE_ROLE }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO || 'default' }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/macos-stage-output/receipt.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true

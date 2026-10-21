@@ -210,6 +210,7 @@ module.exports = function run({
 	// no __dirname/__file__ patch, sourceReceipt mock or Swift/native invocation.
 	const fixtureInputs = [
 		'.github/workflows/ci-macos.yml',
+		'.github/workflows/ci-macos-e2e.yml',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
 		'.github/ci/stable_v102_macos_native_qualification_exception.json',

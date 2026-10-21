@@ -130,7 +130,12 @@ function projectScopedSteps(text, rel) {
 			);
 			const slot = matches[0],
 				protocol = contract.protocols[slot.protocol];
-			assert.equal(policy.scopes[protocol.scope].path, rel, 'scope and workflow owner must agree');
+			// A sibling slot may run in another stage file than its scope's owner step.
+			assert.equal(
+				policy.scopes[protocol.scope].path,
+				slot.owner_file ?? rel,
+				'scope and workflow owner must agree'
+			);
 			if (slot.owner_job !== undefined) {
 				const siblings = {
 					'Receive actual managed HTTP native clients': [
@@ -146,6 +151,11 @@ function projectScopedSteps(text, rel) {
 				assert.ok(Object.hasOwn(siblings, step.name), 'unknown duplicate scoped owner');
 				assert.equal(protocol.scope, siblings[step.name][0], 'duplicate scope family must remain');
 				assert.equal(slot.owner_job, 'e2e-hs', 'original scope owner must remain');
+				assert.equal(
+					slot.owner_file,
+					'.github/workflows/ci-macos-e2e.yml',
+					'original scope owner file must remain'
+				);
 				assert.equal(slot.owner_step, siblings[step.name][1], 'original scope step must remain');
 				assert.equal(
 					policy.scopes[protocol.scope].args[1],

@@ -16,7 +16,7 @@
 	"scopes": {
 		"macos-native-pac": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos.yml",
+			"path": ".github/workflows/ci-macos-e2e.yml",
 			"args": ["e2e-hs", "Qualify actual native PAC and WPAD XCTest controls"],
 			"methods": {
 				"ManagedHTTPWireTests": ["testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure"],
@@ -31,7 +31,7 @@
 		},
 		"macos-native-http": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos.yml",
+			"path": ".github/workflows/ci-macos-e2e.yml",
 			"args": ["e2e-hs", "Receive actual independent managed HTTP native clients"],
 			"command": "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
 			"reason": "Only independent native wire clients are DEFERRED and qualified:false after the original trust-install deadline; owned-process/client-only tests remain mandatory at both call sites."
@@ -44,7 +44,7 @@
 		},
 		"macos-native-model-receiving": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos.yml",
+			"path": ".github/workflows/ci-macos-e2e.yml",
 			"args": ["e2e-hs", "Receive actual native model create, pull, inference and retirement"],
 			"architectures": ["arm64", "amd64"],
 			"profiles": ["pac-inline", "pac-url", "explicit-proxy"],

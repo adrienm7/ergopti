@@ -169,7 +169,7 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 		args: ['shared-validation', 'npm run test:js']
 	},
 	'macos-native-model-receiving': {
-		path: '.github/workflows/ci-macos.yml',
+		path: '.github/workflows/ci-macos-e2e.yml',
 		args: ['e2e-hs', 'Receive actual native model create, pull, inference and retirement']
 	},
 	'linux-unit-suite': {
@@ -181,19 +181,19 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 		args: ['e2e-linux', 'Linux E2E test suite bodies including live fixture chain']
 	},
 	'macos-native-pac': {
-		path: '.github/workflows/ci-macos.yml',
+		path: '.github/workflows/ci-macos-e2e.yml',
 		args: ['e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls']
 	},
 	'macos-native-http': {
-		path: '.github/workflows/ci-macos.yml',
+		path: '.github/workflows/ci-macos-e2e.yml',
 		args: ['e2e-hs', 'Receive actual independent managed HTTP native clients']
 	},
 	'macos-stubbed-unit': {
-		path: '.github/workflows/ci-macos.yml',
+		path: '.github/workflows/ci-macos-unit.yml',
 		args: ['test-hs', 'Run unit + meta tests']
 	},
 	'macos-stubbed-e2e': {
-		path: '.github/workflows/ci-macos.yml',
+		path: '.github/workflows/ci-macos-e2e.yml',
 		args: ['e2e-hs', 'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)']
 	},
 	'windows-native-desktop': {

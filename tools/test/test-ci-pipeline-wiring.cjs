@@ -189,6 +189,8 @@ const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
 // The Linux E2E stage file, where the raw harness steps sit before inlining.
 const LINUX_E2E_BOX = '.github/workflows/ci-linux-e2e.yml';
+// The macOS E2E stage file, where the raw native steps sit before inlining.
+const MACOS_E2E_BOX = '.github/workflows/ci-macos-e2e.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
 // Release verifies every lane against the persisted plan, then publishes.
 const RELEASE_BOX = '.github/workflows/ci-release.yml';
@@ -3392,18 +3394,17 @@ for (const [rel, id, unit] of [
 	[MACOS_BOX, 'e2e-hs', 'test-hs'],
 	[LINUX_BOX, 'e2e-linux', 'test-linux']
 ]) {
+	// The inlined macOS lane lists each stage's needs right after its name.
 	const prerequisite =
 		rel === MACOS_BOX
-			? `      actions: read\n    needs:\n      - ${unit}\n    runs-on: \${{ fromJSON(needs.${unit}`
+			? `    name: E2E tests\n    needs:\n      - ${unit}\n`
 			: `    needs: [${unit}]\n`;
 	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
 		mustCatch(
 			`${id} must remain mandatory`,
 			rel,
 			prerequisite,
-			rel === MACOS_BOX
-				? prerequisite.replace('    runs-on:', suffix + '    runs-on:')
-				: prerequisite + suffix,
+			prerequisite + suffix,
 			graphProblems
 		);
 	}
@@ -3411,10 +3412,9 @@ for (const [rel, id, unit] of [
 
 errors.push(...graphProblems(pipeline.files()));
 // E2E and Build both read Actions evidence and need Unit; each anchor names its own runner.
-const MACOS_E2E_NEEDS =
-	'      actions: read\n    needs:\n      - test-hs\n    runs-on: ${{ fromJSON(needs.test-hs';
-const MACOS_BUILD_NEEDS =
-	'      actions: read\n    needs:\n      - test-hs\n    runs-on: macos-latest\n';
+// The inlined lane lists each stage's needs right after its name.
+const MACOS_E2E_NEEDS = '    name: E2E tests\n    needs:\n      - test-hs\n';
+const MACOS_BUILD_NEEDS = '    name: Build\n    needs:\n      - test-hs\n';
 for (const [what, rel, from, to] of [
 	[
 		'a second root in ci.yml',
@@ -5072,8 +5072,8 @@ function namingProblems(files) {
 									'e2e-hs': 'E2E tests',
 									'e2e-ahk': 'E2E tests',
 									'e2e-linux': 'E2E tests',
-									// The macOS Build states the macOS version it runs on.
-									'package-macos': 'Build (macOS 26)',
+									// The macOS Build job states its macOS version (stage layout).
+									'package-macos': 'Build',
 									'package-windows': 'Build',
 									'package-linux': 'Build',
 									'package-flatpak': 'Flatpak',
@@ -5166,8 +5166,8 @@ for (const [what, rel, from, to] of [
 	[
 		'a repeated lane prefix',
 		MACOS_BOX,
-		'  package-macos:\n    name: Build (macOS 26)\n',
-		"  package-macos:\n    name: 'macOS / Build (macOS 26)'\n"
+		'  package-macos:\n    name: Build\n',
+		"  package-macos:\n    name: 'macOS / Build'\n"
 	],
 	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
 	['an extra root separator', ENTRY, "name: 'Release plan'", "name: 'Validate / Checks / Plan'"],
@@ -5212,6 +5212,19 @@ const STAGE_LAYOUT = {
 		['package-flatpak', 'flatpak', 'Flatpak', 'Build, install and launch'],
 		['install-linux', 'install', 'Install and launch', '${{ matrix.lot }}'],
 		['linux-ok', 'verdict', 'Verdict', 'Mandatory subjects']
+	],
+	[MACOS_BOX]: [
+		['test-hs', 'unit', 'Unit tests', '${{ matrix.lot }}'],
+		['e2e-hs', 'e2e', 'E2E tests', '${{ matrix.lot }}'],
+		// The Build job states the macOS version HOSTS assigns its runner.
+		[
+			'package-macos',
+			'build',
+			'Build',
+			`ErgoptiPlus.app (${require('../ci/macos-stage-roles.cjs').macosName('host')})`
+		],
+		['launch', 'install', 'Install and launch', '${{ matrix.lot }}'],
+		['macos-ok', 'verdict', 'Verdict', 'Mandatory jobs and launch scenarios']
 	]
 };
 // The scripts that find a stage job by its rendered name, with the prefix
@@ -5219,7 +5232,10 @@ const STAGE_LAYOUT = {
 const RENDERED_NAME_READERS = [
 	['tools/ci/validate-js-feature-results.cjs', 'shared-validation'],
 	['tools/ci/site-deploy-admission.cjs', 'common-build'],
-	['tools/ci/site-deploy-admission.cjs', 'common-testbuild']
+	['tools/ci/site-deploy-admission.cjs', 'common-testbuild'],
+	// These two compose the stage and the lot; the lane prefix is matched apart.
+	['tools/ci/managed-ollama-handoff.cjs', 'e2e-hs'],
+	['tools/ci/native_http_clock_evidence.cjs', 'e2e-hs']
 ];
 
 /** Lists how the real files could stop running one stage per reusable workflow. */
@@ -5269,7 +5285,11 @@ function stageLayoutProblems(files) {
 		const stageName = STAGE_LAYOUT[lane].find(([stage]) => stage === id)[2];
 		const prefix = `${laneName(lane)} / ${stageName}`;
 		const source = fs.readFileSync(path.resolve(__dirname, '../..', script), 'utf8');
-		if (!source.includes(`'${prefix}'`) || !source.includes("' / '"))
+		const composes =
+			source.includes(`'${prefix} / '`) ||
+			source.includes(`'${stageName} / '`) ||
+			(source.includes(`'${prefix}'`) && source.includes("' / '"));
+		if (!composes)
 			problems.push(`${script} must find ${id} as '${prefix} / <job>', the name GitHub renders`);
 	}
 	return problems;
@@ -7158,7 +7178,9 @@ for (const [replacement, error] of [
 	]
 ]) {
 	const changed = rawSourceFiles.map((file) =>
-		file.rel === MACOS_BOX ? { ...file, text: file.text.replace(rawSourceStep, replacement) } : file
+		file.rel === MACOS_E2E_BOX
+			? { ...file, text: file.text.replace(rawSourceStep, replacement) }
+			: file
 	);
 	assert.notDeepEqual(changed, rawSourceFiles);
 	assert.throws(() => pipeline.fromFiles(changed), error);
@@ -7938,12 +7960,16 @@ for (const [label, before, after] of [
 			body.replace('        if: ' + runtimeOnly + '\n', `        if: ${condition}\n`),
 			/full step condition/
 		]);
+	// The raw lane inlined; each mutation is written back into its stage file.
+	const rawLoader = require('./ci-pipeline.cjs');
+	const rawLane = rawLoader.inlinePipeline(files).find((file) => file.rel === MACOS_BOX).text;
 	for (const [label, replacement, error] of mutants) {
-		const changed = files.map((file) => {
-			if (file.rel !== MACOS_BOX) return file;
-			assert.equal(file.text.split(body).length, 2, label + ': genuine mutation seam');
-			return { ...file, text: file.text.replace(body, () => replacement) };
-		});
+		assert.equal(rawLane.split(body).length, 2, label + ': genuine mutation seam');
+		const changed = rawLoader.replaceLane(
+			files,
+			MACOS_BOX,
+			rawLane.replace(body, () => replacement)
+		);
 		assert.notDeepEqual(changed, files, label);
 		assert.throws(() => pipeline.fromFiles(changed), error, label);
 	}
@@ -7985,10 +8011,10 @@ for (const name of [
 		);
 	}
 	const from = macConditionalPrefix(head, 'e2e-hs');
-	const source = rawSourceFiles.find((file) => file.rel === MACOS_BOX).text;
+	const source = rawSourceFiles.find((file) => file.rel === MACOS_E2E_BOX).text;
 	assert.equal(source.split(from).length - 1, 1, 'one exact native producer diagnostic step');
 	const swallowed = rawSourceFiles.map((file) =>
-		file.rel === MACOS_BOX
+		file.rel === MACOS_E2E_BOX
 			? { ...file, text: file.text.replace(from, from + '        continue-on-error: true\n') }
 			: file
 	);
@@ -8003,8 +8029,8 @@ for (const name of [
 // independently of earlier refusals.
 {
 	const files = pipeline.rawFiles();
-	const source = files.find((file) => file.rel === MACOS_BOX);
-	const jobs = pipeline.jobsOfText(source.text, MACOS_BOX).filter((job) => job.id === 'e2e-hs');
+	const source = files.find((file) => file.rel === MACOS_E2E_BOX);
+	const jobs = pipeline.jobsOfText(source.text, MACOS_E2E_BOX).filter((job) => job.id === 'e2e-hs');
 	assert.equal(jobs.length, 1, 'one current native model receiving job');
 	const owner = jobs[0];
 	const buildName = 'Receive and admit the clean native source asset from its build cell';
@@ -8025,7 +8051,7 @@ for (const name of [
 		const changed = owner.body.replace(before, () => after);
 		assert.notEqual(changed, owner.body, label + ': real source mutation');
 		const mutated = files.map((file) =>
-			file.rel === MACOS_BOX
+			file.rel === MACOS_E2E_BOX
 				? { ...file, text: file.text.replace(owner.body, () => changed) }
 				: file
 		);

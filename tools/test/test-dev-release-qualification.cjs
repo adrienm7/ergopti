@@ -493,6 +493,11 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'ci-windows-install.yml': ['launch-windows'],
 		'ci-windows-verdict.yml': ['windows-ok'],
 		'ci-macos.yml': ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
+		'ci-macos-unit.yml': ['test-hs'],
+		'ci-macos-e2e.yml': ['e2e-hs'],
+		'ci-macos-build.yml': ['package-macos'],
+		'ci-macos-install.yml': ['launch'],
+		'ci-macos-verdict.yml': ['macos-ok'],
 		'ci-linux.yml': [
 			'test-linux',
 			'e2e-linux',
@@ -572,7 +577,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			}
 		}
 	}
-	const macosSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8');
+	const macosSource = require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml');
 	for (const role of [
 		'e2e-hs',
 		'tooltip-canvas',
@@ -606,8 +611,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 45);
-	assert.equal(jobs, 46);
+	assert.equal(jobs - 1, 50);
+	assert.equal(jobs, 51);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
