@@ -136,11 +136,12 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 				return ""
 		}
 
-		; InputHook may publish a failed dead-key composition as one visible
-		; chunk. Only its final scalar frames END matching; STAR still sees
-		; the complete physical suffix and no intermediate edit is emitted.
-		if StrLen(JustTypedChar) > 1
-				JustTypedChar := SubStr(JustTypedChar, -_TextTailCodeUnits(JustTypedChar, 1))
+		; Native Unicode packets may deliver high and low units separately. The
+		; buffer owns both observations; only its complete final scalar can frame
+		; END matching. A dead-key chunk still contributes its entire STAR suffix.
+		JustTypedChar := _TextCompleteTailScalar(HSE_Buffer)
+		if JustTypedChar == ""
+				return ""
 		BufLen := StrLen(HSE_Buffer)
 		IsTerminator := InStr(HSE_WORD_TERMINATORS, JustTypedChar) > 0
 
@@ -512,22 +513,22 @@ _HSE_WordBoundaryAllows(Buf, Spec, ObservedLength := 0) {
 								return false
 						}
 						PredStart := _TextCodepointStart(Buf, BeforeLen)
-						PredChar := SubStr(Buf, PredStart, BeforeLen - PredStart + 1)
+						PredChar := _TextCompleteTailScalar(SubStr(Buf, PredStart, BeforeLen - PredStart + 1))
 						; Same set as the expansion branch below, tested in the opposite
 						; direction — that is the point. A repeat needs the predecessor to
 						; be mid-word; an expansion needs it to be a boundary. Reading two
 						; DIFFERENT sets here let one character satisfy both at once, so a
 						; quote blocked the expansion and licensed the doubling that
 						; replaced it.
-						return InStr(Boundaries, PredChar) == 0
+						return PredChar != "" && InStr(Boundaries, PredChar) == 0
 				}
 				return true
 		}
 		BeforeLen := StrLen(Buf) - MatchedLength
 		if (BeforeLen >= 1) {
 				BeforeStart := _TextCodepointStart(Buf, BeforeLen)
-				BeforeChar := SubStr(Buf, BeforeStart, BeforeLen - BeforeStart + 1)
-				return InStr(Boundaries, BeforeChar) > 0
+				BeforeChar := _TextCompleteTailScalar(SubStr(Buf, BeforeStart, BeforeLen - BeforeStart + 1))
+				return BeforeChar != "" && InStr(Boundaries, BeforeChar) > 0
 		}
 		return HSE_StartIsWordBoundary
 }

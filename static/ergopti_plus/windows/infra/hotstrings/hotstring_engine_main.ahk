@@ -822,9 +822,14 @@ _HSE_TrimBufferToCapacity() {
 				return
 		; Completion framing is not trigger text. Retain an in-progress nbsp too,
 		; because its punctuation arrives in a separate character notification.
-		LastChar := SubStr(HSE_Buffer, -_TextTailCodeUnits(HSE_Buffer, 1))
-		FramingLength := (InStr(HSE_WORD_TERMINATORS, LastChar)
-				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F)) ? StrLen(LastChar) : 0
+		LastChar := _TextCompleteTailScalar(HSE_Buffer)
+		FramingLength := (LastChar != "" && (InStr(HSE_WORD_TERMINATORS, LastChar)
+				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F))) ? StrLen(LastChar) : 0
+		LastUnit := NumGet(StrPtr(HSE_Buffer), (BufferLength - 1) * 2, "UShort")
+		; Keep the possible completion's high unit outside trigger capacity until
+		; the next callback proves its full scalar and delimiter membership.
+		if LastUnit >= 0xD800 && LastUnit <= 0xDBFF
+				FramingLength := 1
 		if (LastChar == ":" or LastChar == ";") {
 				PreviousChar := SubStr(HSE_Buffer, -2, 1)
 				if (PreviousChar == Chr(0xA0) or PreviousChar == Chr(0x202F))
@@ -837,8 +842,8 @@ _HSE_TrimBufferToCapacity() {
 		; The last discarded character is known: trimming must not turn a real
 		; word boundary into unknown context, or invent one after a word character.
 		DiscardedStart := _TextCodepointStart(HSE_Buffer, DropCount)
-		DiscardedChar := SubStr(HSE_Buffer, DiscardedStart, DropCount - DiscardedStart + 1)
-		HSE_StartIsWordBoundary := InStr(_HSE_WordBoundarySet(), DiscardedChar) > 0
+		DiscardedChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, DiscardedStart, DropCount - DiscardedStart + 1))
+		HSE_StartIsWordBoundary := DiscardedChar != "" && InStr(_HSE_WordBoundarySet(), DiscardedChar) > 0
 		HSE_Buffer := Tail
 }
 
@@ -1110,7 +1115,7 @@ HSE_TryRepeatKey(MagicKey) {
 		; The char being repeated is immediately before the magic key.
 		RepeatCharEnd := BufLen - MkLen
 		RepeatCharPos := _TextCodepointStart(HSE_Buffer, RepeatCharEnd)
-		RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1)
+		RepeatChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, RepeatCharPos, RepeatCharEnd - RepeatCharPos + 1))
 		; Refuse to repeat whitespace or terminators.
 		if (RepeatChar == "" or InStr(_HSE_WordBoundarySet(), RepeatChar) > 0) {
 				return ""
@@ -1124,11 +1129,11 @@ HSE_TryRepeatKey(MagicKey) {
 				return ""
 		}
 		PredStart := _TextCodepointStart(HSE_Buffer, PredPos)
-		PredChar := SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1)
+		PredChar := _TextCompleteTailScalar(SubStr(HSE_Buffer, PredStart, PredPos - PredStart + 1))
 		; Boundary set, not terminator set: after an opening quote the char is the
 		; FIRST letter of its word, so doubling it is meaningless and the real
 		; expansion must be allowed to win instead.
-		if (InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
+		if (PredChar == "" or InStr(_HSE_WordBoundarySet(), PredChar) > 0) {
 				return ""
 		}
 		; When PredChar starts at position 1 of the buffer (PredStart == 1) and the buffer
