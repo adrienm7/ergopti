@@ -229,6 +229,9 @@ try {
 			manifests[0].checks[0].name = 'second';
 		},
 		(manifests) => {
+			manifests[0].checks[0].name = 'cases are reported NOT EXECUTED';
+		},
+		(manifests) => {
 			manifests[0].checks[0].ordinal = 2;
 		},
 		(manifests) => {

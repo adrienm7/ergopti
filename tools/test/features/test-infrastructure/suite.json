@@ -461,7 +461,7 @@
 		{
 			"id": "js-0450",
 			"ordinal": 450,
-			"name": "AHK cases the host cannot run are reported NOT EXECUTED, never passed",
+			"name": "AHK cases the host cannot run are reported as not executed, never passed",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-not-executed.cjs"],
 			"repro": "npm run test:ahk-not-executed"
