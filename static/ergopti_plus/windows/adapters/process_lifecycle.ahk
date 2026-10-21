@@ -6,7 +6,8 @@
 ; AHK v2 implementation of the ProcessLifecycle port contract. Provides
 ; callbacks for foreground-window (focus) changes via a SetTimer polling loop
 ; since AHK v2 exposes no native app-launch/quit notification mechanism short
-; of WMI subscriptions. Launch and quit callbacks are accepted but never fired.
+; of WMI subscriptions. The same loop diffs a Toolhelp process snapshot for
+; launch and quit callbacks while any of them is registered.
 ;
 ; NAMING CONVENTION:
 ; Port method        -> AHK name mapping:
@@ -37,11 +38,25 @@
 ; Array of callbacks invoked when the foreground window changes
 global PLC_FocusCallbacks  := []
 
-; Array of app-launch callbacks - accepted but never triggered on AHK (no WMI)
+; Array of callbacks invoked with an executable name when its first process starts
 global PLC_LaunchCallbacks := []
 
-; Array of app-quit callbacks - accepted but never triggered on AHK (no WMI)
+; Array of callbacks invoked with an executable name when its last process exits
 global PLC_QuitCallbacks   := []
+
+; Executable names of the last successful process snapshot (0 = no baseline).
+; Without a baseline the first snapshot would report every process as launched.
+global PLC_LastProcesses   := 0
+
+; Tick of the last process snapshot attempt (0 = none yet)
+global PLC_LastProcessTick := 0
+
+; Process snapshots are coarser than focus polls: the Linux adapter diffs its
+; process list every 2 s for the same launch/quit contract.
+global PLC_PROCESS_POLL_MS := 2000
+
+; Injectable snapshot seam used only by snapshot-failure regression tests.
+global PLC_PROCESS_SNAPSHOT_DRIVER := 0
 
 ; Whether the polling timer is currently running
 global PLC_Running         := false
@@ -105,9 +120,9 @@ PLC_OnFocusChange(Callback) {
 	}
 }
 
-; Registers a callback for application-launch events (stub - never fired).
-; AHK v2 has no built-in launch notification without WMI; this is accepted
-; to satisfy the port contract but will never be triggered.
+; Registers a callback for application-launch events. While any launch or quit
+; subscriber exists, PLC_Poll diffs a process snapshot every PLC_PROCESS_POLL_MS
+; and calls Callback(AppId) when an executable name appears.
 ; @param Callback {Func} A callable object to append to PLC_LaunchCallbacks.
 PLC_OnAppLaunch(Callback) {
 	try {
@@ -120,8 +135,8 @@ PLC_OnAppLaunch(Callback) {
 	}
 }
 
-; Registers a callback for application-quit events (stub - never fired).
-; Same constraint as PLC_OnAppLaunch: no WMI means no quit signal.
+; Registers a callback for application-quit events, called with the executable
+; name once its last process has exited (same snapshot diff as launches).
 ; @param Callback {Func} A callable object to append to PLC_QuitCallbacks.
 PLC_OnAppQuit(Callback) {
 	try {
@@ -179,6 +194,7 @@ PLC_Start() {
 ; @return {Boolean} True only after every native and logical owner is retired.
 PLC_Stop() {
 	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
+	global PLC_LastProcesses, PLC_LastProcessTick
 	FailureMessage := ""
 	PreviousCritical := Critical("On")
 	try {
@@ -193,6 +209,9 @@ PLC_Stop() {
 		PLC_FocusCallbacks  := []
 		PLC_LaunchCallbacks := []
 		PLC_QuitCallbacks   := []
+		; A later start diffs against a fresh baseline, never a stale one.
+		PLC_LastProcesses   := 0
+		PLC_LastProcessTick := 0
 	} catch as Err {
 		FailureMessage := Err.Message
 	} finally Critical(PreviousCritical)
@@ -382,15 +401,19 @@ PLC_SetEventHandle(Handle) {
 ; the window closed between the SetTimer tick and the WinGet call) cannot
 ; permanently disrupt subsequent poll cycles.
 PLC_Poll() {
-	global PLC_LastAppId, PLC_LastWindowTitle
+	global PLC_LastAppId, PLC_LastWindowTitle, PLC_LastProcesses
 	; Pause invariant: a suspended driver must be fully silent. This SetTimer
 	; callback is not gated by native Suspend, so early-return while suspended -
 	; otherwise focus changes keep being observed and fanned out to the
 	; registered callbacks (which downstream feed keylogger app-switch events)
 	; while the user expects every feature paused. The timer is periodic, so
 	; polling resumes automatically on unpause; no re-arm is needed.
-	if A_IsSuspended
+	if A_IsSuspended {
+		; Launches and quits during the pause are not replayed as one burst.
+		PLC_LastProcesses := 0
 		return
+	}
+	_PLC_PollProcesses()
 	try {
 		local NewApp   := WinGetProcessName("A")
 		local NewTitle := WinGetTitle("A")
@@ -406,6 +429,62 @@ PLC_Poll() {
 	} catch {
 		; Silently ignore errors (window may have closed between poll calls)
 	}
+}
+
+; Diffs the running executable names against the last successful snapshot and
+; fires launch/quit callbacks, at most once per PLC_PROCESS_POLL_MS and only
+; while a launch or quit subscriber exists. A failed snapshot keeps the last
+; set: reading it as an empty machine would report every process as quit, then
+; as launched again once snapshots recover.
+_PLC_PollProcesses() {
+	global PLC_LaunchCallbacks, PLC_QuitCallbacks, PLC_LastProcesses, PLC_LastProcessTick
+	global PLC_PROCESS_POLL_MS
+	if PLC_LaunchCallbacks.Length == 0 && PLC_QuitCallbacks.Length == 0
+		return
+	if PLC_LastProcessTick && TickElapsed(PLC_LastProcessTick) < PLC_PROCESS_POLL_MS
+		return
+	PLC_LastProcessTick := A_TickCount
+	Current := _PLC_ProcessSnapshot()
+	if !(Current is Map)
+		return
+	Previous := PLC_LastProcesses
+	PLC_LastProcesses := Current
+	if !(Previous is Map)
+		return
+	; Iterate snapshots so a callback registering a subscriber cannot corrupt them.
+	for Name in Current
+		if !Previous.Has(Name)
+			for Cb in PLC_LaunchCallbacks.Clone()
+				try Cb(Name)
+	for Name in Previous
+		if !Current.Has(Name)
+			for Cb in PLC_QuitCallbacks.Clone()
+				try Cb(Name)
+}
+
+; Returns the running executable names as a case-insensitive set, or 0 when
+; Windows refused the snapshot or its enumeration.
+_PLC_ProcessSnapshot() {
+	global PLC_PROCESS_SNAPSHOT_DRIVER
+	if HasMethod(PLC_PROCESS_SNAPSHOT_DRIVER, "Call")
+		return PLC_PROCESS_SNAPSHOT_DRIVER.Call()
+	static TH32CS_SNAPPROCESS := 0x2, ERROR_NO_MORE_FILES := 18
+	Snapshot := DllCall("Kernel32\CreateToolhelp32Snapshot", "UInt", TH32CS_SNAPPROCESS, "UInt", 0, "Ptr")
+	if Snapshot == -1 || !Snapshot
+		return 0
+	try {
+		; PROCESSENTRY32W: dwSize first, szExeFile[MAX_PATH] after the fixed fields.
+		Entry := Buffer(A_PtrSize == 8 ? 568 : 556, 0)
+		NumPut("UInt", Entry.Size, Entry)
+		Names := Map()
+		Names.CaseSense := "Off"
+		Next := DllCall("Kernel32\Process32FirstW", "Ptr", Snapshot, "Ptr", Entry, "Int")
+		while Next {
+			Names[StrGet(Entry.Ptr + (A_PtrSize == 8 ? 44 : 36), 260, "UTF-16")] := true
+			Next := DllCall("Kernel32\Process32NextW", "Ptr", Snapshot, "Ptr", Entry, "Int")
+		}
+		return A_LastError == ERROR_NO_MORE_FILES && Names.Count ? Names : 0
+	} finally DllCall("Kernel32\CloseHandle", "Ptr", Snapshot)
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
