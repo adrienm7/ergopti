@@ -521,8 +521,8 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			local controller, ctx = load_controller()
 			controller.init()
 			controller.start()
-			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 7.5,
-				"READY covers the 3 s guardian ARM, one 2.5 s mode write and 2 s of latency")
+			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 11.5,
+				"READY covers two 2 s launcher launches, the 3 s guardian ARM, one 2.5 s mode write and 2 s of latency")
 			ctx.chunk(1, "READY\n")
 
 			controller.pause()

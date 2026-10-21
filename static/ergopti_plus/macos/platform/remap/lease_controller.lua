@@ -45,11 +45,18 @@ local LOG = "karabiner.lease"
 local WORKER_COMMAND_BUDGET_SEC = 2.5
 local WORKER_GUARDIAN_ARM_BUDGET_SEC = 3.0
 local ACK_LATENCY_MARGIN_SEC = 2.0
--- READY follows the guardian ARM handshake and then one ACTIVATE write. At
--- 4.0 s it was shorter than the worker's own 4.75 s worst case, and recoveries
--- that redeployed karabiner.json timed out waiting for READY (issue #95).
-local READY_ACK_TIMEOUT_SEC = WORKER_GUARDIAN_ARM_BUDGET_SEC + WORKER_COMMAND_BUDGET_SEC
-	+ ACK_LATENCY_MARGIN_SEC
+-- The worker's budgets start once it runs. Before READY it must also launch:
+-- the outer worker and then its suspended inner, two starts of the launcher
+-- executable, about 2 s each on the loaded Mac of issue #99 (its detached
+-- revokers and guardian probes ran 2.0 to 2.2 s).
+local WORKER_LAUNCH_ALLOWANCE_SEC = 4.0
+-- READY follows those launches, the guardian ARM handshake and one ACTIVATE
+-- write. At 4.0 s it was shorter than the worker's own 4.75 s worst case
+-- (issue #95); at 7.5 s it still left nothing for the launches, so on that
+-- Mac every lease slower than the 3.4 to 6.0 s that did activate failed, and
+-- each failure redeployed karabiner.json for one more lease (issue #99).
+local READY_ACK_TIMEOUT_SEC = WORKER_LAUNCH_ALLOWANCE_SEC + WORKER_GUARDIAN_ARM_BUDGET_SEC
+	+ WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local COMMAND_ACK_TIMEOUT_SEC = WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local STOP_ACK_TIMEOUT_SEC = 7.0
 -- An ACK timeout that fires this much later than due was held by a parked run
