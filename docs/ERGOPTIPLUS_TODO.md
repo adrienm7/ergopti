@@ -60,6 +60,47 @@ Do these once, in order, right after a release that contains the fixes below is 
    flakes in [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md)).
 5. Cut the release with a `Release-As: X.Y.Z` trailer on the commit pushed to `main`.
 
+## Decisions of October 21 (maintainer answers, to implement)
+
+Each item below was decided by the maintainer; none needs a new question.
+
+1. **Windows exe metadata, in English.** `FileDescription` = "Ergopti+: hotstrings and shortcuts to type faster and
+   more ergonomically" (Ahk2Exe splits directive parameters on commas: no comma in the text). The website goes in the
+   `Comments` property (`https://ergopti.fr`); Windows has no dedicated website field. The directive `SetComments` is
+   REFUSED by the local Ahk2Exe ("Invalid directive"): find a supported way (another directive, `;@Ahk2Exe-AddResource`
+   with a version `.res`, or a post-compile resource edit in the build) and keep the version-info test
+   (`tools/ci/windows-exe-version-info.cjs`, js-0451) reading the field back.
+2. **macOS ISO/ANSI selector.** Add a choice in the Ergopti macOS menu to select manually the Karabiner virtual
+   keyboard type (Automatic, ISO, ANSI), stored in config, declared once in the shared manifest, i18n in 21 locales,
+   with the four-combination table test. On the maintainer's Mac the key left of "1" only works with Karabiner set
+   to ANSI, so Automatic must resolve to what works there (ANSI, 356d14a3f3); an explicit choice is never overridden.
+3. **Code signing (SignPath Foundation, item 132).** Maintainer asked what applying implies before deciding (the
+   driver is not yet 100% stable): see the answer in the questions file history; check the current conditions on
+   signpath.org/foundation before applying (open-source license, public repository, build and signing from CI with
+   a maintainer approval per signing request, a published code-signing policy and privacy statement, and a
+   reputable non-malicious project; the keylogger-like metrics module and hooks need a clear explanation).
+4. **Linux `[BS]x` pairs:** align Linux on Windows and macOS (every driver counts them); update the test that pins
+   the opposite and the shared corpus.
+5. **Ollama redirect policy:** do what is best even if long: when a proxy or the native worker carries the request, an
+   unresolved download host is left to it; literal private, loopback, link-local and CGNAT addresses are still refused,
+   as are names that resolve locally to such addresses; patch the upstream `ValidateRedirectTarget` call in the macOS
+   build recipe accordingly; needs a Go toolchain (validate in the macOS Managed Ollama CI cells on a `tmp/*` branch).
+6. **Recommendations: Linux = Windows** (same keyboard and modifiers): the recommended LAlt then CapsLock action
+   (`caps_word`) and every other recommended value must be identical on both; add a parity test over the manifest.
+7. **Report a bug:** no review screen (already removed; the report is reviewable on GitHub). Nothing more to do.
+8. **NTLM-only company proxies:** pick the transport that works in very locked-down companies: use the Windows
+   system HTTP stack (WinHTTP, via the `WinHttp.WinHttpRequest.5.1` COM object or equivalent), which follows the
+   system proxy/PAC and does NTLM/Negotiate with the user's session, instead of shipping an extra binary (no new hash
+   for scanners to flag). Replace the System32-curl dependency for the managed remote transport; keep the three
+   NOT EXECUTED cases until then.
+9. **HS-274 orphan tools** (`tools/diagnostics/hs274_*_test.py`, `hs274-native.swift`, `karabiner_candidate_install.py`):
+   delete them if useless; if they still guard something real, run them in a CI lane properly (stage workflow).
+10. **Hammerspoon coexistence (macOS):** Ergopti+ must work next to another Hammerspoon the user installed:
+    never kill the user's Hammerspoon; make the launcher-owned instance distinct (own config dir, own
+    single-instance guard) and refuse or recover cleanly if a second Ergopti instance starts (the log of 2026-10-21
+    shows a standalone instance using `~/.config/ergopti_plus` aborting while its timers kept writing to the shared
+    log). If a stale Ergopti-owned instance exists, replace it (only ours).
+
 ## Handoff: work in flight (October 21, 16:45 Paris)
 
 Everything the coordinating session knew (rules, procedures, relaunch prompts for the agents still in flight, open decisions) is in [todo-agents/COORDINATOR-MEMORY.md](todo-agents/COORDINATOR-MEMORY.md): read it first. The maintainer's weekly quota is nearly exhausted. Every agent below works on `dev` in the main
