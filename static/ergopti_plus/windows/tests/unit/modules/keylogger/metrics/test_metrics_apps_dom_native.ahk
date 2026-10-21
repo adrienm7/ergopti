@@ -69,12 +69,14 @@ _MAD_Source(Root, OwnerReceipt) {
 			Seen[Owner] := true
 		}
 	}
+	; The detached entry also loads the genuine inactive hook/watchers state
+	; consumed by the reader; a function-only call graph cannot infer classes.
 	for Symbol in ["LoggerTrace", "WallClockTimestamp", "Redact_Apply", "JsonParse",
 		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "WebView_RunScriptAsync", "WebView_SameCore",
 		"ConfigTransitionNormalizeConfigDir", "ConfigTransitionPrepare", "ReloadTerminalHandoffActive", "ShellRunner_SpawnTreeOwned",
 		"PLC_CreateProcessWithInheritedHandles", "WMHandleExists",
 		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared", "t", "I18nGetLocale", "Gui_Create", "AppPicker_Show",
-		"KL_WriteAtomic", "KL_AppCat_Init", "SQLite_Open", "KeyloggerWalkerLoadTimings", "KLW_WalkTypingEntry",
+		"KL_WriteAtomic", "KL_AppCat_Init", "KL_Hook_HasPendingInput", "KL_Watchers_IdleTick", "SQLite_Open", "KeyloggerWalkerLoadTimings", "KLW_WalkTypingEntry",
 		"KLW_BuildBatchSql", "KLR_ListLedgerPaths", "KLR_BuildDatabase", "KLR_CacheAttach",
 		"KLR_BuildColdCandidateAuto", "KLR_ReadManifest", "KLR_BuildManifestJson", "KLR_BuildRangeSplitTodayJson",
 		"KLPF_RequestBuild", "KLWV_OnWebMessage", "TimerSetCallback", "HotPath_Now"] {
@@ -113,7 +115,7 @@ _MAD_Native() {
 	Script := Root . "\subject.ahk"
 	SourceOwners := []
 	AssertTrue(FSWriteCreateDurable(Script, _MAD_Source(Root . "\store", SourceOwners)))
-	AssertEqual(41, SourceOwners.Length, "all generated and authored owner lookups must finish before native launch")
+	AssertEqual(43, SourceOwners.Length, "all generated and authored owner lookups must finish before native launch")
 	Hash := CryptoSha256Bytes(FSReadBytesStrict(Script))
 	RuntimeHash := CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
 	_TestPrint("# apps-dom-source-built " . KL_JsonEncode(Map("source_sha256", Hash,
