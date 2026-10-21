@@ -101,6 +101,12 @@ function M.new(defaults, delays_default)
 		-- — without it we cannot distinguish « fresh document » from
 		-- « cursor moved mid-word and buffer was wiped ».
 		start_is_word_boundary     = true,
+		-- True when the buffer's start is also the start of an empty input line
+		-- (a terminal prompt after a bare Return, a field whose whole text Cmd+A
+		-- or a browser's Cmd+L selected): a Backspace that finds the buffer empty
+		-- there deleted nothing, so the word start stands. Only meaningful with
+		-- start_is_word_boundary; every reset that moves the caret clears it.
+		start_is_line_start        = false,
 		magic_key                  = defaults.trigger_char,
 		-- Flat list of mapping entries, sorted longest-first. See the
 		-- invariants comment above for how the adjacent indexes must stay
@@ -176,6 +182,7 @@ function M.new(defaults, delays_default)
 		-- char can fire word-boundary-required triggers — that mirrors the
 		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
 		s.start_is_word_boundary = true
+		s.start_is_line_start = false
 	end
 
 	s.suppress_rescan = function(duration)
