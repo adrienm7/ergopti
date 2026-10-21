@@ -647,7 +647,20 @@ HotstringsConfigPath() {
 
 /** Restores only generated shipped definitions, excluding runtime custom rows. */
 HSE_TerminatorRestoreDefaults(CurrentWord, CurrentConsumed) {
-	return HotstringsTerminatorRestore(Terminators().all(), CurrentWord, CurrentConsumed)
+	global HSE_Terminators
+	Catalogue := Terminators()
+	for Definition in HSE_Terminators.all() {
+		if Definition.Get("key", "") != "star"
+			continue
+		MagicChars := Definition["chars"]
+		if !(MagicChars is Array) || MagicChars.Length != 1
+			throw Error("The active magic terminator must own exactly one scalar.")
+		; Fresh shipped defaults exclude runtime custom definitions, while their
+		; magic slot follows the catalogue actually admitted by this boot.
+		Catalogue.updateMagicKey(MagicChars[1])
+		return HotstringsTerminatorRestore(Catalogue.all(), CurrentWord, CurrentConsumed)
+	}
+	throw Error("The active terminator catalogue has no magic slot.")
 }
 
 ; Default word-terminator string — the chars of every catalogue entry that is

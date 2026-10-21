@@ -96,3 +96,19 @@ global _HSResolveGen := 0
 #Include hotstrings_io.ahk
 #Include hotstrings_catalogue.ahk
 #Include terminator_records.ahk
+
+/**
+ * Applies the admitted magic key before custom records or native typing starts.
+ * Historical word/consumed strings remain independent user preferences; only
+ * the catalogue-derived defaults follow the configured magic slot.
+ */
+HotstringsConfigApplyMagicKey(MagicKey) {
+	global HSE_Terminators, HOTSTRINGS_DEFAULT_WORD_DELIMITERS, HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS
+	global HSE_WORD_TERMINATORS, HSE_CONSUMED_DELIMITERS
+	MagicKey := _FeatureStateValidateTriggerChar(MagicKey)
+	HSE_Terminators.updateMagicKey(MagicKey)
+	HOTSTRINGS_DEFAULT_WORD_DELIMITERS := HSE_TerminatorDefaultWordDelimiters()
+	HOTSTRINGS_DEFAULT_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
+	HSE_WORD_TERMINATORS := HotstringsGetWordDelimiters()
+	HSE_CONSUMED_DELIMITERS := HotstringsGetConsumedDelimiters()
+}
