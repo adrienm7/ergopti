@@ -45,6 +45,7 @@ local ENOENT_ERROR_CODE = 2
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
+local SourceOpen = require("toml_codec.source_open")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans
@@ -231,7 +232,8 @@ end
 --- @return string|nil error_message
 --- @return string status "ok" | "absent" | "error"
 read_batch_source = function(path)
-	local open_ok, fh, open_err, open_code = pcall(io.open, path, "r")
+	-- Never stdio on the path itself: opening a FIFO waits for a writer.
+	local open_ok, fh, open_err, open_code = pcall(SourceOpen.open, path)
 	if not open_ok then return nil, "source open raised: " .. tostring(fh), "error" end
 	if not fh then
 		if open_code == ENOENT_ERROR_CODE then return "", nil, "absent" end

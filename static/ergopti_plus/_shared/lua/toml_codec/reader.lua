@@ -36,6 +36,7 @@ local Bom    = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
 local KeyPath = require("toml_codec.key_path")
 local RecordScanner = require("toml_codec.record_scanner")
+local SourceOpen = require("toml_codec.source_open")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -768,7 +769,8 @@ function M.parse(path)
 	end
 	if result == nil then
 		Logger.debug(LOG, "Parsing TOML file…")
-		local ok, f = pcall(io.open, path, "r")
+		-- Never stdio on the path itself: opening a FIFO waits for a writer.
+		local ok, f = pcall(SourceOpen.open, path)
 		if not ok or not f then
 			Logger.warn(LOG, "TOML file open failed (failure content withheld).")
 			return empty_document(), false

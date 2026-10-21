@@ -755,6 +755,14 @@ function M.it(name, fn)
 	end
 end
 
+--- Counterpart of the Linux helper shared contracts call before an io.open
+--- double keyed on a source path. The shared TOML writer's fallback opens
+--- sources with stdio on macOS, so there is nothing to route.
+--- @return function restore No-op.
+function M.route_source_through_stdio()
+	return function() end
+end
+
 --- Builds a minimal lib.logger stub suitable for injection via package.loaded.
 --- All log methods are no-ops so modules can log without crashing in headless tests.
 --- @return table Logger stub with the same public API as infra/logger.lua.

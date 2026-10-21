@@ -32,9 +32,12 @@ return function(helpers, fixture)
 				end
 				os.rename = function() disk, publications = staged, publications + 1; return true end
 				os.remove = function() return true end
+				-- The double owns this virtual path; route the native source admission to it.
+				local release_source = helpers.route_source_through_stdio("/controlled/noop-parity.toml", true)
 				local ran, ok, detail, content = xpcall(function()
 					return Writer.batch_write("/controlled/noop-parity.toml", { row })
 				end, debug.traceback)
+				release_source()
 				io.open, os.rename, os.remove = original_open, original_rename, original_remove
 				if not ran then error(ok, 0) end
 				helpers.assert_eq(stages, vector.writes, "an unchanged image must not even be staged")
