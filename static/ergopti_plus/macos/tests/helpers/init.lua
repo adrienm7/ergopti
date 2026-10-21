@@ -763,6 +763,29 @@ function M.route_source_through_stdio()
 	return function() end
 end
 
+--- Builds an hs.execute double that answers FileSystem.exists()'s `/bin/test -e`
+--- probe honestly. Real Hammerspoon always has hs.fs.attributes; a fixture whose
+--- hs double omits hs.fs makes exists() stat through test(1), and a constant
+--- execute stub then classifies every bundled file as absent.
+--- @param fallback function|nil Receives every other command; nil raises.
+--- @param stat function|nil Path -> truthy when present; defaults to the hs stub's real stat.
+--- @return function execute The hs.execute double.
+function M.existence_probe_execute(fallback, stat)
+	local probe = stat or require("tests.stubs.hs").fs.attributes
+	return function(command, ...)
+		local operand = type(command) == "string" and command:match("^/bin/test %-e (.+)$")
+		if operand then
+			-- Fixtures may stub infra.text_utils with an identity shell_quote.
+			local quoted = operand:match("^'(.*)'$")
+			local path = quoted and (quoted:gsub("'\\''", "'")) or operand
+			if probe(path) then return "", true, "exit", 0 end
+			return "", nil, "exit", 1
+		end
+		if fallback == nil then error("unexpected hs.execute in fixture: " .. tostring(command), 2) end
+		return fallback(command, ...)
+	end
+end
+
 --- Builds a minimal lib.logger stub suitable for injection via package.loaded.
 --- All log methods are no-ops so modules can log without crashing in headless tests.
 --- @return table Logger stub with the same public API as infra/logger.lua.

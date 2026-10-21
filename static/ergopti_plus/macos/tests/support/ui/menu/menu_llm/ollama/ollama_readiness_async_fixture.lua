@@ -62,6 +62,8 @@ local MODULES = {
 	"modules.llm.ollama_endpoint",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
+	-- FileSystem captures hs when it loads; each fixture binds its own copy.
+	"adapters.file_system",
 	"adapters.task_lifecycle",
 	"adapters.shell_runner",
 	"adapters.timer_scheduler",
@@ -401,8 +403,15 @@ local function with_fixture(spec, body)
 			end,
 		}
 
+		-- Loading network_env locates the bundled policy: without hs.fs,
+		-- FileSystem.exists() stats it through test(1). That is fixture setup,
+		-- not readiness work; once the body runs every execute is forbidden.
+		local setup_probe = helpers.existence_probe_execute()
+		local in_setup = true
+		package.loaded["adapters.file_system"] = nil
 		_G.hs = {
-			execute = function()
+			execute = function(...)
+				if in_setup then return setup_probe(...) end
 				synchronous_exec_calls = synchronous_exec_calls + 1
 				error("synchronous hs.execute is forbidden in readiness")
 			end,
@@ -473,6 +482,7 @@ local function with_fixture(spec, body)
 		helpers.assert_eq(timers[1].handle.timer, nil)
 		table.remove(timers, 1)
 
+		in_setup = false
 		body({
 			manager = manager,
 			set_ollama_port = function(port) endpoint_port = port end,
