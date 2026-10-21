@@ -43,12 +43,6 @@
 global JSON_NULL := Object()
 global JSON_MAX_NESTING_DEPTH := 128
 
-; Cumulative decode accounting of this process: containers (objects and arrays)
-; built and string code units decoded. Validated values that a caller did not
-; ask for are never built, so a decode budget is a deterministic count rather
-; than a wall-clock measure.
-global _JsonTallyContainers := 0
-global _JsonTallyStringUnits := 0
 
 
 
@@ -295,8 +289,20 @@ _JsonMemberSelection(memberKeys) {
  *   (decoded string code units, keys included).
  */
 JsonDecodeTally() {
-	global _JsonTallyContainers, _JsonTallyStringUnits
-	return Map("containers", _JsonTallyContainers, "string_units", _JsonTallyStringUnits)
+	Tally := _JsonDecodeCounters()
+	return Map("containers", Tally.Containers, "string_units", Tally.StringUnits)
+}
+
+; Cumulative decode accounting of this process: containers (objects and arrays)
+; built and string code units decoded. Validated values that a caller did not
+; ask for are never built, so a decode budget is a deterministic count rather
+; than a wall-clock measure. A function static rather than a module global, so
+; a decode reached before this file's auto-execute section has run still
+; counts instead of reading an unset variable; each decoder captures the same
+; object once in its own static.
+_JsonDecodeCounters() {
+	static Counters := { Containers: 0, StringUnits: 0 }
+	return Counters
 }
 
 /**
@@ -416,13 +422,14 @@ _JsonParseValue(&text, &pos, depth) {
 ; by the Run pattern (_JsonSkipMembersRun), the rest by _JsonSkipValue
 ; (WellFormed is passed on to it).
 _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false) {
-	global _JsonTallyContainers, JSON_MAX_NESTING_DEPTH
+	global JSON_MAX_NESTING_DEPTH
+	static Tally := _JsonDecodeCounters()
 	pos++  ; consume {
 	; Default case sensitivity is on — keep it so JSON keys keep their casing
 	; semantics (e.g. capitalised AHK Map keys would otherwise collide with
 	; lower-cased JSON keys at lookup time).
 	obj := Map()
-	_JsonTallyContainers += 1
+	Tally.Containers += 1
 	selective := IsObject(selection)
 	wanted := selective ? selection.Keys : 0
 	; The run's member values nest two levels below their own (depth + 1).
@@ -473,10 +480,10 @@ _JsonParseObject(&text, &pos, depth, selection := 0, WellFormed := false) {
 }
 
 _JsonParseArray(&text, &pos, depth) {
-	global _JsonTallyContainers
+	static Tally := _JsonDecodeCounters()
 	pos++  ; consume [
 	arr := []
-	_JsonTallyContainers += 1
+	Tally.Containers += 1
 	_JsonSkipWs(&text, &pos)
 	if (SubStr(text, pos, 1) == "]") {
 		pos++
@@ -777,7 +784,7 @@ _JsonParseUnicodeEscape(&text, &pos, ObjectKey) {
 }
 
 _JsonParseString(&text, &pos, ObjectKey := false) {
-	global _JsonTallyStringUnits
+	static Tally := _JsonDecodeCounters()
 	static Delimiters := _JsonStringRunDelimiters()
 	pos++  ; consume opening "
 	out := ""
@@ -788,7 +795,7 @@ _JsonParseString(&text, &pos, ObjectKey := false) {
 			throw Error("JSON: unescaped control character at position " . pos . ".", -1)
 		if (c == '"') {
 			pos++
-			_JsonTallyStringUnits += StrLen(out)
+			Tally.StringUnits += StrLen(out)
 			return out
 		}
 		if (c == '``') {  ; AHK escape — we won't see literal backtick in JSON
