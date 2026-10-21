@@ -27,8 +27,9 @@ command); there is no Linux machine.
 - **Issues #84, #95, #96 and #97 are closed without a reply** (the maintainer's choice). Their open
   physical checks stay at their items: oMLX listing, ISO key left of "1", Karabiner lease timings and
   dropped letters, all on the Mac.
-- origin/dev is at 9432f4d963; its CI run 39596425717 was queued at 14:02 (Paris). The last
-  `tmp/preflight-dev` run (39591820398) was green in 36 min. The CI errors of dev stay owned by the
+- origin/dev was green at 9432f4d963 (run 39596425717, preflight 39591820398 in 36 min); later pushes
+  (163b8214cb and after) had their automatic CI runs cancelled on the maintainer's order to save quota, so
+  run `gh workflow run ci.yml --ref dev -f os_lanes=all` once before the next release. The CI errors of dev stay owned by the
   coordinator.
 - **Codex agents push directly to dev** with the maintainer's credentials. Fetch and rebase before
   any push; dev and main stay linear (no merge commits, answered October 21). Preflight before
@@ -41,6 +42,38 @@ command); there is no Linux machine.
   (84707de17c, c6896fac9d, c7178bb5bd, c876362759, a6e229a59f, d276bacfe0); the Linux metrics reader
   keeps NUL in its projections and credits a session a crash left open (1bdc2a31cc, b0381e5afa); a
   NOT EXECUTED outcome for AHK cases the host cannot run (edd13547d0).
+
+## Handoff: work in flight (October 21, 16:45 Paris)
+
+The maintainer's weekly quota is nearly exhausted. Every agent below works on `dev` in the main
+repository (no worktree, no feature branch), commits small and atomic, pushes `dev` fast-forward
+only after `git fetch` and `git rebase origin/dev`, then cancels the automatic CI run of that SHA
+(`gh run list --commit <sha>`, `gh run cancel <id>`). Each agent keeps a handoff file in
+[`docs/todo-agents/`](todo-agents/) with what is done, what remains and the exact next step: read
+the file first, then continue. A backup of the working tree at 16:29 (uncommitted patch, untracked
+files, bundle of the local commits, this TODO) sits outside the repository in
+`C:\Users\admin\ergopti_wip_backup_20261021_1629`.
+
+| Work                                                                                                          | Handoff file                                                                               | State at hand-over                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integrate the Codex branches `fix/windows` (113 commits), `fix/macos` (12), `fix/linux` (3) into linear `dev` | [integration-fix-branches.md](todo-agents/integration-fix-branches.md)                     | Rebase/cherry-pick in a scratch clone `D:\_int`, order linux, macos, windows; `git cherry origin/dev origin/fix/<os>` lists what remains                                                       |
+| Issue #99 (macOS 1.0.4): Karabiner lease, swallowed keys, ISO key, event tap                                  | [issue99-karabiner-input.md](todo-agents/issue99-karabiner-input.md)                       | Root cause found: `hs.application.get` falls back to `hs.window.find` and froze the main thread 13 s; fixed by a running-application adapter; READY deadline 11.5 s; ISO fix needs a Mac check |
+| Issue #99: AI startup, oMLX, update flow                                                                      | [issue99-ai-startup-updater.md](todo-agents/issue99-ai-startup-updater.md)                 | IPv4 loopback probe, Atom-feed fallback, refused-install warning committed; rest in the file                                                                                                   |
+| Shared Lua: timer ceiling, tap-binding tests, POSIX separator owner                                           | [lua-shared-timers-separators.md](todo-agents/lua-shared-timers-separators.md)             | Ceiling and tap-binding tests committed; separator conversion in batches (grep for `[/\\]` in `macos/`)                                                                                        |
+| Windows: updater release-list freeze, last 3 native menu rows                                                 | [windows-updater-freeze-menu-census.md](todo-agents/windows-updater-freeze-menu-census.md) | Uncommitted files were blocking the repo-wide lint: first priority is to commit them clean                                                                                                     |
+| Config policy items 33 and 42                                                                                 | [config-policy-33-42.md](todo-agents/config-policy-33-42.md)                               | Reproduce first, fix at the root, per sub-item                                                                                                                                                 |
+
+Rules every continuing agent must keep: dev and main stay linear (never `git merge`); a release is a
+push to `main` carrying a `Release-As: X.Y.Z` trailer; a hook failure caused by someone else's dirty
+file is waited out or bypassed with a private index plus compare-and-swap `update-ref` running the
+hooks, never with `--no-verify`; never weaken a test; quality over speed. Open questions for the
+maintainer are in [questions-for-maintainer.md](questions-for-maintainer.md).
+
+Verification still owed on real runners once dev is green again: the Windows NTLM cases are
+NOT EXECUTED on images whose curl has no NTLM (item 62); the macOS PTY worker test
+`testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope` failed once on macOS 26 and
+passed on rerun (probable timing race in the retirement proof, investigate the Swift test); AppImage
+catalog `/retest` was posted on #10422, read the bot's answer.
 
 ## Priority 0: Windows
 
