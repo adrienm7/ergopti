@@ -89,7 +89,15 @@ helpers.describe("input_access: a tray launch stays visible", function()
 		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false, windows = {} }
 		function tray.setIcon(opts) tray.calls[#tray.calls + 1] = opts end
 		function tray.getBackend() return backend end
-		function tray.setMenu(items) tray.menu = items end
+		-- Flattens the fallback builder's arguments into the rows a click reaches;
+		-- the adapter's own suite pins the separators it adds.
+		function tray.setFallbackMenu(title, quit_label, on_quit, groups)
+			tray.menu = { { title = title, disabled = true } }
+			for _, group in ipairs(groups or {}) do
+				for _, action in ipairs(group) do tray.menu[#tray.menu + 1] = { title = action.label, fn = action.fn } end
+			end
+			tray.menu[#tray.menu + 1] = { title = quit_label, fn = on_quit }
+		end
 		function tray.showStatusWindow(title, text)
 			tray.windows[#tray.windows + 1] = { title = title, text = text }
 			return true

@@ -145,20 +145,28 @@ function M.setMenu(items)
 	return true
 end
 
---- Installs the two-row fallback menu: a name and a way out.
+--- Installs a fallback menu: a name, optional action groups and a way out.
 ---
---- Rows drawn outside the shared renderer, and on purpose: they serve when the
---- menu subsystem failed to load, so they must not depend on what they survive
---- without. The degraded keyboard-access menu (infra/input_access.lua) is the
---- other such menu and passes its rows to setMenu itself.
+--- The only rows this driver draws outside the shared renderer, and on
+--- purpose: they serve when the menu subsystem failed to load, and when the
+--- daemon cannot reach the keyboard and holds its icon to say so, so they must
+--- not depend on what they survive without. One builder serves both.
 --- @param title string The first, inert row.
 --- @param quit_label string The translated Quit row.
 --- @param on_quit function Runs when Quit is clicked.
-function M.setFallbackMenu(title, quit_label, on_quit)
-	M.setMenu({
-		{ title = title, disabled = true },
-		{ title = quit_label, fn = on_quit },
-	})
+--- @param groups table|nil Ordered lists of { label, fn } actions; a separator
+---   parts each group after the first from the previous one, and from Quit.
+function M.setFallbackMenu(title, quit_label, on_quit, groups)
+	local rows = { { title = title, disabled = true } }
+	for index, group in ipairs(groups or {}) do
+		if index > 1 then rows[#rows + 1] = { separator = true } end
+		for _, action in ipairs(group) do
+			rows[#rows + 1] = { title = action.label, fn = action.fn }
+		end
+	end
+	if groups and #groups > 0 then rows[#rows + 1] = { separator = true } end
+	rows[#rows + 1] = { title = quit_label, fn = on_quit }
+	M.setMenu(rows)
 end
 
 --- Shows (or brings back) the status window beside the icon.
