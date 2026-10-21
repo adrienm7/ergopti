@@ -471,6 +471,47 @@ local function call_text_boundary(owner, fn, ...)
 	return table.unpack(results, 1, results.n)
 end
 
+--- Captures one native clipboard generation across every snapshot read.
+--- @param owner table Text owner.
+--- @param include_plain boolean Also capture the plain text representation.
+--- @return boolean accepted
+--- @return table|string|nil snapshot Saved types, or refusal detail.
+--- @return string|nil plain Plain text when requested.
+--- @return integer|nil count Exact captured native generation.
+local function capture_text_clipboard(owner, include_plain)
+	local before_ok, before = call_text_boundary(owner, text_clipboard_count)
+	if not before_ok or before == nil then
+		return false, "native clipboard generation unavailable before snapshot"
+	end
+	local snapshot_ok, snapshot = call_text_boundary(owner, pasteboard.readAllData)
+	if not snapshot_ok or (snapshot ~= nil and type(snapshot) ~= "table") then
+		return false, snapshot_ok and "readAllData returned " .. type(snapshot) or snapshot
+	end
+	local plain = nil
+	if include_plain then
+		local plain_ok
+		plain_ok, plain = call_text_boundary(owner, pasteboard.getContents)
+		if not plain_ok then return false, plain end
+	end
+	local after_ok, after = call_text_boundary(owner, text_clipboard_count)
+	if not after_ok or after == nil then
+		return false, "native clipboard generation unavailable after snapshot"
+	end
+	if after ~= before then return false, "clipboard changed during snapshot capture" end
+	return true, snapshot, plain, before
+end
+
+--- Refuses a first mutation after the captured native clipboard changed owner.
+--- The enclosing boundary retains cleanup authority if a count read reenters PAUSE.
+--- @param owner table Text owner.
+--- @param expected_count integer Captured native generation.
+local function admit_initial_clipboard_mutation(owner, expected_count)
+	local count = text_clipboard_count()
+	assert(text_owner_authorized(owner), "text admission was revoked before clipboard mutation")
+	assert(count ~= nil, "native clipboard generation unavailable before clipboard mutation")
+	assert(count == expected_count, "clipboard changed before its first owned mutation")
+end
+
 --- Fences and joins every text owner for the Bindings lifecycle.
 --- @return boolean settled
 function M.pause_text_actions(parent)
@@ -821,15 +862,13 @@ local function do_transform(transform_func, parent, on_declined, on_empty, conti
 	end
 
 	Logger.trace(LOG, "Text transformation started…")
-	local ok_snapshot, prior = call_text_boundary(owner, pasteboard.readAllData)
-	if not ok_snapshot or (prior ~= nil and type(prior) ~= "table") then
+	local ok_snapshot, prior, _, initial_count = capture_text_clipboard(owner, false)
+	if not ok_snapshot then
 		release()
 		Logger.error(LOG, "Text transform clipboard snapshot failed: %s.", tostring(prior))
 		return false
 	end
-	owns_clipboard = true
 	owner.clipboard_prior = prior or {}
-	owner.clipboard_owned = true
 
 	local restore_prior
 	local queue_restore_retry
@@ -1107,7 +1146,12 @@ local function do_transform(transform_func, parent, on_declined, on_empty, conti
 		Logger.error(LOG, "Text transform failsafe timer was refused: %s.", tostring(failsafe_error))
 		return false
 	end
-	local ok_clear, clear_error = guarded_boundary(pasteboard.clearContents)
+	local ok_clear, clear_error = guarded_boundary(function()
+		admit_initial_clipboard_mutation(owner, initial_count)
+		owns_clipboard = true
+		owner.clipboard_owned = true
+		return pasteboard.clearContents()
+	end)
 	if not ok_clear then
 		abort_transform("clipboard clear", clear_error)
 		return false
@@ -1137,18 +1181,11 @@ function M.paste_as_plain_text(parent)
 	end
 	local owner = acquire_text_owner("plain", scope.id)
 	if not owner then return false end
-	local ok_snapshot, prior = call_text_boundary(owner, pasteboard.readAllData)
-	if not ok_snapshot or (prior ~= nil and type(prior) ~= "table") then
+	local ok_snapshot, prior, plain, initial_count = capture_text_clipboard(owner, true)
+	if not ok_snapshot then
 		owner.business_open = false
 		maybe_release_text_owner(owner)
-		Logger.error(LOG, "Plain-text paste clipboard snapshot failed.")
-		return false
-	end
-	local ok_plain, plain = call_text_boundary(owner, pasteboard.getContents)
-	if not ok_plain then
-		owner.business_open = false
-		maybe_release_text_owner(owner)
-		Logger.error(LOG, "Plain-text paste clipboard snapshot failed.")
+		Logger.error(LOG, "Plain-text paste clipboard snapshot failed: %s.", tostring(prior))
 		return false
 	end
 	_plain_paste_in_flight = true
@@ -1331,6 +1368,7 @@ function M.paste_as_plain_text(parent)
 
 	local ok_write, write_result = call_text_boundary(owner, function()
 		-- Snapshot or timer acquisition alone does not own a clipboard mutation.
+		admit_initial_clipboard_mutation(owner, initial_count)
 		owner.clipboard_owned = true
 		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, plain or "")
 		if not ok then error(result, 0) end
@@ -2202,7 +2240,7 @@ function M.wrap_selection(sel, left, right, parent)
 		return false
 	end
 
-	local snapshot_ok, prior_or_error = call_text_boundary(owner, pasteboard.readAllData)
+	local snapshot_ok, prior_or_error, _, initial_count = capture_text_clipboard(owner, false)
 	if not snapshot_ok then
 		return rollback("clipboard snapshot", prior_or_error)
 	end
@@ -2212,12 +2250,12 @@ function M.wrap_selection(sel, left, right, parent)
 	transaction.prior = prior_or_error
 	transaction.prior_empty = prior_or_error == nil or next(prior_or_error) == nil
 	owner.clipboard_prior = prior_or_error or {}
-	owner.clipboard_owned = true
 
-	-- Mark the clipboard conservatively before the call: a throwing pasteboard
-	-- implementation may have changed its contents before reporting the error.
-	transaction.mutated = true
 	local write_ok, write_result = call_text_boundary(owner, function()
+		admit_initial_clipboard_mutation(owner, initial_count)
+		-- A throwing native write may already have changed the clipboard.
+		transaction.mutated = true
+		owner.clipboard_owned = true
 		owner.clipboard_guarded = true
 		local ok, result = mutate_owned_clipboard(owner, pasteboard.setContents, left .. sel .. right)
 		if not ok then error(result, 0) end
