@@ -476,6 +476,24 @@ Test("terminator-inline: a native case alias cannot acquire the closed parent", 
 Test("terminator-inline: namespace replacement cannot delete unknown parent members", _HTRI_ProtectedRefusal.Bind([], ["hotstrings"]))
 
 
+_MKTB_IncludePath(Target) {
+	; Suite includes use portable slashes. Windows SplitPath recognizes the
+	; native separator, so normalize before identifying the complete owner.
+	Normalized := StrReplace(Target, "/", "\")
+	SplitPath(Normalized, &Filename)
+	return { Target: Normalized, Filename: Filename }
+}
+
+_MKTB_IncludePathSeparators() {
+	for Target in ["../generated/catalogue.ahk", "..\generated\catalogue.ahk", "../generated\catalogue.ahk"] {
+		Owner := _MKTB_IncludePath(Target)
+		AssertEqual("catalogue.ahk", Owner.Filename, "both actual include separator styles expose their basename")
+		AssertEqual("..\generated\catalogue.ahk", Owner.Target, "the whole include retains its original relative owner")
+	}
+}
+Test("Magic-key terminator child: portable include paths retain exact complete owners (magic-terminator-include-path)",
+	_MKTB_IncludePathSeparators)
+
 ; This fresh child reuses the established native config graph and observes only
 ; the external reload action. Every durable config and matcher owner is real.
 _MKTB_ChildSource() {
@@ -504,10 +522,10 @@ _MKTB_ChildSource() {
 		for Line in StrSplit(Suite, "`n") {
 			if !RegExMatch(Line, "^#Include\s+(.+)$", &Match)
 				continue
-			SplitPath(Match[1], &Filename)
-			if Filename != Basename
+			Owner := _MKTB_IncludePath(Match[1])
+			if Owner.Filename != Basename
 				continue
-			Code .= "#Include " . A_ScriptDir . "\" . Match[1] . "`n"
+			Code .= "#Include " . A_ScriptDir . "\" . Owner.Target . "`n"
 			Found += 1
 		}
 		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Basename)
