@@ -184,6 +184,28 @@ helpers.describe("ShellRunner spawn argument typing", function()
 
 
 
+	-- NSTask hands every argument to execve(2) as a C string, so an embedded NUL
+	-- would launch the program with a SHORTER argument than the caller composed
+	-- (task-argv-nul-2026-10-21). Refuse by index, without the argument's bytes.
+	for _, case in ipairs({
+		{ "an argument", "/usr/bin/curl", { "--url", "http://127.0.0.1/a\0/../b" }, "argument 2" },
+		{ "the executable", "/usr/bin/cu\0rl", { "--version" }, "executable" },
+	}) do
+		helpers.it("refuses NUL in " .. case[1] .. " before any native task (task-argv-nul-2026-10-21)", function()
+			with_runner(function(ShellRunner, native)
+				local refusal = ShellRunner.validate_spawn_args(case[2], case[3])
+				helpers.assert_true(refusal:find(case[4], 1, true) ~= nil, "refusal must name the slot: " .. refusal)
+				helpers.assert_true(refusal:find("127.0.0.1", 1, true) == nil, "refusal must not quote the bytes")
+				local handle = ShellRunner.spawn(case[2], case[3], function() end)
+				helpers.assert_eq(handle.start(), false)
+				helpers.assert_eq(#native.tasks, 0, "no native task may receive a truncated argv")
+			end)
+		end)
+	end
+
+
+
+
 	-- ================================================================
 	-- ================================================================
 	-- ======= 3/ The check cannot be bypassed later ==================
