@@ -107,7 +107,7 @@ local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems
 
 -- Data JSONs live alongside this module under data/; Karabiner-Elements is
 -- macOS-exclusive so there is no reason to put these files in _shared/.
-local _DATA_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./") .. "data/"
+local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
