@@ -2034,40 +2034,71 @@ KLWV_ResumeWarmWindow(which, Entry, Epoch, Owner) {
 	MetricsDir := Owner["warm_store"]
 	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
 		return KLWV_RetireWarmWindow(Entry, Owner)
-	if Entry.Get("full_build_done", false) || Owner["revision"] != Entry.Get("ingest_revision", 0)
-		return KLWV_RetireWarmWindow(Entry, Owner)
-	if A_IsSuspended
-		return KLWV_QueueFullBuildRetry(which, Epoch, Owner["attempt"], Owner)
-	if Owner.Get("launching", false)
-		return true
-	if KLPF_ReloadKeepsWorkersOut()
-		return KLWV_RetireWarmWindow(Entry, Owner)
 	Destination := KLPF_PrefetchPath(which, MetricsDir)
-	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
-		return KLWV_RetireWarmWindow(Entry, Owner)
-	if KLPFWorker.jobs.Has(which) {
-		Job := KLPFWorker.jobs[which]
-		if Job["destination"] == Destination && Job["epoch"] == Epoch {
-			if Owner.Get("generation", 0) == Job["generation"]
-				return true ; This recovery's own terminal now owns completion.
-			if !Owner.Get("launching", false)
+	Rearm := false
+	PreviousCritical := Critical("On")
+	try {
+		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
+			|| Entry.Get("full_build_done", false)
+			return KLWV_RetireWarmWindow(Entry, Owner)
+		; New input does not revoke a terminal already admitted by this owner.
+		; Its requested revision stays fixed; pending ingest drains after paint.
+		if Owner.Get("launching", false)
+			return true
+		if KLPFWorker.jobs.Has(which) {
+			Job := KLPFWorker.jobs[which]
+			if Job["destination"] == Destination && Job["epoch"] == Epoch {
+				if Owner.Get("generation", 0) == Job["generation"]
+					return true
 				return KLWV_RetireWarmWindow(Entry, Owner)
+			}
+			Rearm := true ; The other store's terminal has not retired yet.
 		}
-		; A terminal is called BEFORE its reservation retires. Keep the debt
-		; when a timer fires early, rather than losing the waiting window.
+		Revision := Entry.Get("ingest_revision", 0)
+		if Owner["revision"] != Revision {
+			; Only waiting work adopts the new committed input and its fresh budget.
+			Owner["revision"] := Revision, Owner["attempt"] := 0
+			Entry["full_build_retry_revision"] := Revision
+			if Entry.Has("full_build_retry_exhausted")
+				Entry.Delete("full_build_retry_exhausted")
+			Pending := Entry.Get("pending_full_build_retry", 0)
+			if (Pending is Map) && Pending["owner"] == Owner
+				Pending["attempt"] := 0
+		}
+		if A_IsSuspended
+			return KLWV_QueueFullBuildRetry(which, Epoch, Owner["attempt"], Owner)
+		; This query reads only the reload registry. Temporary exclusion must
+		; retain a retry: a refused successor leaves this exact window alive.
+		Rearm := Rearm || KLPF_ReloadKeepsWorkersOut()
+		if !Rearm {
+			Entry["full_build_requested_revision"] := Owner["revision"]
+			Owner["launching"] := true
+		}
+	} finally Critical(PreviousCritical)
+	if Rearm
 		return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
+	Terminal := KLWV_OnWarmWindowTerminal.Bind(which, Entry, Epoch, MetricsDir, Owner)
+	Started := false
+	try Started := KLPF_RequestBuild(which, MetricsDir, "full", Epoch, Terminal, false)
+	finally {
+		PreviousCritical := Critical("On")
+		try {
+			if KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
+				&& Started && KLPFWorker.jobs.Has(which) {
+				Job := KLPFWorker.jobs[which]
+				; RequestBuild can yield or finish synchronously. Never adopt a
+				; replacement merely because it occupies the same dashboard slot.
+				if Job["on_terminal"] == Terminal && Job["destination"] == Destination
+					&& Job["epoch"] == Epoch
+					Owner["generation"] := Job["generation"]
+				else
+					KLWV_RetireWarmWindow(Entry, Owner)
+			}
+			Owner.Delete("launching")
+		} finally Critical(PreviousCritical)
 	}
-	Entry["full_build_requested_revision"] := Owner["revision"]
-	Owner["launching"] := true
-	try Started := KLPF_RequestBuild(which, MetricsDir, "full", Epoch,
-		KLWV_OnWarmWindowTerminal.Bind(which, Entry, Epoch, MetricsDir, Owner), false)
-	finally Owner.Delete("launching")
-	if KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner) {
-		if Started && KLPFWorker.jobs.Has(which)
-			Owner["generation"] := KLPFWorker.jobs[which]["generation"]
-		if !Started
-			return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
-	}
+	if KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner) && !Started
+		return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
 	return Started
 }
 
