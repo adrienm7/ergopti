@@ -78,9 +78,12 @@ function M.keys()
 	if _keys then return _keys end
 	local path = Paths.shared(KEYS_REL_PATH)
 	local raw = FileSystem.read(path)
-	local decoded = raw and JsonCodec.decode(raw) or nil
+	-- A failed read and malformed content are distinct diagnoses: the first is
+	-- the file system, the second is the shared file itself.
+	if type(raw) ~= "string" then error("tap_keys: cannot complete read of " .. tostring(path)) end
+	local decoded = JsonCodec.decode(raw)
 	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" or #decoded.keys == 0 then
-		error("tap_keys: " .. tostring(path) .. " is unreadable or malformed")
+		error("tap_keys: " .. tostring(path) .. " is malformed")
 	end
 	for _, entry in ipairs(decoded.keys) do
 		if type(entry.id) ~= "string" or type(entry.hs) ~= "table" or #entry.hs == 0 then
