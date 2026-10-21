@@ -469,3 +469,5 @@ Test("keylogger_app_categories: shutdown persists discoveries before the deferre
 	TestKLAppCat_ShutdownPersistsPendingDiscovery)
 
 #Include test_keylogger_app_category_set_durability.ahk
+
+#Include test_keylogger_app_category_set_owner.ahk
