@@ -47,6 +47,46 @@ _GSQ_ExternalOpenRefused(Stem) {
 	return ExitCode == 2
 }
 
+; Another process holds the clipboard, as a clipboard history reader does just
+; after each copy, until the capture reports that its own open was refused.
+; @returns {Object} The holder's PID and the file that releases it.
+_GSQ_HoldClipboard(Stem) {
+	Script := Stem . "_holder.ahk", Release := Stem . "_release", Marker := Stem . "_held"
+	FileAppend("#NoTrayIcon`n"
+		. "Started := A_TickCount`n"
+		. 'while !(Opened := DllCall("OpenClipboard", "Ptr", 0, "Int")) && A_TickCount - Started < 5000`n'
+		. "`tSleep(5)`n"
+		. "if !Opened`n"
+		. "`tExitApp(3)`n"
+		. 'FileAppend("held", A_Args[2])`n'
+		. "Started := A_TickCount`n"
+		. "while !FileExist(A_Args[1]) && A_TickCount - Started < 10000`n"
+		. "`tSleep(5)`n"
+		. 'DllCall("CloseClipboard")`n'
+		. "ExitApp(0)`n", Script, "UTF-8")
+	Holder := {Pid: 0, Release: Release, Script: Script, Marker: Marker}
+	Run('"' . A_AhkPath . '" "' . Script . '" "' . Release . '" "' . Marker . '"', , "Hide", &Pid)
+	Holder.Pid := Pid
+	Started := A_TickCount
+	while !FileExist(Marker) && ProcessExist(Pid) && TickElapsed(Started) < 10000
+		Sleep(10)
+	AssertTrue(FileExist(Marker) != "", "the external holder must own the clipboard before the capture starts")
+	return Holder
+}
+
+; Releases the external holder and waits for its process to end.
+_GSQ_ReleaseHolder(Holder) {
+	if !FileExist(Holder.Release)
+		FileAppend("", Holder.Release)
+	Closed := ProcessWaitClose(Holder.Pid, 5) == 0
+	if !Closed
+		ProcessClose(Holder.Pid)
+	for Path in [Holder.Script, Holder.Release, Holder.Marker]
+		if FileExist(Path)
+			FileDelete(Path)
+	AssertTrue(Closed, "the external clipboard holder must exit once released")
+}
+
 ; Reads the stage's top-left pixel back through GDI+.
 ; @returns {String} "R,G,B".
 _GSQ_StagePixel(Stage) {
@@ -70,6 +110,14 @@ _GSQ_StagePixelGdip(Stage) {
 ; Probes the capture at its native phases. "acquired" runs while the original
 ; clipboard lock is held on the borrowed bitmap; "detached" after the release.
 _GSQ_Probe(Probe, Phase, Bitmap) {
+	; A refused open is counted apart: a clipboard history reader may cause one in
+	; any mode, and the held mode releases its holder only after the refusal.
+	if Phase == "contended" {
+		Probe.Contended += 1
+		if IsObject(Probe.Holder) && !FileExist(Probe.Holder.Release)
+			FileAppend("", Probe.Holder.Release)
+		return
+	}
 	Probe.Phases.Push(Phase)
 	if Phase == "acquired" {
 		for DiagnosticLine in _GSQ_BitmapDiagnostics(Bitmap)
@@ -86,7 +134,8 @@ _GSQ_Probe(Probe, Phase, Bitmap) {
 ; The real publisher must share a DDB usable by another process. A DIB section
 ; remains process-local even when its handle reaches CF_BITMAP.
 _GSQ_RequireDeviceBitmap() {
-	AssertTrue(DllCall("OpenClipboard", "Ptr", A_ScriptHwnd, "Int"))
+	; Clipboard history reads the bitmap just published, so wait for its lock.
+	AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "the published bitmap must become readable")
 	try {
 		Bitmap := DllCall("GetClipboardData", "UInt", 2, "Ptr")
 		AssertTrue(Bitmap != 0, "the real immediate clipboard bitmap must exist")
@@ -176,7 +225,8 @@ _GSQ_Receive(Mode) {
 	Token := 0, Snapshot := "", OwnedSequence := 0, Handle := 0, Stage := ""
 	OwnerGui := 0, RenderFn := 0, Renderer := 0
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
-	Probe := {Mode: Mode, Stem: Stem, BluePath: BluePath, Phases: [], LockObserved: false, OwnedSequence: 0}
+	Probe := {Mode: Mode, Stem: Stem, BluePath: BluePath, Phases: [], LockObserved: false, OwnedSequence: 0,
+		Contended: 0, Holder: 0}
 	Primary := 0
 	PreviousCritical := Critical("Off")
 	try {
@@ -191,7 +241,7 @@ _GSQ_Receive(Mode) {
 			Renderer := {Hwnd: OwnerGui.Hwnd, Path: RedPath, Calls: 0, Sequence: 0, ErrorText: ""}
 			RenderFn := _GSQ_Render.Bind(Renderer)
 			OnMessage(0x305, RenderFn)
-			AssertTrue(DllCall("OpenClipboard", "Ptr", OwnerGui.Hwnd, "Int"))
+			AssertTrue(CB_OpenClipboardWithin(OwnerGui.Hwnd), "the delayed owner must open the clipboard")
 			try {
 				AssertTrue(DllCall("EmptyClipboard", "Int"))
 				DllCall("SetClipboardData", "UInt", 2, "Ptr", 0, "Ptr")
@@ -221,6 +271,8 @@ _GSQ_Receive(Mode) {
 			AssertTrue(OwnedSequence != ExpectedSequence, "the hostile copy must have a distinct sequence")
 		}
 		GestureScreenshotWorkerState.native_probe_fn := _GSQ_Probe.Bind(Probe)
+		if Mode == "held"
+			Probe.Holder := _GSQ_HoldClipboard(Stem)
 		Handle := _GestureScreenshotSpawnNative(Capture, _GSQ_Done.Bind(State))
 		AssertTrue(Handle.start(), "the actual native worker must start")
 		Started := A_TickCount
@@ -244,6 +296,8 @@ _GSQ_Receive(Mode) {
 			AssertEqual("255,0,0", _GSQ_StagePixel(Stage), "the stage must contain the selected red pixel")
 			if Mode == "locked"
 				AssertTrue(Probe.LockObserved, "another process cannot replace the bitmap during acquisition")
+			if Mode == "held"
+				AssertTrue(Probe.Contended >= 1, "the capture must have met the external clipboard lock")
 			if Mode == "after"
 				AssertTrue(Probe.OwnedSequence > 0 && Probe.OwnedSequence != ExpectedSequence,
 					"the later copy must hold its own clipboard sequence")
@@ -258,6 +312,9 @@ _GSQ_Receive(Mode) {
 		Primary := Err
 	} finally {
 		try {
+			; The restore below needs the clipboard the holder may still own.
+			if IsObject(Probe.Holder)
+				_GSQ_ReleaseHolder(Probe.Holder)
 			if Probe.OwnedSequence
 				OwnedSequence := Probe.OwnedSequence
 			if IsObject(Renderer) && Renderer.Sequence
@@ -299,5 +356,5 @@ _GSQ_Receive(Mode) {
 		throw Primary
 }
 
-for _GSQ_Mode in ["current", "before", "locked", "after", "unknown", "delayed"]
+for _GSQ_Mode in ["current", "before", "locked", "after", "unknown", "delayed", "held"]
 	Test("region image custody: native " . _GSQ_Mode . " copy (region-image-sequence)", _GSQ_Receive.Bind(_GSQ_Mode))

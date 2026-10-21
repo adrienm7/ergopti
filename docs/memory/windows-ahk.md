@@ -430,6 +430,20 @@ bitmap into a private DDB. Keep `LR_COPYRETURNORG`, `LR_COPYDELETEORG` and
 `LR_CREATEDIBSECTION` absent; delete only that private handle after making the
 managed copy.
 
+### project-clipboard-native-open-waits-for-readers
+
+Windows clipboard history (and any clipboard manager) opens the clipboard right
+after every change, which is exactly when a screenshot capture or a bitmap
+publication's receipt reopen needs it. A single raw `OpenClipboard` then fails
+at random; AutoHotkey's own clipboard calls hide this by waiting up to their
+one-second ClipboardTimeout. Action: open native locks through
+`CB_OpenClipboardWithin`, never a bare `DllCall("User32\OpenClipboard")` that
+must succeed (`CB_IsBusy` and the restore-debt retry stay single-shot by
+design). In tests, "the lock was released" means no window of this process
+holds it; a foreign reader may already hold it again. The region custody suite
+reproduces contention with a second-process holder released from the
+capture's `contended` probe.
+
 ### project-ahk-sendinput-falls-back-to-sendevent
 
 SendInput removes the script's own keyboard hook only while no other AutoHotkey
