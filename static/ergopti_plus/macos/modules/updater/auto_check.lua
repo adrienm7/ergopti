@@ -33,6 +33,10 @@
 ---    recorded like an automatic one and answers the update-check window with
 ---    the shared result (updater.check_result): the release it offers is the
 ---    one the About row names, and it is not announced again afterwards.
+--- 8. When the API gives no list (its anonymous rate limit spent, a proxy
+---    blocking api.github.com), both checks read the public releases Atom feed
+---    on github.com, the changelog window's alternate source: Sparkle installs
+---    from the channel's appcast, so the feed's tags are all a check needs (#99).
 --- ==============================================================================
 
 local M = {}
@@ -45,6 +49,7 @@ local Schedule  = require("updater.schedule")
 local Parser    = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
 local RateLimit = require("updater.rate_limit")
+local ReleaseSources = require("updater.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
@@ -71,7 +76,7 @@ local MS_PER_SEC = 1000
 
 --- Loads the automatic-check contract from the shared updater defaults. It has
 --- no fallback: a guessed cadence or URL would check the wrong list or never.
---- @return table config { timing, state_key, list_key, releases_url, timeout_sec }
+--- @return table config { timing, state_key, list_key, releases_url, feed_url, timeout_sec }
 function M.load_config()
 	local path = Paths.shared("modules/updater/defaults.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
@@ -87,6 +92,7 @@ function M.load_config()
 	local template = type(decoded.update_check) == "table" and decoded.update_check.releases_url or nil
 	local sources = decoded.release_sources
 	local timeout_sec = type(sources) == "table" and sources.source_timeout_sec or nil
+	local feed_template = type(sources) == "table" and sources.atom_feed_url or nil
 	if type(state_key) ~= "string" or state_key == "" then
 		error("the shared updater defaults declare no check_state.storage_key", 0)
 	end
@@ -99,10 +105,15 @@ function M.load_config()
 	if type(timeout_sec) ~= "number" or timeout_sec <= 0 then
 		error("the shared updater defaults declare no release_sources.source_timeout_sec", 0)
 	end
-	local url = template:gsub("{owner}", function() return Updater.GH_OWNER end)
-		:gsub("{repo}", function() return Updater.GH_REPO end)
-	return { timing = decoded.timing, state_key = state_key, list_key = list_key, releases_url = url,
-		timeout_sec = timeout_sec }
+	if type(feed_template) ~= "string" or not feed_template:find("{owner}/{repo}", 1, true) then
+		error("the shared updater defaults declare no release_sources.atom_feed_url", 0)
+	end
+	local function expand(text)
+		return (text:gsub("{owner}", function() return Updater.GH_OWNER end)
+			:gsub("{repo}", function() return Updater.GH_REPO end))
+	end
+	return { timing = decoded.timing, state_key = state_key, list_key = list_key, releases_url = expand(template),
+		feed_url = expand(feed_template), timeout_sec = timeout_sec }
 end
 
 --- Reads a header case-insensitively (HTTP/2 lowercases names, Foundation
@@ -189,6 +200,9 @@ function M.new(opts)
 		error("the automatic update-check owner needs its state, save, channel, pause, callback and ports", 2)
 	end
 	local config = opts.config or M.load_config()
+	if type(config.feed_url) ~= "string" or config.feed_url == "" then
+		error("the automatic update-check owner needs the releases Atom feed URL", 2)
+	end
 	local timing = config.timing
 	local current_version = opts.current_version or Updater.current_version
 	local installed_channel = opts.installed_channel or Updater.installed_channel
@@ -412,6 +426,32 @@ function M.new(opts)
 			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
 	end
 
+	--- Reads the public releases Atom feed after the API gave no list, and
+	--- answers once with its tags as a release list, or with both causes.
+	--- @param api_detail string Why the API list failed.
+	--- @param done function(body|nil, detail|nil)
+	local function read_feed(api_detail, done)
+		local settled = false
+		local function settle(body, detail)
+			if settled then return end
+			settled = true
+			done(body, detail)
+		end
+		local headers = { Accept = "application/atom+xml", ["User-Agent"] = USER_AGENT }
+		local ok_dispatch, sent = pcall(opts.http.get, config.feed_url, headers, function(result)
+			local status = type(result) == "table" and result.status or 0
+			local body = type(result) == "table" and result.body or nil
+			local ok, reason = ReleaseSources.classify_feed(status, body, type(result) == "table" and result.error or nil)
+			local list
+			if ok then list, reason = ReleaseSources.feed_release_list(body, Updater.GH_OWNER, Updater.GH_REPO) end
+			if not list then return settle(nil, api_detail .. "; Atom feed: " .. tostring(reason)) end
+			settle(list, nil)
+		end)
+		if not ok_dispatch or sent ~= true then
+			settle(nil, api_detail .. "; Atom feed: " .. (ok_dispatch and "the request was refused" or tostring(sent)))
+		end
+	end
+
 	--- Sends one conditional request for the release list.
 	local function dispatch(channel)
 		in_flight = true
@@ -426,6 +466,24 @@ function M.new(opts)
 				return
 			end
 			local body, reason, detail = read_response(result)
+			if not body and reason == "no_connection" then
+				Logger.info(LOG, "Background check: the GitHub API gave no list (%s); reading the Atom feed.", detail)
+				read_feed(detail, function(feed_body, feed_detail)
+					if not active or request_generation ~= generation then return end
+					if channel ~= opts.channel() then
+						in_flight = false
+						Logger.info(LOG, "Discarded a completed check for the previous channel '%s'.", channel)
+						return
+					end
+					if not feed_body then
+						Logger.warn(LOG, "Background check failed: %s.", feed_detail)
+						complete(false, nil)
+						return
+					end
+					complete(true, read_list(feed_body, channel))
+				end)
+				return
+			end
 			if not body then
 				if reason == "parse_failed" then
 					Logger.warn(LOG, "Background check returned %s.", detail)
@@ -507,10 +565,9 @@ function M.new(opts)
 			answer(CheckResult.failure(base, "unexpected", "not a registry channel"))
 			return false
 		end
-		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
-			if answered or request_generation ~= manual_generation then return end
-			local body, reason, detail = read_response(response)
-			if not body then return fail(reason, detail) end
+		--- Answers the window from one release list, the API's or the feed's.
+		--- @param body string Release list JSON.
+		local function answer_from(body)
 			local result = CheckResult.classify(body, {
 				registry = Updater.channels(), channel = channel,
 				current = base.current, installed = installed_channel(),
@@ -530,6 +587,19 @@ function M.new(opts)
 			Logger.success(LOG, "Manual update check answered: %s (channel %s, latest %s, %d other channel(s)).",
 				result.state, channel, tostring(result.latest), #result.others)
 			answer(result)
+		end
+		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
+			if answered or request_generation ~= manual_generation then return end
+			local body, reason, detail = read_response(response)
+			if body then return answer_from(body) end
+			if reason ~= "no_connection" then return fail(reason, detail) end
+			Logger.info(LOG, "Manual update check on channel '%s': the GitHub API gave no list (%s); reading the Atom feed.",
+				tostring(channel), detail)
+			read_feed(detail, function(feed_body, feed_detail)
+				if answered or request_generation ~= manual_generation then return end
+				if not feed_body then return fail("no_connection", feed_detail) end
+				answer_from(feed_body)
+			end)
 		end)
 		if not ok_dispatch or sent ~= true then
 			if not answered then fail("no_connection", ok_dispatch and "the request was refused" or tostring(sent)) end
