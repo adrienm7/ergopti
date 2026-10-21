@@ -896,9 +896,11 @@ class CurlAsyncRequest {
 				return this.Abort()
 			Config .= AuthConfig
 		}
+		; curl removes a header written "Name:" with nothing after the colon; its
+		; "Name;" form sends the field with an empty value.
 		for Name, Value in this.Headers
-			Config .= "header = "
-				. _HTTP_CurlConfigQuote(Name . ": " . Value) . "`n"
+			Config .= "header = " . _HTTP_CurlConfigQuote(RegExMatch(Value, "^ *$")
+				? Name . ";" : Name . ": " . Value) . "`n"
 		if (Body != "") {
 			if !FSWrite(this.BodyPath, String(Body)) {
 				this._Cleanup()

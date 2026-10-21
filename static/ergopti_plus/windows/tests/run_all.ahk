@@ -684,6 +684,7 @@ _LLM_Deps_State := "ready"
 #Include unit/platform/network/test_curl_proxy_auth_integration.ahk
 #Include unit/platform/network/test_curl_proxy_discovery.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
+#Include unit/platform/network/test_managed_curl_empty_header.ahk
 #Include unit/platform/network/test_managed_curl_callers.ahk
 #Include unit/platform/network/test_curl_proxy_auth_policy.ahk
 #Include unit/modules/llm/servers/test_local_server_auth.ahk
