@@ -16,6 +16,8 @@ local OWNERS = {
 	"toml_codec.key_path", "toml_codec.record_scanner",
 	-- The real TOML reader opens its source through this shared owner.
 	"toml_codec.source_open",
+	-- The renderer configuration and the paths walk split paths through this pure owner.
+	"native_path",
 	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
 }
 

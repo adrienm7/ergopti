@@ -13,6 +13,10 @@ local OWNERS = {
 	"compat.utf8",
 	-- The real logger and timer scheduler describe failures through this pure owner.
 	"error_description",
+	-- The real paths, logger and configuration owners split paths through this pure owner,
+	-- and the timer scheduler admits delays through the number policy.
+	"native_path",
+	"number_policy",
 	"program_parameter",
 	"actions.assignable",
 	"_generated.action_catalogue",

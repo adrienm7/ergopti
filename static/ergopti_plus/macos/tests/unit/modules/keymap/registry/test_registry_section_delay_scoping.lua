@@ -375,6 +375,8 @@ helpers.describe("hotstring delay boot admission", function()
 				keymap = { with_hotstring_delays = transaction },
 				config_paths = { get_config_dir = function() return "/virtual" end },
 				require = function(name)
+					-- The fragment joins the override path through the pure shared path owner.
+					if name == "native_path" then return require(name) end
 					helpers.assert_eq(name, "modules.hotstrings.hotstrings_config")
 					return { init = function(opts) selected = opts; return admitted end }
 				end,
