@@ -927,6 +927,20 @@ function M.update_private_status()
 	mark_context("window", type(native_title) == "string")
 end
 
+--- Refreshes only the privacy classification at the trusted resume boundary.
+--- No title, document, fullscreen metadata or complete physical receipt is published.
+--- Missing windows keep the existing nonprivate contract; unreadable titles refuse.
+--- @return boolean classified True only when the coarse native read completed.
+local function refresh_private_classification_for_resume()
+	mark_context("window", false)
+	local win = hs.window.focusedWindow()
+	local title = win and win:title() or nil
+	if win and type(title) ~= "string" then return false end
+	_state.is_private_window = PrivateWindow.matches(title or "", get_private_keywords())
+	require_modifier_settlement()
+	return true
+end
+
 --- Reads one application property without allowing a dying native object to
 --- abort the rest of the foreground-switch transaction.
 --- @param app_object table The active hs.application object.
@@ -1063,6 +1077,14 @@ end
 --- @return boolean True when the context was re-synchronised.
 function M.resync_context()
 	if not require_state("resync_context") then return false end
+	local coarse_private = _is_paused() == true
+	if coarse_private then
+		-- The former context must not label the next app's ordinary persistence.
+		-- Revoke it before any native lookup, including a lookup that later refuses.
+		_state.active_win_title = nil
+		_state.session_document_path = nil
+		_state.is_fullscreen = false
+	end
 
 	local app = hs.application.frontmostApplication()
 	if not app then return false end
@@ -1102,16 +1124,21 @@ function M.resync_context()
 	_last_win_title = nil
 	_last_win_time  = now
 
-	invoke_context_writer(M.update_private_status)
+	local private_classified = true
+	if coarse_private then
+		private_classified = refresh_private_classification_for_resume()
+	else
+		invoke_context_writer(M.update_private_status)
+	end
 	if ok_pid then invoke_context_writer(M.update_ax_observer, new_pid) end
 
 	Logger.debug(LOG, "Context re-synchronised on resume (app '%s', secure=%s).",
 		app_name, tostring(_state.is_secure_field))
-	if ok_bundle and ok_path and ok_pid
+	if private_classified and ok_bundle and ok_path and ok_pid
 		and identified_foreground(app_name, _state.active_app_bundle, _state.active_app_path, new_pid) then
 		_state.foreground_refresh_pending = false
 	end
-	return true
+	return private_classified
 end
 
 
