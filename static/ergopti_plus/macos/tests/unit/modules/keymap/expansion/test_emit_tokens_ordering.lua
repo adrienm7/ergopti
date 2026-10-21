@@ -51,39 +51,68 @@ local function load_utils()
 	local pending   = {}
 	local clipboard = { clears = 0 }
 	local debt_sequence = 0
+	local current = nil
+	local now = 0
+	local function complete(tx)
+		if tx.completed or not tx.sealed or tx.retained ~= 0 then return end
+		tx.completed = true
+		for _, callback in ipairs(tx.completions) do callback(tx, "complete") end
+	end
 
 	package.loaded["modules.keymap.utils"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = {
-		current_transaction = function() return nil end,
+		current_transaction = function() return current end,
 		begin = function()
 			debt_sequence = debt_sequence + 1
-			return { id = debt_sequence, sealed = false, cancelled = false }
+			return { id = debt_sequence, sealed = false, cancelled = false, retained = 0,
+				dispatched = {}, completions = {} }
 		end,
 		retain = function(tx)
 			assert(tx ~= nil and tx.sealed ~= true and tx.cancelled ~= true,
 				"clipboard debt must be retained before sealing")
+			tx.retained = tx.retained + 1
 			return { owner = tx, active = true }
 		end,
 		seal = function(tx)
 			assert(tx ~= nil and tx.cancelled ~= true,
 				"a cancelled clipboard debt cannot be sealed")
 			tx.sealed = true
+			complete(tx)
 			return true
 		end,
 		release = function(tx, token)
 			assert(token ~= nil and token.owner == tx and token.active == true,
 				"clipboard restore must release its exact retained debt")
 			token.active = false
+			tx.retained = tx.retained - 1
+			complete(tx)
 			return true
 		end,
 		cancel = function(tx)
 			tx.cancelled = true
 			return true
 		end,
+		on_dispatched = function(tx, callback) tx.dispatched[#tx.dispatched + 1] = callback end,
+		on_complete = function(tx, callback)
+			tx.completions[#tx.completions + 1] = callback
+			if tx.completed then callback(tx, "complete") end
+		end,
+		with_transaction = function(tx, callback)
+			local previous = current
+			current = tx
+			local result = table.pack(xpcall(callback, debug.traceback))
+			current = previous
+			if not result[1] then error(result[2], 0) end
+			return table.unpack(result, 2, result.n)
+		end,
 		emit_key_stroke = function(_mods, key)
 			emissions[#emissions + 1] = "key:" .. tostring(key)
-			return true
+			local batch = {}
+			if current then
+				for _, callback in ipairs(current.dispatched) do callback(current, batch, "dispatched") end
+			end
+			return true, batch
 		end,
 		emit_key_strokes = function(text)
 			emissions[#emissions + 1] = "type:" .. tostring(text):sub(1, 6)
@@ -128,8 +157,8 @@ local function load_utils()
 				return native
 			end,
 			doEvery           = function() return { stop = function() end } end,
-			secondsSinceEpoch = function() return 1000 end,
-			absoluteTime      = function() return 0 end,
+			secondsSinceEpoch = function() return 1000 + now end,
+			absoluteTime      = function() return now * 1e9 end,
 			usleep            = function() end,
 		},
 	})
@@ -144,6 +173,7 @@ local function load_utils()
 		table.sort(scheduled, function(x, y) return x.delay < y.delay end)
 		for _, p in ipairs(scheduled) do
 			if p.running ~= false and p.stopped ~= true then
+				now = now + p.delay
 				pcall(p.fn)
 				-- hs.timer.new is recurring. TimerScheduler.after() stops its native
 				-- owner from inside the wrapper, while TimerScheduler.every() remains
