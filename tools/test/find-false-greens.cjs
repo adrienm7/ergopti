@@ -112,6 +112,27 @@ function isComment(line, ext) {
 // ==================================================
 
 /**
+ * Marks the body lines of AHK continuation sections, which are string data.
+ * A child-process harness carries its own `Test(…)` registrations inside one
+ * such section; they register in the child, not in the file that writes them.
+ * The opening line holds only `(` and options, and the first line beginning
+ * with `)` closes the section.
+ * @param {string[]} lines Physical source lines.
+ * @returns {boolean[]} Index i is true when line i+1 is continuation data.
+ */
+function ahkContinuationLines(lines) {
+	const data = new Array(lines.length).fill(false);
+	let open = false;
+	for (let i = 0; i < lines.length; i++) {
+		if (open) {
+			if (/^[ \t]*\)/.test(lines[i])) open = false;
+			else data[i] = true;
+		} else if (/^[ \t]*\((?:[ \t]+[^()]*)?$/.test(lines[i])) open = true;
+	}
+	return data;
+}
+
+/**
  * Masks physical AHK quoted data and trailing comments in one lexical pass.
  * A quote of the other kind remains data; a backtick escapes the next quoted character.
  * @param {string} line One physical source line.
@@ -238,6 +259,7 @@ function ahkEnclosingFunction(src) {
 	// Stack entries hold the function name a block belongs to, or null for a
 	// control block (Loop/if/try), which must NOT mask an outer function.
 	const stack = [];
+	const data = ahkContinuationLines(lines);
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 		if (isComment(line, '.ahk')) continue;
@@ -247,6 +269,8 @@ function ahkEnclosingFunction(src) {
 				break;
 			}
 		}
+		// String data opens and closes no block of this file.
+		if (data[i]) continue;
 		const raw = line.match(/^[ \t]*([A-Za-z_]\w*)\s*\([^()]*\)\s*\{/);
 		const def = raw && !isControlKeyword(raw[1]) ? raw : null;
 		const code = ahkStructuralCode(line);
@@ -422,15 +446,17 @@ function findDeadTests(file, src, ext) {
 
 	const owners = ahkEnclosingFunction(src);
 	const lines = src.split(/\r?\n/);
+	// A child script written as continuation data neither calls nor registers here.
+	const data = ahkContinuationLines(lines);
 	// A function is "reached" when the file calls it from outside any function.
 	const reached = new Set();
 	lines.forEach((line, i) => {
-		if (isComment(line, '.ahk') || owners[i]) return;
+		if (isComment(line, '.ahk') || owners[i] || data[i]) return;
 		const m = line.match(/^[ \t]*([A-Za-z_]\w*)\s*\(\s*\)\s*$/);
 		if (m) reached.add(m[1]);
 	});
 	lines.forEach((line, i) => {
-		if (isComment(line, '.ahk') || !owners[i]) return;
+		if (isComment(line, '.ahk') || !owners[i] || data[i]) return;
 		if (!/^\s*Test\s*\(\s*["']/.test(line)) return;
 		// Walk outward: a chain of helpers is fine as long as the outermost one runs.
 		if (reached.has(owners[i])) return;

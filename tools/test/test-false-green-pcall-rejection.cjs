@@ -116,6 +116,47 @@ for (const literal of [
 		'an unreached nested registration remains dead'
 	);
 }
+// A child-process harness carries its registrations as continuation data: they
+// register in the child, which the parent test then reads back. Only a real
+// registration in an unreached function of this file stays dead.
+const childHarness = [
+	'Script() {',
+	"\tHarness := '",
+	'(',
+	'Child() {',
+	'\tAssertEqual(1, 1)',
+	'}',
+	'Test("child", Child)',
+	'RunTests()',
+	")'",
+	'\treturn Harness',
+	'}',
+	'Parent() {',
+	'\tAssertContains(Script(), "child")',
+	'}',
+	'Test("parent", Parent)'
+].join('\n');
+assert.deepEqual(
+	Array.from(context.ahkContinuationLines(childHarness.split('\n'))),
+	childHarness.split('\n').map((_, i) => i >= 3 && i <= 7)
+);
+assert.equal(context.ahkEnclosingFunction(childHarness)[6], 'Script');
+assert.equal(context.ahkEnclosingFunction(childHarness)[12], 'Parent');
+assert.equal(
+	context.findDeadTests(ahkFixture, childHarness, '.ahk').length,
+	0,
+	'a child script registration in continuation data is not a dead registration here'
+);
+const unreached = childHarness.replace(
+	'\treturn Harness\n}',
+	'\tTest("unreached", Parent)\n\treturn Harness\n}'
+);
+assert.deepEqual(
+	Array.from(context.findDeadTests(ahkFixture, unreached, '.ahk'), (finding) => finding.line),
+	[10],
+	'a real registration after the continuation section remains dead'
+);
 console.log(
-	'false-green pcall rejection: 10 scenarios; AHK mixed quotes: 5 live/dead/nested vectors passed'
+	'false-green pcall rejection: 10 scenarios; AHK mixed quotes: 5 live/dead/nested vectors; ' +
+		'continuation child harness live/dead vectors passed'
 );
