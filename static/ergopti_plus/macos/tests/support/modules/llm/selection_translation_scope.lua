@@ -34,6 +34,8 @@ local OWNED = {
 	-- Path splitting and timer delay admission go through these pure owners.
 	"native_path",
 	"number_policy",
+	-- The real notifications owner focuses the clicked application through this adapter.
+	"adapters.running_application",
 	"hotstrings.personal_files",
 	"json",
 	"keycodes",
