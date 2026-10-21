@@ -54,9 +54,12 @@ function checkRunner(source) {
 	for (const name of expected) assert.equal(source.split("'" + name + "'").length, 2);
 }
 
+// The Integration lot that owns the cohorts; the unit categories never run them.
+const NATIVE_LOT = "matrix.lot == 'Native cohorts and contracts'";
+
 /** The unqualified ordinary main suite cannot stand in for interactive desktop observations. */
 function checkWorkflow(body) {
-	const main = pipeline.step(body, 'Run AHK test suite');
+	assert.match(body, /^ {8}lot: \[[^\]\n]*\bNative cohorts and contracts\b[^\]\n]*\]$/m);
 	const native = pipeline.step(body, 'Run native desktop AHK cohorts');
 	const receipt = pipeline.step(body, 'Retain the source-bound Windows qualification receipt');
 	const upload = pipeline.step(body, 'Publish native desktop AHK evidence');
@@ -78,20 +81,19 @@ function checkWorkflow(body) {
 	]);
 	assert.equal(pipeline.stepField(native, 'shell'), 'pwsh');
 	assert.equal(pipeline.stepField(native, 'timeout-minutes'), '25');
-	assert.equal(pipeline.stepField(native, 'if'), null);
+	assert.equal(pipeline.stepField(native, 'if'), NATIVE_LOT);
 	assert.equal(pipeline.stepField(native, 'continue-on-error'), null);
 	assert.ok(body.indexOf(native) < body.indexOf(receipt));
 	assert.ok(body.indexOf(receipt) < body.indexOf(upload));
-	assert.ok(body.indexOf(upload) < body.indexOf(main));
-	assert.equal(pipeline.stepField(receipt, 'if'), 'always()');
+	assert.equal(pipeline.stepField(receipt, 'if'), '${{ always() && ' + NATIVE_LOT + ' }}');
 	assert.equal(pipeline.stepField(receipt, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(receipt, 'continue-on-error'), null);
-	assert.match(receipt, /name: assets-qualification-windows-\$\{\{ matrix\.module \}\}\n/);
+	assert.match(receipt, /name: assets-qualification-windows-native-desktop\n/);
 	assert.match(receipt, /path: \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n/);
-	assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+	assert.equal(pipeline.stepField(upload, 'if'), '${{ always() && ' + NATIVE_LOT + ' }}');
 	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(upload, 'continue-on-error'), null);
-	assert.match(upload, /name: windows-ahk-native-desktop-\$\{\{ matrix\.module \}\}\n/);
+	assert.match(upload, /name: windows-ahk-native-desktop\n/);
 	assert.match(
 		upload,
 		/^          path: \|\n            \$\{\{ runner\.temp \}\}\/windows-ahk-native-desktop\/\n            \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n          if-no-files-found: error$/m
@@ -106,9 +108,15 @@ function admittedNativeWorkflow(files) {
 	const file = admitted
 		.rawFiles()
 		.find((entry) => entry.rel === '.github/workflows/ci-windows.yml');
-	const jobs = pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'test-ahk');
-	assert.equal(jobs.length, 1);
-	return jobs[0].body;
+	const jobs = pipeline.jobsOfText(file.text, file.rel);
+	// The cohorts run once, in the Integration stage: no unit category repeats them.
+	const unit = jobs.filter((job) => job.id === 'test-ahk');
+	assert.equal(unit.length, 1);
+	assert.ok(!pipeline.steps(unit[0].body).some((step) => step.name.includes('native desktop')));
+	const integration = jobs.filter((job) => job.id === 'integration-ahk');
+	assert.equal(integration.length, 1);
+	assert.equal(pipeline.field(integration[0].body, 'needs'), '[test-ahk]');
+	return integration[0].body;
 }
 
 /** Keep only the actual desktop modules in the canonical cohort compilation unit. */
@@ -169,12 +177,22 @@ assert.throws(() =>
 checkRunner(runner);
 const body = admittedNativeWorkflow(pipeline.files());
 checkWorkflow(body);
-for (const stepName of ['Run native desktop AHK cohorts', 'Publish native desktop AHK evidence']) {
-	const early = pipeline.step(body, stepName);
-	const main = pipeline.step(body, 'Run AHK test suite');
-	const late = body.replace(early, '').replace(main, main + early);
+// Evidence retained before the cohorts ran, or the cohorts moved back into a
+// unit category, refuse.
+{
+	const native = pipeline.step(body, 'Run native desktop AHK cohorts');
+	const upload = pipeline.step(body, 'Publish native desktop AHK evidence');
+	const late = body.replace(native, '').replace(upload, upload + native);
 	assert.notEqual(late, body);
 	assert.throws(() => checkWorkflow(late));
+	const files = pipeline.files();
+	const lane = files.find((file) => file.rel === '.github/workflows/ci-windows.yml');
+	const unitMain = '      - name: Run AHK test suite\n';
+	assert.equal(lane.text.split(unitMain).length, 2);
+	const repeated = files.map((file) =>
+		file === lane ? { ...file, text: file.text.replace(unitMain, native + '\n' + unitMain) } : file
+	);
+	assert.throws(() => admittedNativeWorkflow(repeated));
 }
 for (const [before, after] of [
 	['  macos:', '  omitted-macos:'],
@@ -229,12 +247,12 @@ for (const [before, after] of [
 }
 for (const [stepName, before, after] of [
 	['Run native desktop AHK cohorts', './tools/test/run-windows-native-desktop.ps1', 'echo skipped'],
-	['Run native desktop AHK cohorts', 'run: |', 'if: false\n        run: |'],
+	['Run native desktop AHK cohorts', 'if: ' + NATIVE_LOT, 'if: false'],
 	['Run native desktop AHK cohorts', 'run: |', 'continue-on-error: true\n        run: |'],
 	[
 		'Publish native desktop AHK evidence',
-		'name: Publish native desktop AHK evidence\n        if: always()',
-		'name: Publish native desktop AHK evidence\n        if: success()'
+		'if: ${{ always() && ' + NATIVE_LOT + ' }}',
+		'if: ${{ success() && ' + NATIVE_LOT + ' }}'
 	],
 	[
 		'Publish native desktop AHK evidence',
@@ -296,7 +314,11 @@ for (const [stepName, before, after] of [
 		'${{ runner.temp }}/stable-windows-native-desktop.json',
 		'${{ runner.temp }}/stale.json'
 	],
-	['Retain the source-bound Windows qualification receipt', 'if: always()', 'if: success()'],
+	[
+		'Retain the source-bound Windows qualification receipt',
+		'if: ${{ always() && ' + NATIVE_LOT + ' }}',
+		'if: ${{ success() && ' + NATIVE_LOT + ' }}'
+	],
 	[
 		'Retain the source-bound Windows qualification receipt',
 		'${{ runner.temp }}/stable-windows-native-desktop.json',

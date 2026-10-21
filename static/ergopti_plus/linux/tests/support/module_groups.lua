@@ -19,12 +19,31 @@
 ---    test time; move a prefix when a group outgrows that.
 --- 4. An unknown group name is refused: a typo in a CI matrix must fail the
 ---    job, not run zero tests and pass.
+--- 5. The integration group comes first and names whole files: the tests that
+---    wire several real production modules together, or drive a real child
+---    process, real signals, a real sqlite3 or real files through production
+---    code. The Integration stage of ci-linux.yml runs it after the Unit rows,
+---    which run every other group. Selecting it refuses a listed file the
+---    runner did not discover, so a rename cannot drop a test into Unit.
 --- ==============================================================================
 
 local M = {}
 
+--- The group the Integration stage runs; every other group is a Unit row.
+M.INTEGRATION = "integration"
+
 --- Ordered groups: first match wins, the final group has no prefixes.
 M.GROUPS = {
+	{ name = "integration", prefixes = {
+		"tests/meta/boot/test_daemon_cli.lua",
+		"tests/unit/adapters/processes/test_owned_process_deadline.lua",
+		"tests/unit/infra/lifecycle/test_callback_error_description.lua",
+		"tests/unit/infra/lifecycle/test_native_timer.lua",
+		"tests/unit/modules/keylogger/storage/test_sqlite_first_open.lua",
+		"tests/unit/modules/llm/prediction/test_llm_prediction_engine_integration.lua",
+		"tests/unit/modules/updater/install/test_config_backup_files.lua",
+		"tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",
+	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
 	{ name = "core", prefixes = { "tests/unit/adapters/", "tests/unit/platform/" } },
 	{ name = "infra", prefixes = { "tests/unit/infra/" } },
@@ -82,6 +101,19 @@ function M.select(module_names, group_name)
 	local selected = {}
 	for _, module_name in ipairs(module_names) do
 		if M.group_of(module_name) == group_name then selected[#selected + 1] = module_name end
+	end
+	if group_name == M.INTEGRATION then
+		local found = {}
+		for _, module_name in ipairs(selected) do found[module_name:gsub("%.", "/") .. ".lua"] = true end
+		for _, group in ipairs(M.GROUPS) do
+			if group.name == M.INTEGRATION then
+				for _, prefix in ipairs(group.prefixes) do
+					if not found[prefix] then
+						error(string.format("integration test %s was not discovered; update M.GROUPS", prefix), 2)
+					end
+				end
+			end
+		end
 	end
 	return selected
 end

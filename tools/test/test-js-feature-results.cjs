@@ -14,7 +14,7 @@ const { createMatrix, displayPlan, selectLot } = require('../ci/js-feature-matri
 const context = { source: 'a'.repeat(40), run_id: '123', run_attempt: '2', platform: 'linux' };
 const inventory = {
 	digest: 'b'.repeat(64),
-	features: ['menus', 'input'],
+	features: ['menus', 'input', 'integration-wiring'],
 	checks: [
 		{
 			id: 'menu-readers',
@@ -30,7 +30,14 @@ const inventory = {
 			name: 'Input routing',
 			repro: 'node routing.cjs'
 		},
-		{ id: 'menu-query', feature: 'menus', ordinal: 3, name: 'Menu query', repro: 'node query.cjs' }
+		{ id: 'menu-query', feature: 'menus', ordinal: 3, name: 'Menu query', repro: 'node query.cjs' },
+		{
+			id: 'wiring-boot',
+			feature: 'integration-wiring',
+			ordinal: 4,
+			name: 'Wiring boot',
+			repro: 'node boot.cjs'
+		}
 	]
 };
 
@@ -88,8 +95,8 @@ function journals(subject = inventory, invocation = context) {
 	});
 }
 
-assert.equal(validateFeatureJournals(inventory, journals(), context).checks, 3);
-assert.equal(validateFeatureJournals(inventory, journals().reverse(), context).checks, 3);
+assert.equal(validateFeatureJournals(inventory, journals(), context).checks, 4);
+assert.equal(validateFeatureJournals(inventory, journals().reverse(), context).checks, 4);
 const projectedInventory = structuredClone(inventory);
 projectedInventory.checks[2].platforms = ['linux'];
 for (const platform of ['linux', 'darwin', 'win32']) {
@@ -100,7 +107,7 @@ for (const platform of ['linux', 'darwin', 'win32']) {
 			journals(projectedInventory, invocation),
 			invocation
 		).checks,
-		platform === 'linux' ? 3 : 2
+		platform === 'linux' ? 4 : 3
 	);
 }
 assert.throws(
@@ -155,11 +162,36 @@ for (const feature of ['properties', 'mutation', 'hotstrings-format'])
 for (const ref of ['refs/heads/main', 'refs/heads/dev', 'refs/pull/42/merge']) {
 	const displayed = displayPlan(inventory, ref);
 	assert.deepEqual(Object.keys(displayed.matrix), ['lot']);
-	assert.deepEqual(displayed.matrix.lot, Object.keys(displayed.metadata));
+	assert.deepEqual(Object.keys(displayed.integration_matrix), ['lot']);
+	// The integration- features form the Integration lots, labelled without the
+	// prefix; every other row is a Unit lot; together they are the whole plan.
+	assert.deepEqual(displayed.integration_matrix.lot, ['Wiring']);
+	assert.deepEqual(displayed.matrix.lot, [
+		'Menus',
+		'Input',
+		'Property tests',
+		'Hotstring TOML formatting',
+		...(ref === 'refs/heads/main' ? ['Mutation tests'] : [])
+	]);
+	assert.deepEqual(
+		[...displayed.matrix.lot, ...displayed.integration_matrix.lot].sort(),
+		Object.keys(displayed.metadata).sort()
+	);
 	assert.deepEqual(Object.values(displayed.metadata), createMatrix(inventory, ref).include);
 	const encoded = JSON.stringify(displayed.metadata);
-	for (const lot of displayed.matrix.lot)
+	for (const lot of displayed.matrix.lot) {
 		assert.deepEqual(selectLot(inventory, ref, lot, encoded), displayed.metadata[lot]);
+		assert.deepEqual(selectLot(inventory, ref, lot, encoded, 'unit'), displayed.metadata[lot]);
+		assert.throws(() => selectLot(inventory, ref, lot, encoded, 'integration'), /another stage/);
+	}
+	for (const lot of displayed.integration_matrix.lot) {
+		assert.deepEqual(
+			selectLot(inventory, ref, lot, encoded, 'integration'),
+			displayed.metadata[lot]
+		);
+		assert.throws(() => selectLot(inventory, ref, lot, encoded), /another stage/);
+		assert.throws(() => selectLot(inventory, ref, lot, encoded, 'e2e'), /another stage/);
+	}
 	for (const lot of ['', 'foreign', undefined, null])
 		assert.throws(() => selectLot(inventory, ref, lot, encoded), /Unknown Common lot/);
 	for (const mutate of [
@@ -195,7 +227,17 @@ for (const ref of ['refs/heads/main', 'refs/heads/dev', 'refs/pull/42/merge']) {
 	);
 }
 assert.throws(
-	() => displayPlan({ features: ['property-tests'] }, 'refs/heads/dev'),
+	() => displayPlan({ features: ['property-tests', 'integration-wiring'] }, 'refs/heads/dev'),
+	/human lot labels must be unique/
+);
+// Neither column may be empty: GitHub refuses an empty matrix, and a plan
+// without Integration lots would silently drop the column.
+assert.throws(
+	() => displayPlan({ features: ['menus', 'input'] }, 'refs/heads/dev'),
+	/both Unit and Integration lots/
+);
+assert.throws(
+	() => displayPlan({ features: ['integration-menus', 'menus'] }, 'refs/heads/dev'),
 	/human lot labels must be unique/
 );
 
@@ -203,20 +245,21 @@ assert.throws(
 const mixed = journals();
 mixed[0][0].ci_run_attempt = '1';
 const mixedResult = validateFeatureJournals(inventory, mixed, context);
-assert.equal(mixedResult.checks, 3);
+assert.equal(mixedResult.checks, 4);
 assert.equal(mixedResult.run_id, context.run_id);
 assert.equal(mixedResult.run_attempt, '2');
 assert.deepEqual(
 	mixedResult.features.map((row) => [row.feature, row.producer_run_attempt]),
 	[
 		['input', '2'],
+		['integration-wiring', '2'],
 		['menus', '1']
 	]
 );
 const retained = journals();
 for (const rows of retained) rows[0].ci_run_attempt = '1';
-assert.equal(validateFeatureJournals(inventory, retained, context).checks, 3);
-assert.equal(validateFeatureJournals(inventory, mixed.reverse(), context).checks, 3);
+assert.equal(validateFeatureJournals(inventory, retained, context).checks, 4);
+assert.equal(validateFeatureJournals(inventory, mixed.reverse(), context).checks, 4);
 for (const run_attempt of ['', '0', '02', '-1', '9007199254740992', 2, null, undefined]) {
 	assert.throws(() => validateFeatureJournals(inventory, journals(), { ...context, run_attempt }));
 	const malformed = journals();
@@ -443,7 +486,7 @@ try {
 			rows.map((row) => JSON.stringify(row)).join('\n') + '\n'
 		);
 	}
-	assert.equal(validateFeatureJournals(inventory, collectJournals(temporary), context).checks, 3);
+	assert.equal(validateFeatureJournals(inventory, collectJournals(temporary), context).checks, 4);
 	const target = path.join(temporary, 'artifact-0', 'execution', 'timings.ndjson');
 	fs.appendFileSync(target, '{');
 	assert.throws(() => collectJournals(temporary), /Truncated feature evidence/);
@@ -459,7 +502,7 @@ console.log(
 require('./fixtures/common-unit-admission-controls.cjs')
 	.run()
 	.then((count) => {
-		assert.equal(count, 58, 'complete source plan, Unit writer admission and refusal diagnostics');
+		assert.equal(count, 61, 'complete source plan, Unit writer admission and refusal diagnostics');
 	})
 	.catch((error) => {
 		console.error(error);

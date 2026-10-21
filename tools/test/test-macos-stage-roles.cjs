@@ -35,7 +35,10 @@ function needsOf(receiver, result = 'success') {
 }
 /** Admits one receiving stage from its predecessors' receipts, as the workflow does. */
 function admitted(receiver, all, ctx = context, attempt = 1) {
-	const displayed = receiver === 'build' ? undefined : roles.displayPlan(receiver, ctx);
+	// Integration and Build are single fixed cells: no human lot matrix to admit.
+	const displayed = ['integration', 'build'].includes(receiver)
+		? undefined
+		: roles.displayPlan(receiver, ctx);
 	return roles.admit(
 		receiver,
 		displayed?.matrix.lot[0],
@@ -59,16 +62,17 @@ function complete(ctx = context, attempt = 1) {
 	return { all, proof };
 }
 const completed = complete();
-check('exact five visible jobs with only their declared predecessor edges', () => {
+check('exact six visible jobs with only their declared predecessor edges', () => {
 	const workflow = YAML.parse(
 		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
 	);
-	const jobs = ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'];
+	const jobs = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'];
 	assert.deepEqual(Object.keys(workflow.jobs), jobs);
 	const needs = {
 		'test-hs': [],
-		'e2e-hs': ['test-hs'],
-		'package-macos': ['test-hs'],
+		'integration-hs': ['test-hs'],
+		'e2e-hs': ['integration-hs'],
+		'package-macos': ['integration-hs'],
 		launch: ['e2e-hs', 'package-macos'],
 		'macos-ok': ['launch']
 	};
@@ -100,7 +104,7 @@ check('exact five visible jobs with only their declared predecessor edges', () =
 		(step) => step.name === 'Verify mandatory jobs and launch scenarios'
 	);
 	assert.equal(verifier.env.NEEDS, '${{ steps.stage-verdict.outputs.needs }}');
-	for (const id of ['e2e-hs', 'package-macos', 'launch']) {
+	for (const id of ['integration-hs', 'e2e-hs', 'package-macos', 'launch']) {
 		const steps = workflow.jobs[id].steps;
 		assert.ok(
 			steps
@@ -244,7 +248,7 @@ check('manual nonrelease retains Item36 and both lease cells', () => {
 			['lease-silence-native', 'macos-15-intel', 20]
 		]
 	);
-	assert.equal(complete(ctx).proof.chain[1].cells.length, 10);
+	assert.equal(complete(ctx).proof.chain[2].cells.length, 10);
 });
 check('release launch preserves both arches and every canonical supplied scenario', () => {
 	const ctx = { ...context, release: true, event_name: 'workflow_dispatch' };
@@ -262,7 +266,7 @@ check('release launch preserves both arches and every canonical supplied scenari
 			['cold-bootstrap-native', 'macos-15', '', 90]
 		]
 	);
-	assert.equal(complete(ctx).proof.chain[3].cells.length, 5);
+	assert.equal(complete(ctx).proof.chain[4].cells.length, 5);
 });
 check('complete proof preserves original mandatory native verdict map', () => {
 	assert.deepEqual(
@@ -270,6 +274,7 @@ check('complete proof preserves original mandatory native verdict map', () => {
 		Object.fromEntries(
 			[
 				'test-hs',
+				'integration-hs',
 				'e2e-hs',
 				'package-macos',
 				'launch',
@@ -406,8 +411,8 @@ check('successful earlier attempts survive a legitimate failed-jobs rerun', () =
 	rows[1].attempt = 2;
 	for (const stage of rows[1].prior) for (const cell of stage.cells) cell.attempt = 2;
 	const proof = roles.union('testbuild', rows, 'success', context, 2);
-	assert.equal(proof.chain[3].cells[0].attempt, 1);
-	assert.equal(proof.chain[3].cells[1].attempt, 2);
+	assert.equal(proof.chain[4].cells[0].attempt, 1);
+	assert.equal(proof.chain[4].cells[1].attempt, 2);
 	roles.legacyNeeds(proof, context);
 });
 check('newer receipt first retains a real oldest successful predecessor witness', () => {
@@ -486,8 +491,9 @@ check('existing scope owner admits every retained Mac command after address relo
 });
 
 // One more than the single-cell Unit: a duplicate Unit row now replaces a mandatory group;
-// one more for the Intel managed native split.
-assert.equal(controls, 86, 'all original stage and receipt controls remain present');
+// one more for the Intel managed native split; eighteen for the Integration stage's own
+// aggregate and receipt refusals.
+assert.equal(controls, 104, 'all original stage and receipt controls remain present');
 check('Unit lots are the module groups, each one complete stubbed cell', () => {
 	const groups = roles.unitGroups();
 	// Deliberately narrow: these are the macOS shard GROUP names, not source trees
@@ -719,8 +725,10 @@ for (const receiver of ['e2e', 'testbuild']) {
 		assert.equal(reads, 0);
 	});
 }
-for (const receiver of ['e2e', 'build', 'testbuild']) {
-	const displayed = receiver === 'build' ? undefined : roles.displayPlan(receiver, context);
+for (const receiver of ['integration', 'e2e', 'build', 'testbuild']) {
+	const displayed = ['integration', 'build'].includes(receiver)
+		? undefined
+		: roles.displayPlan(receiver, context);
 	const lot = displayed?.matrix.lot[0];
 	const receipts = () => roles.PREDECESSORS[receiver].flatMap((stage) => completed.all[stage]);
 	check(receiver + ' admission retains aggregate custody and the exact prior proof', () => {
@@ -769,7 +777,9 @@ for (const receiver of ['e2e', 'build', 'testbuild']) {
 }
 for (const stage of roles.STAGES) {
 	check(stage + ' lot recording preserves every original receipt field and complete cell', () => {
-		const displayed = stage === 'build' ? undefined : roles.displayPlan(stage, context);
+		const displayed = ['integration', 'build'].includes(stage)
+			? undefined
+			: roles.displayPlan(stage, context);
 		for (const [index, selected] of roles.plan(stage, context).entries()) {
 			const original = completed.all[stage][index];
 			assert.deepEqual(
@@ -788,7 +798,7 @@ for (const stage of roles.STAGES) {
 			);
 		}
 	});
-	if (stage !== 'build')
+	if (!['integration', 'build'].includes(stage))
 		check(stage + ' lot recording refuses a missing or foreign displayed lot', () => {
 			const selected = roles.plan(stage, context)[0];
 			const prior = { context, chain: completed.all[stage][0].prior };
@@ -831,7 +841,7 @@ check('recording refuses another valid cell under the selected human lot', () =>
 		/Selected human lot and receipt cell differ/
 	);
 });
-assert.equal(controls, 140, 'original controls and human lot transport controls all execute');
+assert.equal(controls, 163, 'original controls and human lot transport controls all execute');
 check('role labels retain the independent authored human names without runtime metadata', () => {
 	for (const [stage, role, architecture, scenario, expected] of [
 		['unit', 'lua-unit-meta', 'stubbed', 'meta', 'meta'],
@@ -910,7 +920,7 @@ check('full-cell human labels still reject incomplete cells and foreign fields',
 		/Closed stage receipt fields required/
 	);
 });
-assert.equal(controls, 143, 'all original, human lot transport and role-label controls execute');
+assert.equal(controls, 166, 'all original, human lot transport and role-label controls execute');
 /** Admit the Unit group matrix while preserving its complete receipt-producing source chain. */
 function assertLiteralUnit(source) {
 	const job = YAML.parse(source, { uniqueKeys: true }).jobs['test-hs'];
@@ -922,13 +932,14 @@ function assertLiteralUnit(source) {
 			'runs-on': 'ubuntu-latest',
 			'timeout-minutes': 360,
 			strategy: { 'fail-fast': false, matrix: { lot: roles.unitGroups() } },
-			env: { MACOS_STAGE_LOT: '${{ matrix.lot }}' },
-			outputs: {
-				e2e_matrix: '${{ steps.stage-plan.outputs.e2e_matrix }}',
-				e2e_metadata: '${{ steps.stage-plan.outputs.e2e_metadata }}'
-			}
+			env: { MACOS_STAGE_LOT: '${{ matrix.lot }}' }
 		},
 		"Unit must be one matrix row per module group, in the groups' order"
+	);
+	// The Integration cell plans E2E; no unit cell does.
+	assert.ok(
+		!job.steps.some((step) => step.id === 'stage-plan'),
+		'Only the Integration cell plans the E2E cells'
 	);
 	function exact(name, expected) {
 		const matches = job.steps.filter((step) => step.name === name);
@@ -938,10 +949,6 @@ function assertLiteralUnit(source) {
 	exact('Admit the authored unit lot', {
 		id: 'stage-selection',
 		run: 'node tools/ci/macos-stage-roles.cjs select unit'
-	});
-	exact('Resolve exact E2E stage roles', {
-		id: 'stage-plan',
-		run: 'node tools/ci/macos-stage-roles.cjs plan e2e'
 	});
 	exact('Record actual stage role outcome', {
 		if: 'always()',
@@ -995,11 +1002,83 @@ function assertLiteralUnit(source) {
 	);
 	const selectAt = job.steps.findIndex((step) => step.id === 'stage-selection');
 	const testAt = job.steps.findIndex((step) => step.name === 'Run unit + meta tests');
-	const planAt = job.steps.findIndex((step) => step.id === 'stage-plan');
 	const recordAt = job.steps.findIndex((step) => step.name === 'Record actual stage role outcome');
 	assert.ok(
-		selectAt >= 0 && selectAt < testAt && testAt < planAt && planAt < recordAt,
-		'Unit selection and real tests must precede its plan and receipt'
+		selectAt >= 0 && selectAt < testAt && testAt < recordAt,
+		'Unit selection and real tests must precede its receipt'
+	);
+	return job;
+}
+
+/** Admit the one Integration cell: its group, its predecessor receipts and its E2E plan. */
+function assertLiteralIntegration(source) {
+	const job = YAML.parse(source, { uniqueKeys: true }).jobs['integration-hs'];
+	assert.ok(job && Array.isArray(job.steps), 'Missing actual Integration job');
+	const [cell] = roles.plan('integration', context);
+	assert.deepEqual(
+		Object.fromEntries(Object.entries(job).filter(([key]) => key !== 'steps')),
+		{
+			name: 'Integration tests (Lua module wiring, stubbed hs)',
+			'runs-on': cell.runner,
+			'timeout-minutes': cell.timeout_minutes,
+			needs: ['test-hs'],
+			outputs: {
+				e2e_matrix: '${{ steps.stage-plan.outputs.e2e_matrix }}',
+				e2e_metadata: '${{ steps.stage-plan.outputs.e2e_metadata }}'
+			}
+		},
+		'Integration must be one stubbed cell after every Unit cell'
+	);
+	function exact(name, expected) {
+		const matches = job.steps.filter((step) => step.name === name);
+		assert.equal(matches.length, 1, 'Missing or duplicate Integration custody step');
+		assert.deepEqual(matches[0], { name, ...expected }, 'Integration custody source differs');
+	}
+	exact('Download exact prior stage receipts', {
+		uses: 'actions/download-artifact@v4',
+		with: {
+			pattern: 'macos-stage-unit-*-${{ github.run_id }}',
+			path: '${{ runner.temp }}/macos-stage-inputs'
+		}
+	});
+	exact('Admit complete successful predecessor stage', {
+		id: 'stage-admission',
+		env: { MACOS_STAGE_NEEDS: '${{ toJSON(needs) }}' },
+		run: 'node tools/ci/macos-stage-roles.cjs admit integration "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"'
+	});
+	exact('Run integration tests', {
+		'working-directory': 'static/ergopti_plus/macos',
+		env: { LUA: 'lua5.4' },
+		run:
+			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua --module=' +
+			cell.scenario
+	});
+	exact('Resolve exact E2E stage roles', {
+		id: 'stage-plan',
+		run: 'node tools/ci/macos-stage-roles.cjs plan e2e'
+	});
+	exact('Record actual stage role outcome', {
+		if: 'always()',
+		env: { MACOS_STAGE_CELL: JSON.stringify(cell), MACOS_STAGE_RESULT: '${{ job.status }}' },
+		run: 'node tools/ci/macos-stage-roles.cjs record integration "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"'
+	});
+	exact('Retain exact stage role outcome', {
+		if: 'always()',
+		uses: 'actions/upload-artifact@v4',
+		with: {
+			name: `macos-stage-integration-${cell.role}-${cell.runner}-${cell.scenario}-\${{ github.run_id }}`,
+			path: '${{ runner.temp }}/macos-stage-output/receipt.json',
+			'if-no-files-found': 'error',
+			'retention-days': 7,
+			overwrite: true
+		}
+	});
+	const at = (name) => job.steps.findIndex((step) => step.name === name);
+	assert.ok(
+		at('Admit complete successful predecessor stage') < at('Run integration tests') &&
+			at('Run integration tests') < at('Resolve exact E2E stage roles') &&
+			at('Resolve exact E2E stage roles') < at('Record actual stage role outcome'),
+		'Admission and real tests precede the E2E plan and the receipt'
 	);
 	return job;
 }
@@ -1123,10 +1202,13 @@ for (const [name, mutate] of [
 		}
 	],
 	[
-		'foreign E2E plan',
+		'an E2E plan back in a unit cell',
 		(job) => {
-			job.steps.find((step) => step.id === 'stage-plan').run =
-				'node tools/ci/macos-stage-roles.cjs plan testbuild';
+			job.steps.push({
+				name: 'Resolve exact E2E stage roles',
+				id: 'stage-plan',
+				run: 'node tools/ci/macos-stage-roles.cjs plan e2e'
+			});
 		}
 	],
 	[
@@ -1236,7 +1318,77 @@ check('literal Unit lot produces the unchanged complete role and receipt', () =>
 			)
 		);
 });
-assert.equal(controls, 168, 'all prior 143 controls and 25 Unit matrix controls execute');
+check('actual Integration source is one admitted stubbed cell with its E2E plan', () => {
+	assertLiteralIntegration(literalUnitSource);
+});
+for (const [name, mutate] of [
+	[
+		'a missing Unit predecessor',
+		(job) => {
+			delete job.needs;
+		}
+	],
+	[
+		'a foreign E2E plan',
+		(job) => {
+			job.steps.find((step) => step.id === 'stage-plan').run =
+				'node tools/ci/macos-stage-roles.cjs plan testbuild';
+		}
+	],
+	[
+		'the whole suite instead of the integration group',
+		(job) => {
+			const step = job.steps.find((entry) => entry.name === 'Run integration tests');
+			step.run = step.run.replace(' --module=integration', '');
+		}
+	],
+	[
+		'a foreign receipt cell',
+		(job) => {
+			job.steps.find(
+				(step) => step.name === 'Record actual stage role outcome'
+			).env.MACOS_STAGE_CELL = '${{ toJSON(matrix) }}';
+		}
+	],
+	[
+		'a receipt of another stage',
+		(job) => {
+			job.steps.find((step) => step.name === 'Record actual stage role outcome').run =
+				'node tools/ci/macos-stage-roles.cjs record unit - receipt.json';
+		}
+	],
+	[
+		'admission of another stage',
+		(job) => {
+			job.steps.find((step) => step.id === 'stage-admission').run =
+				'node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"';
+		}
+	],
+	[
+		'receipts of another stage',
+		(job) => {
+			job.steps.find((step) => step.name === 'Download exact prior stage receipts').with.pattern =
+				'macos-stage-e2e-*-${{ github.run_id }}';
+		}
+	],
+	[
+		'a plan before the tests',
+		(job) => {
+			const at = job.steps.findIndex((step) => step.id === 'stage-plan');
+			job.steps.unshift(job.steps.splice(at, 1)[0]);
+		}
+	]
+])
+	check('literal Integration source refuses ' + name, () => {
+		const changed = YAML.parse(literalUnitSource, { uniqueKeys: true });
+		mutate(changed.jobs['integration-hs']);
+		assert.throws(() => assertLiteralIntegration(YAML.stringify(changed)));
+	});
+assert.equal(
+	controls,
+	200,
+	'all prior 166 controls, 25 Unit matrix controls and 9 Integration cell controls execute'
+);
 
 /** The native composition validator needs the approved commit's complete HEAD ancestry. */
 function assertManagedNativeHistory(workflow) {
@@ -1286,8 +1438,8 @@ for (const [name, mutate] of [
 	});
 assert.equal(
 	controls,
-	175,
-	'all prior 168 controls and seven managed native history controls execute'
+	207,
+	'all prior 200 controls and seven managed native history controls execute'
 );
 
 // The stage graph: Build admits Unit beside E2E, and the test build joins both.
@@ -1305,25 +1457,36 @@ const admitTestbuild = (receipts, needs = needsOf('testbuild'), ctx = context, a
 check('stage graph keeps every earlier stage once, in order, on every chain', () => {
 	assert.deepEqual(roles.PREDECESSORS, {
 		unit: [],
-		e2e: ['unit'],
-		build: ['unit'],
+		integration: ['unit'],
+		e2e: ['integration'],
+		build: ['integration'],
 		testbuild: ['e2e', 'build']
 	});
 	assert.deepEqual(
 		roles.STAGES.map((stage) => roles.priorStages(stage)),
-		[[], ['unit'], ['unit'], ['unit', 'e2e', 'build']]
+		[
+			[],
+			['unit'],
+			['unit', 'integration'],
+			['unit', 'integration'],
+			['unit', 'integration', 'e2e', 'build']
+		]
 	);
 	assert.deepEqual(
 		completed.proof.chain.map((row) => row.stage),
 		roles.STAGES
 	);
 	assert.deepEqual(
-		completed.all.build[0].prior.map((row) => row.stage),
+		completed.all.integration[0].prior.map((row) => row.stage),
 		['unit']
 	);
 	assert.deepEqual(
+		completed.all.build[0].prior.map((row) => row.stage),
+		['unit', 'integration']
+	);
+	assert.deepEqual(
 		completed.all.e2e[0].prior.map((row) => row.stage),
-		['unit']
+		['unit', 'integration']
 	);
 	assert.throws(
 		() => roles.admit('unit', undefined, undefined, {}, context, 1, () => []),
@@ -1388,7 +1551,7 @@ for (const [name, receipts, pattern] of [
 		'a Build receipt claiming an E2E predecessor',
 		() => {
 			const build = structuredClone(completed.all.build);
-			build[0].prior.push(structuredClone(completed.all.testbuild[0].prior[1]));
+			build[0].prior.push(structuredClone(completed.all.testbuild[0].prior[2]));
 			return [...completed.all.e2e, ...build];
 		},
 		/prior stage/
@@ -1417,6 +1580,7 @@ check('a rerun of E2E alone keeps the earlier Build and still admits', () => {
 		proof.chain.map((row) => [row.stage, Math.max(...row.cells.map((cell) => cell.attempt))]),
 		[
 			['unit', 1],
+			['integration', 1],
 			['e2e', 2],
 			['build', 1]
 		]
@@ -1432,8 +1596,11 @@ check('a rerun of E2E alone keeps the earlier Build and still admits', () => {
 	);
 	assert.deepEqual(receipt.prior, proof.chain);
 });
-check('a Build older than its Unit predecessor is a backward lineage', () => {
-	const unit = completed.all.unit.map((row) => ({ ...structuredClone(row), attempt: 2 }));
+check('a Build older than its Integration predecessor is a backward lineage', () => {
+	const integration = completed.all.integration.map((row) => ({
+		...structuredClone(row),
+		attempt: 2
+	}));
 	const prior = roles.admit(
 		'build',
 		undefined,
@@ -1441,15 +1608,15 @@ check('a Build older than its Unit predecessor is a backward lineage', () => {
 		needsOf('build'),
 		context,
 		2,
-		() => unit
+		() => integration
 	);
 	assert.throws(
 		() =>
 			roles.validateChain(
 				[
 					...prior.chain,
-					{ stage: 'e2e', cells: structuredClone(completed.proof.chain[1].cells) },
-					{ stage: 'build', cells: structuredClone(completed.proof.chain[2].cells) }
+					{ stage: 'e2e', cells: structuredClone(completed.proof.chain[2].cells) },
+					{ stage: 'build', cells: structuredClone(completed.proof.chain[3].cells) }
 				],
 				'testbuild',
 				context
@@ -1457,7 +1624,7 @@ check('a Build older than its Unit predecessor is a backward lineage', () => {
 		/Backward predecessor attempt lineage/
 	);
 });
-assert.equal(controls, 189, 'all prior 175 controls and fourteen stage graph controls execute');
+assert.equal(controls, 221, 'all prior 207 controls and fourteen stage graph controls execute');
 
 // Launch lots: four launch jobs beside the cold bootstrap, each scenario once.
 function checkLaunchLotLoop(workflow) {
@@ -1558,7 +1725,7 @@ check(
 		}
 	}
 );
-assert.equal(controls, 190, 'all prior 189 controls and the launch lot control execute');
+assert.equal(controls, 222, 'all prior 221 controls and the launch lot control execute');
 
 // Every macOS cell, job and repeated step states its macOS version from HOSTS.
 check('macOS cells name their version from one host table and refuse another', () => {
@@ -1611,6 +1778,6 @@ check('macOS cells name their version from one host table and refuse another', (
 	])
 		assert.throws(() => roles.confirmMacosVersion(selected, version));
 });
-assert.equal(controls, 191, 'all prior 190 controls and the macOS version control execute');
+assert.equal(controls, 223, 'all prior 222 controls and the macOS version control execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

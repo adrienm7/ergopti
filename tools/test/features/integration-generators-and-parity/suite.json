@@ -1,0 +1,70 @@
+{
+	"schema_version": 1,
+	"feature": "integration-generators-and-parity",
+	"checks": [
+		{
+			"id": "js-0031",
+			"ordinal": 43,
+			"name": "domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+			"cmd": "npm",
+			"args": ["run", "--silent", "build:domain"],
+			"repro": "npm run build:domain"
+		},
+		{
+			"id": "js-0160",
+			"ordinal": 172,
+			"name": "cross-driver manifest equivalence (resolved values identical across drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-manifest-equivalence.cjs"],
+			"repro": "node tools/test/test-manifest-equivalence.cjs"
+		},
+		{
+			"id": "js-0226",
+			"ordinal": 239,
+			"name": "features manifest no-drift (every committed _generated/ file matches the live generator)",
+			"cmd": "node",
+			"args": ["tools/test/test-features-manifest-no-drift.cjs"],
+			"repro": "node tools/test/test-features-manifest-no-drift.cjs"
+		},
+		{
+			"id": "js-0227",
+			"ordinal": 240,
+			"name": "drift guard detects targeted output changes and preserves exact edits",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-guard-covers-every-output.cjs"],
+			"repro": "node tools/test/test-drift-guard-covers-every-output.cjs"
+		},
+		{
+			"id": "js-0228",
+			"ordinal": 241,
+			"name": "drift coverage rejects invalid receipts and restores damaged targets",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-guard-coverage-oracle.cjs"],
+			"repro": "node tools/test/test-drift-guard-coverage-oracle.cjs"
+		},
+		{
+			"id": "js-0229",
+			"ordinal": 242,
+			"name": "drift restoration preserves healthy siblings after filesystem refusals",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-restore-refusal.cjs"],
+			"repro": "node tools/test/test-drift-restore-refusal.cjs"
+		},
+		{
+			"id": "js-0239",
+			"ordinal": 252,
+			"name": "generator registry runs (npm run gen: every declared output is produced)",
+			"cmd": "node",
+			"args": ["tools/build/gen-all.cjs"],
+			"repro": "npm run gen"
+		},
+		{
+			"id": "js-0248",
+			"ordinal": 261,
+			"name": "feature manifest parity (Windows, macOS, and Linux projections agree)",
+			"cmd": "node",
+			"args": ["tools/test/test-manifest-parity.cjs"],
+			"repro": "node tools/test/test-manifest-parity.cjs"
+		}
+	]
+}

@@ -1,7 +1,9 @@
 # .github/workflows/ci-common.yml
 #
 # Common lane: the shared JavaScript, property, mutation and formatting suites,
-# then browser E2E, then both production sites built, installed and judged.
+# then the shared integration lots (generators, cross-driver projections,
+# installers, bundles and boots), then browser E2E, then both production sites
+# built, installed and judged.
 # Every stage is a job of this workflow, so GitHub renders it in two levels,
 # "YAML, shared code & web / <Stage> (<lot>)": a matrix job keeps a static
 # stage name and GitHub appends its lot, and a single job names its subject
@@ -72,7 +74,7 @@ jobs:
 
       - name: Admit the complete Common lot map
         id: common-lot
-        run: node tools/ci/js-feature-matrix.cjs select
+        run: node tools/ci/js-feature-matrix.cjs select unit
 
       - name: Install native validation tools
         run: |
@@ -136,16 +138,86 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
 
+  # The shared checks that run real production code end to end: the domain and
+  # generator pipelines with their drift guards, the three drivers' manifest
+  # projections compared, the Linux install and uninstall sandboxes, the
+  # bundlers and the boot smokes. Their features carry the integration- prefix
+  # (tools/ci/js-feature-matrix.cjs), so the plan lists them here and never in
+  # a Unit lot; E2E admits the union of both stages, every check exactly once.
+  common-integration:
+    name: 'Integration tests'
+    needs: [shared-validation]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.common_plan).integration_matrix }}
+    env:
+      COMMON_LOT: ${{ matrix.lot }}
+      COMMON_PLAN: ${{ inputs.common_plan }}
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Admit the complete Common integration lot map
+        id: common-lot
+        run: node tools/ci/js-feature-matrix.cjs select integration
+
+      - name: Install native integration tools
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 lua-luv libxml2-utils
+
+      - name: Run shared integration suite
+        env:
+          SUITE: ${{ steps.common-lot.outputs.suite }}
+          FEATURE: ${{ steps.common-lot.outputs.feature }}
+        run: |
+          set -euo pipefail
+          test "$SUITE" = js
+          npm run test:js -- --feature "$FEATURE"
+
+      - name: Retain shared integration timings, including interrupted runs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-js-timings-${{ steps.common-lot.outputs.feature }}
+          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson
+          if-no-files-found: warn
+          overwrite: true
+
+      - name: Retain captured JS integration failure output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-js-failures-${{ steps.common-lot.outputs.feature }}
+          path: ${{ runner.temp }}/ergopti-js-suite-*/failures/**
+          if-no-files-found: ignore
+          overwrite: true
+
   common-e2e:
     name: 'E2E tests (Shared UI rendering)'
-    needs: [shared-validation]
+    needs: [common-integration]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
     env:
       COMMON_PLAN: ${{ inputs.common_plan }}
-      COMMON_PREDECESSOR_RESULT: ${{ needs.shared-validation.result }}
+      COMMON_PREDECESSOR_RESULT: ${{ needs.common-integration.result }}
       GH_TOKEN: ${{ github.token }}
       ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
       ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}

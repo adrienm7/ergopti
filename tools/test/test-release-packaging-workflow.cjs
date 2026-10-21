@@ -124,15 +124,21 @@ const packageWindows = pipeline.job(PACKAGE_JOB[WINDOWS_BOX]);
 if (JSON.stringify(pipeline.needsOf(packageWindows)) !== JSON.stringify(['e2e-ahk'])) {
 	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must directly await its mandatory E2E predecessor`);
 }
-const windowsE2E = pipeline.job('e2e-ahk');
-if (
-	JSON.stringify(pipeline.needsOf(windowsE2E)) !== JSON.stringify(['test-ahk']) ||
-	!windowsE2E.includes('      ci_predecessors: ${{ toJSON(needs) }}') ||
-	!windowsE2E.includes('      ci_source_sha: ${{ github.sha }}') ||
-	!windowsE2E.includes('      ci_run_id: ${{ github.run_id }}') ||
-	!windowsE2E.includes('      ci_attempt: ${{ github.run_attempt }}')
-) {
-	errors.push('Windows E2E must retain the genuine source-bound Unit result');
+// Unit -> Integration -> E2E: each link forwards its genuine source-bound result.
+for (const [id, prior] of [
+	['integration-ahk', 'test-ahk'],
+	['e2e-ahk', 'integration-ahk']
+]) {
+	const link = pipeline.job(id);
+	if (
+		JSON.stringify(pipeline.needsOf(link)) !== JSON.stringify([prior]) ||
+		!link.includes('      ci_predecessors: ${{ toJSON(needs) }}') ||
+		!link.includes('      ci_source_sha: ${{ github.sha }}') ||
+		!link.includes('      ci_run_id: ${{ github.run_id }}') ||
+		!link.includes('      ci_attempt: ${{ github.run_attempt }}')
+	) {
+		errors.push(`Windows ${id} must retain the genuine source-bound ${prior} result`);
+	}
 }
 const buildAdmission = pipeline.step(packageWindows, 'Admit genuine preceding scheduler results');
 if (
@@ -752,49 +758,61 @@ if (windowsToolchainStep !== null) {
 // The AHK suites must run on the interpreter the exe ships with. They
 // downloaded a hardcoded 2.0.19 of their own, so a runtime bump in the contract
 // would have left every measured hook behaviour unchecked on the new base.
-// The test job reads the same contract, keys its cache on it and checks the
-// archive digest.
-try {
-	const contractStep = pipeline.findStep('Read AutoHotkey runtime contract');
-	const cacheStep = pipeline.findStep('Cache AutoHotkey runtime');
-	const downloadStep = pipeline.findStep('Download AutoHotkey v2 runtime');
-	for (const found of [contractStep, cacheStep, downloadStep]) {
-		if (found.file !== WINDOWS_BOX || found.job !== 'test-ahk') {
+// The unit and integration jobs read the same contract, key their cache on it
+// and check the archive digest.
+const AHK_RUNTIME_JOBS = ['test-ahk', 'integration-ahk'];
+for (const name of [
+	'Read AutoHotkey runtime contract',
+	'Cache AutoHotkey runtime',
+	'Download AutoHotkey v2 runtime'
+]) {
+	const owners = pipeline.files().flatMap((entry) =>
+		pipeline
+			.jobsOfText(entry.text, entry.rel)
+			.filter((job) => pipeline.steps(job.body).some((step) => step.name === name))
+			.map((job) => entry.rel + '/' + job.id)
+	);
+	if (
+		JSON.stringify(owners) !== JSON.stringify(AHK_RUNTIME_JOBS.map((id) => WINDOWS_BOX + '/' + id))
+	)
+		errors.push(`the AHK test runtime step ${name} runs in ${owners.join(', ')}`);
+}
+for (const runtimeJob of AHK_RUNTIME_JOBS)
+	try {
+		const owner = pipeline.job(runtimeJob);
+		const contractStep = { body: pipeline.step(owner, 'Read AutoHotkey runtime contract') };
+		const cacheStep = { body: pipeline.step(owner, 'Cache AutoHotkey runtime') };
+		const downloadStep = { body: pipeline.step(owner, 'Download AutoHotkey v2 runtime') };
+		if (
+			!contractStep.body.includes('windows_release_toolchain.json') ||
+			!contractStep.body.includes('ConvertFrom-Json')
+		) {
+			errors.push('the AHK test job must read its runtime from the shared release contract');
+		}
+		const cacheKey = (/^\s+key:\s*(.*)$/m.exec(cacheStep.body) ?? [])[1] ?? '';
+		if (
+			!cacheKey.includes('steps.ahk-contract.outputs.version') ||
+			!cacheKey.includes('steps.ahk-contract.outputs.sha256')
+		) {
 			errors.push(
-				`the AHK test runtime step runs in ${found.file} (job ${found.job}); it belongs in test-ahk of ${WINDOWS_BOX}`
+				`the AHK test runtime cache must be keyed on the contract version and digest, got: ${cacheKey}`
 			);
 		}
-	}
-	if (
-		!contractStep.body.includes('windows_release_toolchain.json') ||
-		!contractStep.body.includes('ConvertFrom-Json')
-	) {
-		errors.push('the AHK test job must read its runtime from the shared release contract');
-	}
-	const cacheKey = (/^\s+key:\s*(.*)$/m.exec(cacheStep.body) ?? [])[1] ?? '';
-	if (
-		!cacheKey.includes('steps.ahk-contract.outputs.version') ||
-		!cacheKey.includes('steps.ahk-contract.outputs.sha256')
-	) {
-		errors.push(
-			`the AHK test runtime cache must be keyed on the contract version and digest, got: ${cacheKey}`
-		);
-	}
-	for (const token of [
-		'steps.ahk-contract.outputs.url',
-		'steps.ahk-contract.outputs.sha256',
-		'Get-FileHash'
-	]) {
-		if (!downloadStep.body.includes(token)) {
-			errors.push(`the AHK test runtime download is missing contract token ${token}`);
+		for (const token of [
+			'steps.ahk-contract.outputs.url',
+			'steps.ahk-contract.outputs.sha256',
+			'Get-FileHash'
+		]) {
+			if (!downloadStep.body.includes(token)) {
+				errors.push(`the AHK test runtime download is missing contract token ${token}`);
+			}
 		}
+		if (/releases\/download\/v\d/.test(downloadStep.body) || /ahk-v\d/.test(cacheKey)) {
+			errors.push('the AHK test runtime must not pin its own AutoHotkey version');
+		}
+	} catch (error) {
+		errors.push(`the AHK test runtime steps are missing: ${error.message}`);
 	}
-	if (/releases\/download\/v\d/.test(downloadStep.body) || /ahk-v\d/.test(cacheKey)) {
-		errors.push('the AHK test runtime must not pin its own AutoHotkey version');
-	}
-} catch (error) {
-	errors.push(`the AHK test runtime steps are missing: ${error.message}`);
-}
 
 // The AHK suite enforces that runtime itself, but only under CI: a developer's
 // self-updating AutoHotkey turned every local run red with nothing wrong in the
@@ -1529,7 +1547,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 	const assert = require('node:assert/strict');
 	const desktop = require('./desktop-ci-evidence.cjs');
 	const needs = Object.fromEntries(
-		['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map((name) => [
+		['test-ahk', 'integration-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map((name) => [
 			name,
 			{ result: 'success' }
 		])

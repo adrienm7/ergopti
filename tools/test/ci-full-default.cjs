@@ -20,6 +20,7 @@ const JOBS = [
 	['.github/workflows/ci.yml', 'core', null],
 	['.github/workflows/ci.yml', 'prepare-common', null],
 	['.github/workflows/ci-common.yml', 'shared-validation', null],
+	['.github/workflows/ci-common.yml', 'common-integration', null],
 	['.github/workflows/ci-common.yml', 'common-unit-verdict', 'always()'],
 	['.github/workflows/ci-common.yml', 'common-e2e', null],
 	['.github/workflows/ci-common.yml', 'common-build', null],
@@ -35,21 +36,24 @@ const JOBS = [
 		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	],
 	['.github/workflows/ci-macos.yml', 'test-hs', null],
+	['.github/workflows/ci-macos.yml', 'integration-hs', null],
 	['.github/workflows/ci-macos.yml', 'e2e-hs', null],
 	['.github/workflows/ci-macos.yml', 'package-macos', null],
 	['.github/workflows/ci-macos.yml', 'launch', null],
 	['.github/workflows/ci-macos.yml', 'macos-ok', 'always()'],
 	['.github/workflows/ci-windows.yml', 'test-ahk', null],
+	['.github/workflows/ci-windows.yml', 'integration-ahk', null],
 	['.github/workflows/ci-windows.yml', 'e2e-ahk', null],
 	['.github/workflows/ci-windows.yml', 'package-windows', null],
 	['.github/workflows/ci-windows.yml', 'launch-windows', null],
 	['.github/workflows/ci-windows.yml', 'windows-ok', 'always()'],
 	['.github/workflows/ci-linux.yml', 'test-linux', null],
+	['.github/workflows/ci-linux.yml', 'integration-linux', null],
 	['.github/workflows/ci-linux.yml', 'e2e-linux', null],
 	[
 		'.github/workflows/ci-linux.yml',
 		'package-linux',
-		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+		"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 	],
 	['.github/workflows/ci-linux.yml', 'package-flatpak', null],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
@@ -106,15 +110,15 @@ const FULL_STEPS = [
 	],
 	[
 		'.github/workflows/ci-linux.yml',
-		'test-linux',
+		'integration-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
-		"${{ !cancelled() && matrix.group == 'meta' }}"
+		"${{ !cancelled() && matrix.group == 'native' }}"
 	],
 	[
 		'.github/workflows/ci-linux.yml',
-		'test-linux',
+		'integration-linux',
 		'Retain actual LuaJIT XI2 diagnostic evidence',
-		"${{ always() && matrix.group == 'meta' }}"
+		"${{ always() && matrix.group == 'native' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
@@ -642,8 +646,26 @@ function validateRaw(files) {
 		MACOS_STAGE_CELL: '${{ steps.stage-selection.outputs.cell }}',
 		MACOS_STAGE_RESULT: '${{ job.status }}'
 	});
-	// Each job names the stage it receives; Build admits Unit beside E2E.
+	// The Integration cell records exactly the one cell its stage plans.
+	const integrationRecord = macJobs['integration-hs'].steps.filter(
+		(step) => step.name === 'Record actual stage role outcome'
+	);
+	assert.equal(integrationRecord.length, 1, 'Integration keeps one actual receipt writer');
+	assert.deepEqual(integrationRecord[0].env, {
+		MACOS_STAGE_CELL: JSON.stringify(
+			macPlans.plan('integration', {
+				source_sha: 'a'.repeat(40),
+				run_id: '1',
+				event_name: 'push',
+				release: false,
+				scenarios: ['clean']
+			})[0]
+		),
+		MACOS_STAGE_RESULT: '${{ job.status }}'
+	});
+	// Each job names the stage it receives; Build admits Integration beside E2E.
 	for (const [id, prior] of [
+		['integration-hs', 'integration'],
 		['e2e-hs', 'e2e'],
 		['package-macos', 'build'],
 		['launch', 'testbuild']

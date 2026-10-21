@@ -1,0 +1,94 @@
+{
+	"schema_version": 1,
+	"feature": "integration-packaging-and-boot",
+	"checks": [
+		{
+			"id": "js-0099",
+			"ordinal": 111,
+			"name": "Linux install.sh leaves a working first install (sandboxed real run)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-install-sandbox.cjs"],
+			"repro": "node tools/test/test-linux-install-sandbox.cjs"
+		},
+		{
+			"id": "js-0102",
+			"ordinal": 114,
+			"name": "Linux uninstall preserves personal data and rejects unrelated installations",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-uninstall-sandbox.cjs"],
+			"repro": "npm run test:linux-uninstall-sandbox"
+		},
+		{
+			"id": "js-0108",
+			"ordinal": 120,
+			"name": "every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-root-resolvers.cjs"],
+			"repro": "node tools/test/test-shared-root-resolvers.cjs"
+		},
+		{
+			"id": "js-0125",
+			"ordinal": 137,
+			"name": "full AHK startup smoke (real auto-execute to ready, isolated config)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-full-startup-smoke.cjs"],
+			"repro": "node tools/test/test-ahk-full-startup-smoke.cjs"
+		},
+		{
+			"id": "js-0177",
+			"ordinal": 189,
+			"name": "macOS bundle payload ships every path the runtime reads and no excluded group",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-bundle-payload.cjs"],
+			"repro": "npm run test:macos-bundle-payload"
+		},
+		{
+			"id": "js-0184",
+			"ordinal": 196,
+			"name": "Linux bundle copies tracked bytes without per-file shell processes",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-tracked-copy.cjs"],
+			"repro": "node tools/test/test-linux-tracked-copy.cjs"
+		},
+		{
+			"id": "js-0198",
+			"ordinal": 210,
+			"name": "Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-canonical-pack-upgrade.cjs"],
+			"repro": "npm run test:linux-canonical-pack-upgrade"
+		},
+		{
+			"id": "js-0199",
+			"ordinal": 211,
+			"name": "Linux checkout installs ship the layout registry and its Ergopti extension hotstrings",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-install-layout-registry.cjs"],
+			"repro": "npm run test:linux-install-layout-registry"
+		},
+		{
+			"id": "js-0206",
+			"ordinal": 219,
+			"name": "Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-launcher-deps.cjs"],
+			"repro": "node tools/test/test-linux-launcher-deps.cjs"
+		},
+		{
+			"id": "js-0217",
+			"ordinal": 230,
+			"name": "Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-bundle-manifest.cjs"],
+			"repro": "npm run test:windows-bundle-manifest"
+		},
+		{
+			"id": "js-0263",
+			"ordinal": 276,
+			"name": "feature-state boot smoke (4 fixtures, real include graph, own process)",
+			"cmd": "node",
+			"args": ["tools/test/test-feature-state-boot-smoke.cjs"],
+			"repro": "node tools/test/test-feature-state-boot-smoke.cjs"
+		}
+	]
+}

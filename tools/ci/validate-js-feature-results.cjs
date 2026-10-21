@@ -6,6 +6,18 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { validateFeatureJournals } = require('../test/lib/js-feature-results.cjs');
+const { stageOf } = require('./js-feature-matrix.cjs');
+
+// The rendered name of each Common stage's matrix job and the step that writes
+// its feature journal: a lot runs in exactly one of them.
+const STAGE_JOBS = Object.freeze({
+	unit: { prefix: 'YAML, shared code & web / Unit tests', writer: 'Run shared validation suite' },
+	integration: {
+		prefix: 'YAML, shared code & web / Integration tests',
+		writer: 'Run shared integration suite'
+	}
+});
+const WRITERS = Object.values(STAGE_JOBS).map((stage) => stage.writer);
 
 function collectJournals(directory) {
 	const result = [];
@@ -30,7 +42,7 @@ function collectJournals(directory) {
 	return result;
 }
 
-/** Bind every actual Unit lot to its unique highest successful execution. */
+/** Bind every actual Unit and Integration lot to its unique highest successful execution. */
 function selectUnitJobs(plan, jobs, identity) {
 	const fail = (ok, message) => {
 		if (!ok) throw new Error('Common Unit admission refused: ' + message);
@@ -45,19 +57,22 @@ function selectUnitJobs(plan, jobs, identity) {
 		'invalid API identity'
 	);
 	fail(Array.isArray(jobs) && jobs.length <= 1000, 'invalid job census');
-	const prefix = 'YAML, shared code & web / Unit tests';
 	const expected = new Map(
-		Object.entries(plan.metadata).map(([lot, row]) => [prefix + ' (' + lot + ')', row])
+		Object.entries(plan.metadata).map(([lot, row]) => [
+			STAGE_JOBS[stageOf(row)].prefix + ' (' + lot + ')',
+			row
+		])
 	);
 	const ids = new Set();
 	for (const job of jobs) {
 		fail(positive(job.id) && !ids.has(String(job.id)), 'duplicate or invalid job ID');
 		ids.add(String(job.id));
 		const carriesWriter =
-			Array.isArray(job.steps) &&
-			job.steps.some((step) => step.name === 'Run shared validation suite');
-		if ((typeof job.name === 'string' && job.name.startsWith(prefix)) || carriesWriter)
-			fail(expected.has(job.name), 'foreign Unit name or writer');
+			Array.isArray(job.steps) && job.steps.some((step) => WRITERS.includes(step.name));
+		const named =
+			typeof job.name === 'string' &&
+			Object.values(STAGE_JOBS).some((stage) => job.name.startsWith(stage.prefix));
+		if (named || carriesWriter) fail(expected.has(job.name), 'foreign Unit name or writer');
 	}
 	const selected = {};
 	for (const [name, row] of expected) {
@@ -88,9 +103,14 @@ function selectUnitJobs(plan, jobs, identity) {
 					conclusion: typeof job.conclusion === 'string' ? job.conclusion.slice(0, 64) : null
 				})
 		);
+		const writer = STAGE_JOBS[stageOf(row)].writer;
 		const writers = Array.isArray(job.steps)
-			? job.steps.filter((step) => step.name === 'Run shared validation suite')
+			? job.steps.filter((step) => WRITERS.includes(step.name))
 			: [];
+		fail(
+			writers.every((step) => step.name === writer),
+			'Unit writer of another stage: ' + JSON.stringify({ lot: name, feature: row.feature })
+		);
 		fail(
 			writers.length === 1 &&
 				writers[0].status === 'completed' &&

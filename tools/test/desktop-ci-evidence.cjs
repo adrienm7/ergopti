@@ -467,9 +467,10 @@ function verify({
 	assert.ok(['windows', 'macos'].includes(platform), 'Unknown desktop platform');
 	const jobs =
 		platform === 'windows'
-			? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
+			? ['test-ahk', 'integration-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
 			: [
 					'test-hs',
+					'integration-hs',
 					'e2e-hs',
 					'package-macos',
 					'launch',

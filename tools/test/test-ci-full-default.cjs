@@ -249,10 +249,17 @@ check('every scoped full body remains owned; all other product scripts remain ex
 			source.find((entry) => entry.rel === '.github/workflows/ci-common.yml').text,
 			'.github/workflows/ci-common.yml'
 		).map((job) => job.id),
-		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
-		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
+		[
+			'shared-validation',
+			'common-integration',
+			'common-e2e',
+			'common-build',
+			'common-testbuild',
+			'common-unit-verdict'
+		],
+		'Common preserves every unit and integration lot and browser E2E before production Build and Testbuild'
 	);
-	assert.equal(jobs, 30);
+	assert.equal(jobs, 34);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
@@ -410,7 +417,8 @@ check('Unit refuses withdrawn, deferred, foreign or late human-lot selection', (
 	assert.throws(() => Full.fromFiles(changed(MAC, record, foreign)));
 });
 for (const [id, prior, predecessor, output] of [
-	['e2e-hs', 'e2e', 'test-hs', 'e2e'],
+	['integration-hs', 'integration', null, null],
+	['e2e-hs', 'e2e', 'integration-hs', 'e2e'],
 	['package-macos', 'build', null, null],
 	['launch', 'testbuild', 'package-macos', 'testbuild']
 ]) {
@@ -726,8 +734,8 @@ check('full Linux package retains cancellation and manual receiving allowance', 
 	const expression = Raw.field(Raw.job('package-linux'), 'if')
 		.slice(3, -2)
 		.replaceAll(
-			'needs.e2e-linux.outputs.ci_unit_result',
-			"needs['e2e-linux'].outputs.ci_unit_result"
+			'needs.e2e-linux.outputs.ci_integration_result',
+			"needs['e2e-linux'].outputs.ci_integration_result"
 		)
 		.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 	const evaluate = new Function('needs', 'github', 'cancelled', `return (${expression});`);
@@ -742,16 +750,16 @@ check('full Linux package retains cancellation and manual receiving allowance', 
 	]);
 	let cases = 0;
 	for (const event of ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown', null])
-		for (const unitResult of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
+		for (const integrationResult of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
 			for (const result of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
 				for (const cancelled of [false, true]) {
 					assert.equal(
 						evaluate(
-							{ 'e2e-linux': { result, outputs: { ci_unit_result: unitResult } } },
+							{ 'e2e-linux': { result, outputs: { ci_integration_result: integrationResult } } },
 							{ event_name: event },
 							() => cancelled
 						),
-						accepted.has(`${event}:${unitResult}:${result}:${cancelled}`)
+						accepted.has(`${event}:${integrationResult}:${result}:${cancelled}`)
 					);
 					cases++;
 				}
@@ -983,14 +991,14 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 			'ARM host authority wrong',
 			job.body,
 			job.body.replace(
-				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
 				'runs-on: ubuntu-latest'
 			)
 		],
 		[
 			'Intel plan absent',
 			job.body,
-			job.body.replace('needs.test-hs.outputs.e2e_matrix', 'inputs.foreign')
+			job.body.replace('needs.integration-hs.outputs.e2e_matrix', 'inputs.foreign')
 		],
 		[
 			'source runner wrong',
@@ -1016,7 +1024,7 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 			'native budget widened',
 			job.body,
 			job.body.replace(
-				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
 				'timeout-minutes: 360'
 			)
 		]

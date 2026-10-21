@@ -10,7 +10,11 @@ const { selectUnitJobs, receiveUnit } = require('../../ci/validate-js-feature-re
 /** Exercise the real admission functions without a Git, network or child-process actor. */
 async function run() {
 	let controls = 0;
-	const inventory = { digest: 'b'.repeat(64), features: ['menus', 'input'], checks: [] };
+	const inventory = {
+		digest: 'b'.repeat(64),
+		features: ['menus', 'input', 'integration-wiring'],
+		checks: []
+	};
 	const context = { source: 'a'.repeat(40), ref: 'refs/heads/feature/example' };
 	const plan = createPlan(inventory, context),
 		encoded = JSON.stringify(plan);
@@ -18,6 +22,11 @@ async function run() {
 	controls++;
 	for (const lot of plan.matrix.lot)
 		assert.deepEqual(selectPlannedLot(inventory, context, lot, encoded), plan.metadata[lot]);
+	for (const lot of plan.integration_matrix.lot)
+		assert.deepEqual(
+			selectPlannedLot(inventory, context, lot, encoded, 'integration'),
+			plan.metadata[lot]
+		);
 	controls++;
 	for (const mutate of [
 		(p) => {
@@ -31,6 +40,12 @@ async function run() {
 		},
 		(p) => {
 			p.matrix.lot.pop();
+		},
+		(p) => {
+			p.integration_matrix.lot.pop();
+		},
+		(p) => {
+			p.matrix.lot.push(p.integration_matrix.lot.pop());
 		},
 		(p) => {
 			p.metadata.Menus.feature = 'input';
@@ -63,18 +78,40 @@ async function run() {
 	);
 	controls++;
 	const identity = { head_sha: context.source, run_id: '123', run_attempt: '2' };
-	const jobs = plan.matrix.lot.map((lot, index) => ({
+	const stageJob = (stage, writer) => (lot, index) => ({
 		id: index + 1,
 		run_id: 123,
 		run_attempt: 2,
 		head_sha: context.source,
-		name: 'YAML, shared code & web / Unit tests (' + lot + ')',
+		name: 'YAML, shared code & web / ' + stage + ' (' + lot + ')',
 		status: 'completed',
 		conclusion: 'success',
-		steps: [{ name: 'Run shared validation suite', status: 'completed', conclusion: 'success' }]
-	}));
-	assert.equal(Object.keys(selectUnitJobs(plan, jobs, identity)).length, 4);
+		steps: [{ name: writer, status: 'completed', conclusion: 'success' }]
+	});
+	const jobs = [
+		...plan.matrix.lot.map(stageJob('Unit tests', 'Run shared validation suite')),
+		...plan.integration_matrix.lot
+			.map(stageJob('Integration tests', 'Run shared integration suite'))
+			.map((job, index) => ({ ...job, id: 50 + index }))
+	];
+	assert.equal(Object.keys(selectUnitJobs(plan, jobs, identity)).length, 5);
 	controls++;
+	// An Integration lot runs only as an Integration job, with its own writer.
+	{
+		const integrationAt = jobs.findIndex((job) => job.name.includes('/ Integration tests ('));
+		const asUnit = structuredClone(jobs);
+		asUnit[integrationAt].name = asUnit[integrationAt].name.replace(
+			'/ Integration tests (',
+			'/ Unit tests ('
+		);
+		assert.throws(() => selectUnitJobs(plan, asUnit, identity), /Common Unit admission refused/);
+		const unitWriter = structuredClone(jobs);
+		unitWriter[integrationAt].steps[0].name = 'Run shared validation suite';
+		assert.throws(() => selectUnitJobs(plan, unitWriter, identity), /another stage/);
+		const missing = jobs.filter((job, index) => index !== integrationAt);
+		assert.throws(() => selectUnitJobs(plan, missing, identity), /missing Unit lot/);
+		controls++;
+	}
 	const retained = structuredClone(jobs);
 	retained[0].run_attempt = 1;
 	assert.equal(selectUnitJobs(plan, retained, identity).menus.run_attempt, '1');
@@ -298,7 +335,7 @@ async function run() {
 	};
 	const admitted = await receiveUnit(inventory, actualEnv, reader(model()).readApi, null);
 	assert.equal(admitted.result, null);
-	assert.equal(Object.keys(admitted.selected).length, 4);
+	assert.equal(Object.keys(admitted.selected).length, 5);
 	controls++;
 	const singleInventory = {
 		...inventory,
@@ -357,7 +394,7 @@ async function run() {
 	assert.equal(
 		(await receiveUnit(singleInventory, actualEnv, reader(model()).readApi, evidence)).result
 			.checks,
-		2
+		3
 	);
 	controls++;
 	const stale = evidence();

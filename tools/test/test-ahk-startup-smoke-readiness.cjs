@@ -607,14 +607,11 @@ function checkObserverStageRetention(root = ROOT) {
 
 async function check(source, root = ROOT) {
 	checkStartupDiagnosticRetention();
-	const pipeline = require('./ci-pipeline.cjs').open(root);
+	const Pipeline = require('./ci-pipeline.cjs');
+	const pipeline = Pipeline.open(root);
 	const unit = pipeline.job('test-ahk');
-	const uploader = require('./ci-pipeline.cjs').step(unit, 'Publish AHK execution manifest');
-	assert.equal(require('./ci-pipeline.cjs').stepField(uploader, 'if'), 'always()');
-	assert.ok(
-		unit.indexOf(uploader) > unit.indexOf('name: Test fresh Git clone bootstrap and warm startup')
-	);
-	assert.ok(unit.indexOf(uploader) > unit.indexOf('name: Run the full-driver startup smoke'));
+	const uploader = Pipeline.step(unit, 'Publish AHK execution manifest');
+	assert.equal(Pipeline.stepField(uploader, 'if'), 'always()');
 	for (const member of [
 		'windows-ahk-execution-manifest.json',
 		'windows-ahk-suite.stdout.log',
@@ -622,12 +619,39 @@ async function check(source, root = ROOT) {
 		'windows-qualification.json',
 		'windows-ahk-isolated-*.json',
 		'ergopti-ahk-menu-lifecycle-*/**',
-		'ergopti-snapshot16-*/**',
-		'ergopti-startup-diagnostics-*/**'
+		'ergopti-snapshot16-*/**'
 	])
 		assert.ok(uploader.includes('${{ runner.temp }}/' + member));
 	assert.ok(uploader.includes('overwrite: true'));
 	assert.ok(uploader.includes('if-no-files-found: warn'));
+	// The whole-driver boots are integration tests: they run once, in their own
+	// Integration lots, and their diagnostics are retained after them even when
+	// a boot fails.
+	const integration = pipeline.job('integration-ahk');
+	for (const name of [
+		'Run the full-driver startup smoke',
+		'Test fresh Git clone bootstrap and warm startup'
+	])
+		assert.ok(
+			!Pipeline.steps(unit).some((step) => step.name === name),
+			name + ' left the unit job'
+		);
+	const diagnostics = Pipeline.step(integration, 'Publish startup diagnostics');
+	assert.equal(
+		Pipeline.stepField(diagnostics, 'if'),
+		"${{ always() && matrix.lot != 'Native cohorts and contracts' }}"
+	);
+	assert.ok(
+		integration.indexOf(diagnostics) >
+			integration.indexOf('name: Test fresh Git clone bootstrap and warm startup')
+	);
+	assert.ok(
+		integration.indexOf(diagnostics) >
+			integration.indexOf('name: Run the full-driver startup smoke')
+	);
+	assert.ok(diagnostics.includes('${{ runner.temp }}/ergopti-startup-diagnostics-*/**'));
+	assert.ok(diagnostics.includes('overwrite: true'));
+	assert.ok(diagnostics.includes('if-no-files-found: warn'));
 	checkObserverStageRetention(root);
 	const observations = [];
 	for (const scenario of [

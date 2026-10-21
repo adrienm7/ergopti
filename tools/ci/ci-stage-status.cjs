@@ -11,9 +11,19 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { loadPlan } = require('./linux-install-matrix.cjs');
 
+// Each OS lane's chain, in order: unit -> integration -> E2E -> build -> install.
 const JOBS = Object.freeze({
-	windows: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'],
-	linux: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux']
+	windows: ['test-ahk', 'integration-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'],
+	linux: ['test-linux', 'integration-linux', 'e2e-linux', 'package-linux', 'install-linux']
+});
+// The E2E link of each chain: Build admits the chain up to and including it.
+const E2E = Object.freeze({ windows: 'e2e-ahk', linux: 'e2e-linux' });
+// What a chain job forwards beyond the custody outputs. Linux E2E reports the
+// result of the integration stage it follows, which gates the manual
+// diagnostic build; Linux Build hands the install cells their authored plan.
+const EXTRA_OUTPUTS = Object.freeze({
+	'e2e-linux': ['ci_integration_result'],
+	'package-linux': ['install_matrix', 'install_metadata']
 });
 // A job that runs beside the last chain job and is needed by the same verdict:
 // the Linux Flatpak is built from the package job's bundle while the install
@@ -82,17 +92,11 @@ function context(value) {
 }
 
 /** Admit a preceding job output and return only its genuine direct needs. */
-function predecessor(job, index, platform, current) {
+function predecessor(job, name, current) {
 	keys(job, ['result', 'outputs']);
 	assert.ok(RESULTS.includes(job.result), 'Unknown scheduler result');
-	const linuxPackage = platform === 'linux' && index === 2;
-	const expected = [
-		...OUTPUTS,
-		...(platform === 'linux' && index === 1 ? ['ci_unit_result'] : []),
-		...(linuxPackage ? ['install_matrix', 'install_metadata'] : [])
-	];
-	keys(job.outputs, expected);
-	if (linuxPackage) {
+	keys(job.outputs, [...OUTPUTS, ...(EXTRA_OUTPUTS[name] ?? [])]);
+	if (name === 'package-linux') {
 		const plan = loadPlan(path.resolve(__dirname, '../..'));
 		assert.equal(
 			job.outputs.install_matrix,
@@ -116,7 +120,7 @@ function predecessor(job, index, platform, current) {
 	return record(job.outputs.ci_predecessors);
 }
 
-/** Restore the original exact four-job map from a closed adjacent chain. */
+/** Restore the original exact job map from a closed adjacent chain. */
 function collect(platform, raw, current, highest) {
 	assert.ok(Object.hasOwn(JOBS, platform), 'Unknown OS status lane');
 	context(current);
@@ -134,16 +138,16 @@ function collect(platform, raw, current, highest) {
 			keys(job.outputs, []);
 			continue;
 		}
-		direct = predecessor(job, index, platform, current);
+		direct = predecessor(job, names[index], current);
 		const attempt = Number(job.outputs.ci_attempt);
 		assert.ok(attempt <= downstreamAttempt, 'Producer lineage runs backward');
 		downstreamAttempt = attempt;
-		if (platform === 'linux' && index === 1) {
-			keys(direct, [names[0]]);
+		if (names[index] === 'e2e-linux') {
+			keys(direct, [names[index - 1]]);
 			assert.equal(
-				job.outputs.ci_unit_result,
-				direct[names[0]].result,
-				'Unit predicate differs from genuine Unit result'
+				job.outputs.ci_integration_result,
+				direct[names[index - 1]].result,
+				'Integration predicate differs from genuine Integration result'
 			);
 		}
 	}
@@ -152,9 +156,12 @@ function collect(platform, raw, current, highest) {
 
 /** Preserve the existing Linux manual diagnostic build after failed E2E. */
 function admitBuild(platform, raw, current) {
-	const result = collect(platform, raw, current, 1);
-	const [unit, e2e] = JOBS[platform];
-	assert.equal(result[unit].result, 'success', 'Unit did not succeed');
+	assert.ok(Object.hasOwn(JOBS, platform), 'Unknown OS status lane');
+	const names = JOBS[platform];
+	const e2e = E2E[platform];
+	const result = collect(platform, raw, current, names.indexOf(e2e));
+	for (const name of names.slice(0, names.indexOf(e2e)))
+		assert.equal(result[name].result, 'success', `${name} did not succeed`);
 	assert.ok(
 		result[e2e].result === 'success' ||
 			(platform === 'linux' &&
@@ -169,12 +176,13 @@ function admitBuild(platform, raw, current) {
 function complete(platform, raw, current) {
 	const names = JOBS[platform];
 	assert.ok(names, 'Unknown OS status lane');
+	const last = names.length - 1;
 	const direct = record(raw);
 	const sibling = SIBLINGS[platform];
-	keys(direct, sibling ? [names[3], sibling] : [names[3]]);
-	assert.equal(direct[names[3]].result, 'success', 'Aggregate Testbuild did not succeed');
-	const chain = JSON.stringify({ [names[3]]: direct[names[3]] });
-	const result = collect(platform, chain, current, 3);
+	keys(direct, sibling ? [names[last], sibling] : [names[last]]);
+	assert.equal(direct[names[last]].result, 'success', 'Aggregate Testbuild did not succeed');
+	const chain = JSON.stringify({ [names[last]]: direct[names[last]] });
+	const result = collect(platform, chain, current, last);
 	for (const name of names) assert.equal(result[name].result, 'success', `${name} did not succeed`);
 	if (sibling) {
 		const job = direct[sibling];
@@ -192,7 +200,7 @@ function complete(platform, raw, current) {
 		// The sibling must have consumed the very package job the install job did.
 		assert.deepEqual(
 			record(job.outputs.ci_predecessors),
-			record(direct[names[3]].outputs.ci_predecessors),
+			record(direct[names[last]].outputs.ci_predecessors),
 			'Sibling was built from a different predecessor than the install job'
 		);
 		result[sibling] = { result: job.result };
@@ -218,4 +226,4 @@ if (require.main === module) {
 	process.stdout.write(JSON.stringify(result) + '\n');
 }
 
-module.exports = { complete, admitBuild };
+module.exports = { JOBS, complete, admitBuild };

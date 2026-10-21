@@ -58,7 +58,7 @@
 		"windows-native-desktop": {
 			"kind": "command",
 			"path": ".github/workflows/ci-windows.yml",
-			"args": ["test-ahk", "Run native desktop AHK cohorts"],
+			"args": ["integration-ahk", "Run native desktop AHK cohorts"],
 			"reason": "Native desktop wrapper receiving remains failing or incomplete; desktop harness qualification is deferred. Main AHK and compiled startup remain mandatory."
 		},
 		"linux-simultaneous-native": {

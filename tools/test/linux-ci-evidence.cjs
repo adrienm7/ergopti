@@ -74,6 +74,22 @@ function validateManifest(manifest) {
 				fail(`${job}/${subject} has an invalid assertion floor`);
 			}
 		}
+		// A job whose rows record different subjects names them per row; together
+		// they are exactly the job's subjects, each recorded by one row.
+		if (contract.shard_subjects !== undefined) {
+			const rows = contract.shard_subjects;
+			const listed = Object.values(rows ?? {}).flat();
+			if (
+				!rows ||
+				Array.isArray(rows) ||
+				JSON.stringify(Object.keys(rows)) !== JSON.stringify(contract.shards ?? []) ||
+				Object.values(rows).some((subjects) => !Array.isArray(subjects) || subjects.length === 0) ||
+				new Set(listed).size !== listed.length ||
+				JSON.stringify([...listed].sort()) !== JSON.stringify(Object.keys(contract.subjects).sort())
+			) {
+				fail(`${job} declares invalid shard subjects`);
+			}
+		}
 	}
 }
 
@@ -183,6 +199,12 @@ function verifyAggregate({
 		for (const [subject, assertions] of Object.entries(document.subjects)) {
 			if (!Object.hasOwn(contract.subjects, subject)) {
 				fail(`evidence names unclassified subject ${document.job}/${subject}`);
+			}
+			if (
+				contract.shard_subjects !== undefined &&
+				!contract.shard_subjects[document.shard]?.includes(subject)
+			) {
+				fail(`${document.job} shard ${document.shard} recorded another row's subject ${subject}`);
 			}
 			const key = `${document.job}/${subject}`;
 			if (indexedEvidence.has(key) || deferredEvidence.has(key))

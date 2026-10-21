@@ -14,23 +14,27 @@ const { loadPlan } = require('../ci/linux-install-matrix.cjs');
 const installPlan = loadPlan(path.resolve(__dirname, '../..'));
 
 const current = { sourceSha: 'a'.repeat(40), runId: '123', attempt: '2', event: 'push' };
+// The chain of each lane, written here independently of the module under test.
 const names = {
-	windows: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'],
-	linux: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux']
+	windows: ['test-ahk', 'integration-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'],
+	linux: ['test-linux', 'integration-linux', 'e2e-linux', 'package-linux', 'install-linux']
 };
+// Positions of the stages in each chain.
+const I = { unit: 0, integration: 1, e2e: 2, build: 3, install: 4 };
+const LAST = I.install;
 let controls = 0;
 function run(platform, results = {}) {
 	let prior = { [names[platform][0]]: { result: results[0] || 'success', outputs: {} } };
-	for (let index = 1; index < 4; index++) {
+	for (let index = 1; index <= LAST; index++) {
 		const outputs = {
 			ci_source_sha: current.sourceSha,
 			ci_run_id: current.runId,
 			ci_attempt: '1',
 			ci_predecessors: JSON.stringify(prior)
 		};
-		if (platform === 'linux' && index === 1)
-			outputs.ci_unit_result = prior[names[platform][0]].result;
-		if (platform === 'linux' && index === 2) {
+		if (platform === 'linux' && index === I.e2e)
+			outputs.ci_integration_result = prior[names[platform][I.integration]].result;
+		if (platform === 'linux' && index === I.build) {
 			outputs.install_matrix = JSON.stringify(installPlan.matrix);
 			outputs.install_metadata = JSON.stringify(installPlan.metadata);
 		}
@@ -69,48 +73,48 @@ for (const platform of Object.keys(names)) {
 		)
 	);
 	for (const result of ['failure', 'cancelled', 'skipped', 'unknown'])
-		for (let index = 0; index < 4; index++)
+		for (let index = 0; index <= LAST; index++)
 			check(() => refuse(run(platform, { [index]: result }), platform));
 	for (const field of ['ci_source_sha', 'ci_run_id', 'ci_attempt', 'ci_predecessors']) {
 		check(() => {
 			const value = run(platform);
-			delete value[names[platform][3]].outputs[field];
+			delete value[names[platform][LAST]].outputs[field];
 			refuse(value, platform);
 		});
 	}
 	check(() => {
 		const value = run(platform);
-		value[names[platform][3]].outputs.ci_source_sha = 'b'.repeat(40);
+		value[names[platform][LAST]].outputs.ci_source_sha = 'b'.repeat(40);
 		refuse(value, platform);
 	});
 	check(() => {
 		const value = run(platform);
-		value[names[platform][3]].outputs.ci_run_id = '124';
+		value[names[platform][LAST]].outputs.ci_run_id = '124';
 		refuse(value, platform);
 	});
 	check(() => {
 		const value = run(platform);
-		value[names[platform][3]].outputs.ci_attempt = '3';
+		value[names[platform][LAST]].outputs.ci_attempt = '3';
 		refuse(value, platform);
 	});
 	check(() => {
 		const value = run(platform);
-		value[names[platform][3]].outputs.ci_predecessors = '';
+		value[names[platform][LAST]].outputs.ci_predecessors = '';
 		refuse(value, platform);
 	});
 	check(() => {
 		const value = run(platform);
-		value[names[platform][3]].outputs.ci_predecessors = '{';
+		value[names[platform][LAST]].outputs.ci_predecessors = '{';
 		refuse(value, platform);
 	});
 	check(() => {
 		const value = run(platform);
-		value[names[platform][3]].outputs.foreign = 'success';
+		value[names[platform][LAST]].outputs.foreign = 'success';
 		refuse(value, platform);
 	});
 	check(() => {
 		const value = run(platform);
-		value.foreign = value[names[platform][3]];
+		value.foreign = value[names[platform][LAST]];
 		refuse(value, platform);
 	});
 }
@@ -156,7 +160,7 @@ check(() => {
 	refuse(value, 'linux');
 });
 check(() => {
-	const value = run('linux', { 1: 'failure' });
+	const value = run('linux', { [I.e2e]: 'failure' });
 	const packageJob = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux'];
 	const beforeBuild = packageJob.outputs.ci_predecessors;
 	assert.throws(() => admitBuild('linux', beforeBuild, current));
@@ -168,10 +172,20 @@ check(() => {
 	refuse(value, 'linux', { ...current, event: 'workflow_dispatch' });
 });
 check(() => {
-	const value = run('linux', { 0: 'failure', 1: 'failure' });
+	const value = run('linux', { [I.unit]: 'failure', [I.e2e]: 'failure' });
 	const beforeBuild = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux']
 		.outputs.ci_predecessors;
 	assert.throws(() => admitBuild('linux', beforeBuild, { ...current, event: 'workflow_dispatch' }));
+});
+// A failed Integration stage admits no build, not even the manual diagnostic one.
+check(() => {
+	const value = run('linux', { [I.integration]: 'failure', [I.e2e]: 'failure' });
+	const beforeBuild = JSON.parse(value['install-linux'].outputs.ci_predecessors)['package-linux']
+		.outputs.ci_predecessors;
+	assert.throws(
+		() => admitBuild('linux', beforeBuild, { ...current, event: 'workflow_dispatch' }),
+		/integration-linux did not succeed/
+	);
 });
 check(() => {
 	const value = run('windows');
@@ -198,7 +212,7 @@ check(() => {
 	const value = run('linux');
 	const packageJob = JSON.parse(value['install-linux'].outputs.ci_predecessors);
 	const e2e = JSON.parse(packageJob['package-linux'].outputs.ci_predecessors);
-	e2e['e2e-linux'].outputs.ci_unit_result = 'failure';
+	e2e['e2e-linux'].outputs.ci_integration_result = 'failure';
 	packageJob['package-linux'].outputs.ci_predecessors = JSON.stringify(e2e);
 	value['install-linux'].outputs.ci_predecessors = JSON.stringify(packageJob);
 	refuse(value, 'linux');
@@ -229,7 +243,7 @@ check(() => {
 
 // Runtime custody receives the same full Linux plan that the Package producer emits.
 const lotControlStart = controls;
-function changeStage(value, platform, index, mutate, cursor = 3) {
+function changeStage(value, platform, index, mutate, cursor = LAST) {
 	const job = value[names[platform][cursor]];
 	if (cursor === index) mutate(job.outputs);
 	else {
@@ -486,12 +500,12 @@ assert.equal(packageMutations.length, 28, 'all whole-map transport refusals are 
 for (const [label, mutate, reason] of packageMutations)
 	check(() => {
 		const value = run('linux');
-		changeStage(value, 'linux', 2, mutate);
+		changeStage(value, 'linux', I.build, mutate);
 		assert.throws(() => complete('linux', JSON.stringify(value), current), reason, label);
 	});
 for (const platform of Object.keys(names))
-	for (let index = 0; index < 4; index++) {
-		if (platform === 'linux' && index === 2) continue;
+	for (let index = 0; index <= LAST; index++) {
+		if (platform === 'linux' && index === I.build) continue;
 		check(() => {
 			const value = run(platform);
 			changeStage(value, platform, index, (output) => {
@@ -512,7 +526,7 @@ for (const [key, value, reason] of [
 ])
 	check(() => {
 		const valueTree = run('linux');
-		changeStage(valueTree, 'linux', 2, (output) => {
+		changeStage(valueTree, 'linux', I.build, (output) => {
 			output[key] = value;
 		});
 		assert.throws(() => complete('linux', JSON.stringify(valueTree), current), reason);
@@ -520,15 +534,18 @@ for (const [key, value, reason] of [
 for (const platform of Object.keys(names)) {
 	check(() => {
 		const value = run(platform);
-		const before = JSON.parse(value[names[platform][3]].outputs.ci_predecessors)[names[platform][2]]
-			.outputs.ci_predecessors;
-		assert.equal(admitBuild(platform, before, current)[names[platform][1]].result, 'success');
+		const before = JSON.parse(value[names[platform][LAST]].outputs.ci_predecessors)[
+			names[platform][I.build]
+		].outputs.ci_predecessors;
+		const admitted = admitBuild(platform, before, current);
+		assert.deepEqual(Object.keys(admitted), names[platform].slice(0, I.e2e + 1));
+		assert.equal(admitted[names[platform][I.e2e]].result, 'success');
 	});
 	for (const result of ['cancelled', 'skipped'])
 		check(() => {
-			const value = run(platform, { 1: result });
-			const before = JSON.parse(value[names[platform][3]].outputs.ci_predecessors)[
-				names[platform][2]
+			const value = run(platform, { [I.e2e]: result });
+			const before = JSON.parse(value[names[platform][LAST]].outputs.ci_predecessors)[
+				names[platform][I.build]
 			].outputs.ci_predecessors;
 			assert.throws(
 				() => admitBuild(platform, before, { ...current, event: 'workflow_dispatch' }),
@@ -538,22 +555,22 @@ for (const platform of Object.keys(names)) {
 }
 assert.equal(
 	controls - lotControlStart,
-	45,
+	47,
 	'all Package transport and preserved selective admission controls execute'
 );
 
 // The source predicate consumes genuine outputs, never a modeled success flag.
 const root = path.resolve(__dirname, '../..');
 function validateWorkflow(platform, workflow) {
-	for (let index = 1; index < 4; index++) {
+	for (let index = 1; index <= LAST; index++) {
 		const job = workflow.jobs[names[platform][index]];
 		assert.deepEqual(job.needs, [names[platform][index - 1]]);
 		assert.deepEqual(
 			Object.keys(job.outputs).sort(),
 			[
 				...['ci_attempt', 'ci_predecessors', 'ci_run_id', 'ci_source_sha'],
-				...(platform === 'linux' && index === 1 ? ['ci_unit_result'] : []),
-				...(platform === 'linux' && index === 2 ? ['install_matrix', 'install_metadata'] : [])
+				...(platform === 'linux' && index === I.e2e ? ['ci_integration_result'] : []),
+				...(platform === 'linux' && index === I.build ? ['install_matrix', 'install_metadata'] : [])
 			].sort()
 		);
 		assert.equal(job.outputs.ci_predecessors, '${{ toJSON(needs) }}');
@@ -564,7 +581,7 @@ function validateWorkflow(platform, workflow) {
 	const verdict = workflow.jobs[platform + '-ok'];
 	assert.deepEqual(
 		verdict.needs,
-		platform === 'linux' ? [names[platform][3], 'package-flatpak'] : [names[platform][3]]
+		platform === 'linux' ? [names[platform][LAST], 'package-flatpak'] : [names[platform][LAST]]
 	);
 	assert.equal(verdict.if, 'always()');
 	assert.ok(
@@ -572,7 +589,7 @@ function validateWorkflow(platform, workflow) {
 			(step.run || '').includes('ci-stage-status.cjs complete ' + platform)
 		)
 	);
-	const build = workflow.jobs[names[platform][2]];
+	const build = workflow.jobs[names[platform][I.build]];
 	assert.ok(
 		build.steps.some(
 			(step) =>
@@ -608,12 +625,12 @@ function validateWorkflow(platform, workflow) {
 			'Linux Build must forward the actual complete install metadata'
 		);
 		assert.equal(
-			workflow.jobs['e2e-linux'].outputs.ci_unit_result,
-			'${{ needs.test-linux.result }}'
+			workflow.jobs['e2e-linux'].outputs.ci_integration_result,
+			'${{ needs.integration-linux.result }}'
 		);
 		assert.equal(
 			build.if,
-			"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+			"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 		);
 	}
 }
@@ -628,10 +645,10 @@ for (const platform of Object.keys(names)) {
 			value.jobs[names[platform][1]].outputs.ci_predecessors = '{"success":true}';
 		},
 		(value) => {
-			value.jobs[names[platform][2]].needs.push(names[platform][0]);
+			value.jobs[names[platform][I.e2e]].needs.push(names[platform][I.unit]);
 		},
 		(value) => {
-			value.jobs[names[platform][3]].outputs.ci_source_sha = 'a'.repeat(40);
+			value.jobs[names[platform][LAST]].outputs.ci_source_sha = 'a'.repeat(40);
 		},
 		(value) => {
 			value.jobs[names[platform][1]].outputs.ci_run_id = '123';
@@ -640,9 +657,9 @@ for (const platform of Object.keys(names)) {
 			value.jobs[platform + '-ok'].if = 'success()';
 		},
 		(value) => {
-			value.jobs[names[platform][2]].steps = value.jobs[names[platform][2]].steps.filter(
-				(step) => !String(step.run).includes('ci-stage-status.cjs admit-build')
-			);
+			value.jobs[names[platform][I.build]].steps = value.jobs[
+				names[platform][I.build]
+			].steps.filter((step) => !String(step.run).includes('ci-stage-status.cjs admit-build'));
 		}
 	])
 		check(() => {
@@ -673,7 +690,7 @@ for (const platform of Object.keys(names)) {
 	if (platform === 'linux')
 		check(() => {
 			const changed = structuredClone(workflow);
-			changed.jobs['e2e-linux'].outputs.ci_unit_result = 'success';
+			changed.jobs['e2e-linux'].outputs.ci_integration_result = 'success';
 			assert.throws(() => validateWorkflow(platform, changed));
 		});
 	if (platform === 'linux') {

@@ -13,6 +13,20 @@
 				"unit-ui": 1
 			}
 		},
+		"integration-linux": {
+			"classification": "mandatory",
+			"shards": ["driver", "native"],
+			"shard_subjects": {
+				"driver": ["integration-driver"],
+				"native": ["native-metrics-equivalence", "native-histogram-multiplicity", "native-xi2-abi"]
+			},
+			"subjects": {
+				"integration-driver": 1,
+				"native-metrics-equivalence": 1,
+				"native-histogram-multiplicity": 1,
+				"native-xi2-abi": 1
+			}
+		},
 		"e2e-linux": {
 			"classification": "mandatory",
 			"shards": ["input-display", "desktop-webview", "updater", "network-ai", "platform-metrics"],

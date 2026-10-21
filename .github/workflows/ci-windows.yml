@@ -1,14 +1,14 @@
 # .github/workflows/ci-windows.yml
 #
-# Windows lane: independent unit/E2E suites, followed by packaging, installed
-# launch and the strict verdict. Every stage is a job of this workflow, so
+# Windows lane: unit tests, then integration tests, then the E2E corpus,
+# followed by packaging, installed launch and the strict verdict. Every stage is a job of this workflow, so
 # GitHub renders it in two levels, "Windows / <Stage> (<subject>)": the unit
 # matrix keeps the static name "Unit tests" and GitHub appends its category.
-# The two suites have independent runtimes and fresh checkouts. Packaging never
+# The three test stages have independent runtimes and fresh checkouts. Packaging never
 # consumes their generated caches. Every run compiles the application; release
 # runs additionally sign it. The launch job downloads assets-windows and runs
 # that exact executable on a fresh host with its normal Defender settings.
-# The verdict requires all four jobs and a successful launch of this commit.
+# The verdict requires all five jobs and a successful launch of this commit.
 # Parent ci.yml owns concurrency; this workflow must not cancel its caller.
 
 name: Windows
@@ -211,10 +211,6 @@ jobs:
         run: npm run build:manifest
         shell: pwsh
 
-      - name: Manifest parity (AHK ↔ HS codegen equivalence)
-        run: npm run test:manifest-parity
-        shell: pwsh
-
       - name: Download AutoHotkey v2 runtime
         if: steps.cache-ahk.outputs.cache-hit != 'true'
         shell: pwsh
@@ -275,113 +271,6 @@ jobs:
         shell: pwsh
         timeout-minutes: 3
         run: ./tools/test/install-ci-kana-layout.ps1
-
-      - name: Receive managed Ollama file component
-        shell: pwsh
-        timeout-minutes: 5
-        run: |
-          $evidence = Join-Path $env:RUNNER_TEMP 'windows-ollama-file-component'
-          if (Test-Path -LiteralPath $evidence) { throw 'File component evidence already exists.' }
-          $null = New-Item -ItemType Directory -Path $evidence
-          $root = '${{ github.workspace }}'
-          $modelsOut = Join-Path $evidence 'models.stdout'
-          $modelsErr = Join-Path $evidence 'models.stderr'
-          node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr
-          $modelsExit = $LASTEXITCODE
-          Get-Content -LiteralPath $modelsOut
-          # The failing assertion is on stderr; print it so the job log names the cause.
-          if ($modelsExit -ne 0) { Get-Content -LiteralPath $modelsErr }
-          if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }
-          $windowsPowerShellDirectory = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
-          $oldModulePath = $env:PSModulePath
-          try {
-              $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
-              $out = Join-Path $evidence 'native.stdout'
-              $err = Join-Path $evidence 'native.stderr'
-              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_install_files.ps1" 1> $out 2> $err
-              $nativeExit = $LASTEXITCODE
-              $stdout = [IO.File]::ReadAllText($out)
-              $stderr = [IO.File]::ReadAllText($err)
-              Write-Host $stdout
-              $testRoot = [regex]::Match($stdout, '(?m)^Evidence root: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
-              $sourceRoot = [regex]::Match($stdout, '(?m)^Independent source receipts: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
-              if ((Split-Path $testRoot -Parent) -cne [Environment]::GetFolderPath('LocalApplicationData') -or
-                  (Split-Path $testRoot -Leaf) -cnotmatch '^ergopti-ollama-test-[0-9a-f]{32}$' -or
-                  (Split-Path $sourceRoot -Parent).TrimEnd('\') -ine ([IO.Path]::GetTempPath()).TrimEnd('\') -or
-                  (Split-Path $sourceRoot -Leaf) -cne ('ergopti-ollama-source-' + (Split-Path $testRoot -Leaf).Substring(20)) -or
-                  -not (Test-Path -LiteralPath $testRoot -PathType Container) -or
-                  -not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
-                  throw 'Native file component evidence root binding refused.'
-              }
-              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_TEST_ROOT=$testRoot"
-              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_SOURCE_ROOT=$sourceRoot"
-              if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or
-                  @($stdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 31 -or
-                  $stdout -cnotmatch '(?m)^RESULT passed=31 failed=0 skipped=0\r?$') {
-                  throw 'Exact native file component acceptance refused; raw evidence retained.'
-              }
-              [ordered]@{ schema = 1; source_sha = '${{ github.sha }}'; native_exit = $nativeExit;
-                  passed = 31; failed = 0; skipped = 0; native_file_component = $true;
-                  acquisition_qualified = $false; runtime_executed = $false } |
-                  ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding utf8
-          } finally { $env:PSModulePath = $oldModulePath }
-
-      - name: Retain managed Ollama file component evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
-          path: |
-            ${{ runner.temp }}/windows-ollama-file-component/
-          if-no-files-found: error
-
-      - name: Retain exact managed Ollama file roots
-        if: ${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
-          path: |
-            ${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/
-            ${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/
-          if-no-files-found: error
-
-      # Fail fast on the short native cohorts before the long canonical suite.
-      # Their receipt/upload owners remain adjacent and run even on failure.
-      - name: Run native desktop AHK cohorts
-        shell: pwsh
-        timeout-minutes: 25
-        run: |
-          $receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'
-          node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --receipt $receipt
-          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }
-          $mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt
-          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }
-          if ($mode -ceq 'deferred') {
-              Write-Host '[DEFERRED] windows-native-desktop: qualified=false; no desktop cohort executed.'
-          } elseif ($mode -ceq 'full') {
-              ./tools/test/run-windows-native-desktop.ps1
-          } else {
-              throw 'Invalid native desktop qualification disposition.'
-          }
-
-      - name: Retain the source-bound Windows qualification receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: assets-qualification-windows-${{ matrix.module }}
-          path: ${{ runner.temp }}/stable-windows-native-desktop.json
-          if-no-files-found: warn
-
-      - name: Publish native desktop AHK evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: windows-ahk-native-desktop-${{ matrix.module }}
-          path: |
-            ${{ runner.temp }}/windows-ahk-native-desktop/
-            ${{ runner.temp }}/stable-windows-native-desktop.json
-          if-no-files-found: error
 
       - name: Run AHK test suite
         shell: pwsh
@@ -563,36 +452,6 @@ jobs:
           }
           Write-Host "No AHK compiler warnings."
 
-      # hardening-a-startup-zero-error: the real ErgoptiPlus.ahk auto-execute
-      # path, booted over a fresh folder, the neutral defaults and config.toml
-      # files older releases wrote, must reach ready with no ERROR logged. The
-      # JS suite runs on Linux, where this smoke can only skip, so it runs here.
-      - name: Run the full-driver startup smoke
-        # Whole-driver gates, not module tests: one module runner owns them.
-        if: matrix.module == 'hotstrings-shortcuts'
-        shell: pwsh
-        timeout-minutes: 20
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
-          $env:ERGOPTI_AHK_EXE = $ahk
-          node tools/test/test-ahk-full-startup-smoke.cjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Test fresh Git clone bootstrap and warm startup
-        # Whole-driver gates, not module tests: one module runner owns them.
-        if: matrix.module == 'hotstrings-shortcuts'
-        shell: pwsh
-        timeout-minutes: 24
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          if (-not $ahk) { throw "AutoHotkey64.exe not found." }
-          $env:ERGOPTI_AHK_EXE = $ahk
-          node tools/test/test-ahk-fresh-clone-startup.cjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       - name: Publish AHK execution manifest
         if: always()
         uses: actions/upload-artifact@v4
@@ -607,12 +466,284 @@ jobs:
             ${{ runner.temp }}/windows-ahk-isolated-*.json
             ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
             ${{ runner.temp }}/ergopti-snapshot16-*/**
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────
+  # 2) Integration tests: the whole driver, native cohorts and real files
+  # ─────────────────────────────────────────────────
+  # The checks that exercise several real parts together, once per run instead
+  # of once per unit category: the real ErgoptiPlus.ahk boot to ready, a fresh
+  # Git clone bootstrapped and restarted warm, the native desktop cohorts that
+  # drive the real keyboard hook, the managed Ollama install files written to
+  # real folders, and the AHK and Hammerspoon manifest codegen compared on the
+  # same generated manifest. One lot per slow subject, so the column waits on
+  # the longest of them rather than their sum.
+  integration-ahk:
+    name: 'Integration tests'
+    needs: [test-ahk]
+    runs-on: windows-latest
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+    strategy:
+      fail-fast: false
+      matrix:
+        lot: [Driver startup, Fresh clone bootstrap, Native cohorts and contracts]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Prepare native PAC source generator
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The same evaluator build the unit runners share, read from their cache
+      # under the same exact-input key and rebuilt only on a miss.
+      - name: Identify the native PAC toolchain
+        id: native-pac-inputs
+        shell: pwsh
+        run: |
+          if (-not $env:ImageOS -or -not $env:ImageVersion) { throw 'The runner image identity is unavailable.' }
+          $python = (python -c 'import sys; print(sys.version.split()[0])')
+          if ($LASTEXITCODE -ne 0 -or -not $python) { throw 'The PAC source generator Python is unavailable.' }
+          "toolchain=$env:ImageOS-$env:ImageVersion-python$python" >> $env:GITHUB_OUTPUT
+
+      - name: Restore the native PAC evaluator built from these exact inputs
+        id: native-pac-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/native/network/**', 'static/ergopti_plus/_shared/modules/network/pac_helpers.js', 'static/ergopti_plus/_shared/modules/network/proxy_policy.json', 'static/ergopti_plus/_shared/modules/updater/defaults.json', 'static/ergopti_plus/_shared/data/linux_native_runtime.json') }}
+
+      - name: Build and test native full-URL PAC evaluator
+        if: steps.native-pac-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./tools/build/build_windows_network_pac.ps1 -Publish
+
+      - name: Read AutoHotkey runtime contract
+        id: ahk-contract
+        shell: pwsh
+        run: |
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
+          "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
+          "sha256=$($contract.runtime.sha256)" >> $env:GITHUB_OUTPUT
+
+      - name: Cache AutoHotkey runtime
+        id: cache-ahk
+        uses: actions/cache@v4
+        with:
+          path: C:\AutoHotkey
+          key: ahk-${{ steps.ahk-contract.outputs.version }}-${{ steps.ahk-contract.outputs.sha256 }}-windows
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+        shell: pwsh
+
+      - name: Build features manifest
+        run: npm run build:manifest
+        shell: pwsh
+
+      - name: Download AutoHotkey v2 runtime
+        if: steps.cache-ahk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+              -Uri "${{ steps.ahk-contract.outputs.url }}" `
+              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          $actual = (Get-FileHash -LiteralPath "$env:TEMP\AHK.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne "${{ steps.ahk-contract.outputs.sha256 }}") {
+              throw "AutoHotkey v${{ steps.ahk-contract.outputs.version }} archive digest mismatch: $actual"
+          }
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+
+      - name: Disable Windows Defender real-time scanning for AHK tests
+        shell: pwsh
+        run: |
+          # The same exclusions as the unit runners: Defender scan locks on the
+          # files the driver and the cohorts write stall their watchdogs.
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
+          Write-Host "Defender exclusions applied."
+
+      - name: Install the shipped Kana layout for real probes
+        if: matrix.lot == 'Native cohorts and contracts'
+        shell: pwsh
+        timeout-minutes: 3
+        run: ./tools/test/install-ci-kana-layout.ps1
+
+      - name: Manifest parity (AHK ↔ HS codegen equivalence)
+        if: matrix.lot == 'Native cohorts and contracts'
+        run: npm run test:manifest-parity
+        shell: pwsh
+
+      - name: Receive managed Ollama file component
+        if: matrix.lot == 'Native cohorts and contracts'
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-ollama-file-component'
+          if (Test-Path -LiteralPath $evidence) { throw 'File component evidence already exists.' }
+          $null = New-Item -ItemType Directory -Path $evidence
+          $root = '${{ github.workspace }}'
+          $modelsOut = Join-Path $evidence 'models.stdout'
+          $modelsErr = Join-Path $evidence 'models.stderr'
+          node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr
+          $modelsExit = $LASTEXITCODE
+          Get-Content -LiteralPath $modelsOut
+          # The failing assertion is on stderr; print it so the job log names the cause.
+          if ($modelsExit -ne 0) { Get-Content -LiteralPath $modelsErr }
+          if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }
+          $windowsPowerShellDirectory = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
+          $oldModulePath = $env:PSModulePath
+          try {
+              $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
+              $out = Join-Path $evidence 'native.stdout'
+              $err = Join-Path $evidence 'native.stderr'
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_install_files.ps1" 1> $out 2> $err
+              $nativeExit = $LASTEXITCODE
+              $stdout = [IO.File]::ReadAllText($out)
+              $stderr = [IO.File]::ReadAllText($err)
+              Write-Host $stdout
+              $testRoot = [regex]::Match($stdout, '(?m)^Evidence root: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              $sourceRoot = [regex]::Match($stdout, '(?m)^Independent source receipts: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              if ((Split-Path $testRoot -Parent) -cne [Environment]::GetFolderPath('LocalApplicationData') -or
+                  (Split-Path $testRoot -Leaf) -cnotmatch '^ergopti-ollama-test-[0-9a-f]{32}$' -or
+                  (Split-Path $sourceRoot -Parent).TrimEnd('\') -ine ([IO.Path]::GetTempPath()).TrimEnd('\') -or
+                  (Split-Path $sourceRoot -Leaf) -cne ('ergopti-ollama-source-' + (Split-Path $testRoot -Leaf).Substring(20)) -or
+                  -not (Test-Path -LiteralPath $testRoot -PathType Container) -or
+                  -not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+                  throw 'Native file component evidence root binding refused.'
+              }
+              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_TEST_ROOT=$testRoot"
+              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_SOURCE_ROOT=$sourceRoot"
+              if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or
+                  @($stdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 31 -or
+                  $stdout -cnotmatch '(?m)^RESULT passed=31 failed=0 skipped=0\r?$') {
+                  throw 'Exact native file component acceptance refused; raw evidence retained.'
+              }
+              [ordered]@{ schema = 1; source_sha = '${{ github.sha }}'; native_exit = $nativeExit;
+                  passed = 31; failed = 0; skipped = 0; native_file_component = $true;
+                  acquisition_qualified = $false; runtime_executed = $false } |
+                  ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding utf8
+          } finally { $env:PSModulePath = $oldModulePath }
+
+      - name: Retain managed Ollama file component evidence
+        if: ${{ always() && matrix.lot == 'Native cohorts and contracts' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/windows-ollama-file-component/
+          if-no-files-found: error
+
+      - name: Retain exact managed Ollama file roots
+        if: ${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' && matrix.lot == 'Native cohorts and contracts' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/
+            ${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/
+          if-no-files-found: error
+
+      # The receipt and evidence owners stay adjacent and run even on failure.
+      - name: Run native desktop AHK cohorts
+        if: matrix.lot == 'Native cohorts and contracts'
+        shell: pwsh
+        timeout-minutes: 25
+        run: |
+          $receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'
+          node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }
+          $mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }
+          if ($mode -ceq 'deferred') {
+              Write-Host '[DEFERRED] windows-native-desktop: qualified=false; no desktop cohort executed.'
+          } elseif ($mode -ceq 'full') {
+              ./tools/test/run-windows-native-desktop.ps1
+          } else {
+              throw 'Invalid native desktop qualification disposition.'
+          }
+
+      - name: Retain the source-bound Windows qualification receipt
+        if: ${{ always() && matrix.lot == 'Native cohorts and contracts' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-windows-native-desktop
+          path: ${{ runner.temp }}/stable-windows-native-desktop.json
+          if-no-files-found: warn
+
+      - name: Publish native desktop AHK evidence
+        if: ${{ always() && matrix.lot == 'Native cohorts and contracts' }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: windows-ahk-native-desktop
+          path: |
+            ${{ runner.temp }}/windows-ahk-native-desktop/
+            ${{ runner.temp }}/stable-windows-native-desktop.json
+          if-no-files-found: error
+
+      # hardening-a-startup-zero-error: the real ErgoptiPlus.ahk auto-execute
+      # path, booted over a fresh folder, the neutral defaults and config.toml
+      # files older releases wrote, must reach ready with no ERROR logged. The
+      # JS suite runs on Linux, where this smoke can only skip, so it runs here.
+      - name: Run the full-driver startup smoke
+        if: matrix.lot == 'Driver startup'
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $env:ERGOPTI_AHK_EXE = $ahk
+          node tools/test/test-ahk-full-startup-smoke.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test fresh Git clone bootstrap and warm startup
+        if: matrix.lot == 'Fresh clone bootstrap'
+        shell: pwsh
+        timeout-minutes: 24
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { throw "AutoHotkey64.exe not found." }
+          $env:ERGOPTI_AHK_EXE = $ahk
+          node tools/test/test-ahk-fresh-clone-startup.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish startup diagnostics
+        if: ${{ always() && matrix.lot != 'Native cohorts and contracts' }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: windows-ahk-startup-diagnostics-${{ matrix.lot }}
+          path: |
             ${{ runner.temp }}/ergopti-startup-diagnostics-*/**
           if-no-files-found: warn
 
   e2e-ahk:
     name: 'E2E tests (Engine E2E corpus)'
-    needs: [test-ahk]
+    needs: [integration-ahk]
     runs-on: windows-latest
     outputs:
       ci_predecessors: ${{ toJSON(needs) }}

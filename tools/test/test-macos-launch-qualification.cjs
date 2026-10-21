@@ -242,6 +242,7 @@ try {
 		needs: Object.fromEntries(
 			[
 				'test-hs',
+				'integration-hs',
 				'e2e-hs',
 				'package-macos',
 				'launch',

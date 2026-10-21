@@ -7,11 +7,11 @@
 # names its subject in parentheses. One lane with one entry job and one exit
 # job:
 #
-#   unit tests -> E2E tests (5) -> package -> install and launch (17) -> verdict
-#                 domain rows                 5 archive installs     (evidence gate)
-#                                             9 first installs
-#                                             3 package runs
-#                                  \-> Flatpak (parallel to install and launch)
+#   unit tests -> integration tests -> E2E tests (5) -> package -> install and launch (17) -> verdict
+#                 driver and native     domain rows                 5 archive installs     (evidence gate)
+#                                                                   9 first installs
+#                                                                   3 package runs
+#                                                        \-> Flatpak (parallel to install and launch)
 #
 # The E2E column is one matrix job (e2e-linux) whose rows split its harnesses by
 # domain; tools/test/fixtures/linux-e2e-shards.json assigns each step to one
@@ -84,9 +84,8 @@ jobs:
   # One row per domain group of static/ergopti_plus/linux/tests/support/
   # module_groups.lua (run.lua --module=<group>); the groups partition the
   # suite, so the rows together run every test module exactly once. The list
-  # below must equal those groups, in order (test-linux-ci-evidence.cjs). The
-  # native qualifications that are not part of the Lua suite run once, in the
-  # meta row.
+  # below must equal those groups, in order, except the integration group,
+  # which the Integration stage runs (test-linux-ci-evidence.cjs).
   test-linux:
     name: 'Unit tests'
     runs-on: ubuntu-latest
@@ -106,14 +105,6 @@ jobs:
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv lua-filesystem sqlite3
           luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
-
-      - name: Verify native metrics aggregation equivalence
-        if: matrix.group == 'meta'
-        run: python3 tools/test/test-linux-metrics-aggregation-native.py
-
-      - name: Verify native cross-driver histogram multiplicity
-        if: matrix.group == 'meta'
-        run: python3 tools/test/test-metrics-histogram-native.py
 
       - name: Run the driver unit test suite
         working-directory: static/ergopti_plus/linux
@@ -157,28 +148,6 @@ jobs:
         if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
         shell: bash
         run: node tools/test/linux-unit-failure-excerpt.cjs "$RUNNER_TEMP/linux-unit.log"
-
-      # This external acceptance is deliberate manual validation, separate from
-      # the frozen prerequisite gate and every package/installed-driver subject.
-      - name: Run manual official runtime and model acceptance
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'meta' }}
-        run: |
-          set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd
-          python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
-            --repository "$GITHUB_WORKSPACE" \
-            --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
-            --lua luajit
-        timeout-minutes: 18
-
-      - name: Upload manual runtime acceptance evidence
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'meta' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ollama-runtime-acceptance-linux
-          retention-days: 7
-          path: ${{ runner.temp }}/ollama-runtime-acceptance/ollama-runtime-acceptance.json
-          if-no-files-found: error
 
       # Timing JSON is best-effort diagnostics; deferred or interrupted runs may have no file.
       - name: Retain Linux Lua timing diagnostics
@@ -232,11 +201,89 @@ jobs:
           path: ${{ runner.temp }}/stable-linux-unit-suite.json
           if-no-files-found: warn
 
+  # ─────────────────────────────────────────────────
+  # 2) Integration tests: real module wiring and native equivalence
+  # ─────────────────────────────────────────────────
+  # driver runs the integration group of module_groups.lua (run.lua
+  # --module=integration), which no unit row runs: the daemon entry point as a
+  # child process, the real tap-hold stack on the shipped defaults, the real
+  # sqlite3, real files, real signals and timers. native runs the equivalence
+  # of the native metrics aggregation and histograms, the actual LuaJIT XI2 ABI
+  # against a real libXi under Xvfb and, on a manual dispatch, the official
+  # runtime and model acceptance. Each row records its evidence; linux-ok
+  # requires both rows.
+  integration-linux:
+    name: 'Integration tests'
+    needs: [test-linux]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [driver, native]
+    env:
+      LINUX_INTEGRATION_GROUP: ${{ matrix.group }}
+    outputs:
+      ci_predecessors: ${{ toJSON(needs) }}
+      ci_source_sha: ${{ github.sha }}
+      ci_run_id: ${{ github.run_id }}
+      ci_attempt: ${{ github.run_attempt }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT and native event dependencies
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv lua-filesystem sqlite3
+          luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
+
+      - name: Verify native metrics aggregation equivalence
+        if: matrix.group == 'native'
+        run: python3 tools/test/test-linux-metrics-aggregation-native.py
+
+      - name: Verify native cross-driver histogram multiplicity
+        if: matrix.group == 'native'
+        run: python3 tools/test/test-metrics-histogram-native.py
+
+      - name: Run the driver integration tests
+        if: matrix.group == 'driver'
+        working-directory: static/ergopti_plus/linux
+        id: linux_integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua --module=integration 2>&1 | tee "$RUNNER_TEMP/linux-integration.log"
+          integration_pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          if [ "${integration_pipeline_status[0]}" -ne 0 ]; then exit "${integration_pipeline_status[0]}"; fi
+          exit "${integration_pipeline_status[1]}"
+
+      - name: Upload failed integration log
+        if: ${{ failure() && !cancelled() && steps.linux_integration.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-integration-failure-log-${{ matrix.group }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/linux-integration.log
+            ${{ runner.temp }}/linux-lua.json
+          if-no-files-found: error
+
+      # Timing JSON is best-effort diagnostics; interrupted runs may have no file.
+      - name: Retain integration Lua timing diagnostics
+        if: ${{ !cancelled() && matrix.group == 'driver' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-timings-linux-integration-${{ matrix.group }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/linux-lua.json
+          if-no-files-found: warn
+          retention-days: 7
+
       # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.
       # The child-local libXi projection grants no installed runtime or input epoch.
       - name: Qualify actual LuaJIT XI2 ABI and property cookies
         id: native_xi2_luajit
-        if: ${{ !cancelled() && matrix.group == 'meta' }}
+        if: ${{ !cancelled() && matrix.group == 'native' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -246,7 +293,7 @@ jobs:
         timeout-minutes: 7
 
       - name: Retain actual LuaJIT XI2 diagnostic evidence
-        if: ${{ always() && matrix.group == 'meta' }}
+        if: ${{ always() && matrix.group == 'native' }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}
@@ -261,9 +308,60 @@ jobs:
             ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr
           if-no-files-found: error
 
+      # This external acceptance is deliberate manual validation, separate from
+      # the frozen prerequisite gate and every package/installed-driver subject.
+      - name: Run manual official runtime and model acceptance
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'native' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd
+          python3 static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py \
+            --repository "$GITHUB_WORKSPACE" \
+            --evidence "$RUNNER_TEMP/ollama-runtime-acceptance" \
+            --lua luajit
+        timeout-minutes: 18
+
+      - name: Upload manual runtime acceptance evidence
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'native' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-runtime-acceptance-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/ollama-runtime-acceptance/ollama-runtime-acceptance.json
+          if-no-files-found: error
+
+      - name: Record mandatory integration evidence
+        run: |
+          set -euo pipefail
+          if [ "$LINUX_INTEGRATION_GROUP" = driver ]; then
+              integration_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
+              subjects=(--subject "integration-driver=$integration_assertions")
+          else
+              subjects=(--subject native-metrics-equivalence=1 --subject native-histogram-multiplicity=1 --subject native-xi2-abi=1)
+          fi
+          node tools/test/linux-ci-evidence.cjs record \
+              --job integration-linux \
+              --shard "$LINUX_INTEGRATION_GROUP" \
+              --output "$RUNNER_TEMP/linux-ci-evidence/integration-linux-$LINUX_INTEGRATION_GROUP.json" \
+              --sha "$GITHUB_SHA" \
+              --architecture "$RUNNER_ARCH" \
+              --distro ubuntu \
+              --session x11-wayland-headless \
+              --interpreter "$(luajit -v 2>&1 | head -1)" \
+              "${subjects[@]}"
+
+      - name: Upload mandatory integration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: linux-ci-evidence-integration-linux-${{ matrix.group }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/integration-linux-${{ matrix.group }}.json
+          if-no-files-found: error
+
   e2e-linux:
     name: 'E2E tests'
-    needs: [test-linux]
+    needs: [integration-linux]
     runs-on: ubuntu-latest
     # One row per domain, listed in tools/test/fixtures/linux-e2e-shards.json.
     # Every harness step runs in exactly one row (its if: names the row); the
@@ -288,7 +386,7 @@ jobs:
       ci_source_sha: ${{ github.sha }}
       ci_run_id: ${{ github.run_id }}
       ci_attempt: ${{ github.run_attempt }}
-      ci_unit_result: ${{ needs.test-linux.result }}
+      ci_integration_result: ${{ needs.integration-linux.result }}
 
     steps:
       - uses: actions/checkout@v4
@@ -3597,7 +3695,7 @@ jobs:
     name: 'Build (.deb, .rpm, AppImage and archive)'
     runs-on: ubuntu-latest
     needs: [e2e-linux]
-    if: ${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
+    if: ${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}

@@ -56,7 +56,7 @@ concurrency:
 
 jobs:
   prepare-common:
-    name: 'Check formatting and plan unit tests'
+    name: 'Check formatting and plan shared tests'
     runs-on: ubuntu-latest
     outputs:
       plan: ${{ steps.plan.outputs.plan }}

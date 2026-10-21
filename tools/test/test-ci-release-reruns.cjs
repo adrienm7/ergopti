@@ -906,7 +906,7 @@ function uploadPaths(stepBody) {
 function assertMacLotSource(job) {
 	const stage = job.id === 'launch' ? 'testbuild' : job.id === 'e2e-hs' ? 'e2e' : null;
 	assert.ok(stage, 'Only genuine Mac matrix stage owners may select metadata.');
-	const predecessor = stage === 'e2e' ? 'test-hs' : 'package-macos';
+	const predecessor = stage === 'e2e' ? 'integration-hs' : 'package-macos';
 	const matrixOutput = stage + '_matrix';
 	const metadataOutput = stage + '_metadata';
 	const map = 'needs.' + predecessor + '.outputs.' + metadataOutput;
@@ -1061,7 +1061,9 @@ function uploadedLayout(channel) {
 						)
 					);
 					assert(
-						job.body.includes('      matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}')
+						job.body.includes(
+							'      matrix: ${{ fromJSON(needs.integration-hs.outputs.e2e_matrix) }}'
+						)
 					);
 					// The real matrix uploads each archive alone: both artifact roots are
 					// its filename. Independent filenames model these two actual legs.

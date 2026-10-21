@@ -196,7 +196,7 @@
 		},
 		{
 			"file": ".github/workflows/ci-windows.yml",
-			"job": "test-ahk",
+			"job": "integration-ahk",
 			"step": "Run native desktop AHK cohorts",
 			"protocol": 6
 		},
@@ -1177,10 +1177,10 @@
 		},
 		{
 			"file": ".github/workflows/ci-windows.yml",
-			"job": "test-ahk",
+			"job": "integration-ahk",
 			"name": "Retain the source-bound Windows qualification receipt",
-			"condition": "always()",
-			"body": "      - name: Retain the source-bound Windows qualification receipt\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-windows-${{ matrix.module }}\n          path: ${{ runner.temp }}/stable-windows-native-desktop.json\n          if-no-files-found: warn"
+			"condition": "${{ always() && matrix.lot == 'Native cohorts and contracts' }}",
+			"body": "      - name: Retain the source-bound Windows qualification receipt\n        if: ${{ always() && matrix.lot == 'Native cohorts and contracts' }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-windows-native-desktop\n          path: ${{ runner.temp }}/stable-windows-native-desktop.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",

@@ -43,14 +43,6 @@
 			"repro": "node tools/test/test-package-builds-stamp-commit.cjs"
 		},
 		{
-			"id": "js-0099",
-			"ordinal": 111,
-			"name": "Linux install.sh leaves a working first install (sandboxed real run)",
-			"cmd": "node",
-			"args": ["tools/test/test-linux-install-sandbox.cjs"],
-			"repro": "node tools/test/test-linux-install-sandbox.cjs"
-		},
-		{
 			"id": "js-0100",
 			"ordinal": 112,
 			"name": "Linux native packages provision graphical input access",
@@ -65,14 +57,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-start-at-login.cjs"],
 			"repro": "npm run test:linux-start-at-login"
-		},
-		{
-			"id": "js-0102",
-			"ordinal": 114,
-			"name": "Linux uninstall preserves personal data and rejects unrelated installations",
-			"cmd": "node",
-			"args": ["tools/test/test-linux-uninstall-sandbox.cjs"],
-			"repro": "npm run test:linux-uninstall-sandbox"
 		},
 		{
 			"id": "js-0103",
@@ -91,14 +75,6 @@
 			"repro": "node tools/test/test-linux-shared-path-resolver.cjs"
 		},
 		{
-			"id": "js-0108",
-			"ordinal": 120,
-			"name": "every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)",
-			"cmd": "node",
-			"args": ["tools/test/test-shared-root-resolvers.cjs"],
-			"repro": "node tools/test/test-shared-root-resolvers.cjs"
-		},
-		{
 			"id": "js-0123",
 			"ordinal": 135,
 			"name": "AHK startup contract (early globals + actionable fatal diagnostics)",
@@ -113,14 +89,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-startup-smoke-readiness.cjs"],
 			"repro": "node tools/test/test-ahk-startup-smoke-readiness.cjs"
-		},
-		{
-			"id": "js-0125",
-			"ordinal": 137,
-			"name": "full AHK startup smoke (real auto-execute to ready, isolated config)",
-			"cmd": "node",
-			"args": ["tools/test/test-ahk-full-startup-smoke.cjs"],
-			"repro": "node tools/test/test-ahk-full-startup-smoke.cjs"
 		},
 		{
 			"id": "js-0152",
@@ -163,14 +131,6 @@
 			"repro": "node tools/test/test-macos-bundle-layout.cjs"
 		},
 		{
-			"id": "js-0177",
-			"ordinal": 189,
-			"name": "macOS bundle payload ships every path the runtime reads and no excluded group",
-			"cmd": "node",
-			"args": ["tools/test/test-macos-bundle-payload.cjs"],
-			"repro": "npm run test:macos-bundle-payload"
-		},
-		{
 			"id": "js-0178",
 			"ordinal": 190,
 			"name": "macOS app ships the keyboard layout bundle its menu resolves (no \"No Ergopti bundle found\")",
@@ -211,14 +171,6 @@
 			"repro": "node tools/test/test-linux-package-layout.cjs"
 		},
 		{
-			"id": "js-0184",
-			"ordinal": 196,
-			"name": "Linux bundle copies tracked bytes without per-file shell processes",
-			"cmd": "node",
-			"args": ["tools/test/test-linux-tracked-copy.cjs"],
-			"repro": "node tools/test/test-linux-tracked-copy.cjs"
-		},
-		{
 			"id": "js-0194",
 			"ordinal": 206,
 			"name": "Compiled upgrade admission requires actual prior-package and committed full-save evidence",
@@ -227,36 +179,12 @@
 			"repro": "node tools/test/test-compiled-save-upgrade.cjs"
 		},
 		{
-			"id": "js-0198",
-			"ordinal": 210,
-			"name": "Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides",
-			"cmd": "node",
-			"args": ["tools/test/test-linux-canonical-pack-upgrade.cjs"],
-			"repro": "npm run test:linux-canonical-pack-upgrade"
-		},
-		{
-			"id": "js-0199",
-			"ordinal": 211,
-			"name": "Linux checkout installs ship the layout registry and its Ergopti extension hotstrings",
-			"cmd": "node",
-			"args": ["tools/test/test-linux-install-layout-registry.cjs"],
-			"repro": "npm run test:linux-install-layout-registry"
-		},
-		{
 			"id": "js-0201",
 			"ordinal": 213,
 			"name": "release packaging workflow (live Windows stamp path + no Linux pipefail/SIGPIPE trap)",
 			"cmd": "node",
 			"args": ["tools/test/test-release-packaging-workflow.cjs"],
 			"repro": "node tools/test/test-release-packaging-workflow.cjs"
-		},
-		{
-			"id": "js-0206",
-			"ordinal": 219,
-			"name": "Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)",
-			"cmd": "node",
-			"args": ["tools/test/test-linux-launcher-deps.cjs"],
-			"repro": "node tools/test/test-linux-launcher-deps.cjs"
 		},
 		{
 			"id": "js-0211",
@@ -289,14 +217,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-extensions-path-resolves.cjs"],
 			"repro": "node tools/test/test-extensions-path-resolves.cjs"
-		},
-		{
-			"id": "js-0217",
-			"ordinal": 230,
-			"name": "Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group",
-			"cmd": "node",
-			"args": ["tools/test/test-windows-bundle-manifest.cjs"],
-			"repro": "npm run test:windows-bundle-manifest"
 		},
 		{
 			"id": "js-0224",

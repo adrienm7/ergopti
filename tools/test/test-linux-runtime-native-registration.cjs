@@ -64,9 +64,9 @@ const SOURCES = [
 
 const MANUAL_STEP = 'Run manual official runtime and model acceptance';
 const MANUAL_EVIDENCE_STEP = 'Upload manual runtime acceptance evidence';
-// The manual acceptance runs once, in the meta row of the Linux unit matrix.
+// The manual acceptance runs once, in the native row of the Linux Integration matrix.
 const MANUAL_IF =
-	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'meta' }}";
+	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'native' }}";
 const MANUAL_EVIDENCE_IF = MANUAL_IF;
 const MANUAL_FIXTURES = [
 	'static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.lua',
@@ -76,7 +76,11 @@ const MANUAL_FIXTURES = [
 /** Registers manual external proof without weakening the original 64-case gate. */
 function validateManual(root) {
 	const pipeline = Pipeline.open(root);
-	const job = pipeline.job('test-linux');
+	const job = pipeline.job('integration-linux');
+	assert.ok(
+		!Pipeline.steps(pipeline.job('test-linux')).some((value) => value.name === MANUAL_STEP),
+		'the manual acceptance is an integration check, never a unit row'
+	);
 	const step = Pipeline.step(job, MANUAL_STEP);
 	assert.equal(Pipeline.stepField(step, 'if'), MANUAL_IF);
 	assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
@@ -102,8 +106,8 @@ function validateManual(root) {
 	);
 	assert.doesNotMatch(upload, /private\.log|inference\.private|\*\*/);
 	const names = Pipeline.steps(job).map((value) => value.name);
-	assert(names.indexOf(MANUAL_STEP) > names.indexOf('Run the driver unit test suite'));
-	assert(names.indexOf(MANUAL_STEP) < names.indexOf('Record mandatory unit evidence'));
+	assert(names.indexOf(MANUAL_STEP) > names.indexOf('Run the driver integration tests'));
+	assert(names.indexOf(MANUAL_STEP) < names.indexOf('Record mandatory integration evidence'));
 	assert(names.indexOf(MANUAL_EVIDENCE_STEP) > names.indexOf(MANUAL_STEP));
 	const py = fs.readFileSync(path.join(root, MANUAL_FIXTURES[1]), 'utf8');
 	const lua = fs.readFileSync(path.join(root, MANUAL_FIXTURES[0]), 'utf8');
@@ -547,7 +551,7 @@ function main() {
 			);
 		}
 		fs.writeFileSync(path.join(scratch, relative), workflow);
-		const manualBody = Pipeline.step(Pipeline.open(scratch).job('test-linux'), MANUAL_STEP);
+		const manualBody = Pipeline.step(Pipeline.open(scratch).job('integration-linux'), MANUAL_STEP);
 		for (const replace of [
 			() => '',
 			(text) => text.replace(MANUAL_IF, '${{ !cancelled() }}'),
