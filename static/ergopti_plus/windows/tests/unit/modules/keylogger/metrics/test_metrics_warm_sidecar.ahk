@@ -253,3 +253,5 @@ _MWS_RegisterWarmSidecarCases()
 #Include test_metrics_warm_admission.ahk
 
 #Include test_metrics_warm_store_recovery.ahk
+
+#Include test_metrics_navigation_visibility_owner.ahk
