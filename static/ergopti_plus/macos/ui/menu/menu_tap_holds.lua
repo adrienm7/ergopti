@@ -12,7 +12,9 @@
 --- 1. Tap/Hold section: each key shows "Label : tap / hold" inline, under the
 ---    header of its hand. Which keys, in which order and under which hand is
 ---    the shared key catalogue's ([tap_hold.catalog]). Items are grayed out
----    while the remap engine is not initialised.
+---    while the remap engine is not initialised. A key's tap and hold rows
+---    open the shared action picker (search, categories, current choice),
+---    the window gestures and keyboard shortcuts use, never a submenu.
 --- 2. Key combinations: the modifier chords, grouped by key, are the
 ---    « Combinaisons de touches » group of the Shortcuts submenu, built here
 ---    (M.build_key_combinations) because this engine runs them. Their own
@@ -330,16 +332,100 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 2/ Action Picker Submenu =========
+-- ======= 2/ Action Pickers ================
 -- =========================================
 -- =========================================
 
---- Builds the list of action items for any picker submenu.
---- Uses full labels grouped by category. The active choice is checked.
----
---- Slot modes control which actions are shown:
----   "tap"  — excludes actions with tappable == false (modifiers, combos, layer-hold).
----   "hold" — shows only actions with holdable == true (modifiers, combos, layer-hold).
+-- The id of the remap catalogue's "no action" entry. The shared picker draws
+-- its own row for it, so the catalogue's entry is not listed twice.
+local NONE_ACTION_ID = "none"
+
+-- The shared picker's presentation of each key slot: its window title names
+-- the slot and the key.
+local KEY_SLOT_PRESENTATIONS = {
+	tap  = "tap_hold_action",
+	hold = "tap_hold_hold_action",
+}
+
+--- Whether one catalogue action may fill a slot.
+---   "tap"   — excludes actions with tappable == false (modifiers, combos, layer-hold).
+---   "hold"  — only actions with holdable == true (modifiers, combos, layer-hold).
+---   "combo" — every action.
+--- @param action table Catalogue entry.
+--- @param slot string "tap", "hold" or "combo".
+--- @return boolean
+local function slot_accepts(action, slot)
+	if slot == "hold" then return action.holdable == true end
+	if slot == "tap" then return action.tappable ~= false end
+	return true
+end
+
+--- Builds the shared picker's items for one slot: the remap catalogue in its
+--- order, one heading per category, and the set of ids the slot accepts.
+--- @param karabiner table Remap facade.
+--- @param slot string "tap" or "hold".
+--- @return table items, table admitted id → true, "none" included.
+local function key_slot_picker_items(karabiner, slot)
+	local items, admitted = {}, { [NONE_ACTION_ID] = true }
+	local category = nil
+	for _, action in ipairs(karabiner.AVAILABLE_ACTIONS or {}) do
+		if action.id ~= NONE_ACTION_ID and slot_accepts(action, slot) then
+			if action.category ~= category then
+				category = action.category
+				if type(category) == "string" and category ~= "" then
+					items[#items + 1] = { type = "heading", level = 1, text = category }
+				end
+			end
+			items[#items + 1] = { type = "action", id = action.id, label = action.label }
+			admitted[action.id] = true
+		end
+	end
+	return items, admitted
+end
+
+--- Opens the shared action picker for the tap or the hold of one key, the
+--- window gestures and keyboard shortcuts use. A pick goes through the same
+--- setter, regeneration and refresh as the former submenu did; an id the slot
+--- does not offer is refused and the picker stays open.
+--- @param karabiner table Remap facade.
+--- @param slot string "tap" or "hold".
+--- @param key_id string Remap key id.
+--- @param key_label string Translated key name, for the window title.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean opened
+local function open_key_slot_picker(karabiner, slot, key_id, key_label, update_menu)
+	local getter = slot == "tap" and karabiner.get_tap_action or karabiner.get_hold_action
+	local setter_name = slot == "tap" and "set_tap_action" or "set_hold_action"
+	local read_ok, current = pcall(getter, key_id)
+	if not read_ok or type(current) ~= "string" then current = NONE_ACTION_ID end
+	local items, admitted = key_slot_picker_items(karabiner, slot)
+	Logger.debug(LOG, "Opening the %s action picker for '%s' (current='%s').", slot, key_id, current)
+	local opened = require("ui.action_picker").open({
+		presentation_id     = KEY_SLOT_PRESENTATIONS[slot],
+		presentation_suffix = key_label,
+		current             = current,
+		items               = items,
+	}, function(action_id)
+		if type(action_id) ~= "string" or not admitted[action_id] then
+			Logger.error(LOG, "The %s of '%s' does not offer the picked action '%s'.",
+				slot, key_id, tostring(action_id))
+			return false
+		end
+		return commit_menu_setting(karabiner, "Key " .. slot .. " action picker", function()
+			return karabiner[setter_name](key_id, action_id)
+		end, update_menu)
+	end)
+	if opened ~= true then
+		Logger.error(LOG, "The %s action picker of '%s' did not open.", slot, key_id)
+		return false
+	end
+	return true
+end
+
+--- Builds the action submenu of one key-combination slot.
+--- Uses full labels grouped by category. The active choice is checked, and
+--- slot_accepts decides which actions are shown. The keys' own tap and hold
+--- open the shared picker instead (open_key_slot_picker).
 ---
 --- @param karabiner   table    The karabiner module.
 --- @param set_fn      function Called with (action_id) when user picks.
@@ -364,12 +450,7 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 		Logger.error(LOG, "Declared Tap-Hold action picker admission refused.")
 		return nil
 	end
-	-- Filter: exclude actions that don't match the slot mode
-	local function slot_filter(action)
-		if slot == "hold" and not action.holdable      then return false end
-		if slot == "tap"  and action.tappable == false then return false end
-		return true
-	end
+	local function slot_filter(action) return slot_accepts(action, slot) end
 
 	-- "Spécial" items (none, CapsWord) are shown ungrouped at the top — skip the header
 	local function special_filter(action)
@@ -521,6 +602,12 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 	if not delay_rows then return nil end
 
 	local key_submenu = ManifestMenu.template_rows("tap_hold_key_rows", {
+		["tap_hold_key_tap"] = function()
+			return open_key_slot_picker(karabiner, "tap", kid, key_label, update_menu)
+		end,
+		["tap_hold_key_hold_action"] = function()
+			return open_key_slot_picker(karabiner, "hold", kid, key_label, update_menu)
+		end,
 		["tap_hold_key_no_action"] = function()
 			return run_bulk_menu_command(
 				karabiner,
@@ -539,20 +626,6 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		["tap_hold_key_delay_caption"] = function() return fmt_delay(effective_ms) end,
 	}, {
 		["tap_hold_key_delay"] = delay_rows,
-		["tap_hold_key_tap_picker"] = build_action_picker(
-			karabiner,
-			function(action_id) return karabiner.set_tap_action(kid, action_id) end,
-			current_tap,
-			update_menu,
-			"tap"
-		),
-		["tap_hold_key_hold_picker"] = build_action_picker(
-			karabiner,
-			function(action_id) return karabiner.set_hold_action(kid, action_id) end,
-			current_hold,
-			update_menu,
-			"hold"
-		),
 	})
 	if not key_submenu then return nil end
 

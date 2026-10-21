@@ -3505,19 +3505,9 @@
 			"caption_getter": "tap_hold_key_tap_caption",
 			"platforms": [
 				"ahk",
+				"hs",
 				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "group",
-			"id": "tap_hold_key_tap_picker",
-			"i18n": "menu.tapholds.tap_arrow",
-			"caption_getter": "tap_hold_key_tap_caption",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "group",
@@ -3531,9 +3521,9 @@
 			"unavailable": "hide"
 		},
 		{
-			"type": "group",
-			"id": "tap_hold_key_hold_picker",
-			"i18n": "menu.tapholds.hold_arrow",
+			"type": "command",
+			"id": "tap_hold_key_hold_action",
+			"i18n": "tap_hold.picker.hold",
 			"caption_getter": "tap_hold_key_hold_caption",
 			"platforms": [
 				"hs"

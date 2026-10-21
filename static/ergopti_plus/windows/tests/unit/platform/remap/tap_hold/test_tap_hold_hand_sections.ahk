@@ -232,7 +232,7 @@ Test("tap-holds: actual key provider follows complete declared head (tap-hold-ke
 _THHS_KeyHeadMutation(TargetPath) {
 	Definition := _MR_GetMenuDef("tap_hold_key_head")
 	Tap := Definition[3]
-	Hold := Definition[5]
+	Hold := Definition[4]
 	PreviousCaption := Tap["i18n"]
 	PreviousGetter := Tap["caption_getter"]
 	try {
@@ -243,14 +243,14 @@ _THHS_KeyHeadMutation(TargetPath) {
 			Rows[3]["label"], "actual provider reads both shared caption and getter metadata")
 		Assert(Rows[3].Has("action") && !Rows[3].Has("items"), "caption changes retain the picker owner")
 		Definition[3] := Hold
-		Definition[5] := Tap
+		Definition[4] := Tap
 		Rows := _THHS_KeyChildren("caps_lock")
 		Assert(Rows[3].Has("items") && Rows[4].Has("action"), "declaration determines hold-before-tap order")
 	} finally {
 		Tap["i18n"] := PreviousCaption
 		Tap["caption_getter"] := PreviousGetter
 		Definition[3] := Tap
-		Definition[5] := Hold
+		Definition[4] := Hold
 	}
 }
 Test("tap-holds: actual key provider reads shared order and caption getter mutations (tap-hold-key-head)",
