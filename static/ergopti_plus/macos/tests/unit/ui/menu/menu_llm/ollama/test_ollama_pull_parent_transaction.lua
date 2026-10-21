@@ -24,6 +24,9 @@ local MODULES = {
 	"modules.llm",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_server_command",
+	"modules.llm.network_env",
+	-- FileSystem captures hs when it loads; bind it to this fixture's probe.
+	"adapters.file_system",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
@@ -94,7 +97,8 @@ local function with_fixture(save_results, callback)
 			logger.today_log_path = function() return "/tmp/ergopti-hs032.log" end
 
 			local hs_fixture = {
-				execute = function() return "", true end,
+				-- The pull's network prelude locates the bundled policy through test(1).
+				execute = helpers.existence_probe_execute(function() return "", true end),
 				http = {
 					asyncPost = function(_, _, _, done)
 						loadability_callbacks[#loadability_callbacks + 1] = done
