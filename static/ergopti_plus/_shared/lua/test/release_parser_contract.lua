@@ -375,6 +375,46 @@ function M.run(helpers, Parser)
 			end)
 		end
 	end)
+	-- The release list index reads every tag and date from one decode, as the
+	-- Windows updater's index does (release-list-budget).
+	helpers.describe("shared Lua release list index contract", function()
+		local function indexed_like_split(body, id)
+			local chunks, records = Parser.index_releases(body)
+			helpers.assert_eq(chunks, Parser.split_releases_array(body), id .. ": same spans as split")
+			helpers.assert_eq(#records, #chunks, id .. ": one record per span")
+			for index, chunk in ipairs(chunks) do
+				helpers.assert_eq(records[index].tag, Parser.parse_tag(chunk), id .. ": tag")
+				helpers.assert_eq(records[index].published_at, Parser.parse_published_at(chunk), id .. ": date")
+			end
+		end
+		for _, row in ipairs(SPLIT) do
+			helpers.it("index_releases: " .. row.id, function() indexed_like_split(row.body, row.id) end)
+		end
+		helpers.it("index_releases: nested and non-string members read as the spans do", function()
+			indexed_like_split('[{"tag_name":"v1.2.0","published_at":"2026-10-21T04:38:53Z","author":'
+				.. '{"tag_name":"v9","published_at":"x"}},{"tag_name":7,"published_at":null},{}]', "members")
+			indexed_like_split(nil, "nil")
+			indexed_like_split("", "empty")
+		end)
+		helpers.it("index_releases: the list is decoded once, not once more per release", function()
+			local Json = require("json")
+			local decode, calls = Json.decode, 0
+			Json.decode = function(...) calls = calls + 1; return decode(...) end
+			local ok, err = pcall(function()
+				local parts = {}
+				for index = 1, 30 do
+					parts[index] = string.format('{"tag_name":"v1.0.%d","published_at":"2026-10-%02dT00:00:00Z",'
+						.. '"assets":[{"name":"a","uploader":{"login":"bot"}}]}', index, index % 28 + 1)
+				end
+				local _, records = Parser.index_releases("[" .. table.concat(parts, ",") .. "]")
+				helpers.assert_eq(#records, 30, "every release is indexed")
+				helpers.assert_eq(records[30].tag, "v1.0.30")
+			end)
+			Json.decode = decode
+			if not ok then error(err, 0) end
+			helpers.assert_eq(calls, 1, "one decode for the whole list")
+		end)
+	end)
 end
 
 return M
