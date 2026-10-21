@@ -522,7 +522,50 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		);
 	}
 	controls++;
-	assert.equal(controls, 56, 'every declared metadata and retained-role control must execute');
+	// A run still creating jobs grows its listing between two pages; that pass is
+	// re-read from page one instead of refusing a healthy run.
+	const growing = fixture();
+	growing.jobs.push(
+		...Array.from({ length: 101 }, (_, i) => ({ id: 3000 + i, name: 'Unrelated role ' + i }))
+	);
+	const growingApi = reader(growing);
+	let firstJobsPage = true;
+	const growingRead = (endpoint) => {
+		const response = growingApi.readApi(endpoint);
+		if (firstJobsPage && endpoint.endsWith('/jobs?filter=all&per_page=50&page=1')) {
+			firstJobsPage = false;
+			return { ...response, total_count: response.total_count - 1 };
+		}
+		return response;
+	};
+	assert.equal((await owner.admitProducer(growing.selection, growingRead)).run_id, '123');
+	assert.equal(
+		growingApi.calls.filter((endpoint) => endpoint.endsWith('/jobs?filter=all&per_page=50&page=1'))
+			.length,
+		2,
+		'a listing that moved between pages is read again from page one'
+	);
+	controls++;
+	// A listing that never holds still across a pass stays refused.
+	const unstable = fixture();
+	unstable.jobs.push(
+		...Array.from({ length: 101 }, (_, i) => ({ id: 4000 + i, name: 'Unrelated role ' + i }))
+	);
+	const unstableApi = reader(unstable);
+	let unstableReads = 0;
+	await assert.rejects(
+		() =>
+			owner.admitProducer(unstable.selection, (endpoint) => {
+				const response = unstableApi.readApi(endpoint);
+				if (!endpoint.includes('/jobs?')) return response;
+				unstableReads++;
+				return { ...response, total_count: response.total_count - (unstableReads % 2) };
+			}),
+		/census changed/,
+		'unstable census'
+	);
+	controls++;
+	assert.equal(controls, 58, 'every declared metadata and retained-role control must execute');
 	for (const [name, mutate, reason] of [
 		[
 			'latest failed Build hides old success',
@@ -832,7 +875,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 	}
 	assert.equal(
 		controls,
-		101,
+		103,
 		'metadata/event, retained-role reruns, target freshness, strict CLI transport and exact downloaded-byte controls all execute'
 	);
 	const markerMutations = [
@@ -974,7 +1017,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 	}
 	assert.equal(
 		controls,
-		153,
+		155,
 		'all original controls and both-target writer custody controls execute'
 	);
 	return {

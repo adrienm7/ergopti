@@ -11,6 +11,9 @@ const { resolveSiteTarget, siteLot, siteLots } = require('../dev/site-context.cj
 const { API_PAGE_SIZE } = require('./github-api-page.cjs');
 const REPOSITORY = 'adrienm7/ergopti';
 const MAX_RECORDS = 1000;
+// A listing that moved between pages is re-read from page one at most this often.
+const CENSUS_ATTEMPTS = 3;
+const CENSUS_CHANGED = Symbol('census changed between pages');
 
 function refuse(ok, detail) {
 	if (!ok) throw new Error('Site deployment admission refused: ' + detail);
@@ -34,8 +37,23 @@ function closed(value, names) {
 	);
 }
 
-/** Collect a finite exact API census; pagination cannot silently omit or duplicate a role. */
+/**
+ * Collect a finite exact API census; pagination cannot silently omit or duplicate a role.
+ * A run still creating jobs (other lanes' reusable workflows) can change the listing
+ * between two pages, which shifts rows across page boundaries. That pass proves nothing,
+ * so the census restarts from page one, a bounded number of times; every other refusal
+ * stays final.
+ */
 async function collect(readApi, endpoint, field) {
+	for (let attempt = 1; attempt <= CENSUS_ATTEMPTS; attempt++) {
+		const census = await collectOnce(readApi, endpoint, field);
+		if (census !== CENSUS_CHANGED) return census;
+	}
+	refuse(false, 'API census changed or is malformed.');
+}
+
+/** Read one census pass, or return CENSUS_CHANGED when the listing moved between pages. */
+async function collectOnce(readApi, endpoint, field) {
 	const records = [];
 	const ids = new Set();
 	let expected;
@@ -56,11 +74,10 @@ async function collect(readApi, endpoint, field) {
 		);
 		if (expected === undefined) expected = response.total_count;
 		refuse(
-			response.total_count === expected &&
-				Array.isArray(response[field]) &&
-				response[field].length <= API_PAGE_SIZE,
+			Array.isArray(response[field]) && response[field].length <= API_PAGE_SIZE,
 			'API census changed or is malformed.'
 		);
+		if (response.total_count !== expected) return CENSUS_CHANGED;
 		for (const row of response[field]) {
 			const id = number(row.id);
 			refuse(!ids.has(id), 'duplicate API record.');
