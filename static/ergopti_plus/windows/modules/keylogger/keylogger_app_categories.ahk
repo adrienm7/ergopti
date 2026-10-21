@@ -285,9 +285,27 @@ KL_AppCat_Reload(ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 				cats := Map()
 				if !KL_AppCat_Load(Owner["path"], &cats, ReadFn, ExistsFn, CreateFn, &Model)
 						return false
-				KLAppCat.categories := cats
-				KLAppCat.store_model := Model
-				KLAppCat.dirty := false
+				PreviousCritical := Critical("On")
+				try {
+						if !_KL_AppCat_WriterCurrent(Owner)
+								return false
+						Pending := false
+						; Preserve only new Get-owned discoveries admitted during this
+						; reload. Earlier pending values and explicit fresh disk values
+						; retain the ordinary authoritative reload semantics.
+						for Key, Value in KLAppCat.categories {
+								if !Owner["snapshot"].Has(Key) && !cats.Has(Key)
+										&& _KL_AppCat_IsDiscovery(Key, Value, Model) {
+										cats[Key] := Value
+										Pending := true
+								}
+						}
+						KLAppCat.categories := cats
+						KLAppCat.store_model := Model
+						KLAppCat.dirty := Pending
+				} finally Critical(PreviousCritical)
+				if Pending
+						_KL_AppCat_ScheduleDeferredSave()
 				return true
 		} finally {
 				_KL_AppCat_ReleaseWrite(Owner)
