@@ -122,8 +122,10 @@ _ParseGlobalKey(Path, KeyName) {
 		}
 		InGlobal := false
 		Pattern  := "^" . KeyName . "\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$"
-		loop read, Path {
-				Line := TOML_StripInlineComment(Trim(A_LoopReadLine, " `t"))
+		; The override writer emits UTF-8 without a BOM, independently of ACP.
+		Content := FSReadStrict(Path)
+		loop parse, Content, "`n", "`r" {
+				Line := TOML_StripInlineComment(Trim(A_LoopField, " `t"))
 				if (Line == "[__global__]") {
 						InGlobal := true
 						continue
