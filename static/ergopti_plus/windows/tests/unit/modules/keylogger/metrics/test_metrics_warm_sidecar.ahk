@@ -249,3 +249,5 @@ _MWS_RegisterWarmSidecarCases() {
 			_MWS_Isolated.Bind(Fn))
 }
 _MWS_RegisterWarmSidecarCases()
+
+#Include test_metrics_warm_admission.ahk
