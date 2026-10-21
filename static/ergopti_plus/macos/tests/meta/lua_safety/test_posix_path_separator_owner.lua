@@ -19,10 +19,9 @@
 
 local helpers = require("tests.helpers")
 
--- Shipped driver subtrees. tests/ is excluded: the harness itself runs on a
+-- The whole driver tree is read except tests/: the harness itself runs on a
 -- Windows checkout and parses its own Windows paths.
-local SOURCE_DIRS = { "_generated", "adapters", "infra", "modules", "platform", "ui", "vendor" }
-local ROOT_FILES = { "init.lua" }
+local EXCLUDED_PREFIX = "tests/"
 
 -- Justified remaining spellings: path = { count, reason }. Empty while every
 -- macOS filesystem path goes through the owner.
@@ -106,8 +105,11 @@ helpers.describe("macOS paths split only through the shared owner (posix-backsla
 	helpers.it("posix-backslash-separator-owner: no [/\\] separator class outside native_path.lua", function()
 		local root = helpers.driver_root()
 		local files = {}
-		for _, d in ipairs(SOURCE_DIRS) do collect(root .. d, files) end
-		for _, name in ipairs(ROOT_FILES) do files[#files + 1] = root .. name end
+		local all = {}
+		collect(root:gsub("/$", ""), all)
+		for _, path in ipairs(all) do
+			if path:gsub("^.*/macos/", ""):sub(1, #EXCLUDED_PREFIX) ~= EXCLUDED_PREFIX then files[#files + 1] = path end
+		end
 		helpers.assert_true(#files >= MIN_FILES, string.format(
 			"the source walk found %d driver .lua files (floor %d): the guard would be vacuous", #files, MIN_FILES))
 
