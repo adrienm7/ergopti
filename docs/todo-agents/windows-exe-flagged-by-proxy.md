@@ -128,12 +128,37 @@ the exe gives 6177221 bytes (54 %), which a size cap would let through but an AV
 ## Done
 
 - This analysis (static, on the published assets in the session scratchpad).
-- No size budget gate: a hard size threshold was added and then reverted by decision. Each file
-  stays as small as possible, without a fixed limit.
+- No size budget gate: a hard size threshold was added (`422ce140fd`) and reverted by decision
+  (`03d9c017ed`). Each file stays as small as possible, without a fixed limit.
+- Fix 1, commit `6d9eae1f94`: every screenshot (region save, window, fullscreen, instant) now
+  captures in the driver with GDI and GDI+ (`BitBlt` into a DIB section, `CopyImage` of the
+  admitted `CF_BITMAP` under the clipboard lock, `GdipSaveImageToFile`). No screenshot path starts
+  `powershell.exe` any more; the window and fullscreen captures had also used a hidden PowerShell
+  `CopyFromScreen`. `test_screenshot_tree_owned_default.ahk` fails if the screenshot module
+  launches a script host again. A local Ahk2Exe build of that commit holds 0 `DllImport`, 0
+  `TypeDefinition`, 0 `ErgoptiScreenshotClipboard` and 0 `CopyFromScreen` (v1.0.4: 7 hits), and
+  is 10915840 bytes (v1.0.4: 11403776).
+- Fix 2, commit `1965c2ffac`: the exe's version resource is ProductName `Ergopti+`, CompanyName
+  `Ergopti`, FileDescription `Ergopti+ keyboard layout companion`, LegalCopyright
+  `Copyright (c) 2024 Adrien MOYAUX (MIT License)`, OriginalFilename `ErgoptiPlus.exe`,
+  InternalName `ErgoptiPlus`, and FileVersion/ProductVersion derived from the stamped
+  `BUNDLE_VERSION` (an unstamped local build reads `0.0.0-dev`). The Windows build stage checks the
+  compiled exe ("Verify the ErgoptiPlus.exe version resource"); the test is js-0451.
 
 ## Remaining
 
-- Fix 1 (ship-fix, Windows driver, full AHK suite before commit), fix 2, fix 3.
+- Fix 3 (reproducible `ergopti_network_pac.exe`, `/Brepro` in
+  `tools/build/build_windows_network_pac.ps1`) and fix 4 (code signing, item 132).
+- Other hidden PowerShell launchers that AHK could replace, not changed (they were present in the
+  builds that pass): the Recycle Bin action (`GESTURE_SYS_EMPTY_TRASH_COMMAND`, AHK has
+  `FileRecycleEmpty`), the screen brightness adapter (WMI, reachable through `ComObjGet`), the
+  bundle unzip (`_Bundle_BuildUnzipCommand`, `Expand-Archive`), and the elevated touchpad registry
+  scripts (`modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`). The updater,
+  crash report, curl, managed network, Ollama and diagnostics workers are vendor scripts: kept.
+- After the next build that contains both fixes: hash its `ErgoptiPlus.exe`
+  (`sha256sum` or `Get-FileHash`), look the hash up on VirusTotal and give it to the tester for
+  T4, with the Service Desk ticket if it is still blocked. Keep the v1.0.4 hash above for the
+  false-positive report.
 - T1 to T4 by the tester, and the VirusTotal lookup by the maintainer.
 - Retire this file when the tester confirms a release passes and the lesson is in
   `docs/memory/windows-ahk.md` ("no inline P/Invoke PowerShell stages in the compiled script").
