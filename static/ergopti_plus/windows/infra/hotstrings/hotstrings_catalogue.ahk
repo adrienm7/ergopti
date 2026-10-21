@@ -755,8 +755,7 @@ HSE_TerminatorSetAllString(WordStr, Enable) {
 		global HSE_Terminators
 		BuiltinChars := HSE_TerminatorBuiltinChars()
 		Kept := ""
-		Loop Parse, WordStr {
-				Ch := A_LoopField
+		for Ch in _TextCodepoints(WordStr) {
 				if (Ch != "`r" and Ch != "`n" and !InStr(BuiltinChars, Ch))
 						Kept .= Ch
 		}
