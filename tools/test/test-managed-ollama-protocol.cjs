@@ -92,7 +92,7 @@ function receiveWindowsComponentShellSetup() {
 	const workflow = YAML.parse(
 		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-windows.yml'), 'utf8')
 	);
-	const steps = workflow.jobs['test-ahk'].steps.filter(
+	const steps = workflow.jobs['integration-ahk'].steps.filter(
 		(step) => step.name === 'Receive managed Ollama file component'
 	);
 	assert.equal(steps.length, 1, 'The component has one actual PowerShell receiving owner.');
