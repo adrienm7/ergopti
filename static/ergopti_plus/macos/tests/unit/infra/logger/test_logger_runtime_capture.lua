@@ -127,4 +127,45 @@ helpers.describe("logger — runtime error capture", function()
 		helpers.assert_eq(calls[1].template, "Uncaught error in hs.timer.%s callback: %s")
 		helpers.assert_true(calls[1].message:find("boom-for-the-window", 1, true) ~= nil)
 	end)
+
+	-- A thrown object whose __tostring raises used to escape the guard through
+	-- its own tostring() and reach Hammerspoon's console (timer-error-object-2026-10-21).
+	helpers.it("contains a timer error object whose formatter raises (timer-error-object-2026-10-21)", function()
+		package.loaded["infra.logger"] = nil
+		local Fresh = require("infra.logger")
+		helpers.admit_logger_privacy(Fresh)
+		local hs = _G.hs
+		local saved = {
+			doAfter     = hs.timer.doAfter,
+			doEvery     = hs.timer.doEvery,
+			new         = hs.timer.new,
+			delayed_new = hs.timer.delayed and hs.timer.delayed.new or nil,
+			print       = _G.print,
+		}
+		hs.timer.doAfter = function(_delay, fn) if type(fn) == "function" then fn() end end
+		local captured, formatted = {}, 0
+		Fresh.set_sink(function(line) captured[#captured + 1] = line end)
+		Fresh.set_level("DEBUG")
+		Fresh.install_runtime_error_capture()
+		local hostile = setmetatable({}, { __tostring = function()
+			formatted = formatted + 1
+			error(setmetatable({}, { __tostring = function() error("formatter failure") end }))
+		end })
+		local ok = pcall(function() hs.timer.doAfter(0, function() error(hostile) end) end)
+		Fresh.set_sink(nil)
+		hs.timer.doAfter = saved.doAfter
+		hs.timer.doEvery = saved.doEvery
+		hs.timer.new     = saved.new
+		if hs.timer.delayed then hs.timer.delayed.new = saved.delayed_new end
+		_G.print = saved.print
+		package.loaded["infra.logger"] = nil
+
+		helpers.assert_true(ok, "the guard must contain the object and its failing formatter")
+		helpers.assert_eq(formatted, 0, "reporting must not run foreign formatting code")
+		local found = false
+		for _, line in ipairs(captured) do
+			if line:find("Uncaught error", 1, true) and line:find("error object (table)", 1, true) then found = true end
+		end
+		helpers.assert_true(found, "the contained failure must still be logged")
+	end)
 end)
