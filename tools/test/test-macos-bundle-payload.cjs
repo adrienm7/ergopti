@@ -869,8 +869,8 @@ errors.push(...buildScriptProblems(BUILD, manifest.external));
 // installer gone, the macOS package job must still run that validation, or a
 // bad pin first fails on a new user's onboarding
 const packageJob =
-	(fs
-		.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+	(require('./ci-pipeline.cjs')
+		.file('.github/workflows/ci-macos.yml')
 		.match(/^ {2}package-macos:\n[\s\S]*?(?=^ {2}[a-z][a-z-]*:\n|(?![\s\S]))/m) || [])[0] || '';
 check(
 	/^ {8}run: python3 -m unittest discover -s tools\/build -p 'karabiner_manifest_test\.py'$/m.test(

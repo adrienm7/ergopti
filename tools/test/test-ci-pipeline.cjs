@@ -538,6 +538,33 @@ check('a lane of stage callers is read back as one workflow, byte for byte', () 
 	assert.equal(ci.real().locateCaller('gate').file, LANE);
 });
 
+check('an inlined lane written back is the real files, and a change reaches its stage', () => {
+	const ci = laneFixture();
+	const real = ci.real().files();
+	assert.deepEqual(pipeline.replaceLane(real, LANE, ci.file(LANE)), real);
+	const moved = pipeline.replaceLane(
+		real,
+		LANE,
+		ci.file(LANE).replace('        run: echo "$PLAN"', '        run: echo moved')
+	);
+	assert.ok(moved.find((entry) => entry.rel === LANE_GATE).text.includes('run: echo moved'));
+	assert.equal(moved.find((entry) => entry.rel === LANE).text, LANE_TEXT);
+	const reread = pipeline.inlinePipeline(moved).find((entry) => entry.rel === LANE).text;
+	assert.equal(
+		reread,
+		ci.file(LANE).replace('        run: echo "$PLAN"', '        run: echo moved')
+	);
+	const renamed = pipeline.replaceLane(
+		real,
+		LANE,
+		ci.file(LANE).replace("name: 'Verdict'", "name: 'Gate'")
+	);
+	assert.ok(
+		renamed.find((entry) => entry.rel === LANE).text.includes("    name: 'Gate'\n    needs: [unit]")
+	);
+	assert.equal(renamed.find((entry) => entry.rel === LANE_GATE).text, LANE_GATE_TEXT);
+});
+
 check('an inlined lane leaves a step output named like an input untouched', () => {
 	const read = '          GIVEN: ${{ steps.native-pac-inputs.outputs.toolchain }}\n';
 	const ci = laneFixture({

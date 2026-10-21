@@ -165,31 +165,31 @@
 			"protocol": 0
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-e2e.yml",
 			"job": "e2e-hs",
 			"step": "Qualify actual native PAC and WPAD XCTest controls",
 			"protocol": 1
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-e2e.yml",
 			"job": "e2e-hs",
 			"step": "Receive actual independent managed HTTP native clients",
 			"protocol": 2
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-e2e.yml",
 			"job": "e2e-hs",
 			"step": "Receive actual native model create, pull, inference and retirement",
 			"protocol": 3
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-unit.yml",
 			"job": "test-hs",
 			"step": "Run unit + meta tests",
 			"protocol": 4
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-e2e.yml",
 			"job": "e2e-hs",
 			"step": "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)",
 			"protocol": 5
@@ -1119,18 +1119,20 @@
 			"protocol": 11
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-build.yml",
 			"job": "package-macos",
 			"step": "Receive actual managed HTTP native clients",
 			"protocol": 12,
+			"owner_file": ".github/workflows/ci-macos-e2e.yml",
 			"owner_job": "e2e-hs",
 			"owner_step": "Receive actual independent managed HTTP native clients"
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-build.yml",
 			"job": "package-macos",
 			"step": "Run Swift launcher tests on macOS 26",
 			"protocol": 13,
+			"owner_file": ".github/workflows/ci-macos-e2e.yml",
 			"owner_job": "e2e-hs",
 			"owner_step": "Qualify actual native PAC and WPAD XCTest controls"
 		}
@@ -1155,21 +1157,21 @@
 			"body": "      - name: Retain the source-bound Core JavaScript qualification\n        if: always() && steps.common-lot.outputs.suite == 'js' && steps.common-lot.outputs.feature == 'test-infrastructure'\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-core-js\n          path: ${{ runner.temp }}/stable-core-js-suite.json\n          if-no-files-found: warn\n          overwrite: true"
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-e2e.yml",
 			"job": "e2e-hs",
 			"name": "Retain source-bound managed-ollama-native qualification receipts",
 			"condition": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}",
 			"body": "      - name: Retain source-bound managed-ollama-native qualification receipts\n        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}${{ env.MACOS_STAGE_SCENARIO && format('-{0}', env.MACOS_STAGE_SCENARIO) || '' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-unit.yml",
 			"job": "test-hs",
 			"name": "Retain source-bound test-hs qualification receipts",
 			"condition": "always()",
 			"body": "      - name: Retain source-bound test-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
-			"file": ".github/workflows/ci-macos.yml",
+			"file": ".github/workflows/ci-macos-e2e.yml",
 			"job": "e2e-hs",
 			"name": "Retain source-bound e2e-hs qualification receipts",
 			"condition": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}",

@@ -36,8 +36,9 @@ const caller = fullDefault.file('.github/workflows/ci.yml');
 // Release and its preflight run in ci-release.yml, called by ci.yml's publication job.
 const releaseWorkflow = fullDefault.file('.github/workflows/ci-release.yml');
 // Wrapper assertions inspect validated raw source, independently of full-branch projection.
-const rawWorkflow = fullDefault
-	.rawFiles()
+// The raw macOS lane, its stage files inlined as one workflow.
+const rawWorkflow = pipeline
+	.inlinePipeline(fullDefault.rawFiles())
 	.find((entry) => entry.rel === '.github/workflows/ci-macos.yml').text;
 const packageSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/launcher/Package.swift'),
@@ -299,13 +300,10 @@ function admitRawNativeSdkSelector(mac) {
 // PAC arguments. A malformed wrapper refuses before any selector is inspected.
 function admitRawWorkflow(mac) {
 	try {
+		// The raw lane is inlined; it is written back into its stage files first.
 		return fullDefault
 			.fromFiles(
-				fullDefault
-					.rawFiles()
-					.map((file) =>
-						file.rel === '.github/workflows/ci-macos.yml' ? { ...file, text: mac } : file
-					)
+				pipeline.replaceLane(fullDefault.rawFiles(), '.github/workflows/ci-macos.yml', mac)
 			)
 			.file('.github/workflows/ci-macos.yml');
 	} catch {

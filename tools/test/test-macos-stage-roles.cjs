@@ -60,9 +60,7 @@ function complete(ctx = context, attempt = 1) {
 }
 const completed = complete();
 check('exact five visible jobs with only their declared predecessor edges', () => {
-	const workflow = YAML.parse(
-		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
-	);
+	const workflow = YAML.parse(require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml'));
 	const jobs = ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'];
 	assert.deepEqual(Object.keys(workflow.jobs), jobs);
 	const needs = {
@@ -190,9 +188,7 @@ function checkManagedNativeSplit(workflow) {
 		assert.match(step.with.name, /env\.MACOS_STAGE_SCENARIO/, step.name + ' names its scenario');
 }
 check('the Intel managed native role splits XCTest from runtime without dropping a step', () => {
-	const workflow = YAML.parse(
-		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
-	);
+	const workflow = YAML.parse(require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml'));
 	checkManagedNativeSplit(workflow);
 	const sdk = 'Qualify actual SDK accepted-owner and deadline XCTest controls';
 	const model = 'Receive actual native model create, pull, inference and retirement';
@@ -476,13 +472,17 @@ check('artifact reader refuses duplicate fields and unexpected members', () => {
 	}
 });
 check('existing scope owner admits every retained Mac command after address relocation', () => {
-	const source = fs.readFileSync(
-		path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'),
-		'utf8'
-	);
+	// Each real file of the lane is projected under its own path, stage files included.
+	const real = require('./ci-pipeline.cjs').real();
 	const scoped = require('./fixtures/ci-scoped-full-branches.cjs');
-	const projected = scoped.projectScopedSteps(source, '.github/workflows/ci-macos.yml');
-	assert.ok(projected.length > 0 && projected !== source);
+	let relocated = 0;
+	for (const rel of real.laneFiles('.github/workflows/ci-macos.yml')) {
+		const source = real.file(rel);
+		const projected = scoped.projectScopedSteps(source, rel);
+		assert.ok(projected.length > 0);
+		if (projected !== source) relocated++;
+	}
+	assert.ok(relocated > 0, 'some retained Mac command is projected');
 });
 
 // One more than the single-cell Unit: a duplicate Unit row now replaces a mandatory group;
@@ -1004,10 +1004,7 @@ function assertLiteralUnit(source) {
 	return job;
 }
 
-const literalUnitSource = fs.readFileSync(
-	path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'),
-	'utf8'
-);
+const literalUnitSource = require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml');
 check('actual Unit source is the group matrix and retains its exact custody', () => {
 	assertLiteralUnit(literalUnitSource);
 });
@@ -1530,7 +1527,7 @@ check(
 				);
 		}
 		const workflow = YAML.parse(
-			fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
+			require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml')
 		);
 		checkLaunchLotLoop(workflow);
 		const loopName = 'Install, launch and judge every scenario of the lot';
@@ -1577,22 +1574,23 @@ check('macOS cells name their version from one host table and refuse another', (
 		}
 	}
 	const build = roles.plan('build', context)[0];
-	const workflow = YAML.parse(
-		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
-	);
+	const workflow = YAML.parse(require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml'));
 	const packaging = workflow.jobs['package-macos'];
 	assert.equal(packaging['runs-on'], build.runner);
-	assert.equal(packaging.name, 'Build (' + roles.macosName(build.architecture) + ')');
+	// GitHub renders 'macOS / Build / ErgoptiPlus.app (macOS 26)': the stage job
+	// in its own file states the version, its caller names the stage.
+	assert.equal(packaging.name, 'Build');
+	const stage = YAML.parse(
+		require('./ci-pipeline.cjs').real().file('.github/workflows/ci-macos-build.yml')
+	).jobs['package-macos'];
+	assert.equal(stage.name, 'ErgoptiPlus.app (' + roles.macosName(build.architecture) + ')');
 	assert.ok(
 		packaging.steps.some(
 			(step) => step.name === 'Run Swift launcher tests on ' + roles.macosName(build.architecture)
 		),
 		'the repeated Swift run names its macOS'
 	);
-	const source = fs.readFileSync(
-		path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'),
-		'utf8'
-	);
+	const source = require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml');
 	assert.match(
 		source,
 		/deliberate cross-version coverage, not\n# duplicated work; do not deduplicate it\./

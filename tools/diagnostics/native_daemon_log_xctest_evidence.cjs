@@ -122,6 +122,7 @@ function sourceReceipt(repository, epoch) {
 	const sources = { ...original.sources };
 	for (const relative of [
 		'.github/workflows/ci-macos.yml',
+		'.github/workflows/ci-macos-e2e.yml',
 		'tools/diagnostics/native_daemon_log_xctest_evidence.cjs',
 		'tools/diagnostics/swift_xctest_evidence.cjs',
 		'tools/diagnostics/native_pac_source_evidence.cjs',

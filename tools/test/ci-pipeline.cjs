@@ -774,6 +774,125 @@ function inlinePipeline(loaded) {
 }
 
 /**
+ * Writes one inlined lane back into the real files: the inverse of inlineLane.
+ * Each job of `text` replaces the job of its stage file, in the stage's own
+ * wording (what the caller hands in is read from inputs again), and its name,
+ * needs, if and permissions become its caller's. A job `text` drops loses its
+ * caller; a job it adds stays a plain job of the lane, which the inliner then
+ * refuses. A check written against the one-workflow view can so mutate it and
+ * still be validated through the files GitHub runs.
+ * @param {Array<{rel: string, text: string}>} files Pipeline files as they are.
+ * @param {string} laneRel Lane path.
+ * @param {string} text The lane, inlined and possibly changed.
+ * @returns {Array<{rel: string, text: string}>}
+ */
+function replaceLane(files, laneRel, text) {
+	const textOf = (rel) => files.find((entry) => entry.rel === rel)?.text;
+	const lane = textOf(laneRel);
+	if (lane === undefined) fail(`${laneRel} is not part of the pipeline`);
+	const callers = new Map(
+		jobsOfText(lane, laneRel)
+			.filter((job) => isStageCaller(job, textOf))
+			.map((job) => [job.id, job])
+	);
+	if (callers.size === 0)
+		return files.map((entry) => (entry.rel === laneRel ? { rel: laneRel, text } : { ...entry }));
+	const lines = text.split('\n');
+	const jobsAt = lines.findIndex((line) => /^jobs:\s*$/.test(line));
+	if (jobsAt < 0) fail(`${laneRel}: the inlined lane has no jobs: block`);
+	const head = lines.slice(0, jobsAt);
+	const env = topLevelBlock(head, 'env');
+	const laneHead = env
+		? [...head.slice(0, env.at), ...head.slice(env.at + env.lines.length)]
+		: head;
+	const stageTexts = new Map();
+	const out = [
+		laneHead
+			.join('\n')
+			.replace(/\n{3,}/g, '\n\n')
+			.replace(/\n+$/, '\n'),
+		'jobs:'
+	];
+	let cursor = jobsAt + 1;
+	for (const job of jobsOfText(text, laneRel)) {
+		const at = job.line - 1;
+		out.push(...lines.slice(cursor, at), lines[at]);
+		cursor = at + 1 + job.body.split('\n').length;
+		const caller = callers.get(job.id);
+		if (!caller) {
+			out.push(job.body);
+			continue;
+		}
+		const stageRel = field(caller.body, 'uses').slice(2);
+		const stageText = stageTexts.get(stageRel) ?? textOf(stageRel);
+		const [stage] = jobsOfText(stageText, stageRel);
+		const given = jobMapping(caller.body, 'with') ?? new Map();
+		// The caller's own keys as the inlined job now sets them, then its call.
+		const orderedCaller = [
+			...(jobKeyLines(job.body, 'name') ?? []),
+			...(jobKeyLines(job.body, 'needs') ?? []),
+			...(jobKeyLines(job.body, 'if') ?? []),
+			...(jobKeyLines(caller.body, 'uses') ?? []),
+			...(jobKeyLines(job.body, 'permissions') ?? []),
+			...(jobKeyLines(caller.body, 'with') ?? []),
+			...(jobKeyLines(caller.body, 'secrets') ?? [])
+		];
+		out.push(orderedCaller.join('\n'));
+		// The stage job: its own name, then the inlined body without the caller's keys.
+		const body = job.body.split('\n');
+		const rest = [];
+		for (let index = 0; index < body.length; index++) {
+			const key = /^ {4}([A-Za-z_][A-Za-z0-9_-]*):/.exec(body[index]);
+			if (key && ['name', 'needs', 'if'].includes(key[1])) {
+				while (
+					index + 1 < body.length &&
+					(body[index + 1] === '' || indentOf(body[index + 1]) > 4)
+				) {
+					if (/^ {4}\S/.test(body[index + 1])) break;
+					index++;
+				}
+				continue;
+			}
+			rest.push(body[index]);
+		}
+		let stageBody = [...(jobKeyLines(stage.body, 'name') ?? []), ...rest].join('\n');
+		for (const [key, value] of given) {
+			if (key === 'predecessors')
+				stageBody = stageBody.replaceAll('toJSON(needs)', 'inputs.predecessors');
+			const result = /^\$\{\{ needs\.([A-Za-z0-9_-]+)\.result \}\}$/.exec(value);
+			if (key === 'predecessor_result' && result)
+				stageBody = stageBody.replaceAll(`needs.${result[1]}.result`, 'inputs.predecessor_result');
+			const output = /^\$\{\{ needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+) \}\}$/.exec(value);
+			if (output)
+				stageBody = stageBody.replaceAll(
+					`needs.${output[1]}.outputs.${output[2]}`,
+					`inputs.${key}`
+				);
+		}
+		let rebuilt = stageText.replace(stage.body, () => stageBody);
+		if (env) {
+			const stageLines = rebuilt.split('\n');
+			const at = stageLines.findIndex((line) => /^jobs:\s*$/.test(line));
+			const own = topLevelBlock(stageLines.slice(0, at), 'env');
+			if (own) {
+				stageLines.splice(own.at, own.lines.length, ...env.lines);
+				rebuilt = stageLines.join('\n');
+			}
+		}
+		stageTexts.set(stageRel, rebuilt);
+	}
+	out.push(...lines.slice(cursor));
+	const laneText = out.join('\n');
+	return files.map((entry) =>
+		entry.rel === laneRel
+			? { rel: laneRel, text: laneText }
+			: stageTexts.has(entry.rel)
+				? { rel: entry.rel, text: stageTexts.get(entry.rel) }
+				: { ...entry }
+	);
+}
+
+/**
  * Lists a lane file and every file its jobs call, read from one checkout: what
  * a fixture copy of the lane must hold.
  * @param {string} root Absolute path of the checkout.
@@ -1071,6 +1190,7 @@ module.exports = {
 	laneOfFile,
 	laneFilesAt,
 	inlineLaneAt,
+	replaceLane,
 	isStageCaller,
 	callDeclarations,
 	jobMapping,

@@ -48,6 +48,8 @@ const INPUTS = Object.freeze([...SWIFT, ...HEADERS, ...RUNTIME, ...OWNERS, RECEI
 const LOADERS = Object.freeze([
 	'.github/workflows/ci.yml',
 	'.github/workflows/ci-macos.yml',
+	// The E2E stage file runs the clock steps; the lane only calls it.
+	'.github/workflows/ci-macos-e2e.yml',
 	'tools/ci/native_http_clock_evidence.cjs',
 	'tools/ci/macos-stage-roles.cjs',
 	'tools/ci/dev-release-qualification.cjs',
@@ -686,7 +688,7 @@ function officialConsistency(verdict, run, artifact, job, archive, receiving) {
 			String(job.run_attempt) === epoch.run_attempt &&
 			job.head_sha === candidate &&
 			job.status === 'completed' &&
-			job.name === 'macOS / E2E tests (' + lot + ')' &&
+			job.name === 'macOS / E2E tests / ' + lot &&
 			job.conclusion !== 'skipped' &&
 			job.conclusion !== 'cancelled',
 		'Official job consistency refused'

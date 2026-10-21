@@ -479,7 +479,7 @@
 		{
 			"id": "package-macos",
 			"metadata": {
-				"name": "Build (macOS 26)",
+				"name": "Build",
 				"permissions": {
 					"contents": "read",
 					"actions": "read"

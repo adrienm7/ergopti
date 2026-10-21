@@ -16,6 +16,7 @@ const FILTER = `(^|[.])${SUITE}[/.]${METHOD}$`;
 const LAUNCHER = 'static/ergopti_plus/macos/launcher';
 const EXTRA_INPUTS = Object.freeze([
 	'.github/workflows/ci-macos.yml',
+	'.github/workflows/ci-macos-e2e.yml',
 	'tools/diagnostics/lease_silence_xctest_evidence.cjs',
 	'tools/diagnostics/run_lease_silence_native.sh',
 	'tools/diagnostics/lease_silence_swift_child.sh',

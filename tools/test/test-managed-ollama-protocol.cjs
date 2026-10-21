@@ -73,9 +73,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 function receiveNativeHTTPClockWorkflow() {
 	const YAML = require('yaml');
 	const repository = path.resolve(__dirname, '../..');
-	const actual = YAML.parse(
-		fs.readFileSync(path.join(repository, '.github/workflows/ci-macos.yml'), 'utf8')
-	);
+	const actual = YAML.parse(require('./ci-pipeline.cjs').file('.github/workflows/ci-macos.yml'));
 	const expected = YAML.parse(
 		fs.readFileSync(
 			path.join(repository, 'tools/test/fixtures/native_http_clock_profile_workflow.yml'),
