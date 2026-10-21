@@ -224,8 +224,21 @@ function M.new(options)
 	function watcher.pump()
 		if not active or failed or not transport then return false end
 		if operation and not operation:is_running() then fail("worker unavailable"); return false end
-		local bytes, frames = 0, 0
-		for _ = 1, MAX_FRAMES do
+		local bytes, frames, exhausted = 0, 0, false
+		for read = 1, MAX_FRAMES do
+			-- A previous bounded drain may retain complete frames even when the
+			-- pipe has no new bytes. Consume those before requesting another read.
+			while frames < MAX_FRAMES do
+				local newline = pending:find("\n", 1, true)
+				if not newline then break end
+				local line = pending:sub(1, newline - 1)
+				pending = pending:sub(newline + 1)
+				frames = frames + 1
+				local ok, message = pcall(Json.decode, line)
+				if not ok or not consume(message) then fail("invalid native receipt"); break end
+			end
+			if failed then break end
+			if frames == MAX_FRAMES then exhausted = true; break end
 			local chunk, status = transport.read()
 			if chunk == nil then
 				if status ~= "again" and not (status == "eof" and not received) then fail("output ended") end
@@ -235,16 +248,14 @@ function M.new(options)
 			bytes = bytes + #chunk
 			pending = pending .. chunk
 			if bytes > MAX_BYTES or #pending > MAX_BYTES then fail("output exceeded bound"); break end
-			while true do
-				local newline = pending:find("\n", 1, true)
-				if not newline then break end
-				local line = pending:sub(1, newline - 1)
-				pending = pending:sub(newline + 1)
-				frames = frames + 1
-				local ok, message = pcall(Json.decode, line)
-				if frames > MAX_FRAMES or not ok or not consume(message) then fail("invalid native receipt"); break end
-			end
-			if failed then break end
+			if read == MAX_FRAMES then exhausted = true end
+		end
+		if exhausted and not failed then
+			-- Work limits defer honest backlog; they do not corrupt its owner.
+			-- Unread frames may revoke the field, so no earlier answer can admit
+			-- input until a later bounded drain obtains a fresh matching receipt.
+			publish(nil)
+			return false
 		end
 		local fresh = last_at ~= nil and now_ms() - last_at <= lease_ms
 		if not fresh then publish(nil) end

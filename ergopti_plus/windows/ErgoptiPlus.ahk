@@ -487,6 +487,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
+#Include infra/driver_control.ahk
 #Include ui/error_dialog/init.ahk
 #Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
@@ -524,8 +525,11 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/modules/features/number_row_policy.ahk
+#Include ../_shared/modules/features/layout_rows_policy.ahk
+#Include ../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
 #Include modules/keymap/layout/digit_row_bindings.ahk
+#Include modules/keymap/layout/number_row_send.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
 ; and the Ergopti tables are read by modules/keymap/layout.ahk.
@@ -1222,7 +1226,9 @@ if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
 global _DriverInputInitPending := true
 global _DriverMenuReady := false
-MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated)
+; Commands clicked while the previous instance's reload was pending are replayed
+; first, once input is ready (infra/menu_reload_replay.ahk).
+MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated, MenuReloadReplay_Consume())
 _TrayRootBootDetailsPending := true
 if !BuildTrayMenuDeferred()
 	throw Error("the configured startup menu could not be published")
@@ -1381,6 +1387,8 @@ BootProfile_Mark("LAYOUT: registry emulation registered")
 #Include modules/keymap/layout.ahk
 BootProfile_Mark("LAYOUT: Ergopti layout registered")
 #Include modules/shortcuts.ahk
+; [shortcuts.caps_word], read before the first activation arms its listeners.
+CapsWordAutoOffReadConfig(_IniCache)
 BootProfile_Mark("LAYOUT: shortcut modules registered")
 #Include platform/remap.ahk
 BootProfile_Mark("LAYOUT: tap-holds and navigation registered")
@@ -1438,6 +1446,11 @@ if _LLM_Menu_RuntimeActivated
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
 HealthCheck_StartWindowControl()
+; The local reload command is optional: a control that cannot start is
+; reported and the ready driver keeps running without it.
+try DriverControl_Start()
+catch as _DriverControlErr
+	LoggerError("ErgoptiPlus", "Local reload control unavailable: {1}.", _DriverControlErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
@@ -1614,7 +1627,8 @@ LayoutPollPort() {
 				"pending", ReloadTerminalHandoffPending,
 				"veto_honored", LifecycleShutdownVetoHonored,
 				"now", () => A_TickCount,
-				"notify", ReloadRefusedNotify)
+				"notify", ReloadRefusedNotify,
+				"number_row", (Hkl) => NumberRowLayoutObserved(Hkl, (*) => RebuildTrayMenu()))
 		return Port
 }
 

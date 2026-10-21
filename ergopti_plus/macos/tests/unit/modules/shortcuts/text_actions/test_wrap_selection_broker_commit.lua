@@ -26,15 +26,27 @@ local function with_broker(callback)
 			["public.html"] = "<b>USER CLIPBOARD</b>",
 		}
 		local clipboard = initial
+		local change_count = 0
 		f.hs_overrides.pasteboard = {
+			changeCount = function() return change_count end,
 			readAllData = function() return clipboard end,
 			setContents = function(value)
+				change_count = change_count + 1
 				clipboard = { ["public.utf8-plain-text"] = value }
 				return true
 			end,
-			writeAllData = function(value) clipboard = value; return true end,
-			clearContents = function() clipboard = {}; return true end,
+			writeAllData = function(value) change_count = change_count + 1; clipboard = value; return true end,
+			clearContents = function() change_count = change_count + 1; clipboard = {} end,
 		}
+		-- Observe actual native pairs in the same delivery register as returned batches.
+		-- A guarded pair bypasses the HID collector but still posts two real events.
+		f.key_observer = function(event)
+			if event.isDown then f.native_down = event
+			else
+				f.pump_deliveries[#f.pump_deliveries + 1] = { events = { f.native_down, event } }
+				f.native_down = nil
+			end
+		end
 		local synthetic = f.load()
 		package.loaded["modules.shortcuts.actions.text"] = nil
 		local text = require("modules.shortcuts.actions.text")
@@ -46,7 +58,7 @@ local function with_broker(callback)
 			local snapshot = {}
 			for _, timer in ipairs(f.timers) do snapshot[#snapshot + 1] = timer end
 			for _, timer in ipairs(snapshot) do
-				if timer.delay > 0 and not timer.stopped then
+				if timer.delay > synthetic.PERIODIC_OWNER_TICK_SEC and not timer.stopped then
 					f.options.absolute_time = f.options.absolute_time + math.ceil(timer.delay * 1e9)
 					timer.callback()
 				end
@@ -74,9 +86,11 @@ local function with_broker(callback)
 		f.handoff_only = function()
 			f.deliver_trigger = true
 			for index, timer in ipairs(f.timers) do
-				if timer.delay == 0 and not timer.stopped then
+				if timer.delay == synthetic.PERIODIC_OWNER_TICK_SEC and not timer.stopped then
 					table.remove(f.timers, index)
+					f.options.absolute_time = f.options.absolute_time + math.ceil(timer.delay * 1e9)
 					timer.callback()
+					if timer.recurring and not timer.stopped then f.timers[#f.timers + 1] = timer end
 					return
 				end
 			end
@@ -85,7 +99,7 @@ local function with_broker(callback)
 		f.active_delayed = function()
 			local count = 0
 			for _, timer in ipairs(f.timers) do
-				if timer.delay > 0 and not timer.stopped then count = count + 1 end
+				if timer.delay > synthetic.PERIODIC_OWNER_TICK_SEC and not timer.stopped then count = count + 1 end
 			end
 			return count
 		end

@@ -385,11 +385,18 @@ _LEH_EmulatedLegendsComeFromTheKeylayout() {
 	AssertTrue(Compared >= 30, "only " . Compared . " emulated keys compared")
 	AssertTrue(Legends["keys"]["KeyQ"] != "x", "KeyQ is not read from the OS layout under the emulation")
 	AssertEqual("1", Legends["keys"]["Digit1"], "the digit row types its digits")
-	AssertEqual(ErgoptiNumberRowEdgeMapping()[0x29], Legends["keys"]["Backquote"], "the digit row's left edge")
-	; Without the digit row, the number row is the OS layout's.
+	AssertEqual(Spec["number_row_base"]["SC029"]["text"], Legends["keys"]["Backquote"],
+		"the left edge keeps the emulated layout's character (number-row-effective-edges)")
+	; Without « digits first » the built-in emulation still types its own number
+	; row (number-row-availability); only a registry-free OS layout keeps it.
 	NoDigits := LayerEditor_Legends(Ctx, Map("active", true,
 		"character", _LayerEditor_EmulatedCharacter.Bind(false, true, false)), Fake.Probe())
-	AssertEqual("x", NoDigits["keys"]["Digit1"], "a key the emulation leaves is the OS layout's")
+	AssertEqual(Spec["number_row_base"]["SC002"]["text"], NoDigits["keys"]["Digit1"],
+		"the built-in emulation types the .keylayout's number row")
+	AssertEqual(Spec["number_row_base"]["SC029"]["text"], NoDigits["keys"]["Backquote"], "and its left edge")
+	NoEmulation := LayerEditor_Legends(Ctx, Map("active", true,
+		"character", _LayerEditor_EmulatedCharacter.Bind(false, false, false)), Fake.Probe())
+	AssertEqual("x", NoEmulation["keys"]["Digit1"], "a key no emulation types is the OS layout's")
 	; The live emulation: the suite's features turn the Ergopti base layer on.
 	AssertTrue(LayerEditor_CurrentEmulation()["active"], "the Ergopti base layer is an emulation")
 	AssertEqual(Legends["keys"]["KeyQ"], LayerEditor_CurrentEmulation()["character"].Call("SC010"),

@@ -103,6 +103,18 @@ local function storage()
 	return Storage
 end
 
+--- Publishes both position coordinates through one acknowledged storage transaction.
+--- @param updates table Position values to store.
+--- @param deletions table|nil Position keys to clear in the same publication.
+--- @return boolean committed
+local function store_position(updates, deletions)
+	local Storage = storage()
+	if not Storage or type(Storage.set_many) ~= "function" then return false end
+	local called, committed = pcall(Storage.set_many, updates, deletions)
+	return called and committed == true
+end
+
+
 --- Persists one canonical sparse boolean.
 --- @param key string Readout preference name.
 --- @param value boolean Desired value.
@@ -138,8 +150,7 @@ local function on_moved(x, y)
 	if not frame or not canon then return end
 	local ax, ay = Model.anchor_from_origin(canon, frame, x, y)
 	_state.anchor = { x = ax, y = ay }
-	local Storage = storage()
-	if not Storage or Storage.set(POS_X_KEY, ax) ~= true or Storage.set(POS_Y_KEY, ay) ~= true then
+	if not store_position({ [POS_X_KEY] = ax, [POS_Y_KEY] = ay }) then
 		Logger.error(LOG, "The widget's new place could not be saved — it returns to the last one on restart.")
 		return
 	end
@@ -364,12 +375,7 @@ end
 --- @return boolean
 function M.reset_position()
 	if _restore_debt or not Preferences.admit() then return false end
-	local Storage = storage()
-	if not Storage then
-		Logger.error(LOG, "No storage adapter — the widget's place was not reset.")
-		return false
-	end
-	if Storage.delete(POS_X_KEY) ~= true or Storage.delete(POS_Y_KEY) ~= true then
+	if not store_position({}, { POS_X_KEY, POS_Y_KEY }) then
 		Logger.error(LOG, "The widget's saved place could not be cleared.")
 		return false
 	end

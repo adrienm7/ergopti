@@ -271,3 +271,14 @@ _TTHRT_EmptyQuotedKeyOwnsMultilineArray() {
 }
 Test("toml keys: an empty quoted key retains its multiline array (toml-quoted-key-identity)",
 	_TTHRT_EmptyQuotedKeyOwnsMultilineArray)
+
+_TTHRT_LiteralStringKind() {
+	for Raw in ["''", "'en'", "'C:\notes\file.txt'", "'a#b' # trailing comment"]
+		AssertEqual("string", TOML_LiteralKind(Raw),
+			"TOML literal strings must carry string intent at typed boundaries")
+	for Raw in ["'unclosed", "'a'b'", "bare", "42"]
+		AssertFalse(TOML_LiteralKind(Raw) == "string",
+			"malformed and bare text must not gain quoted-string intent")
+}
+Test("toml literal kind: single quotes retain string intent (toml-literal-string-kind)",
+	_TTHRT_LiteralStringKind)

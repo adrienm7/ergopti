@@ -208,6 +208,7 @@ local function parse_http_url(url)
 		authority = authority,
 		origin = scheme .. "://" .. host:lower() .. ":" .. port,
 		path = path,
+		query = tail:match("^[^?#]*(%?[^#]*)") or "",
 	}
 end
 
@@ -215,17 +216,30 @@ end
 --- @param path string Absolute URL path.
 --- @return string normalized
 local function normalize_url_path(path)
-	local parts = {}
-	for part in path:gmatch("[^/]+") do
-		if part == ".." then
-			if #parts > 0 then table.remove(parts) end
-		elseif part ~= "." and part ~= "" then
-			parts[#parts + 1] = part
+	-- RFC 3986 section 5.2.4 moves complete segments, including empty ones:
+	-- repeated slashes identify different resources and must remain intact.
+	local output = ""
+	while path ~= "" do
+		if path:sub(1, 3) == "../" then
+			path = path:sub(4)
+		elseif path:sub(1, 2) == "./" then
+			path = path:sub(3)
+		elseif path:sub(1, 3) == "/./" then
+			path = path:sub(3)
+		elseif path == "/." then
+			path = "/"
+		elseif path:sub(1, 4) == "/../" or path == "/.." then
+			path = path == "/.." and "/" or path:sub(4)
+			output = output:gsub("/?[^/]*$", "")
+		elseif path == "." or path == ".." then
+			path = ""
+		else
+			local segment, remaining = path:match("^(/?[^/]*)(.*)$")
+			output = output .. segment
+			path = remaining
 		end
 	end
-	local normalized = "/" .. table.concat(parts, "/")
-	if path:sub(-1) == "/" and normalized ~= "/" then normalized = normalized .. "/" end
-	return normalized
+	return output
 end
 
 --- Resolves one Location value against the current absolute URL.
@@ -249,15 +263,21 @@ local function resolve_redirect(current_url, location)
 		resolved = current.scheme .. ":" .. location
 	elseif location:sub(1, 1) == "/" then
 		resolved = current.scheme .. "://" .. current.authority .. location
-	elseif location:sub(1, 1) == "?" or location:sub(1, 1) == "#" then
+	elseif location:sub(1, 1) == "?" then
 		resolved = current.scheme .. "://" .. current.authority .. current.path .. location
+	elseif location:sub(1, 1) == "#" then
+		resolved = current.scheme .. "://" .. current.authority .. current.path .. current.query .. location
 	else
 		local relative_path, suffix = location:match("^([^?#]*)(.*)$")
 		local base_dir = current.path:match("^(.*)/") or ""
 		resolved = current.scheme .. "://" .. current.authority
-			.. normalize_url_path(base_dir .. "/" .. relative_path) .. suffix
+			.. base_dir .. "/" .. relative_path .. suffix
 	end
 
+	local prefix, path, suffix = resolved:match("^([%a][%w+%.%-]*://[^/?#]+)([^?#]*)(.*)$")
+	-- Query and fragment references inherit the base path byte-for-byte.
+	local inherits_path = location:sub(1, 1) == "?" or location:sub(1, 1) == "#"
+	if prefix and not inherits_path then resolved = prefix .. normalize_url_path(path) .. suffix end
 	local next_parts, next_err = parse_http_url(resolved)
 	if not next_parts then return nil, nil, next_err end
 	return resolved, current, next_parts
@@ -498,6 +518,14 @@ local function new(options)
 			return false
 		end
 
+		-- Scheduler cleanup may synchronously publish a newer request from an
+		-- exact settlement observer. Retire only our unpublished candidate.
+		if my_generation ~= _generation then
+			if not _cancel_timeout_handle(timeout_handle, "Superseded request admission") then
+				_retain_timeout_cleanup(timeout_handle)
+			end
+			return false
+		end
 		_timeout_timer = timeout_handle
 		return true
 	end
@@ -556,9 +584,16 @@ local function new(options)
 	--- @param callback function Completion callback.
 	--- @return integer|nil generation New request generation, or nil on refusal.
 	local function _prepare_request(callback)
+		local admission_generation = _generation
 		if _request_active or _timeout_timer or _active_task then
-			if inst.cancel() ~= true then
+			local cancelled = inst.cancel()
+			admission_generation = admission_generation + 1
+			-- cancel() notifies real settlement observers after its mutation.
+			-- Their newer request/cancel intent supersedes this outer admission.
+			if admission_generation ~= _generation then return nil end
+			if cancelled ~= true then
 				Logger.error(LOG, "HTTP request refused while native cancellation remains pending.")
+				if admission_generation ~= _generation then return nil end
 				invoke_callback(callback, {
 					ok = false,
 					status = 0,
@@ -568,8 +603,11 @@ local function new(options)
 				return nil
 			end
 		end
-		if not _retry_timeout_cleanup() then
+		local cleanup_settled = _retry_timeout_cleanup()
+		if admission_generation ~= _generation then return nil end
+		if not cleanup_settled then
 			Logger.error(LOG, "HTTP request refused while timeout cleanup remains pending.")
+			if admission_generation ~= _generation then return nil end
 			invoke_callback(callback, {
 				ok = false,
 				status = 0,
@@ -582,7 +620,9 @@ local function new(options)
 		_cancelled = false
 		_generation = _generation + 1
 		local my_generation = _generation
-		if not _arm_timeout(callback, my_generation) then
+		local armed = _arm_timeout(callback, my_generation)
+		if my_generation ~= _generation then return nil end
+		if not armed then
 			_cancelled = true
 			invoke_callback(callback, {
 				ok = false,

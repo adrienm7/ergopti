@@ -869,13 +869,26 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			&& Native["move_create"] == FSAtomicMoveCreate && Native["move_replace"] == FSAtomicMoveReplace
 			&& Native["delete"] == FSDeleteStrict && Native["hash"] == CryptoSha256
 	}
-	AllLive() {
-		if !NativeLive() || !_ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
-			return false
+	GuardsHold() {
 		for Key, Row in Guards {
 			if !Row.check.Call(Row.old_content, Row.old_present, Row.new_content, Row.new_present)
 				return false
 		}
+		return true
+	}
+	AllLive() {
+		if !NativeLive() || !_ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
+			return false
+		; Every guard proves the same shipped registry, so one scope pays for one
+		; deep comparison; the fresh check of the last guard then closes the proof
+		; against any mutation made while the guards ran.
+		if !ConfigMigrateWithRegistryProof(GuardsHold)
+			return false
+		for Key, Row in Guards
+			LastRow := Row
+		if IsSet(LastRow) && !LastRow.check.Call(LastRow.old_content, LastRow.old_present,
+				LastRow.new_content, LastRow.new_present)
+			return false
 		; Source comparisons may be long; their accepted result cannot retain
 		; callback authority withdrawn while the real guards were evaluating.
 		return NativeLive() && _ConfigWriteTerminalOwnsExact(Bundle, PathsFile)

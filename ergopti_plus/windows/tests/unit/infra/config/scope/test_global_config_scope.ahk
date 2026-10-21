@@ -79,7 +79,9 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		AssertEqual(Mode == "clear" ? 1 : 0, Position, "the global scope rows open the Configuration menu")
 		Assert(TrayMenuIsSeparatorAt(Rendered, 2), "a separator closes the Configuration first group")
 		Receipt := (_MenuDispatchCallbacks[ItemId])()
-		AssertEqual(12, Backups, "all stores reach one coordinated backup boundary")
+		; A restore leaves the personal hotstring files as they are (#96), so
+		; only config.toml, the overrides and the tap-hold file are backed up.
+		AssertEqual(Mode == "clear" ? 12 : 3, Backups, "all stores reach one coordinated backup boundary")
 		if Scenario == "backup" || Scenario == "external" {
 			AssertEqual(0, Launches)
 			AssertEqual("refused", Receipt["status"])
@@ -135,7 +137,11 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 				AssertEqual(ManifestRecommendedFor("layout.ergopti_base"), Parsed["layout"]["ergopti_base"])
 			Assert(!TOML_ParseFreshFile(Fixture.overrides)["autocorrection"].Has("delay"))
 			for PersonalPath in Fixture.personal {
-				Assert(!TOML_ParseFreshFile(PersonalPath)["_meta"].Has("delay"))
+				if Mode == "clear"
+					Assert(!TOML_ParseFreshFile(PersonalPath)["_meta"].Has("delay"))
+				else
+					AssertEqual(Fixture.personalSource, FSReadUtf8Exact(PersonalPath),
+						"a restore keeps the personal tuning untouched (#96)")
 				AssertContains(FSReadUtf8Exact(PersonalPath), '"abc" = "replacement"')
 				Assert(!_ConfigWriteLeaseTryAcquire(PersonalPath, "foreign-writer"))
 			}

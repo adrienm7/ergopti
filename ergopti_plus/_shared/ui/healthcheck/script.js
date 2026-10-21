@@ -33,7 +33,7 @@
 	var Redact = window.ErgoptiRedact;
 	var post = makeHostBridge('healthcheck');
 
-	// The host's configuration (schema, redaction rules and context, mode) and
+	// The host's configuration (schema, redaction rules and context) and
 	// the snapshot on screen; both null until the host's init message
 	var state = { config: null, snapshot: null };
 	var Checks = window.ErgoptiDiagnosticChecks;
@@ -394,14 +394,6 @@
 		}
 	}
 
-	/** In report mode, the user starts from the preview and the report button. */
-	function applyMode() {
-		if (state.config.mode !== 'report') return;
-		document.getElementById('preview').open = true;
-		setStatus(t('healthcheck.status.report_mode'), 'info');
-		document.getElementById('btn-report').focus();
-	}
-
 	/**
 	 * The host's only entry point into the page.
 	 * @param {object} message { type: "init"|"snapshot"|"probe"|"action", … }
@@ -416,7 +408,6 @@
 				state.snapshot = message.snapshot;
 				startChecks();
 				render();
-				applyMode();
 				break;
 			case 'snapshot':
 				if (!state.config) return;

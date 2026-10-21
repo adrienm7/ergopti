@@ -196,10 +196,21 @@ end)
 
 helpers.describe("keymap paste: Cmd+V inherits the replacement transaction (audit-v6-bug2)", function()
 	helpers.it("the paste helper emits Cmd+V through SyntheticInput", function()
-		local src = read_unit("local function invalidate_ignored_win_cache")
-		local start_pos = src:find("local function perform_paste%(value%)")
-		local next_pos = src:find("\nfunction M.emit_tokens", start_pos or 1, true)
+		local src = helpers.read_driver_source("local function perform_paste(")
+		helpers.assert_true(type(src) == "string" and src:match("%S") ~= nil,
+			"the paste declaration must select nonempty production source")
+		-- The complete unit stays contiguous if moved; ignore comments and parameter
+		-- arity, but stop at this top-level end before a sibling can supply Cmd+V.
+		src = "\n" .. strip_line_comments(src)
+		local declaration = "\nlocal function perform_paste%([^()\r\n]*%)"
+		local start_pos, declaration_end = src:find(declaration)
+		local next_pos = declaration_end and src:find("\nend[ \t]*\n", declaration_end + 1)
 		helpers.assert_not_nil(start_pos, "perform_paste must remain locatable")
+		helpers.assert_nil(src:find(declaration, declaration_end + 1),
+			"the paste declaration must be unique")
+		helpers.assert_not_nil(next_pos, "the paste body must have its own top-level end")
+		helpers.assert_true(src:sub(declaration_end + 1, next_pos - 1):match("%S") ~= nil,
+			"the paste body must not be empty")
 		local body = src:sub(start_pos, next_pos or #src)
 		local count = 0
 		for _ in body:gmatch("SyntheticInput%.emit_key_stroke") do count = count + 1 end

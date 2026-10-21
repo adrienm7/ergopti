@@ -303,8 +303,9 @@ _FeatureStateIdleResetSeconds(Raw) {
 
 _FeatureStateValidateKanaOverride(Value) {
 	if Value is String {
-		if Value == "auto"
-			return Value
+		; Manifest enum admission is case-insensitive; runtime owns one sentinel.
+		if Value = "auto"
+			return "auto"
 		throw ValueError("script.alt_gr_is_kana_remap must be 'auto' or a TOML boolean")
 	}
 	return _FeatureStateValidateBoolean(Value,

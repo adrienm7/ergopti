@@ -94,7 +94,10 @@ helpers.describe("ApiMlx module surface", function()
 	helpers.it("retains a task whose native termination raises, then retries it", function()
 		local stream = get_upvalue(ApiMlx.cancel_streaming, "_stream")
 		local calls = 0
+		local settled, on_settled = false, nil
 		local task = {
+			isSettled = function() return settled end,
+			onSettled = function(callback) on_settled = callback; return true end,
 			terminate = function()
 				calls = calls + 1
 				error("native terminate failed")
@@ -105,7 +108,12 @@ helpers.describe("ApiMlx module surface", function()
 		helpers.assert_eq(ApiMlx.cancel_streaming(), false)
 		helpers.assert_eq(stream.task, task)
 
-		task.terminate = function() calls = calls + 1; return true end
+		task.terminate = function()
+			calls = calls + 1
+			settled = true
+			on_settled()
+			return true, "settled"
+		end
 		helpers.assert_eq(ApiMlx.cancel_streaming(), true)
 		helpers.assert_eq(stream.task, nil)
 		helpers.assert_eq(calls, 2)

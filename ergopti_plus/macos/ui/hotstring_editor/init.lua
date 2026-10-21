@@ -584,6 +584,7 @@ function M.open(open_mode)
 	local closed = false
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
 			title       = i18n.get("editor.hotstrings.window_title"),
 			style_masks = window_style,

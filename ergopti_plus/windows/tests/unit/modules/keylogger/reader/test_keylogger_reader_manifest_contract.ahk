@@ -813,9 +813,9 @@ _KLRMedia_RetainsCleanupRefusal() {
 }
 Test("Semantic media history: cleanup refusal is retained", _KLRMedia_RetainsCleanupRefusal)
 
-; The old format is still admitted by the real cache owner. Exercise its
-; read-only no-tail fast path, rather than constructing a fresh media schema.
-_KLRMedia_OldWarmCache(KeepOriginalReader := true) {
+; Optional media tables may be absent from an otherwise compatible image.
+; Exercise its admitted read-only no-tail fast path and private table upgrade.
+_KLRMedia_CompatibleWarmCache(KeepOriginalReader := true) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	Stored := 0
@@ -827,13 +827,14 @@ _KLRMedia_OldWarmCache(KeepOriginalReader := true) {
 		KLR_ResetCache()
 		Stored := SQLite_Open(CachePath)
 		AssertTrue(Stored != 0)
-		AssertEqual("14", _KLR_CacheMetaValue(Stored, "format_version"), "freeze the actual pre-media format")
+		AssertEqual(KLR_CACHE_FORMAT_VERSION, _KLR_CacheMetaValue(Stored, "format_version"),
+			"the missing-table fixture must retain admitted projection provenance")
 		AssertTrue(SQLite_Exec(Stored, "DROP TABLE ngram_media_keys; DROP TABLE agg_app_day_media_hold;"))
 		SQLite_Close(Stored)
 		Stored := 0
 		KLRCache.disposable := true
 		AssertEqual(1, KLR_CacheAttach(_KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
-			"the old cache must reach production warm admission")
+			"the compatible missing-table cache must reach production warm admission")
 		OldDb := KLRCache.db
 		AssertEqual(1, DllCall(SQLiteConst.DLL . "\sqlite3_db_readonly", "Ptr", OldDb, "AStr", "main", "Int"))
 		; Observe the original image independently while the candidate is upgraded.
@@ -857,7 +858,7 @@ _KLRMedia_OldWarmCache(KeepOriginalReader := true) {
 		AssertEqual(Before, _KLRDC_DerivedFingerprint(Db), "upgrade cannot rebuild or alter numeric projection")
 		Manifest := KLR_ReadManifestBase(Db, "2026-01-01", "2026-01-01")
 		AssertEqual(0, Manifest["2026-01-01"]["code.exe"]["media_keys"].Count,
-			"an old cache carries no fabricated semantic media credit")
+			"a cache without media tables carries no fabricated semantic media credit")
 		AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()), "an admitted unchanged image keeps its existing fast path")
 	} finally {
 		if Stored
@@ -865,7 +866,7 @@ _KLRMedia_OldWarmCache(KeepOriginalReader := true) {
 		_KLRDC_Cleanup()
 	}
 }
-Test("Semantic media history: old format14 warm cache private upgrade", _KLRMedia_OldWarmCache)
+Test("Semantic media history: compatible warm cache private upgrade", _KLRMedia_CompatibleWarmCache)
 
 _KLRMedia_UpgradeRefusalPreservesPublished() {
 	global _SharedDir
@@ -920,4 +921,4 @@ _KLRMedia_CheckedCloseRefusesLiveStatement() {
 }
 Test("Semantic media history: checked native close refuses live statement", _KLRMedia_CheckedCloseRefusesLiveStatement)
 
-Test("Semantic media history: upgraded image persists for future worker", _KLRMedia_OldWarmCache.Bind(false))
+Test("Semantic media history: upgraded image persists for future worker", _KLRMedia_CompatibleWarmCache.Bind(false))

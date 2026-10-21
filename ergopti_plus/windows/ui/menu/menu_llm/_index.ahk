@@ -182,13 +182,6 @@ global _LLM_Menu := Map(
 	"api_entry_id",               ""
 )
 
-; Profile-power thresholds used by LLM_RecommendProfileForModel — kept here
-; as named constants so the policy is the same as the HS reference (see
-; ui/menu/menu_llm/init.lua MODEL_ADVANCED_PARAMS_THRESHOLD_B and
-; MODEL_BATCH_PARAMS_THRESHOLD_B).
-global LLM_PROFILE_ADVANCED_PARAMS_B := 2.0   ; ≥ 2B → advanced
-global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
-
 ; How many Ctrl+<n> shortcuts we register. We stop at Ctrl+9 because Ctrl+0
 ; collides with browser zoom reset on too many apps to be worth binding.
 global LLM_PROFILE_HOTKEY_LIMIT := 9

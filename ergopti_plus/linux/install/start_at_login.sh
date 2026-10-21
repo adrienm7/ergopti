@@ -61,8 +61,14 @@ if command -v systemctl >/dev/null 2>&1; then
 	# which fails when installation runs outside a graphical user session.
 	# A supported --no-service installation has no unit to disable. Listing unit
 	# files also works without a user bus; a failed query must remain an error.
-	unit_files="$(systemctl --user --no-pager --no-legend list-unit-files ergopti-hotstrings.service)"
-	if [ -n "$unit_files" ]; then
+	# A filtered query exits 1 for a missing unit on systemd 257. Query the
+	# complete successful inventory, then select only our exact first column.
+	unit_files="$(systemctl --user --no-pager --no-legend list-unit-files)"
+	unit_present=false
+	while read -r unit_name unit_metadata; do
+		if [ "$unit_name" = ergopti-hotstrings.service ]; then unit_present=true; break; fi
+	done <<< "$unit_files"
+	if "$unit_present"; then
 		systemctl --user --no-reload disable ergopti-hotstrings.service
 	fi
 fi

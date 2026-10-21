@@ -162,6 +162,47 @@ local function synthetic_of(event)
 	return is_synthetic, (is_synthetic and type(meta.st) == "string") and meta.st or "none"
 end
 
+--- Records a finished word and its bigram with the word before it.
+--- @return string|nil previous_word The word the next one pairs with.
+--- @return string word The open word afterwards (empty).
+local function end_word(batch, date_str, app, previous_word, word)
+	if word == "" then return previous_word, word end
+	if previous_word then
+		Helpers.push_ngram(batch, "ngram_word_bigrams", date_str, app,
+			previous_word .. " " .. word, 0, false, "none")
+	end
+	Helpers.push_ngram(batch, "ngram_words", date_str, app, word, 0, false, "none")
+	return word, ""
+end
+
+--- Credits a finished run of corrections: the cascade it formed and the time
+--- the user took to resume.
+--- @param backspace_run number Corrections in the run.
+--- @param resume_delay number|nil Milliseconds before the next ordinary keystroke.
+--- @return number The open run afterwards (zero).
+local function end_correction(batch, date_str, app, backspace_run, resume_delay)
+	if backspace_run == 0 then return 0 end
+	local errors = Helpers.gc(batch.errors, date_str .. SEPARATOR .. app, {
+		date = date_str, app = app,
+		bs_total = 0, cascade_count = 0, cascade_max_len = 0,
+		recovery_sum_ms = 0, recovery_count = 0,
+	})
+	if backspace_run >= CASCADE_MIN_BS then
+		errors.cascade_count = errors.cascade_count + 1
+		if backspace_run > errors.cascade_max_len then
+			errors.cascade_max_len = backspace_run
+		end
+	end
+	-- Only a prompt resumption is recovery time. Past the pause threshold the
+	-- user stopped typing rather than thought about the fix, and folding that
+	-- in would report a coffee break as the cost of a typo.
+	if resume_delay and resume_delay <= MAX_KEYSTROKE_DELAY_MS then
+		errors.recovery_sum_ms = errors.recovery_sum_ms + resume_delay
+		errors.recovery_count = errors.recovery_count + 1
+	end
+	return 0
+end
+
 --- Uses the shared coarse character policy for the composition breakdown.
 --- Keeping Unicode spaces and non-letter codepoints in their canonical buckets
 --- makes Linux agree with the shared metrics classifier used by macOS.
@@ -180,16 +221,35 @@ end
 --- @param clock table|nil { times = {monotonic_ms…}, wall_offset_ms = n } to place
 ---        keystrokes on the wall clock. Absent means the time-of-day tables are
 ---        skipped rather than filled with a guess.
+--- @param ctx table|nil The application's walk context (see M.settle), carried
+---        from the previous flush and updated in place. With it, a word, a
+---        sequence, a correction, a burst and a session continue across the
+---        flush boundary, as the Windows and macOS walkers carry theirs; without
+---        it, everything still open is credited when the stream ends.
 --- @return table The batch.
-function M.walk(events, date_str, app, batch, clock)
+function M.walk(events, date_str, app, batch, clock, ctx)
 	batch = batch or Helpers.new_batch()
 	if type(events) ~= "table" then return batch end
+	-- Nothing continues across midnight: what the context still holds belongs
+	-- to the day it was typed on.
+	if ctx and ctx.date and ctx.date ~= date_str then M.settle(ctx, nil, batch, true) end
+	local carried = ctx or {}
 
 	-- The tail of the current run, newest last. Cleared by a pause, a backspace
 	-- or a switch to synthetic output, because each of those means the next
 	-- character does not follow the previous one from the same hand.
-	local run = {}
-	local word, previous_word = "", nil
+	local run = carried.run or {}
+	local word, previous_word = carried.word or "", carried.previous_word
+	-- The two tokens before the current position, Backspace markers included,
+	-- for the bigrams and trigrams that END in a correction ("e[BS]",
+	-- "he[BS]", "e[BS][BS]"): which sequences the user goes back over, the
+	-- tokens Windows and macOS push. Kept apart from `run`, which a correction
+	-- breaks: nothing is chained AFTER a marker, so "[BS]x" is never a pair.
+	local before_last, last = carried.before_last, carried.last
+	-- The monotonic stamp of the last manual keystroke. The buffered delays are
+	-- capped at the pause threshold, so only the stamps can tell a session gap.
+	local last_time = carried.last_time
+	local times = type(clock) == "table" and type(clock.times) == "table" and clock.times or nil
 
 	local app_day_key = date_str .. SEPARATOR .. app
 	local classes = Helpers.gc(batch.chars_class, app_day_key, {
@@ -205,27 +265,13 @@ function M.walk(events, date_str, app, batch, clock)
 	-- How many backspaces in a row we are currently inside. A cascade is only
 	-- knowable once the run ENDS, so it is closed on the next ordinary keystroke
 	-- and again after the loop — a stream that ends mid-correction still counts.
-	local backspace_run = 0
+	local backspace_run = carried.backspace_run or 0
 
 	--- Closes an in-progress correction, crediting the cascade and the time the
 	--- user took to resume.
 	--- @param resume_delay number|nil Milliseconds before the next ordinary keystroke.
 	local function close_correction(resume_delay)
-		if backspace_run == 0 then return end
-		if backspace_run >= CASCADE_MIN_BS then
-			errors.cascade_count = errors.cascade_count + 1
-			if backspace_run > errors.cascade_max_len then
-				errors.cascade_max_len = backspace_run
-			end
-		end
-		-- Only a prompt resumption is recovery time. Past the pause threshold the
-		-- user stopped typing rather than thought about the fix, and folding that
-		-- in would report a coffee break as the cost of a typo.
-		if resume_delay and resume_delay <= MAX_KEYSTROKE_DELAY_MS then
-			errors.recovery_sum_ms = errors.recovery_sum_ms + resume_delay
-			errors.recovery_count = errors.recovery_count + 1
-		end
-		backspace_run = 0
+		backspace_run = end_correction(batch, date_str, app, backspace_run, resume_delay)
 	end
 
 	-- Which layout the keystrokes of this flush were resolved through. One row
@@ -260,8 +306,8 @@ function M.walk(events, date_str, app, batch, clock)
 	-- The run currently being counted. Both start at zero rather than one: a
 	-- streak of one is not a streak, and seeding at one would report every
 	-- isolated keystroke as a same-finger event.
-	local last_finger, finger_run = nil, 0
-	local last_hand, hand_run = nil, 0
+	local last_finger, finger_run = carried.last_finger, carried.finger_run or 0
+	local last_hand, hand_run = carried.last_hand, carried.hand_run or 0
 
 	--- Extends or restarts the two streaks for one character.
 	--- @param char string
@@ -296,7 +342,7 @@ function M.walk(events, date_str, app, batch, clock)
 	-- run of keystrokes with no real gap; a session is the coarser version of
 	-- the same idea. Neither can be credited until it ENDS, because its length
 	-- and its speed are only known then.
-	local burst, session = nil, nil
+	local burst, session = carried.burst, carried.session
 	-- Two maps rather than one: the dashboard divides the total time by the
 	-- number of keystrokes credited to get a mean delay, and a single map would
 	-- give it only the numerator.
@@ -321,8 +367,9 @@ function M.walk(events, date_str, app, batch, clock)
 
 	--- Adds one keystroke to the open session, or opens a new one.
 	--- @param delay number Milliseconds since the previous keystroke.
-	local function extend_session(delay)
-		if not session or delay > SESSION_GAP_MS then
+	--- @param gap number Uncapped milliseconds since the previous one, when known.
+	local function extend_session(delay, gap)
+		if not session or gap > SESSION_GAP_MS then
 			Helpers.finalize_session(batch, date_str, app, session)
 			session = { char_count = 1, total_ms = 0 }
 			return
@@ -376,23 +423,33 @@ function M.walk(events, date_str, app, batch, clock)
 
 	--- Ends the current word, if there is one.
 	local function flush_word()
-		if word == "" then return end
-		if previous_word then
-			Helpers.push_ngram(batch, "ngram_word_bigrams", date_str, app,
-				previous_word .. " " .. word, 0, false, "none")
-		end
-		Helpers.push_ngram(batch, "ngram_words", date_str, app, word, 0, false, "none")
-		previous_word = word
-		word = ""
+		previous_word, word = end_word(batch, date_str, app, previous_word, word)
 	end
 
 	for index, event in ipairs(events) do
 		local char  = event[1]
 		local delay = tonumber(event[2]) or 0
 		local is_synthetic, source = synthetic_of(event)
+		-- The real gap since the previous manual keystroke, for the session cut.
+		local stamp = times and tonumber(times[index]) or nil
+		local gap = delay
+		if not is_synthetic and stamp then
+			if last_time then gap = math.max(delay, stamp - last_time) end
+			last_time = stamp
+		end
 
 		if char == BACKSPACE_MARKER then
+			-- After a real pause the correction does not continue what came before.
+			if not is_synthetic and delay >= MAX_KEYSTROKE_DELAY_MS then before_last, last = nil, nil end
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
+			if last then
+				Helpers.push_ngram(batch, "ngram_bigrams", date_str, app, last .. char, delay, false, source)
+				if before_last then
+					Helpers.push_ngram(batch, "ngram_trigrams", date_str, app,
+						before_last .. last .. char, delay, false, source)
+				end
+			end
+			before_last, last = last, char
 			-- A correction. The run is broken because what follows continues from
 			-- a different character than it appears to, and the partial word is
 			-- abandoned rather than recorded — the user was not writing it.
@@ -419,6 +476,7 @@ function M.walk(events, date_str, app, batch, clock)
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, 0, false, source)
 			run = {}
 			word = ""
+			before_last, last = nil, nil
 			-- An expansion is not something the hands did, so it cannot extend a
 			-- same-finger run. Counting it would make the layout look worse the
 			-- more the driver types for the user, which is backwards.
@@ -430,7 +488,7 @@ function M.walk(events, date_str, app, batch, clock)
 			classes[class] = classes[class] + 1
 			bump_time_of_day(index)
 			extend_burst(delay)
-			extend_session(delay)
+			extend_session(delay, gap)
 			bump_streaks(char)
 			if layouts then layouts.count = layouts.count + 1 end
 			-- Cumulative, not exclusive: each threshold answers "how much time is
@@ -448,9 +506,11 @@ function M.walk(events, date_str, app, batch, clock)
 				flush_word()
 				run = {}
 				previous_word = nil
+				before_last, last = nil, nil
 			end
 
 			run[#run + 1] = char
+			before_last, last = last, char
 			-- Only the last seven matter, and holding more would grow without bound
 			-- on a long session.
 			if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
@@ -474,11 +534,24 @@ function M.walk(events, date_str, app, batch, clock)
 		end
 	end
 
-	-- The stream ends mid-word far more often than not — a flush lands between
-	-- keystrokes, not between sentences — so the tail is recorded rather than
-	-- discarded. A correction still open at the end is closed with no resume
-	-- time, for the same reason: the cascade happened whether or not the user
-	-- has typed the next character yet.
+	-- The stream ends mid-word far more often than not: a flush lands between
+	-- keystrokes, not between sentences. With a context, what is still open
+	-- waits there for the next flush, so a session the flush cadence cuts in
+	-- ten is still one session and "hel" + "lo" is still "hello"; settle()
+	-- credits it once its own gap has passed.
+	if ctx then
+		ctx.date, ctx.app = date_str, app
+		ctx.run, ctx.word, ctx.previous_word = run, word, previous_word
+		ctx.before_last, ctx.last, ctx.last_time = before_last, last, last_time
+		ctx.backspace_run = backspace_run
+		ctx.last_finger, ctx.finger_run = last_finger, finger_run
+		ctx.last_hand, ctx.hand_run = last_hand, hand_run
+		ctx.burst, ctx.session = burst, session
+		return batch
+	end
+	-- Without one the tail is recorded rather than discarded. A correction still
+	-- open at the end is closed with no resume time, for the same reason: the
+	-- cascade happened whether or not the user has typed the next character yet.
 	flush_word()
 	close_correction(nil)
 	-- A burst or session still open at the flush boundary is credited now rather
@@ -486,6 +559,56 @@ function M.walk(events, date_str, app, batch, clock)
 	-- common case: discarding it would lose almost every burst the user makes.
 	Helpers.finalize_burst(batch, date_str, app, burst)
 	Helpers.finalize_session(batch, date_str, app, session)
+	return batch
+end
+
+--- Credits what a walk context holds once it has provably ended.
+---
+--- The rules are the walk's own, applied to the time elapsed since the last
+--- keystroke instead of to the next one: a pause ends the word, the sequence
+--- and the correction; a burst and a session end at their gaps. So the totals
+--- are those a single walk over the whole stream would give, only credited
+--- earlier and to the day they were typed on. `force` ends everything, for a
+--- shutdown or a new day.
+--- @param ctx table A context M.walk filled; updated in place.
+--- @param now_ms number|nil Monotonic milliseconds now; unknown judges nothing.
+--- @param batch table|nil A batch to add to; created only when a row is credited.
+--- @param force boolean|nil End everything regardless of time.
+--- @return table|nil The batch.
+function M.settle(ctx, now_ms, batch, force)
+	if type(ctx) ~= "table" or not ctx.date then return batch end
+	local date_str, app = ctx.date, ctx.app
+	local gap = (type(now_ms) == "number" and type(ctx.last_time) == "number") and now_ms - ctx.last_time or nil
+	local function ended(threshold, inclusive)
+		if force then return true end
+		if gap == nil then return false end
+		return gap > threshold or (inclusive and gap == threshold)
+	end
+	local function target()
+		batch = batch or Helpers.new_batch()
+		return batch
+	end
+	-- The walk treats a delay AT the threshold as a pause, hence inclusive.
+	if ended(MAX_KEYSTROKE_DELAY_MS, true) then
+		if (ctx.backspace_run or 0) > 0 then
+			ctx.backspace_run = end_correction(target(), date_str, app, ctx.backspace_run, nil)
+		end
+		if (ctx.word or "") ~= "" then end_word(target(), date_str, app, ctx.previous_word, ctx.word) end
+		ctx.word, ctx.previous_word = "", nil
+		ctx.run, ctx.before_last, ctx.last = {}, nil, nil
+	end
+	if ctx.burst and ended(BURST_GAP_MS) then
+		Helpers.finalize_burst(target(), date_str, app, ctx.burst)
+		ctx.burst = nil
+	end
+	if ctx.session and ended(SESSION_GAP_MS) then
+		Helpers.finalize_session(target(), date_str, app, ctx.session)
+		ctx.session = nil
+	end
+	if force then
+		-- Nothing of a finished day or a stopped process continues.
+		for key in pairs(ctx) do ctx[key] = nil end
+	end
 	return batch
 end
 

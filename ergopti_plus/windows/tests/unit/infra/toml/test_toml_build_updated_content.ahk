@@ -155,6 +155,31 @@ Test("toml candidate: invalid renderer result returns a typed failure "
 	. "(toml-build-updated-content-render-failure)",
 	_TBUI_RenderFailureReturnsTypedError)
 
+; The flat writer shares the Lua codec's house spacing: five blank lines before
+; a top-level header, three before a nested one (toml-header-spacing).
+_TBUI_HeaderSpacing() {
+	Path := _TBUI_NewPath()
+	Updates := [{ Section: "alpha", Key: "x", Value: 1 },
+		{ Section: "alpha.beta", Key: "y", Value: 2 },
+		{ Section: "alpha.beta.gamma", Key: "z", Value: 3 },
+		{ Section: "omega", Key: "w", Value: 4 }]
+	Gap5 := "`n`n`n`n`n`n"
+	Gap3 := "`n`n`n`n"
+	Expected := Chr(0xFEFF) . "[alpha]`nx = 1" . Gap3 . "[alpha.beta]`ny = 2" . Gap3
+		. "[alpha.beta.gamma]`nz = 3" . Gap5 . "[omega]`nw = 4`n"
+	try {
+		Candidate := TOML_BuildUpdatedContent(Path, Updates)
+		AssertEqual("ok", Candidate["status"])
+		AssertEqual(Expected, Candidate["content"],
+			"a nested header follows three blank lines and a top-level header five")
+		AssertTrue(TOML_BatchWrite(Path, Updates))
+		AssertEqual(Expected, FSReadUtf8Exact(Path), "publication keeps the same spacing")
+	} finally {
+		FSDelete(Path)
+	}
+}
+Test("toml writer: nested headers follow three blank lines (toml-header-spacing)", _TBUI_HeaderSpacing)
+
 _TBUI_UnchangedBooleanLiterals() {
 	Path := _TBUI_NewPath()
 	Seed := '[existing]`non = true # enabled`nyes = true # affirmative`noff = false`nzero = 0`none = 1`n'

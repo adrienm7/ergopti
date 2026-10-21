@@ -64,7 +64,9 @@ local function install_doubles(h)
 	}
 
 	h.timers = {}
+	h.clock = 0
 	package.loaded["adapters.timer_scheduler"] = {
+		awake_time = function() return h.clock end,
 		every = function(seconds, fn)
 			local handle = { seconds = seconds, fn = fn, cancelled = false }
 			h.timers[#h.timers + 1] = handle
@@ -96,7 +98,10 @@ local function with_guide(body)
 		--- Fires the live poll once, as its timer would.
 		function h.tick()
 			local timer = h.timers[#h.timers]
-			if timer and not timer.cancelled then timer.fn() end
+			if timer and not timer.cancelled then
+				h.clock = h.clock + timer.seconds
+				timer.fn()
+			end
 		end
 		--- Closes the steps as the user does, with Later or the close button.
 		function h.user_closes()
@@ -273,6 +278,70 @@ helpers.describe("Login Items approval guide (guardian-approval-steps)", functio
 		with_guide(function(h)
 			helpers.assert_true(not pcall(h.guide.offer, {}), "an incomplete facade must fail fast")
 			helpers.assert_true(not pcall(h.guide.reopen, nil))
+		end)
+	end)
+end)
+
+
+--- Runs the real scheduler against an independently advanced native awake clock.
+--- @param body function Receives the guide fixture and its live native timer.
+local function with_monotonic_guide(body)
+	helpers.with_stub_scope(MODULES, function()
+		local h = {}
+		install_doubles(h)
+		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["ui.permission_dialog.login_items_guide"] = nil
+		local scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+		h.clock = 0
+		hs.timer.absoluteTime = function() return math.floor(h.clock * 1e9) end
+		h.guide = require("ui.permission_dialog.login_items_guide")
+		function h.fire_at(seconds)
+			h.clock = seconds
+			local native = hs.timer.__timers[#hs.timer.__timers]
+			assert(native ~= nil)
+			native:fire()
+		end
+		body(h, scheduler)
+		helpers.assert_true(scheduler.cancelAll())
+	end)
+end
+
+
+helpers.describe("Login Items deadline uses elapsed awake time (login-guide-monotonic-deadline)", function()
+	helpers.it("closes on the first delayed poll after its actual deadline", function()
+		with_monotonic_guide(function(h, scheduler)
+			helpers.assert_true(h.guide.offer(h.remap))
+			h.fire_at(h.guide.DEADLINE_SECONDS + 1)
+			helpers.assert_nil(h.open, "a delayed runloop must not restart the ten-minute budget")
+			helpers.assert_eq(h.guide.is_active(), false)
+			helpers.assert_eq(scheduler.activeCount(), 0)
+		end)
+	end)
+
+	helpers.it("keeps the guide before the deadline and closes exactly at its awake boundary", function()
+		with_monotonic_guide(function(h, scheduler)
+			helpers.assert_true(h.guide.offer(h.remap))
+			h.fire_at(h.guide.DEADLINE_SECONDS - 0.25)
+			helpers.assert_not_nil(h.open)
+			helpers.assert_true(h.guide.is_active())
+			h.fire_at(h.guide.DEADLINE_SECONDS)
+			helpers.assert_nil(h.open, "the deadline is inclusive even after only two callbacks")
+			helpers.assert_eq(scheduler.activeCount(), 0)
+		end)
+	end)
+
+	helpers.it("retires an expired queue without closing the Accessibility dialog", function()
+		with_monotonic_guide(function(h, scheduler)
+			h.accessibility_open = true
+			helpers.assert_true(h.guide.offer(h.remap))
+			h.fire_at(h.guide.DEADLINE_SECONDS + 1)
+			helpers.assert_eq(h.guide.is_active(), false)
+			helpers.assert_eq(scheduler.activeCount(), 0)
+			helpers.assert_eq(#h.shows, 0)
+			helpers.assert_true(h.accessibility_open, "the expired queue owns no Accessibility window")
+			h.accessibility_open = false
+			h.fire_at(h.guide.DEADLINE_SECONDS + 2)
+			helpers.assert_eq(#h.shows, 0, "late delivery cannot revive the retired queue")
 		end)
 	end)
 end)

@@ -111,6 +111,7 @@ local core_mods = {
 	keylogger     = safe_require("modules.keylogger", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "dynamic hotstrings engine"),
+	capsword_auto_off = safe_require("infra.capsword_auto_off", "CapsWord auto-off settings"),
 }
 
 M._active_tasks = {}

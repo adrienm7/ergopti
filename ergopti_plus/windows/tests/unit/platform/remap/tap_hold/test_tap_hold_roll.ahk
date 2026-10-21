@@ -321,3 +321,78 @@ _THR_HoldStaysTheSharedOwners() {
 }
 Test("tap-hold roll: the hold of a typing key is still the shared owner's (tap-hold-roll-is-a-tap-2026-10-01)",
 	_THR_HoldStaysTheSharedOwners)
+
+; Suspend disarms new hotkeys, but threads already waiting inside a roll keep
+; running. Their withheld physical keys must not escape as synthetic output.
+_THR_PausedLateKeyDoesNotReplay() {
+	WasSuspended := A_IsSuspended
+	World := _THR_World()
+	try {
+		Suspend(true)
+		TapHoldRollOtherKey("*SC010", World.KeyPorts())
+		AssertEqual("", World.Joined(), "a late hotkey thread must not replay after pause")
+		AssertFalse(TapHoldRollUndecided())
+	} finally Suspend(WasSuspended)
+}
+Test("tap-hold roll: a late key respects pause (tap-hold-roll-pause)",
+	_THR_PausedLateKeyDoesNotReplay)
+
+_THR_PauseCancelsQueuedKey() {
+	WasSuspended := A_IsSuspended
+	World := _THR_World()
+	Inside(W) {
+		W.Down[0x10] := true
+		W.Script := [(X) => Suspend(true), (X) => X.Down.Delete(0x10)]
+		TapHoldRollOtherKey("*SC010", W.KeyPorts())
+	}
+	try {
+		Result := _THR_Run(World, Inside, true)
+		AssertEqual("", World.Joined(), "pause must emit neither the tap, the hold nor a withheld key")
+		AssertEqual("", Result["decision"], "the paused press has no typing decision")
+		AssertEqual(1, World.Script.Length, "pause must end the waiting thread before another poll")
+		AssertFalse(TapHoldRollUndecided(), "the cancelled press must release its undecided state")
+		AssertFalse(TapHoldPressIsOwned("space"), "the cancelled owner must release its press claim")
+	} finally Suspend(WasSuspended)
+}
+Test("tap-hold roll: pausing cancels queued keys immediately (tap-hold-roll-pause)",
+	_THR_PauseCancelsQueuedKey)
+
+_THR_PauseDuringTapDoesNotReplay() {
+	WasSuspended := A_IsSuspended
+	World := _THR_World()
+	Wait(KeyName, Seconds) {
+		World.Down[0x10] := true
+		World.Script := [(X) => X.Down.Delete(0x39)]
+		TapHoldRollOtherKey("*SC010", World.KeyPorts())
+		return true
+	}
+	try {
+		World.Down[0x39] := true
+		TapHoldOwnRoll("space", "SC039", 0.2,
+			() => (World.Log("tap"), Suspend(true)),
+			() => (World.Log("press"), true), (Pressed) => World.Log("own"),
+			Map("wait_release", Wait, "tick", () => World.Now))
+		AssertEqual("tap", World.Joined(), "a pause entered by the tap must stop the following replay")
+		AssertFalse(TapHoldRollUndecided())
+	} finally Suspend(WasSuspended)
+}
+Test("tap-hold roll: a tap which pauses prevents queued replay (tap-hold-roll-pause)",
+	_THR_PauseDuringTapDoesNotReplay)
+
+_THR_PauseBetweenReplayedKeys() {
+	WasSuspended := A_IsSuspended
+	PreviousLevel := A_SendLevel
+	Sent := []
+	Emit(Stroke) {
+		Sent.Push(Stroke)
+		Suspend(true)
+	}
+	try {
+		_TapHoldRollReplay([0x10, 0x11], Emit)
+		AssertEqual(1, Sent.Length, "a pause during the first send must stop the second queued key")
+		AssertEqual("{Blind}{SC010}", Sent[1], "only the first admitted key is emitted")
+		AssertEqual(PreviousLevel, A_SendLevel, "cancelled replay must still restore its caller's SendLevel")
+	} finally Suspend(WasSuspended)
+}
+Test("tap-hold roll: pause during replay cancels the remaining keys (tap-hold-roll-pause)",
+	_THR_PauseBetweenReplayedKeys)

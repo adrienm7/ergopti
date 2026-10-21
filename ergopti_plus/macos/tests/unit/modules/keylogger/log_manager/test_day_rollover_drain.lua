@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 local saved_file_system = package.loaded["adapters.file_system"]
 local Logger = helpers.load_with_stubs("infra.logger")
 
@@ -281,7 +282,7 @@ package.loaded["adapters.file_system"] = {
 		execute = function() return "" end,
 	}
 
-	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+	local lm = EmptyLedger.load(hs_overrides)
 	lm.init({
 		LOG_DIR              = "/tmp/test_day_rollover",
 		buffer_events        = {},

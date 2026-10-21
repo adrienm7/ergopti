@@ -93,7 +93,7 @@ _DMNCSM_RebuildUsesStagedInit() {
 	Assert(InStr(Coordinator, "A_TrayMenu.Delete()") = 0
 		and InStr(Coordinator, "_TrayRootDrain()") > 0,
 		"RebuildTrayMenu must leave the live root intact and delegate to the single tray-root generation owner")
-	Assert(InStr(Worker, "initMenu(PublishAuthorizeFn)") > 0,
+	Assert(InStr(Worker, "initMenu(PublishAuthorizeFn, false, LiveLlm?)") > 0,
 		"the canonical root worker must carry terminal authorization into initMenu's staged publication")
 }
 Test("tray_menu: coordinated rebuild delegates root replacement to staged init (dispatcher-map-never-cleared-stale-misfire)", _DMNCSM_RebuildUsesStagedInit)

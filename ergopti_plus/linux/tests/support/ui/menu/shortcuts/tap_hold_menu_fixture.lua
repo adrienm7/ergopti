@@ -22,8 +22,16 @@ local SCOPE = "infra.tap_hold_scope"
 local function fake_writer(calls)
 	local writer = {}
 	for _, name in ipairs({ "set_tap", "set_hold", "set_native", "set_threshold", "set_enabled" }) do
-		writer[name] = function(...)
-			calls[#calls + 1] = { name, ... }
+		writer[name] = function(first, second, third)
+			if name == "set_tap" or name == "set_threshold" then
+				if third ~= nil then
+					assert(type(third) == "function", "deferred editor guard")
+					if third() ~= true then return false end
+				end
+				calls[#calls + 1] = { name, first, second }
+			else
+				calls[#calls + 1] = { name, first, second, third }
+			end
 			return true
 		end
 	end
@@ -69,7 +77,7 @@ local function build(calls, picked, user_text)
 	}
 	local mb = helpers.load_module("ui.menu.menu_builder")
 	local changed = 0
-	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = Manager,
+	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 		on_menu_changed = function() changed = changed + 1 end })
 	local title = require("infra.i18n").get("menu.tapholds.title")
 	local section = nil

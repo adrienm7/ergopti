@@ -136,6 +136,21 @@ local function get_entry(manifest, date, app)
 	return manifest[date][app]
 end
 
+--- Decodes an optional TEXT value that SQL quoted with json_quote.
+--- decode_lossless answers nil for malformed text rather than raising, and a
+--- null token for SQL NULL; an absent column is an absent value.
+--- @param quoted string|nil The json_quote output.
+--- @return boolean valid
+--- @return string|nil text
+local function decode_optional_text(quoted)
+	if quoted == nil then return true, nil end
+	if type(quoted) ~= "string" then return false, nil end
+	local value = Json.decode_lossless(quoted)
+	if Json.is_null(value) then return true, nil end
+	if type(value) == "string" then return true, value end
+	return false, nil
+end
+
 --- Merges persisted error buckets while retaining identical device contributions.
 local function merge_error_buckets(target, row)
 	if not ok_json or type(row.e_buckets_json) ~= "string" then return end
@@ -144,6 +159,44 @@ local function merge_error_buckets(target, row)
 	for label, count in pairs(buckets) do
 		target[label] = (target[label] or 0) + (tonumber(count) or 0) * row.source_rows
 	end
+end
+
+--- Projects local saved category/score overrides for the shared Apps dashboard.
+--- One read-only query joins every score to this device's category history;
+--- foreign synced categories must not replace the user's own assignment.
+--- @param sqlite_path string Database path.
+--- @param device_id string Local device owning the category edit.
+--- @return table|nil categories Shared { app = { type, score } } map; nil on refusal.
+function M.read_user_categories(sqlite_path, device_id)
+	if type(device_id) ~= "string" or device_id == "" then return nil end
+	local prefix = sql_quote("app_score.")
+	-- TEXT substr stops at NUL. The namespace is ASCII, so slice its bytes first.
+	local app = "CAST(substr(CAST(scores.key AS BLOB), length(" .. prefix .. ") + 1) AS TEXT)"
+	local rows, accepted = read_rows(sqlite_path,
+		"SELECT json_quote(" .. app .. ") AS app_json, json_quote(scores.value) AS score_json, "
+		.. "json_quote(MAX(owned.category)) AS category_json FROM meta AS scores "
+		.. "LEFT JOIN agg_app_day AS owned ON owned.app = " .. app
+		.. " AND owned.device_id = " .. sql_quote(device_id)
+		.. " WHERE substr(scores.key, 1, length(" .. prefix .. ")) = " .. prefix
+		.. " GROUP BY scores.key, scores.value;")
+	if not accepted then return nil end
+	local categories = {}
+	for _, row in ipairs(rows) do
+		-- Quote text before the CLI JSON boundary so NUL cannot shorten a key,
+		-- category or malformed score into a different, apparently valid value.
+		local ok_app, name = pcall(Json.decode, row.app_json)
+		local ok_score, raw_score = pcall(Json.decode, row.score_json)
+		local ok_category, category = decode_optional_text(row.category_json)
+		local score = ok_score and type(raw_score) == "string" and tonumber(raw_score) or nil
+		if not ok_app or type(name) ~= "string" or name == "" or not score
+			or score ~= score or score == math.huge or score == -math.huge
+			or not ok_category or (category ~= nil and type(category) ~= "string") then
+			Logger.warn(LOG, "SQLite category metadata is invalid; dashboard projection refused.")
+			return nil
+		end
+		categories[name] = { type = category or new_entry().category, score = score }
+	end
+	return categories
 end
 
 --- Builds the shared date/app manifest from persisted aggregates.
@@ -166,10 +219,18 @@ SELECT date, app, SUM(chars) AS chars, SUM(pauses) AS pauses,
        SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,
        SUM(hs_suggested) AS hs_suggested, SUM(llm_suggested) AS llm_suggested,
        SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,
-       SUM(app_time_ms) AS app_time_ms, MAX(category) AS category
+       SUM(app_time_ms) AS app_time_ms, json_quote(MAX(category)) AS category_json
 FROM agg_app_day%s GROUP BY date, app;
 ]], filters(start_date, end_date, apps)))
 	for _, row in ipairs(rows) do
+		-- Quoted in SQL as read_user_categories quotes it: the CLI's JSON mode
+		-- cuts raw TEXT at NUL, so a saved category came back shortened.
+		local valid, category = decode_optional_text(row.category_json)
+		if not valid then
+			Logger.warn(LOG, "SQLite application category is invalid; manifest projection incomplete.")
+			complete, category = false, nil
+		end
+		row.category = category
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.chars = row.chars or 0
 		entry.pauses = row.pauses or 0
@@ -539,19 +600,44 @@ function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	return out
 end
 
---- Returns historical n-grams before today plus per-app n-grams for today.
-function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
-	local today = os.date("%Y-%m-%d")
-	-- Calendar days can contain 23 or 25 hours. Derive the preceding day from
-	-- the captured date at noon, so DST and a clock crossing midnight cannot
-	-- duplicate today's rows or omit yesterday from the historical projection.
+--- Resolves inclusive date bounds against one captured local calendar day.
+--- Invalid optional bounds are ignored, matching the reader's SQL filters.
+--- @param start_date string|nil Inclusive lower bound.
+--- @param end_date string|nil Inclusive upper bound.
+--- @param today string|nil Captured current day; defaults to the local date.
+--- @return table { today, includes_today, historical_end }.
+function M.split_bounds(start_date, end_date, today)
+	today = today or os.date("%Y-%m-%d")
+	assert(valid_date(today), "Invalid current calendar day")
+	-- Calendar days can contain 23 or 25 hours. Normalize yesterday at noon
+	-- using this captured date, without subtracting a fixed day in seconds.
 	local year, month, day = today:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
 	local yesterday = os.date("%Y-%m-%d", os.time({
 		year = tonumber(year), month = tonumber(month), day = tonumber(day) - 1, hour = 12,
 	}))
-	local historical_end = valid_date(end_date) and end_date < today and end_date or yesterday
+	return {
+		today = today,
+		includes_today = (not valid_date(start_date) or start_date <= today)
+			and (not valid_date(end_date) or end_date >= today),
+		historical_end = valid_date(end_date) and end_date < today and end_date or yesterday,
+	}
+end
+
+--- Returns historical n-grams before today plus per-app n-grams for today.
+--- Both slices obey the requested inclusive range and application filters.
+--- @param sqlite_path string Database path.
+--- @param start_date string|nil Inclusive lower bound.
+--- @param end_date string|nil Inclusive upper bound.
+--- @param apps table|nil Selected application names.
+--- @param today string|nil Current day captured by the projection owner.
+--- @return table { historical, today }.
+function M.read_range_split_today(sqlite_path, start_date, end_date, apps, today)
+	local bounds = M.split_bounds(start_date, end_date, today)
+	today = bounds.today
+	local historical_end = bounds.historical_end
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
+	if not bounds.includes_today then return { historical = historical, today = today_by_app } end
 	local today_where = filters(today, today, apps)
 	for _, code in ipairs(NGRAM_CODES) do
 		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))

@@ -29,6 +29,7 @@ local M = {}
 local Logger   = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local Timings   = require("infra.timings")
+local EvdevCodes = require("infra.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
 local Manifest      = require("infra.manifest_reader")
@@ -109,6 +110,10 @@ local LOG = "modules.keylogger.keylogger"
 -- across a user's two machines redacts identically on both.
 local PRIVATE_PLACEHOLDER_CHAR = "\226\128\162"
 
+-- The token one deletion travels as in the portable events_json stream, the
+-- same bracket marker the Windows hook and the macOS event tap write.
+local BACKSPACE_MARKER = "[BS]"
+
 
 -- =========================================
 -- =========================================
@@ -167,6 +172,16 @@ local _flushed_app_holds = {}
 local _flushed_app_ngrams = {}
 local _flushed_app_scancodes = {}
 local _flushed_app_sources = {}
+-- Each application's aggregate-walk context as of the last COMMIT: the word,
+-- sequence, correction, burst and session still open when that flush was cut.
+-- A flush adopts its successor only on COMMIT, so a refused one re-walks its
+-- restored events from exactly this state.
+local _walker_contexts = {}
+-- The monotonic stamp of each application's last manual keystroke. Kept
+-- across flushes: a fresh pending buffer has none, and its first keystroke
+-- then read as zero milliseconds after the previous one, however long ago
+-- that was, and every expansion typed first in a flush had no stamp at all.
+local _typing_last_key_at = {}
 
 -- Persisted manifest cache keyed by SQLite's monotonic revision. The live
 -- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
@@ -487,11 +502,16 @@ end
 function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 	if not may_record() then return end
 
+	-- A correction is an input event but types nothing, so neither speed readout
+	-- counts it: the Windows widget is pushed for characters only and macOS
+	-- leaves Backspace out of its typing rings. Counting it would make every
+	-- held Backspace read as a burst of fast typing.
+	local is_correction = ch == BACKSPACE_MARKER
 	-- Forward to the base metrics collector if available.
-	if Metrics then
+	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
-	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+	if not is_correction and type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, 1, timestamp_ms)
 	end
 
@@ -503,14 +523,15 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 		M.record_app_key(resolved_app, ch, timestamp_ms)
 		local pending = _pending_typing_events[resolved_app]
 		if not pending then
-			pending = { text = {}, events = {}, times = {}, last_key_at = nil }
+			pending = { text = {}, events = {}, times = {} }
 			_pending_typing_events[resolved_app] = pending
 		end
 		local delay = 0
-		if type(pending.last_key_at) == "number" then
-			delay = math.max(0, math.min(timestamp_ms - pending.last_key_at, MAX_TYPING_INTERVAL_MS))
+		local previous_at = _typing_last_key_at[resolved_app]
+		if type(previous_at) == "number" and type(timestamp_ms) == "number" then
+			delay = math.max(0, math.min(timestamp_ms - previous_at, MAX_TYPING_INTERVAL_MS))
 		end
-		pending.last_key_at = timestamp_ms
+		_typing_last_key_at[resolved_app] = timestamp_ms
 		pending.text[#pending.text + 1] = ch
 		-- [text, inter-key delay, metadata] is the portable events_json shape
 		-- consumed by the macOS/Windows projectors. `sk` deliberately identifies
@@ -528,6 +549,19 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 		-- the delays are capped, so summing them drifts across every real pause.
 		pending.times[#pending.events] = timestamp_ms
 	end
+end
+
+--- Records one physical Backspace press as a manual correction.
+---
+--- The hook reports Backspace through its control callback, never as text, so
+--- before this entry point the daemon fed nothing for it: the walker's error
+--- counts, hourly corrections and backspace n-grams only ever saw the deletions
+--- a hotstring made. Every press counts, auto-repeat and Ctrl+Backspace
+--- included, as on Windows and macOS: each is one deletion the user asked for.
+--- @param app_id       string|nil Focused application identifier.
+--- @param timestamp_ms number     Monotonic wall-clock timestamp in ms.
+function M.record_correction(app_id, timestamp_ms)
+	M.on_keydown(BACKSPACE_MARKER, timestamp_ms, app_id, EvdevCodes.KEY_BACKSPACE)
 end
 
 
@@ -554,7 +588,7 @@ function M.record_app_key(app_id, ch, timestamp_ms)
 	app.last_key_at = timestamp_ms
 
 	-- A correction remains an input event, but contributes no typed character.
-	if ch ~= "[BS]" then app.keystroke_count = app.keystroke_count + 1 end
+	if ch ~= BACKSPACE_MARKER then app.keystroke_count = app.keystroke_count + 1 end
 	-- Against the window it was typed into, not the application. Both are useful
 	-- and only one of them was recorded.
 	if _current_title then
@@ -591,7 +625,7 @@ end
 local function ensure_pending(app_id)
 	local pending = _pending_typing_events[app_id]
 	if pending then return pending end
-	pending = { text = {}, events = {}, times = {}, last_key_at = nil }
+	pending = { text = {}, events = {}, times = {} }
 	_pending_typing_events[app_id] = pending
 	return pending
 end
@@ -619,7 +653,7 @@ end
 --- @param is_private boolean|nil
 --- @return string
 local function recorded_char(char, is_private)
-	if is_private and char ~= "[BS]" then return PRIVATE_PLACEHOLDER_CHAR end
+	if is_private and char ~= BACKSPACE_MARKER then return PRIVATE_PLACEHOLDER_CHAR end
 	return char
 end
 
@@ -629,11 +663,11 @@ local function append_synthetic_events(app_id, text, source, deletes, is_private
 	-- An expansion fires within a keystroke of its trigger, so it belongs in the
 	-- same minute. Taking the trigger's stamp keeps the two together without
 	-- reading a clock from a function that has never needed one.
-	local at = pending.last_key_at
+	local at = _typing_last_key_at[app_id]
 	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
-		pending.events[#pending.events + 1] = { "[BS]", 0, { s = 1, st = source } }
+		pending.events[#pending.events + 1] = { BACKSPACE_MARKER, 0, { s = 1, st = source } }
 		pending.times[#pending.events] = at
-		add_synthetic_ngram(_app_stats[app_id], "[BS]", source)
+		add_synthetic_ngram(_app_stats[app_id], BACKSPACE_MARKER, source)
 	end
 	if type(text) ~= "string" or text == "" then return end
 	local ok, len = pcall(utf8.len, text)
@@ -972,45 +1006,56 @@ local function empty_ngrams()
 end
 
 --- Adds only unflushed character n-grams to the per-app today projection.
-local function add_live_ngram_delta(today_payload)
+local function add_live_ngram_delta(today_payload, apps)
+	-- Match the SQL reader: no valid application name means an unrestricted
+	-- projection. A selected range must not regain excluded apps from RAM.
+	local selected = {}
+	if type(apps) == "table" then
+		for _, app in ipairs(apps) do
+			if type(app) == "string" and app ~= "" then selected[app] = true end
+		end
+	end
+	local unrestricted = next(selected) == nil
 	for app_id, stats in pairs(_app_stats) do
-		local previous = _flushed_app_ngrams[app_id] or {}
-		local app_name = dashboard_app_name(app_id)
-		local target = today_payload[app_name] or empty_ngrams()
-		for token, count in pairs(stats.ngrams or {}) do
-			local delta = math.max(0, count - (previous[token] or 0))
-			if delta > 0 then
-				local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
-				item.c = item.c + delta
-				local source_delta = math.max(0,
-					((stats.ngram_sources[token] or {}).hotstring or 0)
-					- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
-				local llm_delta = math.max(0,
-					((stats.ngram_sources[token] or {}).llm or 0)
-					- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
-				local other_delta = 0
-				local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
-				for label, source_count in pairs(stats.ngram_sources[token] or {}) do
-					if Utils.is_other_synthetic_source(label) then
-						other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+		if unrestricted or selected[dashboard_app_name(app_id)] then
+			local previous = _flushed_app_ngrams[app_id] or {}
+			local app_name = dashboard_app_name(app_id)
+			local target = today_payload[app_name] or empty_ngrams()
+			for token, count in pairs(stats.ngrams or {}) do
+				local delta = math.max(0, count - (previous[token] or 0))
+				if delta > 0 then
+					local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					item.c = item.c + delta
+					local source_delta = math.max(0,
+						((stats.ngram_sources[token] or {}).hotstring or 0)
+						- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
+					local llm_delta = math.max(0,
+						((stats.ngram_sources[token] or {}).llm or 0)
+						- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
+					local other_delta = 0
+					local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
+					for label, source_count in pairs(stats.ngram_sources[token] or {}) do
+						if Utils.is_other_synthetic_source(label) then
+							other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+						end
 					end
+					item.hs = (item.hs or 0) + source_delta
+					item.llm = (item.llm or 0) + llm_delta
+					item.o = (item.o or 0) + other_delta
+					target.c[token] = item
 				end
-				item.hs = (item.hs or 0) + source_delta
-				item.llm = (item.llm or 0) + llm_delta
-				item.o = (item.o or 0) + other_delta
-				target.c[token] = item
 			end
-		end
-		local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
-		for scancode, count in pairs(stats.physical_scancodes or {}) do
-			local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
-			if delta > 0 then
-				local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
-				item.c = item.c + delta
-				target.sc_kb[tostring(scancode)] = item
+			local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
+			for scancode, count in pairs(stats.physical_scancodes or {}) do
+				local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
+				if delta > 0 then
+					local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					item.c = item.c + delta
+					target.sc_kb[tostring(scancode)] = item
+				end
 			end
+			today_payload[app_name] = target
 		end
-		today_payload[app_name] = target
 	end
 	return today_payload
 end
@@ -1021,7 +1066,13 @@ end
 --- @return table Metrics prefetch payload matching the macOS/Windows schema.
 function M.get_dashboard_payload(opts)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
+	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local options = type(opts) == "table" and opts or {}
+	local categories = {}
+	if SqliteWriter and SqliteWriter.is_available() then
+		categories = SqliteReader.read_user_categories(_sqlite_path, _device_id)
+		if categories == nil then return nil, "SQLite projection unavailable" end
+	end
 	local manifest = add_live_manifest_delta(persisted_manifest())
 	local prefetch = nil
 	if options.include_prefetch ~= false then
@@ -1029,6 +1080,7 @@ function M.get_dashboard_payload(opts)
 	end
 	return {
 		metrics_manifest = manifest,
+		user_categories  = categories,
 		app_icons        = {},
 		_prefetch_data   = prefetch,
 		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },
@@ -1041,13 +1093,15 @@ end
 --- @param apps table|nil Selected application IDs.
 function M.get_range_payload(start_date, end_date, apps)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
+	if not SqliteReader then return nil, "SQLite projection unavailable" end
+	local bounds = SqliteReader.split_bounds(start_date, end_date)
 	local payload = { historical = empty_ngrams(), today = {} }
-	if SqliteWriter and SqliteWriter.is_available() and SqliteReader then
-		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps)
+	if SqliteWriter and SqliteWriter.is_available() then
+		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
 	payload.historical = payload.historical or empty_ngrams()
 	payload.today = payload.today or {}
-	payload.today = add_live_ngram_delta(payload.today)
+	if bounds.includes_today then payload.today = add_live_ngram_delta(payload.today, apps) end
 	return payload
 end
 
@@ -1514,6 +1568,7 @@ local function capture_flush()
 	local _flushed_app_ngrams = copy_flush_value(_flushed_app_ngrams)
 	local _flushed_app_scancodes = copy_flush_value(_flushed_app_scancodes)
 	local _flushed_app_sources = copy_flush_value(_flushed_app_sources)
+	local walker_contexts = copy_flush_value(_walker_contexts)
 	-- 1. Compose buffered physical key events and their matching aggregates. This is
 	-- the canonical, replayable source shared with the macOS/AHK drivers.
 	local typing_batch = {}
@@ -1537,9 +1592,10 @@ local function capture_flush()
 				wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
 				events_json = _to_json(pending.events),
 			}
+			walker_contexts[app_id] = walker_contexts[app_id] or {}
 			local ok_walk, walked = pcall(AggregateWalker.walk,
 				pending.events, date, dashboard_app_name(app_id), ngram_batch,
-				{ times = pending.times, wall_offset_ms = wall_offset_ms })
+				{ times = pending.times, wall_offset_ms = wall_offset_ms }, walker_contexts[app_id])
 			if ok_walk then
 				ngram_batch = walked
 			else
@@ -1549,6 +1605,18 @@ local function capture_flush()
 				return nil, "Typing aggregate derivation failed; pending source remains unacknowledged"
 			end
 		end
+	end
+	-- What each context still holds is credited once its own gap has passed,
+	-- and all of it on a new day or at shutdown, so a session ends where the
+	-- user stopped rather than where a flush happened to land.
+	local now_ms = math.floor(Monotonic.now_ms())
+	for _, context in pairs(walker_contexts) do
+		local ok_settle, settled = pcall(AggregateWalker.settle, context, now_ms, ngram_batch,
+			_flush_stopping or (context.date ~= nil and context.date ~= date))
+		if not ok_settle then
+			return nil, "Typing aggregate settlement failed; pending source remains unacknowledged"
+		end
+		ngram_batch = settled
 	end
 	payload.raw.typing = typing_batch
 	if ngram_batch then
@@ -1716,6 +1784,7 @@ local function capture_flush()
 		watermarks = {
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
+			walker = walker_contexts,
 		},
 	}
 end
@@ -1783,6 +1852,7 @@ function M.pump_flush()
 			local marks = state.snapshot.watermarks
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
+			_walker_contexts = marks.walker
 			_manifest_cache = { revision = nil, manifest = nil }
 			_last_flush_committed, _flush_state = true, nil
 			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")
@@ -2003,6 +2073,8 @@ function M.reset_session()
 	_flushed_app_ngrams     = {}
 	_flushed_app_scancodes  = {}
 	_flushed_app_sources    = {}
+	_walker_contexts        = {}
+	_typing_last_key_at     = {}
 	_manifest_cache         = { revision = nil, manifest = nil }
 	_pending_typing_events  = {}
 	_pending_hotstring_events = {}

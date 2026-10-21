@@ -55,21 +55,60 @@ function M.read()
 	return result
 end
 
+--- Reads native ownership metadata without logging or adopting a failed read.
+--- This macOS-private extension does not change the four-method Clipboard port.
+--- @return integer|nil count Zero is a valid native generation.
+--- @return string|nil error
+function M._change_count()
+	local ok, count = pcall(function() return hs.pasteboard.changeCount() end)
+	if not ok or math.type(count) ~= "integer" or count < 0 then
+		return nil, "native clipboard change count is unavailable"
+	end
+	return count
+end
+
+--- Captures metadata before any diagnostic can reenter another clipboard owner.
+local function capture_ownership(receipt)
+	if receipt == nil then return end
+	local count, detail = M._change_count()
+	receipt.count, receipt.count_ok, receipt.detail = count, count ~= nil, detail
+end
+
+--- Refuses a private conditional mutation before touching a foreign pasteboard.
+local function admit_ownership(receipt)
+	if receipt == nil then return true end
+	receipt.attempted = false
+	capture_ownership(receipt)
+	if receipt.count_ok ~= true then return false end
+	if receipt.expected_count ~= nil and receipt.count ~= receipt.expected_count then
+		receipt.detail = "native clipboard ownership changed"
+		return false
+	end
+	receipt.attempted = true
+	return true
+end
+
 --- Writes text to the clipboard.
 --- @param text string The text to place on the clipboard.
+--- @param receipt table|nil Private macOS conditional ownership receipt.
 --- @return boolean True on success, false on error.
-function M.write(text)
+function M.write(text, receipt)
+	if not admit_ownership(receipt) then
+		Logger.error(LOG, "write(): ownership check refused — %s", tostring(receipt.detail))
+		return false, receipt
+	end
 	local ok, result = pcall(function()
 		return hs.pasteboard.setContents(text)
 	end)
+	capture_ownership(receipt)
 
 	if not ok or result ~= true then
 		Logger.error(LOG, "write(): pasteboard error — %s", tostring(result))
-		return false
+		return false, receipt
 	end
 
 	Logger.debug(LOG, "write(): %d char(s) written to clipboard", #tostring(text))
-	return true
+	return true, receipt
 end
 
 --- Saves ALL current clipboard data (all pasteboard types: text, images, files, etc.).
@@ -108,8 +147,13 @@ end
 --- Clears the clipboard when saved is nil.
 --- Uses writeAllData() to restore all pasteboard types, not just text.
 --- @param saved table|nil The pasteboard data to restore, or nil to clear.
+--- @param receipt table|nil Private macOS conditional ownership receipt.
 --- @return boolean True on success, false on error.
-function M.restore(saved)
+function M.restore(saved, receipt)
+	if not admit_ownership(receipt) then
+		Logger.error(LOG, "restore(): ownership check refused — %s", tostring(receipt.detail))
+		return false, receipt
+	end
 	local ok, result = pcall(function()
 		if saved == nil then
 			hs.pasteboard.clearContents()
@@ -118,14 +162,15 @@ function M.restore(saved)
 			return hs.pasteboard.writeAllData(saved)
 		end
 	end)
+	capture_ownership(receipt)
 
 	if not ok or result ~= true then
 		Logger.error(LOG, "restore(): pasteboard error — %s", tostring(result))
-		return false
+		return false, receipt
 	end
 
 	Logger.debug(LOG, "restore(): clipboard %s", saved == nil and "cleared" or "restored")
-	return true
+	return true, receipt
 end
 
 return M

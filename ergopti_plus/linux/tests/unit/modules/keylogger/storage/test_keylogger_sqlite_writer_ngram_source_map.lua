@@ -405,3 +405,42 @@ helpers.describe("SQLite terminal flush retry fence", function()
 	end)
 end)
 
+
+
+
+
+-- SQLite's json_group_object cuts an object key at an embedded NUL, so a merged
+-- map turned "a\u0000b" into a second "a" key. Every numeric map the writer
+-- merges (n-gram sources, error buckets, burst lengths) shares one expression.
+helpers.describe("linux-sqlite-nul-map-keys", function()
+	it("linux-sqlite-nul-map-keys: every merged numeric map spells its keys through json_quote", function()
+		local command = require("modules.keylogger.sqlite_command")
+		local previous_build, merges = command.build, {}
+		command.build = function(path, sql, options)
+			if sql:find("json_each(excluded.", 1, true) then merges[#merges + 1] = sql end
+			return previous_build(path, sql, options)
+		end
+		local ok, reason = xpcall(function()
+			Fixture.with_category_commands(nil, function(writer)
+				local nul = "a\0b"
+				helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned",
+					{ x = { c = 1, sources = { [nul] = 1 } } }))
+				helpers.assert_true(writer.upsert_hourly("owned",
+					{ date = "2000-01-01", app = "owned", hour = "10", c = 1, e = 1, e_buckets = { [nul] = 1 } }))
+				helpers.assert_true(writer.upsert_hourly_min5("owned",
+					{ date = "2000-01-01", app = "owned", slot = "10:00", c = 1, e = 1, e_buckets = { [nul] = 1 } }))
+				helpers.assert_true(writer.upsert_burst("owned",
+					{ date = "2000-01-01", app = "owned", count_total = 1, length_buckets = { [nul] = 1 } }))
+			end)
+		end, debug.traceback)
+		command.build = previous_build
+		if not ok then error(reason, 0) end
+		helpers.assert_eq(#merges, 4, "the source, hourly, five-minute and burst merges are all observed")
+		for _, sql in ipairs(merges) do
+			helpers.assert_true(sql:find("json_group_object", 1, true) == nil,
+				"json_group_object truncates a key at NUL and must not rebuild a merged map")
+			helpers.assert_contains(sql, "json_quote(k)")
+			helpers.assert_contains(sql, "'{}')")
+		end
+	end)
+end)

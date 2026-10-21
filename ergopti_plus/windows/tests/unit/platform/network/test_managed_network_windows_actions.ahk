@@ -493,6 +493,7 @@ _MNW_TimeoutRetiresPresentation(State) {
 	Owner := State["owner"]
 	OldRetry := _MNW_Action(Window.Failure, "retry")
 	Work := _MNW_RunPendingRender(Window, State)
+	RetiredTimer := Work.ack_timer
 	AssertEqual(-5000, State["timer_events"][State["timer_events"].Length]["period"], "the timer uses the manually specified shared presentation deadline")
 	State["clock"] += 5000
 	AssertTrue(Window._RenderAcknowledgementExpired(Work))
@@ -504,7 +505,7 @@ _MNW_TimeoutRetiresPresentation(State) {
 	AssertEqual(1, State["notices"].Length)
 	AssertEqual("network.failure.unknown", State["notices"][1], "expiry does not invent a network diagnosis")
 	AssertTrue(!Window.Failure.Handle(OldRetry))
-	AssertTrue(_MNW_TimerCancelled(State, Work.ack_timer), "the retained physical timer handle is cancelled")
+	AssertTrue(_MNW_TimerCancelled(State, RetiredTimer), "the retained physical timer handle is cancelled")
 	AssertTrue(!Window._RenderAcknowledgementExpired(Work), "a delayed duplicate timer cannot present another notice")
 }
 Test("managed Windows failures: render timeout retires only exact presentation consent", (*) => _MNW_Scope(_MNW_TimeoutRetiresPresentation))
@@ -525,9 +526,10 @@ Test("managed Windows failures: delayed acknowledgement cannot revive an expired
 _MNW_AckCancelsDeadline(State) {
 	Window := _MNW_Window(State)
 	Work := _MNW_RunPendingRender(Window, State)
+	RetiredTimer := Work.ack_timer
 	AssertTrue(Window.Deliver(Window.Epoch, _MNW_Ack(Window, Window.Failure.Epoch)))
 	AssertEqual(1, Window.RenderedEpoch)
-	AssertTrue(_MNW_TimerCancelled(State, Work.ack_timer))
+	AssertTrue(_MNW_TimerCancelled(State, RetiredTimer))
 	AssertTrue(!Window._RenderAcknowledgementExpired(Work), "even an already queued cancelled timer is inert")
 	AssertTrue(!Window.ResetDone)
 	AssertEqual(0, State["notices"].Length)
@@ -538,10 +540,11 @@ _MNW_SuccessorAckDeadline(State) {
 	Window := _MNW_Window(State)
 	OldAck := _MNW_Ack(Window, Window.Failure.Epoch)
 	OldWork := _MNW_RunPendingRender(Window, State)
+	RetiredTimer := OldWork.ack_timer
 	Owner := State["owner"]
 	AssertTrue(Window.Failure.Publish(_MNW_ProxyReceipt(), Owner, _MNW_Current.Bind(State, Owner), _MNW_Retry.Bind(State, Owner)))
 	NewWork := _MNW_RunPendingRender(Window, State)
-	AssertTrue(_MNW_TimerCancelled(State, OldWork.ack_timer))
+	AssertTrue(_MNW_TimerCancelled(State, RetiredTimer))
 	AssertTrue(!Window._RenderAcknowledgementExpired(OldWork))
 	AssertTrue(!Window.Deliver(Window.Epoch, OldAck), "old receipt cannot cancel the successor's acknowledgement deadline")
 	AssertTrue(Window.RenderWork == NewWork)
@@ -555,10 +558,11 @@ Test("managed Windows failures: old timer and acknowledgement cannot borrow a su
 _MNW_CloseReopenAckDeadline(State) {
 	Old := _MNW_Window(State)
 	Work := _MNW_RunPendingRender(Old, State)
+	RetiredTimer := Work.ack_timer
 	OldEpoch := Old.Epoch
 	OldAck := _MNW_Ack(Old, Old.Failure.Epoch)
 	Old.Close()
-	AssertTrue(_MNW_TimerCancelled(State, Work.ack_timer))
+	AssertTrue(_MNW_TimerCancelled(State, RetiredTimer))
 	Current := _MNW_Window(State)
 	AssertTrue(!Old._RenderAcknowledgementExpired(Work))
 	AssertTrue(!Old.Deliver(OldEpoch, OldAck))
@@ -571,6 +575,7 @@ Test("managed Windows failures: teardown cancels deadline and preserves reopened
 _MNW_TimeoutNativeRetired(State) {
 	Window := _MNW_Window(State)
 	Work := _MNW_RunPendingRender(Window, State)
+	RetiredTimer := Work.ack_timer
 	Replacement := Map("request", "new native operation")
 	State["owner"] := Replacement
 	State["clock"] += 5000
@@ -578,7 +583,7 @@ _MNW_TimeoutNativeRetired(State) {
 	AssertEqual(0, State["notices"].Length)
 	AssertTrue(Window.ResetDone, "expiry retires only the old presentation even when its producer is replaced")
 	AssertTrue(State["owner"] == Replacement, "the replacement native operation remains owned")
-	AssertTrue(_MNW_TimerCancelled(State, Work.ack_timer))
+	AssertTrue(_MNW_TimerCancelled(State, RetiredTimer))
 }
 Test("managed Windows failures: expired native ownership refuses timeout notice", (*) => _MNW_Scope(_MNW_TimeoutNativeRetired))
 
@@ -752,6 +757,7 @@ Test("managed Windows failures: controller teardown preserves reentrant singleto
 _MNW_LateAckAbsoluteDeadline(State) {
 	Window := _MNW_Window(State)
 	Work := _MNW_RunPendingRender(Window, State)
+	RetiredTimer := Work.ack_timer
 	Ack := _MNW_Ack(Window, Window.Failure.Epoch)
 	State["clock"] += 5001
 	AssertTrue(!Window.Deliver(Window.Epoch, Ack), "late positive acknowledgement is refused before the delayed timer fires")
@@ -759,7 +765,7 @@ _MNW_LateAckAbsoluteDeadline(State) {
 	AssertTrue(Window.ResetDone && Window.Failure.Closed)
 	AssertEqual(0, Window.RenderWork)
 	AssertEqual(1, State["notices"].Length)
-	AssertTrue(_MNW_TimerCancelled(State, Work.ack_timer))
+	AssertTrue(_MNW_TimerCancelled(State, RetiredTimer))
 }
 Test("managed Windows failures: actual absolute deadline fences acknowledgement before timer dispatch", (*) => _MNW_Scope(_MNW_LateAckAbsoluteDeadline))
 
@@ -777,3 +783,5 @@ _MNW_RepublicationBudget(State) {
 	AssertTrue(Window.Failure.Closed)
 }
 Test("managed Windows failures: repeated rendering retains the original monotonic budget", (*) => _MNW_Scope(_MNW_RepublicationBudget))
+
+#Include test_managed_render_timer_lifetime.ahk

@@ -48,7 +48,14 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 			engine:up("caps_lock")
 			engine:up("right_option")
 			engine:clear()
+			-- Space is a word delimiter: the [shortcuts.caps_word] settings decide
+			-- it in Hammerspoon, so Karabiner passes it through with CapsWord on.
 			engine:down("spacebar")
+			engine:up("spacebar")
+			helpers.assert_eq(engine:variable("ergopti_capsword_" .. TOKEN), 1,
+				"Space must not be a Karabiner CapsWord exit any more")
+			engine:clear()
+			engine:down("escape")
 			local exits = {}
 			for _, emitted in ipairs(engine:emissions()) do
 				if emitted.key_code == "f20" then exits[#exits + 1] = emitted end

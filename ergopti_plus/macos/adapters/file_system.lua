@@ -2443,8 +2443,8 @@ function M.delete(path)
 		return false
 	end
 
-	-- Already absent — contract says this is a no-op success
-	if not M.exists(path) then return true end
+	-- Stat follows links and can fail while the pathname still exists. Only
+	-- remove itself can certify deletion or authoritative ENOENT absence.
 
 	local removed, remove_err = remove_path_or_absent(path)
 	if not removed then

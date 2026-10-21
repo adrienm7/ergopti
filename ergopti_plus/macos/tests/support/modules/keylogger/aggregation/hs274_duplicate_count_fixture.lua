@@ -339,7 +339,7 @@ local function with_private_window_callback(vector, body)
 			local previous_clock = native.timer.absoluteTime
 			local controls = { clock_ms = 1000, title = vector.ordinary_title,
 				title_reads = 0, role_reads = 0, subrole_reads = 0,
-				filter_new = 0, subscriptions = 0, unsubscribes = 0,
+				app_watchers = 0, title_watchers = 0, unsubscribes = 0,
 				ax_starts = 0, ax_stops = 0, metadata = {} }
 			local function element(role)
 				return { attributeValue = function(_, name)
@@ -352,12 +352,35 @@ local function with_private_window_callback(vector, body)
 			local app_element = { attributeValue = function(_, name)
 				if name == "AXFocusedUIElement" then return ordinary end
 			end }
+			-- One exact native watcher per newWatcher call; stop() counts retirements.
+			local function ui_watcher(kind, callback)
+				local watcher = {}
+				function watcher:start(events)
+					controls[kind .. "_events"] = events
+					return self
+				end
+				function watcher:stop()
+					controls.unsubscribes = controls.unsubscribes + 1
+					return self
+				end
+				controls[kind .. "_callback"] = callback
+				return watcher
+			end
 			local app = { name = function() return "Firefox" end,
 				bundleID = function() return "org.mozilla.firefox" end,
 				path = function() return "/Applications/Firefox.app" end,
-				pid = function() return 4242 end }
+				pid = function() return 4242 end,
+				newWatcher = function(_, callback)
+					controls.app_watchers = controls.app_watchers + 1
+					return ui_watcher("focus", callback)
+				end }
 			local window = { title = function() controls.title_reads = controls.title_reads + 1; return controls.title end,
-				isFullScreen = function() return false end, application = function() return app end }
+				isFullScreen = function() return false end, application = function() return app end,
+				id = function() return 77 end,
+				newWatcher = function(_, callback)
+					controls.title_watchers = controls.title_watchers + 1
+					return ui_watcher("title", callback)
+				end }
 			local observer = {
 				addWatcher = function(self) return self end,
 				removeWatcher = function(self) return self end,
@@ -365,26 +388,12 @@ local function with_private_window_callback(vector, body)
 				start = function(self) controls.ax_starts = controls.ax_starts + 1; return self end,
 				stop = function(self) controls.ax_stops = controls.ax_stops + 1; return self end,
 			}
-			local filter = {
-				subscribe = function(self, events, callback)
-					controls.subscriptions = controls.subscriptions + 1
-					controls.events, controls.window_callback = events, callback
-					return self
-				end,
-				unsubscribeAll = function(self) controls.unsubscribes = controls.unsubscribes + 1; return self end,
-			}
 			local tracker, keylogger
 			local called, failure = xpcall(function()
 				native.timer.absoluteTime = function() return controls.clock_ms * 1000000 end
 				native.application = { watcher = { activated = 1 }, frontmostApplication = function() return app end }
-				native.window = { focusedWindow = function() return window end, filter = {
-					windowFocused = "windowFocused", windowTitleChanged = "windowTitleChanged",
-					new = function(browsers)
-						controls.filter_new = controls.filter_new + 1
-						controls.browsers = browsers
-						return filter
-					end,
-				} }
+				native.window = { focusedWindow = function() return window end,
+					filter = { new = function() error("hs.window.filter enumerates every window", 0) end } }
 				native.axuielement = {
 					applicationElementForPID = function() return app_element end,
 					applicationElement = function() return app_element end,
@@ -429,14 +438,15 @@ local function with_private_window_callback(vector, body)
 				helpers.assert_eq(keylogger.context_allows_logging(), true)
 				helpers.assert_true(controls.role_reads > 0 and controls.subrole_reads > 0,
 					"The real AX classifier must establish ordinary secure state")
-				helpers.assert_eq(controls.filter_new, 1)
-				helpers.assert_eq(controls.subscriptions, 1)
-				helpers.assert_eq(controls.events, { native.window.filter.windowFocused, native.window.filter.windowTitleChanged })
-				helpers.assert_true(type(controls.browsers) == "table")
-				local firefox_found = false
-				for _, browser in ipairs(controls.browsers) do if browser == "Firefox" then firefox_found = true end end
-				helpers.assert_eq(firefox_found, true)
-				helpers.assert_eq(controls.window_callback, tracker.update_private_status)
+				helpers.assert_eq(controls.app_watchers, 1, "one watcher on the activated browser")
+				helpers.assert_eq(controls.title_watchers, 1, "one watcher on its focused window")
+				local ui = native.uielement and native.uielement.watcher or {}
+				helpers.assert_eq(controls.focus_events, { ui.focusedWindowChanged or "AXFocusedWindowChanged" })
+				helpers.assert_eq(controls.title_events, { ui.titleChanged or "AXTitleChanged" })
+				helpers.assert_eq(type(controls.title_callback), "function")
+				helpers.assert_eq(type(controls.focus_callback), "function")
+				-- Callers drive the exact native watcher for the vector's event.
+				controls.window_callback = controls.title_callback
 				helpers.assert_eq(scenario.state.ax_observer, observer)
 				helpers.assert_eq(controls.ax_starts, 1)
 				helpers.assert_eq(type(controls.ax_callback), "function")
@@ -448,9 +458,10 @@ local function with_private_window_callback(vector, body)
 					local reads = controls.title_reads
 					helpers.assert_eq(_G.hs, native)
 					helpers.assert_eq(package.loaded["modules.keylogger.context_tracker"], tracker)
-					helpers.assert_eq(controls.window_callback, tracker.update_private_status)
 					helpers.assert_eq(scenario.state.is_secure_field, controls.expected_secure)
-					controls.window_callback(window, "Firefox", native.window.filter[vector.registered_event])
+					local deliver = vector.registered_event == "windowFocused"
+						and controls.focus_callback or controls.title_callback
+					deliver()
 					helpers.assert_eq(controls.title_reads, reads + 1, "The registered callback must read the native title")
 					helpers.assert_eq(scenario.state.is_private_window, private)
 					helpers.assert_eq(scenario.state.is_secure_field, controls.expected_secure)
@@ -482,7 +493,7 @@ local function with_private_window_callback(vector, body)
 			if not called then error(failure, 0) end
 			helpers.assert_eq(stop_ok, true)
 			helpers.assert_eq(stopped, true)
-			helpers.assert_eq(controls.unsubscribes, 1)
+			helpers.assert_eq(controls.unsubscribes, 2, "stop retires the browser and window watchers")
 			helpers.assert_eq(controls.ax_stops, 1)
 			helpers.assert_eq(scenario.state.ax_observer, nil)
 		end)

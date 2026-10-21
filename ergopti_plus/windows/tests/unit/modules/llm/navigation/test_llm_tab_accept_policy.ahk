@@ -312,7 +312,7 @@ Test("LLM accept: deferred output rechecks target and every ABA epoch (llm-outpu
 ; ===========================================================
 
 ; The slot primitive runs after the chord's modifiers were released: it must
-; demand the exact presented record/surface, the chosen slot still active, no
+; demand the same offer (its lifecycle), the chosen slot still active, no
 ; modifier held and the rendering control focused (llm-val-chord-inserts).
 _LTAP_SlotAcceptPolicyTable() {
 	global _Stub_LlmPresentedRecord, _LTAP_AcceptCount, _LTAP_LastAcceptedText
@@ -327,7 +327,12 @@ _LTAP_SlotAcceptPolicyTable() {
 		Map("label", "unverifiable focus", "accept", false,
 			"input", _LTAP_Input(false, false, false, false, false, 0, 0, false)),
 		Map("label", "slot beyond the prediction", "accept", false, "slot", 2),
-		Map("label", "prediction replaced", "accept", false, "replaced", true)
+		Map("label", "prediction replaced", "accept", false, "replaced", true),
+		; The chord's own jump repaints before its modifiers are released: the
+		; record it named is then a predecessor of the same offer, which used to
+		; refuse every chord (val-chord-survives-own-repaint).
+		Map("label", "own navigation repaint of the same offer", "accept", true, "repainted", true),
+		Map("label", "another offer replaced it", "accept", false, "other_offer", true)
 	]
 	for TestVector in Vectors {
 		_LTAP_Setup()
@@ -335,6 +340,12 @@ _LTAP_SlotAcceptPolicyTable() {
 			Record := _Stub_LlmPresentedRecord
 			if TestVector.Get("replaced", false)
 				Record := {Kind: "prediction"}
+			if TestVector.Get("repainted", false)
+				Record := {Kind: "prediction", Slots: Record.Slots.Clone(),
+					ActiveIdx: Record.ActiveIdx, Lifecycle: Record.Lifecycle}
+			if TestVector.Get("other_offer", false)
+				Record := {Kind: "prediction", Slots: Record.Slots.Clone(),
+					ActiveIdx: Record.ActiveIdx, Lifecycle: {OfferId: 999, Outcome: ""}}
 			Accepted := LLM_Tooltip_TryAcceptSlot(Record, Record,
 				TestVector.Get("slot", 1),
 				TestVector.Get("input", _LTAP_Input(false)),

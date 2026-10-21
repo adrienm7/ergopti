@@ -262,9 +262,13 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     }
     // Request EOF finishes only the send direction. Closing the receive
     // direction here interrupts our own still-active response reader.
+    // A finished receiver closes the client to end this copy: a read already
+    // blocked reports IOException, one started after the close reports
+    // ObjectDisposedException. Both end the request; the join below still
+    // refuses an unfinished response.
     static void CopyRequestAndRetireResponse(Stream stream, Stream remote, TcpClient upstream, Thread reverse, Action<string> reached) {
         reached("forward_request");
-        try { stream.CopyTo(remote); } catch(IOException) { }
+        try { stream.CopyTo(remote); } catch(IOException) { } catch(ObjectDisposedException) { }
         finally {
             reached("half_close_request"); upstream.Client.Shutdown(SocketShutdown.Send);
             // An earlier non-IO copy failure must retain its original site.

@@ -156,7 +156,7 @@ _THAM_SpaceStaysItselfUnderAnotherLayerHolder() {
 		Seen++
 		if (InStr(Variant.HotIf, "not LayerEnabled")
 				or Variant.HotIf == '#HotIf TapHoldPressIsOwned("space")'
-				or Variant.HotIf == "#HotIf CapsWordEnabled"
+				or InStr(Variant.HotIf, "#HotIf CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey(") == 1
 				; A key combination that ends on Space is the user's own binding:
 				; it takes Space only while its first key is held and a slot is set.
 				or Variant.HotIf == "#HotIf KeyCombinationOwnsHotkey()")

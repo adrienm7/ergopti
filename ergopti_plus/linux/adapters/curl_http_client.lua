@@ -351,11 +351,27 @@ settle_owned = function(request)
 	end
 end
 
+--- Recognizes optional direct-service unavailability from original native facts.
+--- Unknown connection provenance remains unknown; it never proves an empty list.
+--- @param request table
+--- @param result table
+--- @return boolean
+local function optional_service_failure(request, result)
+	local route, receipt = request.proxy_selection, result.failure_receipt
+	if type(route) ~= "table" or route.mode ~= "direct" or type(receipt) ~= "table"
+		or receipt.backend ~= "curl" or receipt.proxy_mode ~= "direct"
+		or receipt.curl_exit ~= request.exit_code or receipt.http_status ~= result.status then return false end
+	if result.status == 0 then return request.exit_code == 7 and receipt.stage == "connect" end
+	return result.status >= 500 and result.status <= 599 and receipt.stage == "http"
+		and receipt.failure_provenance == "verified" and (request.exit_code == 0 or request.exit_code == 22)
+end
+
 --- Publishes one terminal result and makes all stale callbacks inert.
 --- @param request table
 --- @param result table
 --- @param suppress_callback boolean|nil
-local function finish(request, result, suppress_callback)
+--- @param transport_failure boolean|nil Only a normal native terminal receipt may select a diagnostic level.
+local function finish(request, result, suppress_callback, transport_failure)
 	if request.terminal then return end
 	request.terminal = true
 	request.result = result
@@ -410,7 +426,11 @@ local function finish(request, result, suppress_callback)
 	if result.ok then
 		Logger.debug(LOG, "HTTP request completed (status=%d).", result.status or 0)
 	elseif result.error ~= "cancelled" then
-		Logger.error(LOG, "HTTP request failed: %s.", tostring(result.error))
+		if transport_failure == true and request.failure_log_level == "warn" and optional_service_failure(request, result) then
+			Logger.warn(LOG, "HTTP request failed: %s.", tostring(result.error))
+		else
+			Logger.error(LOG, "HTTP request failed: %s.", tostring(result.error))
+		end
 	end
 	if request.operation then
 		settle_owned(request)
@@ -476,6 +496,12 @@ end
 
 --- Binds the accepted representation only to its actual final endpoint/validator.
 local function attach_etag(request, result)
+	-- A refused conditional request still wrote its final headers: an exhausted
+	-- GitHub rate limit names its reset time there (403/429, curl exit 22).
+	if request.conditional and request.etag_headers_eof == true and not request.terminal
+		and (result.status == 403 or result.status == 429) then
+		result.rate_limit = RedirectReceipt.response_rate_limit(request.etag_headers, result.status)
+	end
 	if not request.conditional or request.etag_headers_eof ~= true or request.exit_code ~= 0
 		or request.exit_signal ~= 0 or (result.ok ~= true and result.status ~= 304) then return result end
 	local headers = RedirectReceipt.response_etag(request.etag_headers, result.status, HeaderPolicy.validate)
@@ -648,6 +674,7 @@ end
 --- Converts a completed buffered curl request to the port result envelope.
 --- @param request table
 --- @return table
+--- @return boolean|nil Expected transport failure rather than a malformed receipt or native I/O fault.
 local function buffered_result(request)
 	local body, status_text = request.stdout_text:match(
 		"^(.*)\n" .. STATUS_MARKER .. "(%d%d%d)\n?$")
@@ -657,7 +684,7 @@ local function buffered_result(request)
 			ok = false, status = 0, body = "",
 			error = public_diagnostic(request, request.stderr_text ~= "" and request.stderr_text
 				or "curl exited with code " .. tostring(request.exit_code)),
-		}
+		}, request.exit_signal == 0
 	end
 	if not status then
 		return { ok = false, status = 0, body = "", error = "missing HTTP status" }
@@ -685,19 +712,20 @@ local function buffered_result(request)
 		-- other exits can leave a valid JSON prefix before transport truncation.
 		error_body = not http_success and (request.exit_code == 0 or request.exit_code == 22) and body or nil,
 		error = failure,
-	}
+	}, not succeeded and status > 0 and request.exit_signal == 0
 end
 
 --- Converts a completed stream without treating curl exit or stderr as HTTP status.
 --- @param request table
 --- @return table
+--- @return boolean|nil Expected transport failure after a normal process exit.
 local function streaming_result(request)
 	local status = tonumber(request.stderr_tail:match("\n" .. STATUS_MARKER .. "(%d%d%d)\n?$"))
 	local diagnostic = public_diagnostic(request, request.stderr_text:gsub("\n" .. STATUS_MARKER .. "%d%d%d\n?$", ""))
 	if not status or status == 0 then
 		return { ok = false, status = 0, body = "", error = diagnostic ~= "" and diagnostic
 			or (request.exit_code ~= 0 and "curl exited with code " .. tostring(request.exit_code)
-				or "missing HTTP status") }
+				or "missing HTTP status") }, request.exit_code ~= 0 and request.exit_signal == 0
 	end
 	local http_success = status >= 200 and status < 300
 	local succeeded = http_success and request.exit_code == 0
@@ -712,7 +740,7 @@ local function streaming_result(request)
 		error_body = not http_success and (request.exit_code == 0 or request.exit_code == 22)
 			and not request.error_body_truncated and request.error_body_text or nil,
 		error = failure,
-	}
+	}, not succeeded and request.exit_signal == 0
 end
 
 --- Completes once both the process and its two output streams ended.
@@ -731,14 +759,16 @@ local function maybe_complete(request)
 			failure_receipt = request.output_failure })
 	elseif request.buffered then
 		request.output_transport_completion = true
-		local result = native_receipt(request, buffered_result(request))
+		local result, transport_failure = buffered_result(request)
+		result = native_receipt(request, result)
 		if request.single_hop_redirect then result = RedirectReceipt.attach(request, result) end
-		finish(request, attach_etag(request, result))
+		finish(request, attach_etag(request, result), nil, transport_failure)
 	else
 		request.output_transport_completion = true
-		local result = native_receipt(request, streaming_result(request))
+		local result, transport_failure = streaming_result(request)
+		result = native_receipt(request, result)
 		if request.single_hop_redirect then result = RedirectReceipt.attach(request, result) end
-		finish(request, result)
+		finish(request, result, nil, transport_failure)
 	end
 	close_process(request)
 end
@@ -872,6 +902,11 @@ end
 --- @return string|nil
 local function admit_metadata(url, headers, body, options)
 	if type(options) ~= "table" then return nil, "native HTTP options are invalid" end
+	local failure_log_level = rawget(options, "failure_log_level")
+	if failure_log_level == nil then failure_log_level = "error" end
+	if failure_log_level ~= "error" and failure_log_level ~= "warn" then
+		return nil, "HTTP failure log level is invalid"
+	end
 	if type(headers) ~= "table" then return nil, "native HTTP headers are invalid" end
 	if body ~= nil and type(body) ~= "string" then return nil, "native HTTP body is invalid" end
 	if type(url) ~= "string" or url == "" then return nil, ("curl URL must be a non-empty string") end
@@ -943,6 +978,7 @@ local function admit_metadata(url, headers, body, options)
 		protocols = protocols,
 		buffered = options.buffered == true,
 		method = options.method or "POST",
+		failure_log_level = failure_log_level,
 		timeout_ms = timeout_ms,
 		follow_redirects = follow_redirects == true,
 		https_only = options.https_only == true,
@@ -1165,6 +1201,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 	end
 
 	request = request or new_request(owner)
+	request.failure_log_level = request_options.failure_log_level
 	request.proxy_selection = request_options.proxy_selection
 	request.proxy_metrics_available = request_options.proxy_metrics_available
 	request.single_hop_redirect = request_options.single_hop_redirect

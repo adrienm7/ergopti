@@ -36,7 +36,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 					execute = function(command)
 						if command:find("*.icns", 1, true) then return "", true, "exit", 0 end
 						scans = scans + 1
-						return "/virtual/App Cloner.app\n", true, "exit", 0
+						return "/virtual/App Cloner.app\0", true, "exit", 0
 					end,
 					application = { infoForBundlePath = function() return {} end },
 					image = { imageFromPath = function() return nil end },

@@ -16,6 +16,7 @@
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes), python_helper (boot, then the
 --- display-mirror shortcut, a helper that runs Python).
+--- type_for_wpm boots Metrics, types physical keys and observes its floating canvas.
 --- Output: the driver's log lines, E2E_* observation lines from the world,
 --- E2E_FACT key=value lines (the lease workers started, the final lease phase
 --- and the native reloads among them), and a final E2E_DONE line.
@@ -127,6 +128,36 @@ if ACTION == "restore_recommended" then
 		if not clicked then World.record("SCENARIO_FAILED", click_error) end
 		World.record("FACT", "restore_timers_fired=" .. idle(VIRTUAL_MINUTE_SEC))
 	end
+elseif ACTION == "select_layout_natively" then
+	-- A real menu click must leave ABC even when setLayout declines the name.
+	local i18n = require("infra.i18n")
+	local path = { i18n.get("menu.layout.title"), "French" }
+	local row = World.find_row(World.menu_items(), path)
+	if type(row) ~= "table" or type(row.fn) ~= "function" or row.disabled then
+		World.record("SCENARIO_FAILED", "no enabled layout row at " .. table.concat(path, " › "))
+	else
+		local clicked, click_error = xpcall(function() return row.fn({}) end, debug.traceback)
+		if not clicked then World.record("SCENARIO_FAILED", click_error) end
+		idle(5)
+	end
+	World.record("FACT", "layout_set_attempts=" .. World.layout_attempts)
+	World.record("FACT", "layout_native_selections=" .. World.native_selections)
+	World.record("FACT", "layout_native_environment=" .. tostring(World.native_selection_environment))
+	World.record("FACT", "layout_native_result=" .. tostring(World.native_selection_result))
+	World.record("FACT", "layout_native_role=" .. tostring(World.native_selection_role))
+	World.record("FACT", "layout_selected_source=" .. tostring(hs.keycodes.currentSourceID()))
+	local refreshed = World.find_row(World.menu_items(), path)
+	World.record("FACT", "layout_french_checked=" .. tostring(type(refreshed) == "table" and refreshed.checked == true))
+	-- A missing identifier must complete with failure and leave that source intact.
+	local before_missing = hs.keycodes.currentSourceID()
+	local missing_refused = false
+	require("modules.keymap.input_sources").set_input_source_async(nil, "com.ergopti.e2e.missing", function(ok)
+		missing_refused = ok == false
+	end)
+	idle(1)
+	World.record("FACT", "layout_missing_refused=" .. tostring(missing_refused))
+	World.record("FACT", "layout_missing_unchanged=" .. tostring(hs.keycodes.currentSourceID() == before_missing))
+	World.record("FACT", "layout_missing_native_result=" .. tostring(World.native_selection_result))
 elseif ACTION == "open_windows" then
 	-- Every window and file the menu, a gesture or a shortcut can open through
 	-- the action catalogue: each must find its data outside the bundle.
@@ -154,6 +185,33 @@ elseif ACTION == "python_helper" then
 		World.record("SCENARIO_FAILED", "display_mirror_toggle did not run: " .. tostring(result))
 	end
 	idle(5)
+elseif ACTION == "type_for_wpm" then
+	-- A user types after the configured application's real menu started Metrics
+	-- and the floating widget. No keylogger, model or widget method is stubbed.
+	for _, key in ipairs({ { 0, "a" }, { 11, "b" }, { 8, "c" } }) do
+		World.keyboard_event(hs, key[1], key[2], true)
+		World.keyboard_event(hs, key[1], key[2], false)
+		idle(0.1)
+	end
+	idle(0.3)
+	local stats = require("modules.keylogger").get_live_stats()
+	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
+	local visible, recovered = 0, false
+	local config = require("toml_codec").decode(require("tests.support.source_file").read(
+		SHARED .. "/modules/wpm_widget/constants.toml"))
+	local compact = config.compact
+	local screen = hs.screen.mainScreen():fullFrame()
+	for _, canvas in ipairs(hs.canvas.__instances) do
+		local frame = canvas:frame()
+		if canvas:isShowing() and frame.w == compact.width and frame.h == compact.height
+			and canvas[3] and tonumber(canvas[3].text) then
+			visible = visible + 1
+			recovered = frame.x == screen.x + screen.w - compact.width - compact.edge_margin
+				and frame.y == screen.y + screen.h - compact.height - compact.edge_margin
+		end
+	end
+	World.record("FACT", "wpm_canvas_visible=" .. visible)
+	World.record("FACT", "wpm_position_recovered=" .. tostring(recovered))
 elseif ACTION ~= "boot" then
 	World.record("SCENARIO_FAILED", "unknown action " .. tostring(ACTION))
 end

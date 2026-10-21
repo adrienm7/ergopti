@@ -42,9 +42,16 @@ local function register_guide(remap)
 		is_open = function(kind) return dialog.open ~= nil and dialog.open.kind == kind end,
 	}
 	local polls = {}
+	local clock = 0
+	local scheduler = package.loaded["adapters.timer_scheduler"]
+	scheduler.awake_time = function() return clock end
 	-- The fixture's cancel settles any handle that still holds a native timer.
-	package.loaded["adapters.timer_scheduler"].every = function(seconds, fn)
-		local handle = { seconds = seconds, fn = fn, timer = {} }
+	scheduler.every = function(seconds, fn)
+		local handle = { seconds = seconds, timer = {} }
+		handle.fn = function()
+			clock = clock + seconds
+			return fn()
+		end
 		polls[#polls + 1] = handle
 		return handle, true
 	end

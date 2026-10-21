@@ -359,8 +359,9 @@ end
 --- emit_tokens (which may need to defer this call — see the serialisation
 --- comment in emit_tokens) share the exact same paste + restore contract.
 --- @param value string The text to paste.
+--- @param handoff table|nil Receives the exact paste batch handoff and settle deadline.
 --- @return boolean True only after the payload and Cmd+V were both accepted.
-local function perform_paste(value)
+local function perform_paste(value, handoff)
 	local transaction = SyntheticInput.current_transaction()
 	if _paste_publication_lease and _paste_publication_lease.producer ~= transaction then
 		Logger.error(LOG, "Clipboard paste refused while another programmable producer retains ownership.")
@@ -515,9 +516,45 @@ local function perform_paste(value)
 		end
 	end
 
-	local ok_emit, emitted_or_error = pcall(function()
+
+	-- One transaction may contain earlier deferred key batches. Observe before
+	-- emission, then reconcile its exact returned batch, including a handoff
+	-- delivered before the emitter returns. Admission alone is not a paste.
+	local observed = {}
+	local function record_handoff(batch, status)
+		if handoff.batch ~= nil and handoff.batch ~= batch then return end
+		local result = { status = status,
+			ready_at = TimerScheduler.awake_time() + CLIPBOARD_PASTE_GAP_SEC }
+		if handoff.batch == batch then
+			handoff.status, handoff.ready_at = result.status, result.ready_at
+		else
+			observed[batch] = result
+		end
+	end
+	if handoff and transaction then
+		local registered, registration_error = pcall(SyntheticInput.on_dispatched,
+			transaction, function(_, batch, status) record_handoff(batch, status) end)
+		if not registered then
+			local restored, restore_error = restore_owned_clipboard()
+			if not restored then queue_paste_restore_retry("handoff registration refusal") end
+			Logger.error(LOG, "Clipboard handoff ownership was refused: %s (restore=%s).",
+				tostring(registration_error), tostring(restore_error))
+			return false
+		end
+	end
+	local ok_emit, emitted_or_error, batch = pcall(function()
 		return SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0)
 	end)
+	if handoff and transaction and ok_emit and emitted_or_error == true then
+		if type(batch) ~= "table" then
+			ok_emit, emitted_or_error = false, "clipboard paste emitter returned no batch receipt"
+		else
+			handoff.batch = batch
+			local result = observed[batch]
+			if result then handoff.status, handoff.ready_at = result.status, result.ready_at end
+		end
+
+	end
 	if not ok_emit or emitted_or_error ~= true then
 		if restore_armed then stop_paste_restore_timer() end
 		local restored, restore_error = restore_owned_clipboard()
@@ -539,8 +576,9 @@ end
 --- overwrite it mid-flight and corrupt the earlier segment
 --- (multi-segment-paste-race). Only the FIRST paste in the loop fires
 --- synchronously; every later token is owned by one pre-acquired recurring
---- cursor, so equal deadlines cannot race and each Cmd+V has
---- CLIPBOARD_PASTE_GAP_SEC before the next setContents() call.
+--- cursor, so equal deadlines cannot race. Each Cmd+V must first reach its
+--- exact batch handoff, then settle for CLIPBOARD_PASTE_GAP_SEC before the next
+--- setContents() call, even while Terminal is still delivering deletions.
 --- @param tokens table The token list produced by tokens_from_repl().
 --- @return number, string, string Total characters, the legacy physical_echo
 ---   metadata, and the logical text inserted. Clipboard text is absent from the
@@ -549,6 +587,27 @@ function M.emit_tokens(tokens)
 	if type(tokens) ~= "table" then
 		Logger.error(LOG, "emit_tokens: tokens must be a table (got %s).", type(tokens))
 		return 0, "", "", 0
+	end
+
+
+	-- Public standalone calls need the same exact batch authority as expansions.
+	-- Own the transaction here rather than treating an implicit emitter's FIFO
+	-- admission as a handoff. Recursive entry observes this exact ambient owner.
+	if SyntheticInput.current_transaction() == nil then
+		local transaction = SyntheticInput.begin("keymap.tokens", "action")
+		local results = table.pack(xpcall(function()
+			return SyntheticInput.with_transaction(transaction, function() return M.emit_tokens(tokens) end)
+		end, debug.traceback))
+		if results[1] ~= true then
+			pcall(SyntheticInput.cancel, transaction)
+			error(results[2], 0)
+		end
+		local sealed, result = pcall(SyntheticInput.seal, transaction)
+		if not sealed or result ~= true then
+			pcall(SyntheticInput.cancel, transaction)
+			error(sealed and "standalone token transaction could not be sealed" or result, 0)
+		end
+		return table.unpack(results, 2, results.n)
 	end
 
 	Logger.trace(LOG, "Emitting %d token(s)…", #tokens)
@@ -560,6 +619,7 @@ function M.emit_tokens(tokens)
 	-- paste queued yet in this emit_tokens call).
 	local next_paste_delay = 0
 	local planned_emissions = {}
+	local pending_paste = nil
 
 	-- When the next token of ANY kind may be emitted. Every clipboard paste moves
 	-- this cursor: Cmd+V is only our last posted event; the target produces the
@@ -611,9 +671,11 @@ function M.emit_tokens(tokens)
 						ok_l and tok_len or 1, paste_at)
 				end
 				emit_in_order(paste_at, function()
-					assert(perform_paste(paste_value) == true,
+					local handoff = {}
+					assert(perform_paste(paste_value, handoff) == true,
 						paste_at > 0 and "deferred clipboard token paste could not be dispatched"
 							or "clipboard token paste could not be dispatched")
+					pending_paste = handoff
 				end)
 				-- Every following paste-worthy token must wait at least one more
 				-- gap so two deferred pastes never collapse onto the same tick.
@@ -668,7 +730,8 @@ function M.emit_tokens(tokens)
 		local function release_retain()
 			if owner.released then return true end
 			owner.released = true
-			if not tx then return true end
+			-- Cancellation atomically retires every retain token itself.
+			if not tx or tx.cancelled then return true end
 			local ok_release, released_or_error = pcall(
 				SyntheticInput.release, tx, retain_token)
 			if not ok_release or released_or_error ~= true then
@@ -714,6 +777,19 @@ function M.emit_tokens(tokens)
 				owner.tick = owner.tick + 1
 				local deadline = owner.tick * CLIPBOARD_PASTE_GAP_SEC
 				while owner.cursor <= #planned_emissions do
+					if tx and (tx.cancelled or tx.failed or tx.completed) then
+						stop_owner()
+						return
+					end
+					if pending_paste then
+						if pending_paste.status == nil then break end
+						if pending_paste.status ~= "dispatched" then
+							fail_owner("preceding clipboard paste was not handed off")
+							return
+						end
+						if TimerScheduler.awake_time() < pending_paste.ready_at then break end
+						pending_paste = nil
+					end
 					local emission = planned_emissions[owner.cursor]
 					if emission.delay > deadline + 0.0000001 then break end
 					local run_ok, run_error = xpcall(function()
@@ -1398,7 +1474,8 @@ end
 --- Captures a classified destination without native calls on the input thread.
 --- @return table|nil destination Opaque retained native receipt.
 function M.capture_text_destination()
-	if M.is_secure_field() ~= false or _ignored_win_cache_value ~= false then return nil end
+	if _ignored_win_stopped or _ignored_win_cache_dirty
+		or _secure_field_cache_value ~= false or _ignored_win_cache_value ~= false then return nil end
 	return _text_destination
 end
 

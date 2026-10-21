@@ -564,21 +564,26 @@ CB_HasImage() {
 ; private file; the owning AHK generation calls this function after completion,
 ; so a canceled or orphaned child process cannot mutate the clipboard by itself.
 ; The HBITMAP ownership transfers to Windows only when SetClipboardData succeeds.
-CB_WriteBitmapFile(Path) {
+; CloseClipboard materializes synthesized DIB formats, so the optional receipt
+; authenticates the exact publication under a new read lock after that close.
+; A sequence sampled after return cannot establish ownership.
+CB_WriteBitmapFile(Path, &MutationSequence := 0) {
+	MutationSequence := 0
 	if !_CB_ResolveRestoreDebtBeforeMutation()
 		return false
 	static IMAGE_BITMAP := 0
 	static CF_BITMAP := 2
 	static LR_LOADFROMFILE := 0x10
-	static LR_CREATEDIBSECTION := 0x2000
 	MutationId := 0
 	BitmapHandle := 0
+	TransferredBitmap := 0
 	ClipboardOpened := false
 	ClipboardMutated := false
 	try {
+		; CF_BITMAP needs a DDB: a process-local DIB section cannot be pasted by another process.
 		BitmapHandle := DllCall("User32\LoadImageW", "Ptr", 0, "Str", Path,
 			"UInt", IMAGE_BITMAP, "Int", 0, "Int", 0,
-			"UInt", LR_LOADFROMFILE | LR_CREATEDIBSECTION, "Ptr")
+			"UInt", LR_LOADFROMFILE, "Ptr")
 		if !BitmapHandle
 			throw Error("LoadImageW could not load the staged bitmap")
 		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
@@ -591,7 +596,8 @@ CB_WriteBitmapFile(Path) {
 		if !DllCall("User32\EmptyClipboard", "Int")
 			throw Error("EmptyClipboard failed")
 		ClipboardMutated := true
-		if !DllCall("User32\SetClipboardData", "UInt", CF_BITMAP, "Ptr", BitmapHandle, "Ptr")
+		TransferredBitmap := DllCall("User32\SetClipboardData", "UInt", CF_BITMAP, "Ptr", BitmapHandle, "Ptr")
+		if !TransferredBitmap
 			throw Error("SetClipboardData(CF_BITMAP) failed")
 		BitmapHandle := 0
 		return true
@@ -601,10 +607,8 @@ CB_WriteBitmapFile(Path) {
 		if MutationId && !ClipboardMutated
 			_CB_CancelOwnedMutation(MutationId)
 		; Release the global clipboard lock before file-backed logging can yield.
-		if ClipboardOpened {
-			try DllCall("User32\CloseClipboard")
-			ClipboardOpened := false
-		}
+		if ClipboardOpened
+			MutationSequence := _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap)
 		if BitmapHandle {
 			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
 			BitmapHandle := 0
@@ -613,9 +617,50 @@ CB_WriteBitmapFile(Path) {
 		return false
 	} finally {
 		if ClipboardOpened
-			try DllCall("User32\CloseClipboard")
+			MutationSequence := _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap)
 		if BitmapHandle
 			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+	}
+}
+
+; Windows synthesizes CF_DIB/CF_DIBV5 when a CF_BITMAP publication closes. Only
+; a reopened lock and the exact native owner/bitmap can authenticate its final
+; sequence. Critical excludes same-HWND AHK writes across the close/reopen gap;
+; another process may win that gap, in which case no receipt is returned.
+_CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap) {
+	PreviousCritical := Critical("On")
+	try {
+		if !DllCall("User32\CloseClipboard", "Int")
+			return 0
+		ClipboardOpened := false
+		if !ClipboardMutated
+			return 0
+		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		if !ClipboardOpened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return 0
+		if TransferredBitmap {
+			if DllCall("User32\GetClipboardData", "UInt", 2, "Ptr") != TransferredBitmap
+				return 0
+		} else {
+			; EmptyClipboard succeeded but SetClipboardData failed. The local bitmap
+			; never transferred, so only our still-empty clipboard can be owned.
+			DllCall("Kernel32\SetLastError", "UInt", 0)
+			FormatCount := DllCall("User32\CountClipboardFormats", "Int")
+			if FormatCount != 0 || A_LastError != 0
+				return 0
+		}
+		Sequence := CB_GetSequenceNumber()
+		if !DllCall("User32\CloseClipboard", "Int")
+			return 0
+		ClipboardOpened := false
+		return Sequence
+	} catch {
+		return 0
+	} finally {
+		if ClipboardOpened
+			try DllCall("User32\CloseClipboard", "Int")
+		ClipboardOpened := false
+		Critical(PreviousCritical)
 	}
 }
 

@@ -120,8 +120,8 @@ _LLM_NavEventOwnerReport(Message) {
 }
 
 _LLM_NavEventOwnerReportNow(Detail) {
-	try LoggerError("LLM.nav",
-		"Navigation event owner failure: {1}.", Detail)
+	try LoggerError("KeyboardArbiter",
+		"Keyboard arbiter failure: {1}.", Detail)
 }
 
 _LLM_NavEventOwnerStopExceptionDetail(Err) {
@@ -435,7 +435,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := fal
 				_LLM_NavEventOwnerStopping := false
 			} finally Critical(PreviousCritical)
 			if !WasPending
-				try LoggerDebug("LLM.nav", "stage=native_stop outcome=pending.")
+				try LoggerDebug("KeyboardArbiter", "stage=native_stop outcome=pending.")
 			return false
 		}
 		if !Stopped {
@@ -502,7 +502,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := fal
 		catch
 			Unloaded := false
 		if ShouldStop && Unloaded
-			try LoggerDebug("LLM.nav", "stage=native_stop outcome=stopped.")
+			try LoggerDebug("KeyboardArbiter", "stage=native_stop outcome=stopped.")
 		return Unloaded
 	} finally {
 		if StopScope is Map

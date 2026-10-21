@@ -340,6 +340,15 @@ h1 {
 	margin: 0 0 12px;
 }
 
+/* Persistent controls: one group per control, spaced like the magic key. */
+.controls {
+	margin: 0 0 12px;
+}
+
+.control-group {
+	margin: 0 0 10px;
+}
+
 .magic-input {
 	background: #fff;
 	border: 1.5px solid #d0d0d0;

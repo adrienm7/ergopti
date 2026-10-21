@@ -409,6 +409,62 @@ function M.new(opts)
 		return called and result or nil
 	end
 
+
+	-- Capture constructor-owned ports before any ordinary injection admission.
+	local text_owner_ports = {
+		focus = guard.focused_text_identity, barrier = watch and watch.barrier, pump = watch and watch.pump,
+		snapshot = watch and watch.snapshot, epoch = detector and detector.currentEpoch,
+		verdict = detector and detector.getVerdict, policy = keylogger.is_context_protected,
+	}
+
+	--- Retains one ordinary text destination across blocking injection phases.
+	--- Fresh checks use the resident barrier; per-DOWN checks only observe RAM.
+	--- This cannot make compositor focus changes atomic with emitted keystrokes.
+	--- @param expected_focus string|nil Exact target retained by an originating action.
+	--- @return table|nil owner Full-phase and cached-key publication guards.
+	function guard.capture_text_owner(expected_focus)
+		if not contextual or not watch or not detector then return nil end
+		local focus, barrier, pump, snapshot = text_owner_ports.focus, text_owner_ports.barrier, text_owner_ports.pump, text_owner_ports.snapshot
+		local epoch, verdict, policy = text_owner_ports.epoch, text_owner_ports.verdict, text_owner_ports.policy
+		if type(focus) ~= "function" or type(barrier) ~= "function" or type(pump) ~= "function"
+			or type(snapshot) ~= "function" or type(epoch) ~= "function" or type(verdict) ~= "function"
+			or type(policy) ~= "function" then return nil end
+		local function ports_current()
+			return guard.focused_text_identity == focus and watch.barrier == barrier and watch.pump == pump
+				and watch.snapshot == snapshot and detector.currentEpoch == epoch and detector.getVerdict == verdict
+				and keylogger.is_context_protected == policy
+		end
+		if not ports_current() then return nil end
+		local captured, target = pcall(focus)
+		if not captured or not target or (expected_focus ~= nil and target ~= expected_focus)
+			or not ports_current() or not joined_field or not joined_context then return nil end
+		local field, context, generation = joined_field, joined_context, context_generation
+		local bus, path, role, field_epoch = field.bus, field.path, field.role, field.epoch
+		local app, title, native = context.app_id, context.title, context.native_identity
+		local function retained()
+			return ports_current() and not stopped and not context_pending and not joining_context
+				and rawequal(joined_field, field) and rawequal(joined_context, context) and context_generation == generation
+				and field.bus == bus and field.path == path and field.role == role and field.epoch == field_epoch and field.generation == generation
+				and context.app_id == app and context.title == title and context.native_identity == native
+				and epoch() == field_epoch
+		end
+		local owner = {}
+		function owner.cached()
+			local checked, current = pcall(function()
+				if not retained() or policy(app, title) ~= false or not retained() or verdict() ~= "insecure" then return false end
+				local observed = snapshot()
+				return retained() and type(observed) == "table" and getmetatable(observed) == nil and observed.bus == bus and observed.path == path
+					and observed.role == role and role ~= 40
+			end)
+			return checked and current == true
+		end
+		function owner.current()
+			local checked, current = pcall(function() return retained() and focus() == target and owner.cached() end)
+			return checked and current == true
+		end
+		return owner.cached() and owner or nil
+	end
+
 	--- Reports retained context ownership without querying native focus.
 	--- Idle reconciliation must not start fresh probes for unknown/password fields.
 	--- @return boolean retained

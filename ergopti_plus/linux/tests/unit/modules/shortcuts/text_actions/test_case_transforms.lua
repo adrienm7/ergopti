@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TextOwnerFixture = require("tests.support.text_owner_fixture")
 
 local function with_manager(selected, body)
 	local names = {
@@ -17,6 +18,7 @@ local function with_manager(selected, body)
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keylogger = "modules.keylogger.keylogger",
+		hook = "adapters.keyboard_hook",
 	}
 	local previous = {}
 	for key, name in pairs(names) do previous[key] = package.loaded[name] end
@@ -29,14 +31,20 @@ local function with_manager(selected, body)
 		end,
 		read_checked = function() return true, "clipboard", nil end,
 	}
-	package.loaded[names.event_loop] = { sleep_ms = function() return true end }
+	package.loaded[names.event_loop] = { sleep_ms = function() return true end, defer = function() return true end }
 	package.loaded[names.combo] = { press = function() return true end }
 	package.loaded[names.injector] = { inject = function() return { ok = true } end }
 	package.loaded[names.keylogger] = { record_shortcut = function() return true end }
+	-- No keyboard is captured here: a CapsWord session locks a fake CapsLock.
+	package.loaded[names.hook] = require("tests.support.caps_word_lock_hook_fake").new()
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()
-		body(require(names.manager), state)
+		TextOwnerFixture.with(function(guard)
+			local manager = require(names.manager)
+			manager.init({ persist = false, capture_text_owner = guard.capture_text_owner })
+			body(manager, state, guard.capture_text_owner)
+		end)
 	end)
 	for key, name in pairs(names) do package.loaded[name] = previous[key] end
 	helpers.assert_true(ok, "shortcut case probe must not throw: " .. tostring(err))
@@ -71,25 +79,16 @@ helpers.describe("shortcut case transforms", function()
 			helpers.assert_eq(state.replacement, "été straße")
 		end)
 	end)
-
-	helpers.it("capitalizes a non-ASCII CapsWord character after Unicode punctuation", function()
-		with_manager("unused", function(manager)
-			manager.toggle_caps_word()
-			helpers.assert_eq(manager.process_caps_word("é"), "É")
-			helpers.assert_eq(manager.process_caps_word("—"), nil)
-			helpers.assert_eq(manager.process_caps_word("я"), "Я")
-		end)
-	end)
 end)
 
 --- Initializes the real configuration reservation and builds its actual tray row.
 --- Native selection/clipboard ports remain the case fixture's boundaries.
 --- @param body function
 local function with_caps_word_menu(body)
-	with_manager("unused", function(manager)
+	with_manager("unused", function(manager, _, capture_text_owner)
 		require("test.config_unused_keys_contract").sandbox.with_config(
 			'[shortcuts]\nenabled = false\n[foreign]\nvalue = "keep"\n', function(path)
-				manager.init({ persist = true, config_path = path })
+				manager.init({ persist = true, config_path = path, capture_text_owner = capture_text_owner })
 				local changed = { count = 0 }
 				local builder = helpers.load_module("ui.menu.menu_builder")
 				local function row()
@@ -219,7 +218,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 			helpers.assert_eq(observed.acquired, true)
 			helpers.assert_eq(manager.is_caps_word_active(), false)
 			helpers.assert_eq(returned, false)
-			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_triggered, false)
+			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_active, false)
 			helpers.assert_eq(changed.count, 0)
 			helpers.assert_eq(manager.release_configuration(owner), true)
 			package.loaded["modules.keylogger.keylogger"].record_shortcut = function() end

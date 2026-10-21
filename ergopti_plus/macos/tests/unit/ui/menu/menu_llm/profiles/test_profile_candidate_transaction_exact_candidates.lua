@@ -562,6 +562,10 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(shortcut_row.action(), false)
 			local spec = fixture.last_shortcut_spec()
 			helpers.assert_type(spec and spec.on_apply, "function")
+			-- The prompt caption comes from the shared native presentation, never
+			-- a title the menu code labels itself (native-menu-rows census).
+			helpers.assert_eq(spec.native_presentation_id, "profile_shortcut_dialog")
+			helpers.assert_nil(spec.title)
 			retain_clone_candidate(fixture)
 			fixture.plan_runtime({{mode = "false", mutate = false}})
 			helpers.assert_eq(spec.on_apply({"ctrl"}, "k"), false)

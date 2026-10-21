@@ -1114,13 +1114,26 @@ _LLM_SegmentColorHex(Role, is_active) {
 	throw ValueError("Unknown prediction line role: " . Role, -1)
 }
 
+; The native label of each modifier, from the shared shortcut spec
+; (_shared/modules/tooltip/constants.toml [llm_ui]). Map keys are
+; case-insensitive, which tolerates "Alt"/"ALT" from config.
+_LLM_ValModifierLabels() {
+	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS
+	Labels := Map()
+	Labels.CaseSense := false
+	Texts := StrSplit(UI_LLM_SHORTCUT_LABELS, ",")
+	for Position, Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
+		Labels[Name] := Texts[Position]
+	return Labels
+}
+
+; Spells a modifier string out for the footer's navigation hint ("Alt+Shift").
+; Windows uses words: the macOS glyphs read as Cmd/Option shortcuts on a PC
+; keyboard (llm-val-mods-windows-labels).
 _LLM_FormatValModifiers(valMods) {
 	if (valMods = "" or valMods = "none")
 		return ""
-	; Windows spells modifiers out ("Alt+1"); the macOS glyphs this used to emit
-	; read as Cmd/Option shortcuts on a PC keyboard (llm-val-mods-windows-labels).
-	; Map keys are case-insensitive, which tolerates "Alt"/"ALT" from config.
-	static Labels := _LLM_ValModifierLabels()
+	Labels := _LLM_ValModifierLabels()
 	out := ""
 	for part in StrSplit(valMods, "+", " `t") {
 		if (part = "")
@@ -1130,41 +1143,30 @@ _LLM_FormatValModifiers(valMods) {
 	return out
 }
 
-_LLM_ValModifierLabels() {
-	Labels := Map()
-	Labels.CaseSense := false
-	Labels["cmd"] := "Win"
-	Labels["ctrl"] := "Ctrl"
-	Labels["alt"] := "Alt"
-	Labels["shift"] := "Shift"
-	return Labels
-}
-
-_LLM_BuildShortcutSuffix(idx, slotCount, valMods := "") {
-	global UI_LLM_SHORTCUT_LABEL_GAP
-	if (slotCount <= 1)
+/**
+ * Port of shortcut_label in _shared/lua/tooltip/llm_line.lua: the chord that
+ * inserts prediction Idx, as the shortcut column of its row shows it. The
+ * modifiers follow the shared order whatever order ValMods lists them in; the
+ * digit is Idx, 0 for the tenth row, and later rows have none.
+ * @param {Integer} Idx - One-based prediction row.
+ * @param {String} ValMods - The validation modifiers ("ctrl+alt", "" = bare digit).
+ * @returns {String} The label, "" when the row has no chord.
+ */
+_LLM_PredictionShortcutLabel(Idx, ValMods) {
+	global UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS, UI_LLM_SHORTCUT_JOINER
+	if !(Idx is Integer) || Idx < 1 || Idx > 10
 		return ""
-	sym := _LLM_FormatValModifiers(valMods)
-	if (sym = "")
-		return ""
-	gap := UI_LLM_SHORTCUT_LABEL_GAP
-	if (idx <= 9)
-		return gap . sym . "+" . idx
-	if (idx = 10)
-		return gap . sym . "+0"
-	return ""
-}
-
-; Build the display string for a slot row (used by the plain-string path).
-_LLM_SlotBuildText(slot, is_active, slotIdx := 1, slotCount := 1) {
-	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX, _LLM_Tooltip_ValMods
-	prefix := is_active ? _LLM_GetActivePrefix(slotCount) : _LLM_GetInactivePrefix(slotCount)
-	shortcut := _LLM_BuildShortcutSuffix(slotIdx, slotCount, _LLM_Tooltip_ValMods)
-	if _LLM_SlotIsEmpty(slot)
-		return prefix . LLM_TOOLTIP_PLACEHOLDER . shortcut
-	txt    := _LLM_SlotGetText(slot)
-	suffix := is_active ? LLM_TOOLTIP_TAB_SUFFIX : ""
-	return prefix . txt . suffix . shortcut
+	Present := Map()
+	Present.CaseSense := false
+	for Part in StrSplit(ValMods, "+", " `t")
+		if (Part != "")
+			Present[Part] := true
+	Texts := StrSplit(UI_LLM_SHORTCUT_LABELS, ",")
+	Out := ""
+	for Position, Name in StrSplit(UI_LLM_SHORTCUT_ORDER, ",")
+		if Present.Has(Name)
+			Out .= Texts[Position] . UI_LLM_SHORTCUT_JOINER
+	return Out . (Idx == 10 ? "0" : String(Idx))
 }
 
 LLM_TooltipSetDisplayOpts(opts) {
@@ -1532,7 +1534,7 @@ _LLM_TooltipDrawFooter(G, Layout, Texts, Footer) {
 
 ; Build a single Gui that renders all LLM slots with per-chunk coloring, laid
 ; out like the macOS canvas: one plain panel, the lines stacked as one block,
-; the shortcut label inline after each line. Active slot: the typed text
+; the shortcut labels in a right-aligned column. Active slot: the typed text
 ; (equal chunks) unsel_gray, the corrections (insert chunks) corr_sel (green),
 ; the next words nw_sel (orange). Inactive slots: unsel_gray throughout.
 ; Placeholder slots: italic slot placeholder in the loading color.
@@ -1543,7 +1545,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	global _TOOLTIP_LINE_SPACING, _TOOLTIP_HINT_SPACING, _TOOLTIP_LOADING_TEXT_HEX
 	global _LLM_Tooltip_ValMods, LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
 	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
-	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_SEL_HEX, UI_LLM_CMD_DIM_HEX
+	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_DIM_HEX, _TOOLTIP_LABEL_GAP
 
 	G := 0
 	CandidateHandedOff := false
@@ -1567,30 +1569,40 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	SuffixSize := 0
 	ActivePrefixSize := _TooltipMeasureText(activePrefix)
 	InactivePrefixSize := _TooltipMeasureText(inactivePrefix)
+	; The shortcut column: every real row shows the chord that inserts it,
+	; right-aligned against the inner edge, label_gap past the widest line
+	; (_shared/modules/tooltip/constants.toml [llm_ui]). Its width is one column
+	; for every row, so it is measured before the lines.
+	ShortcutSizes := []
+	ShortcutColumnW := 0
+	for i, slot in slots {
+		Shortcut := (all_placeholder || _LLM_SlotIsEmpty(slot)) ? ""
+			: _LLM_PredictionShortcutLabel(i, _LLM_Tooltip_ValMods)
+		Shortcuts.Push(Shortcut)
+		ShortcutSize := _LLM_TooltipMeasureOptional(Shortcut, _TOOLTIP_LABEL_FONT_SIZE)
+		ShortcutSizes.Push(ShortcutSize)
+		if IsObject(ShortcutSize)
+			ShortcutColumnW := Max(ShortcutColumnW, ShortcutSize.W)
+	}
+	ShortcutZoneW := ShortcutColumnW > 0 ? _TOOLTIP_LABEL_GAP + ShortcutColumnW : 0
 	for i, slot in slots {
 		Segments := []
 		if all_placeholder {
 			Body := (i == 1) ? loading_label : ""
-			Shortcut := ""
 		} else if _LLM_SlotIsEmpty(slot) {
 			Body := LLM_TOOLTIP_PLACEHOLDER
-			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		} else {
 			Segments := _LLM_SlotSegments(slot, i == active_idx)
 			Body := ""
-			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		}
 		Bodies.Push(Body)
-		Shortcuts.Push(Shortcut)
 		RowSegments.Push(Segments)
-		SpanSizes := { Shortcut: 0, Body: 0, Pieces: [] }
+		SpanSizes := { Shortcut: ShortcutSizes[i], Body: 0, Pieces: [] }
 		RowSpanSizes.Push(SpanSizes)
 		if (all_placeholder and i > 1) {
 			PredRows.Push({ W: 0, H: 0 })
 			continue
 		}
-		SpanSizes.Shortcut := _LLM_TooltipMeasureOptional(Shortcut, _TOOLTIP_LABEL_FONT_SIZE)
-		ShortcutW := IsObject(SpanSizes.Shortcut) ? SpanSizes.Shortcut.W : 0
 		if (Segments.Length > 0) {
 			; A real line is drawn piece by piece after its prefix, so it is
 			; measured the same way.
@@ -1598,7 +1610,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 				SuffixSize := _LLM_TooltipMeasureOptional(LLM_TOOLTIP_TAB_SUFFIX, _TOOLTIP_FONT_SIZE)
 			SuffixW := IsObject(SuffixSize) ? SuffixSize.W : 0
 			MeasuredRow := _LLM_TooltipMeasurePredictionRow(slot,
-				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutW)
+				ActivePrefixSize, InactivePrefixSize, SuffixW, ShortcutZoneW)
 			SpanSizes.Pieces := i == active_idx
 				? MeasuredRow.Selected.Pieces : MeasuredRow.Unselected.Pieces
 			PredRows.Push(MeasuredRow)
@@ -1607,7 +1619,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		Active := _TooltipMeasureText(activePrefix . Body)
 		Inactive := _TooltipMeasureText(inactivePrefix . Body)
 		SpanSizes.Body := _LLM_TooltipMeasureOptional(Body, _TOOLTIP_FONT_SIZE)
-		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutW,
+		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutZoneW,
 			H: Max(Active.H, Inactive.H) })
 	}
 	; The all-placeholder panel is the macOS loading panel: label only, no footer.
@@ -1655,9 +1667,12 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
 					_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX, "norm", SuffixSize)
 		}
-		; Inline after the line, bottom-aligned at the smaller hint size.
-		_LLM_TooltipDrawText(G, X, RowY, RowH, is_active ? UI_LLM_CMD_SEL_HEX : UI_LLM_CMD_DIM_HEX,
-			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx], "norm", SpanSizes.Shortcut)
+		; Right-aligned against the inner edge, bottom-aligned at the smaller hint
+		; size, muted on every row.
+		if IsObject(SpanSizes.Shortcut)
+			_LLM_TooltipDrawText(G, Layout.W - _TOOLTIP_PADDING_X - SpanSizes.Shortcut.W,
+				RowY, RowH, UI_LLM_CMD_DIM_HEX, _TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx],
+				"norm", SpanSizes.Shortcut)
 	}
 	_LLM_TooltipDrawFooter(G, Layout, Texts, Footer)
 	TotalW := Layout.W

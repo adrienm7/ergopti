@@ -376,12 +376,10 @@ local _idle_timer           = nil
 local _maintenance_timer    = nil
 local _tap_watchdog_timer   = nil
 local _foreground_bootstrap_timer = nil
-local _win_filter           = nil
 local _process_lifecycle_registered = false
 
 -- Browser apps whose intra-window focus/title changes warrant a private-mode
--- re-check. The array feeds hs.window.filter.new(); the set gives O(1) lookup in
--- the app-activation hook that lazily creates the filter.
+-- re-check; the set gives O(1) lookup in the app-activation hook.
 local BROWSER_APPS = {
 	"Safari", "Google Chrome", "Firefox", "Microsoft Edge",
 	"Brave Browser", "Arc", "Opera", "Vivaldi",
@@ -389,25 +387,101 @@ local BROWSER_APPS = {
 local BROWSER_APP_SET = {}
 for _, _name in ipairs(BROWSER_APPS) do BROWSER_APP_SET[_name] = true end
 
---- Lazily creates the browser window-filter on the FIRST browser activation.
---- hs.window.filter's first instantiation makes Hammerspoon enumerate every window
---- of every app — multi-second on machines with many apps or a VPN — so creating
---- it eagerly at keylogger start delayed the whole engine becoming ready. Per
---- app-switch private/incognito detection runs immediately via
---- ContextTracker.update_private_status (called from app_watcher_cb) and does NOT
---- need this filter; the filter only adds intra-app (tab/title-change) re-checks,
---- which only matter once the user is actually inside a browser
---- (keylogger-winfilter-lazy).
-local function ensure_browser_window_filter()
-	if _win_filter then return end
-	local t0 = hs.timer.absoluteTime()
-	_win_filter = hs.window.filter.new(BROWSER_APPS)
-	_win_filter:subscribe(
-		{ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged },
-		ContextTracker.update_private_status
-	)
-	Logger.debug(LOG, "Browser window filter created lazily on first browser activation (%.1f ms).",
-		(hs.timer.absoluteTime() - t0) / 1e6)
+-- Accessibility watchers bound to the active browser only: one on the
+-- application for focused-window changes, one on its focused window for title
+-- changes. hs.window.filter did the same job but its first instantiation
+-- enumerates every window of every app on the main thread: 4.8 s and 3.3 s on
+-- the maintainer's Mac, long enough to cost the Karabiner lease (issue #95).
+-- These bind to one application and one window, so they never enumerate.
+local _browser_app_watcher       = nil
+local _browser_app_watcher_pid   = nil
+local _browser_title_watcher     = nil
+local _browser_title_window_id   = nil
+
+--- Resolves an hs.uielement.watcher event name without failing on a stub.
+--- @param name string Event field.
+--- @param fallback string Native AX notification name.
+--- @return string event
+local function browser_ui_event(name, fallback)
+	local watcher = hs.uielement and hs.uielement.watcher
+	return type(watcher) == "table" and watcher[name] or fallback
+end
+
+--- Stops one exact browser watcher and reports a refusal without dropping it.
+--- @param watcher table|nil Native watcher.
+--- @return boolean stopped
+local function stop_browser_watcher(watcher)
+	if not watcher then return true end
+	local ok, result = pcall(function() return watcher:stop() end)
+	if ok and result ~= false then return true end
+	Logger.error(LOG, "Browser window watcher stop failed; retained for retry: %s.", tostring(result))
+	return false
+end
+
+--- Releases both browser watchers.
+--- @return boolean released True only when no watcher remains retained.
+local function release_browser_window_watchers()
+	if not stop_browser_watcher(_browser_title_watcher) then return false end
+	_browser_title_watcher, _browser_title_window_id = nil, nil
+	if not stop_browser_watcher(_browser_app_watcher) then return false end
+	_browser_app_watcher, _browser_app_watcher_pid = nil, nil
+	return true
+end
+
+--- Binds the title watcher to the browser's focused window, replacing the
+--- previous window's watcher. A window of another application is not watched.
+--- @param pid number Browser process identifier.
+local function bind_browser_title_watcher(pid)
+	local win = hs.window.focusedWindow()
+	local win_app = win and win:application()
+	if not win_app or win_app:pid() ~= pid then
+		if stop_browser_watcher(_browser_title_watcher) then
+			_browser_title_watcher, _browser_title_window_id = nil, nil
+		end
+		return
+	end
+	local window_id = win:id()
+	if _browser_title_watcher and _browser_title_window_id == window_id then return end
+	if not stop_browser_watcher(_browser_title_watcher) then return end
+	_browser_title_watcher, _browser_title_window_id = nil, nil
+	local candidate
+	candidate = win:newWatcher(function()
+		if _browser_title_watcher ~= candidate then return end
+		ContextTracker.update_private_status()
+	end)
+	if not candidate then error("browser title watcher construction returned nil", 0) end
+	_browser_title_watcher, _browser_title_window_id = candidate, window_id
+	if candidate:start({ browser_ui_event("titleChanged", "AXTitleChanged") }) == false then
+		error("browser title watcher start refused", 0)
+	end
+end
+
+--- Watches the activated browser's window focus and title changes. Per-app
+--- private detection already runs on activation (ContextTracker.app_watcher_cb);
+--- these watchers add the re-checks for a new window or tab inside the browser.
+--- @param app_object table Activated browser application.
+local function ensure_browser_window_watchers(app_object)
+	local pid = app_object:pid()
+	if _browser_app_watcher and _browser_app_watcher_pid == pid then
+		bind_browser_title_watcher(pid)
+		return
+	end
+	if not release_browser_window_watchers() then return end
+	local candidate
+	candidate = app_object:newWatcher(function()
+		if _browser_app_watcher ~= candidate then return end
+		local bound, bind_err = xpcall(bind_browser_title_watcher, debug.traceback, pid)
+		if not bound then
+			Logger.error(LOG, "Browser title watcher rebind failed: %s.", tostring(bind_err))
+		end
+		ContextTracker.update_private_status()
+	end)
+	if not candidate then error("browser window watcher construction returned nil", 0) end
+	_browser_app_watcher, _browser_app_watcher_pid = candidate, pid
+	if candidate:start({ browser_ui_event("focusedWindowChanged", "AXFocusedWindowChanged") }) == false then
+		error("browser window watcher start refused", 0)
+	end
+	bind_browser_title_watcher(pid)
 end
 -- Sleep/wake/lock watcher handle; its callback lives in the watchers module
 local _caffeinate_watcher   = nil
@@ -1900,14 +1974,8 @@ local function teardown_runtime(opts)
 			end,
 		},
 		{
-			name = "browser-window-filter",
-			run = function()
-				if not _win_filter then return true end
-				if type(_win_filter.unsubscribeAll) ~= "function" then return false end
-				if _win_filter:unsubscribeAll() == false then return false end
-				_win_filter = nil
-				return true
-			end,
+			name = "browser-window-watchers",
+			run = release_browser_window_watchers,
 		},
 		{
 			name = "maintenance-timer",
@@ -2086,13 +2154,15 @@ function M.start(script_control)
 						tostring(context_err))
 					return
 				end
+				local watch_ok, watch_err
 				if BROWSER_APP_SET[app_name] then
-					local filter_ok, filter_err = xpcall(ensure_browser_window_filter,
-						debug.traceback)
-					if not filter_ok then
-						Logger.error(LOG, "Optional browser window-filter setup failed: %s.",
-							tostring(filter_err))
-					end
+					watch_ok, watch_err = xpcall(ensure_browser_window_watchers,
+						debug.traceback, app_object)
+				else
+					watch_ok, watch_err = xpcall(release_browser_window_watchers, debug.traceback)
+				end
+				if not watch_ok then
+					Logger.error(LOG, "Browser window watcher update failed: %s.", tostring(watch_err))
 				end
 			end)
 			_process_lifecycle_registered = true

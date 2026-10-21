@@ -91,12 +91,14 @@ final class OwnedRuntimeCorePlistCustody {
 	private func protection(_ fd: Int32, _ value: stat, mode: mode_t) throws {
 		guard value.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), value.st_mode & 0o7777 == mode,
 			value.st_nlink == 1, !protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
-		guard let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) else { throw OwnedRuntimeInstallFailure.protection }
-		defer { acl_free(UnsafeMutableRawPointer(acl)) }
-		var entry: acl_entry_t?; errno = 0
-		guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
-			throw OwnedRuntimeInstallFailure.protection
-		}
+		errno = 0
+		if let acl = acl_get_fd_np(fd, ACL_TYPE_EXTENDED) {
+			defer { acl_free(UnsafeMutableRawPointer(acl)) }
+			var entry: acl_entry_t?; errno = 0
+			guard acl_valid(acl) == 0, acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry) == -1, errno == EINVAL else {
+				throw OwnedRuntimeInstallFailure.protection
+			}
+		} else if errno != ENOENT { throw OwnedRuntimeInstallFailure.protection } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 	}
 	private func read(_ fd: Int32, count: Int) throws -> Data {
 		var data = Data(count: count)

@@ -25,7 +25,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 	TapHoldPos := InStr(ShutdownBody, "TapHoldShutdownReleaseGate()", true)
 	FullSavePos := InStr(ShutdownBody, "_ConfigFullSaveSettleTerminal(", true)
 	BeginPos := InStr(ShutdownBody, "KL_BeginShutdown()", true)
-	FlushReadyPos := InStr(ShutdownBody, "KL_FlushShutdownReady()", true)
+	FlushReadyPos := InStr(ShutdownBody, "KL_FlushShutdownReady(", true)
 	DrainPos := InStr(ShutdownBody,
 		"HotstringPrefixWatcherPrepareShutdown()", true)
 	LeftPos := InStr(ShutdownBody, "GestureReleaseLeftClick()", true)

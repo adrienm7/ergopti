@@ -306,6 +306,26 @@ function H.collect_features(state)
 	return { items = items }
 end
 
+--- What the configuration probe works with: where the files live, the
+--- manifest, the decoder and a clock. The sections are filled by the probe
+--- (ui.healthcheck.probes), never by phase A.
+--- @param schema table The diagnostics schema.
+--- @param overrides table|nil Replacements for tests: features, path_of, open_fn, clock.
+--- @return table
+function H.configuration_context(schema, overrides)
+	overrides = overrides or {}
+	local names = schema.configuration.file_names
+	return {
+		schema   = schema,
+		driver   = "macos",
+		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
+		decode   = require("toml_codec").decode,
+		open_fn  = overrides.open_fn,
+		clock    = overrides.clock or function() return hs.timer.absoluteTime() / 1e6 end,
+	}
+end
+
 --- The network facts phase A can read: the Wi-Fi signal only. The network's
 --- name identifies a place, and a hash of it is reversed with a list of common
 --- names (no-network-identity); GitHub's reachability is a probe.

@@ -20,10 +20,7 @@ local Json = require("json")
 --- The repository's static folder, from this driver's shared tree.
 --- @return string
 local function static_dir()
-	local source = debug.getinfo(1, "S").source:gsub("^@", "")
-	local macos = source:match("^(.*)/tests/unit/infra/[^/]+$")
-	if macos == nil or macos == "" then macos = "." end
-	return macos .. "/../.."
+	return helpers.driver_root() .. "../.."
 end
 
 --- Real-filesystem scanner collaborators: sorted children of one kind.

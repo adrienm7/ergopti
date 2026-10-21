@@ -427,7 +427,7 @@ _KLT_ReadLocalCase() {
 ; ===============================================
 ; ===============================================
 
-Test("keylayout emulation: registration covers every key and leaves native chords alone (layout-registry-emulation)",
+Test("keylayout emulation: registration covers every key and leaves native chords alone (layout-registry-emulation) (layout-row-win-registry)",
 	_KLT_RegistrationCase)
 
 Test("keylayout emulation: AltGr alone preserves native AZERTY base and Shift (layout-layer-selection)",
@@ -499,7 +499,9 @@ _KLT_IndependentLayersCase() {
 		AssertFalse(KeylayoutEmulation_LayerIsActive("ergopti_alt_gr"))
 		AssertFalse(Capture.Rows["SC138 & SC010"].Call(), "disabled AltGr must not capture its key")
 		Features["layout"]["direct_access_digits"] := "digits"
-		AssertFalse(Capture.Rows["SC002"].Call(), "direct digits own their unshifted row")
+		; Ergo-L already types its digits unshifted: digits first is inert there
+		; and the emulation keeps its own row (number-row-availability).
+		AssertTrue(Capture.Rows["SC002"].Call(), "an inert digits-first choice leaves the row to the emulation")
 		AssertTrue(Capture.Rows["SC010"].Call(), "direct digits do not disable letters")
 		CategoryEnabled["Layout"] := false
 		AssertFalse(Capture.Rows["SC010"].Call(), "the master still gates effective behavior")
@@ -674,7 +676,9 @@ _KLT_MagicKeyYieldCase() {
 
 _KLT_RegistrationCase() {
 	global KLE_Registered, KLE_DEAD_RESET_KEYS
-	Saved := KLE_Registered
+	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
+	Saved := [KLE_Registered, _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort,
+		_KLE_ResetObserverCapture, _KLE_ResetObserverGeneration]
 	KLE_Registered := false
 	Names := []
 	HotIfCalls := []
@@ -695,8 +699,9 @@ _KLT_RegistrationCase() {
 		AssertEqual(Keys - 1, BrokerRows.Length, "every Win typing chord joins the physical broker exactly once")
 		for Row in BrokerRows {
 			AssertTrue(HasMethod(Row["callback"], "Call"), "the real layout callback is retained")
-			AssertTrue(Row["criterion"] == _KLE_ShortcutCriterion, "the real native admission is retained")
+			AssertTrue(HasMethod(Row["criterion"], "Call"), "the real native admission is retained")
 		}
+		_LRPR_AssertBrokerRows(BrokerRows)
 		Joined := " " . _KLT_Join(Names, " ") . " "
 		for Name in ["SC010", "+SC010", "^SC010", "#SC010", "!+SC056", "#+SC029", "SC138 & SC010", "SC039", "+SC039",
 			"SC138 & SC039", "~SC00E"]
@@ -707,7 +712,13 @@ _KLT_RegistrationCase() {
 		AssertEqual(0, HotIfCalls[HotIfCalls.Length], "the HotIf context must be reset after registration")
 		AssertThrows(() => KeylayoutEmulation_Register(Table, (*) => 0, (*) => 0),
 			"a second registration must be refused")
-	} finally KLE_Registered := Saved
+	} finally {
+		KLE_Registered := Saved[1]
+		_KLE_ResetObserverRegistering := Saved[2]
+		_KLE_ResetObserverCohort := Saved[3]
+		_KLE_ResetObserverCapture := Saved[4]
+		_KLE_ResetObserverGeneration := Saved[5]
+	}
 }
 
 Test("master gates: a selected registry layout supersedes the Ergopti emulation (layout-registry-emulation)",

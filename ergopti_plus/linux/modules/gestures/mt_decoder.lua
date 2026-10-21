@@ -162,6 +162,7 @@ function M.new(opts)
 
 	-- When the first finger landed, so a hold can be told from a tap.
 	local _started_at = nil
+	local _dropping = false -- invalid queue contents through the next SYN_REPORT
 
 	--- Discards everything and returns to "no fingers down".
 	local function reset()
@@ -219,6 +220,17 @@ function M.new(opts)
 	function decoder:feed(event)
 		if type(event) ~= "table" then return nil end
 		local etype, code, value = event.type, event.code, event.value
+		if etype == EV_SYN and code == SYN_DROPPED then
+			reset()
+			_dropping = true
+			return nil
+		end
+		-- event-codes.rst requires ignoring the whole packet after SYN_DROPPED.
+		-- No slot, count or touch edge inside that packet can start a new gesture.
+		if _dropping then
+			if etype == EV_SYN and code == SYN_REPORT then _dropping = false end
+			return nil
+		end
 
 		if etype == EV_ABS then
 			if code == ABS_MT_SLOT then
@@ -257,16 +269,6 @@ function M.new(opts)
 
 		if etype ~= EV_SYN then return nil end
 
-		if code == SYN_DROPPED then
-			-- The kernel threw events away because this reader fell behind, so the
-			-- slot state no longer describes the hand on the pad. Continuing would
-			-- emit a gesture assembled from a mix of pre- and post-drop state — a
-			-- three-finger swipe firing the five-finger action, intermittently, and
-			-- only ever on a loaded machine.
-			reset()
-			return nil
-		end
-
 		if code ~= SYN_REPORT then return nil end
 
 		local cx, cy = centroid()
@@ -283,7 +285,9 @@ function M.new(opts)
 		end
 
 		-- Every finger is up: the gesture, if there was one, is complete.
-		if _peak_fingers == 0 then
+		-- A contact held across loss can publish finger-count changes on lift,
+		-- without another BTN_TOUCH down. Only a fresh observed start owns a tap.
+		if _peak_fingers == 0 or _started_at == nil then
 			reset()
 			return nil
 		end

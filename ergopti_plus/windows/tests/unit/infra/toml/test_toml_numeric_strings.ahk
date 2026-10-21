@@ -95,3 +95,89 @@ _TNS_WidgetProducers(Mode) {
 for Mode in ["position", "display", "full"]
 	Test("TOML: widget " . Mode . " producer retains numbers (toml-numeric-string-widget)",
 		_TNS_WidgetProducers.Bind(Mode))
+
+_TNS_ReadPreservesString(Value) {
+	Path := _CTU_NewPath()
+	try {
+		AssertTrue(FSWrite(Path, "[personal_editor]`ndefault_section = "
+			. TOML_RenderString(Value) . "`n"))
+		Actual := TOML_Read(Path, "personal_editor", "default_section", "missing")
+		AssertTrue(Actual is String,
+			"the single-key reader must preserve the parser's quoted string type")
+		AssertEqual(Value, Actual,
+			"numeric section names must retain leading zeros and exact spelling")
+	} finally FSDelete(Path)
+}
+for Value in ["0", "1", "+0", "00", "001", "000", "1.0", "1e0"]
+	Test("TOML: single-key reads retain '" . Value . "' (toml-numeric-string-read)",
+		_TNS_ReadPreservesString.Bind(Value))
+
+_TNS_ReadPreservesNativeValues() {
+	Path := _CTU_NewPath()
+	try {
+		AssertTrue(FSWrite(Path,
+			'[sample]`nflag_on = true`nflag_off = false`ncount = 1`nitems = ["0", "1"]`n'))
+		for Key, Expected in Map("flag_on", 1, "flag_off", 0, "count", 1) {
+			Actual := TOML_Read(Path, "sample", Key, "missing")
+			AssertTrue(Actual is Integer, "native numeric values must retain their type")
+			AssertEqual(Expected, Actual)
+		}
+		Items := TOML_Read(Path, "sample", "items", "missing")
+		AssertTrue(Items is Array)
+		AssertEqual(2, Items.Length)
+		AssertTrue(Items[1] is String)
+		AssertEqual("0", Items[1])
+		AssertEqual("missing", TOML_Read(Path, "sample", "absent", "missing"))
+	} finally FSDelete(Path)
+}
+Test("TOML: single-key reads retain native values and defaults (toml-numeric-string-read)",
+	_TNS_ReadPreservesNativeValues)
+
+_TNS_EditorNumericSectionPreference() {
+	global ConfigurationFile
+	OldPath := ConfigurationFile
+	Path := _CTU_NewPath()
+	try {
+		AssertTrue(FSWrite(Path, '[personal_editor]`ndefault_section = "001"`n'))
+		ConfigurationFile := Path
+		Actual := _EditorPrefGet("default_section", "")
+		AssertTrue(Actual is String, "the editor selects sections by string identity")
+		AssertEqual("001", Actual, "reopening the editor must select the saved numeric section")
+	} finally {
+		ConfigurationFile := OldPath
+		FSDelete(Path)
+	}
+}
+Test("TOML: editor restores the exact numeric section name (toml-numeric-string-read)",
+	_TNS_EditorNumericSectionPreference)
+
+_TNS_EditorSemanticPreference(Shape) {
+	global ConfigurationFile
+	OldPath := ConfigurationFile
+	Path := _CTU_NewPath()
+	switch Shape {
+		case "dotted": Source := 'personal_editor.default_section = "001"`npersonal_editor.close_on_add = "1"`n'
+		case "inline": Source := 'personal_editor = { default_section = "001", close_on_add = "1" }`n'
+		case "quoted": Source := '["personal_editor"]`ndefault_section = "001"`nclose_on_add = "1"`n'
+		default: throw ValueError("Unknown personal-editor semantic fixture")
+	}
+	try {
+		AssertTrue(FSWrite(Path, Source))
+		Admitted := ConfigTomlDecodeSnapshot(Source).Cache
+		AssertEqual("001", Admitted["personal_editor"]["default_section"],
+			"the canonical config reader must already admit this source identity")
+		ConfigurationFile := Path
+		Actual := _EditorPrefGet("default_section", "")
+		AssertTrue(Actual is String)
+		AssertEqual("001", Actual, "the native editor must select the authored section")
+		AssertEqual("1", _EditorPrefGet("close_on_add", "0"))
+		AssertEqual("absent", _EditorPrefGet("missing", "absent"))
+		AssertEqual(Source, FSReadUtf8Exact(Path), "reading preferences must not normalize their source")
+	} finally {
+		ConfigurationFile := OldPath
+		FSDelete(Path)
+	}
+}
+for Shape in ["dotted", "inline", "quoted"]
+	Test("TOML: editor reads " . Shape . " preferences (editor-semantic-preference)",
+		_TNS_EditorSemanticPreference.Bind(Shape))

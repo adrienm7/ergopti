@@ -7,8 +7,8 @@
 ; HealthCheck_ValidateAction accepted them: copy the report, save it as a
 ; Markdown file under the logs folder and select it in Explorer, report it on
 ; GitHub (copy, save and reveal its attachment, then open the bug template) and open
-; a folder. Also the Debug menu's "Report a bug", which opens the diagnostics
-; window at its preview, and "Suggest a feature".
+; a folder. Also the Debug menu's "Report a bug", which runs that same report
+; action on a fresh snapshot without the window, and "Suggest a feature".
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared output is rebuilt from the host snapshot through a closed typed
@@ -28,11 +28,34 @@
 
 #Requires AutoHotkey v2.0
 
+/**
+ * Projects one configuration row {setting, type, value}. A value outside the
+ * grammar of its type drops the whole row: an enum is a bare identifier, a text
+ * or a list only a count, so a path or a sentence matches none of them.
+ */
+_HCShare_SettingRow(Value) {
+	if !(Value is Map)
+		return 0
+	Setting := Value.Get("setting", 0), Kind := Value.Get("type", 0), Text := Value.Get("value", 0)
+	if !(Setting is String) || !(Kind is String) || !(Text is String) || StrLen(Setting) > 96
+		|| !RegExMatch(Setting, "^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$")
+		return 0
+	switch Kind {
+		case "boolean": Fits := Text == "true" || Text == "false"
+		case "number": Fits := StrLen(Text) <= 24 && RegExMatch(Text, "i)^-?\d[\d.]*e?[+-]?\d*$") && IsNumber(Text)
+			&& Abs(Number(Text)) < 1.7e308
+		case "enum": Fits := RegExMatch(Text, "^[A-Za-z0-9_+-]{1,40}$")
+		case "text", "list": Fits := RegExMatch(Text, "^\d{1,6}$")
+		default: Fits := false
+	}
+	return Fits ? Map("setting", Setting, "type", Kind, "value", Text) : 0
+}
+
 /** Projects only typed fields declared in the canonical sharing policy. */
 _HCShare_Project(Value, Rule, &Present) {
 	Present := true
 	Kind := Rule["kind"]
-	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|", "|" . Kind . "|")
+	if !InStr("|object|array|enum|boolean|number|integer|version|hash|utc|commit|runtime|setting_row|", "|" . Kind . "|")
 		throw Error("An unknown diagnostic sharing rule was refused.")
 	if Kind == "object" {
 		Result := Map()
@@ -50,9 +73,19 @@ _HCShare_Project(Value, Rule, &Present) {
 	if Kind == "array" {
 		Result := []
 		if Value is Array
-			for Item in Value
-				Result.Push(_HCShare_Project(Item, Rule["item"], &HasValue))
+			for Item in Value {
+				if Rule.Has("max_items") && Result.Length >= Rule["max_items"]
+					break
+				Kept := _HCShare_Project(Item, Rule["item"], &HasValue)
+				if HasValue
+					Result.Push(Kept)
+			}
 		return Result
+	}
+	if Kind == "setting_row" {
+		Row := _HCShare_SettingRow(Value)
+		Present := Row is Map
+		return Row
 	}
 	if Kind == "enum" {
 		if Value is String
@@ -215,6 +248,8 @@ _HCShare_Rows(Value, Rule, Prefix, Rows) {
 	} else if Rule["kind"] == "array" {
 		for Index, Item in Value
 			_HCShare_Rows(Item, Rule["item"], Prefix . "." . Index, Rows)
+	} else if Rule["kind"] == "setting_row" {
+		Rows.Push("| " . _HCShare_Cell(Value["setting"]) . " | " . _HCShare_Cell(Value["type"] . ": " . Value["value"]) . " |")
 	} else {
 		Text := Rule["kind"] == "boolean" ? (Value ? "true" : "false") : Value
 		Rows.Push("| " . _HCShare_Cell(Prefix) . " | " . _HCShare_Cell(Text) . " |")
@@ -316,14 +351,18 @@ global HC_FOLDER_IDS := Map("config_dir", true, "logs_dir", true, "crash_dir", t
 ; ===============================
 
 ; Saves the report in Dir, creating the folder when it is missing.
+; @param WriterFn {Func|Integer} Optional durable native writer for fault coverage.
 ; @returns {String} The saved file's path.
 ; @throws {Error} When the folder or the file cannot be written.
-_HCReport_Save(Dir, Name, Text) {
+_HCReport_Save(Dir, Name, Text, WriterFn := 0) {
 	DirCreate(Dir)
 	Path := Dir . "\" . Name
-	File := FileOpen(Path, "w", "UTF-8-RAW")
-	try File.Write(Text)
-	finally File.Close()
+	if !(WriterFn is Integer && WriterFn == 0) && !HasMethod(WriterFn, "Call")
+		throw TypeError("The diagnostics attachment writer must be callable or zero.")
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable
+	Written := ResolvedWriter.Call(Path, Text)
+	if !(Written is Integer) || Written != 1
+		throw Error("The complete diagnostics attachment could not be written.")
 	return Path
 }
 
@@ -421,10 +460,10 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 ; @throws {Error} When clipboard, attachment completion or browser opening refuses.
 _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; Copy the complete reviewed report independently of its short metadata URL
+	; Copy the complete approved report independently of its short metadata URL
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
-	; The complete reviewed document stays in a local attachment, never the URL.
+	; The complete approved document stays in a local attachment, never the URL.
 	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
 	Fields := Map()
 	; Only the host-derived technical identity is stable enough to prefill.
@@ -514,10 +553,36 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 ; =============================
 ; =============================
 
-; Opens the diagnostics window at its preview: the user reviews exactly what
-; is shared before the report button copies it and opens GitHub.
-HealthCheck_ReportBug() {
-	HealthCheck_ShowWindow("report")
+; Reports a bug exactly as the diagnostics page's report button does, without
+; the window: the approved report of a fresh snapshot is copied, saved and
+; selected in Explorer, then the bug form opens with the host version, OS and
+; driver prefilled. One path, HealthCheck_PerformAction, owns the policy.
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @returns {Boolean} Whether the bug form was opened.
+HealthCheck_ReportBug(Overrides := 0) {
+	LoggerStart("HealthCheckReport", "Reporting a bug from the Debug menu…")
+	Effects := _HCReport_Effects(Overrides)
+	Opened := false
+	try {
+		Config := HealthCheck_Config()
+		Snapshot := HealthCheck_Run()
+		; A report from the Debug menu has no page to keep responsive
+		HealthCheck_CompleteConfiguration(Snapshot, Config["schema"])
+		Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+		Outcome := HealthCheck_PerformAction(Map("action", "report", "text", Document["text"],
+			"fields", Document["fields"]), Snapshot["sections"]["paths"], Config, Overrides, Snapshot)
+		Opened := Outcome["ok"] ? true : false
+		if !Opened
+			LoggerError("HealthCheckReport", "Bug report failed: the report action was refused.")
+	} catch as Err {
+		LoggerError("HealthCheckReport", "Bug report failed: {1}", Err.Message)
+	}
+	if !Opened {
+		Effects["notify"].Call(t("menu.debug.report_bug"), t("notify.github_report_failed"), "error")
+		return false
+	}
+	LoggerSuccess("HealthCheckReport", "Bug report form opened.")
+	return true
 }
 
 ; Opens the GitHub feature form with the version and the system prefilled.

@@ -17,11 +17,13 @@ local function fixture(callback, cleanup_failures)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.action_picker", "infra.i18n", "infra.locale", "locale.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "infra.i18n", "infra.locale", "locale.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
 			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "webview.i18n_seed",
 			"window_titles", "webview.presentation", "program_provider_picker",
 			"adapters.program_providers", "adapters.apple_shortcuts_native", "hs", "tests.stubs.hs",
+			"_generated.locale_table", "_generated.logger_sub_files", "adapters.log_transport", "app_dirs",
+			"diagnostics.redact", "infra.launcher_environment", "infra.log_folders", "logger", "menu.labels",
 		}, function()
 			local state = { creates = 0, bridges = 0, views = {}, contents = {}, payloads = {}, confirmations = 0 }
 			state.cleanup_failures = cleanup_failures
@@ -30,19 +32,30 @@ local function fixture(callback, cleanup_failures)
 			local body_ok, body_failure = xpcall(function()
 				local native = {
 					windowMasks = { titled = 1, closable = 2, utility = 16 },
-					usercontent = { new = function()
+					usercontent = { new = function(name)
 						state.bridges = state.bridges + 1
-						local content = {}
-						function content:setCallback(fn) self.callback = fn end
+						local content = { port_name = name }
+						function content:setCallback(fn) self.callback = fn; return self end
 						state.contents[#state.contents + 1] = content
 						return content
 					end },
-					new = function()
+					new = function(_, _, content)
 						state.creates = state.creates + 1
-						local view = { captions = {}, scripts = {}, deletes = 0 }
+						local view = setmetatable({ captions = {}, scripts = {}, deletes = 0, content = content }, {})
 						function view:windowTitle(caption) self.captions[#self.captions + 1] = caption; return self end
+						function view:deleteOnClose(value)
+							if value == nil then return self.delete_on_close == true end
+							self.delete_on_close = value
+							return self
+						end
 						for _, name in ipairs({ "windowStyle", "level", "allowTextEntry", "allowGestures",
-							"shadow", "allowNewWindows", "html", "show" }) do view[name] = function() return view end end
+							"shadow", "html", "show" }) do view[name] = function() return view end end
+						function view:allowNewWindows(value)
+							if value == nil then return self.allow_new_windows ~= false end
+							assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+							self.allow_new_windows = value
+							return self
+						end
 						function view:windowCallback(fn) self.on_window = fn; return self end
 						function view:navigationCallback(fn) self.on_navigation = fn; return self end
 						local window = {}
@@ -55,6 +68,7 @@ local function fixture(callback, cleanup_failures)
 							self.deletes = self.deletes + 1
 							if self.on_window then self.on_window("closed") end
 							if state.delete_refused then error("controlled native close refusal") end
+							setmetatable(self, nil)
 							return self
 						end
 						state.views[#state.views + 1] = view
@@ -106,7 +120,11 @@ local function fixture(callback, cleanup_failures)
 					end)
 				end
 				local function ready(index)
-					state.contents[index or #state.contents].callback({ body = { action = "ready" } })
+					local view = assert(state.views[index or #state.views])
+					local content = assert(view.content)
+					-- WKScriptMessage_toLua supplies both the native port name and
+					-- exact originating WebView (pinned usercontent.m:210–215).
+					content.callback({ name = content.port_name, webView = view, body = { action = "ready" } })
 				end
 				callback(state, builder, picker, locale, titles, open, ready, core, i18n)
 			end, function(failure_value) return failure_value end)

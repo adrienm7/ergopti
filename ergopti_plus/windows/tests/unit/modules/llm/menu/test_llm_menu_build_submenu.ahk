@@ -84,10 +84,55 @@ _LBMS_Labels(TargetMenu) {
 	return Labels
 }
 
+; Runs Body with a fresh private configuration the session may write, so the
+; persistence rows draw ready; Ready false keeps the harness's unwritable
+; destination. Restores every global it replaces.
+_LBMS_WithPersistence(Ready, Body) {
+	global ConfigurationFile, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	Prior := Map("path", IsSet(ConfigurationFile), "read", IsSet(_ConfigBootReadFailed),
+		"rejected", IsSet(_ConfigBootRejectedOverrides))
+	if Prior["path"]
+		Prior["path_value"] := ConfigurationFile
+	if Prior["read"]
+		Prior["read_value"] := _ConfigBootReadFailed
+	if Prior["rejected"]
+		Prior["rejected_value"] := _ConfigBootRejectedOverrides
+	PriorSuspend := A_IsSuspended
+	Path := A_Temp . "\ergopti_ai_menu_no_clear_" . DllCall("GetCurrentProcessId", "uint")
+		. "_" . A_TickCount . "_" . Random(1, 1000000) . ".toml"
+	try {
+		Suspend(false)
+		if Ready {
+			AssertFalse(FileExist(Path), "the ready fixture starts from a fresh private destination")
+			ConfigurationFile := Path
+			_ConfigBootReadFailed := false
+			_ConfigBootRejectedOverrides := 0
+			AssertEqual("absent", ConfigMigrateBoot(Path)["status"], "the private destination is admitted as fresh absence")
+			AssertTrue(ConfigFullStateCanPersist(), "the ready fixture lets the session save its configuration")
+		} else
+			AssertFalse(ConfigFullStateCanPersist(), "the harness destination cannot be saved")
+		return Body.Call()
+	} finally {
+		try FileDelete(Path)
+		ConfigurationFile := Prior["path"] ? Prior["path_value"] : unset
+		_ConfigBootReadFailed := Prior["read"] ? Prior["read_value"] : unset
+		_ConfigBootRejectedOverrides := Prior["rejected"] ? Prior["rejected_value"] : unset
+		Suspend(PriorSuspend)
+	}
+}
+
+; Whether a drawn label is Caption itself or Caption greyed with its cause.
+_LBMS_IsCaption(Label, Caption) {
+	return Label == Caption || InStr(Label, Caption . " — ", true) == 1
+}
+
 ; ai-menu-no-clear. The drawn AI submenu keeps « Restaurer les valeurs
 ; conseillées » under its switch and no longer shows « Tout effacer
-; (comportement du système) », whose row the maintainer retired.
-_LBMS_NoClearRow() {
+; (comportement du système) », whose row the maintainer retired. The restore
+; is drawn ready on a configuration the session can save and greyed, with its
+; cause, on one it cannot: the clear row is absent in both shapes.
+_LBMS_NoClearRow(Ready) {
+	static MF_BYPOSITION := 0x400, MF_GRAYED := 0x1, MF_DISABLED := 0x2
 	global _LLM_Menu, _LLM_Menu_Handle
 	SavedMenu := _LBMS_Fixture()
 	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
@@ -97,12 +142,19 @@ _LBMS_NoClearRow() {
 		Labels := _LBMS_Labels(Sub)
 		Restores := 0
 		for Label in Labels {
-			AssertFalse(Label == t("common.clear_to_system"), "the AI submenu draws no clear row")
-			if (Label == t("common.restore_recommended"))
+			AssertFalse(_LBMS_IsCaption(Label, t("common.clear_to_system")), "the AI submenu draws no clear row")
+			if _LBMS_IsCaption(Label, t("common.restore_recommended"))
 				Restores += 1
 		}
 		AssertEqual(1, Restores, "the AI submenu keeps its restore row")
-		AssertEqual(t("common.restore_recommended"), Labels[2], "the restore row follows the switch")
+		AssertTrue(_LBMS_IsCaption(Labels[2], t("common.restore_recommended")), "the restore row follows the switch")
+		Flags := DllCall("GetMenuState", "ptr", Sub.Handle, "uint", 1, "uint", MF_BYPOSITION, "uint")
+		AssertFalse(Flags == 0xFFFFFFFF, "the restore row has a native state")
+		AssertEqual(!Ready, (Flags & (MF_GRAYED | MF_DISABLED)) != 0, "the restore row is greyed exactly when the configuration cannot be saved")
+		if Ready
+			AssertEqual(t("common.restore_recommended"), Labels[2], "a ready restore row reads its caption alone")
+		else
+			AssertTrue(Labels[2] != t("common.restore_recommended"), "a greyed restore row names its cause")
 		AssertEqual("", Labels[3], "a separator closes the switch's group")
 	} finally {
 		_LLM_Menu := SavedMenu
@@ -111,7 +163,9 @@ _LBMS_NoClearRow() {
 	}
 }
 Test("ai-menu-no-clear: the drawn AI submenu has a restore row and no clear row",
-	_LBMS_NoClearRow)
+	_LBMS_WithPersistence.Bind(true, _LBMS_NoClearRow.Bind(true)))
+Test("ai-menu-no-clear: an unsavable configuration greys the restore row and still draws no clear row",
+	_LBMS_WithPersistence.Bind(false, _LBMS_NoClearRow.Bind(false)))
 
 ; backend-row-selected-option. The drawn Backend row, the first after the
 ; switch's group, reads the selected option before its em dash.
@@ -382,8 +436,9 @@ _LBMS_ActualWarningAnchor() {
 	try {
 		WarningRows := [Map("label", t("menu.llm.warning_install_ollama"),
 			"action", _LLM_Menu_OnWarningInstallClick)]
-		_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false,
-			WarningRows, Destination, "LLM")
+		; The captured emitter returns its rows; MenuRenderer_Build draws them.
+		MenuRenderer_AppendRows(Destination, "llm_menu", "llm_backend", _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle,
+			"llm_backend", false, false, false, WarningRows, Destination, "LLM"))
 		Labels := _LBMS_Labels(Destination)
 		AssertEqual(t("menu.llm.warning_install_ollama"), Labels[1],
 			"the retained native warning precedes its actual backend anchor")
@@ -556,7 +611,8 @@ _WBF_ActualBackendRoute(Root) {
 				Target := Menu(), _LLM_Menu_Handle := Target
 				Warnings := Present ? MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map()) : []
 				try {
-					_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false, Warnings, Target, "LLM")
+					MenuRenderer_AppendRows(Target, "llm_menu", "llm_backend",
+						_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false, Warnings, Target, "LLM"))
 					Labels := _LBMS_Labels(Target)
 					AssertEqual(Present ? 2 : 1, Labels.Length)
 					AssertEqual(Expected, Labels[Labels.Length], "actual selected original catalogue datum reaches the declared parent")

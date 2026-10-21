@@ -70,6 +70,29 @@ helpers.describe("api_mlx: streaming native ownership is transactional", functio
 	local shell_runner = get_upvalue(Inference.post_and_parse_streaming, "ShellRunner")
 	local scheduler = get_upvalue(Inference.post_and_parse_streaming, "TimerScheduler")
 
+	-- These narrow cases model immediate exit. A successful signal alone no
+	-- longer settles the production port: publish the exact native receipt too.
+	local function settled_task(task)
+		local settled, observers = false, {}
+		local terminate = task.terminate
+		function task.isSettled() return settled end
+		function task.onSettled(callback)
+			if settled then callback() else observers[#observers + 1] = callback end
+			return true
+		end
+		function task.terminate()
+			local accepted = terminate()
+			if accepted == true then
+				settled = true
+				local pending = observers
+				observers = {}
+				for _, callback in ipairs(pending) do callback() end
+			end
+			return accepted, settled and "settled" or "refused"
+		end
+		return task
+	end
+
 	local function new_ctx()
 		local stream = { task = nil, timeout = nil, generation = 0, has_chunks = false }
 		return {
@@ -99,10 +122,10 @@ helpers.describe("api_mlx: streaming native ownership is transactional", functio
 			local spawns, failures, terminations = 0, 0, 0
 			shell_runner.spawn = function()
 				spawns = spawns + 1
-				return {
+				return settled_task({
 					start = case.start,
 					terminate = function() terminations = terminations + 1; return true end,
-				}
+				})
 			end
 			Inference.init(ctx)
 
@@ -131,10 +154,10 @@ helpers.describe("api_mlx: streaming native ownership is transactional", functio
 			local failures, terminations, schedule_calls = 0, 0, 0
 			local cleanup_callback
 			shell_runner.spawn = function()
-				return {
+				return settled_task({
 					start = function() return true end,
 					terminate = function() terminations = terminations + 1; return true end,
-				}
+				})
 			end
 			scheduler.after = function(_, callback)
 				schedule_calls = schedule_calls + 1
@@ -169,13 +192,13 @@ helpers.describe("api_mlx: streaming native ownership is transactional", functio
 		local failures, terminations = 0, 0
 		local timers = {}
 		local task
-		task = {
+		task = settled_task({
 			start = function() return true end,
 			terminate = function()
 				terminations = terminations + 1
 				return terminations > 1
 			end,
-		}
+		})
 		shell_runner.spawn = function() return task end
 		scheduler.after = function(delay, callback)
 			local handle = { timer = {}, delay = delay, callback = callback }
@@ -213,10 +236,10 @@ helpers.describe("api_mlx: streaming native ownership is transactional", functio
 		local stream_chunk
 		shell_runner.spawn = function(_, _, _, on_chunk)
 			stream_chunk = on_chunk
-			return {
+			return settled_task({
 				start = function() return true end,
 				terminate = function() terminations = terminations + 1; return true end,
-			}
+			})
 		end
 		scheduler.after = function(delay, callback)
 			local handle = { active = true, delay = delay, callback = callback }

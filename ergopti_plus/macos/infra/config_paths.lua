@@ -49,6 +49,7 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
+local TomlCodec  = require("infra.toml.codec")
 local AppDirs    = require("app_dirs")
 local LogFolders = require("infra.log_folders")
 local LOG        = "config_paths"
@@ -217,21 +218,6 @@ local function normalize_logs_dir_override(value)
 	return normalized
 end
 
---- Parses a simple flat TOML file (key = "value" pairs, ignoring comments).
---- @param content string Raw file content.
---- @return table Parsed key-value map.
-local function parse_toml(content)
-	local result = {}
-	for line in content:gmatch("[^\r\n]+") do
-		local trimmed = line:match("^%s*(.-)%s*$")
-		if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then
-			local key, val = trimmed:match('^(%S+)%s*=%s*"(.*)"$')
-			if key then result[key] = val end
-		end
-	end
-	return result
-end
-
 --- Reads and parses one bootstrap file.
 --- @param path string Absolute paths.toml path.
 --- @return table|nil bootstrap Parsed table.
@@ -253,7 +239,8 @@ local function read_bootstrap(path)
 			path, tostring(failed_step), tostring(detail))
 	end
 	if status ~= "ok" then return nil, status, detail end
-	local parsed = parse_toml(raw)
+	local parsed = TomlCodec.decode(raw)
+	if not parsed then return nil, "error", "invalid paths.toml syntax" end
 	if parsed[CONFIG_DIR_KEY] ~= nil then
 		local expanded, expand_error = expand_legacy_home(parsed[CONFIG_DIR_KEY])
 		if expanded == nil then return nil, "error", expand_error end
@@ -394,7 +381,7 @@ local function serialize_toml()
 	lines[#lines + 1] = ""
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then
-		lines[#lines + 1] = string.format('%s = "%s"', CONFIG_DIR_KEY, v)
+		lines[#lines + 1] = string.format('%s = %s', CONFIG_DIR_KEY, TomlCodec.encode_value(v))
 	else
 		lines[#lines + 1] = string.format('# %s = "%s"', CONFIG_DIR_KEY, default_dir)
 	end
@@ -404,7 +391,7 @@ local function serialize_toml()
 		"# Logs folder. If absent or commented out, logs are written to: %s", default_logs)
 	local logs = _bootstrap[LOGS_DIR_KEY]
 	if type(logs) == "string" and logs ~= "" then
-		lines[#lines + 1] = string.format('%s = "%s"', LOGS_DIR_KEY, logs)
+		lines[#lines + 1] = string.format('%s = %s', LOGS_DIR_KEY, TomlCodec.encode_value(logs))
 	else
 		lines[#lines + 1] = string.format('# %s = "%s"', LOGS_DIR_KEY, default_logs)
 	end
@@ -652,7 +639,7 @@ function M.init(base_dir)
 			else
 				_bootstrap_snapshot = { status = "ok", content = migrated_content }
 			end
-		elseif is_home_relative(parse_toml(source_snapshot.content)[CONFIG_DIR_KEY]) then
+		elseif is_home_relative(TomlCodec.decode(source_snapshot.content)[CONFIG_DIR_KEY]) then
 			-- Persist the expansion once so the file shows the folder actually used.
 			local saved, save_err = save_bootstrap()
 			if saved then

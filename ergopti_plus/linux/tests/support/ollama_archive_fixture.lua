@@ -60,9 +60,9 @@ local function fixture()
 		explicit_consent = true, authorized = function() return f.current end,
 		timeout_ms = 120000, helper_timeout_ms = 10000,
 		asset = {
-			version = "0.24.0", name = "ollama-linux-amd64.tar.zst", bytes = 1198635318,
-			sha256 = "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb",
-			url = "https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-linux-amd64.tar.zst",
+			version = "0.40.4", name = "ollama-linux-amd64.tar.zst", bytes = 1436408810,
+			sha256 = "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a",
+			url = "https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-linux-amd64.tar.zst",
 		},
 	}
 	function f.start(options)

@@ -38,9 +38,24 @@ _MetaWrapSymbolsGateBody() {
 		. "symbols (e.g. '@') do not wrap the selection")
 }
 
+; With an OS layout the wrap runs from _OnPrefixChar, which returned at the
+; Hotstrings gate before reaching it: wrapping a selection needed the unrelated
+; Hotstrings switch (selection-wrap-without-hotstrings).
+_MetaWrapPrecedesHotstringsGate() {
+	Body := _StripFullLineComments(_DriverFuncBody("_OnPrefixChar"))
+	AssertTrue(Body != "", "_OnPrefixChar definition not found")
+	WrapAt := InStr(Body, "_PrefixTryWrapSelection(")
+	GateAt := InStr(Body, 'IsCategoryGated("Hotstrings")')
+	AssertTrue(WrapAt > 0 && GateAt > 0, "_OnPrefixChar both wraps a selection and checks the Hotstrings gate")
+	AssertTrue(WrapAt < GateAt,
+		"the selection wrap must run before the Hotstrings gate returns")
+}
+
 _MetaRunWrapSymbolsGateTests() {
 	Test("meta wrap-symbols gate: WrapTextIfSelected honours per-symbol disabled state",
 		_MetaWrapSymbolsGateBody)
+	Test("meta wrap-symbols gate: an OS-layout selection wrap does not need Hotstrings",
+		_MetaWrapPrecedesHotstringsGate)
 }
 
 _MetaRunWrapSymbolsGateTests()

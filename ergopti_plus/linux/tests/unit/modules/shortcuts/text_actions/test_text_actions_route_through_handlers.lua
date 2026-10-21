@@ -56,6 +56,7 @@ local function routed_gestures()
 	package.loaded["modules.shortcuts.manager"] = nil
 
 	local Shortcuts = require("modules.shortcuts.manager")
+	log.shortcuts = Shortcuts
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
 	local noop = function() end
@@ -73,10 +74,20 @@ local function routed_gestures()
 	return Gestures, log
 end
 
+--- Keeps an actual joined destination alive throughout a routed action test.
+--- @param log table Recording fixture and its real shortcut owner.
+--- @param body function Action assertions.
+local function with_destination(log, body)
+	require("tests.support.text_owner_fixture").with(function(guard)
+		log.shortcuts.init({ persist = false, capture_text_owner = guard.capture_text_owner })
+		body()
+	end)
+end
+
 helpers.describe("Linux text actions route through the daemon handlers", function()
 	helpers.it("select_word selects the whole word, select_line the line", function()
 		local Gestures, log = routed_gestures()
-		local ok, err = pcall(function()
+		local ok, err = pcall(with_destination, log, function()
 			Gestures.execute_action("select_word", "keyboard__ctrl_j")
 			helpers.assert_eq(table.concat(log.presses, " / "), "ctrl+Right / ctrl+shift+Left",
 				"select_word must move to the end of the word, then select back to its start")
@@ -90,7 +101,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 
 	helpers.it("paste_plain types the clipboard's plain text", function()
 		local Gestures, log = routed_gestures()
-		local ok, err = pcall(function()
+		local ok, err = pcall(with_destination, log, function()
 			Gestures.execute_action("paste_plain", "keyboard__ctrl_shift_v")
 			helpers.assert_eq(#log.injected, 1, "paste_plain must inject exactly once")
 			helpers.assert_eq(log.injected[1], "plain clipboard")
@@ -101,7 +112,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 
 	helpers.it("the case actions transform the selection", function()
 		local Gestures, log = routed_gestures()
-		local ok, err = pcall(function()
+		local ok, err = pcall(with_destination, log, function()
 			Gestures.execute_action("selection_uppercase", "tap_3")
 			Gestures.execute_action("titlecase_selection", "tap_3")
 			helpers.assert_eq(table.concat(log.transformed, " / "), "ÉTÉ / Été")
@@ -112,7 +123,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 
 	helpers.it("wrap_selection wraps with the pair stored for its binding", function()
 		local Gestures, log = routed_gestures()
-		local ok, err = pcall(function()
+		local ok, err = pcall(with_destination, log, function()
 			helpers.assert_true(Gestures.set_action_parameter("tap_3", "wrap_selection", "«"))
 			Gestures.execute_action("wrap_selection", "tap_3")
 			helpers.assert_eq(table.concat(log.transformed, " / "), "« été »")
@@ -127,7 +138,7 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 
 	helpers.it("surround_parens wraps the current line, as on Windows", function()
 		local Gestures, log = routed_gestures()
-		local ok, err = pcall(function()
+		local ok, err = pcall(with_destination, log, function()
 			Gestures.execute_action("surround_parens", "tap_3")
 			helpers.assert_eq(table.concat(log.presses, " / "), "Home / End / Home")
 			helpers.assert_eq(table.concat(log.injected, " / "), "( / )")

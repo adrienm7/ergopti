@@ -110,7 +110,7 @@ _CPC_IndentWriterReturnsItsNativeStatus() {
 			continue
 		Calls += 1
 		Assert(_CPC_LineConsumesResult(Lines, Index), "the indentation writer must return its native ACK")
-		Assert(InStr(Line, "WriterFn.Call(Path, Owned)") > 0,
+		Assert(InStr(Line, "WriterFn.Call(Path, Owned, Content, 1)") > 0,
 			"the injected and production writers must share the same owned leaf and result boundary")
 		Discarded := Lines.Clone()
 		Discarded[Index] := StrReplace(Line, "return ", "")
@@ -138,7 +138,56 @@ _CPC_IsQualifiedTomlCaller(Line) {
 		"\b(?:TOML_(?:Write|BatchWrite|ConfigBatchWrite)|_TOML_BatchWriteImpl|ConfigCommit(?:Updates|Built))\(")
 }
 
+; Admit the profile publisher by its retained opening image and native ACK,
+; not merely by raising the whole-class inventory after adding a new caller.
+_CPC_ProfileSourceWriterContract(Body) {
+	Body := _DriverMaskBlockComments(&Body)
+	Body := _StripFullLineComments(Body)
+	Guard := RegExMatch(Body,
+		'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)\s*\|\|\s*!\(Path\s*==\s*Source\["path"\]\)\s+return\s+false')
+	Publish := RegExMatch(Body,
+		'return\s+TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*'
+		. '_LLM_Menu_ProfileSourceBound\.Bind\(Source\),\s*Source\["content"\],\s*Source\["present"\]\)')
+	Code := _DriverMaskNonCode(&Body)
+	CodeGuard := RegExMatch(Code, 'if\s+!_LLM_Menu_ProfileSourceBound\(Source\)')
+	CodePublish := RegExMatch(Code, 'return\s+TOML_ConfigBatchWrite\(')
+	return Guard > 0 && Publish > Guard && CodeGuard == Guard && CodePublish == Publish
+		&& _CPC_CountOccurrences(Body, "TOML_ConfigBatchWrite(") == 1
+}
+
+_CPC_ProfilePublisherRetainsOpeningImage() {
+	Body := _DriverFuncBody("_LLM_Menu_WriteProfileSource")
+	Assert(Body != "", "the newly inventoried profile publisher must exist")
+	Assert(_CPC_ProfileSourceWriterContract(Body),
+		"the profile native publisher returns its ACK and retains source, presence and exact menu/path custody")
+	Quoted := 'Evidence := ' . Chr(34) . StrReplace(Body, Chr(34), Chr(96) . Chr(34)) . Chr(34)
+	AssertFalse(_CPC_ProfileSourceWriterContract(Quoted), "quoted documentation cannot stand in for an executable writer")
+	for Mutant in [StrReplace(Body, 'Source["content"]', '""'),
+		StrReplace(Body, 'Source["present"]', "1"),
+		StrReplace(Body, "_LLM_Menu_ProfileSourceBound.Bind(Source)", "0"),
+		StrReplace(Body, 'if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])', "if false")] {
+		Assert(StrCompare(Body, Mutant, true) != 0, "each custody mutant must change the real writer")
+		AssertFalse(_CPC_ProfileSourceWriterContract(Mutant), "a lost retained image or owner fence cannot join the census")
+	}
+	Lines := StrSplit(_StripFullLineComments(Body), "`n", "`r")
+	Calls := 0
+	for Index, Line in Lines {
+		if !InStr(Line, "TOML_ConfigBatchWrite(")
+			continue
+		Calls++
+		Assert(_CPC_LineConsumesResult(Lines, Index), "the actual native receipt must be consumed")
+		for Replacement in ["", "Ignored := "] {
+			Mutant := Lines.Clone()
+			Mutant[Index] := StrReplace(Line, "return ", Replacement)
+			Assert(StrCompare(Line, Mutant[Index], true) != 0, "the receipt mutant must alter the actual return")
+			AssertFalse(_CPC_LineConsumesResult(Mutant, Index), "discarding or ignoring the actual ACK must fail")
+		}
+	}
+	AssertEqual(1, Calls, "exactly one independently audited opening-image publisher joins the inventory")
+}
+
 _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
+	_CPC_ProfilePublisherRetainsOpeningImage()
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "driver source must be readable for the AHK-15 TOML caller scan")
 	Calls := 0
@@ -163,7 +212,11 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 	; acknowledgement, independently audited by the native-ternary controls.
 	; This is three additional counted lines, not three new writer owners.
 	; No production caller disappears when this source-bound gateway moves.
-	AssertEqual(40, Calls,
+	; 41: the CapsWord auto-off setter (CapsWordAutoOffStore) commits through
+	; ConfigCommitUpdates and returns false when that commit refuses.
+	; 42: the profile opening-image publisher retains its original content,
+	; presence and current-owner callback, independently audited above.
+	AssertEqual(42, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -795,3 +848,5 @@ _CPC_NativeTernaryRequiresTestedStatus() {
 	AssertEqual(2, Calls, "the two actual guarded and default native dispatch branches remain enrolled")
 }
 Test("AHK-15-persistence: adjacent native ternary branches retain tested result ownership", _CPC_NativeTernaryRequiresTestedStatus)
+
+#Include test_config_indent_source_witness.ahk

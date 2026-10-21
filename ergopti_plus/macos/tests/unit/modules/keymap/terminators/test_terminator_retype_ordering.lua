@@ -10,6 +10,29 @@
 
 local helpers = require("tests.helpers")
 
+local scoped_helpers = helpers
+local OWNED = {
+	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
+	"adapters.text_sender", "adapters.timer_scheduler", "adapters.tooltip_renderer",
+	"compat.utf8", "hotstring_engine", "hotstrings.personal_files",
+	"hs", "infra.capsword_output", "infra.deferred_work",
+	"infra.hotstring_engine", "infra.keystroke_integrity", "infra.logger",
+	"infra.text_utils", "infra.timings", "json",
+	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
+	"logger.shim", "modules.keylogger", "modules.keymap.expander",
+	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
+	"modules.keymap.utils", "tests.stubs.hs", "text_utils",
+}
+
+-- Keep native consumers isolated even when a historical assertion aborts early.
+helpers = setmetatable({
+	it = function(name, callback)
+		scoped_helpers.it(name, function()
+			scoped_helpers.with_stub_scope(OWNED, callback)
+		end)
+	end,
+}, { __index = scoped_helpers })
+
 local LONG_A = string.rep("a", 80)
 local LONG_B = string.rep("b", 80)
 
@@ -60,17 +83,6 @@ end
 
 local function load_fixture(options)
 	options = options or {}
-	for name in pairs(package.loaded) do
-		if type(name) == "string" and (
-			name:match("^modules%.keymap")
-			or name == "modules.keylogger"
-			or name:match("^adapters%.")
-			or name == "infra.logger"
-			or name == "infra.timings"
-		) then
-			package.loaded[name] = nil
-		end
-	end
 
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -264,6 +276,8 @@ local function fire_scheduled_delay(fixture, delay)
 	for index = 1, initial_count do
 		local handle = fixture.scheduled[index]
 		if not handle.cancelled and handle.delay == delay then
+			-- A positive timer delivery advances the same clock read by handoff fences.
+			if fired == 0 then fixture.advance_time(delay) end
 			if not handle.recurring then
 				handle.cancelled = true
 				handle.timer = nil

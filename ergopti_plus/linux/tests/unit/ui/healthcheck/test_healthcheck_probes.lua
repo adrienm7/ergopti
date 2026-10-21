@@ -10,7 +10,8 @@
 ---    from asynchronous children;
 --- 3. without libuv every probe answers "unsupported" instead of blocking the
 ---    event loop with a synchronous fallback;
---- 4. a cancelled run publishes nothing and stops its requests and children.
+--- 4. a cancelled run publishes nothing and stops its requests, children and
+---    timers, the configuration probe's collection timer included.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -101,6 +102,19 @@ local function start(Probes, state)
 	return run, answers
 end
 
+--- The timers of the processor probe, apart from the configuration probe's
+--- own collection timer.
+--- @param world table
+--- @return table
+local function cpu_timers(world)
+	local sample_s = helpers.load_module("ui.healthcheck.bridge").config().schema.probes.cpu_load.sample_ms / 1000
+	local timers = {}
+	for _, handle in ipairs(world.timers) do
+		if handle.delay == sample_s then timers[#timers + 1] = handle end
+	end
+	return timers
+end
+
 helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("reads GitHub's rate limit under the probe's own owner", function()
 		with_probes(true, function(Probes, world)
@@ -156,7 +170,7 @@ helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("reads the processor load and the daemon's share from two /proc samples (system-load)", function()
 		with_probes(true, function(Probes, world)
 			local _, answers = start(Probes)
-			local timer = world.timers[1]
+			local timer = cpu_timers(world)[1]
 			helpers.assert_true(timer ~= nil, "the second sample waits for a timer")
 			helpers.assert_eq(timer.delay, 1)
 			helpers.assert_nil(answers.cpu_load, "no answer before the second sample")
@@ -185,7 +199,7 @@ helpers.describe("diagnostics probes (linux)", function()
 			world.proc = { ["/proc/stat"] = "", ["/proc/self/stat"] = "" }
 			local _, answers = start(Probes)
 			helpers.assert_eq(answers.cpu_load.result.state, "error")
-			helpers.assert_eq(#world.timers, 0)
+			helpers.assert_eq(#cpu_timers(world), 0)
 		end)
 	end)
 
@@ -199,7 +213,9 @@ helpers.describe("diagnostics probes (linux)", function()
 			helpers.assert_nil(answers.system_details)
 			helpers.assert_eq(world.cancelled_owners, { "diagnostics.github" })
 			helpers.assert_eq(world.cancelled_children, 2)
-			helpers.assert_eq(world.cancelled_timers, 1, "the processor sample's timer is stopped")
+			helpers.assert_true(cpu_timers(world)[1].cancelled == true, "the processor sample's timer is stopped")
+			helpers.assert_eq(world.cancelled_timers, 2, "the processor and configuration timers are stopped")
+			helpers.assert_nil(answers.configuration, "the configuration of a cancelled run is not published")
 		end)
 	end)
 end)

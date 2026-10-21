@@ -8,10 +8,6 @@
 --- still hang forever and never invoke its completion callback, so the guard
 --- needs an independent watchdog release path.
 ---
---- The correct sibling lives in the same file: _capsword_check_pending has FOUR
---- release paths, including a CAPSWORD_PROBE_TIMEOUT_SEC watchdog for a
---- started-but-hung process. This test mirrors that watchdog's coverage.
----
 --- ROOT CAUSE ENCODED HERE (behavioural, not a source grep): a successfully
 --- started spawn whose completion callback NEVER fires must not wedge the poll
 --- forever. Refused starts are covered separately by test_watchers_teardown_retry.
@@ -47,12 +43,20 @@ local function load_watchers_with_dead_spawn()
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(_executable, _args, _on_done)
 			ctx.spawns = ctx.spawns + 1
+			local settled, observer = false, nil
 			-- Deliberately drop _on_done: this models a task that started and hung.
 			-- terminate() is counted rather than ignored, so the test can tell
 			-- "stopped waiting for the read" apart from "reclaimed the read".
 			return {
 				start     = function() return true end,
-				terminate = function() ctx.terminates = ctx.terminates + 1; return true end,
+				terminate = function()
+					ctx.terminates = ctx.terminates + 1
+					settled = true
+					if observer then observer() end
+					return true, "settled"
+				end,
+				isSettled = function() return settled end,
+				onSettled = function(callback) observer = callback; return true end,
 			}
 		end,
 		_active_tasks = {},

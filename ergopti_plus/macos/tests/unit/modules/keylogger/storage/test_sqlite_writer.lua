@@ -114,7 +114,7 @@ helpers.describe("sqlite_writer — init validation", function()
 			device_obj = {
 				device_id      = "test-device-uuid-1234",
 				name           = "TestMac",
-				os             = "macOS",
+				os             = "darwin",
 				os_version     = "14.0",
 				host_signature = "sig",
 				created_at     = "2024-01-01 00:00:00",
@@ -168,7 +168,7 @@ helpers.describe("sqlite_writer — init validation", function()
 		sw.init({
 			paths = { sqlite_path = "/tmp/existing-accounting.sqlite" },
 			device_obj = {
-				device_id = "existing-device", name = "TestMac", os = "macOS",
+				device_id = "existing-device", name = "TestMac", os = "darwin",
 				os_version = "14.0", host_signature = "sig",
 				created_at = "2024-01-01 00:00:00",
 			},
@@ -188,7 +188,7 @@ helpers.describe("sqlite_writer — init validation", function()
 		helpers.assert_eq(closed, false, "a successful migration must keep the writer open")
 	end)
 
-	helpers.it("retains the exact database handle until close succeeds", function()
+	helpers.it("distinguishes open cleanup debt from a consumed database wrapper", function()
 		for _, mode in ipairs({ "throw", "error-code" }) do
 			local close_calls = 0
 			local closed = false
@@ -206,11 +206,13 @@ helpers.describe("sqlite_writer — init validation", function()
 					close_calls = close_calls + 1
 					if close_calls == 1 then
 						if mode == "throw" then error("injected close failure") end
+						closed = true
 						return 1
 					end
 					closed = true
 					return 0
 				end,
+				isopen = function() return not closed end,
 				errmsg = function() return "" end,
 			}
 			local sw = helpers.load_with_stubs("modules.keylogger.sqlite_writer", {
@@ -223,7 +225,7 @@ helpers.describe("sqlite_writer — init validation", function()
 			sw.init({
 				paths = { sqlite_path = "/tmp/close-retry.sqlite" },
 				device_obj = {
-					device_id = "close-device", name = "TestMac", os = "macOS",
+					device_id = "close-device", name = "TestMac", os = "darwin",
 					os_version = "14.0", host_signature = "sig",
 					created_at = "2024-01-01 00:00:00",
 				},
@@ -233,16 +235,18 @@ helpers.describe("sqlite_writer — init validation", function()
 			helpers.assert_true(sw.open_db(), mode .. ": fixture database must open")
 			helpers.assert_eq(sw.close_db(), false,
 				mode .. ": close refusal must remain visible")
-			helpers.assert_true(sw.get_db() == db,
-				mode .. ": a failed close must retain the exact handle for retry")
-			helpers.assert_true(not closed,
-				mode .. ": the first close attempt must not settle the fixture")
-			helpers.assert_eq(sw.close_db(), true,
-				mode .. ": a later exact retry must settle the handle")
-			helpers.assert_nil(sw.get_db(),
-				mode .. ": a successfully closed handle must be released")
-			helpers.assert_true(closed, mode .. ": the second close must reach the native handle")
-			helpers.assert_eq(close_calls, 2, mode .. ": cleanup must retry the same database")
+			if mode == "throw" then
+				helpers.assert_true(sw.get_db() == db, "confirmed open owner remains retryable")
+				helpers.assert_true(sw.close_db())
+				helpers.assert_eq(close_calls, 2)
+			else
+				helpers.assert_nil(sw.get_db(), "consumed wrapper must not remain writable")
+				helpers.assert_eq(sw.close_db(), false, "failed native close remains fatal debt")
+				helpers.assert_eq(sw.open_db(), false, "quarantined close failure blocks replacement")
+				helpers.assert_eq(close_calls, 1, "consumed wrapper must never be closed twice")
+			end
+			helpers.assert_nil(sw.get_db())
+			helpers.assert_true(closed)
 		end
 	end)
 
@@ -306,7 +310,7 @@ local function make_writer()
 		device_obj = {
 			device_id      = DEVICE_ID,
 			name           = "TestMac",
-			os             = "macOS",
+			os             = "darwin",
 			os_version     = "14.0",
 			host_signature = "sig",
 			created_at     = "2024-01-01 00:00:00",
@@ -502,12 +506,15 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 					return 0
 				end,
 				nrows = function() return function() return nil end end,
-				prepare = function() return nil end,
+				prepare = function() return { bind_values = function() return 0 end,
+					step = function() return 101 end, finalize = function() return 0 end } end,
 				errmsg = function() return "fixture database error" end,
+				isopen = function() return not state.db_closed end,
 				close = function()
 					state.db_closes = state.db_closes + 1
 					if schedule.db_close == "throw" and state.db_closes == 1 then error("database close threw") end
-					if schedule.db_close == "refuse" and state.db_closes == 1 then return 1 end
+					if schedule.db_close == "refuse" and state.db_closes == 1 then state.db_closed = true; return 1 end
+					state.db_closed = true
 					return 0
 				end,
 			}
@@ -521,7 +528,7 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 					end },
 			})
 			sw.init({ paths = { sqlite_path = "/tmp/media-startup.sqlite" },
-				device_obj = { device_id = "test", name = "Test", os = "macOS", created_at = "2024-01-01" },
+				device_obj = { device_id = "test", name = "Test", os = "darwin", host_signature = "test-host", created_at = "2024-01-01" },
 				device_id = "test" })
 			local original_open = io.open
 			io.open = function(path, ...)
@@ -610,11 +617,18 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 				helpers.assert_eq(state.db_closes, 1)
 				helpers.assert_eq(sw.open_db(), false, "cleanup debt must block replacement")
 				helpers.assert_eq(state.opens, 1)
-				helpers.assert_eq(sw.close_db(), true, "exact SQLite refusal can be retried")
-				helpers.assert_eq(state.db_closes, 2)
-				helpers.assert_eq(state.file_closes, 1)
-				helpers.assert_eq(sw.open_db(), false, "read failure remains failure on a legitimate new attempt")
-				helpers.assert_eq(state.opens, 2, "successful retirement releases acquisition gate")
+				if failure == "throw" then
+					helpers.assert_eq(sw.close_db(), true, "confirmed open owner may be retried")
+					helpers.assert_eq(state.db_closes, 2)
+					helpers.assert_eq(sw.open_db(), false, "read failure remains failure on a legitimate new attempt")
+					helpers.assert_eq(state.opens, 2)
+				else
+					helpers.assert_eq(sw.close_db(), false, "consumed native close failure is terminal debt")
+					helpers.assert_eq(sw.open_db(), false)
+					helpers.assert_eq(state.db_closes, 1, "consumed wrapper cannot be retried")
+					helpers.assert_eq(state.opens, 1)
+				end
+				helpers.assert_eq(state.file_closes, failure == "throw" and 2 or 1)
 				local logs = table.concat(state.logs, "\n")
 				helpers.assert_true(logs:find("media read", 1, true) ~= nil, "primary error retained")
 				helpers.assert_true(logs:find("close", 1, true) ~= nil, "cleanup error retained")
@@ -657,7 +671,7 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 
 	for _, failure in ipairs({ "refuse", "throw" }) do
 		helpers.it("retires refused media transaction with exact SQLite debt after " .. failure, function()
-			observe({ apply = failure, db_close = "refuse" }, function(sw, state)
+			observe({ apply = failure, db_close = "throw" }, function(sw, state)
 				local ok, result = pcall(sw.open_db)
 				helpers.assert_true(ok, "media transaction failure must not escape its ownership boundary")
 				helpers.assert_eq(result, false)
@@ -687,7 +701,7 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 	end
 
 
-	helpers.it("does not acknowledge full retirement while a distinct admitted database remains", function()
+	helpers.it("refuses replacement while an admitted database remains", function()
 		local schedule = {}
 		observe(schedule, function(sw, state, admitted)
 			helpers.assert_eq(sw.open_db(), true)
@@ -701,9 +715,8 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 			schedule.read = "nil"
 			helpers.assert_eq(sw.open_db(), false)
 			helpers.assert_true(sw.get_db() == admitted)
-			helpers.assert_eq(pending_closes, 1)
-			helpers.assert_eq(sw.close_db(), false, "retiring pending database must not ACK the live admitted owner")
-			helpers.assert_eq(pending_closes, 2)
+			helpers.assert_eq(state.opens, 1, "duplicate open must not acquire a second owner")
+			helpers.assert_eq(pending_closes, 0, "an unacquired candidate must never be closed")
 			helpers.assert_eq(state.db_closes, 0)
 			helpers.assert_true(sw.get_db() == admitted)
 			helpers.assert_eq(sw.close_db(), true)

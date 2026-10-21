@@ -105,6 +105,7 @@ end
 
 local _running    = false   -- Set by run(), cleared by stop() or on exit.
 local _run_active = false   -- Retained until run() retires its owned handles.
+local _stop_generation = 0  -- Revokes detached callback batches at stop().
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
@@ -134,11 +135,16 @@ end
 --- wrapped in pcall so one raising handler (e.g. a GTK context that throws)
 --- never starves the others nor crashes the loop.
 local function _run_idle_handlers()
+	-- Explicit manual pumping before/after run() remains supported; a callback
+	-- cannot use it to resume a batch while its stopped run still owns cleanup.
+	if _run_active and not _running then return end
+	local generation = _stop_generation
 	for i = 1, #_idle_handlers do
 		local ok, err = pcall(_idle_handlers[i])
 		if not ok then
 			Logger.error(LOG, "Idle handler #%d raised: %s", i, ErrorDescription.describe(err))
 		end
+		if generation ~= _stop_generation then return end
 	end
 	if #_deferred == 0 then return end
 	-- Swapped out before running, so a callback that defers again lands in the
@@ -154,6 +160,7 @@ local function _run_idle_handlers()
 		if not ok then
 			Logger.error(LOG, "Deferred callback raised: %s", ErrorDescription.describe(err))
 		end
+		if generation ~= _stop_generation then return end
 	end
 end
 
@@ -276,6 +283,7 @@ local function _run_pump(opts)
 	while _running do
 		_safe_idle(onIdle)
 		_run_idle_handlers()
+		if not _running then break end
 		iteration = iteration + 1
 
 		-- Drive the periodic callback when enough wall-clock has elapsed.
@@ -285,6 +293,8 @@ local function _run_pump(opts)
 			last_tick = now
 			iteration = 0
 		end
+
+		if not _running then break end
 
 		-- Yield the CPU for ~1 ms.  This drops usage from 100 % to < 1 %
 		-- on any modern kernel while keeping latency low enough for real-time
@@ -369,6 +379,8 @@ end
 function M.stop()
 	if not _running then return end
 	_running = false
+	_stop_generation = _stop_generation + 1
+	_deferred = {}
 
 	-- Retire our callbacks, then request return without closing foreign handles.
 	if luv then

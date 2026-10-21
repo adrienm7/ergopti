@@ -269,7 +269,44 @@ function _initialState(page) {
 	if (page.magic_key && Object.prototype.hasOwnProperty.call(_current, page.magic_key.path)) {
 		state.magic = _current[page.magic_key.path];
 	}
+	// Persistent controls start at the values in force, never at a
+	// recommendation: a new installation emulates nothing and reorders nothing.
+	state.controls = {};
+	(page.controls || []).forEach(function (control) {
+		state.controls[control.id] = _controlValueInForce(control);
+	});
 	return state;
+}
+
+/**
+ * The choice of a control whose writes all hold in the configuration in force,
+ * or null when none does (a registry layout chosen in the layout manager).
+ * @param {object} control
+ * @returns {*}
+ */
+function _controlValueInForce(control) {
+	if (!control.available) return null;
+	for (var i = 0; i < control.choices.length; i++) {
+		var choice = control.choices[i];
+		var holds = choice.writes.every(function (write) {
+			return _sameValue(_currentValue(write), write.value);
+		});
+		if (holds) return choice.value;
+	}
+	return null;
+}
+
+/**
+ * The choice record of a control for a value, or null.
+ * @param {object} control
+ * @param {*} value
+ * @returns {object|null}
+ */
+function _controlChoice(control, value) {
+	for (var i = 0; i < control.choices.length; i++) {
+		if (_sameValue(control.choices[i].value, value)) return control.choices[i];
+	}
+	return null;
 }
 
 /** Rebuilds every page's state from the configuration in force. */
@@ -315,7 +352,9 @@ function _asks(page) {
 function _contextMagicKey(choice) {
 	var layoutPage = _pageState.keyboard_layout;
 	var system = (window.SYSTEM_LAYOUT || '').toLowerCase();
-	if ((layoutPage && layoutPage.answer) || system.indexOf('ergopti') !== -1)
+	var emulated = layoutPage && layoutPage.controls ? layoutPage.controls.emulated_layout : null;
+	var emulatesErgopti = typeof emulated === 'string' && emulated.indexOf('ergopti') === 0;
+	if ((layoutPage && layoutPage.answer && emulatesErgopti) || system.indexOf('ergopti') !== -1)
 		return choice.recommended;
 	var candidate = system.indexOf('french') !== -1 || system.indexOf('azerty') !== -1 ? 'ù' : ';';
 	return choice.options.some(function (option) {
@@ -389,6 +428,17 @@ function _operations() {
 			if (subSwitch !== null) operations.push({ path: page.sub_switch.path, value: subSwitch });
 		}
 		if (!state.answer) return;
+		// A control writes only the paths its choice changes against the values
+		// in force; a control left as it was writes nothing.
+		(page.controls || []).forEach(function (control) {
+			var choice = control.available ? _controlChoice(control, state.controls[control.id]) : null;
+			if (!choice) return;
+			choice.writes.forEach(function (write) {
+				if (!_sameValue(_currentValue(write), write.value)) {
+					operations.push({ path: write.path, value: write.value });
+				}
+			});
+		});
 		_eachItem(page.groups, function (item) {
 			var wanted = state.checked[item.path] === true;
 			if (wanted !== _currentlyOn(item)) {
@@ -579,8 +629,77 @@ function _renderPage(page) {
 	document.getElementById('page-no').checked = !state.answer;
 
 	_renderRegister(page, state);
+	_renderControls(page, state);
 	_renderMagicKey(page, state);
 	_renderChecklist(page, state);
+}
+
+/**
+ * Renders the page's persistent controls. A change redraws this box alone:
+ * nothing reloads, and every value is kept across Yes/No, navigation and a
+ * language preview. A control this platform lacks is drawn greyed with why;
+ * the others follow the question, as the checklist does.
+ * @param {object} page
+ * @param {object} state
+ */
+function _renderControls(page, state) {
+	var box = document.getElementById('page-controls');
+	var controls = page.controls || [];
+	box.classList.toggle('hidden', controls.length === 0);
+	box.innerHTML = '';
+	controls.forEach(function (control) {
+		var group = document.createElement('div');
+		group.className = 'control-group';
+		group.dataset.control = control.id;
+		var disabled = !control.available || !state.answer;
+		if (control.kind === 'check') {
+			group.appendChild(
+				_checkRow(
+					{ text: _t(control.label_key) },
+					state.controls[control.id] === true,
+					false,
+					disabled,
+					function (checked) {
+						state.controls[control.id] = checked;
+						_renderControls(page, state);
+					}
+				)
+			);
+		} else {
+			var label = document.createElement('p');
+			label.className = 'question-label';
+			label.textContent = _t(control.label_key);
+			group.appendChild(label);
+			control.choices.forEach(function (choice) {
+				var row = document.createElement('label');
+				row.className = 'radio-card';
+				var radio = document.createElement('input');
+				radio.type = 'radio';
+				radio.name = 'control-' + control.id;
+				radio.value = String(choice.value);
+				radio.checked = _sameValue(state.controls[control.id], choice.value);
+				radio.disabled = disabled;
+				radio.addEventListener('change', function () {
+					if (!radio.checked) return;
+					state.controls[control.id] = choice.value;
+					_renderControls(page, state);
+				});
+				var text = document.createElement('span');
+				text.className = 'radio-label';
+				text.textContent = _t(choice.label_key);
+				row.appendChild(radio);
+				row.appendChild(text);
+				group.appendChild(row);
+			});
+		}
+		if (!control.available) {
+			var reason = document.createElement('p');
+			reason.className = 'hint';
+			reason.textContent = _t(control.reason_key);
+			group.appendChild(reason);
+		}
+		box.appendChild(group);
+	});
 }
 
 /**

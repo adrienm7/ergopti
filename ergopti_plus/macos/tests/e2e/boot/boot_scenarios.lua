@@ -168,6 +168,28 @@ local function neutral_defaults(ctx)
 	ctx.world.install_karabiner(ctx.root .. "/machine", ctx.home)
 end
 
+--- A saved widget position whose X coordinate survived but whose Y did not.
+--- Metrics starts through the configured boot; real key events make it visible.
+--- @param ctx table Scenario context.
+local function partial_wpm_position(ctx)
+	neutral_defaults(ctx)
+	local relative = ".config/ergopti_plus/hammerspoon/config.toml"
+	local config = assert(read(ctx.home .. "/" .. relative))
+	local enabled, enabled_count = config:gsub("%[metrics%]\nenabled = false", "[metrics]\nenabled = true")
+	assert(enabled_count == 1, "the metrics configuration section must be present exactly once")
+	local compact, graph_count = enabled:gsub("float_graph = true", "float_graph = false")
+	assert(graph_count == 1, "the widget graph configuration must be present exactly once")
+	write_home(ctx.home, relative, compact)
+	ctx.settings = { ["ergopti.wpm_widget.pos_x"] = 120 }
+	-- An existing Metrics user already owns its device identity and folders.
+	-- The world has no hardware UUID probe, so the saved identity uses its
+	-- documented host-name fallback, without replacing the production resolver.
+	write_home(ctx.home, ".config/ergopti_plus/metrics/by_device/e2e-wpm/device.json",
+		'{"device_id":"e2e-wpm","name":"E2E Mac","os":"darwin",'
+		.. '"host_signature":"fallback:unknown","created_at":"2024-01-01"}\n')
+	run("mkdir -p " .. q(ctx.root .. "/tmp/ergopti_metrics/e2e-wpm"))
+end
+
 --- A configuration folder an older release left, with its config.toml from the
 --- shared migration corpus (a file that version wrote).
 --- @param case string Case directory under _shared/tests/corpus/config_migrations.
@@ -289,6 +311,32 @@ local function scenarios(repo)
 	local list = {
 		{ name = "a fresh install opens the first-run wizard", steps = { "boot" }, marker = WIZARD_MARKER },
 		{ name = "the neutral defaults boot", setup = neutral_defaults, steps = { "boot" }, marker = BOOTED_MARKER },
+		{ name = "the layout menu selects French through its native fallback (native-layout-selection)",
+			setup = neutral_defaults, steps = { "select_layout_natively" }, marker = BOOTED_MARKER,
+			machine = "native_layout_selection", facts = { layout_set_attempts = "1", layout_native_selections = "1",
+				layout_native_environment = "true", layout_native_result = "0",
+				layout_native_role = "--select-input-source-by-name",
+				layout_selected_source = "com.apple.keylayout.French",
+				layout_french_checked = "true", layout_missing_refused = "true", layout_missing_unchanged = "true",
+				layout_missing_native_result = "MISS" } },
+		{ name = "the layout menu preserves ABC when Carbon refuses selection (native-layout-selection-refused)",
+			setup = neutral_defaults, steps = { "select_layout_natively" }, marker = BOOTED_MARKER,
+			machine = "native_layout_selection_refused", facts = { layout_set_attempts = "1", layout_native_selections = "0",
+				layout_native_environment = "true", layout_native_result = "-50",
+				layout_native_role = "--select-input-source-by-name",
+				layout_selected_source = "com.apple.keylayout.ABC",
+				layout_french_checked = "false", layout_missing_refused = "true", layout_missing_unchanged = "true",
+				layout_missing_native_result = "MISS" } },
+		{ name = "the layout menu refuses ambiguous native names (native-layout-selection-ambiguous)",
+			setup = neutral_defaults, steps = { "select_layout_natively" }, marker = BOOTED_MARKER,
+			machine = "native_layout_selection_ambiguous", facts = { layout_set_attempts = "1", layout_native_selections = "0",
+				layout_native_environment = "true", layout_native_result = "ambiguous",
+				layout_native_role = "--select-input-source-by-name", layout_selected_source = "com.apple.keylayout.ABC",
+				layout_french_checked = "false", layout_missing_refused = "true", layout_missing_unchanged = "true",
+				layout_missing_native_result = "MISS" } },
+		{ name = "a partial saved WPM position recovers after typing (wpm-partial-position)",
+			setup = partial_wpm_position, steps = { "type_for_wpm" }, marker = BOOTED_MARKER,
+			facts = { wpm_input_counted = "true", wpm_canvas_visible = "1", wpm_position_recovered = "true" } },
 		-- Booted over the recommended preset, it then opens every window and file the
 		-- action catalogue can open, which the recommended shortcuts admit.
 		{ name = "the recommended preset imported from the menu boots and opens its windows",
@@ -515,7 +563,7 @@ end
 
 --- Runs every scenario through `check`, on every architecture.
 --- @param check table { pass(label), fail(label, expected, actual), skip(label) }
---- @param options table { driver, interpreter }
+--- @param options table { driver, interpreter, scenario?, source_repo? }
 function M.run(check, options)
 	if ON_WINDOWS then
 		check.skip("installed-application boot scenarios need a POSIX shell, cp, ls and find")
@@ -524,13 +572,22 @@ function M.run(check, options)
 	local world = dofile(options.driver .. "/tests/e2e/boot/world.lua")
 	-- Loaded by path: the scenarios make no assumption on the caller's package.path.
 	local json = dofile(options.driver .. "/../_shared/lua/json.lua")
-	local repo = options.driver:gsub("/static/ergopti_plus/macos/?$", "")
+	-- A source checkout may differ from the harness for a safe red/green replay.
+	-- Normal E2E stages the same checkout that supplies its test support.
+	local repo = options.source_repo or options.driver:gsub("/static/ergopti_plus/macos/?$", "")
+	local selected = {}
+	for _, scenario in ipairs(scenarios(repo)) do
+		if options.scenario == nil or scenario.name:find(options.scenario, 1, true) then
+			selected[#selected + 1] = scenario
+		end
+	end
+	assert(#selected > 0, "no installed-application boot scenario matched the requested selection")
 	local scratch = os.tmpname()
 	os.remove(scratch)
 	local app_root = scratch .. "/app"
 	stage_app(repo, app_root)
 	local before = bundle_files(app_root)
-	for index, scenario in ipairs(scenarios(repo)) do
+	for index, scenario in ipairs(selected) do
 		local contexts = {}
 		for _, arch in ipairs(world.ARCHITECTURES) do
 			local root = scratch .. "/" .. index .. "-" .. arch

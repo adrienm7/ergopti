@@ -34,6 +34,7 @@ local SyntheticInput = require("adapters.synthetic_input")
 local TooltipRenderer  = require("adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Terminators      = require("modules.keymap.terminators")
+local CapsWordOutput   = require("infra.capsword_output")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -298,6 +299,8 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	if suppress_deadline then _state.commit_suppress_rescan(suppress_deadline) end
 	if paced_owner then SyntheticInput.commit_collected_paced(paced_owner) end
 	if replay_owner then TerminatorReplay.commit_prepared(replay_owner) end
+	-- The replacement is typed output: its delimiters end CapsWord like keys do.
+	CapsWordOutput.report(logical_text)
 
 	-- Guard: skip telemetry when nothing was actually injected. This runs only
 	-- after the buffer commit succeeded, so a rolled-back replacement cannot be

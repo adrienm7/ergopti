@@ -53,6 +53,8 @@ Test("TOML: numeric continuation remains an array (toml-nested-array-number)",
 	_TNA_Multiline.Bind("[1]", [1]))
 Test("TOML: quoted continuation remains an array (toml-nested-array-string)",
 	_TNA_Multiline.Bind('["a"]', ["a"]))
+Test("TOML: literal continuation remains an array (toml-literal-array-recovery)",
+	_TNA_Multiline.Bind("['a']", ["a"]))
 Test("TOML: Boolean continuation remains an array (toml-nested-array-boolean)",
 	_TNA_Multiline.Bind("[true]", [true]))
 Test("TOML: empty continuation remains an array (toml-nested-array-empty)",
@@ -63,7 +65,9 @@ Test("TOML: incomplete nested opener remains a value (toml-nested-array-opener)"
 _TNA_RecoveryBoundary() {
 	for Header in ["[later_section]", "[a.b]", '[a."quoted.key"]', "[[later_section]]",
 		'["later"."section"]', '[[ "later"."section" ]]',
-		'["a[b]".section]', '[["a]b".section]]'] {
+		'["a[b]".section]', '[["a]b".section]]',
+		"[later.'section']", "['later'.section]", "[[ 'later'.'section' ]]",
+		"[later.'quoted.key']", "[later.'a]b']", "[later.'a[b']"] {
 		AssertTrue(TOML_ArrayRecoveryHeader(Header), "unambiguous headers must remain recoverable")
 		Source := "[sample]`nitems = [`n" . Header . "`nflag = true`n"
 		Parsed := _ParseTomlFileImpl("nested-recovery-fixture", false, false, Source)
@@ -78,10 +82,36 @@ _TNA_RecoveryBoundary() {
 	}
 	for ValueLine in ["[", "[]", "[1]", "[true]", '["a"]', "[[2]]",
 		"[1e3]", "[0xff]", "[+inf]", "[nan]", "[2020-01-01]", '["a", "b"],',
-		'["a]"]', '["a[b]"]'] {
+		'["a]"]', '["a[b]"]', "['a']", "[ 'a]b' ]", "['a[b']"] {
 		AssertFalse(TOML_ArrayRecoveryHeader(ValueLine),
 			"value-shaped continuations must not discard the pending array: " . ValueLine)
 	}
 }
 Test("TOML: continuation priority preserves section recovery (toml-nested-array-recovery)",
 	_TNA_RecoveryBoundary)
+
+_TNA_MetadataOrder(Raw, Expected) {
+	global _TomlFileCache
+	Path := _CTU_NewPath()
+	try {
+		; The payload is deliberately outside the metadata reader's ownership.
+		AssertTrue(FSWrite(Path, "[_meta]`nsections_order = " . Raw
+			. " # authored order`n[[code]]`nnot a parsed metadata assignment`n"))
+		_TNA_Equal(Expected, ReadTomlSectionsOrder("", Path))
+	} finally {
+		if _TomlFileCache.Has(Path)
+			_TomlFileCache.Delete(Path)
+		FSDelete(Path)
+	}
+}
+Test("TOML: section order decodes Unicode names (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["\u0063ode", "-", "\u0065mail"]', ["code", "-", "email"]))
+Test("TOML: section order retains quoted boundaries (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["first,part", "quote\"key", "path\\key"]',
+		["first,part", 'quote"key', "path\key"]))
+Test("TOML: section order retains numeric-looking names (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["001", "0", "1"]', ["001", "0", "1"]))
+Test("TOML: section order accepts trailing commas (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["code", "email", ]', ["code", "email"]))
+Test("TOML: section order preserves empty arrays (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind("[]", []))

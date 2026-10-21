@@ -1,0 +1,383 @@
+{
+	"_comment": "CapsWord auto-off policy vectors, replayed by _shared/lua/caps_word/auto_off.lua (macOS, Linux) and its AHK port. idle_ms 0 means the policy never times out. Expectations are written by hand, never computed by either implementation. pointer_kinds mirrors [shortcuts.caps_word.pointer]; tools/test/test-caps-word-auto-off-single-source.cjs pins it to the manifest. The text rows with the eight shipped delimiters replay what the Ergopti layout types, judged as typed output: its punctuation from any layer or dead key, and the French spaced punctuation it types (a no-break space before :, a narrow one before ; ! and ?), which ends CapsWord on the space even before a mark that is no delimiter itself.",
+	"pointer_kinds": [
+		"gesture",
+		"pointer_motion",
+		"left_click",
+		"right_click",
+		"middle_click",
+		"other_buttons"
+	],
+	"compile": [
+		{
+			"name": "the settings before 2026-10-20: three delimiters, never",
+			"idle": 0,
+			"terminators": ["space", "tab", "enter"],
+			"pointer": "all_true",
+			"valid": true,
+			"idle_ms": 0
+		},
+		{
+			"name": "the shipped defaults: eight delimiters, 10 s",
+			"idle": 10,
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"pointer": "all_true",
+			"valid": true,
+			"idle_ms": 10000
+		},
+		{
+			"name": "every built-in delimiter",
+			"idle": 5,
+			"terminators": [
+				"space",
+				"nbsp",
+				"nnbsp",
+				"minus",
+				"underscore",
+				"tab",
+				"enter",
+				"star",
+				"comma",
+				"semicolon",
+				"period",
+				"ellipsis",
+				"exclam",
+				"question",
+				"colon",
+				"parenright",
+				"braceright",
+				"bracketright",
+				"anglebracketright",
+				"apostrophe_typo",
+				"apostrophe_straight",
+				"quote",
+				"equal",
+				"slash",
+				"backslash"
+			],
+			"pointer": "all_false",
+			"valid": true,
+			"idle_ms": 5000
+		},
+		{
+			"name": "empty delimiter list",
+			"idle": 1,
+			"terminators": [],
+			"pointer": "all_true",
+			"valid": true,
+			"idle_ms": 1000
+		},
+		{
+			"name": "fractional delay rounds to the millisecond",
+			"idle": 2.5,
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": true,
+			"idle_ms": 2500
+		},
+		{
+			"name": "negative delay",
+			"idle": -1,
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "invalid_idle_timeout"
+		},
+		{
+			"name": "text delay",
+			"idle": "5",
+			"terminators": ["space"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "invalid_idle_timeout"
+		},
+		{
+			"name": "unknown delimiter",
+			"idle": 0,
+			"terminators": ["space", "hyphen"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "unknown_terminator"
+		},
+		{
+			"name": "separator is no delimiter",
+			"idle": 0,
+			"terminators": ["separator"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "unknown_terminator"
+		},
+		{
+			"name": "duplicate delimiter",
+			"idle": 0,
+			"terminators": ["space", "space"],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "duplicate_terminator"
+		},
+		{
+			"name": "delimiter that is not a key",
+			"idle": 0,
+			"terminators": [" "],
+			"pointer": "all_true",
+			"valid": false,
+			"reason": "unknown_terminator"
+		},
+		{
+			"name": "missing pointer kind",
+			"idle": 0,
+			"terminators": ["space"],
+			"pointer": "missing_middle_click",
+			"valid": false,
+			"reason": "invalid_pointer"
+		},
+		{
+			"name": "undeclared pointer kind",
+			"idle": 0,
+			"terminators": ["space"],
+			"pointer": "extra_wheel",
+			"valid": false,
+			"reason": "unknown_pointer_kind"
+		},
+		{
+			"name": "pointer kind that is not a boolean",
+			"idle": 0,
+			"terminators": ["space"],
+			"pointer": "text_left_click",
+			"valid": false,
+			"reason": "invalid_pointer"
+		}
+	],
+	"text": [
+		{ "terminators": ["space", "tab", "enter"], "text": " ", "expected": true },
+		{ "terminators": ["space", "tab", "enter"], "text": "\t", "expected": true },
+		{ "terminators": ["space", "tab", "enter"], "text": "\r", "expected": true },
+		{ "terminators": ["space", "tab", "enter"], "text": "\n", "expected": true },
+		{ "terminators": ["space", "tab", "enter"], "text": "a", "expected": false },
+		{ "terminators": ["space", "tab", "enter"], "text": "É", "expected": false },
+		{ "terminators": ["space", "tab", "enter"], "text": " ", "expected": false },
+		{ "terminators": ["space", "tab", "enter"], "text": " ", "expected": false },
+		{ "terminators": ["space", "tab", "enter"], "text": "-", "expected": false },
+		{ "terminators": ["nbsp"], "text": " ", "expected": true },
+		{ "terminators": ["nbsp"], "text": " ", "expected": false },
+		{ "terminators": ["nnbsp"], "text": " ", "expected": true },
+		{ "terminators": ["nnbsp"], "text": " ", "expected": false },
+		{ "terminators": ["colon"], "text": " :", "expected": true },
+		{ "terminators": ["nnbsp"], "text": " ;", "expected": true },
+		{ "terminators": ["semicolon"], "text": " ;", "expected": true },
+		{ "terminators": ["period"], "text": " ;", "expected": false },
+		{ "terminators": ["minus", "underscore"], "text": "_", "expected": true },
+		{ "terminators": ["ellipsis"], "text": "…", "expected": true },
+		{ "terminators": ["apostrophe_typo"], "text": "’", "expected": true },
+		{ "terminators": ["apostrophe_typo"], "text": "'", "expected": false },
+		{ "terminators": ["star"], "text": "★", "expected": true },
+		{ "terminators": ["backslash"], "text": "\\", "expected": true },
+		{ "terminators": ["quote"], "text": "\"", "expected": true },
+		{ "terminators": [], "text": " ", "expected": false },
+		{ "terminators": ["space"], "text": "", "expected": false },
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": " ",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": " ",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": "a",
+			"expected": false
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": ",",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": ".",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": ";",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": " ;",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": " :",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": " !",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": " ?",
+			"expected": true
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": ":",
+			"expected": false
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": "!",
+			"expected": false
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": "…",
+			"expected": false
+		},
+		{
+			"terminators": ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"],
+			"text": "-",
+			"expected": false
+		}
+	],
+	"keys": [
+		{ "terminators": ["space", "tab", "enter"], "key": "space", "expected": true },
+		{ "terminators": ["space", "tab", "enter"], "key": "enter", "expected": true },
+		{ "terminators": ["space", "tab", "enter"], "key": "tab", "expected": true },
+		{ "terminators": ["tab", "enter"], "key": "space", "expected": false },
+		{ "terminators": ["space"], "key": "enter", "expected": false },
+		{ "terminators": [], "key": "tab", "expected": false }
+	],
+	"unknown_keys": ["spacebar", "return", "", "separator"],
+	"pointer": [
+		{ "pointer": "all_true", "kind": "left_click", "expected": true },
+		{ "pointer": "all_false", "kind": "left_click", "expected": false },
+		{ "pointer": "only_gesture", "kind": "gesture", "expected": true },
+		{ "pointer": "only_gesture", "kind": "pointer_motion", "expected": false },
+		{ "pointer": "only_gesture", "kind": "other_buttons", "expected": false }
+	],
+	"unknown_kinds": ["wheel", "click", ""],
+	"pointer_sets": {
+		"all_true": {
+			"gesture": true,
+			"pointer_motion": true,
+			"left_click": true,
+			"right_click": true,
+			"middle_click": true,
+			"other_buttons": true
+		},
+		"all_false": {
+			"gesture": false,
+			"pointer_motion": false,
+			"left_click": false,
+			"right_click": false,
+			"middle_click": false,
+			"other_buttons": false
+		},
+		"only_gesture": {
+			"gesture": true,
+			"pointer_motion": false,
+			"left_click": false,
+			"right_click": false,
+			"middle_click": false,
+			"other_buttons": false
+		},
+		"missing_middle_click": {
+			"gesture": true,
+			"pointer_motion": true,
+			"left_click": true,
+			"right_click": true,
+			"other_buttons": true
+		},
+		"extra_wheel": {
+			"gesture": true,
+			"pointer_motion": true,
+			"left_click": true,
+			"right_click": true,
+			"middle_click": true,
+			"other_buttons": true,
+			"wheel": true
+		},
+		"text_left_click": {
+			"gesture": true,
+			"pointer_motion": true,
+			"left_click": "true",
+			"right_click": true,
+			"middle_click": true,
+			"other_buttons": true
+		}
+	},
+	"idle": [
+		{ "idle": 0, "last": 0, "now": 999999999, "expected": false },
+		{ "idle": 3, "last": 1000, "now": 3999, "expected": false },
+		{ "idle": 3, "last": 1000, "now": 4000, "expected": true },
+		{ "idle": 3, "last": 1000, "now": 10000, "expected": true },
+		{ "idle": 1, "last": 500, "now": 500, "expected": false },
+		{ "idle": 10, "last": 0, "now": 9999, "expected": false },
+		{ "idle": 10, "last": 0, "now": 10000, "expected": true }
+	],
+	"with_terminator": [
+		{
+			"list": ["space", "tab", "enter"],
+			"key": "nbsp",
+			"checked": true,
+			"expected": ["space", "nbsp", "tab", "enter"]
+		},
+		{
+			"list": ["space", "tab", "enter"],
+			"key": "tab",
+			"checked": false,
+			"expected": ["space", "enter"]
+		},
+		{
+			"list": ["enter", "space"],
+			"key": "comma",
+			"checked": true,
+			"expected": ["space", "enter", "comma"]
+		},
+		{ "list": ["space"], "key": "space", "checked": true, "expected": ["space"] },
+		{ "list": [], "key": "backslash", "checked": false, "expected": [] }
+	],
+	"with_terminator_refusals": [
+		{ "list": ["space"], "key": "hyphen", "checked": true, "reason": "unknown_terminator" },
+		{ "list": ["space", "space"], "key": "tab", "checked": true, "reason": "duplicate_terminator" },
+		{ "list": ["space"], "key": "tab", "checked": "yes", "reason": "invalid_state" }
+	],
+	"terminator_rows": [
+		"space",
+		"nbsp",
+		"nnbsp",
+		"minus",
+		"underscore",
+		"-",
+		"tab",
+		"enter",
+		"star",
+		"-",
+		"comma",
+		"semicolon",
+		"period",
+		"ellipsis",
+		"exclam",
+		"question",
+		"colon",
+		"-",
+		"parenright",
+		"braceright",
+		"bracketright",
+		"anglebracketright",
+		"-",
+		"apostrophe_typo",
+		"apostrophe_straight",
+		"quote",
+		"equal",
+		"slash",
+		"backslash"
+	]
+}

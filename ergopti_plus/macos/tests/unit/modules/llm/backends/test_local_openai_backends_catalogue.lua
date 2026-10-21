@@ -480,6 +480,50 @@ helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backend
 		end)
 	end)
 
+	helpers.it("starts the stale sweep only after the menu build returns (issue #95)", function()
+		with_panel(function(Panel, _, _, world, ctx)
+			world.hold_deferred = true
+			Panel.rows(ctx)
+			Panel.rows(ctx)
+			helpers.assert_eq(#world.probes, 0,
+				"no probe deadline may start while the menu build holds the run loop")
+			helpers.assert_eq(#world.deferred, 1, "repeated builds queue one sweep")
+			helpers.assert_eq(world.deferred[1].delay, 0)
+			world.deferred[1].callback()
+			helpers.assert_eq(#world.probes, 4, "the sweep probes every server once the build returned")
+			answer_sweep(world, { omlx = models_answer({ "Qwen3-8B-4bit" }) })
+			helpers.assert_true(row_starting(Panel.rows(ctx), "oMLX 🖥️") ~= nil)
+			helpers.assert_eq(#world.deferred, 1, "fresh verdicts queue no new sweep")
+		end)
+	end)
+
+	helpers.it("sweeps nothing and keeps the rows inert while the AI is off (issue #97)", function()
+		with_panel(function(Panel, _, _, world, ctx)
+			ctx.state.llm_enabled = false
+			local rows = Panel.rows(ctx)
+			helpers.assert_eq(#world.deferred, 0, "no sweep is queued behind a disabled AI")
+			helpers.assert_eq(#world.probes, 0, "no local server is probed while the AI is off")
+			local live = 0
+			for _, row in ipairs(rows) do
+				if type(row.action) == "function" then live = live + 1 end
+			end
+			helpers.assert_eq(live, 0, "every local server row is inert while the AI is off")
+			-- A sweep queued while on is dropped when the AI is switched off first.
+			ctx.state.llm_enabled = true
+			world.hold_deferred = true
+			Panel.rows(ctx)
+			helpers.assert_eq(#world.deferred, 1)
+			ctx.state.llm_enabled = false
+			world.deferred[1].callback()
+			helpers.assert_eq(#world.probes, 0, "the queued sweep cannot outlive the switch-off")
+			-- Switching the AI on resumes the sweep.
+			ctx.state.llm_enabled = true
+			Panel.rows(ctx)
+			world.deferred[#world.deferred].callback()
+			helpers.assert_eq(#world.probes, 4, "the switch-on sweeps every server")
+		end)
+	end)
+
 	helpers.it("asks for the key a server wants and probes it with the key (local-openai-backends)", function()
 		with_panel(function(Panel, api, LocalServers, world, ctx)
 			Panel.rows(ctx)

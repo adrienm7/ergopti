@@ -45,6 +45,7 @@ local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
+local LedgerAppend = require("adapters.ledger_append")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keylogger.log_manager"
 
@@ -1294,25 +1295,17 @@ local function _clear_local_outbox(db)
 end
 
 --- Flush a committed local batch before allocating any new event id.
---- @return boolean True when no batch is pending or the pending batch is durable.
+--- The adjacent durable intent also survives loss of the disposable SQLite cache.
+--- @return boolean True when the exact batch and its publication journal settled.
 local function _flush_local_data_sql_outbox(db)
 	local batch_text = _get_local_outbox(db)
-	if batch_text == "" then return true end
-
-	local f, ferr = io.open(_paths.data_sql_path, "a")
-	if not f then
-		Logger.error(LOG, "Cannot append pending data.sql outbox at %s: %s.",
-			_paths.data_sql_path, tostring(ferr))
-		return false
-	end
-	local write_ok, write_err = f:write(batch_text)
-	local close_ok, close_err = f:close()
-	if not write_ok or not close_ok then
-		Logger.error(LOG, "Cannot flush pending data.sql outbox: %s.",
-			tostring(write_err or close_err))
-		return false
-	end
-	return _clear_local_outbox(db)
+	return LedgerAppend.flush(_paths.data_sql_path, batch_text, function()
+		return _clear_local_outbox(db)
+	end, function(content)
+		local committed = _last_complete_ledger_offset(content)
+		local suffix = content:sub(committed + 1):gsub("%-%-[^\n]*", ""):gsub("%s+", "")
+		return suffix == "" or (committed == 0 and suffix == "PRAGMAforeign_keys=OFF;")
+	end)
 end
 
 --- Runs foreign ledger sync behind one checked boundary for ingest and startup.
@@ -1707,6 +1700,10 @@ local function _release_failed_init_resources()
 		end
 	end
 
+	if LedgerAppend.cleanup() ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Canonical ledger native cleanup remains pending.")
+	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)
 	if not db_ok or db_result_or_err == false then
@@ -1788,6 +1785,10 @@ local function _init(core_state)
 		Logger.error(LOG, "Cannot open db.sqlite — log manager will only write JSONL.")
 	else
 		local db = SqliteWriter.get_db()
+		-- Repair only the exact journal-owned tail before any cache replay sees SQL.
+		if db and not LedgerAppend.recover(_paths.data_sql_path, _get_local_outbox(db)) then
+			error("pending canonical ledger recovery was refused", 0)
+		end
 		local recovery_cursor = nil
 		local recovery_ready = true
 		if cache_was_fresh and db then
@@ -2014,6 +2015,10 @@ function M.stop(opts)
 			pcall(Logger.error, LOG,
 				"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
 		end
+	end
+	if LedgerAppend.cleanup() ~= true then
+		complete = false
+		pcall(Logger.error, LOG, "Canonical ledger native cleanup remains pending.")
 	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)

@@ -1330,10 +1330,6 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		else if IsSet(LLM_Bridge_FeedCharForPrefix)
 			LLM_Bridge_FeedCharForPrefix(Char)
 		HotPath_LogIfSlow("LLM.PrefixMirror", MirrorStarted)
-		if !IsCategoryGated("Hotstrings") {
-			_PrefixRecordMagicOutcome(Char, "disabled")
-			return
-		}
 		; The pass-through character is already on screen. Before it can participate
 		; in a match, prove that the screen target still owns the buffered prefix. This
 		; guard sits before the main dispatch try, so contain it independently: an
@@ -1395,6 +1391,13 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		Critical("On")
 		if ContextReleased && !(IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext())
 			return
+		; The Hotstrings gate comes after the wrap: wrapping a selection is a
+		; shortcut of its own, and with an OS layout it worked only while
+		; Hotstrings was also on (selection-wrap-without-hotstrings).
+		if !IsCategoryGated("Hotstrings") {
+			_PrefixRecordMagicOutcome(Char, "disabled")
+			return
+		}
 		try {
 			; Serialize the whole match -> fire -> buffer-sync region: Critical makes
 			; this keystroke uninterruptible, so AHK cannot start the NEXT physical
@@ -2525,10 +2528,10 @@ _PrefixCollectCandidates(ContentGeneration := unset,
 	return Candidates
 }
 
-_LookupAndRender() {
+_LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 	global _PrefixBuffer
 	global _PrefixRenderQueuedWallMs
-	global _PrefixContentGeneration, _PrefixInputContextGeneration
+	global _PrefixContentGeneration, _PrefixInputContextGeneration, _PrefixDeferredGeneration
 	; Capture text and both ownership epochs as one in-memory context. Candidate
 	; resolution may yield in a callable; these immutable values follow every
 	; FireDecision through the renderer's final commit oracle.
@@ -2537,6 +2540,10 @@ _LookupAndRender() {
 		PrefixSnapshot := _PrefixBuffer
 		ContentGeneration := _PrefixContentGeneration
 		InputContextGeneration := _PrefixInputContextGeneration
+		EmptyOwner := { Generation: InputContextGeneration,
+			ContentGeneration: ContentGeneration,
+			TooltipOwner: _PrefixCaptureTooltipOwner(),
+			DeferredGeneration: _PrefixDeferredGeneration }
 		PreviewStartedWallMs := _PrefixRenderQueuedWallMs
 	} finally {
 		Critical(PreviousCritical)
@@ -2548,14 +2555,13 @@ _LookupAndRender() {
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "Lookup and render: buffer_units={1} len={2}.", _PrefixLogSafe(PrefixSnapshot), Len)
 	CandidateStarted := HotPath_Now()
-	Candidates := _PrefixCollectCandidates(
-		ContentGeneration, InputContextGeneration)
+	Candidates := IsSet(CollectFn) ? CollectFn.Call(ContentGeneration, InputContextGeneration)
+		: _PrefixCollectCandidates(ContentGeneration, InputContextGeneration)
 	HotPath_LogIfSlow("Prefix.PreviewDecisions", CandidateStarted)
 	if (Candidates.Length == 0) {
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "No prefix match: buffer_units={1}.", _PrefixLogSafe(PrefixSnapshot))
-		TooltipHide("LookupNoMatch", true)
-		_NotifySuggestionDismissed()
+		_PrefixRetireEmptyLookup(EmptyOwner, "LookupNoMatch")
 		return
 	}
 	if LoggerIsDebugEnabled()
@@ -2567,7 +2573,8 @@ _LookupAndRender() {
 	Items := []
 	MetadataStarted := HotPath_Now()
 	for _, Entry in Candidates {
-		Cfg := HotstringsResolve(Entry.Category, Entry.Section)
+		Cfg := IsSet(ResolveFn) ? ResolveFn.Call(Entry.Category, Entry.Section)
+			: HotstringsResolve(Entry.Category, Entry.Section)
 		if !Cfg.ShowTooltip
 			continue
 		Color := (Cfg.Color != "") ? Cfg.Color : ""
@@ -2597,8 +2604,7 @@ _LookupAndRender() {
 	if (Items.Length == 0) {
 		if LoggerIsDebugEnabled()
 			LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
-		TooltipHide("LookupNoItems", true)
-		_NotifySuggestionDismissed()
+		_PrefixRetireEmptyLookup(EmptyOwner, "LookupNoItems")
 		return
 	}
 	if LoggerIsDebugEnabled() {
@@ -2620,4 +2626,19 @@ _LookupAndRender() {
 	if !HotstringPrefixWatcherDecisionItemsStillCurrent(Items)
 		return
 	TooltipShow(Items)
+}
+
+; An empty answer is still a publication: it retires pixels and their metric.
+; Reuse the input/context/surface ownership rule, plus the lookup lifecycle, so
+; a yielded old answer cannot erase a newer surface or act after a pause.
+_PrefixRetireEmptyLookup(Owner, DbgTag) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_PrefixDeferredCanPublish(Owner.DeferredGeneration)
+			or !_PrefixInputCommitStillCurrent(Owner)
+			return false
+		; The renderer detaches its exact metric record with the pixels. A second
+		; dismissal after that call could target a replacement published by logging.
+		return TooltipHide(DbgTag, true)
+	} finally Critical(PreviousCritical)
 }

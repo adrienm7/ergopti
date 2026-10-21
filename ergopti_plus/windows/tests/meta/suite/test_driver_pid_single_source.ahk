@@ -24,3 +24,19 @@ _DPSS_SingleSourceNoUnsetBuiltin() {
 		"no driver code may read A_Pid -- it is not an AHK v2 built-in and throws UnsetError; use DriverPid")
 }
 Test("boot: DriverPid is the single PID source, A_Pid is never read", _DPSS_SingleSourceNoUnsetBuiltin)
+
+; Tests read it too: the personal editor modal fixture used A_Pid in its dialog
+; pump, so its first tick threw UnsetError and the whole hotstrings group died
+; at startup on CI. This file names the token in its own assertions.
+_DPSS_TestsNeverReadUnsetBuiltin() {
+	Readers := []
+	Loop Files, A_ScriptDir . "\*.ahk", "FR" {
+		if A_LoopFileName = "test_driver_pid_single_source.ahk"
+			continue
+		if InStr(_StripFullLineComments(FileRead(A_LoopFileFullPath, "UTF-8")), "A_Pid")
+			Readers.Push(A_LoopFileFullPath)
+	}
+	Assert(Readers.Length = 0,
+		"no test may read A_Pid -- use DriverPid; readers: " . (Readers.Length ? Readers[1] : ""))
+}
+Test("tests: A_Pid is never read, DriverPid is", _DPSS_TestsNeverReadUnsetBuiltin)

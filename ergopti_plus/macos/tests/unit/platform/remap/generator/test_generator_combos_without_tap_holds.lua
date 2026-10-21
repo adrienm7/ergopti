@@ -38,9 +38,12 @@ local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 -- CapsWord control edges now notify the keymap before every variable write.
 -- Exact hand-modifier variants preserve native output and isolate those tags;
 -- historical migration snapshot pins remain unchanged (capsword-control-signal).
+-- The CapsWord rule leaves its delimiter and click exits to the
+-- [shortcuts.caps_word] settings; every other rule digests as before
+-- (capsword-auto-off-settings).
 local TAP_HOLDS_ON_PINS = {
-	default     = { rules = 24, digest = "3ba59a303df80b4f" },
-	recommended = { rules = 30, digest = "2da61660630da029" },
+	default     = { rules = 24, digest = "cff39a3f5e11da3e" },
+	recommended = { rules = 30, digest = "b01ce410bea9a14a" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the

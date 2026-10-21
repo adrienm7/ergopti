@@ -341,6 +341,48 @@ check(successor.started == true and run_until(function() return successor:is_set
 check(owned_receipt and owned_receipt.ok and owned_receipt.body == response.body,
 	"post-cancellation retry receives its own real HTTP body")
 
+
+-- Global daemon shutdown retains every public API's real curl cleanup debt.
+-- Two independently accepted loopback requests stay open until cancellation;
+-- their same-owner boolean successor must never acquire after terminal revoke.
+local native_spawn, shutdown_spawns = uv.spawn, 0
+uv.spawn = function(...)
+	shutdown_spawns = shutdown_spawns + 1
+	return native_spawn(...)
+end
+local shutdown_callbacks, shutdown_chunks, shutdown_settled = 0, 0, 0
+local prior_requests = #requests
+local first_started, shutdown_first = Http.get(base_url .. "/slow", {},
+	{ owner = "native-shutdown-first", timeout_ms = 2000 }, function() shutdown_callbacks = shutdown_callbacks + 1 end)
+local shutdown_second = Http.post_stream_owned(base_url .. "/slow", {}, "{}",
+	{ owner = "native-shutdown-second", timeout_ms = 2000 },
+	function() shutdown_chunks = shutdown_chunks + 1 end, function() shutdown_callbacks = shutdown_callbacks + 1 end)
+check(first_started == true and shutdown_second.started == true
+	and run_until(function() return #requests == prior_requests + 2 end),
+	"global shutdown begins with two actually accepted pending loopback HTTP owners")
+local queued_started, shutdown_queued = Http.get(base_url .. "/slow", {},
+	{ owner = "native-shutdown-first", timeout_ms = 2000 }, function() shutdown_callbacks = shutdown_callbacks + 1 end)
+check(queued_started == true and not shutdown_queued:is_settled() and shutdown_spawns == 2,
+	"a boolean successor reserves its owner without dispatching over native retirement debt")
+for _, operation in ipairs({ shutdown_first, shutdown_second, shutdown_queued }) do
+	operation:on_settled(function() shutdown_settled = shutdown_settled + 1 end)
+end
+local admitted_chunks = shutdown_chunks
+check(Http.shutdown() == false and not shutdown_first:is_settled() and not shutdown_second:is_settled(),
+	"global shutdown cannot acknowledge logical cancellation before actual native exit and close ACKs")
+local stopped_started, stopped_operation = Http.get(base_url .. "/slow", {},
+	{ owner = "native-after-shutdown" }, function() shutdown_callbacks = shutdown_callbacks + 1 end)
+check(stopped_started == false and stopped_operation.started == false and stopped_operation:is_settled(),
+	"terminal global shutdown refuses subsequent boolean dispatch with a settled resource-free operation")
+check(run_until(function() return Http.shutdown() == true end)
+	and shutdown_first:is_settled() and shutdown_second:is_settled() and shutdown_queued:is_settled()
+	and shutdown_settled == 3,
+	"global shutdown acknowledges only after all exact native operations and their deadlines physically settle")
+check(shutdown_callbacks == 0 and shutdown_chunks == admitted_chunks and shutdown_spawns == 2
+	and #requests == prior_requests + 2 and Http.shutdown() == true,
+	"terminal shutdown suppresses callbacks, late chunks, queued promotion and all post-stop native acquisitions")
+uv.spawn = native_spawn
+
 Http.cancel()
 for _, owner in ipairs({ "native-status", "native-partial", "native-bounded", "native-cancel" }) do Http.cancel(owner) end
 Offer._reset_for_test()

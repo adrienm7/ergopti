@@ -33,7 +33,7 @@ helpers.describe("modules/shortcuts/manager.lua", function()
     helpers.assert_true(type(M.wrap_selection) == "function", "wrap_selection")
     helpers.assert_true(type(M.is_caps_word_active) == "function", "is_caps_word_active")
     helpers.assert_true(type(M.toggle_caps_word) == "function", "toggle_caps_word")
-    helpers.assert_true(type(M.process_caps_word) == "function", "process_caps_word")
+    helpers.assert_true(type(M.cancel_caps_word) == "function", "cancel_caps_word")
     helpers.assert_true(type(M.transform_uppercase) == "function", "transform_uppercase")
     helpers.assert_true(type(M.transform_lowercase) == "function", "transform_lowercase")
     helpers.assert_true(type(M.transform_titlecase) == "function", "transform_titlecase")
@@ -112,76 +112,46 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   -- 3. CapsWord
   -- ==========================================================================
 
-  -- Reset CapsWord state before this block so tests don't leak between runs.
+  -- No keyboard is captured here: the session's CapsLock goes to a fake hook,
+  -- restored at the end of the block. The real lock is proven by
+  -- test_keyboard_hook_caps_word_lock and the session's endings by
+  -- test_caps_word_auto_off.
+  local prior_hook = package.loaded["adapters.keyboard_hook"]
+  local hook = require("tests.support.caps_word_lock_hook_fake").new()
+  package.loaded["adapters.keyboard_hook"] = hook
   M.init({})
 
   helpers.it("is_caps_word_active returns false initially", function()
     helpers.assert_eq(M.is_caps_word_active(), false)
   end)
 
-  helpers.it("toggle_caps_word flips state", function()
-    -- Start from known state (off).
+  helpers.it("toggle_caps_word locks CapsLock on and unlocks it off", function()
     if M.is_caps_word_active() then M.toggle_caps_word() end
-    M.toggle_caps_word()
+    local locks, releases = hook.locks, hook.releases
+    helpers.assert_true(M.toggle_caps_word())
     helpers.assert_true(M.is_caps_word_active())
-    M.toggle_caps_word()
+    helpers.assert_eq(hook.locks, locks + 1)
+    helpers.assert_true(M.toggle_caps_word())
     helpers.assert_eq(M.is_caps_word_active(), false)
+    helpers.assert_eq(hook.releases, releases + 1)
   end)
 
-  helpers.it("process_caps_word returns nil when inactive", function()
-    -- Ensure CapsWord is off.
-    if M.is_caps_word_active() then M.toggle_caps_word() end
-    helpers.assert_eq(M.process_caps_word("a"), nil)
+  helpers.it("CapsWord rewrites no character: the capitals come from CapsLock", function()
+    helpers.assert_eq(M.process_caps_word, nil,
+      "a rewritten buffer character never reached the application")
   end)
 
-  helpers.it("process_caps_word capitalizes first letter of word", function()
-    -- Toggle off-then-on so _caps_word_triggered is clean (toggle_caps_word resets it).
-    if M.is_caps_word_active() then M.toggle_caps_word() end
-    M.toggle_caps_word()
-    helpers.assert_eq(M.process_caps_word("a"), "A")
-    -- CapsWord auto-disengages after first letter; next letter passes through.
-    helpers.assert_eq(M.process_caps_word("b"), nil)
-  end)
-
-  helpers.it("process_caps_word only capitalizes first letter", function()
-    if M.is_caps_word_active() then M.toggle_caps_word() end
-    M.toggle_caps_word()
-    M.process_caps_word("h") -- first letter → "H"
-    -- Second letter of same word should pass through.
-    helpers.assert_eq(M.process_caps_word("e"), nil)
-    helpers.assert_eq(M.process_caps_word("l"), nil)
-  end)
-
-  helpers.it("process_caps_word resets on word boundary", function()
-    if M.is_caps_word_active() then M.toggle_caps_word() end
-    M.toggle_caps_word()
-    M.process_caps_word("h") -- capitalize → "H"
-    -- Space resets the word boundary.
-    helpers.assert_eq(M.process_caps_word(" "), nil) -- boundary
-    -- Next word: first letter capitalized again.
-    helpers.assert_eq(M.process_caps_word("w"), "W")
-  end)
-
-  helpers.it("process_caps_word resets on punctuation", function()
-    if M.is_caps_word_active() then M.toggle_caps_word() end
-    M.toggle_caps_word()
-    M.process_caps_word("t") -- capitalize → "T"
-    helpers.assert_eq(M.process_caps_word("."), nil) -- boundary
-    helpers.assert_eq(M.process_caps_word("n"), "N") -- new word
-  end)
-
-  helpers.it("process_caps_word passes already-uppercase through", function()
-    if M.is_caps_word_active() then M.toggle_caps_word() end
-    M.toggle_caps_word()
-    -- Already uppercase — no change needed, but still marks as triggered.
-    helpers.assert_eq(M.process_caps_word("A"), nil)
-  end)
-
-  helpers.it("disable clears CapsWord state", function()
-    M.toggle_caps_word() -- on
+  helpers.it("disable clears CapsWord state and unlocks", function()
+    helpers.assert_true(M.toggle_caps_word()) -- on
+    local releases = hook.releases
     M.disable()
     helpers.assert_eq(M.is_caps_word_active(), false)
-    helpers.assert_eq(M.process_caps_word("a"), nil)
+    helpers.assert_eq(hook.releases, releases + 1)
+  end)
+
+  helpers.it("restores the hook after the CapsWord block", function()
+    package.loaded["adapters.keyboard_hook"] = prior_hook
+    helpers.assert_eq(package.loaded["adapters.keyboard_hook"], prior_hook)
   end)
 
   -- ==========================================================================

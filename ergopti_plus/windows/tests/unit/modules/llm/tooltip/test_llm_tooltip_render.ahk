@@ -37,10 +37,24 @@
 ; ==================================================================
 ; ==================================================================
 
+; This headless harness does not run UiStyle_LoadSharedConst: read the shared
+; shortcut spec from the same constants.toml it reads, so the labels below are
+; the shipped ones.
+_TestRender_SeedShortcutSpec() {
+	global _SharedDir, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_LABELS, UI_LLM_SHORTCUT_JOINER
+	Constants := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
+	UI_LLM_SHORTCUT_ORDER := IniCacheGet(Constants, "llm_ui", "shortcut_modifier_order")
+	UI_LLM_SHORTCUT_LABELS := IniCacheGet(Constants, "llm_ui", "shortcut_labels_ahk")
+	UI_LLM_SHORTCUT_JOINER := IniCacheGet(Constants, "llm_ui", "shortcut_joiner_ahk")
+	AssertTrue(UI_LLM_SHORTCUT_ORDER != "_" && UI_LLM_SHORTCUT_LABELS != "_" && UI_LLM_SHORTCUT_JOINER != "_",
+		"constants.toml must declare the shortcut spec")
+}
+
 ; Windows names its modifiers in words. The macOS glyphs (U+2318 cmd, U+2303
 ; ctrl, U+2325 option, U+21E7 shift) are meaningless on a Windows keyboard and
 ; made "Alt+1" read as a Mac Cmd shortcut (llm-val-mods-windows-labels).
 _TestRender_ValModsDoesNotThrow() {
+	_TestRender_SeedShortcutSpec()
 	threw := false
 	r := ""
 	try {
@@ -57,6 +71,7 @@ Test("render: _LLM_FormatValModifiers does not throw and maps 'alt'",
 
 
 _TestRender_ValModsAllSymbols() {
+	_TestRender_SeedShortcutSpec()
 	AssertEqual("Win",   _LLM_FormatValModifiers("cmd"),   "'cmd' -> Win")
 	AssertEqual("Ctrl",  _LLM_FormatValModifiers("ctrl"),  "'ctrl' -> Ctrl")
 	AssertEqual("Shift", _LLM_FormatValModifiers("shift"), "'shift' -> Shift")
@@ -72,6 +87,7 @@ Test("render: each modifier name maps to its Windows label (llm-val-mods-windows
 
 
 _TestRender_ValModsEmptyAndCombined() {
+	_TestRender_SeedShortcutSpec()
 	AssertEqual("", _LLM_FormatValModifiers(""),     "empty input formats to empty")
 	AssertEqual("", _LLM_FormatValModifiers("none"), "'none' formats to empty")
 	AssertEqual("Alt+Shift", _LLM_FormatValModifiers("alt+shift"),
@@ -81,18 +97,60 @@ Test("render: empty/none/combined modifiers format correctly",
 	_TestRender_ValModsEmptyAndCombined)
 
 
-_TestRender_ShortcutSuffixReadsAsWindowsChord() {
-	global UI_LLM_SHORTCUT_LABEL_GAP
-	Gap := UI_LLM_SHORTCUT_LABEL_GAP
-	AssertEqual(Gap . "Alt+1", _LLM_BuildShortcutSuffix(1, 3, "alt"),
-		"the slot hint must read as the Windows chord Alt+1")
-	AssertEqual(Gap . "Ctrl+Shift+0", _LLM_BuildShortcutSuffix(10, 10, "ctrl+shift"),
-		"slot 10 maps to digit 0")
-	AssertEqual("", _LLM_BuildShortcutSuffix(1, 1, "alt"),
-		"a single slot has no numbered shortcut")
+; Every prediction row shows the chord that inserts it in a right-aligned
+; column: bare digits included (they had no hint at all), a single prediction
+; included, under the Windows labels of the shared shortcut spec
+; (_shared/tests/corpus/tooltip/llm_shortcut_vectors.json, llm-shortcut-column).
+_TestRender_ShortcutLabelsFollowTheCorpus() {
+	_TestRender_SeedShortcutSpec()
+	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\tooltip\llm_shortcut_vectors.json"
+	if !FileExist(Path)
+		throw Error("LLM shortcut corpus not found at '" . Path . "'")
+	Corpus := JsonParse(FileRead(Path, "UTF-8"))
+	AssertTrue(Corpus["vectors"].Length >= 10, "the corpus must carry every prediction row")
+	for Vec in Corpus["vectors"] {
+		Mods := ""
+		for Name in Vec["modifiers"]
+			Mods .= (Mods = "" ? "" : "+") . Name
+		AssertEqual(Vec["expected"]["ahk"], _LLM_PredictionShortcutLabel(Vec["index"], Mods),
+			"shortcut '" . Vec["id"] . "'")
+	}
 }
-Test("render: slot shortcut suffix reads Alt+1 (llm-val-mods-windows-labels)",
-	_TestRender_ShortcutSuffixReadsAsWindowsChord)
+Test("render: the shortcut column follows the shared corpus (llm-shortcut-column)",
+	_TestRender_ShortcutLabelsFollowTheCorpus)
+
+; The hint is read from the same validation modifiers that build the binding:
+; for each modifier choice, every digit route of the real binding plan and the
+; label of its row name the same modifiers and the same digit.
+_TestRender_ShortcutLabelsAgreeWithTheBinding() {
+	_TestRender_SeedShortcutSpec()
+	global UI_LLM_SHORTCUT_JOINER
+	Names := Map("^", "ctrl", "!", "alt", "+", "shift", "#", "cmd")
+	for ValMods in ["", "alt", "ctrl", "shift", "cmd", "ctrl+alt", "shift+alt+ctrl", "cmd+shift"] {
+		Built := _LLM_Menu_BuildNavBindingPlan(Map("nav_modifiers", "", "val_modifiers", ValMods))
+		AssertTrue(Built is Map, "'" . ValMods . "' must build a binding plan")
+		Routes := 0
+		for Record in Built["plan"] {
+			if !Record.Has("jump_idx") || !Record["jump_idx"]
+				continue
+			Routes += 1
+			Spec := Record["spec"]
+			Bound := ""
+			for Char in StrSplit(SubStr(Spec, 1, -1))
+				if (Char != "")
+					Bound .= (Bound = "" ? "" : "+") . Names[Char]
+			AssertEqual(_LLM_PredictionShortcutLabel(Record["jump_idx"], Bound),
+				_LLM_PredictionShortcutLabel(Record["jump_idx"], ValMods),
+				"'" . ValMods . "' row " . Record["jump_idx"] . ": hint and binding modifiers")
+			AssertEqual(SubStr(Spec, -1),
+				SubStr(_LLM_PredictionShortcutLabel(Record["jump_idx"], ValMods), -1),
+				"'" . ValMods . "' row " . Record["jump_idx"] . ": hint and binding digit")
+		}
+		AssertEqual(10, Routes, "'" . ValMods . "' must bind the ten digit routes")
+	}
+}
+Test("render: each row's shortcut names the chord its binding consumes (llm-shortcut-column)",
+	_TestRender_ShortcutLabelsAgreeWithTheBinding)
 
 
 

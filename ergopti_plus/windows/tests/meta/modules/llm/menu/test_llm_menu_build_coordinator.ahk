@@ -83,8 +83,8 @@ _LMBCM_RawBuilderIsSinglePassAndCoordinatorOwned() {
 	Assert(InStr(RequestBody, ".Request(Reason)") > 0,
 		"the public request boundary must delegate to the generation owner")
 	Assert(InStr(RawBody,
-		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)") > 0,
-		"the detached LLM builder must request a narrow projection that promotes to a full rebuild on contention")
+		"RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true, StagedHandle)") > 0,
+		"the detached LLM builder must request a narrow projection that promotes to a full rebuild on contention, lending that rebuild its child")
 	Assert(InStr(RootWorkerBody, "initMenu(_LLM_Menu_PreparedRootCurrent.Bind(Submenu, PublishAuthorizeFn), false, Submenu)") > 0,
 		"the LLM root projection must attach the staged submenu through the root publication fence")
 	Assert(InStr(RootWorkerBody, "InitSubMenus(") == 0
@@ -109,7 +109,8 @@ _LMBCM_ToggleRecordingScript(Source, Framework, Receipt) {
 		"if", true, "else", true, "true", true, "false", true, "return", true,
 		"SetTimer", true, "_LLM_Menu_FireHealthProbe", true,
 		"LLM_Menu_ScheduleBackendLifecycle", true, "LLM_Menu_BackendLifecycleInvalidate", true,
-		"LLM_Bridge_Stop", true, "LLM_Menu_RequestBuild", true)
+		"LLM_Bridge_Stop", true, "LLM_Menu_RequestBuild", true,
+		"LLM_Menu_ScheduleHotkeysAwaitingEnable", true)
 	Position := 1, Scanned := 0
 	while Found := RegExMatch(Code, "[A-Za-z_][A-Za-z0-9_]*", &Word, Position) {
 		AssertTrue(Allowed.Has(Word[0]), "the exact toggle recorder refuses an uncontrolled effect: " Word[0])
@@ -150,6 +151,11 @@ LLM_Menu_ScheduleBackendLifecycle(ShowUi) {
 	_LMTO_State["show_ui"] := ShowUi
 	_LMTO_State["events"].Push("schedule")
 }
+LLM_Menu_ScheduleHotkeysAwaitingEnable() {
+	global _LMTO_State
+	_LMTO_State["hotkeys"] += 1
+	_LMTO_State["events"].Push("hotkeys")
+}
 LLM_Menu_BackendLifecycleInvalidate(Stop) {
 	global _LMTO_State
 	AssertEqual(true, Stop)
@@ -169,6 +175,7 @@ LLM_Menu_RequestBuild(Reason) {
 	if State["enabled"] {
 		AssertEqual(LLM_HEALTH_PROBE_INTERVAL_MS, State["timer"], "health ownership is armed before repaint")
 		AssertEqual(1, State["scheduled"], "backend lifecycle is scheduled before repaint")
+		AssertEqual(1, State["hotkeys"], "hotkeys left inactive by an AI-off boot are handed over before repaint")
 		AssertEqual(State["expected_ui"], State["show_ui"])
 		AssertEqual(0, State["stopped"])
 		AssertEqual(0, State["invalidated"])
@@ -177,6 +184,7 @@ LLM_Menu_RequestBuild(Reason) {
 		AssertEqual(1, State["invalidated"], "repaint cannot delay exact lifecycle invalidation")
 		AssertEqual(1, State["stopped"], "bridge retirement precedes entry into the repaint")
 		AssertEqual(0, State["scheduled"])
+		AssertEqual(0, State["hotkeys"], "disabling never activates AI hotkeys")
 	}
 	State["events"].Push("build")
 	if State["throw_build"]
@@ -187,7 +195,7 @@ _LMTO_Case(Enabled, ShowUi, ThrowBuild) {
 	global _LMTO_State
 	_LMTO_State := Map("enabled", Enabled, "expected_ui", ShowUi, "throw_build", ThrowBuild,
 		"events", [], "timer", -1, "scheduled", 0, "show_ui", -1,
-		"invalidated", 0, "stopped", 0, "builds", 0)
+		"invalidated", 0, "stopped", 0, "builds", 0, "hotkeys", 0)
 	Observed := "", Accepted := false
 	try Accepted := _LLM_Menu_ApplyToggleCommitted(Map("enabled", Enabled), ShowUi)
 	catch as Err
@@ -195,7 +203,7 @@ _LMTO_Case(Enabled, ShowUi, ThrowBuild) {
 	AssertEqual(ThrowBuild ? "Controlled repaint refusal." : "", Observed)
 	AssertEqual(!ThrowBuild, Accepted)
 	AssertEqual(1, _LMTO_State["builds"])
-	Expected := Enabled ? ["log", "timer", "schedule", "build"] : ["log", "timer", "invalidate", "stop", "build"]
+	Expected := Enabled ? ["log", "timer", "schedule", "hotkeys", "build"] : ["log", "timer", "invalidate", "stop", "build"]
 	AssertEqual(Expected.Length, _LMTO_State["events"].Length)
 	for Index, Event in Expected
 		AssertEqual(Event, _LMTO_State["events"][Index], "all committed effects keep exact order")
@@ -333,6 +341,7 @@ BootProfile_Mark(Args*) => 0
 BootProfile_StageBegin(Args*) => 0
 BootProfile_StageEnd(Args*) => 0
 BootProfile_StageAbort(Args*) => 0
+ErrorNet_Describe(Err) => Err.Message
 _HS_InvalidateCaches() => 0
 MenuManifest_InvalidateCache() => 0
 LLM_Menu_BuildSavedOpts(Cache) => Map()
@@ -410,9 +419,10 @@ _LMPC_Authorize() {
   _LLM_Menu_Handle := _LMPC_State["foreign"]
  return !InStr(_LMPC_State["mode"], "refusal")
 }
-RebuildTrayMenu(AuthorizeFn, WorkerFn, Narrow, Promote) {
+RebuildTrayMenu(AuthorizeFn, WorkerFn, Narrow, Promote, CallerLlm) {
  global _LMPC_State, _LLM_Menu_Handle
  AssertTrue(Narrow && Promote)
+ AssertTrue(CallerLlm == _LLM_Menu_Handle, "the request lends the exact child it built")
  _LMPC_State["expected"] := _LLM_Menu_Handle
  if _LMPC_State["mode"] == "stale_candidate"
   _LLM_Menu_Handle := _LMPC_State["foreign"]

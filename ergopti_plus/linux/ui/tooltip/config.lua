@@ -26,6 +26,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
+local LlmLine = require("tooltip.llm_line")
 
 local LOG = "ui.tooltip.config"
 
@@ -179,21 +180,27 @@ local _llm_line = nil
 --- Apart from M.load() because the suggestion overlay builds its rows before
 --- any panel style reaches it, and what a line reads must not depend on which
 --- renderer draws it.
---- @return table { mark, align, label_gap, colors = { typed, corrected, next,
----   cursor, label_selected, label_unselected } }
+--- @return table { mark, align, shortcut_spec, colors = { typed, corrected,
+---   next, cursor, label } }
 function M.llm_line()
 	if _llm_line then return _llm_line end
+	-- The shortcut column's modifier labels (_shared/lua/tooltip/llm_line.lua).
+	local shortcut_spec = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
+		require_key("llm_ui", "shortcut_labels_linux"), require_key("llm_ui", "shortcut_joiner_linux"))
+	if not shortcut_spec then
+		error("[llm_ui].shortcut_labels_linux must label every modifier of shortcut_modifier_order")
+	end
 	_llm_line = {
-		mark      = require_key("llm_ui", "active_prefix"),
-		align     = require_key("llm_ui", "inactive_align_char"),
-		label_gap = require_key("llm_ui", "shortcut_label_gap"),
+		mark          = require_key("llm_ui", "active_prefix"),
+		align         = require_key("llm_ui", "inactive_align_char"),
+		shortcut_spec = shortcut_spec,
 		colors = {
-			typed            = parse_hex(require_key("llm_colors", "unsel_gray_hex")),
-			corrected        = parse_hex(require_key("llm_colors", "corr_sel_hex")),
-			next             = parse_hex(require_key("llm_colors", "nw_sel_hex")),
-			cursor           = parse_hex(require_key("llm_colors", "cursor_hex")),
-			label_selected   = parse_hex(require_key("llm_colors", "cmd_sel_hex")),
-			label_unselected = parse_hex(require_key("llm_colors", "cmd_dim_hex")),
+			typed     = parse_hex(require_key("llm_colors", "unsel_gray_hex")),
+			corrected = parse_hex(require_key("llm_colors", "corr_sel_hex")),
+			next      = parse_hex(require_key("llm_colors", "nw_sel_hex")),
+			cursor    = parse_hex(require_key("llm_colors", "cursor_hex")),
+			-- The shortcut column is muted on every row, the selected one included.
+			label     = parse_hex(require_key("llm_colors", "cmd_dim_hex")),
 		},
 	}
 	return _llm_line

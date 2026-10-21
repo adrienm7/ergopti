@@ -144,3 +144,56 @@ _CSTT_ValidTomlPrivacySettings() {
 }
 Test("metrics config: commented headers and multiline opt-outs apply (metrics-toml-grammar)",
 	_CSTT_ValidTomlPrivacySettings)
+
+_CSTT_SemanticPrivacySettings(Shape, Enabled) {
+	global _ConfigDir, _AhkSubDir
+	SavedConfigDir := _ConfigDir, SavedAhkSubDir := _AhkSubDir
+	SavedEnabled := MetricsShortcuts.enabled
+	SavedApps := MetricsFilters.disabled_apps
+	SavedFilters := Map()
+	for Name in ["private_browsing", "secure_field", "system_auth", "encrypt"]
+		SavedFilters[Name] := MetricsFilters.%Name%
+	TestDir := A_Temp . "\ergopti_cs_semantic_" . A_TickCount . "_" . A_ScriptHwnd . "\"
+	DirCreate(TestDir)
+	try {
+		_ConfigDir := TestDir, _AhkSubDir := ""
+		Literal := Enabled ? "true" : "false"
+		Apps := '["CHROME.EXE", "editor#1.exe"]'
+		switch Shape {
+			case "dotted": Source := "metrics.metrics_enabled = " . Literal
+				. "`nmetrics.metrics_disabled_apps = " . Apps . "`n"
+			case "inline": Source := "metrics = { metrics_enabled = " . Literal
+				. ", metrics_disabled_apps = " . Apps . " }`n"
+			case "quoted": Source := '["metrics"]`nmetrics_enabled = ' . Literal
+				. "`nmetrics_disabled_apps = " . Apps . "`n"
+			default: throw ValueError("Unknown metrics semantic fixture")
+		}
+		Path := CS_GetTomlPath()
+		AssertTrue(FSWrite(Path, Source))
+		Data := CS_Read()
+		AssertTrue(Data.Has("metrics"), "the real metrics reader must retain the semantic namespace")
+		AssertEqual(Enabled, Data["metrics"]["metrics_enabled"])
+		AssertTrue(Data["metrics"]["metrics_disabled_apps"] is Array)
+		MetricsShortcuts.enabled := !Enabled
+		CS_Load()
+		AssertEqual(Enabled, MetricsShortcuts.enabled, "authored consent must reach the live metrics owner")
+		AssertEqual(2, MetricsFilters.disabled_apps.Count)
+		AssertTrue(MetricsFilters.disabled_apps.Has("chrome.exe"))
+		AssertTrue(MetricsFilters.disabled_apps.Has("editor#1.exe"))
+		AssertEqual(Source, FSReadUtf8Exact(Path), "reading semantic settings must not rewrite their source")
+	} finally {
+		MetricsShortcuts.enabled := SavedEnabled
+		MetricsFilters.disabled_apps := SavedApps
+		for Name, Value in SavedFilters
+			MetricsFilters.%Name% := Value
+		_ConfigDir := SavedConfigDir, _AhkSubDir := SavedAhkSubDir
+		if DirExist(TestDir)
+			DirDelete(TestDir, true)
+	}
+}
+for Shape in ["dotted", "inline", "quoted"] {
+	Test("metrics config: " . Shape . " opt-in reaches runtime (metrics-semantic-source)",
+		_CSTT_SemanticPrivacySettings.Bind(Shape, true))
+	Test("metrics config: " . Shape . " opt-out reaches runtime (metrics-semantic-source)",
+		_CSTT_SemanticPrivacySettings.Bind(Shape, false))
+}

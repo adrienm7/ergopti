@@ -10,6 +10,10 @@ log_level = "INFO"
 show_error_dialog = true
 alt_gr_is_kana_remap = "auto"
 
+
+
+
+
 [hotstrings]
 trigger_char = "★"
 magic_key_source = "auto"
@@ -21,257 +25,401 @@ arrow_resets_word = true
 shortcut_resets_word = true
 tap_hold_resets_word = true
 
+
+
 [hotstrings.autocorrection.names]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.autocorrection.abbreviations]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.autocorrection.technical_terms]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.distances_reduction.qu]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.distances_reduction.comma_j]
 enabled = false
+
+
 
 [hotstrings.distances_reduction.comma_far_letters]
 enabled = false
 
+
+
 [hotstrings.distances_reduction.dead_key_e_circumflex]
 enabled = false
+
+
 
 [hotstrings.distances_reduction.e_circumflex_e]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.distances_reduction.space_around_symbols]
 enabled = false
+
+
 
 [hotstrings.sfbs_reduction.comma]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.sfbs_reduction.e_circ]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.sfbs_reduction.e_grave]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.sfbs_reduction.bu]
 enabled = false
 
+
+
 [hotstrings.sfbs_reduction.i_e_acute]
 enabled = false
+
+
 
 [hotstrings.rolls.hc]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.sx]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.rolls.cx]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.ct]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.rolls.ez]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.assign]
 enabled = false
+
+
 
 [hotstrings.rolls.assign_arrow_equal_left]
 enabled = false
 
+
+
 [hotstrings.rolls.assign_arrow_equal_right]
 enabled = false
+
+
 
 [hotstrings.rolls.assign_arrow_minus_left]
 enabled = false
 
+
+
 [hotstrings.rolls.assign_arrow_minus_right]
 enabled = false
+
+
 
 [hotstrings.rolls.bracket_quote]
 enabled = false
 
+
+
 [hotstrings.rolls.chevron_equal]
 enabled = false
+
+
 
 [hotstrings.rolls.chevron_greater]
 enabled = false
 
+
+
 [hotstrings.rolls.chevron_less]
 enabled = false
+
+
 
 [hotstrings.rolls.close_chevron_tag]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.comment_close]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.rolls.comment_open]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.english_negation]
 enabled = false
 
+
+
 [hotstrings.rolls.equal_string]
 enabled = false
+
+
 
 [hotstrings.rolls.hashtag_close_bracket]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.hashtag_open_bracket]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.rolls.hashtag_parenthesis]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.rolls.hashtag_quote]
 enabled = false
+
+
 
 [hotstrings.rolls.left_arrow]
 enabled = false
 
+
+
 [hotstrings.rolls.not_equal]
 enabled = false
+
+
 
 [hotstrings.rolls.paren_quote]
 enabled = false
 
+
+
 [hotstrings.magic_key.replace]
 enabled = false
+
+
 
 [hotstrings.magic_key.repeat_corrections]
 enabled = false
 time_activation_seconds = 2
 
+
+
 [hotstrings.magic_key.text_expansion_symbols]
 enabled = false
 time_activation_seconds = 2
+
+
 
 [hotstrings.magic_key.text_expansion_symbols_typst]
 enabled = false
 time_activation_seconds = 2
 
+
+
 [hotstrings.french_distancesreduction.suffixes_a]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.french_autocorrection.accents]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.french_autocorrection.names]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.french_autocorrection.typographic_apostrophe]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.french_autocorrection.errors]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.french_autocorrection.ou]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.french_autocorrection.multiple_punctuation_marks]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.french_autocorrection.suffixes_a_chaining]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.french_autocorrection.minus]
 enabled = false
 time_activation_seconds = 0.5
+
+
 
 [hotstrings.french_autocorrection.minus_apostrophe]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.french_magickey.text_expansion]
 enabled = false
 time_activation_seconds = 2
+
+
 
 [hotstrings.french_magickey.text_expansion_auto]
 enabled = false
 time_activation_seconds = 2
 
+
+
 [hotstrings.french_magickey.text_expansion_emojis]
 enabled = false
 time_activation_seconds = 2
 
+
+
 [hotstrings.dynamic.date]
 enabled = false
+
+
 
 [hotstrings.dynamic.date_fr]
 enabled = false
 
+
+
 [hotstrings.dynamic.date_long_fr]
 enabled = false
+
+
 
 [hotstrings.dynamic.iban_prefixes]
 enabled = false
 
+
+
 [hotstrings.dynamic.phone_prefixes]
 enabled = false
 
+
+
 [hotstrings.dynamic.ssn_prefixes]
 enabled = false
+
+
 
 [hotstrings.dynamic.user_code]
 enabled = false
 time_activation_seconds = 0.5
 
+
+
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
 pattern_max_length = 1
+
+
 
 [hotstrings.personal.autocorrection]
 enabled = false
 time_activation_seconds = 0.75
 
+
+
 [hotstrings.personal.code]
 enabled = false
 time_activation_seconds = 0.75
+
+
 
 [hotstrings.personal.email_shortcuts]
 enabled = false
 time_activation_seconds = 0.75
 
+
+
 [hotstrings.personal.professional_vocabulary]
 enabled = false
 time_activation_seconds = 0.75
 
+
+
 [hotstrings.personal.test]
 enabled = false
 time_activation_seconds = 0.75
+
+
+
+
 
 [llm]
 enabled = false
@@ -283,11 +431,15 @@ agent_system2 = ""
 agent_mode = "off"
 agent_disabled_apps = []
 
+
+
 [llm.display]
 pred_indent = 0
 show_info_bar = true
 streaming = true
 streaming_multi = true
+
+
 
 [llm.generation]
 context_length = 500
@@ -298,14 +450,20 @@ auto_raise_temp = true
 reset_on_nav = true
 sequential_mode = false
 
+
+
 [llm.models]
 selected = "ollama"
 ollama = "Qwen3.5-0.8B"
+
+
 
 [llm.profiles]
 active = "basic"
 num_predictions = 3
 auto_profile_for_model = true
+
+
 
 [llm.trigger]
 debounce_ms = 500
@@ -315,8 +473,14 @@ inline_autotype = false
 secure_filter_enabled = true
 url_bar_filter_enabled = false
 
+
+
 [llm.navigation]
 val_modifiers = []
+
+
+
+
 
 [metrics]
 enabled = false
@@ -332,6 +496,10 @@ wpm_widget_x = -1
 wpm_widget_y = -1
 wpm_widget_colors = false
 wpm_widget_graph = false
+
+
+
+
 
 [shortcuts]
 chatgpt_url = "https://chat.openai.com"
@@ -350,40 +518,58 @@ move = false
 screen = false
 win_caps_lock = false
 
+
+
 [shortcuts.gpt]
 enabled = false
 link = "https://chatgpt.com/"
+
+
 
 [shortcuts.search]
 enabled = false
 search_engine = "https://www.google.com"
 search_engine_url_query = "https://www.google.com/search?q="
 
+
+
 [shortcuts.take_note]
 enabled = false
 dated_notes = false
 destination_folder = "D:\\Bureau"
 
+
+
 [shortcuts.a_grave]
 enabled = false
 letter = "v"
+
+
 
 [shortcuts.e_acute]
 enabled = false
 letter = "c"
 
+
+
 [shortcuts.e_circ]
 enabled = false
 letter = "x"
+
+
 
 [shortcuts.e_grave]
 enabled = false
 letter = "z"
 
+
+
 [shortcuts.key_combination_taps]
 alt_gr_then_left_alt = "none"
 alt_gr_then_caps_lock = "none"
 left_alt_then_caps_lock = "none"
+
+
 
 [shortcuts.personal]
 laptop_broken_key = false
@@ -392,6 +578,8 @@ mouse_tab_switching = false
 professional_environment = false
 programmable_keyboard = false
 
+
+
 [shortcuts.script_control]
 chords_enabled = true
 script_altgr_backspace = "script_reload"
@@ -399,13 +587,36 @@ script_altgr_delete = "open_personal_shortcuts"
 script_altgr_enter = "script_pause_toggle"
 script_altgr_escape = "script_quit"
 
+
+
 [shortcuts.keyboard]
 magic_editor = "open_hotstrings_editor"
+
+
 
 [shortcuts.tap_keys]
 number_row_left = "none"
 number_row_right_1 = "none"
 number_row_right_2 = "none"
+
+
+
+[shortcuts.caps_word]
+idle_timeout_seconds = 10
+terminators = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
+
+
+
+[shortcuts.caps_word.pointer]
+pointer_motion = true
+left_click = true
+right_click = true
+middle_click = true
+other_buttons = true
+
+
+
+
 
 [gestures]
 enabled = false
@@ -420,13 +631,26 @@ swipe_4_up = "none"
 tap_3 = "none"
 tap_4 = "none"
 
+
+
+
+
 [layout]
 ergopti_base = false
 direct_access_digits = "native"
+number_row_reorder_edges = false
 ergopti_alt_gr = false
 ergopti_variant = "none"
+emulate_number_row = true
+emulate_top_row = true
+emulate_home_row = true
+emulate_bottom_row = true
 ctrl_magic_save = false
 emulated_layout = ""
+
+
+
+
 
 [category_enabled]
 hotstrings = false

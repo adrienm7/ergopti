@@ -246,6 +246,63 @@ helpers.describe("bridge handler TOML persistence", function()
       "while the UI edit itself still lands")
   end)
 
+	-- Issue #96: a section created in the editor stayed neutral-off, so its
+	-- hotstrings never loaded and a bundled autocorrection fired over them.
+	helpers.it("hotstring_editor_bridge.save enables exactly the sections it creates", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		local ok_mkdir = os.execute('mkdir "' .. dir .. '"')
+		helpers.assert_true(ok_mkdir == true or ok_mkdir == 0, "sandbox directory must exist")
+		local path = dir .. "/personal.toml"
+		local seed = assert(io.open(path, "w"))
+		seed:write('[_meta]\ndescription = "Personal"\nsections_order = ["english"]\n\n'
+			.. '[[english]]\n"btw" = { output = "by the way", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }\n')
+		seed:close()
+		local calls, reloads = {}, 0
+		local state = { config = {
+			get_config_dir = function() return dir end,
+			reload = function() reloads = reloads + 1 end,
+			enable_new_sections = function(category, sections)
+				calls[#calls + 1] = { category = category, sections = sections }
+				return true
+			end,
+		} }
+		-- The real writer: its owned committed payload is what lets each save
+		-- reach its reload, and the second save starts from the first one's file.
+		local previous_manager = package.loaded["ui.webview_manager"]
+		package.loaded["ui.webview_manager"] = { current_epoch = function() return 73 end, eval_js = function() return true end }
+		local ok, err = pcall(function()
+			local handler = helpers.load_module("ui.hotstring_editor.bridge")
+			local context = open_personal_view(handler, state)
+			handler.on_message({ action = "save", data = {
+				sections_order = { "english", "metiers" },
+				sections = {
+					english = { description = "English", entries = { { trigger = "btw", output = "by the way" } } },
+					metiers = { description = "Metiers", entries = { { trigger = "sru", output = "SRU" } } },
+				},
+			} }, state, context)
+			handler.on_message({ action = "save", data = {
+				sections_order = { "english", "metiers" },
+				sections = {
+					english = { description = "English", entries = {} },
+					metiers = { description = "Metiers", entries = {} },
+				},
+			} }, state, context)
+		end)
+		package.loaded["ui.webview_manager"] = previous_manager
+		package.loaded["ui.hotstring_editor.bridge"] = nil
+		-- The writer may leave its backup beside the file.
+		local listing = io.popen('ls -A "' .. dir .. '"')
+		for name in listing:lines() do os.remove(dir .. "/" .. name) end
+		listing:close()
+		os.execute('rmdir "' .. dir .. '"')
+		if not ok then error(err, 0) end
+		helpers.assert_eq(reloads, 2, "each save reloads the engine first")
+		helpers.assert_eq(#calls, 1, "only the save that adds a section enables one")
+		helpers.assert_eq(calls[1].category, "personal")
+		helpers.assert_eq(calls[1].sections, { "metiers" }, "the existing section keeps its own state")
+	end)
+
 end)
 
 

@@ -45,10 +45,10 @@
 // Optional Linux document protocol. Other hosts and pages keep the original
 // payload contract. This private state belongs to this exact JS document.
 const linuxDocumentBridges = new Map();
+const linuxDocumentBridgeNames = ['changelog_bridge', 'dl_bridge', 'model_browser_bridge'];
 
 function getLinuxDocumentNonce(name) {
-	if (window.__ergopti_host !== 'linux' || !['changelog_bridge', 'dl_bridge'].includes(name))
-		return null;
+	if (window.__ergopti_host !== 'linux' || !linuxDocumentBridgeNames.includes(name)) return null;
 	let state = linuxDocumentBridges.get(name);
 	if (state) return state.pageNonce;
 	if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') return null;
@@ -139,7 +139,7 @@ function makeHostBridge(name) {
 				return;
 			}
 			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[name]) {
-				if (window.__ergopti_host === 'linux' && ['changelog_bridge', 'dl_bridge'].includes(name)) {
+				if (window.__ergopti_host === 'linux' && linuxDocumentBridgeNames.includes(name)) {
 					const state = linuxDocumentBridges.get(name);
 					if (!state || !state.admitted) return false;
 					const documentOwner = {

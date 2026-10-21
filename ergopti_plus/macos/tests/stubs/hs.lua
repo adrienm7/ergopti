@@ -1276,6 +1276,7 @@ M.urlevent = {
 	__reset   = function() M.urlevent.__opened = {} end,
 }
 local PASTEBOARD_DATA = {}
+local PASTEBOARD_COUNTS = {}
 local GENERAL_PASTEBOARD = {}
 local PASTEBOARD_TEXT_UTI = "public.utf8-plain-text"
 
@@ -1290,6 +1291,7 @@ end
 -- table references. Raw strings are immutable, so one table copy suffices.
 -- Explicit test overrides remain responsible for daemon/ownership refusals.
 M.pasteboard = {
+	changeCount = function(name) return PASTEBOARD_COUNTS[pasteboard_key(name)] or 0 end,
 	getContents = function(name)
 		local data = PASTEBOARD_DATA[pasteboard_key(name)] or {}
 		local text = data[PASTEBOARD_TEXT_UTI]
@@ -1298,6 +1300,8 @@ M.pasteboard = {
 		return text:match("^[^%z]*")
 	end,
 	setContents = function(text, name)
+		local key = pasteboard_key(name)
+		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = { [PASTEBOARD_TEXT_UTI] = tostring(text) }
 		return true
 	end,
@@ -1316,6 +1320,7 @@ M.pasteboard = {
 			name, contents = ...
 		end
 		local key = pasteboard_key(name)
+		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		local data = {}
 		PASTEBOARD_DATA[key] = data
 		for uti, bytes in pairs(contents) do
@@ -1326,6 +1331,8 @@ M.pasteboard = {
 		return true
 	end,
 	clearContents = function(name)
+		local key = pasteboard_key(name)
+		PASTEBOARD_COUNTS[key] = (PASTEBOARD_COUNTS[key] or 0) + 1
 		PASTEBOARD_DATA[pasteboard_key(name)] = nil
 	end,
 }
@@ -1473,6 +1480,7 @@ function M.__reset()
 	HOST_UUID_COUNTER = 0
 	for k in pairs(SETTINGS_STORE) do SETTINGS_STORE[k] = nil end
 	for name in pairs(PASTEBOARD_DATA) do PASTEBOARD_DATA[name] = nil end
+	for name in pairs(PASTEBOARD_COUNTS) do PASTEBOARD_COUNTS[name] = nil end
 	for i = #TIMERS, 1, -1 do TIMERS[i] = nil end
 	for i = #KEYSTROKES, 1, -1 do KEYSTROKES[i] = nil end
 	for i = #EXEC_CALLS, 1, -1 do EXEC_CALLS[i] = nil end

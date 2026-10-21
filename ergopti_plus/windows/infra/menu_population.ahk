@@ -68,6 +68,21 @@ class MenuPopulation {
 		return MenuObj
 	}
 
+	/** Completes only a deferred picker containing the requested canonical action. */
+	CompleteReplayIdentity(Identity) {
+		Handles := []
+		for Handle, Entry in this.Pending {
+			for Row in Entry.Rows {
+				if Row is Map && Row.Get("replay_id", "") == Identity {
+					Handles.Push(Handle)
+					break
+				}
+			}
+		}
+		for Handle in Handles
+			this.Complete(Handle, "reload replay identity")
+	}
+
 	/** Appends an owned prefix, or completes all remaining rows before paint. */
 	Complete(Handle, Reason := "navigation", RenderFn := 0, MaxRows := 0) {
 		if !(MaxRows is Integer) || MaxRows < 0

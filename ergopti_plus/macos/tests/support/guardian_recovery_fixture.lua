@@ -36,6 +36,8 @@ local STUB_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
+	"adapters.system_info",
+	"platform.remap.deploy_pacing",
 	"infra.notifications",
 	"modules.keylogger.kc_bridge",
 	"modules.gestures.engine",
@@ -679,6 +681,13 @@ local function with_remap(options, body)
 		return true
 	end
 	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	-- Unknown input idle never delays a deploy; a case sets calls.input_idle_seconds.
+	calls.input_idle_seconds = options.input_idle_seconds
+	package.loaded["adapters.system_info"] = {
+		input_idle_seconds = function() return calls.input_idle_seconds end,
+	}
+	-- The pacing owner captures its probe at require time.
+	package.loaded["platform.remap.deploy_pacing"] = nil
 	-- Recorded, never sent: a real notice would arm its own retention timer on
 	-- the scheduler above and read as a recovery delay.
 	package.loaded["infra.notifications"] = {

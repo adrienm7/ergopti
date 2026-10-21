@@ -91,20 +91,26 @@ Test("layout: number-row hotkeys delegate to the serialised emit helpers (remap-
 
 _RECU_AssertOuterSymbolsRouteViaShiftSend() {
 	Src := _RECU_ReadSource("modules/keymap/layout.ahk")
-	; SC029 ($), SC00C (%), SC00D (=) sit outside the SC002-SC00B digit run but
-	; are still part of the same number-row block. They must delegate to
-	; _DigitShiftSend (which wraps Critical("On")) instead of calling
-	; SendNewResult directly — a bare SendNewResult has no Critical and can
-	; interleave with a neighbouring remap's SendEvent (remap-emit-critical-uneven).
+	; SC029, SC00C and SC00D sit outside the SC002-SC00B digit run. Their only
+	; number-row hotkeys reorder the three edge keys (number-row-edge-keys) and
+	; delegate to _NumberRowEdgeSend, which must type through _DigitShiftSend
+	; (which wraps Critical("On")) or the registry layout's own emit, never a
+	; bare SendNewResult: that has no Critical and can interleave with a
+	; neighbouring remap's SendEvent (remap-emit-critical-uneven).
 	for SC in ["SC029", "SC00C", "SC00D"] {
-		; Find the hotkey line for this scancode.
-		Idx := InStr(Src, SC . "::")
-		Assert(Idx > 0, SC . ":: hotkey must exist in modules/keymap/layout.ahk")
-		; Extract the rest of that line and assert it routes via _DigitShiftSend.
-		LineEnd := InStr(Src, "`n", , Idx)
-		HotkeyLine := LineEnd ? SubStr(Src, Idx, LineEnd - Idx) : SubStr(Src, Idx, 120)
-		Assert(InStr(HotkeyLine, "_DigitShiftSend(") > 0,
-			SC . ":: must delegate to _DigitShiftSend — calling SendNewResult directly bypasses Critical and allows transposition with a neighbouring remap (remap-emit-critical-uneven)")
+		for Prefix in ["`n", "`n+"] {
+			Idx := InStr(Src, Prefix . SC . "::")
+			Assert(Idx > 0, SC . ":: hotkey must exist in modules/keymap/layout.ahk")
+			LineEnd := InStr(Src, "`n", , Idx + 1)
+			HotkeyLine := LineEnd ? SubStr(Src, Idx, LineEnd - Idx) : SubStr(Src, Idx, 120)
+			Assert(InStr(HotkeyLine, "_NumberRowEdgeSend(") > 0,
+				SC . ":: must delegate to _NumberRowEdgeSend, the serialised edge-key handler (remap-emit-critical-uneven)")
+		}
 	}
+	Body := _StripFullLineComments(_DriverFuncBody("_NumberRowEdgeSend"))
+	Assert(Body != "", "_NumberRowEdgeSend must exist")
+	Assert(InStr(Body, "_DigitShiftSend(") > 0, "the edge keys type through _DigitShiftSend (remap-emit-critical-uneven)")
+	Assert(!InStr(Body, "SendNewResult("), "the edge keys never call SendNewResult directly (remap-emit-critical-uneven)")
 }
-Test("layout: SC029/SC00C/SC00D route through _DigitShiftSend (remap-emit-critical-uneven)", _RECU_AssertOuterSymbolsRouteViaShiftSend)
+Test("layout: SC029/SC00C/SC00D route through the serialised edge-key handler (remap-emit-critical-uneven)",
+	_RECU_AssertOuterSymbolsRouteViaShiftSend)

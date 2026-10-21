@@ -155,8 +155,10 @@ local function segment_font(segment, style)
 end
 
 --- Measures a segmented row: a prefix, then pieces that each have their own
---- colour, weight and size, laid out one after the other on a single line.
---- @param row table { prefix?, segments }
+--- colour, weight and size, laid out one after the other on a single line,
+--- and an optional label right-aligned on the same line (the AI tooltip's
+--- shortcut column).
+--- @param row table { prefix?, segments, label? }
 --- @param style table
 --- @param pango_layout userdata
 --- @return table { text_w, text_h, label_w, height, prefix_w, segments }
@@ -174,9 +176,13 @@ local function measure_segmented_row(row, style, pango_layout)
 		width = width + w
 		height = math.max(height, h)
 	end
+	local label_w, label_h = 0, 0
+	if row.label and row.label ~= "" then
+		label_w, label_h = measure(pango_layout, row.label, style.fonts.main, style.sizes.hint)
+	end
 	return {
-		text_w = width, text_h = height, label_w = 0, height = height,
-		prefix_w = prefix_w, segments = sizes,
+		text_w = width, text_h = height, label_w = label_w, label_h = label_h,
+		height = math.max(height, label_h), prefix_w = prefix_w, segments = sizes,
 	}
 end
 
@@ -197,7 +203,9 @@ function M.measure_rows(rows, style, pango_layout)
 		local row_w, row_h
 		if type(row.segments) == "table" then
 			metrics[i] = measure_segmented_row(row, style, pango_layout)
-			row_w, row_h = metrics[i].text_w, metrics[i].height
+			local m = metrics[i]
+			row_w = m.text_w + (m.label_w > 0 and (style.layout.label_gap + m.label_w) or 0)
+			row_h = m.height
 		else
 			local text_w, text_h = measure(pango_layout, row.text or "", style.fonts.main, style.sizes.main)
 			local label_w, label_h = 0, 0
@@ -253,11 +261,12 @@ end
 --- text beside it instead of hanging from the top.
 --- @param cr userdata Cairo context.
 --- @param pango_layout userdata
---- @param row table { prefix?, prefix_color?, segments }
+--- @param row table { prefix?, prefix_color?, segments, label?, label_color? }
 --- @param m table The row's metrics from measure_segmented_row.
 --- @param style table
 --- @param y number Top of the row.
-local function paint_segmented_row(cr, pango_layout, row, m, style, y)
+--- @param panel_w number Width of the panel, for the right-aligned label.
+local function paint_segmented_row(cr, pango_layout, row, m, style, y, panel_w)
 	local g = bind()
 	local x = style.layout.pad_x
 
@@ -280,6 +289,13 @@ local function paint_segmented_row(cr, pango_layout, row, m, style, y)
 		local font, size = segment_font(segment, style)
 		draw(segment.text or "", font, size, segment.color, m.segments[index].h)
 		x = x + m.segments[index].w
+	end
+
+	if m.label_w > 0 then
+		-- Right-aligned against the panel's inner edge, like the trigger column
+		-- of the hotstring rows, on the row's bottom edge at the hint size.
+		x = panel_w - style.layout.pad_x - m.label_w
+		draw(row.label, style.fonts.main, style.sizes.hint, row.label_color, m.label_h)
 	end
 end
 
@@ -316,7 +332,7 @@ local function paint(cr, rows, metrics, style, size, background)
 	for i, row in ipairs(rows) do
 		local m = metrics[i]
 		if type(row.segments) == "table" then
-			paint_segmented_row(cr, pango_layout, row, m, style, y)
+			paint_segmented_row(cr, pango_layout, row, m, style, y, size.w)
 			y = y + m.height + style.layout.line_spacing
 			goto continue
 		end

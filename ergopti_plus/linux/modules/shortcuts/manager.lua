@@ -4,7 +4,7 @@
 --- MODULE: Shortcuts Manager (Linux)
 --- DESCRIPTION:
 --- Text-manipulation shortcuts for Linux: wrap symbols (brackets, quotes),
---- CapsWord (auto-capitalize first letter of each word), and text transforms
+--- CapsWord (the next word typed in capitals), and text transforms
 --- (uppercase, lowercase, title case) through the session clipboard and uinput.
 ---
 --- Wrap and text transforms use the display-server-aware clipboard adapter and
@@ -18,9 +18,15 @@
 ---    modules/shortcuts/wrap_on_type.lua, run from the keyboard hook's
 ---    consumption callback; this module owns its switch
 ---    (shortcuts.wrap_text_if_selected) and the wrap-pair catalogue.
---- 2. CapsWord: toggled via menu or shortcut. When active, the next word's
----    first letter is capitalized and CapsWord auto-disengages. Hooked into
----    the daemon's on_char for per-keystroke processing.
+--- 2. CapsWord: toggled via menu, shortcut or tap action. While it is on,
+---    CapsLock is locked on the desktop (adapters/keyboard_hook,
+---    lock_caps_for_word), as Windows and macOS light theirs, so every letter
+---    reaches the application as a capital and the digits and punctuation
+---    stay what the layout's CapsLock level types. It switches itself off on
+---    what [shortcuts.caps_word] names (a delay without a keystroke, a checked
+---    delimiter, a checked pointer kind), through the shared policy and
+---    modules/shortcuts/caps_word_auto_off, and on a CapsLock press. Hooked
+---    into the daemon's on_char, control-key and pointer callbacks.
 --- 3. Text transforms: clipboard-based transforms that copy the selection,
 ---    apply a transform function, paste the result, and restore the clipboard.
 --- ==============================================================================
@@ -39,8 +45,12 @@ local EventLoop = require("adapters.event_loop")
 local ComboEmitter = require("modules.gestures.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
 local EvdevCodes = require("infra.evdev_codes")
+local Monotonic = require("infra.monotonic")
+local CapsWordPolicy = require("caps_word.auto_off")
+local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
+local _capture_text_owner = nil
 local ENABLED_PATH = "shortcuts.enabled"
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
@@ -66,6 +76,23 @@ local collision_read = TomlWriter and TomlWriter.read_classified
 local collision_decode, collision_shared = TomlCodec.decode, Paths.shared
 local collision_single_character = TextCase.is_single_character
 local collision_generation, collision_initialized = 0, false
+
+--- Retains the original native field before metrics or clipboard I/O can yield.
+--- @return table|nil publication
+local function capture_text_destination()
+	if type(_capture_text_owner) ~= "function" or _configuration_owner ~= nil then return nil end
+	local generation = collision_generation
+	local ok, destination = pcall(_capture_text_owner)
+	if not ok or type(destination) ~= "table" or getmetatable(destination) ~= nil
+		or type(destination.current) ~= "function" or type(destination.cached) ~= "function" then return nil end
+	local function check(cached)
+		if generation ~= collision_generation or _configuration_owner ~= nil then return false end
+		local checked, allowed = pcall(cached and destination.cached or destination.current)
+		return checked and allowed == true and generation == collision_generation and _configuration_owner == nil
+	end
+	if not check(false) then return nil end
+	return { current = function() return check(false) end, cached = function() return check(true) end }
+end
 local wrap_source
 local collision_json, collision_json_decode
 local collision_factory
@@ -332,15 +359,21 @@ end
 --- @param right string Closing symbol.
 function M.wrap_selection(left, right)
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Selection wrapping refused: no retained text destination."); return false end
 	record("wrap_selection")
 	if type(left) ~= "string" or type(right) ~= "string" then return false end
 	local ok, reason = Clipboard.transform_selection(function(selected)
 		return left .. selected .. right
-	end, ComboEmitter.press, EventLoop.sleep_ms)
+	end, ComboEmitter.press, EventLoop.sleep_ms, publication)
 	if ok then return true end
 	if reason == "no_selection" then
-		local result = Injector.inject(0, left .. right, false)
+		local result = Injector.inject(0, left .. right, false, nil, publication)
 		return type(result) == "table" and result.ok == true
+	end
+	if reason == "destination_changed" then
+		Logger.warn(LOG, "Selection wrapping stopped: its original text destination was retired.")
+		return false
 	end
 	Logger.error(LOG, "Selection wrapping failed: %s.", tostring(reason))
 	return false
@@ -353,12 +386,99 @@ end
 -- =========================================
 
 local _caps_word_active = false
-local _caps_word_triggered = false  -- true after first letter capitalized, waiting for word end
+-- What ends this CapsWord session on its own (modules/shortcuts/caps_word_auto_off),
+-- compiled when it was switched on; nil while CapsWord is off.
+local _caps_word_policy = nil
+-- Monotonic time of the last keystroke of the session, for the idle delay.
+local _caps_word_last_ms = nil
+-- Bumped by every session start and stop, so a queued idle check of an earlier
+-- session never ends a later one.
+local _caps_word_session = 0
 
 --- Returns whether CapsWord is currently active.
 --- @return boolean
 function M.is_caps_word_active()
 	return _caps_word_active
+end
+
+-- Both idle checks take the clock resolution off the measured gap: without
+-- luv the clock counts whole seconds, and two keys typed together would read a
+-- second apart (project-linux-coarse-clock-overstates-a-gap).
+
+--- Presses and releases CapsLock on the daemon's device: the key a CapsWord
+--- session locks and unlocks the desktop's Caps Lock with.
+--- @return boolean True when the press and the release were written.
+local function press_caps_lock()
+	return (ComboEmitter.press_codes({}, { EvdevCodes.KEY_CAPSLOCK }, "CapsWord CapsLock")) == true
+end
+
+--- Clears the session state, naming why once.
+--- @param reason string What ended it, for the log.
+local function clear_caps_word(reason)
+	_caps_word_active = false
+	_caps_word_policy, _caps_word_last_ms = nil, nil
+	_caps_word_session = _caps_word_session + 1
+	Logger.info(LOG, "CapsWord: OFF (%s).", reason)
+end
+
+--- Ends the current CapsWord session and unlocks the CapsLock it locked.
+--- @param reason string What ended it, for the log.
+local function end_caps_word(reason)
+	if not _caps_word_active then return end
+	clear_caps_word(reason)
+	-- The hook logs an unlock it could not emit; the session is over either way.
+	require("adapters.keyboard_hook").release_caps_word_lock()
+end
+
+--- Queues the idle check of one session on the daemon loop: it ends the
+--- session once the delay has passed since its last keystroke, or queues
+--- itself again for the time still left.
+--- @param session integer Session the check belongs to.
+--- @param delay_ms number Milliseconds until the earliest possible expiry.
+local function schedule_idle_check(session, delay_ms)
+	local queued = EventLoop.defer(function()
+		if session ~= _caps_word_session or not _caps_word_active or not _caps_word_policy then return end
+		local now = Monotonic.now_ms()
+		if CapsWordPolicy.idle_expired(_caps_word_policy, _caps_word_last_ms, now - Monotonic.resolution_ms()) then
+			end_caps_word("no keystroke for the configured delay")
+			return
+		end
+		schedule_idle_check(session,
+			CapsWordPolicy.idle_delay_ms(_caps_word_policy) + Monotonic.resolution_ms() - (now - _caps_word_last_ms))
+	end, math.max(0, delay_ms))
+	if not queued then Logger.error(LOG, "CapsWord idle check could not be queued; the delay will not apply.") end
+end
+
+--- Starts a CapsWord session with the settings in force now.
+--- @return boolean started
+local function start_caps_word()
+	-- Read now, not cached from boot: a scope restore or a hand edit applies to
+	-- the next CapsWord without any disk access on the input path.
+	CapsWordAutoOff.refresh()
+	local called, policy = pcall(CapsWordAutoOff.policy)
+	if not called or type(policy) ~= "table" then
+		Logger.error(LOG, "CapsWord refused: its auto-off settings do not compile: %s.", tostring(policy))
+		return false
+	end
+	-- The capitals come from CapsLock, locked on the desktop as Windows and
+	-- macOS light it: the application receives what the layout's CapsLock
+	-- level types. The hook ends the hold itself when the user presses
+	-- CapsLock, when it stops and before a dialog takes the keyboard.
+	local session = _caps_word_session + 1
+	local locked, refusal = require("adapters.keyboard_hook").lock_caps_for_word(press_caps_lock, function(reason)
+		if session == _caps_word_session and _caps_word_active then clear_caps_word(reason) end
+	end)
+	if not locked then
+		Logger.error(LOG, "CapsWord refused: CapsLock could not be locked: %s.", tostring(refusal))
+		return false
+	end
+	_caps_word_session = session
+	_caps_word_active = true
+	_caps_word_policy, _caps_word_last_ms = policy, Monotonic.now_ms()
+	local delay = CapsWordPolicy.idle_delay_ms(policy)
+	if delay then schedule_idle_check(_caps_word_session, delay) end
+	Logger.info(LOG, "CapsWord: ON (idle delay %s).", delay and (delay .. " ms") or "never")
+	return true
 end
 
 --- Toggles CapsWord on/off via the menu.
@@ -368,44 +488,83 @@ function M.toggle_caps_word()
 	record("caps_word")
 	-- Metric delivery is protected external code and can reserve configuration.
 	if _configuration_owner ~= nil then return false end
-	_caps_word_active = not _caps_word_active
-	_caps_word_triggered = false
-	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
+	if _caps_word_active then
+		end_caps_word("switched off")
+		return true
+	end
+	return start_caps_word()
+end
+
+--- Stamps a keystroke of the session and ends it when the delay before it was
+--- longer than the configured one.
+--- @return boolean active Whether CapsWord is still on.
+local function observe_caps_word_keystroke()
+	if not _caps_word_active or not _caps_word_policy then return false end
+	local now = Monotonic.now_ms()
+	if CapsWordPolicy.idle_expired(_caps_word_policy, _caps_word_last_ms, now - Monotonic.resolution_ms()) then
+		end_caps_word("no keystroke for the configured delay")
+		return false
+	end
+	_caps_word_last_ms = now
 	return true
 end
 
---- Processes a character for CapsWord.
---- Called from the daemon's on_char hook.
---- CapsWord logic: when active, capitalize the first letter of the next word,
---- then disengage until the next word boundary.
---- @param ch string The character just typed.
---- @return string|nil Modified character (upper-cased), or nil to pass through.
-function M.process_caps_word(ch)
-	if _configuration_owner ~= nil then return nil end
-	if not _caps_word_active then return nil end
-	if not TextCase.is_single_character(ch) then return nil end
-
-	-- Word boundaries: Unicode whitespace and punctuation.
-	local is_boundary = TextCase.is_word_boundary(ch)
-
-	if is_boundary then
-		-- Word boundary reached — prepare for next word.
-		_caps_word_triggered = false
-		return nil
+--- Ends CapsWord on a typed checked delimiter, before the character is processed.
+--- @param ch string Characters of one typed event.
+--- @return boolean ended
+function M.caps_word_observe_text(ch)
+	if not observe_caps_word_keystroke() then return false end
+	if CapsWordPolicy.ends_on_text(_caps_word_policy, ch) then
+		end_caps_word("delimiter typed")
+		return true
 	end
+	return false
+end
 
-	if not _caps_word_triggered then
-		-- First letter of new word — capitalize and disengage for this word.
-		_caps_word_triggered = true
-		local upper = TextCase.upper(ch)
-		if upper == ch then
-			return nil  -- already uppercase, no change needed
-		end
-		Logger.debug(LOG, "CapsWord: '%s' → '%s'.", ch, upper)
-		return upper
+--- Ends CapsWord on a control key that is a checked delimiter (a modified Tab
+--- or Enter reaches the control callback, not the text one).
+--- @param key_name string The hook's control-key name.
+--- @return boolean ended
+function M.caps_word_observe_control(key_name)
+	if not observe_caps_word_keystroke() then return false end
+	if CapsWordPolicy.is_terminator_key(key_name) and CapsWordPolicy.ends_on_key(_caps_word_policy, key_name) then
+		end_caps_word("delimiter key " .. key_name)
+		return true
 	end
+	return false
+end
 
-	return nil
+--- Ends CapsWord on a pointer event of a checked kind.
+--- @param kind string|nil Declared pointer kind; nil for an event of no kind.
+--- @return boolean ended
+function M.caps_word_observe_pointer(kind)
+	if not _caps_word_active or not _caps_word_policy or kind == nil then return false end
+	if CapsWordPolicy.ends_on_pointer(_caps_word_policy, kind) then
+		end_caps_word("pointer " .. kind)
+		return true
+	end
+	return false
+end
+
+--- Ends CapsWord on a native pointer event of a checked kind, named here so
+--- the daemon's main() captures no pointer-kind table of its own (it sits at
+--- LuaJIT's 60-upvalue limit).
+--- @param kind_of_event string "press" (a button) or "motion" (an EV_REL report).
+--- @param code integer The button's evdev code for a press.
+--- @return boolean ended
+function M.caps_word_observe_pointer_event(kind_of_event, code)
+	if not _caps_word_active then return false end
+	local kind
+	if kind_of_event == "press" then kind = CapsWordAutoOff.pointer_kind_of_button(code)
+	else kind = CapsWordAutoOff.pointer_kind_of_motion() end
+	return M.caps_word_observe_pointer(kind)
+end
+
+--- Ends a running CapsWord session from outside its own rules (a script
+--- pause), unlocking the CapsLock it locked.
+--- @param reason string What ended it, for the log.
+function M.cancel_caps_word(reason)
+	end_caps_word(reason)
 end
 
 -- =========================================
@@ -416,10 +575,12 @@ end
 
 local function transform_selection(action, transform)
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "%s refused: no retained text destination.", action); return false end
 	record(action)
 	-- Metric delivery can reserve configuration before clipboard ownership begins.
 	if _configuration_owner ~= nil then return false end
-	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
+	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms, publication)
 	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
 	return ok
 end
@@ -503,6 +664,9 @@ end
 --- @return table { [action_id] = function(binding, parameter): boolean }
 function M.action_handlers()
 	return {
+		-- A key, a key combination, a tap-hold or a gesture bound to CapsWord
+		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
+		["caps_word"] = function() return M.toggle_caps_word() end,
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,
@@ -586,10 +750,7 @@ function M.set_enabled(enabled)
 
 	_enabled = enabled
 	collision_generation = collision_generation + 1
-	if not enabled then
-		_caps_word_active = false
-		_caps_word_triggered = false
-	end
+	if not enabled then end_caps_word("shortcuts disabled") end
 	Logger.info(LOG, "Shortcuts %s.", enabled and "enabled" or "disabled")
 	return true
 end
@@ -624,6 +785,13 @@ local _wrap_on_type = DEFAULT_WRAP_ON_TYPE
 --- @return boolean
 function M.is_wrap_on_type_enabled()
 	return _wrap_on_type
+end
+
+--- Returns the runtime revision owned by an in-progress selection window.
+--- This getter performs no file, clipboard or native input queries.
+--- @return integer epoch Committed state and configuration ownership revision.
+function M.wrap_selection_epoch()
+	return collision_generation
 end
 
 --- Persists and applies the wrap-on-type switch.
@@ -680,16 +848,21 @@ function M.mark_config_reads(config, mark)
 end
 
 --- Initialises the shortcuts module.
---- @param opts table|nil { enabled?, persist?, config_path? }
+--- @param opts table|nil { enabled?, persist?, config_path?, capture_text_owner? }
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	opts = type(opts) == "table" and opts or {}
 	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
 		error("shortcuts enabled override must be a boolean")
 	end
-	-- Reset CapsWord state so init() gives a clean slate for tests.
-	_caps_word_active = false
-	_caps_word_triggered = false
+	if opts.capture_text_owner ~= nil and type(opts.capture_text_owner) ~= "function" then
+		error("shortcuts text destination capture must be a function")
+	end
+	_capture_text_owner = opts.capture_text_owner
+	-- A clean slate: a session still running unlocks its CapsLock first.
+	end_caps_word("shortcuts re-initialised")
+	_caps_word_policy, _caps_word_last_ms = nil, nil
+	_caps_word_session = _caps_word_session + 1
 	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_persist = opts.persist == true
 
@@ -774,7 +947,7 @@ function M.configuration_candidate(document)
 	if enabled == nil then enabled = Manifest.default_for(ENABLED_PATH) end
 	if wrap == nil then wrap = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY) end
 	assert(type(enabled) == "boolean" and type(wrap) == "boolean", "shortcut switches must be boolean")
-	return { enabled = enabled, wrap = wrap, caps_word_active = false, caps_word_triggered = false }
+	return { enabled = enabled, wrap = wrap, caps_word_active = false }
 end
 
 --- Captures the exact manager state without touching clipboard or input devices.
@@ -782,22 +955,24 @@ end
 --- @return table|nil state
 function M.configuration_snapshot(owner)
 	if _configuration_owner ~= owner then return nil end
-	return { enabled = _enabled, wrap = _wrap_on_type,
-		caps_word_active = _caps_word_active, caps_word_triggered = _caps_word_triggered }
+	return { enabled = _enabled, wrap = _wrap_on_type, caps_word_active = _caps_word_active }
 end
 
 --- Applies a validated runtime state without invoking independent setters.
+--- A state with CapsWord off ends a running session and unlocks its CapsLock.
+--- One with CapsWord on never starts a session: a lock is the desktop's state,
+--- not a value to restore, so a transaction that stopped CapsWord leaves it off.
 --- @param owner table Exact transaction token.
 --- @param state table Candidate or saved state.
 --- @return boolean acknowledged
 function M.apply_configuration(owner, state)
 	if _configuration_owner ~= owner or type(state) ~= "table" then return false end
-	for _, key in ipairs({ "enabled", "wrap", "caps_word_active", "caps_word_triggered" }) do
+	for _, key in ipairs({ "enabled", "wrap", "caps_word_active" }) do
 		if type(state[key]) ~= "boolean" then return false end
 	end
 	collision_generation = collision_generation + 1
 	_enabled, _wrap_on_type = state.enabled, state.wrap
-	_caps_word_active, _caps_word_triggered = state.caps_word_active, state.caps_word_triggered
+	if not state.caps_word_active then end_caps_word("shortcut configuration applied") end
 	return true
 end
 

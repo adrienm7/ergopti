@@ -20,9 +20,7 @@
 ; loses. NotifyFn is injectable so behavioural tests can count the signal
 ; without displaying a real TrayTip.
 ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
-	global ConfigurationFile
-	NewerSchema := IsSet(ConfigurationFile) && (ConfigurationFile is String)
-		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
+	NewerSchema := ConfigNewerSchemaReadOnly()
 	if NewerSchema
 		Detail := "the startup configuration uses a newer schema; update ErgoptiPlus and reload before changing settings"
 	if (Detail != "") {
@@ -49,6 +47,15 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 		try LoggerError("Config", "Could not present the persistence failure notification: {1}.", Err.Message)
 	}
 	return false
+}
+
+; True when the startup configuration was saved by a newer schema: the boot
+; migration preserved it and every write is refused for the session. The
+; refused-save notice and the menus' greyed persistence rows name this cause.
+ConfigNewerSchemaReadOnly() {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
 }
 
 ; SaveFullConfig has three explicit outcomes. Callers must compare against the
@@ -1192,6 +1199,43 @@ HS_TogglePersonalAllSections(Enable, Options := unset) {
 }
 
 /**
+ * Switches on the personal sections the user has just created. Undeclared
+ * personal sections are neutral-off like every absent setting, so a category
+ * created in an editor never loaded its hotstrings and a bundled trigger kept
+ * firing over them (issue #96). Creating one is the user's choice to use it.
+ * @param {Array} Sections Section names already committed to the personal file.
+ * @param {Map} Options Optional "live" / "reload" continuations.
+ * @returns {Integer} True when the selection was written and applied.
+ */
+HS_EnableNewPersonalSections(Sections, Options := unset) {
+	if !(Sections is Array) || !Sections.Length
+		throw ValueError("New personal sections are required.")
+	return _ConfigCommitHotstringIntent("personal", Sections, true,
+		"the new personal-hotstring section", IsSet(Options) ? Options : Map())
+}
+
+/**
+ * The sections a save adds to the personal file, in their new order.
+ * @param {Array} Before Section names on disk before the save.
+ * @param {Array} After Section names the save commits.
+ * @returns {Array} Names in After absent from Before (case-insensitive).
+ */
+HS_PersonalSectionsAdded(Before, After) {
+	Known := Map()
+	Known.CaseSense := false
+	for Name in Before
+		Known[Name] := true
+	Added := []
+	for Name in After {
+		if Name is String && Name != "-" && !Known.Has(Name) {
+			Known[Name] := true
+			Added.Push(Name)
+		}
+	}
+	return Added
+}
+
+/**
  * The manifest paths of the sections a bundled category's own submenu draws:
  * every declared section except those a layout extension binds, which its
  * « Hotstrings <extension> » submenu draws instead (InitSubMenus).
@@ -1291,12 +1335,26 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 			if PersonalPath == "" || !FSExists(PersonalPath)
 				throw Error("Personal hotstring configuration is unavailable.")
 			; A menu preview must not freeze a later admitted scope inventory.
-			for Section in ReadPersonalToml(true)["sections_order"] {
-				if Section == "-"
+			; An Array selector names the only sections to switch; each must
+			; still be in the file read under this lease.
+			OnDisk := ReadPersonalToml(true)["sections_order"]
+			Wanted := 0
+			if Selector is Array {
+				Wanted := Map()
+				Wanted.CaseSense := false
+				for Name in Selector
+					Wanted[Name] := true
+			}
+			for Section in OnDisk {
+				if Section == "-" || (Wanted is Map && !Wanted.Has(Section))
 					continue
+				if Wanted is Map
+					Wanted.Delete(Section)
 				_ConfigSeedPersonalHotstring(Desired, Section)
 				Entries.Push(Map("path", "hotstrings.personal." . StrLower(Section), "value", Bool))
 			}
+			if Wanted is Map && Wanted.Count
+				throw Error("A selected personal section is not in the personal file.")
 		default:
 			throw Error("Unknown hotstring scope: " . Kind)
 	}

@@ -71,6 +71,7 @@ helpers.initialize_timing()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
 local ModuleGroups = require("tests.support.module_groups")
+local CommandLines = require("tests.support.command_lines")
 
 -- --only accepts an exact test module path/name or a historical case-name
 -- substring, so one file or behaviour can be re-run from a red message
@@ -79,16 +80,22 @@ local ModuleGroups = require("tests.support.module_groups")
 local only_filter = nil
 local module_group = nil
 if arg then
-	for i = 1, #arg do
-		if arg[i] == "--module" then
-			module_group = arg[i + 1]
-		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-module=") then
-			module_group = arg[i]:gsub("^%-%-module=", "")
-		elseif arg[i] == "--only" then
-			only_filter = arg[i + 1]
-		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
-			only_filter = arg[i]:gsub("^%-%-only=", "")
+	local index = 1
+	while index <= #arg do
+		local option, value = arg[index]:match("^(%-%-[%w%-]+)=(.*)$")
+		local separated = option == nil
+		option = option or arg[index]
+		if option ~= "--only" and option ~= "--module" then
+			io.stderr:write("tests/run.lua: unknown argument " .. tostring(arg[index]) .. "\n")
+			os.exit(2)
 		end
+		if separated then value = arg[index + 1] end
+		if type(value) ~= "string" or value == "" or (separated and value:sub(1, 2) == "--") then
+			io.stderr:write("tests/run.lua: " .. option .. " requires a nonempty value\n")
+			os.exit(2)
+		end
+		if option == "--only" then only_filter = value else module_group = value end
+		index = index + (separated and 2 or 1)
 	end
 end
 
@@ -143,10 +150,8 @@ local function discover_tests(dir)
 	if package.config:sub(1, 1) == "\\" then
 		cmd = string.format('cmd /c dir /b /s /a-d "%s"', abs:gsub("/", "\\"))
 	else
-		cmd = string.format("find '%s' -type f -name 'test_*.lua'", abs)
+		cmd = string.format("find %s -type f -name 'test_*.lua'", shell_quote(abs))
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return results end
 	-- Build an absolute, normalized prefix to strip from each result line
 	local strip_prefix
 	if driver_root == "." then
@@ -161,7 +166,7 @@ local function discover_tests(dir)
 	else
 		strip_prefix = driver_root
 	end
-	for raw_line in pipe:lines() do
+	for _, raw_line in ipairs(CommandLines.read(cmd)) do
 		local line = raw_line:gsub("\\", "/")
 		-- Match suffix that starts after the driver root and ends in .lua
 		local rel
@@ -174,7 +179,6 @@ local function discover_tests(dir)
 			results[#results + 1] = rel:gsub("/", ".")
 		end
 	end
-	pipe:close()
 	return results
 end
 
@@ -204,13 +208,17 @@ helpers.reset_results()
 
 local discovered_modules = {}
 for _, dir in ipairs(TEST_DIRS) do
-	for _, mod_name in ipairs(discover_tests(dir)) do
+	local modules = discover_tests(dir)
+	assert(#modules > 0, "no test modules discovered in " .. dir)
+	for _, mod_name in ipairs(modules) do
 		discovered_modules[#discovered_modules + 1] = mod_name
 	end
 end
 if module_group then
 	local total = #discovered_modules
 	discovered_modules = ModuleGroups.select(discovered_modules, module_group)
+	assert(#discovered_modules > 0,
+		string.format("no test modules discovered for group %q", module_group))
 	print(string.format("Module group %q: %d of %d module(s)", module_group, #discovered_modules, total))
 end
 local modules_to_load, narrowed, case_filter = OnlySelector.select_modules(

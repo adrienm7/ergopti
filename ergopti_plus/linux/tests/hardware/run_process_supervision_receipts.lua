@@ -2,8 +2,9 @@
 --- ==============================================================================
 --- MODULE: Native Process Supervision Receipt Regression
 --- DESCRIPTION:
---- Simulates timer or stream invalidation by closing one actual libuv handle
---- before its native start. Child creation, pipes, returned EINVAL, process-group
+--- Redirects one native start to a closing fixture-owned twin to produce a
+--- genuine EINVAL. The production handle stays owned through its actual close
+--- callback. Child creation, pipes, returned EINVAL, process-group
 --- retirement and cleanup are real. This does not establish that ordinary
 --- production handles spontaneously become invalid (linux-process-supervision).
 --- ==============================================================================
@@ -23,8 +24,12 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 		return process, child_pid, code
 	end
 	local function invalidate(handle, start, ...)
-		uv.close(handle) -- Simulated invalidation of an actual native handle.
-		local accepted, message, code = start(handle, ...)
+		-- Never close somebody else's owner without its captured close callback.
+		-- A fixture twin produces the same genuine native refusal while leaving
+		-- production's handle available for its authoritative cleanup receipt.
+		local twin = operation == "timer" and uv.new_timer() or uv.new_pipe(false)
+		assert(twin); uv.close(twin)
+		local accepted, message, code = start(twin, ...)
 		native_receipt = { accepted = accepted, message = message, code = code }
 		return accepted, message, code
 	end
@@ -45,9 +50,8 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 		end)
 		assert(pid and native_receipt and native_receipt.accepted == nil and native_receipt.code == "EINVAL",
 			"fixture did not observe a native supervision refusal")
-		assert(dispatched == false and callbacks == 1,
-			"ProcessRunner accepted a child whose native " .. operation .. " supervision could not start")
-		assert(result.exit_code == -1 and result.error == "process supervision could not start")
+		assert(dispatched == false and callbacks == 0,
+			"ProcessRunner admitted dispatch or published before native cleanup ACK")
 		local deadline = uv.hrtime() + 1000000000
 		repeat
 			uv.run("nowait")
@@ -55,6 +59,7 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 			uv.sleep(5)
 		until uv.hrtime() >= deadline
 		assert(not uv.loop_alive(), "refused supervision left a live child or native handle")
+		assert(callbacks == 1 and result.exit_code == -1 and result.error == "process supervision could not start")
 		local absent, _, code = uv.kill(-pid, 0)
 		assert(absent == nil and code == "ESRCH", "refused child group survived before fixture cleanup")
 	end, debug.traceback)
@@ -65,7 +70,7 @@ for _, operation in ipairs({ "timer", "stdout", "stderr" }) do
 	assert(not uv.loop_alive(), "owned native handles survived fixture cleanup")
 	if ok then
 		assert(callbacks == 1, "late native exit published another callback")
-		print("PASS " .. operation .. " native EINVAL refused (simulated invalidation; native child and cleanup)")
+		print("PASS " .. operation .. " native EINVAL refused (controlled closing-twin port; native child and cleanup)")
 	else
 		failures = failures + 1
 		io.stderr:write("FAIL " .. operation .. ": " .. tostring(err) .. "\n")

@@ -69,21 +69,19 @@ _GSWO_FakeFileExists(Path) {
 _GSWO_FakePublishFile(Stage, Destination) {
 	global _GSWO_ExistingFiles, _GSWO_FilePublishes
 	_GSWO_FilePublishes += 1
-	if !_GSWO_ExistingFiles.Get(Stage, false)
-		return false
-	_GSWO_ExistingFiles.Delete(Stage)
+	if !_GSWO_ExistingFiles.Get(Stage, false) || _GSWO_ExistingFiles.Get(Destination, false)
+		return Map("published", false, "snapshot", 0)
 	_GSWO_ExistingFiles[Destination] := true
-	return true
+	return Map("published", true, "snapshot", Map("fake_owned_path", Destination))
 }
 
 _GSWO_FakePublishFilePartialFailure(Stage, Destination) {
 	global _GSWO_ExistingFiles, _GSWO_FilePublishes
 	_GSWO_FilePublishes += 1
-	if !_GSWO_ExistingFiles.Get(Stage, false)
-		return false
-	_GSWO_ExistingFiles.Delete(Stage)
+	if !_GSWO_ExistingFiles.Get(Stage, false) || _GSWO_ExistingFiles.Get(Destination, false)
+		return Map("published", false, "snapshot", 0)
 	_GSWO_ExistingFiles[Destination] := true
-	return false
+	return Map("published", false, "snapshot", Map("fake_owned_path", Destination))
 }
 
 _GSWO_FakePublishClipboard(Stage) {
@@ -91,10 +89,10 @@ _GSWO_FakePublishClipboard(Stage) {
 	global _GSWO_ClipboardSequence, _GSWO_ClipboardHasImage
 	_GSWO_ClipboardPublishes += 1
 	if !_GSWO_ExistingFiles.Get(Stage, false)
-		return false
+		return Map("published", false, "sequence", 0)
 	_GSWO_ClipboardSequence += 1
 	_GSWO_ClipboardHasImage := true
-	return true
+	return Map("published", true, "sequence", _GSWO_ClipboardSequence)
 }
 
 _GSWO_FakePublishClipboardPartialFailure(Stage) {
@@ -102,11 +100,11 @@ _GSWO_FakePublishClipboardPartialFailure(Stage) {
 	global _GSWO_ClipboardSequence, _GSWO_ClipboardHasImage
 	_GSWO_ClipboardPublishes += 1
 	if !_GSWO_ExistingFiles.Get(Stage, false)
-		return false
+		return Map("published", false, "sequence", 0)
 	; Models EmptyClipboard succeeding before SetClipboardData fails.
 	_GSWO_ClipboardSequence += 1
 	_GSWO_ClipboardHasImage := false
-	return false
+	return Map("published", false, "sequence", _GSWO_ClipboardSequence)
 }
 
 _GSWO_FakeCleanupStage(Path) {
@@ -117,8 +115,9 @@ _GSWO_FakeCleanupStage(Path) {
 	return true
 }
 
-_GSWO_FakeRollbackFile(Path) {
+_GSWO_FakeRollbackFile(Path, Snapshot) {
 	global _GSWO_ExistingFiles, _GSWO_FileRollbacks
+	AssertEqual(Path, Snapshot["fake_owned_path"], "the fake rollback must receive its publisher ownership receipt")
 	_GSWO_FileRollbacks += 1
 	if _GSWO_ExistingFiles.Has(Path)
 		_GSWO_ExistingFiles.Delete(Path)
@@ -690,7 +689,7 @@ _GSWO_AllEntryPointsShareOwnership() {
 	Assert(InStr(DirectScript, "Clipboard]::SetImage") = 0
 		&& InStr(DirectScript, "Stage") > 0 && InStr(DirectScript, '"Bmp"') > 0,
 		"direct workers may write only a private stage, never the clipboard")
-	Assert(InStr(DefaultClipboardPublish, "CB_WriteBitmapFile(Stage)") > 0
+	Assert(InStr(DefaultClipboardPublish, "CB_WriteBitmapFile(Stage, &MutationSequence)") > 0
 		&& InStr(ClipboardPublish, "LoadImageW") > 0
 		&& InStr(ClipboardPublish, "SetClipboardData") > 0
 		&& InStr(ClipboardPublish, "_CB_BeginOwnedMutation") > 0,
@@ -715,9 +714,11 @@ _GSWO_AllEntryPointsShareOwnership() {
 	Assert(InStr(CancelWorker, 'Reason == "shutdown"') > 0
 		&& InStr(CancelWorker, "_GestureScreenshotCleanupStage") > 0,
 		"shutdown cancellation must clean a stage which already exists before AHK exits")
-	Assert(InStr(TreeSpawner,
-		"handle.requestTerminate := _SR_TreeOwnedRequestTerminate") > 0
-		&& InStr(TreeSpawner, "_SR_TreeHandleTerminate(state, true)") > 0,
+	TreeConstructor := _DriverFuncBody("_SR_NewTreeOwnedTask")
+	Assert(TreeConstructor != "", "the canonical tree constructor must exist")
+	Assert(InStr(TreeSpawner, "_SR_NewTreeOwnedTask(") > 0
+		&& InStr(TreeConstructor, "handle.requestTerminate := _SR_TreeOwnedRequestTerminate") > 0
+		&& InStr(TreeConstructor, "_SR_TreeHandleTerminate(state, true)") > 0,
 		"screenshot cancellation must retain completion ownership while using the synchronous native tree fence")
 	Assert(RegExMatch(TreeCreate,
 		"\b([A-Za-z_][A-Za-z0-9_]*)\s*:=\s*PLC_CreateProcessWithInheritedHandles\b", &CreatePort) > 0,
@@ -759,3 +760,11 @@ _GSWO_AllEntryPointsShareOwnership() {
 
 Test("screenshot-worker-ownership: every entry point and lifecycle boundary shares one owner",
 	_GSWO_AllEntryPointsShareOwnership)
+
+#Include test_screenshot_region_startup.ahk
+
+#Include test_screenshot_region_sequence.ahk
+
+#Include test_screenshot_file_publication.ahk
+
+#Include test_screenshot_clipboard_publication.ahk

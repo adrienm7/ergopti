@@ -138,9 +138,12 @@ class PersonalFileControls {
 	static Refresh() {
 		global ConfigurationFile
 		Inventory := this.Scan(), Owners := Map()
-		Stored := TOML_ParseFreshFileTyped(ConfigurationFile)
-		if TOML_ReadFailed(ConfigurationFile)
+		Content := FileExist(ConfigurationFile) ? FSReadUtf8Exact(ConfigurationFile) : ""
+		if !(Content is String)
 			throw Error("The personal-file activation configuration is unreadable.")
+		; Dynamic choices may be dotted assignments or inline containers. Read
+		; their typed semantic tree without publishing another boot snapshot.
+		Stored := ConfigTomlDecodeSnapshot(Content).Document
 		for Record in Inventory {
 			if Record["admitted"] && Record["exclusive"] {
 				Owner := PersonalFileAdoptedOwner(Record, Stored)
@@ -176,23 +179,31 @@ class PersonalFileControls {
 		Count := 0
 		for Id, Owner in this.owners
 			Count += Owner.ActiveCount()
-		; Sources without an exclusive gate retain their generic registration.
-		for Record in this.inventory {
-			if !this.owners.Has(Record["owner"])
-				Count += Record.Get("count", 0)
-		}
 		return Count
 	}
 
-	/** Load real native mappings through an explicit owner, retaining generic unavailable packs. */
+	/**
+	 * The identity gate the live engine and the preview share: only a source the
+	 * adoption admitted with an exclusive owner is active. A refused source (an
+	 * alias of the primary or of another file, an ambiguous or unreadable one)
+	 * stays unavailable, as on macOS and Linux; loading it as a whole-file pack
+	 * fired the primary's mappings a second time, past the personal category gate.
+	 */
+	static ActiveOwner(Record) {
+		return this.owners.Get(Record["owner"], 0)
+	}
+
+	/** Load real native mappings only through their adopted owner. */
 	static Register() {
 		this.Refresh()
 		for Record in this.inventory {
 			Pack := Record["pack"]
-			if this.owners.Has(Record["owner"])
-				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"], this.owners[Record["owner"]])
+			Owner := this.ActiveOwner(Record)
+			if Owner
+				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"], Owner)
 			else
-				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"])
+				LoggerWarn("PersonalFiles", "Personal hotstring file '{1}' is not loaded ({2}): it stays unavailable until its identity is unique and readable.",
+					Pack["Path"], Record.Get("reason", "unavailable-owner"))
 		}
 	}
 
@@ -200,10 +211,8 @@ class PersonalFileControls {
 	static BuildPreview(Index, TriggerSet) {
 		for Record in this.inventory {
 			Pack := Record["pack"]
-			if this.owners.Has(Record["owner"])
-				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"], this.owners[Record["owner"]])
-			else
-				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"])
+			if Owner := this.ActiveOwner(Record)
+				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"], Owner)
 		}
 	}
 }
@@ -224,8 +233,10 @@ class PersonalFileAdoptedOwner {
 		this.parsed := Record["parsed"]
 		this.parsedContent := PersonalFileControls.ParseContent(this.content)
 		this.config := this.ReadMetadata(this.parsedContent)
-		this.groups := Stored.Get("hotstrings.groups", Map())
-		this.sections := Stored.Get("hotstrings.modules." . TOML_RenderKey(this.id), Map())
+		Groups := _TOML_DocumentLookup(Stored, ["hotstrings", "groups"])
+		Sections := _TOML_DocumentLookup(Stored, ["hotstrings", "modules", this.id])
+		this.groups := Groups.Get("value", 0) is Map ? Groups["value"] : Map()
+		this.sections := Sections.Get("value", 0) is Map ? Sections["value"] : Map()
 		this.sectionNames := Map(), this.counts := Map(), Current := ""
 		global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 		loop parse, this.parsedContent, "`n", "`r" {

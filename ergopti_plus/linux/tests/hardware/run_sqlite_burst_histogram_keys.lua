@@ -6,7 +6,8 @@
 --- CLI reads json_valid and json_each/hex(key), proving key bytes and repeated
 --- merge counts without the writer's JSON encoder or reader projection. Normal
 --- collection uses numeric and 500+ labels; custom supplied labels exercise the
---- public writer boundary. NUL key projection is outside this regression.
+--- public writer boundary. A NUL key survives a merge beside its own prefix
+--- (linux-sqlite-nul-map-keys).
 --- ==============================================================================
 
 local uv = require("luv")
@@ -88,9 +89,19 @@ check("real SQLite statement refusal leaves the row unchanged and allows retry",
 	assert(query("SELECT count_total,length_buckets_json FROM agg_app_day_burst WHERE app='owned-key-1';") == '3|{"10":6}\n')
 end)
 
+check("a NUL key merges beside its own prefix instead of collapsing into it", function()
+	local row = { date = "2000-01-01", app = "owned-nul", count_total = 1, length_buckets = { ["a\0b"] = 1, a = 10 } }
+	assert(Writer.upsert_burst("owned-burst", row))
+	assert(Writer.upsert_burst("owned-burst", row), "second public write refused")
+	assert(query("SELECT json_valid(length_buckets_json) FROM agg_app_day_burst WHERE app='owned-nul';") == "1\n")
+	assert(query("SELECT hex(key)||'|'||value FROM agg_app_day_burst,json_each(length_buckets_json)"
+		.. " WHERE app='owned-nul' ORDER BY hex(key);") == "61|20\n610062|2\n",
+		"json_group_object cut the NUL key into a second prefix key")
+end)
+
 Writer.close_db()
 for name in uv.fs_scandir_next, assert(uv.fs_scandir(root)) do assert(uv.fs_unlink(root .. "/" .. name)) end
 assert(uv.fs_rmdir(root))
-assert(checks == 18, "native histogram regression check floor changed")
+assert(checks == 19, "native histogram regression check floor changed")
 print(string.format("Native SQLite burst histogram keys: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

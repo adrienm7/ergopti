@@ -16,7 +16,7 @@
 --- is exactly why a second violation survived 3099 green tests: context_tracker
 --- held no reference to the pause predicate at all, so app switches, window
 --- TITLES and native-autocorrect events kept being recorded while paused. Their
---- drivers (hs.window.filter, ProcessLifecycle.onAppActivate, the AX observer)
+--- drivers (the browser window watchers, ProcessLifecycle.onAppActivate, the AX observer)
 --- are torn down only by keylogger.M.stop(), which pause never calls.
 ---
 --- Per `project-ahk-guard-tests-must-loop-the-class`, a guard test must enumerate
@@ -42,7 +42,7 @@ helpers.describe("keylogger: pause guard precedes the mouse/flagsChanged branche
 		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		local src = helpers.read_driver_source("local function ensure_browser_window_watchers")
 		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		local hk = src:find("local function handle_key", 1, true)

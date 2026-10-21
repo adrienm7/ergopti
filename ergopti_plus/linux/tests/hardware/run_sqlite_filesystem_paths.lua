@@ -169,6 +169,25 @@ check("public software keylogger events flush into the selected literal database
 	assert(read(root .. "/public.sqlite") == public_decoy_before, "public flush changed the decoy database")
 end)
 
+
+check("an open store survives a refused path switch and explicit close admits the next store", function()
+	Writer.close_db()
+	local original, replacement = root .. "/owner-a.sqlite", root .. "/owner-b.sqlite"
+	assert(Writer.open_db(original))
+	assert(Writer.set_meta("owned-store", "original"))
+	assert(Writer.open_db(replacement) == false, "database ownership changed without explicit close")
+	assert(Writer.get_db_path() == original and Writer.is_available(), "refused switch lost the original store")
+	assert(not uv.fs_lstat(replacement), "refused switch created or migrated another database")
+	assert(Writer.set_meta("owned-store", "retained"), "refusal disabled writes to the original store")
+	Writer.close_db()
+	assert(Writer.open_db(replacement), "explicit close did not permit canonical bootstrap of the replacement")
+	assert(Writer.set_meta("owned-store", "replacement"))
+	Writer.close_db()
+	assert(Writer.open_db(original))
+	assert(Writer.get_meta("owned-store") == "retained", "switching stores changed the original data")
+	Writer.close_db()
+end)
+
 assert(uv.chdir(initial_cwd))
 for variable, value in pairs(original_xdg) do
 	if value == false then assert(uv.os_unsetenv(variable)) else assert(uv.os_setenv(variable, value)) end
@@ -181,6 +200,6 @@ local function remove_owned(path)
 	else assert(uv.fs_unlink(path)) end
 end
 remove_owned(root)
-assert(checks == 35, "native regression check floor changed")
+assert(checks == 36, "native regression check floor changed")
 print(string.format("Native SQLite filesystem paths: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

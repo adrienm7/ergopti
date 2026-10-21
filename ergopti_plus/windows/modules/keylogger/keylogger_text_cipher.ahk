@@ -216,7 +216,7 @@ KL_Enc_IsAvailable() {
 KL_Enc_Encrypt(deviceId, eventId, plaintext) {
 		if (!KL_ENC_Enabled)
 				return plaintext
-		if (Type(plaintext) != "String" || plaintext = "")
+		if (Type(plaintext) != "String" || StrLen(plaintext) = 0)
 				return plaintext
 		if (KL_Enc_IsEncrypted(plaintext))
 				return plaintext
@@ -253,7 +253,9 @@ KL_Enc_Decrypt(value) {
 				return ""
 		ivHex := SubStr(rest, 1, sepPos - 1)
 		b64   := SubStr(rest, sepPos + StrLen(KL_ENC_SEPARATOR))
-		if (StrLen(ivHex) != KL_ENC_IV_BYTES * 2)
+		; Match the shared codec's unwrap contract before native key work or hex
+		; conversion: a corrupt stored IV is a refused envelope, not an exception.
+		if (StrLen(ivHex) != KL_ENC_IV_BYTES * 2 || !RegExMatch(ivHex, "\A[0-9a-fA-F]+\z"))
 				return ""
 
 		key := _KL_Enc_EnsureKey()
@@ -269,7 +271,8 @@ KL_Enc_Decrypt(value) {
 		plain := CryptoAesCbc(key, ivBuf, cipher.Ptr, cipher.Size, false)
 		if (plain = "")
 				return ""
-		return StrGet(plain.Ptr, plain.UsedSize, "UTF-8")
+		; Negative length decodes the exact byte image, including embedded NUL.
+		return StrGet(plain.Ptr, -plain.UsedSize, "UTF-8")
 }
 
 ; Test seam: forces the machine id and clears the cached key. Pass "" to force

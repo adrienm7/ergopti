@@ -54,7 +54,8 @@ class _LSP_SourceOperationObserver {
 		global _LLM_Menu
 		this.FullAdmissions += 1
 		Accepted := this.OriginalAdmit.Call(Owner)
-		if this.Kind == "final_context" && this.FullAdmissions == 2 && Accepted {
+		; A source operation's only full admission is its final one.
+		if this.Kind == "final_context" && this.FullAdmissions == 1 && Accepted {
 			_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
 			this.Mutated := true
 		}
@@ -105,7 +106,8 @@ _LSP_SourceOperationBody(ReadIndex, Kind, World) {
 		if Kind == "nominal" {
 			AssertTrue(World.Owner.Current(World.Receipt))
 			AssertEqual(4, Observed.Reads, "all four external snapshot fences remain active")
-			AssertEqual(2, Observed.FullAdmissions, "one source operation has full initial and final admission")
+			AssertEqual(1, Observed.FullAdmissions,
+				"one source operation pays one full admission, after its reads (llm-source-current-single-admission)")
 		} else if Kind == "default_full" {
 			Held := World.Owner._Held(World.Receipt)
 			AssertTrue(World.Owner._NativeCurrent(Held))
@@ -115,7 +117,7 @@ _LSP_SourceOperationBody(ReadIndex, Kind, World) {
 			AssertFalse(World.Owner.Current(World.Receipt), "changed source, registry or context cannot mint currentness")
 			AssertTrue(Observed.Mutated, "the actual designated external-read or final-admission seam must execute")
 			if Kind == "registry" || Kind == "future" || Kind == "malformed" || Kind == "final_context"
-				AssertEqual(2, Observed.FullAdmissions, "persistent schema or registry refusal is rechecked at the final boundary")
+				AssertEqual(1, Observed.FullAdmissions, "persistent schema or registry refusal is rechecked at the final boundary")
 		}
 		AssertEqual(0, World.ApplyCalls, "read-only validation cannot publish RAM or initiate application")
 	} finally Observed.Restore()
@@ -145,7 +147,8 @@ _LSP_CaptureOperationBody(ReadIndex, Kind, World) {
 		if Kind == "nominal" {
 			AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
 			AssertEqual(6, Observed.Reads, "capture retains its two acquisitions and four external image rechecks")
-			AssertEqual(4, Observed.FullAdmissions, "capture avoids repeating full admission after each initial read")
+			AssertEqual(2, Observed.FullAdmissions,
+				"capture pays one opening and one closing full admission (llm-source-current-single-admission)")
 		} else {
 			AssertFalse(Receipt is LLM_Menu_ApiPrivateSourceReceipt,
 				"source, registry or context replacement cannot issue initial authority")

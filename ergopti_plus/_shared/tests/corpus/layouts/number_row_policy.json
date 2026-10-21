@@ -288,5 +288,187 @@
 			"shift": false
 		}
 	],
-	"invalid_modes": [false, true, 0, 1, 2, "", "Native", "DIGITS", "symbols ", "future", {}, []]
+	"invalid_modes": [false, true, 0, 1, 2, "", "Native", "DIGITS", "symbols ", "future", {}, []],
+	"availability": [
+		{
+			"id": "symbols_unshifted_digits_on_shift",
+			"note": "AZERTY: only digits first can reorder the row",
+			"plain": ["&", "é", "\"", "'", "(", "-", "è", "_", "ç", "à"],
+			"shift": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"digits": "",
+			"symbols": "already_symbols_first"
+		},
+		{
+			"id": "digits_unshifted_symbols_on_shift",
+			"note": "US QWERTY, Ergo-L: only symbols first can reorder the row",
+			"plain": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"shift": ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
+			"digits": "already_digits_first",
+			"symbols": ""
+		},
+		{
+			"id": "digits_on_both",
+			"note": "Ergopti, Ergopti+: base equals Shift",
+			"plain": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"shift": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"digits": "digits_on_both",
+			"symbols": "digits_on_both"
+		},
+		{
+			"id": "symbols_on_both",
+			"note": "no digit on either level",
+			"plain": ["&", "é", "\"", "'", "(", "-", "è", "_", "ç", "à"],
+			"shift": ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
+			"digits": "symbols_on_both",
+			"symbols": "symbols_on_both"
+		},
+		{
+			"id": "no_level",
+			"note": "neither level types anything",
+			"plain": ["", "", "", "", "", "", "", "", "", ""],
+			"shift": ["", "", "", "", "", "", "", "", "", ""],
+			"digits": "no_digits",
+			"symbols": "no_digits"
+		},
+		{
+			"id": "symbols_unshifted_nothing_on_shift",
+			"note": "no digit, Shift types nothing",
+			"plain": ["&", "é", "\"", "'", "(", "-", "è", "_", "ç", "à"],
+			"shift": ["", "", "", "", "", "", "", "", "", ""],
+			"digits": "no_digits",
+			"symbols": "no_digits"
+		},
+		{
+			"id": "digits_only_on_shift_nothing_unshifted",
+			"note": "swapping would leave Shift empty",
+			"plain": ["", "", "", "", "", "", "", "", "", ""],
+			"shift": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"digits": "incomplete",
+			"symbols": "incomplete"
+		},
+		{
+			"id": "digits_only_unshifted_nothing_on_shift",
+			"note": "swapping would leave the base level empty",
+			"plain": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"shift": ["", "", "", "", "", "", "", "", "", ""],
+			"digits": "incomplete",
+			"symbols": "incomplete"
+		},
+		{
+			"id": "dead_key_symbol",
+			"note": "a dead key counts as a symbol",
+			"plain": ["dead:^", "é", "\"", "'", "(", "-", "è", "_", "ç", "à"],
+			"shift": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"digits": "",
+			"symbols": "already_symbols_first"
+		},
+		{
+			"id": "mixed_one_key_differs",
+			"note": "nine AZERTY keys and one direct digit: no option reorders all ten keys",
+			"plain": ["1", "é", "\"", "'", "(", "-", "è", "_", "ç", "à"],
+			"shift": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+			"digits": "mixed",
+			"symbols": "mixed"
+		}
+	],
+	"effective": [
+		{
+			"mode": "native",
+			"availability": "symbols_unshifted_digits_on_shift",
+			"effective": "native",
+			"reason": ""
+		},
+		{
+			"mode": "digits",
+			"availability": "symbols_unshifted_digits_on_shift",
+			"effective": "digits",
+			"reason": ""
+		},
+		{
+			"mode": "symbols",
+			"availability": "symbols_unshifted_digits_on_shift",
+			"effective": "native",
+			"reason": "already_symbols_first"
+		},
+		{
+			"mode": "digits",
+			"availability": "digits_unshifted_symbols_on_shift",
+			"effective": "native",
+			"reason": "already_digits_first"
+		},
+		{
+			"mode": "symbols",
+			"availability": "digits_unshifted_symbols_on_shift",
+			"effective": "symbols",
+			"reason": ""
+		},
+		{
+			"mode": "digits",
+			"availability": "digits_on_both",
+			"effective": "native",
+			"reason": "digits_on_both"
+		},
+		{
+			"mode": "symbols",
+			"availability": "digits_on_both",
+			"effective": "native",
+			"reason": "digits_on_both"
+		},
+		{
+			"mode": "digits",
+			"availability": "mixed_one_key_differs",
+			"effective": "native",
+			"reason": "mixed"
+		}
+	],
+	"edges": [
+		{
+			"id": "azerty",
+			"note": "AZERTY: the key left of 1 types nothing with Shift",
+			"ordering": "digits",
+			"plain": ["²", ")", "="],
+			"shift": ["", "°", "+"],
+			"expected": "edges_incomplete"
+		},
+		{
+			"id": "us_qwerty",
+			"note": "US QWERTY: every edge key types two symbols",
+			"ordering": "symbols",
+			"plain": ["`", "-", "="],
+			"shift": ["~", "_", "+"],
+			"expected": ""
+		},
+		{
+			"id": "ergopti",
+			"note": "the Ergopti row: $, % and = with their Shift symbols",
+			"ordering": "digits",
+			"plain": ["$", "%", "="],
+			"shift": ["€", "% ", "º"],
+			"expected": ""
+		},
+		{
+			"id": "dead_key",
+			"note": "a dead key counts as a symbol",
+			"ordering": "symbols",
+			"plain": ["dead:^", "-", "="],
+			"shift": ["~", "_", "+"],
+			"expected": ""
+		},
+		{
+			"id": "same_levels",
+			"note": "an edge key typing the same thing on both levels gains nothing",
+			"ordering": "digits",
+			"plain": ["$", "%", "="],
+			"shift": ["$", "€", "+"],
+			"expected": "edges_same"
+		},
+		{
+			"id": "no_ordering",
+			"note": "no ordering applies to the digit keys",
+			"ordering": "native",
+			"plain": ["`", "-", "="],
+			"shift": ["~", "_", "+"],
+			"expected": "no_ordering"
+		}
+	]
 }

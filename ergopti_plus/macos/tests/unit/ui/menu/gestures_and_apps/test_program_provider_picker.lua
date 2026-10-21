@@ -12,6 +12,7 @@ local function fixture(body)
 	local ok, failure = xpcall(function()
 		package.loaded.program_provider_picker = nil
 		package.loaded["ui.action_picker"] = nil
+		package.loaded["ui.webview_controller_pool"] = nil
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.paths"] = { shared = function() return "/controlled/shared" end }
@@ -27,9 +28,9 @@ local function fixture(body)
 			f.owners[#f.owners + 1] = owner
 			return owner
 		end }
-		_G.hs = { webview = { usercontent = { new = function()
-			local content = {}
-			function content:setCallback(callback) self.callback = callback end
+		_G.hs = { webview = { usercontent = { new = function(name)
+			local content = { name = name }
+			function content:setCallback(callback) self.callback = callback; return self end
 			f.content = content
 			return content
 		end } }, json = { encode = function(payload) f.payload = payload; return "{}" end } }
@@ -37,7 +38,7 @@ local function fixture(body)
 			get_app_geometry = function() return { width = 600, height = 500 } end,
 			get_centered_frame = function() return {} end,
 			show_webview = function(options)
-				local page = { options = options, content = options.usercontent, scripts = {}, deletes = 0 }
+				local page = { options = options, content = options.usercontent, callback = options.usercontent.callback, scripts = {}, deletes = 0 }
 				function page:evaluateJavaScript(script) self.scripts[#self.scripts + 1] = script end
 				function page:delete()
 					self.deletes = self.deletes + 1
@@ -70,7 +71,7 @@ local function fixture(body)
 			end)
 		end
 		function f.message(page, body)
-			page.content.callback({ body = body })
+			page.callback({ name = page.content.name, webView = page, body = body })
 		end
 		function f.confirm(page, key)
 			f.message(page, { action = "confirm", id = "run_program", providerKey = key or "opaque-choice", programArguments = {} })

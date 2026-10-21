@@ -304,23 +304,71 @@ _LLM_Menu_ToggleAutoProfileCandidate(Candidate) {
 ; ====================================
 ; ====================================
 
+_LLM_Menu_ProfilePorts(Port) {
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("Profile dialogs require an optional native port Map.")
+	return Port is Map ? Port : Map()
+}
+
+_LLM_Menu_ProfileSourceBound(Source) {
+	global ConfigurationFile, _LLM_Menu
+	return Source is Map && Source.Get("path", 0) is String
+		&& Source.Get("content", 0) is String && Source.Get("present", -1) is Integer
+		&& (Source["present"] == 0 || Source["present"] == 1)
+		&& Source.Get("menu", 0) is Map
+		&& ConfigurationFile == Source["path"] && _LLM_Menu == Source["menu"]
+}
+
+_LLM_Menu_CaptureProfileSource() {
+	global ConfigurationFile, _LLM_Menu
+	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String) || ConfigurationFile == ""
+			|| !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	Source := Map("path", ConfigurationFile, "menu", _LLM_Menu, "present", 0, "content", "")
+	if !ConfigFullStateCanPersist() || !_LLM_Menu_ProfileSourceBound(Source)
+		return false
+	try {
+		Source["present"] := FSStrictExists(Source["path"])
+		if !_LLM_Menu_ProfileSourceBound(Source)
+			return false
+		Source["content"] := Source["present"] ? FSConfigReadUtf8Exact(Source["path"]) : ""
+	} catch
+		return false
+	return _LLM_Menu_ProfileSourceBound(Source) ? Source : false
+}
+
+_LLM_Menu_WriteProfileSource(Source, Path, Updates) {
+	if !_LLM_Menu_ProfileSourceBound(Source) || !(Path == Source["path"])
+		return false
+	; The native writer retains this exact pre-dialog image through stage and
+	; replacement; a fresh schema admission must not adopt later external edits.
+	return TOML_ConfigBatchWrite(Path, Updates, [],
+		_LLM_Menu_ProfileSourceBound.Bind(Source), Source["content"], Source["present"])
+}
+
 /**
  * Shows a context sub-menu style dialog for a user profile (use / edit / delete).
  * AHK has no native submenu on the fly; we show a MsgBox with button choices.
  * @param {Map} profile - The user profile Map object.
  */
-LLM_Menu_OnUserProfileClick(profile) {
+LLM_Menu_OnUserProfileClick(profile, Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_OnUserProfileClick(profile)
+		try return LLM_Menu_OnUserProfileClick(profile, Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	Options := _LLM_Menu_ProfilePorts(Port)
+	Source := _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map)
+		return ConfigReportPersistenceFailure("the custom LLM profile action", Options.Get("notify", 0),
+			"the opening configuration source is unavailable")
+	ConfirmFn := Options.Get("confirm", Ui_MsgBox)
 	pid    := profile.Has("id")    ? profile["id"]    : ""
 	plabel := profile.Has("label") ? profile["label"] : pid
 
-	choice := Ui_MsgBox(
+	choice := ConfirmFn.Call(
 		t("menu.profiles.use_profile") . "`n"
 		. t("menu.profiles.edit_profile") . "`n"
 		. t("menu.profiles.delete_profile"),
@@ -329,17 +377,23 @@ LLM_Menu_OnUserProfileClick(profile) {
 	)
 
 	if (choice == "Yes") {
-		; Use this profile
-		LLM_Menu_SetProfile(pid)
+		; Use this profile through the same opening image as the management dialog.
+		LLM_Menu_CommitMutation("the LLM profile selection",
+			(Candidate) => _LLM_Menu_SetProfileCandidate(Candidate, pid),
+			Options.Get("apply", _LLM_Menu_ApplyManualProfileCommitted),
+			_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+			Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 	} else if (choice == "No") {
 		; Edit this profile
-		LLM_Menu_PromptEditProfile(profile)
+		LLM_Menu_PromptEditProfile(profile, Port, Source)
 	} else if (choice == "Cancel") {
-		confirm := Ui_MsgBox(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
+		confirm := ConfirmFn.Call(t("menu.profiles.delete_profile") . " ?", plabel, "4 48")
 		if (confirm == "Yes") {
 			return LLM_Menu_CommitMutation("the custom LLM profile removal",
 				(Candidate) => _LLM_Menu_DeleteProfileCandidate(Candidate, pid),
-				_LLM_Menu_ApplyProfileCommitted)
+				Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
+				_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+				Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 		}
 	}
 	return true
@@ -613,24 +667,32 @@ _LLM_Menu_CloneProfileRow(OpenFn, PausedFn := 0) {
 /**
  * Opens InputBox dialogs to create a new user profile (label + prompt).
  */
-LLM_Menu_PromptCreateProfile() {
+LLM_Menu_PromptCreateProfile(Port := 0) {
 	if A_IsSuspended
 		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_PromptCreateProfile()
+		try return LLM_Menu_PromptCreateProfile(Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	Options := _LLM_Menu_ProfilePorts(Port)
+	Source := _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map)
+		return ConfigReportPersistenceFailure("the custom LLM profile creation", Options.Get("notify", 0),
+			"the opening configuration source is unavailable")
+	if A_IsSuspended
+		return false
+	InputFn := Options.Get("input", Ui_InputBox)
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
 	; to the native InputBox wizard below when the WebView2 runtime is absent.
-	if _PromptEdWeb_TryOpen(0)
+	if _PromptEdWeb_TryOpen(0, Source)
 		return
 
 	; Step 1: label
-	ib_label := Ui_InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
+	ib_label := InputFn.Call(t("menu.profiles.prompt_label"), t("menu.profiles.create_profile"), "w450 h120")
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &plabel)
 		return
 
@@ -638,7 +700,7 @@ LLM_Menu_PromptCreateProfile() {
 		return false
 
 	; Step 2: system prompt (multi-line via Edit control)
-	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
+	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.create_profile"), "w520 h320")
 	if (ib_prompt.Result != "OK")
 		return
 	system_single := ib_prompt.Value
@@ -659,7 +721,9 @@ LLM_Menu_PromptCreateProfile() {
 
 	return LLM_Menu_CommitMutation("the custom LLM profile creation",
 		(Candidate) => _LLM_Menu_AddProfileCandidate(Candidate, new_profile),
-		_LLM_Menu_ApplyProfileCommitted)
+		Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
+		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 }
 
 _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
@@ -674,34 +738,42 @@ _LLM_Menu_AddProfileCandidate(Candidate, Profile) {
  * Opens InputBox dialogs to edit an existing user profile in place.
  * @param {Map} profile - The user profile to edit.
  */
-LLM_Menu_PromptEditProfile(profile) {
+LLM_Menu_PromptEditProfile(profile, Port := 0, OpeningSource := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return LLM_Menu_PromptEditProfile(profile)
+		try return LLM_Menu_PromptEditProfile(profile, Port, OpeningSource)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	Options := _LLM_Menu_ProfilePorts(Port)
+	Source := OpeningSource is Map ? OpeningSource : _LLM_Menu_CaptureProfileSource()
+	if !(Source is Map) || !_LLM_Menu_ProfileSourceBound(Source)
+		return ConfigReportPersistenceFailure("the custom LLM profile edit", Options.Get("notify", 0),
+			"the opening configuration source is unavailable")
+	InputFn := Options.Get("input", Ui_InputBox)
 	pid := profile.Has("id") ? profile["id"] : ""
 
 	; Prefer the shared WebView2 editor (identical rich UI to macOS). Falls back
 	; to the native InputBox wizard below when the WebView2 runtime is absent.
-	if _PromptEdWeb_TryOpen(profile)
+	if _PromptEdWeb_TryOpen(profile, Source)
 		return
 
-	ib_label := Ui_InputBox(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
+	ib_label := InputFn.Call(t("menu.profiles.prompt_label"), t("menu.profiles.edit_profile"), "w450 h120",
 		profile.Has("label") ? profile["label"] : "")
 	if !_LLM_Menu_TryRequiredPrompt(ib_label.Result, ib_label.Value, &new_label)
 		return
 
-	ib_prompt := Ui_InputBox(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
+	ib_prompt := InputFn.Call(t("menu.profiles.prompt_system_single"), t("menu.profiles.edit_profile"), "w520 h320",
 		profile.Has("system_single") ? profile["system_single"] : "")
 	if (ib_prompt.Result != "OK")
 		return
 
 	return LLM_Menu_CommitMutation("the custom LLM profile edit",
 		(Candidate) => _LLM_Menu_EditProfileCandidate(Candidate, pid,
-			new_label, ib_prompt.Value), _LLM_Menu_ApplyProfileCommitted)
+			new_label, ib_prompt.Value), Options.Get("apply", _LLM_Menu_ApplyProfileCommitted),
+		_LLM_Menu_WriteProfileSource.Bind(Source), Options.Get("notify", 0),
+		Options.Get("acquire", 0), Options.Get("settle", 0), Options.Get("collect", 0))
 }
 
 _LLM_Menu_EditProfileCandidate(Candidate, ProfileId, Label, Prompt) {

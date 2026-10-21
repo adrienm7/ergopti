@@ -81,6 +81,7 @@ _FTI_Inventory() {
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"this.Timer",                    "150",   ; exact managed Ollama session/debt/READY custody; canceled on retirement
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
+		'Callbacks["motion"]',          "?",     ; only armed while CapsWord is on and set to end on pointer motion; timings [ui] capsword_check_interval_ms (100), one cursor read
 		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
 		"KLHook.flush_timer",           "200",   ; keylogger buffer flush
 		"PLC_Poll",                     "250",   ; process lifecycle watch

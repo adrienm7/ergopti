@@ -1703,6 +1703,48 @@ function M.key_combinations_enabled(state)
 	return true
 end
 
+-- The CapsWord exits [shortcuts.caps_word] now decides: the word delimiters a
+-- key types (Space, Enter, Tab, and Ergopti's "." and "," keys g and v, which
+-- typed letters on any other layout) and the left and right clicks.
+-- platform/remap/watchers.lua ends CapsWord on the typed character and the
+-- pointer kind the user checked; a Karabiner exit would end it on the key
+-- whatever they chose. Escape, Delete, the arrows, Page Up/Down, Home, End,
+-- F1-F12 and CapsLock stay Karabiner's fixed exits. capsword.json keeps every
+-- exit: it is the historical anchor each released graph was built from.
+local CAPSWORD_SETTING_EXIT_KEYS = { spacebar = true, return_or_enter = true, tab = true, g = true, v = true }
+
+--- Whether one CapsWord manipulator is an exit the settings now own.
+--- @param manipulator table Karabiner manipulator.
+--- @return boolean
+local function is_capsword_setting_exit(manipulator)
+	local from = type(manipulator) == "table" and manipulator.from or nil
+	if type(from) ~= "table" then return false end
+	local active_only = false
+	for _, condition in ipairs(manipulator.conditions or {}) do
+		if condition.name == "capsword" and condition.type == "variable_if" and condition.value == 1 then
+			active_only = true
+		end
+	end
+	if not active_only then return false end
+	return from.pointing_button ~= nil or CAPSWORD_SETTING_EXIT_KEYS[from.key_code] == true
+end
+
+--- The deployed CapsWord rule: capsword.json without the exits the settings own.
+--- The kept manipulators are the decoded tables themselves, so the build's
+--- shared-table refusal still sees what the JSON codec returned.
+--- @param rule table Decoded capsword.json (the anchor keeps its own copy).
+--- @return table rule Deployable rule.
+local function capsword_without_setting_exits(rule)
+	local deployed = {}
+	for field, value in pairs(rule) do deployed[field] = value end
+	local kept = {}
+	for _, manipulator in ipairs(rule.manipulators or {}) do
+		if not is_capsword_setting_exit(manipulator) then kept[#kept + 1] = manipulator end
+	end
+	deployed.manipulators = kept
+	return deployed
+end
+
 --- Assembles the full Karabiner JSON structure from current state.
 ---
 --- Rule priority order (highest → lowest):
@@ -1775,6 +1817,9 @@ function M.build_karabiner_json(
 	-- must never cost the user the way back.
 	local tap_hold_feature_rules = {}
 	local legacy_tap_hold_rules = {}
+	-- A deployed static rule a release graph carried in another shape: the
+	-- CapsWord rule without its setting exits was capsword.json whole.
+	local legacy_static_rule_of = {}
 	-- Rules owned by the key-combinations switch (M.key_combinations_enabled).
 	-- They were Tap-Holds feature rules until the combinations got a switch
 	-- of their own, under Shortcuts.
@@ -1792,7 +1837,9 @@ function M.build_karabiner_json(
 	local capsword_rule = load_json_file(shared_dir .. "capsword.json")
 	if capsword_rule then
 		legacy_static_anchors.capsword = deep_copy(capsword_rule)
-		all_rules[#all_rules + 1] = capsword_rule
+		local deployed_capsword = capsword_without_setting_exits(capsword_rule)
+		legacy_static_rule_of[deployed_capsword] = capsword_rule
+		all_rules[#all_rules + 1] = deployed_capsword
 	else
 		Logger.warn(LOG, "capsword.json not found — CapsWord will be inactive.")
 	end
@@ -1971,7 +2018,7 @@ function M.build_karabiner_json(
 	local legacy_rules = {}
 	for index, rule in ipairs(all_rules) do
 		if rule ~= nav_rule then
-			local legacy_rule = deep_copy(legacy_tap_hold_rules[rule] or rule)
+			local legacy_rule = deep_copy(legacy_tap_hold_rules[rule] or legacy_static_rule_of[rule] or rule)
 			strip_exit_sentinels(legacy_rule)
 			legacy_rules[#legacy_rules + 1] = legacy_rule
 		end
@@ -3311,7 +3358,11 @@ function M.merge_and_deploy_config(
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
 	end
-	if merge_changed == false then
+	-- A skip leaves the file as it is on disk, so that file must still be the
+	-- one the merge read: confirmed by its exact bytes before reporting success.
+	-- One INFO line per decision: each publication makes Karabiner reload every
+	-- rule, so the log must show how often that happens and why.
+	local function skip_identical(why)
 		local read_ok, current, current_status, current_detail = pcall(
 			FileSystem.read_with_status,
 			karabiner_out
@@ -3330,11 +3381,11 @@ function M.merge_and_deploy_config(
 			Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 			return false, detail, 0
 		end
-		Logger.debug(
-			LOG,
-			"Karabiner managed rules are unchanged; publication skipped after exact source revalidation."
-		)
+		Logger.info(LOG, "Karabiner deploy decision: skipped-identical (%s; no reload).", why)
 		return true, "unchanged", 0
+	end
+	if merge_changed == false then
+		return skip_identical("the managed rules on disk already match")
 	end
 
 	local encode_ok, content = pcall(hs.json.encode, merged, true)
@@ -3342,6 +3393,11 @@ function M.merge_and_deploy_config(
 		local detail = "JSON encode failed: " .. tostring(content)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
+	end
+	-- The bytes read for the merge are the deployed file: identical output is
+	-- no publication, whatever the semantic verdict said.
+	if source_snapshot.status == "ok" and content == source_snapshot.content then
+		return skip_identical("the encoded file equals the bytes on disk")
 	end
 
 	local call_ok, deployed, deploy_detail = pcall(
@@ -3356,6 +3412,10 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
+	Logger.info(LOG,
+		"Karabiner deploy decision: deployed (%s; %d bytes; Karabiner reloads every rule).",
+		source_snapshot.status == "absent" and "no karabiner.json yet"
+			or "the managed rules on disk differ", #content)
 	return true, deploy_detail or "ok", 1
 end
 

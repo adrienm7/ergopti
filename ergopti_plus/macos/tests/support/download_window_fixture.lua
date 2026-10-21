@@ -31,23 +31,35 @@ local function make_webview_overrides()
 					delete             = function(_self)
 						state.deletes = state.deletes + 1
 						if state.delete_throws then error("synthetic download window delete refusal") end
+						setmetatable(_self, nil)
 					end,
-					navigationCallback = function(_self, fn) nav_callback = fn end,
-					windowCallback     = function(_self, _fn) end,
+					navigationCallback = function(self, fn) nav_callback = fn; return self end,
+					windowCallback     = function(self, fn) self.close_callback = fn; return self end,
 					windowTitle        = function(self) return self end,
 					windowStyle        = function(self) return self end,
 					level              = function(self) return self end,
 					allowTextEntry     = function(self) return self end,
 					allowGestures      = function(self) return self end,
 					shadow             = function(self) return self end,
-					allowNewWindows    = function(self) return self end,
+					allowNewWindows    = function(self, value)
+						if value == nil then return self.allow_new_windows ~= false end
+						assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+						self.allow_new_windows = value
+						return self
+					end,
+					deleteOnClose      = function(self, value)
+						if value == nil then return self.delete_on_close == true end
+						self.delete_on_close = value
+						return self
+					end,
 					html               = function(self) return self end,
 					show               = function(self) return self end,
 				}
+				setmetatable(wv, {})
 				return wv
 			end,
 			usercontent = {
-				new = function(_name) return { setCallback = function(_self, _fn) end } end,
+				new = function(_name) return { setCallback = function(self, _fn) return self end } end,
 			},
 			windowMasks = {},
 		},

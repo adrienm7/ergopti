@@ -234,7 +234,7 @@ helpers.describe("dynamic expansions publish only committed output", function()
 
 	helpers.it("declines a registered dynamic rule when injection fails", function()
 		with_fixture(function()
-			local fired, event = dh.on_trigger("@p\\", "\\")
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@p\\", "\\")
 			helpers.assert_true(fired == false,
 				"a failed uinput transaction must not publish a dynamic expansion")
 			helpers.assert_true(event == nil,
@@ -244,7 +244,7 @@ helpers.describe("dynamic expansions publish only committed output", function()
 
 	helpers.it("declines a multi-field combo when injection fails", function()
 		with_fixture(function()
-			local fired, event = dh.on_trigger("@np\\", "\\")
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@np\\", "\\")
 			helpers.assert_true(fired == false,
 				"a failed multi-field transaction must not publish a combo expansion")
 			helpers.assert_true(event == nil,
@@ -275,7 +275,7 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 
 	helpers.it("a personal_info rule reports itself private", function()
 		with_fixture(function()
-			local fired, event = dh.on_trigger("@p\\", "\\")
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@p\\", "\\")
 			-- with_fixture installs a successful output transaction so this assertion
 			-- isolates the event's privacy verdict from host uinput availability.
 			helpers.assert_true(fired, "'@p\\\\' must fire — the fixture maps 'p' to a filled field")
@@ -288,7 +288,7 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 
 	helpers.it("a date rule does not, because a date is not a secret", function()
 		with_fixture(function()
-			local fired, event = dh.on_trigger("dt\\", "\\", true)
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "dt\\", "\\", true)
 			helpers.assert_true(fired, "'dt\\\\' is a registered date rule and must fire")
 			helpers.assert_true(event ~= nil, "a fired expansion returns its event")
 			helpers.assert_true(event.is_private ~= true,
@@ -312,9 +312,9 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 		}
 
 		with_fixture(function()
-			local personal_fired = dh.on_trigger("@p\\", "\\")
-			local date_fired = dh.on_trigger("dt\\", "\\", true)
-			local combo_fired = dh.on_trigger("@np\\", "\\")
+			local personal_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@p\\", "\\")
+			local date_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "dt\\", "\\", true)
+			local combo_fired = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "@np\\", "\\")
 			helpers.assert_true(personal_fired and date_fired and combo_fired,
 				"all three real output paths must reach the observing injector")
 		end, observing_injector)

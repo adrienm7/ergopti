@@ -4,14 +4,17 @@
 --- MODULE: LLM Prediction Line (Shared)
 --- DESCRIPTION:
 --- Decides what one line of the prediction tooltip reads: the prefix in front
---- of it, and the pieces of its text with the role each one plays.
+--- of it, the pieces of its text with the role each one plays, and the chord
+--- its right-aligned shortcut column shows.
 ---
 --- WHY IT IS SHARED:
 --- macOS drew this first, inside its canvas code. Linux then drew plain text
 --- with the indentation read the other way round, and Windows painted a whole
 --- line in the correction colour. One rule, read by the two Lua drivers and
 --- ported by the Windows one (ui/tooltip/llm.ahk), pinned on the three by
---- _shared/tests/corpus/tooltip/llm_line_vectors.json.
+--- _shared/tests/corpus/tooltip/llm_line_vectors.json. The shortcut labels
+--- once differed the same way (glyphs on Windows, no hint for bare digits,
+--- inline after the text); llm_shortcut_vectors.json pins them now.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Roles, not colours. A piece is "typed" (already in the document),
@@ -142,6 +145,58 @@ function M.segments(prediction, is_selected)
 	end
 
 	return segments
+end
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 3/ Shortcut column ==================
+-- =============================================
+-- =============================================
+
+--- Splits one comma-separated [llm_ui] list of constants.toml.
+--- @param value string
+--- @return table
+local function split_list(value)
+	local items = {}
+	for item in tostring(value or ""):gmatch("[^,]+") do items[#items + 1] = item end
+	return items
+end
+
+--- The labels of one OS from the [llm_ui] keys of constants.toml.
+--- @param order string shortcut_modifier_order.
+--- @param labels string The OS's shortcut_labels_* list, same positions.
+--- @param joiner string The OS's shortcut_joiner_*.
+--- @return table|nil spec { order, labels, joiner }, nil when the lists differ.
+function M.shortcut_spec(order, labels, joiner)
+	local names, texts = split_list(order), split_list(labels)
+	if #names == 0 or #names ~= #texts or type(joiner) ~= "string" then return nil end
+	local by_name = {}
+	for index, name in ipairs(names) do by_name[name] = texts[index] end
+	return { order = names, labels = by_name, joiner = joiner }
+end
+
+--- The chord that inserts prediction `index`, as its row shows it.
+---
+--- The modifiers come in the spec's order whatever order the configuration
+--- lists them in; the digit is the index, 0 for the tenth row. Rows past the
+--- tenth have no digit, so they show nothing.
+--- @param index number One-based prediction row.
+--- @param modifiers table Validation modifier names ("ctrl", "alt", ...).
+--- @param spec table From shortcut_spec.
+--- @return string The label, "" when the row has no chord.
+function M.shortcut_label(index, modifiers, spec)
+	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > 10 then return "" end
+	local present = {}
+	for _, name in ipairs(type(modifiers) == "table" and modifiers or {}) do present[name] = true end
+	local parts = {}
+	for _, name in ipairs(spec.order) do
+		if present[name] then parts[#parts + 1] = spec.labels[name] end
+	end
+	parts[#parts + 1] = index == 10 and "0" or tostring(index)
+	return table.concat(parts, spec.joiner)
 end
 
 return M

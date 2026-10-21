@@ -25,21 +25,6 @@ local _candidates = {}
 local _active_index = 1
 local _meta = {}
 
-local function modifier_label(modifiers)
-	local labels = { alt = "Alt", ctrl = "Ctrl", shift = "Shift", cmd = "Super", super = "Super" }
-	local parts = {}
-	for _, name in ipairs(modifiers or {}) do
-		parts[#parts + 1] = labels[name] or tostring(name)
-	end
-	return table.concat(parts, "+")
-end
-
-local function validation_label(index, modifiers)
-	local prefix = modifier_label(modifiers)
-	local digit = index == 10 and "0" or tostring(index)
-	return prefix ~= "" and (prefix .. "+" .. digit) or digit
-end
-
 --- The pieces a candidate's line reads, each with its role.
 ---
 --- A parsed prediction carries its own (the typed tail, the corrections, the
@@ -65,8 +50,9 @@ end
 ---
 --- A prediction row is a prefix and coloured segments, as on macOS: the mark
 --- in front of the selected line, the typed text grey, the corrections green
---- and the continuation orange on it, every other line grey, and the
---- validation chord after each line.
+--- and the continuation orange on it, every other line grey, and the chord
+--- that inserts each line right-aligned in a muted column
+--- (_shared/modules/tooltip/constants.toml [llm_ui]).
 --- @param candidates table Array of { to_type, chunks?, nw?, has_corrections? }.
 --- @param active_index integer
 --- @param meta table { model?, profile?, validation_modifiers?, loading? }
@@ -99,12 +85,6 @@ function M.build_rows(candidates, active_index, meta)
 				color = active and chrome.colors[segment.role] or chrome.colors.typed,
 			}
 		end
-		segments[#segments + 1] = {
-			text = chrome.label_gap .. validation_label(entry.index, meta.validation_modifiers),
-			role = "label",
-			small = true,
-			color = active and chrome.colors.label_selected or chrome.colors.label_unselected,
-		}
 		rows[#rows + 1] = {
 			-- The mark is drawn on the selected line only; elsewhere the prefix
 			-- is spacing, of the width its characters would take.
@@ -112,6 +92,8 @@ function M.build_rows(candidates, active_index, meta)
 			prefix_color = active and chrome.colors.cursor or nil,
 			segments = segments,
 			selected = active,
+			label = LlmLine.shortcut_label(entry.index, meta.validation_modifiers, chrome.shortcut_spec),
+			label_color = chrome.colors.label,
 		}
 	end
 	if meta.loading == true and #rows == 0 then

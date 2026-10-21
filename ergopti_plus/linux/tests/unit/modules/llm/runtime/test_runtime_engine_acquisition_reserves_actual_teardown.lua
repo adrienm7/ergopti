@@ -393,29 +393,37 @@ helpers.describe("managed response private identities and inventory", function()
 	test("(linux-managed-response) endpoint reader retires the producer before model inventory dispatch", function()
 		with_managed_responses(function(world, engine)
 			local Bridge = require("infra.llm_bridge"); local endpoint = Bridge.ollama_endpoint
-			local opens = 0
-			io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"stale"}]}' end, close = function() return true end } end
 			Bridge.ollama_endpoint = function(...) engine.stop_runtime(); return endpoint(...) end
-			local called, models = pcall(world.profiles.refresh_models)
+			local called, models = pcall(function()
+				local projection = world.profiles.refresh_models()
+				world:inventory_defer()
+				return projection
+			end)
 			Bridge.ollama_endpoint = endpoint
-			helpers.assert_true(called, models); helpers.assert_eq(models, {}); helpers.assert_eq(opens, 0)
+			helpers.assert_true(called, models); helpers.assert_eq(models, {}); helpers.assert_eq(#world.inventory_requests, 0)
 		end)
 	end)
 	test("(linux-managed-response) same-origin service replacement during inventory read cannot publish models", function()
 		with_managed_responses(function(world)
-			io.popen = function() return { read = function() world:replace_app(); return '{"models":[{"name":"stale"}]}' end, close = function() return true end } end
+			world.inventory_during_http = function(op)
+				world:replace_app()
+				op:answer({ ok = true, status = 200, body = '{"models":[{"name":"stale"}]}' })
+			end
 			helpers.assert_eq(world.profiles.refresh_models(), {})
+			world:inventory_defer()
+			helpers.assert_eq(world.profiles.get_cached_models(), {})
 			helpers.assert_eq(world.profiles.get_current_model(), "model:2b")
 		end)
 	end)
 	test("(linux-managed-response) inventory cache belongs to its original private app", function()
 		with_managed_responses(function(world)
-			local opens = 0
-			io.popen = function() opens = opens + 1; return { read = function() return '{"models":[{"name":"model:2b"}]}' end, close = function() return true end } end
-			helpers.assert_eq(world.profiles.refresh_models(), { "model:2b" })
-			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(opens, 1)
+			helpers.assert_eq(world.profiles.refresh_models(), {})
+			world:inventory_defer(); world:inventory_answer({ "model:2b" })
+			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(#world.inventory_requests, 1)
 			world:replace_app()
-			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(opens, 2, "a fresh app requires its own inventory response")
+			helpers.assert_eq(world.profiles.get_models(), {})
+			world:inventory_defer(); world:inventory_answer({ "model:2b" })
+			helpers.assert_eq(world.profiles.get_models(), { "model:2b" }); helpers.assert_eq(#world.inventory_requests, 2, "a fresh app requires its own inventory response")
 		end)
 	end)
 	test("(linux-managed-response) origin resolution refuses before borrowing a newer managed owner", function()
@@ -441,7 +449,7 @@ helpers.describe("managed response reentrancy and closed authority", function()
 				world.on_observe = nil
 				world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function() end)
 			end
-			original.chunk('{"message":{"content":"old"}}\n')
+			original.chunk('{"message":{"content":"old"},"done":true}\n')
 			helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
 		end)
 	end)
@@ -451,7 +459,7 @@ helpers.describe("managed response reentrancy and closed authority", function()
 			world.api.chat(engine.get_base_url(), "model:2b", {}, {}, function(text)
 				chunks[#chunks + 1] = text; engine.stop_runtime()
 			end)
-			world.posts[1].chunk('{"message":{"content":"first"}}\n{"message":{"content":"second"}}\n')
+			world.posts[1].chunk('{"message":{"content":"first"},"done":false}\n{"message":{"content":"second"},"done":true}\n')
 			helpers.assert_eq(chunks, { "first" })
 		end)
 	end)
@@ -493,19 +501,13 @@ end)
 
 
 helpers.describe("managed response observer and cache publication order", function()
-	test("(linux-managed-response) superseded synchronous inventory cannot overwrite a newer cache", function()
+	test("(linux-managed-response) retired inventory callbacks cannot overwrite a newer cache", function()
 		with_managed_responses(function(world)
-			local reads = 0
-			io.popen = function() return { read = function()
-				reads = reads + 1
-				if reads == 1 then
-					helpers.assert_eq(world.profiles.refresh_models(), { "new" })
-					return '{"models":[{"name":"old"}]}'
-				end
-				return '{"models":[{"name":"new"}]}'
-			end, close = function() return true end } end
 			helpers.assert_eq(world.profiles.refresh_models(), {})
-			helpers.assert_eq(world.profiles.get_models(), { "new" }); helpers.assert_eq(reads, 2)
+			world:inventory_defer(); local old = world:inventory_answer({ "old" })
+			world.profiles.refresh_models(); world:inventory_defer(); world:inventory_answer({ "new" })
+			old:answer({ ok = true, status = 200, body = '{"models":[{"name":"stale"}]}' })
+			helpers.assert_eq(world.profiles.get_models(), { "new" }); helpers.assert_eq(#world.inventory_requests, 2)
 		end)
 	end)
 	test("(linux-managed-response) final running proof has no later source observer", function()
@@ -600,7 +602,7 @@ helpers.describe("managed response closes per-line observer currency", function(
 				end
 				return parse(line)
 			end
-			local called, failure = pcall(original.chunk, '{"message":{"content":"old"}}\n')
+			local called, failure = pcall(original.chunk, '{"message":{"content":"old"},"done":true}\n')
 			Bridge.parse_stream_line = parse
 			helpers.assert_true(called, failure); helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
 		end)
@@ -630,6 +632,7 @@ helpers.describe("managed response consumers retain constructor-bound engine por
 				if consumer == "inventory" then helpers.assert_eq(result, {}) else helpers.assert_eq(result, false) end
 				helpers.assert_eq(#world.posts, 0); helpers.assert_eq(#world.calls, probes)
 				helpers.assert_eq(opens, 0); helpers.assert_eq(delivered, 0)
+				if consumer == "inventory" then helpers.assert_eq(#world.inventory_defers, 0) end
 			end)
 		end)
 	end

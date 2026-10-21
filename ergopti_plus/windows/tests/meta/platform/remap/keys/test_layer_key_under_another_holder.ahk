@@ -110,7 +110,7 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 			continue ; the key's own claimed press, never one made on another key's layer
 		if _LKAH_IsAltGrOwnerCriterion(C)
 			continue ; called below
-		if (C == "CapsWordEnabled")
+		if (InStr(C, "CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey(") == 1)
 			continue ; CapsWord's own Space and Enter, a separate mode
 		if (C == "KeyCombinationOwnsHotkey()")
 			continue ; a key combination the user bound, held first key and all

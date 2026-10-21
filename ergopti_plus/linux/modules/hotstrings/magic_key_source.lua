@@ -90,6 +90,13 @@ local _pending_choices = {}
 -- The magic key character last reported as untypable on the session layout.
 local _untypable_reported = nil
 
+-- The evdev code last reported as yielding its press to a tap owner, nil once
+-- the source is admitted again, so a held or repeated key logs only once.
+local _yield_reported = nil
+
+-- Shown on a tap key's menu row while its action takes the physical magic key.
+M.TAP_OVERRIDE_REASON = "menu.shortcuts.tap_keys.overrides_magic_key_source"
+
 
 
 
@@ -147,6 +154,20 @@ function M.choice_reason(value)
 		return Shared.TAP_CONFLICT_REASON
 	end
 	return nil
+end
+
+--- The reverse of choice_reason: whether a tap assignment on a native key takes
+--- the key the physical magic key is set to. The explicit assignment keeps its
+--- priority (the press runs the action), so the menu row and the log must say
+--- that the magic key no longer comes from that key.
+--- @param evdev number Native key of the tap key.
+--- @param action string|nil The action assigned to it, "none" when unassigned.
+--- @return string|nil reason_key
+function M.tap_override_reason(evdev, action)
+	if type(evdev) ~= "number" or action == nil or action == "none" then return nil end
+	local code = M.evdev_code()
+	if code == nil or code ~= evdev then return nil end
+	return M.TAP_OVERRIDE_REASON
 end
 
 --- Stores a new value; the next press follows it, nothing is re-registered.
@@ -492,7 +513,17 @@ function M.on_key(detail)
 	if code == nil or detail.code ~= code then return false end
 	if not Shared.unmodified(detail.mods) then return false end
 	if _deps.is_active() ~= true or _deps.replace_on() ~= true then return false end
-	if _deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true then return false end
+	if _deps.direct_source_admitted and _deps.direct_source_admitted(code, true) ~= true then
+		-- The configured tap or tap-hold action keeps its priority; say once why
+		-- the chosen key stopped typing the magic key instead of going quiet.
+		if _yield_reported ~= code then
+			_yield_reported = code
+			Logger.warn(LOG, "The physical magic key %s yields to the tap action configured on its key — "
+				.. "it types no magic key until that action is set to none or another key is chosen.", M.get())
+		end
+		return false
+	end
+	_yield_reported = nil
 	local magic = _deps.magic_key()
 	if type(magic) ~= "string" or magic == "" then return false end
 	if _deps.can_type(magic) ~= true then
@@ -529,6 +560,7 @@ function M._reset_for_test()
 	M.cancel_capture()
 	_code, _code_generation = nil, nil
 	_untypable_reported = nil
+	_yield_reported = nil
 end
 
 

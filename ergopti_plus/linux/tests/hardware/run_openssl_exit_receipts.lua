@@ -239,7 +239,14 @@ check("saved ON without EVP keeps real collector SQL closed and recovers retaine
 	local rows = assert(writer.query_rows("SELECT text FROM events_typing;"))
 	assert(#rows == 1 and Codec.is_encrypted(rows[1]) and cipher.decrypt(rows[1]) == "a")
 	assert(assert(writer.query_rows("SELECT sum(c) FROM ngram_chars;"))[1] == "1")
-	assert(K.stop())
+	-- The walk context still holds the open word and session, which stop()
+	-- credits in a final native flush: stop answers false until that flush
+	-- physically settles, as the shutdown coordinator polls it.
+	local stop_deadline = uv.hrtime() + 4000000000
+	while not K.stop() do
+		assert(uv.hrtime() < stop_deadline, "the final keylogger flush never settled")
+		uv.run("nowait"); uv.sleep(1)
+	end
 end)
 
 if writer then writer.close_db() end

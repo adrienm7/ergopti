@@ -1,0 +1,196 @@
+{
+	"_comment": "The rows a layout emulation types, each behind its own [layout] switch (emulate_<row>). Written by hand from a physical ISO keyboard, never generated from the registry: every driver reads the rows from _shared/data/keycodes/physical_keys.json through its layout_rows_policy and must find exactly these keys, left to right.",
+	"rows": {
+		"number_row": [
+			"Backquote",
+			"Digit1",
+			"Digit2",
+			"Digit3",
+			"Digit4",
+			"Digit5",
+			"Digit6",
+			"Digit7",
+			"Digit8",
+			"Digit9",
+			"Digit0",
+			"Minus",
+			"Equal"
+		],
+		"top_row": [
+			"KeyQ",
+			"KeyW",
+			"KeyE",
+			"KeyR",
+			"KeyT",
+			"KeyY",
+			"KeyU",
+			"KeyI",
+			"KeyO",
+			"KeyP",
+			"BracketLeft",
+			"BracketRight"
+		],
+		"home_row": [
+			"KeyA",
+			"KeyS",
+			"KeyD",
+			"KeyF",
+			"KeyG",
+			"KeyH",
+			"KeyJ",
+			"KeyK",
+			"KeyL",
+			"Semicolon",
+			"Quote",
+			"Backslash"
+		],
+		"bottom_row": [
+			"IntlBackslash",
+			"KeyZ",
+			"KeyX",
+			"KeyC",
+			"KeyV",
+			"KeyB",
+			"KeyN",
+			"KeyM",
+			"Comma",
+			"Period",
+			"Slash"
+		]
+	},
+	"windows_scan_codes": {
+		"number_row": [
+			"SC029",
+			"SC002",
+			"SC003",
+			"SC004",
+			"SC005",
+			"SC006",
+			"SC007",
+			"SC008",
+			"SC009",
+			"SC00A",
+			"SC00B",
+			"SC00C",
+			"SC00D"
+		],
+		"top_row": [
+			"SC010",
+			"SC011",
+			"SC012",
+			"SC013",
+			"SC014",
+			"SC015",
+			"SC016",
+			"SC017",
+			"SC018",
+			"SC019",
+			"SC01A",
+			"SC01B"
+		],
+		"home_row": [
+			"SC01E",
+			"SC01F",
+			"SC020",
+			"SC021",
+			"SC022",
+			"SC023",
+			"SC024",
+			"SC025",
+			"SC026",
+			"SC027",
+			"SC028",
+			"SC02B"
+		],
+		"bottom_row": [
+			"SC056",
+			"SC02C",
+			"SC02D",
+			"SC02E",
+			"SC02F",
+			"SC030",
+			"SC031",
+			"SC032",
+			"SC033",
+			"SC034",
+			"SC035"
+		]
+	},
+	"switches": [
+		{
+			"id": "all_on",
+			"note": "the shipped defaults: the emulation types every row",
+			"layout": {
+				"emulate_number_row": true,
+				"emulate_top_row": true,
+				"emulate_home_row": true,
+				"emulate_bottom_row": true
+			},
+			"emulated": { "number_row": true, "top_row": true, "home_row": true, "bottom_row": true },
+			"number_row_source": { "active": "emulated", "inactive": "native" }
+		},
+		{
+			"id": "number_row_off",
+			"note": "the OS layout types the number row, so the ordering reads its row",
+			"layout": {
+				"emulate_number_row": false,
+				"emulate_top_row": true,
+				"emulate_home_row": true,
+				"emulate_bottom_row": true
+			},
+			"emulated": { "number_row": false, "top_row": true, "home_row": true, "bottom_row": true },
+			"number_row_source": { "active": "native", "inactive": "native" }
+		},
+		{
+			"id": "letters_off",
+			"note": "the letter rows off, the number row still emulated",
+			"layout": {
+				"emulate_number_row": true,
+				"emulate_top_row": false,
+				"emulate_home_row": false,
+				"emulate_bottom_row": false
+			},
+			"emulated": { "number_row": true, "top_row": false, "home_row": false, "bottom_row": false },
+			"number_row_source": { "active": "emulated", "inactive": "native" }
+		},
+		{
+			"id": "all_off",
+			"note": "every row switched off: the emulation types nothing on these rows",
+			"layout": {
+				"emulate_number_row": false,
+				"emulate_top_row": false,
+				"emulate_home_row": false,
+				"emulate_bottom_row": false
+			},
+			"emulated": { "number_row": false, "top_row": false, "home_row": false, "bottom_row": false },
+			"number_row_source": { "active": "native", "inactive": "native" }
+		}
+	],
+	"invalid": [
+		{
+			"id": "unknown_row",
+			"layout": {
+				"emulate_number_row": true,
+				"emulate_top_row": true,
+				"emulate_home_row": true,
+				"emulate_bottom_row": true
+			},
+			"row": "space_row"
+		},
+		{
+			"id": "missing_switch",
+			"layout": { "emulate_top_row": true, "emulate_home_row": true, "emulate_bottom_row": true },
+			"row": "number_row"
+		},
+		{
+			"id": "string_switch",
+			"layout": {
+				"emulate_number_row": "false",
+				"emulate_top_row": true,
+				"emulate_home_row": true,
+				"emulate_bottom_row": true
+			},
+			"row": "number_row"
+		}
+	]
+}

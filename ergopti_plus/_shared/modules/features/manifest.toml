@@ -221,7 +221,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols"]
+subsections = ["caps_word", "key_combination_taps", "keyboard", "personal", "script_control", "tap_keys", "wrap_symbols"]
 
 [sections.category_enabled]
 description_key = "menu.category_enabled"
@@ -266,6 +266,15 @@ platforms = ["hs"]
 
 [sections.shortcuts.tap_keys]
 description_key = "menu.shortcuts.header_tap_keys"
+platforms = ["ahk", "hs", "linux"]
+
+[sections.shortcuts.caps_word]
+description_key = "menu.caps_word.auto_off"
+platforms = ["ahk", "hs", "linux"]
+subsections = ["pointer"]
+
+[sections.shortcuts.caps_word.pointer]
+description_key = "menu.caps_word.pointer_header"
 platforms = ["ahk", "hs", "linux"]
 
 # ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
@@ -2420,6 +2429,121 @@ description_key = "menu.shortcuts.tap_keys.number_row_right_2"
 
 
 
+# ======================================
+# ===== 3.5.10 shortcuts.caps_word =====
+# ======================================
+
+# What ends CapsWord on its own, the same settings on every driver; the policy
+# is _shared/lua/caps_word/auto_off.lua and its AHK port, both replaying
+# _shared/tests/corpus/caps_word/auto_off_vectors.json. These are parameters
+# of CapsWord, which only the user switches on, so none alters input by itself.
+#
+# Seconds without a keystroke after which CapsWord switches itself off; 0 is
+# « never », what every driver did before the setting existed. The default is
+# 10 s by the maintainer's decision of 2026-10-20: a CapsWord left on by a
+# hand that walked away must not capitalise the next word typed minutes later.
+# It is a parameter of CapsWord, which only the user switches on, so a
+# non-zero default activates nothing; the preset and the neutral value are the
+# same, so restoring and clearing both give 10 s. The menu offers exactly
+# `preset_values`; the drivers read the stored number.
+[[features.shortcuts.caps_word]]
+id = "idle_timeout_seconds"
+platforms = ["ahk", "hs", "linux"]
+default = 10
+recommended = 10
+input_altering = false
+type = "number"
+preset_values = [0, 1, 3, 5, 10, 30, 60]
+description_key = "menu.caps_word.idle_timeout"
+
+# The word delimiters that end CapsWord, by their key in the hotstring
+# delimiter catalogue (_shared/core/domain/Terminators.spec.js), one checkbox
+# per entry in every driver's menu. Only the catalogue's built-in
+# entries are valid, stored in catalogue order. Space and Enter ended CapsWord
+# on every driver, Tab on macOS and Linux. By the maintainer's decision of
+# 2026-10-20 the default adds the catalogue's no-break space (nbsp, U+00A0)
+# and narrow no-break space (nnbsp, U+202F), the spaces French typography puts
+# before punctuation, and the comma, semicolon and period, so these eight end a
+# word out of the box. Each driver matches the character typed, whatever key,
+# layer or dead key produced it, so each one ends CapsWord only while its own
+# entry is checked.
+[[features.shortcuts.caps_word]]
+id = "terminators"
+platforms = ["ahk", "hs", "linux"]
+default = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
+recommended = ["space", "nbsp", "nnbsp", "tab", "enter", "comma", "semicolon", "period"]
+input_altering = false
+type = "array"
+description_key = "menu.caps_word.terminators_header"
+
+
+
+# ==============================================
+# ===== 3.5.11 shortcuts.caps_word.pointer =====
+# ==============================================
+
+# The pointer actions that end CapsWord: the hand has left the keyboard. One
+# entry per kind; this section is the list every driver maps its native events
+# to. All are on by default: macOS ended CapsWord on any of them, Windows on a
+# left or a right click. Windows never sees a touchpad gesture (the system
+# keeps it and sends at most the scrolling it produces), hence the platforms.
+[[features.shortcuts.caps_word.pointer]]
+id = "gesture"
+platforms = ["hs", "linux"]
+reason_key = "platform_reason.caps_word_gestures_stay_with_windows"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.gesture"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "pointer_motion"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.pointer_motion"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "left_click"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.left_click"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "right_click"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.right_click"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "middle_click"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.middle_click"
+
+[[features.shortcuts.caps_word.pointer]]
+id = "other_buttons"
+platforms = ["ahk", "hs", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.caps_word.pointer.other_buttons"
+
+
+
 # ========================
 # ===== 3.6 gestures =====
 # ========================
@@ -3551,6 +3675,22 @@ type = "enum"
 enum_values = ["native", "digits", "symbols"]
 description_key = "menu.layout.number_row"
 
+# Whether « digits first » and « symbols first » also swap the two levels of the
+# three edge keys of the number row (left of 1, the two right of 0). Off: the
+# ordering moves the ten digit keys only and the edge keys type what the
+# effective layout types there. On: each edge key types its Shift level
+# unshifted and its base level with Shift, read from the effective layout,
+# while an ordering applies and each edge key can be swapped. Like the ordering
+# itself, only Windows applies it; macOS and Linux keep the native row.
+[[features.layout]]
+id = "number_row_reorder_edges"
+platforms = ["ahk", "hs", "linux"]
+default = false
+recommended = false
+input_altering = true
+type = "boolean"
+description_key = "menu.layout.number_row_edges"
+
 [[features.layout]]
 id = "ergopti_alt_gr"
 platforms = ["ahk"]
@@ -3572,6 +3712,57 @@ type = "enum"
 enum_values = ["none", "ergopti", "ergopti_plus"]
 description_key = "menu.layout.ergopti_plus"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
+
+# The physical rows the layout emulation (a registry layout or the built-in
+# Ergopti one) types, each behind its own switch, all on: a row switched off
+# types what the OS layout types there, on every level the emulation covers,
+# and the number-row ordering then reads the OS layout's row. Which keys each
+# row holds is read from the shared physical-key registry by the shared policy
+# (layout_rows_policy.ahk and .lua, tests/corpus/layouts/layout_rows.json).
+# Windows alone emulates a layout: macOS installs it as a system input source
+# and Linux remaps through kanata, so their menus grey these rows with why.
+# The switches only narrow an emulation that an empty configuration leaves off
+# (emulated_layout "", ergopti_variant "none", ergopti_base false): on their
+# own they alter no input, so they are parameters, not activations.
+[[features.layout]]
+id = "emulate_number_row"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.layout.emulate_number_row"
+
+[[features.layout]]
+id = "emulate_top_row"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.layout.emulate_top_row"
+
+[[features.layout]]
+id = "emulate_home_row"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.layout.emulate_home_row"
+
+[[features.layout]]
+id = "emulate_bottom_row"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.layout.emulate_bottom_row"
 
 [[features.layout]]
 id = "ctrl_magic_save"
@@ -4111,6 +4302,9 @@ checked_when = ["llm_enabled"]
 # The row used to vanish in those states, leaving the IA submenu without a switch.
 disabled_when = ["llm_toggle_ready"]
 disabled_reason_key = "menu.llm.save_unavailable"
+# A configuration saved by a newer version is read-only for the session: the
+# row names that cause, since resuming or Diagnostics cannot lift it.
+disabled_reasons = [{ when = "config_newer_schema", reason_key = "menu.read_only.newer_schema" }]
 category = "LLM"
 
 # The restore alone: the maintainer retired the AI menu's « Tout effacer » on
@@ -4120,6 +4314,11 @@ category = "LLM"
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
+# The restore writes the AI section: greyed, like the switch, whenever the
+# configuration cannot be saved, and with the same newer-configuration cause.
+disabled_when = ["llm_scope_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
+disabled_reasons = [{ when = "config_newer_schema", reason_key = "menu.read_only.newer_schema" }]
 
 [[menu.llm_menu]]
 type = "---"
@@ -4903,6 +5102,12 @@ i18n = "menu.shortcuts.key_combinations"
 checked_when = ["key_combinations_enabled"]
 platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
+# « CapsWord : désactivation automatique »: what ends CapsWord on its own, the
+# same submenu on the three drivers. Its rows are caps_word_auto_off_group.
+[[menu.shortcuts_menu]]
+type = "group"
+id = "caps_word_auto_off"
+i18n = "menu.caps_word.auto_off"
 # « Raccourcis de gestion du script »: the script chords, a group whose title
 # is ticked while its first-row switch is on. Its rows are
 # script_control_group, the same on the three drivers.
@@ -5277,6 +5482,46 @@ type = "---"
 type = "list"
 id = "script_control_shortcuts"
 
+# « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.
+# The delay is one choice row whose values the caps_word.idle_timeout registry
+# projects from the feature's preset_values. The delimiter rows are provider
+# data: each driver draws one checkbox per entry of the hotstring delimiter
+# catalogue, in its order and with its separators and labels, never a list of
+# its own. The pointer rows are provider data too: one checkbox per
+# [shortcuts.caps_word.pointer] kind, labelled by its description_key; a
+# driver the kind's platforms leave out draws it greyed with its reason_key
+# (disabled_reason_key), so the user sees why.
+[[menu.caps_word_auto_off_group]]
+type = "choice"
+id = "caps_word_idle_timeout"
+path = "shortcuts.caps_word.idle_timeout_seconds"
+i18n = "menu.caps_word.idle_timeout"
+choice_registry = "caps_word.idle_timeout"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+
+[[menu.caps_word_auto_off_group]]
+type = "---"
+
+[[menu.caps_word_auto_off_group]]
+type = "section_header"
+i18n = "menu.caps_word.terminators_header"
+
+[[menu.caps_word_auto_off_group]]
+type = "list"
+id = "caps_word_terminators"
+
+[[menu.caps_word_auto_off_group]]
+type = "---"
+
+[[menu.caps_word_auto_off_group]]
+type = "section_header"
+i18n = "menu.caps_word.pointer_header"
+
+[[menu.caps_word_auto_off_group]]
+type = "list"
+id = "caps_word_pointer_kinds"
+
 # Unrestricted: every driver draws this row from the declaration and registers
 # only what the click does. Windows used to insert its own master row by hand in
 # BuildMetricsMenu, which is why this row once excluded "ahk" — a second
@@ -5584,6 +5829,47 @@ id = "layout_features_altgr"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
+# The rows the emulation types, one checkbox each (the layout.emulate_<row>
+# switches). The other drivers emulate no layout: they draw each row greyed
+# with why, in the custom-layout section, without this header.
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.header_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_number_row"
+i18n = "menu.layout.emulate_number_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_top_row"
+i18n = "menu.layout.emulate_top_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_home_row"
+i18n = "menu.layout.emulate_home_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[menu.layout_menu]]
+type = "feature"
+path = "layout.emulate_bottom_row"
+i18n = "menu.layout.emulate_bottom_row"
+platforms = ["ahk"]
+unavailable = "grey"
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
 # The menubar icon, ONE row with its variants beneath it, last of the Ergopti
 # section. It was two sibling rows, one per variant, stored in hs.settings.
 [[menu.layout_menu]]
@@ -5597,6 +5883,7 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 [[menu.layout_menu]]
 type = "---"
 platforms = ["hs"]
+unavailable = "hide"
 
 # The input sources macOS has enabled, under a header of their own (« Sources
 # de saisie »): without it the list read as more Ergopti settings.
@@ -6661,9 +6948,12 @@ clear_exclude = ["gestures.enabled"]
 prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"]
 restore_exclude = []
 
+# A restore leaves the user's own hotstrings as they are: the personal sections
+# (hotstrings.personal on Windows, the "personal" group and the macOS editor's
+# "custom" group elsewhere) are not the shipped catalogue it recommends.
 [scopes.hotstrings]
 prefixes = ["hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key"]
-restore_exclude = ["hotstrings.preview_ai_enabled"]
+restore_exclude = ["hotstrings.preview_ai_enabled", "hotstrings.personal", "hotstrings.groups.personal", "hotstrings.modules.personal", "hotstrings.groups.custom", "hotstrings.modules.custom"]
 dynamic_defaults = [{ prefix = "category_enabled", depth = 1, default = false, recommended = true }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0 }]
 
 [scopes.llm]
@@ -6779,11 +7069,49 @@ description_key = "onboarding.page.keyboard_layout.description"
 master = { ahk = "category_enabled.layout" }
 checklist = "recommended"
 # The AltGr virtual-key compensation answers a custom layout detected at
-# runtime; it is not one of Ergopti's preferences to import.
-exclude = ["script.alt_gr_is_kana_remap"]
+# runtime; it is not one of Ergopti's preferences to import. The emulated
+# layout and the number-row ordering are the page's own controls (below), which
+# a Yes never prefills.
+exclude = ["script.alt_gr_is_kana_remap", "layout.ergopti_base", "layout.ergopti_variant", "layout.ergopti_alt_gr", "layout.direct_access_digits"]
 # macOS installs the layout as a system input source and Linux through its
 # desktop: both are chosen in the keyboard-layout menu, not switched here.
 note_key = { hs = "onboarding.page.keyboard_layout.system_note", linux = "onboarding.page.keyboard_layout.system_note" }
+
+# The layout step's persistent controls (the maintainer's request of October
+# 13): the emulated layout and its AltGr layer, the number-row emulation (its
+# base and Shift levels) and the number-row ordering, drawn on the page rather
+# than in its checklist. Each starts at the value in force and changes only
+# when the user changes it, so a new installation emulates no layout and
+# reorders nothing; a change redraws the controls alone. Layout emulation and the ordering are
+# Windows-only today: macOS and Linux draw the controls greyed with why.
+[[onboarding.pages.keyboard_layout.controls]]
+id = "emulated_layout"
+label_key = "onboarding.layout.emulated_layout"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+choices = [{ value = "none", label_key = "onboarding.layout.emulated_none", writes = { "layout.ergopti_base" = false, "layout.ergopti_variant" = "none", "layout.emulated_layout" = "" } }, { value = "ergopti", label_key = "onboarding.layout.emulated_ergopti", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti", "layout.emulated_layout" = "" } }, { value = "ergopti_plus", label_key = "onboarding.layout.emulated_ergopti_plus", writes = { "layout.ergopti_base" = true, "layout.ergopti_variant" = "ergopti_plus", "layout.emulated_layout" = "" } }]
+
+[[onboarding.pages.keyboard_layout.controls]]
+id = "alt_gr_emulation"
+label_key = "layout.ergoptialtgr"
+path = "layout.ergopti_alt_gr"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[onboarding.pages.keyboard_layout.controls]]
+id = "number_row_emulation"
+label_key = "onboarding.layout.number_row_emulation"
+path = "layout.emulate_number_row"
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+[[onboarding.pages.keyboard_layout.controls]]
+id = "number_row_order"
+label_key = "menu.layout.number_row"
+path = "layout.direct_access_digits"
+choice_label_prefix = "menu.layout.number_row_"
+platforms = ["ahk"]
+reason_key = "platform_reason.number_row_override_unsupported"
 
 [onboarding.pages.hotstrings]
 title_key = "menu.hotstrings.title"
@@ -7200,6 +7528,15 @@ id = "number_row_mode"
 path = "layout.direct_access_digits"
 i18n = "menu.layout.number_row"
 choice_label_prefix = "menu.layout.number_row_"
+
+# « Also reorder the three edge keys », after the ordering it extends. Each
+# driver greys it with why where the edge keys cannot join the ordering.
+[[menu.number_row_policy_rows]]
+type = "check"
+id = "number_row_edges"
+path = "layout.number_row_reorder_edges"
+i18n = "menu.layout.number_row_edges"
+checked_when = ["number_row_edges_enabled"]
 
 [[menu.apps_empty_rows]]
 type = "label"

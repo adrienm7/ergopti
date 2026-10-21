@@ -1255,16 +1255,12 @@ class TapHoldScopeOwner {
 		Source := Present ? FSReadUtf8Exact(this.path) : ""
 		if !(Source is String)
 			throw Error("The tap-hold source cannot be read.")
-		Existing := Present ? TOML_ParseFreshFile(this.path) : Map()
+		Existing := TOML_ParseDocument(Source)
 		Kinds := TapHoldFieldKinds()
 		Rows := [{ Section: "tap_hold", Key: "inherit_defaults", Delete: true }]
-		for Section, Fields in Existing {
-			if !RegExMatch(Section, "^tap_hold\.keys\.[A-Za-z0-9_]+$")
-				continue
-			for Field in Fields {
-				if Kinds.Has(Field)
-					Rows.Push({ Section: Section, Key: Field, Delete: true })
-			}
+		for KeyId, Fields in _TH_OwnedDocumentKeys(Existing) {
+			for Field in Fields
+				Rows.Push({ Section: "tap_hold.keys." . KeyId, Key: Field, Delete: true })
 		}
 		if this.mode == "recommended" {
 			if !FileExist(this.defaults)
@@ -1281,7 +1277,7 @@ class TapHoldScopeOwner {
 				}
 			}
 		}
-		Image := TOML_BuildUpdatedContent(this.path, Rows)
+		Image := _TH_BuildSemanticImage(this.path, Source, Present, Rows)
 		if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 				|| Image["source_present"] != Present || !(Image["source_content"] == Source)
 			throw Error("The tap-hold source changed or its scoped image could not be rendered.")
@@ -1311,10 +1307,10 @@ TapHoldConfigPathBeside(ConfigPath) {
 	return Folder . "\tap_hold.toml"
 }
 
-; Whether a loaded or parsed TOML value is true.
+; Whether a parsed source value carries genuine TOML Boolean intent.
 ; @param Value any
 ; @returns {Boolean}
-_TH_TomlTrue(Value) => (Value is TOML_Bool) ? Value.Value : ((Value is Integer) && Value == 1)
+_TH_TomlTrue(Value) => (Value is TOML_Bool) && Value.Value
 
 ; Same type and value; strings compare case-sensitively, TOML Booleans by value.
 ; @returns {Boolean}
@@ -1339,23 +1335,41 @@ _TH_SameOwnedFields(Left, Right) {
 	return true
 }
 
-; The owned fields of every [tap_hold.keys.<id>] section of a parsed file.
-; @param Sections Map From TOML_ParseFreshFileTyped.
-; @returns {Map} Key id -> Map of owned fields.
-_TH_OwnedKeySections(Sections) {
+; The typed document keeps exact namespace identity for every admitted spelling.
+; Unknown leaves and table-array members never lend a key identity to this owner.
+_TH_OwnedDocumentKeys(Document) {
 	Kinds := TapHoldFieldKinds()
 	Keys := Map()
-	for Section, Fields in Sections {
-		if !RegExMatch(Section, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &Match)
+	Root := Document.Get("tap_hold", Map())
+	if !(Root is Map)
+		throw ValueError("The tap_hold source namespace must be a table.")
+	Entries := Root.Get("keys", Map())
+	if !(Entries is Map)
+		throw ValueError("The tap_hold.keys source namespace must be a table.")
+	for KeyId, Fields in Entries {
+		if !RegExMatch(KeyId, "^[A-Za-z0-9_]+$") || !(Fields is Map)
 			continue
 		Owned := Map()
 		for Field, Value in Fields {
 			if Kinds.Has(Field)
 				Owned[Field] := Value
 		}
-		Keys[Match[1]] := Owned
+		Keys[KeyId] := Owned
 	}
 	return Keys
+}
+
+; Tap-hold files have no config.toml schema metadata. Build a detached image
+; through the same semantic leaf owner as per-key duration persistence, without
+; config.toml first-use stamping or publication of a runtime cache.
+_TH_BuildSemanticImage(Path, Source, Present, Rows) {
+	if TOML_WriteRefusal(Path) != ""
+		throw Error("The tap-hold source is read-only for this session.")
+	Admitted := TOML_BuildConfigDocumentCandidate(Source, Rows, [])
+	if !_TOML_WriteSourceMatches(Path, Present, Source)
+		throw Error("The tap-hold source changed during candidate preparation.")
+	return Map("status", "ok", "kind", "rendered", "content", Admitted["content"],
+		"source_present", Present, "source_content", Source, "preserve_source", Admitted["preserve_source"])
 }
 
 ; The first-run wizard's view of a tap_hold.toml, read fresh from disk: each
@@ -1369,17 +1383,25 @@ _TH_OwnedKeySections(Sections) {
 TapHoldKeyReport(Path, Defaults) {
 	if !FileExist(Path)
 		return Map()
-	Sections := TOML_ParseFreshFileTyped(Path, &DiscardedArrays)
-	if TOML_ReadFailed(Path) || DiscardedArrays
+	try Document := TOML_ParseDocument(FSReadStrict(Path))
+	catch
 		return "the tap-hold file '" . Path . "' could not be read"
+	try return _TH_KeyReportDocument(Document, Defaults)
+	catch
+		return "the tap-hold file '" . Path . "' could not be read"
+}
+
+; Report and import inspect the same captured source instead of racing a second
+; file read between the customised-key refusal and candidate construction.
+_TH_KeyReportDocument(Document, Defaults) {
 	Preset := LoadTapHoldToml(Defaults)["keys"]
 	Keys := Map()
-	Root := Sections.Get("tap_hold", Map())
+	Root := Document.Get("tap_hold", Map())
 	if Root.Has("inherit_defaults") && _TH_TomlTrue(Root["inherit_defaults"]) {
 		for KeyId, Fields in Preset
 			Keys[KeyId] := _TH_CloneData(Fields)
 	}
-	for KeyId, Fields in _TH_OwnedKeySections(Sections) {
+	for KeyId, Fields in _TH_OwnedDocumentKeys(Document) {
 		if !Keys.Has(KeyId)
 			Keys[KeyId] := Map()
 		; A modifier hold and a layer hold exclude each other, as in the loader.
@@ -1440,10 +1462,12 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 	if TOML_UnreadableFile(Defaults) || Preset["keys"].Count == 0
 		throw Error("The canonical tap-hold preset is unreadable or empty.")
 	Present := FileExist(Path) ? 1 : 0
-	Existing := Present ? TOML_ParseFreshFile(Path) : Map()
-	Report := TapHoldKeyReport(Path, Defaults)
-	if (Report is String)
-		throw Error(Report)
+	Source := Present ? FSReadUtf8Exact(Path) : ""
+	if !(Source is String)
+		throw Error("The tap-hold source cannot be read.")
+	Document := TOML_ParseDocument(Source)
+	Existing := _TH_OwnedDocumentKeys(Document)
+	Report := _TH_KeyReportDocument(Document, Defaults)
 	Kinds := TapHoldFieldKinds()
 	Rows := []
 	Imported := Map()
@@ -1456,8 +1480,8 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			throw ValueError("Tap-hold key '" . KeyId . "' holds the user's own setting.")
 		Imported[KeyId] := true
 		Section := "tap_hold.keys." . KeyId
-		if Existing.Has(Section) {
-			for Field in Existing[Section] {
+		if Existing.Has(KeyId) {
+			for Field in Existing[KeyId] {
 				if Kinds.Has(Field)
 					Rows.Push({ Section: Section, Key: Field, Delete: true })
 			}
@@ -1469,7 +1493,7 @@ TapHoldImportImage(Path, Defaults, KeyIds) {
 			Rows.Push({ Section: Section, Key: Field, Value: Serialized })
 		}
 	}
-	Image := TOML_BuildUpdatedContent(Path, Rows)
+	Image := _TH_BuildSemanticImage(Path, Source, Present, Rows)
 	if !(Image is Map) || Image.Get("status", "") != "ok" || Image.Get("kind", "") != "rendered"
 			|| Image["source_present"] != Present
 		throw Error("The tap-hold file '" . Path . "' could not be read or rendered.")

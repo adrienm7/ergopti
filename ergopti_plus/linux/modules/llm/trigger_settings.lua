@@ -100,8 +100,10 @@ end
 --- Persists before publishing the live value.
 --- @param name string
 --- @param value number|boolean
+--- @param expected_source table|nil Exact source retained by a deferred editor.
+--- @param admission function|nil Final originating configuration admission.
 --- @return boolean
-function M.set(name, value, expected_source)
+function M.set(name, value, expected_source, admission)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then
 		Logger.error(LOG, "Refused invalid trigger setting %s=%s.", tostring(name), tostring(value))
@@ -113,9 +115,10 @@ function M.set(name, value, expected_source)
 		return false
 	end
 	local persisted
-	if expected_source ~= nil then
-		if type(expected_source) ~= "table" or type(Storage.set_many) ~= "function" then return false end
-		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source)
+	if expected_source ~= nil or admission ~= nil then
+		if type(expected_source) ~= "table" or admission ~= nil and type(admission) ~= "function"
+			or type(Storage.set_many) ~= "function" then return false end
+		persisted = Storage.set_many({[PREF_PREFIX .. name] = value}, expected_source, admission)
 	else
 		persisted = Storage.set(PREF_PREFIX .. name, value)
 	end

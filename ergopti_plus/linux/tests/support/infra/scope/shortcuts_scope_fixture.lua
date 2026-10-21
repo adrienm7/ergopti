@@ -107,7 +107,7 @@ local function with_scope(body, source, options)
 				helpers.assert_true(combinations.install({ keys = loaded_pairs.catalog, hold_picker = loaded_pairs.hold_picker,
 					files = files, route = function() return path end, is_paused = function() return controls.paused end,
 					actions = { is_assignable = function(action)
-						return action ~= "one_shot_shift" and action ~= "caps_word" and gestures.is_assignable(action) == true
+						return action ~= "one_shot_shift" and gestures.is_assignable(action) == true
 					end },
 					changed = function() controls.pair_changes = controls.pair_changes + 1; return true end }))
 			end

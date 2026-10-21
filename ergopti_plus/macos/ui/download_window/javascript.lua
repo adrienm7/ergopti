@@ -25,11 +25,19 @@ function M.new_context(session, kind)
 	return { session = session, kind = kind, reported = {} }
 end
 
+--- Revokes diagnostics before an operation is hidden or replaced.
+--- @param context table State returned by new_context for the retiring operation.
+function M.retire(context)
+	assert(type(context) == "table" and type(context.reported) == "table",
+		"JavaScript retirement requires an operation diagnostic context")
+	context.retired = true
+end
+
 --- Reports each failure category once per operation, before returning control.
 --- @param context table Operation-owned diagnostic state.
 --- @param category string Fixed internal failure category.
 local function report(context, category)
-	if context.reported[category] then return end
+	if context.retired or context.reported[category] then return end
 	context.reported[category] = true
 	-- Native errors may echo script literals; neither their messages nor the
 	-- submitted JavaScript belong in diagnostic logs
@@ -46,6 +54,7 @@ function M.execute(view, code, context)
 	assert(type(code) == "string", "JavaScript execution requires a string payload")
 	assert(type(context) == "table" and type(context.reported) == "table",
 		"JavaScript execution requires an operation diagnostic context")
+	if context.retired then return false end
 	local ok, result = pcall(function()
 		return view:evaluateJavaScript(code, function(_, script_error)
 			if WebviewResult.is_error(script_error) then report(context, "execution failed") end
@@ -59,7 +68,7 @@ function M.execute(view, code, context)
 		report(context, "submission refused")
 		return false
 	end
-	return true
+	return not context.retired
 end
 
 return M

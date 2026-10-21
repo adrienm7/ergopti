@@ -39,6 +39,7 @@ local _wv        = nil
 local _wv_committed = false
 local _focus_owner = nil
 local _ucc       = nil
+local _releasing_controller = false
 local _ready     = false
 local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
@@ -47,6 +48,24 @@ local _selection_owner = nil
 local _javascript_failures = {}
 local _session = 0
 local _rejected_session_logged = false
+
+--- Releases a callback only after the native controller acknowledges its unref.
+--- @param controller userdata|table|nil Exact controller to release.
+--- @return boolean released Refusals retain cleanup-only ownership.
+local function release_controller(controller)
+	if _releasing_controller then return false end
+	if controller == nil or _ucc ~= controller then return true end
+	_releasing_controller = true
+	local ok, result = pcall(controller.setCallback, controller, nil)
+	local released = ok and result == controller
+	if released then
+		if _ucc == controller then _ucc = nil end
+	else
+		Logger.error(LOG, "Model browser callback release did not commit; exact controller retained: %s.", tostring(result))
+	end
+	_releasing_controller = false
+	return released
+end
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/model_browser/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -70,7 +89,13 @@ local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
 --- @return boolean submitted Whether the native view accepted the script.
 local function submit_javascript(view, code)
 	local failures = _javascript_failures
+	local session, controller, focus_owner = _session, _ucc, _focus_owner
+	local function current()
+		return focus_owner ~= nil and _focus_owner == focus_owner and _wv == view
+			and _ucc == controller and _session == session and _wv_committed == true
+	end
 	local function report(category)
+		if not current() then return end
 		if failures[category] then return end
 		failures[category] = true
 		-- Native errors can echo the catalogue payload; report only fixed metadata
@@ -83,7 +108,7 @@ local function submit_javascript(view, code)
 	end)
 	if not ok then report("submission raised"); return false end
 	if result ~= view then report("submission refused"); return false end
-	return true
+	return current()
 end
 
 --- Queues catalogue scripts until the native page reports readiness.
@@ -173,8 +198,9 @@ local function create_ucc()
 		return nil
 	end
 	local controller = controller_or_err
+	_ucc = controller
 	local callback_set, callback_err = xpcall(function()
-		controller:setCallback(function(msg)
+		return controller:setCallback(function(msg)
 			if _ucc ~= controller then return end
 			if type(msg) ~= "table" then return end
 			local body = msg.body
@@ -231,7 +257,8 @@ local function create_ucc()
 			end
 		end)
 	end, debug.traceback)
-	if not callback_set then
+	if not callback_set or callback_err ~= controller then
+		release_controller(controller)
 		Logger.error(LOG, "Failed to bind the model browser bridge: %s.",
 			tostring(callback_err))
 		return nil
@@ -258,6 +285,8 @@ function M.open(ctx)
 		Logger.error(LOG, "M.open() requires a context table.")
 		return false
 	end
+	if _releasing_controller then return false end
+	if not _wv and not release_controller(_ucc) then return false end
 	_session = _session + 1
 	_rejected_session_logged = false
 	local session = _session
@@ -294,7 +323,7 @@ function M.open(ctx)
 
 	local geo = ui_builder.get_app_geometry("model_browser")
 	if not geo then
-		if _ucc == usercontent then _ucc = nil end
+		release_controller(usercontent)
 		return false
 	end
 	local candidate = nil
@@ -310,6 +339,7 @@ function M.open(ctx)
 	end
 	local show_ok, webview_or_err = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 			title             = i18n.get("model_browser.window_title"),
 			style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
@@ -333,7 +363,7 @@ function M.open(ctx)
 				if _wv ~= candidate then return end
 				_wv = nil
 				_wv_committed = false
-				if _ucc == usercontent then _ucc = nil end
+				release_controller(usercontent)
 				_ready = false
 				_queued = {}
 				_selection_owner = nil
@@ -355,7 +385,7 @@ function M.open(ctx)
 		if candidate ~= nil and _wv == candidate and M.close() ~= true then
 			Logger.error(LOG, "Model browser construction rollback remains pending.")
 		end
-		if (candidate == nil or _wv ~= candidate) and _ucc == usercontent then _ucc = nil end
+		if candidate == nil or _wv ~= candidate then release_controller(usercontent) end
 		Logger.error(LOG, "Model browser WebView creation failed.")
 		return false
 	end
@@ -375,7 +405,8 @@ end
 
 --- Closes the model browser window if open.
 function M.close()
-	if not _wv then return true end
+	if _releasing_controller then return false end
+	if not _wv then return release_controller(_ucc) end
 	_focus_owner = nil
 	local owned = _wv
 	local owned_ucc = _ucc
@@ -401,9 +432,9 @@ function M.close()
 		_queued = {}
 		_selection_owner = nil
 	end
-	if _ucc == owned_ucc then _ucc = nil end
+	local controller_settled = release_controller(owned_ucc)
 	Logger.info(LOG, "Model browser closed.")
-	return true
+	return controller_settled
 end
 
 -- Exposed for unit tests only — pure catalogue-normalisation helpers with no

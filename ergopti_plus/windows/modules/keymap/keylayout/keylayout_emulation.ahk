@@ -107,6 +107,115 @@ global _KLE_ResetObserverCohort := 0
 global _KLE_ResetObserverCapture := 0
 global _KLE_ResetObserverGeneration := 0
 
+/**
+ * The physical rows the layout emulation (a registry layout or the built-in
+ * Ergopti one) can leave to the OS layout, each behind its own [layout] switch
+ * (emulate_<row>, on by default): a row switched off types what the OS layout
+ * types there, on every level the emulation would have typed (base, Shift,
+ * CapsLock, AltGr and the shortcut chords). The keys come from the shared
+ * physical-key registry through the shared policy (LayoutRowsPolicyKeys), read
+ * once: the number row from the key left of 1 to the two right of 0, the top
+ * row from the key right of Tab, the home row from the key right of CapsLock
+ * (with the ISO key left of Enter), the bottom row from the ISO key left of Z.
+ * @param {String} SharedRoot The _shared folder; the driver's own when omitted.
+ * @returns {Map} Row id -> Array of scan code names ("SC010"), left to right.
+ */
+LayoutEmulationRows(SharedRoot := unset) {
+	static Rows := 0
+	global _SharedDir
+	if Rows is Map
+		return Rows
+	Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
+	Registry := JsonParse(FSReadStrict(Root . "\data\keycodes\physical_keys.json"))
+	Built := Map()
+	for Row, Codes in LayoutRowsPolicyKeys(Registry) {
+		Names := []
+		for Code in Codes
+			Names.Push(StrUpper(Registry["keys"][Code]["ahk"]))
+		Built[Row] := Names
+	}
+	Rows := Built
+	return Rows
+}
+
+/**
+ * The row of a physical key, "" for a key outside the four rows (the space
+ * bar, the modifiers...), which the row switches never leave to the OS.
+ * @param {String} Sc Scan code name ("SC010").
+ * @returns {String}
+ */
+LayoutRowOf(Sc) {
+	static RowOf := 0
+	if !(RowOf is Map) {
+		Built := Map()
+		for Row, Keys in LayoutEmulationRows()
+			for Key in Keys
+				Built[Key] := Row
+		RowOf := Built
+	}
+	return RowOf.Get(StrUpper(Sc), "")
+}
+
+/**
+ * The four row switches in force: the stored ones, each absent one at its
+ * manifest default. Before Features is loaded (early boot, the parse-time
+ * criteria) every switch is at its manifest default.
+ * @returns {Map} "emulate_<row>" -> Boolean.
+ */
+LayoutRowSwitches() {
+	global Features, LAYOUT_ROWS_POLICY_IDS
+	Layout := IsSet(Features) && Features is Map && Features.Has("layout") && Features["layout"] is Map
+		? Features["layout"] : Map()
+	Switches := Map()
+	for Row in LAYOUT_ROWS_POLICY_IDS {
+		Key := "emulate_" . Row
+		Switches[Key] := Layout.Has(Key) ? Layout[Key] : ManifestDefaultFor("layout." . Key)
+	}
+	return Switches
+}
+
+/**
+ * Whether every row switch is on, as the manifest ships them: the emulation
+ * then types every key it covers, and the row of a key need not be looked up.
+ * @param {Map} Switches LayoutRowSwitches().
+ * @returns {Boolean}
+ */
+LayoutRowsAllEmulated(Switches := unset) {
+	global LAYOUT_ROWS_POLICY_IDS
+	if !IsSet(Switches)
+		Switches := LayoutRowSwitches()
+	for Row in LAYOUT_ROWS_POLICY_IDS {
+		if !LayoutRowsPolicyEmulates(Switches, Row)
+			return false
+	}
+	return true
+}
+
+/**
+ * Whether the layout emulation types key Sc: its row's switch is on.
+ * @param {String} Sc Scan code name ("SC010").
+ * @returns {Boolean}
+ */
+LayoutRowIsEmulated(Sc) {
+	Switches := LayoutRowSwitches()
+	if LayoutRowsAllEmulated(Switches)
+		return true
+	Row := LayoutRowOf(Sc)
+	return Row == "" || LayoutRowsPolicyEmulates(Switches, Row)
+}
+
+/**
+ * The same for a hotkey name, read from its last scan code: "SC138 & SC010"
+ * is the AltGr level of SC010. A HotIf criterion receives this name.
+ * @param {String} HotkeyName
+ * @returns {Boolean}
+ */
+LayoutRowIsEmulatedHotkey(HotkeyName) {
+	if !(HotkeyName is String) || !RegExMatch(HotkeyName, "i)(SC[0-9A-F]{3})(?!.*SC[0-9A-F]{3})", &Found)
+		return true
+	return LayoutRowIsEmulated(Found[1])
+}
+
 _KLE_AltGrBindingOwner("initialize")
 _KLE_CanonicalSourceOwner("initialize")
 
@@ -173,7 +282,9 @@ _KLE_BaseCriterion(Sc, Shift, ForegroundFn := 0, *) {
 		return true
 	if !Shift && _KLE_MagicKeyOwnsKey(Sc)
 		return false
-	return KeylayoutEmulation_LayerIsActive("ergopti_base") && !_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn)
+	; A row switched off is the OS layout's (LayoutRowIsEmulated).
+	return KeylayoutEmulation_LayerIsActive("ergopti_base") && LayoutRowIsEmulated(Sc)
+		&& !_KLE_DigitsOwnKey(Sc, Shift, ForegroundFn)
 }
 
 ; The magic key is an Ergopti feature tied to the layout that declares it: when
@@ -192,15 +303,23 @@ _KLE_MagicKeyOwnsKey(Sc) {
 
 _KLE_DigitsOwnKey(Sc, Shift, ForegroundFn := 0) {
 	global Features, _SHIFT_DIGIT_SCS
-	if NumberRowEffectiveMode() != "digits"
+	; The ordering in effect on the layout of the press (the seam's in tests).
+	if IsObject(ForegroundFn) {
+		Hkl := ForegroundFn.Call()
+		Effective := NumberRowEffectiveMode(Hkl)
+	} else
+		Effective := NumberRowEffectiveMode()
+	if Effective != "digits"
 		return false
 	if Shift {
-		Hkl := IsObject(ForegroundFn) ? ForegroundFn.Call() : GetForegroundKeyboardLayout()
+		if !IsSet(Hkl)
+			Hkl := GetForegroundKeyboardLayout()
 		Code := Integer("0x" . SubStr(Sc, 3))
 		return _SHIFT_DIGIT_SCS.Has(Sc) && _DigitRowSwapResolution(Code, Hkl)["swap"]
 	}
 	Code := Integer("0x" . SubStr(Sc, 3))
-	return _SHIFT_DIGIT_SCS.Has(Sc) || ErgoptiNumberRowEdgeMapping().Has(Code)
+	; Only the ten digit keys: the edge keys keep the emulation's own level.
+	return _SHIFT_DIGIT_SCS.Has(Sc)
 }
 
 /**
@@ -214,7 +333,8 @@ KeylayoutEmulation_NumberRowLevels(Sc, Caps) {
 	if !KeylayoutEmulation_LayerIsActive("ergopti_base")
 		return 0
 	Name := Format("SC{:03X}", Sc)
-	if !KLE_KeyCodes.Has(Name)
+	; A number row switched off is the OS layout's, so is its ordering.
+	if !KLE_KeyCodes.Has(Name) || !LayoutRowIsEmulated(Name)
 		return 0
 	Code := KLE_KeyCodes[Name]
 	return Map(
@@ -222,8 +342,8 @@ KeylayoutEmulation_NumberRowLevels(Sc, Caps) {
 		"shift", Keylayout_Resolve(KLE_Model, KLE_LevelIndex[_KLE_ComboKey(true, Caps, false)], Code))
 }
 
-_KLE_ShortcutCriterion(*) {
-	return KeylayoutEmulation_LayerIsActive("ergopti_base")
+_KLE_ShortcutCriterion(HotkeyName := "", *) {
+	return KeylayoutEmulation_LayerIsActive("ergopti_base") && LayoutRowIsEmulatedHotkey(HotkeyName)
 }
 
 
@@ -389,13 +509,16 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 	global KLE_Model, KLE_State, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE, Features
 	Code := Integer("0x" . SubStr(Sc, 3))
 	Native := KS_KeyTextNoStateChange(KS_ScancodeToVk(Code, Hkl), Code, Hkl, Shift, Caps)
-	if NumberRowEffectiveMode() == "digits" {
+	if NumberRowEffectiveMode(Hkl, Caps) == "digits" {
 		if !Shift && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: Mod(Code - 1, 10) . ""}
-		else if !Shift && ErgoptiNumberRowEdgeMapping().Has(Code)
-			Native := {Count: 1, Text: ErgoptiNumberRowEdgeMapping()[Code]}
 		else if Shift && DigitRowIsSwapped(Hkl) && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: DigitRowSwapSymbol(Code, Hkl)}
+	} else if Code >= 0x02 && Code <= 0x0B {
+		; « Symbols first » on the native row continues a registry dead key too.
+		Swapped := NumberRowSymbolsFirstText(Code, Shift, Hkl, Caps)
+		if Swapped != ""
+			Native := {Count: 1, Text: Swapped}
 	}
 	Transitions := KLE_Compositions.Get(KLE_State, Map())
 	if Native.Count > 0 && Transitions.Has(Native.Text) {
@@ -550,7 +673,7 @@ _KLE_StepCapturedResetObserver(Proof, Event, State) {
 _KLE_Emit(Sc, Shift, Option) {
 	_AtCrit := Critical("On")
 	try {
-		Output := KeylayoutEmulation_Press(Sc, Shift, GetKeyState("CapsLock", "T"), Option)
+		Output := KeylayoutEmulation_Press(Sc, Shift, KS_CapsLockToggleState(), Option)
 		if (Output != "")
 			SendNewResult(Output)
 	} finally {
@@ -561,9 +684,9 @@ _KLE_Emit(Sc, Shift, Option) {
 _KLE_OnKey(Sc, Shift, *) {
 	global _SHIFT_DIGIT_SCS
 	if NumberRowEffectiveMode() == "symbols" && _SHIFT_DIGIT_SCS.Has(Sc)
-			&& NumberRowSymbolsCapable(GetKeyState("CapsLock", "T")) {
+			&& NumberRowSymbolsCapable(KS_CapsLockToggleState()) {
 		Code := Integer("0x" . SubStr(Sc, 3))
-		Level := NumberRowSymbolsLevel(Code, GetKeyState("CapsLock", "T"))
+		Level := NumberRowSymbolsLevel(Code, KS_CapsLockToggleState())
 		if Level["supported"] {
 			; Walk the same original source action machine, including pending dead
 			; keys and repeats. Ctrl/AltGr registrations retain their own levels.
@@ -588,7 +711,7 @@ _KLE_OnKey(Sc, Shift, *) {
 	}
 	_AtCrit := Critical("On")
 	try {
-		Step := KeylayoutEmulation_PressNative(Sc, Shift, GetKeyState("CapsLock", "T"), GetForegroundKeyboardLayout())
+		Step := KeylayoutEmulation_PressNative(Sc, Shift, KS_CapsLockToggleState(), GetForegroundKeyboardLayout())
 		if Step["Output"] != ""
 			SendNewResult(Step["Output"])
 		if Step["Native"]
@@ -620,8 +743,9 @@ _KLE_OnShortcut(Sc, Mods, *) {
 	}
 }
 
-_KLE_AltGrCriterion(*) {
+_KLE_AltGrCriterion(HotkeyName := "", *) {
 	return KeylayoutEmulation_LayerIsActive("ergopti_alt_gr") && IsRealAltGrPress()
+		&& LayoutRowIsEmulatedHotkey(HotkeyName)
 }
 
 _KLE_PendingDeadKeyCriterion(*) {
@@ -644,8 +768,8 @@ _KLE_PendingDeadKeyCriterion(*) {
  * They stay inert until a layout is loaded. Must run before the Ergopti
  * layers register theirs (see the module header).
  * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
- * @param {Func} HotkeyFn - Hotkey(Name, Callback, Options) implementation.
- * @param {Func} HotIfFn - HotIf(Criterion?) implementation.
+ * @param {Func} HotkeyFn - The Hotkey built-in, or a stand-in taking Name, Callback, Options.
+ * @param {Func} HotIfFn - The HotIf built-in, or a stand-in taking an optional Criterion.
  * @param {Func|Integer} ForegroundFn Foreground layout reader; native by default.
  * @returns {Integer} Number of hotkeys registered.
  * @throws {Error} On a second registration.
@@ -896,6 +1020,7 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 	_KLE_RegisterBindings(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
 			BrokerFn := MagicEditorRecordLayoutFallback) {
 		local Count
+		static WinCriteria := Map()
 		global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
 		global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
 		global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverGeneration
@@ -934,9 +1059,13 @@ _KLE_AltGrBindingOwner(Request, Args*) {
 				HotIfFn.Call(_KLE_ShortcutCriterion)
 				for Prefix in KLE_SHORTCUT_PREFIXES {
 					Level := (SubStr(Prefix, 1, 1) == "!") ? KLE_ALT_INPUT_LEVEL : KLE_INPUT_LEVEL
-					if Prefix == "#"
-						BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), _KLE_ShortcutCriterion)
-					else
+					if Prefix == "#" {
+						; The broker calls admission without a HotIf name. Retain the
+						; physical row here, including across a registration retry.
+						if !WinCriteria.Has(Sc)
+							WinCriteria[Sc] := _KLE_ShortcutCriterion.Bind("#" . Sc)
+						BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), WinCriteria[Sc])
+					} else
 						HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
 					Count += 1
 				}

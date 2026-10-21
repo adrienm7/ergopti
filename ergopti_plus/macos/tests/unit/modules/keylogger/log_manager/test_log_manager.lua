@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 local saved_file_system = package.loaded["adapters.file_system"]
 
 
@@ -117,7 +118,7 @@ local hs_overrides = {
 	execute = function() return "" end,
 }
 
-local LM = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+local LM = EmptyLedger.load(hs_overrides)
 
 
 
@@ -183,7 +184,7 @@ helpers.describe("log_manager — pre-init guards", function()
 
 	-- Fresh module so _state is nil, and so its Rotation upvalue is the proxy.
 	package.loaded["modules.keylogger.log_manager"] = nil
-	local fresh = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+	local fresh = EmptyLedger.load(hs_overrides)
 
 	helpers.it("flush_buffer writes nothing before init", function()
 		writes.append = 0
@@ -294,7 +295,7 @@ end)
 
 helpers.describe("log_manager — M.init()", function()
 	helpers.it("rejects nil core_state", function()
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		lm.init(nil)
 		-- The guard must PREVENT the delegate, not merely survive it. Called
 		-- directly so a raise fails with the real error; the assertion is that the
@@ -306,7 +307,7 @@ helpers.describe("log_manager — M.init()", function()
 	end)
 
 	helpers.it("rejects core_state without LOG_DIR string", function()
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		lm.init({ some = "table", LOG_DIR = 42 })
 		local written = lm.flush_buffer()
 		helpers.assert_true(written == nil or written == false or written == 0,
@@ -315,7 +316,7 @@ helpers.describe("log_manager — M.init()", function()
 	end)
 
 	helpers.it("accepts a valid core_state and becomes usable", function()
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		lm.init({
 				LOG_DIR              = "/tmp/test_ergopti_metrics",
 				buffer_events        = {},
@@ -339,7 +340,7 @@ helpers.describe("log_manager — M.init()", function()
 	end)
 
 	helpers.it("ignores duplicate init calls", function()
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		local state = {
 			LOG_DIR = "/tmp/test2",
 			buffer_events = {}, buffer_text = "", rich_chunks = {},
@@ -371,7 +372,7 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 	--- Returns the lm instance. The Rotation.append_log stub captures the entry.
 	local function make_lm_with_buffer(events, extra_state)
 		_appended_entries = {}
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		local state = {
 			LOG_DIR = "/tmp/wpm_test",
 			buffer_events        = events or {},
@@ -501,7 +502,7 @@ helpers.describe("log_manager — flush_buffer WPM formula", function()
 			pending_keyup = {}, today_idx = {}, manifest = {},
 			session_app_name = "App",
 		}
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		lm.init(state_ref)
 		lm.flush_buffer()
 		-- After flush the buffer is reset to empty.
@@ -522,7 +523,7 @@ end)
 helpers.describe("log_manager — log delegate entry points", function()
 	local function make_initialized_lm()
 		_appended_entries = {}
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+		local lm = EmptyLedger.load(hs_overrides)
 		lm.init({
 			LOG_DIR = "/tmp/delegate_test",
 			buffer_events = {}, buffer_text = "", rich_chunks = {},
@@ -649,7 +650,7 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 
 	helpers.it("ingest timer is running after init", function()
 		lm_timer_running = false
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		local lm = EmptyLedger.load(hs_tracking_overrides)
 		lm.init(make_lm_lifecycle_state())
 		helpers.assert_true(lm_timer_running,
 			"ingest timer must be started by M.init()")
@@ -657,7 +658,7 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 
 	helpers.it("stop() halts the ingest timer", function()
 		lm_timer_running = false
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		local lm = EmptyLedger.load(hs_tracking_overrides)
 		lm.init(make_lm_lifecycle_state())
 		lm.stop()
 		helpers.assert_eq(lm_timer_running, false,
@@ -668,7 +669,7 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 		-- Pre-fix: no ensure_ingest_running() — the ingest loop stayed dead after stop().
 		-- Post-fix: calling it after stop() recreates and starts the ingest timer.
 		lm_timer_running = false
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		local lm = EmptyLedger.load(hs_tracking_overrides)
 		lm.init(make_lm_lifecycle_state())
 		lm.stop()
 		lm.ensure_ingest_running()
@@ -678,7 +679,7 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 
 	helpers.it("ensure_ingest_running() is a no-op before init", function()
 		lm_timer_running = false
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_tracking_overrides)
+		local lm = EmptyLedger.load(hs_tracking_overrides)
 		helpers.assert_eq(false, lm.ensure_ingest_running(),
 			"the exact acquisition contract must fail closed before initialization")
 		helpers.assert_eq(lm_timer_running, false,
@@ -706,7 +707,7 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 				secondsSinceEpoch = function() return 0 end,
 			},
 		}
-		local lm = helpers.load_with_stubs("modules.keylogger.log_manager", tracking_overrides_2)
+		local lm = EmptyLedger.load(tracking_overrides_2)
 		lm.init(make_lm_lifecycle_state())
 		local after_init = created_count
 		lm.ensure_ingest_running()

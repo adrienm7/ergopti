@@ -81,7 +81,8 @@ local _runtime_closed = false
 local _runtime_owner, _runtime_request = nil, nil
 local retire_runtime_request, stop_runtime_app
 local _request_epoch = 0
-local Collision = { navigation = NavigationSettings.capture_collision_configuration }
+local Collision = { navigation = NavigationSettings.capture_collision_configuration,
+	api_selections = setmetatable({}, { __mode = "k" }), inventory = {} }
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
 -- tells the user it was refused (a desktop notification in the daemon).
@@ -343,11 +344,13 @@ local function hide_overlay()
 	if _overlay and type(_overlay.hide) == "function" then _overlay.hide() end
 end
 
-local function clear_offer()
-	hide_overlay()
+local function clear_offer(defer_hide)
+	-- Revoke the old offer before a native hide callback can publish a successor.
+	-- Accepted output defers that callback until its transport has been retired.
 	_suggestions = {}
 	_suggestion_context = nil
 	_offer_notified = false
+	if not defer_hide then hide_overlay() end
 end
 
 local function show_candidates(candidates, meta)
@@ -509,6 +512,8 @@ end
 --- Initialises the engine and its explicit side-effect seams.
 --- @param opts table|nil Optional privacy_guard returns false only for admitted
 --- ownership; privacy_context returns its joined { app_id, title, native_identity }.
+--- apply_prediction acknowledges committed output with true; false, "dry_run"
+--- refuses diagnostic output without treating it as a transport failure.
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
 	Collision.construction = nil
@@ -520,6 +525,7 @@ function M.init(opts)
 	_enable_generation = _enable_generation + 1
 	local collision_revision, collision_construction = _enable_generation
 	local options = type(opts) == "table" and opts or {}
+	local on_models_changed = type(options.on_models_changed) == "function" and options.on_models_changed or nil
 	_engine = options.engine
 	_keyboard_hook = options.keyboard_hook
 	_overlay = type(options.overlay) == "table" and options.overlay or nil
@@ -571,7 +577,9 @@ function M.init(opts)
 
 	local profiles = get_profiles()
 	if profiles then
-		profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT })
+		if profiles.init({ port = HttpBridge.OLLAMA_DEFAULT_PORT, on_models_changed = on_models_changed }) == false then return false end
+		Collision.inventory.profiles, Collision.inventory.cancel, Collision.inventory.pending =
+			profiles, profiles.cancel_model_inventory, profiles.model_inventory_pending
 		if _runtime_closed or _scope_owner then return false end
 		if type(profiles.is_enabled) == "function" then
 			local enabled = profiles.is_enabled()
@@ -719,17 +727,30 @@ end
 function M.predict(context, output_context, override)
 	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
+	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return false
 	end
+	local function admission_current()
+		return not _runtime_closed and _scope_owner == nil and not _predicting
+			and request == _request_epoch and app_epoch == _runtime_app_epoch
+			and engine == _engine and owner == _runtime_owner
+	end
 
+	if not admission_current() then return false end
 	local focus = _buffer_focus or current_focus()
-	if focus == "" or current_focus() ~= focus then
+	if not admission_current() then return false end
+	local observed_focus = focus ~= "" and current_focus() or ""
+	-- A native admission barrier may dispatch cancellation or a newer request
+	-- even when it returns the same field. The older admission owns no cleanup.
+	if not admission_current() then return false end
+	if focus == "" or observed_focus ~= focus then
 		Logger.info(LOG, "Prediction suppressed: the native typing target is unavailable or changed.")
 		return false
 	end
 	local backend, target, model, runtime_response = M.resolve_backend()
+	if not admission_current() then return false end
 	if not backend then return end
 
 	local clean_context, trigger_chars = context_without_trigger(context,
@@ -777,6 +798,7 @@ function M.predict(context, output_context, override)
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
+	if not admission_current() then return false end
 	_suggestion_context = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = trigger_chars,
@@ -817,10 +839,18 @@ function M.predict(context, output_context, override)
 
 	local function request_current(verify_focus)
 		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
-		if verify_focus and (global_privacy_blocks() or current_focus() ~= focus) then
-			Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
-			M.dismiss()
-			return false
+		if verify_focus then
+			local blocked = global_privacy_blocks()
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+			if not blocked then blocked = current_focus() ~= focus end
+			-- Native focus and privacy barriers can dispatch cancellation, a scope
+			-- change or a successor request. Only this request may be withdrawn.
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+			if blocked then
+				Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
+				M.dismiss()
+				return false
+			end
 		end
 		return true
 	end
@@ -857,7 +887,8 @@ function M.predict(context, output_context, override)
 			M.drop_agent_triage("a prediction needs the backend")
 		end
 		_inflight_backend = backend
-		backend.chat(target, model, messages, {
+		local dispatch_index, terminal_seen = request_index, false
+		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
 			stream = DisplaySettings.get("streaming") == true,
 			-- A batch asks once, at the builder's temperature. Sequential variants
@@ -884,6 +915,7 @@ function M.predict(context, output_context, override)
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
+			terminal_seen = true
 			if not request_current(true) then return end
 			if err then
 				_predicting = false
@@ -907,6 +939,17 @@ function M.predict(context, output_context, override)
 			meta.loading = false
 			if #candidates > 0 then publish() else clear_offer() end
 		end)
+		-- A backend can refuse admission while its earlier native transport is
+		-- still settling. A synchronous completion may already own the next
+		-- variant, so only an unacknowledged, current dispatch retires loading.
+		if dispatched == false and not terminal_seen and dispatch_index == request_index and request_current(false) then
+			_inflight_backend = nil
+			_predicting = false
+			meta.loading = false
+			Logger.warn(LOG, "Prediction could not be dispatched: backend unavailable.")
+			if not request_current(false) then return end
+			if #candidates > 0 then publish() else clear_offer() end
+		end
 	end
 	dispatch()
 end
@@ -1364,7 +1407,13 @@ function M.shift_tone(direction, cycle)
 				end
 				return
 			end
-			if global_privacy_blocks() or current_focus() ~= focus then
+			local blocked = global_privacy_blocks()
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			if not blocked then blocked = current_focus() ~= focus end
+			-- Native barriers can dispatch shutdown, configuration or a newer step.
+			-- Only the originating tone generation may submit its captured text.
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			if blocked then
 				Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 				return
 			end
@@ -1483,7 +1532,11 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 		end
 		return
 	end
-	if global_privacy_blocks() then
+	local blocked = global_privacy_blocks()
+	-- A resident barrier can dispatch scope changes, shutdown or a new offer.
+	-- Its old result owns neither permission to send nor the successor to dismiss.
+	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+	if blocked then
 		Logger.info(LOG, "%s dropped: global text privacy no longer admits the request.", what)
 		M.dismiss()
 		return
@@ -1829,6 +1882,9 @@ end
 --- @param err string|nil The backend's error.
 --- @param focus string Exact native text destination captured before selection.
 local function finish_translation(epoch, meta, config, full_text, err, focus)
+	local function current()
+		return not _runtime_closed and _scope_owner == nil and epoch == _request_epoch
+	end
 	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
@@ -1842,7 +1898,13 @@ local function finish_translation(epoch, meta, config, full_text, err, focus)
 		clear_offer()
 		return
 	end
-	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
+	local blocked = global_privacy_blocks()
+	if not current() then return end
+	if not blocked and focus ~= "" then
+		blocked = current_focus() ~= focus
+		if not current() then return end
+	end
+	if blocked or focus == "" then
 		Logger.info(LOG, "Translation dropped: the active text field changed while it ran.")
 		M.dismiss()
 		return
@@ -1950,7 +2012,9 @@ function M.translate_selection(value)
 		Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
 			M.get_backend(), model, code, #selection)
 		send_paced(epoch, "Translation", function()
-			if current_focus() ~= focus then
+			local observed_focus = current_focus()
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if observed_focus ~= focus then
 				Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
 				_predicting = false
 				clear_offer()
@@ -2664,11 +2728,20 @@ function M.dismiss(resync_owner)
 		AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, false)
 	end
 	advance_request_epoch(resync_owner)
-	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
-	if _predicting and _inflight_backend then _inflight_backend.cancel() end
-	_inflight_backend = nil
-	_predicting = false
-	clear_offer()
+	local retired_epoch, timer = _request_epoch, _rate_timer
+	local backend = _predicting and _inflight_backend or nil
+	_rate_timer, _inflight_backend, _predicting = nil, nil, false
+	-- Native cancellation can dispatch another user action synchronously. Detach
+	-- the old state first, then leave any successor request and offer untouched.
+	clear_offer(true)
+	if timer then _scheduler.cancel(timer) end
+	if backend then
+		local ok, cancelled = pcall(backend.cancel)
+		if not ok or cancelled ~= true then
+			Logger.error(LOG, "Dismissed prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
+		end
+	end
+	if _request_epoch == retired_epoch then hide_overlay() end
 end
 
 
@@ -2678,17 +2751,20 @@ end
 --- may synchronously deliver a final response, and the physical edit is committed.
 local function close_accepted_offer()
 	advance_request_epoch()
+	local retired_epoch = _request_epoch
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
 	local backend = _predicting and _inflight_backend or nil
 	_inflight_backend, _predicting = nil, false
-	clear_offer()
+	clear_offer(true)
 	if backend then
 		local ok, cancelled = pcall(backend.cancel)
 		if not ok or cancelled ~= true then
 			Logger.error(LOG, "Accepted prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
 		end
 	end
+	if _request_epoch == retired_epoch then hide_overlay() end
+	return retired_epoch
 end
 
 --- Accepts one displayed prediction, or starts selection verification.
@@ -2700,19 +2776,49 @@ local function accept_candidate(index, complete)
 	if _runtime_closed or _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
-	if global_privacy_blocks() then
+	local context, epoch, output = _suggestion_context, _request_epoch, _on_output
+	local function current()
+		return not _runtime_closed and not _scope_owner
+			and _request_epoch == epoch and _suggestion_context == context
+			and _suggestions[tonumber(index)] == candidate
+	end
+	local continuation_current, continuation_context, continuation_apply
+	if not candidate.on_accept and not candidate.replaces_selection then
+		-- These are original request identities, captured before privacy/focus
+		-- callbacks can cancel, pause or publish a successor offer.
+		local context, epoch, runtime, engine, apply, paused = _suggestion_context, _request_epoch,
+			_runtime_owner, _engine, _apply_prediction, _is_paused
+		local focus = context and context.focus
+		local function retained()
+			return not _runtime_closed and _scope_owner == nil and epoch == _request_epoch
+				and rawequal(_runtime_owner, runtime) and rawequal(_engine, engine)
+				and rawequal(_suggestion_context, context) and context ~= nil and context.focus == focus
+				and rawequal(_suggestions[tonumber(index)], candidate) and _apply_prediction == apply and _is_paused == paused
+		end
+		continuation_current = function()
+			if not retained() then return false end
+			local checked, is_paused = pcall(paused)
+			return checked and is_paused == false and retained()
+		end
+		continuation_context, continuation_apply = context, apply
+		if not continuation_current() then return false end
+	end
+	local blocked = global_privacy_blocks()
+	if continuation_current and not continuation_current() then return false end
+	if blocked then
 		Logger.info(LOG, "AI offer withdrawn: global text privacy no longer admits output.")
-		M.dismiss()
+		if current() then M.dismiss() end
 		return false
 	end
-	local ok, committed
+	if not current() then return false end
+	local ok, committed, reason
 	if candidate.on_accept then
 		-- An agent action: its connector runs, nothing is typed.
 		ok, committed = pcall(candidate.on_accept)
 		if ok and committed == true then
-			local agent = _suggestion_context and _suggestion_context.agent or nil
+			local agent = context and context.agent or nil
 			if agent and agent.auto then AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, true) end
-			close_accepted_offer()
+			if current() then close_accepted_offer() end
 			complete(true)
 			return true
 		end
@@ -2721,12 +2827,12 @@ local function accept_candidate(index, complete)
 		-- a tone step leaves it. Compared like a tone step's focus: in another
 		-- window the text would land where nothing was selected.
 		if not _replace_selection then return false end
-		local focus = _suggestion_context and _suggestion_context.focus or ""
-		if focus == "" or current_focus() ~= focus then
+		local focus = context and context.focus or ""
+		if focus == "" or current_focus() ~= focus or not current() then
 			Logger.info(LOG, "Translation not inserted: another window has the focus.")
 			return false
 		end
-		local context, epoch, generation = _suggestion_context, _request_epoch, _tone_generation
+		local generation = _tone_generation
 		if context.selection_accepting then return false end
 		local pending = {}
 		context.selection_accepting = pending
@@ -2742,9 +2848,11 @@ local function accept_candidate(index, complete)
 			if not completed then complete(false); return end
 			if _on_output then pcall(_on_output, candidate.to_type, context) end
 			if _suggestion_context ~= context or epoch ~= _request_epoch then complete(true); return end
-			close_accepted_offer()
-			if _engine and type(_engine.reset) == "function" then _engine:reset() end
-			_buffer_focus = nil
+			local retired_epoch = close_accepted_offer()
+			if _request_epoch == retired_epoch then
+				_buffer_focus = nil
+				if _engine and type(_engine.reset) == "function" then _engine:reset() end
+			end
 			complete(true)
 		end)
 		if not ok or committed ~= true then
@@ -2753,27 +2861,37 @@ local function accept_candidate(index, complete)
 		end
 		return completed ~= false
 	else
-		if type(_apply_prediction) ~= "function" then return false end
-		local focus = _suggestion_context and _suggestion_context.focus or ""
-		if focus == "" or current_focus() ~= focus then
+		if type(continuation_apply) ~= "function" then return false end
+		local focus = continuation_context.focus or ""
+		local observed = current_focus()
+		if not continuation_current() then return false end
+		if focus == "" or observed ~= focus then
 			Logger.info(LOG, "Prediction not inserted: the native typing target is unavailable or changed.")
-			M.dismiss()
+			if current() then M.dismiss() end
 			return false
 		end
-		ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
+		ok, committed, reason = pcall(continuation_apply, candidate, continuation_context, continuation_current)
 	end
 	if not ok or committed ~= true then
+		if ok and committed == false and reason == "dry_run" then
+			Logger.debug(LOG, "Prediction not inserted: dry-run mode.")
+			return false
+		end
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
 		return false
 	end
-	if _on_output then
-		local observed, observe_err = pcall(_on_output, candidate.to_type, _suggestion_context)
+	if output then
+		local observed, observe_err = pcall(output, candidate.to_type, context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
-	close_accepted_offer()
+	if continuation_current and not continuation_current() then complete(true); return true end
+	if not current() then complete(true); return true end
+	local retired_epoch = close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
-	if _engine and type(_engine.reset) == "function" then _engine:reset() end
-	_buffer_focus = nil
+	if _request_epoch == retired_epoch then
+		_buffer_focus = nil
+		if _engine and type(_engine.reset) == "function" then _engine:reset() end
+	end
 	complete(true)
 	return true
 end
@@ -2937,9 +3055,13 @@ end
 stop_runtime_app = function()
 	_runtime_app_epoch = _runtime_app_epoch + 1
 	local owner = _runtime_owner
+	local profiles = Collision.inventory.profiles
+	local inventory_closed = not profiles or package.loaded["modules.llm.profiles"] == profiles
+		and profiles.cancel_model_inventory == Collision.inventory.cancel and type(Collision.inventory.cancel) == "function"
+		and Collision.inventory.cancel() == true
 	local retired = retire_runtime_request()
 	local stopped = not owner or owner.controller:stop_app() == true
-	return retired and stopped and _runtime_owner == owner
+	return inventory_closed and retired and stopped and _runtime_owner == owner
 		and (not owner or not owner.controller:has_debt())
 end
 --- Stops only this app's Ollama service for pause, scope or app shutdown.
@@ -3009,7 +3131,11 @@ end
 --- Reports retained runtime repair or app-service cleanup ownership.
 --- @return boolean pending
 function M.runtime_pending()
-	return (_runtime_request ~= nil and not _runtime_request:is_settled())
+	local profiles = Collision.inventory.profiles
+	local inventory_pending = profiles ~= nil and (package.loaded["modules.llm.profiles"] ~= profiles
+		or profiles.model_inventory_pending ~= Collision.inventory.pending or type(Collision.inventory.pending) ~= "function"
+		or Collision.inventory.pending() ~= false)
+	return inventory_pending or (_runtime_request ~= nil and not _runtime_request:is_settled())
 		or (_runtime_owner ~= nil and _runtime_owner.controller:has_debt())
 end
 --- Builds native composition lazily and classifies construction refusal.
@@ -3380,6 +3506,85 @@ function M.set_backend(kind, admit)
 	return true
 end
 
+--- Revalidates one private API publication without exposing its configuration gate.
+--- @param receipt table Opaque API selection receipt.
+--- @param source_current function|nil Exact private source check inside the runtime bracket.
+--- @return boolean current
+function M.api_selection_is_current(receipt, source_current)
+	local held = type(receipt) == "table" and Collision.api_selections[receipt] or nil
+	if not held then return false end
+	local expected_owner
+	if not held.published then expected_owner = held.owner end
+	if _runtime_closed or _scope_owner ~= expected_owner or held.revision ~= _enable_generation
+		or held.epoch ~= _runtime_app_epoch then return false end
+	local paused_ok, paused = pcall(_is_paused)
+	local paths = require("infra.config_paths")
+	local path_ok, path = pcall(paths.config, "config.toml")
+	local loaded, values, source = pcall(require("infra.llm_preferences").get_many, { BACKEND_KEY })
+	local final_path_ok, final_path = pcall(paths.config, "config.toml")
+	local source_ok, source_live = true, true
+	if source_current ~= nil then
+		if type(source_current) ~= "function" then return false end
+		source_ok, source_live = pcall(source_current)
+	end
+	return source_ok and source_live == true and paused_ok and paused == false and path_ok and final_path_ok and path == held.path and final_path == held.path
+		and loaded and type(values) == "table" and type(source) == "table" and values[BACKEND_KEY] == "api"
+		and source.status == held.source.status and source.content == held.source.content
+		and Collision.api_selections[receipt] == held and not _runtime_closed and _scope_owner == expected_owner
+		and held.revision == _enable_generation and held.epoch == _runtime_app_epoch
+end
+
+--- Quiesces an already-selected API backend and owns its tentative private RAM.
+--- This action never writes config.toml or changes an Ollama selection.
+--- @return table|nil receipt Opaque admission; finish_api_selection must retire it.
+function M.begin_api_selection()
+	local revision, epoch = _enable_generation, _runtime_app_epoch
+	if _runtime_closed or _scope_owner then return nil end
+	local paused_ok, paused = pcall(_is_paused)
+	local paths = require("infra.config_paths")
+	local path_ok, path = pcall(paths.config, "config.toml")
+	local loaded, values, source = pcall(require("infra.llm_preferences").get_many, { BACKEND_KEY })
+	local function initial()
+		return not _runtime_closed and _scope_owner == nil and revision == _enable_generation
+			and epoch == _runtime_app_epoch
+	end
+	if not paused_ok or paused ~= false or not path_ok or not loaded or type(values) ~= "table" or type(source) ~= "table"
+		or values[BACKEND_KEY] ~= "api" or not initial() then return nil end
+	if not retire_runtime_request() or not initial() then return nil end
+	_enable_generation = _enable_generation + 1
+	revision = _enable_generation
+	if _enable_admission and _enable_admission.cancel() ~= true then return nil end
+	if not initial() then return nil end
+	M.withdraw()
+	if not initial() then return nil end
+	local owner, receipt = { unsettled = true }, {}
+	function owner.pending() return owner.unsettled end
+	if not M.acquire_configuration(owner) then return nil end
+	Collision.api_selections[receipt] = { owner = owner, source = source, path = path, revision = _enable_generation, epoch = _runtime_app_epoch }
+	local checked, current = pcall(M.api_selection_is_current, receipt)
+	if not checked or current ~= true then
+		M.finish_api_selection(receipt, false, true)
+		return nil
+	end
+	return receipt
+end
+
+--- Releases tentative API state only after an acknowledged commit or rollback.
+--- Unknown publication keeps its private gate; a caller cannot forge its token.
+--- @param receipt table Opaque original admission.
+--- @param committed boolean Whether the private entry was committed.
+--- @param settled boolean Literal true acknowledges the private publication.
+--- @return boolean acknowledged
+function M.finish_api_selection(receipt, committed, settled)
+	local held = type(receipt) == "table" and Collision.api_selections[receipt] or nil
+	if not held or held.published or _scope_owner ~= held.owner or settled ~= true
+		or type(committed) ~= "boolean" then return false end
+	held.owner.unsettled = false
+	if not M.release_configuration(held.owner) then held.owner.unsettled = true; return false end
+	if committed == true then held.published = true else Collision.api_selections[receipt] = nil end
+	return true
+end
+
 --- The module, target and model a prediction would be sent with.
 --- @param quiet boolean Do not log why the backend cannot answer.
 --- @return table|nil backend, any target, string|nil model
@@ -3431,6 +3636,13 @@ end
 function M.get_models()
 	local profiles = get_profiles()
 	return profiles and type(profiles.get_models) == "function" and profiles.get_models() or {}
+end
+
+--- Projects validated installed models without starting network work.
+--- @return table models Immediate array projection.
+function M.get_cached_models()
+	local profiles = get_profiles()
+	return profiles and type(profiles.get_cached_models) == "function" and profiles.get_cached_models() or {}
 end
 
 function M.get_current_model()
@@ -3485,8 +3697,14 @@ function M.download_model(model_tag, label, on_done)
 	return (Download.start(base_url, model_tag, label, function(succeeded, tag)
 		if not current() then return end
 		if succeeded then
-			M.refresh_models()
-			if not M.set_model(tag) then succeeded = false end
+			local profiles = get_profiles()
+			if not current() then return end
+			if not profiles or type(profiles.refresh_models_after_mutation) ~= "function" then succeeded = false
+			else
+				profiles.refresh_models_after_mutation()
+				if not current() then return end
+				if not M.set_model(tag) then succeeded = false end
+			end
 		end
 		if _runtime_closed or _scope_owner then return end
 		if type(on_done) == "function" then on_done(succeeded, tag) end

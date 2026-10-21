@@ -484,14 +484,14 @@ _ConfigMigrateRenderRecords(Source, Updates, DropSections, Scan := 0) {
 		else if !Dropped.Has(Index)
 			Content .= Line.Text . Line.Eol
 		if AfterLine.Has(Index) {
-			if Content != "" && !RegExMatch(Content, "[\r\n]$")
+			if Content != "" && !TOML_EndsWithLineBreak(Content)
 				Content .= Scan.Eol
 			Content .= AfterLine[Index]
 		}
 	}
 	for Block in Appended {
 		if Content != "" {
-			if !RegExMatch(Content, "[\r\n]$")
+			if !TOML_EndsWithLineBreak(Content)
 				Content .= Scan.Eol
 			Content .= Scan.Eol
 		}

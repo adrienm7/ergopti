@@ -22,12 +22,14 @@ local function load_fixture(options)
 		["public.html"] = "<b>hello world</b>",
 	}
 	local current = original
+	local change_count = 0
 	local timers = {}
 	local write_calls = 0
 	local restore_calls = 0
 	local keys = {}
 	local selection_reads = 0
 	local pasteboard = {
+		changeCount = function() return change_count end,
 		readAllData = function() return original end,
 		getContents = function()
 			selection_reads = selection_reads + 1
@@ -35,8 +37,9 @@ local function load_fixture(options)
 			if outcome == "throw" then error("injected selection read failure") end
 			return "hello world"
 		end,
-		clearContents = function() current = {} end,
+		clearContents = function() change_count = change_count + 1; current = {} end,
 		setContents = function(text)
+			change_count = change_count + 1
 			write_calls = write_calls + 1
 			current = { ["public.utf8-plain-text"] = text }
 			local outcome = options.write_outcomes and options.write_outcomes[write_calls]
@@ -47,6 +50,7 @@ local function load_fixture(options)
 			restore_calls = restore_calls + 1
 			local outcome = options.restore_outcomes and options.restore_outcomes[restore_calls]
 			if outcome == "false" then return false end
+			change_count = change_count + 1
 			current = snapshot
 			return true
 		end,
@@ -60,26 +64,50 @@ local function load_fixture(options)
 			return true
 		end,
 		emit_key_strokes = function() return true end,
-		begin = function() return {} end,
+		begin = function(_, _, publication) return { publication = publication } end,
 		begin_batch = function() return {} end,
 		keyStroke = function() return true end,
 		dispatch = function() return true end,
-		seal = function() return true end,
-		cancel = function() return true end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		on_dispatched = function(tx, callback)
+			tx.dispatched = tx.dispatched or {}
+			tx.dispatched[#tx.dispatched + 1] = callback
+		end,
+		seal = function(tx)
+			for _, callback in ipairs(tx.dispatched or {}) do
+				callback(tx, { native_down_attempted = tx.native_down_attempted }, "dispatched")
+			end
+			if tx.callback then tx.callback(tx, "complete") end
+			return true
+		end,
+		cancel = function(tx)
+			if tx.callback then tx.callback(tx, "cancelled") end
+			return true
+		end,
 	}
+	synthetic.emit_guarded_key_stroke = function(modifiers, key, tx)
+		if not tx.publication or tx.publication.current() ~= true then return false end
+		tx.native_down_attempted = true
+		return synthetic.emit_key_stroke(modifiers, key, 0, tx)
+	end
 	package.loaded["adapters.synthetic_input"] = synthetic
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	local timer_calls = 0
+	local clock_ns = 0
 	local text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
 		timer = {
+			absoluteTime = function() return clock_ns end,
 			new = function(_delay, callback)
 				timer_calls = timer_calls + 1
 				local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
 				if outcome == "throw" then error("injected timer allocation failure") end
 				if outcome == "nil" then return nil end
 				local handle = {
-					callback = callback,
+					callback = function()
+						clock_ns = clock_ns + math.ceil(_delay * 1e9)
+						callback()
+					end,
 					stopped = false,
 					running_state = false,
 				}
@@ -145,10 +173,10 @@ helpers.describe("text actions: clipboard refusals fail closed", function()
 		helpers.assert_true(f.current() == f.original)
 	end)
 
-	helpers.it("transform refuses Cmd+C when its capture timer cannot be armed", function()
+	helpers.it("transform restores after capture timer refusal following completed Cmd+C", function()
 		local f = load_fixture({ timer_outcomes = { "success", "nil" } })
 		f.text.toggle_titlecase()
-		helpers.assert_eq(count_key(f.keys, "c"), 0)
+		helpers.assert_eq(count_key(f.keys, "c"), 1, "capture grace begins after native Cmd+C completion")
 		helpers.assert_eq(count_key(f.keys, "v"), 0)
 		helpers.assert_true(f.current() == f.original)
 	end)

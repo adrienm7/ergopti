@@ -163,11 +163,24 @@ Test("llm-menu-layout-shared: LLM_Menu_Build is driven by the shared layout spec
 ; which is silent to a user who never reads the log.
 _LMLS_DispatchAnswersEveryRow() {
 	Seg := _DriverFuncBody("_LLM_Menu_EmitRow")
+	Groups := _DriverFuncBody("_LLM_Menu_GroupBuilders")
 	Assert(Seg != "", "_LLM_Menu_EmitRow() must exist in menu_main.ahk")
-	for _, c in _LMLS_Canonical() {
-		Assert(InStr(Seg, 'case "' . c["id"] . '":') > 0,
-			"_LLM_Menu_EmitRow must answer the declared row '" . c["id"]
-			. "' — an unanswered id is dropped with only a log line to show for it")
+	Assert(Groups != "", "_LLM_Menu_GroupBuilders() must exist in menu_main.ahk")
+	for _, Row in _LMLS_ManifestRows() {
+		CaseLine := 'case "' . Row["id"] . '":'
+		if Row["type"] == "group" {
+			; A declared group is drawn by the renderer from its builder: a second
+			; native case would be a dead row site the manifest no longer reaches.
+			Assert(InStr(Groups, '"' . Row["id"] . '", LLM_Menu_Build') > 0,
+				"_LLM_Menu_GroupBuilders must build the declared group '" . Row["id"]
+				. "' — an unbuilt group renders with nothing under it")
+			Assert(InStr(Seg, CaseLine) == 0,
+				"_LLM_Menu_EmitRow must not draw the declared group '" . Row["id"] . "' natively")
+		} else {
+			Assert(InStr(Seg, CaseLine) > 0,
+				"_LLM_Menu_EmitRow must answer the declared row '" . Row["id"]
+				. "' — an unanswered id is dropped with only a log line to show for it")
+		}
 	}
 }
 Test("llm-menu-layout-shared: the dispatch answers every declared row", _LMLS_DispatchAnswersEveryRow)

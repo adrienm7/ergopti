@@ -15,7 +15,7 @@
 ; the future native backend or change repeat, release or screen-ring behavior.
 _DigitRowDown(Digit, *) {
 	Critical("On")
-	SendEvent("{" Digit " Down}")
+	NumberRowSendEvent("{" Digit " Down}")
 	; An armed suppressing hook can consume the character before the screen.
 	if _EmitReachedScreen()
 		UpdateLastSentCharacter(Digit)
@@ -23,7 +23,7 @@ _DigitRowDown(Digit, *) {
 
 _DigitRowUp(Digit, *) {
 	Critical("On")
-	SendEvent("{" Digit " Up}")
+	NumberRowSendEvent("{" Digit " Up}")
 }
 
 /**
@@ -53,7 +53,7 @@ DigitRow_CaptureBinding(Source, Scan) {
 /** One private initialization owner; there is deliberately no reset or issuer API. */
 _DigitRowBindingOwner(Request, Value := 0, Scan := 0) {
 	static Phase := "fresh", Factory := 0, Bindings := Map()
-	static Criterion := 'NumberRowEffectiveMode() == "digits"'
+	static Criterion := 'NumberRowEffectiveMode() == "digits" && !TapHoldKanaAltGrHeld()'
 	static NativeCall := Func.Prototype.Call
 	static NativeBind := Func.Prototype.Bind
 	static Keys := [["SC002", "1"], ["SC003", "2"], ["SC004", "3"],

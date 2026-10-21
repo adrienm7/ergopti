@@ -263,6 +263,17 @@ _G4B_NativeDispatchFailure(Mode, Retirement := true, Bootstrap := false) {
 		AssertEqual(Executable, A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe")
 		AssertEqual(Arguments[Arguments.Length], "qwen3:0.6b", "The native worker receives the exact consented tag.")
 		AssertTrue(InStr(Arguments[7], "ollama-model-pull.ps1"), "The managed worker remains the production entry point.")
+		for Pair in [["-ServeEnvironmentPath", "C:\captured\managed_ollama_environment.json"],
+			["-ServeEnvironmentSha256", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]] {
+			Found := false
+			for Index, Argument in Arguments {
+				if Argument == Pair[1] {
+					AssertEqual(Arguments[Index + 1], Pair[2], "The native pull receives its captured environment declaration.")
+					Found := true
+				}
+			}
+			AssertTrue(Found, "The native pull includes the environment argument.")
+		}
 		if Mode == "factory_throw"
 			throw Error("Synthetic lazy native task construction refusal")
 		Task.Done := Done
@@ -275,6 +286,8 @@ _G4B_NativeDispatchFailure(Mode, Retirement := true, Bootstrap := false) {
 		F.Flow.Plan["directory"] := "C:\managed-workers"
 		F.Flow.Plan["helper"] := "C:\managed-workers\ollama_managed_files.ps1"
 		F.Flow.Plan["helper_sha256"] := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		F.Flow.Plan["environment"] := "C:\captured\managed_ollama_environment.json"
+		F.Flow.Plan["environment_sha256"] := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 		F.Flow.Sources["C:\managed-workers\ollama-runtime-launch.ps1"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		F.Flow.Target["ready_file_identity"] := "34567890:3456789012345678"
 		F.Flow.Target["ready_image_sha256"] := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

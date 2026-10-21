@@ -67,6 +67,9 @@ local EV_KEY_BIT = 0x2
 local EV_REL_BIT = 0x4
 local EV_ABS_BIT = 0x8
 
+-- EV_SW: tablet/lid/radio switches may share a node with extra keys.
+local EV_SW_BIT = 0x20
+
 
 -- =========================================
 -- =========================================
@@ -211,6 +214,46 @@ function M.is_key_device(path, devices)
 	return false, path .. " is not listed in " .. PROC_INPUT_DEVICES
 end
 
+--- Whether the keyboard-only output can preserve an event-type bitmap.
+--- Shared by proc discovery and the acquired fd check before EVIOCGRAB.
+--- @param mask number Event-type bitmap, not a key-code bitmap.
+--- @return boolean ok, string|nil reason
+function M.is_interceptable_event_mask(mask)
+	if type(mask) ~= "number" or mask < 0 or mask > 0xffffffff or mask % 1 ~= 0 then
+		return false, "invalid event capability bitmap"
+	end
+	if not has_bit(mask, EV_KEY_BIT) then return false, "reports no EV_KEY capability" end
+	if has_bit(mask, EV_REL_BIT) or has_bit(mask, EV_ABS_BIT) then
+		return false, "reports EV_REL/EV_ABS axes that the keyboard output cannot forward"
+	end
+	if has_bit(mask, EV_SW_BIT) then
+		return false, "reports EV_SW switches that the keyboard output cannot forward"
+	end
+	return true
+end
+
+--- Whether the keyboard-only output can preserve a source under EVIOCGRAB.
+--- The grab owns every event on the node, including axes/switches the keyboard
+--- output cannot forward. Observe mode keeps using is_key_device instead.
+--- @param path string|nil An absolute device path.
+--- @param devices table|nil Pre-parsed descriptors; reads /proc once when omitted.
+--- @return boolean ok, string|nil reason Why interception was refused.
+function M.is_interceptable_key_device(path, devices)
+	local snapshot = type(devices) == "table" and devices or read_proc_devices()
+	local is_key, why = M.is_key_device(path, snapshot)
+	if not is_key then return false, why end
+	local basename = path:match("([^/]+)$")
+	for _, dev in ipairs(snapshot) do
+		for _, handler in ipairs(dev.handlers) do
+			if handler == basename then
+				local allowed, reason = M.is_interceptable_event_mask(dev.ev_mask)
+				return allowed, reason and path .. " " .. reason or nil
+			end
+		end
+	end
+	return false, path .. " is not listed in " .. PROC_INPUT_DEVICES
+end
+
 --- Returns true when the device name looks like a keyboard.
 --- Prefers devices with "keyboard" or "kbd" in their name.
 --- @param name string Device name string.
@@ -261,7 +304,8 @@ end
 ---
 --- Selection rules, in order:
 ---   1. Every physical device whose name says "keyboard" or "kbd".
----   2. Every non-pointer physical EV_KEY device when none is keyboard-named.
+---   2. Every other physical EV_KEY device when none is keyboard-named.
+--- Axes and switches are excluded from both rules: the output cannot relay them.
 --- Synthetic devices never reach either rule — reading one means reading our
 --- own injections back.
 --- @param devices table Array of descriptors from parse_devices().
@@ -283,8 +327,7 @@ function M.select_keyboards(devices)
 			goto next_dev
 		end
 
-		local is_pointer = has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT)
-		if is_pointer then goto next_dev end
+		if not M.is_interceptable_event_mask(dev.ev_mask) then goto next_dev end
 		Logger.debug(LOG, "Physical EV_KEY device: '%s' → %s", dev.name, path)
 
 		if is_likely_keyboard(dev.name) then

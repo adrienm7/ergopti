@@ -94,10 +94,10 @@ Test("HealthCheck: Run returns a version 2 quick snapshot with probes explicitly
 
 /** Proves the actual starter admits only the independent extensive selection. */
 _TestHC_ExtensiveAdmission(Selected, ExpectedStarts) {
-	global _HC_Session, _HC_ProbeRun
+	global _HC_Session, _HC_ProbeRun, _HC_WindowEpoch, _HC_ResetDone
 	if _HC_ProbeRun
 		throw Error("A foreign diagnostic probe run is active.")
-	SavedSession := _HC_Session
+	SavedSession := _HC_Session, SavedEpoch := _HC_WindowEpoch, SavedReset := _HC_ResetDone
 	Calls := []
 	Start(Epoch, Schema, Publish) {
 		Calls.Push(Epoch)
@@ -106,12 +106,15 @@ _TestHC_ExtensiveAdmission(Selected, ExpectedStarts) {
 		return true
 	}
 	try {
+		_HC_WindowEpoch := 71, _HC_ResetDone := false
 		_HC_Session := Map("extensive", Selected, "detailed", true)
 		_HC_RestartProbes(71, Start)
 		AssertEqual(ExpectedStarts, Calls.Length)
 		if ExpectedStarts
 			AssertEqual(71, Calls[1])
-	} finally _HC_Session := SavedSession
+	} finally {
+		_HC_Session := SavedSession, _HC_WindowEpoch := SavedEpoch, _HC_ResetDone := SavedReset
+	}
 }
 Test("HealthCheck extensive: quick privacy opt-in creates no probe", _TestHC_ExtensiveAdmission.Bind(false, 0))
 Test("HealthCheck extensive: explicit opt-in reaches actual starter once", _TestHC_ExtensiveAdmission.Bind(true, 1))
@@ -549,12 +552,14 @@ for _HCClockOrigin in [100, 0x100000064] {
 
 /** Exercises the actual cancel/refresh/export owner without a live WebView or probe run. */
 _TestHC_CancelRefreshExportHistory(Refresh := true) {
-	global _HC_Session, _HC_ResetDone, _HC_ProbeRun
+	global _HC_Session, _HC_ResetDone, _HC_ProbeRun, _HC_WindowEpoch, _HC_WebView
 	if _HC_ProbeRun
 		throw Error("A foreign diagnostic probe run is active.")
 	SavedSession := _HC_Session, SavedReset := _HC_ResetDone, SavedProbeRun := _HC_ProbeRun
+	SavedEpoch := _HC_WindowEpoch, HadView := IsSet(_HC_WebView), SavedView := HadView ? _HC_WebView : 0
 	try {
-		_HC_ResetDone := true
+		_HC_ResetDone := false, _HC_WindowEpoch := 71
+		_HC_WebView := unset
 		; This Windows-host fixture supplies the identity required by typed sharing.
 		_HC_Session := Map("snapshot", Map("driver", "windows", "probes", Map(
 			"github_api", Map("state", "timeout", "cleanup", "unknown", "ms", 23),
@@ -567,15 +572,15 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 			"the genuine sharing owner still refuses a missing host identity")
 		AssertThrows(() => HealthCheck_ShareSnapshot(Map("driver", "unknown", "probes", Map()), Config["schema"]),
 			"the genuine sharing owner still refuses an invalid host identity")
-		_HC_PerformPageAction(0, Map("action", "cancel"), Config)
+		_HC_PerformPageAction(71, Map("action", "cancel"), Config)
 		if Refresh {
-			_HC_PerformPageAction(0, Map("action", "refresh", "detailed", false, "extensive", false), Config)
+			_HC_PerformPageAction(71, Map("action", "refresh", "detailed", false, "extensive", false), Config)
 			AssertTrue(_HC_Session["snapshot"].Has("retired_probes"), "refresh must retain unconfirmed prior cleanup")
 			AssertEqual(1, _HC_Session["snapshot"]["retired_probes"].Length)
-			_HC_PerformPageAction(0, Map("action", "refresh", "detailed", false, "extensive", false), Config)
+			_HC_PerformPageAction(71, Map("action", "refresh", "detailed", false, "extensive", false), Config)
 			AssertEqual(1, _HC_Session["snapshot"]["retired_probes"].Length, "idle refresh must not duplicate the cohort")
 		}
-		_HC_PerformPageAction(0, Map("action", "export_snapshot", "export_sequence", 3), Config)
+		_HC_PerformPageAction(71, Map("action", "export_snapshot", "export_sequence", 3), Config)
 		Encoded := JsonParse(_HC_ValueToJson(_HC_Session["snapshot"]))
 		Rows := Refresh ? Encoded["retired_probes"][1]["probes"] : Encoded["probes"]
 		AssertEqual("timeout", Rows["github_api"]["state"], "cleanup metadata must not change a terminal business result")
@@ -583,11 +588,21 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 		AssertEqual(23, Rows["github_api"]["ms"])
 		AssertEqual("cancelled", Rows["ai_health"]["state"])
 		AssertEqual("pending", Rows["ai_health"]["cleanup"])
+		if Refresh
+			AssertFalse(Encoded["retired_probes"][1]["probes"].Has("configuration"),
+				"a local probe owns nothing to clean up")
 	} finally {
+		; A quick refresh starts the local configuration probe: its run is the
+		; fixture's to stop
+		HealthCheck_CancelProbes()
 		_HC_Session := SavedSession
 		_HC_ResetDone := SavedReset
+		_HC_WindowEpoch := SavedEpoch
+		_HC_WebView := HadView ? SavedView : unset
 		AssertEqual(SavedProbeRun, _HC_ProbeRun, "the fixture retains the exact idle probe owner after session/reset restoration")
 	}
 }
 Test("HealthCheck cleanup-history: cancel then refresh then export preserves unknown cleanup", _TestHC_CancelRefreshExportHistory)
 Test("HealthCheck cleanup-history: immediate cancel export retains existing truthful metadata", _TestHC_CancelRefreshExportHistory.Bind(false))
+
+#Include test_healthcheck_session_owner.ahk

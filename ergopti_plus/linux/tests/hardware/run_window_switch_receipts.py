@@ -281,6 +281,46 @@ def main():
             command("xrandr", "--setmonitor", "LEFT", "1000/300x800/240+0+0", "screen")
             command("xrandr", "--setmonitor", "RIGHT", "1000/300x800/240+1000+0", "none")
             assert "Monitors: 2" in command("xrandr", "--listmonitors").stdout
+            # Openbox advertises itself before it has handled the RandR changes:
+            # a client mapped right away stayed an unmanaged, unmapped root child
+            # past the deadline (dev run 39375032517). A desktop round trip proves
+            # its event loop runs before any owned client exists.
+            #
+            # A switch request sent before Openbox applied rc.xml's two desktops
+            # names a desktop that does not exist yet, and Openbox drops it: the
+            # one-shot request then timed out (dev run 39388400901). Wait for the
+            # two desktops first, then re-send the idempotent request at most
+            # twice within the same deadline, logging each re-send.
+            wait(
+                lambda: re.search(
+                    r"^_NET_NUMBER_OF_DESKTOPS\(CARDINAL\) = 2$",
+                    command("xprop", "-root", "_NET_NUMBER_OF_DESKTOPS", check=False).stdout,
+                    re.MULTILINE,
+                )
+            )
+            for desktop in ("1", "0"):
+                requests = {"sent": 0, "at": 0.0}
+
+                def on_desktop(desktop=desktop, requests=requests):
+                    if re.search(
+                        r"^_NET_CURRENT_DESKTOP\(CARDINAL\) = " + desktop + r"$",
+                        command("xprop", "-root", "_NET_CURRENT_DESKTOP", check=False).stdout,
+                        re.MULTILINE,
+                    ):
+                        return True
+                    if requests["sent"] < 3 and time.monotonic() - requests["at"] >= 1.5:
+                        if requests["sent"] > 0:
+                            print(
+                                f"# desktop {desktop} not current: re-sending set_desktop"
+                                f" ({requests['sent']}/2)",
+                                file=sys.stderr,
+                            )
+                        command("xdotool", "set_desktop", desktop)
+                        requests["sent"] += 1
+                        requests["at"] = time.monotonic()
+                    return False
+
+                wait(on_desktop)
             ids = {}
             for name, x in [("active", 100), ("right", 1100), ("left", 100)]:
                 title = "owned111_" + name

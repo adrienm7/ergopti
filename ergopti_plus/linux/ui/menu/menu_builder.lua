@@ -570,6 +570,8 @@ local function _build_layouts(ctx)
 						LayoutRegistry.select(id, function(selected, _, detail)
 							if not selected then
 								Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
+							elseif type(ctx.on_menu_changed) == "function" then
+								ctx.on_menu_changed()
 							end
 						end)
 					end,
@@ -671,6 +673,7 @@ local function _build_layouts(ctx)
 
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands["number_row_mode"] = function() return false end
+	render_ctx.commands["number_row_edges"] = function() return false end
 	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
 	local rows = ManifestMenu
 		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
@@ -2335,6 +2338,59 @@ local function _build_hotstrings(ctx)
 		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return true end })
 end
 
+--- Captures the displayed value and publication authority from one exact read.
+--- The caller passes its menu refresh, not the native menu context: the AI
+--- parent keeps that context closed to the owners it reviews.
+--- @param refresh function|nil Menu refresh run after an accepted save.
+--- @param owner table Original settings owner.
+--- @param module_name string Settings module identity.
+--- @param name string Setting key.
+--- @param path string Canonical preference path.
+--- @return any value, function|nil save
+local function numeric_setting_request(refresh, owner, module_name, name, path)
+	-- Not named Preferences: that local belongs to _build_llm's toggle admission.
+	local Prefs = require("infra.llm_preferences")
+	local Paths = require("infra.config_paths")
+	local set, get_many, generation = owner.set, Prefs.get_many, Prefs.generation
+	local revision_current, publish, config = Prefs.is_current_revision, Prefs.set_many, Paths.config
+	if type(set) ~= "function" or type(get_many) ~= "function" or type(generation) ~= "function"
+		or type(revision_current) ~= "function" or type(publish) ~= "function" or type(config) ~= "function" then return nil end
+	local function ports_current()
+		return package.loaded[module_name] == owner and owner.set == set
+			and package.loaded["infra.llm_preferences"] == Prefs and Prefs.get_many == get_many
+			and Prefs.generation == generation and Prefs.is_current_revision == revision_current
+			and Prefs.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
+	end
+	local root_ok, root = pcall(config, "config.toml")
+	if not root_ok or type(root) ~= "string" or not ports_current() then return nil end
+	local called, values, source, revision = pcall(get_many, { path })
+	if not called or type(values) ~= "table" or type(values[path]) ~= "number" or type(source) ~= "table"
+		or type(revision) ~= "number" or revision < 0 or revision % 1 ~= 0 then return nil end
+	local function current()
+		if not ports_current() then return false end
+		local read, selected = pcall(config, "config.toml")
+		return read and selected == root and ports_current() and revision_current(revision) == true and ports_current()
+	end
+	local function refused()
+		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
+		local okay, notifier = pcall(require, "adapters.notifier")
+		if okay and type(notifier.send) == "function" then
+			pcall(notifier.send, i18n_safe("dialog.bulk_toggle.save_failed"), { level = "error" })
+		end
+		return false
+	end
+	if not current() then refused(); return nil end
+	return values[path], function(value)
+		if not current() then return refused() end
+		local checked, actual = pcall(generation)
+		if not checked or actual ~= revision or not current() then return refused() end
+		local saved, accepted = pcall(set, name, value, source, current)
+		if not saved or accepted ~= true then return refused() end
+		if type(refresh) == "function" then refresh() end
+		return true
+	end
+end
+
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
 	local NativeParent = require("ui.menu.ai_parent")
@@ -2405,17 +2461,25 @@ local function _build_llm(ctx)
 					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
 					return
 				end
+				-- The prompt is headed by the declared caption of the group that opens it.
+				local title_key
+				for _, entry in ipairs(ManifestMenu.get_array("llm_menu")) do
+					if entry.id == "llm_trigger" then title_key = entry.i18n end
+				end
+				if type(title_key) ~= "string" or title_key == "" then
+					Logger.error(LOG, "The AI trigger group declares no caption; debounce prompt refused.")
+					return
+				end
+				local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
+					"modules.llm.trigger_settings", "debounce_ms", "llm.trigger.debounce_ms")
+				if not save then return false end
 				Prompt.ask({
-					title = i18n_safe("menu.llm.trigger_menu_title"),
+					title = i18n_safe(title_key),
 					hint = string.format("%d – %d ms", bounds.min, bounds.max),
-					value = current_delay,
+					value = value,
 					min = bounds.min,
 					max = bounds.max,
-					on_save = function(value)
-						local saved = TriggerSettings.set("debounce_ms", math.floor(value))
-						if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-						return saved
-					end,
+					on_save = function(number) return save(math.floor(number)) end,
 				}, ctx.webview)
 			end,
 		})
@@ -3009,17 +3073,16 @@ local function _build_llm(ctx)
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
 							return
 						end
+						local value, save = numeric_setting_request(ctx.on_menu_changed, Settings,
+							"modules.llm.settings", setting.name, "llm.generation." .. setting.name)
+						if not save then return false end
 						Prompt.ask({
 							title = i18n_safe(setting.key),
 							hint = string.format("%s – %s", tostring(bounds.min), tostring(bounds.max)),
-							value = Settings.get(setting.name),
+							value = value,
 							min = bounds.min,
 							max = bounds.max,
-							on_save = function(value)
-								local saved = Settings.set(setting.name, value)
-								if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-								return saved
-							end,
+							on_save = save,
 						}, ctx.webview)
 					end,
 				})
@@ -3065,16 +3128,30 @@ local function _build_llm(ctx)
 	for key, value in pairs(ctx) do llm_ctx[key] = value end
 	llm_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
-	-- The restore alone: the AI menu's clear row was retired.
-	llm_ctx.commands["scope_restore"] = function()
-		if ctx.paused == true then return false end
-		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
-		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		return committed
-	end
 	local Preferences = require("infra.llm_preferences")
 	local function toggle_ready()
 		return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true
+	end
+	-- The AI rows that write config.toml: greyed, and their retained clicks
+	-- refused, while paused or while the configuration refuses writes.
+	local function scope_ready()
+		return Preferences.admit() == true and ctx.paused ~= true
+	end
+	-- A configuration saved by a newer version names its own cause on those rows.
+	local function newer_schema()
+		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
+	end
+	-- The restore alone: the AI menu's clear row was retired.
+	llm_ctx.commands["scope_restore"] = function()
+		-- A retained row rechecks what greyed it when it was built.
+		if not scope_ready() then
+			Logger.warn(LOG, "AI settings restore refused: %s.", ctx.paused == true and "the script is paused"
+				or "the configuration is protected from writes")
+			return false
+		end
+		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
+		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
 	end
 	llm_ctx.commands["llm_toggle"] = function()
 		if not toggle_ready() then return false end
@@ -3086,6 +3163,8 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
 	-- The same source/scope admission greys the row and fences retained clicks.
 	llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready
+	llm_ctx.state_getters["llm_scope_ready"] = scope_ready
+	llm_ctx.state_getters["config_newer_schema"] = newer_schema
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
@@ -3243,7 +3322,11 @@ local function _manifest_metrics_rows(ctx, k)
 				Logger.error(LOG, "No setter for privacy flag '%s' — the row does nothing.", key)
 				return
 			end
-			setter(not privacy(key)())
+			local result = setter(not privacy(key)())
+			-- Encryption returns its posture, so false can also acknowledge OFF.
+			-- Re-read the owner after either outcome; never publish an optimistic tick.
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return result
 		end
 	end
 
@@ -3818,6 +3901,9 @@ local function _build_shortcuts(ctx)
 		end
 		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
 		local labels = { get = i18n_safe }
+		-- An action on the key chosen as the physical magic key takes its press;
+		-- the row says so, and so does the log when the assignment is made.
+		local Source = type(ctx.magic_key_source) == "table" and ctx.magic_key_source or nil
 		local rows = {}
 		for _, key in ipairs(TapKeys.keys()) do
 			local bound = TapKeys.get_action(key.id)
@@ -3825,13 +3911,19 @@ local function _build_shortcuts(ctx)
 			local function assign(option, picked)
 				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
 					option, function() return TapKeys.set_action(key.id, option) end, picked)
+				if assigned and Source and Source.tap_override_reason(key.linux, option) ~= nil then
+					Logger.warn(LOG, "Tap key '%s' → '%s' takes the physical magic key %s: that key no longer types "
+						.. "the magic key.", key.id, tostring(option), tostring(Source.get()))
+				end
 				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return assigned
 			end
+			local override = Source and Source.tap_override_reason(key.linux, bound) or nil
 			rows[#rows + 1] = {
 				label = name .. " → " .. (bound ~= "none" and binding_label(
 					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
-					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
+					or i18n_safe("menu.shortcuts.tap_keys.unassigned"))
+					.. (override and (" — " .. i18n_safe(override)) or ""),
 				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
 			}
 		end
@@ -3933,6 +4025,80 @@ local function _build_shortcuts(ctx)
 		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
 		-- Already rendered: the group row takes the rows as its finished submenu.
 		return ManifestMenu.build("script_control_group", "Shortcuts", nil, nil, chords_ctx, chord_providers)
+	end
+
+	-- « CapsWord : désactivation automatique », declared by
+	-- caps_word_auto_off_group: the delay choice, one checkbox per delimiter of
+	-- the hotstring catalogue (in its order, with its separators and labels) and
+	-- one per declared pointer kind. Each change is published, then cached, and
+	-- applies to the CapsWord running now from its next event.
+	group_builders["caps_word_auto_off"] = function()
+		local ok_settings, AutoOff = pcall(require, "modules.shortcuts.caps_word_auto_off")
+		local ok_policy, Policy = pcall(require, "caps_word.auto_off")
+		if not ok_settings or not ok_policy then
+			Logger.error(LOG, "CapsWord auto-off settings unavailable — the shortcuts submenu loses them.")
+			return nil
+		end
+		-- Read once per build: a scope restore or a hand edit shows here.
+		AutoOff.refresh()
+		local settings = AutoOff.settings()
+		local function changed(committed)
+			if committed ~= true then
+				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				return false
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		local checked = {}
+		for _, key in ipairs(settings.terminators) do checked[key] = true end
+		local boundaries = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+		local providers_cw = {}
+		providers_cw["caps_word_terminators"] = function()
+			local rows = {}
+			for _, row in ipairs(Policy.terminator_rows()) do
+				if row.separator then
+					for _, boundary in ipairs(boundaries or {}) do rows[#rows + 1] = boundary end
+				else
+					local key = row.key
+					rows[#rows + 1] = {
+						label = (i18n_safe(row.label_key):gsub("★", MagicKey.get())),
+						checked = checked[key] == true,
+						action = function() return changed(AutoOff.set_terminator(key, not checked[key])) end,
+					}
+				end
+			end
+			return rows
+		end
+		local cw_ctx = {}
+		for key, value in pairs(ctx) do cw_ctx[key] = value end
+		cw_ctx.commands = {}
+		for key, value in pairs(ctx.commands or {}) do cw_ctx.commands[key] = value end
+		cw_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do cw_ctx.state_getters[key] = value end
+		cw_ctx.commands["caps_word_idle_timeout"] = function(seconds)
+			return changed(AutoOff.set_idle_timeout_seconds(seconds))
+		end
+		cw_ctx.state_getters["shortcuts.caps_word.idle_timeout_seconds"] = function()
+			return settings.idle_timeout_seconds
+		end
+		-- One checkbox per kind the manifest declares, in its order; a kind
+		-- this driver cannot see is drawn greyed with its own reason.
+		providers_cw["caps_word_pointer_kinds"] = function()
+			local rows = {}
+			for _, entry in ipairs(AutoOff.pointer_kind_rows()) do
+				local kind = entry.kind
+				local row = { label = i18n_safe(entry.label_key), checked = settings.pointer[kind] == true }
+				if entry.available then
+					row.action = function() return changed(AutoOff.set_pointer(kind, not settings.pointer[kind])) end
+				else
+					row.checked, row.disabled, row.disabled_reason_key = false, true, entry.reason_key
+				end
+				rows[#rows + 1] = row
+			end
+			return rows
+		end
+		return ManifestMenu.build("caps_word_auto_off_group", "Shortcuts", nil, nil, cw_ctx, providers_cw)
 	end
 
 	-- The wrap-symbol picker. The manifest called it Windows-only until
@@ -4143,10 +4309,34 @@ local function _build_tap_holds(ctx)
 	local options = th.hold_options()
 	local feature_on = th.file_enabled() and th.is_enabled()
 
+	local capture_edit = th.capture_configuration_edit
+	local function edit_guard(setter_name)
+		local setter, is_paused = Writer[setter_name], ctx.is_paused
+		if type(capture_edit) ~= "function" or type(setter) ~= "function" then return nil end
+		local ok, scope = pcall(capture_edit)
+		if not ok or type(scope) ~= "function" then return nil end
+		local function ports_current()
+			return ctx.tap_holds == th and th.capture_configuration_edit == capture_edit
+				and package.loaded["platform.remap.tap_hold_writer"] == Writer and Writer[setter_name] == setter
+				and type(is_paused) == "function" and ctx.is_paused == is_paused
+		end
+		local function current()
+			if not ports_current() then return false end
+			local called, paused = pcall(is_paused)
+			if not called or paused ~= false or not ports_current() then return false end
+			local checked, live = pcall(scope)
+			return checked and live == true and ports_current()
+		end
+		if not current() then return nil end
+		return current, setter
+	end
+
 	--- Opens the searchable action picker for a key's tap.
 	--- @param catalog_entry table The key's entry of the manager's key_catalog().
 	--- @param current string The key's tap now.
 	local function pick_tap(catalog_entry, current)
+		local guard, setter = edit_guard("set_tap")
+		if not guard then changed(false); return false end
 		local key_id = catalog_entry.id
 		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 		if not ok_picker or type(Picker.open) ~= "function" then
@@ -4158,6 +4348,7 @@ local function _build_tap_holds(ctx)
 			items[#items + 1] = { type = "action", id = id, label = _tap_hold_action_label(id, ctx.gestures) }
 		end
 		table.sort(items, function(left, right) return left.label < right.label end)
+		if guard() ~= true then changed(false); return false end
 		Picker.open({
 			presentation_id = "tap_hold_action",
 			presentation_suffix = _tap_hold_key_label(catalog_entry),
@@ -4166,14 +4357,18 @@ local function _build_tap_holds(ctx)
 			native_label = i18n_safe("tap_hold.tap.none"),
 			items = items,
 		}, function(option)
-			local ok = Writer.set_tap(key_id, option == "__native__" and "" or option)
-			changed(ok)
-			return ok
+			if guard() ~= true then changed(false); return false end
+			local called, persisted = pcall(setter, key_id, option == "__native__" and "" or option, guard)
+			local accepted = called and persisted == true
+			changed(accepted)
+			return accepted
 		end)
 	end
 
 	--- Asks for a key's own delay, in milliseconds.
 	local function ask_delay(key_id, current_ms)
+		local guard, setter = edit_guard("set_threshold")
+		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
 			tostring(current_ms))
@@ -4184,7 +4379,8 @@ local function _build_tap_holds(ctx)
 			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
-		local call_ok, persisted = pcall(Writer.set_threshold, key_id, math.floor(ms + 0.5) / 1000)
+		if guard() ~= true then changed(false); return false end
+		local call_ok, persisted = pcall(setter, key_id, math.floor(ms + 0.5) / 1000, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false

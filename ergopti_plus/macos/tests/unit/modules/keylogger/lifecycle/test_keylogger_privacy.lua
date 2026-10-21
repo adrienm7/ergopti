@@ -184,6 +184,7 @@ local function start_real_keylogger()
 	-- LogManager. TimerScheduler owns native timer capabilities, so retaining it
 	-- across scenarios would bind later cleanup to an earlier scenario's hs table.
 	package.loaded["modules.keylogger.log_manager"] = nil
+	package.loaded["adapters.ledger_append"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil

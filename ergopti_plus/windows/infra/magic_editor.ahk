@@ -220,12 +220,18 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	if Features["hotstrings"]["magic_key"]["replace"]["enabled"]
 			&& StrUpper(Scan) == StrUpper(ScriptInformation["MagicKeySourceScan"])
 		return { Count: StrLen(ScriptInformation["MagicKey"]), Text: ScriptInformation["MagicKey"] }
+	; « Also reorder the three edge keys » types the other level.
+	Edge := NumberRowEdgeText(Numeric, false, NumberRowForegroundLayout(), false)
+	if Edge != ""
+		return { Count: StrLen(Edge), Text: Edge }
 	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
-		Edges := ErgoptiNumberRowEdgeMapping()
-		if Edges.Has(Numeric)
-			return { Count: StrLen(Edges[Numeric]), Text: Edges[Numeric] }
+	} else if !KeylayoutEmulation_LayerIsActive("ergopti_base") {
+		; « Symbols first » on the native or built-in row (NumberRowSymbolsFirstText).
+		Swapped := NumberRowSymbolsFirstText(Numeric, false, NumberRowForegroundLayout(), false)
+		if Swapped != ""
+			return { Count: StrLen(Swapped), Text: Swapped }
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
 		Shift := false
@@ -239,7 +245,11 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 		return { Count: Step["Next"] != "" && Step["Next"] != KEYLAYOUT_NEUTRAL_STATE ? -1 : StrLen(Step["Output"]),
 			Text: Step["Output"] }
 	}
-	if Features["layout"]["ergopti_base"] {
+	if Features["layout"]["ergopti_base"] && LayoutRowIsEmulated(Scan) {
+		; The built-in emulation types its own number row (RegisterBuiltinNumberRow).
+		Row := NumberRowEmulatedBase(StrUpper(Scan))
+		if Row != ""
+			return { Count: StrLen(Row), Text: Row }
 		if ErgoptiBaseDeadKeys().Has(Scan)
 			return { Count: -1, Text: ErgoptiBaseDeadKeys()[Scan]["chain"] }
 		Base := ErgoptiBaseMapping()

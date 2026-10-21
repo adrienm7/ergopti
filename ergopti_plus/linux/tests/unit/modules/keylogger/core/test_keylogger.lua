@@ -647,6 +647,189 @@ helpers.describe("manual-marker-chars", function()
   end)
 end)
 
+-- The hook reports a physical Backspace through its control callback, never
+-- as text, and the daemon fed the keylogger nothing for it: every error count,
+-- hourly correction and backspace n-gram saw only a hotstring's own deletions.
+helpers.describe("physical-backspace-corrections", function()
+  it("physical-backspace-corrections: a press joins the stream as one manual correction", function()
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local captured = {}
+    package.loaded["modules.keylogger.sqlite_writer"] = setmetatable({
+      insert_typing_events = function(_, events)
+        captured[#captured + 1] = events
+        return true
+      end,
+    }, { __index = function() return function() return true end end })
+    require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keylogger.sqlite_writer"])
+    local ok, err = pcall(function()
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      require("tests.support.metrics_consent_fixture").enable(kl)
+      helpers.assert_true(type(kl.record_correction) == "function",
+        "the daemon's Backspace path needs an entry point into the keylogger")
+      kl.on_keydown("a", 1000, "owned-physical", 30)
+      kl.record_correction("owned-physical", 1100)
+      kl.on_keydown("b", 1200, "owned-physical", 48)
+      helpers.assert_eq(kl.get_app_stats()["owned-physical"].keystrokes, 2,
+        "a correction types no character")
+      local live = kl.get_range_payload().today["owned-physical"].c["[BS]"]
+      helpers.assert_true(live ~= nil and live.c == 1, "the live projection counts the correction once")
+      kl.flush()
+      local row = captured[1] and captured[1][1]
+      helpers.assert_true(row ~= nil, "the typed events must reach the writer")
+      local events = require("json").decode(row.events_json)
+      helpers.assert_eq(#events, 3)
+      helpers.assert_eq(events[2][1], "[BS]")
+      helpers.assert_eq(events[2][2], 100, "the correction keeps its own inter-key delay")
+      helpers.assert_eq(events[2][3].sk, 14, "the physical source key is Backspace")
+      helpers.assert_nil(events[2][3].s, "a physical correction is manual, never synthetic")
+    end)
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    package.loaded["modules.keylogger.keylogger"] = nil
+    keylogger = helpers.load_module("modules.keylogger.keylogger")
+    if not ok then error(err, 0) end
+  end)
+  it("physical-backspace-corrections: corrections leave the live speed unchanged", function()
+    local function live_wpm(stream)
+      keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
+      keylogger.reset_session()
+      for _, key in ipairs(stream) do keylogger.on_keydown(key[1], key[2], "owned-speed") end
+      return keylogger.get_live_stats(2000).wpm
+    end
+    local typed = { { "a", 1000 }, { "b", 1150 }, { "c", 1300 } }
+    local corrected = { { "a", 1000 }, { "[BS]", 1050 }, { "[BS]", 1100 }, { "[BS]", 1120 },
+      { "b", 1150 }, { "[BS]", 1200 }, { "c", 1300 } }
+    local expected = live_wpm(typed)
+    helpers.assert_true(expected > 0, "the healthy control produces a speed")
+    helpers.assert_eq(live_wpm(corrected), expected,
+      "a held Backspace must not read as a burst of fast typing")
+  end)
+  it("physical-backspace-corrections: corrections leave the session speed and n-grams unchanged", function()
+    keylogger.init({ sqlite_path = fresh_db() })
+    require("tests.support.metrics_consent_fixture").enable(keylogger)
+    keylogger.reset_session()
+    local before = keylogger.get_session_stats().keystrokes
+    helpers.assert_true(type(before) == "number", "the session collector reports a keystroke count")
+    keylogger.on_keydown("a", 1000, "owned-session")
+    keylogger.on_keydown("[BS]", 1100, "owned-session")
+    keylogger.on_keydown("[BS]", 1150, "owned-session")
+    helpers.assert_eq(keylogger.get_session_stats().keystrokes - before, 1,
+      "only the typed character is a session keystroke")
+    for _, gram in ipairs(keylogger.get_ngrams(10) or {}) do
+      local token = type(gram) == "table" and (gram.gram or gram[1]) or gram
+      helpers.assert_true(type(token) ~= "string" or not token:find("[BS]", 1, true),
+        "the session n-grams never contain the correction marker")
+    end
+  end)
+end)
+
+-- The flush walked each buffer on its own and credited everything still open
+-- at its end: on the flush cadence every few seconds of typing was a session,
+-- a word cut by a flush was two words, and the first key of a flush read as
+-- typed zero milliseconds after the previous one.
+helpers.describe("linux-cross-flush-walk", function()
+  it("linux-cross-flush-walk: the flushes carry one session, one word and the pair across the cut", function()
+    local Monotonic = require("infra.monotonic")
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local previous_now = Monotonic.now_ms
+    local now = 10000
+    local sessions, words, bigrams, typing = {}, {}, {}, {}
+    local refuse_next = false
+    local writer = setmetatable({
+      insert_typing_events = function(_, events)
+        for _, row in ipairs(events) do typing[#typing + 1] = row end
+        return true
+      end,
+      upsert_session = function(_, row) sessions[#sessions + 1] = row; return true end,
+      upsert_ngrams = function(_, _, _, ngrams, table_name)
+        local target = (table_name == "ngram_words" and words) or (table_name == "ngram_bigrams" and bigrams) or nil
+        if target then
+          for token, value in pairs(ngrams) do target[token] = (target[token] or 0) + value.c end
+        end
+        return true
+      end,
+    }, { __index = function() return function() return true end end })
+    require("tests.support.sqlite_flush_fake").attach(writer)
+    local start_flush = writer.start_flush
+    writer.start_flush = function(...)
+      if refuse_next then refuse_next = false; return nil end
+      return start_flush(...)
+    end
+    package.loaded["modules.keylogger.sqlite_writer"] = writer
+    local ok, err = pcall(function()
+      Monotonic.now_ms = function() return now end
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      require("tests.support.metrics_consent_fixture").enable(kl)
+      local function type_text(text, at)
+        for index = 1, #text do kl.on_keydown(text:sub(index, index), at + (index - 1) * 100, "owned-cross") end
+        return at + (#text - 1) * 100
+      end
+      local last = type_text("hel", 10000)
+      now = last + 50
+      helpers.assert_true(kl.flush(), "the first flush commits")
+      last = type_text("lo ", last + 100)
+      now = last + 50
+      refuse_next = true
+      helpers.assert_eq(kl.flush(), false, "a refused flush restores its events")
+      helpers.assert_true(kl.flush(), "the retry commits")
+      helpers.assert_eq(#sessions, 0, "a session still open is credited when it ends, not at each flush")
+      helpers.assert_eq(words.hello, 1, "the word cut by the flush is one word")
+      helpers.assert_nil(words.hel)
+      helpers.assert_nil(words.lo, "the refused snapshot's context was never adopted")
+      helpers.assert_eq(bigrams.ll, 1, "the pair across the cut is counted once")
+      helpers.assert_eq(require("json").decode(typing[2].events_json)[1][2], 100,
+        "the first key of a flush keeps its delay after the previous flush's last key")
+      now = last + 300001
+      helpers.assert_true(kl.flush(), "the settled session commits")
+      helpers.assert_eq(#sessions, 1)
+      helpers.assert_eq(sessions[1].count_total, 1, "six keys across three flushes are one session")
+      helpers.assert_eq(sessions[1].longest_chars, 6)
+      helpers.assert_true(kl.flush())
+      helpers.assert_eq(#sessions, 1, "a credited session is never credited again")
+    end)
+    Monotonic.now_ms = previous_now
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    package.loaded["modules.keylogger.keylogger"] = nil
+    keylogger = helpers.load_module("modules.keylogger.keylogger")
+    if not ok then error(err, 0) end
+  end)
+  it("linux-cross-flush-walk: shutdown credits the session still open", function()
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local sessions = {}
+    local writer = setmetatable({
+      upsert_session = function(_, row) sessions[#sessions + 1] = row; return true end,
+    }, { __index = function() return function() return true end end })
+    require("tests.support.sqlite_flush_fake").attach(writer)
+    package.loaded["modules.keylogger.sqlite_writer"] = writer
+    local ok, err = pcall(function()
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      require("tests.support.metrics_consent_fixture").enable(kl)
+      local Monotonic = require("infra.monotonic")
+      local at = math.floor(Monotonic.now_ms())
+      kl.on_keydown("a", at, "owned-stop")
+      kl.on_keydown("b", at + 100, "owned-stop")
+      helpers.assert_true(kl.flush())
+      helpers.assert_eq(#sessions, 0, "the session is still open")
+      helpers.assert_true(kl.stop(), "shutdown settles")
+      helpers.assert_eq(#sessions, 1, "the open session is credited at shutdown")
+      helpers.assert_eq(sessions[1].longest_chars, 2)
+    end)
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    package.loaded["modules.keylogger.keylogger"] = nil
+    keylogger = helpers.load_module("modules.keylogger.keylogger")
+    if not ok then error(err, 0) end
+  end)
+end)
+
 helpers.describe("live-source-projection", function()
 	local function fresh_live()
 		keylogger.init({ sqlite_path = fresh_db() })

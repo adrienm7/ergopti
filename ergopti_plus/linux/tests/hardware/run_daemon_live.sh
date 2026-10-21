@@ -8,7 +8,7 @@
 # real daemon, a real trigger, a real prediction, and the tray it shows.
 #
 # Needs root (uinput and the grab), Xvfb, dbus-launch, at-spi2-core, openbox,
-# xkbcomp, python3-gi with Gtk 3. Run from anywhere.
+# xkbcomp, xclip, python3-gi with Gtk 3. Run from anywhere.
 # Exit 0 = expansion and tray both verified; 1 = a failure; 2 = no environment.
 
 set -u
@@ -18,7 +18,7 @@ BUS_LAUNCHER=""
 for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
 	[ -x "${candidate}" ] && BUS_LAUNCHER="${candidate}" && break
 done
-for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp; do
+for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp xclip; do
 	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }

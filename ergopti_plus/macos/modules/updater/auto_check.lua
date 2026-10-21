@@ -16,8 +16,10 @@
 ---    off past its due time catches up once the boot delay has passed.
 --- 2. One release list: the check reads update_check.releases_url with an ETag
 ---    and keeps the channel's latest release through the shared registry and
----    offer rule; a 304 reuses the list this session holds, and a session that
----    holds none sends a full request.
+---    offer rule; a 304 reuses the list copy kept in the Storage port
+---    (check_state.list_storage_key), so a restart does not spend one of the 60
+---    anonymous GitHub API calls an hour. The copy keeps only the fields the
+---    check reads, since the full list with its notes is several megabytes.
 --- 3. Never on the typing path: evaluations run from timers and the wake
 ---    watcher, and the request is asynchronous.
 --- 4. Paused: nothing is dispatched and the record is left as it is. A wake
@@ -42,6 +44,7 @@ local JsonCodec = require("adapters.json_codec")
 local Schedule  = require("updater.schedule")
 local Parser    = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
+local RateLimit = require("updater.rate_limit")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
 local notifications = require("infra.notifications")
@@ -68,7 +71,7 @@ local MS_PER_SEC = 1000
 
 --- Loads the automatic-check contract from the shared updater defaults. It has
 --- no fallback: a guessed cadence or URL would check the wrong list or never.
---- @return table config { timing, state_key, releases_url, timeout_sec }
+--- @return table config { timing, state_key, list_key, releases_url, timeout_sec }
 function M.load_config()
 	local path = Paths.shared("modules/updater/defaults.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
@@ -80,11 +83,15 @@ function M.load_config()
 	local ok, err = Schedule.validate_timing(decoded.timing)
 	if not ok then error("the shared updater timing is invalid: " .. tostring(err), 0) end
 	local state_key = type(decoded.check_state) == "table" and decoded.check_state.storage_key or nil
+	local list_key = type(decoded.check_state) == "table" and decoded.check_state.list_storage_key or nil
 	local template = type(decoded.update_check) == "table" and decoded.update_check.releases_url or nil
 	local sources = decoded.release_sources
 	local timeout_sec = type(sources) == "table" and sources.source_timeout_sec or nil
 	if type(state_key) ~= "string" or state_key == "" then
 		error("the shared updater defaults declare no check_state.storage_key", 0)
+	end
+	if type(list_key) ~= "string" or list_key == "" or list_key == state_key then
+		error("the shared updater defaults declare no distinct check_state.list_storage_key", 0)
 	end
 	if type(template) ~= "string" or not template:find("{owner}/{repo}", 1, true) then
 		error("the shared updater defaults declare no update_check.releases_url", 0)
@@ -94,7 +101,8 @@ function M.load_config()
 	end
 	local url = template:gsub("{owner}", function() return Updater.GH_OWNER end)
 		:gsub("{repo}", function() return Updater.GH_REPO end)
-	return { timing = decoded.timing, state_key = state_key, releases_url = url, timeout_sec = timeout_sec }
+	return { timing = decoded.timing, state_key = state_key, list_key = list_key, releases_url = url,
+		timeout_sec = timeout_sec }
 end
 
 --- Reads a header case-insensitively (HTTP/2 lowercases names, Foundation
@@ -189,11 +197,13 @@ function M.new(opts)
 	local timer_handle = nil
 	local record = nil
 	local started_at = nil
-	local list_cache = nil     -- { body, etag } of the last 200 this session read
+	local list_cache = nil     -- { url, etag, body } of the last 200, kept in the Storage port
 	local in_flight = false
 	local latest = nil         -- { tag, channel } offered by the last check
 	local active = false
 	local generation = 0
+	-- Manual answers survive channel changes, but not a retired schedule owner.
+	local manual_generation = 0
 
 	--- The check record, loaded once; a missing install seed is created.
 	local function load_record()
@@ -220,6 +230,50 @@ function M.new(opts)
 		if opts.storage.set(config.state_key, state) == true then return true end
 		Logger.error(LOG, "The update-check record could not be saved; this session keeps its copy.")
 		return false
+	end
+
+	--- The list copy an earlier session stored, when it belongs to this list URL.
+	--- @return table|nil copy { url, etag, body }
+	local function load_list_cache()
+		local stored = opts.storage.get(config.list_key, nil)
+		if stored == nil then return nil end
+		if type(stored) ~= "table" or stored.url ~= config.releases_url or type(stored.etag) ~= "string"
+			or stored.etag == "" or type(stored.body) ~= "string" or not stored.body:match("^%s*%[") then
+			Logger.warn(LOG, "Dropped the unusable stored copy of the release list.")
+			return nil
+		end
+		return stored
+	end
+	list_cache = load_list_cache()
+
+	--- Keeps the fields the check reads from a validated list, with its ETag.
+	--- A refused write leaves this session's copy; the next start sends a full request.
+	--- @param decoded table The decoded release array.
+	--- @param etag string|nil The response's validator.
+	local function store_list_cache(decoded, etag)
+		-- An empty array would encode as a JSON object, which no copy may hold.
+		if not etag or #decoded == 0 then
+			list_cache = nil
+			if opts.storage.set(config.list_key, nil) ~= true then
+				Logger.error(LOG, "The stale copy of the release list could not be removed.")
+			end
+			return
+		end
+		local kept = {}
+		for index, entry in ipairs(decoded) do
+			kept[index] = { tag_name = entry.tag_name, published_at = entry.published_at,
+				prerelease = entry.prerelease, draft = entry.draft }
+		end
+		local body, encode_error = JsonCodec.encode(kept)
+		if type(body) ~= "string" then
+			list_cache = nil
+			Logger.error(LOG, "The release list copy could not be encoded: %s.", tostring(encode_error))
+			return
+		end
+		list_cache = { url = config.releases_url, etag = etag, body = body }
+		if opts.storage.set(config.list_key, list_cache) ~= true then
+			Logger.error(LOG, "The release list copy could not be saved; this session keeps it.")
+		end
 	end
 
 	--- The interval in force: the persisted preference snapped to a preset.
@@ -318,7 +372,7 @@ function M.new(opts)
 		return { tag = tag, channel = channel }
 	end
 
-	--- The headers of one list request, conditional on this session's copy.
+	--- The headers of one list request, conditional on the stored copy.
 	local function list_headers()
 		local headers = { Accept = "application/vnd.github+json", ["User-Agent"] = USER_AGENT }
 		if list_cache then headers["If-None-Match"] = list_cache.etag end
@@ -334,7 +388,7 @@ function M.new(opts)
 	local function read_response(result)
 		local status = type(result) == "table" and tonumber(result.status) or 0
 		if status == 304 and list_cache then
-			Logger.debug(LOG, "Release list unchanged (304); reusing this session's copy.")
+			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
 			return list_cache.body
 		end
 		if type(result) == "table" and result.ok == true and type(result.body) == "string"
@@ -348,10 +402,12 @@ function M.new(opts)
 					return nil, "parse_failed", "a release without a tag"
 				end
 			end
-			local etag = header_value(result.headers, "etag")
-			list_cache = etag and { body = result.body, etag = etag } or nil
+			store_list_cache(decoded, header_value(result.headers, "etag"))
 			return result.body
 		end
+		local limited = RateLimit.exhausted_detail(status, header_value(result.headers, "x-ratelimit-remaining"),
+			header_value(result.headers, "x-ratelimit-reset"))
+		if limited then return nil, "no_connection", limited end
 		return nil, "no_connection",
 			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
 	end
@@ -427,18 +483,20 @@ function M.new(opts)
 	--- one the About row names, and a later automatic check does not announce
 	--- it again: the window already showed it.
 	--- @param channel string Registry channel id to check.
-	--- @param on_result function(result) Receives the check result, exactly once.
+	--- @param on_result function(result) Receives one result unless the owner stops or restarts.
 	--- @return boolean dispatched
 	function owner.check_now(channel, on_result)
+		local request_generation = manual_generation
 		local base = { channel = channel, current = current_version() }
 		local answered = false
 		local function answer(result)
-			if answered then return end
+			if answered or request_generation ~= manual_generation then return end
 			answered = true
 			local ok, err = pcall(on_result, result)
 			if not ok then Logger.error(LOG, "The manual check's answer raised: %s.", tostring(err)) end
 		end
 		local function fail(reason, detail)
+			if answered or request_generation ~= manual_generation then return end
 			save_record(Schedule.record_check(load_record(), opts.now(), false))
 			Logger.warn(LOG, "Manual update check failed on channel '%s': %s.", tostring(channel), tostring(detail))
 			answer(CheckResult.failure(base, reason, detail))
@@ -450,7 +508,7 @@ function M.new(opts)
 			return false
 		end
 		local ok_dispatch, sent = pcall(opts.http.get, config.releases_url, list_headers(), function(response)
-			if answered then return end
+			if answered or request_generation ~= manual_generation then return end
 			local body, reason, detail = read_response(response)
 			if not body then return fail(reason, detail) end
 			local result = CheckResult.classify(body, {
@@ -503,6 +561,7 @@ function M.new(opts)
 			return false
 		end
 		generation = generation + 1
+		manual_generation = manual_generation + 1
 		in_flight = false
 		active = true
 		if not evaluate() then
@@ -516,6 +575,7 @@ function M.new(opts)
 	--- Stops the schedule; a completion still in flight is discarded.
 	--- @return boolean stopped
 	function owner.stop()
+		manual_generation = manual_generation + 1
 		active = false
 		generation = generation + 1
 		in_flight = false

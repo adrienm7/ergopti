@@ -51,6 +51,21 @@ class _LSPN_Fixture extends _LSJ_Fixture {
 			"build", ObjBindMethod(this, "Build"), "timer", ObjBindMethod(this, "RepairTimer")))
 		_LLM_LocalServerPanel := this.Panel
 		_LLM_Menu_RuntimeActivated := true
+		; The panel prepares and discovers only behind an enabled AI feature
+		; (issue #97); these controls exercise that enabled runtime.
+		global _LLM_Menu
+		AssertTrue(_LLM_Menu is Map, "the panel fixture requires the published AI menu state")
+		this.HadEnabled := _LLM_Menu.Has("enabled")
+		this.SavedEnabled := _LLM_Menu.Get("enabled", false)
+		_LLM_Menu["enabled"] := true
+	}
+
+	RestoreEnabled() {
+		global _LLM_Menu
+		if this.HadEnabled
+			_LLM_Menu["enabled"] := this.SavedEnabled
+		else if _LLM_Menu.Has("enabled")
+			_LLM_Menu.Delete("enabled")
 	}
 
 	Prepare() {
@@ -187,6 +202,7 @@ class _LSPN_Fixture extends _LSJ_Fixture {
 			AssertEqual(0, this.Panel.RepairRecords.Count)
 			AssertEqual(0, this.RepairTimers.Count)
 		} finally {
+			this.RestoreEnabled()
 			_LLM_LocalServerPanel := this.SavedPanel
 			if this.HadActivated
 				_LLM_Menu_RuntimeActivated := this.Activated

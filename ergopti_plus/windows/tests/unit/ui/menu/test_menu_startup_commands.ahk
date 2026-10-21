@@ -35,10 +35,10 @@ _MSC_InitializationOwnership() {
 	try {
 		_MenuStartupCommands := false
 		AssertFalse(MenuStartupCommands_Defer((*) => 0, []), "ordinary contexts have no startup admission")
-		MenuStartupCommands_Begin(() => false)
+		MenuStartupCommands_Begin(() => false, [])
 		Owner := _MenuStartupCommands
 		Threw := false
-		try MenuStartupCommands_Begin(() => true)
+		try MenuStartupCommands_Begin(() => true, [])
 		catch
 			Threw := true
 		AssertTrue(Threw, "duplicate initialization cannot replace accepted selection ownership")

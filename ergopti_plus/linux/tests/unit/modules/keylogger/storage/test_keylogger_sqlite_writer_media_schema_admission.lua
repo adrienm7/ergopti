@@ -15,6 +15,18 @@ local helpers, it, sw, is_media_schema_startup, with_writer_read_receipts, with_
 
 
 
+helpers.describe("linux-sqlite-database-owner", function()
+	it("(sqlite-database-owner) a different path refuses before changing the open store or executing SQL", function()
+		with_category_commands(nil, function(writer, commands)
+			local original = writer.get_db_path()
+			helpers.assert_eq(writer.open_db(original .. ".replacement"), false)
+			helpers.assert_eq(writer.get_db_path(), original)
+			helpers.assert_eq(#commands, 0, "A refused owner switch must not execute migrations against another file")
+			helpers.assert_true(writer.exec_sql("SELECT 1;"), "The previous open store must remain usable")
+		end)
+	end)
+end)
+
 helpers.describe("linux-sqlite-media-schema-admission", function()
 	it("media-schema-deferred-open: current schema admission does not reserve a writer", function()
 		with_category_commands(nil, function(_, commands)
@@ -254,7 +266,9 @@ helpers.describe("sqlite_writer", function()
 				hotstring = 2, llm = 3, other = 4, ["extension.v2"] = 5,
 			})
 			helpers.assert_contains(sql, "ON CONFLICT(device_id, date, app, token) DO UPDATE SET")
-			helpers.assert_contains(sql, "esrc_json = (SELECT json_group_object(k, v)")
+			-- Rebuilt with json_quote keys (linux-sqlite-nul-map-keys), never json_group_object.
+			helpers.assert_contains(sql,
+				"esrc_json = (SELECT COALESCE('{' || group_concat(json_quote(k) || ':' || v, ',') || '}', '{}')")
 			helpers.assert_contains(sql, "SELECT key AS k, SUM(value) AS v")
 			helpers.assert_contains(sql, "SELECT key, value FROM json_each(esrc_json)")
 			helpers.assert_contains(sql, "UNION ALL SELECT key, value FROM json_each(excluded.esrc_json)")

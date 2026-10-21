@@ -10,7 +10,7 @@
 --- unswitchable layout. pcall therefore yielded (true, false) and only the status
 --- was bound, so `ok` was true on every call. Consequences:
 ---   - the kl_name retry never ran;
----   - the TIS osascript fallback never ran — even though the function's own
+---   - the native TIS fallback never ran — even though the function's own
 ---     docstring says that path exists precisely for macOS Sequoia third-party
 ---     bundles where setLayout FAILS;
 ---   - the Logger.warn on total failure was unreachable, so a failed layout
@@ -20,17 +20,39 @@
 ---
 --- This test stubs setLayout to RETURN false WITHOUT raising — the exact shape
 --- the old code misread — and proves the cascade advances into the asynchronous
---- osascript fallback without treating subprocess dispatch as switch success.
+--- native fallback without treating subprocess dispatch as switch success.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 local LOCALISED_NAME = "Ergopti+"
 local KL_NAME        = "Ergopti_v2_2_2_plus"
+local EXECUTABLE     = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+
+
+--- Isolates the fallback's exact helper resolver and all native adapter state.
+--- @param name string Test description.
+--- @param body function fn(resolution_count).
+local function selection_test(name, body)
+	helpers.it(name, function()
+		helpers.with_stub_scope({ "modules.keymap.input_sources", "modules.keymap.layout_install",
+			"adapters.input_source_selector", "platform.remap.lease_helper",
+			"adapters.shell_runner", "adapters.timer_scheduler", "adapters.task_lifecycle" }, function()
+			local resolutions = 0
+			package.loaded["platform.remap.lease_helper"] = {
+				resolve = function()
+					resolutions = resolutions + 1
+					return EXECUTABLE, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = EXECUTABLE }
+				end,
+			}
+			body(function() return resolutions end)
+		end)
+	end)
+end
 
 
 helpers.describe("set_input_source: a setLayout that returns false must fall through", function()
-	helpers.it("tries both hs.keycodes names and then reaches the TIS osascript fallback", function()
+	selection_test("tries both hs.keycodes names and then reaches the native TIS fallback", function(resolutions)
 		package.loaded["adapters.shell_runner"] = nil
 		package.loaded["adapters.timer_scheduler"] = nil
 		local task_args = nil
@@ -74,11 +96,14 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 
 		-- The load-bearing assertion: the TIS fallback actually executed.
 		helpers.assert_not_nil(task_args,
-			"the TIS osascript fallback must be reached when hs.keycodes declines both names")
-		helpers.assert_eq(task_args.executable, "/usr/bin/osascript")
-		helpers.assert_eq(task_args.args[1], "-e")
+			"the native TIS fallback must be reached when hs.keycodes declines both names")
+		helpers.assert_eq(resolutions(), 1)
+		helpers.assert_eq(task_args.executable, EXECUTABLE)
+		helpers.assert_eq(task_args.args[1], "--select-input-source-by-name")
+		helpers.assert_eq(task_args.args[2], LOCALISED_NAME)
+		helpers.assert_eq(task_args.args[3], KL_NAME)
 
-		-- Dispatch succeeded, but the script's MISS payload is the business result.
+		-- Dispatch succeeded, but the native MISS payload is the business result.
 		helpers.assert_eq(accepted, true)
 		helpers.assert_eq(terminal, false,
 			"a committed child must not be confused with a successful layout switch")
@@ -88,7 +113,7 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		package.loaded["adapters.timer_scheduler"] = nil
 	end)
 
-	helpers.it("still short-circuits on the first name when setLayout RETURNS true", function()
+	selection_test("still short-circuits on the first name when setLayout RETURNS true", function(resolutions)
 		local IS = helpers.load_with_stubs("modules.keymap.input_sources")
 
 		local setlayout_args = {}
@@ -107,10 +132,7 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		helpers.assert_eq(terminal, true)
 		helpers.assert_eq(#setlayout_args, 1,
 			"a successful first attempt must not fall through to the retry")
-		for _, cmd in ipairs(hs.__exec_calls) do
-			helpers.assert_true(not (type(cmd) == "string" and cmd:find("/usr/bin/osascript", 1, true)),
-				"the osascript fallback must NOT run once hs.keycodes reports a real switch")
-		end
+		helpers.assert_eq(resolutions(), 0, "a genuine in-process switch must not resolve a native fallback")
 
 		package.loaded["modules.keymap.input_sources"] = nil
 		package.loaded["adapters.shell_runner"] = nil

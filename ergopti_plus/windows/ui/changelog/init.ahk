@@ -718,7 +718,9 @@ _CLW_SourceFailed(Context, Status, Reason) {
 	global _CLW_FeedStarter
 	Channel := Context.Channel
 	if (Context.Stage == "api") {
-		try LoggerWarn("Changelog", "GitHub API release list failed ({1}); trying the Atom feed (channel={2}).",
+		; Expected without a token (HTTP 403 rate limit): the feed serves the
+		; list, and only exhausted sources are a warning.
+		try LoggerInfo("Changelog", "GitHub API release list failed ({1}); trying the Atom feed (channel={2}).",
 			Reason, Channel)
 		Feed := {
 			WindowEpoch: Context.WindowEpoch,

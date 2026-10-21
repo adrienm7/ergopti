@@ -140,7 +140,8 @@ function rebuildFilterButtons() {
 				}
 				if (currentCategoryFilter.has(cat)) currentCategoryFilter.delete(cat);
 				else currentCategoryFilter.add(cat);
-				if (currentCategoryFilter.size === catList.length) currentCategoryFilter = null;
+				if (catList.every((category) => currentCategoryFilter.has(category)))
+					currentCategoryFilter = null;
 				renderCats();
 				renderDashboard();
 			});
@@ -213,7 +214,7 @@ function updateCharts(appsArray, aggregatedData) {
 		// Pre-load icon images so the afterDraw plugin can paint them. Each loaded
 		// image triggers a chart redraw so icons appear as soon as they decode.
 		const iconImages = topApps.map((a) => {
-			if (!appIcons[a.name]) return null;
+			if (!Object.prototype.hasOwnProperty.call(appIcons, a.name) || !appIcons[a.name]) return null;
 			const img = new Image();
 			img.onload = () => {
 				if (appsBarChart) appsBarChart.draw();
@@ -281,7 +282,7 @@ function updateCharts(appsArray, aggregatedData) {
 	}
 
 	// 2. Category Pie Chart (Colored by fixed category dictionary)
-	const catGroups = {};
+	const catGroups = Object.create(null);
 	appsArray.forEach((a) => {
 		if (!catGroups[a.category]) catGroups[a.category] = { timeMs: 0, score: a.score };
 		catGroups[a.category].timeMs += a.timeMs;

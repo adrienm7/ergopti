@@ -123,7 +123,9 @@ _MMRDW_TemplateGroupPolicy() {
 	try {
 		Rows := MenuRenderer_TemplateRows(Section, Map(), Map(), Payload)
 		Assert(Rows is Array && Rows.Length == 1, "one actual group row")
-		AssertEqual(2, Rows[1].Count, "absent policy retains exact legacy two-field group shape")
+		AssertEqual(3, Rows[1].Count, "a static group adds only its canonical replay parent")
+		AssertEqual(_MR_ReplayIdentity(Section, "owned_group", "container"), Rows[1]["replay_group"])
+		AssertFalse(Rows[1].Has("disabled") || Rows[1].Has("disabled_reason_key"), "absent policy does not invent a readiness decision")
 		Assert(Rows[1]["items"] == Children, "native child array identity is retained")
 		AssertEqual(false, Rows[1]["items"][1]["action"].Call(), "native child refusal is preserved")
 		Item["disabled_when"] := ["ready"]

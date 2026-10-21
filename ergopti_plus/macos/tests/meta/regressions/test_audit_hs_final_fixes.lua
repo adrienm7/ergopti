@@ -46,7 +46,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ===================================================
 
 	helpers.it("toml_cache.lua M.store must close fh even when fh:write() panics", function()
-		local src = read_src("local function content_fingerprint") -- adapters/toml_cache.lua
+		local src = read_src("local function read_source_bytes") -- adapters/toml_cache.lua
 		assert(src, "adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around fh:write(body) with fh:close() outside.
 		assert(
@@ -61,7 +61,7 @@ helpers.describe("Audit-hs-final fixes", function()
 	-- ==========================================================
 
 	helpers.it("toml_cache.lua content_fingerprint must close f even when f:read() panics", function()
-		local src = read_src("local function content_fingerprint") -- adapters/toml_cache.lua
+		local src = read_src("local function read_source_bytes") -- adapters/toml_cache.lua
 		assert(src, "adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around f:read(...) with f:close() outside.
 		assert(

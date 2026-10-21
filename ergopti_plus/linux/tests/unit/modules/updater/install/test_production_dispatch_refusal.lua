@@ -7,7 +7,7 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(options, body)
  options = options or {}
  local names = { "modules.updater.manager", "modules.updater.archive_transfer", "infra.archive_output",
-  "infra.monotonic", "infra.installation", "modules.updater.installer", "toml_codec.writer" }
+  "infra.monotonic", "infra.installation", "modules.updater.installer", "toml_codec.writer", "adapters.storage" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
@@ -36,6 +36,13 @@ local function scenario(options, body)
   return original_require(name, ...)
  end
  local ok, err = xpcall(function()
+  -- Runtime check state belongs to this model. A warmed real Storage would
+  -- otherwise retain this scenario's fake Writer after the cache is restored.
+  local stored = {}
+  package.loaded["adapters.storage"] = {
+   get = function(key, default) local value = stored[key]; if value == nil then return default end; return value end,
+   set = function(key, value) stored[key] = value; return true end,
+  }
   local actual_installer = options.actual_installer and require("modules.updater.installer") or nil
   local brand, transaction = {}, {}; h.brand = brand
   local artifact = {
@@ -222,5 +229,10 @@ local helpers = require("tests.helpers")
 helpers.describe("known zero-dispatch native transaction", function()
  assert(#tests == 8, "Independent case floor changed")
  for _, case in ipairs(tests) do helpers.it(case[1], case[2]) end
+end)
+helpers.describe("updater receiving model storage isolation", function()
+ helpers.it("restores a warmed real storage owner after the receiving scenario (test_production_dispatch_refusal)", function()
+  require("tests.support.modules.updater.storage_isolation").check(scenario)
+ end)
 end)
 return tests

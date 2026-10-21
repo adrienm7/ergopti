@@ -247,6 +247,9 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 		package.loaded["modules.hotstrings.device_finder"] = {
 			find_devices = function() return { keyboard }, { pointer } end,
 			is_key_device = function() return true, nil end,
+			-- Controlled keyboard sources have no REL/ABS axes.
+			is_interceptable_key_device = function() return true, nil end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
 		package.loaded["adapters.xkb_capture"] = {
 			is_ready = function() return true end,
@@ -256,6 +259,7 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 		}
 		local reader = helpers.load_module("adapters.evdev_reader")
 		reader._set_backend({
+			read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 			open = function(path) return path end,
 			ioctl = function() return true end,
 			read = function(fd) return table.remove(queues[fd] or {}, 1) end,
@@ -497,6 +501,9 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 		package.loaded["modules.hotstrings.device_finder"] = {
 			find_devices = function() return { nodes.keyboard }, { nodes.mouse } end,
 			is_key_device = function() return true, nil end,
+			-- Controlled keyboard sources have no REL/ABS axes.
+			is_interceptable_key_device = function() return true, nil end,
+			is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		}
 		package.loaded["adapters.xkb_capture"] = {
 			is_ready = function() return true end,
@@ -513,6 +520,7 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 		}
 		local reader = helpers.load_module("adapters.evdev_reader")
 		reader._set_backend({
+			read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 			open = function(path) return path end,
 			ioctl = function() return true end,
 			read = function(fd) return table.remove(queues[fd] or {}, 1) end,

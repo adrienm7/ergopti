@@ -94,7 +94,7 @@ _LMDG_ModelParentHelperDisables() {
 	Seg := _DriverFuncBody("_LLM_Menu_ModelParentRows")
 	Assert(Seg != "", "the actual model parent helper must exist in menu_main.ahk")
 	Assert(_LMDG_ModelParentGreyingRoute(_DriverFuncBody("_LLM_Menu_EmitRow"), Seg),
-		"the retained actual parent must reach native AppendRows with the completed model picker")
+		"the retained actual parent must go back to MenuRenderer_Build with the completed model picker")
 	Rows := _MR_GetMenuDef("llm_model_parent_ahk")
 	Assert(Rows.Length == 1 && Rows[1]["disabled_when"].Length == 1
 		&& Rows[1]["disabled_when"][1] == "llm_model_parent_ready"
@@ -149,7 +149,7 @@ _LMDG_ToggleRoute(Build, Render, Getters) {
 		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
 	; The factored getter must retain both pause and genuine full-state admission.
 	Ready := _LMDG_Statement(Getters,
-		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended && ConfigFullStateCanPersist\(\)\)[ \t]*$', 1)
+		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended && ConfigFullStateCanPersist\(\),[ \t]*$', 1)
 	if !(Command && Reader && Ready && Publish && Command < Reader && Reader < Publish)
 		return false
 	Stage := _LMDG_Statement(Build, 'm)^[ \t]*(try) \{[ \t]*$', 1)
@@ -225,8 +225,8 @@ _LMDG_BackendFrameGreyingRoute(Emit, Helper) {
 		return false
 	Call := _LMDG_Statement(Emit,
 		'm)^[ \t]*(BackendRows) := _LLM_Menu_BackendParentRows\(BackendMenu, BackendCaption, disabled, WarningRows\)', 3)
-	Consumer := _LMDG_Statement(Emit,
-		'm)^[ \t]*(MenuRenderer_AppendRows)\(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows\)', 3)
+	; The emitter returns the frame; MenuRenderer_Build draws it at the entry.
+	Consumer := _LMDG_Statement(Emit, 'm)^[ \t]*(return) BackendRows[ \t]*$', 2)
 	Getter := _LMDG_Statement(Helper,
 		'm)^[ \t]*(Getters) := Map\("llm_backend_parent_caption", \(\*\) => Caption,[ \t]*\n[ \t]*"llm_backend_parent_ready", \(\*\) => !Disabled,', 1)
 	Parent := _LMDG_Statement(Helper,
@@ -256,7 +256,7 @@ _LMDG_BackendFrameGreyingDecoy(Kind) {
 	else if Kind == "foreign-group"
 		Helper := StrReplace(Helper, 'Parent := MenuRenderer_GroupRow(', 'Parent := Foreign.MenuRenderer_GroupRow(')
 	else if Kind == "wrong-consumer"
-		Emit := StrReplace(Emit, '"llm_backend_parent_frame_ahk", BackendRows)', '"llm_backend_parent_frame_ahk", ForeignRows)')
+		Emit := StrReplace(Emit, 'return BackendRows', 'return ForeignRows')
 	else if Kind == "discarded-parent"
 		Helper := StrReplace(Helper, 'ParentRows := [Parent]', 'ParentRows := [Map("label", Caption, "submenu", NativeChild)]')
 	else if Kind == "foreign-parent"
@@ -284,8 +284,8 @@ _LMDG_ModelParentGreyingRoute(Emit, Helper) {
 	Child := _LMDG_Statement(Emit, 'm)^[ \t]*(model_menu) := LLM_Menu_BuildModelMenu\(\)', 2)
 	Call := _LMDG_Statement(Emit,
 		'm)^[ \t]*(ModelRows) := _LLM_Menu_ModelParentRows\(ReceiveModel, model_menu, health_dot, model_shown, disabled\)', 3)
-	Consumer := _LMDG_Statement(Emit,
-		'm)^[ \t]*(MenuRenderer_AppendRows)\(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows\)', 3)
+	; The emitter returns the parent rows; MenuRenderer_Build draws them at the entry.
+	Consumer := _LMDG_Statement(Emit, 'm)^[ \t]*(return) ModelRows[ \t]*$', 2)
 	Getters := _LMDG_Statement(Helper,
 		'm)^[ \t]*(Getters) := Map\("llm_model_health_prefix", \(\*\) => HealthPrefix,[ \t]*\n'
 		. '[ \t]*"llm_model_current_caption", \(\*\) => ModelCaption,[ \t]*\n'
@@ -306,7 +306,7 @@ _LMDG_ModelParentGreyingDecoy(Kind) {
 	else if Kind == "wrong-receiver"
 		Emit := StrReplace(Emit, '_LLM_Menu_ModelParentRows(ReceiveModel, model_menu,', '_LLM_Menu_ModelParentRows(Foreign, model_menu,')
 	else if Kind == "wrong-consumer"
-		Emit := StrReplace(Emit, '"llm_model_parent_ahk", ModelRows)', '"llm_model_parent_ahk", ForeignRows)')
+		Emit := StrReplace(Emit, 'return ModelRows', 'return ForeignRows')
 	else if Kind == "discarded-parent"
 		Helper := StrReplace(Helper, 'return [Parent]', 'return [Map("label", ModelCaption, "submenu", NativeChild)]')
 	else if Kind == "commented-capture"

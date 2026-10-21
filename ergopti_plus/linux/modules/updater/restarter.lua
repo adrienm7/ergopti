@@ -72,7 +72,11 @@ function M.relay_command(pid, wrapper, args)
 	local script = string.format("while kill -0 %d 2>/dev/null"
 		.. " && [ \"$(sed -n 's/^State:[[:space:]]*\\([A-Z]\\).*/\\1/p' /proc/%d/status 2>/dev/null)\" != Z ]; do sleep 0.2; done; exec %s",
 		pid, pid, table.concat(argv, " "))
-	return "setsid sh -c " .. ShellRunner.quote(script) .. " </dev/null >/dev/null 2>&1 &"
+	-- Keep dispatch in the foreground until the detached shell has forked its
+	-- relay. An outer '&' reports success even when setsid cannot start at all,
+	-- which would authorize shutdown with no process left to launch the update.
+	return "setsid sh -c " .. ShellRunner.quote("(" .. script .. ") </dev/null >/dev/null 2>&1 &")
+		.. " </dev/null >/dev/null 2>&1"
 end
 
 --- Starts the installed version in place of this process.

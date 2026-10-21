@@ -158,7 +158,7 @@ helpers.describe("context_tracker: source pins the AXFocusedUIElement pcall guar
 		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local init_src = helpers.read_driver_source("local function ensure_browser_window_filter")
+		local init_src = helpers.read_driver_source("local function ensure_browser_window_watchers")
 		helpers.assert_true(init_src ~= nil, "modules/keylogger/init.lua source must be locatable")
 
 		helpers.assert_true(

@@ -917,34 +917,6 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"the shared serializer must make the watcher clear latest-wins")
 	end)
 
-	helpers.it("set_if_revision rejects a stale probe after a newer CapsWord activation", function()
-		local bridge, ctx = fresh_bridge()
-
-		local probe_revision = bridge.capsword_revision()
-		local accepted, activation_revision = bridge.set("capsword", 1)
-		helpers.assert_true(accepted)
-		helpers.assert_true(activation_revision > probe_revision)
-		local stale_accepted, current_revision = bridge.set_if_revision(
-			"capsword",
-			0,
-			probe_revision
-		)
-		helpers.assert_true(not stale_accepted,
-			"an old probe must not clear the activation that happened while it was in flight")
-		helpers.assert_eq(current_revision, activation_revision)
-		helpers.assert_eq(#ctx.tasks, 1)
-		ctx.apply(1)
-		helpers.assert_eq(ctx.engine[scoped_name("capsword")], 1)
-
-		local clear_accepted, clear_revision = bridge.set_if_revision(
-			"capsword",
-			0,
-			activation_revision
-		)
-		helpers.assert_true(clear_accepted)
-		helpers.assert_true(clear_revision > activation_revision)
-	end)
-
 	helpers.it("keeps accepting the settled active state until PAUSED acknowledges", function()
 		local bridge, ctx = fresh_bridge()
 		ctx.lease_phase = "pausing"

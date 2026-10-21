@@ -258,6 +258,13 @@ end)
 -- =================================================================
 -- =================================================================
 
+local function daemon_source()
+	local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+	local source = handle:read("*a")
+	handle:close()
+	return source
+end
+
 helpers.describe("keyboard hook: the daemon refreshes the active XKB keymap", function()
 
 	helpers.it("calls the reading side and the writing side from one handler", function()
@@ -265,9 +272,7 @@ helpers.describe("keyboard hook: the daemon refreshes the active XKB keymap", fu
 		-- and loading that starts a device hook. The behaviour above carries the
 		-- weight; this pins that the handler is wired to it at all, which is what
 		-- was missing — it logged and returned.
-		local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
-		local source = handle:read("*a")
-		handle:close()
+		local source = daemon_source()
 
 		local handler = source:match("on_layout_change = function.-\n\t\t\t\tend,")
 		helpers.assert_not_nil(handler,
@@ -285,4 +290,102 @@ helpers.describe("keyboard hook: the daemon refreshes the active XKB keymap", fu
 			"refresh must load capture from the exact text used to build injection")
 	end)
 
+end)
+
+--- Executes the actual initial state and layout callback without opening input.
+local function with_daemon_layout_state(body)
+	local source = daemon_source()
+	local handler = assert(source:match("(on_layout_change = function.-\n\t\t\t\tend),"),
+		"the actual layout callback must be present")
+	local initial_section = assert(source:match("%-%- 8%.10e%) Wire daemon state(.-)%-%- Completion belongs"),
+		"the actual initial state publication must be present")
+	local initial = assert(initial_section:match("webview_manager%.set_daemon_state%((%b{})%)"),
+		"the actual initial state table must be present")
+	local saved_manager = package.loaded["ui.webview_manager"]
+	local saved_wizard = package.loaded["ui.onboarding.bridge"]
+	local called, failure = xpcall(function()
+		local manager = helpers.load_module("ui.webview_manager")
+		local notices, refreshed = {}, 0
+		local layout = { refresh = function() refreshed = refreshed + 1;return true end }
+		local env = setmetatable({
+			engine = {}, keylogger = {}, hotstrings_config = {}, prediction_engine = {},
+			gestures = {}, shortcuts = {}, dyn_hotstrings = {}, MagicKey = {}, input_capture_gate = {},
+			webview_manager = manager, keyboard_layout = layout,
+			opts = { layout = "qwerty", keymap = "owned-test-keymap" },
+			script_actions = { is_paused = function() return false end },
+			package = { loaded = { ["adapters.keyboard_layout"] = layout } },
+			perform_reload = function() end, restart_on_installed_release = function() return true end,
+			restart_daemon = function() return false end, rebuild_tray_menu = function() end,
+			Logger = { start = function() end, error = function() end, success = function() end }, LOG = "test",
+			ok_i18n = true, i18n_mod = { get = function(key) return key end },
+			notifier = { send = function(message, options) notices[#notices + 1] = { message = message, options = options };return true end },
+		}, { __index = _G })
+		env.keyboard_hook = {
+			set_layout = function() return true end,
+			refresh_capture = function(_, refresh, current) return current() == true and refresh() == true end,
+		}
+		local function compile(text)
+			local fn, why
+			if setfenv then fn, why = loadstring(text, "actual daemon layout state");if fn then setfenv(fn, env) end
+			else fn, why = load(text, "actual daemon layout state", "t", env) end
+			assert(fn, why);return fn
+		end
+		compile("webview_manager.set_daemon_state(" .. initial .. ")")()
+		body({ manager = manager, env = env, notices = notices,
+			change = compile("return ({" .. handler .. "}).on_layout_change")(),
+			refreshes = function() return refreshed end })
+	end, debug.traceback)
+	package.loaded["ui.webview_manager"], package.loaded["ui.onboarding.bridge"] = saved_manager, saved_wizard
+	if not called then error(failure, 0) end
+end
+
+helpers.describe("daemon layout changes preserve UI state ownership", function()
+	helpers.it("(layout-ui-state-ports) preserves every current port and both notification callbacks", function()
+		with_daemon_layout_state(function(f)
+			local before = f.manager.get_daemon_state()
+			before.future_port, before.future_callback = {}, function() end
+			f.change("azerty")
+			local after, count = f.manager.get_daemon_state(), 0
+			helpers.assert_eq(type(after.notify_error), "function", "layout changes must retain visible save failures")
+			helpers.assert_eq(type(after.notify_restart_required), "function", "layout changes must retain restart-required notices")
+			for key, value in pairs(before) do
+				count = count + 1
+				if key ~= "layout" then helpers.assert_true(rawequal(after[key], value), "lost current UI state port: " .. key) end
+			end
+			helpers.assert_true(count >= 17, "the real initial state must expose its full port set")
+			helpers.assert_true(after ~= before, "publish a new state without rewriting an in-flight state's snapshot")
+			helpers.assert_eq(before.layout, "qwerty")
+			helpers.assert_eq(after.layout, "azerty")
+			after.notify_error("dialog.personal_info.save_failed")
+			after.notify_restart_required()
+			helpers.assert_eq(f.notices[1].message, "dialog.personal_info.save_failed")
+			helpers.assert_eq(f.notices[2].message, "onboarding.done.restart_required")
+		end)
+	end)
+
+	helpers.it("(layout-ui-state-ports) keeps the actual wizard's refusal visible after a layout change", function()
+		with_daemon_layout_state(function(f)
+			local wizard = helpers.load_module("ui.onboarding.bridge")
+			local first = wizard.on_message({ action = "finish" }, f.manager.get_daemon_state())
+			helpers.assert_eq(first.done, false)
+			helpers.assert_eq(#f.notices, 1)
+			f.change("azerty")
+			local second = wizard.on_message({ action = "finish" }, f.manager.get_daemon_state())
+			helpers.assert_eq(second.done, false)
+			helpers.assert_eq(#f.notices, 2, "the bridge refusal must still reach the user's notifier")
+			helpers.assert_eq(f.notices[2], f.notices[1])
+		end)
+	end)
+
+	helpers.it("(layout-ui-state-ports) leaves the exact previous UI state when capture refresh is refused", function()
+		with_daemon_layout_state(function(f)
+			local before = f.manager.get_daemon_state()
+			f.env.keyboard_hook.refresh_capture = function() return false end
+			f.change("azerty")
+			helpers.assert_true(f.manager.get_daemon_state() == before)
+			helpers.assert_eq(f.env.opts.layout, "qwerty")
+			helpers.assert_eq(f.refreshes(), 0)
+			helpers.assert_eq(#f.notices, 0)
+		end)
+	end)
 end)

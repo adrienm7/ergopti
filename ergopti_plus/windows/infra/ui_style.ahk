@@ -34,7 +34,6 @@
 ;   [tint]        lightness              → UI_TINT_LIGHTNESS
 ;   [tint]        saturation             → UI_TINT_SATURATION
 ;   [llm_colors]  cursor_hex             → UI_LLM_CURSOR_HEX
-;   [llm_colors]  cmd_sel_hex            → UI_LLM_CMD_SEL_HEX
 ;   [llm_colors]  cmd_dim_hex            → UI_LLM_CMD_DIM_HEX
 ;   [llm_ui]      active_prefix          → UI_LLM_ACTIVE_PREFIX
 ;   [llm_ui]      slot_placeholder       → UI_LLM_SLOT_PLACEHOLDER
@@ -97,7 +96,6 @@ global UI_LLM_NW_SEL_HEX     := ""
 global UI_LLM_UNSEL_GRAY_HEX := ""
 global UI_LLM_LOADING_HEX    := ""
 global UI_LLM_CURSOR_HEX     := ""
-global UI_LLM_CMD_SEL_HEX    := ""
 global UI_LLM_CMD_DIM_HEX    := ""
 global UI_AI_LOADING_HEX     := ""
 
@@ -107,7 +105,9 @@ global UI_LLM_SLOT_PLACEHOLDER      := ""
 global UI_LLM_INACTIVE_ALIGN_CHAR   := ""
 global UI_LLM_FOOTER_SPACE_DIV      := ""
 global UI_LLM_FOOTER_COMBINED_SEP   := ""
-global UI_LLM_SHORTCUT_LABEL_GAP    := ""
+global UI_LLM_SHORTCUT_ORDER        := ""
+global UI_LLM_SHORTCUT_LABELS       := ""
+global UI_LLM_SHORTCUT_JOINER       := ""
 global UI_LLM_HINT_ACCEPT_SINGLE    := ""
 global UI_LLM_HINT_NAV_LEFT         := ""
 global UI_LLM_HINT_NAV_RIGHT        := ""
@@ -157,30 +157,6 @@ _UiStyleRequireHex(c, section, key) {
 	if (StrLen(val) != 6)
 		_UiStyleFatal(section, key, "valeur hex invalide : " . val)
 	return val
-}
-
-; Reads one numeric member of an inline RGBA table (e.g. cmd_sel.alpha).
-_UiStyleRequireInlineNumber(c, section, key, member) {
-	val := _UiStyleRequire(c, section, key)
-	if (val is Map) {
-		if !val.Has(member)
-			_UiStyleFatal(section, key . "." . member)
-		return Float(val[member])
-	}
-	if !RegExMatch(String(val), "\b" . member . "\s*=\s*([0-9.]+)", &m)
-		_UiStyleFatal(section, key . "." . member)
-	return Float(m[1])
-}
-
-; Blends Hex over BgHex at Alpha (0..1), both "RRGGBB"; returns "RRGGBB".
-_UiStyleBlendHex(Hex, BgHex, Alpha) {
-	out := ""
-	loop 3 {
-		fg := Integer("0x" . SubStr(Hex, A_Index * 2 - 1, 2))
-		bg := Integer("0x" . SubStr(BgHex, A_Index * 2 - 1, 2))
-		out .= Format("{1:02X}", Round(bg * (1 - Alpha) + fg * Alpha))
-	}
-	return out
 }
 
 /** * Reads _shared/modules/tooltip/constants.toml at startup and assigns every tooltip
@@ -254,11 +230,6 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_UNSEL_GRAY_HEX := _UiStyleRequireHex(c, "llm_colors", "unsel_gray_hex")
 	global UI_LLM_LOADING_HEX    := _UiStyleRequireHex(c, "llm_colors", "loading_hex")
 	global UI_LLM_CURSOR_HEX     := _UiStyleRequireHex(c, "llm_colors", "cursor_hex")
-	; macOS draws cmd_sel at its RGBA alpha; AHK text has no alpha, so the same
-	; colour is pre-blended onto the panel background here.
-	global UI_LLM_CMD_SEL_HEX    := _UiStyleBlendHex(
-		_UiStyleRequireHex(c, "llm_colors", "cmd_sel_hex"), UI_BG_HEX,
-		_UiStyleRequireInlineNumber(c, "llm_colors", "cmd_sel", "alpha"))
 	global UI_LLM_CMD_DIM_HEX    := _UiStyleRequireHex(c, "llm_colors", "cmd_dim_hex")
 	global UI_AI_LOADING_HEX     := _UiStyleRequireHex(c, "accent_colors", "ai_loading_hex")
 
@@ -268,7 +239,11 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_INACTIVE_ALIGN_CHAR  := _UiStyleRequire(c, "llm_ui", "inactive_align_char")
 	global UI_LLM_FOOTER_SPACE_DIV     := _UiStyleRequire(c, "llm_ui", "footer_space_divider")
 	global UI_LLM_FOOTER_COMBINED_SEP  := _UiStyleRequire(c, "llm_ui", "footer_combined_separator")
-	global UI_LLM_SHORTCUT_LABEL_GAP   := _UiStyleRequire(c, "llm_ui", "shortcut_label_gap")
+	global UI_LLM_SHORTCUT_ORDER       := _UiStyleRequire(c, "llm_ui", "shortcut_modifier_order")
+	global UI_LLM_SHORTCUT_LABELS      := _UiStyleRequire(c, "llm_ui", "shortcut_labels_ahk")
+	global UI_LLM_SHORTCUT_JOINER      := _UiStyleRequire(c, "llm_ui", "shortcut_joiner_ahk")
+	if StrSplit(UI_LLM_SHORTCUT_ORDER, ",").Length != StrSplit(UI_LLM_SHORTCUT_LABELS, ",").Length
+		_UiStyleFatal("llm_ui", "shortcut_labels_ahk", "shortcut_modifier_order")
 	global UI_LLM_HINT_ACCEPT_SINGLE   := _UiStyleRequire(c, "llm_ui", "hint_accept_single")
 	global UI_LLM_HINT_NAV_LEFT        := _UiStyleRequire(c, "llm_ui", "hint_nav_left")
 	global UI_LLM_HINT_NAV_RIGHT       := _UiStyleRequire(c, "llm_ui", "hint_nav_right")

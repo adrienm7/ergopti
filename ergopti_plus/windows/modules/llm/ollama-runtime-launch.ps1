@@ -13,7 +13,9 @@ param(
 	[Parameter(Mandatory = $true)][string]$RuntimeTicket,
 	[Parameter(Mandatory = $true)][ValidateRange(1, 65535)][int]$Port,
 	[Parameter(Mandatory = $true)][int64]$StartedTick,
-	[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$DeadlineMs
+	[Parameter(Mandatory = $true)][ValidateRange(1, 2147483647)][int]$DeadlineMs,
+	[Parameter(Mandatory = $true)][string]$ServeEnvironmentPath,
+	[Parameter(Mandatory = $true)][string]$ServeEnvironmentSha256
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -35,6 +37,51 @@ function Read-OllamaRuntimeSource([string]$Path, [string]$ExpectedHash) {
 		if ($errors.Count -ne 0) { throw 'The captured managed runtime helper cannot be parsed.' }
 		return @{ stream = $stream; block = $ast.GetScriptBlock() }
 	} catch { $stream.Dispose(); throw }
+}
+
+# The shared serve environment (managed_ollama_environment.json) keeps the owned
+# server on local models only: OLLAMA_NO_CLOUD stops its ollama.com contact. The
+# listener address and the model store stay with this launcher.
+function Read-OllamaServeEnvironment([string]$Path, [string]$ExpectedHash) {
+	if ($Path -cnotmatch '^[A-Za-z]:\\' -or $ExpectedHash -cnotmatch '^[0-9a-f]{64}\z') {
+		throw 'The serve environment requires its captured absolute source and digest.'
+	}
+	$bytes = [IO.File]::ReadAllBytes($Path)
+	if ($bytes.Length -le 0 -or $bytes.Length -gt 65536) { throw 'The serve environment size is invalid.' }
+	$hash = [Security.Cryptography.SHA256]::Create()
+	try { $actual = ([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }
+	finally { $hash.Dispose() }
+	if ($actual -cne $ExpectedHash) { throw 'The captured serve environment changed.' }
+	$policy = [Text.UTF8Encoding]::new($false, $true).GetString($bytes) | ConvertFrom-Json
+	$fields = @($policy.PSObject.Properties | ForEach-Object { $_.Name })
+	if ($fields.Count -ne 2 -or $fields -cnotcontains 'schema_version' -or $fields -cnotcontains 'serve_environment' -or
+		$policy.schema_version -isnot [int] -or $policy.schema_version -ne 1 -or
+		$policy.serve_environment -isnot [Management.Automation.PSCustomObject]) {
+		throw 'The serve environment declaration is invalid.'
+	}
+	$environment = [ordered]@{}
+	foreach ($entry in $policy.serve_environment.PSObject.Properties) {
+		if ($entry.Name -cnotmatch '^[A-Z][A-Z0-9_]*\z' -or $entry.Name -ceq 'OLLAMA_HOST' -or $entry.Name -ceq 'OLLAMA_MODELS' -or
+			$entry.Value -isnot [string] -or $entry.Value -match "[`0`r`n]") {
+			throw 'The serve environment declaration is invalid.'
+		}
+		$environment[$entry.Name] = $entry.Value
+	}
+	if ($environment.Count -eq 0) { throw 'The serve environment declaration is empty.' }
+	return $environment
+}
+
+function New-OllamaRuntimeStart([string]$Executable, [int]$Port, [string]$ModelsPath, $ServeEnvironment) {
+	if ($ServeEnvironment -isnot [Collections.Specialized.OrderedDictionary] -or $ServeEnvironment.Count -eq 0) {
+		throw 'The managed server requires its shared serve environment.'
+	}
+	$start = [Diagnostics.ProcessStartInfo]::new($Executable)
+	$start.UseShellExecute = $false
+	$start.Arguments = 'serve'
+	$start.EnvironmentVariables['OLLAMA_HOST'] = '127.0.0.1:' + $Port
+	$start.EnvironmentVariables['OLLAMA_MODELS'] = $ModelsPath
+	foreach ($name in $ServeEnvironment.Keys) { $start.EnvironmentVariables[$name] = $ServeEnvironment[$name] }
+	return $start
 }
 
 function Initialize-OllamaRuntimeObservation {
@@ -127,6 +174,7 @@ function Invoke-OllamaRuntimeEntry {
 	$request = @{ root = $ManagedRoot; root_identity = $RootIdentity; path = $PublishedPath;
 		identity = $StageIdentity; ticket = $TicketId; manifest = $ManifestSha256;
 		runtime_ticket = $RuntimeTicket; port = $Port; started_tick = $StartedTick; deadline_ms = $DeadlineMs }
+	$serveEnvironment = Read-OllamaServeEnvironment $ServeEnvironmentPath $ServeEnvironmentSha256
 	try {
 		if ($request.runtime_ticket -cnotmatch '^[0-9a-f]{32}\z' -or $request.started_tick -le 0) {
 			throw 'Runtime start requires its fresh admitted ticket and original clock.'
@@ -153,11 +201,7 @@ function Invoke-OllamaRuntimeEntry {
 		Assert-OllamaPrivateSecurity $modelsPath
 		$readyPath = [IO.Path]::Combine($root.path, '.runtime-' + $request.runtime_ticket + '.json')
 		if (-not [Ergopti.Ollama.ManagedNative]::PathIsAbsent($readyPath)) { throw 'The fresh runtime receipt already exists.' }
-		$start = [Diagnostics.ProcessStartInfo]::new([IO.Path]::Combine($stage.path, 'ollama.exe'))
-		$start.UseShellExecute = $false
-		$start.Arguments = 'serve'
-		$start.EnvironmentVariables['OLLAMA_HOST'] = '127.0.0.1:' + $request.port
-		$start.EnvironmentVariables['OLLAMA_MODELS'] = $modelsPath
+		$start = New-OllamaRuntimeStart ([IO.Path]::Combine($stage.path, 'ollama.exe')) $request.port $modelsPath $serveEnvironment
 		$null = Get-OllamaRuntimeRemaining $request
 		if (@(Get-OllamaRuntimeListeners $request.port).Count -ne 0) {
 			throw 'Managed runtime refuses a pre-existing listener; its owner is unchanged.'

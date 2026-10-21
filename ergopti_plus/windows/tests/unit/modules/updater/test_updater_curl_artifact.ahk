@@ -19,7 +19,9 @@ _ArtifactCurlFactoryControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("CURL_ATTEMPT_MODEL_CONTROLS:29", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
@@ -179,21 +181,38 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 		this.CurrentExe := this.Directory . "existing.exe"
 		this.NewExe := this.Directory . "staged.exe"
 		this.SwapPath := this.Directory . "swap.ps1"
+		; The same passive sidecars as the managed transport run: an intermittent
+		; refusal before any curl exit is recorded names its throw line and
+		; exception family instead of a bare stage.
+		this.StagingDiagnosticPath := this.Directory . "staging-diagnostic.json"
+		this.StagingSetupDiagnosticPath := this.StagingDiagnosticPath . ".setup"
+		this.RouteShapeDiagnosticPath := this.Directory . "route-shape.json"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
 		if this.ForeignBytes != ""
 			FileAppend(this.ForeignBytes, this.NewExe, "UTF-8-RAW")
 		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
-		this.Transport := _Updater_BuildStagingTransport(_Updater_BuildStagingWorkerScript(), this.SwapBytes,
+		this.Transport := _Updater_BuildStagingTransport(
+			_UpdaterNativeObservedStagingScript(_Updater_BuildStagingWorkerScript()), this.SwapBytes,
 			Url, this.Digest, this.NewExe, this.SwapPath, this.CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, 5000, _VendorDir . "\ergopti_updater_download.ps1",
 			this.DeadlineMs, this.StartedTick, _SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json", this.Size)
 		try {
+			ScriptName := this.Transport.Environment[1].Name
+			Prefix := SubStr(ScriptName, 1, StrLen(ScriptName) - StrLen("_SCRIPT"))
+			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
+			RouteShapePair := {Name: Prefix . "_TEST_ROUTE_SHAPE", Value: this.RouteShapeDiagnosticPath}
+			for Pair in [DiagnosticPair, RouteShapePair] {
+				this.Transport.Environment.Push(Pair)
+				EnvSet(Pair.Name, Pair.Value)
+			}
 			; Only substitute user settings and inherited proxy inventory. Native
 			; routing, actual capability, curl, Schannel, SSPI and filesystem run.
 			ProxyValue := "127.0.0.1:" . this.Proxy.State["port"]
-			Admission := '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl="";Proxy="' . ProxyValue . '";Bypass="";NativeError=0;FailureOrigin=""}};'
+			Admission := '$env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE=$env:' . RouteShapePair.Name
+				. ';$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';'
+				. '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl="";Proxy="' . ProxyValue . '";Bypass="";NativeError=0;FailureOrigin=""}};'
 				. '$environment={param($Name)return ""};'
 			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
 			Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand",
@@ -505,7 +524,9 @@ _ArtifactNtlmTunnelCopyControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("ARTIFACT_RELAY_TCP_CONTROLS:4", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
@@ -532,8 +553,10 @@ _ArtifactNtlmFullDuplexRetirementControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
-		AssertEqual("ARTIFACT_TUNNEL_RETIREMENT_CONTROLS:6", Trim(Observed[1]["stdout"], "`r`n "))
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
+		AssertEqual("ARTIFACT_TUNNEL_RETIREMENT_CONTROLS:7",Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
 		if IsObject(Handle)
@@ -624,7 +647,9 @@ _ArtifactOwnedCloseProgressControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("OWNED_CLOSE_PROGRESS_CONTROLLED_PORTS:11", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {

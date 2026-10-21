@@ -379,3 +379,40 @@ _LSPD_CoalescenceSource() {
 	}
 }
 Test("local nonblocking discovery: coalescence retains the admitted source image", _LSPD_CoalescenceSource)
+
+; ai-disabled-no-discovery-2026-10-20 (issue #97): a tray build with the AI off
+; queued the view preparation, whose stale projection queued a discovery sweep of
+; every local server after ready. The AI-off user got HTTP probes and their
+; transport warnings although no AI path should run at all.
+_LSPD_DisabledAiIsInert() {
+	Fixture := _LSPD_Fixture()
+	global _LLM_Menu, _DriverReady
+	try {
+		_LLM_Menu["enabled"] := false
+		_DriverReady := true
+		Rows := Fixture.Panel.Rows()
+		AssertTrue(Rows is Array && Rows.Length > 0, "the disabled panel still renders its inert rows")
+		AssertFalse(Fixture.Panel.Preparation is Map, "a disabled AI must not queue the view preparation")
+		AssertFalse(Fixture.Panel.Discovery is Map, "a disabled AI must not queue a discovery sweep")
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		AssertFalse(Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()),
+			"discovery admission refuses a disabled AI")
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length, "no local server probe runs with the AI off")
+		AssertEqual(0, Fixture.Children.Length)
+		; A sweep queued while on retires when the AI is switched off before it fires.
+		_LLM_Menu["enabled"] := true
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		_LLM_Menu["enabled"] := false
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.RescanCalls, "a queued sweep cannot outlive the AI being switched off")
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: a disabled AI queues no view preparation or sweep (ai-disabled-no-discovery-2026-10-20)",
+	_LSPD_DisabledAiIsInert)

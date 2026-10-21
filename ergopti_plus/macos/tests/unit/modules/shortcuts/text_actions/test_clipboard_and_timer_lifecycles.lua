@@ -54,6 +54,7 @@ local function load_wrap_fixture(restore_outcomes)
 	local clock_ns = 0
 	local snapshots = 0
 	local restore_calls = 0
+	local change_count = 0
 
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.synthetic_input"] = {
@@ -72,7 +73,7 @@ local function load_wrap_fixture(restore_outcomes)
 			if tx.callback then tx.callback(tx, "cancelled") end
 			return true
 		end,
-		emit_key_stroke = function(_mods, key)
+		emit_guarded_key_stroke = function(_mods, key)
 			helpers.assert_eq(key, "v", "wrap_selection may emit only Cmd+V")
 			return true
 		end,
@@ -81,11 +82,13 @@ local function load_wrap_fixture(restore_outcomes)
 	}
 
 	local pasteboard = {
+		changeCount = function() return change_count end,
 		readAllData = function()
 			snapshots = snapshots + 1
 			return clone(clipboard)
 		end,
 		setContents = function(value)
+			change_count = change_count + 1
 			clipboard = { ["public.utf8-plain-text"] = value }
 			return true
 		end,
@@ -93,10 +96,12 @@ local function load_wrap_fixture(restore_outcomes)
 			restore_calls = restore_calls + 1
 			local outcome = (restore_outcomes or {})[restore_calls] or "success"
 			if outcome == "false" then return false end
+			change_count = change_count + 1
 			clipboard = clone(snapshot)
 			return true
 		end,
 		clearContents = function()
+			change_count = change_count + 1
 			clipboard = {}
 			return nil
 		end,

@@ -982,6 +982,8 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         return
     entry := _LLM_Remote_Async[req_id]
     terminal := ReadTerminalFn.Call(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+    ; Receipt reads and cleanup can yield to cancellation or registry trimming.
+    ; Only exact-owner retirement after the last I/O may authorize delivery.
     ; The exit sidecar is written last by _LLM_CurlOwnedCommand. Resolve that
     ; durable receipt before cancellation, deadline or PID state: the numeric PID
     ; may already name an unrelated process by the time this timer runs.
@@ -989,7 +991,7 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         _LLM_CurlReleaseEntryProcess(entry, false, Port)
         if entry["cancelled"] {
             CleanupFn.Call(entry)
-            _LLM_Remote_Async.Delete(req_id)
+            _LLMRemote_DeleteOwned(req_id, entry)
             return
         }
         on_success := entry["on_success"]
@@ -1002,7 +1004,8 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
             try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4} reason={5} server_msg={6}.",
                 req_id, terminal["exit"], terminal["status"], StrLen(body), Classified["reason"], Classified["server_message"])
             CleanupFn.Call(entry)
-            _LLM_Remote_Async.Delete(req_id)
+            if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+                return
             _LLM_InvokeCallback(on_fail, "on_fail",
                 _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
@@ -1011,20 +1014,22 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
             try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, status={3}, body_chars={4}, server_msg={5}).",
                 req_id, Classified["reason"], terminal["status"], StrLen(body), Classified["server_message"])
             CleanupFn.Call(entry)
-            _LLM_Remote_Async.Delete(req_id)
+            if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+                return
             _LLM_InvokeCallback(on_fail, "on_fail",
                 _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
         }
         CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
         return
     }
     if entry["cancelled"] {
         _LLM_CurlReleaseEntryProcess(entry, true, Port)
         CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     if (_LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
@@ -1033,7 +1038,8 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         on_fail := entry["on_fail"]
         _LLM_CurlReleaseEntryProcess(entry, true, Port)
         CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
@@ -1109,6 +1115,8 @@ _LLMRemote_PollRequest(req_id) {
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
+    ; Abort is a yielding COM boundary: a queued cancellation or eviction may
+    ; retire this owner before it returns. Revalidate exact custody afterward.
     if entry["cancelled"] {
         ; Abort the in-flight WinHTTP request before dropping our reference.
         ; Without this the COM object + its socket stay resident until WinHTTP's
@@ -1116,7 +1124,7 @@ _LLMRemote_PollRequest(req_id) {
         ; never responds keeps the request alive far longer than intended.
         if entry.Has("http")
             try entry["http"].Abort()
-        _LLM_Remote_Async.Delete(req_id)
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     ; Wrap-safe deadline guard: if the response never arrives (CDN silent drop,
@@ -1129,7 +1137,8 @@ _LLMRemote_PollRequest(req_id) {
         ; rather than lingering until WinHTTP's internal receive timeout fires.
         if entry.Has("http")
             try entry["http"].Abort()
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
@@ -1146,10 +1155,17 @@ _LLMRemote_PollRequest(req_id) {
     } catch as com_err {
         on_fail := entry["on_fail"]
         try http.Abort()
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
         ComMsg := SubStr(com_err.Message, 1, 120)
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport", 0, ComMsg))
+        return
+    }
+    ; WaitForResponse and each response property may pump cancellation. Keep
+    ; the exact reservation until the last read and classification have finished.
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     if !ready {
@@ -1161,19 +1177,32 @@ _LLMRemote_PollRequest(req_id) {
     entryFormat := entry["format"]
     NetworkReport := ManagedNetworkFailureWindows_FromTransport(http,
         () => _LLMRemote_RequestOwns(req_id, entry) && !entry["cancelled"])
-    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"]
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
-    _LLM_Remote_Async.Delete(req_id)
+    }
     try {
         status := http.Status
-        body   := http.ResponseText
+        if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+            _LLMRemote_DeleteOwned(req_id, entry)
+            return
+        }
+        body := http.ResponseText
     } catch {
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport"))
+        return
+    }
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     Classified := _LLMRemoteClassifyTerminal(entryFormat,
         Map("exit", 0, "status", status, "body_read", true, "body", body),
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
+    if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+        return
     if !Classified["terminal_ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail",
             _LLMRemote_FailInfo("transport", status, "", NetworkReport))

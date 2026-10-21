@@ -255,6 +255,29 @@ return function(helpers)
 			for _, change in ipairs(changes) do helpers.assert_nil(change.value) end
 		end)
 
+		-- The maintainer's rule: « restaurer les valeurs conseillées » never touches
+		-- the user's own hotstrings; only « tout effacer » resets their tuning.
+		helpers.it("leaves a personal group untouched on restore and resets it on clear", function()
+			local user = { { id = "personal", override = { "personal" }, sections = { "code" }, bundled = false, personal = true },
+				{ id = "rolls", override = { "rolls" }, sections = { "hc" }, bundled = true } }
+			local restored = Planner.plan({ mode = "recommended", features = Manifest.features(),
+				groups = user, inherited = inherited })
+			for _, change in ipairs(restored) do
+				helpers.assert_true(change.override[1] ~= "personal", "a restore plans no personal row")
+			end
+			helpers.assert_true(#restored > 0, "the bundled group is still restored")
+			local cleared = Planner.plan({ mode = "clear", features = Manifest.features(),
+				groups = user, inherited = inherited })
+			local personal = 0
+			for _, change in ipairs(cleared) do
+				if change.override[1] == "personal" then personal = personal + 1 end
+			end
+			helpers.assert_eq(personal, 8, "a clear resets the group and its section, four fields each")
+			helpers.assert_eq(pcall(Planner.plan, { mode = "clear", features = Manifest.features(), inherited = inherited,
+				groups = { { id = "p", override = { "p" }, sections = {}, bundled = false, personal = "yes" } } }), false,
+				"a malformed personal flag is refused")
+		end)
+
 		helpers.it("owns only the four override fields of listed tables and extras", function()
 			local changes = Planner.plan({ mode = "clear", features = Manifest.features(),
 				groups = { { id = "rolls", override = { "rolls" }, sections = { "hc" }, bundled = true } },

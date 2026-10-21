@@ -436,3 +436,5 @@ _LTATO_AssertSetupDiagnostic(Captured, Operation, Stage, Owner) {
 	}
 	AssertEqual(1, Found, "setup failure must identify its operation, stage and exact owner once")
 }
+
+#Include test_llm_delete_confirmation_owner.ahk

@@ -647,6 +647,14 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.set_chatgpt_url) == "function" then
 		try("shortcuts", "shortcuts.set_chatgpt_url", core_mods.shortcuts_mod.set_chatgpt_url, state.chatgpt_url)
 	end
+	-- CapsWord's delay, delimiters and pointer kinds take effect at the next event.
+	-- A state without any of them (built before the owner's defaults) leaves the
+	-- settings in force; a partial one is refused by the owner.
+	local capsword = core_mods.capsword_auto_off
+	if capsword and (state[capsword.IDLE_KEY] ~= nil or state[capsword.TERMINATORS_KEY] ~= nil
+		or state[capsword.POINTER_KEY] ~= nil) then
+		try_exact("shortcuts", "capsword_auto_off.apply_state", core_mods.capsword_auto_off.apply_state, state)
+	end
 	if core_mods.dyn_hot_mod then
 		if state.dynamichotstrings_user_code_time_activation_seconds ~= nil then
 			try_exact("programmable hotstrings", "dyn_hot.set_user_code_time_activation",
