@@ -54,10 +54,19 @@ helpers.describe("Hotstrings Menu Classification", function()
 
 	helpers.it("extracts real preference group names from absolute and relative paths (group-name-classification)", function()
 		with_classification(function(_, context)
-			for _, path in ipairs({ "/abs/path/to/mygroup.toml", "mygroup.toml",
-				"/abs/path/to/mygroup.lua", "mygroup.lua", "C:\\hotstrings\\mygroup.toml" }) do
-				helpers.assert_eq(context.get_group_name(path), "mygroup", path)
-			end
+			-- macOS is a POSIX host: a backslash is an ordinary file-name byte, never a
+			-- separator, whatever host runs the suite.
+			local saved_config = package.config
+			package.config = "/\n;\n?\n!\n-\n"
+			local ok, failure = xpcall(function()
+				for _, path in ipairs({ "/abs/path/to/mygroup.toml", "mygroup.toml",
+					"/abs/path/to/mygroup.lua", "mygroup.lua", "/abs/C:\\hotstrings\\mygroup.toml" }) do
+					local expected = path:find("\\", 1, true) and "C:\\hotstrings\\mygroup" or "mygroup"
+					helpers.assert_eq(context.get_group_name(path), expected, path)
+				end
+			end, debug.traceback)
+			package.config = saved_config
+			if not ok then error(failure, 0) end
 		end)
 	end)
 end)
