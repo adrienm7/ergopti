@@ -84,3 +84,47 @@ helpers.describe("linux-callback-error-description", function()
 		end
 	end
 end)
+
+helpers.describe("linux-http-callback-error-description", function()
+	--- Loads the curl engine with a recording logger.
+	--- @return table client, table logs Formatted error lines.
+	local function recorded_client()
+		local logs = {}
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, message, ...) logs[#logs + 1] = string.format(message, ...) end
+		local previous_logger, previous_client = package.loaded["logger.shim"], package.loaded["adapters.curl_http_client"]
+		package.loaded["logger.shim"], package.loaded["adapters.curl_http_client"] = logger, nil
+		local loaded, client = pcall(require, "adapters.curl_http_client")
+		package.loaded["logger.shim"], package.loaded["adapters.curl_http_client"] = previous_logger, previous_client
+		if not loaded then error(client, 0) end
+		return client, logs
+	end
+	for _, throwing in ipairs({ false, true }) do
+		helpers.it("linux-http-callback-error-description: a refused request reports a " .. (throwing and "throwing" or "successful")
+			.. " formatter object without running it", function()
+			local client, logs = recorded_client()
+			local formatted, delivered = 0, 0
+			local failure = setmetatable({}, { __tostring = function()
+				formatted = formatted + 1
+				if throwing then error("owned formatter failure") end
+				return "private callback details"
+			end })
+			local called, dispatched = pcall(client.post, "https://example.invalid/\0refused", {}, "",
+				function(result)
+					delivered = delivered + 1
+					helpers.assert_eq(result.ok, false)
+					error(failure)
+				end)
+			helpers.assert_true(called, "a caller's failing callback cannot escape the refusal boundary: " .. tostring(dispatched))
+			helpers.assert_eq(dispatched, false)
+			helpers.assert_eq(delivered, 1)
+			helpers.assert_eq(formatted, 0, "reporting must not invoke foreign formatting code")
+			helpers.assert_eq(logs[#logs], "HTTP rejection callback raised: error object (table).")
+		end)
+	end
+	helpers.it("linux-http-callback-error-description: a string failure keeps its text", function()
+		local client, logs = recorded_client()
+		helpers.assert_eq(client.post("https://example.invalid/\0refused", {}, "", function() error("plain failure", 0) end), false)
+		helpers.assert_eq(logs[#logs], "HTTP rejection callback raised: plain failure.")
+	end)
+end)

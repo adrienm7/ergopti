@@ -12,6 +12,8 @@
 local M = {}
 
 local Logger = require("logger.shim")
+-- A caught callback failure is described without running its __tostring.
+local ErrorDescription = require("error_description")
 local ShellRunner = require("adapters.shell_runner")
 local LibuvExit = require("infra.libuv_exit")
 local BodyPipe = require("infra.http_body_pipe")
@@ -255,13 +257,13 @@ local function finalize_owned(request)
 	local result = request.result
 	if not operation._cancelled and not request.suppress_callback and type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, result)
-		if not ok then Logger.error(LOG, "Owned HTTP terminal callback raised: %s.", tostring(err)) end
+		if not ok then Logger.error(LOG, "Owned HTTP terminal callback raised: %s.", ErrorDescription.describe(err)) end
 	end
 	local listeners = operation._listeners
 	operation._listeners = {}
 	for _, listener in ipairs(listeners) do
 		local ok, err = pcall(listener)
-		if not ok then Logger.error(LOG, "Owned HTTP settlement callback raised: %s.", tostring(err)) end
+		if not ok then Logger.error(LOG, "Owned HTTP settlement callback raised: %s.", ErrorDescription.describe(err)) end
 	end
 end
 
@@ -438,7 +440,7 @@ local function finish(request, result, suppress_callback, transport_failure)
 	end
 	if not suppress_callback and type(request.on_done) == "function" then
 		local ok, err = pcall(request.on_done, result)
-		if not ok then Logger.error(LOG, "HTTP terminal callback raised: %s.", tostring(err)) end
+		if not ok then Logger.error(LOG, "HTTP terminal callback raised: %s.", ErrorDescription.describe(err)) end
 	end
 end
 
@@ -1116,7 +1118,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 		if operation then operation._settled = true end
 		if type(on_done) == "function" then
 			local ok, err = pcall(on_done, result)
-			if not ok then Logger.error(LOG, "HTTP rejection callback raised: %s.", tostring(err)) end
+			if not ok then Logger.error(LOG, "HTTP rejection callback raised: %s.", ErrorDescription.describe(err)) end
 		end
 		return false
 	end
@@ -1497,7 +1499,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done, ope
 			end
 			if type(request.on_chunk) == "function" then
 				local ok, callback_err = pcall(request.on_chunk, chunk)
-				if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
+				if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", ErrorDescription.describe(callback_err)) end
 			end
 		end
 	end
@@ -1622,7 +1624,7 @@ local function owned_request(url, headers, body, options, on_chunk, on_done, met
 		if type(listener) ~= "function" then return false end
 		if self._settled then
 			local ok, err = pcall(listener)
-			if not ok then Logger.error(LOG, "Owned HTTP settlement callback raised: %s.", tostring(err)) end
+			if not ok then Logger.error(LOG, "Owned HTTP settlement callback raised: %s.", ErrorDescription.describe(err)) end
 		else
 			self._listeners[#self._listeners + 1] = listener
 		end
