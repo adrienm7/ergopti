@@ -105,10 +105,12 @@ local function capture(dir, body)
 		local key = tostring(path)
 		writes[key]  = writes[key]  or {}
 		flushes[key] = flushes[key] or 0
+		-- Same success results as a real Lua file: write returns the file,
+		-- flush and close return true (nil plus a message would be a refusal).
 		return {
-			write = function(_self, chunk) writes[key][#writes[key] + 1] = tostring(chunk) end,
-			flush = function() flushes[key] = flushes[key] + 1 end,
-			close = function() end,
+			write = function(self, chunk) writes[key][#writes[key] + 1] = tostring(chunk); return self end,
+			flush = function() flushes[key] = flushes[key] + 1; return true end,
+			close = function() return true end,
 			read  = function() return nil end,
 		}
 	end
@@ -535,9 +537,9 @@ helpers.describe("logger file sinks — the print() tee", function()
 			local key = tostring(path)
 			writes[key] = writes[key] or {}
 			return {
-				write = function(_self, chunk) writes[key][#writes[key] + 1] = tostring(chunk) end,
-				flush = function() end,
-				close = function() end,
+				write = function(self, chunk) writes[key][#writes[key] + 1] = tostring(chunk); return self end,
+				flush = function() return true end,
+				close = function() return true end,
 				read  = function() return nil end,
 			}
 		end

@@ -911,6 +911,46 @@ local function _console_out(line)
 	_emitting = false
 end
 
+-- Channels whose refusal was already reported; cleared by the next success so a
+-- full disk prints one line per episode rather than one per lost log line.
+local _refused_channels = {}
+
+--- Reports one refused synchronous log channel on the console. Never through
+--- the logger: the line would go back to the very file that refused it.
+--- @param channel string Channel name ("unified", "topical", "errors-only").
+--- @param detail any Native refusal message.
+local function _report_sink_refusal(channel, detail)
+	if _refused_channels[channel] then return end
+	_refused_channels[channel] = true
+	_console_out("[logger] " .. channel .. " log write refused: " .. tostring(detail))
+end
+
+--- Ends a reported refusal episode once the channel accepts a line again.
+--- @param channel string Channel name.
+local function _sink_accepted(channel)
+	_refused_channels[channel] = nil
+end
+
+--- Runs native file operations and returns the first refusal message, or nil.
+--- ENOSPC often surfaces only at flush or close, from the stdio buffer.
+--- @param fn function Performs the operations; returns a message on refusal.
+--- @return string|nil detail
+local function _sink_refusal(fn)
+	local ok, detail = pcall(fn)
+	if not ok then return tostring(detail) end
+	return detail
+end
+
+--- Returns nil for a successful file method result, else its refusal message.
+--- Real Lua files return a value on success and nil plus a message on refusal.
+--- @param result any First value returned by write/flush/close.
+--- @param message any Second value.
+--- @return string|nil
+local function _refused(result, message)
+	if result == nil then return tostring(message or "operation refused") end
+	return nil
+end
+
 
 
 
@@ -970,14 +1010,19 @@ local function _ensure_log_file()
 	end
 	local ok, fh = pcall(io.open, _unified_path, "a")
 	if not ok or not fh then return nil end
+	-- Session boundary marker so tailing reveals where HS restarted
+	local refusal = _sink_refusal(function()
+		local wrote, write_err = fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
+		return _refused(wrote, write_err) or _refused(fh:flush())
+	end)
+	if refusal then
+		pcall(function() fh:close() end)
+		_report_sink_refusal("unified", refusal)
+		return nil
+	end
 	_file_handle   = fh
 	_last_log_date = today
 	_last_log_path = _unified_path
-	-- Session boundary marker so tailing reveals where HS restarted
-	pcall(function()
-		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
-		fh:flush()
-	end)
 	if previous_date and previous_date ~= today and _log_retention_days then
 		_schedule_log_purge(_log_dir, _log_retention_days, false)
 	end
@@ -1045,19 +1090,24 @@ local function _write_to_file(line, immediate)
 	local full = line .. "\n"
 	local fh = _ensure_log_file()
 	if fh then
-		pcall(function()
-			fh:write(full)
+		local refusal = _sink_refusal(function()
+			local wrote, write_err = fh:write(full)
+			if wrote == nil then return _refused(wrote, write_err) end
 			if immediate == false then
 				_unflushed_debug = _unflushed_debug + 1
-				if _unflushed_debug >= FLUSH_EVERY_N_DEBUG then
-					fh:flush()
-					_unflushed_debug = 0
-				end
-			else
-				fh:flush()
-				_unflushed_debug = 0
+				if _unflushed_debug < FLUSH_EVERY_N_DEBUG then return nil end
 			end
+			_unflushed_debug = 0
+			return _refused(fh:flush())
 		end)
+		if refusal then
+			-- Retire the refusing handle; the next line reopens a repaired file.
+			if _file_handle == fh then _file_handle = nil end
+			pcall(function() fh:close() end)
+			_report_sink_refusal("unified", refusal)
+		else
+			_sink_accepted("unified")
+		end
 	end
 	-- Fan-out to topical sub-files.
 	--
@@ -1075,8 +1125,8 @@ local function _write_to_file(line, immediate)
 	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
-			pcall(function()
-				local path = _log_dir .. sub.name
+			local path = _log_dir .. sub.name
+			local refusal = _sink_refusal(function()
 				local mode = _sub_file_mode(path, today)
 				local entry = _sub_handles[path]
 				-- Re-open when the mode changes: "w" means a new calendar day has
@@ -1087,13 +1137,23 @@ local function _write_to_file(line, immediate)
 				end
 				if not entry then
 					local fh = io.open(path, mode)
-					if not fh then return end
+					if not fh then return nil end
 					entry = { fh = fh, mode = "a" }
 					_sub_handles[path] = entry
 				end
-				entry.fh:write(full)
-				if immediate ~= false then entry.fh:flush() end
+				local wrote, write_err = entry.fh:write(full)
+				if wrote == nil then return _refused(wrote, write_err) end
+				if immediate ~= false then return _refused(entry.fh:flush()) end
+				return nil
 			end)
+			if refusal then
+				local entry = _sub_handles[path]
+				_sub_handles[path] = nil
+				if entry then pcall(function() entry.fh:close() end) end
+				_report_sink_refusal("topical", refusal)
+			else
+				_sink_accepted("topical")
+			end
 		end
 	end
 end
@@ -1163,13 +1223,18 @@ _driver_sink = function(line, variant)
 	-- without drowning in the full daily unified log.
 	if level >= Core.LEVELS.WARNING then
 		local err_full = line .. "\n"
-		pcall(function()
+		local refusal = _sink_refusal(function()
 			local f = io.open(_errors_path, "a")
-			if f then
-				f:write(err_full)
-				f:close()
-			end
+			if not f then return nil end
+			local wrote, write_err = f:write(err_full)
+			local closed, close_err = f:close()
+			return _refused(wrote, write_err) or _refused(closed, close_err)
 		end)
+		if refusal then
+			_report_sink_refusal("errors-only", refusal)
+		else
+			_sink_accepted("errors-only")
+		end
 	end
 end
 
