@@ -108,8 +108,8 @@ function M.open(target, on_done, authorized)
 		end
 		local timeout = deps.timeout()
 		if not current(record) then return end
-		assert(type(timeout) == "number" and timeout > 0 and timeout < math.huge and timeout % 1 == 0,
-			"desktop confirmation needs its canonical finite deadline")
+		assert(require("number_policy").within_timer_ceiling(timeout) and timeout > 0 and timeout % 1 == 0,
+			"desktop confirmation needs its canonical deadline within the timer ceiling")
 		assert(deps.update_time() ~= false, "desktop helper clock refresh refused")
 		if not current(record) then return end
 		acquired = true

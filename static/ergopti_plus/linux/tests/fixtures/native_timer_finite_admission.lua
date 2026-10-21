@@ -162,15 +162,28 @@ check("defer preserves fractional native elapsed delay", function()
 	assert(calls == 1, "native elapsed time failed to release due work")
 end)
 
-check("defer preserves huge finite delays without starving ordinary work", function()
+check("defer refuses a finite delay above the timer ceiling without starving ordinary work", function()
 	local loop = fresh("adapters.event_loop")
 	local delayed, ordinary = 0, 0
-	assert(loop.defer(function() delayed = delayed + 1 end, 1e308))
+	assert(loop.defer(function() delayed = delayed + 1 end, 1e308) == false,
+		"a finite delay above the shared timer ceiling entered the deferred queue")
 	assert(loop.defer(function() ordinary = ordinary + 1 end))
 	loop._run_idle_tick()
-	assert(delayed == 0 and ordinary == 1, "finite delayed work affected ordinary delivery")
+	assert(delayed == 0 and ordinary == 1, "refused delayed work affected ordinary delivery")
 end)
 
-assert(checks == 24, "native finite-admission fixture lost a case")
+for _, method in ipairs({ "after", "every" }) do
+	check(method .. " refuses a real libuv delay above the timer ceiling", function()
+		local scheduler = fresh("adapters.timer_scheduler")
+		local calls = 0
+		-- 9007199254741 s is 9007199254741000 ms, just above 2^53 ms.
+		local token = scheduler[method](9007199254741, function() calls = calls + 1 end)
+		assert(token.armed == false and token.timer == nil, "above-ceiling delay armed a native timer")
+		assert(scheduler.activeCount() == 0 and handle_count() == 0, "refused delay retained a native resource")
+		assert(calls == 0, "refused delay delivered user work")
+	end)
+end
+
+assert(checks == 26, "native finite-admission fixture lost a case")
 print(string.format("Native finite timer admission: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

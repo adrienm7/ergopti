@@ -545,8 +545,8 @@ function M.run_async(executable, args, options, callback)
 	if refusal ~= "" then return nil, refusal end
 	if type(callback) ~= "function" then return nil, "a callback is required" end
 	local timeout_ms = type(options) == "table" and tonumber(options.timeout_ms) or nil
-	if not NumberPolicy.is_finite(timeout_ms) or timeout_ms <= 0 then
-		return nil, "a positive finite timeout_ms is required"
+	if not NumberPolicy.within_timer_ceiling(timeout_ms) or timeout_ms <= 0 then
+		return nil, "a positive timeout_ms within the timer ceiling is required"
 	end
 	local request = {
 		name = executable, callback = callback, started = Monotonic.now_ms(),
