@@ -4,17 +4,21 @@
 ; MODULE: Gesture Screenshot Capture (AHK)
 ; DESCRIPTION:
 ; Owns every asynchronous screenshot worker from launch through cancellation,
-; private staging, publication, and cleanup. PowerShell children may capture only
-; into per-generation staging files; the current AHK owner alone may publish a
-; final file or clipboard image after revalidating its epoch and lifecycle state.
+; private staging, publication, and cleanup. Workers capture in process with
+; GDI and GDI+ and write only per-generation staging files; the current AHK owner
+; alone may publish a final file or clipboard image after revalidating its epoch
+; and lifecycle state.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One worker registry - direct, instant, window, fullscreen, and region-save
-;    paths share one cancellable ShellRunner lifecycle.
+;    paths share one cancellable worker lifecycle.
 ; 2. Side-effect fencing - a worker which survives suspend, timeout, supersession,
 ;    or shutdown can finish only a private stage and cannot touch user state.
-; 3. Exact ownership - terminal callbacks and process termination are claimed
+; 3. Exact ownership - terminal callbacks and worker termination are claimed
 ;    once; staging cleanup retains its native identity until deletion is acknowledged.
+; 4. No child process - the capture never starts a hidden script host: a hidden
+;    process compiling clipboard P/Invoke code is the shape of a stealer stage,
+;    and corporate antivirus engines flagged the release that carried one.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,6 +40,13 @@ global GESTURE_SM_XVIRTUALSCREEN := 76
 global GESTURE_SM_YVIRTUALSCREEN := 77
 global GESTURE_SM_CXVIRTUALSCREEN := 78
 global GESTURE_SM_CYVIRTUALSCREEN := 79
+global GESTURE_SCREENSHOT_PNG_ENCODER := "{557CF406-1A04-11D3-9A73-0000F81EF32E}"
+global GESTURE_SCREENSHOT_BMP_ENCODER := "{557CF400-1A04-11D3-9A73-0000F81EF32E}"
+global GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB := 0x26200A
+global GESTURE_SCREENSHOT_INTERPOLATION_HIGH_QUALITY_BICUBIC := 7
+global GESTURE_SCREENSHOT_SRCCOPY := 0x00CC0020
+global GESTURE_SCREENSHOT_CF_BITMAP := 2
+global GESTURE_SCREENSHOT_IMAGE_BITMAP := 0
 
 ; Test seams stay at zero in production. Tests replace only the OS boundaries,
 ; while the same ownership state machine and terminal paths execute unchanged.
@@ -52,6 +63,9 @@ class GestureScreenshotWorkerState {
 	static clipboard_has_image_fn := 0
 	static clipboard_save_fn := 0
 	static clipboard_restore_fn := 0
+	; Called as (Phase, Bitmap) at "acquired" (clipboard lock held, borrowed
+	; bitmap) and "detached" (lock released, private image retained).
+	static native_probe_fn := 0
 }
 
 
@@ -313,21 +327,63 @@ _GestureScreenshotRollbackClipboard(Snapshot, PublishedSequence, OwnerToken) {
 ; ==========================================
 ; ==========================================
 
-_GestureScreenshotPowerShellArgs(Script, NeedsSta := false) {
-	Args := ["-NoProfile", "-NonInteractive"]
-	if NeedsSta
-		Args.Push("-Sta")
-	Args.Push("-WindowStyle", "Hidden", "-Command", Script)
-	return Args
+; An in-process capture task with the start/requestTerminate/completion contract
+; of a process handle. start() defers the capture to its own timer thread, so a
+; hotkey returns at once and the owner is registered before any pixel is read.
+; @param {Func} Capture Writes the private stage; throws on any failure.
+; @param {Func} Done Called once with (ExitCode, Stdout, Stderr).
+; @returns {Object} The handle with start() and requestTerminate().
+_GestureScreenshotSpawnNative(Capture, Done) {
+	Task := Map("capture", Capture, "done", Done, "started", false, "running", false,
+		"terminated", false)
+	Handle := {}
+	Handle.start := _GestureScreenshotNativeStart.Bind(Task)
+	Handle.requestTerminate := _GestureScreenshotNativeRequestTerminate.Bind(Task)
+	return Handle
 }
 
-_GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Args, OwnerDone) {
+_GestureScreenshotNativeStart(Task, *) {
+	if Task["started"] || Task["terminated"]
+		return false
+	Task["started"] := true
+	SetTimer(_GestureScreenshotNativeRun.Bind(Task), -1)
+	return true
+}
+
+; A terminated task still reports once, so the registry reaps its job and stage.
+; The quiescence receipt (1) is exact: a capture interrupted mid-run by another
+; AHK thread can still write its stage, so it reports 0 and its completion,
+; which follows, fences publication and owns the cleanup.
+_GestureScreenshotNativeRequestTerminate(Task, *) {
+	Task["terminated"] := true
+	return Task["running"] ? 0 : 1
+}
+
+_GestureScreenshotNativeRun(Task) {
+	ExitCode := 1
+	ErrorText := "terminated before capture"
+	if !Task["terminated"] {
+		Task["running"] := true
+		try {
+			Task["capture"].Call()
+			ExitCode := 0
+			ErrorText := ""
+		} catch as Err {
+			ErrorText := Err.Message
+		} finally {
+			Task["running"] := false
+		}
+	}
+	Task["done"].Call(ExitCode, "", ErrorText)
+}
+
+_GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Capture, OwnerDone) {
 	PreviousCritical := Critical("On")
 	try WorkerId := ++GestureScreenshotWorkerState.generation
 	finally Critical(PreviousCritical)
 	Spawn := IsObject(GestureScreenshotWorkerState.spawn_fn)
-		? GestureScreenshotWorkerState.spawn_fn : ShellRunner_SpawnTreeOwned
-	try Handle := Spawn.Call("powershell.exe", Args, GestureScreenshotWorkerDone.Bind(WorkerId))
+		? GestureScreenshotWorkerState.spawn_fn : _GestureScreenshotSpawnNative
+	try Handle := Spawn.Call(Capture, GestureScreenshotWorkerDone.Bind(WorkerId))
 	catch as Err {
 		LoggerError("gestures", "Screenshot worker construction failed ({1}): {2}.", Kind, Err.Message)
 		return 0
@@ -503,51 +559,169 @@ GestureScreenshotCancelAll(Reason := "canceled") {
 ; ========================================
 ; ========================================
 
-; PowerShell statements that shrink the bitmap held by Var (e.g. "$bmp") so its
-; longest edge is at most MaxEdge, with GDI+ (System.Drawing) bicubic
-; resampling. "" when MaxEdge is 0: the capture keeps its size.
-; @param {String} Var The PowerShell variable holding a System.Drawing image.
 ; @param {Integer} MaxEdge The longest edge allowed, 0 for no limit.
-; @returns {String}
-_GestureScreenshotDownscaleScript(Var, MaxEdge) {
+_GestureScreenshotRequireMaxEdge(MaxEdge) {
 	if !(MaxEdge is Integer) || MaxEdge < 0
 		throw ValueError("A screenshot's longest edge must be a non-negative integer.")
-	if (MaxEdge == 0)
-		return ""
-	Longest := "[Math]::Max(" . Var . ".Width, " . Var . ".Height)"
-	return "if (" . Longest . " -gt " . MaxEdge . ") {"
-		. "$dsScale = " . MaxEdge . " / " . Longest . ";"
-		. "$dsW = [Math]::Max(1, [int][Math]::Round(" . Var . ".Width * $dsScale));"
-		. "$dsH = [Math]::Max(1, [int][Math]::Round(" . Var . ".Height * $dsScale));"
-		. "$dsImg = New-Object System.Drawing.Bitmap $dsW,$dsH;"
-		. "$dsG = [System.Drawing.Graphics]::FromImage($dsImg);"
-		. "$dsG.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic;"
-		. "$dsG.DrawImage(" . Var . ", 0, 0, $dsW, $dsH);"
-		. "$dsG.Dispose(); " . Var . ".Dispose(); " . Var . " = $dsImg };"
 }
 
-_GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage, MaxEdge := 0) {
-	global DriverPid
-	EscapedStage := StrReplace(Stage, "'", "''")
-	FormatName := (Mode == "clipboard") ? "Bmp" : "Png"
-	return "Add-Type -AssemblyName System.Drawing;"
-		. "$bmp = New-Object System.Drawing.Bitmap " . W . "," . H . ";"
-		. "$g = [System.Drawing.Graphics]::FromImage($bmp);"
-		. "$g.CopyFromScreen(" . X . "," . Y . ",0,0,(New-Object System.Drawing.Size " . W . "," . H . "));"
-		. "$g.Dispose();"
-		. _GestureScreenshotDownscaleScript("$bmp", MaxEdge)
-		. "$bmp.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::" . FormatName . ");"
-		. "$bmp.Dispose();"
-		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
-		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
+_GestureScreenshotGdipCheck(Status, Operation) {
+	if Status != 0
+		throw Error(Operation . " failed with GDI+ status " . Status . ".")
+}
+
+; Runs Work between a GDI+ startup and its shutdown. GDI+ counts its startups,
+; so this owner never disturbs the overlays which hold their own token.
+; @param {Func} Work Called without arguments; its result is returned.
+_GestureScreenshotWithGdiplus(Work) {
+	Module := DllCall("Kernel32\LoadLibraryW", "Str", "gdiplus.dll", "Ptr")
+	if !Module
+		throw OSError(A_LastError, -1, "gdiplus.dll could not be loaded")
+	try {
+		Token := 0
+		StartupInput := Buffer(24, 0)
+		NumPut("UInt", 1, StartupInput)
+		_GestureScreenshotGdipCheck(DllCall("gdiplus\GdiplusStartup", "Ptr*", &Token,
+			"Ptr", StartupInput, "Ptr", 0, "Int"), "GdiplusStartup")
+		try return Work.Call()
+		finally DllCall("gdiplus\GdiplusShutdown", "Ptr", Token)
+	} finally {
+		DllCall("Kernel32\FreeLibrary", "Ptr", Module)
+	}
+}
+
+; GDI+ copies the pixels, so the caller may delete the GDI bitmap at once.
+; The bitmap must not be selected into a device context.
+; @returns {Integer} The GDI+ bitmap, which the caller disposes.
+_GestureScreenshotGdipFromHBitmap(HBitmap) {
+	Image := 0
+	_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipCreateBitmapFromHBITMAP",
+		"Ptr", HBitmap, "Ptr", 0, "Ptr*", &Image, "Int"), "GdipCreateBitmapFromHBITMAP")
+	return Image
+}
+
+_GestureScreenshotGdipDispose(Image) {
+	if Image
+		DllCall("gdiplus\GdipDisposeImage", "Ptr", Image)
+}
+
+; Shrinks Image so its longest edge is at most MaxEdge with high-quality
+; bicubic resampling, then saves it. Image is replaced by the shrunk copy and
+; stays owned by the caller, who disposes it whatever happens.
+; @param {Integer} Image The GDI+ image, by reference.
+; @param {String} Stage The private file to write.
+; @param {String} Encoder The encoder CLSID (PNG or BMP).
+; @param {Integer} MaxEdge The longest edge allowed, 0 to keep the size.
+_GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge) {
+	global GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB
+	global GESTURE_SCREENSHOT_INTERPOLATION_HIGH_QUALITY_BICUBIC
+	_GestureScreenshotRequireMaxEdge(MaxEdge)
+	if MaxEdge {
+		Width := 0, Height := 0
+		_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipGetImageWidth", "Ptr", Image,
+			"UInt*", &Width, "Int"), "GdipGetImageWidth")
+		_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipGetImageHeight", "Ptr", Image,
+			"UInt*", &Height, "Int"), "GdipGetImageHeight")
+		Longest := Max(Width, Height)
+		if Longest > MaxEdge {
+			Scale := MaxEdge / Longest
+			ScaledWidth := Max(1, Round(Width * Scale))
+			ScaledHeight := Max(1, Round(Height * Scale))
+			Scaled := 0
+			_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipCreateBitmapFromScan0",
+				"Int", ScaledWidth, "Int", ScaledHeight, "Int", 0,
+				"Int", GESTURE_SCREENSHOT_PIXEL_FORMAT_32BPP_ARGB, "Ptr", 0, "Ptr*", &Scaled, "Int"),
+				"GdipCreateBitmapFromScan0")
+			try {
+				Graphics := 0
+				_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipGetImageGraphicsContext",
+					"Ptr", Scaled, "Ptr*", &Graphics, "Int"), "GdipGetImageGraphicsContext")
+				try {
+					_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipSetInterpolationMode",
+						"Ptr", Graphics, "Int", GESTURE_SCREENSHOT_INTERPOLATION_HIGH_QUALITY_BICUBIC,
+						"Int"), "GdipSetInterpolationMode")
+					_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipDrawImageRectI",
+						"Ptr", Graphics, "Ptr", Image, "Int", 0, "Int", 0,
+						"Int", ScaledWidth, "Int", ScaledHeight, "Int"), "GdipDrawImageRectI")
+				} finally {
+					if Graphics
+						DllCall("gdiplus\GdipDeleteGraphics", "Ptr", Graphics)
+				}
+			} catch as Err {
+				_GestureScreenshotGdipDispose(Scaled)
+				throw Err
+			}
+			_GestureScreenshotGdipDispose(Image)
+			Image := Scaled
+		}
+	}
+	Clsid := Buffer(16, 0)
+	HResult := DllCall("Ole32\CLSIDFromString", "WStr", Encoder, "Ptr", Clsid, "Int")
+	if HResult != 0
+		throw Error("The screenshot encoder CLSID is invalid (HRESULT " . HResult . ").")
+	_GestureScreenshotGdipCheck(DllCall("gdiplus\GdipSaveImageToFile", "Ptr", Image,
+		"WStr", Stage, "Ptr", Clsid, "Ptr", 0, "Int"), "GdipSaveImageToFile")
+}
+
+; Copies a screen rectangle (virtual-screen coordinates, in the driver's own
+; DPI context) into a private DIB section and saves it to Stage.
+_GestureScreenshotCaptureScreen(X, Y, W, H, Encoder, Stage, MaxEdge) {
+	_GestureScreenshotWithGdiplus(_GestureScreenshotCaptureScreenGdip.Bind(
+		X, Y, W, H, Encoder, Stage, MaxEdge))
+}
+
+_GestureScreenshotCaptureScreenGdip(X, Y, W, H, Encoder, Stage, MaxEdge) {
+	global GESTURE_SCREENSHOT_SRCCOPY
+	Image := 0
+	ScreenDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+	if !ScreenDC
+		throw Error("The screen device context could not be acquired.")
+	try {
+		MemoryDC := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
+		if !MemoryDC
+			throw Error("The capture device context could not be created.")
+		try {
+			; A top-down 32-bit BITMAPINFOHEADER: biSize, biWidth, -biHeight,
+			; biPlanes, biBitCount; BI_RGB compression stays zero.
+			Header := Buffer(40, 0)
+			NumPut("UInt", 40, "Int", W, "Int", -H, "UShort", 1, "UShort", 32, Header)
+			Bits := 0
+			Section := DllCall("Gdi32\CreateDIBSection", "Ptr", MemoryDC, "Ptr", Header,
+				"UInt", 0, "Ptr*", &Bits, "Ptr", 0, "UInt", 0, "Ptr")
+			if !Section
+				throw Error("The capture bitmap could not be allocated.")
+			try {
+				Previous := DllCall("Gdi32\SelectObject", "Ptr", MemoryDC, "Ptr", Section, "Ptr")
+				if !Previous
+					throw Error("The capture bitmap could not be selected.")
+				try {
+					if !DllCall("Gdi32\BitBlt", "Ptr", MemoryDC, "Int", 0, "Int", 0, "Int", W, "Int", H,
+							"Ptr", ScreenDC, "Int", X, "Int", Y, "UInt", GESTURE_SCREENSHOT_SRCCOPY, "Int")
+						throw Error("The screen pixels could not be copied.")
+				} finally {
+					DllCall("Gdi32\SelectObject", "Ptr", MemoryDC, "Ptr", Previous, "Ptr")
+				}
+				Image := _GestureScreenshotGdipFromHBitmap(Section)
+			} finally {
+				DllCall("Gdi32\DeleteObject", "Ptr", Section)
+			}
+		} finally {
+			DllCall("Gdi32\DeleteDC", "Ptr", MemoryDC)
+		}
+	} finally {
+		DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
+	}
+	try _GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge)
+	finally _GestureScreenshotGdipDispose(Image)
 }
 
 ; @param {Integer} MaxEdge Longest edge of the saved image, 0 to keep the
 ;     captured size (the screen reading shrinks what it sends to a model).
 GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "", MaxEdge := 0) {
 	global _GestureDirectCaptures, _GestureDirectCaptureEpoch, GESTURE_DIRECT_CAPTURE_TIMEOUT_MS
-	global DriverPid
+	global DriverPid, GESTURE_SCREENSHOT_PNG_ENCODER, GESTURE_SCREENSHOT_BMP_ENCODER
 	Completion := IsObject(OnComplete) ? OnComplete : 0
+	_GestureScreenshotRequireMaxEdge(MaxEdge)
 	if (Mode != "save" && Mode != "clipboard") || W <= 0 || H <= 0
 		return _GestureScreenshotRejectDirect(Completion, "invalid capture request")
 	if (Mode == "save" && Path == "")
@@ -563,9 +737,11 @@ GestureCaptureRegion(X, Y, W, H, Mode, Path := "", OnComplete := "", MaxEdge := 
 		Epoch := ++_GestureDirectCaptureEpoch
 		Extension := (Mode == "clipboard") ? "bmp" : "png"
 		Stage := A_Temp . "\ergopti_screenshot_direct_" . DriverPid . "_" . Epoch . "." . Extension
-		Script := _GestureScreenshotDirectScript(X, Y, W, H, Mode, Stage, MaxEdge)
+		; The clipboard publisher loads a BMP stage; a saved capture is a PNG.
+		Encoder := (Mode == "clipboard") ? GESTURE_SCREENSHOT_BMP_ENCODER : GESTURE_SCREENSHOT_PNG_ENCODER
+		Capture := _GestureScreenshotCaptureScreen.Bind(X, Y, W, H, Encoder, Stage, MaxEdge)
 		WorkerId := _GestureScreenshotCreateWorker("direct_" . Mode, Epoch, Stage,
-			_GestureScreenshotPowerShellArgs(Script), GestureDirectCaptureWorkerDone.Bind(Epoch))
+			Capture, GestureDirectCaptureWorkerDone.Bind(Epoch))
 		if WorkerId {
 			_GestureDirectCaptures[Epoch] := Map(
 				"epoch", Epoch,
@@ -658,7 +834,9 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		return
 	}
 	if ExitCode != 0 || !_GestureScreenshotFileExists(Job["stage"]) {
-		GestureDirectCaptureFinish(Epoch, false, "worker exited without staged output")
+		GestureDirectCaptureFinish(Epoch, false, (Stderr != "")
+			? "worker exited without staged output: " . RTrim(Stderr, ".")
+			: "worker exited without staged output")
 		return
 	}
 
@@ -955,45 +1133,68 @@ _GestureRegionCaptureStartCurrent(Epoch) {
 		&& !IsObject(_GestureRegionCapture)
 }
 
+; Builds the region-save capture. Validation runs here, in the owner, so a bad
+; sequence or edge fails before any worker is registered.
+; @returns {Func} The capture that writes Stage from the admitted clipboard image.
+_GestureScreenshotRegionCapture(Stage, ExpectedSequence, MaxEdge := 0) {
+	if !(ExpectedSequence is Integer) || ExpectedSequence < 0 || ExpectedSequence > 0xFFFFFFFF
+		throw ValueError("A region image requires its captured clipboard sequence.")
+	_GestureScreenshotRequireMaxEdge(MaxEdge)
+	return _GestureScreenshotWithGdiplus.Bind(
+		_GestureScreenshotCaptureClipboardImage.Bind(Stage, ExpectedSequence, MaxEdge))
+}
+
+_GestureScreenshotNativeProbe(Phase, Bitmap) {
+	if IsObject(GestureScreenshotWorkerState.native_probe_fn)
+		GestureScreenshotWorkerState.native_probe_fn.Call(Phase, Bitmap)
+}
+
 ; Delayed rendering may legitimately change the sequence during acquisition.
 ; Hold the native clipboard lock from admission through the detached GDI+ copy,
 ; then let later copies proceed independently of this captured image.
-_GestureScreenshotRegionSaveScript(Stage, ExpectedSequence, MaxEdge := 0) {
-	global DriverPid
-	if !(ExpectedSequence is Integer) || ExpectedSequence < 0 || ExpectedSequence > 0xFFFFFFFF
-		throw ValueError("A region image requires its captured clipboard sequence.")
-	EscapedStage := StrReplace(Stage, "'", "''")
-	return "$ErrorActionPreference = 'Stop';$ProgressPreference = 'SilentlyContinue';"
-		. "Add-Type -AssemblyName System.Windows.Forms;"
-		. "Add-Type -AssemblyName System.Drawing;"
-		. "Add-Type -TypeDefinition 'public static class ErgoptiScreenshotClipboard {"
-		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern uint GetClipboardSequenceNumber();'
-		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern bool OpenClipboard(System.IntPtr owner);'
-		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern bool CloseClipboard();'
-		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern System.IntPtr GetClipboardData(uint format);'
-		. '[System.Runtime.InteropServices.DllImport("user32.dll")]public static extern System.IntPtr CopyImage(System.IntPtr image,uint type,int width,int height,uint flags);'
-		. '[System.Runtime.InteropServices.DllImport("gdi32.dll")]public static extern bool DeleteObject(System.IntPtr image);'
-		. "}';"
-		. "$expectedSequence = " . ExpectedSequence . ";$img = $null;"
-		. "if (-not [ErgoptiScreenshotClipboard]::OpenClipboard([System.IntPtr]::Zero)) {throw 'The region clipboard is busy.'};"
-		. "try {"
-		. "if ($expectedSequence -eq 0 -or [ErgoptiScreenshotClipboard]::GetClipboardSequenceNumber() -ne $expectedSequence) {throw 'Region clipboard content changed before image acquisition.'};"
-		. "$bitmapHandle = [ErgoptiScreenshotClipboard]::GetClipboardData(2);"
-		. "if ($bitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region clipboard contains no bitmap.'};"
+_GestureScreenshotCaptureClipboardImage(Stage, ExpectedSequence, MaxEdge) {
+	global GESTURE_SCREENSHOT_CF_BITMAP, GESTURE_SCREENSHOT_IMAGE_BITMAP
+	global GESTURE_SCREENSHOT_PNG_ENCODER
+	Image := 0
+	if !DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int")
+		throw Error("The region clipboard is busy.")
+	try {
+		if ExpectedSequence == 0
+				|| DllCall("User32\GetClipboardSequenceNumber", "UInt") != ExpectedSequence
+			throw Error("Region clipboard content changed before image acquisition.")
+		Borrowed := DllCall("User32\GetClipboardData", "UInt", GESTURE_SCREENSHOT_CF_BITMAP, "Ptr")
+		if !Borrowed
+			throw Error("The admitted region clipboard contains no bitmap.")
+		_GestureScreenshotNativeProbe("acquired", Borrowed)
 		; Copy the valid shared CF_BITMAP under its lock. Flags zero makes a
-		; private DDB, never the borrowed handle; FromHbitmap then makes its
-		; detached managed copy before the clipboard lock is released.
-		. "$localBitmapHandle = [System.IntPtr]::Zero;try {"
-		. "$localBitmapHandle = [ErgoptiScreenshotClipboard]::CopyImage($bitmapHandle,0,0,0,0);"
-		. "if ($localBitmapHandle -eq [System.IntPtr]::Zero) {throw 'The admitted region bitmap could not be copied.'};"
-		. "$img = [System.Drawing.Image]::FromHbitmap($localBitmapHandle);"
-		. "} finally {if ($localBitmapHandle -ne [System.IntPtr]::Zero -and -not [ErgoptiScreenshotClipboard]::DeleteObject($localBitmapHandle)) {if ($img) {$img.Dispose();$img=$null};throw 'The private region bitmap could not be released.'}};"
-		. "} finally {if (-not [ErgoptiScreenshotClipboard]::CloseClipboard()) {if ($img) {$img.Dispose()};throw 'The region clipboard lock could not be released.'}};"
-		. "try {" . _GestureScreenshotDownscaleScript("$img", MaxEdge)
-		. "$img.Save('" . EscapedStage . "', [System.Drawing.Imaging.ImageFormat]::Png);"
-		. "} finally {$img.Dispose()};"
-		. "$parentAlive = Get-Process -Id " . DriverPid . " -ErrorAction SilentlyContinue;"
-		. "if (-not $parentAlive) { Remove-Item -LiteralPath '" . EscapedStage . "' -Force -ErrorAction SilentlyContinue }"
+		; private DDB, never the borrowed handle; GDI+ then makes its detached
+		; copy before the clipboard lock is released.
+		Private := DllCall("User32\CopyImage", "Ptr", Borrowed, "UInt", GESTURE_SCREENSHOT_IMAGE_BITMAP,
+			"Int", 0, "Int", 0, "UInt", 0, "Ptr")
+		if !Private
+			throw Error("The admitted region bitmap could not be copied.")
+		try {
+			Image := _GestureScreenshotGdipFromHBitmap(Private)
+		} finally {
+			if !DllCall("Gdi32\DeleteObject", "Ptr", Private, "Int") {
+				_GestureScreenshotGdipDispose(Image)
+				Image := 0
+				throw Error("The private region bitmap could not be released.")
+			}
+		}
+	} finally {
+		if !DllCall("User32\CloseClipboard", "Int") {
+			_GestureScreenshotGdipDispose(Image)
+			Image := 0
+			throw Error("The region clipboard lock could not be released.")
+		}
+	}
+	try {
+		_GestureScreenshotNativeProbe("detached", 0)
+		_GestureScreenshotGdipWrite(&Image, Stage, GESTURE_SCREENSHOT_PNG_ENCODER, MaxEdge)
+	} finally {
+		_GestureScreenshotGdipDispose(Image)
+	}
 }
 
 _GestureRegionCaptureState(Epoch, WorkerId := 0) {
@@ -1020,8 +1221,7 @@ GestureRegionCaptureStartSaveWorker(Epoch) {
 		State := _GestureRegionCapture
 		Stage := A_Temp . "\ergopti_screenshot_region_" . DriverPid . "_" . Epoch . ".png"
 		WorkerId := _GestureScreenshotCreateWorker("region_save", Epoch, Stage,
-			_GestureScreenshotPowerShellArgs(
-				_GestureScreenshotRegionSaveScript(Stage, State["clipboard_sequence"], State.Get("max_edge", 0)), true),
+			_GestureScreenshotRegionCapture(Stage, State["clipboard_sequence"], State.Get("max_edge", 0)),
 			GestureRegionSaveWorkerDone.Bind(Epoch))
 		if WorkerId {
 			State["worker_id"] := WorkerId
@@ -1108,7 +1308,8 @@ GestureRegionSaveWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		return
 	}
 	if ExitCode != 0 || !_GestureScreenshotFileExists(Job["stage"]) {
-		LoggerError("gestures", "Region screenshot save worker produced no staged image.")
+		LoggerError("gestures", "Region screenshot save worker produced no staged image: {1}.",
+			(Stderr != "") ? RTrim(Stderr, ".") : "exit code " . ExitCode)
 		GestureRegionCaptureFinish(Epoch, "save worker failed")
 		return
 	}

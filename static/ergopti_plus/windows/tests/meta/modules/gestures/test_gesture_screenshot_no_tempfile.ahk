@@ -14,14 +14,14 @@
 ; reading it — producing a crash or a corrupted/blank screenshot for the first
 ; capture. There was also no cleanup path for the temp file.
 ;
-; The fix passes capture code as a PowerShell -Command argument and gives every
-; worker a unique bitmap stage. The stage is output, never executable source,
-; and one generation owns its cleanup.
+; The fix captures in process (GDI and GDI+) and gives every worker a unique
+; bitmap stage. The stage is output, never executable source, and one
+; generation owns its cleanup.
 ;
 ; This test verifies:
 ;   1. GestureScreenshotInstant does NOT reference "hs_screenshot.ps1".
 ;   2. GestureScreenshotInstant does NOT call FileAppend to write the PS code.
-;   3. GestureScreenshotInstant uses -Command to inline the PS code.
+;   3. The shared capture runs in process and never launches a script host.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -55,7 +55,7 @@ Test("gestures: GestureScreenshotInstant does not write a shared temp .ps1 file 
 
 ; ======================================================
 ; ======================================================
-; ======= 2/ Inline -Command pattern is used ============
+; ======= 2/ The capture runs in process =================
 ; ======================================================
 ; ======================================================
 
@@ -71,19 +71,20 @@ _GSNF_InlineCommand() {
 		"GestureScreenshotInstant must delegate to the shared hardened capture path")
 
 	Capture := _DriverFuncBody("GestureCaptureRegion")
-	ArgsBuilder := _DriverFuncBody("_GestureScreenshotPowerShellArgs")
-	Assert(Capture != "" && ArgsBuilder != "",
-		"GestureCaptureRegion and its PowerShell argument builder must exist")
-	Assert(InStr(ArgsBuilder, 'Args.Push("-WindowStyle", "Hidden", "-Command", Script)') > 0,
-		"the shared capture must pass PS code via -Command, never a temp .ps1 (gesture-screenshot-tempfile-race)")
+	NativeCapture := _DriverFuncBody("_GestureScreenshotCaptureScreen")
+	Assert(Capture != "" && NativeCapture != "",
+		"GestureCaptureRegion and its in-process screen capture must exist")
+	Assert(InStr(Capture, "_GestureScreenshotCaptureScreen.Bind(") > 0
+		&& InStr(Capture, ".ps1") = 0 && InStr(NativeCapture, ".ps1") = 0,
+		"the shared capture must run in process, never through a temp .ps1 (gesture-screenshot-tempfile-race)")
 
-	; ShellRunner owns process launch, termination, and completion. A raw Run here
+	; The worker registry owns start, termination, and completion. A raw Run here
 	; would recreate the detached sibling fixed by AHK-13.
 	Assert(InStr(Capture, "_GestureScreenshotCreateWorker") > 0,
-		"the shared capture must register its process with the common worker owner")
+		"the shared capture must register its worker with the common owner")
 	Assert(InStr(Capture, "Run(") = 0,
-		"the shared capture must not launch an unowned PowerShell sibling")
+		"the shared capture must not launch an unowned sibling process")
 	Assert(InStr(Capture, "RunWait") = 0,
 		"the shared capture must never RunWait — that would block the keyboard hook thread")
 }
-Test("gestures: GestureScreenshotInstant inlines PowerShell via -Command (gesture-screenshot-tempfile-race)", _GSNF_InlineCommand)
+Test("gestures: the shared screenshot capture runs in process (gesture-screenshot-tempfile-race)", _GSNF_InlineCommand)
