@@ -1775,6 +1775,63 @@ end
 -- One-shot guard so the constructors are patched exactly once.
 local _capture_installed = false
 
+-- A timer callback that holds the main thread this long delays every event
+-- tap, the Karabiner lease heartbeat and each typed key behind it. macOS
+-- disables an event tap that waits about a second, so a shorter hold is
+-- invisible to the user and a longer one is named in the log.
+local SLOW_TIMER_CALLBACK_REPORT_MS = 1000
+-- One report per callback site per minute: a callback that stalls on every
+-- tick would otherwise write a line per tick.
+local SLOW_TIMER_CALLBACK_REPEAT_SEC = 60
+local NANOSECONDS_PER_MILLISECOND = 1000000
+local MILLISECONDS_PER_SECOND = 1000
+-- Monotonic nanosecond clock captured at install; nil without hs.timer.
+local _callback_clock = nil
+local _slow_callback_reported_at = {}
+
+--- Names the source line of the function a timer callback runs.
+--- adapters/timer_scheduler.lua wraps every owner's callback in a closure of
+--- its own, so its site names nothing: the first function upvalue defined in
+--- another file is the owner's callback.
+--- @param fn function Callback handed to the hs.timer constructor.
+--- @return string site "path:line" of the owner's function.
+local function describe_callback_site(fn)
+	local info = debug.getinfo(fn, "S")
+	local site = info and (tostring(info.short_src) .. ":" .. tostring(info.linedefined)) or "?"
+	if not (info and tostring(info.short_src):find("timer_scheduler", 1, true)) then return site end
+	for index = 1, 16 do
+		local name, value = debug.getupvalue(fn, index)
+		if name == nil then break end
+		if type(value) == "function" then
+			local inner = debug.getinfo(value, "S")
+			if inner and not tostring(inner.short_src):find("timer_scheduler", 1, true) then
+				return tostring(inner.short_src) .. ":" .. tostring(inner.linedefined)
+			end
+		end
+	end
+	return site
+end
+
+--- Reports one timer callback that held the main thread past the threshold.
+--- @param fn function The callback that ran.
+--- @param kind string Timer family label.
+--- @param started integer Monotonic start, nanoseconds.
+local function report_slow_timer_callback(fn, kind, started)
+	local ok_now, now = pcall(_callback_clock)
+	if not ok_now or type(now) ~= "number" then return end
+	local held_ms = (now - started) / NANOSECONDS_PER_MILLISECOND
+	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then return end
+	local ok_site, site = pcall(describe_callback_site, fn)
+	site = ok_site and site or "?"
+	local previous = _slow_callback_reported_at[site]
+	local now_sec = now / NANOSECONDS_PER_MILLISECOND / MILLISECONDS_PER_SECOND
+	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
+	_slow_callback_reported_at[site] = now_sec
+	M.warn("runtime",
+		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.",
+		kind, site, math.floor(held_ms))
+end
+
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback
 --- instead of vanishing into the Hammerspoon Console. hs.timer ignores callback
 --- return values, so discarding them here changes nothing.
@@ -1796,10 +1853,24 @@ local _capture_installed = false
 local function _guard_timer_cb(fn, kind)
 	if type(fn) ~= "function" then return fn end
 	return function(...)
+		local started = nil
+		if _callback_clock then
+			local ok_start, value = pcall(_callback_clock)
+			if ok_start and type(value) == "number" then started = value end
+		end
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
 			-- Never tostring() a caught object: its own __tostring may raise again.
 			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, ErrorDescription.describe(err))
+		end
+		-- A main-thread hold has no error to report, yet it is what disabled the
+		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
+		-- ingest flush). Naming the callback makes the next log say which one.
+		if started then
+			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started)
+			if not reported then
+				M.error("runtime", "Slow timer callback report failed: %s", ErrorDescription.describe(report_err))
+			end
 		end
 	end
 end
@@ -1863,6 +1934,7 @@ function M.install_runtime_error_capture()
 	local hs_ref = rawget(_G, "hs")
 	if type(hs_ref) == "table" and type(hs_ref.timer) == "table" then
 		local timer = hs_ref.timer
+		if type(timer.absoluteTime) == "function" then _callback_clock = timer.absoluteTime end
 		if type(timer.doAfter) == "function" then
 			local orig = timer.doAfter
 			timer.doAfter = function(delay, fn, ...) return orig(delay, _guard_timer_cb(fn, "doAfter"), ...) end
@@ -1881,7 +1953,8 @@ function M.install_runtime_error_capture()
 		end
 	end
 
-	_log("INFO", "logger", "Runtime error capture installed (hs.timer guards + console tee).")
+	_log("INFO", "logger",
+		"Runtime error capture installed (hs.timer guards with slow-callback reports + console tee).")
 end
 
 --- Reads only the logger state this module owns; no persistence occurs here.
