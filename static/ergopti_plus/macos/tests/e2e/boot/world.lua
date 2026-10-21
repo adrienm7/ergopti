@@ -767,6 +767,45 @@ end
 -- ==================================
 -- ==================================
 
+--- Runs the folder commands of the modelled Mac for real inside its HOME.
+--- The shared hs.execute stub answers any command it does not know with a
+--- synthetic success that does nothing. infra/driver_control.lua makes its
+--- folder with `/bin/mkdir -p P && /bin/chmod 700 P` and then checks the result
+--- with hs.fs.attributes, so the stub's success left no folder and every boot
+--- logged that the control could not start. Only that exact shape, on paths
+--- under the private HOME, reaches the host; anything else keeps the stub.
+--- @param hs table The hs stub.
+--- @param home string The private HOME.
+local function install_private_folder_commands(hs, home)
+	local stub_execute = hs.execute
+	local function inside_home(path)
+		return path:sub(1, #home + 1) == home .. "/"
+	end
+	--- The host command for one part, or nil when the part is not modelled.
+	local function host_part(part)
+		local folder = part:match("^/bin/mkdir %-p '([^']+)'$")
+		if folder and inside_home(folder) then return "/bin/mkdir -p " .. sh_quote(folder) end
+		local mode, target = part:match("^/bin/chmod (%d%d%d) '([^']+)'$")
+		if mode and inside_home(target) then return "/bin/chmod " .. mode .. " " .. sh_quote(target) end
+		return nil
+	end
+	hs.execute = function(cmd, with_user_env)
+		if type(cmd) == "string" then
+			local parts, modelled = {}, true
+			for part in (cmd .. " && "):gmatch("(.-) && ") do
+				local host = host_part(part)
+				if host == nil then modelled = false; break end
+				parts[#parts + 1] = host
+			end
+			if modelled and #parts > 0 then
+				local success = sh(table.concat(parts, " && "))
+				return "", success, "exit", success and 0 or 1
+			end
+		end
+		return stub_execute(cmd, with_user_env)
+	end
+end
+
 --- Completes the hs stub where the boot needs a native answer it lacks.
 --- @param hs table The hs stub.
 --- @param env table launcher_environment().
@@ -980,6 +1019,7 @@ local function install_natives(hs, env, arch, machine_root)
 		return task
 	end
 	for _, answer in ipairs(execute_answers(arch)) do hs.__set_exec(answer[1], answer[2], answer[3]) end
+	install_private_folder_commands(hs, env.HOME)
 
 	-- The menu bar item keeps the menu it is given, so a scenario can click a
 	-- row the way the user does (M.menu_items, M.click).
