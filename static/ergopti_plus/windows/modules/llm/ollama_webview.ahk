@@ -52,6 +52,7 @@ global _OllamaWV_WebView    := unset
 global _OllamaWV_MsgSub     := unset
 global _OllamaWV_Ready      := false   ; true once JS signals "ready"
 global _OllamaWV_Queue      := []      ; JS calls buffered before page ready
+global _OllamaWV_PendingFlush := 0    ; authorized unready flush deferred by pause
 global _OllamaWV_OnCancel   := unset
 global _OllamaWV_OnRetry    := unset
 ; Every deferred WebView callback is bound to the window instance that armed it.
@@ -173,6 +174,7 @@ OllamaWV_CloseIfEpoch(captured_epoch, *) {
  * Hides and destroys the window.
  */
 OllamaWV_Close() {
+	global _OllamaWV_PendingFlush
 	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir, _OllamaWV_MsgSub, _OllamaWV_Epoch
 	Retired := Map()
 	PreviousCritical := Critical("On")
@@ -180,6 +182,7 @@ OllamaWV_Close() {
 		; Keep every old object alive while detaching the public session. COM
 		; unsubscribe and native cleanup may publish a successor when they yield.
 		Retired["queue"] := _OllamaWV_Queue
+		Retired["pending_flush"] := _OllamaWV_PendingFlush
 		if IsSet(_OllamaWV_Gui)
 			Retired["gui"] := _OllamaWV_Gui
 		if IsSet(_OllamaWV_Controller)
@@ -193,6 +196,7 @@ OllamaWV_Close() {
 		_OllamaWV_Epoch += 1
 		_OllamaWV_Ready := false
 		_OllamaWV_Queue := []
+		_OllamaWV_PendingFlush := 0
 		_OllamaWV_MsgSub := unset
 		_OllamaWV_Gui := unset
 		_OllamaWV_Controller := unset
@@ -246,10 +250,18 @@ OllamaWV_Create(kind, subtitle) {
 	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_MsgSub
 	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_W, _OllamaWV_H, _OllamaWV_Margin, _OllamaWV_Epoch
 
-	_OllamaWV_Epoch += 1
-	captured_epoch := _OllamaWV_Epoch
-	_OllamaWV_Ready := false
-	_OllamaWV_Queue := []
+	global _OllamaWV_PendingFlush
+	PreviousCritical := Critical("On")
+	try {
+		; Keep detached owners alive until native cleanup is interruptible.
+		RetiredPending := _OllamaWV_PendingFlush
+		RetiredQueue := _OllamaWV_Queue
+		_OllamaWV_Epoch += 1
+		captured_epoch := _OllamaWV_Epoch
+		_OllamaWV_Ready := false
+		_OllamaWV_Queue := []
+		_OllamaWV_PendingFlush := 0
+	} finally Critical(PreviousCritical)
 
 	if !OllamaWV_WebView2Available() {
 		LoggerError("LLM", "WebView2 not available — cannot show install window.")
@@ -465,37 +477,89 @@ OllamaWV_RunScript(captured_epoch, js) {
  * so i18n_apply() can walk live DOM nodes instead of a not-yet-parsed tree.
  */
 OllamaWV_FlushQueue(captured_epoch := unset) {
-	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _I18nLocale, _OllamaWV_Epoch
-	if !IsSet(captured_epoch)
-		captured_epoch := _OllamaWV_Epoch
-	if (captured_epoch != _OllamaWV_Epoch or A_IsSuspended)
-		return
-	if !IsSet(_OllamaWV_WebView)
-		return
-	if _OllamaWV_Ready   ; Guard: flush must only run once
-		return
-	captured_view := _OllamaWV_WebView
-	captured_queue := _OllamaWV_Queue
+	global _OllamaWV_WebView, _OllamaWV_Queue, _OllamaWV_Epoch, _OllamaWV_PendingFlush
+	PreviousCritical := Critical("On")
+	try {
+		if !IsSet(captured_epoch)
+			captured_epoch := _OllamaWV_Epoch
+		if captured_epoch != _OllamaWV_Epoch or !IsSet(_OllamaWV_WebView)
+			return
+		Owner := Map("epoch", captured_epoch, "view", _OllamaWV_WebView, "queue", _OllamaWV_Queue)
+		Pending := _OllamaWV_PendingFlush
+	} finally Critical(PreviousCritical)
+	_OllamaWV_FlushOwned(Owner, Pending)
+}
+
+/**
+ * Retries only a readiness milestone already admitted before or during pause.
+ * An ordinary resume cannot certify a document which is still loading.
+ */
+OllamaWV_OnResume() {
+	global _OllamaWV_PendingFlush
+	PreviousCritical := Critical("On")
+	try Pending := _OllamaWV_PendingFlush
+	finally Critical(PreviousCritical)
+	if Pending is Map
+		_OllamaWV_FlushOwned(Pending, Pending)
+}
+
+_OllamaWV_FlushSessionCurrent(Owner) {
+	global _OllamaWV_Epoch, _OllamaWV_WebView
+	return Owner["epoch"] == _OllamaWV_Epoch && IsSet(_OllamaWV_WebView)
+		&& Owner["view"] == _OllamaWV_WebView
+}
+
+_OllamaWV_FlushOwned(Owner, ExpectedPending) {
+	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_PendingFlush, _I18nLocale
+	RetainedPending := 0
+	PreviousCritical := Critical("On")
+	try {
+		if !_OllamaWV_FlushSessionCurrent(Owner) or !(_OllamaWV_PendingFlush == ExpectedPending)
+			return
+		if _OllamaWV_Ready {
+			; A newer same-session debt may survive an older successful flush.
+			; Retire only the exact current receipt, without replaying its scripts.
+			RetainedPending := _OllamaWV_PendingFlush
+			_OllamaWV_PendingFlush := 0
+			return
+		}
+		if !(Owner["queue"] == _OllamaWV_Queue)
+			return
+		if A_IsSuspended {
+			RetainedPending := _OllamaWV_PendingFlush
+			_OllamaWV_PendingFlush := Owner
+			return
+		}
+	} finally Critical(PreviousCritical)
 	; Locale I/O and diagnostics may retire this page. Keep it unready so
 	; same-session updates still append to the retained queue during that work.
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
 	PreviousCritical := Critical("On")
 	try {
-		if captured_epoch != _OllamaWV_Epoch or A_IsSuspended
+		if !_OllamaWV_FlushSessionCurrent(Owner) or _OllamaWV_Ready
 			return
-		if !IsSet(_OllamaWV_WebView) or !(captured_view == _OllamaWV_WebView)
+		if !(Owner["queue"] == _OllamaWV_Queue)
 			return
-		if _OllamaWV_Ready or !(captured_queue == _OllamaWV_Queue)
+		if A_IsSuspended {
+			; A reentrant delivery may already have installed a newer receipt.
+			if _OllamaWV_PendingFlush == ExpectedPending {
+				RetainedPending := _OllamaWV_PendingFlush
+				_OllamaWV_PendingFlush := Owner
+			}
 			return
-		; Detach only the admitted queue before any deferred script can run.
+		}
+		; Queue publication and consumption of our exact debt share one commit.
 		_OllamaWV_Queue := []
 		_OllamaWV_Ready := true
+		if _OllamaWV_PendingFlush == ExpectedPending {
+			RetainedPending := _OllamaWV_PendingFlush
+			_OllamaWV_PendingFlush := 0
+		}
 	} finally Critical(PreviousCritical)
-	; These callbacks retain the admitted epoch and queue, never a successor's
-	; mutable globals. Execution remains outside WebMessageReceived's stack.
-	SetTimer(OllamaWV_RunScript.Bind(captured_epoch, i18n_js), -1)
-	for _, js in captured_queue
-		SetTimer(OllamaWV_RunScript.Bind(captured_epoch, js), -1)
+	; Execution stays outside WebMessageReceived and the RAM transaction.
+	SetTimer(OllamaWV_RunScript.Bind(Owner["epoch"], i18n_js), -1)
+	for _, js in Owner["queue"]
+		SetTimer(OllamaWV_RunScript.Bind(Owner["epoch"], js), -1)
 }
 
 /**
