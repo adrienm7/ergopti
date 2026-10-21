@@ -55,11 +55,11 @@
 		"static/ergopti_plus/windows/modules/updater/changelog.ahk": "62e59046174046da6ff12288464dc42c495edb96a7465d3da935e0b675502eef",
 		"static/ergopti_plus/windows/modules/updater/channels.ahk": "d65f0823227bca1f86d102542629bd369c8a28de064036680e49c754961c8961",
 		"static/ergopti_plus/windows/modules/updater/config_backup.ahk": "10e29db58b4f14c972d114ddf5b637da9b1341c0cbbd10aaee0a4c171e40327b",
-		"static/ergopti_plus/windows/modules/updater/core.ahk": "00178661218751305c0547b355c65d8a88c354da302546ae1e86c2fb743ee3c0",
+		"static/ergopti_plus/windows/modules/updater/core.ahk": "9542cfe076adccf9d663edb365ac5ff226b8740452a5d5b7ee931a366836d79c",
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "c4ea711e38ca3827e884dc84dc8ab579cf18086e3df59bd7ecb132c7b23110d4",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "964896291f50265e5222a62591ebe7f9aafa139a15463203f8b930ba8bda15ce",
-		"static/ergopti_plus/windows/tests/run_all.ahk": "1e3f5f74e9f70b4d7503c98421dcc317e5fdd784719a2e2d5c8002a34477fc84",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "4d3e8b9db285678344aa4106f9435c7fe8ab8912c18a75a2a9a342d684c46efa",
 		"static/ergopti_plus/windows/tests/test_framework.ahk": "825f299411b3e8b2535238633415152e9577673e70b608f05cae4a39346b08a0",
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "91cbd592c28a9b473bc9e7c7e28e08703a8a6203b7bce6a6e3a57d2ef36e0266",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "fd031f86136ed0c5014b8efaf9f5134fbe647ed2",
+	"source_pin_base": "ffa4ee7c21bf1f664d7d0863733d495ecd144473",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
