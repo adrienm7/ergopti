@@ -22,7 +22,7 @@ _CRDC_Restore(State, Snapshot) {
 }
 
 _CRDC_Binary(FormatId) {
-	AssertTrue(DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int"))
+	AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd))
 	try {
 		Handle := DllCall("User32\GetClipboardData", "UInt", FormatId, "Ptr")
 		AssertTrue(Handle != 0, "the restored native binary format must exist")
@@ -92,7 +92,7 @@ _CRDC_Run(Mode) {
 			AssertTrue(CB_Write(Foreign))
 			AssertTrue(CB_GetSequenceNumber() != Expected, "the borrowed-lock control must take the skip path")
 			BeforeMutation := CBClipboardOwner.mutation_id
-			RawOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+			RawOpened := CB_OpenClipboardWithin(A_ScriptHwnd)
 			AssertTrue(RawOpened, "the real caller must retain its own native lease")
 		}
 		Result := CB_RestoreOwnedAllEventually(State.Captured, Expected, Token,
