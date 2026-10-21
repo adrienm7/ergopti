@@ -1309,6 +1309,81 @@ PersonalInfoCommitValues(FilePath, Values, WriterFn := 0, ReplaceFn := 0,
 	}
 }
 
+; A raw witness retains the existing reader's native BOM contract. An unknown
+; probe/read is never an absent or empty identity, and no decoded replacement
+; character can conceal an external byte change.
+_PersonalInfoReadWriteSource(FilePath) {
+	Source := Map("admitted", false, "present", false, "bytes", Buffer(0),
+		"target_key", "", "configured_key", "")
+	if !(FilePath is String) || FilePath == ""
+		return Source
+	try {
+		ConfiguredPath := PersonalInfoTomlPath()
+		if !(ConfiguredPath is String) || ConfiguredPath == ""
+			return Source
+		Source["target_key"] := _ConfigWriteLeaseKey(FilePath)
+		Source["configured_key"] := _ConfigWriteLeaseKey(ConfiguredPath)
+		if FSStrictExists(FilePath) {
+			Source["bytes"] := FSReadBytesStrict(FilePath)
+			if !(Source["bytes"] is Buffer)
+				return Source
+			Source["present"] := true
+		}
+		Source["admitted"] := true
+	} catch {
+		return Source
+	}
+	return Source
+}
+
+_PersonalInfoSourceBytesEqual(Expected, Observed) {
+	if !(Expected is Buffer) || !(Observed is Buffer) || Expected.Size != Observed.Size
+		return false
+	Offset := 0
+	while Offset + 4 <= Expected.Size {
+		if NumGet(Expected, Offset, "UInt") != NumGet(Observed, Offset, "UInt")
+			return false
+		Offset += 4
+	}
+	while Offset < Expected.Size {
+		if NumGet(Expected, Offset, "UChar") != NumGet(Observed, Offset, "UChar")
+			return false
+		Offset += 1
+	}
+	return true
+}
+
+; Memory-only admission after a source read. The explicit-path writer remains
+; usable without making its target the configured path, while a relocation of
+; the configured identity invalidates the attempt that started before it.
+_PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
+	if !Source["admitted"] || A_IsSuspended
+			|| !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
+		return false
+	ConfiguredPath := PersonalInfoTomlPath()
+	return ConfiguredPath is String && ConfiguredPath != ""
+		&& _ConfigWriteLeaseKey(FilePath) == Source["target_key"]
+		&& _ConfigWriteLeaseKey(ConfiguredPath) == Source["configured_key"]
+}
+
+_PersonalInfoReplaceUnchanged(Source, OwnerToken, ReplaceFn, StagePath, FilePath) {
+	Replacement := HasMethod(ReplaceFn, "Call") ? ReplaceFn : FSAtomicMoveReplace
+	; Atomic dispatches this boundary after staging and authorization, outside
+	; Critical. Reading here must not be moved into its authorization callback.
+	Observed := _PersonalInfoReadWriteSource(FilePath)
+	if !Observed["admitted"] || Source["present"] != Observed["present"]
+			|| !_PersonalInfoSourceBytesEqual(Source["bytes"], Observed["bytes"])
+		return false
+	PreviousCritical := Critical("On")
+	try Current := _PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath)
+	finally Critical(PreviousCritical)
+	if !Current
+		return false
+	; This is a witness check, not an OS-atomic external compare-and-swap.
+	; Preserve the original port's receipt for the canonical strict status check.
+	return Replacement.Call(StagePath, FilePath)
+}
+
 ; Serialise one detached personal-information snapshot and atomically replace
 ; personal_info.toml. A one-argument compatibility call snapshots the current
 ; globals only after it owns the path (used by first-boot materialisation).
@@ -1365,6 +1440,12 @@ WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 			try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the identity in memory is the shipped placeholder rather than the user's. Reopen the editor once the file is readable.", FilePath)
 			return false
 		}
+		Source := _PersonalInfoReadWriteSource(FilePath)
+		if !Source["admitted"] || !_PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
+			try LoggerError("PersonalToml",
+				"Refusing to write '{1}': its current identity source could not be retained.", FilePath)
+			return false
+		}
 		if !IsSet(Information)
 			Information := PersonalInformation.Clone()
 		if !IsSet(Letters)
@@ -1378,7 +1459,7 @@ WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 		}
 
 		Written := _PersonalTomlWriteAtomic(FilePath, Content,
-			WriterFn, ReplaceFn, DeleteFn,
+			WriterFn, _PersonalInfoReplaceUnchanged.Bind(Source, OwnerToken, ReplaceFn), DeleteFn,
 			_PersonalTomlAuthorizeOwnedWrite.Bind(
 				OwnerToken, FilePath, AuthorizeFn), PublishFn)
 		if !((Written is Integer) && Written == 1)
