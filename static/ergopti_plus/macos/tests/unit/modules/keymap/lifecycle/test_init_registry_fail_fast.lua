@@ -29,6 +29,8 @@ local function load_keymap_with_results(results)
 			current_action_epoch = function() return 0 end,
 		},
 		["modules.keymap.utils"] = {},
+		["adapters.text_sender"] = {},
+		["modules.llm.app_filter"] = {},
 		["infra.logger"] = {},
 		["infra.keycodes"] = {},
 		["infra.manifest_reader"] = {
