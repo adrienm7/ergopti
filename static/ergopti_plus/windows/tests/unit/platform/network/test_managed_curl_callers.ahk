@@ -192,3 +192,5 @@ _ManagedCallerInvalidNativeCause(State) {
 	} finally _ManagedCurlControlRelease(Control)
 }
 Test("managed caller: typed failure rejects string coercion and arbitrary renderer keys", (*) => _MNW_Scope(_ManagedCallerInvalidNativeCause))
+
+#Include test_managed_response_utf8.ahk
