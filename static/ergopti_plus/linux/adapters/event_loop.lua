@@ -245,16 +245,18 @@ local function _run_pump(opts)
 	local onPeriodic = opts.onPeriodic
 	local periodSec  = tonumber(opts.periodSec) or 0.25
 
-	local last_tick = os.clock()
+	-- The gate reads the wall clock. os.clock() is CPU time: an iteration whose
+	-- callbacks waited on I/O advanced it by almost nothing, so the periodic
+	-- tick slipped by as much as the callbacks blocked. Without luv the wall
+	-- clock counts whole seconds; its resolution is subtracted so a second
+	-- boundary crossed a millisecond after the last tick cannot fire early.
+	local period_ms = periodSec * 1000
+	local last_tick = Monotonic.now_ms()
 	local iteration = 0
 
-	-- Iteration-based fallback for the periodic gate. When os.clock() returns
-	-- CPU-time (some Lua builds on CI) instead of wall-clock, the periodSec
-	-- condition never fires and onPeriodic is starved — the failing test
-	-- "onPeriodic exception is caught" relies on the callback being called at
-	-- least once. Derive from periodSec so a tiny test value (0.001 s) fires
-	-- on the very first idle tick while the default (0.25 s) fires every
-	-- ~250 ticks at ~1 ms each — proportional to the intended interval.
+	-- Iteration-based cadence for the coarse wall clock: a tiny test value
+	-- (0.001 s) fires on the very first idle tick while the default (0.25 s)
+	-- fires every ~250 ticks at ~1 ms each — proportional to the interval.
 	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(periodSec * 1000))
 
 	while _running do
@@ -264,8 +266,9 @@ local function _run_pump(opts)
 		iteration = iteration + 1
 
 		-- Drive the periodic callback when enough wall-clock has elapsed.
-		local now = os.clock()
-		if onPeriodic and (now - last_tick >= periodSec or iteration >= PERIODIC_ITER_FALLBACK) then
+		local now = Monotonic.now_ms()
+		if onPeriodic and (now - last_tick - Monotonic.resolution_ms() >= period_ms
+			or iteration >= PERIODIC_ITER_FALLBACK) then
 			_safe_periodic(onPeriodic)
 			last_tick = now
 			iteration = 0
