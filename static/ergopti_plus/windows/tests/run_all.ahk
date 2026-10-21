@@ -1123,6 +1123,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keylogger/ergonomics/test_walker_json_flush_merge.ahk
 #Include unit/modules/keylogger/ergonomics/test_walker_histogram_partitions.ahk
 #Include unit/modules/keylogger/test_keylogger_sql.ahk
+#Include unit/modules/keylogger/test_keylogger_sql_literal_controls.ahk
 #Include unit/modules/keylogger/test_keylogger_text_cipher.ahk
 #Include unit/modules/keylogger/test_keylogger_text_migration.ahk
 #Include unit/infra/config/migration/test_migration_native_write.ahk

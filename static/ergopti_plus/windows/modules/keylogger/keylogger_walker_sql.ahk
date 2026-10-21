@@ -29,8 +29,9 @@
 ; =======================================
 ; =======================================
 
+; Delegates to the driver's one literal encoder, which keeps NUL and CR exact.
 KLW_SqlEscape(s) {
-		return "'" . StrReplace(String(s), "'", "''") . "'"
+		return SQLite_Q(s)
 }
 
 KLW_JsonEscape(m) {

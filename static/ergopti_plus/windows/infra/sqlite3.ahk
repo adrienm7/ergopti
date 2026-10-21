@@ -771,12 +771,19 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 ; ===============================
 ; ===============================
 
-; Single-quote a string for safe SQL embedding. We never use parameter
-; binding in this codebase — the queries are static and the only user
-; data injected is the YYYY-MM-DD date and the app process name, both
-; of which we sanitise here.
+; Single-quote a string for safe SQL embedding. This is the one literal
+; encoder of the Windows driver: the metrics ledger writer, the walker and the
+; reader filters all delegate here. sqlite3_prepare_v2 reads a NUL-terminated
+; statement, and the data.sql reader translates CRLF and skips NUL bytes, so a
+; raw NUL or CR would cut the statement or alter the stored value. Like the
+; shared policy (_shared/lua/sqlite/literal.lua), both are written as char()
+; concatenations, which store the exact original text.
+; @param s {Any} Value converted to String.
+; @returns {String} A complete SQL text expression.
 SQLite_Q(s) {
-		s := String(s)
-		s := StrReplace(s, "'", "''")
+		; RegExReplace walks the stored length, past an embedded NUL.
+		s := RegExReplace(String(s), "'", "''")
+		s := RegExReplace(s, "\r", "'||char(13)||'")
+		s := RegExReplace(s, "\x00", "'||char(0)||'")
 		return "'" . s . "'"
 }
