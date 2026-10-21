@@ -25,13 +25,29 @@ local M = {}
 local Logger = require("infra.logger")
 local LOG    = "paths"
 
+--- Returns the host's separator class. Backslash is a filename byte on macOS
+--- and separates components only when the host itself is Windows (the headless
+--- suite). Read per call so a test can model either host.
+--- @return string Lua pattern class body.
+local function separators()
+	return package.config:sub(1, 1) == "\\" and "/\\" or "/"
+end
+
+--- Returns the parent directory of a path, or nil when it has none.
+--- @param path string Path without a trailing separator.
+--- @return string|nil
+local function parent_of(path)
+	local sep = separators()
+	return path:match("^(.*)[" .. sep .. "][^" .. sep .. "]+$")
+end
+
 -- Absolute path of this file's own directory — used as the script-relative
 -- fallback base when hs.configdir does not reach the repository root. The
 -- leading "@" from debug.getinfo source strings is stripped if present.
 local _script_dir = (function()
 	local src = (debug.getinfo(1, "S") or {}).source or ""
 	src = src:gsub("^@", "")
-	return src:match("^(.*)[/\\][^/\\]+$") or ""
+	return parent_of(src) or ""
 end)()
 
 
@@ -59,7 +75,7 @@ end)()
 --- @return string|nil Absolute path to the match, or nil.
 function M.find_upward(base_dir, relative_target, max_steps, required_mode)
 	max_steps = max_steps or 8
-	local current = (base_dir or ""):gsub("[/\\]+$", "")
+	local current = (base_dir or ""):gsub("[" .. separators() .. "]+$", "")
 	for _ = 1, max_steps do
 		local candidate = current .. "/" .. relative_target
 		local ok, attr = pcall(hs.fs.attributes, candidate)
@@ -67,7 +83,7 @@ function M.find_upward(base_dir, relative_target, max_steps, required_mode)
 			Logger.debug(LOG, "find_upward('%s'): found at '%s'.", relative_target, candidate)
 			return candidate
 		end
-		local parent = current:match("^(.*)[/\\][^/\\]+$")
+		local parent = parent_of(current)
 		if not parent or parent == current then break end
 		current = parent
 	end
