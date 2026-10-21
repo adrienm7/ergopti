@@ -12,6 +12,40 @@ local fixtures = require("tests.unit.modules.shortcuts.pause_owners.fixtures")
 local reset_module = fixtures.reset_module
 local load_inventory_context = fixtures.load_inventory_context
 
+
+--- Adds only the transaction and clock boundaries used by queued Search.
+local function search_transaction_ports(hs_stub)
+	local input = package.loaded["adapters.synthetic_input"]
+	local function complete(tx, status)
+		if tx.status then return false end
+		tx.status, tx.sealed = status, true
+		for _, callback in ipairs(tx.completed) do callback(tx, status) end
+		return true
+	end
+	input.begin = function() return { completed = {}, dispatched = {}, batch = {} } end
+	input.on_complete = function(tx, callback)
+		if tx.status then callback(tx, tx.status) else tx.completed[#tx.completed + 1] = callback end
+	end
+	input.on_dispatched = function(tx, callback) tx.dispatched[#tx.dispatched + 1] = callback end
+	input.seal = function(tx)
+		if tx.sealed then return false end
+		tx.sealed = true
+		for _, callback in ipairs(tx.dispatched) do callback(tx, tx.batch, "dispatched") end
+		complete(tx, "complete")
+		return true
+	end
+	input.cancel = function(tx) return complete(tx, "cancelled") end
+	local now, after = 0, hs_stub.timer.doAfter
+	hs_stub.timer.absoluteTime = function() return math.floor(now * 1e9) end
+	hs_stub.timer.doAfter = function(delay, callback)
+		local timer = after(delay, callback)
+		if not timer then return timer end
+		local fire, deadline = timer.fire, now + delay
+		timer.fire = function(self) now = math.max(now, deadline); return fire(self) end
+		return timer
+	end
+end
+
 local function load_real_wpm_surface(module_name)
 	reset_module("tests.stubs.hs")
 	local hs_stub = require("tests.stubs.hs")
@@ -135,6 +169,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		clear = function() return true end,
 	}
 
+	search_transaction_ports(hs_stub)
 	local actions = require("modules.gestures.actions")
 	local gestures = nil
 	local gesture_engine = nil

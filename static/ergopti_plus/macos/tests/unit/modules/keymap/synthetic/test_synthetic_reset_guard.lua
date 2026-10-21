@@ -65,15 +65,32 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		text_surround = 'SyntheticInput.begin("shortcuts.text.surround", "action")',
 		text_sender_paste = 'SyntheticInput.begin("text_sender.clipboard", "action", {',
 		apps_copy = 'SyntheticInput.begin("shortcuts.apps.copy", "action", {',
+		search_copy = 'SyntheticInput.begin("gestures.search.copy", "action", {',
 	}
+
+	helpers.it("Search joins its exact native copy before capture or cleanup", function()
+		local source = read_unit("local function start_search_dispatch")
+		local begin_pos = source:find(producers.search_copy, 1, true)
+		helpers.assert_not_nil(begin_pos)
+		local complete_pos = source:find("SyntheticInput.on_complete(dispatch.tx", begin_pos, true)
+		local dispatched_pos = source:find("SyntheticInput.on_dispatched(dispatch.tx", begin_pos, true)
+		local emit_pos = source:find("pcall(SyntheticInput.emit_key_stroke,", begin_pos, true)
+		local seal_pos = source:find("SyntheticInput.seal(dispatch.tx)", begin_pos, true)
+		helpers.assert_true(complete_pos and dispatched_pos and emit_pos and seal_pos)
+		helpers.assert_true(begin_pos < complete_pos and complete_pos < dispatched_pos
+			and dispatched_pos < emit_pos and emit_pos < seal_pos)
+		helpers.assert_not_nil(source:find("pcall(SyntheticInput.cancel, dispatch.tx)", 1, true))
+		helpers.assert_not_nil(source:find('if dispatch.pending then return false, "search transaction retirement pending" end', 1, true))
+		helpers.assert_not_nil(source:find("if dispatch.pending then dispatch.timer_elapsed = true; return end", 1, true))
+	end)
 
 	helpers.it("enumerates the complete non-vacuous class", function()
 		local all = strip_line_comments(helpers.read_driver_source())
 		local producer_names = {}
 		for name in pairs(producers) do producer_names[#producer_names + 1] = name end
 		table.sort(producer_names)
-		helpers.assert_eq(#producer_names, 8,
-			"the explicit producer inventory must name all eight reviewed owners")
+		helpers.assert_eq(#producer_names, 9,
+			"the explicit producer inventory must name all nine reviewed owners")
 		helpers.assert_eq(count_literal(all, "SyntheticInput.begin(") + count_literal(all, "input.begin("), #producer_names,
 			"a new explicit producer needs a lifecycle assertion in this inventory")
 		for _, name in ipairs(producer_names) do
