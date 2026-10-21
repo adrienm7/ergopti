@@ -1,0 +1,13 @@
+{
+	"expected_count": 10,
+	"filters": [
+		{
+			"contains": "metrics-warm-terminal-budget",
+			"expected_count": 4
+		},
+		{
+			"contains": "personal-info-editor-source",
+			"expected_count": 6
+		}
+	]
+}
