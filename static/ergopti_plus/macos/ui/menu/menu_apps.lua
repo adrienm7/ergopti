@@ -22,6 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
@@ -97,7 +98,7 @@ local function apps_dir(ctx)
 	-- in both repo and deployed setups where the apps bundles are colocated.
 	local base = ctx and type(ctx.base_dir) == "string" and ctx.base_dir or nil
 	if base and base ~= "" then
-		base = base:gsub("[/\\]+$", "")
+		base = NativePath.without_trailing_separators(base)
 		local candidate = base .. "/apps"
 		local ok, attr = pcall(hs.fs.attributes, candidate)
 		if ok and type(attr) == "table" and attr.mode == "directory" then
@@ -107,7 +108,7 @@ local function apps_dir(ctx)
 
 	-- Fallback for legacy layouts where hs.configdir directly contains apps/.
 	if hs and hs.configdir and hs.configdir ~= "" then
-		return hs.configdir:gsub("[/\\]+$", "") .. "/apps"
+		return NativePath.without_trailing_separators(hs.configdir) .. "/apps"
 	end
 
 	return nil
