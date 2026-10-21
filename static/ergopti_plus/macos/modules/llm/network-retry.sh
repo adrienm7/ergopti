@@ -366,7 +366,7 @@ opaque_automatic_mode_from_scutil() {
 # supported; a system automatic route must be refused before any child starts.
 # These facts belong to this admission only, not to unstructured child stderr.
 apply_opaque_system_network() {
-	local relay snapshot mode settings line
+	local relay snapshot mode mode_name settings line
 	OPAQUE_NETWORK_FAILURE_PROVENANCE=""
 	OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=""
 	relay="$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE"
@@ -390,7 +390,13 @@ apply_opaque_system_network() {
 		if [ "$mode" != none ]; then
 			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
 			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
-			log_error "The system proxy configuration cannot be used by this client. No download was started."
+			# Name the setting: the log is all a maintainer gets from a user's Mac (#99)
+			case "$mode" in
+				pac) mode_name="an automatic proxy configuration file (PAC)" ;;
+				wpad) mode_name="automatic proxy discovery (WPAD)" ;;
+				*) mode_name="a SOCKS proxy without an HTTPS proxy" ;;
+			esac
+			log_error "The system proxy configuration ($mode_name) cannot be used by this client. No download was started."
 			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
 		fi
 		settings="$(printf '%s\n' "$snapshot" | system_network_from_scutil)" || return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
