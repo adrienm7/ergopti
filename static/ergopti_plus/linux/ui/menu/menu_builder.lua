@@ -2338,26 +2338,28 @@ local function _build_hotstrings(ctx)
 		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return true end })
 end
 
---- Builds the AI / LLM submenu.
 --- Captures the displayed value and publication authority from one exact read.
---- @param ctx table Native menu context.
+--- The caller passes its menu refresh, not the native menu context: the AI
+--- parent keeps that context closed to the owners it reviews.
+--- @param refresh function|nil Menu refresh run after an accepted save.
 --- @param owner table Original settings owner.
 --- @param module_name string Settings module identity.
 --- @param name string Setting key.
 --- @param path string Canonical preference path.
 --- @return any value, function|nil save
-local function numeric_setting_request(ctx, owner, module_name, name, path)
-	local Preferences = require("infra.llm_preferences")
+local function numeric_setting_request(refresh, owner, module_name, name, path)
+	-- Not named Preferences: that local belongs to _build_llm's toggle admission.
+	local Prefs = require("infra.llm_preferences")
 	local Paths = require("infra.config_paths")
-	local set, get_many, generation = owner.set, Preferences.get_many, Preferences.generation
-	local revision_current, publish, config = Preferences.is_current_revision, Preferences.set_many, Paths.config
+	local set, get_many, generation = owner.set, Prefs.get_many, Prefs.generation
+	local revision_current, publish, config = Prefs.is_current_revision, Prefs.set_many, Paths.config
 	if type(set) ~= "function" or type(get_many) ~= "function" or type(generation) ~= "function"
 		or type(revision_current) ~= "function" or type(publish) ~= "function" or type(config) ~= "function" then return nil end
 	local function ports_current()
 		return package.loaded[module_name] == owner and owner.set == set
-			and package.loaded["infra.llm_preferences"] == Preferences and Preferences.get_many == get_many
-			and Preferences.generation == generation and Preferences.is_current_revision == revision_current
-			and Preferences.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
+			and package.loaded["infra.llm_preferences"] == Prefs and Prefs.get_many == get_many
+			and Prefs.generation == generation and Prefs.is_current_revision == revision_current
+			and Prefs.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
 	end
 	local root_ok, root = pcall(config, "config.toml")
 	if not root_ok or type(root) ~= "string" or not ports_current() then return nil end
@@ -2384,11 +2386,12 @@ local function numeric_setting_request(ctx, owner, module_name, name, path)
 		if not checked or actual ~= revision or not current() then return refused() end
 		local saved, accepted = pcall(set, name, value, source, current)
 		if not saved or accepted ~= true then return refused() end
-		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		if type(refresh) == "function" then refresh() end
 		return true
 	end
 end
 
+--- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
 	local NativeParent = require("ui.menu.ai_parent")
 	local parent = NativeParent.begin(ManifestMenu, "llm", ctx)
@@ -2467,8 +2470,8 @@ local function _build_llm(ctx)
 					Logger.error(LOG, "The AI trigger group declares no caption; debounce prompt refused.")
 					return
 				end
-				local value, save = numeric_setting_request(ctx, TriggerSettings, "modules.llm.trigger_settings",
-					"debounce_ms", "llm.trigger.debounce_ms")
+				local value, save = numeric_setting_request(ctx.on_menu_changed, TriggerSettings,
+					"modules.llm.trigger_settings", "debounce_ms", "llm.trigger.debounce_ms")
 				if not save then return false end
 				Prompt.ask({
 					title = i18n_safe(title_key),
@@ -3070,8 +3073,8 @@ local function _build_llm(ctx)
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
 							return
 						end
-						local value, save = numeric_setting_request(ctx, Settings, "modules.llm.settings",
-							setting.name, "llm.generation." .. setting.name)
+						local value, save = numeric_setting_request(ctx.on_menu_changed, Settings,
+							"modules.llm.settings", setting.name, "llm.generation." .. setting.name)
 						if not save then return false end
 						Prompt.ask({
 							title = i18n_safe(setting.key),

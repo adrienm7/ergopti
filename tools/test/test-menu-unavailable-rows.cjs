@@ -873,6 +873,11 @@ console.log(
 		const linux = source.linux.match(
 			/local bounds = Settings\.bounds\(setting\.name\)([\s\S]*?)\}, ctx\.webview\)/
 		);
+		// The prompt reads and saves through one request owner, which binds the
+		// displayed value and the write to the opening configuration.
+		const linuxRequest = source.linux.match(
+			/\nlocal function numeric_setting_request\(refresh, owner, module_name, name, path\)([\s\S]*?)\nend\b/
+		);
 		const mac = source.mac.match(
 			/local function generic_numeric_prompt\(([\s\S]*?)local function reset_to_default\(/
 		);
@@ -881,18 +886,21 @@ console.log(
 		const context = ahkOwner(source.windows, 'LLM_Menu_PromptCtxChars');
 		return (
 			!!linux &&
+			!!linuxRequest &&
 			!!mac &&
 			windows !== '' &&
 			temperature !== '' &&
 			context !== '' &&
 			/Prompt\.ask\(/.test(linux[1]) &&
-			/value = Settings\.get\(setting\.name\)/.test(linux[1]) &&
-			/min = bounds\.min/.test(linux[1]) &&
-			/max = bounds\.max/.test(linux[1]) &&
-			/local saved = Settings\.set\(setting\.name, value\)/.test(linux[1]) &&
-			/if saved and type\(ctx\.on_menu_changed\) == "function" then ctx\.on_menu_changed\(\) end/.test(
+			/local value, save = numeric_setting_request\(ctx\.on_menu_changed, Settings,\s*"modules\.llm\.settings", setting\.name, "llm\.generation\." \.\. setting\.name\)/.test(
 				linux[1]
 			) &&
+			/value = value,/.test(linux[1]) &&
+			/min = bounds\.min/.test(linux[1]) &&
+			/max = bounds\.max/.test(linux[1]) &&
+			/on_save = save,/.test(linux[1]) &&
+			/local saved, accepted = pcall\(set, name, value, source, current\)/.test(linuxRequest[1]) &&
+			/if type\(refresh\) == "function" then refresh\(\) end/.test(linuxRequest[1]) &&
 			/pcall\(dialog\.text_prompt/.test(mac[1]) &&
 			/apply_setting_transaction\(\{/.test(mac[1]) &&
 			/key = key/.test(mac[1]) &&
@@ -923,8 +931,10 @@ console.log(
 	for (const driver of Object.keys(numeric))
 		assert.equal(numericCounterparts({ ...numeric, [driver]: '' }), false);
 	for (const [driver, before] of [
-		['linux', 'Settings.set(setting.name, value)'],
-		['linux', 'ctx.on_menu_changed()'],
+		['linux', 'pcall(set, name, value, source, current)'],
+		['linux', 'then refresh() end'],
+		['linux', 'numeric_setting_request(ctx.on_menu_changed, Settings,'],
+		['linux', 'on_save = save,'],
 		['mac', 'pcall(dialog.text_prompt'],
 		['mac', 'runtime_fn = hs_fn'],
 		['mac', 'publish_setting = true'],
