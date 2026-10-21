@@ -45,7 +45,7 @@ command); there is no Linux machine.
 
 ## Handoff: work in flight (October 21, 16:45 Paris)
 
-The maintainer's weekly quota is nearly exhausted. Every agent below works on `dev` in the main
+Everything the coordinating session knew (rules, procedures, relaunch prompts for the agents still in flight, open decisions) is in [todo-agents/COORDINATOR-MEMORY.md](todo-agents/COORDINATOR-MEMORY.md): read it first. The maintainer's weekly quota is nearly exhausted. Every agent below works on `dev` in the main
 repository (no worktree, no feature branch), commits small and atomic, pushes `dev` fast-forward
 only after `git fetch` and `git rebase origin/dev`, then cancels the automatic CI run of that SHA
 (`gh run list --commit <sha>`, `gh run cancel <id>`). Each agent keeps a handoff file in
