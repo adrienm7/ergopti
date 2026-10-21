@@ -1,5 +1,14 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
+; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
+; the interpreter): without it the exe carries only the runtime's defaults. The
+; version comes from BUNDLE_VERSION in infra/bundle.ahk.
+;@Ahk2Exe-SetProductName Ergopti+
+;@Ahk2Exe-SetCompanyName Ergopti
+;@Ahk2Exe-SetDescription Ergopti+ keyboard layout companion
+;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License)
+;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
+;@Ahk2Exe-SetInternalName ErgoptiPlus
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.

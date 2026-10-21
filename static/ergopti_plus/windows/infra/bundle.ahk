@@ -49,7 +49,14 @@
 ; the literal string "__BUNDLE_VERSION__" below is rewritten before Ahk2Exe
 ; runs so the compiled exe ships with a stable identifier. In dev mode the
 ; placeholder stays as-is and we treat it as ``dev`` to disable any skip.
+; The three Ahk2Exe directives after it copy the same value into the exe's
+; FileVersion and ProductVersion; an unstamped local build reads 0.0.0-dev. The
+; needle spells the placeholder as _{2}...: the stamp step rewrites every
+; literal copy of it in this file.
 global BUNDLE_VERSION := "__BUNDLE_VERSION__"
+;@Ahk2Exe-Let U_BundleVersion = %A_PriorLine~.*"(.*)".*~$1%
+;@Ahk2Exe-Let U_BundleVersion = %U_BundleVersion~_{2}BUNDLE_VERSION_{2}~0.0.0-dev%
+;@Ahk2Exe-SetVersion %U_BundleVersion%
 
 ; Commit the release was built from, stamped by the same CI step. The boot
 ; diagnostic snapshot reports it; a source checkout reads .git/HEAD instead.

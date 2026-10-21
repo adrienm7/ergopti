@@ -220,6 +220,25 @@ jobs:
           }
           Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item -LiteralPath $out).Length) bytes)"
 
+      # The identity fields are owned by the Ahk2Exe directives in ErgoptiPlus.ahk
+      # and the version by the BUNDLE_VERSION stamp; a compiler that drops them
+      # would ship the bare AutoHotkey defaults again.
+      - name: Verify the ErgoptiPlus.exe version resource
+        shell: pwsh
+        run: |
+          $out = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $version = "${{ inputs.version || '0.0.0-dev' }}"
+          $expected = node tools/ci/windows-exe-version-info.cjs --version $version | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "The expected version resource could not be derived." }
+          $actual = (Get-Item -LiteralPath $out).VersionInfo
+          foreach ($field in $expected.PSObject.Properties) {
+              $value = $actual.($field.Name)
+              if ($value -cne $field.Value) {
+                  throw "ErgoptiPlus.exe $($field.Name) is '$value', expected '$($field.Value)'."
+              }
+              Write-Host "$($field.Name): $value"
+          }
+
       - name: Sign and verify ErgoptiPlus.exe
         if: inputs.release
         shell: pwsh
