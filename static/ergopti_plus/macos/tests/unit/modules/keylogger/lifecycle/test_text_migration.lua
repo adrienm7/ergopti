@@ -84,19 +84,21 @@ local function delivered_stdin(cmd)
 end
 
 --- Points every route to the shell at a double answering the commands the cipher
---- issues. TWO routes have to be covered: the cipher goes through the shell
---- adapter, but adapters/crypto calls hs.execute directly, and the stub answers
---- "" to everything — which yields an empty digest, hence no IV, hence an
---- encryption that fails for a reason that has nothing to do with the migration.
+--- issues, and hs.hash at a deterministic digest double: adapters/crypto hashes
+--- the per-row IV seed natively, and the stub has no hs.hash — which yields an
+--- empty digest, hence no IV, hence an encryption that fails for a reason that
+--- has nothing to do with the migration.
 --- @param opts table|nil { fail_crypto = boolean }.
 --- @return table The recorded commands.
 local _real_exec = nil
 local _real_hs_execute = nil
+local _real_hs_hash = nil
 local function install_shell(opts)
 	opts = opts or {}
 	local Shell = require("adapters.shell_runner")
 	if _real_exec == nil then _real_exec = Shell.exec end
 	if _real_hs_execute == nil then _real_hs_execute = hs.execute end
+	if _real_hs_hash == nil then _real_hs_hash = hs.hash end
 
 	local seen = {}
 	local function answer(cmd)
@@ -109,13 +111,6 @@ local function install_shell(opts)
 		if head:find("pbkdf2", 1, true) then
 			return "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n"
 		end
-		-- The per-row IV. The digest must vary with the command, or two rows share
-		-- an IV exactly as they would with a broken derivation on a real machine.
-		if head:find("dgst", 1, true) then
-			local h = 0
-			for i = 1, #cmd do h = (h * 33 + cmd:byte(i)) % 0xFFFFFFF end
-			return "(stdin)= " .. (string.format("%07x", h):rep(10)):sub(1, 64)
-		end
 		if opts.fail_crypto then return "" end
 		local payload = delivered_stdin(cmd)
 		if payload == nil then return "" end
@@ -125,12 +120,26 @@ local function install_shell(opts)
 
 	Shell.exec = answer
 	hs.execute = function(cmd) return answer(cmd), true, "exit", 0 end
+	-- The per-row IV. The digest must vary with the seed, or two rows share an
+	-- IV exactly as they would with a broken derivation on a real machine.
+	hs.hash = { new = function()
+		local parts, context = {}, {}
+		function context:append(data) parts[#parts + 1] = data; return self end
+		function context:finish() return self end
+		function context:value()
+			local h, data = 0, table.concat(parts)
+			for i = 1, #data do h = (h * 33 + data:byte(i)) % 0xFFFFFFF end
+			return (string.format("%07x", h):rep(10)):sub(1, 64)
+		end
+		return context
+	end }
 	return seen
 end
 
 local function restore_shell()
 	if _real_exec ~= nil then require("adapters.shell_runner").exec = _real_exec end
 	if _real_hs_execute ~= nil then hs.execute = _real_hs_execute end
+	hs.hash = _real_hs_hash
 end
 
 --- Builds an in-memory stand-in for events_typing.
