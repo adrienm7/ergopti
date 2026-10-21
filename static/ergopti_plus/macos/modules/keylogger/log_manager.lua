@@ -43,6 +43,7 @@ local timer   = require("hs.timer")
 
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
+local Literal = require("sqlite.literal")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
 local LedgerAppend = require("adapters.ledger_append")
@@ -912,7 +913,7 @@ end
 
 --- Helper to safely SQL-escape a string.
 local function _sq(s)
-	return "'" .. tostring(s):gsub("'", "''") .. "'"
+	return "'" .. Literal.escape(tostring(s)) .. "'"
 end
 
 --- Require an exact SQLite success code inside a transaction.

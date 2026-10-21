@@ -37,6 +37,7 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
+local Literal = require("sqlite.literal")
 local LOG    = "keylogger.sqlite_reader"
 
 
@@ -62,7 +63,7 @@ local function _open(sqlite_path)
 end
 
 --- Quote a string for safe SQL embedding.
-local function _q(s) return "'" .. tostring(s):gsub("'", "''") .. "'" end
+local function _q(s) return "'" .. Literal.escape(tostring(s)) .. "'" end
 
 --- Runs a db:nrows() query loop under pcall so a schema mismatch or corrupt-db
 --- exception never propagates out of the reader into the metrics-dashboard
