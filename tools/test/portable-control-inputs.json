@@ -5,7 +5,7 @@
 	},
 	"validator": {
 		"path": "validate-ahk-suite-manifest.cjs",
-		"sha256": "ba8a3c26d6271e819fb3669e3e7ac95d30793d88c4a20e8173c636f7805da287"
+		"sha256": "9e93ef4fc7b3c27fc8816c9af7d3f1d0a19674f7b97a4390d339dc663546aa61"
 	},
 	"inputs": {
 		"path": "../ci/windows-key-combination-cohort-original-inputs.json",
