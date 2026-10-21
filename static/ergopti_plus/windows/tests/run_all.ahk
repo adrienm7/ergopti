@@ -674,6 +674,7 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/local_servers.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_streaming.ahk
+#Include unit/modules/llm/api/test_llm_api_ollama_curl_personal_config.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_local_presence.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_warmup.ahk
 #Include unit/modules/llm/prediction/test_llm_engine_read_guarded_in_timer.ahk
@@ -1968,6 +1969,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/platform/remap/key_combinations/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/modules/updater/test_changelog_fetch_async.ahk
 #Include meta/platform/network/test_curl_response_size_bound.ahk
+#Include meta/platform/network/test_curl_personal_config_disabled.ahk
 #Include meta/modules/updater/test_curl_staging_failure_cleanup.ahk
 #Include meta/modules/updater/test_changelog_webview_bridge.ahk
 #Include meta/modules/llm/menu/test_model_browser_webview_bridge.ahk
