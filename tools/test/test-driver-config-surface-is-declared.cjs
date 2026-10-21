@@ -633,7 +633,7 @@ function isSecondaryWrite(driver, relative, source, surface, offset, sourceRoot 
 // Redirecting that owner to config.toml must fail the gate too.
 const secondaryBootstrap = fs.readFileSync(path.join(DRIVERS_DIR, 'macos', 'init.lua'), 'utf8');
 const secondaryDestination =
-	/override_path = override_path \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
+	/override_path = require\("native_path"\)\.with_trailing_separator\(override_path\) \.\. "hotstrings_config\.toml"\s+local hotstring_config_ready = hotstrings_config\.init\(\{\s+override_path = override_path,/;
 assert.equal(
 	secondaryDestination.test(secondaryBootstrap),
 	true,
