@@ -81,3 +81,5 @@ for Outcome in ["delivered", "refused", "replaced", "inflight"]
 	Test("metrics cached ready: " . Outcome . " (metrics-cached-ready)", _MCR_CachedReady.Bind(Outcome))
 
 #Include test_metrics_apps_editor.ahk
+
+#Include test_metrics_apps_refresh_retry.ahk
