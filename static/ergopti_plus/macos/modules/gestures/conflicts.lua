@@ -374,7 +374,9 @@ function M.restore_all_overrides()
 	local probe = pending_probe
 	pending_probe = nil
 	if probe then
-		Logger.warn(LOG, "System gesture settings read cancelled during shutdown.")
+		-- A quit or a reload during the boot read: nothing is lost, the next
+		-- start reads the settings again, so no warning (#99 logged three)
+		Logger.info(LOG, "System gesture settings read cancelled during shutdown.")
 		for _, handle in ipairs(probe.handles) do
 			if not handle.isSettled() then handle.terminate() end
 		end
