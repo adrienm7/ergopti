@@ -18,6 +18,9 @@ _OPRP_Complete(State, Code, Output, ErrorText) {
 _OPRP_ChildSource() {
 	global _DriverDir
 	Source := '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
+	Diagnostic := _DriverDir . "\tests\fixtures\ollama_child_startup_diagnostics.ahk"
+	AssertTrue(FileExist(Diagnostic) != "", "the private startup observer must exist")
+	Source .= "#Include " . Diagnostic . "`n"
 	Seen := Map()
 	for Symbol in ["OllamaWV_FlushQueue", "Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent", "LLM_Menu_ApplySharedDefaults",
 		"LLM_Deps_Cancel", "LLM_Ollama_SetPort", "LLM_Option_TryNormalizeOllamaPort",
@@ -27,7 +30,9 @@ _OPRP_ChildSource() {
 			"the paused-readiness child requires the whole real owner: " . Symbol)
 		if !Seen.Has(Owner) {
 			Seen[Owner] := true
+			Source .= '_OCSD_Checkpoint("before-owner-' . Seen.Count . '")' . "`n"
 			Source .= "#Include " . Owner . "`n"
+			Source .= '_OCSD_Checkpoint("after-owner-' . Seen.Count . '")' . "`n"
 		}
 	}
 	Create := _DriverFuncBody("OllamaWV_Create")
@@ -39,7 +44,7 @@ _OPRP_ChildSource() {
 	Source .= "_OPR_SafetyCallback(captured_epoch) {`n`treturn " . Safety[1] . "`n}`n"
 	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_pause_readiness_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the private paused-readiness fixture must exist")
-	return Source . "#Include " . Fixture . "`n"
+	return Source . "_OCSD_Stop()`n#Include " . Fixture . "`n"
 }
 
 _OPRP_Case(Mode) {
@@ -51,17 +56,21 @@ _OPRP_Case(Mode) {
 	Script := Directory . "\subject.ahk"
 	Handle := 0, Primary := 0, Retired := false
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
+	Nonsettled := false, ParentSuspended := false, ParentCritical := 0
+	LaunchSuspended := false, LaunchCritical := 0, StartupTrace := "", TraceFailure := ""
 	PreviousCritical := Critical("Off")
 	try {
 		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _OPRP_ChildSource()) == 1)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _OPRP_Complete.Bind(State))
+		LaunchSuspended := A_IsSuspended, LaunchCritical := A_IsCritical
 		AssertTrue(Handle.start(), "the isolated real resume owners must start")
 		Started := A_TickCount
 		while State.Calls == 0 && TickElapsed(Started) < 15000 {
 			_SR_TreePoll()
 			Sleep(10)
 		}
+		Nonsettled := State.Calls == 0, ParentSuspended := A_IsSuspended, ParentCritical := A_IsCritical
 		for Line in StrSplit(State.Output, "`n", "`r")
 			if InStr(Line, "RECEIPT ") == 1
 				_TestPrint("# ollama-paused-readiness " . Line)
@@ -73,10 +82,22 @@ _OPRP_Case(Mode) {
 		Primary := Failure
 	} finally {
 		try {
-			Receipt := IsObject(Handle) ? Handle.terminate() : 1
+			; Preserve the original nonsettlement failure, but let the canonical
+			; owner deliver its combined native capture before cleanup deletes it.
+			Receipt := IsObject(Handle)
+				? (Nonsettled ? Handle.requestTerminate() : Handle.terminate()) : 1
 			Retired := (Receipt is Integer) && Receipt == 1
-			if Retired
+			if Retired {
+				try {
+					if FSStrictExists(Directory . "\startup.trace")
+						StartupTrace := FSReadUtf8Exact(Directory . "\startup.trace")
+				} catch as Failure {
+					TraceFailure := Type(Failure)
+					if !IsObject(Primary)
+						Primary := Failure
+				}
 				DirDelete(Directory, true)
+			}
 		} catch as Failure {
 			if !IsObject(Primary)
 				Primary := Failure
@@ -86,8 +107,21 @@ _OPRP_Case(Mode) {
 			Critical(PreviousCritical)
 		}
 	}
-	if IsObject(Primary)
-		throw Primary
+	if IsObject(Primary) {
+		try {
+			_TestPrint("# ollama-child-startup-diagnostic nonsettled_at_deadline=" . Nonsettled
+				. " retired_ack=" . Retired . " parent_launch_suspended=" . LaunchSuspended
+				. " parent_launch_critical=" . LaunchCritical . " parent_deadline_suspended=" . ParentSuspended
+				. " parent_deadline_critical=" . ParentCritical . " postcleanup_calls=" . State.Calls
+				. " postcleanup_code=" . State.Code . " native_capture_delivered=" . (State.Calls > 0)
+				. " trace_read_error=" . TraceFailure . " trace=" . JsonStringLiteral(SubStr(StartupTrace, 1, 8192))
+				. " port_combined_output=" . JsonStringLiteral(State.Calls > 0 ? SubStr(State.Output, 1, 8192)
+					: "UNKNOWN: no terminal callback was delivered"))
+		} finally {
+			; A diagnostic printing failure cannot replace the original outcome.
+			throw Primary
+		}
+	}
 	AssertTrue(Retired, "private source retirement requires an exact child acknowledgment")
 }
 

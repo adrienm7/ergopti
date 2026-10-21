@@ -218,6 +218,7 @@ _OPR_Run(World, Mode) {
 _OPR_Main() {
 	global _SharedDir, _I18nLocale, _LLM_Menu, _OPR_World
 	global _OllamaWV_Gui, _OllamaWV_WebView, _OllamaWV_Controller, _OllamaWV_Epoch
+	_OCSD_Note("main-entry")
 	Mode := A_Args[1]
 	World := {View: _OPR_View(), Args: _OPR_Args(), Controller: _OPR_Controller(),
 		Checks: 0, ReadyChecks: 0, ReadyCalls: 0, SafetyCalls: 0, Resumes: 0, Flow: 0, AsyncFailure: 0}
@@ -227,20 +228,29 @@ _OPR_Main() {
 		_SharedDir := A_Args[2] . "\shared", _I18nLocale := "fixture"
 		DirCreate(_SharedDir . "\data\locales")
 		FileAppend('{"fixture":"retained"}', _SharedDir . "\data\locales\fixture.json", "UTF-8-RAW")
+		_OCSD_Note("before-gui")
 		World.Gui := Gui("+ToolWindow", "Private Ollama readiness component")
 		World.Gui.Show("NA w80 h40 x-32000 y-32000")
 		World.GuiHwnd := World.Gui.Hwnd
+		_OCSD_Note("after-gui")
 		_OllamaWV_Gui := World.Gui, _OllamaWV_WebView := World.View, _OllamaWV_Controller := World.Controller
 		_OllamaWV_Epoch += 1, World.Epoch := _OllamaWV_Epoch
 		World.Safety := _OPR_SafetyCallback(World.Epoch)
+		_OCSD_Note("before-endpoint")
 		_OPR_Require(LLM_Ollama_SetPort(11434), "the actual endpoint must be initialized through its real validator")
+		_OCSD_Note("after-endpoint")
 		_LLM_Menu["enabled"] := true
 		Ports := Map("deps_ready", _OPR_DependencyReady.Bind(World), "deps_check", _OPR_DependencyCheck.Bind(World))
+		_OCSD_Note("before-bootstrap")
 		_OPR_Require(LLM_Menu_BootstrapOllama(true, Ports), "the actual menu bootstrap must admit its public dependency boundary")
+		_OCSD_Note("after-bootstrap")
+		_OCSD_Note("before-run")
 		_OPR_Run(World, Mode)
+		_OCSD_Note("after-run")
 	} catch as Failure {
 		Primary := Failure
 	} finally {
+		_OCSD_Note("before-cleanup")
 		try {
 			Suspend(false)
 			if IsObject(World.Flow)
@@ -262,6 +272,7 @@ _OPR_Main() {
 			World.Flow.Timer := 0, World.Flow.Port := 0, World.Flow.OnReady := 0, World.Flow.OnFailed := 0
 		OnError(_OPR_AsyncError, 0)
 		_OPR_World := 0
+		_OCSD_Note("after-cleanup")
 	}
 	if IsObject(Primary)
 		throw Primary
@@ -275,8 +286,12 @@ global _OPR_World := 0
 OnError(_OPR_AsyncError)
 try {
 	_OPR_Main()
+	_OCSD_Note("before-exit-success")
+	_OCSD_Finish()
 	ExitApp(0)
 } catch as Failure {
+	_OCSD_Note("before-exit-failure")
+	try _OCSD_Finish()
 	FileAppend("FAIL ollama-paused-readiness: " . Failure.Message . "`n" . Failure.Stack . "`n", "*", "UTF-8")
 	ExitApp(1)
 }
