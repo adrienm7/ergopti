@@ -108,30 +108,38 @@ local function matrix_harness_name(src, job_at, step_at, name, roles)
 	once(src:sub(step_at, step_end - 1),
 		"        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' }}\n",
 		"the harness must run only in its admitted matrix role")
-	once(roles, "function cell(role, runner, architecture, timeout, scenario = '') {\n"
-		.. "\treturn { role, runner, architecture, timeout_minutes: timeout, scenario };\n}",
+	-- A cell names its host; the HOSTS table alone owns that host's runner.
+	once(roles, "function cell(role, architecture, timeout, scenario = '') {\n"
+		.. "\tassert.ok(Object.hasOwn(HOSTS, architecture), 'Unknown cell host');\n"
+		.. "\treturn {\n\t\trole,\n\t\trunner: HOSTS[architecture].runner,\n\t\tarchitecture,\n"
+		.. "\t\ttimeout_minutes: timeout,\n\t\tscenario\n\t};\n}",
 		"matrix role fields must retain their canonical argument mapping")
 	local rows = roles:match("\n\tif %(stage === 'e2e'%) {\n\t\tconst rows = %[(.-)\n\t\t%];")
 	helpers.assert_true(rows ~= nil, "the E2E plan must declare its mandatory literal rows")
 	local architecture, count = nil, 0
 	for line in rows:gmatch("[^\n]+") do
-		-- The fifth argument (a scenario, e.g. the Intel XCTest cohort) is optional.
-		local role, runner, label, timeout = line:match(
-			"^%s*cell%('([^']+)', '([^']+)', '([^']+)', (%d+)%),?%s*$")
+		-- The fourth argument (a scenario, e.g. the Intel XCTest cohort) is optional.
+		local role, label, timeout = line:match(
+			"^%s*cell%('([^']+)', '([^']+)', (%d+)%),?%s*$")
 		if role == nil then
-			role, runner, label, timeout = line:match(
-				"^%s*cell%('([^']+)', '([^']+)', '([^']+)', (%d+), '[%w_%-]+'%),?%s*$")
+			role, label, timeout = line:match(
+				"^%s*cell%('([^']+)', '([^']+)', (%d+), '[%w_%-]+'%),?%s*$")
 		end
 		helpers.assert_true(role ~= nil, "the mandatory matrix row must be a literal canonical cell")
 		if role == "e2e-hs" then
 			count = count + 1
-			helpers.assert_eq(runner, "ubuntu-latest", "the replay retains its non-Hammerspoon runner")
 			helpers.assert_eq(timeout, "360", "the replay retains its original bound")
 			architecture = label
 		end
 	end
 	helpers.assert_eq(count, 1, "exactly one mandatory replay role must provide the displayed label")
 	helpers.assert_eq(architecture, "stubbed", "the displayed stub lot must retain its stubbed runtime")
+	local hosts = roles:match("\nconst HOSTS = Object%.freeze%({\n(.-)\n}%);")
+	helpers.assert_true(hosts ~= nil, "the role plan must declare its one host table")
+	local _, stubbed_hosts = hosts:gsub("\n?\tstubbed: ", "")
+	helpers.assert_eq(stubbed_hosts, 1, "the stubbed host must be declared exactly once")
+	helpers.assert_eq(hosts:match("\tstubbed: Object%.freeze%({ runner: '([^']+)', macos: null }%)"),
+		"ubuntu-latest", "the replay retains its non-Hammerspoon runner")
 	once(roles, "function humanLot(stage, selected) {\n"
 		.. "\tfields(selected, ['role', 'runner', 'architecture', 'timeout_minutes', 'scenario']);\n"
 		.. "\treturn roleLot(stage, selected.role, selected.architecture, selected.scenario);\n}",
@@ -327,12 +335,22 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 		local original = locate_harness(workflow, roles)
 		helpers.assert_true(flags_stub(original.job_name))
 		local changed = replace_once(roles,
-			"cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360)",
-			"cell('e2e-hs', 'ubuntu-latest', 'arm64', 360)")
+			"cell('e2e-hs', 'stubbed', 360)",
+			"cell('e2e-hs', 'arm64', 360)")
 		local accepted, reason = pcall(locate_harness, workflow, changed)
 		helpers.assert_eq(accepted, false)
 		helpers.assert_true(type(reason) == "string"
 			and reason:find("the displayed stub lot must retain its stubbed runtime", 1, true) ~= nil)
+	end)
+	helpers.it("a stubbed host moved onto a macOS runner cannot keep the stub label", function()
+		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
+		local changed = replace_once(roles,
+			"stubbed: Object.freeze({ runner: 'ubuntu-latest', macos: null }),",
+			"stubbed: Object.freeze({ runner: 'macos-15', macos: null }),")
+		local accepted, reason = pcall(locate_harness, workflow, changed)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(type(reason) == "string"
+			and reason:find("the replay retains its non-Hammerspoon runner", 1, true) ~= nil)
 	end)
 	helpers.it("foreign matrix, output, command and role bindings cannot borrow the stub label", function()
 		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
@@ -359,8 +377,8 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 				"source custody must fail for the intended binding")
 		end
 		local duplicate = replace_once(roles,
-			"cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360)",
-			"cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360),\n\t\t\tcell('e2e-hs', 'ubuntu-latest', 'stubbed', 360)")
+			"cell('e2e-hs', 'stubbed', 360)",
+			"cell('e2e-hs', 'stubbed', 360),\n\t\t\tcell('e2e-hs', 'stubbed', 360)")
 		local accepted, reason = pcall(locate_harness, workflow, duplicate)
 		helpers.assert_eq(accepted, false)
 		helpers.assert_true(type(reason) == "string"
