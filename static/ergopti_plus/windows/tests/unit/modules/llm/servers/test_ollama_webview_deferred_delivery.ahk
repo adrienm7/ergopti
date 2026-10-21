@@ -23,10 +23,11 @@ _ODLP_ChildSource() {
 	Source .= "#Include " . Diagnostic . "`n"
 	Seen := Map()
 	for Symbol in ["OllamaWV_FlushQueue", "Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent",
-		"LLM_Menu_ApplySharedDefaults",
+		"ManifestFindEntryByPath", "LLM_DisplayIndentValues", "LLM_Menu_ApplySharedDefaults",
 		"LLM_Deps_Cancel", "LLM_Ollama_SetPort", "LLM_Option_TryNormalizeOllamaPort",
 		"WebView_SameCore", "LoggerInfo", "WallClockTimestamp", "TickElapsed", "JsonStringLiteral"] {
-		Owner := _DriverProductionFileForSymbol(Symbol)
+		OwnerRoot := Symbol == "LLM_DisplayIndentValues" ? _DriverDir . "\..\_shared" : _DriverDir
+		Owner := _DriverProductionFileForSymbol(Symbol, OwnerRoot)
 		AssertTrue(Owner != "" && FileExist(Owner) != "",
 			"the deferred-delivery child requires the whole real owner: " . Symbol)
 		if !Seen.Has(Owner) {
