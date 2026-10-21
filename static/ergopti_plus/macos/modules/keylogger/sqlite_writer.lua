@@ -314,9 +314,23 @@ local function _initialize_db(db, existed)
 	end
 
 	local next_event_id = 1
-	-- Restore persisted counter.
+	-- Restore persisted counter. Only a positive decimal integer is a cursor: a
+	-- silent restart at 1 would make INSERT OR IGNORE drop every colliding new
+	-- event, and a float would raise later in the insert builders.
+	local cursor_refused = false
 	for r in db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
-		next_event_id = tonumber(r.value) or 1
+		local text = math.type(r.value) == "integer" and tostring(r.value) or r.value
+		local value = type(text) == "string" and text:match("^[1-9]%d*$")
+			and math.tointeger(tonumber(text)) or nil
+		if value and tostring(value) == text then
+			next_event_id = value
+		else
+			cursor_refused = true
+		end
+	end
+	if cursor_refused then
+		Logger.error(LOG, "Persisted next_event_id is not a positive integer; SQLite ingest refused.")
+		return false
 	end
 
 	-- Upsert the local device row so name / os_version stay fresh.
