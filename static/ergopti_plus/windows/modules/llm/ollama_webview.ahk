@@ -473,21 +473,35 @@ OllamaWV_FlushQueue(captured_epoch := unset) {
  */
 OllamaWV_OnWebMessage(sender, args) {
 	global _OllamaWV_OnCancel, _OllamaWV_OnRetry, _OllamaWV_WebView, _OllamaWV_Epoch
-	if A_IsSuspended or !IsSet(_OllamaWV_WebView) or !(sender == _OllamaWV_WebView)
+	if A_IsSuspended or !IsSet(_OllamaWV_WebView)
+		return
+	captured_epoch := _OllamaWV_Epoch
+	captured_view := _OllamaWV_WebView
+	if !(sender == captured_view)
 		return
 	msg := ""
 	try msg := args.TryGetWebMessageAsString()
+	; COM payload reads and logger I/O can both resume after this page closes.
+	; A retired callback cannot borrow the replacement window's globals.
+	if A_IsSuspended or captured_epoch != _OllamaWV_Epoch
+			or !IsSet(_OllamaWV_WebView) or !(captured_view == _OllamaWV_WebView)
+		return
 	LoggerInfo("LLM", "WebView message: '" msg "'.")
+	if A_IsSuspended or captured_epoch != _OllamaWV_Epoch
+			or !IsSet(_OllamaWV_WebView) or !(captured_view == _OllamaWV_WebView)
+		return
 	switch msg {
 	case "ready":
-			OllamaWV_FlushQueue(_OllamaWV_Epoch)
+			OllamaWV_FlushQueue(captured_epoch)
 		case "cancel":
+			OnCancel := IsSet(_OllamaWV_OnCancel) ? _OllamaWV_OnCancel : unset
 			OllamaWV_Close()
-			if IsSet(_OllamaWV_OnCancel)
-				_OllamaWV_OnCancel()
+			if IsSet(OnCancel)
+				OnCancel()
 		case "retry":
-			if IsSet(_OllamaWV_OnRetry)
-				_OllamaWV_OnRetry()
+			OnRetry := IsSet(_OllamaWV_OnRetry) ? _OllamaWV_OnRetry : unset
+			if IsSet(OnRetry)
+				OnRetry()
 		case "terminal":
 			Run("cmd.exe")
 	}
