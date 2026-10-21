@@ -1,0 +1,33 @@
+{
+	"expected_count": 31,
+	"filters": [
+		{
+			"contains": "KLAppCatConst.DEFAULTS:",
+			"expected_count": 9
+		},
+		{
+			"contains": "KeyloggerAppCategories:",
+			"expected_count": 1
+		},
+		{
+			"contains": "KL_AppCat_Get:",
+			"expected_count": 8
+		},
+		{
+			"contains": "keylogger_app_categories:",
+			"expected_count": 9
+		},
+		{
+			"contains": "KL_SortArray: sorts ordinary alphabetic app-name strings without throwing",
+			"expected_count": 1
+		},
+		{
+			"contains": "app-category-set-durability",
+			"expected_count": 2
+		},
+		{
+			"contains": "app-category-set-owner",
+			"expected_count": 1
+		}
+	]
+}
