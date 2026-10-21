@@ -263,6 +263,7 @@ return {
 	"tests.unit.infra.lifecycle.test_xkb_rmlvo",
 	"tests.unit.infra.logger.test_logger_contract",
 	"tests.unit.infra.text.test_text_case",
+	"tests.unit.infra.text.test_native_path",
 	"tests.unit.modules.keylogger.aggregation.test_aggregator_helpers",
 	"tests.unit.modules.llm.ollama.test_api_ollama_payload",
 	"tests.unit.modules.llm.ollama.test_api_ollama_stream_parse",

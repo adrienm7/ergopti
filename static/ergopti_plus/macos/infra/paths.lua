@@ -23,23 +23,12 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local LOG    = "paths"
 
---- Returns the host's separator class. Backslash is a filename byte on macOS
---- and separates components only when the host itself is Windows (the headless
---- suite). Read per call so a test can model either host.
---- @return string Lua pattern class body.
-local function separators()
-	return package.config:sub(1, 1) == "\\" and "/\\" or "/"
-end
-
---- Returns the parent directory of a path, or nil when it has none.
---- @param path string Path without a trailing separator.
---- @return string|nil
-local function parent_of(path)
-	local sep = separators()
-	return path:match("^(.*)[" .. sep .. "][^" .. sep .. "]+$")
-end
+-- Backslash is a filename byte on macOS and separates components only when the
+-- host itself is Windows (the headless suite): the shared owner applies that rule.
+local parent_of = NativePath.dirname
 
 -- Absolute path of this file's own directory — used as the script-relative
 -- fallback base when hs.configdir does not reach the repository root. The
@@ -75,7 +64,7 @@ end)()
 --- @return string|nil Absolute path to the match, or nil.
 function M.find_upward(base_dir, relative_target, max_steps, required_mode)
 	max_steps = max_steps or 8
-	local current = (base_dir or ""):gsub("[" .. separators() .. "]+$", "")
+	local current = NativePath.without_trailing_separators(base_dir or "")
 	for _ = 1, max_steps do
 		local candidate = current .. "/" .. relative_target
 		local ok, attr = pcall(hs.fs.attributes, candidate)
