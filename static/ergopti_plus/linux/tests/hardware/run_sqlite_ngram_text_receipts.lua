@@ -126,6 +126,17 @@ check("today's per-application split keeps the complete application id", functio
 	assert(split.today.owned == nil, "a NUL-cut id is another application")
 end)
 
+check("open-session record round-trips through the actual meta table", function()
+	local encoded = '[{"date":"2000-01-01","app":"owned\\u0000app","session":[3,250],"burst":null}]'
+	assert(Writer.upsert_open_walk("owned-open-walk", encoded) == true, "native record write refused")
+	local read, ok = Writer.read_open_walk("owned-open-walk")
+	assert(ok == true and read == encoded, "native record changed: " .. tostring(read))
+	assert(Writer.upsert_open_walk("owned-open-walk", "[]") == true)
+	assert(select(1, Writer.read_open_walk("owned-open-walk")) == "[]", "a replaced record must not keep the old value")
+	local absent, absent_ok = Writer.read_open_walk("owned-no-record")
+	assert(absent == nil and absent_ok == true, "a missing record is a proven absence")
+end)
+
 check("native empty range keeps every n-gram family empty", function()
 	local empty = Reader.read_ngrams(database, today, today, { "owned-absent-app" })
 	for _, item in ipairs(tables) do assert(next(empty[item[1]]) == nil) end
@@ -144,6 +155,6 @@ local function remove_owned_tree(path)
 	end
 end
 remove_owned_tree(root)
-assert(checks == 31, "all nine n-gram families and public controls must execute")
+assert(checks == 32, "all nine n-gram families and public controls must execute")
 print(string.format("Native SQLite n-gram text receipts: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

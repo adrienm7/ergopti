@@ -882,6 +882,13 @@ function M.sqlite_writer(opts)
 	function fake.query_rows() return {} end
 	function fake.get_meta(key) return fake.meta[key] end
 	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
+	function fake.upsert_open_walk(device_id, encoded)
+		fake.meta["open_walk:" .. device_id] = encoded ; return true
+	end
+	function fake.read_open_walk(device_id)
+		if not available then return nil, false end
+		return fake.meta["open_walk:" .. device_id], true
+	end
 
 	require("tests.support.sqlite_flush_fake").attach(fake)
 	return fake
