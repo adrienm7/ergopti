@@ -100,6 +100,12 @@ function M.register(helpers, driver)
 					package.loaded[name] = nil
 				end
 				construct()
+				-- A LuaJIT trace recorded while Authority.current called this
+				-- still-monomorphic getter keeps the closure as an IR constant,
+				-- and trace constants are GC roots outside the ledger under test.
+				-- Hot counters are shared across the whole module group, so that
+				-- recording happens in some lanes only; drop every trace first.
+				if jit then jit.flush() end
 				collectgarbage("collect"); collectgarbage("collect")
 				helpers.assert_nil(weak[1], "the weak ledger cannot retain an accessor-owner cycle")
 				construct()
