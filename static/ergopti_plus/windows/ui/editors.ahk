@@ -776,16 +776,25 @@ _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 }
 
 PersonalInformationEditor(*) {
+		global PersonalInformation, PersonalInformationLetters
 		; Prefer the shared WebView2 editor (identical UI to macOS); the native
 		; multi-field dialog below remains as an automatic fallback.
 		if _PiEdWeb_TryOpen()
 				return
+		Path := PersonalInfoTomlPath()
+		ConfiguredKey := _ConfigWriteLeaseKey(Path)
+		ReadPersonalInfoToml(Path)
+		EditorSource := _PersonalInfoCaptureEditorSource(Path, true, ConfiguredKey)
+		if !_PersonalInfoEditorPathCurrent(EditorSource)
+			return
 		GuiToShow := Gui_Create(, t("dialog.personal_info.title"))
+		GuiToShow.OnEvent("Close", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
+		GuiToShow.OnEvent("Escape", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
 		UpdatedPersonalInformation := Map()
 		ReverseLetters := Map()
-		for k, v in PersonalInformationLetters
+		for k, v in EditorSource["letters"]
 				ReverseLetters[v] := k
-		for PersonalInformationKey, OldValue in PersonalInformation {
+		for PersonalInformationKey, OldValue in EditorSource["information"] {
 				TextToAdd := ""
 				if ReverseLetters.Has(PersonalInformationKey)
 						TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation["MagicKey"] . ")"
@@ -795,12 +804,18 @@ PersonalInformationEditor(*) {
 				NewValue := GuiToShow.Add("Edit", "w300", OldValue)
 				UpdatedPersonalInformation[PersonalInformationKey] := NewValue
 		}
-		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation))
+		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click",
+			(*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation, 0, 0, 0, 0, 0, 0, 0, EditorSource))
 		GuiToShow.Show("Center")
 }
 
+_PersonalInfoCloseEditor(Window, EditorSource, *) {
+	EditorSource["active"] := false
+	Window.Destroy()
+}
+
 ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
-		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0) {
+		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0, EditorSource := unset) {
 	global PersonalInformation, ScriptInformation
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -808,7 +823,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		; may be Critical, but this complete user action must remain interruptible.
 		Critical("Off")
 		try return ProcessUserInput(gui, edits, WriterFn, ReplaceFn, DeleteFn,
-			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn)
+			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn, EditorSource?)
 		finally Critical(InheritedCritical)
 	}
 	if !(edits is Map) {
@@ -836,8 +851,16 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 			Changed[Key] := true
 	}
 
-	if !PersonalInfoCommitValues(ScriptInformation["PersonalInfoTomlPath"],
-			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn) {
+	Path := ScriptInformation["PersonalInfoTomlPath"]
+	if !IsSet(EditorSource) {
+		AdapterSource := _PersonalInfoEditorAdapterSource(Path)
+		if AdapterSource is Map
+			EditorSource := AdapterSource
+	}
+	if IsSet(EditorSource) && EditorSource is Map && EditorSource.Get("path", 0) is String
+		Path := EditorSource["path"]
+	if !PersonalInfoCommitValues(Path,
+			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, EditorSource?) {
 		try LoggerError("PersonalInfo",
 			"Personal information NOT saved — keeping the native editor open so the values are not lost.")
 		return _PersonalInfoReportSaveFailure(NotifyFn)
