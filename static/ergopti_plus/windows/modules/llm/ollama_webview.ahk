@@ -53,6 +53,7 @@ global _OllamaWV_MsgSub     := unset
 global _OllamaWV_Ready      := false   ; true once JS signals "ready"
 global _OllamaWV_Queue      := []      ; JS calls buffered before page ready
 global _OllamaWV_PendingFlush := 0    ; authorized unready flush deferred by pause
+global _OllamaWV_Delivery := 0        ; exact session owner of unsent scripts
 global _OllamaWV_OnCancel   := unset
 global _OllamaWV_OnRetry    := unset
 ; Every deferred WebView callback is bound to the window instance that armed it.
@@ -174,7 +175,7 @@ OllamaWV_CloseIfEpoch(captured_epoch, *) {
  * Hides and destroys the window.
  */
 OllamaWV_Close() {
-	global _OllamaWV_PendingFlush
+	global _OllamaWV_PendingFlush, _OllamaWV_Delivery
 	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir, _OllamaWV_MsgSub, _OllamaWV_Epoch
 	Retired := Map()
 	PreviousCritical := Critical("On")
@@ -183,6 +184,7 @@ OllamaWV_Close() {
 		; unsubscribe and native cleanup may publish a successor when they yield.
 		Retired["queue"] := _OllamaWV_Queue
 		Retired["pending_flush"] := _OllamaWV_PendingFlush
+		Retired["delivery"] := _OllamaWV_Delivery
 		if IsSet(_OllamaWV_Gui)
 			Retired["gui"] := _OllamaWV_Gui
 		if IsSet(_OllamaWV_Controller)
@@ -197,12 +199,14 @@ OllamaWV_Close() {
 		_OllamaWV_Ready := false
 		_OllamaWV_Queue := []
 		_OllamaWV_PendingFlush := 0
+		_OllamaWV_Delivery := 0
 		_OllamaWV_MsgSub := unset
 		_OllamaWV_Gui := unset
 		_OllamaWV_Controller := unset
 		_OllamaWV_WebView := unset
 		_OllamaWV_Udir := unset
 	} finally Critical(PreviousCritical)
+	_OllamaWV_RetireDelivery(Retired["delivery"])
 	; The subscription must unsubscribe while its captured controller is alive.
 	; Its finalizer runs outside the RAM transaction, before native Close.
 	if Retired.Has("subscription") {
@@ -250,18 +254,21 @@ OllamaWV_Create(kind, subtitle) {
 	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_MsgSub
 	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_W, _OllamaWV_H, _OllamaWV_Margin, _OllamaWV_Epoch
 
-	global _OllamaWV_PendingFlush
+	global _OllamaWV_PendingFlush, _OllamaWV_Delivery
 	PreviousCritical := Critical("On")
 	try {
 		; Keep detached owners alive until native cleanup is interruptible.
 		RetiredPending := _OllamaWV_PendingFlush
 		RetiredQueue := _OllamaWV_Queue
+		RetiredDelivery := _OllamaWV_Delivery
 		_OllamaWV_Epoch += 1
 		captured_epoch := _OllamaWV_Epoch
 		_OllamaWV_Ready := false
 		_OllamaWV_Queue := []
 		_OllamaWV_PendingFlush := 0
+		_OllamaWV_Delivery := 0
 	} finally Critical(PreviousCritical)
+	_OllamaWV_RetireDelivery(RetiredDelivery)
 
 	if !OllamaWV_WebView2Available() {
 		LoggerError("LLM", "WebView2 not available — cannot show install window.")
@@ -437,37 +444,117 @@ OllamaWV_I18nApplyScript(locale_code) {
  * @param {string} js - JavaScript expression to evaluate.
  */
 OllamaWV_EvalJS(js) {
-	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Epoch
-	if !IsSet(_OllamaWV_WebView) {
-		_OllamaWV_Queue.Push(js)
+	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Delivery
+	PreviousCritical := Critical("On")
+	try {
+		if !IsSet(_OllamaWV_WebView) || !_OllamaWV_Ready {
+			_OllamaWV_Queue.Push(js)
+			return
+		}
+		Owner := _OllamaWV_Delivery
+		if !_OllamaWV_DeliveryCurrent(Owner)
+			throw Error("A ready Ollama page requires its exact script delivery owner.")
+		Owner["pending"].Push(js)
+	} finally Critical(PreviousCritical)
+	; All ready producers share the admitted FIFO. A pause retains unsent work;
+	; no script runs on WebMessageReceived's COM stack.
+	_OllamaWV_ScheduleDelivery(Owner)
+}
+
+_OllamaWV_DeliveryCurrent(Owner) {
+	global _OllamaWV_Delivery, _OllamaWV_Epoch, _OllamaWV_WebView, _OllamaWV_Ready
+	return Owner is Map && Owner == _OllamaWV_Delivery && !Owner["retired"]
+		&& Owner["epoch"] == _OllamaWV_Epoch && _OllamaWV_Ready
+		&& IsSet(_OllamaWV_WebView) && Owner["view"] == _OllamaWV_WebView
+}
+
+_OllamaWV_DeliveryHasWork(Owner) {
+	return Owner["head"] == 0 || Owner["head"] <= Owner["pending"].Length
+}
+
+_OllamaWV_RetireDelivery(Owner) {
+	if !(Owner is Map)
 		return
+	; A running drainer retains its own view/item. Never mutate its prefix or
+	; pending array while it is returning from a native observer or logger.
+	Owner["retired"] := true
+	SetTimer(Owner["timer"], 0)
+	Owner["scheduled"] := false
+}
+
+_OllamaWV_ScheduleDelivery(Owner) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_OllamaWV_DeliveryCurrent(Owner) || A_IsSuspended
+				|| Owner["scheduled"] || Owner["running"] || !_OllamaWV_DeliveryHasWork(Owner)
+			return
+		Owner["scheduled"] := true
+		Timer := Owner["timer"]
+	} finally Critical(PreviousCritical)
+	try SetTimer(Timer, -1)
+	catch as Failure {
+		; The unsent slot stays in the FIFO; scheduling failure is never delivery.
+		Owner["scheduled"] := false
+		throw Failure
 	}
-	if !_OllamaWV_Ready {
-		_OllamaWV_Queue.Push(js)
-		return
+	; Close may have run after the scheduling claim but before SetTimer.
+	if !_OllamaWV_DeliveryCurrent(Owner) {
+		SetTimer(Timer, 0)
+		Owner["scheduled"] := false
 	}
-	; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript is
-	; ExecuteScriptAsync().await(), which spins a NESTED message loop; calling
-	; it synchronously from inside the WebMessageReceived COM callback (as the
-	; "ready" handler does) re-enters the STA apartment and wedges further
-	; WebView2 message delivery.
-	SetTimer(OllamaWV_RunScript.Bind(_OllamaWV_Epoch, js), -1)
 }
 
 /**
- * Executes a queued script on a fresh call stack (scheduled by OllamaWV_EvalJS
- * via a -1 timer). Fire-and-forget ExecuteScriptAsync (no .await()) -- we do
- * not need the return value, and awaiting it here would reintroduce the same
- * nested-message-loop wedge OllamaWV_EvalJS's deferral avoids.
- * @param {string} js - JavaScript expression to evaluate.
+ * Admits at most one unsent FIFO item on a fresh timer stack. Promise errors
+ * and observer refusals after ExecuteScriptAsync never replay that item.
+ * @param {Integer} captured_epoch Exact session which armed this timer.
  */
-OllamaWV_RunScript(captured_epoch, js) {
-	global _OllamaWV_WebView, _OllamaWV_Epoch
-	if (captured_epoch != _OllamaWV_Epoch or A_IsSuspended)
-		return
-	if !IsSet(_OllamaWV_WebView)
-		return
-	WebView_RunScriptAsync(_OllamaWV_WebView, js, "LLM.ollama")
+OllamaWV_RunScript(captured_epoch) {
+	global _OllamaWV_Delivery, _OllamaWV_Epoch
+	PreviousCritical := Critical("On")
+	try {
+		if captured_epoch != _OllamaWV_Epoch
+			return
+		Owner := _OllamaWV_Delivery
+		if !_OllamaWV_DeliveryCurrent(Owner)
+			return
+		Owner["scheduled"] := false
+		if Owner["running"] || A_IsSuspended || !_OllamaWV_DeliveryHasWork(Owner)
+			return
+		Owner["running"] := true
+		Head := Owner["head"]
+		Js := Head == 0 ? Owner["prefix"] : Owner["pending"][Head]
+		View := Owner["view"]
+	} finally Critical(PreviousCritical)
+	Admitted := false
+	RetiredQueue := 0
+	try {
+		; Restore the scheduler before this final RAM-only fence. Admission is
+		; irreversible: implicit interruption after it cannot retract a COM call.
+		if !_OllamaWV_DeliveryCurrent(Owner) || A_IsSuspended
+			return
+		Owner["head"] := Head + 1
+		Admitted := true
+		WebView_RunScriptAsync(View, Js, "LLM.ollama")
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if Admitted && _OllamaWV_DeliveryCurrent(Owner) {
+				; Js retains the consumed string through Critical exit. An observer
+				; may have appended, so release only this slot before testing empty.
+				if Head == 0
+					Owner["prefix"] := ""
+				else Owner["pending"][Head] := ""
+				if !_OllamaWV_DeliveryHasWork(Owner) {
+					RetiredQueue := Owner["pending"]
+					Owner["pending"] := []
+					Owner["head"] := 1
+				}
+			}
+			Owner["running"] := false
+		} finally Critical(PreviousCritical)
+		_OllamaWV_ScheduleDelivery(Owner)
+	}
 }
 
 /**
@@ -495,12 +582,16 @@ OllamaWV_FlushQueue(captured_epoch := unset) {
  * An ordinary resume cannot certify a document which is still loading.
  */
 OllamaWV_OnResume() {
-	global _OllamaWV_PendingFlush
+	global _OllamaWV_PendingFlush, _OllamaWV_Delivery
 	PreviousCritical := Critical("On")
 	try Pending := _OllamaWV_PendingFlush
 	finally Critical(PreviousCritical)
 	if Pending is Map
 		_OllamaWV_FlushOwned(Pending, Pending)
+	PreviousCritical := Critical("On")
+	try Delivery := _OllamaWV_Delivery
+	finally Critical(PreviousCritical)
+	_OllamaWV_ScheduleDelivery(Delivery)
 }
 
 _OllamaWV_FlushSessionCurrent(Owner) {
@@ -510,7 +601,7 @@ _OllamaWV_FlushSessionCurrent(Owner) {
 }
 
 _OllamaWV_FlushOwned(Owner, ExpectedPending) {
-	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_PendingFlush, _I18nLocale
+	global _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_PendingFlush, _OllamaWV_Delivery, _I18nLocale
 	RetainedPending := 0
 	PreviousCritical := Critical("On")
 	try {
@@ -534,6 +625,10 @@ _OllamaWV_FlushOwned(Owner, ExpectedPending) {
 	; Locale I/O and diagnostics may retire this page. Keep it unready so
 	; same-session updates still append to the retained queue during that work.
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
+	Delivery := Map("epoch", Owner["epoch"], "view", Owner["view"],
+		"prefix", i18n_js, "pending", Owner["queue"], "head", 0,
+		"timer", OllamaWV_RunScript.Bind(Owner["epoch"]),
+		"scheduled", false, "running", false, "retired", false)
 	PreviousCritical := Critical("On")
 	try {
 		if !_OllamaWV_FlushSessionCurrent(Owner) or _OllamaWV_Ready
@@ -548,7 +643,10 @@ _OllamaWV_FlushOwned(Owner, ExpectedPending) {
 			}
 			return
 		}
-		; Queue publication and consumption of our exact debt share one commit.
+		; Keep the SAME queue: reentrant producers may append during locale I/O.
+		; Ready, delivery publication and exact debt consumption share one commit.
+		RetiredDelivery := _OllamaWV_Delivery
+		_OllamaWV_Delivery := Delivery
 		_OllamaWV_Queue := []
 		_OllamaWV_Ready := true
 		if _OllamaWV_PendingFlush == ExpectedPending {
@@ -556,10 +654,8 @@ _OllamaWV_FlushOwned(Owner, ExpectedPending) {
 			_OllamaWV_PendingFlush := 0
 		}
 	} finally Critical(PreviousCritical)
-	; Execution stays outside WebMessageReceived and the RAM transaction.
-	SetTimer(OllamaWV_RunScript.Bind(Owner["epoch"], i18n_js), -1)
-	for _, js in Owner["queue"]
-		SetTimer(OllamaWV_RunScript.Bind(Owner["epoch"], js), -1)
+	_OllamaWV_RetireDelivery(RetiredDelivery)
+	_OllamaWV_ScheduleDelivery(Delivery)
 }
 
 /**

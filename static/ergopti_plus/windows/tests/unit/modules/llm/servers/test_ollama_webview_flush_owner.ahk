@@ -89,3 +89,5 @@ _OWFP_Case(Mode) {
 for _OWFP_Mode in ["locale-replace", "current-locale", "current-fallback", "stale-epoch", "entry-paused"]
 	Test("Ollama locale flush: " . _OWFP_Mode . " retains queue ownership (ollama-locale-flush-owner)",
 		_OWFP_Case.Bind(_OWFP_Mode))
+
+#Include test_ollama_webview_delivery_reentrancy.ahk
