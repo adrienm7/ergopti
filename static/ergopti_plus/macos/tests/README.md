@@ -113,10 +113,11 @@ Commit the fixture update only when the diff matches the intended change.
 ## CI
 
 GitHub Actions runs the full suite on every push/PR — see the `test-hs` job of
-`.github/workflows/ci-macos.yml`, whose ordinary job is named `Unit tests`,
-the entry job of the macOS lane. The job installs Lua 5.4 and luacheck, runs
-`tests/run.lua` with Lua 5.4. The separate `e2e-hs` job then runs
-`tests/e2e/run_e2e.lua` as `macOS / E2E tests (stubbed)`. Packaging waits for
+`.github/workflows/ci-macos-unit.yml`, the `Unit tests` stage that opens the
+macOS lane (`ci-macos.yml`). The job installs Lua 5.4 and luacheck, runs
+`tests/run.lua` with Lua 5.4. The separate `e2e-hs` job of
+`.github/workflows/ci-macos-e2e.yml` then runs `tests/e2e/run_e2e.lua` as
+`macOS / E2E tests / Virtual-keyboard replay (stubbed)`. Packaging waits for
 both suites, so a red suite spends no macOS runner time. Installation scenarios
 consume the uploaded package; the final verdict checks their completeness.
 

@@ -63,9 +63,13 @@ shared validation and the release plan in one root job, `Validate and plan`,
 then calls one workflow per OS,
 [`ci-macos.yml`](.github/workflows/ci-macos.yml),
 [`ci-windows.yml`](.github/workflows/ci-windows.yml) and
-[`ci-linux.yml`](.github/workflows/ci-linux.yml). Each draws one lane in the
-run graph: its `tests` job first, then its `package` job and whatever checks
-that package. Run the suites locally before opening a PR.
+[`ci-linux.yml`](.github/workflows/ci-linux.yml), plus
+[`ci-common.yml`](.github/workflows/ci-common.yml) for the shared code and the
+web site. Each draws one lane in the run graph and only calls its stages, one
+small reusable workflow per stage (`ci-<lane>-unit.yml`, `-e2e`, `-build`,
+`-install`, `-verdict`): `Unit tests`, `E2E tests`, `Build`,
+`Install and launch`, then `Verdict`. Run the suites locally before opening a
+PR.
 
 | Command                           | What it covers                                                                                                                 |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |

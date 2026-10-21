@@ -7,31 +7,36 @@ the one command — the local output is byte-identical to CI.
 The test suite spans four independent layers. CI runs them as separate jobs; you
 only need the layer whose check failed.
 
-| Layer                       | One command                   | CI job                 | Needs         |
-| --------------------------- | ----------------------------- | ---------------------- | ------------- |
-| **JS / domain / codegen**   | `npm run test:js`             | `Core / js`            | Node 22       |
-| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests` | AutoHotkey v2 |
-| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests`   | Lua 5.4       |
-| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests`   | LuaJIT        |
+| Layer                       | One command                   | CI job                                         | Needs         |
+| --------------------------- | ----------------------------- | ---------------------------------------------- | ------------- |
+| **JS / domain / codegen**   | `npm run test:js`             | `YAML, shared code & web / Unit tests / <lot>` | Node 22       |
+| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests / <category>`            | AutoHotkey v2 |
+| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests / <lot>`                   | Lua 5.4       |
+| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests / <group>`                 | LuaJIT        |
 
 `Validate and plan` is the root job of [`ci.yml`](../.github/workflows/ci.yml):
 it validates the release inputs and resolves the plan. The `Core` matrix then
-runs in parallel with the three OS lanes. A check named `<OS> / <job>` is a
-job of the workflow that `ci.yml` calls for that OS:
+runs in parallel with the three OS lanes. A check named
+`<OS> / <stage> / <what it tests>` is a job of one stage of the workflow that
+`ci.yml` calls for that OS:
 [`ci-windows.yml`](../.github/workflows/ci-windows.yml),
 [`ci-macos.yml`](../.github/workflows/ci-macos.yml) or
 [`ci-linux.yml`](../.github/workflows/ci-linux.yml). Each draws one lane,
-`Unit tests → E2E tests → Package → Install and launch → Verdict`. Variants are
-grouped into one installation matrix per OS. `macOS / Package` also builds the Swift launcher and runs its
-XCTest (`swift test --package-path static/ergopti_plus/macos/launcher`, macOS
-only) before it builds the app.
+`Unit tests → E2E tests → Build → Install and launch → Verdict`, and only calls
+one reusable workflow per stage, named after the lane and the stage: the jobs of
+`macOS / E2E tests` are in `ci-macos-e2e.yml`, those of `Windows / Build` in
+`ci-windows-build.yml`. Variants are grouped into one installation matrix per
+OS. `macOS / Build / ErgoptiPlus.app (macOS 26)` also builds the Swift launcher
+and runs its XCTest
+(`swift test --package-path static/ergopti_plus/macos/launcher`, macOS only)
+before it builds the app.
 
 ---
 
 ## JS / domain / codegen
 
 ```bash
-npm run test:js            # the everyday gate — mirrors the CI "Core / js" job
+npm run test:js            # the everyday gate — the CI "Unit tests" lots of the shared lane
 npm run test:js -- --full  # also runs the slow property + mutation tests
 ```
 
@@ -63,12 +68,13 @@ failure means:
 
 **Slow checks**, excluded from the default run: `npm run test:js -- --full` adds
 `test:properties` (fast-check) and `test:mutation` (Stryker). CI exposes them as
-`Core / properties` and `Core / mutation`, with mutation on `main` only. These
-jobs run independently of `Core / js`; the release waits for all of them.
+`YAML, shared code & web / Unit tests / Property tests` and
+`… / Mutation tests`, with mutation on `main` only. These lots run independently
+of the `test:js` feature lots; the release waits for all of them.
 
 **Not bundled at all**: `python tools/format_toml.py --hotstrings --all --check`
-(hotstring TOML sorting/formatting) is its own step of the CI `Validate and plan`
-job.
+(hotstring TOML sorting/formatting) is its own lot,
+`YAML, shared code & web / Unit tests / Hotstring TOML formatting`.
 Run it after touching any hotstring `.toml`.
 
 **Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,

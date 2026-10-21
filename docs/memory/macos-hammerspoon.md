@@ -24,7 +24,7 @@ test started from a pristine runner: an arm64-only launcher, a legacy
 in Git). The last one was an `O_NOFOLLOW` open of the final component in the
 native log sink; Hammerspoon reports exit code 0 even after Lua `os.exit(1)`,
 so the launcher could only say "stopped unexpectedly with exit code 0".
-The `launch` job of `.github/workflows/ci-macos.yml` now runs
+The `launch` job of `.github/workflows/ci-macos-install.yml` now runs
 `tools/diagnostics/macos_launch_gate.py` on the archive that `package-macos`
 built in the same run, installed over those user states. A run that does not
 publish uses the `ci` profile on macos-15; a release run uses the `release`
