@@ -29,6 +29,8 @@ local OWNED = {
 	"diagnostics.operation_reporter",
 	"diagnostics.redact",
 	"diagnostics.runtime_log",
+	-- The real logger and timer scheduler describe failures through this pure owner.
+	"error_description",
 	"hotstrings.personal_files",
 	"json",
 	"keycodes",
@@ -60,6 +62,8 @@ local OWNED = {
 	"toml_codec.key_path",
 	"toml_codec.reader",
 	"toml_codec.record_scanner",
+	-- The real TOML reader opens its source through this shared owner.
+	"toml_codec.source_open",
 	"wrap_pair",
 
 	"adapters.accessibility_permission",

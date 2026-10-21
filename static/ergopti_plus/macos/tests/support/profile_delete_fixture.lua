@@ -16,6 +16,8 @@ local MODULES = {
 	"diagnostics.operation_reporter",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
+	-- The real timer scheduler describes callback failures through this pure owner.
+	"error_description",
 	"chord",
 	"infra.app_picker",
 	"infra.dialog_util",
