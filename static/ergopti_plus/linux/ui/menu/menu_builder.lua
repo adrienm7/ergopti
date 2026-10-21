@@ -2572,6 +2572,7 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
+		local save_edit, edit_current, select_edit, delete_edit = require("ui.menu.profile_editor_request").capture(ProfileSettings)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
@@ -2581,6 +2582,10 @@ local function _build_llm(ctx)
 		end
 		local function select_profile(profile_id)
 			if type(profile_id) ~= "string" or profile_id == "" then return false end
+			if type(edit_current) ~= "function" or edit_current() ~= true then
+				Logger.error(LOG, "Profile selection refused: its originating configuration is no longer current.")
+				return false
+			end
 			if type(llm.get_live) ~= "function" or type(llm.set_live) ~= "function" then
 				Logger.error(LOG, "Manual profile selection refused: its live override owner is unavailable.")
 				return false
@@ -2595,13 +2600,13 @@ local function _build_llm(ctx)
 					return false
 				end
 			end
-			local saved = ProfileSettings.set("active", profile_id, current_model)
+			local saved = select_edit and select_edit(profile_id, current_model) == true
+			if not saved then Logger.error(LOG, "Profile selection was not committed.") end
 			if saved then refresh() end
 			return saved
 		end
 		local function save_profile(profile, activate, expected_existing)
-			local saved = ProfileSettings.save_user_profile(
-				profile, activate, expected_existing)
+			local saved = save_edit and save_edit(profile, activate, expected_existing) == true
 			if saved then refresh() end
 			return saved
 		end
@@ -2611,6 +2616,10 @@ local function _build_llm(ctx)
 			return ok and current == false
 		end
 		local function open_editor(existing, activate, opts, create)
+			if type(edit_current) ~= "function" or edit_current() ~= true then
+				Logger.error(LOG, "Profile editor refused: its originating configuration is no longer current.")
+				return false
+			end
 			if create and not create_ready() then return false end
 			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
 			if not ok_editor or type(Editor.open) ~= "function" then
@@ -2692,6 +2701,10 @@ local function _build_llm(ctx)
 						["llm_profile_use"] = function() return select_profile(profile_id) end,
 						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
 						["llm_profile_delete"] = function()
+								if type(edit_current) ~= "function" or edit_current() ~= true then
+									Logger.error(LOG, "Profile deletion refused: its originating configuration is no longer current.")
+									return false
+								end
 								local title = string.format(
 									i18n_safe("menu.profiles.delete_confirm_title"), label)
 								local confirmed
@@ -2705,7 +2718,8 @@ local function _build_llm(ctx)
 										i18n_safe("button.cancel"))
 								end
 								if confirmed ~= true then return false end
-								local deleted = ProfileSettings.delete_user_profile(profile_id)
+								local deleted = delete_edit and delete_edit(profile_id) == true
+								if not deleted then Logger.error(LOG, "Profile deletion was not committed.") end
 								if deleted then refresh() end
 								return deleted
 							end,
