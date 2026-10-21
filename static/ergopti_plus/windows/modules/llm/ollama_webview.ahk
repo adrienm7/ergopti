@@ -495,7 +495,10 @@ OllamaWV_OnWebMessage(sender, args) {
 		return
 	captured_epoch := _OllamaWV_Epoch
 	captured_view := _OllamaWV_WebView
-	if !(sender == captured_view)
+	if !WebView_SameCore(sender, captured_view)
+		return
+	if A_IsSuspended or captured_epoch != _OllamaWV_Epoch
+			or !IsSet(_OllamaWV_WebView) or !(captured_view == _OllamaWV_WebView)
 		return
 	msg := ""
 	try msg := args.TryGetWebMessageAsString()
