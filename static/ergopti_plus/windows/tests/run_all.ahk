@@ -700,6 +700,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/adapters/test_filesystem_native_write.ahk
 #Include unit/adapters/test_filesystem_nul_paths.ahk
+#Include unit/adapters/test_process_lifecycle_app_events.ahk
 #Include unit/infra/logger/test_logger_native_write.ahk
 #Include unit/modules/keylogger/test_keylogger_sql_native_write.ahk
 #Include unit/modules/keylogger/test_keylogger_sql_write_compensation.ahk
