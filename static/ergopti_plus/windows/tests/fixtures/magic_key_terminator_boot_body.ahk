@@ -125,6 +125,20 @@ _MKTB_Boot() {
 	_UNC_Require(FSWriteDurable(OverridePath, OverrideSource), "The private historical preference file must be durable.")
 	HotstringsConfigInit(OverridePath)
 	AdmittedOverrideSource := FSReadStrict(OverridePath)
+	if _HotstringsWordDelimiters != HistoricalWord || _HotstringsConsumedDelimiters != HistoricalConsumed {
+		; Observe the actual reader's encoding and results without changing its
+		; admission, the stored bytes, or the independent preference goldens.
+		FileAppend("OVERRIDE_FAILURE encoding=" . A_FileEncoding . " acp=" . DllCall("GetACP", "UInt")
+			. " source_unchanged=" . (AdmittedOverrideSource == OverrideSource) . "`n", "**")
+		for Name, Text in Map("expected_word", HistoricalWord, "actual_word", _HotstringsWordDelimiters,
+			"expected_consumed", HistoricalConsumed, "actual_consumed", _HotstringsConsumedDelimiters,
+			"source_utf16", AdmittedOverrideSource)
+			FileAppend("OVERRIDE_HEX " . Name . "=" . _UNC_Hex(_UNC_Units(Text)) . "`n", "**")
+		Raw := FileRead(OverridePath, "RAW"), Bytes := ""
+		loop Raw.Size
+			Bytes .= (A_Index == 1 ? "" : ",") . Format("{:02X}", NumGet(Raw, A_Index - 1, "UChar"))
+		FileAppend("OVERRIDE_BYTES " . Bytes . "`n", "**")
+	}
 	_UNC_Require(_HotstringsWordDelimiters == HistoricalWord && _HotstringsConsumedDelimiters == HistoricalConsumed,
 		"The actual override loader must admit the exact independent preference strings.")
 	; Reset only the runtime leaf, then execute the actual entry's current window.
