@@ -1103,6 +1103,20 @@ keyboard defaults) exactly. The suite watchdog is `_SUITE_MAX_TIMEOUT_MS` (120
 min, pinned by `test-ahk-suite-manifest.cjs`): shard the suite rather than
 raising it.
 
+### project-windows-system32-curl-has-no-ntlm
+
+Microsoft's System32 `curl.exe` dropped NTLM: curl 8.21.0, shipped with
+hosted image windows-2025-vs2026 20261018 (OS build 26100.33650), lists no
+`NTLM` in its `curl -V` Features. The managed transport launches that binary
+and, when its capability receipt has no NTLM, refuses a proxy that offers NTLM
+alone (`ergopti_curl_attempt.ps1`, "The observed proxy authentication feature
+is unavailable"). A user behind an NTLM-only company proxy therefore gets no
+managed request on an up-to-date Windows; Negotiate proxies are unaffected.
+The two `test_managed_remote_sspi.ahk` cases report NOT EXECUTED through
+`TestRequireHostCurlNtlm` on such a host and still run, and fail, on a curl
+that lists NTLM or whose features are unknown. Action: ship an owned
+SSPI-capable curl (TODO item 62), then confirm both cases execute again.
+
 ### project-windows-tls-fixture-git-prefix
 
 The native Windows TLS fixture takes OpenSSL tools from exactly one Git for
