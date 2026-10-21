@@ -1,0 +1,17 @@
+{
+	"expected_count": 38,
+	"filters": [
+		{
+			"contains": "prefix-scalar-framing",
+			"expected_count": 16
+		},
+		{
+			"contains": "prefix dead-key-chunk:",
+			"expected_count": 10
+		},
+		{
+			"contains": "hse-scalar-framing",
+			"expected_count": 12
+		}
+	]
+}

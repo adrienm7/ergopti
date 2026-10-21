@@ -857,3 +857,5 @@ Test("prefix: a key typed while Notepad edits follows the expansion (hsfix-notep
 	_PCA_NotepadKeysFollowExpansion.Bind("emit"))
 Test("prefix: a key typed after the verified Notepad edit follows the expansion (hsfix-notepad-interleave)",
 	_PCA_NotepadKeysFollowExpansion.Bind("after"))
+
+#Include test_prefix_scalar_framing.ahk
