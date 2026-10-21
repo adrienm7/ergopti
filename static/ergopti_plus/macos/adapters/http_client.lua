@@ -44,9 +44,12 @@
 ---    inference POST sharing the same instance) is discarded instead of
 ---    delivering its result to the wrong caller. Mirrors modules/updater/init.lua's
 ---    _poll_generation pattern.
---- 8. Redirect ownership: requests carrying caller credentials disable the
----    native opaque auto-follow path. Same-origin hops retain those headers;
----    cross-origin hops strip them before dispatch, and HTTPS never downgrades.
+--- 8. Redirect ownership: requests carrying caller credentials, and every HTTPS
+---    request, disable the native opaque auto-follow path. Same-origin hops
+---    retain credentials; cross-origin hops strip them before dispatch, and
+---    HTTPS never downgrades to HTTP.
+--- 9. Admission first: the URL (absolute HTTP/HTTPS, no control byte), headers
+---    and body are validated before a replacement cancels the request in flight.
 --- ==============================================================================
 
 local hs             = hs
@@ -210,6 +213,33 @@ local function parse_http_url(url)
 		path = path,
 		query = tail:match("^[^?#]*(%?[^#]*)") or "",
 	}
+end
+
+--- Returns why a request cannot be handed to hs.http, or nil when admissible.
+--- Runs before any ownership change, so a refused replacement never cancels
+--- the valid request in flight. The URL is never quoted: it can carry a key.
+--- @param url any Candidate absolute URL.
+--- @param headers any Candidate header map.
+--- @param body any Candidate request body.
+--- @return string|nil reason
+local function request_refusal(url, headers, body)
+	if type(url) ~= "string" or url == "" then return "the URL must be a non-empty string" end
+	-- A control byte cannot be represented in a URL; the native bridge would have
+	-- to guess (cut at NUL, or encode it) which resource is meant.
+	if url:find("[%z\1-\31\127]") then return "the URL contains a control byte" end
+	local scheme = url:match("^([%a][%w+%.%-]*)://")
+	scheme = scheme and scheme:lower()
+	if scheme ~= "http" and scheme ~= "https" then return "the URL must be absolute HTTP or HTTPS" end
+	if headers ~= nil and type(headers) ~= "table" then return "headers must be a table" end
+	if body ~= nil and type(body) ~= "string" then return "the body must be a string" end
+	return nil
+end
+
+--- Returns whether an admitted URL is HTTPS, whatever the scheme's case.
+--- @param url string Admitted absolute URL.
+--- @return boolean
+local function is_https(url)
+	return url:match("^([%a][%w+%.%-]*)://"):lower() == "https"
 end
 
 --- Removes literal dot segments from one absolute path.
@@ -811,6 +841,35 @@ local function new(options)
 		return true
 	end
 
+	--- Admits one request and selects who follows its redirects.
+	--- Native auto-follow is opaque: it would forward credentials to another
+	--- origin and follow an HTTPS response to HTTP. Credentialed and HTTPS
+	--- requests therefore follow through the adapter's own hop policy.
+	--- @param method string Lowercase request method.
+	--- @param url any Candidate absolute URL.
+	--- @param headers any Candidate header map.
+	--- @param body any Candidate request body.
+	--- @param callback function Completion callback.
+	--- @return boolean accepted
+	local function _request(method, url, headers, body, callback)
+		local refusal = request_refusal(url, headers, body)
+		if refusal then
+			Logger.error(LOG, "%s(): request refused before dispatch: %s.", method, refusal)
+			invoke_callback(callback, {
+				ok = false,
+				status = 0,
+				body = "",
+				error = "invalid request: " .. refusal,
+				error_kind = "invalid_request",
+			})
+			return false
+		end
+		if follow_redirects == true and (has_sensitive_headers(headers) or is_https(url)) then
+			return _dispatch_with_redirect_policy(method, url, headers, body, callback)
+		end
+		return _dispatch(method, url, headers, body, callback)
+	end
+
 	-- ── Public methods ────────────────────────────────────────────────────
 
 	--- Sends an HTTP POST request.
@@ -819,10 +878,7 @@ local function new(options)
 	--- @param body     string   JSON-encoded request body.
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.post(url, headers, body, callback)
-		if follow_redirects == true and has_sensitive_headers(headers) then
-			return _dispatch_with_redirect_policy("post", url, headers, body, callback)
-		end
-		return _dispatch("post", url, headers, body, callback)
+		return _request("post", url, headers, body, callback)
 	end
 
 	--- Sends an HTTP GET request.
@@ -830,10 +886,7 @@ local function new(options)
 	--- @param headers  table    Key→value header map.
 	--- @param callback function Called with { ok, status, body, headers, error }.
 	function inst.get(url, headers, callback)
-		if follow_redirects == true and has_sensitive_headers(headers) then
-			return _dispatch_with_redirect_policy("get", url, headers, nil, callback)
-		end
-		return _dispatch("get", url, headers, nil, callback)
+		return _request("get", url, headers, nil, callback)
 	end
 
 	--- Aborts the in-flight request. The callback is NOT called after cancel().
