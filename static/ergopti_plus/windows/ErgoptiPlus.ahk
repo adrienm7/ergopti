@@ -5,8 +5,8 @@
 ; version comes from BUNDLE_VERSION in infra/bundle.ahk.
 ;@Ahk2Exe-SetProductName Ergopti+
 ;@Ahk2Exe-SetCompanyName Ergopti
-;@Ahk2Exe-SetDescription Ergopti+ keyboard layout companion
-;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License)
+;@Ahk2Exe-SetDescription Ergopti+: hotstrings and shortcuts to type faster and more ergonomically
+;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
 ;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
 ;@Ahk2Exe-SetInternalName ErgoptiPlus
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
