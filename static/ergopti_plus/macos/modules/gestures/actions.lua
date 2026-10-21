@@ -1578,6 +1578,7 @@ local _search_restore_retry_timer_parent = nil
 local _search_deferred_retry_armed = false
 local _search_mutation_depth = 0
 local _search_cleanup_requested = false
+local _search_dispatch = nil
 
 local function search_capture_is_current(parent, generation)
 	return _search_capture_in_flight == true
@@ -1638,6 +1639,7 @@ end
 
 local function release_search_clipboard(generation)
 	if generation ~= _search_capture_generation then return end
+	if _search_dispatch and _search_dispatch.pending then return false, "search transaction retirement pending" end
 	local parent = _search_parent
 	local capture_stopped = stop_search_timer("capture", parent)
 	local restore_stopped = stop_search_timer("restore", parent)
@@ -1645,6 +1647,7 @@ local function release_search_clipboard(generation)
 		return false, "search timer cleanup pending"
 	end
 	_search_capture_in_flight = false
+	_search_dispatch = nil
 	_search_parent = nil
 	_search_saved_clipboard = nil
 	_search_result_receipt = nil
@@ -1659,6 +1662,13 @@ end
 local function restore_search_clipboard(generation)
 	if generation ~= _search_capture_generation or not _search_capture_in_flight then
 		return false, "stale search generation"
+	end
+	local dispatch = _search_dispatch
+	if dispatch and dispatch.pending then
+		dispatch.cancel_requested = true
+		pcall(SyntheticInput.cancel, dispatch.tx)
+		if dispatch.pending then return false, "search transaction retirement pending" end
+		if generation ~= _search_capture_generation then return true, nil end
 	end
 	if _search_mutation_depth > 0 then return false, "search clipboard boundary is active" end
 	_search_mutation_depth = _search_mutation_depth + 1
@@ -1799,6 +1809,73 @@ local function retain_search_restore_failure(generation, context, restore_error)
 		context, tostring(restore_error))
 end
 
+--- Joins the exact queued copy before reading or restoring its clipboard owner.
+local function start_search_dispatch(generation, parent, callback)
+	local dispatch = { pending = true, timer_elapsed = false }
+	_search_dispatch = dispatch
+	local function owns_dispatch()
+		return _search_dispatch == dispatch and generation == _search_capture_generation
+	end
+	local capture
+	local function failed(detail)
+		if not owns_dispatch() then return end
+		_search_capture_authorized = false
+		stop_search_timer("capture", parent)
+		local restored, restore_error = restore_search_clipboard(generation)
+		if not restored then _search_recovery_only = true; queue_search_restore_retry(generation) end
+		Logger.error(LOG, "search_web copy transaction failed: %s (restore=%s).", tostring(detail), tostring(restore_error))
+	end
+	local function arm(delay)
+		dispatch.timer_elapsed = false
+		local armed, detail = arm_search_timer("capture", delay, "capture", generation, parent, capture)
+		if not armed then failed(detail) end
+		return armed
+	end
+	capture = function()
+		if not owns_dispatch() or not search_capture_is_current(parent, generation) then return end
+		if dispatch.deadline == nil then dispatch.timer_elapsed = true; return end
+		local remaining = dispatch.deadline - hs.timer.absoluteTime()
+		if remaining > 0 then arm(remaining / 1e9); return end
+		if dispatch.pending then dispatch.timer_elapsed = true; return end
+		_search_dispatch = nil
+		callback()
+	end
+	local ok, accepted = xpcall(function()
+		dispatch.tx = SyntheticInput.begin("gestures.search.copy", "action", {
+			current = function() return owns_dispatch() and search_capture_is_current(parent, generation) end,
+			cached = function() return owns_dispatch() and search_capture_is_current(parent, generation) end,
+		})
+		SyntheticInput.on_complete(dispatch.tx, function(_, status)
+			dispatch.pending = false
+			if not owns_dispatch() then return end
+			if dispatch.cancel_requested then
+				local restored = restore_search_clipboard(generation)
+				if not restored and generation == _search_capture_generation then queue_search_restore_retry(generation) end
+			elseif status ~= "complete" then failed(status)
+			elseif dispatch.timer_elapsed and dispatch.deadline ~= nil then capture() end
+		end)
+		SyntheticInput.on_dispatched(dispatch.tx, function(_, _, status)
+			if not owns_dispatch() or status ~= "dispatched" then return end
+			dispatch.deadline = hs.timer.absoluteTime() + math.ceil(CLIPBOARD_COPY_SETTLE_SEC * 1e9)
+			if dispatch.timer_elapsed and search_capture_is_current(parent, generation) then arm(CLIPBOARD_COPY_SETTLE_SEC) end
+		end)
+		if not arm(CLIPBOARD_COPY_SETTLE_SEC) then return false end
+		_search_mutation_depth = _search_mutation_depth + 1
+		local emitted, copied = pcall(SyntheticInput.emit_key_stroke,
+			{ "cmd" }, "c", KEYSTROKE_NO_DELAY_US, dispatch.tx)
+		_search_mutation_depth = _search_mutation_depth - 1
+		assert(emitted and copied == true, "search copy shortcut admission refused: " .. tostring(copied))
+		assert(SyntheticInput.seal(dispatch.tx) == true, "search copy transaction seal refused")
+		return true
+	end, debug.traceback)
+	if not ok then
+		if dispatch.tx == nil then dispatch.pending = false end
+		failed(accepted)
+		return false, accepted
+	end
+	return accepted == true
+end
+
 local function cleanup_search_capture(parent)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or GESTURE_ACTION_PARENT
@@ -1896,8 +1973,7 @@ sg("search_web", function(binding)
 		end
 		return false
 	end
-	local timer_armed, timer_error = arm_search_timer(
-		"capture", CLIPBOARD_COPY_SETTLE_SEC, "capture", my_generation, parent, function()
+	local timer_armed, timer_error = start_search_dispatch(my_generation, parent, function()
 		if not search_capture_is_current(parent, my_generation) then return end
 		local count_before, count_error = Clipboard._change_count()
 		local ok_selected, selected = pcall(hs.pasteboard.getContents)
@@ -1959,24 +2035,6 @@ sg("search_web", function(binding)
 					"superseded after capture timer acquisition", restore_error)
 			end
 		end
-		return false
-	end
-	_search_mutation_depth = _search_mutation_depth + 1
-	local ok_copy, copied = pcall(
-		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-	_search_mutation_depth = _search_mutation_depth - 1
-	if not ok_copy or copied ~= true
-		or _search_cleanup_requested
-		or not search_capture_is_current(parent, my_generation) then
-		_search_capture_authorized = false
-		stop_search_timer("capture", parent)
-		local restored, restore_error = restore_search_clipboard(my_generation)
-		if not restored then
-			_search_recovery_only = true
-			queue_search_restore_retry(my_generation)
-		end
-		Logger.error(LOG, "search_web copy shortcut was refused: %s (restore=%s).",
-			tostring(copied), tostring(restore_error))
 		return false
 	end
 	return true
