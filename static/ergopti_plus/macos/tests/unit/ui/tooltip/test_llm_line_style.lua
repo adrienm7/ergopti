@@ -179,15 +179,22 @@ helpers.describe("tooltip_llm: the shortcut column (llm-shortcut-column)", funct
 				helpers.assert_eq(built_label.attributes.font.size, config.sizes.hint, label .. " is at the hint size")
 			end
 			helpers.assert_true(piece(pieces, "\t") ~= nil, "the chord sits after a tab")
-			local stopped = 0
+			-- show_predictions assembles the lines once per sizing pass and once
+			-- to draw; each assembly builds one tab and gives both labelled lines
+			-- the stop, always at the same place.
+			local stopped, tabs, location = 0, 0, nil
 			for _, candidate in ipairs(pieces) do
+				if candidate.text == "\t" then tabs = tabs + 1 end
 				local paragraph = type(candidate.attributes) == "table" and candidate.attributes.paragraphStyle
 				if paragraph and paragraph.tabStops then
 					helpers.assert_eq(paragraph.tabStops[1].tabStopType, "right")
+					location = location or paragraph.tabStops[1].location
+					helpers.assert_eq(paragraph.tabStops[1].location, location, "the column never moves")
 					stopped = stopped + 1
 				end
 			end
-			helpers.assert_eq(stopped, 2, "each labelled line starts with the right tab stop")
+			helpers.assert_true(tabs >= 2, "the lines are sized before they are drawn")
+			helpers.assert_eq(stopped, 2 * tabs, "each labelled line starts with the right tab stop")
 		end)
 	end)
 
