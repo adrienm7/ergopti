@@ -560,9 +560,20 @@ end
 --- Rejects one observer candidate while retaining ambiguous cleanup debt.
 --- @param detail any Setup failure detail.
 --- @return false
-local function reject_ax_observer_candidate(detail)
+local function reject_ax_observer_candidate(detail, app_pid)
 	mark_context("secure", false)
-	Logger.warn(LOG, "Accessibility observer setup failed: %s.", tostring(detail))
+	local text = tostring(detail)
+	if text:match("^[^\n]*Messaging failed") then
+		-- kAXErrorCannotComplete: the application did not answer Accessibility,
+		-- as one still launching or one without an Accessibility server does.
+		-- This is the application's state, not a driver fault, and the next
+		-- activation attaches again; a WARNING and its traceback said otherwise.
+		Logger.info(LOG,
+			"Accessibility observer not attached to PID %s: the application did not answer Accessibility (Messaging failed); its focus changes stay unobserved until it is activated again.",
+			tostring(app_pid))
+	else
+		Logger.warn(LOG, "Accessibility observer setup failed: %s.", text)
+	end
 	if stop_ax_observer("Accessibility observer rollback") ~= true then
 		Logger.error(LOG, "Accessibility observer cleanup remains pending.")
 	end
@@ -613,7 +624,7 @@ function M.update_ax_observer(app_pid)
 		return observer:addWatcher(app_element, "AXFocusedUIElementChanged")
 	end, debug.traceback)
 	if not focus_watch_ok or focus_watch_result == false then
-		return reject_ax_observer_candidate(focus_watch_result)
+		return reject_ax_observer_candidate(focus_watch_result, app_pid)
 	end
 
 	-- Bootstrap: also watch the currently focused element for value changes.
