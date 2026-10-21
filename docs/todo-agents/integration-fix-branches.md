@@ -35,22 +35,26 @@ fast-forwarded from the branch only by the maintainer or on the maintainer's own
 
 ## Remaining, with next steps
 
-1. Fast-forward dev to the branch tip (maintainer): `git fetch github` then check
+1. Fast-forward dev to the branch tip (maintainer): `git fetch github`, check
    `git merge-base --is-ancestor github/dev github/tmp/integrate-final`, then push that tip to dev.
-   If dev moved, rebase first: `git rebase --onto github/dev <old dev base> tmp/integrate-final`.
-2. Verify nothing is left: `git cherry github/dev github/fix/linux`, `git cherry github/dev
-github/fix/macos`, `git cherry github/dev github/fix/windows`. Lines starting with `+` are
-   commits not yet on dev; after the cherry-picks above they print `+` too until dev contains the
-   branch (patch ids of the two adapted macOS commits differ by design).
-3. Linux flake to watch: `Linux / Install and launch / Arch Linux` and `openSUSE: installed archive`
-   failed once (run 39610248703) in "retires shortcut overrides before persisting the chosen normal
-   profile" (Codex's `tests/support/ui/menu/llm/manual_profile_selection.lua` on dev's
-   `numeric_configuration_fixture.lua`): the runner's parent `storage.json` appeared during the
-   test with exactly the global-scope natives (`locale`, `script.log_level`,
-   `script.show_error_dialog`). The same code passed in run 39607861912. Suspect a module loaded by
-   an earlier test that kept the parent `adapters.storage` instance (`infra.script_settings`
-   captures it at load; `infra.i18n` caches it lazily). If it recurs, unload those owners in the
-   fixture alongside `adapters.storage`, and prove it with an earlier test that loads them first.
+   If dev moved, rebase first: `git rebase --onto github/dev <old dev tip> tmp/integrate-final`.
+2. Verify nothing is left: `git cherry github/dev github/fix/linux` (and `fix/macos`,
+   `fix/windows`). Once dev holds the branch, every line prints `-` except the two adapted macOS
+   commits, whose patch ids differ by design.
+3. The dev reds listed under Validation belong to dev's own newer commits (the same jobs fail on dev
+   alone); they are not caused by this integration and are left to their owners.
+
+## Resolved during the integration
+
+- Linux archive cells: "retires shortcut overrides before persisting the chosen normal profile"
+  failed in two of four runs. Root cause: `tools/test/prepare-linux-distro-unit.sh` runs every
+  module group at once with a private TMPDIR but one shared HOME, so one group's writes to
+  `~/.config/ergopti_plus/storage.json` reached the fixture of another group that proves its parent
+  bootstrap stays untouched. Each group now gets a private HOME too (`ci(linux): give each parallel
+archive unit group its own HOME`).
+- Windows `updater curl capture: actual progressing native body retires after cancellation` failed
+  once (run 39619616096) and passed in runs 39616630799 and 39623459261: native timing, not
+  reproduced.
 
 ## Validation
 
