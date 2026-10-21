@@ -26,6 +26,13 @@ answer once, then delete the answered lines.
    your word.
 8. **Windows `config.toml` blank lines.** All three drivers and templates now use the 5/3 style. Anything
    else to align? Default: done.
+9. **Windows managed network: NTLM-only proxies.** On Windows image 20261018 Microsoft's `System32\curl.exe` 8.21.0
+   no longer lists NTLM, so the managed transport (which refuses an NTLM-only proxy when curl cannot do NTLM)
+   cannot serve a user behind such a company proxy with an up-to-date Windows. Two CI cases now report
+   NOT EXECUTED on such a host. Proper fix: ship an owned, pinned, SSPI-capable curl for Windows (size,
+   signing, updater impact) or move that transport to WinHTTP/.NET. Which one? Default: nothing shipped yet.
+10. **Timer ceiling (L105).** A finite delay above 2^63 ms is refused under Lua 5.4 but arms a timer that
+    never fires under LuaJIT. Refuse above about 2^53 ms on every runtime? Default: decided yes, to implement.
 
 ## Answered
 
