@@ -48,7 +48,7 @@ package.loaded['ui.metrics_typing.projection'].session=function()
    local manifest=empty and {} or {['2026-09-01']={[rev==1 and 'Startup' or 'Live']={chars=rev}}}
    return manifest,package.loaded['hs.json'].encode(manifest)
   end,
-  range=function()return '{"historical":{},"today":{}}' end,
+  range=function()return '{"historical":{},"today":{}}',true end,
  }
 end
 dashboard._app_icon_cache={Startup=false,Live=false}
@@ -120,7 +120,7 @@ local manager=package.loaded['modules.keylogger.log_manager'];manager.get_sqlite
 package.loaded['ui.metrics_typing.projection'].session=function()
  return {
   manifest=function()local manifest={['2026-09-01']={Fresh={chars=2}}};return manifest,json.encode(manifest)end,
-  range=function()return '{"historical":{},"today":{}}' end,
+  range=function()return '{"historical":{},"today":{}}',true end,
  }
 end
 dashboard._app_icon_cache={Fresh=false}
