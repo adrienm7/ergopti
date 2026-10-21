@@ -30,6 +30,11 @@ function buildCommand(fakeBinary, logFile) {
 	const sharedRoot = SHARED_LUA_ROOT.replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${moduleRoot}/?.lua;${moduleRoot}/?/init.lua;${sharedRoot}/?.lua;${sharedRoot}/?/init.lua;`)} .. package.path`,
+		// Hammerspoon always provides hs.fs.attributes, and FileSystem.exists
+		// refuses to classify a path without a metadata probe. Plain Lua has no
+		// stat, so this host stand-in reports the regular files the builder
+		// locates (the bundled network policy and daemon owner) as present.
+		'hs = { fs = { attributes = function(p) local f = io.open(p, "rb"); if not f then return nil end; f:close(); return { mode = "file" } end } }',
 		// Native Windows Lua expands module dots with backslashes. Load this
 		// path-sensitive macOS module with its real POSIX filename on every host.
 		`package.loaded["modules.llm.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/modules/llm/network_env.lua`)}))()`,
