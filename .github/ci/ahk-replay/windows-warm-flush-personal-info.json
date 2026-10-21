@@ -1,0 +1,17 @@
+{
+	"expected_count": 16,
+	"filters": [
+		{
+			"contains": "metrics-warm-callout-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "ollama-locale-flush-owner",
+			"expected_count": 5
+		},
+		{
+			"contains": "personal-info-source-witness",
+			"expected_count": 5
+		}
+	]
+}
