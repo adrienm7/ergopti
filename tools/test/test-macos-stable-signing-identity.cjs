@@ -576,8 +576,7 @@ check(
 // ==========================================
 // ==========================================
 
-// macos-release-launch.yml re-signs a downloaded release ad hoc for a launch
-// diagnostic that is never distributed; that is the only other ad hoc site.
+// No workflow signs ad hoc: build_macos_app.sh alone owns the signature.
 for (const rel of [
 	'.github/workflows/ci-macos.yml',
 	'.github/workflows/ci.yml',
