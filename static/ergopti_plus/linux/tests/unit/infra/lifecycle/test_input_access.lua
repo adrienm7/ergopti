@@ -86,15 +86,38 @@ helpers.describe("input_access: a tray launch stays visible", function()
 
 	--- A tray adapter double that records what the user would see.
 	local function fake_tray(backend)
-		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false }
+		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false, windows = {} }
 		function tray.setIcon(opts) tray.calls[#tray.calls + 1] = opts end
 		function tray.getBackend() return backend end
-		function tray.setFallbackMenu(title, quit_label, on_quit)
-			tray.menu = { { title = title, disabled = true }, { title = quit_label, fn = on_quit } }
+		function tray.setMenu(items) tray.menu = items end
+		function tray.showStatusWindow(title, text)
+			tray.windows[#tray.windows + 1] = { title = title, text = text }
+			return true
 		end
 		function tray.pump() tray.pumps = tray.pumps + 1 end
 		function tray.destroy() tray.destroyed = true end
 		return tray
+	end
+
+	--- The degraded state's side effects, recorded instead of performed.
+	local function fake_actions()
+		local actions = { opened = {}, drains = 0 }
+		function actions.open_logs() actions.opened[#actions.opened + 1] = "logs" end
+		function actions.report_bug() actions.opened[#actions.opened + 1] = "bug" end
+		function actions.run_once() actions.drains = actions.drains + 1 end
+		return actions
+	end
+
+	local fake_i18n = { init = function() end, get = function(key)
+		return key == "menu.global.quit" and "🚪 Leave" or "<" .. key .. ">"
+	end }
+
+	--- Finds the row with a title.
+	local function row(menu, title)
+		for _, item in ipairs(menu) do
+			if item.title == title then return item end
+		end
+		return nil
 	end
 
 	helpers.it("keeps the icon, names the failure and exits only on Quit", function()
@@ -103,25 +126,66 @@ helpers.describe("input_access: a tray launch stays visible", function()
 		-- notification left nothing on screen.
 		local Access = helpers.load_module("infra.input_access")
 		local tray = fake_tray("appindicator")
+		local actions = fake_actions()
 		local naps = 0
 		local status = Access.report({
-			i18n = { init = function() end, get = function(key)
-				return key == "menu.global.quit" and "🚪 Leave" or "<" .. key .. ">"
-			end },
-			tray = tray,
-			print = function() end,
+			i18n = fake_i18n, tray = tray, actions = actions, print = function() end,
 			sleep_ms = function()
 				naps = naps + 1
-				if naps == 3 then tray.menu[2].fn() end
+				if naps == 3 then row(tray.menu, "Leave").fn() end
 			end,
 		}, "denied")
 		helpers.assert_eq(status, 78)
 		helpers.assert_eq(#tray.calls, 1, "the icon is shown")
 		helpers.assert_eq(tray.menu[1].title, "<startup.linux_input_access_label>")
 		helpers.assert_eq(tray.menu[1].disabled, true)
-		helpers.assert_eq(tray.menu[2].title, "Leave", "the Quit row drops the menu emoji")
+		helpers.assert_true(row(tray.menu, "Leave") ~= nil, "the Quit row drops the menu emoji")
 		helpers.assert_eq(tray.pumps, 3, "the menu is served until Quit is clicked")
+		helpers.assert_eq(actions.drains, 3, "desktop helpers progress while the tray is held")
 		helpers.assert_true(tray.destroyed, "the icon is removed before the exit")
+	end)
+
+	helpers.it("opens a status window at once (appimage-catalogue-tray-screenshot)", function()
+		-- The catalogue screenshots the first named window. With only an icon it
+		-- left-clicked it (the menu popped), then right-clicked the same spot,
+		-- which closed the grabbed menu: its screenshot showed the bare icon.
+		local Access = helpers.load_module("infra.input_access")
+		local tray = fake_tray("appindicator")
+		Access.report({
+			i18n = fake_i18n, tray = tray, actions = fake_actions(), print = function() end,
+			sleep_ms = function() row(tray.menu, "Leave").fn() end,
+		}, "no keyboard device detected")
+		helpers.assert_eq(#tray.windows, 1, "the window opens before any click")
+		helpers.assert_eq(tray.windows[1].title, "Ergopti+")
+		helpers.assert_contains(tray.windows[1].text, "<startup.linux_input_access_title>")
+		helpers.assert_contains(tray.windows[1].text, "<startup.linux_input_access_body>")
+	end)
+
+	helpers.it("publishes a real menu, not a name and a way out", function()
+		local Access = helpers.load_module("infra.input_access")
+		local tray = fake_tray("appindicator")
+		local actions = fake_actions()
+		local clicked = false
+		Access.report({
+			i18n = fake_i18n, tray = tray, actions = actions, print = function() end,
+			sleep_ms = function()
+				if not clicked then
+					clicked = true
+					row(tray.menu, "<startup.linux_input_access_title>").fn()
+					row(tray.menu, "<menu.debug.open_logs>").fn()
+					row(tray.menu, "<menu.debug.report_bug>").fn()
+				else
+					row(tray.menu, "Leave").fn()
+				end
+			end,
+		}, "denied")
+		helpers.assert_eq(#tray.windows, 2, "the details row shows the window again")
+		helpers.assert_eq(table.concat(actions.opened, ","), "logs,bug")
+		local actionable = 0
+		for _, item in ipairs(tray.menu) do
+			if type(item.fn) == "function" then actionable = actionable + 1 end
+		end
+		helpers.assert_eq(actionable, 4, "details, logs, bug report and quit")
 	end)
 
 	helpers.it("returns at once when no tray backend can show an icon", function()
@@ -131,6 +195,7 @@ helpers.describe("input_access: a tray launch stays visible", function()
 			sleep_ms = function() error("must not wait without an icon") end }, "denied")
 		helpers.assert_eq(status, 78)
 		helpers.assert_eq(tray.menu, nil)
+		helpers.assert_eq(#tray.windows, 0, "no window without a GTK backend")
 	end)
 
 end)
