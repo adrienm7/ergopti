@@ -51,9 +51,11 @@ local LOG    = "keylogger.sqlite_reader"
 -- ==========================
 
 --- Open the canonical db.sqlite cache. Returns a sqlite3 handle or nil.
+--- The open itself is read-only: the default flags are READWRITE|CREATE, which
+--- created an absent cache (or a dangling link's target) before query_only.
 --- @param sqlite_path string Absolute path to db.sqlite.
 local function _open(sqlite_path)
-	local db, err = sqlite3.open(sqlite_path)
+	local db, err = sqlite3.open(sqlite_path, sqlite3.OPEN_READONLY)
 	if not db then
 		Logger.error(LOG, "Cannot open SQLite at %s: %s.", sqlite_path, tostring(err))
 		return nil
