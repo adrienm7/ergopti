@@ -364,8 +364,7 @@ _HS_WordExpanderRows(Commands := unset) {
 					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 		}
 	}
-	Loop Parse, Current {
-		Ch := A_LoopField
+	for Ch in _TextCodepoints(Current) {
 		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch) or InStr(RecordChars, Ch))
 			continue
 		ConsumedSfx := (InStr(Consumed, Ch) > 0) ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
