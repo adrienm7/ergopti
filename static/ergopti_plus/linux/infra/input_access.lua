@@ -144,27 +144,24 @@ local DEFAULT_ACTIONS = {
 
 --- The degraded menu: what is wrong, how to read more, and the ways out.
 ---
---- Built here rather than by the shared renderer, which this state has not
---- initialised; every label still comes from the shared catalogue.
---- @param deps table i18n optional; actions overrides.
+--- The shared renderer is not initialised in this state, so the tray adapter's
+--- fallback builder draws it; every label still comes from the shared catalogue.
+--- @param deps table tray; i18n optional; actions overrides.
 --- @param texts table { label, title, body }.
 --- @param show_details function Shows the status window.
 --- @param on_quit function
---- @return table Neutral menu tree.
-function M.degraded_menu(deps, texts, show_details, on_quit)
+local function install_degraded_menu(deps, texts, show_details, on_quit)
 	local actions = deps.actions or DEFAULT_ACTIONS
 	local quit_label = label_for(deps.i18n, "menu.global.quit")
 	-- The menu key carries the row's emoji, which this short menu does not need.
 	if quit_label ~= "menu.global.quit" then quit_label = quit_label:gsub("^%S+%s+", "") end
-	return {
-		{ title = texts.label, disabled = true },
-		{ title = texts.title, fn = show_details },
-		{ separator = true },
-		{ title = label_for(deps.i18n, "menu.debug.open_logs"), fn = actions.open_logs },
-		{ title = label_for(deps.i18n, "menu.debug.report_bug"), fn = actions.report_bug },
-		{ separator = true },
-		{ title = quit_label, fn = on_quit },
-	}
+	deps.tray.setFallbackMenu(texts.label, quit_label, on_quit, {
+		{ { label = texts.title, fn = show_details } },
+		{
+			{ label = label_for(deps.i18n, "menu.debug.open_logs"), fn = actions.open_logs },
+			{ label = label_for(deps.i18n, "menu.debug.report_bug"), fn = actions.report_bug },
+		},
+	})
 end
 
 --- Keeps a tray icon that names the failure until the user quits it.
@@ -193,7 +190,7 @@ function M.hold_tray(deps, texts)
 		end
 	end
 	local quit = false
-	tray.setMenu(M.degraded_menu(deps, texts, show_details, function() quit = true end))
+	install_degraded_menu(deps, texts, show_details, function() quit = true end)
 	show_details()
 	Logger.start(LOG, "Holding the degraded tray until Quit.")
 	local sleep_ms = deps.sleep_ms or require("adapters.event_loop").sleep_ms
