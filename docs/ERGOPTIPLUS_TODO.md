@@ -207,6 +207,9 @@ dev reaches main only with a release (main last moved with v1.0.4).
       loading, process-tree termination. Steps: rank candidates and ship the smallest safe change, submit
       the hash to Microsoft Defender and VirusTotal, have the tester open a Service Desk ticket with the
       hash, check the Ahk2Exe metadata, and prioritise code signing (item 132) before the next stable.
+      Done on dev: the hidden PowerShell clipboard stage is gone (screenshots capture in process,
+      `6d9eae1f94`) and the exe has its own version resource (`1965c2ffac`). Left: the reproducible
+      PAC helper, signing, the new hash to VirusTotal and the tester's retry after the next build.
       Details and the discriminating download matrix: [handoff](todo-agents/windows-exe-flagged-by-proxy.md).
 - [ ] **132. SignPath Foundation signing.** [CODE] Apply, integrate Windows signing, then delete
       `.github/ci/stable_windows_signing_exception.json`. Unsigned stable Windows releases are
