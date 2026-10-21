@@ -538,6 +538,7 @@ return {
 	"tests.unit.modules.llm.agent.test_agent_auto",
 	"tests.unit.modules.llm.features.test_translate_selection",
 	"tests.unit.modules.llm.prediction.test_prediction_triggers",
+	"tests.unit.modules.llm.prediction.test_unicode_trigger_deletion",
 	"tests.unit.modules.llm.settings.test_profile_settings",
 	"tests.unit.modules.llm.settings.test_profile_preferences_canonical_prompt_profiles",
 	"tests.unit.modules.llm.settings.test_profile_preferences_canonical_ordered_child_template",

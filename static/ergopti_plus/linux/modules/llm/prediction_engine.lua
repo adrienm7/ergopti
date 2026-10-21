@@ -367,9 +367,11 @@ local function show_candidates(candidates, meta)
 end
 
 local function context_without_trigger(context, input_chars)
+	local TextUtils = require("text_utils")
 	local count = math.max(0, math.floor(tonumber(input_chars) or 0))
 	if count == 0 or count > #context then return context, 0 end
-	return context:sub(1, #context - count), count
+	-- Prompt slicing uses bytes; deletion and metrics use the suffix characters.
+	return context:sub(1, #context - count), TextUtils.utf8_len(context:sub(-count))
 end
 
 local function append_unique(target, candidate, extra_deletes)
