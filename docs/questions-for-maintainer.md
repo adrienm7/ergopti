@@ -7,7 +7,10 @@ answer once, then move the answered line below.
 
 ## Open
 
-(none: all answered on October 21, see "Decisions of October 21" in the checklist)
+- **Tap-hold hold rows on Windows and Linux (October 21):** the tap and, on macOS, the hold now open the shared action
+  picker. The Windows and Linux « Hold → … » rows still list the seven shared hold options (none, five modifiers, the
+  navigation layer) in a submenu, because they are hold options, not actions. Default meanwhile: kept as a submenu. Say
+  if they should open a picker window too ([handoff](todo-agents/macos-tap-hold-action-picker.md)).
 
 ## Answered
 

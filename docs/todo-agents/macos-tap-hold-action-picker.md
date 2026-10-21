@@ -1,0 +1,78 @@
+<!-- docs/todo-agents/macos-tap-hold-action-picker.md -->
+
+# Tap-hold actions open the shared action picker
+
+The maintainer's rule (October 21): choosing a tap-hold key's action never
+opens a submenu of actions; it opens the shared "all actions" picker
+(`_shared/ui/action_picker/`) that gestures and keyboard shortcuts use, on
+every system.
+
+## Done
+
+Committed on local dev as 61ab0fb351 (not pushed).
+
+- **macOS.** A key's « Tap → … » and « Hold → … » rows are now commands that
+  open the shared picker (`open_key_slot_picker` in
+  `macos/ui/menu/menu_tap_holds.lua`). The picker lists the remap catalogue
+  the slot accepts (the tap: every tappable action; the hold: the holdable
+  ones, that is modifiers, chords, sticky keys and the layer), one heading
+  per category, with search; the current action is marked; the picker's own
+  « ∅ » row clears the slot. A pick goes through the same owner as the
+  former submenu: `set_tap_action` / `set_hold_action`, then the exact
+  regeneration and the menu refresh. An id the slot does not offer, or a
+  refused setter, keeps the picker open and writes nothing else. The window
+  title is « Tap action — <key> » or « Hold action — <key> »
+  (presentations `tap_hold_action`, now also on macOS, and
+  `tap_hold_hold_action`, new, in `_shared/ui/apps.manifest.json`).
+- **Manifest.** `tap_hold_key_tap` is one command row for the three drivers;
+  the macOS group rows `tap_hold_key_tap_picker` and `tap_hold_key_hold_picker`
+  are gone, replaced for the hold by the command `tap_hold_key_hold_action`
+  (macOS only). The `menu.tapholds.tap_arrow` / `hold_arrow` captions are
+  retired; their translations moved into `tap_hold.picker.tap` / `hold`,
+  which were English in eleven locales on Windows and Linux.
+- **Windows.** Already opened the shared picker for the tap
+  (`_TH_TapPickerFnObj` → `ShowActionPicker`); unchanged.
+- **Linux.** Already opened the shared picker for the tap through its webview
+  bridge (`pick_tap` → `ui.action_picker.bridge`); unchanged.
+- **Tests.** macOS `test_menu_tap_holds_hand_sections.lua`
+  (« the macOS key slots open the shared action picker », cases named
+  `tap-hold-action-picker`): both rows open the picker with the key's
+  presentation, suffix, current action and slot catalogue; a pick is
+  persisted through the key's setter and regenerates; false, nil, truthy or
+  throwing setters keep it open with no regeneration; an action the slot does
+  not offer is refused; a picker that does not open is reported; no key row
+  builds an action row any more. The head, corpus and title tests on the
+  three drivers follow the new declarations.
+
+## Remaining
+
+- **Windows and Linux hold.** Their « Hold → … » row still opens a submenu,
+  but of the seven shared hold options (`[tap_hold.hold_picker]`: none, five
+  modifiers, the navigation layer), not of actions; the shared picker lists
+  actions with a parameter editor and has no notion of a hold option. Kept on
+  purpose and asked in `docs/questions-for-maintainer.md`.
+- **macOS key combinations.** The three slots of a key pair (chord, hold 1 +
+  tap 2, hold 1 + hold 2) under Shortcuts still open action submenus
+  (`build_action_picker`), whereas Windows opens the shared picker for the
+  pair's tap. Not in this change's scope (they are Shortcuts rows); moving
+  them to the picker also removes the menu's largest build cost (182 pairs ×
+  three submenus).
+- The macOS tap catalogue is Karabiner's (`platform/remap/data/actions.json`):
+  it has no action with a parameter, so the picker's parameter editor never
+  shows there. Windows' tap offers the gesture catalogue instead; giving a
+  Karabiner tap a Hammerspoon action would need a dispatch bridge.
+
+## Check on the Mac
+
+1. Reload ErgoptiPlus with Karabiner on and Tap-Holds on.
+2. Menu bar → Tap-Holds → a key (for example Caps Lock) → « Tap → … »: a
+   window titled « ErgoptiPlus — Tap action — Caps Lock » opens, with a
+   search field, category headings and the current tap highlighted. No
+   submenu unfolds.
+3. Type « esc » in the search, pick Escape: the window closes, the key row
+   reads « Caps Lock : Escape / … », and a tap of Caps Lock types Escape.
+4. Same key → « Hold → … »: the window is titled « Hold action — Caps Lock »
+   and lists only modifiers, chords, sticky keys and the layer; pick Ctrl and
+   check that holding the key acts as Ctrl.
+5. Reopen « Tap → … » and pick « ∅ »: the tap goes back to the key's own
+   character.
