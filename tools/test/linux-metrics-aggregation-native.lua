@@ -125,7 +125,9 @@ refuses_rows(refused_receipt, 'native SQLite exit receipt failed:')
 -- Freeze the previous two SQL projections, not a second copy of Lua merge logic.
 command.build = function(db, sql, options)
 	if sql:find('FROM ngram_', 1, true) and not sql:find('FROM ngram_scancodes', 1, true) then
-		local by_app = sql:find('SELECT app,', 1, true) ~= nil
+		-- The application travels quoted, like the token: raw TEXT is cut at NUL.
+		local app_column = 'json_quote(app) AS app_json'
+		local by_app = sql:find('SELECT ' .. app_column .. ',', 1, true) ~= nil
 		-- Raw rows must retain the reader's complete-token transport contract;
 		-- only aggregation changes between the two projections.
 		local token_column = 'json_quote(token) AS token_json'
@@ -133,7 +135,7 @@ command.build = function(db, sql, options)
 			or (not by_app and control == 'legacy-global-column') then
 			token_column = 'token'
 		end
-		local columns = (by_app and 'app, ' or '') .. token_column .. ', c, td, e, esrc_json'
+		local columns = (by_app and app_column .. ', ' or '') .. token_column .. ', c, td, e, esrc_json'
 		-- Remove only the new typed partition; retain the actual date/app filters.
 		sql = sql:gsub(" AND %(typeof%(c%).*$", ';')
 		sql = sql:gsub(" WHERE %(typeof%(c%).*$", ';')
