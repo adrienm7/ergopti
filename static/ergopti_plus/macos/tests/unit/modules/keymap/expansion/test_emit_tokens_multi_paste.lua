@@ -43,13 +43,19 @@ local function load_fixture()
 		end,
 	}
 
+	local native_set_contents = hs_stub.pasteboard.setContents
+	local native_write_all_data = hs_stub.pasteboard.writeAllData
+	local native_clear = hs_stub.pasteboard.clearContents
 	local pasted_values = {}
 	hs_stub.pasteboard.setContents = function(value)
 		if value ~= "" then pasted_values[#pasted_values + 1] = value end
-		return true
+		return native_set_contents(value)
 	end
 	return {
 		hs = hs_stub,
+		native_set_contents = native_set_contents,
+		native_write_all_data = native_write_all_data,
+		native_clear = native_clear,
 		synthetic = require("adapters.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 		pasted_values = pasted_values,
@@ -192,10 +198,12 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local payload_writes = 0
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.writeAllData = function(saved)
+			fixture.native_write_all_data(saved)
 			current = saved
 			return true
 		end
 		fixture.hs.pasteboard.setContents = function(value)
+			fixture.native_set_contents(value)
 			payload_writes = payload_writes + 1
 			if payload_writes == 2 then return false end
 			current = value
@@ -236,14 +244,22 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
 		local restore_attempts = 0
+		local refused_restore_before = nil
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.setContents = function(value)
+			fixture.native_set_contents(value)
 			current = value
 			return true
 		end
 		fixture.hs.pasteboard.writeAllData = function(saved)
 			restore_attempts = restore_attempts + 1
-			if restore_attempts == 1 then return false end
+			if restore_attempts == 1 then
+				refused_restore_before = fixture.hs.pasteboard.changeCount()
+				fixture.native_clear()
+				current = {}
+				return false
+			end
+			fixture.native_write_all_data(saved)
 			current = saved
 			return true
 		end
@@ -270,8 +286,12 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		helpers.assert_eq(restore_attempts, 1)
 		helpers.assert_true(helpers.deep_equal(drained, { idle = 0, pause = 0, reload = 0 }),
 			"a refused exact restore keeps pause/reload/quit behind the drain")
-		helpers.assert_eq(current, ("R"):rep(60),
-			"a refused restore must keep ownership instead of pretending recovery succeeded")
+		helpers.assert_true(type(current) == "table" and next(current) == nil,
+			"native writeAllData clears before refusal; the retained snapshot must survive that empty result")
+		helpers.assert_eq(fixture.hs.pasteboard.changeCount(), refused_restore_before + 1,
+			"the refused native restore must acknowledge exactly its own clear")
+		helpers.assert_true(fixture.synthetic.stats().active_transactions > 0,
+			"the empty native result must retain the exact clipboard drain debt")
 
 		helpers.assert_eq(fire_existing_delay(fixture.hs, 0.15), 1,
 			"a refused native restore must autonomously arm another retained attempt")
@@ -317,10 +337,12 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local current = original
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.setContents = function(value)
+			fixture.native_set_contents(value)
 			current = value
 			return true
 		end
 		fixture.hs.pasteboard.writeAllData = function(saved)
+			fixture.native_write_all_data(saved)
 			current = saved
 			return true
 		end
@@ -360,10 +382,13 @@ helpers.describe("KU.emit_tokens: multi-segment paste is serialised", function()
 		local defer_calls = 0
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.setContents = function(value)
+			fixture.native_set_contents(value)
 			current = value
 			return true
 		end
 		fixture.hs.pasteboard.writeAllData = function()
+			fixture.native_clear()
+			current = {}
 			restore_attempts = restore_attempts + 1
 			return false
 		end

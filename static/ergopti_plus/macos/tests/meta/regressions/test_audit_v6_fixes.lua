@@ -283,8 +283,22 @@ helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (a
 			"the exact committed timer must remain retained until callback or cancellation")
 		helpers.assert_true(restore:find("restore_owned_clipboard", 1, true) ~= nil,
 			"the timer must delegate to the retained exact-restore helper")
-		local helper_pos = src:find("local function restore_owned_clipboard", 1, true)
-		local helper = helper_pos and src:sub(helper_pos, helper_pos + 900) or ""
+		local code = strip_line_comments(src)
+		local declaration = "local function restore_owned_clipboard()"
+		local boundary = "\nlocal queue_paste_restore_retry"
+		helpers.assert_eq(count_literal(code, declaration), 1,
+			"the exact restore helper declaration must be unique and locatable")
+		helpers.assert_eq(count_literal(code, boundary), 1,
+			"the exact restore helper boundary must be unique and locatable")
+		local helper_pos = code:find(declaration, 1, true)
+		local helper_end = code:find(boundary, 1, true)
+		helpers.assert_true(helper_pos ~= nil and helper_end ~= nil
+			and helper_end > helper_pos + #declaration,
+			"the exact restore helper bounds must remain ordered and nonempty")
+		local helper = code:sub(helper_pos + #declaration, helper_end - 1)
+			:match("^(.-)%s+end%s*$")
+		helpers.assert_true(type(helper) == "string" and helper:find("%S") ~= nil,
+			"the exact restore helper body must remain nonempty")
 		helpers.assert_true(helper:find("writeAllData", 1, true) ~= nil,
 			"the shared restore helper must preserve every clipboard UTI")
 		helpers.assert_true(helper:find("restore_result ~= true", 1, true) ~= nil,

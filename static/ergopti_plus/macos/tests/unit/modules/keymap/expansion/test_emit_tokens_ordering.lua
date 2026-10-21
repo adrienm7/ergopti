@@ -119,17 +119,24 @@ local function load_utils()
 			return true
 		end,
 	}
+	local clipboard_generation = 0
 	local KU = helpers.load_with_stubs("modules.keymap.utils", {
 		-- The override replaces hs.pasteboard wholesale, so it must carry every
 		-- member perform_paste touches (readAllData / writeAllData included).
 		pasteboard = {
+			changeCount = function() return clipboard_generation end,
 			getContents  = function() return "" end,
 			readAllData  = function() return {} end,
-			writeAllData = function(_) return true end,
+			writeAllData = function(_)
+				clipboard_generation = clipboard_generation + 1
+				return true
+			end,
 			clearContents = function()
+				clipboard_generation = clipboard_generation + 1
 				clipboard.clears = clipboard.clears + 1
 			end,
 			setContents  = function(s)
+				clipboard_generation = clipboard_generation + 1
 				-- perform_paste writes the clipboard then sends Cmd+V; the write is what
 				-- marks the segment as having been emitted, so record it here.
 				emissions[#emissions + 1] = "paste:" .. tostring(s):sub(1, 6)

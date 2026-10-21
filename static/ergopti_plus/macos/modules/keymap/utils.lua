@@ -103,6 +103,7 @@ local _paste_saved_original = nil
 local _paste_pending_timer = nil
 local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
+local _paste_builtin_count = nil
 local _publication_clipboards = setmetatable({}, { __mode = "k" })
 local _paste_publication_lease = nil
 local _paste_recovery_only = false
@@ -226,10 +227,40 @@ local function release_paste_ownership()
 	stop_paste_restore_timer()
 	_paste_saved_original = nil
 	_paste_owns_clipboard = false
+	_paste_builtin_count = nil
 	_paste_recovery_only = false
 	_paste_generation = _paste_generation + 1
 	release_paste_debt()
 	if lease then clear_settled_publication_lease(lease) end
+end
+
+--- Retires a builtin snapshot when a newer native owner has replaced its payload.
+--- Unknown receipts retain the exact snapshot and drain debt without writing.
+--- @return boolean reconciled
+--- @return any error_detail
+local function reconcile_builtin_clipboard()
+	if not _paste_owns_clipboard or _paste_publication_lease then return true, nil end
+	local count = clipboard_change_count()
+	if count == nil or _paste_builtin_count == nil then
+		return false, "builtin clipboard ownership unproven"
+	end
+	if count ~= _paste_builtin_count then release_paste_ownership() end
+	return true, nil
+end
+
+--- Records one native clear, including a clear followed by false or throw.
+--- A second change or an unreadable receipt cannot authorize a later restore.
+--- @param before number Native count immediately before the call.
+--- @param accepted boolean Native call acknowledged successful publication.
+--- @return boolean proven
+local function record_builtin_clipboard_change(before, accepted)
+	local after = clipboard_change_count()
+	if after == before + 1 or (not accepted and after == before) then
+		_paste_builtin_count = after
+		return true
+	end
+	_paste_builtin_count = nil
+	return false
 end
 
 --- Restores the retained all-type snapshot without releasing it on refusal.
@@ -243,16 +274,26 @@ local function restore_owned_clipboard()
 	if lease and (lease.count == nil or clipboard_change_count() ~= lease.count) then
 		return false, "guarded clipboard ownership changed"
 	end
+	local reconciled, ownership_error = reconcile_builtin_clipboard()
+	if not reconciled then return false, ownership_error end
+	if not _paste_owns_clipboard then return true, nil end
+	local before = _paste_builtin_count
 	local saved = _paste_saved_original
 	local ok_restore, restore_result
 	if type(saved) == "table" and next(saved) ~= nil then
 		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
+		if not lease and not record_builtin_clipboard_change(before, ok_restore and restore_result == true) then
+			return false, "builtin clipboard restore ownership unproven"
+		end
 		if not ok_restore or restore_result ~= true then
 			return false, ok_restore and "writeAllData returned " .. tostring(restore_result)
 				or restore_result
 		end
 	else
 		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+		if not lease and not record_builtin_clipboard_change(before, ok_restore) then
+			return false, "builtin clipboard clear ownership unproven"
+		end
 		if not ok_restore then return false, restore_result end
 	end
 	release_paste_ownership()
@@ -378,6 +419,13 @@ local function perform_paste(value, handoff)
 			return false
 		end
 	end
+	local reconciled, ownership_error = reconcile_builtin_clipboard()
+	if not reconciled then
+		queue_paste_restore_retry("new paste while ownership is unproven")
+		Logger.error(LOG, "Clipboard paste refused: %s.", tostring(ownership_error))
+		return false
+	end
+	if retry_paste_timer_cleanup() ~= true then return false end
 	-- A previous failed restore owns the clipboard but has no valid user output
 	-- to extend. Recover it first; if the native pasteboard still refuses, fail
 	-- closed and preserve the original snapshot for the autonomous retry.
@@ -436,6 +484,19 @@ local function perform_paste(value, handoff)
 		end
 		return false
 	end
+	local builtin_before = nil
+	if _paste_publication_lease == nil then
+		builtin_before = clipboard_change_count()
+		if builtin_before == nil or (_paste_owns_clipboard and builtin_before ~= _paste_builtin_count) then
+			if not _paste_owns_clipboard or builtin_before ~= nil then
+				release_paste_ownership()
+			else
+				queue_paste_restore_retry("payload ownership receipt unavailable")
+			end
+			Logger.error(LOG, "Clipboard paste refused because native ownership is unproven.")
+			return false
+		end
+	end
 	_paste_generation = _paste_generation + 1
 	-- Conservative ordering: a native method may mutate the pasteboard and only
 	-- then return false or throw. Ownership must exist before entering it.
@@ -460,6 +521,8 @@ local function perform_paste(value, handoff)
 			or after ~= guarded_count + 1 then
 			ok_write, write_result = false, "guarded clipboard write ownership unproven"
 		end
+	elseif not record_builtin_clipboard_change(builtin_before, ok_write and write_result == true) then
+		ok_write, write_result = false, "builtin clipboard write ownership unproven"
 	end
 	if not ok_write or write_result ~= true then
 		local restored, restore_error = restore_owned_clipboard()
