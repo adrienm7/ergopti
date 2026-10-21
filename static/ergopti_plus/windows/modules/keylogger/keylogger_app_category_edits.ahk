@@ -48,6 +48,7 @@ _KL_AppCat_WriteAdmission(Owner, AdmissionFn) {
 ; against arbitrary foreign writers. Only the final RAM check and rename share
 ; the adapter's minimal native publication span.
 _KL_AppCat_WriteOwned(Owner, Content, Source := unset, FullCurrentFn := 0, AdmissionFn := 0) {
+	static WriteSeq := 0
 	if !IsSet(Source) {
 		Source := _KL_AppCat_ReadImage(Owner["path"])
 		Model := Owner["model"]
@@ -62,7 +63,10 @@ _KL_AppCat_WriteOwned(Owner, Content, Source := unset, FullCurrentFn := 0, Admis
 		|| !_KL_AppCat_WriterCurrent(Owner) || !_KL_AppCat_ImageCurrent(Source)
 		|| !_KL_AppCat_WriteAdmission(Owner, AdmissionFn)
 		return false
-	Stage := Owner["path"] . "." . A_ScriptHwnd . "-" . ObjPtr(Owner) . ".tmp"
+	; Separate this writer from other atomic producers. A failed cleanup retains
+	; its exact stage while each later attempt owns a fresh monotone name.
+	Sequence := ++WriteSeq
+	Stage := Owner["path"] . ".appcat." . A_ScriptHwnd . "-" . Sequence . ".tmp"
 	Created := false, Published := false
 	try {
 		Created := FSWriteCreateDurable(Stage, Content)
