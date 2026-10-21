@@ -143,26 +143,14 @@ local _nanosleep = nil
 --- CI and is optional on a user's machine, so the fallback below is what actually
 --- ran everywhere — and it forks /bin/sleep on the injection path, once per
 --- expansion. LuaJIT is a hard requirement of this driver, so FFI is not.
+--- The shared binding resumes after a child's SIGCHLD: discarding the remainder
+--- typed the next phase before the application had settled.
 --- @return function|nil sleep(seconds)
 local function nanosleep()
 	if _nanosleep ~= nil then return _nanosleep or nil end
-	_nanosleep = false
-
 	local ok_ffi, ffi = pcall(require, "ffi")
-	if not ok_ffi or type(ffi) ~= "table" then return nil end
-	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
-		struct timespec { long tv_sec; long tv_nsec; };
-		int nanosleep(const struct timespec *req, struct timespec *rem);
-	]])
-	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then return nil end
-
-	local req = ffi.new("struct timespec[1]")
-	_nanosleep = function(seconds)
-		req[0].tv_sec = math.floor(seconds)
-		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
-		ffi.C.nanosleep(req, nil)
-	end
-	return _nanosleep
+	_nanosleep = require("infra.native_sleep").bind(ok_ffi and ffi or nil) or false
+	return _nanosleep or nil
 end
 
 --- Sleeps for the given number of milliseconds without forking or spinning.

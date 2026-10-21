@@ -57,31 +57,8 @@ end
 --- @return function sleep(seconds)
 local nap = (function()
 	local ok_ffi, ffi = pcall(require, "ffi")
-	if not ok_ffi or type(ffi) ~= "table" then
-		return command_nap
-	end
-	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
-		struct timespec { long tv_sec; long tv_nsec; };
-		int nanosleep(const struct timespec *req, struct timespec *rem);
-	]])
-	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
-		return command_nap
-	end
-	local req = ffi.new("struct timespec[1]")
-	local remaining = ffi.new("struct timespec[1]")
-	local EINTR = 4 -- Linux errno for a signal-interrupted wait.
-	return function(seconds)
-		req[0].tv_sec = math.floor(seconds)
-		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
-		-- A libuv child's SIGCHLD interrupts nanosleep even with SA_RESTART.
-		-- Resume its remaining duration; restarting the whole wait extends it.
-		while ffi.C.nanosleep(req, remaining) ~= 0 do
-			local code = ffi.errno()
-			if code ~= EINTR then error("nanosleep failed (errno " .. code .. ")", 0) end
-			req[0].tv_sec = remaining[0].tv_sec
-			req[0].tv_nsec = remaining[0].tv_nsec
-		end
-	end
+	-- The shared binding resumes the remainder after a libuv child's SIGCHLD.
+	return require("infra.native_sleep").bind(ok_ffi and ffi or nil) or command_nap
 end)()
 
 --- True when the luv library is available and the event loop is native.

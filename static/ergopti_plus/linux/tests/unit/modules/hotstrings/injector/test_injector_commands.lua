@@ -393,3 +393,91 @@ helpers.describe("linux injector: several fields, one Tab between each", functio
 	end)
 
 end)
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ A child exit cannot shorten the pacing wait ==========
+-- =================================================================
+-- =================================================================
+
+--- A recording FFI double whose nanosleep is interrupted by the scripted errnos.
+--- @param errnos table Native errno per failed call; a call past the list succeeds.
+--- @return table ffi, table requests Each requested { sec, nsec } in call order.
+local function interrupted_ffi(errnos)
+	local requests, calls, current_errno = {}, 0, 0
+	local ffi = {
+		cdef = function() end,
+		new = function() return { [0] = { tv_sec = 0, tv_nsec = 0 } } end,
+		errno = function() return current_errno end,
+	}
+	ffi.C = {
+		nanosleep = function(req, remaining)
+			calls = calls + 1
+			requests[#requests + 1] = { req[0].tv_sec, req[0].tv_nsec }
+			local errno = errnos[calls]
+			if errno == nil then return 0 end
+			current_errno = errno
+			-- The kernel reports what is left; a fixed 20 ms keeps the oracle exact.
+			if remaining then remaining[0].tv_sec, remaining[0].tv_nsec = 0, 20000000 end
+			return -1
+		end,
+	}
+	return ffi, requests
+end
+
+helpers.describe("linux-injector-wait-eintr", function()
+	--- Runs the injector's actual pacing sleep through its public selected route.
+	local function injector_sleep(ffi, ms)
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local previous_ffi, previous_route = package.loaded.ffi, package.loaded["modules.hotstrings.selected_output"]
+		local dependencies
+		package.loaded["modules.hotstrings.selected_output"] = {
+			new = function(_, _, deps) dependencies = deps; return {} end,
+		}
+		package.loaded.ffi = ffi
+		injector._set_nanosleep_for_test(nil)
+		local ok, err = pcall(function()
+			injector.prepare_selected("x", {})
+			dependencies.sleep(ms)
+		end)
+		injector._set_nanosleep_for_test(nil)
+		package.loaded.ffi, package.loaded["modules.hotstrings.selected_output"] = previous_ffi, previous_route
+		return ok, err
+	end
+
+	helpers.it("linux-injector-wait-eintr: resumes the remaining duration after SIGCHLD", function()
+		local ffi, requests = interrupted_ffi({ 4, 4 })
+		local ok, err = injector_sleep(ffi, 30)
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(#requests, 3, "an interrupted wait must resume until the kernel reports completion")
+		helpers.assert_eq(requests[1], { 0, 30000000 })
+		helpers.assert_eq(requests[2], { 0, 20000000 }, "the resumed request is the kernel's remainder, not a restart")
+		helpers.assert_eq(requests[3], { 0, 20000000 })
+	end)
+
+	helpers.it("linux-injector-wait-eintr: an uninterrupted wait is one native call", function()
+		local ffi, requests = interrupted_ffi({})
+		local ok, err = injector_sleep(ffi, 1500)
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(requests, { { 1, 500000000 } })
+	end)
+
+	helpers.it("linux-injector-wait-eintr: another native refusal is reported, not taken as a completed wait", function()
+		local ffi, requests = interrupted_ffi({ 22 })
+		local ok, err = injector_sleep(ffi, 30)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(tostring(err), "errno 22")
+		helpers.assert_eq(#requests, 1)
+	end)
+
+	helpers.it("linux-injector-wait-eintr: the event loop and the injector share one binding", function()
+		local NativeSleep = require("infra.native_sleep")
+		helpers.assert_nil(NativeSleep.bind(nil))
+		helpers.assert_nil(NativeSleep.bind({ cdef = function() error("controlled cdef refusal") end }))
+		local ffi, requests = interrupted_ffi({ 4 })
+		local loop = helpers.load_module_with_dependency("adapters.event_loop", "ffi", ffi)
+		helpers.assert_eq(loop.sleep_ms(30), true)
+		helpers.assert_eq(requests, { { 0, 30000000 }, { 0, 20000000 } })
+	end)
+end)
