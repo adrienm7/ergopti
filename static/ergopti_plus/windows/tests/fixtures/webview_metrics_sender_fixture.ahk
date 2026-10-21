@@ -23,6 +23,7 @@
 #Include ../../adapters/file_system.ahk
 #Include ../../adapters/crypto.ahk
 #Include ../../adapters/webview_profiles.ahk
+#Include ../../infra/webview_utils.ahk
 #Include ../../infra/config_transition.ahk
 #Include ../../infra/config_transition_runtime.ahk
 #Include ../../infra/reload_terminal_handoff.ahk
@@ -30,6 +31,16 @@
 #Include ../../modules/keylogger/keylogger_walker_core.ahk
 #Include ../../modules/keylogger/keylogger_prefetch.ahk
 #Include ../../modules/keylogger/keylogger_webview.ahk
+
+class _MVSP_PassiveCoreProbe {
+	Reads := 0
+	Ptr {
+		get {
+			this.Reads += 1
+			throw Error("A mixed passive view cannot expose a native pointer.")
+		}
+	}
+}
 
 global _MVSP := {Phase: "arguments", Root: "", Profile: "", Gui: 0, Controller: 0,
 	View: 0, Sender: 0, HostSubscription: 0, ObserverSubscription: 0, BrowserHandle: 0,
@@ -305,6 +316,18 @@ _MVSP_Main() {
 			"fixture_sha256", FixtureHash, "host_sha256", HostHash,
 			"runtime_sha256", RuntimeHash, "runtime_version", A_AhkVersion,
 			"action", "request_refresh", "external_boundary", "worker_spawn_only")
+		_MVSP.Phase := "empty-core-controls"
+		EmptyCore := WebView2.Core(), OtherEmptyCore := WebView2.Core()
+		_MVSP.Receipt["empty_core_same_refused"] := !WebView_SameCore(EmptyCore, EmptyCore)
+		_MVSP.Receipt["empty_core_distinct_refused"] := !WebView_SameCore(EmptyCore, OtherEmptyCore)
+		_MVSP_Require(_MVSP.Receipt["empty_core_same_refused"] && _MVSP.Receipt["empty_core_distinct_refused"],
+			"Real vendor Core wrappers without native pointers must never grant browser identity.")
+		Passive := _MVSP_PassiveCoreProbe()
+		_MVSP.Receipt["mixed_core_passive_refused"] := !WebView_SameCore(EmptyCore, Passive)
+		_MVSP.Receipt["mixed_passive_core_refused"] := !WebView_SameCore(Passive, EmptyCore)
+		_MVSP.Receipt["mixed_passive_ptr_reads"] := Passive.Reads
+		_MVSP_Require(_MVSP.Receipt["mixed_core_passive_refused"] && _MVSP.Receipt["mixed_passive_core_refused"]
+			&& Passive.Reads == 0, "A mixed Core/passive pair must be refused before reading passive pointers.")
 		_MVSP.Phase := "private-profile"
 		FSCreateDirectoryExclusiveStrict(_MVSP.Root)
 		FSCreateDirectoryExclusiveStrict(_MVSP.Root . "\assets")

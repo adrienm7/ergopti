@@ -21,10 +21,14 @@ _OWMO_ChildSource() {
 	AssertTrue(Owner != "", "the child must include the unique actual message-handler owner")
 	Body := _DriverFuncBody("OllamaWV_OnWebMessage")
 	AssertTrue(Body != "", "the production handler must exist before its owner is included")
+	IdentityOwner := _DriverProductionFileForSymbol("WebView_SameCore")
+	AssertTrue(IdentityOwner != "" && _DriverFuncBody("WebView_SameCore") != "",
+		"the child must include its actual shared Core-identity owner")
 	Fixture := _DriverDir . "\tests\fixtures\ollama_webview_message_owner_body.ahk"
 	AssertTrue(FileExist(Fixture) != "", "the registered child must retain its actual behavioral fixture")
 	return '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 		. "#Include " . Owner . "`n"
+		. "#Include " . IdentityOwner . "`n"
 		. 'global _SharedDir := A_Args[2], _I18nLocale := "fr"' . "`n"
 		. 'LoggerInfo(*) => _OWMB_Log()' . "`n"
 		. 'LoggerError(Tag, Text, *) {' . "`n throw Error(Text)`n}`n"

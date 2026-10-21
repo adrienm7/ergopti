@@ -33,8 +33,8 @@ _MAD_Source(Root) {
 	Source .= "#Include " . ButtonHelper . "`n"
 	Seen := Map()
 	for Symbol in ["LocaleTableData", "WindowTitle", "LoggerTrace", "WallClockTimestamp", "Redact_Apply", "JsonParse",
-		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "WebView_RunScriptAsync", "ConfigTransitionNormalizeConfigDir",
-		"ConfigTransitionPrepare", "ReloadTerminalHandoffActive", "ShellRunner_SpawnTreeOwned",
+		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "WebView_RunScriptAsync", "WebView_SameCore",
+		"ConfigTransitionNormalizeConfigDir", "ConfigTransitionPrepare", "ReloadTerminalHandoffActive", "ShellRunner_SpawnTreeOwned",
 		"PLC_CreateProcessWithInheritedHandles", "WMHandleExists",
 		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared", "t", "I18nGetLocale", "Gui_Create", "AppPicker_Show",
 		"KL_WriteAtomic", "KL_AppCat_Init", "SQLite_Open", "KeyloggerWalkerLoadTimings", "KLW_WalkTypingEntry",

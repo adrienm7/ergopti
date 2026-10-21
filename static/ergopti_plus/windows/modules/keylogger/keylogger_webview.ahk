@@ -618,11 +618,15 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 	if !KLWV_IsCurrent(which, Epoch)
 		return
 	entry := KLWV.windows[which]
-	if !entry.Has("webview") || !(sender == entry["webview"])
+	if !entry.Has("webview")
 		return
 	View := entry["webview"]
 	HasNavigation := entry.Has("navigation_url")
 	NavigationUrl := HasNavigation ? entry["navigation_url"] : ""
+	if !WebView_SameCore(sender, View)
+		return
+	if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
+		return
 	if HasNavigation {
 		Source := args.Source
 		if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)

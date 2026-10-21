@@ -34,6 +34,32 @@ global _WebView_SharedEnvRetired := false
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
 global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
 
+/** Compare native Core identity without interning vendor wrappers or trusting a raw Ptr. */
+WebView_SameCore(Sender, Expected) {
+	if !IsObject(Sender) || !IsObject(Expected)
+		return false
+	CoreAvailable := IsSet(WebView2) && HasProp(WebView2, "Core")
+	SenderIsCore := CoreAvailable && (Sender is WebView2.Core)
+	ExpectedIsCore := CoreAvailable && (Expected is WebView2.Core)
+	; Passive headless views keep exact identity without native-property reads.
+	; Even an identical native wrapper must still own a usable Core pointer.
+	if !SenderIsCore && !ExpectedIsCore
+		return Sender == Expected
+	if !SenderIsCore || !ExpectedIsCore || !Sender.Ptr || !Expected.Ptr
+		return false
+	try {
+		; IUnknown is COM's canonical identity. Retain both queried references
+		; until comparison; interface addresses and AHK wrapper objects can differ.
+		IUnknown := "{00000000-0000-0000-C000-000000000046}"
+		SenderUnknown := ComObjQuery(Sender, IUnknown)
+		ExpectedUnknown := ComObjQuery(Expected, IUnknown)
+		return ComObjValue(SenderUnknown) == ComObjValue(ExpectedUnknown)
+	} catch as Err {
+		try LoggerWarn("WebView", "Browser identity query refused: {1}.", Err.Message)
+		return false
+	}
+}
+
 /** Invalidate virtual-host subresources before reusing a native document host. */
 WebView_ClearDocumentCache(WebView) {
 	global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS
