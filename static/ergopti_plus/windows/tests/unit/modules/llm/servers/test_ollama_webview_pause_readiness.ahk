@@ -19,7 +19,7 @@ _OPRP_ChildSource() {
 	global _DriverDir
 	Source := '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 	Seen := Map()
-	for Symbol in ["OllamaWV_FlushQueue", "Ergopti_OnSuspendResume", "LLM_Menu_ApplySharedDefaults",
+	for Symbol in ["OllamaWV_FlushQueue", "Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent", "LLM_Menu_ApplySharedDefaults",
 		"LLM_Deps_Cancel", "LLM_Ollama_SetPort", "LLM_Option_TryNormalizeOllamaPort",
 		"WebView_SameCore", "LoggerInfo", "WallClockTimestamp", "TickElapsed", "JsonStringLiteral"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
