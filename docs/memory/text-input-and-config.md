@@ -79,6 +79,28 @@ not an error. `(hsfix-notepad-interleave)` and `(hsfix-notepad-capture)` pin it.
 Each physical character enters the custom engine exactly once. Windows and macOS
 word-boundary framing differ intentionally because their event ownership differs.
 
+### project-backspace-word-start
+
+The word-start flag (`HSE_StartIsWordBoundary`, Lua `_start_is_boundary`,
+macOS `start_is_word_boundary`) describes the left edge of the buffer, and the
+Windows and macOS buffers keep terminators, so a Backspace that empties the
+buffer is back where the typing began: it sets the flag (2026-10-21, all three
+drivers; Windows only for the user's Backspace, `HSE_FeedBackspace(true, true)`,
+never the driver's probe Space). A Backspace on an empty buffer flips it
+unknown, except at a known empty line (`HSE_StartIsLineStart`, Lua
+`reset(true, true)`, macOS `start_is_line_start`): a bare Enter in a terminal,
+Ctrl/Cmd+A outside a terminal, Ctrl/Cmd+L in a browser. Every reset that moves
+the caret must clear that line-start flag. The proven incident (typing ledger,
+Windows Terminal running Claude Code): Enter, a pause, `c★` fired, six
+Backspaces over the five characters of « c’est », then `C★` was not offered;
+the sixth Backspace hit the empty prompt. Two more rules ship with it: the idle
+reset never throws away the word a following Backspace edits (Windows restores
+it through `_PrefixRestoreIdleForgottenWord`, macOS skips the wipe for a bare
+Backspace, Linux never idle-resets on a control key), and Ctrl+Backspace
+(Option+Backspace on macOS) starts a word. The ledger's `typing` rows are
+batched about every 200 ms, so a sequence must be rebuilt across rows from the
+per-key delays, never read row by row.
+
 ### project-hotstring-delay-architecture
 
 Typing delays live in shared timing constants with explicit per-driver
