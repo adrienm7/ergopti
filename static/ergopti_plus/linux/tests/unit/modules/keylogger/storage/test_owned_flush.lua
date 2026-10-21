@@ -292,6 +292,12 @@ helpers.describe("owned SQLite collector flush", function()
 end)
 
 helpers.describe("linux-open-session-crash-recovery", function()
+	--- A keystroke stamp just before now on the monotonic clock the flush settles
+	--- with. A fixed small stamp read as typed long ago once the host had been up
+	--- longer than the session gap, so the session closed at the first flush.
+	local function recent_stamp(index)
+		return math.floor(require("infra.monotonic").now_ms()) - 1000 + 100 * index
+	end
 	--- Starts one collector process against a shared logical database.
 	local function process(writer, body)
 		local writer_name, keylogger_name = "modules.keylogger.sqlite_writer", "modules.keylogger.keylogger"
@@ -322,7 +328,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 	it("linux-open-session-crash-recovery: the session still open at a COMMIT is recorded with it", function()
 		local writer = Fakes.sqlite_writer()
 		process(writer, function(k)
-			for index, char in ipairs({ "a", "b", "c" }) do k.on_keydown(char, 1000 + 100 * index, "owned") end
+			for index, char in ipairs({ "a", "b", "c" }) do k.on_keydown(char, recent_stamp(index), "owned") end
 			helpers.assert_true(k.flush())
 		end)
 		local text = record(writer)
@@ -334,7 +340,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 	it("linux-open-session-crash-recovery: a process after a crash credits the open session once", function()
 		local writer = Fakes.sqlite_writer()
 		process(writer, function(k)
-			for index, char in ipairs({ "a", "b", "c" }) do k.on_keydown(char, 1000 + 100 * index, "owned") end
+			for index, char in ipairs({ "a", "b", "c" }) do k.on_keydown(char, recent_stamp(index), "owned") end
 			helpers.assert_true(k.flush())
 			-- No stop(): the process dies here, before its final flush.
 		end)
@@ -353,7 +359,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 	it("linux-open-session-crash-recovery: a clean stop leaves nothing to recover", function()
 		local writer = Fakes.sqlite_writer()
 		process(writer, function(k)
-			for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, 1000 + 100 * index, "owned") end
+			for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, recent_stamp(index), "owned") end
 			helpers.assert_true(k.flush())
 			k.stop()
 			helpers.assert_eq(#sessions_for(writer, "owned"), 1)
@@ -378,7 +384,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 		process(writer, function(k)
 			helpers.assert_true(k.flush())
 			helpers.assert_eq(writes, 0, "nothing open and nothing recorded: no write")
-			k.on_keydown("a", 1100, "owned")
+			k.on_keydown("a", recent_stamp(1), "owned")
 			helpers.assert_true(k.flush())
 			helpers.assert_eq(writes, 1)
 			helpers.assert_true(k.flush())
@@ -391,7 +397,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 			local writer = Fakes.sqlite_writer()
 			writer.meta["open_walk:" .. "linux-" .. (io.popen("hostname"):read("*l") or "linux"):gsub("%s+", "")] = text
 			process(writer, function(k)
-				for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, 1000 + 100 * index, "fresh") end
+				for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, recent_stamp(index), "fresh") end
 				helpers.assert_true(k.flush())
 			end)
 			helpers.assert_eq(#writer.sessions, 0, text)
