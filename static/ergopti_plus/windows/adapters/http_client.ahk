@@ -508,6 +508,10 @@ class CurlAsyncRequest {
 	SetRequestHeader(Name, Value) {
 		if !_HTTP_CurlScalarIsSafe(Name) || !_HTTP_CurlScalarIsSafe(Value)
 			throw ValueError("HTTP header contains a control character.")
+		; The managed worker admits only RFC 9110 token names; refusing here
+		; keeps every refusal ahead of dispatch and of any replaced request.
+		if !RegExMatch(Name, "^[!#$%&'*+.^_``|~0-9A-Za-z-]+$")
+			throw ValueError("HTTP header name is not a token.")
 		this.Headers[String(Name)] := String(Value)
 	}
 
@@ -1684,6 +1688,30 @@ _SystemProxy_CurlSelectionIsCurrent(Url, ReaderFn, EnvFn, Identity) {
 HTTPPost(Url, Headers, Body, Callback) {
 	Started := A_TickCount
 	global _HTTP_ACTIVE_REQUEST, HTTP_TIMEOUT_MS, _HTTP_REQUEST_GENERATION
+	Result := Map("ok", false, "status", 0, "body", "", "error", "")
+	; Compose and validate the complete replacement before touching the active
+	; request: a refused URL or header must never cancel a valid request.
+	try {
+		Req := CurlAsyncRequest()
+		Req.SetTimeouts(HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS)
+		Req.Open("POST", Url, true)
+		if (Headers is Map) {
+			for HName, HVal in Headers
+				Req.SetRequestHeader(HName, HVal)
+		}
+	} catch as Err {
+		; The refusal names the rule, never the refused URL or header bytes.
+		LoggerWarn("HttpClient", "HTTPPost: request refused before dispatch: {1}", Err.Message)
+		Result["error"] := Err.Message
+		if Callback != 0 && !A_IsSuspended {
+			try
+				Callback(Result)
+			catch as CallbackErr {
+				LoggerError("HttpClient", "HTTPPost: completion callback threw: {1}", CallbackErr.Message)
+			}
+		}
+		return
+	}
 	if _HTTP_ACTIVE_REQUEST != 0 {
 		LoggerWarn("HttpClient", "HTTPPost: reentrant call for '{1}' while a request is already active - cancelling the in-flight request first.", Url)
 		HTTPCancel()
@@ -1696,19 +1724,10 @@ HTTPPost(Url, Headers, Body, Callback) {
 	; guard adapters/text_sender.ahk uses for its clipboard-restore race.
 	_HTTP_REQUEST_GENERATION += 1
 	MyGeneration := _HTTP_REQUEST_GENERATION
-	Result := Map("ok", false, "status", 0, "body", "", "error", "")
 	try {
-		Req := CurlAsyncRequest()
 		_HTTP_ACTIVE_REQUEST := Req
 		Req.SetManagedRouting(0, () => _HTTP_REQUEST_GENERATION == MyGeneration && _HTTP_ACTIVE_REQUEST == Req)
 		Req.SetDeadline(Started, HTTP_TIMEOUT_MS * 4)
-		Req.SetTimeouts(HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS, HTTP_TIMEOUT_MS)
-		Req.Open("POST", Url, true)
-		; Set caller-supplied headers.
-		if (Headers is Map) {
-			for HName, HVal in Headers
-				Req.SetRequestHeader(HName, HVal)
-		}
 		if !Req.Send(Body) || !_HTTP_ManagedWait(Req)
 			throw Error("The managed HTTP request refused dispatch or completion.")
 		Status := Req.Status
