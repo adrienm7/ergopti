@@ -69,6 +69,39 @@ helpers.describe("infra.keystroke_integrity", function()
 		helpers.assert_eq(Integrity.drop_count(), 2)
 	end)
 
+	-- Issue #99 reported swallowed keys and logged no drop: every loss happened
+	-- upstream of the taps, across a lease fence or a rule reload the ring could
+	-- not see past (keystroke-exposure-report).
+	helpers.it("names keys typed across an input transition, once per cause (keystroke-exposure-report)", function()
+		Integrity.reset()
+		warnings, deferred = {}, {}
+		now_ms = 70000
+		Integrity.record("passed")
+		Integrity.record("passed")
+		now_ms = 70000 + Integrity.EXPOSURE_WINDOW_MS - 1
+		Integrity.record("consumed")
+		helpers.assert_true(Integrity.report_exposure("a Karabiner lease fence"))
+		helpers.assert_true(Integrity.report_exposure("a Karabiner lease fence"))
+		helpers.assert_eq(#warnings, 0, "nothing may be logged inside the caller's turn")
+		helpers.assert_eq(#deferred, 1)
+		deferred[1].callback()
+		helpers.assert_eq(#warnings, 1, "one transition is one line")
+		helpers.assert_true(warnings[1].text:find("^3 key%-down%(s%) of the last 2000 ms were typed across a Karabiner lease fence") ~= nil,
+			warnings[1].text)
+	end)
+
+	helpers.it("stays silent when nobody was typing (keystroke-exposure-report)", function()
+		Integrity.reset()
+		warnings, deferred = {}, {}
+		now_ms = 90000
+		Integrity.record("passed")
+		now_ms = 90000 + Integrity.EXPOSURE_WINDOW_MS + 1
+		helpers.assert_eq(Integrity.report_exposure("a keyDown event-tap outage"), false)
+		helpers.assert_eq(#deferred, 0)
+		helpers.assert_eq(Integrity.note_exposure(""), false,
+			"the input-path variant contains a refused cause instead of raising")
+	end)
+
 	package.loaded["infra.logger"] = saved.logger
 	package.loaded["infra.deferred_work"] = saved.deferred
 	package.loaded["adapters.timer_scheduler"] = saved.timer

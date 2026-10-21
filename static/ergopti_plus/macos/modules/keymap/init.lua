@@ -2324,6 +2324,9 @@ tap_watchdog = function(timer, generation)
 	end
 	local keydown_revived = revive("keyDown", tap)
 	local keyup_revived = revive("loopbackKeyUp", loopback_keyup_tap)
+	-- A press made while the tap was off reached the application undecided:
+	-- name the outage when the user was typing around it.
+	if keydown_revived then KeystrokeIntegrity.note_exposure("a keyDown event-tap outage") end
 	if (keydown_revived or keyup_revived) and _one_shot_shift then _one_shot_shift.reset() end
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
