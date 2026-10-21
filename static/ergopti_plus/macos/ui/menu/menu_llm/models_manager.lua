@@ -282,11 +282,16 @@ function M.new(deps)
 		local requirement_lifecycle = type(opts) == "table"
 			and opts._requirement_lifecycle or nil
 		local cancellation_sent = false
-		local function cancel_once(label)
+		--- Cancels the requirement once.
+		--- @param label string Diagnostic label of the cancelling boundary.
+		--- @param reason string|nil RequirementRegistry.CANCEL_* when the user
+		---   chose it or the disk cannot hold the model: the caller tells that
+		---   from a failure.
+		local function cancel_once(label, reason)
 			if cancellation_sent then return false end
 			cancellation_sent = true
 			if type(on_cancel) ~= "function" then return true end
-			local ok, result = Logger.callback(LOG, label, on_cancel)
+			local ok, result = Logger.callback(LOG, label, on_cancel, reason)
 			return ok and result ~= false
 		end
 		local function still_current()
@@ -496,7 +501,7 @@ function M.new(deps)
 				if not owner_current_or_cancel() then return true end
 				if is_critical then
 					pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
-					cancel_once("System-check cancellation")
+					cancel_once("System-check cancellation", RequirementRegistry.CANCEL_DISK_INSUFFICIENT)
 					return true
 				end
 				
@@ -533,7 +538,7 @@ function M.new(deps)
 						return false
 					end
 				else
-					cancel_once("Download prompt cancellation")
+					cancel_once("Download prompt cancellation", RequirementRegistry.CANCEL_DOWNLOAD_DECLINED)
 				end
 				return true
 			end

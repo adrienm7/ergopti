@@ -26,6 +26,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
+local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 local LOG = "startup_ctrl"
 
@@ -479,6 +480,15 @@ function M.new(ctx)
 		_startup_timer_generation = _startup_timer_generation + 1
 		_startup_abort_pending = true
 		if settle_startup_abort() ~= true then
+			if _startup_settlement_observer ~= nil then
+				-- A terminal delivered from inside its own requirement task cannot
+				-- join that task yet: the armed observer finishes the settlement
+				-- once it retires. Expected, so no error window opens (#99).
+				Logger.info(LOG,
+					"Startup-cycle settlement after '%s' waits for its requirement tasks to retire.",
+					tostring(reason))
+				return false
+			end
 			Logger.error(LOG,
 				"Startup-cycle settlement remains unsettled after '%s'.",
 				tostring(reason))
@@ -760,16 +770,18 @@ function M.new(ctx)
 		Logger.info(LOG, string.format("LLM enabled at startup, model: %s.", state.llm_model or "nil"))
 
 		--- Turns the AI off for this failed startup check.
-		--- @param cause table|nil { backend, reason, offer } when the user is told
-		---   what is wrong and how to fix it: a warning, and `offer` (the
-		---   unreachable-backend error) once the AI is off. Nil for an unexplained
-		---   failure, which stays an error.
+		--- @param cause table|string|nil { backend, reason, offer } when the user
+		---   is told what is wrong and how to fix it: a warning, and `offer` (the
+		---   unreachable-backend error) once the AI is off. A string or nil is the
+		---   manager's reason for an unexplained failure, which stays an error.
 		local function disable_llm(cause)
 			if type(cause) == "table" then
 				Logger.warn(LOG, "Disabling LLM: the %s backend %s.", tostring(cause.backend),
 					tostring(cause.reason))
 			else
-				Logger.error(LOG, "Disabling LLM (requirements check failed).")
+				Logger.error(LOG, "Disabling LLM (requirements check failed: %s).",
+					tostring(cause or "no reason given"))
+				cause = nil
 			end
 			state.llm_enabled = false
 			local preference_applied = false
@@ -965,7 +977,19 @@ function M.new(ctx)
 						offer = true,
 					})
 				end
-				return disable_llm()
+				-- The user closed the download prompt, or the dialog said the
+				-- disk cannot hold the model: they know, so no error window
+				if reason == RequirementRegistry.CANCEL_DOWNLOAD_DECLINED then
+					return disable_llm({ backend = state.llm_backend,
+						reason = "lacks the model '" .. tostring(state.llm_model)
+							.. "' and its download was declined" })
+				end
+				if reason == RequirementRegistry.CANCEL_DISK_INSUFFICIENT then
+					return disable_llm({ backend = state.llm_backend,
+						reason = "lacks the model '" .. tostring(state.llm_model)
+							.. "' and the disk cannot hold it" })
+				end
+				return disable_llm(reason)
 			end)
 			if dispatch_result ~= true then
 				abort_startup_cycle("requirements dispatch")
