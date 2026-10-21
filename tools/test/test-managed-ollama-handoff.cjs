@@ -25,6 +25,7 @@ const os = require('node:os');
 const path = require('node:path');
 const YAML = require('yaml');
 const Handoff = require('../ci/managed-ollama-handoff.cjs');
+const { API_PAGE_SIZE } = require('../ci/github-api-page.cjs');
 const { roleLot } = require('../ci/macos-stage-roles.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -613,6 +614,35 @@ assert.ok(
 );
 controls += 4;
 
-console.log(
-	`PASS: managed Ollama build handoff — ${controls} admission, refusal and wiring controls.`
+// A run listing is read one page of API_PAGE_SIZE at a time: GitHub answered
+// 502 for every jobs page of 70 or more jobs of a three-OS dispatch.
+const paging = (async () => {
+	assert.equal(API_PAGE_SIZE, 50, 'GitHub answers 502 for heavier jobs pages');
+	const rows = Array.from({ length: 2 * API_PAGE_SIZE + 1 }, (_, id) => ({ id }));
+	const routes = [];
+	const read = async (route) => {
+		routes.push(route);
+		const match = /[?&]per_page=(\d+)&page=(\d+)$/.exec(route);
+		assert.ok(match, 'every listing names its page size and page');
+		const size = Number(match[1]);
+		const page = Number(match[2]);
+		return { jobs: rows.slice((page - 1) * size, page * size) };
+	};
+	assert.deepEqual(await Handoff.listAll('/runs/1/jobs?filter=latest', 'jobs', read), rows);
+	assert.deepEqual(
+		routes,
+		[1, 2, 3].map((page) => '/runs/1/jobs?filter=latest&per_page=50&page=' + page)
+	);
+	controls++;
+})();
+
+paging.then(
+	() =>
+		console.log(
+			`PASS: managed Ollama build handoff — ${controls} admission, refusal and wiring controls.`
+		),
+	(error) => {
+		console.error(error);
+		process.exitCode = 1;
+	}
 );

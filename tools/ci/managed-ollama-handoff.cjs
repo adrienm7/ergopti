@@ -28,6 +28,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const { API_PAGE_SIZE } = require('./github-api-page.cjs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
@@ -386,12 +387,21 @@ async function api(route) {
 	return response.json();
 }
 
-async function listAll(route, key) {
+/**
+ * Lists every record of one run listing, one page of API_PAGE_SIZE at a time.
+ * @param {string} route API route of the listing, with or without a query.
+ * @param {string} key Field holding the records (jobs or artifacts).
+ * @param {(route: string) => Promise<object>} read Reads one API route.
+ * @returns {Promise<object[]>}
+ */
+async function listAll(route, key, read = api) {
 	const rows = [];
 	for (let page = 1; ; page++) {
-		const body = await api(route + (route.includes('?') ? '&' : '?') + 'per_page=100&page=' + page);
+		const body = await read(
+			route + (route.includes('?') ? '&' : '?') + 'per_page=' + API_PAGE_SIZE + '&page=' + page
+		);
 		rows.push(...body[key]);
-		if (body[key].length < 100) return rows;
+		if (body[key].length < API_PAGE_SIZE) return rows;
 	}
 }
 
@@ -487,6 +497,7 @@ async function main(args) {
 }
 
 module.exports = {
+	listAll,
 	members,
 	artifactName,
 	producerJobSuffix,

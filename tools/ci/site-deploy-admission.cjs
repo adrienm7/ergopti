@@ -8,6 +8,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const { resolveSiteTarget, siteLot, siteLots } = require('../dev/site-context.cjs');
+const { API_PAGE_SIZE } = require('./github-api-page.cjs');
 const REPOSITORY = 'adrienm7/ergopti';
 const MAX_RECORDS = 1000;
 
@@ -38,9 +39,14 @@ async function collect(readApi, endpoint, field) {
 	const records = [];
 	const ids = new Set();
 	let expected;
-	for (let page = 1; page <= MAX_RECORDS / 100; page++) {
+	for (let page = 1; page <= MAX_RECORDS / API_PAGE_SIZE; page++) {
 		const response = await readApi(
-			endpoint + (endpoint.includes('?') ? '&' : '?') + 'per_page=100&page=' + page
+			endpoint +
+				(endpoint.includes('?') ? '&' : '?') +
+				'per_page=' +
+				API_PAGE_SIZE +
+				'&page=' +
+				page
 		);
 		refuse(
 			Number.isSafeInteger(response.total_count) &&
@@ -52,7 +58,7 @@ async function collect(readApi, endpoint, field) {
 		refuse(
 			response.total_count === expected &&
 				Array.isArray(response[field]) &&
-				response[field].length <= 100,
+				response[field].length <= API_PAGE_SIZE,
 			'API census changed or is malformed.'
 		);
 		for (const row of response[field]) {
@@ -63,7 +69,7 @@ async function collect(readApi, endpoint, field) {
 		}
 		refuse(records.length <= expected, 'API census has extra records.');
 		if (records.length === expected) return records;
-		refuse(response[field].length === 100, 'API census is incomplete.');
+		refuse(response[field].length === API_PAGE_SIZE, 'API census is incomplete.');
 	}
 	throw new Error('Site deployment admission refused: API census did not terminate.');
 }
