@@ -8,8 +8,10 @@
 ; removed. But Ctrl+Backspace deletes a whole WORD on screen, so the engine buffer
 ; ended up ahead of the screen; a later trigger match then fired an expansion whose
 ; {BackSpace N} chewed into unrelated text. Ctrl+Backspace destroys an unknown
-; amount left of the cursor, so it must be treated as a context-unknown wipe like
-; Ctrl+X, not a single decrement. (F20, audit 2026-07-20.)
+; amount left of the cursor, so it must wipe both buffers like Ctrl+X, not
+; decrement them by one (F20, audit 2026-07-20). Since 2026-10-21 the wipe
+; starts a word, as the caret then sits where the deleted word began; its
+; behaviour is pinned in test_hotstring_backspace_word_start.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -21,8 +23,8 @@ _PKCB_CtrlBackspaceResetsBuffer() {
 	; The Ctrl-combo reset group must include VK == 0x08 (Backspace), and its
 	; paired context invalidation must precede the plain single-decrement helper
 	; so Ctrl+Backspace never falls through to it.
-	ResetGroupPos := InStr(Body, "_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)")
-	Assert(ResetGroupPos > 0, "_OnPrefixKeyDown must keep the context-unknown reset for Ctrl+X/V/Z/Y")
+	ResetGroupPos := InStr(Body, "_PrefixInvalidateInputContext(_PrefixFocusedControlToken, _PrefixWordDeleteChordHeld())")
+	Assert(ResetGroupPos > 0, "_OnPrefixKeyDown must keep the whole-context reset for Ctrl+Backspace")
 	GroupCond := SubStr(Body, 1, ResetGroupPos)
 	VkCondPos := InStr(GroupCond, "VK == 0x08", , -1)
 	Assert(VkCondPos > 0,
@@ -60,7 +62,7 @@ _PKCB_FocusedControlGenerationIsWiredToLiveCallbacks() {
 		"OnChar must verify the focused-control generation before feeding a character to HSE")
 
 	CriticalPos := InStr(Invalidate, 'Critical("On")')
-	CommitCallPos := InStr(Invalidate, "_PrefixCommitInputContext(FocusToken, KnownBoundary)", true, CriticalPos)
+	CommitCallPos := InStr(Invalidate, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)", true, CriticalPos)
 	RestorePos := InStr(Invalidate, "Critical(PreviousCritical)", true, CommitCallPos)
 	EngineResetPos := InStr(Commit, "HSE_FeedReset(")
 	PreviewResetPos := InStr(Commit, '_PrefixSetBuffer("")')

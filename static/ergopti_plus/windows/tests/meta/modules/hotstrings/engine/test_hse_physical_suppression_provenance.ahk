@@ -19,13 +19,13 @@ _HPSP_PhysicalInputBypassesSyntheticSuppress() {
         "HSE_FeedBackspace must preserve physical backspaces during synthetic suppression")
 	Assert(InStr(KeyDownHook, "_PrefixFeedBackspace()") > 0
 		and InStr(BackspacePair, "_PrefixCommitBackspace()") > 0
-		and InStr(BackspaceCommit, "HSE_FeedBackspace(true)") > 0,
+		and InStr(BackspaceCommit, "HSE_FeedBackspace(true, true)") > 0,
 		"InputHook keydown must route Backspace through the paired helper that marks it physical")
     Assert(InStr(Reset, "IsPhysical := false") > 0 && InStr(Reset, "HSE_Suppressed and !IsPhysical") > 0,
         "HSE_FeedReset must preserve physical navigation resets during synthetic suppression")
 	Assert(InStr(KeyDownHook, "_PrefixInvalidateInputContext(") > 0
-		and InStr(ResetPair, "_PrefixCommitInputContext(FocusToken, KnownBoundary)") > 0
-		and InStr(ResetCommit, "HSE_FeedReset(KnownBoundary, true)") > 0,
+		and InStr(ResetPair, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)") > 0
+		and InStr(ResetCommit, "HSE_FeedReset(KnownBoundary, true, AtLineStart)") > 0,
 		"InputHook navigation resets must use the paired helper with physical provenance")
 }
 Test("HSE: physical input bypasses synthetic suppression by provenance", _HPSP_PhysicalInputBypassesSyntheticSuppress)

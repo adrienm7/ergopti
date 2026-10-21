@@ -118,7 +118,7 @@ _NCR_EngineResetsForEveryNavKey() {
 	Body := _DriverFuncBody("_OnPrefixKeyDown")
 	Assert(Body != "", "_OnPrefixKeyDown() must exist in the driver source")
 	Gate := InStr(Body, "else if ResetVKs.Has(VK)")
-	Pair := InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary)", true, Gate)
+	Pair := InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary, AtLineStart)", true, Gate)
 	Assert(Gate > 0 and Pair > Gate,
 		"every key enumerated by ResetVKs must flow through the same paired engine+preview transaction; a second VK list is the N-of-M drift this test prevents")
 }
@@ -133,7 +133,7 @@ _NCR_BoundaryPromiseMatchesTheContract() {
 	; Insert/Delete select boundary FALSE; all other ResetVKs keep TRUE.
 	Assert(InStr(Body, "KnownBoundary := !(VK == 0x2D or VK == 0x2E)") > 0,
 		"Insert and Delete must reset with the boundary flag FALSE, like the disruptive Ctrl combos: they rewrite text in place without moving the caret, so nothing can be assumed about what now sits to its left")
-	Assert(InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary)") > 0,
+	Assert(InStr(Body, "_PrefixInvalidateInputContext(FocusToken, KnownBoundary, AtLineStart)") > 0,
 		"the cursor movers must keep resetting with the boundary flag TRUE — the caret landed somewhere unknown, but the next typed run legitimately starts a fresh word")
 }
 

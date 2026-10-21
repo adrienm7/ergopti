@@ -107,8 +107,10 @@ HS_ShortcutWordResetKey() {
 ; @param Key {String} "arrow_resets_word", "shortcut_resets_word" or
 ;        "tap_hold_resets_word".
 ; @param Reason {String} The event, for the debug log.
+; @param AtLineStart {Boolean} The event also left the caret in an empty field
+;        (Ctrl+A, whose selection the next Backspace or character replaces).
 ; @returns {Boolean} True when the word was reset.
-HS_ApplyEventWordReset(Key, Reason) {
+HS_ApplyEventWordReset(Key, Reason, AtLineStart := false) {
 	global _PrefixFocusedControlToken
 	if IsSet(_PrefixRevokeIncompleteFragments)
 		_PrefixRevokeIncompleteFragments()
@@ -118,9 +120,9 @@ HS_ApplyEventWordReset(Key, Reason) {
 		return false
 	}
 	if IsSet(_PrefixInvalidateInputContext) {
-		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true, AtLineStart)
 	} else if IsSet(HSE_FeedReset) {
-		HSE_FeedReset(true, true)
+		HSE_FeedReset(true, true, AtLineStart)
 	}
 	if LoggerIsDebugEnabled()
 		LoggerDebug("HotstringBuffers", "{1}: new word (hotstrings.{2}).", Reason, Key)
@@ -170,7 +172,7 @@ HS_CommitSyntheticEffect(Payload, SendFailed := false) {
 			if HasPreviewCommit {
 				BackspaceCommit := _PrefixCommitBackspace()
 			} else if IsSet(HSE_FeedBackspace) {
-				HSE_FeedBackspace(true)
+				HSE_FeedBackspace(true, true)
 			}
 		}
 		return {
