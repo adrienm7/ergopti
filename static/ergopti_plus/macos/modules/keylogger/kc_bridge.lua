@@ -29,6 +29,7 @@ local M = {}
 
 local hs      = hs
 local Logger  = require("infra.logger")
+local NativePath = require("native_path")
 local Timings = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "keylogger.kc_bridge"
@@ -39,9 +40,7 @@ local LOG     = "keylogger.kc_bridge"
 local KC_LOG_PATH
 do
 	local mp = require("infra.config_paths")
-	local d  = mp.get_config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	KC_LOG_PATH = d .. "metrics/karabiner_kc.log"
+	KC_LOG_PATH = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
 end
 
 -- Maximum lines drained per watcher callback to avoid monopolising the run loop
