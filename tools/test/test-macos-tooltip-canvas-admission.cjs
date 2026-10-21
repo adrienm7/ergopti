@@ -36,7 +36,7 @@ function state(needs) {
 	};
 }
 
-const oldJobs = ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
+const oldJobs = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch'];
 const oldNeeds = Object.fromEntries(oldJobs.map((job) => [job, { result: 'success' }]));
 // Independent transport/bootstrap jobs remain mandatory while this fixture
 // isolates canvas refusal ahead of missing launch/package observations.
@@ -95,16 +95,16 @@ for (const job of ['managed-ollama-native', 'cold-bootstrap-native']) {
 
 const canvasStage = pipeline.job('e2e-hs');
 const canvas = macRole.body(pipeline.file('.github/workflows/ci-macos.yml'), 'tooltip-canvas');
-assert.deepEqual(pipeline.needsOf(canvasStage), ['test-hs']);
+assert.deepEqual(pipeline.needsOf(canvasStage), ['integration-hs']);
 assert.equal(
 	pipeline.field(canvasStage, 'runs-on'),
-	'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}'
+	'${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}'
 );
 assert.equal(pipeline.field(canvasStage, 'if'), null);
 assert.equal(pipeline.field(canvasStage, 'continue-on-error'), null);
 assert.equal(
 	pipeline.field(canvasStage, 'timeout-minutes'),
-	'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}'
+	'${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}'
 );
 for (const release of [false, true])
 	for (const event_name of ['push', 'pull_request', 'workflow_dispatch']) {

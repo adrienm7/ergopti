@@ -3,14 +3,6 @@
 	"feature": "data-and-source-contracts",
 	"checks": [
 		{
-			"id": "js-0031",
-			"ordinal": 43,
-			"name": "domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
-			"cmd": "npm",
-			"args": ["run", "--silent", "build:domain"],
-			"repro": "npm run build:domain"
-		},
-		{
 			"id": "js-0033",
 			"ordinal": 45,
 			"name": "translation key consistency audit",
@@ -187,14 +179,6 @@
 			"repro": "node tools/test/test-no-fallback-literals.cjs"
 		},
 		{
-			"id": "js-0160",
-			"ordinal": 172,
-			"name": "cross-driver manifest equivalence (resolved values identical across drivers)",
-			"cmd": "node",
-			"args": ["tools/test/test-manifest-equivalence.cjs"],
-			"repro": "node tools/test/test-manifest-equivalence.cjs"
-		},
-		{
 			"id": "js-0169",
 			"ordinal": 181,
 			"name": "configuration cleanup page (long lists, literal values, session actions, 21 locales)",
@@ -209,38 +193,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-repo-url-single-source.cjs"],
 			"repro": "node tools/test/test-repo-url-single-source.cjs"
-		},
-		{
-			"id": "js-0226",
-			"ordinal": 239,
-			"name": "features manifest no-drift (every committed _generated/ file matches the live generator)",
-			"cmd": "node",
-			"args": ["tools/test/test-features-manifest-no-drift.cjs"],
-			"repro": "node tools/test/test-features-manifest-no-drift.cjs"
-		},
-		{
-			"id": "js-0227",
-			"ordinal": 240,
-			"name": "drift guard detects targeted output changes and preserves exact edits",
-			"cmd": "node",
-			"args": ["tools/test/test-drift-guard-covers-every-output.cjs"],
-			"repro": "node tools/test/test-drift-guard-covers-every-output.cjs"
-		},
-		{
-			"id": "js-0228",
-			"ordinal": 241,
-			"name": "drift coverage rejects invalid receipts and restores damaged targets",
-			"cmd": "node",
-			"args": ["tools/test/test-drift-guard-coverage-oracle.cjs"],
-			"repro": "node tools/test/test-drift-guard-coverage-oracle.cjs"
-		},
-		{
-			"id": "js-0229",
-			"ordinal": 242,
-			"name": "drift restoration preserves healthy siblings after filesystem refusals",
-			"cmd": "node",
-			"args": ["tools/test/test-drift-restore-refusal.cjs"],
-			"repro": "node tools/test/test-drift-restore-refusal.cjs"
 		},
 		{
 			"id": "js-0236",
@@ -267,14 +219,6 @@
 			"repro": "node tools/test/test-locale-hints-quote-live-labels.cjs"
 		},
 		{
-			"id": "js-0239",
-			"ordinal": 252,
-			"name": "generator registry runs (npm run gen: every declared output is produced)",
-			"cmd": "node",
-			"args": ["tools/build/gen-all.cjs"],
-			"repro": "npm run gen"
-		},
-		{
 			"id": "js-0240",
 			"ordinal": 253,
 			"name": "new-driver scaffold emits one adapter per port spec (not zero)",
@@ -297,14 +241,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-port-compliance.cjs"],
 			"repro": "node tools/test/test-port-compliance.cjs"
-		},
-		{
-			"id": "js-0248",
-			"ordinal": 261,
-			"name": "feature manifest parity (Windows, macOS, and Linux projections agree)",
-			"cmd": "node",
-			"args": ["tools/test/test-manifest-parity.cjs"],
-			"repro": "node tools/test/test-manifest-parity.cjs"
 		},
 		{
 			"id": "js-0249",
@@ -345,14 +281,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-adapter-reachability.cjs"],
 			"repro": "node tools/test/test-adapter-reachability.cjs"
-		},
-		{
-			"id": "js-0263",
-			"ordinal": 276,
-			"name": "feature-state boot smoke (4 fixtures, real include graph, own process)",
-			"cmd": "node",
-			"args": ["tools/test/test-feature-state-boot-smoke.cjs"],
-			"repro": "node tools/test/test-feature-state-boot-smoke.cjs"
 		},
 		{
 			"id": "js-0264",

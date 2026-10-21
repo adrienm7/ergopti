@@ -1,24 +1,25 @@
 // tools/ci/macos-stage-roles.cjs
 'use strict';
 
-/** Keeps the five visible Mac stages complete through exact source-bound stage receipts. */
+/** Keeps the six visible Mac stages complete through exact source-bound stage receipts. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { parseClosedJson } = require('./dev-release-qualification.cjs');
-const STAGES = ['unit', 'e2e', 'build', 'testbuild'];
-const JOBS = ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
+const STAGES = ['unit', 'integration', 'e2e', 'build', 'testbuild'];
+const JOBS = ['test-hs', 'integration-hs', 'e2e-hs', 'package-macos', 'launch'];
 /**
- * The stages each stage admits directly. Build packages after Unit, beside
- * E2E, and the test build admits both, so every receipt chain still names
- * each earlier stage exactly once, in STAGES order, and the verdict proof
- * covers all four stages.
+ * The stages each stage admits directly. Integration follows Unit; Build
+ * packages after Integration, beside E2E, and the test build admits both, so
+ * every receipt chain still names each earlier stage exactly once, in STAGES
+ * order, and the verdict proof covers all five stages.
  */
 const PREDECESSORS = Object.freeze({
 	unit: Object.freeze([]),
-	e2e: Object.freeze(['unit']),
-	build: Object.freeze(['unit']),
+	integration: Object.freeze(['unit']),
+	e2e: Object.freeze(['integration']),
+	build: Object.freeze(['integration']),
 	testbuild: Object.freeze(['e2e', 'build'])
 });
 
@@ -117,11 +118,16 @@ const MODULE_GROUPS = path.resolve(
 	'../../static/ergopti_plus/macos/tests/support/module_groups.lua'
 );
 let unitGroupNames;
+// The module group the Integration stage runs instead of a Unit cell.
+const INTEGRATION_GROUP = 'integration';
+// Stages of one fixed cell: no human lot matrix, no lot metadata to admit.
+const SINGLE_CELL_STAGES = Object.freeze(['integration', 'build']);
 
 /**
  * The Lua runner's domain groups, in order, read from their one owner
- * (run.lua --module=<group>). Each names one Unit cell; the groups partition
- * the suite, so the Unit cells together run every test module once.
+ * (run.lua --module=<group>). Each names one Unit cell, except the integration
+ * group, which the Integration cell runs; the groups partition the suite, so
+ * the Unit cells and the Integration cell together run every test module once.
  */
 function unitGroups() {
 	if (unitGroupNames) return unitGroupNames.slice();
@@ -140,8 +146,9 @@ function unitGroups() {
 		/prefixes = \{\} \},?$/,
 		'The last group must be the catch-all'
 	);
-	unitGroupNames = names;
-	return names.slice();
+	assert.equal(names[0], INTEGRATION_GROUP, 'The integration group must claim its files first');
+	unitGroupNames = names.slice(1);
+	return unitGroupNames.slice();
 }
 
 /** Authored roles retain the original operating systems, architectures and job bounds. */
@@ -149,6 +156,9 @@ function plan(stage, context) {
 	validateContext(context);
 	if (stage === 'unit')
 		return unitGroups().map((group) => cell('lua-unit-meta', 'stubbed', 360, group));
+	// The Lua modules the integration group of module_groups.lua wires together
+	// for real: one cell, on the stubbed host like the unit cells.
+	if (stage === 'integration') return [cell('lua-integration', 'stubbed', 20, INTEGRATION_GROUP)];
 	// Each managed-ollama-build cell runs the clean native source build of the
 	// managed-ollama-native cell of its architecture, beside it; the sealed bytes
 	// travel through tools/ci/managed-ollama-handoff.cjs.
@@ -325,8 +335,11 @@ function selectUnitLot(lot, context) {
  * histories of a shared earlier stage refuse.
  */
 function admit(receiver, lot, metadata, needs, context, currentAttempt, receive) {
-	assert.ok(['e2e', 'build', 'testbuild'].includes(receiver), 'Unknown receiving stage');
-	if (receiver !== 'build') selectLot(receiver, lot, metadata, context);
+	assert.ok(
+		['integration', 'e2e', 'build', 'testbuild'].includes(receiver),
+		'Unknown receiving stage'
+	);
+	if (!SINGLE_CELL_STAGES.includes(receiver)) selectLot(receiver, lot, metadata, context);
 	const predecessors = PREDECESSORS[receiver];
 	const result = aggregate(needs, predecessors);
 	assert.equal(typeof receive, 'function', 'Missing prior receipt reader');
@@ -377,7 +390,7 @@ function join(receiver, proofs, context) {
 
 /** Bind the visible lot to the original receipt cell without extending the receipt schema. */
 function recordLot(stage, selected, result, prior, context, host, attempt, lot, metadata) {
-	if (stage !== 'build') {
+	if (!SINGLE_CELL_STAGES.includes(stage)) {
 		const expected =
 			stage === 'unit' ? selectUnitLot(lot, context) : selectLot(stage, lot, metadata, context);
 		assert.deepEqual(selected, expected, 'Selected human lot and receipt cell differ');
@@ -539,6 +552,7 @@ function legacyNeeds(proof, context) {
 	return Object.fromEntries(
 		[
 			'test-hs',
+			'integration-hs',
 			'e2e-hs',
 			'package-macos',
 			'launch',
@@ -666,8 +680,8 @@ function main(args) {
 		// A macOS cell runs on the macOS version its job and lot names state.
 		if (process.platform === 'darwin')
 			confirmMacosVersion(
-				stage === 'build'
-					? plan('build', context)[0]
+				SINGLE_CELL_STAGES.includes(stage)
+					? plan(stage, context)[0]
 					: selectLot(
 							stage,
 							process.env.MACOS_STAGE_LOT,
@@ -681,7 +695,9 @@ function main(args) {
 			admit(
 				stage,
 				process.env.MACOS_STAGE_LOT,
-				stage === 'build' ? undefined : parseClosedJson(process.env.MACOS_STAGE_METADATA),
+				SINGLE_CELL_STAGES.includes(stage)
+					? undefined
+					: parseClosedJson(process.env.MACOS_STAGE_METADATA),
 				parseClosedJson(process.env.MACOS_STAGE_NEEDS),
 				context,
 				Number(process.env.GITHUB_RUN_ATTEMPT),

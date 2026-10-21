@@ -198,7 +198,7 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 	},
 	'windows-native-desktop': {
 		path: '.github/workflows/ci-windows.yml',
-		args: ['test-ahk', 'Run native desktop AHK cohorts']
+		args: ['integration-ahk', 'Run native desktop AHK cohorts']
 	},
 	'linux-simultaneous-native': {
 		path: 'static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh',

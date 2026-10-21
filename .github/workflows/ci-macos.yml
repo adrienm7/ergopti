@@ -1,8 +1,8 @@
 # .github/workflows/ci-macos.yml
 #
-# macOS lane: Unit -> (E2E and Build side by side) -> Test build -> Verdict.
-# Build packages after Unit; the test build admits both E2E and Build, so the
-# verdict still proves all four stages. Native roles stay parallel inside their
+# macOS lane: Unit -> Integration -> (E2E and Build side by side) -> Test build
+# -> Verdict. Build packages after Integration; the test build admits both E2E
+# and Build, so the verdict still proves all five stages. Native roles stay parallel inside their
 # authored stage matrices.
 # Lua unit and stubbed engine E2E tests run on Ubuntu. Every macOS cell names
 # its macOS version (tools/ci/macos-stage-roles.cjs HOSTS owns the runner
@@ -72,7 +72,8 @@ jobs:
   # One row per domain group of static/ergopti_plus/macos/tests/support/
   # module_groups.lua (run.lua --module=<group>); the groups partition the
   # suite, so the rows together run every test module exactly once. The list
-  # below must equal those groups, in order (test-macos-stage-roles.cjs).
+  # below must equal those groups, in order, except the integration group,
+  # which the Integration stage runs (test-macos-stage-roles.cjs).
   test-hs:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -83,9 +84,6 @@ jobs:
         lot: [meta, core, modules, menu_llm, menu_input, ui, other]
     env:
       MACOS_STAGE_LOT: ${{ matrix.lot }}
-    outputs:
-      e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}
-      e2e_metadata: ${{ steps.stage-plan.outputs.e2e_metadata }}
     steps:
       # Enough history for test_no_coauthor_in_commits.lua, which scans
       # HEAD~20..HEAD. The default checkout is a depth-1 clone, so that range does
@@ -167,9 +165,6 @@ jobs:
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 
-      - name: Resolve exact E2E stage roles
-        id: stage-plan
-        run: node tools/ci/macos-stage-roles.cjs plan e2e
       - name: Record actual stage role outcome
         if: always()
         env:
@@ -186,32 +181,103 @@ jobs:
           retention-days: 7
           overwrite: true
 
-  e2e-hs:
-    name: E2E tests
-    permissions:
-      contents: read
-      actions: read
+  # The integration group of module_groups.lua (run.lua --module=integration),
+  # which no unit cell runs: the LLM features wired end to end with only their
+  # outer boundaries faked, the preferences and bootstrap paths round-tripped
+  # through real files, and the harness probes run as child processes. One
+  # stubbed Ubuntu cell, admitted after every Unit cell; it plans the E2E cells,
+  # and E2E and Build both admit its receipt.
+  integration-hs:
+    name: Integration tests (Lua module wiring, stubbed hs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs:
       - test-hs
-    runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}
-    timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}
-    env:
-      MACOS_STAGE_LOT: ${{ matrix.lot }}
-      MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_metadata }}
-      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot]) }}
-      MACOS_STAGE_ROLE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].role }}
-      MACOS_STAGE_RUNNER: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}
-      MACOS_STAGE_ARCHITECTURE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].architecture }}
-      MACOS_STAGE_SCENARIO: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].scenario }}
+    outputs:
+      e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}
+      e2e_metadata: ${{ steps.stage-plan.outputs.e2e_metadata }}
     steps:
       - uses: actions/checkout@v4
       - name: Download exact prior stage receipts
         uses: actions/download-artifact@v4
         with:
           pattern: macos-stage-unit-*-${{ github.run_id }}
+          path: ${{ runner.temp }}/macos-stage-inputs
+      - name: Admit complete successful predecessor stage
+        id: stage-admission
+        env:
+          MACOS_STAGE_NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/macos-stage-roles.cjs admit integration "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"
+
+      - name: Install Lua 5.4 + luarocks
+        run: |
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y lua5.4 liblua5.4-dev luarocks lua-luv
+          lua5.4 -e 'local uv = require("luv"); local a = uv.hrtime(); local b = uv.hrtime(); assert(type(a) == "number" and a >= 0 and b >= a, "native Lua wall clock is mandatory")'
+
+      - name: Install luafilesystem
+        run: sudo luarocks --lua-version 5.4 install luafilesystem
+
+      - name: Run integration tests
+        working-directory: static/ergopti_plus/macos
+        env:
+          LUA: lua5.4
+        run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua --module=integration
+
+      # Timing JSON is best-effort diagnostics; interrupted runs may have no file.
+      - name: Retain integration Lua timing diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua-timings-macos-integration-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/macos-lua.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Resolve exact E2E stage roles
+        id: stage-plan
+        run: node tools/ci/macos-stage-roles.cjs plan e2e
+      - name: Record actual stage role outcome
+        if: always()
+        env:
+          MACOS_STAGE_CELL: '{"role":"lua-integration","runner":"ubuntu-latest","architecture":"stubbed","timeout_minutes":20,"scenario":"integration"}'
+          MACOS_STAGE_RESULT: ${{ job.status }}
+        run: node tools/ci/macos-stage-roles.cjs record integration "$RUNNER_TEMP/macos-stage-prior.json" "$RUNNER_TEMP/macos-stage-output/receipt.json"
+      - name: Retain exact stage role outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-stage-integration-lua-integration-ubuntu-latest-integration-${{ github.run_id }}
+          path: ${{ runner.temp }}/macos-stage-output/receipt.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  e2e-hs:
+    name: E2E tests
+    permissions:
+      contents: read
+      actions: read
+    needs:
+      - integration-hs
+    runs-on: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}
+    timeout-minutes: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.integration-hs.outputs.e2e_matrix) }}
+    env:
+      MACOS_STAGE_LOT: ${{ matrix.lot }}
+      MACOS_STAGE_METADATA: ${{ needs.integration-hs.outputs.e2e_metadata }}
+      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot]) }}
+      MACOS_STAGE_ROLE: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].role }}
+      MACOS_STAGE_RUNNER: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}
+      MACOS_STAGE_ARCHITECTURE: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].architecture }}
+      MACOS_STAGE_SCENARIO: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].scenario }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact prior stage receipts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-stage-integration-*-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-inputs
       - name: Admit complete successful predecessor stage
         id: stage-admission
@@ -1729,7 +1795,7 @@ jobs:
       contents: read
       actions: read
     needs:
-      - test-hs
+      - integration-hs
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -1747,7 +1813,7 @@ jobs:
       - name: Download exact prior stage receipts
         uses: actions/download-artifact@v4
         with:
-          pattern: macos-stage-unit-*-${{ github.run_id }}
+          pattern: macos-stage-integration-*-${{ github.run_id }}
           path: ${{ runner.temp }}/macos-stage-inputs
       - name: Admit complete successful predecessor stage
         id: stage-admission

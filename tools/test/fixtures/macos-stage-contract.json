@@ -13,10 +13,6 @@
 						"lot": ["meta", "core", "modules", "menu_llm", "menu_input", "ui", "other"]
 					}
 				},
-				"outputs": {
-					"e2e_matrix": "${{ steps.stage-plan.outputs.e2e_matrix }}",
-					"e2e_metadata": "${{ steps.stage-plan.outputs.e2e_metadata }}"
-				},
 				"env": {
 					"MACOS_STAGE_LOT": "${{ matrix.lot }}"
 				}
@@ -58,10 +54,6 @@
 					"if": "always()"
 				},
 				{
-					"name": "Resolve exact E2E stage roles",
-					"id": "stage-plan"
-				},
-				{
 					"name": "Record actual stage role outcome",
 					"if": "always()"
 				},
@@ -73,6 +65,60 @@
 			]
 		},
 		{
+			"id": "integration-hs",
+			"metadata": {
+				"name": "Integration tests (Lua module wiring, stubbed hs)",
+				"runs-on": "ubuntu-latest",
+				"timeout-minutes": 20,
+				"needs": ["test-hs"],
+				"outputs": {
+					"e2e_matrix": "${{ steps.stage-plan.outputs.e2e_matrix }}",
+					"e2e_metadata": "${{ steps.stage-plan.outputs.e2e_metadata }}"
+				}
+			},
+			"steps": [
+				{
+					"uses": "actions/checkout@v4"
+				},
+				{
+					"name": "Download exact prior stage receipts",
+					"uses": "actions/download-artifact@v4"
+				},
+				{
+					"name": "Admit complete successful predecessor stage",
+					"id": "stage-admission"
+				},
+				{
+					"name": "Install Lua 5.4 + luarocks"
+				},
+				{
+					"name": "Install luafilesystem"
+				},
+				{
+					"name": "Run integration tests",
+					"working-directory": "static/ergopti_plus/macos"
+				},
+				{
+					"name": "Retain integration Lua timing diagnostics",
+					"if": "${{ !cancelled() }}",
+					"uses": "actions/upload-artifact@v4"
+				},
+				{
+					"name": "Resolve exact E2E stage roles",
+					"id": "stage-plan"
+				},
+				{
+					"name": "Record actual stage role outcome",
+					"if": "always()"
+				},
+				{
+					"name": "Retain exact stage role outcome",
+					"if": "always()",
+					"uses": "actions/upload-artifact@v4"
+				}
+			]
+		},
+		{
 			"id": "e2e-hs",
 			"metadata": {
 				"name": "E2E tests",
@@ -80,21 +126,21 @@
 					"contents": "read",
 					"actions": "read"
 				},
-				"needs": ["test-hs"],
-				"runs-on": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
-				"timeout-minutes": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}",
+				"needs": ["integration-hs"],
+				"runs-on": "${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
+				"timeout-minutes": "${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}",
 				"strategy": {
 					"fail-fast": false,
-					"matrix": "${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}"
+					"matrix": "${{ fromJSON(needs.integration-hs.outputs.e2e_matrix) }}"
 				},
 				"env": {
 					"MACOS_STAGE_LOT": "${{ matrix.lot }}",
-					"MACOS_STAGE_METADATA": "${{ needs.test-hs.outputs.e2e_metadata }}",
-					"MACOS_STAGE_CELL": "${{ toJSON(fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot]) }}",
-					"MACOS_STAGE_ROLE": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].role }}",
-					"MACOS_STAGE_RUNNER": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
-					"MACOS_STAGE_ARCHITECTURE": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].architecture }}",
-					"MACOS_STAGE_SCENARIO": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].scenario }}"
+					"MACOS_STAGE_METADATA": "${{ needs.integration-hs.outputs.e2e_metadata }}",
+					"MACOS_STAGE_CELL": "${{ toJSON(fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot]) }}",
+					"MACOS_STAGE_ROLE": "${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].role }}",
+					"MACOS_STAGE_RUNNER": "${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
+					"MACOS_STAGE_ARCHITECTURE": "${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].architecture }}",
+					"MACOS_STAGE_SCENARIO": "${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].scenario }}"
 				}
 			},
 			"steps": [
@@ -484,7 +530,7 @@
 					"contents": "read",
 					"actions": "read"
 				},
-				"needs": ["test-hs"],
+				"needs": ["integration-hs"],
 				"runs-on": "macos-latest",
 				"timeout-minutes": 45,
 				"outputs": {

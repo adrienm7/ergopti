@@ -31,7 +31,7 @@ const MacRoles = require('../ci/macos-stage-roles.cjs');
 
 /** Checks actual stage metadata and the typed matrix producer used by that stage. */
 function macRoleBody(body, role, expectedCount) {
-	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'test-hs';
+	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'integration-hs';
 	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
 	const metadata = role === 'cold-bootstrap-native' ? 'testbuild_metadata' : 'e2e_metadata';
 	const selected = `fromJSON(needs.${parent}.outputs.${metadata})[matrix.lot]`;
@@ -337,9 +337,10 @@ for (const platform of ['windows', 'macos']) {
 	for (const release of [false, true]) {
 		const jobs =
 			platform === 'windows'
-				? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
+				? ['test-ahk', 'integration-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
 				: [
 						'test-hs',
+						'integration-hs',
 						'e2e-hs',
 						'package-macos',
 						'launch',
@@ -674,7 +675,14 @@ try {
 }
 
 /** Pin fresh feature runners and the exact independently gated additional suites. */
-function checkCore(caller, body, prepare, browser, planner = displayPlan) {
+function checkCore(
+	caller,
+	body,
+	prepare,
+	browser,
+	planner = displayPlan,
+	integration = coreIntegration
+) {
 	assert.deepEqual(pipeline.needsOf(caller), ['validate', 'prepare-common']);
 	assert.equal(pipeline.field(caller, 'if'), null);
 	assert.equal(pipeline.field(caller, 'uses'), './.github/workflows/ci-common.yml');
@@ -703,7 +711,15 @@ function checkCore(caller, body, prepare, browser, planner = displayPlan) {
 	const inventory = loadInventory(path.resolve(__dirname, '../..'));
 	for (const ref of ['refs/heads/main', 'refs/heads/dev']) {
 		const planned = planner(inventory, ref);
-		assert.deepEqual(planned.matrix, { lot: Object.keys(planned.metadata) });
+		// The integration- features are the Integration lots; every other row a Unit lot.
+		const integrationLots = Object.keys(planned.metadata).filter((lot) =>
+			planned.metadata[lot].feature.startsWith('integration-')
+		);
+		assert.ok(integrationLots.length > 0, 'Common keeps an Integration column');
+		assert.deepEqual(planned.integration_matrix, { lot: integrationLots });
+		assert.deepEqual(planned.matrix, {
+			lot: Object.keys(planned.metadata).filter((lot) => !integrationLots.includes(lot))
+		});
 		const rows = Object.values(planned.metadata);
 		assert.deepEqual(rows, [
 			...inventory.features.map((feature) => ({ suite: 'js', feature })),
@@ -725,7 +741,7 @@ function checkCore(caller, body, prepare, browser, planner = displayPlan) {
 	assert.equal(pipeline.stepField(admission, 'id'), 'common-lot');
 	assert.equal(pipeline.stepField(admission, 'if'), null);
 	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
-	assert.deepEqual(pipeline.runOf(admission), ['node tools/ci/js-feature-matrix.cjs select']);
+	assert.deepEqual(pipeline.runOf(admission), ['node tools/ci/js-feature-matrix.cjs select unit']);
 	assert.ok(
 		body.indexOf(admission) < body.indexOf(pipeline.step(body, 'Install native validation tools'))
 	);
@@ -760,7 +776,38 @@ function checkCore(caller, body, prepare, browser, planner = displayPlan) {
 		body,
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y lua5\.4 lua-luv libxml2-utils/
 	);
-	assert.deepEqual(pipeline.needsOf(browser), ['shared-validation']);
+	// Integration follows every Unit lot; E2E follows every Integration lot.
+	assert.deepEqual(pipeline.needsOf(integration), ['shared-validation']);
+	assert.equal(pipeline.field(integration, 'if'), null);
+	assert.equal(
+		pipeline.field(integration, 'strategy'),
+		'fail-fast: false matrix: ${{ fromJSON(inputs.common_plan).integration_matrix }}'
+	);
+	assert.match(integration, /^      COMMON_LOT: \$\{\{ matrix\.lot \}\}$/m);
+	assert.match(integration, /^      COMMON_PLAN: \$\{\{ inputs\.common_plan \}\}$/m);
+	const integrationAdmission = pipeline.step(
+		integration,
+		'Admit the complete Common integration lot map'
+	);
+	assert.equal(pipeline.stepField(integrationAdmission, 'id'), 'common-lot');
+	assert.equal(pipeline.stepField(integrationAdmission, 'if'), null);
+	assert.deepEqual(pipeline.runOf(integrationAdmission), [
+		'node tools/ci/js-feature-matrix.cjs select integration'
+	]);
+	const integrationRun = pipeline.step(integration, 'Run shared integration suite');
+	assert.equal(pipeline.stepField(integrationRun, 'if'), null);
+	assert.equal(pipeline.stepField(integrationRun, 'continue-on-error'), null);
+	assert.deepEqual(pipeline.runOf(integrationRun), [
+		'set -euo pipefail',
+		'test "$SUITE" = js',
+		'npm run test:js -- --feature "$FEATURE"'
+	]);
+	for (const name of [
+		'Retain shared integration timings, including interrupted runs',
+		'Retain captured JS integration failure output'
+	])
+		assert.equal(pipeline.stepField(pipeline.step(integration, name), 'if'), 'always()');
+	assert.deepEqual(pipeline.needsOf(browser), ['common-integration']);
 	assert.equal(pipeline.field(browser, 'if'), null);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
@@ -778,6 +825,7 @@ const coreCaller = pipeline.job('core');
 const core = pipeline.job('shared-validation');
 const corePrepare = pipeline.job('prepare-common');
 const coreBrowser = pipeline.job('common-e2e');
+const coreIntegration = pipeline.job('common-integration');
 assert.equal(pipeline.locate('shared-validation').file, '.github/workflows/ci-common.yml');
 checkCore(coreCaller, core, corePrepare, coreBrowser);
 for (const [from, to] of [
@@ -1001,23 +1049,23 @@ assert.match(
 );
 assert.ok(pipeline.job('macos').includes('tag: ${{ needs.validate.outputs.tag }}'));
 for (const [from, to] of [
-	['    needs:\n      - test-hs\n', ''],
-	['    needs:\n      - test-hs', 'needs: []'],
+	['    needs:\n      - integration-hs\n', ''],
+	['    needs:\n      - integration-hs', 'needs: []'],
 	[
-		'matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}',
-		'matrix: ${{ fromJSON(needs.test-hs.outputs.foreign_matrix) }}'
+		'matrix: ${{ fromJSON(needs.integration-hs.outputs.e2e_matrix) }}',
+		'matrix: ${{ fromJSON(needs.integration-hs.outputs.foreign_matrix) }}'
 	],
-	['    needs:\n      - test-hs', 'needs: [e2e-hs]'],
-	['    needs:\n      - test-hs', 'needs: [e2e-hs, test-linux]'],
-	['    needs:\n      - test-hs', 'needs: [package-macos]'],
+	['    needs:\n      - integration-hs', 'needs: [e2e-hs]'],
+	['    needs:\n      - integration-hs', 'needs: [e2e-hs, test-linux]'],
+	['    needs:\n      - integration-hs', 'needs: [package-macos]'],
 	[
-		'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+		'runs-on: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
 		'runs-on: ubuntu-latest'
 	],
 	['fail-fast: false', 'fail-fast: true'],
 	[
-		'MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_metadata }}',
-		'MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_matrix }}'
+		'MACOS_STAGE_METADATA: ${{ needs.integration-hs.outputs.e2e_metadata }}',
+		'MACOS_STAGE_METADATA: ${{ needs.integration-hs.outputs.e2e_matrix }}'
 	],
 	['[matrix.lot].role', '[matrix.lot].runner'],
 	['Record actual stage role outcome — ${{ matrix.lot }}', 'Record actual stage role outcome'],
@@ -1129,17 +1177,17 @@ for (const [from, to] of [
 }
 
 /**
- * A fresh-clone boot is a native Windows gate owned by exactly one module
- * runner of the unit matrix, never disabled.
+ * A fresh-clone boot is a native Windows integration gate owned by exactly one
+ * lot of the Integration matrix, never disabled.
  */
 function checkFreshSourceBoot(body) {
 	const step = pipeline.step(body, 'Test fresh Git clone bootstrap and warm startup');
 	assert.equal(pipeline.stepField(step, 'shell'), 'pwsh');
-	assert.equal(pipeline.stepField(step, 'if'), "matrix.module == 'hotstrings-shortcuts'");
+	assert.equal(pipeline.stepField(step, 'if'), "matrix.lot == 'Fresh clone bootstrap'");
 	assert.match(
 		body,
-		/^ +hotstrings-shortcuts,$/m,
-		'the owning module must stay in the unit matrix'
+		/^ {8}lot: \[[^\]\n]*\bFresh clone bootstrap\b[^\]\n]*\]$/m,
+		'the owning lot must stay in the Integration matrix'
 	);
 	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 	const run = pipeline.runOf(step).join('\n');
@@ -1148,7 +1196,12 @@ function checkFreshSourceBoot(body) {
 	assert.match(run, /if \(\$LASTEXITCODE -ne 0\) \{ exit \$LASTEXITCODE \}/);
 }
 const sourceBoot = pipeline.job('test-ahk');
-checkFreshSourceBoot(sourceBoot);
+const integrationBoot = pipeline.job('integration-ahk');
+checkFreshSourceBoot(integrationBoot);
+assert.ok(
+	!pipeline.steps(sourceBoot).some((step) => step.name.includes('fresh Git clone')),
+	'the fresh-clone boot runs once, in the Integration stage'
+);
 
 /** Requires bounded refusal facts without changing source admission authority. */
 function checkSourceOwnerEvidence(source) {
@@ -1332,15 +1385,15 @@ for (const [from, to] of [
 for (const [from, to] of [
 	['node tools/test/test-ahk-fresh-clone-startup.cjs', 'echo skipped source boot'],
 	['$env:ERGOPTI_AHK_EXE = $ahk', '$env:UNUSED_AHK_EXE = $ahk'],
-	["if: matrix.module == 'hotstrings-shortcuts'", 'if: false'],
-	["if: matrix.module == 'hotstrings-shortcuts'", "if: matrix.module == 'nonexistent'"],
-	[' hotstrings-shortcuts,', ' nonexistent,'],
+	["if: matrix.lot == 'Fresh clone bootstrap'", 'if: false'],
+	["if: matrix.lot == 'Fresh clone bootstrap'", "if: matrix.lot == 'Nonexistent'"],
+	[', Fresh clone bootstrap,', ', Nonexistent,'],
 	[
 		'- name: Test fresh Git clone bootstrap and warm startup',
 		'- name: Test fresh Git clone bootstrap and warm startup\n        continue-on-error: true'
 	]
 ])
-	assert.throws(() => checkFreshSourceBoot(sourceBoot.replaceAll(from, to)), from);
+	assert.throws(() => checkFreshSourceBoot(integrationBoot.replaceAll(from, to)), from);
 for (const replacement of [
 	'run: echo skipped native probes',
 	'if: false\n        run: node tools/test/test-desktop-ci-evidence.cjs',

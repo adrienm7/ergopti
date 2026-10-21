@@ -340,11 +340,11 @@ function admitItem36Selector(mac) {
 	)
 		return null;
 	if (
-		JSON.stringify(pipeline.needsOf(job)) !== JSON.stringify(['test-hs']) ||
+		JSON.stringify(pipeline.needsOf(job)) !== JSON.stringify(['integration-hs']) ||
 		pipeline.field(job, 'runs-on') !==
-			'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}' ||
+			'${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}' ||
 		pipeline.field(job, 'timeout-minutes') !==
-			'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}' ||
+			'${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}' ||
 		pipeline.field(job, 'if') !== null ||
 		pipeline.field(job, 'continue-on-error') !== null ||
 		pipeline.field(job, 'secrets') !== null ||

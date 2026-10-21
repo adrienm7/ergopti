@@ -78,7 +78,14 @@ function verify(subject) {
 	// Use the real independent CI parser and its existing graph/field contracts.
 	// Exact whole-file preimages belong to private receiving receipts only.
 	const jobs = pipeline.jobsOfText(subject.workflow, '.github/workflows/ci-linux.yml');
-	const required = ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok'];
+	const required = [
+		'test-linux',
+		'integration-linux',
+		'e2e-linux',
+		'package-linux',
+		'install-linux',
+		'linux-ok'
+	];
 	for (const id of required)
 		assert.strictEqual(
 			jobs.filter((job) => job.id === id).length,
@@ -92,19 +99,19 @@ function verify(subject) {
 	assert.strictEqual(pipeline.field(owner.body, 'continue-on-error'), null);
 	assert.deepStrictEqual(
 		pipeline.needsOf(owner.body),
-		['test-linux'],
-		'the full unit prerequisite must finish before E2E'
+		['integration-linux'],
+		'the full integration prerequisite, after every unit row, must finish before E2E'
 	);
 	const build = jobs.find((job) => job.id === 'package-linux');
 	assert.deepStrictEqual(
 		pipeline.needsOf(build.body),
 		['e2e-linux'],
-		'the package directly waits for E2E with genuine carried unit admission'
+		'the package directly waits for E2E with genuine carried integration admission'
 	);
 	assert.strictEqual(
 		pipeline.field(build.body, 'if'),
-		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
-		'unit success stays mandatory; failed E2E admits package diagnostics only on manual dispatch'
+		"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+		'integration success stays mandatory; failed E2E admits package diagnostics only on manual dispatch'
 	);
 	assert.strictEqual(pipeline.field(gate.body, 'if'), 'always()');
 	assert.deepStrictEqual(
@@ -113,7 +120,8 @@ function verify(subject) {
 		'the verdict waits for the latest aggregate testbuild and the parallel Flatpak'
 	);
 	for (const [id, prior] of [
-		['e2e-linux', 'test-linux'],
+		['integration-linux', 'test-linux'],
+		['e2e-linux', 'integration-linux'],
 		['package-linux', 'e2e-linux'],
 		['install-linux', 'package-linux']
 	]) {
@@ -132,9 +140,9 @@ function verify(subject) {
 			);
 	}
 	assert.strictEqual(
-		owner.body.split('      ci_unit_result: ${{ needs.test-linux.result }}\n').length,
+		owner.body.split('      ci_integration_result: ${{ needs.integration-linux.result }}\n').length,
 		2,
-		'unit predicate is the real scheduler result'
+		'integration predicate is the real scheduler result'
 	);
 	assert.strictEqual(
 		pipeline
@@ -354,7 +362,7 @@ console.log(
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
 const LUAJIT_BLOCK =
-	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == \x27meta\x27 }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: ${{ always() && matrix.group == \x27meta\x27 }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
+	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == \x27native\x27 }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: ${{ always() && matrix.group == \x27native\x27 }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
 function verifyLuaJitEnrollment(value) {
 	assert.strictEqual(
 		value.workflow.split(LUAJIT_BLOCK).length,
@@ -362,41 +370,48 @@ function verifyLuaJitEnrollment(value) {
 		'exact fatal LuaJIT native and always evidence steps'
 	);
 	const jobs = pipeline.jobsOfText(value.workflow, '.github/workflows/ci-linux.yml');
-	const owner = jobs.find((job) => job.id === 'test-linux');
+	// An integration check: the Integration stage owns it, never a unit row.
 	assert(
-		owner && owner.body.endsWith(LUAJIT_BLOCK.trimEnd()),
-		'real independent unit-job native owner'
+		!jobs.find((job) => job.id === 'test-linux').body.includes('native_xi2_luajit'),
+		'the unit rows never run the native XI2 observation'
+	);
+	const owner = jobs.find((job) => job.id === 'integration-linux');
+	assert(
+		owner && owner.body.split(LUAJIT_BLOCK).length === 2,
+		'real independent Integration-job native owner'
 	);
 	const steps = pipeline.steps(owner.body);
 	const index = (name) => {
 		assert.strictEqual(steps.filter((step) => step.name === name).length, 1, 'unique ' + name);
 		return steps.findIndex((step) => step.name === name);
 	};
-	const oldEvidence = index('Retain the source-bound linux-unit-suite qualification');
+	const driver = index('Run the driver integration tests');
 	const native = index('Qualify actual LuaJIT XI2 ABI and property cookies');
 	const evidence = index('Retain actual LuaJIT XI2 diagnostic evidence');
+	const record = index('Record mandatory integration evidence');
 	assert(
-		oldEvidence < native && native < evidence && evidence === steps.length - 1,
-		'additive unit-retention/LuaJIT/retention END order'
+		driver < native && native < evidence && evidence < record,
+		'driver/LuaJIT/retention/evidence-record order'
 	);
-	assert.strictEqual(native, oldEvidence + 1, 'native observation follows all original unit steps');
 	assert.strictEqual(evidence, native + 1, 'native failure evidence is immediately retained');
-	assert.strictEqual(pipeline.field(owner.body, 'if'), null, 'unit owner admission is unchanged');
+	assert.strictEqual(pipeline.field(owner.body, 'if'), null, 'integration owner admission');
 	assert.strictEqual(
 		pipeline.field(owner.body, 'continue-on-error'),
 		null,
-		'unit failures remain fatal'
+		'integration failures remain fatal'
 	);
+	assert.deepStrictEqual(pipeline.needsOf(owner.body), ['test-linux']);
 	for (const at of [native, evidence])
 		assert.strictEqual(pipeline.stepField(steps[at].body, 'continue-on-error'), null);
-	// Both run once, in the meta row of the unit matrix.
+	// Both run once, in the native row of the Integration matrix.
+	assert.match(owner.body, /^ {8}group: \[driver, native\]$/m);
 	assert.strictEqual(
 		pipeline.stepField(steps[native].body, 'if'),
-		"${{ !cancelled() && matrix.group == 'meta' }}"
+		"${{ !cancelled() && matrix.group == 'native' }}"
 	);
 	assert.strictEqual(
 		pipeline.stepField(steps[evidence].body, 'if'),
-		"${{ always() && matrix.group == 'meta' }}"
+		"${{ always() && matrix.group == 'native' }}"
 	);
 	for (const literal of [
 		'assert original.main() == 0, "original three C cases remain mandatory"',
@@ -448,7 +463,7 @@ const luaJitMutations = [
 	[
 		'cancel fence weakened',
 		'workflow',
-		"        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == 'meta' }}",
+		"        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == 'native' }}",
 		'        id: native_xi2_luajit\n        if: success()'
 	],
 	[
@@ -557,11 +572,15 @@ for (const [name, role, before, after] of luaJitMutations) {
 	assert.throws(() => verifyLuaJitEnrollment(altered), undefined, name);
 }
 const unitTail = '      - name: Retain the source-bound linux-unit-suite qualification';
+const driverHead = '      - name: Run the driver integration tests';
+const uploadHead = '      - name: Upload mandatory integration evidence';
 const harmlessUnitStep = '      - name: LuaJIT guard harmless adjacent step\n        run: true\n\n';
 assert.strictEqual(luaJitSubject.workflow.split(unitTail).length, 2, 'unique original unit tail');
+assert.strictEqual(luaJitSubject.workflow.split(driverHead).length, 2, 'unique driver head');
+assert.strictEqual(luaJitSubject.workflow.split(uploadHead).length, 2, 'unique upload head');
 verifyLuaJitEnrollment({
 	...luaJitSubject,
-	workflow: luaJitSubject.workflow.replace(unitTail, harmlessUnitStep + unitTail)
+	workflow: luaJitSubject.workflow.replace(driverHead, harmlessUnitStep + driverHead)
 });
 const omittedLuaJitBlock = luaJitSubject.workflow.replace(LUAJIT_BLOCK, '');
 assert.notStrictEqual(
@@ -579,14 +598,12 @@ for (const [name, workflow] of [
 				'      # A real X server and WM qualify logical RandR placement and input focus.'
 		)
 	],
+	['moved into a unit row', omittedLuaJitBlock.replace(unitTail, LUAJIT_BLOCK + unitTail)],
 	[
-		'before original unit qualification',
-		omittedLuaJitBlock.replace(unitTail, LUAJIT_BLOCK + unitTail)
+		'before the driver integration tests',
+		omittedLuaJitBlock.replace(driverHead, LUAJIT_BLOCK + driverHead)
 	],
-	[
-		'foreign step after terminal evidence',
-		luaJitSubject.workflow.replace(LUAJIT_BLOCK, LUAJIT_BLOCK + harmlessUnitStep)
-	]
+	['after its evidence record', omittedLuaJitBlock.replace(uploadHead, LUAJIT_BLOCK + uploadHead)]
 ]) {
 	assert.notStrictEqual(workflow, luaJitSubject.workflow, 'nonvacuous placement mutation ' + name);
 	assert.throws(() => verifyLuaJitEnrollment({ ...luaJitSubject, workflow }), undefined, name);
@@ -611,18 +628,22 @@ assert.match(
 	'all 15 actual portable cases executed'
 );
 console.log(
-	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals4; ABI29/cookies3 native UNRUN'
+	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals5; ABI29/cookies3 native UNRUN'
 );
 
 // The ordered suites converge before packaging; a manual diagnostic never qualifies release.
 for (const [name, before, replacement] of [
 	[
-		'package omits unit',
-		'      ci_unit_result: ${{ needs.test-linux.result }}',
-		'      ci_unit_result: success'
+		'package omits integration',
+		'      ci_integration_result: ${{ needs.integration-linux.result }}',
+		'      ci_integration_result: success'
 	],
 	['package omits E2E', '    needs: [e2e-linux]', '    needs: []'],
-	['unit success omitted', "needs.e2e-linux.outputs.ci_unit_result == 'success' && ", ''],
+	[
+		'integration success omitted',
+		"needs.e2e-linux.outputs.ci_integration_result == 'success' && ",
+		''
+	],
 	[
 		'automatic failed E2E admitted',
 		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
@@ -630,6 +651,7 @@ for (const [name, before, replacement] of [
 	],
 	['E2E success omitted', "needs.e2e-linux.result == 'success' || ", ''],
 	['unit prerequisite omitted', '    needs: [test-linux]\n', ''],
+	['integration prerequisite omitted', '    needs: [integration-linux]\n', ''],
 	[
 		'verdict omits unit',
 		'      ci_predecessors: ${{ toJSON(needs) }}',
@@ -665,5 +687,5 @@ for (const [name, before, replacement] of [
 	assert.throws(() => verify({ ...subject, workflow }), undefined, name);
 }
 console.log(
-	'PASS ordered XI2 prerequisites: 9 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
+	'PASS ordered XI2 prerequisites: 10 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
 );

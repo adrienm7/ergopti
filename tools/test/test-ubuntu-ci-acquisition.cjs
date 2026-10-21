@@ -11,9 +11,9 @@ const browsers = require('../ci/install-playwright.cjs');
 
 const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
-	['ci-linux.yml', 38],
-	['ci-macos.yml', 2],
-	['ci-common.yml', 1],
+	['ci-linux.yml', 39],
+	['ci-macos.yml', 3],
+	['ci-common.yml', 2],
 	['linux-layout.yml', 2]
 ]);
 const command = 'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py"';
@@ -223,13 +223,13 @@ for (const [file, floor] of scopes) {
 			' -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb';
 		const luaJitOwner = pipeline
 			.jobsOfText(text, rel)
-			.filter((job) => job.id === 'test-linux')
+			.filter((job) => job.id === 'integration-linux')
 			.flatMap((job) => pipeline.steps(job.body))
 			.filter((step) => step.name === 'Qualify actual LuaJIT XI2 ABI and property cookies');
 		assert.equal(
 			luaJitOwner.length,
 			1,
-			'the LuaJIT acquisition retains one genuine independent unit owner'
+			'the LuaJIT acquisition retains one genuine independent integration owner'
 		);
 		assert.equal(
 			(pipeline.runOf(luaJitOwner[0].body) || []).filter((line) => line.trim() === luaJitInvocation)

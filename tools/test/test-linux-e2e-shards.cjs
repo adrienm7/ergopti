@@ -209,12 +209,12 @@ assert.deepEqual(
 );
 
 // The scheduler and the verdict still treat e2e-linux as one mandatory job.
-assert.ok(
-	fs
-		.readFileSync(path.join(ROOT, 'tools/ci/ci-stage-status.cjs'), 'utf8')
-		.includes("linux: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux']"),
+assert.deepEqual(
+	require('../ci/ci-stage-status.cjs').JOBS.linux,
+	['test-linux', 'integration-linux', 'e2e-linux', 'package-linux', 'install-linux'],
 	'the Linux scheduler chain keeps e2e-linux as one link'
 );
+assert.deepEqual(pipeline.needsOf(pipeline.job(JOB)), ['integration-linux']);
 assert.equal(MANIFEST.jobs[JOB].classification, 'mandatory');
 assert.deepEqual(pipeline.needsOf(pipeline.job('package-linux')), [JOB]);
 assert.deepEqual(pipeline.needsOf(pipeline.job('linux-ok')), ['install-linux', 'package-flatpak']);
@@ -346,7 +346,7 @@ function aggregate() {
 						? Object.keys(contract.subjects)
 						: job === JOB
 							? FIXTURE.subjects[shard]
-							: ['unit-' + shard]
+							: (contract.shard_subjects?.[shard] ?? ['unit-' + shard])
 					).map((subject) => [subject, contract.subjects[subject]])
 				)
 			});

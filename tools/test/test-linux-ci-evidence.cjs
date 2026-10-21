@@ -31,16 +31,17 @@ const pipeline = require('./ci-full-default.cjs');
 const installMatrix = require('../ci/linux-install-matrix.cjs');
 const LINUX_E2E_SHARDS = require('./fixtures/linux-e2e-shards.json');
 const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
-/** The unit-matrix steps that are not part of the Lua suite run in the meta row only. */
-const UNIT_META_ROW = new Set([
+/** The unit-matrix step that is not part of the Lua suite runs in the meta row only. */
+const UNIT_META_ROW = new Set(['Retain the source-bound linux-unit-suite qualification']);
+/** The native integration checks run in the native row of the Integration matrix only. */
+const INTEGRATION_NATIVE_ROW = new Set([
 	'Run manual official runtime and model acceptance',
 	'Upload manual runtime acceptance evidence',
-	'Retain the source-bound linux-unit-suite qualification',
 	'Qualify actual LuaJIT XI2 ABI and property cookies',
 	'Retain actual LuaJIT XI2 diagnostic evidence'
 ]);
-/** A unit predicate narrowed to the meta row of the unit matrix. */
-function unitMetaRow(predicate) {
+/** A predicate narrowed to one row of its matrix. */
+function matrixRow(predicate, row) {
 	const inner =
 		predicate === 'always()'
 			? 'always()'
@@ -49,15 +50,17 @@ function unitMetaRow(predicate) {
 					.replace(/^\$\{\{\s*/, '')
 					.replace(/\s*\}\}$/, '')
 					.trim();
-	return '${{ ' + inner + " && matrix.group == 'meta' }}";
+	return '${{ ' + inner + " && matrix.group == '" + row + "' }}";
 }
 /** A Linux matrix step keeps its predicate, narrowed to its own matrix row. */
 const rowCondition = (name, predicate) =>
 	LinuxE2E.has(name)
 		? LinuxE2E.condition(name, predicate)
 		: UNIT_META_ROW.has(name)
-			? unitMetaRow(predicate)
-			: predicate;
+			? matrixRow(predicate, 'meta')
+			: INTEGRATION_NATIVE_ROW.has(name)
+				? matrixRow(predicate, 'native')
+				: predicate;
 const UPDATER_IF = rowCondition('Update to the newest release and restart', '${{ !cancelled() }}');
 const UPDATER_EVIDENCE_IF = rowCondition(
 	'Upload live updater diagnostic evidence',
@@ -1235,6 +1238,19 @@ exit "$UPDATER_TEST_STATUS"
 	fs.rmSync(updaterScratch, { recursive: true, force: true });
 }
 
+// The integration rows record their own subjects, as the Record step of
+// ci-linux.yml writes them: the Lua group in driver, the native checks in native.
+const INTEGRATION_SUBJECTS = {
+	driver: ['integration-driver'],
+	native: ['native-metrics-equivalence', 'native-histogram-multiplicity', 'native-xi2-abi']
+};
+assert.deepEqual(
+	Object.values(INTEGRATION_SUBJECTS).flat().sort(),
+	Object.keys(MANIFEST.jobs['integration-linux'].subjects).sort(),
+	'the integration rows together record every integration subject'
+);
+assert.deepEqual(Object.keys(INTEGRATION_SUBJECTS), MANIFEST.jobs['integration-linux'].shards);
+
 function fixtures() {
 	const needs = {};
 	const evidence = [];
@@ -1254,9 +1270,12 @@ function fixtures() {
 					interpreter: 'LuaJIT 2.1',
 					subjects: Object.fromEntries(
 						// The unit rows each record their own group subject, unit-<group>.
-						(job === 'test-linux' ? ['unit-' + shard] : LINUX_E2E_SHARDS.subjects[shard]).map(
-							(subject) => [subject, contract.subjects[subject]]
-						)
+						(job === 'test-linux'
+							? ['unit-' + shard]
+							: job === 'integration-linux'
+								? INTEGRATION_SUBJECTS[shard]
+								: LINUX_E2E_SHARDS.subjects[shard]
+						).map((subject) => [subject, contract.subjects[subject]])
 					)
 				});
 			continue;
@@ -1292,6 +1311,31 @@ function rejects(mutate, pattern) {
 }
 
 verifyAggregate({ manifest: MANIFEST, ...fixtures(), expectedSha: SHA });
+
+// Each Integration row records only its own subjects, as the manifest names them.
+rejects(({ evidence }) => {
+	const row = (shard) =>
+		evidence.find((doc) => doc.job === 'integration-linux' && doc.shard === shard);
+	row('native').subjects['integration-driver'] = row('driver').subjects['integration-driver'];
+	delete row('driver').subjects['integration-driver'];
+}, /recorded another row's subject/);
+for (const [what, mutate] of [
+	['a subject no row records', (contract) => contract.shard_subjects.native.pop()],
+	[
+		'a subject two rows record',
+		(contract) => contract.shard_subjects.driver.push('native-xi2-abi')
+	],
+	['a row without subjects', (contract) => delete contract.shard_subjects.native],
+	['an undeclared row', (contract) => (contract.shard_subjects.extra = ['native-xi2-abi'])]
+]) {
+	const manifest = structuredClone(MANIFEST);
+	mutate(manifest.jobs['integration-linux']);
+	assert.throws(
+		() => verifyAggregate({ manifest, ...fixtures(), expectedSha: SHA }),
+		/invalid shard subjects/,
+		what
+	);
+}
 
 for (const job of Object.keys(MANIFEST.jobs)) {
 	for (const result of ['failure', 'cancelled', 'skipped', null]) {
@@ -1408,7 +1452,14 @@ assert.match(
 );
 assert.deepStrictEqual(
 	Object.keys(MANIFEST.jobs).sort(),
-	['test-linux', 'e2e-linux', 'package-linux', 'package-flatpak', 'install-linux'].sort()
+	[
+		'test-linux',
+		'integration-linux',
+		'e2e-linux',
+		'package-linux',
+		'package-flatpak',
+		'install-linux'
+	].sort()
 );
 for (const job of Object.keys(MANIFEST.jobs)) {
 	assert.strictEqual(
@@ -1631,7 +1682,15 @@ assert.deepStrictEqual(
 		.jobs(LINUX_BOX)
 		.map((job) => job.id)
 		.sort(),
-	['e2e-linux', 'install-linux', 'linux-ok', 'package-flatpak', 'package-linux', 'test-linux']
+	[
+		'e2e-linux',
+		'install-linux',
+		'integration-linux',
+		'linux-ok',
+		'package-flatpak',
+		'package-linux',
+		'test-linux'
+	]
 );
 for (const [id] of INSTALL_ROWS) {
 	rejects(({ evidence }) => {
@@ -1912,15 +1971,19 @@ const manualPackageJob = pipeline.job('package-linux');
 assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
 assert.match(manualPackageJob, /node tools\/ci\/ci-stage-status\.cjs admit-build linux/);
 assert.ok(
-	pipeline.job('e2e-linux').includes('ci_unit_result: ${{ needs.test-linux.result }}'),
-	'Package Unit admission must come from the genuine E2E predecessor output'
+	pipeline
+		.job('e2e-linux')
+		.includes('ci_integration_result: ${{ needs.integration-linux.result }}'),
+	'Package Integration admission must come from the genuine E2E predecessor output'
 );
-assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['integration-linux']);
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('integration-linux')), ['test-linux']);
+assert.strictEqual(pipeline.field(pipeline.job('integration-linux'), 'if'), null);
 assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), null);
 assert.strictEqual(
 	pipeline.field(manualPackageJob, 'if'),
-	"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
-	'manual packaging must retain unit admission, cancellation and automatic E2E admission'
+	"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+	'manual packaging must retain integration admission, cancellation and automatic E2E admission'
 );
 // The frozen acceptance table is independent of the workflow expression.
 // Evaluate only after the exact source guard above admits this closed predicate.
@@ -1937,25 +2000,30 @@ const admittedPackageCases = new Set([
 const diagnosticExpression = pipeline
 	.field(manualPackageJob, 'if')
 	.slice(3, -2)
-	.replaceAll('needs.e2e-linux.outputs.ci_unit_result', "needs['e2e-linux'].outputs.ci_unit_result")
+	.replaceAll(
+		'needs.e2e-linux.outputs.ci_integration_result',
+		"needs['e2e-linux'].outputs.ci_integration_result"
+	)
 	.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 let diagnosticCaseCount = 0;
 for (const event of diagnosticEvents) {
-	for (const unitResult of diagnosticResults) {
+	for (const integrationResult of diagnosticResults) {
 		for (const result of diagnosticResults) {
 			for (const cancelled of [false, true]) {
 				const actual = require('node:vm').runInNewContext(
 					diagnosticExpression,
 					{
 						cancelled: () => cancelled,
-						needs: { 'e2e-linux': { result, outputs: { ci_unit_result: unitResult } } },
+						needs: {
+							'e2e-linux': { result, outputs: { ci_integration_result: integrationResult } }
+						},
 						github: { event_name: event }
 					},
 					{ timeout: 100 }
 				);
 				assert.strictEqual(
 					actual,
-					admittedPackageCases.has(`${event}:${unitResult}:${result}:${cancelled}`)
+					admittedPackageCases.has(`${event}:${integrationResult}:${result}:${cancelled}`)
 				);
 				diagnosticCaseCount++;
 			}
@@ -2297,7 +2365,7 @@ const xi2LuaJitRetentionFixture = {
 };
 assert.strictEqual(assertRetainedQualification(xi2LuaJitRetentionFixture), true);
 const xi2LuaJitActualArtifacts = pipeline
-	.steps(pipeline.job('test-linux'))
+	.steps(pipeline.job('integration-linux'))
 	.filter((step) => step.name === 'Retain actual LuaJIT XI2 diagnostic evidence');
 assert.strictEqual(
 	xi2LuaJitActualArtifacts.length,
@@ -2307,7 +2375,7 @@ assert.strictEqual(
 assert.strictEqual(assertRetainedQualification(xi2LuaJitActualArtifacts[0]), true);
 const xi2LuaJitRetentionMutations = [
 	['success-only', 'if: ' + XI2_LUAJIT_RETAIN_IF, 'if: success()'],
-	['every unit row', 'if: ' + XI2_LUAJIT_RETAIN_IF, 'if: always()'],
+	['every integration row', 'if: ' + XI2_LUAJIT_RETAIN_IF, 'if: always()'],
 	['wrong upload API', 'actions/upload-artifact@v4', 'actions/upload-artifact@v3'],
 	['warn', 'if-no-files-found: error', 'if-no-files-found: warn'],
 	['ignore', 'if-no-files-found: error', 'if-no-files-found: ignore'],
@@ -2571,7 +2639,7 @@ function assertLinuxUnitFailureExcerpt(job) {
 		steps[uploadAt + 1]?.name,
 		'Emit Configuration assertion from failed unit log'
 	);
-	assert.strictEqual(steps[uploadAt + 2]?.name, 'Run manual official runtime and model acceptance');
+	assert.strictEqual(steps[uploadAt + 2]?.name, 'Retain Linux Lua timing diagnostics');
 }
 assertLinuxUnitFailureExcerpt(testLinux);
 const unitExcerptMutations = [
@@ -2736,8 +2804,18 @@ function moduleGroupNames(source) {
  */
 function unitMatrixProblems(workflow, groupsSource) {
 	const found = [];
-	const groups = moduleGroupNames(groupsSource);
+	// The integration group comes first and runs in the Integration stage; every
+	// other group is one unit row.
+	const integration = /\nM\.INTEGRATION = "([a-z_]+)"\n/.exec(groupsSource)?.[1];
+	const declared = moduleGroupNames(groupsSource);
+	if (!integration || declared[0] !== integration)
+		found.push('module_groups.lua must declare its integration group first');
+	const groups = declared.slice(1);
 	if (groups.length < 2) found.push('module_groups.lua must declare several groups');
+	const integrationJob =
+		/\n {2}integration-linux:\n([\s\S]*?)\n {2}[a-z0-9-]+:\n/.exec(workflow)?.[1] ?? '';
+	if (!integrationJob.includes(' -- luajit tests/run.lua --module=' + integration + ' 2>&1 | tee '))
+		found.push('the Integration stage must run the integration group');
 	const job = /\n {2}test-linux:\n([\s\S]*?)\n {2}[a-z0-9-]+:\n/.exec(workflow)?.[1] ?? '';
 	const matrix = /\n {6}fail-fast: false\n {6}matrix:\n {8}group: \[([a-z_, ]+)\]\n/.exec(
 		'\n' + job
@@ -2765,7 +2843,15 @@ for (const [what, mutate] of [
 				'      fail-fast: true\n      matrix:\n        group:'
 			)
 	],
-	['unnamed group', (text) => text.replace('      LINUX_UNIT_GROUP: ${{ matrix.group }}\n', '')]
+	['unnamed group', (text) => text.replace('      LINUX_UNIT_GROUP: ${{ matrix.group }}\n', '')],
+	[
+		'integration group not run',
+		(text) => text.replace('tests/run.lua --module=integration', 'tests/run.lua --module=meta')
+	],
+	[
+		'integration group run as a unit row',
+		(text) => text.replace('[meta, core, infra,', '[integration, meta, core, infra,')
+	]
 ]) {
 	const changed = mutate(WORKFLOW);
 	assert.notStrictEqual(changed, WORKFLOW, 'unit matrix mutation must alter source: ' + what);
@@ -2780,6 +2866,13 @@ assert.ok(
 		)
 	).length > 0,
 	'a renamed group must fail until the matrix follows'
+);
+assert.ok(
+	unitMatrixProblems(
+		WORKFLOW,
+		MODULE_GROUPS_SOURCE.replace('M.INTEGRATION = "integration"', 'M.INTEGRATION = "meta"')
+	).length > 0,
+	'the integration group must be the first group'
 );
 
 process.stdout.write('PASS: Linux CI requires successful jobs and complete assertion evidence.\n');

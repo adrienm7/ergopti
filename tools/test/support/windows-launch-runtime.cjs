@@ -251,10 +251,9 @@ module.exports = function checkWindowsLaunchRuntime() {
 						require('../desktop-ci-evidence.cjs').verify({
 							platform: 'windows',
 							needs: Object.fromEntries(
-								['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map((name) => [
-									name,
-									{ result: 'success' }
-								])
+								['test-ahk', 'integration-ahk', 'e2e-ahk', 'package-windows', 'launch-windows'].map(
+									(name) => [name, { result: 'success' }]
+								)
 							),
 							evidence: [failure],
 							sha: 'a'.repeat(40),

@@ -193,6 +193,7 @@ const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
 // single job names its subject in parentheses, 'Windows / Build (...)'.
 const STAGE_NAMES = Object.freeze({
 	unit: 'Unit tests',
+	integration: 'Integration tests',
 	e2e: 'E2E tests',
 	build: 'Build',
 	flatpak: 'Flatpak',
@@ -202,22 +203,27 @@ const STAGE_NAMES = Object.freeze({
 // Each lane job: its stage, and its subject when it is not a matrix (null).
 const LANE_JOB_NAMES = Object.freeze({
 	'shared-validation': ['unit', null],
+	'common-integration': ['integration', null],
 	'common-e2e': ['e2e', 'Shared UI rendering'],
 	'common-build': ['build', null],
 	'common-testbuild': ['install', null],
 	'common-unit-verdict': ['verdict', 'Production site receipts'],
 	'test-ahk': ['unit', null],
+	'integration-ahk': ['integration', null],
 	'e2e-ahk': ['e2e', 'Engine E2E corpus'],
 	'package-windows': ['build', 'ErgoptiPlus.exe and layout installer'],
 	'launch-windows': ['install', 'Compiled ErgoptiPlus.exe'],
 	'windows-ok': ['verdict', 'Mandatory jobs and launch evidence'],
 	'test-linux': ['unit', null],
+	'integration-linux': ['integration', null],
 	'e2e-linux': ['e2e', null],
 	'package-linux': ['build', '.deb, .rpm, AppImage and archive'],
 	'package-flatpak': ['flatpak', 'Build, install and launch'],
 	'install-linux': ['install', null],
 	'linux-ok': ['verdict', 'Mandatory subjects'],
 	'test-hs': ['unit', null],
+	// One stubbed cell, so no matrix: the job names its subject.
+	'integration-hs': ['integration', 'Lua module wiring, stubbed hs'],
 	'e2e-hs': ['e2e', null],
 	// The macOS Build states the macOS version HOSTS assigns its runner.
 	'package-macos': [
@@ -239,11 +245,15 @@ const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF =
 	"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'";
 const NOT_CANCELLED = '${{ !cancelled() }}';
-// The native checks outside the Lua suite run once, in the meta row of the unit matrix.
-const LINUX_UNIT_META_ROW = "matrix.group == 'meta'";
+// The native checks outside the Lua suite are integration tests: they run once,
+// in the native row of the Linux Integration matrix.
+const LINUX_INTEGRATION_NATIVE_ROW = "matrix.group == 'native'";
+const LINUX_INTEGRATION_DRIVER_ROW = "matrix.group == 'driver'";
+// The Windows Integration lot that owns the native cohorts and real install files.
+const WINDOWS_NATIVE_LOT = "matrix.lot == 'Native cohorts and contracts'";
 const MANUAL_RUNTIME_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && " +
-	LINUX_UNIT_META_ROW +
+	LINUX_INTEGRATION_NATIVE_ROW +
 	' }}';
 const MANUAL_RUNTIME_EVIDENCE_IF = MANUAL_RUNTIME_IF;
 const MANUAL_VERDICT_IF = 'always() && !cancelled()';
@@ -515,17 +525,19 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 const WINDOWS_FILE_RETENTION = [
 	{
 		name: 'Retain managed Ollama file component evidence',
-		condition: 'always()',
+		condition: '${{ always() && ' + WINDOWS_NATIVE_LOT + ' }}',
 		artifact:
-			'windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}',
+			'windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		paths: ['${{ runner.temp }}/windows-ollama-file-component/']
 	},
 	{
 		name: 'Retain exact managed Ollama file roots',
 		condition:
-			"${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}",
+			"${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' && " +
+			WINDOWS_NATIVE_LOT +
+			' }}',
 		artifact:
-			'windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}',
+			'windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		paths: [
 			'${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/',
 			'${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/'
@@ -543,7 +555,12 @@ const STEP_CONDITIONS = [
 		"always() && steps.common-lot.outputs.suite == 'js'"
 	],
 	[MACOS_BOX, 'lease-silence-native', 'Retain exact paired-process native receiving', 'always()'],
-	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
+	...WINDOWS_FILE_RETENTION.map((owner) => [
+		WINDOWS_BOX,
+		'integration-ahk',
+		owner.name,
+		owner.condition
+	]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
 	...scoped.contract.retained_steps.map((owner) => [
 		owner.file,
@@ -557,10 +574,17 @@ const STEP_CONDITIONS = [
 		'Retain native PAC artifact and source identity',
 		"${{ always() && (steps.native-pac-build.outcome == 'success' || steps.native-pac-cache.outputs.cache-hit == 'true') }}"
 	],
-	// The unit runners alone reuse a PAC evaluator built from identical inputs.
+	// The unit runners alone save a PAC evaluator built from identical inputs;
+	// the Integration lots restore it and rebuild it only on a miss.
 	[
 		WINDOWS_BOX,
 		'test-ahk',
+		'Build and test native full-URL PAC evaluator',
+		"steps.native-pac-cache.outputs.cache-hit != 'true'"
+	],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
 		'Build and test native full-URL PAC evaluator',
 		"steps.native-pac-cache.outputs.cache-hit != 'true'"
 	],
@@ -586,31 +610,69 @@ const STEP_CONDITIONS = [
 	[LINUX_BOX, 'e2e-linux', 'Retain actual XI2 property-cookie evidence', 'always()'],
 	[
 		LINUX_BOX,
-		'test-linux',
+		'integration-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
-		'${{ !cancelled() && ' + LINUX_UNIT_META_ROW + ' }}'
+		'${{ !cancelled() && ' + LINUX_INTEGRATION_NATIVE_ROW + ' }}'
 	],
 	[
 		LINUX_BOX,
-		'test-linux',
+		'integration-linux',
 		'Retain actual LuaJIT XI2 diagnostic evidence',
-		'${{ always() && ' + LINUX_UNIT_META_ROW + ' }}'
+		'${{ always() && ' + LINUX_INTEGRATION_NATIVE_ROW + ' }}'
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
-	[LINUX_BOX, 'test-linux', 'Verify native metrics aggregation equivalence', LINUX_UNIT_META_ROW],
 	[
 		LINUX_BOX,
-		'test-linux',
-		'Verify native cross-driver histogram multiplicity',
-		LINUX_UNIT_META_ROW
+		'integration-linux',
+		'Verify native metrics aggregation equivalence',
+		LINUX_INTEGRATION_NATIVE_ROW
 	],
-	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
 		LINUX_BOX,
-		'test-linux',
+		'integration-linux',
+		'Verify native cross-driver histogram multiplicity',
+		LINUX_INTEGRATION_NATIVE_ROW
+	],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		'Run manual official runtime and model acceptance',
+		MANUAL_RUNTIME_IF
+	],
+	[
+		LINUX_BOX,
+		'integration-linux',
 		'Upload manual runtime acceptance evidence',
 		MANUAL_RUNTIME_EVIDENCE_IF
 	],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		'Run the driver integration tests',
+		LINUX_INTEGRATION_DRIVER_ROW
+	],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		'Upload failed integration log',
+		"${{ failure() && !cancelled() && steps.linux_integration.outcome == 'failure' }}"
+	],
+	[
+		LINUX_BOX,
+		'integration-linux',
+		'Retain integration Lua timing diagnostics',
+		'${{ !cancelled() && ' + LINUX_INTEGRATION_DRIVER_ROW + ' }}'
+	],
+	[MACOS_BOX, 'integration-hs', 'Retain integration Lua timing diagnostics', '${{ !cancelled() }}'],
+	[MACOS_BOX, 'integration-hs', 'Record actual stage role outcome', 'always()'],
+	[MACOS_BOX, 'integration-hs', 'Retain exact stage role outcome', 'always()'],
+	[
+		COMMON_BOX,
+		'common-integration',
+		'Retain shared integration timings, including interrupted runs',
+		'always()'
+	],
+	[COMMON_BOX, 'common-integration', 'Retain captured JS integration failure output', 'always()'],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native retained FD SHA-256', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Prepare authenticated managed HTTP validation tools', NOT_CANCELLED],
@@ -717,24 +779,55 @@ const STEP_CONDITIONS = [
 		'Download AutoHotkey v2 runtime',
 		"steps.cache-ahk.outputs.cache-hit != 'true'"
 	],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
+		'Download AutoHotkey v2 runtime',
+		"steps.cache-ahk.outputs.cache-hit != 'true'"
+	],
 	[WINDOWS_BOX, 'e2e-ahk', 'Download E2E runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
 	[WINDOWS_BOX, 'e2e-ahk', 'Retain E2E native streams', 'always()'],
-	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
-	// The whole-driver boot gates do not depend on the module group: one runner.
+	// The Windows Integration lots: each check runs once, in its own lot.
 	[
 		WINDOWS_BOX,
-		'test-ahk',
-		'Run the full-driver startup smoke',
-		"matrix.module == 'hotstrings-shortcuts'"
+		'integration-ahk',
+		'Install the shipped Kana layout for real probes',
+		WINDOWS_NATIVE_LOT
 	],
 	[
 		WINDOWS_BOX,
-		'test-ahk',
+		'integration-ahk',
+		'Manifest parity (AHK ↔ HS codegen equivalence)',
+		WINDOWS_NATIVE_LOT
+	],
+	[WINDOWS_BOX, 'integration-ahk', 'Receive managed Ollama file component', WINDOWS_NATIVE_LOT],
+	[WINDOWS_BOX, 'integration-ahk', 'Run native desktop AHK cohorts', WINDOWS_NATIVE_LOT],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
+		'Publish native desktop AHK evidence',
+		'${{ always() && ' + WINDOWS_NATIVE_LOT + ' }}'
+	],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
+		'Run the full-driver startup smoke',
+		"matrix.lot == 'Driver startup'"
+	],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
 		'Test fresh Git clone bootstrap and warm startup',
-		"matrix.module == 'hotstrings-shortcuts'"
+		"matrix.lot == 'Fresh clone bootstrap'"
+	],
+	[
+		WINDOWS_BOX,
+		'integration-ahk',
+		'Publish startup diagnostics',
+		"${{ always() && matrix.lot != 'Native cohorts and contracts' }}"
 	],
 	[
 		WINDOWS_BOX,
@@ -1119,7 +1212,7 @@ function commonPlanProblems(files) {
 		assert.deepEqual(
 			prepare,
 			{
-				name: 'Check formatting and plan unit tests',
+				name: 'Check formatting and plan shared tests',
 				'runs-on': 'ubuntu-latest',
 				outputs: { plan: '${{ steps.plan.outputs.plan }}' },
 				steps: [
@@ -1171,7 +1264,7 @@ function commonPlanProblems(files) {
 				{
 					name: 'Admit the complete Common lot map',
 					id: 'common-lot',
-					run: 'node tools/ci/js-feature-matrix.cjs select'
+					run: 'node tools/ci/js-feature-matrix.cjs select unit'
 				}
 			]
 		);
@@ -1179,9 +1272,35 @@ function commonPlanProblems(files) {
 			unit.steps.findIndex((step) => step.id === 'common-lot') <
 				unit.steps.findIndex((step) => step.name === 'Install native validation tools')
 		);
+		// The Integration lots follow every Unit lot and admit the same whole plan.
+		const integration = common.jobs['common-integration'];
+		assert.deepEqual(integration.needs, ['shared-validation']);
+		assert.deepEqual(integration.strategy, {
+			'fail-fast': false,
+			matrix: '${{ fromJSON(inputs.common_plan).integration_matrix }}'
+		});
+		assert.equal(integration.env.COMMON_LOT, '${{ matrix.lot }}');
+		assert.equal(integration.env.COMMON_PLAN, '${{ inputs.common_plan }}');
+		assert.deepEqual(
+			integration.steps.filter((step) => step.id === 'common-lot'),
+			[
+				{
+					name: 'Admit the complete Common integration lot map',
+					id: 'common-lot',
+					run: 'node tools/ci/js-feature-matrix.cjs select integration'
+				}
+			]
+		);
+		assert.ok(
+			integration.steps.findIndex((step) => step.id === 'common-lot') <
+				integration.steps.findIndex((step) => step.name === 'Install native integration tools')
+		);
+		assert.deepEqual(common.jobs['common-e2e'].needs, ['common-integration']);
 		const expectedReads = [
 			[ENTRY, '      common_plan: ${{ needs.prepare-common.outputs.plan }}'],
 			[COMMON_BOX, '      matrix: ${{ fromJSON(inputs.common_plan).matrix }}'],
+			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}'],
+			[COMMON_BOX, '      matrix: ${{ fromJSON(inputs.common_plan).integration_matrix }}'],
 			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}'],
 			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}']
 		];
@@ -1203,7 +1322,7 @@ const LUA_TIMING_RETENTION = [
 		file: LINUX_BOX,
 		job: 'test-linux',
 		producer: 'Run the driver unit test suite',
-		after: 'Upload manual runtime acceptance evidence',
+		after: 'Emit Configuration assertion from failed unit log',
 		directory: 'static/ergopti_plus/linux',
 		step: 'Retain Linux Lua timing diagnostics',
 		artifact:
@@ -1239,7 +1358,7 @@ function lotTransport(source, rel) {
 			rel === MACOS_BOX
 				? [
 						[
-							'test-hs',
+							'integration-hs',
 							'e2e-hs',
 							'stage-plan',
 							'e2e_matrix',
@@ -1421,7 +1540,11 @@ function planReferenceProblems(files) {
 				? consumerStart + strategy.index + matrixField.index + '      matrix: '.length
 				: -1;
 		for (const match of file.text.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
-			if (file.rel === LINUX_BOX && match[1] === 'e2e-linux' && match[2] === 'ci_unit_result') {
+			if (
+				file.rel === LINUX_BOX &&
+				match[1] === 'e2e-linux' &&
+				match[2] === 'ci_integration_result'
+			) {
 				const build = pipeline
 					.jobsOfText(file.text, file.rel)
 					.find((job) => job.id === 'package-linux');
@@ -1477,7 +1600,7 @@ errors.push(...planReferenceProblems(pipeline.files()));
 // Each output remains private to its actual matrix include and canonical producer.
 for (const [producer, consumer, stage, roleStep, role] of [
 	[
-		'test-hs',
+		'integration-hs',
 		'e2e-hs',
 		'e2e',
 		'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)',
@@ -2604,6 +2727,7 @@ function commonProblems(files) {
 	const child = byId.get('shared-validation');
 	const prepare = callers.find((job) => job.id === 'prepare-common');
 	const verdict = byId.get('common-unit-verdict');
+	const integration = byId.get('common-integration');
 	const browser = byId.get('common-e2e');
 	if (!call || pipeline.field(call.body, 'uses') !== './.github/workflows/ci-common.yml')
 		problems.push('core must call the exact reusable Common workflow');
@@ -2630,7 +2754,8 @@ function commonProblems(files) {
 	const dependencies = {
 		'shared-validation': [],
 		'common-unit-verdict': ['common-testbuild'],
-		'common-e2e': ['shared-validation'],
+		'common-integration': ['shared-validation'],
+		'common-e2e': ['common-integration'],
 		'common-build': ['common-e2e'],
 		'common-testbuild': ['common-build']
 	};
@@ -2638,7 +2763,9 @@ function commonProblems(files) {
 		JSON.stringify(children.map((job) => job.id).sort()) !==
 		JSON.stringify(Object.keys(dependencies).sort())
 	)
-		problems.push('Common must retain its complete Unit, E2E, Build and Testbuild chain');
+		problems.push(
+			'Common must retain its complete Unit, Integration, E2E, Build and Testbuild chain'
+		);
 	for (const [id, needs] of Object.entries(dependencies)) {
 		const job = byId.get(id);
 		if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(needs))
@@ -2657,6 +2784,12 @@ function commonProblems(files) {
 	if (!child || fieldBlock(child.body, 'strategy') !== strategy)
 		problems.push('Common must consume the exact prepared inventory matrix without fail-fast');
 	if (
+		!integration ||
+		fieldBlock(integration.body, 'strategy') !==
+			'    strategy:\n      fail-fast: false\n      matrix: ${{ fromJSON(inputs.common_plan).integration_matrix }}'
+	)
+		problems.push('Common Integration must consume the exact prepared integration matrix');
+	if (
 		!prepare ||
 		fieldBlock(prepare.body, 'outputs') !==
 			'    outputs:\n      plan: ${{ steps.plan.outputs.plan }}'
@@ -2667,18 +2800,18 @@ function commonProblems(files) {
 		['RELEASE', 'PRERELEASE', 'CHANNEL', 'TAG', 'VERSION']
 			.map((key) => `      ERGOPTI_DEV_RELEASE_${key}: \${{ inputs.${key.toLowerCase()} }}`)
 			.join('\n');
-	for (const job of [child, browser])
+	for (const job of [child, integration, browser])
 		if (
 			!job ||
 			fieldBlock(job.body, 'env') !==
-				(job === child
+				(job !== browser
 					? environment.replace(
 							'    env:\n',
 							'    env:\n      COMMON_LOT: ${{ matrix.lot }}\n      COMMON_PLAN: ${{ inputs.common_plan }}\n'
 						)
 					: environment.replace(
 							'    env:\n',
-							'    env:\n      COMMON_PLAN: ${{ inputs.common_plan }}\n      COMMON_PREDECESSOR_RESULT: ${{ needs.shared-validation.result }}\n      GH_TOKEN: ${{ github.token }}\n'
+							'    env:\n      COMMON_PLAN: ${{ inputs.common_plan }}\n      COMMON_PREDECESSOR_RESULT: ${{ needs.common-integration.result }}\n      GH_TOKEN: ${{ github.token }}\n'
 						))
 		)
 			problems.push('Common must retain exact qualification input bindings');
@@ -2735,10 +2868,28 @@ function commonProblems(files) {
 	const selected = exactStep(
 		child,
 		'Admit the complete Common lot map',
-		'node tools/ci/js-feature-matrix.cjs select'
+		'node tools/ci/js-feature-matrix.cjs select unit'
 	);
 	if (!selected || pipeline.stepField(selected, 'id') !== 'common-lot')
 		problems.push('Common must admit the whole source-owned lot map before dispatch.');
+	const integrationSelected = exactStep(
+		integration,
+		'Admit the complete Common integration lot map',
+		'node tools/ci/js-feature-matrix.cjs select integration'
+	);
+	if (!integrationSelected || pipeline.stepField(integrationSelected, 'id') !== 'common-lot')
+		problems.push('Common Integration must admit the whole source-owned lot map before dispatch.');
+	const integrationDispatch = exactStep(
+		integration,
+		'Run shared integration suite',
+		'set -euo pipefail\ntest "$SUITE" = js\nnpm run test:js -- --feature "$FEATURE"'
+	);
+	if (
+		!integrationDispatch ||
+		pipeline.stepField(integrationDispatch, 'env') !==
+			'SUITE: ${{ steps.common-lot.outputs.suite }} FEATURE: ${{ steps.common-lot.outputs.feature }}'
+	)
+		problems.push('Common Integration must dispatch the exact feature from its declared matrix');
 	const dispatch = exactStep(child, 'Run shared validation suite', COMMON_DISPATCH);
 	if (
 		!dispatch ||
@@ -2978,8 +3129,48 @@ for (const [what, file, from, to] of [
 	[
 		'Common changes feature input',
 		COMMON_BOX,
-		'          FEATURE: ${{ steps.common-lot.outputs.feature }}\n',
-		'          FEATURE: foreign\n'
+		pipeline.job('shared-validation'),
+		pipeline
+			.job('shared-validation')
+			.replace(
+				'          FEATURE: ${{ steps.common-lot.outputs.feature }}\n',
+				'          FEATURE: foreign\n'
+			)
+	],
+	[
+		'Common Integration changes feature input',
+		COMMON_BOX,
+		pipeline.job('common-integration'),
+		pipeline
+			.job('common-integration')
+			.replace(
+				'          FEATURE: ${{ steps.common-lot.outputs.feature }}\n',
+				'          FEATURE: foreign\n'
+			)
+	],
+	[
+		'Common Integration runs the unit lots',
+		COMMON_BOX,
+		'      matrix: ${{ fromJSON(inputs.common_plan).integration_matrix }}\n',
+		'      matrix: ${{ fromJSON(inputs.common_plan).matrix }}\n'
+	],
+	[
+		'Common Integration admits a unit lot',
+		COMMON_BOX,
+		'        run: node tools/ci/js-feature-matrix.cjs select integration\n',
+		'        run: node tools/ci/js-feature-matrix.cjs select unit\n'
+	],
+	[
+		'Common E2E skips the integration lots',
+		COMMON_BOX,
+		'    needs: [common-integration]\n',
+		'    needs: [shared-validation]\n'
+	],
+	[
+		'Common Integration drops its suite',
+		COMMON_BOX,
+		'          npm run test:js -- --feature "$FEATURE"\n',
+		'          echo skipped-integration\n'
 	],
 	[
 		'Common omits property dispatch',
@@ -3134,29 +3325,33 @@ if (
 
 /**
  * Each lane's jobs in file order, with the exact needs and the stage of each.
- * Stages follow one another except for declared parallel siblings: the Linux
- * Flatpak job builds from the package beside the install cells, and the
- * verdict waits for both; the macOS Build packages after Unit beside E2E, and
- * the test build waits for both.
+ * Every lane reads unit -> integration -> E2E. Stages follow one another
+ * except for declared parallel siblings: the Linux Flatpak job builds from the
+ * package beside the install cells, and the verdict waits for both; the macOS
+ * Build packages after Integration beside E2E, and the test build waits for
+ * both.
  */
 const LANE_GRAPHS = {
 	[MACOS_BOX]: [
 		['test-hs', [], 'unit'],
-		['e2e-hs', ['test-hs'], 'e2e'],
-		['package-macos', ['test-hs'], 'build'],
+		['integration-hs', ['test-hs'], 'integration'],
+		['e2e-hs', ['integration-hs'], 'e2e'],
+		['package-macos', ['integration-hs'], 'build'],
 		['launch', ['e2e-hs', 'package-macos'], 'testbuild'],
 		['macos-ok', ['launch'], 'verdict']
 	],
 	[WINDOWS_BOX]: [
 		['test-ahk', [], 'unit'],
-		['e2e-ahk', ['test-ahk'], 'e2e'],
+		['integration-ahk', ['test-ahk'], 'integration'],
+		['e2e-ahk', ['integration-ahk'], 'e2e'],
 		['package-windows', ['e2e-ahk'], 'build'],
 		['launch-windows', ['package-windows'], 'testbuild'],
 		['windows-ok', ['launch-windows'], 'verdict']
 	],
 	[LINUX_BOX]: [
 		['test-linux', [], 'unit'],
-		['e2e-linux', ['test-linux'], 'e2e'],
+		['integration-linux', ['test-linux'], 'integration'],
+		['e2e-linux', ['integration-linux'], 'e2e'],
 		['package-linux', ['e2e-linux'], 'build'],
 		['package-flatpak', ['package-linux'], 'build'],
 		['install-linux', ['package-linux'], 'testbuild'],
@@ -3237,7 +3432,7 @@ function graphProblems(files) {
 		const sequence = graph.map(([id]) => id);
 		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(sequence)) {
 			problems.push(
-				`${rel} must expose unit tests, E2E, package, installed launch and verdict in order`
+				`${rel} must expose unit tests, integration tests, E2E, package, installed launch and verdict in order`
 			);
 		}
 		for (const [id, expected, stage] of graph) {
@@ -3258,7 +3453,9 @@ function graphProblems(files) {
 					'      ci_source_sha: ${{ github.sha }}',
 					'      ci_run_id: ${{ github.run_id }}',
 					'      ci_attempt: ${{ github.run_attempt }}',
-					...(id === 'e2e-linux' ? ['      ci_unit_result: ${{ needs.test-linux.result }}'] : [])
+					...(id === 'e2e-linux'
+						? ['      ci_integration_result: ${{ needs.integration-linux.result }}']
+						: [])
 				].join('\n');
 				const blocks = [...job.body.matchAll(/^ {4}outputs:\n((?: {6}[^\n]*(?:\n|$)|\n)*)/gm)];
 				if (blocks.length !== 1 || blocks[0][0].trimEnd() !== expectedOutputs)
@@ -3271,7 +3468,7 @@ function graphProblems(files) {
 				stage === 'verdict'
 					? 'always()'
 					: rel === LINUX_BOX && id === 'package-linux'
-						? "${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+						? "${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 						: null;
 			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
 				problems.push(
@@ -3365,7 +3562,7 @@ for (const [label, before, after] of [
 		pipeline
 			.job('e2e-hs')
 			.replace(
-				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
 				'runs-on: ubuntu-latest'
 			)
 	],
@@ -3375,7 +3572,7 @@ for (const [label, before, after] of [
 		pipeline
 			.job('e2e-hs')
 			.replace(
-				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: ${{ fromJSON(needs.integration-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
 				'timeout-minutes: 360'
 			)
 	]
@@ -3386,19 +3583,24 @@ for (const [label, before, after] of [
 // Ordered Linux suites still gate packaging and the mandatory verdict.
 for (const [what, from, to] of [
 	[
-		'Linux E2E omits its unit prerequisite',
-		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n",
+		'Linux E2E omits its integration prerequisite',
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [integration-linux]\n",
 		"  e2e-linux:\n    name: 'E2E tests'\n"
 	],
 	[
-		'Linux package omits units',
-		'      ci_unit_result: ${{ needs.test-linux.result }}\n',
-		'      ci_unit_result: success\n'
+		'Linux integration omits its unit prerequisite',
+		"  integration-linux:\n    name: 'Integration tests'\n    needs: [test-linux]\n",
+		"  integration-linux:\n    name: 'Integration tests'\n"
+	],
+	[
+		'Linux package omits integration tests',
+		'      ci_integration_result: ${{ needs.integration-linux.result }}\n',
+		'      ci_integration_result: success\n'
 	],
 	['Linux package omits E2E', '    needs: [e2e-linux]\n', '    needs: []\n'],
 	[
-		'Linux package forgives failed units',
-		"needs.e2e-linux.outputs.ci_unit_result == 'success' && ",
+		'Linux package forgives failed integration tests',
+		"needs.e2e-linux.outputs.ci_integration_result == 'success' && ",
 		''
 	],
 	[
@@ -3415,16 +3617,21 @@ for (const [what, from, to] of [
 	mustCatch(what, LINUX_BOX, from, to, graphProblems);
 }
 
-// Unit completion precedes E2E, and neither conditions nor forgiveness may
-// turn any required phase into a silent success.
+// Unit completion precedes Integration, Integration precedes E2E, and neither
+// conditions nor forgiveness may turn any required phase into a silent success.
 for (const [rel, id, unit] of [
-	[WINDOWS_BOX, 'e2e-ahk', 'test-ahk'],
-	[MACOS_BOX, 'e2e-hs', 'test-hs'],
-	[LINUX_BOX, 'e2e-linux', 'test-linux']
+	[WINDOWS_BOX, 'integration-ahk', 'test-ahk'],
+	[WINDOWS_BOX, 'e2e-ahk', 'integration-ahk'],
+	[MACOS_BOX, 'integration-hs', 'test-hs'],
+	[MACOS_BOX, 'e2e-hs', 'integration-hs'],
+	[LINUX_BOX, 'integration-linux', 'test-linux'],
+	[LINUX_BOX, 'e2e-linux', 'integration-linux']
 ]) {
 	const prerequisite =
 		rel === MACOS_BOX
-			? `      actions: read\n    needs:\n      - ${unit}\n    runs-on: \${{ fromJSON(needs.${unit}`
+			? id === 'integration-hs'
+				? `    needs:\n      - ${unit}\n    outputs:`
+				: `      actions: read\n    needs:\n      - ${unit}\n    runs-on: \${{ fromJSON(needs.${unit}`
 			: `    needs: [${unit}]\n`;
 	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
 		mustCatch(
@@ -3432,7 +3639,9 @@ for (const [rel, id, unit] of [
 			rel,
 			prerequisite,
 			rel === MACOS_BOX
-				? prerequisite.replace('    runs-on:', suffix + '    runs-on:')
+				? id === 'integration-hs'
+					? prerequisite.replace('    outputs:', suffix + '    outputs:')
+					: prerequisite.replace('    runs-on:', suffix + '    runs-on:')
 				: prerequisite + suffix,
 			graphProblems
 		);
@@ -3440,11 +3649,12 @@ for (const [rel, id, unit] of [
 }
 
 errors.push(...graphProblems(pipeline.files()));
-// E2E and Build both read Actions evidence and need Unit; each anchor names its own runner.
+// E2E and Build both read Actions evidence and need Integration; each anchor names its own runner.
 const MACOS_E2E_NEEDS =
-	'      actions: read\n    needs:\n      - test-hs\n    runs-on: ${{ fromJSON(needs.test-hs';
+	'      actions: read\n    needs:\n      - integration-hs\n    runs-on: ${{ fromJSON(needs.integration-hs';
 const MACOS_BUILD_NEEDS =
-	'      actions: read\n    needs:\n      - test-hs\n    runs-on: macos-latest\n';
+	'      actions: read\n    needs:\n      - integration-hs\n    runs-on: macos-latest\n';
+const MACOS_INTEGRATION_NEEDS = '    needs:\n      - test-hs\n    outputs:\n';
 for (const [what, rel, from, to] of [
 	[
 		'a second root in ci.yml',
@@ -3480,37 +3690,49 @@ for (const [what, rel, from, to] of [
 		'a sixth entry in the macOS lane',
 		MACOS_BOX,
 		MACOS_E2E_NEEDS,
-		MACOS_E2E_NEEDS.replace('    needs:\n      - test-hs\n', '')
+		MACOS_E2E_NEEDS.replace('    needs:\n      - integration-hs\n', '')
 	],
 	[
-		'macOS packaging stops waiting for units',
+		'macOS packaging stops waiting for integration tests',
 		MACOS_BOX,
 		MACOS_BUILD_NEEDS,
-		MACOS_BUILD_NEEDS.replace('    needs:\n      - test-hs\n', '    needs: []\n')
+		MACOS_BUILD_NEEDS.replace('    needs:\n      - integration-hs\n', '    needs: []\n')
+	],
+	[
+		'macOS packaging waits for units only',
+		MACOS_BOX,
+		MACOS_BUILD_NEEDS,
+		MACOS_BUILD_NEEDS.replace('      - integration-hs\n', '      - test-hs\n')
 	],
 	[
 		'macOS packaging waits for E2E again',
 		MACOS_BOX,
 		MACOS_BUILD_NEEDS,
-		MACOS_BUILD_NEEDS.replace('      - test-hs\n', '      - e2e-hs\n')
+		MACOS_BUILD_NEEDS.replace('      - integration-hs\n', '      - e2e-hs\n')
 	],
 	[
-		'native canvas stops waiting for units',
+		'native canvas stops waiting for integration tests',
 		MACOS_BOX,
 		MACOS_E2E_NEEDS,
-		MACOS_E2E_NEEDS.replace('    needs:\n      - test-hs\n', '    needs: []\n')
+		MACOS_E2E_NEEDS.replace('    needs:\n      - integration-hs\n', '    needs: []\n')
 	],
 	[
 		'native canvas stops waiting for E2E',
 		MACOS_BOX,
 		MACOS_E2E_NEEDS,
-		MACOS_E2E_NEEDS.replace('      - test-hs\n', '      - package-macos\n')
+		MACOS_E2E_NEEDS.replace('      - integration-hs\n', '      - package-macos\n')
 	],
 	[
-		'macOS E2E omits its unit prerequisite',
+		'macOS E2E skips its integration prerequisite',
 		MACOS_BOX,
 		MACOS_E2E_NEEDS,
-		MACOS_E2E_NEEDS.replace('    needs:\n      - test-hs\n', '')
+		MACOS_E2E_NEEDS.replace('      - integration-hs\n', '      - test-hs\n')
+	],
+	[
+		'macOS integration omits its unit prerequisite',
+		MACOS_BOX,
+		MACOS_INTEGRATION_NEEDS,
+		MACOS_INTEGRATION_NEEDS.replace('    needs:\n      - test-hs\n', '')
 	],
 	[
 		'macOS test build stops waiting for E2E',
@@ -3532,10 +3754,10 @@ for (const [what, rel, from, to] of [
 	],
 	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [e2e-ahk]\n', ''],
 	[
-		'Windows packaging stops waiting for unit tests',
+		'Windows packaging stops waiting for unit and integration tests',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
-		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [integration-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [integration-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
 	],
 	[
 		'Windows packaging stops waiting for E2E tests',
@@ -3544,10 +3766,28 @@ for (const [what, rel, from, to] of [
 		'    needs: [test-ahk]\n'
 	],
 	[
-		'Windows E2E omits its unit prerequisite',
+		'Windows E2E omits its integration prerequisite',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n",
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [integration-ahk]\n",
 		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n"
+	],
+	[
+		'Windows E2E skips its integration prerequisite',
+		WINDOWS_BOX,
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [integration-ahk]\n",
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n"
+	],
+	[
+		'Windows integration omits its unit prerequisite',
+		WINDOWS_BOX,
+		"  integration-ahk:\n    name: 'Integration tests'\n    needs: [test-ahk]\n",
+		"  integration-ahk:\n    name: 'Integration tests'\n"
+	],
+	[
+		'Linux E2E skips its integration prerequisite',
+		LINUX_BOX,
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [integration-linux]\n",
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n"
 	],
 	[
 		'a second exit in the macOS lane',
@@ -3822,8 +4062,11 @@ const WINDOWS_GATES = [
 		name: 'Build and test native navigation event owner',
 		run: './tools/build/build_windows_nav_owner.ps1'
 	},
+	// A cross-driver contract: an integration check, run once in its own lot.
 	{
 		name: 'Manifest parity (AHK ↔ HS codegen equivalence)',
+		job: 'integration-ahk',
+		condition: WINDOWS_NATIVE_LOT,
 		run: 'npm run test:manifest-parity'
 	},
 	{
@@ -3871,14 +4114,14 @@ for (const gate of WINDOWS_GATES) {
 	const found = attempt(() => pipeline.step(pipeline.job(gate.job ?? 'test-ahk'), gate.name));
 	if (!found) {
 		errors.push(
-			`"${gate.name}" must run in job test-ahk of ${WINDOWS_BOX}, which runs on every run`
+			`"${gate.name}" must run in job ${gate.job ?? 'test-ahk'} of ${WINDOWS_BOX}, which runs on every run`
 		);
 		continue;
 	}
-	for (const key of ['if', 'continue-on-error']) {
-		if (pipeline.stepField(found, key) !== null)
-			errors.push(`"${gate.name}" gates the Windows box and must not set ${key}`);
-	}
+	if (pipeline.stepField(found, 'if') !== (gate.condition ?? null))
+		errors.push(`"${gate.name}" gates the Windows box and must run exactly where it is owned`);
+	if (pipeline.stepField(found, 'continue-on-error') !== null)
+		errors.push(`"${gate.name}" gates the Windows box and must not set continue-on-error`);
 	if (gate.run && pipeline.stepField(found, 'run') !== gate.run) {
 		errors.push(
 			`"${gate.name}" must run exactly \`${gate.run}\`, got: ${pipeline.stepField(found, 'run')}`
@@ -4065,7 +4308,7 @@ function windowsFileRetentionProblems(files) {
 	const steps = files
 		.filter((entry) => entry.rel === WINDOWS_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
-		.filter((job) => job.id === 'test-ahk')
+		.filter((job) => job.id === 'integration-ahk')
 		.flatMap((job) => pipeline.steps(job.body));
 	const problems = [];
 	const receivers = steps.filter((step) => step.name === 'Receive managed Ollama file component');
@@ -4079,14 +4322,14 @@ function windowsFileRetentionProblems(files) {
 			: [];
 	if (
 		receivers.length !== 1 ||
-		pipeline.stepField(receivers[0].body, 'if') !== null ||
+		pipeline.stepField(receivers[0].body, 'if') !== WINDOWS_NATIVE_LOT ||
 		!WINDOWS_FILE_RECEIVER_LINES.every((command) => commands.includes(command))
 	)
 		problems.push('managed Ollama file component receiver and both failing exits remain mandatory');
 	for (const owner of WINDOWS_FILE_RETENTION) {
 		const found = steps.filter((step) => step.name === owner.name);
 		if (found.length !== 1) {
-			problems.push(`${owner.name} must exist once in test-ahk`);
+			problems.push(`${owner.name} must exist once in integration-ahk`);
 			continue;
 		}
 		const expected =
@@ -4117,7 +4360,7 @@ for (const owner of WINDOWS_FILE_RETENTION) {
 			head + (changed ? `        if: ${changed}\n` : ''),
 			stepProblems
 		);
-	const actual = pipeline.step(pipeline.job('test-ahk'), owner.name);
+	const actual = pipeline.step(pipeline.job('integration-ahk'), owner.name);
 	for (const [description, from, to] of [
 		['missing step', actual, ''],
 		['renamed step', owner.name, 'Unowned managed component evidence'],
@@ -4135,16 +4378,16 @@ for (const owner of WINDOWS_FILE_RETENTION) {
 		);
 }
 const componentHead = '      - name: Receive managed Ollama file component\n';
-for (const condition of ['false', 'success()', 'inputs.release'])
+for (const condition of ['false', 'success()', 'inputs.release', "matrix.lot == 'Driver startup'"])
 	mustCatch(
-		`managed file component receiver cannot be conditional: ${condition}`,
+		`managed file component receiver runs only in its own lot: ${condition}`,
 		WINDOWS_BOX,
-		componentHead,
+		componentHead + `        if: ${WINDOWS_NATIVE_LOT}\n`,
 		componentHead + `        if: ${condition}\n`,
 		windowsFileRetentionProblems
 	);
 const componentBody = pipeline.step(
-	pipeline.job('test-ahk'),
+	pipeline.job('integration-ahk'),
 	'Receive managed Ollama file component'
 );
 for (const command of [
@@ -4947,9 +5190,10 @@ function assertLotTransportControls() {
 	let count = 0;
 	for (const [rel, producer, consumer, matrix, metadata] of [
 		[COMMON_BOX, null, 'shared-validation', 'matrix', 'metadata'],
+		[COMMON_BOX, null, 'common-integration', 'integration_matrix', 'metadata'],
 		[COMMON_BOX, 'common-e2e', 'common-build', 'site_matrix', 'site_metadata'],
 		[COMMON_BOX, 'common-build', 'common-testbuild', 'site_matrix', 'site_metadata'],
-		[MACOS_BOX, 'test-hs', 'e2e-hs', 'e2e_matrix', 'e2e_metadata'],
+		[MACOS_BOX, 'integration-hs', 'e2e-hs', 'e2e_matrix', 'e2e_metadata'],
 		[MACOS_BOX, 'package-macos', 'launch', 'testbuild_matrix', 'testbuild_metadata'],
 		[LINUX_BOX, 'package-linux', 'install-linux', 'install_matrix', 'install_metadata']
 	]) {
@@ -4958,7 +5202,7 @@ function assertLotTransportControls() {
 		assert.ok(job, 'Actual human-lot consumer exists');
 		const matrixLine =
 			producer === null
-				? '      matrix: ' + COMMON_MATRIX + '\n'
+				? '      matrix: ${{ fromJSON(inputs.common_plan).' + matrix + ' }}\n'
 				: '      matrix: ${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}\n';
 		const metadataRef =
 			producer === null ? 'inputs.common_plan' : 'needs.' + producer + '.outputs.' + metadata;
@@ -4977,7 +5221,7 @@ function assertLotTransportControls() {
 				'foreign matrix key',
 				matrixLine,
 				producer === null
-					? matrixLine.replace(').matrix', ').foreign')
+					? matrixLine.replace(').' + matrix, ').foreign')
 					: matrixLine.replace('.outputs.' + matrix, '.outputs.foreign')
 			],
 			[
@@ -5054,7 +5298,7 @@ function assertLotTransportControls() {
 			count++;
 		}
 	}
-	assert.equal(count, 50, 'Closed human-lot and mandatory-format source refusal census');
+	assert.equal(count, 57, 'Closed human-lot and mandatory-format source refusal census');
 	return count;
 }
 assertLotTransportControls();
@@ -5088,7 +5332,7 @@ function namingProblems(files) {
 								[PUBLICATION]: 'Release'
 							}[candidate.id] === name
 						: {
-								'prepare-common': 'Check formatting and plan unit tests',
+								'prepare-common': 'Check formatting and plan shared tests',
 								validate: 'Release plan'
 							}[candidate.id] === name
 					: entry.rel === RELEASE_BOX
@@ -5308,17 +5552,23 @@ if (rootConcurrencyBlock === undefined) {
 // rather than interpreting a script's embedded content as another group.
 const concurrencyScriptAnchor = '      - name: Install Lua 5.4 + luarocks\n        run: |\n';
 const concurrencyScriptSource = pipeline.file(MACOS_BOX);
-if (concurrencyScriptSource.split(concurrencyScriptAnchor).length - 1 !== 1) {
+// The unit cells own the anchor; the Integration cell installs the same runtime.
+const concurrencyScriptJob = pipeline
+	.jobsOfText(concurrencyScriptSource, MACOS_BOX)
+	.find((job) => job.id === 'test-hs').body;
+if (concurrencyScriptJob.split(concurrencyScriptAnchor).length - 1 !== 1) {
 	errors.push('the actual macOS run block must uniquely own the script-text concurrency fixture');
 } else {
 	const scriptFixture = pipeline.files().map((entry) =>
 		entry.rel === MACOS_BOX
 			? {
 					rel: entry.rel,
-					text: entry.text.replace(
-						concurrencyScriptAnchor,
-						concurrencyScriptAnchor +
-							'          concurrency:\n            group: literal-script-content\n            cancel-in-progress: true\n'
+					text: entry.text.replace(concurrencyScriptJob, () =>
+						concurrencyScriptJob.replace(
+							concurrencyScriptAnchor,
+							concurrencyScriptAnchor +
+								'          concurrency:\n            group: literal-script-content\n            cancel-in-progress: true\n'
+						)
 					)
 				}
 			: entry
@@ -5422,7 +5672,7 @@ function reporterLifecycleProblems(files) {
 			const admissionAt = steps.indexOf(admission),
 				downloadAt = steps.indexOf(download);
 			if (
-				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['test-hs']) ||
+				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['integration-hs']) ||
 				pipeline.field(job.body, 'if') !== null ||
 				pipeline.field(job.body, 'continue-on-error') !== null ||
 				admissions.length !== 1 ||
@@ -5453,7 +5703,7 @@ function reporterLifecycleProblems(files) {
 				['if', 'continue-on-error'].some(
 					(key) => pipeline.stepField(download.body, key) !== null
 				) ||
-				!/^          pattern: macos-stage-unit-\*-\$\{\{ github\.run_id \}\}$/m.test(
+				!/^          pattern: macos-stage-integration-\*-\$\{\{ github\.run_id \}\}$/m.test(
 					download.body
 				) ||
 				!/^          path: \$\{\{ runner\.temp \}\}\/macos-stage-inputs$/m.test(download.body) ||
@@ -5602,12 +5852,15 @@ for (const [rel, shell] of [
 		],
 		[
 			'wrong reporter predecessor',
-			(body) => body.replace('    needs:\n      - test-hs', '    needs:\n      - e2e-hs')
+			(body) => body.replace('    needs:\n      - integration-hs', '    needs:\n      - e2e-hs')
 		],
 		[
 			'transitive reporter predecessor',
 			(body) =>
-				body.replace('    needs:\n      - test-hs', '    needs:\n      - test-hs\n      - e2e-hs')
+				body.replace(
+					'    needs:\n      - integration-hs',
+					'    needs:\n      - integration-hs\n      - e2e-hs'
+				)
 		],
 		[
 			'missing reporter predecessor metadata',
@@ -5616,7 +5869,8 @@ for (const [rel, shell] of [
 		['missing reporter receipt download', (body) => body.replace(download, '')],
 		[
 			'foreign reporter receipt download',
-			(body) => body.replace(download, download.replace('macos-stage-unit-*', 'macos-stage-e2e-*'))
+			(body) =>
+				body.replace(download, download.replace('macos-stage-integration-*', 'macos-stage-e2e-*'))
 		],
 		[
 			'forgiven reporter receipt download',

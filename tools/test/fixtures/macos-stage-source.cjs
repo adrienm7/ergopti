@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const raw = require('../ci-pipeline.cjs');
 const stage = Object.freeze({
 	'test-hs': 'test-hs',
+	'integration-hs': 'integration-hs',
 	'e2e-hs': 'e2e-hs',
 	'tooltip-canvas': 'e2e-hs',
 	'managed-ollama-native': 'e2e-hs',
@@ -42,7 +43,8 @@ function metadata(value, role) {
 }
 function condition(role, predicate = null) {
 	assert.ok(Object.hasOwn(stage, role), 'Unknown Mac role');
-	if (role === 'test-hs' || role === 'macos-ok') return predicate;
+	// The unit and integration cells run on the stubbed host without role guards.
+	if (role === 'test-hs' || role === 'integration-hs' || role === 'macos-ok') return predicate;
 	const parts = ["steps.stage-admission.outcome == 'success'"];
 	if (role !== 'package-macos') parts.push("env.MACOS_STAGE_ROLE == '" + role + "'");
 	if (['item36-native', 'lease-silence-native'].includes(role))
