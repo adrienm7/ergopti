@@ -38,6 +38,7 @@ local M = {}
 
 local hs         = hs
 local Logger     = require("infra.logger")
+local NativePath = require("native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
@@ -169,9 +170,7 @@ local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 local KE_PHYSICAL_KC_LOG
 do
 	local mp = require("infra.config_paths")
-	local d  = mp.get_config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	KE_PHYSICAL_KC_LOG = d .. "metrics/karabiner_kc.log"
+	KE_PHYSICAL_KC_LOG = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
 	-- Parent dir created lazily by deploy_json_file() or when keylogger starts;
 	-- no mkdir here to avoid creating metrics/ when the feature is off
 end
@@ -1781,12 +1780,15 @@ function M.build_karabiner_json(
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
-	local form_ok, virtual_form = pcall(function()
+	-- The layout convention the actions were resolved under must be known, or the
+	-- generation fails closed. It no longer chooses the deployed virtual
+	-- keyboard: Layout.VIRTUAL_KEYBOARD_PRODUCT does (issue #99).
+	local form_ok, keycode_form = pcall(function()
 		if state.virtual_keyboard_type ~= nil then return state.virtual_keyboard_type end
 		return Layout.keyboard_form()
 	end)
-	if not form_ok or (virtual_form ~= "ansi" and virtual_form ~= "iso") then
-		local err = "the active layout virtual keyboard convention is unavailable: " .. tostring(virtual_form)
+	if not form_ok or (keycode_form ~= "ansi" and keycode_form ~= "iso") then
+		local err = "the active layout virtual keyboard convention is unavailable: " .. tostring(keycode_form)
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
@@ -2140,7 +2142,7 @@ function M.build_karabiner_json(
 				devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
 				name                 = "Default profile",
 				selected             = true,
-				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = virtual_form },
+				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = Layout.VIRTUAL_KEYBOARD_PRODUCT },
 			}
 		}
 	}
@@ -3269,7 +3271,9 @@ function M.merge_into_existing_config(
 		return nil, "existing virtual keyboard settings are not an object"
 	end
 	local changed = false
-	-- Only this owned field follows the active source; country code and every
+	-- Only this owned field is written (the generated graph is named for that
+	-- product, so an ISO setting left from an older build swaps the ISO pair);
+	-- country code and every
 	-- unrelated virtual-HID/profile/personal setting remain the user's values.
 	if requested_type ~= nil then
 		local virtual = selected_profile.virtual_hid_keyboard

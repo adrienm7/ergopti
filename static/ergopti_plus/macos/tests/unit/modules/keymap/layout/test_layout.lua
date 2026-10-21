@@ -146,8 +146,10 @@ helpers.describe("one form owns one action generation (iso-typing-convention)", 
 			helpers.assert_eq(count, 2)
 			helpers.assert_eq(form, "iso")
 			helpers.assert_eq(reads, 1, "one metadata snapshot must own the complete action list")
-			helpers.assert_eq(actions[1].karabiner_to, { { key_code = "non_us_backslash" } })
-			helpers.assert_eq(actions[2].karabiner_to, { { key_code = "grave_accent_and_tilde" } })
+			-- The names are for the deployed ANSI product, which sends 0x35 as 50 and
+			-- 0x64 as 10 whatever the layout's convention (issue #99).
+			helpers.assert_eq(actions[1].karabiner_to, { { key_code = "grave_accent_and_tilde" } })
+			helpers.assert_eq(actions[2].karabiner_to, { { key_code = "non_us_backslash" } })
 		end)
 	end)
 end)

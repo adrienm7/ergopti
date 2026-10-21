@@ -10,7 +10,9 @@
 --- 1. Layout-aware: uses hs.keycodes.map to resolve which physical key produces
 ---    a given character on the current input source.
 --- 2. HID translation: ordinary Carbon positions are fixed; the ISO pair
----    follows the active registry layout's declared keycode convention. Never
+---    follows the virtual keyboard product the name is sent through
+---    (VIRTUAL_KEYBOARD_PRODUCT), never the layout's keycode convention, which
+---    the registry declares and keyboard_form() reads. Never
 ---    infer that convention from a variant's name or a different keyboard.
 ---    Character legends cannot translate HID names: they would loop back to
 ---    the layout character instead of the physical position.
@@ -40,6 +42,19 @@ local LOG = "layout"
 -- ======= 1/ Keycode Constants =======
 -- ====================================
 -- ====================================
+
+--- The virtual keyboard product Ergopti deploys (karabiner.json
+--- `virtual_hid_keyboard.keyboard_type_v2`) and the form every generated
+--- Karabiner name is written for. An Apple ISO keyboard already reports the key
+--- left of 1 as non_us_backslash (0x64) and the key left of Z as
+--- grave_accent_and_tilde (0x35), the registry's `macos_iso` Karabiner names; the
+--- ANSI product passes both through to keycodes 10 and 50, the ISO keycodes
+--- macOS gives that keyboard natively. The ISO product swaps them once more, so
+--- every key Karabiner passed through typed the other key's character (#99:
+--- "Karabiner on ANSI gives ISO behaviour"). The product is therefore never the
+--- layout's keycode convention; that convention only tells which keycode a
+--- physical key arrives as.
+M.VIRTUAL_KEYBOARD_PRODUCT = "ansi"
 
 --- Fixed mapping from Carbon virtual keycode numbers to Karabiner key_code
 --- names (USB HID QWERTY physical key names).
@@ -222,7 +237,7 @@ end
 --- direct lookups but does NOT enumerate via pairs(), which caused earlier
 --- revisions to silently fall through to the char fallback.
 --- @param char string Single character to resolve (e.g. "c").
---- @param form string|nil Captured virtual keyboard convention.
+--- @param form string|nil Virtual keyboard product the name is for (default: the deployed one).
 --- @return string QWERTY key_code name (e.g. "o").
 function M.key_code_for_char(char, form)
 	local map = get_map()
@@ -253,7 +268,7 @@ function M.key_code_for_char(char, form)
 
 	-- Resolve keycode → QWERTY name via the fixed table
 	-- (NOT via hs.keycodes.map, which would loop back to the layout character)
-	local qwerty_name = virtual_name(target_keycode, form or M.keyboard_form())
+	local qwerty_name = virtual_name(target_keycode, form or M.VIRTUAL_KEYBOARD_PRODUCT)
 	if not qwerty_name then
 		Logger.warn(LOG, "Keycode %d has no QWERTY name — falling back to char '%s'.",
 			target_keycode, tostring(char))
@@ -269,7 +284,7 @@ end
 --- returns "c".
 --- Falls back to qwerty_name itself on error.
 --- @param qwerty_name string QWERTY key name (e.g. "o").
---- @param form string|nil Captured virtual keyboard convention.
+--- @param form string|nil Virtual keyboard product the name is for (default: the deployed one).
 --- @return string Character on current layout (e.g. "c").
 function M.char_for_key_code(qwerty_name, form)
 	local map = get_map()
@@ -277,7 +292,7 @@ function M.char_for_key_code(qwerty_name, form)
 
 	-- Find the keycode number whose QWERTY name matches the input
 	local target_keycode = nil
-	form = form or M.keyboard_form()
+	form = form or M.VIRTUAL_KEYBOARD_PRODUCT
 	for kc in pairs(KEYCODE_TO_QWERTY_NAME) do
 		if virtual_name(kc, form) == qwerty_name then
 			target_keycode = kc
