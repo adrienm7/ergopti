@@ -242,7 +242,7 @@ _AHK04M_UIAWrapperPreparesBeforeErasing() {
 	ResetHelper := _StripFullLineComments(_DriverFuncBody("_PrefixInvalidateInputContext"))
 	ResetCommitHelper := _StripFullLineComments(_DriverFuncBody("_PrefixCommitInputContext"))
 	EnterCritical := InStr(ResetHelper, 'Critical("On")')
-	CommitCall := InStr(ResetHelper, "_PrefixCommitInputContext(FocusToken, KnownBoundary)", true, EnterCritical)
+	CommitCall := InStr(ResetHelper, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)", true, EnterCritical)
 	LeaveCritical := InStr(ResetHelper, "Critical(PreviousCritical)", true, CommitCall)
 	ResetEngine := InStr(ResetCommitHelper, "HSE_FeedReset(")
 	ResetPreview := InStr(ResetCommitHelper, '_PrefixSetBuffer("")', true, ResetEngine)

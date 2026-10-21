@@ -257,13 +257,17 @@ _HEWR_TypingIsNoShortcut() {
 		_HEWR_WithLayout(Family, _HEWR_TypingOnLayout.Bind(Family))
 }
 
-; Ctrl+Backspace deletes a word: both buffers go, the word start unknown,
-; with every setting off.
+; Ctrl+Backspace deletes a word: both buffers go and the caret sits where
+; that word began, so the next letter starts a word, with every setting off.
+; Alt+Backspace (undo in many editors) forgets the word at an unknown start.
 _HEWR_CtrlBackspaceAlwaysForgets() {
 	Off := Map("arrow_resets_word", false, "shortcut_resets_word", false, "tap_hold_resets_word", false)
 	Event := () => _HEWR_PhysicalKey(0x08, 0x0E, "LControl")
 	AssertEqual("", _HEWR_Run(Off, Event, "x"), "Ctrl+Backspace forgets the « a »")
-	AssertEqual("", _HEWR_Run(Off, Event, "r"), "and promises no word start")
+	AssertEqual("r", _HEWR_Run(Off, Event, "r"), "and starts a word (bs-word-start)")
+	AltEvent := () => _HEWR_PhysicalKey(0x08, 0x0E, "LAlt")
+	AssertEqual("", _HEWR_Run(Off, AltEvent, "x"), "Alt+Backspace forgets the « a »")
+	AssertEqual("", _HEWR_Run(Off, AltEvent, "r"), "and promises no word start")
 }
 
 Test("event word reset: the probe without any event", _HEWR_ProbeUnaffectedWithoutEvent)
@@ -271,7 +275,7 @@ Test("event word reset: physical arrows, on and off", _HEWR_PhysicalArrows)
 Test("event word reset: navigation-layer and sent arrows, on and off", _HEWR_SyntheticArrows)
 Test("event word reset: shortcuts with one and several modifiers, on and off", _HEWR_PhysicalShortcuts)
 Test("event word reset: AltGr and Shift keystrokes are typing", _HEWR_TypingIsNoShortcut)
-Test("event word reset: Ctrl+Backspace forgets the word whatever the settings", _HEWR_CtrlBackspaceAlwaysForgets)
+Test("event word reset: Ctrl+Backspace starts a word whatever the settings", _HEWR_CtrlBackspaceAlwaysForgets)
 
 
 

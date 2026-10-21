@@ -53,6 +53,9 @@ global _PrefixInputContextGeneration := 0
 ; A_TickCount of the last physical keystroke the watcher observed, "" before
 ; the first: the reference of the idle reset (_PrefixApplyIdleReset).
 global _PrefixLastKeyTick := ""
+; What the last idle reset forgot, with the two generations it published, so
+; a Backspace right after the pause can still edit that word; 0 when none.
+global _PrefixIdleForgotten := 0
 
 ; Set when a PRIVATE expansion has written its resolved value into the buffers.
 ; After a star fire the watcher takes the engine's buffer verbatim, so
@@ -1117,11 +1120,13 @@ _PrefixTooltipOwnerStillCurrent(Owner) {
 ; transaction without dragging GUI or file-backed logging under Critical.
 ; @param FocusToken {Integer} New focused-control identity, or 0 while unknown.
 ; @param KnownBoundary {Boolean} Whether the new run starts at a word boundary.
+; @param AtLineStart {Boolean} Whether the caret is at the start of an empty
+;        input line (HSE_StartIsLineStart).
 ; @return {Object} Immutable state needed by the post-commit effects phase.
-_PrefixCommitInputContext(FocusToken := 0, KnownBoundary := true) {
+_PrefixCommitInputContext(FocusToken := 0, KnownBoundary := true, AtLineStart := false) {
 	global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixInputContextGeneration
 	ClearedBuffer := _PrefixBuffer
-	HSE_FeedReset(KnownBoundary, true)
+	HSE_FeedReset(KnownBoundary, true, AtLineStart)
 	ContentGeneration := _PrefixSetBuffer("")
 	_PrefixFocusedControlToken := FocusToken
 	_PrefixInputContextGeneration += 1
@@ -1178,11 +1183,13 @@ _PrefixInputCommitStillCurrent(Commit) {
 ; Logging and retired-Gui disposal remain deferred off the keyboard transaction.
 ; @param FocusToken {Integer} New focused-control identity, or 0 while unknown.
 ; @param KnownBoundary {Boolean} Whether the new run starts at a word boundary.
+; @param AtLineStart {Boolean} Whether the caret is at the start of an empty
+;        input line (HSE_StartIsLineStart).
 ; @return {Integer} Published input-context generation.
-_PrefixInvalidateInputContext(FocusToken := 0, KnownBoundary := true) {
+_PrefixInvalidateInputContext(FocusToken := 0, KnownBoundary := true, AtLineStart := false) {
 	PreviousCritical := Critical("On")
 	try {
-		Commit := _PrefixCommitInputContext(FocusToken, KnownBoundary)
+		Commit := _PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -1199,7 +1206,8 @@ _PrefixInvalidateInputContext(FocusToken := 0, KnownBoundary := true) {
 ; @returns {Boolean} True when the context was reset.
 _PrefixApplyIdleReset(NowTick) {
 	global _PrefixLastKeyTick, _PrefixBuffer, _PrefixFocusedControlToken
-	global HSE_Buffer, HSE_StartIsWordBoundary
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart
+	global _PrefixIdleForgotten, _PrefixInputContextGeneration, _PrefixContentGeneration
 	LastTick := _PrefixLastKeyTick
 	_PrefixLastKeyTick := NowTick
 	IdleSeconds := HSE_IdleResetSecondsCurrent()
@@ -1209,7 +1217,16 @@ _PrefixApplyIdleReset(NowTick) {
 	if (HSE_Buffer == "" and _PrefixBuffer == "" and HSE_StartIsWordBoundary
 		and !_PrefixHasIncompleteFragment())
 		return false
+	Forgotten := { Buffer: HSE_Buffer, Preview: _PrefixBuffer,
+		Boundary: HSE_StartIsWordBoundary, LineStart: HSE_StartIsLineStart,
+		Fragment: _PrefixHasIncompleteFragment() }
 	_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
+	; A Backspace that follows still edits the word typed before the pause:
+	; _PrefixRestoreIdleForgottenWord gives it back as long as nothing else
+	; changed the context since this reset.
+	Forgotten.Generation := _PrefixInputContextGeneration
+	Forgotten.ContentGeneration := _PrefixContentGeneration
+	_PrefixIdleForgotten := Forgotten
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "Idle reset: {1} ms without typing (limit {2} s) — new word.",
 			NowTick - LastTick, IdleSeconds)
@@ -1225,6 +1242,7 @@ _PrefixApplyIdleReset(NowTick) {
 ; @return {Boolean} True when the character may safely enter the buffers.
 _PrefixEnsureInputContext(FocusToken := unset) {
 	global _PrefixBuffer, _PrefixFocusedControlToken, HSE_Buffer, HSE_StartIsWordBoundary
+	global HSE_StartIsLineStart
 	if !IsSet(FocusToken)
 		FocusToken := WIGetFocusedControlToken()
 	if !FocusToken {
@@ -1236,8 +1254,11 @@ _PrefixEnsureInputContext(FocusToken := unset) {
 		; An unresolved probe deliberately marks the left context unknown. Preserve
 		; that verdict when focus becomes observable again; otherwise ignored text
 		; could be mistaken for a word boundary and a suffix could backspace it.
-		KnownBoundary := (_PrefixFocusedControlToken == 0) ? HSE_StartIsWordBoundary : true
-		_PrefixInvalidateInputContext(FocusToken, KnownBoundary)
+		; A terminal Enter publishes the unknown token too, and the empty prompt
+		; line it promised (HSE_StartIsLineStart) is still the one being bound.
+		Unbound := (_PrefixFocusedControlToken == 0)
+		KnownBoundary := Unbound ? HSE_StartIsWordBoundary : true
+		_PrefixInvalidateInputContext(FocusToken, KnownBoundary, Unbound and HSE_StartIsLineStart)
 	}
 	return true
 }
@@ -1300,8 +1321,36 @@ _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld) {
 		return false
 	; Focus usually moves only after this keydown callback returns. Publish an
 	; unknown token now; the next OnChar binds the new control generation.
-	_PrefixInvalidateInputContext(0, true)
+	; Ctrl+L selects the whole address of a browser's address bar: typing or a
+	; Backspace replaces it, and a further Backspace finds an empty field. In a
+	; terminal Ctrl+L redraws the screen and keeps the line being typed.
+	_PrefixInvalidateInputContext(0, true, VK == 0x4C and !_PrefixTerminalHostFocused())
 	return true
+}
+
+; Whether the key going down is struck with Ctrl as the delete-previous-word
+; and select-all modifier: a real Ctrl (never AltGr's fake LCtrl, which
+; _PrefixShortcutModifierHeld already reads as typing), Shift allowed, and no
+; Alt or Win, which make other commands of the same key.
+; @returns {Boolean}
+_PrefixWordDeleteChordHeld() {
+	global _PrefixModifierIsDown
+	IsDown := _PrefixModifierIsDown
+	RAltIsAltGr := KS_AltGrAddsFakeLCtrl()
+	CtrlDown := (IsDown.Call("LControl") or IsDown.Call("RControl"))
+		and !(RAltIsAltGr and IsDown.Call("RAlt"))
+	AltDown := IsDown.Call("LAlt") or IsDown.Call("RAlt")
+	WinDown := IsDown.Call("LWin") or IsDown.Call("RWin")
+	return CtrlDown and !AltDown and !WinDown
+}
+
+; Whether the focused window is a terminal (Windows Terminal, conhost,
+; mintty…), whose line editor submits on Enter and ignores a Backspace at the
+; start of an empty prompt. Reads the output-host owner the dispatch uses.
+; @returns {Boolean}
+_PrefixTerminalHostFocused() {
+	Host := OutputHostResolve(false)
+	return Host["Valid"] and _HSE_IsTerminalInputHost(Host["Exe"])
 }
 
 ; Replace the physical wrapping symbol with a selection wrapper as one
@@ -1752,13 +1801,15 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		IsArrow := (VK >= 0x25 and VK <= 0x28)
 		if (!IsArrow and !_PrefixIsModifierVK(VK) and _PrefixShortcutModifierHeld()) {
 			if (VK == 0x08) {
-				; Ctrl+Backspace (or Alt+Backspace) deletes a whole word, by an
-				; amount this watcher cannot observe: whatever the settings say,
-				; both buffers are wiped and no word boundary is assumed on the
-				; left. Falling through to the plain VK==0x08 branch below would
-				; chop only ONE char, leaving the buffer ahead of the screen and
-				; later firing an expansion with backspaces into unrelated text.
-				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+				; Ctrl+Backspace deletes the word before the caret, by an amount
+				; this watcher cannot observe: both buffers are wiped whatever the
+				; settings say, and the caret now sits where that word started, so
+				; the next character starts a word. Alt+Backspace (undo in many
+				; editors) and Win+Backspace promise no such boundary. Falling
+				; through to the plain VK==0x08 branch below would chop only ONE
+				; char, leaving the buffer ahead of the screen and later firing an
+				; expansion with backspaces into unrelated text.
+				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, _PrefixWordDeleteChordHeld())
 				return
 			}
 			; Insert and Delete keep their own reset below, modifiers or not.
@@ -1767,7 +1818,11 @@ _OnPrefixKeyDown(IH, VK, SC) {
 				; a new word, or the word left open, as
 				; hotstrings.shortcut_resets_word says — or
 				; hotstrings.tap_hold_resets_word when a tap-hold made it.
-				HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut")
+				; Ctrl+A selects the whole text outside a terminal: a Backspace
+				; then empties the field and the next one deletes nothing.
+				SelectsAll := (VK == 0x41 and _PrefixWordDeleteChordHeld()
+					and !_PrefixTerminalHostFocused())
+				HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut", SelectsAll)
 				return
 			}
 		}
@@ -1800,10 +1855,15 @@ _OnPrefixKeyDown(IH, VK, SC) {
 			FocusToken := (VK == 0x09 or VK == 0x0D or VK == 0x1B)
 				? 0
 				: _PrefixFocusedControlToken
+			; A bare Enter in a terminal submits the line: the prompt that
+			; follows is empty, and a Backspace there deletes nothing. Shift+Enter
+			; inserts a newline in the multi-line TUIs and keeps no such promise.
+			AtLineStart := (VK == 0x0D and !_PrefixModifierIsDown.Call("LShift")
+				and !_PrefixModifierIsDown.Call("RShift") and _PrefixTerminalHostFocused())
 			; An arrow leaves the word open when hotstrings.arrow_resets_word
 			; is off; the prediction still learns that the caret moved.
 			if (!IsArrow or HSE_WordResetFlagCurrent("arrow_resets_word"))
-				_PrefixInvalidateInputContext(FocusToken, KnownBoundary)
+				_PrefixInvalidateInputContext(FocusToken, KnownBoundary, AtLineStart)
 			else if LoggerIsDebugEnabled()
 				LoggerDebug("PrefixWatcher", "Arrow key: hotstrings.arrow_resets_word is off — the word stays open.")
 			if IsSet(LLM_Bridge_FeedKeyDownIfActive)
@@ -1851,7 +1911,8 @@ _PrefixWordTail(Buf) {
 ; @return {Object} The preview value plus immutable content/tooltip owners.
 _PrefixCommitBackspace() {
 	global _PrefixBuffer
-	HSE_FeedBackspace(true)
+	_PrefixRestoreIdleForgottenWord()
+	HSE_FeedBackspace(true, true)
 	if (_PrefixBuffer == "") {
 		; Empty does not always mean "nothing to step back over". Typing a
 		; terminator resets the preview while the engine keeps it, so deleting
@@ -1868,6 +1929,32 @@ _PrefixCommitBackspace() {
 		ContentGeneration: ContentGeneration,
 		TooltipOwner: _PrefixCaptureTooltipOwner()
 	}
+}
+
+; Give a Backspace back the word an idle reset forgot just before it.
+;
+; The pause rule makes the next key start a new word, but a Backspace is no
+; new word: it edits the one typed before the pause. Without the word it found
+; the buffer empty and declared the word start unknown, so « ab », a pause,
+; Backspace, Backspace, « c★ » stayed silent. Restored only while nothing
+; else touched the context since that reset (both generations unchanged).
+; The caller owns Critical, as for _PrefixCommitBackspace.
+; @return {Boolean} True when the forgotten word was restored.
+_PrefixRestoreIdleForgottenWord() {
+	global _PrefixIdleForgotten, _PrefixInputContextGeneration, _PrefixContentGeneration
+	global HSE_Buffer, HSE_StartIsWordBoundary, HSE_StartIsLineStart
+	Forgotten := _PrefixIdleForgotten
+	_PrefixIdleForgotten := 0
+	if !IsObject(Forgotten) or Forgotten.Fragment
+		return false
+	if (Forgotten.Generation != _PrefixInputContextGeneration
+			or Forgotten.ContentGeneration != _PrefixContentGeneration or HSE_Buffer != "")
+		return false
+	HSE_Buffer := Forgotten.Buffer
+	HSE_StartIsWordBoundary := Forgotten.Boundary
+	HSE_StartIsLineStart := Forgotten.LineStart
+	_PrefixSetBuffer(Forgotten.Preview)
+	return true
 }
 
 _PrefixBackspaceCommitStillCurrent(Commit) {

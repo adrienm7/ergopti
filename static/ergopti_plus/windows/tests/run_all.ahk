@@ -755,6 +755,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/hotstrings/prefix/test_prefix_char_admission.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_idle_click_reset.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_event_word_reset.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_backspace_word_start.ahk
 #Include unit/modules/llm/prediction/test_llm_bridge_buffer_cap.ahk
 #Include unit/modules/llm/navigation/test_llm_pointer_watch_transaction.ahk
 #Include unit/modules/llm/navigation/test_llm_tab_accept_policy.ahk

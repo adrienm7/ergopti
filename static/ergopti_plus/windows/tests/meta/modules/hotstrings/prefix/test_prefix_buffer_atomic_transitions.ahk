@@ -49,10 +49,10 @@ _PBAT_ContextResetSitesUseOneOwner() {
 		"physical context resets must not bypass the paired helper at sibling keydown sites")
 
 	EnterCritical := InStr(Pair, 'Critical("On")')
-	CommitCall := InStr(Pair, "_PrefixCommitInputContext(FocusToken, KnownBoundary)", true, EnterCritical)
+	CommitCall := InStr(Pair, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)", true, EnterCritical)
 	LeaveCritical := InStr(Pair, "Critical(PreviousCritical)", true, CommitCall)
 	Effects := InStr(Pair, "_PrefixFinishInputContext(Commit)", true, LeaveCritical)
-	Engine := InStr(Commit, "HSE_FeedReset(KnownBoundary, true)")
+	Engine := InStr(Commit, "HSE_FeedReset(KnownBoundary, true, AtLineStart)")
 	Preview := InStr(Commit, '_PrefixSetBuffer("")', true, Engine)
 	Assert(EnterCritical > 0 and CommitCall > EnterCritical and LeaveCritical > CommitCall
 		and Effects > LeaveCritical and Engine > 0 and Preview > Engine,
@@ -85,7 +85,7 @@ _PBAT_BackspaceHasOneAtomicDecrement() {
 	CommitCall := InStr(Pair, "_PrefixCommitBackspace()", true, EnterCritical)
 	LeaveCritical := InStr(Pair, "Critical(PreviousCritical)", true, CommitCall)
 	Effects := InStr(Pair, "_PrefixFinishBackspace(Commit)", true, LeaveCritical)
-	Engine := InStr(Commit, "HSE_FeedBackspace(true)")
+	Engine := InStr(Commit, "HSE_FeedBackspace(true, true)")
 	Preview := InStr(Commit, "_PrefixSetBuffer(NextPrefixBuffer)", true, Engine)
 	Hide := InStr(Finish, 'TooltipHide("Backspace", true)')
 	Assert(EnterCritical > 0 and CommitCall > EnterCritical and LeaveCritical > CommitCall
@@ -95,7 +95,7 @@ _PBAT_BackspaceHasOneAtomicDecrement() {
 	WatcherBranch := InStr(Synthetic, "if HasPreviewCommit")
 	Fallback := InStr(Synthetic, "else if IsSet(HSE_FeedBackspace)", true, WatcherBranch)
 	Assert(WatcherBranch > 0 and Fallback > WatcherBranch
-		and _PBAT_Count(Synthetic, "HSE_FeedBackspace(true)") == 1,
+		and _PBAT_Count(Synthetic, "HSE_FeedBackspace(true, true)") == 1,
 		"synthetic Backspace must choose the paired watcher OR the engine-only harness fallback, never both")
 }
 

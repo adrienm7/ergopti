@@ -33,8 +33,8 @@ _HSPIP_PhysicalFeedsDeclareProvenance() {
 	Commit := _DriverFuncBody("_PrefixCommitInputContext")
 	Assert(KeyDown != "", "_OnPrefixKeyDown must exist")
 	Assert(InStr(KeyDown, "_PrefixInvalidateInputContext(") > 0
-		and InStr(Invalidate, "_PrefixCommitInputContext(FocusToken, KnownBoundary)") > 0
-		and InStr(Commit, "HSE_FeedReset(KnownBoundary, true)") > 0,
+		and InStr(Invalidate, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)") > 0
+		and InStr(Commit, "HSE_FeedReset(KnownBoundary, true, AtLineStart)") > 0,
 		"physical keydown resets must route through the paired transaction whose engine mutation declares IsPhysical=true")
 }
 Test("HSE: physical feeds outside the InputHook declare IsPhysical", _HSPIP_PhysicalFeedsDeclareProvenance)
