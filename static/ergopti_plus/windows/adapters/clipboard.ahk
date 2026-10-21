@@ -65,6 +65,11 @@ class CBClipboardOwner {
 	static settle_hook := 0
 }
 global CB_RESTORE_RETRY_MS := 50
+; Readers such as the Windows clipboard history open the clipboard right after
+; each change. AutoHotkey's own clipboard calls wait for them up to their default
+; ClipboardTimeout of one second; raw native locks wait for the same bound.
+global CB_NATIVE_OPEN_TIMEOUT_MS := 1000
+global CB_NATIVE_OPEN_RETRY_MS := 10
 
 ; Claims the one process-wide temporary paste slot before its caller performs
 ; any blocking clipboard snapshot. The returned token is also the regular
@@ -663,7 +668,7 @@ _CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn) {
 	ClipboardOpened := false, ClipboardMutated := false
 	MutationId := 0, TransferredBitmap := 0
 	try {
-		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		ClipboardOpened := CB_OpenClipboardWithin(A_ScriptHwnd)
 		if !ClipboardOpened
 			throw Error("OpenClipboard failed")
 		if HasMethod(AdmissionFn, "Call") {
@@ -705,7 +710,9 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 		ClipboardOpened := false
 		if !ClipboardMutated
 			return 0
-		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		; Readers notified by the close race this reopen; the owner check below
+		; still refuses a receipt if another process replaced the content meanwhile.
+		ClipboardOpened := CB_OpenClipboardWithin(A_ScriptHwnd)
 		if !ClipboardOpened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
 			return 0
 		if TransferredBitmap {
@@ -754,6 +761,30 @@ CB_IsBusy() {
 		return true
 	try DllCall("User32\CloseClipboard")
 	return false
+}
+
+; Opens the native clipboard lock for Hwnd, waiting up to CB_NATIVE_OPEN_TIMEOUT_MS
+; while another process holds it. A single attempt loses to the readers that open
+; the clipboard just after every change, which is exactly when callers need it.
+; @param {Integer} Hwnd The window that will own the lock.
+; @param {Func} OnRefused Optional; called once, at the first refused attempt.
+; @returns {Boolean} True once the lock is held; false when the bound expired.
+CB_OpenClipboardWithin(Hwnd, OnRefused := 0) {
+	global CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
+	Started := A_TickCount
+	Refused := false
+	Loop {
+		if DllCall("User32\OpenClipboard", "Ptr", Hwnd, "Int")
+			return true
+		if !Refused {
+			Refused := true
+			if HasMethod(OnRefused, "Call")
+				OnRefused.Call()
+		}
+		if TickElapsed(Started) >= CB_NATIVE_OPEN_TIMEOUT_MS
+			return false
+		Sleep(CB_NATIVE_OPEN_RETRY_MS)
+	}
 }
 
 

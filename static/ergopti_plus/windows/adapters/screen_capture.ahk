@@ -188,7 +188,8 @@ _GestureScreenshotCaptureClipboardImage(Stage, ExpectedSequence, MaxEdge) {
 	global GESTURE_SCREENSHOT_CF_BITMAP, GESTURE_SCREENSHOT_IMAGE_BITMAP
 	global GESTURE_SCREENSHOT_PNG_ENCODER
 	Image := 0
-	if !DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int")
+	; The region image was just copied, which is when clipboard readers hold it.
+	if !CB_OpenClipboardWithin(A_ScriptHwnd, _GestureScreenshotNativeProbe.Bind("contended", 0))
 		throw Error("The region clipboard is busy.")
 	try {
 		if ExpectedSequence == 0
