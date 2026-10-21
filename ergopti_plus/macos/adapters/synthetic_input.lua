@@ -940,6 +940,7 @@ local function observe_periodic_settlement(owner, timer)
 		owner.timer = nil
 		owner.stop_error_reported = false
 		release_periodic_cleanup(owner)
+		if owner.on_native_settled then owner.on_native_settled() end
 		if owner._marker == IDLE_WAITER_MARKER then
 			_idle_waiter_cleanup[owner] = nil
 			if owner.settling == true then finish_idle_waiter(owner) end
@@ -1103,6 +1104,7 @@ local invalidate_periodic_owner
 local run_pending_action_listeners
 local start_action_dispatcher
 local post_deferred_trigger
+local publication_allowed
 
 
 --- Stops the reusable pump watchdog only when it belongs to this batch.
@@ -1164,6 +1166,14 @@ local function finish_batch(batch, status)
 	tx.pending_batches = tx.pending_batches - 1
 	assert(tx.pending_batches >= 0,
 		"adapters.synthetic_input: transaction batch count underflow")
+	-- The original of a physical replay was consumed when it was queued, so a
+	-- replay that ends before its post is a typed key the user never sees.
+	if batch.mode == "physical" and status ~= "dispatched"
+		and batch.physical_owner and batch.physical_owner.ordinal == 1 then
+		pcall(require("infra.keystroke_integrity").report_drop, string.format(
+			"their delayed replay ended %s before it was posted (%s)",
+			status, tostring(tx.failure or "no failure detail")))
+	end
 	for _, callback in ipairs(tx.dispatched_callbacks) do
 		invoke_lifecycle("on_dispatched", callback, tx, batch, status)
 	end
@@ -1587,6 +1597,11 @@ local function ensure_pump_started()
 				consume = true
 				return
 			end
+			if not publication_allowed(batch.tx.publication, true) then
+				fail_queued_batch(batch, "publication is no longer current", false, true)
+				return
+			end
+			if batch.status ~= "queued" then return end
 			publish_action_epoch(batch)
 			batch.status = "handed_off"
 			events = batch.events
@@ -1993,6 +2008,11 @@ function M.cancel(tx)
 	-- suffix so pause/reload cannot strand a partial replacement on screen.
 	for _, batch in ipairs(tx.batches) do
 		local owner = batch.paced_owner
+		if owner and owner.guarded_pair == true and batch.status == "queued" then
+			-- A pending/uncertain Down owns its release and exact timer retirement.
+			owner.publication_cancelled = true
+			return false
+		end
 		if owner and owner.committed == true and batch.status == "queued" then
 			if tx.publication ~= nil then
 				owner.publication_cancelled = true
@@ -2009,8 +2029,14 @@ function M.cancel(tx)
 	for token in pairs(tx.retains) do token.active = false end
 	tx.retains = {}
 	tx.retain_count = 0
+	local loopback_pending = false
 	for _, batch in ipairs(tx.batches) do
-		if batch.status == "building" or batch.status == "queued" then
+		if batch.loopback_owner and (batch.status == "building" or batch.status == "queued") then
+			-- Atomically cancel untouched siblings, while the exact loopback
+			-- retains a possible Down's release, provenance and timer debt.
+			batch.loopback_owner.cancel()
+			loopback_pending = true
+		elseif batch.status == "building" or batch.status == "queued" then
 			if batch.paced_owner and invalidate_paced_owner then
 				invalidate_paced_owner(batch.paced_owner, "cancelled")
 			end
@@ -2020,10 +2046,6 @@ function M.cancel(tx)
 			if batch.reserved_owner then
 				invalidate_periodic_owner(batch.reserved_owner, "cancelled")
 			end
-			if batch.loopback_timer and type(batch.loopback_timer.stop) == "function" then
-				pcall(batch.loopback_timer.stop, batch.loopback_timer)
-			end
-			batch.loopback_timer = nil
 			clear_pump_watchdog(batch)
 			if _inflight_batch == batch then _inflight_batch = nil end
 			discard_active_trigger(batch)
@@ -2038,7 +2060,7 @@ function M.cancel(tx)
 		end
 	end
 	try_complete(tx)
-	return true
+	return not loopback_pending
 end
 
 
@@ -2367,6 +2389,12 @@ end
 --- @param batch table Deferred batch.
 post_deferred_trigger = function(batch)
 	if batch.status ~= "queued" then return end
+	-- Both the broker and watchdog enter here from owned run-loop timers.
+	if not publication_allowed(batch.tx.publication, false) then
+		fail_queued_batch(batch, "publication is no longer current", false)
+		return
+	end
+	if batch.status ~= "queued" then return end
 	local trigger_tag = nil
 	local post_attempted = false
 	local ok, err = xpcall(function()
@@ -2616,6 +2644,7 @@ end
 --- @param delay number|nil Legacy Hammerspoon delay in microseconds.
 --- @param explicit_tx table|nil Transaction override.
 --- @return boolean success
+--- @return table batch Opaque exact batch for on_dispatched identity checks.
 function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 	local collector = _callback_stack[#_callback_stack]
 	local tx, implicit = resolve_emission_transaction(explicit_tx, collector == nil)
@@ -2629,8 +2658,9 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 		error(arguments_err, 0)
 	end
 	if collector then
+		local batch
 		local ok, err = xpcall(function()
-			local batch = collector_batch(collector, tx)
+			batch = collector_batch(collector, tx)
 			M.keyStroke(batch, modifiers, key)
 		end, debug.traceback)
 		if not ok then
@@ -2638,7 +2668,7 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 			error(err, 0)
 		end
 		if implicit and not tx.cancelled then collector.implicit_transactions[tx] = true end
-		return true
+		return true, batch
 	end
 	local token = nil
 	if tx.sealed then
@@ -2662,7 +2692,7 @@ function M.emit_key_stroke(modifiers, key, delay, explicit_tx)
 	end
 	if not scheduled then cancel_failed_emission(tx, "key-stroke") end
 	if implicit and not tx.cancelled then M.seal(tx) end
-	return scheduled
+	return scheduled, batch
 end
 
 
@@ -2690,50 +2720,42 @@ function M.emit_loopback_key_stroke(modifiers, key, delay, explicit_tx)
 		for candidate in pairs(tx.retains) do token = candidate break end
 	end
 	local batch
-	local built_ok, build_err = xpcall(function()
+	local ok, accepted = xpcall(function()
 		batch = create_batch(tx, "loopback", token)
 		M.loopbackKeyStroke(batch, modifiers, key)
+		assert(not tx.cancelled and not tx.completed and batch.status == "building",
+			"loopback construction lost its exact transaction")
+		local LoopbackOwner = require("adapters.synthetic_input_loopback_owner")
+		local owner = LoopbackOwner.new(TimerScheduler, batch.events, {
+			admit = function() return batch.status == "queued" and not tx.failed and not tx.completed end,
+			withdraw = function() untrack_pending_loopback(batch) end,
+			discard = function() discard_batch_records(batch) end,
+			diagnostic = function(format, detail) defer_diagnostic("error", format, detail) end,
+			terminal = function(status, detail)
+				if detail then tx.failure = detail end
+				if status == "cancelled" then tx.cancelled, tx.sealed = true, true end
+				finish_batch(batch, status)
+			end,
+		})
+		batch.loopback_owner = owner
 		batch.status = "queued"
 		track_pending_loopback(batch)
+		-- Acquire retries before native Down: the first global pair now waits
+		-- the canonical owner tick instead of a one-shot zero-delay turn.
+		return owner.start(M.PERIODIC_OWNER_TICK_SEC)
 	end, debug.traceback)
-	if not built_ok then
-		cancel_failed_emission(tx, "loopback key-stroke")
-		error(build_err, 0)
-	end
-	local timer_handle
-	timer_handle = schedule_zero("synthetic loopback dispatch", function()
-		batch.loopback_timer = nil
-		if batch.status ~= "queued" then return end
-		local posted_count = 0
-		local ok, err = xpcall(function()
-			for index, event in ipairs(batch.events) do
-				assert(type(event.post) == "function",
-					"loopback event.post is unavailable")
-				event:post()
-				posted_count = index
-			end
-		end, debug.traceback)
-		if not ok then
-			-- Keep enrichment only for phases whose post returned successfully;
-			-- never-emitted ghosts must not evict delayed live provenance later.
-			for index = posted_count + 1, #batch.tags do discard_record(batch.tags[index]) end
-			for index = #batch.tags, posted_count + 1, -1 do batch.tags[index] = nil end
-			batch.tx.failure = tostring(err)
-			Logger.error(LOG, "Cannot post synthetic loopback pair - %s.", tostring(err))
-			finish_batch(batch, "failed")
-			return
+	if not ok then
+		tx.failure = tostring(accepted)
+		if batch and batch.loopback_owner == nil then
+			-- A native constructor may return after reentrant cancellation.
+			discard_batch_records(batch)
 		end
-		finish_batch(batch, "dispatched")
-	end)
-	batch.loopback_timer = timer_handle
-	if not timer_handle then
-		batch.tx.failure = "loopback dispatch timer could not be scheduled"
-		discard_batch_records(batch)
-		finish_batch(batch, "failed")
 		cancel_failed_emission(tx, "loopback key-stroke")
+		error(accepted, 0)
 	end
+	if accepted ~= true then cancel_failed_emission(tx, "loopback key-stroke") end
 	if implicit and not tx.cancelled then M.seal(tx) end
-	return timer_handle ~= nil
+	return accepted == true
 end
 
 
@@ -3022,6 +3044,139 @@ start_unowned_fifo_head = function()
 end
 
 
+-- Scope these helpers below Lua’s active-local limit in the main adapter chunk.
+do
+	--- Publishes one guarded terminal only after its periodic capability settled.
+	--- @param batch table Exact guarded batch.
+	--- @param owner table Exact periodic owner.
+	local function finish_guarded_pair(batch, owner)
+		if owner.guarded_settling ~= true or owner.timer ~= nil or batch.status ~= "queued" then return end
+		if owner.publication_cancelled then batch.tx.cancelled = true end
+		finish_serial_batch(batch, owner, owner.terminal_status, owner.terminal_detail)
+	end
+
+
+	--- Fences the exact recurring owner before requesting its native stop.
+	--- The settlement callback may finish synchronously; no global state follows it.
+	--- @param batch table Exact guarded batch.
+	--- @param owner table Exact periodic owner.
+	--- @param status string dispatched|failed.
+	--- @param detail string|nil Native failure detail.
+	local function settle_guarded_pair(batch, owner, status, detail)
+		owner.guarded_settling = true
+		owner.terminal_status, owner.terminal_detail = status, detail
+		invalidate_periodic_owner(owner, status)
+		finish_guarded_pair(batch, owner)
+	end
+
+
+	--- Posts one clipboard pair outside event taps, retaining every uncertain Up.
+	--- @param batch table FIFO batch with one exact native key pair.
+	--- @param owner table Guarded periodic owner.
+	local function pump_guarded_pair(batch, owner)
+		if owner.pumping or owner.guarded_settling then return end
+		owner.pumping = true
+		local ran, failure = xpcall(function()
+			if owner.awaiting_settlement then
+				settle_guarded_pair(batch, owner, owner.failure and "failed" or "dispatched", owner.failure)
+				return
+			end
+			if not owner.release_due then
+				-- This is the final native probe before Down. Everything between the
+				-- check and post is RAM-only, including conservative release ownership.
+				if owner.publication_cancelled or not publication_allowed(batch.tx.publication, false) then
+					discard_batch_records(batch)
+					settle_guarded_pair(batch, owner, "failed", "clipboard publication is no longer current")
+					return
+				end
+				if owner.publication_cancelled or batch.status ~= "queued" then return end
+				owner.release_due = true
+				batch.native_down_attempted = true
+				owner.ordinal = 2
+				local posted, detail = pcall(owner.events[1].post, owner.events[1])
+				if not posted then owner.failure = tostring(detail) end
+				-- A throwing post may already have delivered Down. Publish a conservative
+				-- epoch after its unique attempt; a purely reversible refusal has none.
+				local published, epoch_error = pcall(publish_action_epoch, batch)
+				if not published then owner.failure = owner.failure or tostring(epoch_error) end
+			end
+			-- Up compensates an attempted Down regardless of cancellation, clipboard
+			-- ownership, or the ordinary five-attempt posting budget. Never replay Down.
+			local released, release_error = pcall(owner.events[2].post, owner.events[2])
+			if not released then
+				owner.failure = owner.failure or tostring(release_error)
+				if not owner.release_error_reported then
+					owner.release_error_reported = true
+					pcall(defer_diagnostic, "error", "Guarded key-up cleanup remains pending: %s.", tostring(release_error))
+				end
+				return
+			end
+			if owner.failure then
+				pcall(defer_diagnostic, "error", "Guarded native key pair failed: %s.", owner.failure)
+			end
+			owner.release_due = false
+			owner.ordinal = 3
+			owner.awaiting_settlement = true
+		end, debug.traceback)
+		owner.pumping = false
+		if not ran then
+			owner.failure = owner.failure or tostring(failure)
+			if not owner.release_due and not owner.guarded_settling then
+				discard_unposted_suffix(batch, owner.ordinal)
+				settle_guarded_pair(batch, owner, "failed", owner.failure)
+			end
+		end
+	end
+
+
+	--- Enqueues one guarded pair under a pre-acquired non-adoptable FIFO owner.
+	--- This private macOS extension never joins the ambient callback collector.
+	--- @param modifiers table Native modifiers.
+	--- @param key string|number Native key.
+	--- @param tx table Explicit transaction with full and cached publication guards.
+	--- @return boolean accepted
+	function M.emit_guarded_key_stroke(modifiers, key, tx)
+		tx = require_transaction(tx)
+		assert(tx.publication ~= nil, "guarded key pair requires publication authority")
+		local batch = M.begin_batch(tx)
+		local owner
+		local ok, failure = xpcall(function()
+			M.keyStroke(batch, modifiers, key)
+			owner = {
+				_marker = PACED_OWNER_MARKER, guarded_pair = true,
+				tx = tx, batch = batch, events = batch.events, ordinal = 1,
+				generation = 0, status = "prepared", committed = false,
+			}
+			owner.pump = function() pump_guarded_pair(batch, owner) end
+			owner.on_native_settled = function() finish_guarded_pair(batch, owner) end
+			owner.token = M.retain(tx)
+			batch.paced_owner = owner
+			assert(acquire_periodic_owner(owner, M.PERIODIC_OWNER_TICK_SEC),
+				"guarded key pair periodic owner refused")
+			assert(not tx.cancelled and not tx.completed and not tx.failed
+				and batch.status == "building" and owner.generation == 0
+				and not owner.cleanup_requested and owner.timer ~= nil,
+				"guarded key pair admission changed while acquiring its owner")
+			owner.committed, owner.status = true, "queued"
+			batch.mode, batch.status = "paced", "queued"
+			_pending_count = _pending_count + 1
+			batch.pending_counted = true
+			_deferred_tail = _deferred_tail + 1
+			_deferred_queue[_deferred_tail] = batch
+		end, debug.traceback)
+		if not ok then
+			if owner then invalidate_paced_owner(owner, "refused") end
+			if batch.status == "building" then M.discard_batch(batch)
+			else discard_batch_records(batch) end -- a native constructor may finish after reentrant cancellation
+			error(failure, 0)
+		end
+		return true
+	end
+
+
+end
+
+
 --- Finishes one fully target-posted paced batch and advances the global FIFO.
 --- @param batch table Paced batch.
 local function finish_paced_batch(batch)
@@ -3051,7 +3206,7 @@ end
 --- @param publication table|nil Optional domain owner.
 --- @param cached boolean Selects the RAM-only check.
 --- @return boolean current
-local function publication_allowed(publication, cached)
+publication_allowed = function(publication, cached)
 	if publication == nil then return true end
 	local check = publication.current
 	if cached then check = publication.cached end
@@ -3066,6 +3221,10 @@ end
 pump_paced_batch = function(batch)
 	if batch.status ~= "queued" then return end
 	local owner = batch.paced_owner
+	if owner and owner.guarded_pair == true then
+		owner.pump()
+		return
+	end
 	assert(type(owner) == "table" and owner._marker == PACED_OWNER_MARKER
 		and owner.committed == true,
 		"adapters.synthetic_input: queued paced batch has no committed owner")
@@ -3214,6 +3373,7 @@ pump_physical_batch = function(batch)
 	owner.ordinal = 2
 	owner.awaiting_settlement = true
 	owner.status = "queued"
+	require("infra.keystroke_integrity").note("replay_posted")
 end
 
 
@@ -3524,7 +3684,9 @@ function M.cancel_reserved_successor(owner)
 		_owned_completion_depth = _owned_completion_depth + 1
 		pcall(finish_batch, batch, "cancelled")
 		_owned_completion_depth = _owned_completion_depth - 1
-		start_unowned_fifo_head()
+		-- Cancellation can originate in an event tap. Full publication probes for
+		-- the next ordinary head must wait for the broker's run-loop turn.
+		schedule_broker()
 		return true
 	end
 	invalidate_periodic_owner(owner, "cancelled")
@@ -3689,6 +3851,19 @@ local function prepare_pending_adoption(excluded_collector)
 		end
 	end
 
+	-- The full destination probe belongs to the broker timer. Adoption happens
+	-- inside HID callbacks and may consult only the retained RAM authority.
+	local admitted_batches = {}
+	local refused_batches = {}
+	for _, batch in ipairs(batches) do
+		if publication_allowed(batch.tx.publication, true) then
+			admitted_batches[#admitted_batches + 1] = batch
+		else
+			refused_batches[#refused_batches + 1] = batch
+		end
+	end
+	batches = admitted_batches
+
 	local event_groups = {}
 	local event_count = 0
 	for index, batch in ipairs(batches) do
@@ -3725,6 +3900,7 @@ local function prepare_pending_adoption(excluded_collector)
 		events = events,
 		event_groups = event_groups,
 		remaining_batches = remaining_batches,
+		refused_batches = refused_batches,
 	}
 end
 
@@ -3734,7 +3910,8 @@ end
 --- consumed by the still-enabled pump, so the payload cannot replay twice.
 --- @param adoption table Result of prepare_pending_adoption().
 local function commit_pending_adoption(adoption)
-	if #adoption.batches == 0 then return end
+	local refused_batches = adoption.refused_batches or {}
+	if #adoption.batches == 0 and #refused_batches == 0 then return end
 
 	local has_remaining = #adoption.remaining_batches > 0
 	if not has_remaining then
@@ -3746,6 +3923,7 @@ local function commit_pending_adoption(adoption)
 	end
 	local selected = {}
 	for _, batch in ipairs(adoption.batches) do selected[batch] = true end
+	for _, batch in ipairs(refused_batches) do selected[batch] = true end
 	if _inflight_batch and selected[_inflight_batch] then _inflight_batch = nil end
 	_deferred_queue = {}
 	_deferred_head = 1
@@ -3771,6 +3949,9 @@ local function commit_pending_adoption(adoption)
 				"adapters.synthetic_input: pending adoption count underflow")
 			batch.pending_counted = false
 		end
+	end
+	for _, batch in ipairs(refused_batches) do
+		fail_queued_batch(batch, "publication is no longer current", false, true)
 	end
 end
 
@@ -3870,6 +4051,9 @@ function M.claim_physical_fence(event)
 			tostring(adoption_or_err))
 		return nil
 	end
+	if adoption_or_err and adoption_or_err.consume_original == true then
+		require("infra.keystroke_integrity").note("replay_queued")
+	end
 	return adoption_or_err
 end
 
@@ -3883,8 +4067,7 @@ function M.leave_callback(consume)
 	local collector = _callback_stack[#_callback_stack]
 	assert(collector ~= nil,
 		"adapters.synthetic_input.leave_callback: no active callback collector")
-	if consume == nil then consume = #collector.events > 0 end
-	assert(type(consume) == "boolean",
+	assert(consume == nil or type(consume) == "boolean",
 		"adapters.synthetic_input.leave_callback: consume must be boolean")
 	-- Validate the entire collector before popping it or handing off any prefix.
 	-- If validation fails, the wrapper can still call abort_callback() and roll
@@ -3897,6 +4080,14 @@ function M.leave_callback(consume)
 			error("adapters.synthetic_input.leave_callback: collector batch already handed off", 0)
 		end
 	end
+	for _, batch in ipairs(collector.batches) do
+		if batch.status == "building"
+			and not publication_allowed(batch.tx.publication, true) then
+			discard_batch_records(batch)
+			finish_batch(batch, "failed")
+		end
+	end
+	if consume == nil then consume = #collector.events > 0 end
 	-- Eligible older FIFO work is returned before this callback's own events. A
 	-- target-mismatched paced batch, the freshly committed paced batch, and every
 	-- later sibling remain queued behind their retained post-return wake

@@ -83,6 +83,8 @@ local IOC_READ = 0x80000000
 local EVDEV_IOCTL_TYPE = 0x45
 local EVIOCGKEY_NR = 0x18
 local EVIOCGLED_NR = 0x19
+local EVIOCGBIT_NR = 0x20
+local EVENT_TYPE_BYTES = 4 -- EV_MAX is 0x1f: one complete event-type bitmap.
 
 -- poll(2) event mask for "there is something to read".
 local POLLIN = 0x001
@@ -162,6 +164,7 @@ end
 --- A backend implements:
 ---   open(path, flags)        → handle|nil, err
 ---   ioctl(handle, req, arg)  → boolean
+---   read_event_bits(fd, req, count) → string|nil (full event-type bitmap)
 ---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
 ---   close(handle)            → true|nil on completion, false, reason on failure
@@ -256,6 +259,12 @@ local function build_ffi_backend()
 			if copied ~= count then return nil, "pressed-key ioctl did not acknowledge the full bitset" end
 			return native_string(bits, count)
 		end,
+		read_event_bits = function(fd, request, count)
+			local bits = native_new("uint8_t[?]", count)
+			local copied = tonumber(native_ioctl(fd, request, bits))
+			if copied ~= count then return nil, "event-type ioctl did not acknowledge the full bitset" end
+			return native_string(bits, count)
+		end,
 		read = function(fd, count)
 			local got = tonumber(native_read(fd, buf, count))
 			if not got then return nil, "fatal", "read returned no result" end
@@ -300,7 +309,7 @@ function M.use_ffi_backend()
 	end
 	_backend, _native_backend = backend, backend
 	_native_ports = {}
-	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "poll", "close" }) do
+	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "read_event_bits", "poll", "close" }) do
 		_native_ports[name] = rawget(backend, name)
 	end
 	pcall(Logger.debug, LOG, "FFI backend bound.")
@@ -490,6 +499,42 @@ end
 
 local function ioctl_read_request(number, count)
 	return IOC_READ + count * 0x10000 + EVDEV_IOCTL_TYPE * 0x100 + number
+end
+
+--- Queries event types on the acquired descriptor, independently of its pathname.
+--- An eventN can be reused between proc discovery and open; its fd identifies
+--- the device whose complete stream EVIOCGRAB would remove from the desktop.
+--- @param slot string|nil Reader slot.
+--- @return number|nil mask, string|nil reason
+function M.event_capabilities(slot)
+	if _busy or _native_debt then return nil, "capability query is unavailable" end
+	local st = state(slot)
+	if st.fd == nil or st.close_error then return nil, "device is not open" end
+	local backend, fd, generation = _backend, st.fd, st.generation
+	local query = type(backend) == "table" and rawget(backend, "read_event_bits")
+	if type(query) ~= "function" or st.native and query ~= _native_ports.read_event_bits then
+		return nil, "backend cannot query original event capabilities"
+	end
+	local function current()
+		if not rawequal(_backend, backend) or rawget(backend, "read_event_bits") ~= query
+			or st.fd ~= fd or st.generation ~= generation or st.close_error then return false end
+		if st.native then
+			for name, port in pairs(_native_ports) do
+				if rawget(backend, name) ~= port then return false end
+			end
+		end
+		return true
+	end
+	if not current() then return nil, "original capability provider is unavailable" end
+	_busy = true
+	local called, bytes = pcall(query, fd, ioctl_read_request(EVIOCGBIT_NR, EVENT_TYPE_BYTES), EVENT_TYPE_BYTES)
+	_busy = false
+	if not called or type(bytes) ~= "string" or #bytes ~= EVENT_TYPE_BYTES or not current() then
+		return nil, "event capability query was not acknowledged"
+	end
+	local mask = 0
+	for i = 1, EVENT_TYPE_BYTES do mask = mask + bytes:byte(i) * 256 ^ (i - 1) end
+	return mask
 end
 
 local function bit_snapshot(slot, number, max_code)

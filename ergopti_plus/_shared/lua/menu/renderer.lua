@@ -445,6 +445,36 @@ function M.new(deps)
 		return (head:gsub("^%s+", ""):gsub("%s+$", ""))
 	end
 
+	--- The reason a greyed row names: the first `disabled_reasons` entry whose
+	--- state getter answers true (a configuration saved by a newer version),
+	--- otherwise its `disabled_reason_key`. A malformed entry or a missing getter
+	--- refuses the row, as the manifest generator refuses the declaration.
+	--- @param manifest_key string Menu definition key, for the report.
+	--- @param item table Manifest entry.
+	--- @param getters table Native state readers.
+	--- @return string|nil reason_key The key, or nil when the row is refused.
+	local function disabled_reason(manifest_key, item, getters)
+		local reason = item.disabled_reason_key
+		local cases = item.disabled_reasons
+		if cases == nil then return reason end
+		if type(cases) ~= "table" or #cases == 0 or type(reason) ~= "string" or reason == "" then
+			Logger.error(LOG, "Invalid disabled reasons on '%s.%s' — row refused.", manifest_key, tostring(item.id))
+			return nil
+		end
+		for _, case in ipairs(cases) do
+			local when = type(case) == "table" and case.when or nil
+			local key = type(case) == "table" and case.reason_key or nil
+			if type(when) ~= "string" or type(key) ~= "string" or key == ""
+				or type(getters) ~= "table" or type(getters[when]) ~= "function" then
+				Logger.error(LOG, "No getter or reason for disabled reason '%s' on '%s.%s' — row refused.",
+					tostring(when), manifest_key, tostring(item.id))
+				return nil
+			end
+			if getters[when]() == true then return key end
+		end
+		return reason
+	end
+
 	--- The disabled stand-in of a row this platform has not yet ported: its
 	--- label and the short form of its translated reason. The manifest generator
 	--- refuses a `grey` row without both keys, so a missing one here is a stale
@@ -1039,10 +1069,12 @@ function M.new(deps)
 		-- ported, « label — head of the reason », with nothing to run: the
 		-- two differ only in how the condition is evaluated.
 		if disabled and type(item.disabled_reason_key) == "string" then
+			local reason_key = disabled_reason(manifest_key, item, getters)
+			if reason_key == nil then return nil end
 			local stand_in = greyed_stand_in(manifest_key,
-				{ id = row_id, i18n = i18n_key, reason_key = item.disabled_reason_key })
+				{ id = row_id, i18n = i18n_key, reason_key = reason_key })
 			if stand_in and (has_caption_layout(item) or item.caption_getters ~= nil) then
-				stand_in.title = title .. " — " .. reason_head(i18n.get(item.disabled_reason_key))
+				stand_in.title = title .. " — " .. reason_head(i18n.get(reason_key))
 			end
 			if stand_in and rawget(item, "label_prefix") ~= nil then
 				stand_in.title = prefix .. stand_in.title
@@ -1652,6 +1684,8 @@ function M.new(deps)
 					local disabled = R.resolve_disabled_when(manifest_key, toggle_id, getters)
 					local title = i18n.get(i18n_key)
 					if disabled and reason ~= nil then
+						reason = disabled_reason(manifest_key, item, getters)
+						if reason == nil then goto continue end
 						title = title .. " — " .. reason_head(i18n.get(reason))
 						fn = nil
 					end

@@ -31,6 +31,9 @@ local function load_fixture()
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
+	hs_stub.timer.__elapsed = 0
+	hs_stub.timer.absoluteTime = function() return hs_stub.timer.__elapsed * 1e9 end
+	hs_stub.timer.secondsSinceEpoch = function() return 1900000000 + hs_stub.timer.__elapsed end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -67,6 +70,17 @@ end
 
 
 local function fire_existing_delay(hs_stub, delay)
+	-- A native settle tick follows the collector's two zero-delay handoff turns.
+	if math.abs(delay - 0.08) < 0.000001 then
+		for _ = 1, 2 do
+			local count = #hs_stub.timer.__timers
+			for index = 1, count do
+				local timer = hs_stub.timer.__timers[index]
+				if timer.running and timer.delay == 0 then timer:fire() end
+			end
+		end
+	end
+	hs_stub.timer.__elapsed = hs_stub.timer.__elapsed + delay
 	local initial_count = #hs_stub.timer.__timers
 	local fired = 0
 	for index = 1, initial_count do

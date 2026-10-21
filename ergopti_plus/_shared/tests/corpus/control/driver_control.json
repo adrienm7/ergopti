@@ -1,0 +1,207 @@
+{
+	"_comment": "Local driver control vectors replayed by the Windows, macOS and Linux suites: request admission against the session token, the exact result texts, and the completion a freshly ready driver owes.",
+	"token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	"requests": [
+		{
+			"name": "an authenticated request",
+			"text": "{\"schema\":1,\"token\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"cli-42_a\"}",
+			"request_id": "cli-42_a"
+		},
+		{
+			"name": "a request with a stale token",
+			"text": "{\"schema\":1,\"token\":\"1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"stale\"}",
+			"reason": "unauthenticated",
+			"echoed": "stale"
+		},
+		{
+			"name": "a request with an uppercase token",
+			"text": "{\"schema\":1,\"token\":\"0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"upper\"}",
+			"reason": "unauthenticated",
+			"echoed": "upper"
+		},
+		{
+			"name": "a request with a short token",
+			"text": "{\"schema\":1,\"token\":\"0123\",\"request_id\":\"short\"}",
+			"reason": "unauthenticated",
+			"echoed": "short"
+		},
+		{
+			"name": "a request without a token",
+			"text": "{\"schema\":1,\"request_id\":\"anon\"}",
+			"reason": "malformed",
+			"echoed": "anon"
+		},
+		{
+			"name": "a request of another schema",
+			"text": "{\"schema\":2,\"token\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"future\"}",
+			"reason": "malformed",
+			"echoed": "future"
+		},
+		{
+			"name": "a request whose schema is a boolean",
+			"text": "{\"schema\":true,\"token\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"bool\"}",
+			"reason": "malformed",
+			"echoed": "bool"
+		},
+		{
+			"name": "a request whose schema is a decimal",
+			"text": "{\"schema\":1.0,\"token\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"decimal\"}",
+			"reason": "malformed",
+			"echoed": "decimal"
+		},
+		{
+			"name": "a request with an unknown field",
+			"text": "{\"schema\":1,\"token\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"extra\",\"force\":true}",
+			"reason": "malformed",
+			"echoed": "extra"
+		},
+		{
+			"name": "a request with an invalid identifier",
+			"text": "{\"schema\":1,\"token\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"request_id\":\"a b\"}",
+			"reason": "malformed"
+		},
+		{
+			"name": "a request that is not an object",
+			"text": "[1,2]",
+			"reason": "malformed"
+		},
+		{
+			"name": "a request that is not JSON",
+			"text": "reload please",
+			"reason": "malformed"
+		},
+		{
+			"name": "an empty request",
+			"text": "",
+			"reason": "malformed"
+		}
+	],
+	"results": [
+		{
+			"name": "a request handed to the reload owner",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "requested",
+				"driver_pid": 100,
+				"successor_pid": 200
+			},
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":200}\n"
+		},
+		{
+			"name": "a refused request",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "refused",
+				"driver_pid": 100,
+				"reason": "busy"
+			},
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"refused\",\"driver_pid\":100,\"reason\":\"busy\"}\n"
+		},
+		{
+			"name": "a refusal of a request without a valid identifier",
+			"fields": {
+				"state": "refused",
+				"driver_pid": 100,
+				"reason": "malformed"
+			},
+			"text": "{\"schema\":1,\"request_id\":null,\"state\":\"refused\",\"driver_pid\":100,\"reason\":\"malformed\"}\n"
+		},
+		{
+			"name": "a completed reload",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "completed",
+				"driver_pid": 200,
+				"successor_pid": 200
+			},
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"completed\",\"driver_pid\":200,\"successor_pid\":200}\n"
+		},
+		{
+			"name": "a completion written by another process",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "completed",
+				"driver_pid": 100,
+				"successor_pid": 200
+			},
+			"invalid": true
+		},
+		{
+			"name": "a refusal with an undeclared reason",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "refused",
+				"driver_pid": 100,
+				"reason": "nope"
+			},
+			"invalid": true
+		},
+		{
+			"name": "a requested result without its successor",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "requested",
+				"driver_pid": 100
+			},
+			"invalid": true
+		},
+		{
+			"name": "a requested result without its identifier",
+			"fields": {
+				"state": "requested",
+				"driver_pid": 100,
+				"successor_pid": 200
+			},
+			"invalid": true
+		},
+		{
+			"name": "an undeclared state",
+			"fields": {
+				"request_id": "cli-42_a",
+				"state": "finished",
+				"driver_pid": 100,
+				"successor_pid": 100
+			},
+			"invalid": true
+		}
+	],
+	"completions": [
+		{
+			"name": "the named successor completes the request",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":200}\n",
+			"pid": 200,
+			"completed": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"completed\",\"driver_pid\":200,\"successor_pid\":200}\n"
+		},
+		{
+			"name": "an in-process reload completes in the same process",
+			"text": "{\"schema\":1,\"request_id\":\"same\",\"state\":\"requested\",\"driver_pid\":300,\"successor_pid\":300}\n",
+			"pid": 300,
+			"completed": "{\"schema\":1,\"request_id\":\"same\",\"state\":\"completed\",\"driver_pid\":300,\"successor_pid\":300}\n"
+		},
+		{
+			"name": "another process leaves the request pending",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"requested\",\"driver_pid\":100,\"successor_pid\":200}\n",
+			"pid": 201
+		},
+		{
+			"name": "a refusal stays refused",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"refused\",\"driver_pid\":100,\"reason\":\"busy\"}\n",
+			"pid": 100
+		},
+		{
+			"name": "a completed reload is not completed twice",
+			"text": "{\"schema\":1,\"request_id\":\"cli-42_a\",\"state\":\"completed\",\"driver_pid\":200,\"successor_pid\":200}\n",
+			"pid": 200
+		},
+		{
+			"name": "an unreadable result is left alone",
+			"text": "{not json",
+			"pid": 200
+		},
+		{
+			"name": "no result yet",
+			"text": "",
+			"pid": 200
+		}
+	]
+}

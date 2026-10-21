@@ -59,6 +59,8 @@ local EXPECTED_SYMBOLS = {
 	},
 	gobject = {
 		"g_signal_connect_data",
+		"g_signal_handler_block",
+		"g_signal_handler_unblock",
 	},
 }
 
@@ -110,6 +112,8 @@ pcall(ffi.cdef, [[
 	void  gtk_widget_set_sensitive(GtkWidget*, int);
 	void  gtk_check_menu_item_set_active(GtkWidget*, int);
 	unsigned long g_signal_connect_data(gpointer, const char*, void*, gpointer, void*, int);
+	void g_signal_handler_block(gpointer, unsigned long);
+	void g_signal_handler_unblock(gpointer, unsigned long);
 ]])
 
 --- Loads the first soname that works.

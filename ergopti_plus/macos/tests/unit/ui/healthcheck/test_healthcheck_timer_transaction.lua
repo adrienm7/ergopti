@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder",
+		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 	}) do package.loaded[name] = nil end
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -30,12 +30,24 @@ local function load_healthcheck(scheduler, title_label)
 	package.loaded["hs"] = hs_stub
 
 	local context = { evaluated = 0, deleted = 0 }
-	local webview = {}
+	local webview = setmetatable({}, {})
 	for _, method in ipairs({
 		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
 		"allowGestures", "level", "html", "show", "shadow",
 	}) do webview[method] = function(self) return self end end
 	webview.windowTitle = function(self, title) context.title = title return self end
+	-- The packaged methods have boolean getters, fluent setters and C defaults.
+	function webview:allowNewWindows(value)
+		if value == nil then return self.children ~= false end
+		self.children = value
+		return self
+	end
+	function webview:deleteOnClose(value)
+		if value == nil then return self.automatic_close == true end
+		self.automatic_close = value
+		return self
+	end
+	function webview:show() self.presented = true; return self end
 	webview.windowCallback = function(self, callback)
 		context.window_callback = callback
 		return self
@@ -48,8 +60,15 @@ local function load_healthcheck(scheduler, title_label)
 		context.evaluated = context.evaluated + 1
 		return self
 	end
-	webview.delete = function() context.deleted = context.deleted + 1 end
+	webview.delete = function(self) context.deleted = context.deleted + 1; setmetatable(self, nil) end
 
+	-- Focus tests control only their presentation schedule; retain close cleanup
+	-- separately, without synchronously invoking a native close continuation.
+	package.loaded["infra.deferred_work"] = { after = function(_, receive)
+		context.close_cleanup = context.close_cleanup or {}
+		context.close_cleanup[#context.close_cleanup + 1] = receive
+		return true
+	end }
 	package.loaded["adapters.timer_scheduler"] = scheduler
 	local logger = helpers.make_logger_stub()
 	context.warnings = {}
@@ -72,7 +91,12 @@ local function load_healthcheck(scheduler, title_label)
 		force_focus = function() return true end,
 	}
 
-	hs_stub.webview.new = function() return webview end
+	hs_stub.webview.new = function()
+		if webview.presented or getmetatable(webview) == nil then
+			local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
+			webview = setmetatable(fresh, {})
+		end
+		return webview end
 	hs_stub.webview.windowMasks = { titled = 1, closable = 2, miniaturizable = 4 }
 	hs_stub.screen.mainScreen = function()
 		return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }

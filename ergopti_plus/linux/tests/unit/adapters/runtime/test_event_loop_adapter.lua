@@ -332,8 +332,8 @@ helpers.describe("event_loop adapter", function()
       os.clock = real_clock  -- always restore, even if run() raised
 
       helpers.assert_true(ok, "loop ran to completion without raising: " .. tostring(err))
-      helpers.assert_true(pumps >= 5,
-        string.format("idle handler pumped every tick despite frozen clock (got %d over %d ticks)", pumps, ticks))
+      helpers.assert_eq(pumps, 4,
+        "the handler runs on each live tick; the fifth primary callback stops before secondary dispatch")
     end)
 
     helpers.it("rejects a non-function handler (fail-fast) without crashing", function()
@@ -597,4 +597,89 @@ helpers.describe("linux-defer-finite-admission", function()
 			helpers.assert_eq(calls, 1, "an invalid delay must not starve following healthy work")
 		end)
 	end
+end)
+
+helpers.describe("event loop: stop cancels queued dispatch", function()
+	for _, branch in ipairs({ "pump", "native" }) do
+		local function fresh_loop(source)
+			if branch == "pump" then return load_pump_loop() end
+			return stop_fixture(source or "idle")
+		end
+
+		helpers.it(branch .. " stop inside a deferred callback cancels the remaining batch and waiting work", function()
+			local loop = fresh_loop()
+			local calls, weak = {}, setmetatable({}, { __mode = "v" })
+			local function waiting_callback()
+				local marker = {}; weak[1] = marker
+				return function() calls[#calls + 1] = "waiting"; return marker end
+			end
+			helpers.assert_true(loop.defer(waiting_callback(), 1000))
+			helpers.assert_true(loop.defer(function() calls[#calls + 1] = "quit"; loop.stop() end))
+			helpers.assert_true(loop.defer(function() calls[#calls + 1] = "old action" end))
+			loop.run({ onIdle = function() end })
+			helpers.assert_eq(calls, { "quit" }, "a successful stop withdraws the rest of the detached batch")
+			collectgarbage("collect"); collectgarbage("collect")
+			helpers.assert_eq(weak[1], nil, "stopped waiting work must release its retained owner")
+			loop._run_idle_tick()
+			loop.run({ onIdle = function()
+				loop.defer(function() calls[#calls + 1] = "new action"; loop.stop() end)
+			end })
+			helpers.assert_eq(calls, { "quit", "new action" }, "a later run cannot replay stopped work")
+		end)
+
+		helpers.it(branch .. " stop in the primary idle callback prevents secondary and periodic dispatch", function()
+			local loop = fresh_loop()
+			local calls = {}
+			loop.add_idle_handler(function() calls[#calls + 1] = "secondary" end)
+			loop.defer(function() calls[#calls + 1] = "deferred" end)
+			loop.run({ periodSec = 0.001,
+				onIdle = function() calls[#calls + 1] = "quit"; loop.stop() end,
+				onPeriodic = function() calls[#calls + 1] = "periodic" end,
+			})
+			helpers.assert_eq(calls, { "quit" })
+		end)
+
+
+		helpers.it(branch .. " periodic stop releases pending work and prevents reentrant stopped pumping", function()
+			local loop = fresh_loop("periodic")
+			local after_stop, weak = 0, setmetatable({}, { __mode = "v" })
+			local function waiting_callback()
+				local marker = {}; weak[1] = marker
+				return function() return marker end
+			end
+			loop.add_idle_handler(function() if not loop.isRunning() then after_stop = after_stop + 1 end end)
+			loop.defer(waiting_callback(), 1000)
+			loop.run({ periodSec = 0.001, onIdle = function() end, onPeriodic = function()
+				loop.stop()
+				loop._run_idle_tick()
+			end })
+			collectgarbage("collect"); collectgarbage("collect")
+			helpers.assert_eq(after_stop, 0, "a stopped callback cannot reenter manual dispatch before cleanup returns")
+			helpers.assert_eq(weak[1], nil, "periodic stop cancels waiting callbacks without awaiting their deadline")
+		end)
+
+		helpers.it(branch .. " stop in a secondary handler cancels subsequent handlers and deferred actions", function()
+			local loop = fresh_loop()
+			local calls = {}
+			loop.add_idle_handler(function() calls[#calls + 1] = "quit"; loop.stop() end)
+			loop.add_idle_handler(function() calls[#calls + 1] = "later handler" end)
+			loop.defer(function() calls[#calls + 1] = "deferred" end)
+			loop.run({ periodSec = 0.001, onIdle = function() end,
+				onPeriodic = function() calls[#calls + 1] = "periodic" end })
+			helpers.assert_eq(calls, { "quit" })
+		end)
+	end
+
+	helpers.it("inactive stop preserves explicit pre-start pumping and new work after a completed run", function()
+		local loop = load_pump_loop()
+		local calls = 0
+		loop.defer(function() calls = calls + 1 end)
+		loop.stop()
+		loop._run_idle_tick()
+		helpers.assert_eq(calls, 1, "a defensive inactive stop must not cancel pre-start work")
+		loop.run({ onIdle = function() loop.stop() end })
+		loop.defer(function() calls = calls + 1 end)
+		loop._run_idle_tick()
+		helpers.assert_eq(calls, 2, "manual pumping remains an explicit supported owner after run returns")
+	end)
 end)

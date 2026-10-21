@@ -12,6 +12,33 @@
 		"evidence": []
 	},
 	"evidence_groups": {
+		"caps_word_auto_off": {
+			"members": [
+				"shortcuts.caps_word.idle_timeout_seconds",
+				"shortcuts.caps_word.terminators",
+				"shortcuts.caps_word.pointer.gesture",
+				"shortcuts.caps_word.pointer.pointer_motion",
+				"shortcuts.caps_word.pointer.left_click",
+				"shortcuts.caps_word.pointer.right_click",
+				"shortcuts.caps_word.pointer.middle_click",
+				"shortcuts.caps_word.pointer.other_buttons"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
+				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/caps_word/test_caps_word_auto_off.lua",
+				"static/ergopti_plus/_shared/lua/caps_word/auto_off.lua"
+			]
+		},
 		"agent_settings": {
 			"members": [
 				"llm.agent_system1",
@@ -845,6 +872,20 @@
 			]
 		},
 		"layout.direct_access_digits": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "not_applicable",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_number_row_policy.lua",
+				"static/ergopti_plus/_shared/lua/test/number_row_policy_contract.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+			]
+		},
+		"layout.number_row_reorder_edges": {
 			"registered": "yes",
 			"production_caller": "yes",
 			"persisted": "not_applicable",

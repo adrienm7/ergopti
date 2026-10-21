@@ -1875,60 +1875,181 @@
 						"question_key": "menu.layout.enable",
 						"description_key": "onboarding.page.keyboard_layout.description",
 						"consent": false,
-						"groups": [
+						"groups": [],
+						"master": {
+							"path": "category_enabled.layout",
+							"default": false
+						},
+						"controls": [
 							{
-								"items": [
+								"id": "emulated_layout",
+								"kind": "choice",
+								"label_key": "onboarding.layout.emulated_layout",
+								"available": true,
+								"choices": [
 									{
-										"path": "layout.ergopti_base",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
+										"value": "none",
+										"label_key": "onboarding.layout.emulated_none",
+										"writes": [
 											{
-												"key": "layout.ergoptibase"
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": false,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "none",
+												"default": "none"
 											}
 										]
 									},
 									{
-										"path": "layout.direct_access_digits",
-										"value": "digits",
-										"default": "native",
-										"recommended": true,
-										"label": [
+										"value": "ergopti",
+										"label_key": "onboarding.layout.emulated_ergopti",
+										"writes": [
 											{
-												"key": "menu.layout.number_row"
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti",
+												"default": "none"
 											}
 										]
 									},
 									{
-										"path": "layout.ergopti_alt_gr",
-										"value": true,
-										"default": false,
-										"recommended": true,
-										"label": [
-											{
-												"key": "layout.ergoptialtgr"
-											}
-										]
-									},
-									{
-										"path": "layout.ergopti_variant",
 										"value": "ergopti_plus",
-										"default": "none",
-										"recommended": true,
-										"label": [
+										"label_key": "onboarding.layout.emulated_ergopti_plus",
+										"writes": [
 											{
-												"key": "layout.ergoptiplus"
+												"path": "layout.emulated_layout",
+												"value": "",
+												"default": ""
+											},
+											{
+												"path": "layout.ergopti_base",
+												"value": true,
+												"default": false
+											},
+											{
+												"path": "layout.ergopti_variant",
+												"value": "ergopti_plus",
+												"default": "none"
+											}
+										]
+									}
+								]
+							},
+							{
+								"id": "alt_gr_emulation",
+								"kind": "check",
+								"label_key": "layout.ergoptialtgr",
+								"available": true,
+								"choices": [
+									{
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": true,
+												"default": false
+											}
+										]
+									},
+									{
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.ergopti_alt_gr",
+												"value": false,
+												"default": false
+											}
+										]
+									}
+								]
+							},
+							{
+								"id": "number_row_emulation",
+								"kind": "check",
+								"label_key": "onboarding.layout.number_row_emulation",
+								"available": true,
+								"choices": [
+									{
+										"value": true,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": true,
+												"default": true
+											}
+										]
+									},
+									{
+										"value": false,
+										"writes": [
+											{
+												"path": "layout.emulate_number_row",
+												"value": false,
+												"default": true
+											}
+										]
+									}
+								]
+							},
+							{
+								"id": "number_row_order",
+								"kind": "choice",
+								"label_key": "menu.layout.number_row",
+								"available": true,
+								"choices": [
+									{
+										"value": "native",
+										"label_key": "menu.layout.number_row_native",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "native",
+												"default": "native"
+											}
+										]
+									},
+									{
+										"value": "digits",
+										"label_key": "menu.layout.number_row_digits",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "digits",
+												"default": "native"
+											}
+										]
+									},
+									{
+										"value": "symbols",
+										"label_key": "menu.layout.number_row_symbols",
+										"writes": [
+											{
+												"path": "layout.direct_access_digits",
+												"value": "symbols",
+												"default": "native"
 											}
 										]
 									}
 								]
 							}
-						],
-						"master": {
-							"path": "category_enabled.layout",
-							"default": false
-						}
+						]
 					},
 					{
 						"id": "hotstrings",
@@ -3551,7 +3672,81 @@
 						"description_key": "onboarding.page.keyboard_layout.description",
 						"consent": false,
 						"groups": [],
-						"note_key": "onboarding.page.keyboard_layout.system_note"
+						"note_key": "onboarding.page.keyboard_layout.system_note",
+						"controls": [
+							{
+								"id": "emulated_layout",
+								"kind": "choice",
+								"label_key": "onboarding.layout.emulated_layout",
+								"available": false,
+								"choices": [
+									{
+										"value": "none",
+										"label_key": "onboarding.layout.emulated_none"
+									},
+									{
+										"value": "ergopti",
+										"label_key": "onboarding.layout.emulated_ergopti"
+									},
+									{
+										"value": "ergopti_plus",
+										"label_key": "onboarding.layout.emulated_ergopti_plus"
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "alt_gr_emulation",
+								"kind": "check",
+								"label_key": "layout.ergoptialtgr",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_emulation",
+								"kind": "check",
+								"label_key": "onboarding.layout.number_row_emulation",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_order",
+								"kind": "choice",
+								"label_key": "menu.layout.number_row",
+								"available": false,
+								"choices": [
+									{
+										"value": "native",
+										"label_key": "menu.layout.number_row_native"
+									},
+									{
+										"value": "digits",
+										"label_key": "menu.layout.number_row_digits"
+									},
+									{
+										"value": "symbols",
+										"label_key": "menu.layout.number_row_symbols"
+									}
+								],
+								"reason_key": "platform_reason.number_row_override_unsupported"
+							}
+						]
 					},
 					{
 						"id": "hotstrings",
@@ -4751,7 +4946,81 @@
 						"description_key": "onboarding.page.keyboard_layout.description",
 						"consent": false,
 						"groups": [],
-						"note_key": "onboarding.page.keyboard_layout.system_note"
+						"note_key": "onboarding.page.keyboard_layout.system_note",
+						"controls": [
+							{
+								"id": "emulated_layout",
+								"kind": "choice",
+								"label_key": "onboarding.layout.emulated_layout",
+								"available": false,
+								"choices": [
+									{
+										"value": "none",
+										"label_key": "onboarding.layout.emulated_none"
+									},
+									{
+										"value": "ergopti",
+										"label_key": "onboarding.layout.emulated_ergopti"
+									},
+									{
+										"value": "ergopti_plus",
+										"label_key": "onboarding.layout.emulated_ergopti_plus"
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "alt_gr_emulation",
+								"kind": "check",
+								"label_key": "layout.ergoptialtgr",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_emulation",
+								"kind": "check",
+								"label_key": "onboarding.layout.number_row_emulation",
+								"available": false,
+								"choices": [
+									{
+										"value": true
+									},
+									{
+										"value": false
+									}
+								],
+								"reason_key": "platform_reason.layout_emulation_is_windows_only"
+							},
+							{
+								"id": "number_row_order",
+								"kind": "choice",
+								"label_key": "menu.layout.number_row",
+								"available": false,
+								"choices": [
+									{
+										"value": "native",
+										"label_key": "menu.layout.number_row_native"
+									},
+									{
+										"value": "digits",
+										"label_key": "menu.layout.number_row_digits"
+									},
+									{
+										"value": "symbols",
+										"label_key": "menu.layout.number_row_symbols"
+									}
+								],
+								"reason_key": "platform_reason.number_row_override_unsupported"
+							}
+						]
 					},
 					{
 						"id": "hotstrings",

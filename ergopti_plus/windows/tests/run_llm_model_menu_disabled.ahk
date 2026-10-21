@@ -113,7 +113,7 @@ _MMD_AppendBuildsFullCatalogueWhenNotReady() {
 	global _MMD_DepsReady
 	_MMD_DepsReady := false
 	_MMD_ResetCounters()
-	any := _LLM_Menu_AppendCatalogue(Menu(), LLM_GetModelPresets(), "", false)
+	any := _LLM_Menu_AppendCatalogue([], LLM_GetModelPresets(), "", false)
 	AssertTrue(any, "the full catalogue must still be built when the feature/daemon is not ready")
 	AssertEqual(0, _MMD_ProbeCalls, "install probe must be skipped when deps are not ready (non-blocking)")
 }
@@ -123,7 +123,7 @@ _MMD_AppendProbesWhenReady() {
 	global _MMD_DepsReady
 	_MMD_DepsReady := true
 	_MMD_ResetCounters()
-	any := _LLM_Menu_AppendCatalogue(Menu(), LLM_GetModelPresets(), "", true)
+	any := _LLM_Menu_AppendCatalogue([], LLM_GetModelPresets(), "", true)
 	AssertTrue(any, "the catalogue must be built when ready too")
 	AssertTrue(_MMD_ProbeCalls > 0, "install probe must run to paint the green dot when the daemon is ready")
 }

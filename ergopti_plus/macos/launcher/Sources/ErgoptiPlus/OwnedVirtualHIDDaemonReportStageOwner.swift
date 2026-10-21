@@ -73,7 +73,9 @@ final class OwnedVirtualHIDDaemonReportStageOwner {
 			&& value.st_ctimespec.tv_sec == original.st_ctimespec.tv_sec && value.st_ctimespec.tv_nsec == original.st_ctimespec.tv_nsec)
 	}
 	private func protected(_ fd: OwnedVHDReportDescriptor, _ value: stat) -> Bool {
-		guard fd.current(), value.st_uid == 0, value.st_mode & 0o6022 == 0, let acl = acl_get_fd_np(fd.number, ACL_TYPE_EXTENDED) else { return false }
+		guard fd.current(), value.st_uid == 0, value.st_mode & 0o6022 == 0 else { return false }
+		errno = 0
+		guard let acl = acl_get_fd_np(fd.number, ACL_TYPE_EXTENDED) else { return errno == ENOENT && fd.current() } // Libc answers NULL/ENOENT for a file without an extended ACL (filesec_get_property): that is the empty ACL, not a refusal.
 		defer { acl_free(UnsafeMutableRawPointer(acl)) }; var entry: acl_entry_t?; errno = 0
 		let valid = acl_valid(acl), result = acl_get_entry(acl, Int32(ACL_FIRST_ENTRY.rawValue), &entry), saved = errno
 		return fd.current() && valid == 0 && result == -1 && saved == EINVAL

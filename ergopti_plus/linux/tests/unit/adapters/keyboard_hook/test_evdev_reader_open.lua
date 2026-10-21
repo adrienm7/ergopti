@@ -485,3 +485,104 @@ helpers.describe("evdev_reader: is_available", function()
 
 end)
 
+
+helpers.describe("evdev_reader: open descriptor capabilities", function()
+	helpers.it("queries event types on the exact open fd before any grab", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = recorder()
+		local queries = {}
+		backend.read_event_bits = function(fd, request, count)
+			queries[#queries + 1] = { fd, request, count }
+			return string.char(19, 0, 18, 0)
+		end
+		reader._set_backend(backend); assert(reader.open("/dev/input/event3"))
+		local called, detail = pcall(function()
+			helpers.assert_eq(reader.event_capabilities(), 0x120013)
+			helpers.assert_eq(queries, { { 7, 0x80044520, 4 } }, "EVIOCGBIT(0, 4) identifies this fd, not its path")
+			helpers.assert_eq(log.ioctls, {}, "capability inspection must not acquire a grab")
+		end)
+		assert(reader.close()); reader._reset_backend()
+		if not called then error(detail, 0) end
+	end)
+
+	helpers.it("does not inspect capabilities on a closed descriptor", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		backend.read_event_bits = function() error("closed fd must not issue an ioctl") end
+		reader._set_backend(backend)
+		local called, detail = pcall(function() helpers.assert_eq(reader.event_capabilities(), nil) end)
+		reader._reset_backend()
+		if not called then error(detail, 0) end
+	end)
+
+	helpers.it("keeps its descriptor stable through a reentrant query callback", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = recorder()
+		backend.read_event_bits = function()
+			helpers.assert_eq(reader.close(), false)
+			helpers.assert_eq(reader.open("/dev/input/event4"), false)
+			helpers.assert_eq(reader.event_capabilities(), nil)
+			return string.char(19, 0, 18, 0)
+		end
+		reader._set_backend(backend); assert(reader.open("/dev/input/event3"))
+		local called, detail = pcall(function()
+			helpers.assert_eq(reader.event_capabilities(), 0x120013)
+			helpers.assert_eq(log.closed, false)
+		end)
+		assert(reader.close()); reader._reset_backend()
+		if not called then error(detail, 0) end
+	end)
+end)
+
+helpers.describe("evdev_reader: native capability ioctl acknowledgement", function()
+	for _, result in ipairs({ 4, 0, -1, 3, 5 }) do
+		helpers.it("requires exactly four copied bytes from ioctl, result " .. result, function()
+			Fixture.controlled_native_reader({}, { event_result = result }, function(reader, log)
+				assert(reader.open("/dev/input/event3"))
+				local called, detail = pcall(function()
+					local mask = reader.event_capabilities()
+					helpers.assert_eq(mask, result == 4 and 0x120013 or nil)
+					helpers.assert_eq(log.capability_queries, 1)
+					helpers.assert_eq(log.grabs, 0, "capabilities are queried without taking a grab")
+				end)
+				assert(reader.close()); helpers.assert_eq(log.closes, 1)
+				if not called then error(detail, 0) end
+			end)
+		end)
+	end
+end)
+
+helpers.describe("evdev_reader: capability query ownership", function()
+	helpers.it("distinguishes descriptors in separate slots, including fd zero", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local next_fd, queries = 0, {}
+		backend.open = function() local fd = next_fd; next_fd = next_fd + 1; return fd end
+		backend.read_event_bits = function(fd, request, count)
+			queries[#queries + 1] = { fd, request, count }
+			return fd == 0 and string.char(19, 0, 18, 0) or string.char(51, 0, 0, 0)
+		end
+		reader._set_backend(backend); assert(reader.open("/dev/input/event0", "a")); assert(reader.open("/dev/input/event1", "b"))
+		local called, detail = pcall(function()
+			helpers.assert_eq(reader.event_capabilities("a"), 0x120013)
+			helpers.assert_eq(reader.event_capabilities("b"), 0x33)
+			helpers.assert_eq(queries, { { 0, 0x80044520, 4 }, { 1, 0x80044520, 4 } })
+		end)
+		assert(reader.close("a")); assert(reader.close("b")); reader._reset_backend()
+		if not called then error(detail, 0) end
+	end)
+
+	helpers.it("keeps a failed native retirement fenced after a refused capabilities ioctl", function()
+		Fixture.controlled_native_reader({}, { event_result = -1, close_fails = true }, function(reader, log)
+			assert(reader.open("/dev/input/event3"))
+			helpers.assert_eq(reader.event_capabilities(), nil)
+			helpers.assert_eq(reader.close(), false)
+			helpers.assert_eq(reader.has_native_origin_debt(), true)
+			helpers.assert_eq(reader.close(), false)
+			helpers.assert_eq(reader.open("/dev/input/event3"), false)
+			helpers.assert_eq(reader._reset_backend(), false)
+			helpers.assert_eq(log.closes, 1, "an unacknowledged native close cannot be retried against a reused fd")
+			helpers.assert_eq(log.grabs, 0)
+		end)
+	end)
+end)

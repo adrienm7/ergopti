@@ -13,6 +13,7 @@ local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
 local Exit = require("infra.libuv_exit")
 local Group = require("infra.libuv_process_group")
+local NativeTimer = require("infra.native_timer")
 local Defaults = require("llm.process_limits").defaults()
 local available, native = pcall(require, "luv")
 if not available then native = nil end
@@ -194,7 +195,7 @@ local function watch_cleanup(request)
 	if not receipt or receipt.state ~= "open" or request.cleanup_watching then return end
 	receipt.active = true
 	request.cleanup_watching = true
-	if not accepted(native.timer_start, handle, GROUP_RECHECK_MS, GROUP_RECHECK_MS, function()
+	if not accepted(NativeTimer.start, native, handle, GROUP_RECHECK_MS, GROUP_RECHECK_MS, function()
 		retry_cleanup(request)
 	end) then
 		request.cleanup_watching = false
@@ -291,7 +292,7 @@ end
 --- @param args table Pure string argument vector.
 --- @param options table { owner, timeout_ms?, max_output_bytes?, capture_tail?, capture_output?, authorized?, on_output?, env?, cwd? }.
 --- @param callback function Called after physical settlement unless cancelled/stale.
---- @return table operation { started, error, cleanup_error, result, cancel, is_running, is_settled, on_settled }.
+--- @return table operation { started, error, not_found?, cleanup_error, result, cancel, is_running, is_settled, on_settled }.
 function M.start(executable, args, options, callback)
 	options = type(options) == "table" and options or {}
 	local request = {
@@ -392,7 +393,7 @@ function M.start(executable, args, options, callback)
 	end
 	if not native then return refuse("native asynchronous process support is unavailable") end
 	for _, name in ipairs({ "new_pipe", "new_timer", "spawn", "read_start", "read_stop", "timer_start",
-		"timer_stop", "is_closing", "close", "kill" }) do
+		"timer_stop", "is_closing", "close", "kill", "update_time" }) do
 		if type(native[name]) ~= "function" then return refuse("native process capability is unavailable") end
 	end
 	if owners[request.owner] then return refuse("previous process cleanup pending") end
@@ -410,7 +411,7 @@ function M.start(executable, args, options, callback)
 	end
 	-- The source can change while a fallible allocator invokes another owner.
 	if not authorized(request) then return refuse("process source admission refused") end
-	local spawned, process, pid = pcall(native.spawn, executable, {
+	local spawned, process, pid, spawn_code = pcall(native.spawn, executable, {
 		args = args, stdio = { request.stdin, request.stdout, request.stderr },
 		detached = true, env = options.env, cwd = options.cwd,
 	}, function(code, signal)
@@ -419,7 +420,10 @@ function M.start(executable, args, options, callback)
 		if operation.result then operation.result.exit_code = request.exit_code end
 		observe_exit(request)
 	end)
-	if not spawned or not process then return refuse("native process dispatch failed") end
+	if not spawned or not process then
+		operation.not_found = spawned and spawn_code == "ENOENT"
+		return refuse("native process dispatch failed")
+	end
 	if not own_handle(request, process, "process") then return refuse("native process handle malformed") end
 	request.spawned, request.pid = true, pid
 	operation.started = true
@@ -465,7 +469,7 @@ function M.start(executable, args, options, callback)
 	end
 	if request.timeout and not request.terminal then
 		request.handles[request.timeout].active = true
-		if not accepted(native.timer_start, request.timeout, options.timeout_ms, 0, function()
+		if not accepted(NativeTimer.start, native, request.timeout, options.timeout_ms, 0, function()
 			finish(request, "process deadline exceeded")
 		end) then return refuse("native process deadline refused") end
 	end

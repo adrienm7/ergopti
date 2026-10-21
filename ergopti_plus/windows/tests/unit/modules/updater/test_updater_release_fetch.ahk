@@ -578,3 +578,98 @@ _UpdaterTest_BackgroundTickIsAsync() {
 		"Updater_BackgroundTick must not call the blocking Updater_FetchLatestJson directly")
 }
 Test("Updater: background poller dispatches asynchronously (regression: sync fetch froze remapping)", _UpdaterTest_BackgroundTickIsAsync)
+
+_UpdaterTest_RateLimitDetail() {
+	global _UpdaterFetchCache
+	AssertEqual("HTTP 403: the GitHub API rate limit is exhausted, it resets at 1970-01-02 00:00:00 UTC",
+		_Updater_RateLimitDetail(403, "0", "86400"), "an exhausted limit names its UTC reset")
+	AssertEqual("HTTP 429: the GitHub API rate limit is exhausted",
+		_Updater_RateLimitDetail(429, "0", ""), "a missing reset still names the limit")
+	AssertEqual("HTTP 403: the GitHub API rate limit is exhausted",
+		_Updater_RateLimitDetail(403, "0", "soon"), "a malformed reset is not a time")
+	AssertEqual("", _Updater_RateLimitDetail(403, "12", "86400"), "calls left is another refusal")
+	AssertEqual("", _Updater_RateLimitDetail(403, "", ""), "no rate-limit header is another refusal")
+	AssertEqual("", _Updater_RateLimitDetail(500, "0", "86400"), "only 403 and 429 are rate limits")
+	SavedCache := _UpdaterFetchCache
+	try {
+		_UpdaterFetchCache := Map()
+		AssertEqual("", _Updater_InterpretResponse(403, "{}", "", "dev", "test://limited", ,
+			Map("remaining", "0", "reset", "86400")), "a rate-limited answer has no release")
+		AssertFalse(_UpdaterFetchCache.Has("dev"), "a refusal never enters the response cache")
+	} finally {
+		_UpdaterFetchCache := SavedCache
+	}
+}
+Test("Updater: an exhausted GitHub rate limit names its reset time (#95)", _UpdaterTest_RateLimitDetail)
+
+
+; Simulates a driver restart: the in-memory cache and the load memo are fresh.
+_UpdaterTest_ListCacheRestart() {
+	global _UpdaterFetchCache, _UpdaterListDiskLoaded, _UpdaterListDiskEntry
+	_UpdaterFetchCache := Map()
+	_UpdaterListDiskLoaded := false
+	_UpdaterListDiskEntry := 0
+}
+
+; Regression (#95 point 3): the list ETag lived in memory only, so the first
+; request after every restart was a full one and spent GitHub's 60 anonymous
+; calls an hour. The complete list and its ETag now survive on disk; a 304 after
+; a restart reuses them and the file is rewritten only when the ETag changes.
+_UpdaterTest_ListCacheSurvivesRestart() {
+	global _UpdaterFetchCache, _UpdaterListCacheDir, _UpdaterListDiskLoaded, _UpdaterListDiskEntry
+	SavedCache := _UpdaterFetchCache
+	SavedDir := _UpdaterListCacheDir
+	SavedLoaded := _UpdaterListDiskLoaded
+	SavedEntry := _UpdaterListDiskEntry
+	Dir := A_Temp . "\ergopti-list-cache-" . A_TickCount
+	Url := Updater_ReleaseApiUrl()
+	ListA := '[{"tag_name":"v1.2.0","prerelease":false,"body":"first"},{"tag_name":"v1.1.0","prerelease":false}]'
+	ListB := '[{"tag_name":"v1.3.0","prerelease":false,"body":"second"},{"tag_name":"v1.2.0","prerelease":false}]'
+	try {
+		_UpdaterListCacheDir := Dir
+		_UpdaterTest_ListCacheRestart()
+		Path := _Updater_ListCachePath()
+		_Updater_InterpretResponse(200, ListA, '"etag-a"', "main", Url)
+		AssertTrue(FileExist(Path) != "", "a fresh 200 must save the list on disk")
+
+		_UpdaterTest_ListCacheRestart()
+		Entry := _Updater_FetchCacheEntry("main", Url)
+		AssertTrue(IsObject(Entry), "a restart must find the stored list")
+		AssertEqual('"etag-a"', Entry.Etag, "a restart must send the stored ETag")
+		Selected := _Updater_InterpretResponse(304, "", "", "main", Url)
+		AssertEqual("v1.2.0", Updater_ParseTagName(Selected),
+			"a 304 after a restart must select the release from the stored complete list")
+
+		; The same ETag never rewrites the file, even with a different body.
+		_Updater_InterpretResponse(200, ListB, '"etag-a"', "main", Url)
+		AssertTrue(InStr(FileRead(Path, "UTF-8"), '"first"') > 0,
+			"an unchanged ETag must not rewrite the stored list")
+		_Updater_InterpretResponse(200, ListB, '"etag-b"', "main", Url)
+		AssertTrue(InStr(FileRead(Path, "UTF-8"), '"second"') > 0,
+			"a changed ETag must rewrite the stored list")
+
+		; A list URL other than the real one never reaches the disk.
+		FileDelete(Path)
+		_UpdaterTest_ListCacheRestart()
+		_Updater_InterpretResponse(200, ListA, '"etag-c"', "main", "test://elsewhere")
+		AssertFalse(FileExist(Path) != "", "a foreign URL must not be persisted")
+
+		; A truncated or foreign copy is discarded, never trusted.
+		for Corrupt in ["garbage", "ergopti-release-list-v1`n" . Url . "`n" . '"e"' . "`n" . SubStr(ListA, 1, 20),
+			"ergopti-release-list-v1`ntest://other`n" . '"e"' . "`n" . ListA,
+			"ergopti-release-list-v1`n" . Url . "`n`n" . ListA] {
+			DirCreate(Dir)
+			FileAppend(Corrupt, Path, "UTF-8-RAW")
+			_UpdaterTest_ListCacheRestart()
+			AssertEqual(0, _Updater_FetchCacheEntry("main", Url), "a corrupt copy must not be used")
+			AssertFalse(FileExist(Path) != "", "a corrupt copy must be discarded")
+		}
+	} finally {
+		_UpdaterFetchCache := SavedCache
+		_UpdaterListCacheDir := SavedDir
+		_UpdaterListDiskLoaded := SavedLoaded
+		_UpdaterListDiskEntry := SavedEntry
+		try DirDelete(Dir, true)
+	}
+}
+Test("Updater: the release list and its ETag survive a restart (#95)", _UpdaterTest_ListCacheSurvivesRestart)

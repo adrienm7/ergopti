@@ -84,9 +84,55 @@ _KJS_PreInitializationShutdown() {
 		Port["owner"].Rollback(Token, {}, 0, (*) => false)
 		Port["owner"].Release(Token)
 		AssertFalse(KL_FlushShutdownReady(Port), "uninitialized compensation debt is never bypassed")
+		; The shutdown log names the refusal; an in-progress flush is told apart.
+		Reason := "unset"
+		AssertFalse(KL_FlushShutdownReady(Port, , &Reason))
+		AssertEqual("uninitialized_owner_debt", Reason)
+		Keylogger._flush_in_progress := true
+		AssertFalse(KL_FlushShutdownReady(Port, , &Reason))
+		AssertEqual("flush_in_progress", Reason, "a busy flush is reported as such, not as debt")
+		Keylogger._flush_in_progress := false
 	} finally {
 		for Name, Value in Saved
 			Keylogger.%Name% := Value
 	}
 }
 Test("keylogger: early UI shutdown accepts only an empty owner (early-ui-admission)", _KJS_PreInitializationShutdown)
+
+_KJS_AwaitFlushHandoff() {
+	SavedFlush := Keylogger._flush_in_progress
+	try {
+		Port := Map("owner", KL_JournalOwner())
+		Polls := []
+		Arm := (Callback, DelayMs) => Polls.Push(Map("callback", Callback, "delay", DelayMs))
+		Outcome := []
+		Settled := (*) => Outcome.Push("settled")
+		Expired := (*) => Outcome.Push("expired")
+		; A running flush keeps the exit waiting, then releases it once it ends.
+		Keylogger._flush_in_progress := true
+		AssertFalse(KL_FlushHandoffSettled(Port), "a running flush is not settled")
+		KL_AwaitFlushHandoff(Settled, Expired, A_TickCount + 60000, 100, Arm, Port)
+		AssertEqual(1, Polls.Length, "a running flush schedules the next poll")
+		AssertEqual(100, Polls[1]["delay"])
+		AssertEqual(0, Outcome.Length, "nothing runs while the flush holds persistence")
+		Keylogger._flush_in_progress := false
+		Token := Port["owner"].Acquire()
+		Polls[1]["callback"].Call()
+		AssertEqual(2, Polls.Length, "a journal handoff in progress still waits")
+		AssertEqual(0, Outcome.Length)
+		Port["owner"].Release(Token)
+		Polls[2]["callback"].Call()
+		AssertEqual("settled", Outcome.Length ? Outcome[1] : "", "the settled handoff releases the exit")
+		AssertEqual(2, Polls.Length, "a settled handoff arms no further poll")
+		; A flush that never ends expires instead of polling forever.
+		Outcome := []
+		Polls := []
+		Keylogger._flush_in_progress := true
+		KL_AwaitFlushHandoff(Settled, Expired, A_TickCount - 1, 100, Arm, Port)
+		AssertEqual("expired", Outcome.Length ? Outcome[1] : "", "an elapsed deadline abandons the retry")
+		AssertEqual(0, Polls.Length)
+	} finally {
+		Keylogger._flush_in_progress := SavedFlush
+	}
+}
+Test("keylogger: a deferred exit waits for the flush handoff, then runs once (flush-exit-retry)", _KJS_AwaitFlushHandoff)

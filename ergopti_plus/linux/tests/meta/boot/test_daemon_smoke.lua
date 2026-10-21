@@ -11,6 +11,52 @@
 
 local helpers = require("tests.helpers")
 
+--- Executes Main's actual admission expression against the independent truth table.
+--- @param control_body string Actual control callback containing its dispatch table.
+local function check_shortcut_gate(control_body)
+  helpers.assert_true(type(control_body) == "string" and control_body:match("%S") ~= nil,
+    "the actual control callback must not be empty")
+  local gate = assert(control_body:find("local shortcuts_on =", 1, true), "master query declaration is missing")
+  local dispatch = assert(control_body:find("pcall(keyboard_shortcuts.dispatch, detail, {", 1, true),
+    "actual keyboard dispatch is missing")
+  helpers.assert_true(gate < dispatch, "the master switch is queried before dispatch")
+  local call = assert(control_body:sub(dispatch):match("^(pcall%b())"), "dispatch call is incomplete")
+  local expression = assert(call:match("only_script%s*=%s*([^\n]+)"), "actual dispatch admission is missing")
+  expression = expression:gsub(",%s*$", "")
+  helpers.assert_true(expression:match("%S") ~= nil, "the admission expression must not be empty")
+  local source = control_body:sub(gate, dispatch - 1) .. call
+  local states = {
+    { false, false, false, true }, { false, false, true, false },
+    { false, true, false, true }, { false, true, true, true },
+    { true, false, false, true }, { true, false, true, true },
+    { true, true, false, true }, { true, true, true, true },
+  }
+  for index, state in ipairs(states) do
+    local events, queries, calls, observed, argument, detail = {}, 0, 0, nil, nil, {}
+    local environment = {
+      pcall = pcall, opts = { dry_run = state[1] }, detail = detail,
+      shortcuts = { is_enabled = function()
+        queries = queries + 1; events[#events + 1] = "master"; return state[3]
+      end },
+      script_actions = { is_paused = function() events[#events + 1] = "pause"; return state[2] end },
+      keyboard_shortcuts = { dispatch = function(value, options)
+        calls = calls + 1; events[#events + 1] = "dispatch"
+        argument, observed = value, options.only_script
+      end },
+    }
+    local compiled
+    if loadstring then compiled = assert(loadstring(source)); setfenv(compiled, environment)
+    else compiled = assert(load(source, "actual Main shortcut admission", "t", environment)) end
+    compiled()
+    helpers.assert_eq(queries, 1, "state " .. index .. " queries the real master expression once")
+    helpers.assert_eq(calls, 1, "state " .. index .. " reaches the actual dispatch once")
+    helpers.assert_true(rawequal(argument, detail), "dispatch retains the original chord")
+    helpers.assert_eq({ events[1], events[#events] }, { "master", "dispatch" },
+      "master observation precedes dispatch in every state")
+    helpers.assert_eq(observed, state[4], "state " .. index .. " keeps only script controls when narrowed")
+  end
+end
+
 -- We test the argument parser and module structure by loading the daemon
 -- module. The daemon has a main() call at the bottom, so we must be careful
 -- to only test individual functions or the --help path.
@@ -85,8 +131,12 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local click_body = src:sub(click_start, focus_start - 1)
       local focus_body = src:sub(focus_start, focus_end)
 
-      helpers.assert_true(control_body:find("engine:reset()", 1, true) ~= nil,
+      -- Control keys reset through the word-reset owner; the undo restore resets
+      -- at an unknown word start (unknown-context-resets).
+      helpers.assert_true(control_body:find("WordReset.apply_control(engine, key_name, detail)", 1, true) ~= nil,
         "control keys must reset text and its aligned timing history")
+      helpers.assert_true(control_body:find("engine:reset(false)", 1, true) ~= nil,
+        "the undo restore must reset text at an unknown word start")
       helpers.assert_true(click_body:find("secure_focus_guard.invalidate()", 1, true) ~= nil,
         "pointer clicks must cross the text buffer and privacy state together")
       helpers.assert_true(focus_body:find("secure_focus_guard.prime()", 1, true) ~= nil,
@@ -141,17 +191,41 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local control_start = assert(src:find("local function handle_control", 1, true))
       local click_start = assert(src:find("local function on_click", control_start, true))
       local control_body = src:sub(control_start, click_start - 1)
-      -- The switch and the pause both narrow dispatch to the script-control
-      -- actions (keyboard_shortcuts' only_script), which is how the user resumes;
-      -- test_script_actions proves only_script holds Ctrl+G and assignments back.
-      local gate = control_body:find("shortcuts.is_enabled()", 1, true)
-      local dispatch = control_body:find("pcall(keyboard_shortcuts.dispatch, detail, {", 1, true)
-      local narrowed = control_body:find(
-        "only_script = script_actions.is_paused() or not shortcuts_on", 1, true)
+      -- Dry-run, pause and the disabled master each retain only script controls.
+      -- Execute their real joined expression rather than pinning its old spelling.
+      check_shortcut_gate(control_body)
+    end)
 
-      helpers.assert_true(gate ~= nil and dispatch ~= nil and gate < dispatch and narrowed ~= nil,
-        "the shortcuts master toggle must guard keyboard dispatch; disabling the "
-          .. "feature cannot leave Ctrl+G and user assignments active")
+    -- A physical Backspace reaches the control callback, never on_char, and the
+    -- daemon used to record nothing for it: the metrics counted only the
+    -- deletions a hotstring made (physical-backspace-corrections).
+    helpers.it("physical-backspace-corrections: the control callback records every admitted Backspace", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local control_start = assert(src:find("local function handle_control", 1, true))
+      local control_end = assert(src:find("local on_control = input_capture_gate.guard(handle_control)", control_start, true))
+      local body = src:sub(control_start, control_end - 1)
+      local paused = body:find("if script_actions.is_paused() then return end", 1, true)
+      local branch = body:find('if key_name == "backspace" then', 1, true)
+      local record = body:find("keylogger.record_correction(app_id,", 1, true)
+      local privacy = branch and body:find("secure_focus_guard.blocks_text()", branch, true)
+      local undo = body:find("injector.inject(remaining - 1", 1, true)
+      helpers.assert_true(paused ~= nil and branch ~= nil and record ~= nil and undo ~= nil,
+        "the control callback must route Backspace to the keylogger")
+      helpers.assert_true(paused < branch and branch < record,
+        "a paused daemon records nothing, so the correction follows the pause gate")
+      helpers.assert_true(privacy ~= nil and privacy < record,
+        "a correction is admitted under the same privacy verdict as a character")
+      helpers.assert_true(record < undo,
+        "the undo returns early, and the press deleted a character whatever happens next")
+      -- Only one keylogger entry exists for a press: on_char never sees Backspace.
+      local handle_char = src:sub(assert(src:find("local function handle_char", 1, true)),
+        assert(src:find("local function handle_physical", 1, true)) - 1)
+      helpers.assert_true(handle_char:find("record_correction", 1, true) == nil,
+        "the text callback never records a correction, so a press is counted once")
     end)
 
     helpers.it("routes recurring pumps through the runtime failure guard", function()
@@ -160,7 +234,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
-      local loop_start = assert(src:find("event_loop.run({", 1, true))
+      -- Startup refusal has its own cleanup loop; inspect the recurring runtime loop.
+      local periodic_start = assert(src:find("local on_periodic = function()", 1, true))
+      local loop_start = assert(src:find("event_loop.run({", periodic_start, true))
       local loop_end = assert(src:find("\n\t})", loop_start, true))
       local loop_body = src:sub(loop_start, loop_end)
 
@@ -378,7 +454,7 @@ helpers.describe("daemon startup-capture-publication", function()
 			local calls, retired, closed, pending = {}, false, false, mode == "pending" or mode == "debt" or mode == "runner-rebound"
 			local layout = require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 			local publication = layout.publish_current_capture
-			local loop = { run = function(opts) calls[#calls + 1] = "loop"; opts.onIdle() end }
+			local loop = { run = function(opts) calls[#calls + 1] = "loop"; opts.onIdle() end, stop = function() end }
 			if mode ~= "success" and mode ~= "late-rebound" and mode ~= "late-stop" then
 				layout.publish_current_capture = function()
 					if mode == "throw" then error("controlled publication failure") end
@@ -387,7 +463,14 @@ helpers.describe("daemon startup-capture-publication", function()
 					return false
 				end
 			end
-			local hook = { isRunning = function() return not retired end }
+			local hook = {
+				isRunning = function() return not retired end,
+				stop = function() calls[#calls + 1] = "retire"; retired = true end,
+				emergency_stop = function(reason)
+					helpers.assert_eq(reason, "startup runtime failure")
+					calls[#calls + 1] = "retire"; retired = true
+				end,
+			}
 			if mode == "late-rebound" or mode == "late-stop" then
 				local ready = layout.is_ready
 				layout.is_ready = function()
@@ -397,23 +480,44 @@ helpers.describe("daemon startup-capture-publication", function()
 					return admitted
 				end
 			end
-			local shutdown = {
-				request = function(reason, emergency)
-					helpers.assert_eq(reason, "startup layout publication refused")
-					helpers.assert_eq(emergency, reason)
-					calls[#calls + 1] = "retire"; retired = true
-				end,
-				is_pending = function() return pending end,
-				poll = function() calls[#calls + 1] = "ack"; if mode ~= "debt" then pending = false end end,
-			}
+			local polls = 0
+			local shutdown = require("infra.shutdown_coordinator").new({
+				keyboard_hook = hook, event_loop = loop,
+				pre_wait = { { name = "controlled startup native owner", wait_for_ack = true, stop = function()
+					polls = polls + 1
+					if polls > 1 then
+						calls[#calls + 1] = "ack"
+						if mode ~= "debt" then pending = false end
+					end
+					return not pending
+				end } },
+			})
 			local env = { opts = {}, keyboard_layout = layout, keyboard_hook = hook, shutdown = shutdown,
 				injector = { close_fast_channel = function() calls[#calls + 1] = "close"; closed = true; return true end },
-				event_loop = loop,
-				pcall = pcall, type = type, error = error }
-			local chunk
-			if setfenv then chunk = assert(loadstring(block, "actual startup capture admission")); setfenv(chunk, env)
-			else chunk = assert(load(block, "actual startup capture admission", "t", env)) end
-			local ok, failure = pcall(chunk)
+				event_loop = loop, privacy_owners = {},
+				pcall = pcall, type = type, error = error, assert = assert }
+			local function compile(text)
+				if setfenv then
+					local chunk = assert(loadstring(text, "actual startup capture admission")); setfenv(chunk, env); return chunk
+				end
+				return assert(load(text, "actual startup capture admission", "t", env))
+			end
+			-- Capture failure now unwinds through Main's central preparation owner;
+			-- the inverse publisher no longer owns a second private shutdown path.
+			local setup = assert(source:find("\tprivacy_owners.startup = { token =", 1, true))
+			local setup_end = assert(source:find("\n\tif not privacy_owners.startup_checkpoint()", setup, true))
+			compile(source:sub(setup, setup_end - 1))()
+			local ok, failure = pcall(compile(block))
+			if not ok then
+				helpers.assert_true(tostring(failure):find("Current capture inverse publication refused at startup", 1, true) ~= nil,
+					"the actual inverse admission must refuse before central cleanup")
+				local unwind = 'if privacy_owners.startup then privacy_owners.finish_startup("startup runtime failure") end'
+				helpers.assert_true(source:find(unwind, 1, true) ~= nil, "actual terminal unwind must retain preparation cleanup")
+				local cleaned, cleanup_error = pcall(compile(unwind))
+				if not cleaned then failure = cleanup_error end
+			else
+				env.privacy_owners.finish_startup()
+			end
 			if mode == "success" then
 				helpers.assert_true(ok and not retired and not closed)
 				helpers.assert_eq(#calls, 0)
@@ -421,6 +525,7 @@ helpers.describe("daemon startup-capture-publication", function()
 			else
 				helpers.assert_eq(ok, false, "no failed publication may reach readiness")
 				helpers.assert_true(retired, "the owned input hook must retire first")
+				helpers.assert_eq(shutdown.is_pending(), mode == "debt", "only actual native close debt may retain shutdown")
 				if mode == "debt" then
 					helpers.assert_true(tostring(failure):find("unacknowledged", 1, true) ~= nil)
 					helpers.assert_eq(closed, false, "unacknowledged native debt never receives a close success")
@@ -443,7 +548,7 @@ helpers.describe("daemon managed reacquisition publisher", function()
 			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 			local source = file:read("*a"); file:close()
 			local first = assert(source:find("\t-- Retain the selected inverse publisher", 1, true))
-			local last = assert(source:find("\n\tkeyboard_hook.start({", first, true))
+			local last = assert(source:find('\n\tBootProfiler.stage("input hooks")', first, true))
 			helpers.assert_true(last > first, "the actual original binding must be nonempty")
 			helpers.assert_true(source:sub(last):find("onCaptureReacquired = publish_reacquired_capture", 1, true) ~= nil)
 			local block = source:sub(first, last - 1) .. "\nreturn publish_reacquired_capture"

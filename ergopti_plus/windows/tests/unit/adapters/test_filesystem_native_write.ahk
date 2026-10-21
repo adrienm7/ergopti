@@ -219,3 +219,36 @@ _FSNativeGuardActuallyPublishes() {
 	} finally DirDelete(Root, true)
 }
 Test("filesystem native guard: actual acknowledged rename consumes the verified stage", _FSNativeGuardActuallyPublishes)
+
+
+; Indexing carries opaque UTF-8 fragments, including NUL and partial scalars.
+; The native adapter must also preserve memmove semantics for overlapping spans.
+_FSNW_BufferMove(Mode) {
+	if Mode == "separate" {
+		Source := Buffer(8)
+		Bytes := [0x00, 0xC3, 0xA9, 0xF0, 0x9F, 0x98, 0x80, 0xFF]
+		for Index, Byte in Bytes
+			NumPut("UChar", Byte, Source, Index - 1)
+		Target := Buffer(10, 0x55)
+		FSBufferMove(Target.Ptr + 1, Source, Source.Size)
+		Expected := [0x55, 0x00, 0xC3, 0xA9, 0xF0, 0x9F, 0x98, 0x80, 0xFF, 0x55]
+		for Index, Byte in Bytes
+			AssertEqual(Byte, NumGet(Source, Index - 1, "UChar"), "the source span remains unchanged")
+	} else {
+		Target := Buffer(10)
+		loop Target.Size
+			NumPut("UChar", A_Index - 1, Target, A_Index - 1)
+		if Mode == "overlap-left" {
+			FSBufferMove(Target, Target.Ptr + 2, 8)
+			Expected := [2, 3, 4, 5, 6, 7, 8, 9, 8, 9]
+		} else {
+			FSBufferMove(Target.Ptr + 2, Target, 8)
+			Expected := [0, 1, 0, 1, 2, 3, 4, 5, 6, 7]
+		}
+	}
+	for Index, Byte in Expected
+		AssertEqual(Byte, NumGet(Target, Index - 1, "UChar"), "only the exact native destination span may change")
+}
+
+for Mode in ["separate", "overlap-left", "overlap-right"]
+	Test("filesystem: opaque byte move " . Mode . " (filesystem-buffer-move)", _FSNW_BufferMove.Bind(Mode))

@@ -81,8 +81,13 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 		and InStr(_DriverFuncBody("_LLM_Accept_IsBareUserTabEvent"),
 			"_LLM_Accept_BareTabRefusal(") > 0,
 		"each policy predicate must delegate to its single refusal implementation")
-	for Needle in ["ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)",
-			"ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)",
+	; The chord names the offer by its lifecycle: its own jump repaint replaces
+	; the exact record and surface before the modifiers are released
+	; (val-chord-survives-own-repaint).
+	Assert(InStr(_DriverFuncBody("_LLM_Accept_SameOffer"),
+		"ObjPtr(Presented.Lifecycle) == ObjPtr(ExpectedRecord.Lifecycle)") > 0,
+		"the validation-chord offer check must compare the shared lifecycle")
+	for Needle in ["!_LLM_Accept_SameOffer(Presented, ExpectedRecord)",
 			"Presented.ActiveIdx != SlotIdx",
 			"_LLM_Accept_AnyModifierDown(InputSnapshot)",
 			"_LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)"] {

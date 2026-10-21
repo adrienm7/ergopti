@@ -878,6 +878,14 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		end
 	end
 	steps[#steps + 1] = {
+		name = "driver-control",
+		run = function()
+			local module = package.loaded["infra.driver_control"]
+			if module == nil then return true end
+			return module.stop()
+		end,
+	}
+	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
 			local module = package.loaded["ui.menu"]
@@ -1055,7 +1063,8 @@ end
 
 -- Now safe to load modules that depend on config_dir
 -- The native map is immutable for this VM; every key event supplies its own
--- model identifier, including events from Karabiner's virtual keyboard.
+-- model identifier. Behind Karabiner that model does not decide the ISO pair:
+-- the virtual keyboard form the bridge deploys does (registered below).
 require("adapters.keyboard_geometry").initialize()
 local file_system        = require("adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
@@ -1069,6 +1078,11 @@ if not ok_karabiner then
 	Logger.error(LOG, "platform.remap failed to load: %s — the Karabiner bridge is "
 		.. "disabled for this session; everything else continues.", tostring(karabiner))
 	karabiner = nil
+else
+	local bridge = karabiner
+	require("adapters.keyboard_geometry").set_virtual_form_source(function()
+		return bridge.virtual_keyboard_form()
+	end)
 end
 local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
@@ -1164,7 +1178,7 @@ do
 	else
 		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
 	end
-	ConfigMigrate.boot({
+	local migration = ConfigMigrate.boot({
 		context       = context,
 		context_error = context_error,
 		path          = config_paths.get("ConfigTomlPath"),
@@ -1172,6 +1186,15 @@ do
 		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = file_system,
 	})
+	-- A file saved by a newer build stays untouched and read-only for the
+	-- session: say so, or every change the user makes silently fails to stick.
+	local notice = ConfigMigrate.read_only_notice_key(migration)
+	if notice then
+		local sent, notice_error = require("infra.notifications").notify(i18n.get(notice), nil, "warning")
+		if not sent then
+			Logger.error(LOG, "The newer-configuration notice was not shown: %s.", tostring(notice_error))
+		end
+	end
 end
 Boot.mark("Config schema migration")
 Boot.stage("First-launch guard (onboarding check)")
@@ -2136,6 +2159,15 @@ Logger.info(LOG, "════════════════════�
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Storage.set(HS_BOOT_READY_SETTING_KEY, true)
+-- The local reload command, once boot is complete: a reload it requested is
+-- completed here by this reloaded state. Optional, so a control that cannot
+-- start is logged and the driver runs on.
+require("infra.driver_control").start({
+	pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
+	request_reload = function(reason, on_aborted)
+		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
+	end,
+})
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop

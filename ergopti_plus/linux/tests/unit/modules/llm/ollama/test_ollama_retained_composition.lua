@@ -21,7 +21,8 @@ helpers.describe("Retained Ollama runtime composition", function()
     assert(options.asset.tag == nil and options.asset.checksum_url == nil and options.explicit_consent == true)
     return result
    end }, process = { start_service = function() end }, http = { get_owned = function() end },
-   owned_timer = { after = function() end, now_ms = function() return 0 end }, environment = function() return {} end })
+   owned_timer = { after = function() end, now_ms = function() return 0 end }, environment = function() return {} end,
+   serve_environment = { "OLLAMA_NO_CLOUD=1" } })
   assert(captured.install({}, budget, yes, function() end) == result)
  end)
 end)

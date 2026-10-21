@@ -68,7 +68,7 @@ Test("accented shortcuts: only directly typed letters get a key (accented-shortc
 
 Test("accented shortcuts: direct-access digits take the AZERTY top row back (accented-shortcuts-any-layout)", () =>
 	_ACS_WithShortcuts(_ACS_DefaultConfig(), () =>
-		AssertEqual(0, AccentedShortcutKeysForLayout(1, _ACS_AzertyScanCode).Count,
+		AssertEqual(0, AccentedShortcutKeysForLayout(1, _ACS_AzertyScanCode, true).Count,
 			"with digits in direct access, e-acute/e-grave/a-grave need Shift and are no longer direct"),
 		true))
 
@@ -222,3 +222,48 @@ _ACS_CountLayoutToken(Tokens, Token) {
 			Count += 1
 	return Count
 }
+
+; A cached HKL is insufficient: digit access and the Layout master change
+; in-process. Registration must retain the hidden native keys for that return.
+_ACS_NumberRowPolicyCache() {
+	global Features, CategoryEnabled, _AccentedShortcutLayoutCache, _AccentedShortcutRegistered
+	SavedCache := _AccentedShortcutLayoutCache
+	SavedRegistered := _AccentedShortcutRegistered
+	SavedCategory := CategoryEnabled["Layout"]
+	_AccentedShortcutLayoutCache := Map()
+	_AccentedShortcutRegistered := false
+	CategoryEnabled["Layout"] := true
+	; Digits first applies only on a layout whose row it reorders: the real AZERTY.
+	Azerty := _LDRP_Layout("0000040C")
+	if !Azerty
+		Azerty := 0x040C040C
+	try {
+		Native := _AccentedShortcutKeysCached(Azerty, _ACS_AzertyScanCode)
+		AssertEqual("c", AccentedShortcutResolve("^SC003", Native))
+		Features["layout"]["direct_access_digits"] := "digits"
+		Digits := _AccentedShortcutKeysCached(Azerty, _ACS_AzertyScanCode)
+		AssertEqual(0, Digits.Count, "live digits mode must not reuse the native accented-key cache")
+		AssertEqual("", AccentedShortcutResolve("^SC003", Digits), "Ctrl+2 must keep its native chord")
+
+		Names := []
+		; The fake native profile is already cached. Keep the production default
+		; KeysFn so this also proves registration selects the native inventory.
+		Count := AccentedShortcuts_Register([Azerty], (Name, *) => Names.Push(Name), (Args*) => 0)
+		AssertEqual(18, Count, "digits mode must still register the three hidden native accent positions")
+		AssertEqual(18, Names.Length)
+
+		Features["layout"]["direct_access_digits"] := "native"
+		AssertEqual(Native, _AccentedShortcutKeysCached(Azerty, _ACS_AzertyScanCode),
+			"returning to native mode must recover its own cached profile")
+		Features["layout"]["direct_access_digits"] := "digits"
+		CategoryEnabled["Layout"] := false
+		AssertEqual(Native, _AccentedShortcutKeysCached(Azerty, _ACS_AzertyScanCode),
+			"disabling the Layout master returns accented chords to the native profile")
+	} finally {
+		_AccentedShortcutLayoutCache := SavedCache
+		_AccentedShortcutRegistered := SavedRegistered
+		CategoryEnabled["Layout"] := SavedCategory
+	}
+}
+Test("accented shortcuts: live number-row changes select their own cache (accented-shortcuts-live-digits)", () =>
+	_ACS_WithShortcuts(_ACS_DefaultConfig(), _ACS_NumberRowPolicyCache))

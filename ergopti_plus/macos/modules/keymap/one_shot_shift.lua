@@ -94,6 +94,21 @@ function Owner:commit(key, kind)
 	else error("invalid one-shot ownership kind") end
 end
 
+--- Whether this key still holds a claim from an earlier press.
+--- @param key number
+--- @return boolean
+function Owner:claims(key)
+	return self.absorbed[key] == true or self.shifted[key] == true
+end
+
+--- Drops the claim of a press whose release never arrived (a tap outage lets
+--- it pass unseen); without this, the key's next press would be swallowed.
+--- @param key number
+function Owner:forget(key)
+	self.absorbed[key] = nil
+	self.shifted[key] = nil
+end
+
 --- Settles a physical release and reports its required treatment.
 --- @param key number
 --- @return string|nil kind

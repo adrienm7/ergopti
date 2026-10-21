@@ -18,14 +18,16 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		local hs_stub = require("tests.stubs.hs")
 		hs_stub.__reset()
 		local selected = string.rep("a", 32)
+		local change_count = 0
 		hs_stub.pasteboard = {
+			changeCount = function() return change_count end,
 			getContents = function() return selected end,
-			setContents = function() return true end,
-			clearContents = function() return true end,
+			setContents = function() change_count = change_count + 1; return true end,
+			clearContents = function() change_count = change_count + 1 end,
 			readAllData = function()
 				return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" }
 			end,
-			writeAllData = function() return true end,
+			writeAllData = function() change_count = change_count + 1; return true end,
 		}
 		_G.hs = hs_stub
 		package.loaded.hs = hs_stub
@@ -40,9 +42,14 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			cancels = 0,
 		}
 		local synthetic = {}
-		function synthetic.emit_key_stroke()
+		function synthetic.emit_key_stroke(_, _, _, tx)
+			helpers.assert_not_nil(tx, "copy and paste require explicit completion ownership")
 			calls.implicit = calls.implicit + 1
 			return true
+		end
+		function synthetic.emit_guarded_key_stroke(mods, key, tx)
+			tx.guarded = true
+			return synthetic.emit_key_stroke(mods, key, nil, tx)
 		end
 		function synthetic.emit_key_strokes() return true end
 		function synthetic.begin(owner, effect)
@@ -62,7 +69,16 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			calls.dispatches = calls.dispatches + 1
 			return true
 		end
-		function synthetic.seal()
+		function synthetic.on_complete(tx, callback) tx.callback = callback end
+		function synthetic.on_dispatched(tx, callback)
+			tx.dispatched = tx.dispatched or {}
+			tx.dispatched[#tx.dispatched + 1] = callback
+		end
+	function synthetic.seal(tx)
+			for _, callback in ipairs(tx.dispatched or {}) do
+				callback(tx, { native_down_attempted = tx.guarded == true }, "dispatched")
+			end
+		if tx.callback then tx.callback(tx, "complete") end
 			calls.seals = calls.seals + 1
 			return true
 		end
@@ -88,10 +104,10 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		timers[4]:fire()
 
 		helpers.assert_eq(calls.implicit, 2,
-			"only Cmd+C and Cmd+V may use standalone synthetic actions")
-		helpers.assert_eq(calls.begins, 1)
+			"Cmd+C and Cmd+V each retain an explicit synthetic action")
+		helpers.assert_eq(calls.begins, 3)
 		helpers.assert_eq(calls.dispatches, 1)
-		helpers.assert_eq(calls.seals, 1)
+		helpers.assert_eq(calls.seals, 3)
 		helpers.assert_eq(calls.cancels, 0)
 		helpers.assert_eq(calls.pairs, #selected * 2,
 			"the original Left then Shift+Right selection must stay inside one batch")

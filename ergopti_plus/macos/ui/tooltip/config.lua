@@ -46,6 +46,7 @@
 
 local M = {}
 local Logger = require("infra.logger")
+local LlmLine = require("tooltip.llm_line")
 local LOG = "tooltip_config"
 
 -- Populated strictly from _shared/modules/tooltip/constants.toml at require-time (fail fast).
@@ -281,6 +282,7 @@ local function load_from_shared()
 	M.layout.hint_spacing  = require_key("layout", "hint_spacing")
 	M.layout.screen_margin = require_key("layout", "screen_margin")
 	M.layout.corner_radius = require_key("layout", "corner_radius")
+	M.layout.label_gap     = require_key("layout", "label_gap")
 
 	-- [positioning]
 	M.layout.caret_offset_x      = require_key("positioning", "caret_offset_x")
@@ -307,7 +309,6 @@ local function load_from_shared()
 	M.colors.nw_sel     = rgba_from_table(require_key("llm_colors", "nw_sel"),     "llm_colors", "nw_sel")
 	M.colors.unsel_gray = rgba_from_table(require_key("llm_colors", "unsel_gray"), "llm_colors", "unsel_gray")
 	M.colors.cursor     = rgba_from_table(require_key("llm_colors", "cursor"),     "llm_colors", "cursor")
-	M.colors.cmd_sel    = rgba_from_table(require_key("llm_colors", "cmd_sel"),    "llm_colors", "cmd_sel")
 	M.colors.cmd_dim    = rgba_from_table(require_key("llm_colors", "cmd_dim"),    "llm_colors", "cmd_dim")
 	M.colors.loading    = rgba_from_table(require_key("llm_colors", "loading"),    "llm_colors", "loading")
 
@@ -325,7 +326,9 @@ local function load_from_shared()
 		inactive_align_char  = require_key("llm_ui", "inactive_align_char"),
 		footer_space_divider = require_key("llm_ui", "footer_space_divider"),
 		footer_combined_sep  = require_key("llm_ui", "footer_combined_separator"),
-		shortcut_label_gap   = require_key("llm_ui", "shortcut_label_gap"),
+		-- The shortcut column's modifier labels (_shared/lua/tooltip/llm_line.lua).
+		shortcut_spec        = LlmLine.shortcut_spec(require_key("llm_ui", "shortcut_modifier_order"),
+			require_key("llm_ui", "shortcut_labels_hs"), require_key("llm_ui", "shortcut_joiner_hs")),
 		hint_accept_single   = require_key("llm_ui", "hint_accept_single"),
 		hint_nav_left        = require_key("llm_ui", "hint_nav_left"),
 		hint_nav_right       = require_key("llm_ui", "hint_nav_right"),
@@ -336,6 +339,9 @@ local function load_from_shared()
 		hint_arrow_sep_left  = require_key("llm_ui", "hint_arrow_sep_left"),
 		hint_arrow_sep_right = require_key("llm_ui", "hint_arrow_sep_right"),
 	}
+	if not M.llm_ui.shortcut_spec then
+		error("[tooltip/config] [llm_ui].shortcut_labels_hs must label every modifier of shortcut_modifier_order")
+	end
 
 	-- [tint]
 	M.tint_config.lightness  = require_key("tint", "lightness")

@@ -132,7 +132,7 @@ local function with_healthcheck(controls, callback)
 	controls = controls or {}
 	helpers.with_fresh_modules({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder",
+		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 		"infra.dialog_util", "adapters.timer_scheduler", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
@@ -163,11 +163,21 @@ local function with_healthcheck(controls, callback)
 			force_focus = function() state.focus_calls = state.focus_calls + 1; return true end,
 		}
 
-		local webview = {}
+		local webview = setmetatable({}, {})
 		for _, method in ipairs({
 			"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
 			"allowGestures", "level", "windowCallback", "navigationCallback", "shadow",
 		}) do webview[method] = function(self) return self end end
+		function webview:allowNewWindows(value)
+			if value == nil then return self.children ~= false end
+			self.children = value
+			return self
+		end
+		function webview:deleteOnClose(value)
+			if value == nil then return self.automatic_close == true end
+			self.automatic_close = value
+			return self
+		end
 		webview.html = function(self)
 			if controls.reject_html == true then error("fixture page load refusal") end
 			return self
@@ -176,14 +186,18 @@ local function with_healthcheck(controls, callback)
 			state.show_calls = state.show_calls + 1
 			return self
 		end
-		webview.delete = function()
+		webview.delete = function(self)
 			state.deletes = state.deletes + 1
 			if controls.delete_throws == true then
 				error("fixture healthcheck delete refusal")
 			end
-			return webview
+			setmetatable(self, nil)
 		end
 		hs_stub.webview.new = function()
+			if getmetatable(webview) == nil then
+				local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
+				webview = setmetatable(fresh, {})
+			end
 			state.webviews_created = state.webviews_created + 1
 			return webview
 		end

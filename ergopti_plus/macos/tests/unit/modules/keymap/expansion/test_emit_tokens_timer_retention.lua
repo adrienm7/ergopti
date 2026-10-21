@@ -25,6 +25,9 @@ local function load_fixture()
 	package.loaded["hs"] = hs_stub
 
 	local pending = {}
+	local now = 0
+	hs_stub.timer.absoluteTime = function() return now * 1e9 end
+	hs_stub.timer.secondsSinceEpoch = function() return 1900000000 + now end
 	hs_stub.timer.new = function(delay, callback)
 		local entry = {
 			delay = delay,
@@ -48,6 +51,7 @@ local function load_fixture()
 		completed = false,
 		active_retains = 0,
 		completion_callbacks = {},
+		dispatch_callbacks = {},
 	}
 	local debt_tx = nil
 	local retain_count = 0
@@ -113,7 +117,15 @@ local function load_fixture()
 			return true
 		end,
 		with_transaction = function(_, callback) return callback() end,
-		emit_key_stroke = function() return true end,
+		on_dispatched = function(owner, callback)
+			assert(owner == tx, "handoff must observe the exact emission transaction")
+			owner.dispatch_callbacks[#owner.dispatch_callbacks + 1] = callback
+		end,
+		emit_key_stroke = function()
+			local batch = {}
+			for _, callback in ipairs(tx.dispatch_callbacks) do callback(tx, batch, "dispatched") end
+			return true, batch
+		end,
 		emit_key_strokes = function() return true end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -143,6 +155,7 @@ local function load_fixture()
 			end
 			if next_entry == nil then break end
 			next_entry.fired = true
+			now = now + next_entry.delay
 			next_entry.callback()
 		end
 	end

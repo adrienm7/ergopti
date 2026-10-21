@@ -79,4 +79,38 @@ helpers.describe("logger: native logger stall recovery", function()
 			helpers.assert_eq(later, 1, "the recovery is not reported again")
 		end, { clock = function() return clock end })
 	end)
+
+	helpers.it("(logger-stall-recovery) reports a stall that shed nothing at INFO (issue #95)", function()
+		local clock = 100
+		Fixture.with_fixture(function(fixture)
+			local Logger = fixture.Logger
+			local seen = {}
+			Logger.set_sink(function(line, variant)
+				seen[#seen + 1] = { line = line, variant = variant }
+			end)
+
+			Logger.info("probe", "Head of line before a busy run loop.")
+			for _ = 1, 16 do
+				fixture.pump()
+				if #fixture.sent > 0 then break end
+			end
+			helpers.assert_eq(#fixture.sent, 1, "the head batch must be in flight")
+			clock = 101.5
+			fixture.pump()
+			helpers.assert_eq(Logger.async_sink_status().stalled, true)
+			clock = 101.6
+			acknowledge_last_batch(fixture)
+			fixture.pump()
+			local warnings, reports = 0, {}
+			for _, entry in ipairs(seen) do
+				if entry.variant == "warn" then warnings = warnings + 1 end
+				if entry.line:find("Native logger stalled", 1, true) then reports[#reports + 1] = entry.line end
+			end
+			helpers.assert_eq(warnings, 0, "nothing was lost, so nothing to warn about")
+			helpers.assert_eq(#reports, 1, "the recovered stall stays visible once")
+			helpers.assert_contains(reports[1], "[INFO]")
+			helpers.assert_contains(reports[1], "stalled 1600 ms")
+			helpers.assert_contains(reports[1], "0 DEBUG/TRACE/DONE line(s)")
+		end, { clock = function() return clock end })
+	end)
 end)

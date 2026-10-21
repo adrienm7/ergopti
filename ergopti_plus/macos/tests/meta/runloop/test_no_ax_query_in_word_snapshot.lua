@@ -26,7 +26,7 @@
 local helpers = require("tests.helpers")
 
 -- This declaration is unique to the keylogger translation unit.
-local KEYLOGGER_SELECTOR = "local function ensure_browser_window_filter"
+local KEYLOGGER_SELECTOR = "local function ensure_browser_window_watchers"
 
 -- The queries it must not make.
 local FORBIDDEN = {

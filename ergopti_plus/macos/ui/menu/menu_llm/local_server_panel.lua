@@ -12,11 +12,15 @@
 --- FEATURES & RATIONALE:
 --- 1. Listed only when it answers: the menu shows the last sweep's verdicts
 ---    and asks for a new sweep, asynchronously, when they are stale; the menu
----    is redrawn only when a verdict changed.
+---    is redrawn only when a verdict changed. That sweep starts after the menu
+---    build returns: its probes answer on the main run loop, which the build
+---    holds for about a second, so a probe dispatched from inside it spent its
+---    1.5 s deadline waiting and every server read as silent (issue #95).
 --- 2. Choosing a model is choosing the backend: the server's API entry is
 ---    stored (api_panel.apply_local_server), then the API backend is selected
 ---    if it was not, so predictions go to the server at once.
---- 3. Every failure offers its fix: a server that stopped answering, a key it
+--- 3. Inert with the AI off: no sweep, no live row, as on Windows (issue #97).
+--- 4. Every failure offers its fix: a server that stopped answering, a key it
 ---    wants and a model it no longer serves each post a notice whose click
 ---    searches again, asks for the key or asks for another model.
 --- ==============================================================================
@@ -24,6 +28,7 @@
 local M = {}
 
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local i18n          = require("infra.i18n")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
@@ -37,6 +42,8 @@ local LOG = "menu_llm.local_servers"
 local _ctx = nil
 -- The AI agent menu's context: a missing model of a System is fixed through it
 local _agent_ctx = nil
+-- True while a stale-verdict sweep waits for the menu build to return
+local _rescan_deferred = false
 
 
 
@@ -67,6 +74,14 @@ local function admitted(ctx)
 	if type(ctx) ~= "table" or ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
 	local ok, paused = pcall(ctx.is_paused)
 	return ok and type(paused) == "boolean" and paused == false
+end
+
+--- Whether the user switched the AI on. With the AI off the rows stay inert
+--- and no sweep probes the servers behind it (issue #97).
+--- @param ctx table|nil Engine menu context.
+--- @return boolean
+local function ai_enabled(ctx)
+	return type(ctx) == "table" and type(ctx.state) == "table" and ctx.state.llm_enabled == true
 end
 
 --- Captures an originating entry and current jointly published model view.
@@ -366,13 +381,21 @@ function M.rows(ctx)
 	servers().set_failure_handler(on_failure)
 	-- Source provenance is refreshed before cache age can grant a model view.
 	api_remote.refresh_local_server_views()
-	if admitted(ctx) and servers().is_stale() then M.rescan(ctx) end
+	if admitted(ctx) and ai_enabled(ctx) and servers().is_stale() and not _rescan_deferred then
+		_rescan_deferred = true
+		local scheduled = DeferredWork.after(0, function()
+			_rescan_deferred = false
+			-- A switch-off before the build returned drops the queued sweep.
+			if ai_enabled(_ctx) then M.rescan(_ctx) end
+		end, "menu_llm.local_servers.rescan")
+		if not scheduled then _rescan_deferred = false end
+	end
 	local data = servers()
 	local receipts = {}
 	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end
 	return ServerMenu.rows({
 		order = data.view_order(), servers = data.view_servers(), detected = data.detected(),
-		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx),
+		result = data.result, sweeping = data.is_sweeping(), paused = not admitted(ctx) or not ai_enabled(ctx),
 		backend = ctx.state.llm_backend, active = remote().get_active_entry(),
 		entry_id = function(id) local entry = remote().local_server_entry(id); return entry and entry.id end,
 		tr = i18n.get, format = i18n.format,

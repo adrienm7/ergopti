@@ -25,6 +25,11 @@
 ; already had the correct helper. This is the documented
 ; `project-ahk-invariant-incomplete-application` shape: one sibling missed.
 ;
+; Current-value previews use the canonical semantic decoder. Its native cache
+; converts Booleans to 1/0, while each row's typed projection retains TOML_Bool
+; for the page. Guard that full read/projection/delegation chain rather than a
+; legacy parser entry point; the native disk matrix covers its actual values.
+;
 ; SCOPE: behavioural (real ParseTomlFile round-trip) + source introspection.
 ; ==============================================================================
 
@@ -86,6 +91,16 @@ _OTB_HelperAcceptsLegacyShapes() {
 ; =======================================================
 ; =======================================================
 
+; Canonical source admission, row enumeration, typed projection and delegation
+; must stay together: any one without the others could publish native 1/0 flags
+; or lose valid dotted/inline settings before the JSON boundary.
+_OTB_HasSemanticTypedRead(Body) {
+	return InStr(Body, "Snapshot := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigPath))") > 0
+		&& InStr(Body, "for Row in Snapshot.Rows") > 0
+		&& InStr(Body, "Sections[Row.Section][Row.Key] := Row.Typed") > 0
+		&& InStr(Body, "Values := OnboardingCurrentValues(Index, Sections)") > 0
+}
+
 ; Policed as a CLASS, not as one pinned site: the defect was a missing sibling,
 ; so the guard has to fail on the NEXT sibling too.
 _OTB_NoHostReimplementsTheBoolTest() {
@@ -93,8 +108,18 @@ _OTB_NoHostReimplementsTheBoolTest() {
 	Assert(Src != "", "the onboarding source must be readable")
 	Assert(InStr(Src, 'StrLower(') == 0 or InStr(Src, '== "true"') == 0,
 		'no onboarding host may test a TOML boolean with StrLower(x) == "true" — IniCacheGet returns a real boolean, so that comparison is always false; use TomlCacheBool')
-	Assert(InStr(Src, "TOML_ParseFreshFileTyped(") > 0,
-		"the onboarding host must read config.toml through the typed parse, which keeps a TOML Boolean a Boolean for the page")
+	Read := _StripFullLineComments(_DriverFuncBody("OnboardingReadCurrentValues"))
+	Assert(Read != "", "the actual onboarding current-value reader must exist")
+	Assert(_OTB_HasSemanticTypedRead(Read),
+		"the wizard must admit semantic source, retain canonical Row.Typed values and delegate their sections to OnboardingCurrentValues")
+	for Link in ["Snapshot := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigPath))", "for Row in Snapshot.Rows",
+		"Sections[Row.Section][Row.Key] := Row.Typed", "Values := OnboardingCurrentValues(Index, Sections)"] {
+		Mutant := StrReplace(Read, Link, "RemovedTypedReadLink")
+		Assert(Mutant != Read, "each semantic Boolean guard control must change its actual source subject")
+		Assert(!_OTB_HasSemanticTypedRead(Mutant), "losing any semantic typed-read link must fail the guard")
+	}
+	Assert(!_OTB_HasSemanticTypedRead(StrReplace(Read, "Row.Typed", "Row.Value")),
+		"a native 1/0 row projection must not qualify as the page's typed Boolean input")
 }
 
 ; §5.2: the helper must exist in exactly one place.

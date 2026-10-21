@@ -76,7 +76,13 @@ require("tests.support.live_preferences").ensure_directory()
 local Profiles = require("modules.llm.profiles")
 Profiles.init({})
 assert(Profiles.enable() == true, "the live prediction fixture must explicitly grant AI consent")
-local models = Profiles.refresh_models() or Profiles.get_models() or {}
+-- The inventory is acquired off the event loop: a refresh only reserves the
+-- request, so the listing is read once that owned request has settled.
+Profiles.refresh_models()
+check(Profiles.model_inventory_pending(), "the inventory request is dispatched")
+check(run_until(10, function() return not Profiles.model_inventory_pending() end),
+	"the inventory request settles asynchronously")
+local models = Profiles.get_cached_models()
 local listed = false
 for _, name in ipairs(models) do if name == MODEL then listed = true end end
 check(listed, string.format("the model list holds %s (%d model(s))", MODEL, #models))

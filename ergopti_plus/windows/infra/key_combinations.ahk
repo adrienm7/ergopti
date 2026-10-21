@@ -71,6 +71,12 @@ global _KeyCombinationPressAssignments := Map()
 ; with the slots, so the criterion of the pair hotkeys only looks a key up.
 global _KeyCombinationScanNames := Map()
 global _KeyCombinationKeysByScanName := Map()
+; The pair menu last shown. A transient Menu held only by a local dies when
+; KeyCombinationShowPairMenu returns, and AHK runs the chosen item's callback
+; only after Show returns, so the click found no item: pairs could not be
+; changed while the ² key could (report of October 15). The next pair menu
+; replaces it.
+global _KeyCombinationPairMenu := 0
 
 ; The id of the pair « First held, then Second ».
 ; @param First {String} Tap-hold key id of the key held first.
@@ -625,11 +631,13 @@ KeyCombinationsApplyScope(Mode, Options := unset) {
 ; Read after admission so edits made since boot participate in this scope.
 KeyCombinationScopedOperations(Mode, Path) {
 	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_HOLD_SECTION
-	Stored := TOML_ParseFreshFile(Path)
-	if TOML_ReadFailed(Path)
-		throw Error("Key combination configuration could not be read.")
+	; Keep the admitted document's namespace identity: dotted assignments,
+	; inline tables and quoted headers can all describe these same slots.
+	Content := FileExist(Path) ? FSReadStrict(Path) : ""
+	Stored := ConfigTomlDecodeSnapshot(Content).Document
+	ParameterTable := _TOML_DocumentLookup(Stored, ["action_parameters"])
 	Parameters := []
-	for Key in Stored.Get("action_parameters", Map()) {
+	for Key in (ParameterTable.Get("value", 0) is Map ? ParameterTable["value"] : Map()) {
 		ParameterPath := "action_parameters." . Key
 		if ConfigScopeActionParameterDomain(ParameterPath) == "combination"
 			&& (KeyCombinationParsePair(StrSplit(Key, "__")[2]) is Map)
@@ -638,7 +646,8 @@ KeyCombinationScopedOperations(Mode, Path) {
 	Plan := ManifestScopePlan("key_combinations", Mode, Parameters,
 		Map("action_parameter_domain", ConfigScopeActionParameterDomain))
 	for Section in [KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_HOLD_SECTION] {
-		for PairId in Stored.Get(Section, Map()) {
+		Table := _TOML_DocumentLookup(Stored, TOML_ParseKeyPath(Section, true))
+		for PairId in (Table.Get("value", 0) is Map ? Table["value"] : Map()) {
 			if !(KeyCombinationParsePair(PairId) is Map)
 				continue
 			SlotPath := Section . "." . PairId
@@ -740,6 +749,8 @@ KeyCombinationShowPairMenu(PairId, PairLabel, ShowFn := 0) {
 	Getters := Map("key_combination_pair_assigned", () => KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
 		or KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE)
 	PairMenu := MenuRenderer_Build("key_combination_pair_menu", "Shortcuts", "", "", ListProviders, Commands, Getters)
+	global _KeyCombinationPairMenu
+	_KeyCombinationPairMenu := PairMenu
 	if HasMethod(ShowFn, "Call")
 		return ShowFn.Call(PairMenu)
 	PairMenu.Show()

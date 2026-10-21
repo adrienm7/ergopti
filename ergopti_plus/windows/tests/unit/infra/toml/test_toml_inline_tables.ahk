@@ -280,3 +280,95 @@ _TIT_DocumentTypedRecords() {
 }
 Test("TOML: document records retain exact typed identities and owner generations (toml-dotted-document-records)",
 	_TIT_DocumentTypedRecords)
+
+; The document owner skips comments in the original source. A literal token on
+; the next physical line must not inherit that discarded comment's last byte.
+_TIT_LiteralLineBoundary(Comment) {
+	Source := '[metrics]`nmetrics_enabled = false`nmetrics_disabled_apps = [`n'
+		. ' "CHROME#1.EXE", ' . Comment . "`n"
+		. "`t'editor#1.exe',`n]`n"
+	Document := TOML_ParseDocument(Source)
+	Section := Document["metrics"]
+	AssertTrue(Section["metrics_enabled"] is TOML_Bool)
+	AssertFalse(Section["metrics_enabled"].Value, "comments cannot invert the authored opt-out")
+	Apps := Section["metrics_disabled_apps"]
+	AssertTrue(Apps is Array)
+	AssertEqual(2, Apps.Length, "comment punctuation cannot create or discard array elements")
+	AssertTrue(Apps[1] is String && Apps[2] is String)
+	AssertEqual("CHROME#1.EXE", Apps[1], "a hash in a basic string remains data")
+	AssertEqual("editor#1.exe", Apps[2], "a hash in a literal string remains data")
+	Cache := ConfigTomlDecodeSnapshot(Source).Cache
+	Validated := _CS_ValidateMetricsSection(Cache["metrics"])
+	AssertFalse(Validated["metrics_enabled"])
+	AssertEqual(2, Validated["metrics_disabled_apps"].Count)
+	AssertTrue(Validated["metrics_disabled_apps"].Has("chrome#1.exe"))
+	AssertTrue(Validated["metrics_disabled_apps"].Has("editor#1.exe"))
+}
+_TIT_LiteralBoundaryComments := [
+	"# excluded browser",
+	'# "quoted#name", apostrophe ' . Chr(39) . " tail",
+	"# punctuation ] }, = # comment tail",
+	"# inline comment`n`t# standalone ' quote and " . Chr(34) . " tail"]
+for _TIT_LiteralBoundaryNo, _TIT_LiteralBoundaryComment in _TIT_LiteralBoundaryComments
+	Test("TOML: literal after comment " . _TIT_LiteralBoundaryNo . " retains opt-outs (toml-literal-line-boundary)",
+		_TIT_LiteralLineBoundary.Bind(_TIT_LiteralBoundaryComment))
+
+_TIT_LiteralLineBoundaryControls() {
+	Triple := Chr(39) . Chr(39) . Chr(39)
+	Source := "[sample]`nlegacy = O'Brien`nliteral = 'editor#1.exe'`n"
+		. "multiline = " . Triple . "`nfirst`nsecond # literal data`n" . Triple . "`n"
+	Section := TOML_ParseDocument(Source)["sample"]
+	AssertEqual("O'Brien", Section["legacy"], "same-line legacy apostrophes stay inside their bare token")
+	AssertEqual("editor#1.exe", Section["literal"])
+	AssertEqual("first`nsecond # literal data`n", Section["multiline"], "valid multiline literal strings remain supported")
+	for Newline in ["`n", "`r", "`r`n"] {
+		AssertThrows(TOML_ParseDocument.Bind("[sample]`nvalue = 'first" . Newline . "second'`n"),
+			"a physical boundary cannot legalize a newline inside an active single-line literal")
+	}
+}
+Test("TOML: line boundaries retain literal and multiline string contracts (toml-literal-line-boundary)",
+	_TIT_LiteralLineBoundaryControls)
+
+; The tokenizer takes unquoted runs in one native search (toml-token-run); its
+; result must stay what the character-by-character reading produced.
+_TIT_TokenRun() {
+	Text := "  key  = [ 1 , 'a#b' ]  # tail`nnext"
+	Position := 1
+	Record := _TOML_DocumentToken(Text, &Position, Chr(10), &Separated, &SpanStart, &SpanEnd)
+	AssertEqual("key  = [ 1 , 'a#b' ]", Record, "a run, a container and a comment form one trimmed record")
+	AssertTrue(Separated, "the unquoted line feed still ends the record")
+	AssertEqual(3, SpanStart, "the span starts at the first solid character, not at leading blanks")
+	AssertEqual(22, SpanEnd, "the span ends at the last solid character, before the comment")
+	AssertEqual(Position - 1, InStr(Text, Chr(10)), "the cursor sits just after the separator")
+	Position := 1
+	Key := _TOML_DocumentToken("a , b = 1", &Position, "=", &Separated, &SpanStart, &SpanEnd)
+	AssertEqual("a , b", Key, "a comma is plain content when the separator is =")
+	AssertEqual(1, SpanStart)
+	AssertEqual(5, SpanEnd)
+	Position := 1
+	Member := _TOML_DocumentToken("{ a = 1, b = 2 }, c", &Position, ",", &Separated)
+	AssertEqual("{ a = 1, b = 2 }", Member, "a separator inside a container does not end the token")
+	AssertTrue(Separated)
+	Position := 1
+	AssertEqual("", _TOML_DocumentToken("   ", &Position, ",", &Separated, &SpanStart, &SpanEnd),
+		"blank content has no span")
+	AssertEqual(0, SpanStart)
+	AssertEqual(0, SpanEnd)
+	AssertFalse(Separated)
+}
+Test("TOML: unquoted token runs keep their spans and separators (toml-token-run)", _TIT_TokenRun)
+
+_TIT_BlankRuns() {
+	Source := "[a]`nx = 1`n`n`n`n`n[b]`r`n`r`ny = 2`n"
+	Physical := []
+	TOML_ParseDocument(Source, , &Physical)
+	Rebuilt := ""
+	for Row in Physical
+		Rebuilt .= Row.Text
+	AssertEqual(Source, Rebuilt, "every physical record, blank ones included, rebuilds the source exactly")
+	AssertEqual("trivia", Physical[3].Kind)
+	AssertEqual("a", Physical[3].Section, "a blank line belongs to the section above it")
+	AssertEqual(Chr(10), Physical[3].Text)
+	AssertEqual(9, Physical.Length)
+}
+Test("TOML: blank runs rebuild the source and keep their section (toml-blank-runs)", _TIT_BlankRuns)

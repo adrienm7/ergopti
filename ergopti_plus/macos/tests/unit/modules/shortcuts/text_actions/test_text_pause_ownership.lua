@@ -39,6 +39,7 @@ local function fresh_fixture()
 	local fixture = {
 		clock_ns = 0,
 		native_timers = {},
+		broker_timers = {},
 		next_native_options = {},
 		posted_triggers = {},
 		batches = {},
@@ -50,6 +51,7 @@ local function fresh_fixture()
 		restore_outcomes = {},
 		restore_calls = 0,
 		clear_calls = 0,
+		change_count = 0,
 		snapshot_calls = 0,
 	}
 	fixture.clipboard = clone(fixture.original)
@@ -62,7 +64,9 @@ local function fresh_fixture()
 	for key, value in pairs(hs_stub.timer) do timer_contract[key] = value end
 	timer_contract.absoluteTime = function() return fixture.clock_ns end
 	timer_contract.new = function(delay, callback)
-		local options = table.remove(fixture.next_native_options, 1) or {}
+		local adapter = package.loaded["adapters.synthetic_input"]
+		local broker = adapter and delay == adapter.PERIODIC_OWNER_TICK_SEC
+		local options = not broker and table.remove(fixture.next_native_options, 1) or {}
 		local native = {
 			delay = delay,
 			callback = callback,
@@ -110,10 +114,26 @@ local function fresh_fixture()
 		function native:deliver()
 			self.callback()
 		end
-		fixture.native_timers[#fixture.native_timers + 1] = native
+		local owned = broker and fixture.broker_timers or fixture.native_timers
+		owned[#owned + 1] = native
 		return native
 	end
 	hs_stub.timer = timer_contract
+
+	local base_new_key = hs_stub.eventtap.event.newKeyEvent
+	hs_stub.eventtap.event.newKeyEvent = function(...)
+		local event = base_new_key(...)
+		event.post = function(self)
+			if self.isDown then
+				fixture.native_down = self
+			else
+				fixture.batches[#fixture.batches + 1] = { fixture.native_down, self }
+				fixture.native_down = nil
+			end
+			return self
+		end
+		return event
+	end
 
 	local base_new_mouse = hs_stub.eventtap.event.newMouseEvent
 	hs_stub.eventtap.event.newMouseEvent = function(event_type, position, modifiers)
@@ -126,16 +146,19 @@ local function fresh_fixture()
 	end
 
 	hs_stub.pasteboard = {
+		changeCount = function() return fixture.change_count end,
 		readAllData = function()
 			fixture.snapshot_calls = fixture.snapshot_calls + 1
 			return clone(fixture.clipboard)
 		end,
 		getContents = function() return "hello world" end,
 		setContents = function(value)
+			fixture.change_count = fixture.change_count + 1
 			fixture.clipboard = { ["public.utf8-plain-text"] = value }
 			return true
 		end,
 		writeAllData = function(snapshot)
+			fixture.change_count = fixture.change_count + 1
 			fixture.restore_calls = fixture.restore_calls + 1
 			local mode = fixture.restore_outcomes[fixture.restore_calls] or "success"
 			if mode == "false" then return false end
@@ -145,6 +168,7 @@ local function fresh_fixture()
 			return true
 		end,
 		clearContents = function()
+			fixture.change_count = fixture.change_count + 1
 			fixture.clear_calls = fixture.clear_calls + 1
 			fixture.clipboard = {}
 			-- Hammerspoon exposes no boolean success result for this operation.
@@ -182,6 +206,10 @@ local function fresh_fixture()
 				fixture.batches[#fixture.batches + 1] = events or {}
 				progressed = true
 			else
+				for _, native in ipairs(fixture.broker_timers) do
+					if native.running_state then native:fire(); progressed = true; break end
+				end
+				if not progressed then
 				for _, pending in ipairs(hs_stub.timer.__timers) do
 					if pending.running == true and pending.recurring ~= true
 						and pending.delay == 0 then
@@ -189,6 +217,7 @@ local function fresh_fixture()
 						progressed = true
 						break
 					end
+				end
 				end
 			end
 			if not progressed then break end
@@ -634,6 +663,9 @@ helpers.describe("text composite owner: parent isolation", function()
 		helpers.assert_eq(
 			f.subject.has_pending_text_action("gestures"), true)
 
+		helpers.assert_eq(f.subject.pause_text_actions("gestures"), false,
+			"the exact queued copy remains owned until its cancellation callback")
+		f.drain_synthetic()
 		helpers.assert_eq(f.subject.pause_text_actions("gestures"), true)
 		helpers.assert_eq(gesture_timer.stop_calls, 1)
 		helpers.assert_eq(f.subject.resume_text_actions("gestures"), true)
@@ -661,7 +693,10 @@ helpers.describe("text composite owner: parent isolation", function()
 		helpers.assert_eq(
 			f.subject.has_pending_text_action("shortcut_bindings"), true)
 		helpers.assert_eq(
-			f.subject.pause_text_actions("shortcut_bindings"), true)
+			f.subject.pause_text_actions("shortcut_bindings"), false,
+			"the copy transaction must report terminal cancellation before release")
+		f.drain_synthetic()
+		helpers.assert_eq(f.subject.pause_text_actions("shortcut_bindings"), true)
 		helpers.assert_eq(owner_timer.stop_calls, 1)
 		helpers.assert_eq(
 			f.subject.resume_text_actions("shortcut_bindings"), true)

@@ -14,15 +14,17 @@ function M.new(options)
 	local write, remove = port.set, port.delete
 	local revision = 0
 	function port.generation() return revision end
+	function port.is_current_revision(expected) return expected == revision end
 	function port.admit() return true end
 	function port.get_many(paths)
+		local captured_revision = revision
 		local values = {}
 		for _, path in ipairs(paths) do
 			local value = port.get(path)
 			if value == nil then value = Manifest.default_for(path) end
 			values[path] = value
 		end
-		return values, { status = "ok", content = tostring(revision) }
+		return values, { status = "ok", content = tostring(captured_revision) }, captured_revision
 	end
 	function port.set(path, value)
 		local operation = Manifest.sparse_operation(path, value)
@@ -66,16 +68,19 @@ function M.with(body, options)
 	local old_many = preferences.set_many
 	local old_get_many = preferences.get_many
 	local old_generation, old_admit = preferences.generation, preferences.admit
+	local old_current_revision = preferences.is_current_revision
 	local fake = M.new(options)
 	preferences.get, preferences.set, preferences.delete = fake.get, fake.set, fake.delete
 	preferences.set_many = fake.set_many
 	preferences.get_many = fake.get_many
 	preferences.generation, preferences.admit = fake.generation, fake.admit
+	preferences.is_current_revision = fake.is_current_revision
 	local ok, err = pcall(body, fake)
 	preferences.get, preferences.set, preferences.delete = old_get, old_set, old_delete
 	preferences.set_many = old_many
 	preferences.get_many = old_get_many
 	preferences.generation, preferences.admit = old_generation, old_admit
+	preferences.is_current_revision = old_current_revision
 	if not ok then error(err, 0) end
 end
 

@@ -134,6 +134,7 @@ local function with_numeric_menu(options, exercise)
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
 		local log = { prompts = {}, changed = 0 }
+		package.loaded["adapters.notifier"] = { send = function() return true end }
 		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }
@@ -212,6 +213,11 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_eq(prompt.spec.min, context.min)
 				helpers.assert_eq(prompt.spec.max, context.max)
 				helpers.assert_eq(prompt.spec.value, context.current)
+				if context.name == "debounce_ms" then
+					-- Headed by the declared caption of the AI trigger group, not a
+					-- title the driver labels itself (native-menu-rows census).
+					helpers.assert_eq(prompt.spec.title, f.strings["menu.llm.trigger_menu_title"])
+				end
 				helpers.assert_true(prompt.spec.on_save(context.candidate))
 				local owner = context.name == "debounce_ms" and f.trigger or f.settings
 				helpers.assert_eq(owner.get(context.name), context.saved)
@@ -233,7 +239,12 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_type(f.writer.write_refusal(f.path), "string")
 				package.loaded["toml_codec.writer"] = nil
 				package.loaded["infra.llm_preferences"] = nil
-				helpers.assert_true(spec.on_save(context.candidate))
+				helpers.assert_eq(spec.on_save(context.candidate), false,
+					"replacement preference owners cannot adopt the retained request")
+				helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)
+				row.fn()
+				helpers.assert_true(f.log.prompts[2].spec.on_save(context.candidate),
+					"a reopened request captures fresh owners and can retry the original write")
 				helpers.assert_eq(f.log.changed, 1)
 			end)
 		end)

@@ -651,38 +651,41 @@ helpers.describe("declared complete per-key delay tail", function()
 		local _, Manager = build({}, {})
 		package.loaded[WRITER] = nil
 		local Writer = require(WRITER)
-		local path = os.tmpname()
+		local path = Manager.user_path()
 		local reloads, refreshes, notices = 0, 0, 0
 		local TextPrompt = require("ui.text_prompt")
 		local previous_ask, previous_execute = TextPrompt.ask, os.execute
-		local answer, prompts = "375.4", {}
+		local answer, prompts, during_prompt = "375.4", {}, nil
 		local function write(text) local file = assert(io.open(path, "w")); file:write(text); file:close() end
 		local function read() local file = assert(io.open(path, "r")); local text = file:read("*a"); file:close(); return text end
 		local ok, err = pcall(function()
-			Writer.init({ path = path, reload = function() reloads = reloads + 1; return true end,
+			Writer.init({ path = path, reload = function() reloads = reloads + 1; return Manager.reload() end,
 				is_tap_action = function() return true end, canonical_hold = function() return nil end })
 			TextPrompt.ask = function(title, prompt, initial)
-				prompts[#prompts + 1] = { title, prompt, initial }; return answer
+				prompts[#prompts + 1] = { title, prompt, initial }
+				if during_prompt then write(during_prompt); during_prompt = nil end
+				return answer
 			end
 			os.execute = function(command)
 				if command:find("zenity --error", 1, true) then notices = notices + 1; return 1 end
 				return previous_execute(command)
 			end
 			local items = helpers.load_module("ui.menu.menu_builder").build({ _version = "test",
-				on_quit = function() end, tap_holds = Manager,
+				on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 				on_menu_changed = function() refreshes = refreshes + 1 end })
 			local i18n = require("infra.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("tap_hold.group.left_ctrl")))
 			local callback = ctrl.menu[5].menu[1].fn
 			local malformed = "[tap_hold.keys.left_ctrl\n"
-			write(malformed)
+			during_prompt = malformed
 			helpers.assert_eq(callback(), false, "refused native duration has an explicit refusal receipt")
 			helpers.assert_eq(read(), malformed, "native classification refuses before publication")
 			helpers.assert_eq(reloads, 0)
 			helpers.assert_eq(refreshes, 1, "existing refusal refresh is retained")
 			helpers.assert_eq(notices, 1)
 			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntime_activation_seconds = 0.2\n[tap_hold.keys.left_shift]\ntime_activation_seconds = 0.4\n[future]\nkeep = "neighbour"\n')
+			helpers.assert_eq(Manager.reload(), true, "the repaired source is the current editable configuration")
 			helpers.assert_eq(callback(), true, "only durable native acceptance acknowledges the chosen delay")
 			local document = assert(require("toml_codec").decode(read()))
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.time_activation_seconds, 0.375)

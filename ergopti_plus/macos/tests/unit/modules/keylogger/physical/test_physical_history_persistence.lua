@@ -37,7 +37,10 @@ function sqlite.open(path)
 	end
 	function database:prepare(sql)
 		local values
-		return { bind_values = function(_, ...) values = { ... } end,
+		return { bind_values = function(_, ...)
+			values = { ... }
+			return sqlite.OK
+		end,
 			step = function() assert(call("bound", sql, values), detail); return sqlite.DONE end,
 			finalize = function() return sqlite.OK end }
 	end
@@ -56,7 +59,8 @@ function fs.attributes(path, attribute)
 	assert(response.ok, response.error)
 	local stat = response.value
 	if stat == false then return nil end
-	local result = { mode = stat.type, size = stat.size }
+	local native = assert(require("lfs").attributes(path))
+	local result = { mode = stat.type, size = stat.size, dev = native.dev, ino = native.ino }
 	return attribute and result[attribute] or result
 end
 function fs.dir(path)
@@ -82,8 +86,11 @@ function timer.new()
 end
 function timer.absoluteTime() return math.floor(os.clock() * 1000000000) end
 function timer.secondsSinceEpoch() return os.time() end
-local file_system = { read = read, write = write,
-	read_with_status = function(path) local value = read(path); return value, value and "ok" or "absent" end }
+local file_system
+require("tests.support.file_system_transaction_fixture").with_fixture(function(native)
+	file_system = native.make_adapter()
+end)
+local complete_batch_offset
 local function ports()
 	_G.hs = { fs = fs, timer = timer, json = json,
 		execute = function() return "physical-fixture-host" end,
@@ -100,7 +107,8 @@ local function ports()
 	package.loaded["adapters.timer_scheduler"] = { after = function()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
-	package.loaded["modules.keylogger.export"] = { init = function() end,
+	complete_batch_offset = complete_batch_offset or require("modules.keylogger.export")._last_complete_batch_offset
+	package.loaded["modules.keylogger.export"] = { _last_complete_batch_offset = complete_batch_offset, init = function() end,
 		sync_foreign_data_sql = function() return {} end, get_native_app_category = function() return "other" end }
 end
 local metrics = temporary .. "/metrics"
@@ -154,7 +162,9 @@ shell.run(function(capture, observed, native)
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,get_config_dir=function() return temporary end}
 	package.loaded["adapters.file_system"]=file_system
 	package.loaded["modules.keylogger.text_cipher"]={is_enabled=function() return false end}
-	package.loaded["modules.keylogger.export"]={init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
+	package.loaded["modules.keylogger.export"]=nil
+	complete_batch_offset=require("modules.keylogger.export")._last_complete_batch_offset
+	package.loaded["modules.keylogger.export"]={_last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
 	package.loaded["infra.dialog_util"]={alert=function() end}
 	local kc_running=false
@@ -313,7 +323,7 @@ shell.run(function(capture, observed, native)
 		return result
 	end
 	-- Stop completed before the persistence-only reload; old Session/capabilities never reopen.
-	for _,name in ipairs({"modules.keylogger.log_manager","modules.keylogger.sqlite_writer","modules.keylogger.aggregator","modules.keylogger.aggregator.state","modules.keylogger.aggregator.core","modules.keylogger.aggregator.events","modules.keylogger.aggregator.sql"}) do package.loaded[name]=nil end
+	for _,name in ipairs({"adapters.ledger_append", "modules.keylogger.log_manager","modules.keylogger.sqlite_writer","modules.keylogger.aggregator","modules.keylogger.aggregator.state","modules.keylogger.aggregator.core","modules.keylogger.aggregator.events","modules.keylogger.aggregator.sql"}) do package.loaded[name]=nil end
 	ports();manager=require("modules.keylogger.log_manager");assert(manager.init(state))
 	receipt.live=snapshot()
 	for _,phase in ipairs({"rebuild_one","rebuild_two"}) do
@@ -322,7 +332,7 @@ shell.run(function(capture, observed, native)
 		assert(database:exec("UPDATE ngram_keycodes SET c=999;")==sqlite.OK)
 		assert(database:exec("UPDATE meta SET value='0' WHERE key='aggregate_cache_revision';")==sqlite.OK)
 		assert(manager.stop({process_exit=true}))
-		for _,name in ipairs({"modules.keylogger.log_manager","modules.keylogger.sqlite_writer","modules.keylogger.aggregator","modules.keylogger.aggregator.state","modules.keylogger.aggregator.core","modules.keylogger.aggregator.events","modules.keylogger.aggregator.sql"}) do package.loaded[name]=nil end
+		for _,name in ipairs({"adapters.ledger_append", "modules.keylogger.log_manager","modules.keylogger.sqlite_writer","modules.keylogger.aggregator","modules.keylogger.aggregator.state","modules.keylogger.aggregator.core","modules.keylogger.aggregator.events","modules.keylogger.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keylogger.log_manager");assert(manager.init(state))
 		receipt[phase]=snapshot()
 		helpers.assert_eq(receipt[phase],receipt.live,"Real raw rebuild must recover independent totals")
@@ -370,7 +380,10 @@ function sqlite.open(path)
 	end
 	function database:prepare(sql)
 		local values
-		return { bind_values = function(_, ...) values = { ... } end,
+		return { bind_values = function(_, ...)
+			values = { ... }
+			return sqlite.OK
+		end,
 			step = function() assert(call("bound", sql, values), detail); return sqlite.DONE end,
 			finalize = function() return sqlite.OK end }
 	end
@@ -389,7 +402,8 @@ function fs.attributes(path, attribute)
 	assert(response.ok, response.error)
 	local stat = response.value
 	if stat == false then return nil end
-	local result = { mode = stat.type, size = stat.size }
+	local native = assert(require("lfs").attributes(path))
+	local result = { mode = stat.type, size = stat.size, dev = native.dev, ino = native.ino }
 	return attribute and result[attribute] or result
 end
 function fs.dir(path)
@@ -415,8 +429,11 @@ function timer.new()
 end
 function timer.absoluteTime() return math.floor(os.clock() * 1000000000) end
 function timer.secondsSinceEpoch() return os.time() end
-local file_system = { read = read, write = write,
-	read_with_status = function(path) local value = read(path); return value, value and "ok" or "absent" end }
+local file_system
+require("tests.support.file_system_transaction_fixture").with_fixture(function(native)
+	file_system = native.make_adapter()
+end)
+local complete_batch_offset
 local function ports()
 	_G.hs = { fs = fs, timer = timer, json = json,
 		execute = function() return "physical-fixture-host" end,
@@ -433,7 +450,8 @@ local function ports()
 	package.loaded["adapters.timer_scheduler"] = { after = function()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
-	package.loaded["modules.keylogger.export"] = { init = function() end,
+	complete_batch_offset = complete_batch_offset or require("modules.keylogger.export")._last_complete_batch_offset
+	package.loaded["modules.keylogger.export"] = { _last_complete_batch_offset = complete_batch_offset, init = function() end,
 		sync_foreign_data_sql = function() return {} end, get_native_app_category = function() return "other" end }
 end
 local metrics = temporary .. "/metrics"
@@ -487,7 +505,9 @@ shell.run(function(capture, observed, native)
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,get_config_dir=function() return temporary end}
 	package.loaded["adapters.file_system"]=file_system
 	package.loaded["modules.keylogger.text_cipher"]={is_enabled=function() return false end}
-	package.loaded["modules.keylogger.export"]={init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
+	package.loaded["modules.keylogger.export"]=nil
+	complete_batch_offset=require("modules.keylogger.export")._last_complete_batch_offset
+	package.loaded["modules.keylogger.export"]={_last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
 	package.loaded["infra.dialog_util"]={alert=function() end}
 	local kc_running=false
@@ -606,7 +626,7 @@ shell.run(function(capture, observed, native)
 	-- Two cancelled intervals still credit their original presses, no held duration.
 	assert(manager.stop({process_exit=true}))
 	local function reopen()
-		for _,name in ipairs({"modules.keylogger.log_manager","modules.keylogger.sqlite_writer","modules.keylogger.aggregator","modules.keylogger.aggregator.state","modules.keylogger.aggregator.core","modules.keylogger.aggregator.events","modules.keylogger.aggregator.sql"}) do package.loaded[name]=nil end
+		for _,name in ipairs({"adapters.ledger_append", "modules.keylogger.log_manager","modules.keylogger.sqlite_writer","modules.keylogger.aggregator","modules.keylogger.aggregator.state","modules.keylogger.aggregator.core","modules.keylogger.aggregator.events","modules.keylogger.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keylogger.log_manager");assert(manager.init(state))
 	end
 	reopen();receipt.reopened=snapshot()

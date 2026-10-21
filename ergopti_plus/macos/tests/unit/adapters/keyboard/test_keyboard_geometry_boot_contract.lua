@@ -28,6 +28,20 @@ helpers.describe("keyboard geometry boot ownership", function()
 		end
 	end)
 
+	helpers.it("registers the bridge's deployed virtual form once, after the bridge loads (issue #95)", function()
+		local source, detail = helpers.read_driver_unit("local function finish_boot_after_onboarding()")
+		helpers.assert_true(source ~= nil, detail)
+		source = source:gsub("%-%-[^\n]*", "")
+		local register = 'require("adapters.keyboard_geometry").set_virtual_form_source('
+		local position = source:find(register, 1, true)
+		helpers.assert_true(position ~= nil, "root boot must hand the deployed virtual form to geometry")
+		helpers.assert_nil(source:find(register, position + #register, true), "one registration per VM")
+		local bridge = source:find('pcall(require, "platform.remap")', 1, true)
+		helpers.assert_true(bridge ~= nil and bridge < position, "the bridge must load before registration")
+		local reader = source:find("bridge.virtual_keyboard_form()", position, true)
+		helpers.assert_true(reader ~= nil, "the source must read the bridge's deployed form")
+	end)
+
 	helpers.it("reports the boot field and strips it before helper construction", function()
 		helpers.with_fresh_modules({ "infra.launcher_environment" }, function()
 			local policy = require("infra.launcher_environment")

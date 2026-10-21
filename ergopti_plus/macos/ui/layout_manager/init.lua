@@ -28,18 +28,59 @@ local Paths         = require("infra.paths")
 local FileSystem    = require("adapters.file_system")
 local Json          = require("json")
 local ManagerBridge = require("layouts.manager_bridge")
+local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+	return hs.webview.usercontent.new(name)
+end, Logger)
 
 local LOG = "layout_manager"
 
--- Name of the page's message handler (_shared/ui/host_bridge.js catalogue).
-local BRIDGE_NAME = "layout_manager_bridge"
 -- Every string the page shows, declared next to it.
 local STRINGS_FILE = "ui/layout_manager/strings.json"
 
 -- The exact window this module created, and its message channel.
 local _webview = nil
 local _usercontent = nil
+local _controller_lease = nil
 local _controller = nil
+local _retiring_window = nil
+local _retiring_window_has_metadata = false
+local _retiring_usercontent = nil
+local _retiring_lease = nil
+local _settling_retired_window = false
+local _opening_window = false
+
+--- Settles exact window and callback owners before admitting another window.
+--- @return boolean settled Native cleanup committed or already consumed the window.
+local function settle_retired_window()
+	if _settling_retired_window then return false end
+	_settling_retired_window = true
+	local view = _retiring_window
+	if view ~= nil then
+		local metadata = _retiring_window_has_metadata
+		local ok, result = pcall(function()
+			if not metadata or getmetatable(view) ~= nil then return view:delete() end
+		end)
+		local settled = (ok and result ~= false) or (metadata and getmetatable(view) == nil)
+		if not settled then
+			pcall(Logger.error, LOG, "The layout manager candidate cleanup remains pending: %s.", tostring(result))
+			_settling_retired_window = false
+			return false
+		end
+		if _retiring_window == view then _retiring_window = nil end
+	end
+	local bridge = _retiring_usercontent
+	if bridge ~= nil then
+		local released, result = ControllerPool.release(_retiring_lease)
+		if not released then
+			pcall(Logger.error, LOG, "The layout manager callback cleanup remains pending: %s.", tostring(result))
+			_settling_retired_window = false
+			return false
+		end
+		if _retiring_usercontent == bridge then _retiring_usercontent, _retiring_lease = nil, nil end
+	end
+	_settling_retired_window = false
+	return true
+end
 
 
 
@@ -87,12 +128,12 @@ end
 
 --- Closes the window this module created.
 local function close_window()
-	local view = _webview
-	_webview, _usercontent, _controller = nil, nil, nil
-	if view ~= nil then
-		local ok, err = pcall(function() view:delete() end)
-		if not ok then Logger.error(LOG, "The layout manager window did not close: %s.", tostring(err)) end
-	end
+	if _settling_retired_window then return false end
+	_retiring_window, _retiring_usercontent = _webview, _usercontent
+	_retiring_lease = _controller_lease
+	_retiring_window_has_metadata = type(_webview) == "userdata" or getmetatable(_webview) ~= nil
+	_webview, _usercontent, _controller, _controller_lease = nil, nil, nil, nil
+	return settle_retired_window()
 end
 
 --- The controller of one window, bound to that exact window.
@@ -144,6 +185,8 @@ end
 --- Opens the layout manager, or focuses it when it is already open.
 --- @return boolean opened
 function M.open()
+	if _opening_window then return false end
+	if settle_retired_window() ~= true then return false end
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if not ok_ui then
 		Logger.error(LOG, "The layout manager cannot open: ui_builder is unavailable.")
@@ -153,21 +196,31 @@ function M.open()
 		ui_builder.force_focus(_webview, false)
 		return true
 	end
+	_opening_window = true
 	Logger.start(LOG, "Opening the layout manager…")
-	local ok_uc, uc = pcall(hs.webview.usercontent.new, BRIDGE_NAME)
-	if not ok_uc or not uc then
+	local geo = ui_builder.get_app_geometry("layout_manager")
+	if not geo then _opening_window = false; return false end
+	local lease, uc = ControllerPool.reserve("layout_manager")
+	if not lease then
+		_opening_window = false
 		Logger.error(LOG, "The layout manager message channel could not be created.")
 		return false
 	end
-	local geo = ui_builder.get_app_geometry("layout_manager")
-	if not geo then return false end
 	local candidate = nil
-	uc:setCallback(function(message)
+	local bound, bind_error = ControllerPool.bind(lease, function(message)
 		if candidate == nil or candidate ~= _webview or _controller == nil then return end
 		if message and type(message.body) == "table" then _controller.on_message(message.body) end
 	end)
+	if not bound then
+		_retiring_usercontent, _retiring_lease = uc, lease
+		settle_retired_window()
+		_opening_window = false
+		Logger.error(LOG, "The layout manager callback binding did not commit: %s.", tostring(bind_error))
+		return false
+	end
 	local masks = hs.webview.windowMasks
-	local view = ui_builder.show_webview({
+	local created, view = pcall(function() return ui_builder.show_webview({
+		delete_on_close = true,
 		frame = ui_builder.get_centered_frame(geo.width, geo.height),
 		title = i18n.get("layout_manager.window_title"),
 		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8),
@@ -175,7 +228,10 @@ function M.open()
 		assets_dir = (Paths.shared("ui/layout_manager") or "") .. "/",
 		on_close = function()
 			if candidate ~= nil and candidate == _webview then
-				_webview, _usercontent, _controller = nil, nil, nil
+				_retiring_usercontent = _usercontent
+				_retiring_lease = _controller_lease
+				_webview, _usercontent, _controller, _controller_lease = nil, nil, nil, nil
+				settle_retired_window()
 			end
 		end,
 		on_navigation = function(action)
@@ -189,17 +245,38 @@ function M.open()
 		on_webview_created = function(owned)
 			if _webview ~= nil then return false end
 			candidate = owned
+			if not ControllerPool.attach(lease, owned) then return false end
 			_webview, _usercontent = owned, uc
+			_controller_lease = lease
 			_controller = controller_for(owned)
 			return true
 		end,
 		is_current = function() return candidate ~= nil and candidate == _webview end,
-	})
+	}) end)
+	if not created then
+		pcall(Logger.error, LOG, "The layout manager native construction failed: %s.", tostring(view))
+		view = nil
+	end
 	if view == nil or view ~= candidate then
-		_webview, _usercontent, _controller = nil, nil, nil
+		-- on_webview_created transferred cleanup to this caller before the factory
+		-- could reject a required mutation. Retain that exact candidate for retry.
+		_retiring_usercontent, _retiring_lease = uc, lease
+		if candidate ~= nil then
+			_retiring_window = candidate
+			_retiring_window_has_metadata = type(candidate) == "userdata" or getmetatable(candidate) ~= nil
+		end
+		if _webview == candidate then _webview, _usercontent, _controller, _controller_lease = nil, nil, nil, nil end
+		settle_retired_window()
+		_opening_window = false
 		Logger.error(LOG, "The layout manager window could not be created.")
 		return false
 	end
+	if not ControllerPool.commit(lease) then
+		close_window()
+		_opening_window = false
+		return false
+	end
+	_opening_window = false
 	Logger.success(LOG, "Layout manager opened.")
 	return true
 end

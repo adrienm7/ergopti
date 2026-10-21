@@ -414,6 +414,11 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 		; unqualified pre-fix behaviour is correct.
 		if UpdateRing and (!IsSet(_EmitReachedScreen) or _EmitReachedScreen()) {
 				UpdateLastSentCharacter(SubStr(Text, -_TextTailCodeUnits(Text, 1)))
+				; The ring records the last character only; a delimiter anywhere in
+				; the literal text ends CapsWord. Key syntax ("{BackSpace}", "^v")
+				; is not text and says nothing about what reached the screen.
+				if OnlyText and IsSet(CapsWordAutoOffObserveOutput)
+						CapsWordAutoOffObserveOutput(Text)
 		}
 		return true
 }
@@ -423,13 +428,19 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 _SendFinalResultUnchecked(Text, OnlyText) {
 		if _SendHook {
 				Hook := _SendHook
-				return _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+				Sent := _SendVerdictSucceeded(Hook("SendFinalResult", Text, OnlyText))
+		} else {
+				if OnlyText
+						SendInput("{Text}" Text)
+				else
+						SendInput(Text)
+				Sent := true
 		}
-		if OnlyText
-				SendInput("{Text}" Text)
-		else
-				SendInput(Text)
-		return true
+		; SendInput lifts the script's own hook, so the auto-off InputHook never
+		; sees this text: a checked delimiter in it ends CapsWord here.
+		if Sent and OnlyText and IsSet(CapsWordAutoOffObserveOutput)
+				CapsWordAutoOffObserveOutput(Text)
+		return Sent
 }
 
 ; @param DeclareBufferEffect {Boolean} True when Text is a caret/document edit
@@ -454,6 +465,14 @@ _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
 		"hotstring_send_instant")
 }
 
+; SendInput lifts the script's own hook and a paste types nothing at all, so
+; the auto-off InputHook never sees what SendInstant puts on screen: a checked
+; delimiter in it ends CapsWord here, once the injection succeeded.
+_SendInstantReport(Text) {
+	if IsSet(CapsWordAutoOffObserveOutput)
+		CapsWordAutoOffObserveOutput(Text)
+}
+
 SendInstant(Text, Prefix := "") {
 	; Sends a large text through the clipboard while keeping Prefix (typically the
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
@@ -462,7 +481,10 @@ SendInstant(Text, Prefix := "") {
 	if _SendHook {
 		try {
 			Hook := _SendHook
-			return _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+			Sent := _SendVerdictSucceeded(Hook("SendInstant", Text, Prefix))
+			if Sent
+				_SendInstantReport(Text)
+			return Sent
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant hook failed: {1}", Err.Message)
 			return false
@@ -479,6 +501,7 @@ SendInstant(Text, Prefix := "") {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
+			_SendInstantReport(Text)
 			return true
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
@@ -499,6 +522,7 @@ SendInstant(Text, Prefix := "") {
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
+			_SendInstantReport(Text)
 			return true
 		} catch as Err {
 			try LoggerError("Hotstrings", "SendInstant clipboard-free injection failed: {1}", Err.Message)
@@ -528,6 +552,7 @@ SendInstant(Text, Prefix := "") {
 		; Prefix and Ctrl+V are one kernel injection transaction. Critical callers
 		; therefore cannot be interrupted after the erase but before the paste.
 		SendInput(Prefix . "^v")
+		_SendInstantReport(Text)
 		return true
 	} catch as err {
 		; SendInput can fail after the restore timer was armed. Cancel that exact
@@ -682,7 +707,7 @@ global _SelectionCaptureNextId := 0
 global SELECTION_CAPTURE_POLL_MS := 15
 global SELECTION_CAPTURE_INPUT_GRACE_MS := 20
 
-GetSelectionAsync(OnReady) {
+GetSelectionAsync(OnReady, Ports := 0) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
 		global SELECTION_CAPTURE_POLL_MS
 
@@ -690,53 +715,130 @@ GetSelectionAsync(OnReady) {
 				return false
 		if !IsObject(OnReady)
 				throw TypeError("GetSelectionAsync requires a callback object")
+		CaptureId := ++_SelectionCaptureNextId
 
 		; The newest user command owns the clipboard capture. Finishing the prior
 		; job first stops its timer and restores its clipboard snapshot before the
 		; new Ctrl+C clears the clipboard.
-		if IsObject(_SelectionCaptureJob)
+		if IsObject(_SelectionCaptureJob) {
+				; A native snapshot or clear may still be on the interrupted stack.
+				; Its owner must unwind before another request can take a snapshot.
+				if _SelectionCaptureJob.Get("starting", false)
+						return false
 				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "superseded")
+		}
+		if A_IsSuspended or _SelectionCaptureNextId != CaptureId
+				return false
+		if !(Ports is Map)
+				Ports := Map()
+		SaveFn := Ports.Get("save", CB_SaveAll)
+		ClearFn := Ports.Get("clear", CB_Write.Bind(""))
+		SendFn := Ports.Get("send", SendEvent.Bind("^c"))
+		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
+		RestoreFn := Ports.Get("restore", CB_RestoreAll)
+		ForegroundFn := Ports.Get("foreground", _SelectionCaptureForeground)
 
 		Job := Map(
-				"id", ++_SelectionCaptureNextId,
+				"id", CaptureId,
 				"callback", OnReady,
 				"started", A_TickCount,
-				"foreground", WinExist("A"),
+				"foreground", 0,
 				"clipboard", "",
 				"clear_sequence", 0,
+				"owned_sequence", 0,
 				"owner_token", 0,
 				"expected_change", 0,
-				"timer", 0
+				"timer", 0,
+				"starting", true,
+				"mutated", false
 		)
+		PreviousCritical := Critical("On")
 		try {
+				if _SelectionCaptureNextId != Job["id"] or IsObject(_SelectionCaptureJob)
+						return false
+				_SelectionCaptureJob := Job
+		} finally Critical(PreviousCritical)
+		Started := false
+		try {
+				Job["foreground"] := ForegroundFn.Call()
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
 				Job["owner_token"] := CB_TryBeginOwnedTransaction("selection_capture")
 				if !Job["owner_token"]
 						throw Error("clipboard transaction busy")
-				Job["clipboard"] := CB_SaveAll()
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				Job["clipboard"] := SaveFn.Call()
 				if (Type(Job["clipboard"]) == "String"
 						and Job["clipboard"] == "__CB_SAVE_ERROR__")
 						throw Error("clipboard snapshot failed")
-				if !CB_Write("")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				if !ClearFn.Call()
 						throw Error("clipboard clear failed")
-				Job["clear_sequence"] := _SelectionClipboardSequence()
+				Job["mutated"] := true
+				Job["clear_sequence"] := SequenceFn.Call()
+				Job["owned_sequence"] := Job["clear_sequence"]
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
 				Job["expected_change"] := CB_ExpectOwnedChange()
-				SendEvent("^c")
+				SendFn.Call()
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
 				Job["timer"] := _SelectionCapturePoll.Bind(Job)
-				_SelectionCaptureJob := Job
 				SetTimer(Job["timer"], SELECTION_CAPTURE_POLL_MS)
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				Started := true
 				return true
 		} catch as Err {
-				if Job["expected_change"]
-						CB_CancelExpectedChange(Job["expected_change"])
-				if Job["owner_token"] {
-						try CB_RestoreOwnedAllEventually(Job["clipboard"],
-								Job["clear_sequence"], Job["owner_token"],
-								"selection_capture_rollback", true, true)
-				}
-				Job["clipboard"] := ""
 				try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
 				return false
+		} finally {
+				Job["starting"] := false
+				if !Started
+						_SelectionCaptureAbortStart(Job, RestoreFn, SequenceFn)
 		}
+}
+
+_SelectionCaptureForeground() {
+		return WinExist("A")
+}
+
+_SelectionCaptureStartCurrent(Job) {
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		return !A_IsSuspended and _SelectionCaptureJob == Job
+				and _SelectionCaptureNextId == Job["id"]
+}
+
+; Startup cancellation only revokes admission while the OS call is in flight.
+; Its initiating stack retires the exact snapshot and owner after that call.
+_SelectionCaptureAbortStart(Job, RestoreFn, SequenceFn) {
+		global _SelectionCaptureJob
+		if _SelectionCaptureJob == Job
+				_SelectionCaptureJob := false
+		_SelectionCaptureReleaseTimer(Job)
+		if Job["expected_change"]
+				CB_CancelExpectedChange(Job["expected_change"])
+		if Job["owner_token"] {
+				if Job["mutated"] {
+						CB_RestoreOwnedAllEventually(Job["clipboard"],
+								Job["clear_sequence"], Job["owner_token"],
+								"selection_capture_rollback", true, true, RestoreFn, SequenceFn)
+				} else {
+						CB_EndOwnedTransaction(Job["owner_token"])
+				}
+		}
+		Job["clipboard"] := ""
+}
+
+; Cancelling the native timer does not break Map -> BoundFunc -> Map ownership.
+; Clear the job's callback reference only after the exact timer is cancelled.
+_SelectionCaptureReleaseTimer(Job) {
+		Timer := Job["timer"]
+		if IsObject(Timer)
+				SetTimer(Timer, 0)
+		Job["timer"] := 0
 }
 
 _SelectionCapturePoll(Job) {
@@ -764,7 +866,7 @@ _SelectionCapturePoll(Job) {
 		; Zero timeout is a probe, never a blocking wait. Accept every clipboard
 		; format so an image selection resolves immediately to an empty text result.
 		if ClipWait(0, 1) {
-				_SelectionCaptureFinish(Job, A_Clipboard, true, "ready")
+				_SelectionCaptureReadReady(Job)
 				return
 		}
 		if (Elapsed >= Round(GET_SELECTION_TIMEOUT_SEC * 1000)) {
@@ -775,6 +877,63 @@ _SelectionCapturePoll(Job) {
 		}
 }
 
+; Admit the sequence of a ready copy before its potentially blocking text
+; read. A later cancellation or external copy cannot rename the clipboard's
+; new contents as this job's own mutation. Zero never replaces proven ownership.
+_SelectionCaptureReadReady(Job, ReadFn := 0, SequenceFn := 0,
+		RestoreFn := 0, ContextFn := 0) {
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		if !IsObject(SequenceFn)
+				SequenceFn := _SelectionClipboardSequence
+		if !IsObject(ReadFn)
+				ReadFn := () => A_Clipboard
+		Sequence := _SelectionCaptureProbeSequence(SequenceFn)
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		if !Sequence {
+				try LoggerWarn("hotstring_engine", "Selection read refused: clipboard ownership is unavailable.")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				_SelectionCaptureFinish(Job, "", false, "clipboard sequence unavailable", RestoreFn, SequenceFn, ContextFn)
+				return true
+		}
+		Job["owned_sequence"] := Sequence
+		try Text := ReadFn.Call()
+		catch as Err {
+				try LoggerWarn("hotstring_engine", "Selection clipboard read failed: {1}.", Err.Message)
+				; A failed getter must not retain its repeating timer forever.
+				; Cleanup is permitted while paused, but never for a replaced job.
+				if _SelectionCaptureJob != Job or _SelectionCaptureNextId != Job["id"]
+						return false
+				_SelectionCaptureFinish(Job, "", false, "clipboard read failed", RestoreFn, SequenceFn, ContextFn)
+				return true
+		}
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		VerifiedSequence := _SelectionCaptureProbeSequence(SequenceFn)
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		Deliver := VerifiedSequence && VerifiedSequence == Sequence
+		if !Deliver {
+				try LoggerWarn("hotstring_engine", "Selection read refused: clipboard ownership changed or became unavailable while reading.")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+		}
+		_SelectionCaptureFinish(Job, Deliver ? Text : "", Deliver,
+				Deliver ? "ready" : "clipboard changed during read", RestoreFn, SequenceFn, ContextFn)
+		return true
+}
+
+_SelectionCaptureProbeSequence(SequenceFn) {
+		try return SequenceFn.Call()
+		catch as Err {
+				try LoggerWarn("hotstring_engine", "Selection ownership probe failed: {1}.", Err.Message)
+				return 0
+		}
+}
+
 _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		SequenceFn := 0, ContextFn := 0) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
@@ -782,28 +941,21 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
-		SetTimer(Job["timer"], 0)
+		_SelectionCaptureReleaseTimer(Job)
 		_SelectionCaptureJob := false
 
-		; On a physical-input cancellation, preserve clipboard data which arrived
-		; after our clear: it may be the user's own copy, and restoring the old
-		; snapshot would silently destroy it. All normal completion paths restore
-		; exactly the prior clipboard contents.
+		; Restore only the clear or received-copy sequence this job admitted.
+		; Sampling current contents here would authorize overwriting a newer
+		; copy on cancellation, or one published during the text read above.
 		if !IsObject(SequenceFn)
 				SequenceFn := _SelectionClipboardSequence
-		PreserveCurrent := (Reason == "superseded by input"
-				and SequenceFn.Call() != Job["clear_sequence"])
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
-		if !PreserveCurrent {
-				OwnedSequence := SequenceFn.Call()
-				if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
-						Job["owner_token"], "selection_capture_" . Reason, true,
-						!OwnedSequence, RestoreFn, SequenceFn)
-						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
-		} else if Job["owner_token"] {
-				CB_EndOwnedTransaction(Job["owner_token"])
-		}
+		OwnedSequence := Job["owned_sequence"]
+		if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+				Job["owner_token"], "selection_capture_" . Reason, true,
+				!OwnedSequence, RestoreFn, SequenceFn)
+				try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended
@@ -836,7 +988,7 @@ GetSelectionCancel(*) {
 		; A completion has already retired its job while restoring the clipboard.
 		; Revoke that continuation even when there is no timer left to cancel.
 		_SelectionCaptureNextId += 1
-		if IsObject(_SelectionCaptureJob)
+		if IsObject(_SelectionCaptureJob) and !_SelectionCaptureJob.Get("starting", false)
 				_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled")
 }
 

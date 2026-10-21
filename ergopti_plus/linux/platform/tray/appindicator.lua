@@ -177,6 +177,8 @@ local function bind()
 		gulong       g_signal_connect_data(gpointer instance, const char *detailed_signal,
 		                                   GCallback c_handler, gpointer data,
 		                                   void *destroy_data, int connect_flags);
+		void         g_signal_handler_block(gpointer instance, gulong handler_id);
+		void         g_signal_handler_unblock(gpointer instance, gulong handler_id);
 		void         g_object_unref(gpointer object);
 
 		AppIndicator* app_indicator_new(const char *id, const char *icon_name, int category);
@@ -257,11 +259,28 @@ end
 --- @param lib table
 --- @param widget userdata
 --- @param fn function
-local function on_activate(lib, widget, fn, owned)
+--- @param owned table
+--- @param checked boolean|nil
+local function on_activate(lib, widget, fn, owned, checked)
+	local signal_id
+	local action = fn
+	if checked ~= nil then
+		action = function()
+			-- GTK toggles before activate handlers run. Only the owning rebuild
+			-- may publish a changed setting; rejected writes must keep its check.
+			-- set_active emits activate too, so block this exact handler while
+			-- restoring, before fn can rebuild and destroy the old widget.
+			lib.gobject.g_signal_handler_block(widget, signal_id)
+			local restored, err = pcall(lib.gtk.gtk_check_menu_item_set_active, widget, checked and 1 or 0)
+			lib.gobject.g_signal_handler_unblock(widget, signal_id)
+			if not restored then error(err, 0) end
+			return fn()
+		end
+	end
 	_next_action = _next_action + 1
-	_actions[_next_action] = fn
+	_actions[_next_action] = action
 	owned[#owned + 1] = _next_action
-	lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
+	signal_id = lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
 		lib.ffi.cast("gpointer", _next_action), nil, 0)
 end
 
@@ -295,7 +314,7 @@ local function build_menu(lib, items, owned, inherited_disabled)
 		elseif not disabled and type(item.fn) == "function" then
 			-- dbusmenu Event can activate an insensitive GTK item directly.
 			-- Unavailable rows therefore never receive an action capability.
-			on_activate(lib, widget, item.fn, owned)
+			on_activate(lib, widget, item.fn, owned, item.checked)
 		end
 
 		if disabled then

@@ -4,7 +4,8 @@
 ; MODULE: Shortcuts — CapsWord
 ; DESCRIPTION:
 ; CapsWord mode: auto-capitalises characters while the user types a word and
-; deactivates as soon as Space, Enter, or a mouse click is detected.
+; deactivates on what [shortcuts.caps_word] names (a delay, a delimiter, a
+; pointer kind), through capsword_auto_off.ahk.
 ; Reference: https://github.com/qmk/qmk_firmware/blob/master/users/drashna/keyrecords/capwords.md
 ; ==============================================================================
 
@@ -13,27 +14,32 @@
 
 
 
-; Bound mouse-cancel callback, resolved through an accessor with a static
-; initializer instead of a top-level `global := .Bind()`. A module-scope
-; assignment executes only when auto-exec reaches this file's #Include position
-; (~700 ms into boot), but ToggleCapsWord/DisableCapsWord are reachable far
-; earlier — a key combination bound to caps_word fires from a parse-time-armed
-; hotkey once its slots are read — so the old global was
+; Bound end callback of the auto-off listeners, resolved through an accessor
+; with a static initializer instead of a top-level `global := .Bind()`. A
+; module-scope assignment executes only when auto-exec reaches this file's
+; #Include position (~700 ms into boot), but ToggleCapsWord/DisableCapsWord are
+; reachable far earlier — a key combination bound to caps_word fires from a
+; parse-time-armed hotkey once its slots are read — so the old global was
 ; unset in that window and dereferencing it threw UnsetError -> ExitApp(1) via the
 ; pre-ready error net. The static initializer runs on first call (any time after
-; parse) and returns the SAME object every call, so HookDispatcher's identity
-; compare on Unregister still matches the registered callback.
+; parse) and returns the SAME object every call.
 _CapsWord_Callback() {
-	static Bound := _CapsWord_HandleMouseDown.Bind()
+	static Bound := _CapsWord_HandleAutoOff.Bind()
 	return Bound
 }
 
-_CapsWord_HandleMouseDown(*) {
-	if (GestureLeftClickHeld) {
-		GestureReleaseLeftClick()
-	}
-	if (GestureRightClickHeld) {
-		GestureReleaseRightClick()
+; Ends CapsWord for the auto-off listeners. A click that ends it first lets go
+; of a gesture click-hold, as the click handler always did.
+; @param Reason {String} Why CapsWord ends (the auto-off module logs it).
+; @param Kind {String} The pointer kind, "" for a key or the delay.
+_CapsWord_HandleAutoOff(Reason, Kind) {
+	if (Kind == "left_click" || Kind == "right_click") {
+		if (GestureLeftClickHeld) {
+			GestureReleaseLeftClick()
+		}
+		if (GestureRightClickHeld) {
+			GestureReleaseRightClick()
+		}
 	}
 	DisableCapsWord()
 }
@@ -51,24 +57,21 @@ _CapsWord_HandleMouseDown(*) {
 ToggleCapsWord() {
 	global CapsWordEnabled := not CapsWordEnabled
 	if (CapsWordEnabled) {
-		; Arm mouse-click cancellation via HookDispatcher so the mouse events go
-		; through the unified fan-out rather than bypassing it with static hotkeys
-		HookDispatcher.Register(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_Callback())
-		HookDispatcher.Register(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_Callback())
+		; The auto-off listeners subscribe through HookDispatcher, the unified
+		; fan-out, never with static mouse hotkeys of their own.
+		CapsWordAutoOffArm(_CapsWord_Callback())
 	} else {
-		HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_Callback())
-		HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_Callback())
+		CapsWordAutoOffDisarm()
 	}
 	UpdateCapsLockLED()
 }
 
 DisableCapsWord() {
 	global CapsWordEnabled := False
-	; Always unregister on deactivation — Unregister is a no-op if not registered,
-	; so calling it unconditionally is safe and prevents listener leaks on any
-	; deactivation path (Space, Enter, or mouse click triggering this directly)
-	HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_LDOWN, _CapsWord_Callback())
-	HookDispatcher.Unregister(HookDispatcherConst.EVT_MS_RDOWN, _CapsWord_Callback())
+	; Always disarm on deactivation — a no-op when nothing is armed, so calling
+	; it unconditionally prevents listener and timer leaks on every path (a
+	; delimiter, the delay, a pointer kind, CapsLock, a pause).
+	CapsWordAutoOffDisarm()
 	UpdateCapsLockLED()
 }
 
@@ -102,23 +105,13 @@ UpdateCapsLockLED() {
 	}
 }
 
-; Defines what deactivates the CapsLock triggered by CapsWord
-#HotIf CapsWordEnabled
-SC039::
-{
-	TextPressKey("Space", [])
-	; A lost key-up must not leave CapsWord active forever after the visible space
-	try {
-		KeyWait("SC039", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
-	} finally {
-		DisableCapsWord()
-	}
-}
+; Space and Enter send their key themselves, at level 0, which the auto-off
+; InputHook does not see: while their delimiter is checked they end CapsWord
+; here. Unchecked, the criterion fails and the key stays native.
+#HotIf CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey("space")
+SC039:: CapsWordAutoOffNativeKey("Space")
 
 ; Big Enter key
-SC01C::
-{
-	TextPressKey("Enter", [])
-	DisableCapsWord()
-}
+#HotIf CapsWordEnabled and CapsWordAutoOffEndsOnNativeKey("enter")
+SC01C:: CapsWordAutoOffNativeKey("Enter")
 #HotIf

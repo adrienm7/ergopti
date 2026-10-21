@@ -8,8 +8,7 @@
 
 package.loaded["tests.support.ui.editors.ui_bridge_handlers_fixture"] = nil
 local Fixture = require("tests.support.ui.editors.ui_bridge_handlers_fixture")
-local helpers, read_sandbox_file, sandboxed_toml_bridge, restore_sandbox, build_mock_state =
-	Fixture.helpers, Fixture.read_sandbox_file, Fixture.sandboxed_toml_bridge, Fixture.restore_sandbox, Fixture.build_mock_state
+local helpers, build_mock_state = Fixture.helpers, Fixture.build_mock_state
 
 
 
@@ -200,19 +199,13 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(handler.bridge_name, "model_browser_bridge")
     end)
     helpers.it("pushes the curated Ollama catalogue and routes exact page actions", function()
-      local previous_manager = package.loaded["ui.webview_manager"]
-      local pushed, selected, download, closes = {}, nil, nil, 0
-      package.loaded["ui.webview_manager"] = {
-        eval_js = function(app, code)
-          pushed[#pushed + 1] = { app = app, code = code }
-          return true
-        end,
-      }
+      local selected, download = nil, nil
       handler._reset()
       local state = {
         llm = {
-          get_models = function() return { "qwen3.5:0.8b" } end,
+          get_cached_models = function() return { "qwen3.5:0.8b" } end,
           get_current_model = function() return "qwen3.5:0.8b" end,
+          refresh_models = function() return {} end,
           set_model = function(name) selected = name; return true end,
           download_model = function(runtime_name, label)
             download = { runtime_name = runtime_name, label = label }
@@ -220,31 +213,32 @@ helpers.describe("ui.bridge_handlers", function()
           end,
         },
       }
-      local context = {
-        close_owned_window = function() closes = closes + 1; return true end,
-      }
-      local ready = handler.on_message("ready", state, context)
-      helpers.assert_true(ready.pushed)
-      helpers.assert_eq(pushed[1].app, "model_browser")
-      helpers.assert_true(pushed[1].code:find("window.injectModels", 1, true) ~= nil)
-      helpers.assert_true(#ready.data.models > 0)
-
-      local installed, available = nil, nil
-      for _, row in ipairs(ready.data.models) do
-        if row.runtime_name == "qwen3.5:0.8b" then installed = row end
-        if not available and row.installed ~= true then available = row end
-      end
-      helpers.assert_not_nil(installed)
-      helpers.assert_not_nil(available)
-      local chosen = handler.on_message({ action = "select_model", name = installed.name }, state, context)
-      helpers.assert_true(chosen.selected and chosen.closed)
-      helpers.assert_eq(selected, installed.runtime_name)
-      local queued = handler.on_message({ action = "select_model", name = available.name }, state, context)
-      helpers.assert_true(queued.downloading and queued.closed)
-      helpers.assert_eq(download.runtime_name, available.runtime_name)
-      helpers.assert_eq(download.label, available.name)
-      helpers.assert_eq(closes, 2)
-      package.loaded["ui.webview_manager"] = previous_manager
+      local fixture = require("tests.support.document_fixture").new("model_browser", handler, state)
+      local ok, failure = xpcall(function()
+        local ready = fixture.handshake()
+        helpers.assert_true(ready.pushed)
+        helpers.assert_true(fixture.effects[1].code:find("window.injectModels", 1, true) ~= nil)
+        helpers.assert_true(#ready.data.models > 0)
+        local installed, available = nil, nil
+        for _, row in ipairs(ready.data.models) do
+          if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+          if not available and row.installed ~= true then available = row end
+        end
+        helpers.assert_not_nil(installed)
+        helpers.assert_not_nil(available)
+        fixture.send({ action = "select_model", name = installed.name })
+        helpers.assert_eq(selected, installed.runtime_name)
+        helpers.assert_eq(fixture.manager.is_visible("model_browser"), false)
+        helpers.assert_true(fixture.manager.show("model_browser"))
+        fixture.handshake()
+        fixture.send({ action = "select_model", name = available.name })
+        helpers.assert_eq(download.runtime_name, available.runtime_name)
+        helpers.assert_eq(download.label, available.name)
+        helpers.assert_eq(fixture.manager.is_visible("model_browser"), false)
+      end, debug.traceback)
+      local closed = fixture.close()
+      assert(ok, failure)
+      helpers.assert_true(closed)
     end)
   end)
 
@@ -281,118 +275,6 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(type(result) == "table")
       helpers.assert_true(result.requested)
     end)
-  end)
-
-  -- ==========================================================================
-  -- 15. personal_toml_editor
-  -- ==========================================================================
-end)
-
-
-
-
-helpers.describe("ui.bridge_handlers", function()
-  helpers.describe("personal_toml_editor", function()
-    local handler = helpers.load_module("ui.personal_info_editor.bridge_toml")
-    local state = build_mock_state()
-
-    helpers.it("has correct bridge_name", function()
-      helpers.assert_eq(handler.bridge_name, "personal_toml_editor")
-    end)
-    helpers.it("'ready' returns TOML content", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.toml_content) == "string")
-      helpers.assert_true(type(result.toml_path) == "string")
-      helpers.assert_eq(result.readonly, false)
-    end)
-    helpers.it("handles 'reload' action", function()
-      local result = handler.on_message({ action = "reload" }, state)
-      helpers.assert_true(type(result) == "table")
-    end)
-  end)
-end)
-
-
-
-
-helpers.describe("personal_toml_editor save (toml-save)", function()
-
-  helpers.it("toml-save: refuses malformed TOML and keeps the previous file", function()
-    local path = os.tmpname()
-    local seed = io.open(path, "w")
-    seed:write('[info]\nfirst_name = "Ada"\n')
-    seed:close()
-    local handler, previous = sandboxed_toml_bridge(path)
-    local ok, err = pcall(function()
-      local result = handler.on_message({ action = "save", content = "[info\nbroken" }, {})
-      helpers.assert_true(type(result) == "table" and result.saved == false,
-        "a malformed save must be refused loudly, not stored")
-      helpers.assert_eq(read_sandbox_file(path), '[info]\nfirst_name = "Ada"\n',
-        "the previous file must survive the refused save byte for byte")
-    end)
-    restore_sandbox(previous)
-    os.remove(path)
-    if not ok then error(err, 0) end
-  end)
-
-  helpers.it("toml-save: saves valid TOML exactly and stages atomically", function()
-    local path = os.tmpname()
-    os.remove(path)
-    local seed = io.open(path, "w")
-    seed:write('[info]\nfirst_name = "Ada"\n')
-    seed:close()
-    local handler, previous = sandboxed_toml_bridge(path)
-    local ok, err = pcall(function()
-      local sent = '[info]\nfirst_name = "Grace"\n'
-      local result = handler.on_message({ action = "save", content = sent }, {})
-      helpers.assert_true(type(result) == "table" and result.saved == true,
-        "a valid save must succeed")
-      helpers.assert_eq(result.path, path, "…at the resolved personal_info.toml path")
-      helpers.assert_eq(read_sandbox_file(path), sent,
-        "the file must carry exactly what was sent")
-      helpers.assert_true(io.open(path .. ".tmp", "r") == nil,
-        "no staging litter may survive a published save")
-    end)
-    restore_sandbox(previous)
-    os.remove(path)
-    os.remove(path .. ".tmp")
-    if not ok then error(err, 0) end
-  end)
-
-  helpers.it("toml-save: creates the file on first save", function()
-    local path = os.tmpname()
-    os.remove(path)
-    local handler, previous = sandboxed_toml_bridge(path)
-    local ok, err = pcall(function()
-      local result = handler.on_message({ action = "save", content = '[info]\nfirst_name = "New"\n' }, {})
-      helpers.assert_true(type(result) == "table" and result.saved == true,
-        "a fresh home with no file must still be able to save — the editor is the only writer some users have")
-      helpers.assert_eq(read_sandbox_file(path), '[info]\nfirst_name = "New"\n',
-        "the created file must carry what was sent")
-    end)
-    restore_sandbox(previous)
-    os.remove(path)
-    os.remove(path .. ".tmp")
-    if not ok then error(err, 0) end
-  end)
-
-  helpers.it("toml-save: refuses blank content loudly", function()
-    local path = os.tmpname()
-    local seed = io.open(path, "w")
-    seed:write('[info]\nfirst_name = "Ada"\n')
-    seed:close()
-    local handler, previous = sandboxed_toml_bridge(path)
-    local ok, err = pcall(function()
-      local result = handler.on_message({ action = "save", content = "" }, {})
-      helpers.assert_true(type(result) == "table" and result.saved == false,
-        "blank content must be refused with an answer, not dropped silently")
-      helpers.assert_eq(read_sandbox_file(path), '[info]\nfirst_name = "Ada"\n',
-        "and the previous file must be untouched")
-    end)
-    restore_sandbox(previous)
-    os.remove(path)
-    if not ok then error(err, 0) end
   end)
 
 end)
@@ -472,6 +354,113 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		for name, value in pairs(prior) do assert(package.loaded[name] == value, "every prior module identity is restored") end
 		if not called then error(failure, 0) end
 	end
+	for _, scenario in ipairs({ "positive", "external", "recovery", "root", "page", "publication", "generation", "ready-refused", "retained", "retained-foreign", "forged", "push-reentry", "final-page", "postwrite-external", "state-refresh" }) do
+		helpers.it("personal-source-receipt: preserves the displayed file through " .. scenario, function()
+			with_native_owners(function(c)
+				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local epoch, closes, notices = 41, 0, 0
+				local host = {
+					current_epoch = function() return epoch end,
+					page_current = function(_, expected) return expected == epoch end,
+					eval_js = function() return true end,
+				}
+				local context = { app_name = "personal_info_editor", epoch = epoch,
+					close_owned_window = function() closes = closes + 1;return true end }
+				local state = { dyn_hotstrings = c.dynamic, webview_manager = host,
+					config = { reload = function() return 0, true end },
+					i18n = { get = function(key) return key end },
+					notify_error = function(key) helpers.assert_eq(key, "dialog.personal_info.save_failed");notices = notices + 1 end }
+				if scenario == "ready-refused" then host.eval_js = function() return false end end
+				if scenario == "push-reentry" then host.eval_js = function() epoch = epoch + 1;return true end end
+				local ready = handler.on_message({ action = "ready" }, state, context)
+				helpers.assert_eq(ready.pushed, scenario ~= "ready-refused" and scenario ~= "push-reentry")
+				helpers.assert_eq(ready.data.fields[1].value, "Ada")
+				local winner = c.original:gsub('first_name = "Ada"', 'first_name = "Independent"', 1)
+				local target = c.path
+				if scenario == "state-refresh" then
+					local refreshed = {};for key, value in pairs(state) do refreshed[key] = value end
+					refreshed.layout = "independent input source change";state = refreshed
+				end
+				if scenario == "external" or scenario == "recovery" then write(c.path, winner) end
+				if scenario == "root" then
+					target = c.directory .. "/other-personal-info.toml"
+					write(target, winner)
+					helpers.assert_true(c.dynamic.init({ personal_info_path = target, trigger_char = "★" }))
+				end
+				if scenario == "generation" then helpers.assert_true(c.dynamic.init({ personal_info_path = c.path, trigger_char = "★" })) end
+				if scenario == "page" then epoch = epoch + 1;handler.on_window_closed(context.epoch) end
+				if scenario == "retained" or scenario == "retained-foreign" then
+					state.config.reload = function() return 0, false end
+					local first = handler.on_message({ action = "save", values = { first_name = "InitiallyCommitted" } }, state, context)
+					helpers.assert_eq(first, { saved = true, reloaded = false, closed = false })
+					state.config.reload = function() return 0, true end
+					if scenario == "retained-foreign" then write(c.path, winner) end
+				end
+				local writer = require("toml_codec.writer")
+				local native_batch = writer.batch_write
+				if scenario == "publication" then
+					writer.batch_write = function(...)
+						write(c.path, winner)
+						return native_batch(...)
+					end
+				end
+				if scenario == "final-page" then
+					writer.batch_write = function(path, updates, adapter, expected, on_error, admission)
+						return native_batch(path, updates, adapter, expected, on_error, function()
+							epoch = epoch + 1
+							return admission == nil or admission() == true
+						end)
+					end
+				end
+				if scenario == "postwrite-external" then
+					state.config.reload = function() return 0, false end
+					writer.batch_write = function(...)
+						local committed, detail, bytes = native_batch(...)
+						write(c.path, winner)
+						return committed, detail, bytes
+					end
+				end
+				local called, result
+				if scenario == "forged" then
+					called, result = pcall(c.dynamic.save_info, { first_name = "Grace" }, { status = "ok", content = c.original })
+					result = { saved = result }
+				else
+					called, result = pcall(handler.on_message, { action = "save", values = { first_name = "Grace" },
+						source = { status = "ok", content = c.original } }, state, context)
+				end
+				writer.batch_write = native_batch
+				helpers.assert_true(called, tostring(result))
+				if scenario == "postwrite-external" then
+					helpers.assert_eq(result, { saved = true, reloaded = false, closed = false })
+					helpers.assert_eq(read(target), winner)
+					local retry = handler.on_message({ action = "save", values = { first_name = "MustNotBorrowWinner" } }, state, context)
+					helpers.assert_eq(retry.saved, false)
+					helpers.assert_eq(read(target), winner)
+				elseif scenario == "positive" or scenario == "retained" or scenario == "state-refresh" then
+					helpers.assert_true(result.saved and result.reloaded and result.closed)
+					helpers.assert_eq(closes, 1)
+					helpers.assert_eq(read(target), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1))
+				else
+					helpers.assert_eq(result.saved, false)
+					helpers.assert_eq(closes, 0)
+					helpers.assert_eq(read(target), (scenario == "page" or scenario == "generation"
+						or scenario == "ready-refused" or scenario == "forged" or scenario == "push-reentry"
+						or scenario == "final-page") and c.original or winner)
+					if scenario == "root" then helpers.assert_eq(read(c.path), c.original) end
+					if scenario == "external" or scenario == "publication" then helpers.assert_eq(notices, 1) end
+					if scenario == "recovery" then
+						local fresh = handler.on_message({ action = "ready" }, state, context)
+						helpers.assert_true(fresh.pushed)
+						helpers.assert_eq(fresh.data.fields[1].value, "Independent")
+						local retry = handler.on_message({ action = "save", values = { first_name = "Retried" } }, state, context)
+						helpers.assert_true(retry.saved and retry.closed)
+						helpers.assert_eq(read(target), winner:gsub('first_name = "Independent"', 'first_name = "Retried"', 1))
+					end
+				end
+			end)
+		end)
+	end
+
 	for _, outcome in ipairs({ "committed", "uninitialized", "false", "nil", "number", "throw" }) do
 		helpers.it("consumes the actual canonical catalogue receipt after a real personal save " .. outcome, function()
 			with_native_owners(function(c)

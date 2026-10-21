@@ -31,7 +31,7 @@ timeouts, and pushes each answer into the open page.
 ```lua
 local Healthcheck = require("ui.healthcheck")
 Healthcheck.show_window({ state = menu_state })          -- Debug > Diagnostics
-require("ui.healthcheck.report").report_bug()            -- Debug > Report a bug (opens the preview)
+require("ui.healthcheck.report").report_bug({ state = menu_state }) -- Debug > Report a bug (the page's report action, no window)
 ```
 
 Every page message goes through `_shared/lua/healthcheck/actions.lua`: the host

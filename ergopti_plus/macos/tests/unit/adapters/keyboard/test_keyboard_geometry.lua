@@ -119,6 +119,45 @@ helpers.describe("native keyboard geometry adapter", function()
 		end)
 	end)
 
+	helpers.it("lets a deployed virtual keyboard form decide the ISO pair over the event model (issue #95)", function()
+		with_geometry(map(), function(owner)
+			helpers.assert_true(owner.initialize())
+			local deployed = "iso"
+			owner.set_virtual_form_source(function() return deployed end)
+			-- Model 0 is classified ANSI: behind the ISO virtual keyboard the key
+			-- left of 1 still arrives as 10, so 50 would name the extra ISO key.
+			helpers.assert_eq(owner.native_code(50, 10, 0), 10)
+			helpers.assert_eq(owner.native_code(50, 10, 1), 10)
+			helpers.assert_eq(owner.native_code(50, 10, nil), 10)
+			helpers.assert_eq(owner.physical_code({ hs = 50, macos_iso = { hs = 10 } }, 0), 10)
+			deployed = "ansi"
+			helpers.assert_eq(owner.native_code(50, 10, 1), 50)
+			helpers.assert_eq(owner.native_code(10, 50, 1), 10)
+			deployed = nil
+			helpers.assert_eq(owner.native_code(50, 10, 0), 50, "no deployed form keeps the event model")
+			helpers.assert_eq(owner.native_code(50, 10, 1), 10, "no deployed form keeps the event model")
+			helpers.assert_nil(owner.native_code(50, 10, 2))
+			helpers.assert_eq(owner.native_code(12, 12, 0), 12)
+			deployed = "jis"
+			local ok, reason = pcall(owner.native_code, 50, 10, 0)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(reason):find("answered jis", 1, true) ~= nil)
+		end)
+	end)
+
+	helpers.it("registers one virtual keyboard form source", function()
+		with_geometry(map(), function(owner)
+			local refused, why = pcall(owner.set_virtual_form_source, "iso")
+			helpers.assert_eq(refused, false)
+			helpers.assert_true(tostring(why):find("must be a function", 1, true) ~= nil)
+			owner.set_virtual_form_source(function() return "iso" end)
+			local ok, reason = pcall(owner.set_virtual_form_source, function() return "ansi" end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(reason):find("already registered", 1, true) ~= nil)
+			helpers.assert_eq(owner.native_code(50, 10, 0), 10, "the first source stays in force")
+		end)
+	end)
+
 	helpers.it("reads the actual event property and performs no environment JSON or file IO on the input path", function()
 		with_geometry(map(), function(owner, state)
 			helpers.assert_true(owner.initialize())

@@ -243,29 +243,76 @@ helpers.describe("prediction_engine integration", function()
     end)
 
     PreferencesFixture.it("profiles query the exact /api/tags endpoint", function()
+      local previous_loaded = {}
+      for name, value in pairs(package.loaded) do previous_loaded[name] = value end
       local previous_popen = io.popen
-      local command = nil
-      io.popen = function(value)
-        command = value
-        return {
-          read = function() return '{"models":[{"name":"test-model"}]}' end,
-          close = function() return true end,
-        }
-      end
-
-      local ok, err = pcall(function()
-        local pf = helpers.load_module("modules.llm.profiles")
-        pf.init({})
-        local models = pf.refresh_models()
-        helpers.assert_eq(models[1], "test-model")
-      end)
+      local ok, err = xpcall(function()
+        local Fixture = require("tests.support.modules.llm.runtime.runtime_engine_acquisition_fixture")
+        Fixture.with_managed_responses(function(world, prediction)
+          local pf, notifications, projected = world.profiles, 0, nil
+          local completed, failure = xpcall(function()
+            -- A regression to synchronous curl must fail without contacting an
+            -- ambient service. Only the actual inventory's owned HTTP is scripted.
+            io.popen = function() error("model inventory must use owned asynchronous HTTP") end
+            helpers.assert_true(pf.init({ on_models_changed = function()
+              notifications = notifications + 1
+              projected = prediction.get_cached_models()
+            end }))
+            helpers.assert_eq(pf.get_base_url(), "http://127.0.0.1:11434")
+            local receipt = prediction.capture_runtime_response()
+            helpers.assert_true(prediction.runtime_response_current(receipt, pf.get_base_url()))
+            helpers.assert_eq(pf.get_cached_models(), {})
+            world.inventory_hold_settlement = "defer"
+            helpers.assert_eq(pf.refresh_models(), {})
+            helpers.assert_eq(#world.inventory_defers, 1)
+            helpers.assert_eq(#world.inventory_requests, 0)
+            local deferred = world:inventory_defer()
+            helpers.assert_eq(deferred:is_settled(), false)
+            helpers.assert_eq(pf.get_models(), {})
+            helpers.assert_eq(#world.inventory_requests, 0, "HTTP must wait for the defer's physical ACK.")
+            deferred:close()
+            helpers.assert_eq(#world.inventory_requests, 1)
+            local request = world.inventory_requests[1]
+            helpers.assert_eq(request.url, "http://127.0.0.1:11434/api/tags",
+              "the model catalogue must request the exact tags endpoint")
+            helpers.assert_true(request.url:find("/api/chat/api/tags", 1, true) == nil,
+              "the chat path must never prefix the tags operation")
+            helpers.assert_true(request.options.authorized())
+            helpers.assert_eq(pf.refresh_models(), {})
+            world.inventory_hold_settlement = "http"
+            world:inventory_answer({ "test-model" })
+            helpers.assert_eq(request:is_settled(), false)
+            helpers.assert_eq(pf.get_models(), {})
+            helpers.assert_eq(pf.get_cached_models(), {})
+            helpers.assert_eq(notifications, 0, "Logical completion cannot publish before physical HTTP settlement.")
+            request:close()
+            helpers.assert_eq(pf.get_models(), { "test-model" })
+            helpers.assert_eq(projected, { "test-model" })
+            helpers.assert_eq(notifications, 1)
+            world:inventory_answer({ "test-model" })
+            helpers.assert_eq(notifications, 1, "A duplicate terminal callback cannot publish twice.")
+            helpers.assert_eq(#world.inventory_requests, 1)
+            helpers.assert_eq(#world.inventory_defers, 1)
+          end, debug.traceback)
+          io.popen = previous_popen
+          local stopped, retired = pcall(prediction.stop_runtime)
+          local cancelled, acknowledged = pcall(world.api.cancel)
+          for _, operations in ipairs({ world.inventory_defers, world.inventory_requests }) do
+            for _, operation in ipairs(operations) do
+              local called, settled = pcall(function() operation:cancel(); return operation:is_settled() end)
+              assert(called and settled, "the exact controlled inventory owner must retire even after an assertion fails")
+            end
+          end
+          assert(completed, failure)
+          helpers.assert_true(stopped and retired and cancelled and acknowledged)
+        end)
+      end, debug.traceback)
       io.popen = previous_popen
-
-      helpers.assert_true(ok, "profile refresh must complete: " .. tostring(err))
-      helpers.assert_true(command and command:find("'http://127.0.0.1:11434/api/tags'", 1, true),
-        "the model catalogue must request the exact tags endpoint")
-      helpers.assert_true(command:find("/api/chat/api/tags", 1, true) == nil,
-        "the chat path must never prefix the tags operation")
+      for name in pairs(package.loaded) do
+        if previous_loaded[name] == nil then package.loaded[name] = nil end
+      end
+      for name, value in pairs(previous_loaded) do package.loaded[name] = value end
+      if not ok then error(err, 0) end
     end)
 
     PreferencesFixture.it("profiles.toggle toggles enabled state", function()

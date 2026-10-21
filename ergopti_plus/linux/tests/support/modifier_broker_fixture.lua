@@ -25,12 +25,16 @@ function M.new(options)
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return sources, {} end,
 		is_key_device = function() return true end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
 	local Reader = helpers.load_module("adapters.evdev_reader")
 	Reader._set_backend({
 		open = function(path) next_fd = next_fd + 1; handles[next_fd] = path; return next_fd end,
 		close = function(fd) handles[fd] = nil; return true end,
 		ioctl = function() return true end,
+		read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 		read_bits = function(_, _, count) return string.rep("\0", count) end,
 		read = function(fd)
 			local queue = queues[handles[fd]]

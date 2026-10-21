@@ -77,7 +77,12 @@ local function controlled_native_reader(rows, options, body)
 			if options.before_open then options.before_open(reader) end
 			return options.fds and options.fds[log.opens] or options.fd or 7
 		end,
-		ioctl = function(_, request, buffer)
+		ioctl = function(fd, request, buffer)
+			if request == 0x80044520 then
+				log.capability_queries = (log.capability_queries or 0) + 1
+				buffer.bytes = options.event_bits or require("tests.support.evdev_capabilities_fixture").key_bits(fd, request, 4)
+				return options.event_result ~= nil and options.event_result or 4
+			end
 			log.grabs = log.grabs + 1
 			if options.before_ioctl then options.before_ioctl(reader) end
 			if options.grab_fails and request == 0x40044590 then return -1 end

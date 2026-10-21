@@ -132,6 +132,68 @@ end)
 
 helpers.describe("fakes: the shapes callers depend on", function()
 
+	helpers.it("reader capabilities belong only to the queried open slot", function()
+		local reader = Fakes.evdev_reader()
+		local mask, reason = reader.event_capabilities()
+		helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+		helpers.assert_true(reader.open("keyboard-a"))
+		helpers.assert_eq(reader.event_capabilities(), 3)
+		helpers.assert_nil(reader.event_capabilities(reader.POINTER))
+		helpers.assert_true(reader.open("pointer-b", reader.POINTER))
+		helpers.assert_true(reader.close())
+		helpers.assert_nil(reader.event_capabilities())
+		helpers.assert_eq(reader.event_capabilities(reader.POINTER), 3)
+		helpers.assert_nil(Fakes.evdev_reader().event_capabilities(reader.POINTER))
+		helpers.assert_nil(reader.capture_source_owner(reader.POINTER), "modeled bits cannot certify native origin")
+	end)
+
+	helpers.it("reader capability overrides keep numeric masks and explicit failures", function()
+		local calls = 0
+		local reader = Fakes.evdev_reader({ event_capabilities = function(slot, path)
+			calls = calls + 1
+			if slot == "keyboard" and path == "keyboard-a" then return 7 end
+			return nil, "controlled query failure"
+		end })
+		helpers.assert_nil(reader.event_capabilities()); helpers.assert_eq(calls, 0)
+		reader.open("keyboard-a"); reader.open("pointer-b", reader.POINTER)
+		helpers.assert_eq(reader.event_capabilities(), 7)
+		local mask, reason = reader.event_capabilities(reader.POINTER)
+		helpers.assert_nil(mask); helpers.assert_eq(reason, "controlled query failure")
+		local zero = Fakes.evdev_reader({ event_capabilities = 0 }); zero.open("empty-device")
+		helpers.assert_eq(zero.event_capabilities(), 0)
+		for _, invalid in ipairs({ "3", -1, .5, 4294967296, math.huge }) do
+			local malformed = Fakes.evdev_reader({ event_capabilities = invalid }); malformed.open("invalid-mask")
+			mask, reason = malformed.event_capabilities()
+			helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+		end
+	end)
+
+	helpers.it("a same-path reopen retires the original capability query", function()
+		local reader, replaced
+		reader = Fakes.evdev_reader({ event_capabilities = function(slot, path)
+			if not replaced then replaced = true; reader.close(slot); reader.open(path, slot) end
+			return 3
+		end })
+		reader.open("same-path")
+		local mask, reason = reader.event_capabilities()
+		helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+		helpers.assert_true(reader.is_open()); helpers.assert_eq(reader.event_capabilities(), 3)
+		reader.close(); helpers.assert_nil(reader.event_capabilities())
+	end)
+
+	helpers.it("capability provider withdrawal cannot acknowledge an old query", function()
+		local options, reader = {}, nil
+		options.event_capabilities = function() options.event_capabilities = 7; return 3 end
+		reader = Fakes.evdev_reader(options); reader.open("keyboard-a")
+		helpers.assert_nil(reader.event_capabilities()); helpers.assert_eq(reader.event_capabilities(), 7)
+		reader.open("pointer-b", reader.POINTER)
+		options.event_capabilities = function() reader.close(reader.POINTER); return 3 end
+		helpers.assert_eq(reader.event_capabilities(), 3, "another slot cannot retire this open query")
+		options.event_capabilities = function() error("controlled query exception") end
+		local mask, reason = reader.event_capabilities()
+		helpers.assert_nil(mask); helpers.assert_type(reason, "string")
+	end)
+
 	helpers.it("storage round-trips a value and reports absence as the default", function()
 		local storage = Fakes.storage()
 		helpers.assert_eq(storage.get("nothing", "fallback"), "fallback",
@@ -470,5 +532,120 @@ helpers.describe("fakes: semantic media writer contract", function()
 		helpers.assert_true(rawequal(projection(writer, "media-a", "device-a"), before))
 		helpers.assert_eq(#writer.media_rebuilds, 0)
 		helpers.assert_eq(writer.revision, 1)
+	end)
+end)
+
+helpers.describe("fakes: prepared clipboard custody", function()
+	local function channel(events, on_emit)
+		return { emit = function(code, value)
+			events[#events + 1] = { code, value }
+			if on_emit then return on_emit(code, value) end
+			return true
+		end }
+	end
+
+	helpers.it("stages without constructor I/O and restores only on close", function()
+		helpers.assert_eq(Fakes.clipboard().paste_keycode(), 47)
+		local fake = Fakes.clipboard({ initial = "saved", paste_keycode = 38 })
+		local waits, events = {}, {}
+		local stage = fake.new_paste_stage("replacement", function(ms) waits[#waits + 1] = ms end,
+			fake.paste_keycode(), function() return true end)
+		helpers.assert_eq(fake.contents, "saved")
+		helpers.assert_eq(stage.paste(channel(events)), false)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "replacement")
+		helpers.assert_true(stage.paste(channel(events)))
+		helpers.assert_eq(events, { {29, 1}, {38, 1}, {38, 0}, {29, 0} })
+		helpers.assert_eq(waits, { 30, 120 })
+		helpers.assert_eq(fake.last_pasted, "replacement")
+		helpers.assert_eq(fake.pastes, 1)
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(stage.paste(channel(events)), false)
+	end)
+
+	for _, refusal in ipairs({ false, "not a boolean", "throw" }) do
+		helpers.it("refuses a staged admission of " .. tostring(refusal), function()
+			local fake = Fakes.clipboard({ initial = "saved" })
+			local stage = fake.new_paste_stage("replacement", function() error("no wait") end, 47, function()
+				if refusal == "throw" then error("retired") end
+				return refusal
+			end)
+			helpers.assert_eq(stage.prepare(), false)
+			helpers.assert_eq(fake.contents, "saved")
+			helpers.assert_eq(fake.pastes, 0)
+		end)
+	end
+
+	helpers.it("refuses an unavailable or unreadable clipboard before setting", function()
+		for _, unreadable in ipairs({ false, true }) do
+			local fake = Fakes.clipboard({ initial = "saved", available = unreadable })
+			if unreadable then fake.read_checked = function() return false, "", "refused" end end
+			fake.write = function() error("must not set") end
+			local stage = fake.new_paste_stage("replacement", function() error("no wait") end, 47)
+			helpers.assert_eq(stage.prepare(), false)
+			helpers.assert_true(stage.close())
+			helpers.assert_eq(fake.contents, "saved")
+		end
+	end)
+
+	helpers.it("restores a setter that commits after reentrant close", function()
+		local fake, stage = Fakes.clipboard({ initial = "saved" }), nil
+		local write = fake.write
+		fake.write = function(text)
+			if text == "replacement" then helpers.assert_eq(stage.close(), false) end
+			return write(text)
+		end
+		stage = fake.new_paste_stage("replacement", function() error("no wait") end, 47)
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "saved")
+		helpers.assert_true(stage.close())
+	end)
+
+	helpers.it("retains restoration debt on failure and retries the original save", function()
+		local fake, failed = Fakes.clipboard({ initial = "saved" }), true
+		local write = fake.write
+		fake.write = function(text)
+			if text == "saved" and failed then return false end
+			return write(text)
+		end
+		local stage = fake.new_paste_stage("replacement", function() end, 47)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.close(), false)
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "replacement")
+		failed = false
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+	end)
+
+	helpers.it("does not let an admission callback reopen a closed paste", function()
+		local fake, stage = Fakes.clipboard({ initial = "saved" }), nil
+		local calls, events = 0, {}
+		stage = fake.new_paste_stage("replacement", function() end, 47, function()
+			calls = calls + 1
+			if calls == 7 then helpers.assert_eq(stage.close(), false) end
+			return true
+		end)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.paste(channel(events)), false)
+		helpers.assert_eq(events, { {29, 1} })
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+	end)
+
+	helpers.it("refuses failed waits and wire output without reporting a paste", function()
+		local fake = Fakes.clipboard({ initial = "saved" })
+		local stage = fake.new_paste_stage("replacement", function() return false end, 47)
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "saved")
+		stage = fake.new_paste_stage("replacement", function() end, 47)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.paste(channel({}, function() return false end)), false)
+		helpers.assert_eq(fake.pastes, 0)
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
 	end)
 end)

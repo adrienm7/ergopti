@@ -282,6 +282,62 @@ TestHSE_CreateHotstringForwardsPriority() {
 Test("HSE CreateHotstring forwards an explicit priority into the spec",
     TestHSE_CreateHotstringForwardsPriority)
 
+; A tester's personal entry won its collision at priority 100 yet could not type
+; its capitalised output: the cased family lowercased the replacement before
+; registering, so "ppt" typed "powerpoint" and "Ppt" typed "Powerpoint". Only the
+; typed casing may change the output: lower keeps the replacement as written,
+; Title capitalises its first letter, UPPER upper-cases all of it.
+_HSE_FeedWordThenSpace(Word) {
+    HSE_FeedReset(true)
+    loop parse Word
+        HSE_FeedChar(A_LoopField)
+    return HSE_FeedChar(" ")
+}
+TestHSE_CasedFamilyKeepsReplacementCapitals() {
+    global HSE_PRIORITY_COMMON
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("", "ppt", "ppt", Map("Priority", HSE_PRIORITY_COMMON))
+    CreateCaseSensitiveHotstrings("", "ppt", "PowerPoint", Map("Priority", 100))
+    for Vector in [["ppt", "PowerPoint"], ["Ppt", "PowerPoint"], ["PPT", "POWERPOINT"]] {
+        Match := _HSE_FeedWordThenSpace(Vector[1])
+        AssertTrue(Match != "", "the priority 100 entry fires on '" . Vector[1] . "'")
+        AssertEqual(100, Match.Priority, "the priority 100 entry wins on '" . Vector[1] . "'")
+        AssertTrue(Match.Replacement == Vector[2],
+            "'" . Vector[1] . "' types '" . Vector[2] . "', got '" . Match.Replacement . "'")
+    }
+}
+Test("HSE cased family keeps the replacement's own capitals at any priority",
+    TestHSE_CasedFamilyKeepsReplacementCapitals)
+
+; The literal registration (the editor's « Case sensitive » box) emits the output
+; exactly as written whatever casing was typed: that is the setting for an output
+; that must never change case, at the priority that wins the collision.
+TestHSE_LiteralEntryEmitsVerbatimAtPriority() {
+    global HSE_PRIORITY_COMMON
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("", "ppt", "ppt", Map("Priority", HSE_PRIORITY_COMMON))
+    HSE_RegisterFromTomlFlags(true, "", "ppt", "PowerPoint", Map("Priority", 100))
+    for Typed in ["ppt", "Ppt", "PPT"] {
+        Match := _HSE_FeedWordThenSpace(Typed)
+        AssertTrue(Match != "" && Match.Priority == 100, "the literal priority 100 entry wins on '" . Typed . "'")
+        AssertTrue(Match.Replacement == "PowerPoint", "'" . Typed . "' types the literal output")
+    }
+}
+Test("HSE literal entry emits its output verbatim at the winning priority",
+    TestHSE_LiteralEntryEmitsVerbatimAtPriority)
+
+; The preview indexes the same variants the engine registers, with the same
+; casing, or the tooltip promises "powerpoint" while "PowerPoint" is typed.
+TestHSE_PreviewVariantsKeepReplacementCapitals() {
+    Index := Map(), Triggers := Map()
+    _AddTriggerVariants("ppt", "PowerPoint", "personal", "s", false, false, "", Index, Triggers, 100)
+    AssertTrue(Index["ppt"][1].Output == "PowerPoint", "lower-case preview keeps the capitals")
+    AssertTrue(Index["Ppt"][1].Output == "PowerPoint", "Title preview keeps the inner capitals")
+    AssertTrue(Index["PPT"][1].Output == "POWERPOINT", "UPPER preview upper-cases the output")
+}
+Test("HSE preview variants keep the replacement's own capitals",
+    TestHSE_PreviewVariantsKeepReplacementCapitals)
+
 ; Regression (2026-06-12): the hand loader (modules/hotstrings.ahk) calls the
 ; factories with NO options at all — e.g. CreateCaseSensitiveHotstrings("*", abbr, repl).
 ; The priority resolve must guard IsSet(options) at the CALL SITE; an earlier

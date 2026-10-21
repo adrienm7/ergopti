@@ -42,6 +42,9 @@ local hs         = hs
 local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local ui_builder = require("ui.ui_builder")
+local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+	return hs.webview.usercontent.new(name)
+end, Logger)
 
 local LOG = "permission_dialog"
 
@@ -112,6 +115,26 @@ local function notify_closed(session)
 	if not ok then
 		Logger.error(LOG, "The %s permission dialog owner failed on close: %s.", session.kind, tostring(err))
 	end
+end
+
+--- Releases the native script callback before retiring its exact session.
+--- @param session table A session whose window has closed or never opened.
+--- @return boolean released
+local function release_closed(session)
+	if session.releasing then return false end
+	if session.usercontent ~= nil then
+		session.releasing = true
+		local ok, err = ControllerPool.release(session.controller_lease)
+		session.releasing = false
+		if not ok then
+			Logger.error(LOG, "The %s permission dialog bridge release did not commit: %s.", session.kind, tostring(err))
+			return false
+		end
+		session.usercontent = nil
+	end
+	if _session == session then _session = nil end
+	notify_closed(session)
+	return true
 end
 
 --- Escapes text for an HTML text node or a double-quoted attribute.
@@ -275,7 +298,7 @@ end
 --- @param session table The dialog that received it.
 --- @param action any Action name posted by the page.
 local function on_action(session, action)
-	if _session ~= session then return end
+	if _session ~= session or session.closed or session.opening or session.closing then return end
 	if action == "open_settings" then
 		Logger.info(LOG, "Reopening the %s Settings pane from the permission dialog.", session.kind)
 		local ok, opened = pcall(session.open_settings)
@@ -308,7 +331,10 @@ end
 --- @return boolean shown True when the dialog of this kind is open.
 function M.show(spec)
 	validate(spec)
-	if _session ~= nil and _session.closing then return false end
+	if _session ~= nil and (_session.closing or _session.opening or _session.releasing) then return false end
+	if _session ~= nil and _session.closed then
+		if M.close() ~= true or _session ~= nil then return false end
+	end
 	if _session ~= nil and _session.kind == spec.kind then
 		raise(_session)
 		return true
@@ -328,58 +354,68 @@ function M.show(spec)
 		Logger.error(LOG, "The %s permission dialog has no geometry in the apps manifest.", spec.kind)
 		return false
 	end
-	local ok_uc, usercontent = pcall(hs.webview.usercontent.new, M.BRIDGE)
-	if not ok_uc or usercontent == nil then
+	local controller_lease, usercontent = ControllerPool.reserve("permission_dialog")
+	if controller_lease == nil then
 		Logger.error(LOG, "The permission dialog bridge could not be created: %s.", tostring(usercontent))
 		return false
 	end
 	local session = {
 		kind          = spec.kind,
 		usercontent   = usercontent,
+		controller_lease = controller_lease,
 		open_settings = spec.open_settings,
 		on_closed     = spec.on_closed,
+		opening       = true,
 	}
 	local floating = M.KINDS[spec.kind].floating == true
-	usercontent:setCallback(function(message)
-		local body = type(message) == "table" and message.body or nil
-		on_action(session, type(body) == "table" and body.action or nil)
-	end)
-
-	local content = M.content(spec.kind, spec.bundle_path)
 	_session = session
-	local built, webview = xpcall(ui_builder.show_webview, debug.traceback, {
-		frame         = dialog_frame(geometry),
-		title         = content.window_title,
-		usercontent   = usercontent,
-		html_string   = M.render(content, spec.bundle_path, app_icon_url()),
-		inject_i18n   = false,
-		-- Accessibility is the factory's one floating exception (see
-		-- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused.
-		focus         = not floating,
-		chrome        = floating and ui_builder.PERMISSION_DIALOG_CHROME or nil,
-		on_close      = function()
-			session.closed = true
-			if _session == session then
-				_session = nil
-				Logger.info(LOG, "The %s permission dialog was closed by the user.", session.kind)
-				notify_closed(session)
-			end
-		end,
-	})
+	local built, webview = xpcall(function()
+		local bound, detail = ControllerPool.bind(controller_lease, function(message)
+			local body = type(message) == "table" and message.body or nil
+			on_action(session, type(body) == "table" and body.action or nil)
+		end)
+		if not bound then error("Permission dialog callback binding did not commit: " .. tostring(detail)) end
+		local content = M.content(spec.kind, spec.bundle_path)
+		return ui_builder.show_webview({
+			frame         = dialog_frame(geometry),
+			title         = content.window_title,
+			usercontent   = usercontent,
+			html_string   = M.render(content, spec.bundle_path, app_icon_url()),
+			inject_i18n   = false,
+			delete_on_close = true,
+			-- Accessibility is the factory's one floating exception (see
+			-- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused.
+			focus         = not floating,
+			chrome        = floating and ui_builder.PERMISSION_DIALOG_CHROME or nil,
+			on_close      = function()
+				session.closed = true
+				session.webview = nil
+				if _session == session then
+					Logger.info(LOG, "The %s permission dialog was closed by the user.", session.kind)
+					if not session.closing then release_closed(session) end
+				end
+			end,
+		})
+	end, debug.traceback)
+	session.opening = false
 	if not built or webview == nil then
-		-- A raise here must not leave an owner without a window: every later
-		-- request would then "raise" nothing instead of opening the dialog.
-		if _session == session then _session = nil end
+		-- A failed opening retains only explicit controller cleanup debt.
 		-- A dialog that never opened has no close to report.
 		session.on_closed = nil
+		session.closed = true
+		release_closed(session)
 		Logger.error(LOG, "The %s permission dialog window could not be created: %s.", spec.kind,
 			tostring(built and "no window" or webview))
 		return false
 	end
-	session.webview = webview
-	if _session ~= session then
+	if _session ~= session or session.closed then
 		-- The window closed while it was being built; keep no reference to it.
 		Logger.warn(LOG, "The %s permission dialog closed while opening.", spec.kind)
+		return false
+	end
+	session.webview = webview
+	if not ControllerPool.attach(controller_lease, webview) or not ControllerPool.commit(controller_lease) then
+		M.close(session.kind)
 		return false
 	end
 	Logger.success(LOG, "The %s permission dialog is open.", spec.kind)
@@ -388,29 +424,26 @@ end
 
 --- Closes the dialog. With a kind, only the dialog of that permission closes.
 --- @param kind string|nil Permission kind, or nil for whichever is open.
---- @return boolean closed True when no matching dialog remains open.
+--- @return boolean closed True when the matching window and bridge are released.
 function M.close(kind)
 	local session = _session
 	if session == nil or (kind ~= nil and session.kind ~= kind) then return true end
-	if session.closing then return false end
+	if session.closing or session.opening or session.releasing then return false end
 	session.closing = true
 	local webview = session.webview
 	local ok, err = pcall(function()
-		if webview ~= nil then webview:delete() end
+		if webview ~= nil and not session.closed then webview:delete() end
 	end)
 	session.closing = false
 	if not ok then
 		Logger.error(LOG, "The %s permission dialog deletion raised: %s.", session.kind, tostring(err))
 		if session.closed ~= true then return false end
 	end
-	-- A native close callback can already have released this exact session.
-	-- Otherwise successful deletion is its acknowledgement; a refusal keeps
-	-- the original window and callback available to the next cleanup attempt.
-	if _session == session then
-		session.closed = true
-		_session = nil
-		notify_closed(session)
-	end
+	-- Successful deletion or the exact native callback acknowledges the window.
+	-- Keep controller ownership until its separate native unref succeeds.
+	session.closed = true
+	session.webview = nil
+	if not release_closed(session) then return false end
 	Logger.info(LOG, "The %s permission dialog closed.", session.kind)
 	return true
 end
@@ -450,7 +483,7 @@ end
 --- @param kind string|nil Permission kind, or nil for any.
 --- @return boolean
 function M.is_open(kind)
-	if _session == nil then return false end
+	if _session == nil or _session.closed then return false end
 	return kind == nil or _session.kind == kind
 end
 

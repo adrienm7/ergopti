@@ -31,6 +31,7 @@
 ;   healthcheck/probes.ahk  -- The asynchronous probes (api.github.com, the local AI backend).
 ;   healthcheck/report.ahk  -- The page's actions and the Debug menu's reports.
 ;   healthcheck/actions.ahk -- Validation of the diagnostics page's actions.
+;   healthcheck/configuration.ahk -- The reduced, shareable rows of the user's configuration.
 
 #Include core.ahk
 #Include helpers.ahk
@@ -38,3 +39,4 @@
 #Include report.ahk
 #Include actions.ahk
 #Include collection.ahk
+#Include configuration.ahk

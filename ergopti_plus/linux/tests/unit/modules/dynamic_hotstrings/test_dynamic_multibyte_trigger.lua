@@ -48,7 +48,7 @@ helpers.describe("dynamic hotstrings: multibyte trigger", function()
 		with_manager(function(manager, injections)
 			helpers.assert_not_nil(manager.preview("td★", true),
 				"the tooltip must resolve the same canonical trigger as the fire path")
-			local fired, event = manager.on_trigger("td★", "★", true)
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(manager, "td★", "★", true)
 			helpers.assert_true(fired == true,
 				"the shipped three-byte trigger must fire as one screen character")
 			helpers.assert_eq(#injections, 1)
@@ -61,7 +61,7 @@ helpers.describe("dynamic hotstrings: multibyte trigger", function()
 
 	helpers.it("rejects a non-magic character passed by the daemon", function()
 		with_manager(function(manager, injections)
-			local fired, event = manager.on_trigger("tdx", "x")
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(manager, "tdx", "x")
 			helpers.assert_true(fired == false,
 				"the daemon passes every live character; only the configured magic key may open matching")
 			helpers.assert_true(event == nil, "a rejected ordinary character must publish no expansion event")
@@ -100,17 +100,20 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 				Dynamic.reset_rules()
 				Dynamic.register_date_rules("★")
 				local count = 0
+				local gate_clears, wrap_clears = 0, 0
+				local privacy_owners = { end_wrap_selection = function() gate_clears = gate_clears + 1 end }
+				local wrap_on_type = { end_selection_window = function() wrap_clears = wrap_clears + 1 end }
 				for _, marker in ipairs({ "on_text_injected = function()", "reset_text = function()",
 					"on_block = function()", "process_lifecycle.onFocusChange(function(appName, windowTitle)" }) do
 					local start = assert(source:find(marker, 1, true), "actual callback must exist") + #marker
 					local prefix = assert(source:sub(start):match("^(.-engine:reset%b())"), "callback reset must exist")
 					local compile = loadstring or load
-					local callback = assert(compile("return function(engine)\nlocal keylogger = require(\"modules.keylogger.keylogger\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
+					local callback = assert(compile("return function(engine, privacy_owners, wrap_on_type)\nlocal keylogger = require(\"modules.keylogger.keylogger\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
 						.. prefix .. "\nend", "@actual-unknown-reset-prefix"))()
 					local engine = Core.new()
 					helpers.assert_true(engine:load_mappings({ { trigger = "date", replacement = "owned-result", is_word = true } }))
 					engine:reset(false)
-					callback(engine)
+					callback(engine, privacy_owners, wrap_on_type)
 					helpers.assert_eq(engine:buffer_starts_at_word_boundary(), false, marker)
 					for _, character in ipairs({ "d", "a", "t", "e" }) do engine:on_char(character) end
 					local ordinary = engine:candidates()
@@ -122,12 +125,97 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 					count = count + 1
 				end
 				helpers.assert_eq(count, 4)
+				helpers.assert_true(gate_clears >= 1, "the actual capture-gate prefix must revoke its wrap owner")
+				helpers.assert_true(wrap_clears >= 1, "the actual focus prefix must close its selection window")
 				Dynamic.reset_rules()
 			end)
 		end, debug.traceback)
 		helpers.assert_true(rawequal(package.loaded["dynamic_hotstrings"], retained), "the exact prior module owner must survive")
 		helpers.assert_true(rawequal(retained.get_rules(), retained_rules), "the exact prior rule array must survive")
 		if not completed then error(failure, 0) end
+	end)
+end)
+
+-- unknown-context-resets: a pause, an uncommitted output, a replaced selection,
+-- an undo, a typed action result and lost input all leave the caret after text
+-- this engine never buffered. A plain reset declared a word start there, so
+-- "adn" restored by Undo followed by "dt★" fired the date inside the word.
+local UNKNOWN_CONTEXT_MARKERS = {
+	"reset = function()",
+	"if remaining >= 1 then",
+	"invalidated = true",
+	"local result = injector.inject(0, text, false, nil, publication)",
+	"onDesync = function()",
+}
+
+-- Plain resets are reserved for genuine word starts: an idle pause, a
+-- final_result expansion and a consumed dynamic trigger.
+local BOUNDARY_RESET_CONTEXTS = {
+	"if WordReset.observe_key(now_ms) then",
+	"if result.final_result then",
+	"Dynamic expansion consumed the trigger",
+}
+
+helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)", function()
+	helpers.it("each reviewed daemon reset leaves the next word start unknown", function()
+		local source = daemon_source()
+		local Core = require("hotstring_engine")
+		local compile = loadstring or load
+		local count = 0
+		for _, marker in ipairs(UNKNOWN_CONTEXT_MARKERS) do
+			local first = source:find(marker, 1, true)
+			helpers.assert_true(first ~= nil, "reviewed reset site must exist: " .. marker)
+			helpers.assert_nil(source:find(marker, first + 1, true), "reviewed marker must be unique: " .. marker)
+			local prefix = assert(source:sub(first + #marker):match("^(.-engine:reset%b())"), "site must reset: " .. marker)
+			local callback = assert(compile("return function(engine, injector, Logger)\n"
+				.. "local keylogger = require(\"modules.keylogger.keylogger\")\n"
+				.. "local _undoable, _last_offered, tooltip_preview, llm_overlay, prediction_engine\n"
+				.. "local LOG, undo, text, publication = \"fixture\", { trigger = \"adn\" }, \"owned\", {}\n"
+				-- The marker line itself is not part of the prefix: seed what it bound.
+				.. "local remaining, result = 3, { ok = true }\n"
+				.. prefix .. "\nend", "@reviewed-unknown-reset-prefix"))()
+			local engine = Core.new()
+			helpers.assert_true(engine:load_mappings({ { trigger = "dt", replacement = "owned-date",
+				is_word = true, auto_expand = true } }))
+			-- Positive control: the same mapping fires from a genuine word start.
+			engine:reset(true)
+			engine:on_char("d")
+			helpers.assert_not_nil(engine:on_char("t"), "the control mapping fires at a known word start")
+			engine:reset(true)
+			callback(engine, { inject = function() return { ok = true } end }, { info = function() end })
+			helpers.assert_eq(engine:buffer_starts_at_word_boundary(), false, marker)
+			engine:on_char("d")
+			helpers.assert_nil(engine:on_char("t"), "no word-start mapping fires after " .. marker)
+			count = count + 1
+		end
+		helpers.assert_eq(count, #UNKNOWN_CONTEXT_MARKERS)
+	end)
+
+	helpers.it("every daemon reset names whether a word starts", function()
+		local source = daemon_source()
+		local plain, explicit = 0, 0
+		local position = 1
+		while true do
+			local first, last, argument = source:find("engine:reset(%b())", position)
+			if not first then break end
+			position = last + 1
+			local inner = argument:sub(2, -2)
+			if inner == "" then
+				local context = source:sub(math.max(1, first - 600), first)
+				local allowed = false
+				for _, marker in ipairs(BOUNDARY_RESET_CONTEXTS) do
+					if context:find(marker, 1, true) then allowed = true end
+				end
+				helpers.assert_true(allowed, "a plain reset outside a known word start, near byte " .. first)
+				plain = plain + 1
+			else
+				helpers.assert_true(inner == "false" or inner == "at_word_start",
+					"a reset argument must be false or the click setting, got " .. inner)
+				explicit = explicit + 1
+			end
+		end
+		helpers.assert_eq(plain, #BOUNDARY_RESET_CONTEXTS, "each genuine word-start reset is accounted for")
+		helpers.assert_true(explicit >= #UNKNOWN_CONTEXT_MARKERS, "the reviewed sites pass an explicit boundary")
 	end)
 end)
 
@@ -141,6 +229,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 			local compile = loadstring or load
 			local actor = assert(compile("return function(engine, prediction_engine, dyn_hotstrings, keylogger)\n"
 				.. "local ch, app_id, tooltip_preview, result, now_ms = '★', 'owned-fixture', nil, nil, 0\n"
+				.. "local opts = { dry_run = false }\n"
 				.. slice .. "\nend", "@actual-dynamic-daemon-parent"))()
 			local engine = require("hotstring_engine").new()
 			engine:reset(false)
@@ -164,7 +253,7 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 				rule.resolver = function() calls = calls + 1; return original() end
 			end
 			helpers.assert_nil(manager.preview("update★", true))
-			local fired, event = manager.on_trigger("update★", "★", true)
+			local fired, event = require("tests.support.dynamic_hotstrings_fixture").trigger(manager, "update★", "★", true)
 			helpers.assert_eq(fired, false)
 			helpers.assert_nil(event)
 			helpers.assert_eq(calls, 0)
@@ -181,12 +270,12 @@ helpers.describe("Linux builtin dynamic word-start owners", function()
 			helpers.assert_eq(buffer, "date★")
 			helpers.assert_eq(boundary, false)
 			helpers.assert_nil(manager.preview(buffer, boundary))
-			helpers.assert_eq(manager.on_trigger(buffer, "★", boundary), false)
+			helpers.assert_eq(require("tests.support.dynamic_hotstrings_fixture").trigger(manager, buffer, "★", boundary), false)
 			helpers.assert_eq(#injections, 0)
 			engine:reset(true)
 			for _, char in ipairs({ "d", "a", "t", "e", "★" }) do engine:on_char(char) end
 			helpers.assert_not_nil(manager.preview(engine:current_buffer(), engine:buffer_starts_at_word_boundary()))
-			helpers.assert_eq(manager.on_trigger(engine:current_buffer(), "★", engine:buffer_starts_at_word_boundary()), true)
+			helpers.assert_eq(require("tests.support.dynamic_hotstrings_fixture").trigger(manager, engine:current_buffer(), "★", engine:buffer_starts_at_word_boundary()), true)
 			helpers.assert_eq(#injections, 1)
 		end)
 	end)

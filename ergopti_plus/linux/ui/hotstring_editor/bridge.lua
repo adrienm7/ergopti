@@ -372,6 +372,8 @@ local function save_all(state, data, context)
 	end
 	local source = opening.source
 	local content, status = source.content, source.status
+	-- Sections already in the file; the rest are the ones this save creates.
+	local existing = {}
 	local read_ok, current, current_status = pcall(writer.read_classified, path)
 	if not read_ok or current_status ~= status or current ~= content
 		or not (_opening == opening and opening_current(opening, state, context)) then
@@ -396,6 +398,9 @@ local function save_all(state, data, context)
 			or type(current.meta) ~= "table" then
 			Logger.error(LOG, "Personal source parse refused — nothing saved.")
 			return false
+		end
+		for _, name in ipairs(type(current.sections_order) == "table" and current.sections_order or {}) do
+			existing[name] = true
 		end
 		local file_meta = current.meta
 		if type(file_meta.delay) == "number" then toml.meta.delay = file_meta.delay end
@@ -466,6 +471,24 @@ local function save_all(state, data, context)
 		local ok_reload = pcall(config.reload)
 		if not ok_reload then
 			Logger.warn(LOG, "Saved, but the reload failed — the new hotstrings need a restart.")
+		end
+	end
+	-- A section the user creates is meant to be used (issue #96).
+	local added = {}
+	for _, name in ipairs(toml.sections_order) do
+		if not existing[name] then added[#added + 1] = name end
+	end
+	if #added > 0 then
+		local enabled, reason = false, "the hotstring configuration is unavailable"
+		if type(config) == "table" and type(config.enable_new_sections) == "function" then
+			local called, committed, refusal = pcall(config.enable_new_sections, PERSONAL_CATEGORY, added)
+			enabled, reason = called and committed == true, called and refusal or committed
+		end
+		if enabled then
+			Logger.success(LOG, "%d new personal section(s) enabled.", #added)
+		else
+			Logger.error(LOG, "The %d new personal section(s) could not be enabled (%s); enable them from the tray.",
+				#added, tostring(reason))
 		end
 	end
 	return true

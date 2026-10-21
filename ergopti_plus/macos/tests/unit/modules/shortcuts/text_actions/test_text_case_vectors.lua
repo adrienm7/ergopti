@@ -60,12 +60,14 @@ local function transformed_by(action_name, selected)
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	local written = nil
+	local change_count = 0
 	hs_stub.pasteboard = {
+		changeCount = function() return change_count end,
 		getContents = function() return selected end,
-		setContents = function(value) written = value; return true end,
-		clearContents = function() return true end,
+		setContents = function(value) change_count = change_count + 1; written = value; return true end,
+		clearContents = function() change_count = change_count + 1 end,
 		readAllData = function() return { ["public.utf8-plain-text"] = "USER_CLIPBOARD" } end,
-		writeAllData = function() return true end,
+		writeAllData = function() change_count = change_count + 1; return true end,
 	}
 	_G.hs = hs_stub
 	package.loaded.hs = hs_stub
@@ -79,8 +81,17 @@ local function transformed_by(action_name, selected)
 		begin_batch = function(tx) return { tx = tx } end,
 		keyStroke = function() return true end,
 		dispatch = function() return true end,
-		seal = function() return true end,
-		cancel = function() return true end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		on_dispatched = function(tx, callback) tx.dispatched = callback end,
+		seal = function(tx)
+			if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+			if tx.callback then tx.callback(tx, "complete") end
+			return true
+		end,
+		cancel = function(tx)
+			if tx.callback then tx.callback(tx, "cancelled") end
+			return true
+		end,
 	}
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil

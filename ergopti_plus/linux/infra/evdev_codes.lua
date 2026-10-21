@@ -111,6 +111,16 @@ M.KEY_DOWN      = 108
 M.KEY_LEFT      = 105
 M.KEY_RIGHT     = 106
 
+--- The pointer buttons the domain names (CapsWord ends on a click of a chosen
+--- button), and the BTN_DIGI range a touchpad reports a finger contact in
+--- (BTN_TOUCH, BTN_TOOL_FINGER, BTN_TOOL_DOUBLETAP...). Every other code of
+--- the pointer button range (infra/input_event) is "another" button.
+M.BTN_LEFT       = 0x110
+M.BTN_RIGHT      = 0x111
+M.BTN_MIDDLE     = 0x112
+M.BTN_DIGI_FIRST = 0x140
+M.BTN_DIGI_LAST  = 0x14f
+
 --- The digit-row keys, KEY_1 to KEY_0, by the prediction slot each numbers (0
 --- is slot 10). The validation chord names the physical key, as the macOS
 --- keycodes do: Shift+1 is slot 1 although Shift makes that key type "!".

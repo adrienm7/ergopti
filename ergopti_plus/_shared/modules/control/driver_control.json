@@ -1,0 +1,20 @@
+{
+	"_comment": "Local driver control: a tool run by the same user asks the running driver to reload. The driver writes a session file holding a random token into a folder only that user can read; a request names the token, so only a process that can read the folder is obeyed. The driver hands an admitted request to its own reload owner and reports requested, refused and completed in the result file; it never starts a second driver or ends one by force. Completion is written by the reloaded driver itself, once ready, when the pending result names it as the successor. Read at run time by the Windows, macOS and Linux drivers and by tools/control.",
+	"schema": 1,
+	"max_request_bytes": 4096,
+	"token_hex_length": 64,
+	"request_id_pattern": "^[A-Za-z0-9_-]{1,64}$",
+	"files": {
+		"session": "session.json",
+		"request": "reload.request",
+		"result": "reload.result"
+	},
+	"folders": {
+		"windows": { "base": "LOCALAPPDATA", "segments": ["{app}", "control"] },
+		"macos": { "base": "HOME", "segments": ["Library", "Application Support", "{app}", "control"] },
+		"linux": { "base": "XDG_RUNTIME_DIR", "segments": ["{app}", "control"] }
+	},
+	"windows_message": "Ergopti.Driver.Reload.v1",
+	"states": ["requested", "refused", "completed"],
+	"reasons": ["unauthenticated", "malformed", "busy", "refused", "failed"]
+}

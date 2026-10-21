@@ -534,10 +534,18 @@ _LLV_MenuListsRewritePrompts() {
 		AssertFalse(LLM_Engine_LiveIsActive())
 		AssertEqual("advanced", _LLM_Menu["profile_id"], "a temporary shortcut never changes the manual profile")
 	}
-	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
-	Assert(!InStr(Emit, 'case "llm_live_mode":', true), "the AI menu has no second live profile selector")
-	Assert(!InStr(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', true), "the retired live selector is not bound")
-	Assert(_LMNM_GenerationRoute(Emit), "the native generation group keeps the same typed renderer")
+	; The retired selector is judged by its id, not by the spelling of one native
+	; binding (it was a row dispatch case, then a group builder entry): no
+	; production source and no declared AI row may name it.
+	Retired := "llm_live_mode"
+	AssertEqual(0, InStr(_DriverSourceNoComments(), Retired, true),
+		"no Windows source may bind the retired live selector, whichever owner would draw it")
+	Declared := _MR_GetMenuDef("llm_menu")
+	AssertTrue(Declared is Array && Declared.Length > 0, "the shared AI menu must be readable")
+	for Row in Declared
+		Assert(!(Row is Map) || _MR_Get(Row, "id", "") != Retired, "the shared AI menu declares no live selector")
+	Assert(_LMNM_GenerationRoute(_DriverFuncBody("_LLM_Menu_GroupBuilders"), _DriverFuncBody("LLM_Menu_BuildSubmenu")),
+		"the native generation group keeps the same typed renderer")
 }
 Test("LLM live mode: retained prompt chooser and shortcut owners preserve state (retired-live-menu)",
 	_LLV_MenuListsRewritePrompts)

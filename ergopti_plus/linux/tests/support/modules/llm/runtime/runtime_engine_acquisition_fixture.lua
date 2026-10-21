@@ -17,7 +17,7 @@ local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 local function with_owner(body, options)
 	options = options or {}
 	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
-		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences",
+		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
 		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
 		"adapters.shell_runner", "infra.i18n", "window_titles", "modules.llm.runtime_factory" }
 	local previous = {}
@@ -66,6 +66,7 @@ local function with_owner(body, options)
 		} })
 		package.loaded["infra.llm_preferences"] = preferences
 		package.loaded["modules.llm.profiles"] = nil
+		package.loaded["modules.llm.model_inventory"] = nil
 		package.loaded["modules.llm.prediction_engine"] = nil
 		world.private_source, world.private_current, world.view_current = {}, true, true
 		world.servers = {
@@ -163,11 +164,13 @@ end
 --- Runs the real repair, engine, profiles, probe and chat graph over owned OS ports.
 --- @param body function Receives actual producers and the retained service capability.
 local function with_managed_responses(body)
-	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "llm.runtime_repair" }
+	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "llm.runtime_repair",
+		"modules.llm.model_inventory", "infra.managed_http_deadline" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local popen = io.popen
 	local ok, failure = xpcall(function()
 		with_owner(function(world)
+			require("tests.support.modules.llm.runtime.inventory_fixture").install(world)
 			local engine = world.load_engine()
 			local profiles = require("modules.llm.profiles")
 			local Repair = require("llm.runtime_repair")
@@ -250,7 +253,7 @@ local function with_managed_responses(body)
 					function(text, err) self.responses[#self.responses + 1] = err or "done:" .. text end)
 			end
 			function world:respond()
-				local post = assert(self.posts[#self.posts]); post.chunk('{"message":{"content":"stale"}}\n'); post.done({ ok = true, status = 200 })
+				local post = assert(self.posts[#self.posts]); post.chunk('{"message":{"content":"stale"},"done":true}\n'); post.done({ ok = true, status = 200 })
 			end
 			function world:begin_app()
 				local state = engine_port.state()

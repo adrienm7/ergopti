@@ -161,8 +161,8 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 			end,
 		}
 
-		local fired_off = dh.on_trigger("td\\", "\\", true)
-		local fired_on  = dh.on_trigger("dt\\", "\\", true)
+		local fired_off = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "td\\", "\\", true)
+		local fired_on  = require("tests.support.dynamic_hotstrings_fixture").trigger(dh, "dt\\", "\\", true)
 
 		package.loaded["modules.hotstrings.injector"] = previous
 		drop_storage()

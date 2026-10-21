@@ -42,6 +42,7 @@ local function fresh_apps()
 	hs_stub.__reset()
 	local fixture = {
 		native_timers = {},
+		now = 0,
 		next_timer_options = {},
 		shells = {},
 		next_shell_options = {},
@@ -69,6 +70,7 @@ local function fresh_apps()
 
 	local timer_contract = {}
 	for key, value in pairs(hs_stub.timer) do timer_contract[key] = value end
+	timer_contract.absoluteTime = function() return math.floor(fixture.now * 1e9) end
 	timer_contract.new = function(delay, callback)
 		local options = table.remove(fixture.next_timer_options, 1) or {}
 		local native = {
@@ -83,6 +85,7 @@ local function fresh_apps()
 		}
 		function native:start()
 			self.start_calls = self.start_calls + 1
+			self.deadline = fixture.now + self.delay
 			if self.start_mode == "false_mutate" then self.running_state = true; return false end
 			if self.start_mode == "nil_mutate" then self.running_state = true; return nil end
 			if self.start_mode == "throw_mutate" then
@@ -103,9 +106,15 @@ local function fresh_apps()
 		end
 		function native:running() return self.running_state end
 		function native:fire()
-			if self.running_state then self.callback() end
+			if self.running_state then
+				fixture.now = math.max(fixture.now, self.deadline)
+				self.callback()
+			end
 		end
-		function native:deliver() self.callback() end
+		function native:deliver()
+			fixture.now = math.max(fixture.now, self.deadline or fixture.now)
+			self.callback()
+		end
 		fixture.native_timers[#fixture.native_timers + 1] = native
 		return native
 	end
@@ -239,11 +248,34 @@ local function fresh_apps()
 	package.loaded["adapters.window_info"] = {
 		getFocused = function() return { appId = fixture.focused_app_id } end,
 	}
+	local function complete(tx, status)
+		if tx.status then return false end
+		tx.status, tx.sealed = status, true
+		for _, callback in ipairs(tx.completed) do callback(tx, status) end
+		return true
+	end
 	package.loaded["adapters.synthetic_input"] = {
-		emit_key_stroke = function()
+		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
+		on_complete = function(tx, callback)
+			if tx.status then callback(tx, tx.status)
+			else tx.completed[#tx.completed + 1] = callback end
+		end,
+		on_dispatched = function(tx, callback)
+			tx.dispatched[#tx.dispatched + 1] = callback
+		end,
+		emit_key_stroke = function(_, _, _, tx)
+			assert(type(tx) == "table" and not tx.sealed)
 			fixture.copies = fixture.copies + 1
 			return true
 		end,
+		seal = function(tx)
+			if tx.sealed then return false end
+			tx.sealed = true
+			for _, callback in ipairs(tx.dispatched) do callback(tx, tx.batch, "dispatched") end
+			complete(tx, "complete")
+			return true
+		end,
+		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = {

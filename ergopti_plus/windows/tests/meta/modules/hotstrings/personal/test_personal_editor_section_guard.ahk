@@ -45,26 +45,28 @@ _PESG_EveryConsumerIsGuarded() {
 	Assert(InStr(Src, "_PersonalEditorSection") > 0,
 		'the personal editor source must be reachable from the ui/ directory concat')
 
-	Needle := '_PersonalEditorData["sections"][_PersonalEditorSection]'
-	Pos := 1
+	Needles := ['_PersonalEditorData["sections"][_PersonalEditorSection]', 'Data["sections"][SectionName]']
 	Checked := 0
-	while (Pos := InStr(Src, Needle, , Pos)) {
-		Checked += 1
-		; Look back over a bounded window for either form of the guard. The
-		; window is generous enough to span a function preamble but far short of
-		; the whole file, so a guard in an unrelated earlier function cannot
-		; vouch for this one.
-		WinStart := (Pos > 1400) ? Pos - 1400 : 1
-		Window := SubStr(Src, WinStart, Pos - WinStart)
-		Guarded := InStr(Window, ".Has(_PersonalEditorSection)") > 0
-			or InStr(Window, "_PersonalEditorRequireSection(") > 0
-		Assert(Guarded,
-			"an indexed read of sections[_PersonalEditorSection] at offset " . Pos
-			. " is not preceded by a .Has() check or a _PersonalEditorRequireSection() call — a stale default_section pointer throws UnsetItemError here")
-		Pos += StrLen(Needle)
+	for Needle in Needles {
+		Pos := 1
+		while (Pos := InStr(Src, Needle, , Pos)) {
+			Checked += 1
+			; Local snapshots additionally prove their native session, model and
+			; selected section after a modal; global pointers still prove presence.
+			WinStart := (Pos > 1400) ? Pos - 1400 : 1
+			Window := SubStr(Src, WinStart, Pos - WinStart)
+			Guarded := Needle == Needles[1]
+				? (InStr(Window, ".Has(_PersonalEditorSection)") > 0 || InStr(Window, "_PersonalEditorRequireSection(") > 0)
+				: ((InStr(Window, ".Has(SectionName)") > 0 || InStr(Window, "_PersonalEditorRequireSection(") > 0)
+					&& (InStr(Window, "_PersonalEditorSectionActionCurrent(") > 0
+						|| InStr(Window, "_PopulateList(LV, Data, SectionName) {") > 0))
+			Assert(Guarded,
+				"an indexed section read at offset " . Pos . " lacks its presence or captured-session precondition")
+			Pos += StrLen(Needle)
+		}
 	}
-	Assert(Checked >= 6,
-		"expected at least six indexed reads to police (found " . Checked . ") — if the count dropped, confirm the consumers were removed rather than the scan silently missing them")
+	Assert(Checked >= 8,
+		"expected five global reads, the presence-guarded list helper and two session-bound local reads; every pointer consumer remains policed")
 }
 
 ; The shared helper must test BOTH halves of "selected". A helper that only

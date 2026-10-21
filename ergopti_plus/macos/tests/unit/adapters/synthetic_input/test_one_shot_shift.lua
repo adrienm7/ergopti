@@ -15,9 +15,11 @@ local data = assert(require("json").decode(SourceFile.read(helpers.shared("tap_h
 local function fixture()
 	local text_by_key = { [0] = { "a", "A" }, [1] = { "é", "2" }, [2] = { " ", " " }, [3] = { "b", "B" } }
 	local calls = { emitted = {}, allowed = true }
-	local function event(code, flags, override)
+	-- repeat_flag mirrors keyboardEventAutorepeat: 1 for a native auto-repeat.
+	local function event(code, flags, override, repeat_flag)
 		local raw, unicode = flags or 0, override
 		return {
+			autorepeat = repeat_flag or 0,
 			getKeyCode = function() return code end,
 			getFlags = function() return { cmd = (raw & 4) ~= 0, ctrl = (raw & 8) ~= 0, alt = (raw & 16) ~= 0 } end,
 			rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end,
@@ -34,6 +36,7 @@ local function fixture()
 		data = data, magic = function() return "★" end, now = function() return 10 end,
 		event = { rawFlagMasks = { shift = 2 } },
 		translate = function(code, flags) return event(code, flags):getCharacters(false) end,
+		is_repeat = function(e) return e.autorepeat ~= 0 end,
 		emit = function(text)
 			if not calls.allowed then return false end
 			calls.emitted[#calls.emitted + 1] = text
@@ -98,7 +101,7 @@ helpers.describe("one-shot native boundary", function()
 		adapter.arm(2)
 		helpers.assert_true(adapter.key_down(event(2), 2))
 		adapter.finish(false)
-		helpers.assert_true(adapter.claim_repeat(event(1)), "the earlier accepted owner must survive")
+		helpers.assert_true(adapter.claim_repeat(event(1, 0, nil, 1)), "the earlier accepted owner must survive")
 		helpers.assert_eq(adapter.claim_repeat(event(2)), false)
 		helpers.assert_eq(adapter.key_up(event(2), 2), false)
 		adapter.arm(2)
@@ -111,8 +114,9 @@ helpers.describe("one-shot native boundary", function()
 	helpers.it("preserves unrelated flags and native repetition until the original release (one-shot-native)", function()
 		local adapter, event, calls = fixture()
 		adapter.arm(2)
-		for _ = 1, 2 do
-			local key = event(0, 128)
+		for press = 1, 2 do
+			-- The second key-down is the native auto-repeat of the first.
+			local key = event(0, 128, nil, press - 1)
 			helpers.assert_eq(adapter.key_down(key, 0), false)
 			adapter.finish(true)
 			helpers.assert_eq(key:rawFlags(), 130)
@@ -135,11 +139,50 @@ helpers.describe("one-shot native boundary", function()
 		adapter.finish(true)
 		helpers.assert_eq(calls.emitted, { "É" })
 		adapter.disarm()
-		helpers.assert_true(adapter.claim_repeat(event(1)))
-		helpers.assert_true(adapter.key_down(event(1), 1))
+		helpers.assert_true(adapter.claim_repeat(event(1, 0, nil, 1)))
+		helpers.assert_true(adapter.key_down(event(1, 0, nil, 1), 1))
 		helpers.assert_eq(#calls.emitted, 1)
 		helpers.assert_true(adapter.key_up(event(1), 1))
+		helpers.assert_eq(adapter.claim_repeat(event(1, 0, nil, 1)), false)
+	end)
+	helpers.it("types a fresh press whose earlier release was missed (one-shot-stale-claim)", function()
+		-- A tap outage lets a release pass unseen. The claim used to outlive it
+		-- and swallow the next press of the same key without any output.
+		local Integrity = require("infra.keystroke_integrity")
+		Integrity.reset()
+		local adapter, event, calls = fixture()
+		adapter.arm(2)
+		helpers.assert_true(adapter.key_down(event(1), 1))
+		adapter.finish(true)
+		helpers.assert_eq(calls.emitted, { "É" })
+		local fresh = event(1)
+		helpers.assert_eq(adapter.key_down(fresh, 1), false,
+			"a fresh press of a key whose release was missed must reach the application")
+		adapter.finish(true)
+		helpers.assert_eq(fresh:getCharacters(false), "é")
+		helpers.assert_eq(#calls.emitted, 1)
+		helpers.assert_eq(adapter.key_up(event(1), 1), false)
+		helpers.assert_true(Integrity.summary():find("stale_claim=1", 1, true) ~= nil)
+		-- The same holds while paused, where only claim_repeat runs.
+		adapter.arm(2)
+		helpers.assert_true(adapter.key_down(event(1), 1))
+		adapter.finish(true)
 		helpers.assert_eq(adapter.claim_repeat(event(1)), false)
+		helpers.assert_eq(adapter.claim_repeat(event(1, 0, nil, 1)), false)
+	end)
+	helpers.it("drops a missed Shift release at the key's next fresh press (one-shot-stale-claim)", function()
+		local adapter, event = fixture()
+		adapter.arm(2)
+		adapter.key_down(event(0), 0)
+		adapter.finish(true)
+		local fresh = event(0)
+		helpers.assert_eq(adapter.key_down(fresh, 0), false)
+		adapter.finish(true)
+		helpers.assert_eq(fresh:getCharacters(false), "a",
+			"a stale Shift claim must not capitalize the next press")
+		local other = event(3)
+		adapter.key_down(other, 3)
+		helpers.assert_eq(other:getCharacters(false), "b")
 	end)
 	helpers.it("does not invent physical Shift for an IME or explicit Unicode event (one-shot-native)", function()
 		local adapter, event, calls = fixture()

@@ -418,3 +418,6 @@ for Provider in ["openai", "openai_compat"] {
 	Test("Windows API Add: " . Provider . " actual readiness owner refuses HTML (windows-api-add-production)", _WAA_ReadyReply.Bind(Provider, 200, '<html>not a model API</html>', false))
 	Test("Windows API Add: " . Provider . " actual readiness owner refuses 204 (windows-api-add-production)", _WAA_ReadyReply.Bind(Provider, 204, '{"data":[{"id":"independent"}]}', false))
 }
+
+#Include test_llm_api_remove_confirmation.ahk
+#Include test_llm_api_post_save_owner.ahk

@@ -23,6 +23,7 @@ local function load_fixture(options)
 	}
 	local current = original
 	local timers = {}
+	local now = 0
 	local timer_calls = 0
 	local restore_calls = 0
 	local copies = 0
@@ -31,15 +32,38 @@ local function load_fixture(options)
 	package.loaded["adapters.window_info"] = {
 		getFocused = function() return { appId = "TextEdit" } end,
 	}
-	package.loaded["adapters.synthetic_input"] = setmetatable({
-		emit_key_stroke = function()
+	local function complete(tx, status)
+		if tx.status then return false end
+		tx.status, tx.sealed = status, true
+		for _, callback in ipairs(tx.completed) do callback(tx, status) end
+		return true
+	end
+	package.loaded["adapters.synthetic_input"] = {
+		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
+		on_complete = function(tx, callback)
+			if tx.status then callback(tx, tx.status)
+			else tx.completed[#tx.completed + 1] = callback end
+		end,
+		on_dispatched = function(tx, callback)
+			tx.dispatched[#tx.dispatched + 1] = callback
+		end,
+		emit_key_stroke = function(_, _, _, tx)
+			assert(type(tx) == "table" and not tx.sealed)
 			copies = copies + 1
 			local outcome = options.copy_outcomes and options.copy_outcomes[copies]
 			if outcome == "throw" then error("injected copy dispatch failure") end
 			if outcome == "false" then return false end
 			return true
 		end,
-	}, { __index = function() return function() return true end end })
+		seal = function(tx)
+			if tx.sealed then return false end
+			tx.sealed = true
+			for _, callback in ipairs(tx.dispatched) do callback(tx, tx.batch, "dispatched") end
+			complete(tx, "complete")
+			return true
+		end,
+		cancel = function(tx) return complete(tx, "cancelled") end,
+	}
 	local pasteboard = {
 		readAllData = function() snapshots = snapshots + 1; return original end,
 		clearContents = function() current = {} end,
@@ -53,7 +77,7 @@ local function load_fixture(options)
 		end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(_delay, callback)
+		after = function(delay, callback)
 			timer_calls = timer_calls + 1
 			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
 			if outcome == "nil" then return { timer = nil, committed = false }, false end
@@ -61,9 +85,11 @@ local function load_fixture(options)
 				timer = {},
 				committed = true,
 				observers = {},
+				deadline = now + delay,
 			}
 			function handle.callback()
 				if handle.timer == nil then return end
+				now = math.max(now, handle.deadline)
 				handle.timer = nil
 				handle.committed = false
 				local observers = handle.observers
@@ -91,6 +117,7 @@ local function load_fixture(options)
 	}
 	local actions = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
 		pasteboard = pasteboard,
+		timer = { absoluteTime = function() return math.floor(now * 1e9) end },
 		http = { encodeForQuery = function(value) return value end },
 		urlevent = { openURL = function() return true end },
 	})

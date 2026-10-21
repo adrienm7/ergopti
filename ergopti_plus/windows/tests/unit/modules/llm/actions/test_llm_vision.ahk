@@ -206,7 +206,7 @@ _LVS_DownscaleScript() {
 	Direct := _GestureScreenshotDirectScript(0, 0, 3000, 2000, "save", "C:\t.png", 1568)
 	AssertTrue(InStr(Direct, Script) > 0 && InStr(Direct, Script) < InStr(Direct, "$bmp.Save("),
 		"the full-screen capture shrinks before saving")
-	Region := _GestureScreenshotRegionSaveScript("C:\t.png", 1568)
+	Region := _GestureScreenshotRegionSaveScript("C:\t.png", 123, 1568)
 	AssertTrue(InStr(Region, _GestureScreenshotDownscaleScript("$img", 1568)) > 0,
 		"the region capture shrinks the selection before saving")
 	AssertThrows(() => _GestureScreenshotDownscaleScript("$bmp", -1), "a negative edge is a caller bug")

@@ -62,6 +62,9 @@ helpers.describe("Karabiner recovery external gates", function()
 			helpers.assert_true(remap.regenerate(function() callback_count = callback_count + 1 end))
 			helpers.assert_eq(calls.guardian_probe_count, 1,
 				"equivalent rebuilds must share the exact native observation")
+			-- (deploy-decision-log) the joined request is one INFO decision line.
+			helpers.assert_eq(count_logs(calls, "info", "Karabiner deploy decision: coalesced"), 1,
+				"the coalesced request must be visible in the log")
 
 			calls.deliver_guardian_probe("ready", nil, 1)
 			helpers.assert_eq(calls.builds, 1)

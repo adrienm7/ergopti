@@ -89,7 +89,7 @@ helpers.describe("shared application native window titles", function()
 			-- Keep the original low-level GTK path for all other applications.
 			local manager = setmetatable({
 				_create_gtk_window = function(app, html, handler)
-					if app ~= "changelog" and app ~= "download_window" then
+					if app ~= "changelog" and app ~= "download_window" and app ~= "model_browser" then
 						return native_manager._create_gtk_window(app, html, handler)
 					end
 					native_fixture = require("tests.support.document_fixture").new(app,

@@ -47,7 +47,10 @@ local function fake_binding()
 		gtk_menu_item_new_with_label = function(label) return widget("item", label) end,
 		gtk_check_menu_item_new_with_label = function(label) return widget("check", label) end,
 		gtk_separator_menu_item_new = function() return widget("separator") end,
-		gtk_check_menu_item_set_active = function(w, active) w.active = active end,
+		gtk_check_menu_item_set_active = function(w, active)
+			-- GTK implements a changed programmatic check through activate too.
+			if w.active ~= active and w.activate then w.activate() else w.active = active end
+		end,
 		gtk_menu_item_set_submenu = function(item, submenu)
 			log.submenus[#log.submenus + 1] = { item = item, submenu = submenu }
 			item.submenu = submenu
@@ -73,6 +76,16 @@ local function fake_binding()
 	}
 
 	local gobject = {
+		g_signal_handler_block = function(instance, id)
+			local entry = assert(log.signals[id])
+			assert(entry.widget == instance)
+			entry.blocked = true
+		end,
+		g_signal_handler_unblock = function(instance, id)
+			local entry = assert(log.signals[id])
+			assert(entry.widget == instance)
+			entry.blocked = false
+		end,
 		g_object_unref = function(instance)
 			log.unrefs = log.unrefs or {}
 			log.unrefs[#log.unrefs + 1] = instance
@@ -80,9 +93,14 @@ local function fake_binding()
 		g_signal_connect_data = function(instance, signal, handler, data)
 			local entry = { widget = instance, signal = signal, handler = handler, data = data }
 			-- Fired the way GTK fires "activate": (the item, the user data).
-			entry.fire = function() return handler(instance, data) end
+			entry.id = #log.signals + 1
+			entry.fire = function()
+				if instance.kind == "check" then instance.active = instance.active == 1 and 0 or 1 end
+				if not entry.blocked then return handler(instance, data) end
+			end
+			instance.activate = entry.fire
 			log.signals[#log.signals + 1] = entry
-			return 1
+			return entry.id
 		end,
 	}
 
@@ -551,5 +569,62 @@ helpers.describe("tray-disabled-admission: protocol activation", function()
 		indicator.destroy(); log.signals[#log.signals].fire()
 		helpers.assert_eq(current, 1, "Stop retires the enabled successor capability too")
 		indicator._set_binding_for_test(nil)
+	end)
+end)
+
+
+helpers.describe("tray indicator: authoritative checks", function()
+	for _, checked in ipairs({ false, true }) do
+		helpers.it("(tray-authoritative-check) a refused change preserves " .. tostring(checked), function()
+			local indicator, log = with_fake()
+			indicator.create("id", "icon", "title")
+			local calls = 0
+			indicator.set_menu({ { title = "Refused", checked = checked, fn = function()
+				calls = calls + 1
+				return false
+			end } })
+			log.signals[1].fire()
+			helpers.assert_eq(calls, 1, "Restoring a check must never invoke the action twice")
+			helpers.assert_eq(widget_named(log, "Refused").active, checked and 1 or 0,
+				"A GTK click must not publish a setting its owner refused")
+			indicator.destroy()
+		end)
+	end
+
+	helpers.it("(tray-authoritative-check) a throwing action preserves its saved check", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		indicator.set_menu({ { title = "Broken", checked = true, fn = function() error("write refused") end } })
+		log.signals[1].fire()
+		helpers.assert_eq(widget_named(log, "Broken").active, 1)
+		indicator.destroy()
+	end)
+
+	helpers.it("(tray-authoritative-check) the acknowledged rebuild publishes the new check once", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local calls = 0
+		indicator.set_menu({ { title = "Toggle", checked = false, fn = function()
+			calls = calls + 1
+			indicator.set_menu({ { title = "Saved", checked = true } })
+		end } })
+		log.signals[1].fire()
+		helpers.assert_eq(calls, 1)
+		helpers.assert_eq(widget_named(log, "Saved").active, 1)
+		indicator.destroy()
+	end)
+
+	helpers.it("(tray-authoritative-check) repeated clicks restore state without recursion or extra actions", function()
+		local indicator, log = with_fake()
+		indicator.create("id", "icon", "title")
+		local calls = 0
+		indicator.set_menu({ { title = "Refused", checked = false, fn = function() calls = calls + 1 return false end } })
+		for _ = 1, 100 do
+			log.signals[1].fire()
+			helpers.assert_eq(widget_named(log, "Refused").active, 0)
+		end
+		helpers.assert_eq(calls, 100)
+		helpers.assert_eq(widget_named(log, "Refused").active, 0)
+		indicator.destroy()
 	end)
 end)

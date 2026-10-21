@@ -6,7 +6,7 @@
 ; CI splits the canonical suite across runners with run_all.ahk --module=<g>.
 ; The groups must partition the registered tests by their file: every test
 ; belongs to exactly one group, keeps its relative order, and unknown groups
-; are refused. --list replays an exact subset in registry order, and
+; are refused (a file no category declares too). --list replays an exact subset in registry order, and
 ; --reverse runs the selection backwards to expose order-dependent tests.
 ; ==============================================================================
 
@@ -41,18 +41,34 @@ Test("runner module: the module groups partition the suite in order (runner-modu
 
 _RSH_GroupRules() {
 	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\meta\test_x.ahk"))
-	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel.ahk"))
-	AssertEqual("llm-servers-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_join.ahk"))
+	AssertEqual("llm-server-panel", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel.ahk"))
+	AssertEqual("llm-server-panel", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel_view_preparation.ahk"))
+	AssertEqual("llm-servers", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_join.ahk"))
+	AssertEqual("llm-servers", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_scope_cohort.ahk"))
+	AssertEqual("llm-servers", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_ollama_runtime_owner.ahk"))
 	AssertEqual("llm-terminal", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\nav_event_owner\test_terminal_route_metadata.ahk"))
+	AssertEqual("llm", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\prediction\test_llm_live_mode.ahk"))
 	AssertEqual("config-transition", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\transition\test_config_transition_windows_port.ahk"))
-	AssertEqual("config-scope-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_global_config_scope.ahk"))
-	AssertEqual("hotstrings", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\hotstrings\personal\test_user_hotstrings.ahk"))
-	AssertEqual("keymap", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
-	AssertEqual("config", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_updater.ahk"))
-	AssertEqual("config", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk"))
-	AssertEqual("config-scope-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_config_scope_manifest.ahk"))
+	AssertEqual("config-scope-global", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_global_config_scope.ahk"))
+	AssertEqual("config-scope-global", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_config_scope_manifest.ahk"))
+	AssertEqual("config-scope-features", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_hotstrings_scope.ahk"))
+	AssertEqual("config-scope-features", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_personal_file_captions.ahk"))
+	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\toml\test_toml_writer_admission.ahk"))
+	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_updater.ahk"))
+	AssertEqual("config-updater", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk"))
+	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\hotstrings\personal\test_user_hotstrings.ahk"))
+	AssertEqual("hotstrings-shortcuts", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\shortcuts\test_capsword_auto_off.ahk"))
+	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
+	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\gestures\test_gestures.ahk"))
+	AssertEqual("keylogger", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\keylogger\test_keylogger_event_id.ahk"))
+	AssertEqual("ui", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_script_control_submenu.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\adapters\shell_runner\test_shell_runner_tree_owned.ahk"))
-	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))
+	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\network\test_managed_remote_transport.ahk"))
+	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\test_text_utils.ahk"))
+	; No catch-all: a file no category declares is refused, never filed under core.
+	AssertThrows(() => _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))
+	AssertThrows(() => _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\new_area\test_x.ahk"))
+	AssertThrows(() => _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_unfiled.ahk"))
 	AssertThrows(() => _SelectModule([], "no-such-group"))
 }
 Test("runner module: files map to their product module and unknown groups are refused (runner-module)", _RSH_GroupRules)

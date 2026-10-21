@@ -229,10 +229,11 @@ class OllamaManagedBootstrap {
 		Catalogue := _SharedDir . "\modules\llm\ollama_release.json"
 		Updater := _SharedDir . "\modules\updater\defaults.json"
 		Policy := _SharedDir . "\modules\network\proxy_policy.json"
+		ServeEnvironment := _SharedDir . "\modules\llm\managed_ollama_environment.json"
 		Helper := Directory . "\ollama_managed_files.ps1"
 		Acquisition := Directory . "\ollama_managed_acquisition.ps1"
 		Vendor := _VendorDir
-		for Path in [Catalogue, Updater, Policy, Helper, Acquisition,
+		for Path in [Catalogue, Updater, Policy, ServeEnvironment, Helper, Acquisition,
 			Directory . "\ollama_download_archive.ps1", Directory . "\ollama-runtime-launch.ps1",
 			Directory . "\ollama-model-pull.ps1"]
 			this.Sources[Path] := this._Hash(Path)
@@ -251,6 +252,7 @@ class OllamaManagedBootstrap {
 		this.Plan := Map("version", Release["version"], "ManagedRoot", Root, "CataloguePath", Catalogue,
 			"CatalogueSha256", this.Sources[Catalogue], "AssetId", Asset,
 			"helper", Helper, "helper_sha256", this.Sources[Helper], "directory", Directory,
+			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"port", Integer(Match[1]), "deadline_ms", LLM_DEPS_POLL_TIMEOUT_MS,
 			"download", Map("ManagedRoot", Root, "CataloguePath", Catalogue,
 				"CatalogueSha256", this.Sources[Catalogue], "AssetId", Asset,
@@ -267,6 +269,7 @@ class OllamaManagedBootstrap {
 			"on_physical", ObjBindMethod(this, "_Physical"), "on_error", ObjBindMethod(this, "_Error")))
 		this.Runtime := OllamaRuntimeOwner(Map("launcher", Directory . "\ollama-runtime-launch.ps1",
 			"helper", Helper, "helper_sha256", this.Sources[Helper],
+			"environment", ServeEnvironment, "environment_sha256", this.Sources[ServeEnvironment],
 			"on_retired", ObjBindMethod(this, "_RuntimeRetired"), "on_error", ObjBindMethod(this, "_Error")))
 	}
 
@@ -333,7 +336,14 @@ class OllamaManagedBootstrap {
 	}
 
 	RuntimeIdentityReady() {
-		if !(this.Target is Map) || !this.Runtime.HasOwner()
+		if !(this.Target is Map) || !this.Runtime.HasOwner() || !(this._RuntimeReadyRecord(this.Target) is Map)
+			return false
+		return this.Runtime.IdentityReady()
+	}
+
+	; This pure state predicate can also guard the short readiness publication.
+	_RuntimeReadyRecord(Target) {
+		if !(Target is Map) || !(this.Target is Map)
 			return false
 		Record := this.Runtime.Record
 		if !(Record is Map) || !this._True(Record.Get("accepted", false)) || !this._True(Record.Get("ready", false))
@@ -341,9 +351,9 @@ class OllamaManagedBootstrap {
 				|| !(Record.Get("terminal", "") is Integer) || Record["terminal"] != false || !(Record.Get("target", 0) is Map)
 			return false
 		for Name in ["origin", "runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256"]
-			if Record["target"].Get(Name, "") != this.Target[Name]
+			if Record["target"].Get(Name, "") != Target[Name] || Target[Name] != this.Target[Name]
 				return false
-		return this.Runtime.IdentityReady()
+		return Record
 	}
 
 	/** Exact borrowed enable writer successor; no arbitrary source recapture. */
@@ -516,9 +526,17 @@ class OllamaManagedBootstrap {
 	}
 
 	_ServerReady(Target, Receipt) {
-		this.ServerReady := true
-		this.Target["ready_file_identity"] := Receipt["ready_file_identity"]
-		this.Target["ready_image_sha256"] := this.Runtime.Record["ready_image_sha256"]
+		if !this._Current()
+			return this.Cancel()
+		PreviousCritical := Critical("On")
+		try {
+			Record := this._RuntimeReadyRecord(Target)
+			if this.Cancelled || this.Failed || !(Record is Map)
+				return false
+			this.ServerReady := true
+			this.Target["ready_file_identity"] := Receipt["ready_file_identity"]
+			this.Target["ready_image_sha256"] := Record["ready_image_sha256"]
+		} finally Critical(PreviousCritical)
 		if !this._Current()
 			return this.Cancel()
 		if this.Port is Map
@@ -685,6 +703,7 @@ class OllamaManagedBootstrap {
 			"-ManagedHelperSha256", this.Plan["helper_sha256"], "-ManagedRoot", Target["managed_root"],
 			"-RuntimeLauncherPath", this.Plan["directory"] . "\ollama-runtime-launch.ps1",
 			"-RuntimeLauncherSha256", this.Sources[this.Plan["directory"] . "\ollama-runtime-launch.ps1"],
+			"-ServeEnvironmentPath", this.Plan["environment"], "-ServeEnvironmentSha256", this.Plan["environment_sha256"],
 			"-ReadyFileIdentity", Target["ready_file_identity"], "-ReadyImageSha256", Target["ready_image_sha256"],
 			"-RootIdentity", Target["root_identity"], "-PublishedPath", Target["version_path"],
 			"-StageIdentity", Target["version_identity"], "-TicketId", Target["ticket"],

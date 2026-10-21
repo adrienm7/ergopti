@@ -2187,6 +2187,9 @@ local function queue_guardian_regeneration(context)
 			and retained.enabled_transaction == context.enabled_transaction
 		if equivalent and not retained.settled then
 			join_guardian_regeneration_context(retained, context)
+			Logger.info(LOG,
+				"Karabiner deploy decision: coalesced (a %s regeneration joined the one waiting for its guardian proof; one build, at most one reload).",
+				tostring(context.intent))
 			return true
 		end
 	end
@@ -2411,6 +2414,39 @@ local function run_lease_recovery_attempt(recovery, guardian_proven_ready)
 		cancel_lease_recovery("lease-superseded-in-phase-" .. tostring(phase))
 		return
 	end
+	-- The deploy below reloads Karabiner; let a typing burst finish first
+	-- (platform/remap/deploy_pacing.lua). Required here: this chunk is at
+	-- Lua's 200-local limit.
+	local waited = recovery.typing_deferred_sec or 0
+	local recheck = require("platform.remap.deploy_pacing").recheck_after(waited, recovery.attempt)
+	if recheck then
+		retry_lease_recovery_timer_cleanup()
+		local recheck_timer = nil
+		local recheck_armed = false
+		local recheck_fired_early = false
+		local recheck_ok, recheck_or_err, recheck_committed = pcall(TimerScheduler.after, recheck, function()
+			if not recheck_armed then
+				recheck_fired_early = true
+				return
+			end
+			if _lease_recovery ~= recovery or recovery.timer ~= recheck_timer then return end
+			run_async_step("Karabiner deploy typing deferral", function()
+				run_lease_recovery_attempt(recovery)
+			end)
+		end)
+		if recheck_ok then recheck_timer = recheck_or_err end
+		if recheck_committed == true and type(recheck_timer) == "table"
+			and recheck_timer.fired ~= true and not recheck_fired_early then
+			recovery.timer = recheck_timer
+			recovery.typing_deferred_sec = waited + recheck
+			recheck_armed = true
+			return
+		end
+		reject_lease_recovery_timer(recheck_timer, "Deploy typing deferral")
+		Logger.warn(LOG, "Karabiner deploy typing deferral could not arm; deploying now: %s.",
+			tostring(recheck_ok and "invalid timer handle" or recheck_or_err))
+	end
+	recovery.typing_deferred_sec = nil
 
 	recovery.in_flight = true
 	recovery.waiting_for_phase = false
@@ -3533,6 +3569,14 @@ local ONBOARDING_STOP_JOINED = {}
 function M.get_enabled()
 	if not _state then return false end
 	return _state.enabled == true
+end
+
+--- The virtual keyboard form the generator deploys while the integration is
+--- on, read from memory: input callbacks resolve the ISO pair with it.
+--- @return string|nil form "ansi" or "iso"; nil when off or not yet resolved.
+function M.virtual_keyboard_form()
+	if not _state or _state.enabled ~= true then return nil end
+	return _state.virtual_keyboard_type
 end
 
 --- The remap guardian's state for the diagnostics permissions table, read
@@ -5914,7 +5958,8 @@ function M.regenerate(
 			if type(on_done) == "function" then
 				retained.callbacks[#retained.callbacks + 1] = on_done
 			end
-			Logger.debug(LOG, "Joined retained %s regeneration after a layout change.",
+			Logger.info(LOG,
+				"Karabiner deploy decision: coalesced (joined the %s regeneration retained until the layout change settles).",
 				tostring(retained.intent))
 			return true
 		end

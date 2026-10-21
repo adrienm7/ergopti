@@ -27,6 +27,7 @@ local KEY_SCROLLLOCK_XKB = 70 + 8
 local function load(led_byte, failing_code)
 	local Evdev = helpers.load_module("adapters.evdev_reader")
 	Evdev._set_backend({
+		read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 		open = function() return 7 end,
 		ioctl = function() return true end,
 		read = function() return nil end,

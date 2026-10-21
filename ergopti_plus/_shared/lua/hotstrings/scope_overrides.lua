@@ -58,7 +58,8 @@ end
 ---   features table The generated manifest's `features` array.
 ---   groups table Dense array of runtime-owned groups: { id = string,
 ---     override = segments (the group's override table path),
----     sections = { section names }, bundled = boolean }.
+---     sections = { section names }, bundled = boolean, personal = boolean|nil }
+---     where personal marks the user's own files, which a restore leaves alone.
 ---   inherited function (group_id, section) -> seconds the runtime resolves
 ---     for that section once every user override is removed.
 ---   extra table|nil Dense array of { override = segments, fields = names }
@@ -89,9 +90,16 @@ function M.plan(request)
 			and valid_segments(group.override) and type(group.sections) == "table"
 			and type(group.bundled) == "boolean", "override scope group is malformed at " .. position)
 		assert(not seen[group.id], "override scope group is duplicated: " .. group.id)
+		assert(group.personal == nil or type(group.personal) == "boolean",
+			"override scope personal flag is malformed in " .. group.id)
 		seen[group.id] = true
-		for _, field in ipairs(M.FIELDS) do emit(group.override, nil, field) end
-		for _, section in ipairs(group.sections) do
+		-- A restore leaves the user's own hotstrings as they are: only a clear
+		-- resets a personal group's delay, colour, priority and tooltip.
+		local untouched = request.mode == "recommended" and group.personal == true
+		if not untouched then
+			for _, field in ipairs(M.FIELDS) do emit(group.override, nil, field) end
+		end
+		for _, section in ipairs(untouched and {} or group.sections) do
 			assert(type(section) == "string" and section ~= "", "override scope section is malformed in " .. group.id)
 			local delay_change
 			for _, field in ipairs(M.FIELDS) do

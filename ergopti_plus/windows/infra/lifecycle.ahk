@@ -73,6 +73,13 @@ global _LifecycleShutdownVetoAttempts := 0
 global _LifecycleShutdownReason := ""
 ; Exact private AI attempt owned by this noninterruptible OnExit call.
 global _LifecycleAiShutdownAttempt := 0
+;
+; A user exit refused only because a keylogger flush or journal handoff was
+; running is retried once that settles, so one Quit is enough. The poll costs no
+; shutdown veto: only the retried ExitApp passes through the gates again.
+global LIFECYCLE_FLUSH_EXIT_POLL_MS := 100
+global LIFECYCLE_FLUSH_EXIT_BUDGET_MS := 10000
+global _LifecycleFlushExitRetryArmed := false
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -907,6 +914,42 @@ _LifecycleRefuseShutdown(Gate, RequireNativeRetirement := false) {
 	return 0
 }
 
+; Arms the retry of the same user exit after a transient keylogger refusal.
+; Reloads and system exits keep their own owners; one retry is armed at most.
+; @param Reason {String} The refused OnExit reason.
+; @param Code {Integer} The refused exit code, reused by the retry.
+_LifecycleArmFlushExitRetry(Reason, Code) {
+	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_POLL_MS
+	global LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	if _LifecycleFlushExitRetryArmed || !(Reason = "Exit" || Reason = "Menu")
+		return
+	_LifecycleFlushExitRetryArmed := true
+	Deadline := A_TickCount + LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	; The first poll runs after OnExit returns: ExitApp never re-enters it.
+	try TimerArmOneShotMs(() => KL_AwaitFlushHandoff(_LifecycleRetryExitNow.Bind(Code),
+		_LifecycleAbandonExitRetry, Deadline, LIFECYCLE_FLUSH_EXIT_POLL_MS),
+		LIFECYCLE_FLUSH_EXIT_POLL_MS)
+	catch as Err {
+		_LifecycleFlushExitRetryArmed := false
+		try LoggerError("Lifecycle", "Deferred exit retry could not be armed: {1}.", Err.Message)
+	}
+}
+
+_LifecycleRetryExitNow(Code, *) {
+	global _LifecycleFlushExitRetryArmed
+	_LifecycleFlushExitRetryArmed := false
+	try LoggerInfo("Lifecycle", "Keylogger flush settled; retrying the deferred exit.")
+	ExitApp(Code)
+}
+
+_LifecycleAbandonExitRetry(*) {
+	global _LifecycleFlushExitRetryArmed, LIFECYCLE_FLUSH_EXIT_BUDGET_MS
+	_LifecycleFlushExitRetryArmed := false
+	try LoggerError("Lifecycle",
+		"Deferred exit abandoned: the keylogger flush did not settle within {1} ms.",
+		LIFECYCLE_FLUSH_EXIT_BUDGET_MS)
+}
+
 ; This admission protects only the exact unsettled successor retirement.
 _LifecycleRefuseNativeRetirement(Gate) {
 	return _LifecycleRefuseShutdown(Gate, true)
@@ -1039,12 +1082,23 @@ Ergopti_OnShutdown(reason, code) {
 		catch as Err
 			try LoggerError("Lifecycle", "Keylogger shutdown lease failed: {1}.", Err.Message)
 		KeyloggerFlushReady := false
-		try KeyloggerFlushReady := KL_FlushShutdownReady()
+		KeyloggerFlushReason := ""
+		try KeyloggerFlushReady := KL_FlushShutdownReady(, , &KeyloggerFlushReason)
 		catch as Err
 			try LoggerError("Lifecycle", "Keylogger flush shutdown preflight failed: {1}.", Err.Message)
 		if !KeyloggerFlushReady {
-			try LoggerError("Lifecycle",
-				"Shutdown refused because keylogger persistence debt is not durable yet.")
+			; A flush or journal handoff in progress settles on its own, so the
+			; same exit is retried once it ends instead of asking the user again.
+			; Braces: a one-line try would claim this else as its own clause.
+			if (KeyloggerFlushReason == "flush_in_progress" || KeyloggerFlushReason == "journal_busy") {
+				try LoggerInfo("Lifecycle",
+					"Shutdown deferred while a keylogger flush settles ({1}).", KeyloggerFlushReason)
+				_LifecycleArmFlushExitRetry(reason, code)
+			} else {
+				try LoggerError("Lifecycle",
+					"Shutdown refused because keylogger persistence debt is not durable yet ({1}).",
+					KeyloggerFlushReason)
+			}
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
@@ -1216,6 +1270,13 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
+		; The reload is now certain: menu commands that waited for it go to the
+		; successor, read from the tray before any teardown retires its rows.
+		if (TerminalHandoff is Map) {
+			try MenuReloadReplay_Publish()
+			catch as Err
+				try LoggerError("Lifecycle", "Menu commands could not be handed to the reload successor: {1}.", Err.Message)
+		}
 		if (SupersededReload is Map)
 			try ReloadTerminalHandoffAbandon(SupersededReload, reason)
 		try ScreenBrightnessCancel("shutdown")
@@ -1255,6 +1316,9 @@ Ergopti_OnShutdown(reason, code) {
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
+		try DriverControl_Stop()
+		catch as Err
+			try LoggerError("Lifecycle", "Local reload control teardown failed: {1}.", Err.Message)
 		try HealthCheck_StopWindowControl()
 		catch as Err
 			try LoggerError("Lifecycle", "Diagnostics window control teardown failed: {1}.", Err.Message)
@@ -1468,7 +1532,7 @@ _TrayRootBuildShell(PublishAuthorizeFn) {
 		Published := initMenu(PublishAuthorizeFn, true)
 	} catch as Err {
 		TrayMenuStage_Abort()
-		BootProfile_StageAbort("tray global commands", Err.Message)
+		BootProfile_StageAbort("tray global commands", ErrorNet_Describe(Err))
 		throw Err
 	} finally {
 		_DriverReady := SavedReady

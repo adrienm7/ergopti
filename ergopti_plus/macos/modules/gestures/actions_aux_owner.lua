@@ -435,10 +435,14 @@ end
 local function publish_shell_timeout(entry)
 	if not entry_is_current(entry) or entry.terminal_received == true then return false end
 	entry.terminal_received = true
-	entry.terminal_delivered = true
-	entry.callback_active = true
-	invoke(entry.scope, entry.label, entry.callback, false, nil)
-	entry.callback_active = false
+	-- A due timer can settle after pause revoked its parent's business authority.
+	-- Keep the exact process cleanup continuation without publishing stale work.
+	if authorized(entry) then
+		entry.terminal_delivered = true
+		entry.callback_active = true
+		invoke(entry.scope, entry.label, entry.callback, false, nil)
+		entry.callback_active = false
+	end
 	shell_error(entry, "%s process exceeded its %.1f-second settlement deadline.",
 		tostring(entry.label), SHELL_DEADLINE_SEC)
 	request_shell_termination(entry, "settlement deadline exhausted")

@@ -62,7 +62,7 @@ function M.run_selective_cleanup(on_done)
 		-- Match the executable identity before inspecting argv. A pgrep -f pattern
 		-- also sees this entire /bin/sh -c script and can therefore select the shell
 		-- that is running the cleanup, killing it before the diagnostics below.
-		"  PIDS=$(ps -axo pid=,comm=,args= 2>/dev/null | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
+		"  PIDS=$(ps -axo pid=,ucomm=,args= 2>/dev/null | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
 		"  if [ -n \"$PIDS\" ]; then echo \"[BOOT] no single healthy server on :" .. P .. " (listeners=$NLISTEN, model_id='$MODEL_ID') — terminating leftover MLX Python process(es): $PIDS\"; echo \"$PIDS\" | xargs kill -9 2>/dev/null; sleep 0.3; else echo \"[BOOT] no MLX Python processes and no server on :" .. P .. " — clean slate.\"; fi; " ..
 		"fi; " ..
 		"echo \"[BOOT-DIAG] port " .. P .. " state:\"; lsof -nP -iTCP:" .. P .. " 2>/dev/null || echo \"  (port " .. P .. " is FREE)\""

@@ -27,6 +27,9 @@ local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
 local Json       = require("json")
+local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+	return hs.webview.usercontent.new(name)
+end, Logger)
 local ProgramProviderPicker = require("program_provider_picker")
 local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
 local PresentationContextPrepareOwner = rawget(ui_builder, "prepare_app_contextual_title")
@@ -75,35 +78,34 @@ local ASSETS_DIR = (Paths.shared("ui/action_picker") or "") .. "/"
 --- @param session table Session identity.
 --- @return boolean closed Whether this session still owned the window.
 local function close_session(session)
-	if _active_session ~= session then return false end
-	if session.closing then return false end
+	if _active_session ~= session or session.closing then return false end
+	session.closing = true
 	local webview = session.webview
 	if webview then
-		if type(webview.delete) ~= "function" then
-			Logger.error(LOG, "Action picker close refused; owned WebView has no delete method.")
+		local ok, result = pcall(function() return webview:delete() end)
+		if not ok or result == false then
+			pcall(Logger.error, LOG, "Action picker close did not commit; exact WebView retained: %s.", tostring(result))
+			session.closing = false
 			return false
 		end
-		session.closing = true
-		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
-		session.closing = false
-		if not ok then
-			-- ui_builder may deliver on_close synchronously before native deletion
-			-- raises. Restore the exact session so replacement and callback retries
-			-- cannot escape the still-ambiguous native owner.
-			_active_session = session
-			_webview = webview
-			_usercontent = session.usercontent
-			Logger.error(LOG, "Action picker close did not commit; exact WebView retained: %s.",
-				tostring(err))
+		session.webview = nil
+		if _webview == webview then _webview = nil end
+	end
+	session.retired = true
+	local bridge = session.usercontent
+	if bridge then
+		local released, result = ControllerPool.release(session.controller_lease)
+		if not released then
+			pcall(Logger.error, LOG, "Action picker callback cleanup remains pending: %s.", tostring(result))
+			session.closing = false
 			return false
 		end
+		session.usercontent = nil
+		if _usercontent == bridge then _usercontent = nil end
 	end
-	if _active_session == session then
-		ProgramProviderPicker.close(session.providers)
-		_active_session = nil
-		_webview = nil
-		_usercontent = nil
-	end
+	ProgramProviderPicker.close(session.providers)
+	if _active_session == session then _active_session = nil end
+	session.closing = false
 	return true
 end
 
@@ -176,13 +178,17 @@ function M.open(opts, on_confirm)
 
 	if presentation_live and (not presentation_live() or _active_session ~= nil
 		or _session_serial ~= replacement_serial) then return false end
-	local ok_uc, uc = pcall(hs.webview.usercontent.new, "action_picker_bridge")
-	if not ok_uc or not uc then
-		Logger.error(LOG, "Error creating usercontent bridge.")
+	local controller_lease, uc = ControllerPool.reserve("action_picker")
+	if not controller_lease then
+		Logger.error(LOG, "Error creating usercontent bridge: %s.", tostring(uc))
 		return false
 	end
 	if presentation_live and (not presentation_live() or _active_session ~= nil
-		or _session_serial ~= replacement_serial) then return false end
+		or _session_serial ~= replacement_serial) then
+		local released, detail = ControllerPool.release(controller_lease)
+		if not released then Logger.error(LOG, "Action picker unpublished bridge cleanup remains pending: %s.", tostring(detail)) end
+		return false
+	end
 	_session_serial = _session_serial + 1
 	local session = {
 		epoch = _session_serial,
@@ -190,6 +196,7 @@ function M.open(opts, on_confirm)
 		settled = false,
 		settling = false,
 		usercontent = uc,
+		controller_lease = controller_lease,
 		webview = nil,
 		providers = { packet = { unavailable = true } },
 	}
@@ -235,7 +242,7 @@ function M.open(opts, on_confirm)
 	}
 
 	local function push_init()
-		if _active_session ~= session or not session.webview then return end
+		if _active_session ~= session or session.retired or session.closing or not session.webview then return end
 		if presentation_live and not presentation_live() then
 			close_session(session)
 			return
@@ -252,8 +259,8 @@ function M.open(opts, on_confirm)
 		end
 	end
 
-	uc:setCallback(function(msg)
-		if _active_session ~= session then return end
+	local bound, bind_error = ControllerPool.bind(controller_lease, function(msg)
+		if _active_session ~= session or session.retired or session.closing then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
 		if type(body) ~= "table" then return end
@@ -302,7 +309,7 @@ function M.open(opts, on_confirm)
 					if type(reason) ~= "string" or not utf8.len(reason) then return nil end
 					return Json.quote(reason)
 				end)
-				if _active_session ~= session or not session.webview then return end
+				if _active_session ~= session or session.retired or session.closing or not session.webview then return end
 				if not encoded or type(argument) ~= "string" or argument == "" then
 					Logger.error(LOG, "Action picker refusal could not be encoded (content withheld).")
 					return
@@ -323,6 +330,11 @@ function M.open(opts, on_confirm)
 			close_session(session)
 		end
 	end)
+	if not bound then
+		Logger.error(LOG, "Action picker callback binding did not commit: %s.", tostring(bind_error))
+		close_session(session)
+		return false
+	end
 
 	local geo = ui_builder.get_app_geometry("action_picker")
 	if not geo then
@@ -330,6 +342,7 @@ function M.open(opts, on_confirm)
 		return false
 	end
 	local native_options = {
+		delete_on_close = true,
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
 		style_masks   = { "titled", "closable", "utility" },
 		usercontent   = uc,
@@ -345,10 +358,9 @@ function M.open(opts, on_confirm)
 			-- Only the acknowledged caller may retire choices in that interval.
 			if session.closing then return end
 			if _active_session == session then
-				ProgramProviderPicker.close(session.providers)
-				_active_session = nil
+				session.webview = nil
 				_webview = nil
-				_usercontent = nil
+				close_session(session)
 			end
 		end,
 	}
@@ -393,6 +405,10 @@ function M.open(opts, on_confirm)
 	end
 	session.webview = webview
 	_webview = webview
+	if not ControllerPool.attach(controller_lease, webview) or not ControllerPool.commit(controller_lease) then
+		close_session(session)
+		return false
+	end
 	local automation_ok, automation = pcall(require, "adapters.apple_shortcuts_native")
 	ProgramProviderPicker.capture_automation(session.providers, automation_ok and automation or nil, function(packet)
 		if _active_session ~= session or session.closing or not session.webview then return end

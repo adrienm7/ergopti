@@ -20,7 +20,9 @@ _LNEO_StopDiagnosticCount(Lines, Level, Detail) {
 			"native operation text must not escape through stop diagnostics")
 		AssertFalse(InStr(Line, "injected navigation-owner stop failure"),
 			"arbitrary exception messages must not escape through stop diagnostics")
-		if InStr(Line, "[" . Level . "] [LLM.nav]") && InStr(Line, Detail)
+		; The shared arbiter serves hotstrings too: its lines are not AI lines (issue #97).
+		AssertFalse(InStr(Line, "[LLM.nav]"), "the keyboard arbiter must not log under an AI tag")
+		if InStr(Line, "[" . Level . "] [KeyboardArbiter]") && InStr(Line, Detail)
 			Count += 1
 	}
 	return Count

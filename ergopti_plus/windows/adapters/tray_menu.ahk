@@ -132,12 +132,48 @@ TrayMenuHandleItemCount(Handle) {
 	return DllCall("GetMenuItemCount", "ptr", Handle, "int")
 }
 
+/**
+ * Reads the native state flags at a captured menu's zero-based row position.
+ * This Windows-only helper is outside the cross-driver TrayMenu port contract.
+ * Callers retain the failure sentinel so they can refuse their owning operation.
+ * @param {Integer} Handle Captured HMENU, without reacquiring Menu.Handle.
+ * @param {Integer} Position Zero-based row position.
+ * @returns {Integer} Native state flags, or 0xFFFFFFFF when the row cannot be read.
+ */
+TrayMenuHandleItemState(Handle, Position) {
+	return DllCall("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")
+}
+
 ; Reads a child from the same captured native parent during owned-tree cleanup.
 ; @param Handle {Integer} Captured parent HMENU.
 ; @param Position {Integer} Zero-based row position.
 ; @returns {Integer} Native submenu handle, or 0 when the row has no submenu.
 TrayMenuSubmenuHandle(Handle, Position) {
 	return DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+}
+
+; Reads the command identifier of a row of a captured native menu.
+; @param Handle {Integer} Captured HMENU.
+; @param Position {Integer} Zero-based row position.
+; @returns {Integer} Native item identifier, 0xFFFFFFFF for a submenu or a missing row.
+TrayMenuHandleItemId(Handle, Position) {
+	return DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+}
+
+; Reads the caption of a row of a captured native menu.
+; @param Handle {Integer} Captured HMENU.
+; @param Position {Integer} Zero-based row position.
+; @returns {String} Native UTF-16 caption, "" for a separator or a row without text.
+TrayMenuHandleItemCaption(Handle, Position) {
+	static MF_BYPOSITION := 0x0400
+	Required := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", MF_BYPOSITION, "int")
+	if Required <= 0
+		return ""
+	TextBuffer := Buffer((Required + 1) * 2, 0)
+	DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+		"ptr", TextBuffer, "int", Required + 1, "uint", MF_BYPOSITION, "int")
+	return StrGet(TextBuffer, "UTF-16")
 }
 
 ; Tells whether the row at a zero-based position of a native menu is a separator.

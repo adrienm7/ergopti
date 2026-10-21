@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
 local Json = require("json")
 local EvdevCodes = require("infra.evdev_codes")
@@ -41,7 +42,7 @@ local RESERVED_CODES = { [42] = true, [54] = true, [29] = true, [97] = true, [56
 local RELOADED = {
 	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
 	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
-	"modules.llm.api_remote", "modules.hotstrings.injector", "adapters.keyboard_layout", "adapters.xkb_capture",
+	"modules.llm.api_remote", "modules.hotstrings.injector", "modules.hotstrings.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
 }
 local FAKED = {
 	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
@@ -125,8 +126,8 @@ local function scenario(opts, body)
 				return true
 			end,
 		}
-		package.loaded["modules.llm.profiles"] = {
-			init = function() end,
+		local profiles = ProfilesFixture.without_inventory({
+			init = function() return true end,
 			is_enabled = function() return opts.disabled ~= true end,
 			get_current_model = function() return "ollama-model" end,
 			set_model = function(name, source, admission)
@@ -134,7 +135,8 @@ local function scenario(opts, body)
 				return preferences.set_many({ ["llm.models.ollama"] = name }, source, admission)
 			end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
-		}
+		})
+		package.loaded["modules.llm.profiles"] = profiles
 		package.loaded["modules.llm.api_ollama"] = {
 			chat = function(_, _, messages, request_opts, _, on_done)
 				world.ollama[#world.ollama + 1] = { messages = messages, opts = request_opts, on_done = on_done }
@@ -185,15 +187,24 @@ local function scenario(opts, body)
 			replace_selection = function(text, _, authorized, callback)
 				local function complete()
 					if not authorized() then callback(false); return end
-					local result = injector.inject_selected(text, false)
-					local committed = type(result) == "table" and result.ok == true
+					-- The native range/caret observations are controlled selection
+					-- boundaries in this Engine scenario; both output phases are real.
+					local stage = injector.prepare_selected(text, { current = authorized, cached = authorized })
+					local prepared = stage.prepare()
+					local payload = prepared and stage.payload() or nil
+					local result = payload and payload.ok and stage.reselect() or nil
+					local cleaned = stage.close()
+					local committed = cleaned and type(result) == "table" and result.ok == true
 					if committed then world.selection = text end
 					callback(committed)
 				end
 				if world.defer_selection_replace then world.complete_selection_replace = complete else complete() end
 				return true
 			end,
-			focus_id = function() return world.focus end,
+			focus_id = function()
+				if world.on_focus then world.on_focus() end
+				return world.focus
+			end,
 			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
@@ -221,6 +232,7 @@ local function scenario(opts, body)
 		for _, name in ipairs(RELOADED) do package.loaded[name] = previous[name] end
 		for _, name in ipairs(FAKED) do package.loaded[name] = previous[name] end
 		if not ok then error(err, 0) end
+		profiles.assert_no_inventory()
 	end, { initial = stored })
 end
 
@@ -731,4 +743,80 @@ helpers.describe("active API entry deletion", function()
 			helpers.assert_eq(#world.emitted, 0, "a deleted provider cannot replace the selected text")
 		end)
 	end)
+end)
+
+helpers.describe("tone dispatch retains its native admission owner", function()
+	for _, paced in ipairs({ false, true }) do
+		for _, boundary in ipairs({ "privacy", "focus" }) do
+			for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+				helpers.it("(tone-dispatch-owner) rechecks " .. action .. " after " .. boundary .. " paced=" .. tostring(paced), function()
+					local subject, armed, observed, action_result, boundary_finished
+					local focus_reads, retired_focus_reads = 0, 0
+					local owner = { pending = function() return false end }
+					local function intervene()
+						if not armed then return end
+						armed, observed = false, true
+						if action == "scope" then action_result = subject.engine.acquire_configuration(owner)
+						elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
+						else
+							subject.selection = "Bonjour"
+							action_result = subject.engine.shift_tone(require("llm.tone").MORE_FORMAL, false)
+						end
+						boundary_finished = true
+					end
+					scenario({ selection = "Merci pour ton aide !", privacy_guard = function()
+						if boundary == "privacy" then intervene() end
+						return false
+					end }, function(world)
+						subject = world
+						if paced then
+							helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+							world.respond(1, "REWRITE: Merci pour votre aide.")
+						end
+						world.emitted = {}
+						local previous_posts = #world.posts
+						if not paced then
+							-- The capture callback has one separate focus check before
+							-- send(). Arm only after selection capture begins and skip
+							-- that earlier observer so the pre-send barrier is tested.
+							world.on_read_selection = function() world.on_read_selection = nil; armed = true end
+						end
+						if boundary == "focus" then
+							world.on_focus = function()
+								if not armed then return end
+								focus_reads = focus_reads + 1
+								if paced or focus_reads > 1 then intervene() end
+							end
+						else
+							world.on_focus = function() if boundary_finished then retired_focus_reads = retired_focus_reads + 1 end end
+						end
+						helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+						if paced then
+							helpers.assert_eq(#world.posts, previous_posts, "the original request must be paced before its observer runs")
+							armed = true
+						end
+						world.wait_for(previous_posts + (action == "successor" and 2 or 1))
+						helpers.assert_true(observed, "the actual pre-send " .. boundary .. " boundary must dispatch the competing action")
+						helpers.assert_true(action_result, "the competing action must acquire its real engine owner")
+						helpers.assert_eq(retired_focus_reads, 0, "a revoked privacy owner must not begin another native focus observation")
+						world.on_focus = nil
+						helpers.assert_eq(#world.posts, previous_posts + (action == "successor" and 1 or 0),
+							"a retired tone selection must never reach the real remote client's HTTP transport")
+						helpers.assert_eq(#world.emitted, 0, "dispatch does not authorize physical replacement")
+						if action == "successor" then
+							local index = previous_posts + 1
+							helpers.assert_eq(user_turn(world.posts[index]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "only the successor selection may be sent")
+							world.respond(index, "REWRITE: Bonjour")
+							assert_replaced(world, "Bonjour")
+							helpers.assert_eq(world.selection, "Bonjour", "the successor callback retains its tone generation")
+							world.emitted = {}
+							helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+							world.wait_for(index + 1)
+							helpers.assert_eq(user_turn(world.posts[index + 1]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "the next ladder step must retain the successor's original source")
+						elseif action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
+					end)
+				end)
+			end
+		end
+	end
 end)

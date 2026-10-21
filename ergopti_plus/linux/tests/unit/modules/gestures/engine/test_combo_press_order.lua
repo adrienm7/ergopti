@@ -228,3 +228,164 @@ helpers.describe("combo press: a modifier the hand or a hold already has down", 
 	end)
 
 end)
+
+
+
+
+
+-- ===========================================================
+-- ===========================================================
+-- ======= 4/ Original modifier owners across a chord ========
+-- ===========================================================
+-- ===========================================================
+
+--- Runs the actual Reader/Hook/Writer/custody with controlled byte ports.
+--- Restores every imported module so each case also works alone or in reverse.
+--- @param options table|nil Native write refusal or observation hooks.
+--- @param body function Receives the source session and actual ComboEmitter.
+local function with_owners(options, body)
+	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
+	local ok, detail = pcall(function()
+		require("tests.support.modifier_broker_fixture").with_session(options, function(session)
+			local combo = helpers.load_module("modules.gestures.combo_emitter")
+			body(session, combo)
+		end)
+	end)
+	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(saved) do package.loaded[name] = value end
+	if not ok then error(detail, 0) end
+end
+
+local function wire_after(session, count)
+	local trail = {}
+	for index = count + 1, #session.rows do
+		local row = session.rows[index]; trail[#trail + 1] = row[1] .. ":" .. row[2]
+	end
+	return table.concat(trail, " ")
+end
+
+helpers.describe("combo press: foreign carrier modifiers retain their original source", function()
+	local carriers = {
+		{ "Ctrl", { 29 }, "30:1 30:0" },
+		{ "Alt", { 56 }, "56:0 29:1 30:1 30:0 29:0 56:1" },
+		{ "Ctrl+Shift", { 29, 42 }, "42:0 30:1 30:0 42:1" },
+		{ "Super", { 125 }, "125:0 29:1 30:1 30:0 29:0 125:1" },
+		{ "Alt+Shift", { 56, 42 }, "42:0 56:0 29:1 30:1 30:0 29:0 56:1 42:1" },
+		{ "Super+Shift", { 125, 42 }, "42:0 125:0 29:1 30:1 30:0 29:0 125:1 42:1" },
+	}
+	for _, case in ipairs(carriers) do
+		helpers.it("select-all excludes the " .. case[1] .. " carrier and restores exactly its original owners", function()
+			with_owners(nil, function(s, combo)
+				for _, code in ipairs(case[2]) do s.queue("a", code, 1, 1) end
+				s.pump(); local count = #s.rows
+				local before = s.view().down
+				local ok, result = combo.press_codes({ 29 }, { 30 }, "select-all carrier")
+				helpers.assert_true(ok); helpers.assert_eq(result.kind, "emitted")
+				helpers.assert_eq(wire_after(s, count), case[3])
+				helpers.assert_eq(s.view().down, before, "only the original exact holders remain down")
+				for index = #case[2], 1, -1 do s.queue("a", case[2][index], 0, 2) end
+				s.pump(); helpers.assert_eq(s.view().down, {})
+			end)
+		end)
+	end
+	for _, pair in ipairs({ { 29, 97 }, { 42, 54 }, { 125, 126 } }) do
+		for _, held in ipairs(pair) do
+			helpers.it("preserves the requested modifier family while exact side " .. held .. " remains held", function()
+				with_owners(nil, function(s, combo)
+					s.queue("a", held, 1, 1); s.pump(); local count = #s.rows
+					helpers.assert_true(combo.press_codes({ pair[1] }, { 30 }, "requested family"))
+					local expected = held == pair[1] and "30:1 30:0"
+						or (pair[1] .. ":1 30:1 30:0 " .. pair[1] .. ":0")
+					helpers.assert_eq(wire_after(s, count), expected)
+					helpers.assert_eq(s.view().down, { held })
+					s.queue("a", held, 0, 2); s.pump(); helpers.assert_eq(s.view().down, {})
+				end)
+			end)
+		end
+	end
+	helpers.it("does not borrow AltGr as the requested ordinary Alt family", function()
+		with_owners(nil, function(s, combo)
+			s.queue("a", 100, 1, 1); s.pump(); local count = #s.rows
+			helpers.assert_true(combo.press_codes({ 56 }, { 30 }, "ordinary Alt"))
+			helpers.assert_eq(wire_after(s, count), "100:0 56:1 30:1 30:0 56:0 100:1")
+			helpers.assert_eq(s.view().down, { 100 })
+			s.queue("a", 100, 0, 2); s.pump(); helpers.assert_eq(s.view().down, {})
+		end)
+	end)
+	for _, phase in ipairs({ "neutralize", "restore" }) do
+		for _, throws in ipairs({ false, true }) do
+			helpers.it("retires output after " .. phase .. " " .. (throws and "throws" or "refuses") .. " its native ACK", function()
+				local armed = false
+				with_owners({ fail_sync = function(code, value)
+					if armed and code == 56 and value == (phase == "restore" and 1 or 0) then
+						if throws then error("controlled modifier synchronization refusal") end
+						return true
+					end
+				end }, function(s, combo)
+					s.queue("a", 56, 1, 1); s.pump(); armed = true
+					local ok, result = combo.press_codes({ 29 }, { 30 }, "refused modifier ACK")
+					helpers.assert_eq(ok, false); helpers.assert_eq(result.kind, "custody_unresolved")
+					helpers.assert_eq(s.hook.isRunning(), false)
+					helpers.assert_eq(s.writer.is_open(), false, "the original failed output was actually retired")
+				end)
+			end)
+		end
+	end
+	helpers.it("never restores a carrier whose real source UP arrived during the chord", function()
+		local armed, released = false, false
+		with_owners({ after_sync = function(s, code, value)
+			if armed and not released and code == 30 and value == 1 then
+				released = true; s.queue("a", 56, 0, 2); s.pump()
+			end
+		end }, function(s, combo)
+			s.queue("a", 56, 1, 1); s.pump(); armed = true; local count = #s.rows
+			helpers.assert_true(combo.press_codes({ 29 }, { 30 }, "retiring source"))
+			helpers.assert_true(released)
+			helpers.assert_eq(wire_after(s, count), "56:0 29:1 30:1 30:0 29:0")
+			helpers.assert_eq(s.view().down, {})
+		end)
+	end)
+	helpers.it("restores the other carrier source after one of two same-code owners releases", function()
+		local armed, released = false, false
+		with_owners({ after_sync = function(s, code, value)
+			if armed and not released and code == 30 and value == 1 then
+				released = true; s.queue("a", 56, 0, 2); s.pump()
+			end
+		end }, function(s, combo)
+			s.queue("a", 56, 1, 1); s.queue("b", 56, 1, 1); s.pump(); armed = true; local count = #s.rows
+			helpers.assert_true(combo.press_codes({ 29 }, { 30 }, "surviving source"))
+			helpers.assert_eq(wire_after(s, count), "56:0 29:1 30:1 30:0 29:0 56:1")
+			helpers.assert_eq(s.view().down, { 56 })
+			s.queue("b", 56, 0, 3); s.pump(); helpers.assert_eq(s.view().down, {})
+		end)
+	end)
+	helpers.it("refuses a nested producer while restoring the original carrier exactly once", function()
+		local armed, nested, inner = false, nil, nil
+		with_owners({ after_sync = function(_, code, value)
+			if armed and nested == nil and code == 30 and value == 1 then nested = inner.press("Escape") end
+		end }, function(s, combo)
+			inner = combo; s.queue("a", 56, 1, 1); s.pump(); armed = true; local count = #s.rows
+			helpers.assert_true(combo.press_codes({ 29 }, { 30 }, "nested producer"))
+			helpers.assert_eq(nested, false)
+			helpers.assert_eq(wire_after(s, count), "56:0 29:1 30:1 30:0 29:0 56:1")
+			helpers.assert_eq(s.view().down, { 56 })
+			s.queue("a", 56, 0, 2); s.pump(); helpers.assert_eq(s.view().down, {})
+		end)
+	end)
+	helpers.it("refuses a foreign modifier on a legacy channel without borrowing another source's cleanup rights", function()
+		local saved_writer, saved_hook = package.loaded["adapters.uinput_writer"], package.loaded["adapters.keyboard_hook"]
+		local saved_combo = package.loaded["modules.gestures.combo_emitter"]
+		local rows = {}
+		package.loaded["adapters.uinput_writer"] = { is_open = function() return true end,
+			emit = function(code, value) rows[#rows + 1] = { code, value }; return true end }
+		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return { 56 } end,
+			held_shortcut_modifier_codes = function() return {} end }
+		local called, ok, result = pcall(function()
+			return helpers.load_module("modules.gestures.combo_emitter").press_codes({ 29 }, { 30 }, "unowned carrier")
+		end)
+		package.loaded["adapters.uinput_writer"], package.loaded["adapters.keyboard_hook"] = saved_writer, saved_hook
+		package.loaded["modules.gestures.combo_emitter"] = saved_combo
+		helpers.assert_true(called); helpers.assert_eq(ok, false); helpers.assert_eq(result.kind, "refused")
+		helpers.assert_eq(rows, {}, "no modifier UP or replacement is allowed without an exact original owner")
+	end)
+end)

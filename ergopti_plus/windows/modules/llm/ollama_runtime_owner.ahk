@@ -24,6 +24,10 @@ class OllamaRuntimeOwner {
 				|| !this._LocalPath(Options.Get("helper", ""))
 				|| !RegExMatch(Options.Get("helper_sha256", ""), "^[0-9a-f]{64}$")
 			throw TypeError("Runtime ownership requires a trusted launcher path.")
+		; The shared serve environment (OLLAMA_NO_CLOUD) is part of every owned launch.
+		if !this._LocalPath(Options.Get("environment", ""))
+				|| !RegExMatch(Options.Get("environment_sha256", ""), "^[0-9a-f]{64}$")
+			throw TypeError("Runtime ownership requires the captured shared serve environment.")
 		if !HasMethod(Options.Get("on_retired", 0), "Call")
 			throw TypeError("Runtime ownership requires an independent physical retirement observer.")
 		for Name in ["spawn", "factory", "read_ready", "live_identity", "clock", "on_error", "on_retired"]
@@ -95,6 +99,8 @@ class OllamaRuntimeOwner {
 				["StartedTick", "started_tick"], ["DeadlineMs", "deadline_ms"]] {
 				Arguments.Push("-" . Pair[1], String(Target[Pair[2]]))
 			}
+			Arguments.Push("-ServeEnvironmentPath", this.Options["environment"],
+				"-ServeEnvironmentSha256", this.Options["environment_sha256"])
 			Spawn := this.Options.Get("spawn", ObjBindMethod(this, "_NativeSpawn"))
 			Task := Spawn.Call(PowerShell, Arguments, ObjBindMethod(this, "_OnTerminal", Record),
 				ObjBindMethod(this, "_AdoptConstruction", Record))
@@ -303,14 +309,15 @@ class OllamaRuntimeOwner {
 				|| !RegExMatch(Observation["image_sha256"], "^[0-9a-f]{64}$")
 			return false
 		Receipt := Observation.Get("receipt", 0)
-		if !(Receipt is Map) || Receipt.Count != 11 || !IsObject(Record["task"]) || !this._Current(Record)
+		Task := Record["task"]
+		if !(Receipt is Map) || Receipt.Count != 11 || !IsObject(Task) || !this._Current(Record)
 				|| !this._ReadyDeadline(Record)
 			return false
 		Target := Record["target"]
 		for Name in ["runtime_ticket", "ticket", "root_identity", "version_identity", "manifest_sha256", "origin"]
 			if !(Receipt.Get(Name, 0) is String) || !(Receipt[Name] == Target[Name])
 				return false
-		Pid := Record["task"].processId()
+		Pid := Task.processId()
 		if !(Pid is Integer) || Pid <= 0 || !(Receipt.Get("launcher_pid", 0) is Integer) || Receipt["launcher_pid"] != Pid
 				|| !(Receipt.Get("child_pid", 0) is Integer) || Receipt["child_pid"] <= 0
 				|| Receipt["child_pid"] == Pid || !(Receipt.Get("child_created_filetime", 0) is Integer)
@@ -320,7 +327,7 @@ class OllamaRuntimeOwner {
 			return false
 		PreviousCritical := Critical("On")
 		try {
-			if !this._Owns(Record) || Record["cancelled"] || Record["terminal"] || Record["ready"]
+			if !this._Owns(Record) || Record["task"] != Task || Record["cancelled"] || Record["terminal"] || Record["ready"]
 				return false
 			Record["ready"] := true
 			Record["process_receipt"] := Receipt.Clone()
@@ -367,7 +374,9 @@ class OllamaRuntimeOwner {
 		if !(Now is Integer)
 			throw TypeError("Runtime readiness requires an exact monotonic observation.")
 		Elapsed := Now - Record["target"]["started_tick"]
+		; A timer may retire this exact task while the clock is observed.
 		return Elapsed >= 0 && Elapsed < Record["target"]["deadline_ms"]
+			&& this._Owns(Record) && !Record["cancelled"] && !Record["terminal"] && !A_IsSuspended
 	}
 
 	_NativeReadReady(Target) {

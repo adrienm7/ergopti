@@ -420,56 +420,94 @@ _LLM_Menu_PromptApiEntry(EditId, Port := 0) {
 		Receipt, Owner, (*) => true)
 	if !((Committed is Integer) && Committed == 1)
 		return false
-	new_name := _LLM_Menu_ApiEntryDisplayName(new_entry)
-
-	; Creation only: offer the full end-to-end probe on the just-saved
-	; entry, so a bad token or model surfaces here with its server message
-	; instead of mid-typing. A declined offer keeps the save. The entry is
-	; named: a decisions entry does not become the active one.
-	if (EditId == "") {
-		try {
-			AskFn := Options.Get("ask_test", 0)
-			TestFn := Options.Get("test_entry", 0)
-			Ask := HasMethod(AskFn, "Call") ? AskFn.Call() : _LLM_Menu_AskTestNewApiEntry()
-			if (Ask is Integer) && Ask == 1 {
-				if HasMethod(TestFn, "Call")
-					TestFn.Call(0, new_entry["Id"])
-				else
-					_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
-			}
-		} catch as AskErr {
-			try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
-				AskErr.Message)
-		}
-	}
-
-	; Token validation: hit the provider's /models endpoint once with the
-	; freshly-saved credentials so the user finds out NOW (with an explicit
-	; TrayTip) instead of mid-typing with an empty tooltip and no idea why.
-	; This MUST be async: the synchronous LLM_RemoteIsReady ran a blocking
-	; WinHTTP GET on the main thread, freezing the whole driver (and dropping
-	; the user's next keystrokes via LowLevelHooksTimeout) for up to 2 s when
-	; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
-	; the save path returns immediately and the result is surfaced from the
-	; poll callback once it resolves.
-	if !LLM_RemoteHasReadyPing(provider_id) {
-		try LoggerInfo("LLM", "API entry '{1}' saved: {2} has no reachability ping, the Test action probes it.",
-			new_name, provider_id)
-		return true
-	}
+	; The optional post-save question must not re-authorize credentials after
+	; a later API publication or lifecycle transition has retired this save.
+	MenuOwner := _LLM_Menu
+	Generation := LLM_AuxGeneration()
 	ValidationOwner := LLM_AuxBegin("api_validation:" . new_entry["Id"], Map(
 		"backend", "api",
 		"endpoint", new_entry["BaseUrl"],
 		"identity", new_entry["Id"]))
-	ReadyFn := Options.Get("ready", LLM_RemoteIsReady_Async)
-	try ReadyFn.Call(new_entry,
-		_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],
-			ValidationOwner), ValidationOwner)
-	catch as Err {
-		LLM_AuxFinish(ValidationOwner)
-		try LoggerError("LLM", "Remote API validation dispatch failed: {1}.", Err.Message)
+	HandedOff := false
+	try {
+		if !_LLM_Menu_SavedApiEntryCurrent(ValidationOwner, MenuOwner, new_entry, Generation)
+			return true
+		new_name := _LLM_Menu_ApiEntryDisplayName(new_entry)
+
+		; Creation only: offer the full end-to-end probe on the just-saved
+		; entry, so a bad token or model surfaces here with its server message
+		; instead of mid-typing. A declined offer keeps the save. The entry is
+		; named: a decisions entry does not become the active one.
+		if (EditId == "") {
+			try {
+				AskFn := Options.Get("ask_test", 0)
+				TestFn := Options.Get("test_entry", 0)
+				Ask := HasMethod(AskFn, "Call") ? AskFn.Call() : _LLM_Menu_AskTestNewApiEntry()
+				if (Ask is Integer) && Ask == 1
+						&& _LLM_Menu_SavedApiEntryCurrent(ValidationOwner, MenuOwner, new_entry, Generation) {
+					if HasMethod(TestFn, "Call")
+						TestFn.Call(0, new_entry["Id"])
+					else
+						_LLM_Menu_TestActiveApiEntry(0, new_entry["Id"])
+				}
+			} catch as AskErr {
+				try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
+					AskErr.Message)
+			}
+		}
+
+		; Token validation: hit the provider's /models endpoint once with the
+		; freshly-saved credentials so the user finds out NOW (with an explicit
+		; TrayTip) instead of mid-typing with an empty tooltip and no idea why.
+		; This MUST be async: the synchronous LLM_RemoteIsReady ran a blocking
+		; WinHTTP GET on the main thread, freezing the whole driver (and dropping
+		; the user's next keystrokes via LowLevelHooksTimeout) for up to 2 s when
+		; the BaseUrl was unreachable. LLM_RemoteIsReady_Async polls instead, so
+		; the save path returns immediately and the result is surfaced from the
+		; poll callback once it resolves.
+		if !LLM_RemoteHasReadyPing(provider_id) {
+			try LoggerInfo("LLM", "API entry '{1}' saved: {2} has no reachability ping, the Test action probes it.",
+				new_name, provider_id)
+			return true
+		}
+		if !_LLM_Menu_SavedApiEntryCurrent(ValidationOwner, MenuOwner, new_entry, Generation)
+			return true
+		ReadyFn := Options.Get("ready", LLM_RemoteIsReady_Async)
+		try ReadyFn.Call(new_entry,
+			_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],
+				ValidationOwner), ValidationOwner)
+		catch as Err {
+			try LoggerError("LLM", "Remote API validation dispatch failed: {1}.", Err.Message)
+			return true
+		}
+		HandedOff := true
+		return true
+	} finally {
+		if !HandedOff
+			_LLM_AuxRetireOwner(ValidationOwner, true)
 	}
-	return true
+}
+
+_LLM_Menu_SavedApiEntryCurrent(Owner, MenuOwner, Expected, Generation) {
+	global _LLM_Menu
+	PreviousCritical := Critical("On")
+	try {
+		if A_IsSuspended || _LLM_Menu != MenuOwner || Generation != LLM_AuxGeneration()
+				|| !LLM_AuxIsCurrent(Owner) || !(Expected is Map)
+			return false
+		Matches := 0
+		for Entry in _LLM_Menu.Get("api_entries", []) {
+			if _LLM_MenuApiEntryGet(Entry, "Id", "") != Expected["Id"]
+				continue
+			Matches += 1
+			for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
+				Value := _LLM_MenuApiEntryGet(Entry, Field, 0)
+				if !(Value is String) || !(Expected[Field] is String) || !(Value == Expected[Field])
+					return false
+			}
+		}
+		return Matches == 1
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, EditId) {
@@ -559,17 +597,32 @@ _LLM_Menu_OnApiValidationDone(reachable, Name, EntryId, Owner, NotifyFn := 0) {
 	} finally Critical(PreviousCritical)
 }
 
-_LLM_Menu_RemoveActiveApiEntry() {
+_LLM_Menu_RemoveActiveApiEntry(Port := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _LLM_Menu_RemoveActiveApiEntry()
+		try return _LLM_Menu_RemoveActiveApiEntry(Port)
 		finally Critical(InheritedCritical)
 	}
 	global _LLM_Menu
+	if !((Port is Integer) && Port == 0) && !(Port is Map)
+		throw TypeError("API entry removal requires an optional native port Map.")
+	Options := Port is Map ? Port : Map()
+	ConfirmFn := Options.Get("confirm", Ui_MsgBox)
+	if !HasMethod(ConfirmFn, "Call")
+		throw TypeError("The API entry confirmation port is not callable.")
+	SourceOptions := Options.Get("source_options", Map())
+	if !(SourceOptions is Map)
+		throw TypeError("API entry source options must be a native Map.")
+	Owner := LLM_Menu_ApiPrivateSourceOwner(SourceOptions)
+	NotifyFn := Options.Get("notify", SourceOptions.Get("notify", 0))
+	Receipt := Owner.Capture()
+	if !(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration is unavailable")
 	active_id := _LLM_Menu["api_entry_id"]
 	if (active_id == "")
-		return
+		return false
 	; Confirm before destroying the entry — the saved token is gone for
 	; good once we delete it. Worth one extra click, especially because
 	; the user is one stray click away in a small menu.
@@ -581,16 +634,26 @@ _LLM_Menu_RemoveActiveApiEntry() {
 		}
 	}
 	entry_name := (active_entry != "") ? _LLM_Menu_ApiEntryDisplayName(active_entry) : active_id
-	confirm := Ui_MsgBox(
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration changed before confirmation")
+	confirm := ConfirmFn.Call(
 		t("menu.llm.api_remove_confirm_body"),
 		StrReplace(t("menu.llm.api_remove_confirm_title"), "%s", entry_name),
 		"4 48"  ; Yes/No + warning icon
 	)
 	if (confirm != "Yes")
-		return
+		return false
+	if !Owner.Current(Receipt)
+		return ConfigReportPersistenceFailure("the LLM API-entry removal", NotifyFn,
+			"the originating private configuration changed during confirmation")
 	return LLM_Menu_CommitApiEntriesMutation("the LLM API-entry removal",
 		(Candidate) => _LLM_Menu_RemoveApiEntryCandidate(Candidate, active_id),
-		_LLM_Menu_ApplyApiEntriesCommitted)
+		SourceOptions.Get("apply", _LLM_Menu_ApplyApiEntriesCommitted), Owner.Port,
+		NotifyFn, SourceOptions.Get("acquire", 0), SourceOptions.Get("settle", 0),
+		SourceOptions.Get("collect", 0), SourceOptions.Get("build_config", 0),
+		SourceOptions.Get("serialize", 0), SourceOptions.Get("pause", 0),
+		Receipt, Owner, (*) => true)
 }
 
 _LLM_Menu_RemoveApiEntryCandidate(Candidate, EntryId) {
@@ -1456,7 +1519,9 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"default_backend", LLM_Defaults["llm_backend"],
 			"backend", _LLM_Menu["backend"], "active_id", _LLM_Menu["api_entry_id"],
 			"entries", LLM_Menu_DeepClone(_LLM_Menu["api_entries"]))
-		if !this._NativeCurrent(Held)
+		; Admit above ran the full schema/persistence admission; nothing but RAM
+		; reads separates it from this context fence.
+		if !this._NativeContextCurrent(Held)
 			return false
 		try {
 			ConfigImage := this._Snapshot(Held["config_path"])
@@ -1927,7 +1992,12 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; Classified second reads fence mutations during snapshot/hash/decrypt. This
 		; is current-at-check authority; the WAL owns the final expected-image claim.
 		Images := IsSet(Expected) ? Expected : Held
-		if !this._NativeCurrent(Held)
+		; The full schema/persistence admission (a fresh registry comparison,
+		; about 25 ms) closes the operation below, after every read: a refusal
+		; that appears while the files are read is still refused there. Opening
+		; with it too doubled the cost of every check, which a menu build pays
+		; seven times (llm-source-current-single-admission).
+		if !this._NativeContextCurrent(Held)
 			return false
 		loop 2 {
 			if !this._NativeContextCurrent(Held)

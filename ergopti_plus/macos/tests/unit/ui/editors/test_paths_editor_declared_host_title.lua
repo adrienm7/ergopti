@@ -16,7 +16,7 @@ local function with_fixture(callback)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.menu.menu_paths", "infra.i18n", "infra.locale", "locale.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "infra.i18n", "infra.locale", "locale.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
 			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "webview.i18n_seed",
 			"window_titles", "hs", "tests.stubs.hs",
@@ -25,17 +25,28 @@ local function with_fixture(callback)
 			package.loaded["infra.paths"] = { shared = helpers.shared }
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
 			local state = { creates = 0, titles = {}, deletes = 0, acquired = false }
-			local view = {}
+			local view = setmetatable({}, {})
 			function view:windowTitle(caption)
 				state.titles[#state.titles + 1] = caption
 				return self
 			end
 			for _, name in ipairs({"windowStyle", "level", "allowTextEntry", "allowGestures",
-				"shadow", "allowNewWindows", "windowCallback", "navigationCallback", "html", "show"}) do
+				"shadow", "windowCallback", "navigationCallback", "html", "show"}) do
 				view[name] = function() return view end
 			end
+			function view:allowNewWindows(value)
+				if value == nil then return self.allow_new_windows ~= false end
+				assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+				self.allow_new_windows = value
+				return self
+			end
+			function view:deleteOnClose(value)
+				if value == nil then return self.delete_on_close == true end
+				self.delete_on_close = value
+				return self
+			end
 			function view:hswindow() return nil end
-			function view:delete() state.deletes = state.deletes + 1; return self end
+			function view:delete() state.deletes = state.deletes + 1; setmetatable(self, nil); return self end
 			local builder = helpers.load_with_stubs("ui.ui_builder", {
 				json = {decode = Json.decode, encode = Json.encode},
 				webview = {

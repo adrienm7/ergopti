@@ -53,7 +53,7 @@ local RuntimeGuard = require("infra.runtime_guard")
 local original_reader_load = package.loaded["adapters.evdev_reader"] == nil
 local EvdevReader = require("adapters.evdev_reader")
 local INPUT_READER_PORT_NAMES = { "capture_event", "event_view", "event_current", "source_current", "reconcile_sources",
-	"capture_source_owner", "source_owner_current", "retire_source", "open", "close", "grab", "ungrab", "use_ffi_backend", "_set_backend", "_reset_backend" }
+	"capture_source_owner", "source_owner_current", "retire_source", "open", "close", "grab", "ungrab", "event_capabilities", "use_ffi_backend", "_set_backend", "_reset_backend" }
 local _input_reader_ports = {}
 for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 	_input_reader_ports[name] = rawget(EvdevReader, name)
@@ -224,6 +224,10 @@ local LED_CAPSL = 1
 local _locks = { last_led = 2, codes = { [0] = EvdevCodes.KEY_NUMLOCK,
 	[LED_CAPSL] = EvdevCodes.KEY_CAPSLOCK, [2] = EvdevCodes.KEY_SCROLLLOCK }, keys = {} }
 for _, code in pairs(_locks.codes) do _locks.keys[code] = true end
+-- The CapsLock a CapsWord session holds (M.lock_caps_for_word):
+-- { emit, on_lost, owned }, `owned` when the session locked it itself. Kept in
+-- _locks, not a local of its own: this chunk is near LuaJIT's local budget.
+_locks.word = nil
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
@@ -282,6 +286,10 @@ local _reported_missing = false
 
 -- Called when a pointer button is pressed, if the caller asked for it.
 local _on_click = nil
+-- Called with ("press", code) for every press of an observed pointer and with
+-- ("motion", axis) for every EV_REL report (a movement or a wheel turn), if
+-- the caller asked for it: CapsWord ends on the pointer kinds it names.
+local _on_pointer_event = nil
 
 -- Set while XKB cannot tell the keys' roles or capture them, so that is
 -- logged once and not at every key event; the next press XKB answers in full
@@ -381,6 +389,14 @@ function _locks.seed_leds(leds)
 			if up_err then return false, tostring(up_err) end
 		end
 	end
+	-- A CapsLock a CapsWord session locked is the desktop's state even when the
+	-- LED never showed it: under the grab the kernel drops the compositor's LED
+	-- writes to the grabbed keyboard, so a reseed would read it unlocked.
+	local word = _locks.word
+	if word and word.owned and not XkbCapture.caps_locked() then
+		local ok, reason = _locks.capture_tap()
+		if not ok then return false, reason end
+	end
 	return true
 end
 
@@ -399,6 +415,61 @@ function _locks.seed(path)
 		return false, led_err
 	end
 	return _locks.seed_leds(leds)
+end
+
+--- Feeds the capture state one CapsLock press and release, as the desktop
+--- receives the key a CapsWord session emits.
+--- @return boolean acknowledged
+--- @return string|nil reason
+function _locks.capture_tap()
+	for _, value in ipairs({ InputEvent.VALUE_DOWN, InputEvent.VALUE_UP }) do
+		local _, _, err = _capture(EvdevCodes.KEY_CAPSLOCK, value)
+		if err then return false, "the capture state refused CapsLock: " .. tostring(err) end
+	end
+	return true
+end
+
+--- Toggles CapsLock in the capture state, then on the desktop through `emit`.
+--- The capture goes first: a keymap whose CapsLock key locks nothing
+--- (caps:escape, ctrl:nocaps, caps:shiftlock) is refused before the desktop
+--- receives that key, and its press and release are undone in the capture.
+--- @param emit function() -> boolean Presses and releases KEY_CAPSLOCK.
+--- @param locked boolean The Caps Lock state wanted.
+--- @return boolean ok
+--- @return string|nil reason
+function _locks.toggle_word(emit, locked)
+	local captured, capture_err = _locks.capture_tap()
+	if not captured then return false, capture_err end
+	if XkbCapture.caps_locked() ~= locked then
+		local undone, undo_err = _locks.capture_tap()
+		if not undone then return false, undo_err end
+		return false, "the keymap's CapsLock key does not toggle Caps Lock"
+	end
+	local called, emitted = pcall(emit)
+	if called and emitted == true then return true end
+	local undone, undo_err = _locks.capture_tap()
+	if not undone then return false, undo_err end
+	return false, "the CapsLock key could not be emitted: " .. tostring(emitted)
+end
+
+--- Ends the session's hold on CapsLock.
+--- @param unlock boolean Whether to unlock a CapsLock the session locked.
+--- @param reason string|nil When the hook ends it, why: the session is told.
+--- @return boolean ok False when the unlock could not be emitted (logged).
+function _locks.end_word(unlock, reason)
+	local word = _locks.word
+	if not word then return true end
+	_locks.word = nil
+	local ok, err = true, nil
+	if unlock and word.owned and XkbCapture.caps_locked() then
+		ok, err = _locks.toggle_word(word.emit, false)
+		if not ok then Logger.error(LOG, "CapsWord could not unlock CapsLock: %s.", tostring(err)) end
+	end
+	if reason then
+		local told, tell_err = pcall(word.on_lost, reason)
+		if not told then Logger.error(LOG, "CapsWord lock-loss callback failed: %s.", tostring(tell_err)) end
+	end
+	return ok
 end
 
 
@@ -522,7 +593,37 @@ local _dispatch_owned_rows
 local _deliver_owned_rows
 local function _combination_source(source)
 	local receipt = M.physical_source_receipt()
-	return { source = source, generation = receipt.generation, ready = receipt.ready, physical = _physical_sources[source] == true }
+	local slot = keyboard_slot(source)
+	local owner = _input_source_owners and _input_source_owners[slot]
+	local observer = owner and _input_source_observers[slot]
+	local current = owner and _input_reader_ports.source_owner_current(owner, observer,
+		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	-- A source publication may mint another lease for the SAME native opening.
+	-- Keep its original opaque identity while both that lease and the published
+	-- cohort remain current; a closed/reopened descriptor fails the old join.
+	local cache = _source_recovery.remap_sources
+	if not cache or cache.session ~= _capture_session then
+		cache = { session = _capture_session, sources = _input_source_owners, owners = {} }
+		_source_recovery.remap_sources = cache
+	elseif cache.sources ~= _input_source_owners then
+		local retained = {}
+		for _, path in ipairs(_devices) do retained[path] = cache.owners[path] end
+		cache.sources, cache.owners = _input_source_owners, retained
+	end
+	local original = cache.owners[source]
+	if current == true then
+		local original_current = original and (rawequal(original.owner, owner) or
+			_input_reader_ports.source_owner_current(original.owner, original.observer,
+				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current,
+				_input_reader_ports.retire_source) == true)
+		if not original_current then
+			original = { owner = owner, observer = observer }
+			cache.owners[source] = original
+		end
+	end
+	return { source = source, generation = receipt.generation, ready = receipt.ready,
+		physical = _physical_sources[source] == true,
+		source_owner = original and original.owner or owner, source_current = current }
 end
 
 local function _input_exports_current()
@@ -1665,6 +1766,9 @@ local function _dispatch_post_remap(ev, source)
 		return
 	end
 	if ev.code == EvdevCodes.KEY_CAPSLOCK then
+		-- The desktop's CapsLock is the user's again: a CapsWord session riding
+		-- on it ends, and must not toggle it back.
+		if ev.value == InputEvent.VALUE_DOWN and _locks.word then _locks.end_word(false, "CapsLock pressed") end
 		_forward_raw(ev, source)
 		return
 	end
@@ -2460,6 +2564,13 @@ local function _dispatch_pointer(ev)
 		_remapper:activity()
 		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 	end
+	if _on_pointer_event then
+		if ev.type == InputEvent.EV_REL then
+			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code)
+		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code)
+		end
+	end
 end
 
 local function _read_source(source)
@@ -2472,6 +2583,10 @@ local function _read_source(source)
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
 	if source.keyboard then
+		if _source_recovery.retire_remaps({ source.path }) ~= true then
+			M.emergency_stop("could not retire the failed source remapper")
+			return nil
+		end
 		local released, release_err = _release_forwarded_sources({ source.path })
 		if not released then
 			M.emergency_stop("could not release keys from failed source: " .. tostring(release_err))
@@ -2754,6 +2869,47 @@ function M.caps_lock_on()
 	return nil, "no keyboard is open"
 end
 
+--- Locks CapsLock for a CapsWord session, as Windows and macOS light it for
+--- theirs: the letters then reach the application as the layout's CapsLock
+--- level types them (capitals; Ergopti keeps its digits and punctuation).
+--- A CapsLock the user already locked is ridden, never toggled, and stays on
+--- after the session. The hold ends with release_caps_word_lock(), or with
+--- `on_lost(reason)` when the hook ends it: a CapsLock pressed, the hook
+--- stopped, the keyboard handed to a dialog.
+--- @param emit function() -> boolean Presses and releases KEY_CAPSLOCK on the
+---   daemon's device; kept to unlock it on the session's behalf.
+--- @param on_lost function(reason) Told once when the hook ends the hold.
+--- @return boolean ok
+--- @return string|nil reason Why the lock was refused.
+function M.lock_caps_for_word(emit, on_lost)
+	if type(emit) ~= "function" or type(on_lost) ~= "function" then
+		error("lock_caps_for_word needs an emitter and a loss callback", 2)
+	end
+	if _locks.word then return false, "a CapsWord session already holds CapsLock" end
+	if not _running then return false, "the keyboard is not captured" end
+	if XkbCapture.caps_locked() then
+		_locks.word = { emit = emit, on_lost = on_lost, owned = false }
+		return true
+	end
+	local ok, reason = _locks.toggle_word(emit, true)
+	if not ok then return false, reason end
+	_locks.word = { emit = emit, on_lost = on_lost, owned = true }
+	return true
+end
+
+--- Ends a CapsWord session's hold on CapsLock, unlocking it when the session
+--- locked it. A no-op when the hook already ended the hold.
+--- @return boolean ok False when the unlock could not be emitted (logged).
+function M.release_caps_word_lock()
+	return _locks.end_word(true, nil)
+end
+
+--- Whether a CapsWord session holds CapsLock.
+--- @return boolean
+function M.caps_word_lock_held()
+	return _locks.word ~= nil
+end
+
 --- Rechecks the existing capture owner's kernel origin without a new watcher.
 --- @return table receipt Physical-source generation and admission.
 function M.physical_source_receipt()
@@ -2844,6 +3000,12 @@ _release_forwarded_sources = function(paths)
 		local retained = false
 		for _, current in ipairs(_modifier_order) do if current.code == entry.code then retained = true end end
 		if role and not retained then _capture(entry.code, InputEvent.VALUE_UP) end
+	end
+	-- Reconciliation may already have dropped an orphan's physical record.
+	-- Its encoded source still owns that old suppressed press, not a later
+	-- descriptor that happens to reuse the same path.
+	for key in pairs(_remap_orphans) do
+		if retiring[key:match("^(.*):%d+$")] then _remap_orphans[key] = nil end
 	end
 	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
@@ -2970,6 +3132,43 @@ local function _source_transaction_current(tx)
 	for name, port in pairs(tx.output_ports or {}) do
 		if rawget(tx.broker, name) ~= port then return false end
 	end
+	return true
+end
+
+--- Retires the shared engine only when a departing source owns consumed input.
+--- A retained physical press stays swallowed until UP rather than becoming a tap
+--- or replaying its remapped DOWN after the engine's state was retired.
+--- @param paths table Departing keyboard paths.
+--- @return boolean retired
+function _source_recovery.retire_remaps(paths)
+	if not _remapper then return true end
+	local departing, needed = {}, false
+	for _, path in ipairs(paths) do departing[path] = true end
+	for key in pairs(_remap_owned) do
+		local physical = _physical_down[key]
+		if physical and departing[physical.source] then needed = true; break end
+	end
+	if not needed then return true end
+	local exact, generation, output, session, issuer = _remapper, _remapper_generation, _broker, _capture_session, _remapper_input_owner
+	local tx, owned = _source_reconciliation, _remap_owned
+	local function current()
+		return _remapper == exact and _remapper_generation == generation and _broker == output
+			and _capture_session == session and _remapper_input_owner == issuer
+			and (not tx or _source_transaction_current(tx))
+	end
+	if not current() or _release_remapped() ~= true or not current() then return false end
+	if exact.activate and exact:activate() ~= true then return false end
+	if not current() then return false end
+	local replacement = _input_ports.capture_input_owner(exact)
+	if exact.has_combinations and (not replacement or not _input_ports.input_owner_current(replacement)) then return false end
+	if not current() then return false end
+	for key in pairs(owned) do
+		local physical = _physical_down[key]
+		if physical and not departing[physical.source] then _remap_orphans[key] = true end
+	end
+	_remap_owned, _remap_source_of = {}, {}
+	_remapper_input_owner = replacement
+	if tx then tx.issuer = replacement end
 	return true
 end
 
@@ -3105,6 +3304,7 @@ local function _acquire(paths, force_path, tx)
 	for _, path in ipairs(paths) do
 		local slot = keyboard_slot(path)
 		if path == force_path then
+			if _source_recovery.retire_remaps({ path }) ~= true then return false, "reconnected source remapper retirement refused" end
 			local released, release_err = _release_forwarded_sources({ path })
 			if not released then return false, release_err end
 			_close_paths({ path }, keyboard_slot, tx)
@@ -3120,6 +3320,26 @@ local function _acquire(paths, force_path, tx)
 			if tx and not _capture_source_member(tx, path, keyboard_slot, false) then
 				return false, "original source cleanup authority refused"
 			end
+			if _intercept then
+				-- Discovery is a pathname snapshot. Only the opened fd identifies
+				-- the complete stream this grab would take from the desktop.
+				local query = _input_reader_ports.event_capabilities
+				local finder = package.loaded["modules.hotstrings.device_finder"]
+				local policy = type(finder) == "table" and rawget(finder, "is_interceptable_event_mask")
+				local called, mask = false, nil
+				if type(query) == "function" and rawget(EvdevReader, "event_capabilities") == query then
+					called, mask = pcall(query, slot)
+				end
+				local checked, allowed = false, false
+				if called and mask ~= nil and type(policy) == "function" then checked, allowed = pcall(policy, mask) end
+				if not checked or allowed ~= true or rawget(EvdevReader, "event_capabilities") ~= query
+					or package.loaded["modules.hotstrings.device_finder"] ~= finder
+					or rawget(finder, "is_interceptable_event_mask") ~= policy
+					or tx and not _source_transaction_current(tx) then
+					_close_paths(opened, keyboard_slot, tx)
+					return false, "opened device cannot be intercepted by the keyboard output"
+				end
+			end
 			if _intercept and not EvdevReader.grab(slot) then
 				_close_paths(opened, keyboard_slot, tx)
 				return false
@@ -3133,6 +3353,7 @@ local function _acquire(paths, force_path, tx)
 	local retired = {}
 	for path in pairs(retained) do retired[#retired + 1] = path end
 	table.sort(retired)
+	if _source_recovery.retire_remaps(retired) ~= true then return false, "departed source remapper retirement refused" end
 	local released, release_err = _release_forwarded_sources(retired)
 	if not released then
 		_close_paths(opened, keyboard_slot, tx)
@@ -3383,17 +3604,21 @@ function M.check_device()
 			-- mouse or another non-keyboard node. start() refuses those, so the
 			-- watchdog must not adopt one behind its back and grab it as a keyboard.
 			local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
-			if ok_finder and type(Finder.is_key_device) == "function" then
-				local is_key, key_why = Finder.is_key_device(_pinned_device)
-				if not is_key then
-					_pinned_missing = true
-					if not _reported_missing then
-						Logger.warn(LOG, "Pinned input device %s no longer produces key events (%s) — waiting for that exact path.",
-							_pinned_device, tostring(key_why))
-						_reported_missing = true
-					end
-					tx.waiting = true; return true
+			local validate = ok_finder and Finder.is_key_device
+			if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
+			if type(validate) ~= "function" then
+				Logger.error(LOG, "Pinned input capability validation is unavailable — refusing capture.")
+				return false
+			end
+			local is_key, key_why = validate(_pinned_device)
+			if not is_key then
+				_pinned_missing = true
+				if not _reported_missing then
+					Logger.warn(LOG, "Pinned input device %s cannot be captured in the current mode (%s) — waiting for that exact path.",
+						_pinned_device, tostring(key_why))
+					_reported_missing = true
 				end
+				tx.waiting = true; return true
 			end
 			keyboards = { _pinned_device }
 		else
@@ -3473,6 +3698,9 @@ function M.check_device()
 			local sources, suppressed, physical, snapshots = {}, {}, {}, {}
 			for _, path in ipairs(_devices) do sources[path] = true end
 			for key, down in pairs(_physical_down) do
+				-- A retained remap hold still needs its original physical source
+				-- for later unplug retirement, even when no consumer swallowed it.
+				if _remap_owned[key] and sources[down.source] then physical[key] = down end
 				if _consumed_down[key] and sources[down.source] then
 					local snapshot = snapshots[down.source]
 					if snapshot == nil then
@@ -3638,6 +3866,7 @@ function M.start(opts)
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
 	if type(options.onHold) == "function" then _on_hold = options.onHold end
 	if type(options.onClick) == "function" then _on_click = options.onClick end
+	if type(options.onPointerEvent) == "function" then _on_pointer_event = options.onPointerEvent end
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
 	if type(options.layout) == "string"  then _layout   = options.layout end
@@ -3724,14 +3953,16 @@ function M.start(opts)
 	-- /proc, and a runtime without it must fail HERE with a reason rather than at
 	-- the first keystroke that never comes.
 	local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
-	if not ok_finder or type(Finder.is_key_device) ~= "function" then
+	local validate = ok_finder and Finder.is_key_device
+	if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
+	if type(validate) ~= "function" then
 		Logger.error(LOG, "start(): device_finder unavailable — cannot verify the keyboard source set.")
 		return
 	end
 	for _, target in ipairs(targets) do
-		local is_key, key_why = Finder.is_key_device(target)
+		local is_key, key_why = validate(target)
 		if not is_key then
-			Logger.error(LOG, "start(): %s cannot produce key events — %s.", target, tostring(key_why))
+			Logger.error(LOG, "start(): %s cannot be captured in the current mode — %s.", target, tostring(key_why))
 			return
 		end
 	end
@@ -3820,6 +4051,8 @@ end
 
 function M.stop()
 	if _number_row.retire() ~= true then M.emergency_stop("native number-row stop cleanup pending"); return false end
+	-- First, while the daemon's device can still carry the unlock.
+	_locks.end_word(true, "keyboard hook stopped")
 	_capture_session = nil
 	if not _running and not _reacquiring then return end
 	if _release_remapped() == false then
@@ -3864,6 +4097,9 @@ function M.emergency_stop(reason)
 	_capture_session = nil
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
+	-- Best effort as below: a CapsLock left locked types every later letter in
+	-- capitals, and Ergopti's CapsLock key taps Enter instead of unlocking it.
+	pcall(_locks.end_word, true, "emergency keyboard stop")
 	-- Best effort, before the descriptors close: a Ctrl the virtual keyboard
 	-- still holds would stay down in every application once nothing forwards
 	-- its release. The output path may be what failed, so nothing here throws.
@@ -3928,7 +4164,7 @@ function M.while_released(fn, opts)
 		observe("refused", { ok = false, reason = "reconciliation_pending" })
 		return nil, "source reconciliation is already pending"
 	end
-	if not _running or not _intercept then
+	if not _running then
 		if _remapper and _remapper.has_combinations then
 			if _release_remapped() ~= true or _remapper:activate() ~= true then
 				observe("refused", { ok = false, reason = "release_failed" })
@@ -3943,25 +4179,31 @@ function M.while_released(fn, opts)
 		observe("refused", { ok = false, reason = "release_failed" })
 		return nil, "combination key retirement refused"
 	end
-	local modal_tx = original_reader_load and _input_source_owners and _capture_session and _begin_source_transaction() or nil
+	-- Ungrabbed, the keyboard reaches the desktop unseen: a CapsLock pressed
+	-- in the dialog could not be told apart from the session's, so it ends.
+	_locks.end_word(true, "keyboard handed to a dialog")
+	local modal_tx = _intercept and original_reader_load and _input_source_owners and _capture_session
+		and _begin_source_transaction() or nil
 	local function stop_modal(reason)
 		if modal_tx then
 			_retire_source_transaction(modal_tx, reason)
 			if _source_reconciliation == modal_tx then _source_reconciliation = nil end
 		else M.emergency_stop(reason) end
 	end
-	local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
-	if not release_call or not released then
-		stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
-		observe("refused", { ok = false, reason = "release_failed" })
-		return nil, "virtual key retirement refused"
-	end
-	for _, path in ipairs(paths) do
-		local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
-		if not called or acknowledged ~= true then
-			stop_modal("could not release the keyboard before a dialog: " .. path)
-			observe("refused", { ok = false, reason = "ungrab_failed" })
-			return nil, "keyboard release refused"
+	if _intercept then
+		local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
+		if not release_call or not released then
+			stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
+			observe("refused", { ok = false, reason = "release_failed" })
+			return nil, "virtual key retirement refused"
+		end
+		for _, path in ipairs(paths) do
+			local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
+			if not called or acknowledged ~= true then
+				stop_modal("could not release the keyboard before a dialog: " .. path)
+				observe("refused", { ok = false, reason = "ungrab_failed" })
+				return nil, "keyboard release refused"
+			end
 		end
 	end
 	Logger.debug(LOG, "Keyboard released to the desktop for a dialog.")
@@ -3989,8 +4231,11 @@ function M.while_released(fn, opts)
 			local slot = keyboard_slot(path)
 			repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
 			_pending_events[slot] = nil
-			if EvdevReader.grab(slot) ~= true then return false, "regrab_failed" end
+			if _intercept and EvdevReader.grab(slot) ~= true then return false, "regrab_failed" end
 		end
+		-- Observe mode receives the same queued evdev input while the blocking
+		-- dialog owns the desktop. Discard it and resynchronise without grabbing
+		-- or creating the native transaction reserved for intercepted sources.
 		if not _source_recovery.run(paths, true, modal_tx) then return false, "resynchronisation_failed" end
 		return true
 	end)

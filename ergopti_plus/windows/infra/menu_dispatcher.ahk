@@ -74,6 +74,7 @@
 
 #Include menu_command_origin.ahk
 #Include menu_startup_commands.ahk
+#Include menu_reload_replay.ahk
 
 
 
@@ -159,6 +160,7 @@ MenuDispatcher_Reset() {
 		_MenuDispatchCallbacks := Map()
 		_MenuDispatchLastFire  := Map()
 		_MenuDispatchTokens    := Map()
+		MenuReloadReplay_ClearIdentities()
 		_MenuDispatchClickSequences := Map()
 		; Nothing is tracked any more, so the ownership set must go with it —
 		; otherwise handles from the retired generation keep being walked forever.
@@ -282,6 +284,7 @@ MenuDispatcher_PruneMenu(MenuObj) {
 		}
 		for Id in DeadIds {
 				_MenuDispatchCallbacks.Delete(Id)
+				MenuReloadReplay_ForgetIdentity(Id)
 				if _MenuDispatchLastFire.Has(Id) {
 						_MenuDispatchLastFire.Delete(Id)
 				}
@@ -427,7 +430,9 @@ MenuDispatcher_Shutdown(RootMenu := unset) {
 ; click. Returns 1 on successful tracking, 0 if the item was added but
 ; its ID could not be discovered (in which case AHK's native dispatch is
 ; the only path — same behavior as before the bypass was installed).
-RegisterMenuItem(MenuObj, ItemName, Callback) {
+RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {
+		if !(ReplayIdentity is String)
+				throw TypeError("A menu replay identity must be a String.")
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
 		; To avoid the double-Add penalty (placeholder then replace), we use a
@@ -469,6 +474,7 @@ RegisterMenuItem(MenuObj, ItemName, Callback) {
 		_MenuDispatchCallbacks[ItemId] := Callback
 		_MenuDispatchLastFire[ItemId]  := 0
 		_MenuDispatchTokens[ItemId]    := TrackedObj.Token
+		MenuReloadReplay_RegisterIdentity(ItemId, TrackedObj.Token, ReplayIdentity)
 		_MenuDispatchTrackOwner(MenuObj)
 		return 1
 }
@@ -522,7 +528,8 @@ _TrackedDispatch(TrackedObj, Args*) {
 ; @param BusyFn {Func} Test seam: whether a configuration write is in progress.
 ; @param ArmFn {Func} Test seam for the one-shot timer, TimerArmOneShotMs by default.
 ; @param Registration {Object|Integer} Optional native item identity retained through startup and write deferral.
-; @returns {Any} What the command returned, "" when deferred, false when its registration retired.
+; @param HeldKey {Integer} The reload hand-off key of a command waiting for a reload successor, 0 otherwise.
+; @returns {Any} What the command returned, "" when deferred or handed to a reload successor, false when its registration retired.
 /** Freezes the accepted item/token without retaining a native Menu object. */
 _MenuCommandRegistrationSnapshot(Registration) {
 		if (Registration is Integer) && Registration == 0
@@ -552,17 +559,42 @@ _MenuCommandRegistrationCurrent(Registration) {
 		finally Critical(PreviousCritical)
 }
 
-MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registration := 0) {
+MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registration := 0, HeldKey := 0) {
 		global MENU_COMMAND_DEFERRAL_RETRY_MS, MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS
 		if !HasMethod(Callback, "Call")
 				throw TypeError("A menu command must be callable.")
 		Registration := _MenuCommandRegistrationSnapshot(Registration)
-		if !_MenuCommandRegistrationCurrent(Registration) {
+		; A command held for a pending reload is identified by its row, not its
+		; registration, so a tray rebuild meanwhile does not drop it.
+		RefusedPath := 0
+		Held := HeldKey ? MenuReloadReplay_Hold(HeldKey, Registration, &RefusedPath) : 0
+		; A detached rebuild may keep the old Menu alive through Args. Its token
+		; still exists, but only the retained path can identify the current action.
+		if RefusedPath is Array
+				return MenuReloadReplay_Run(RefusedPath)
+		if !Held && !_MenuCommandRegistrationCurrent(Registration) {
 				try LoggerWarn("MenuDispatcher", "Menu command refused because its native registration was retired.")
 				return false
 		}
-		if MenuStartupCommands_Defer(Callback, Args, Registration)
+		if !Held && MenuStartupCommands_Defer(Callback, Args, Registration)
 			return ""
+		; From the successor's launch to this instance's exit the terminal barrier
+		; owns every configuration path: the command waits for the successor,
+		; which replays it (infra/menu_reload_replay.ahk), instead of being refused.
+		if !Held
+			Held := MenuReloadReplay_Hold(0, Registration)
+		if (Held < 0)
+				return ""
+		if (Held > 0) {
+				Arm := HasMethod(ArmFn, "Call") ? ArmFn : TimerArmOneShotMs
+				try {
+						Arm.Call(_MenuCommandRetry.Bind(Callback, Args, Attempt, BusyFn, ArmFn, Registration, Held), MENU_COMMAND_DEFERRAL_RETRY_MS)
+						return ""
+				} catch as Err {
+						MenuReloadReplay_Release(Held)
+						try LoggerError("MenuDispatcher", "The menu command waiting for the reload successor could not be scheduled: {1}; it runs now.", Err.Message)
+				}
+		}
 		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigMutationBusy()
 		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
 				if (Attempt == 0)
@@ -590,8 +622,8 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 }
 
 ; The one-shot timer's callback of a deferred menu command.
-_MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, Registration := 0, *) {
-		MenuCommandRun(Callback, Args, Attempt, BusyFn, ArmFn, Registration)
+_MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, Registration := 0, HeldKey := 0, *) {
+		MenuCommandRun(Callback, Args, Attempt, BusyFn, ArmFn, Registration, HeldKey)
 }
 
 ; Variant for items added via ``Menu.Insert(BeforeItem, ItemName, Callback)``.
@@ -601,7 +633,9 @@ _MenuCommandRetry(Callback, Args, Attempt, BusyFn, ArmFn, Registration := 0, *) 
 ;
 ; BeforeItem accepts AHK's standard syntax: "Nname" / "&n" / "Nn&" — see
 ; AHK 2.0 Menu.Insert docs.
-RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
+RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback, ReplayIdentity := "") {
+		if !(ReplayIdentity is String)
+				throw TypeError("A menu replay identity must be a String.")
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
 		; Keep the same registration identity as RegisterMenuItem. _TrackedDispatch
@@ -648,6 +682,7 @@ RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
 		_MenuDispatchCallbacks[ItemId] := Callback
 		_MenuDispatchLastFire[ItemId]  := 0
 		_MenuDispatchTokens[ItemId]    := TrackedObj.Token
+		MenuReloadReplay_RegisterIdentity(ItemId, TrackedObj.Token, ReplayIdentity)
 		_MenuDispatchTrackOwner(MenuObj)
 		return 1
 }

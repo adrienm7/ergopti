@@ -374,6 +374,51 @@
 			}
 		},
 		{
+			"id": "case_conform_keeps_replacement_capitals",
+			"description": "The DEFAULT mode conforms the replacement to the typed casing; it never rewrites the capitals the replacement itself carries. A lower-case buffer emits the replacement as written. Windows lowercased the whole replacement before registering the family, so \"ppt\" typed \"powerpoint\" and a personal entry whose output was capitalised could not produce it by any setting but the literal one.",
+			"trigger": "ppt",
+			"replacement": "PowerPoint",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "ppt",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "PowerPoint",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "case_conform_title_keeps_inner_capitals",
+			"description": "A Title-cased buffer capitalises the replacement's first letter only: the rest keeps the casing written. Windows lowercased everything after the first letter, typing \"Powerpoint\".",
+			"trigger": "ppt",
+			"replacement": "PowerPoint",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "Ppt",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "PowerPoint",
+				"backspace_count": 3
+			}
+		},
+		{
+			"id": "case_conform_upper_buffer_uppercases_mixed_replacement",
+			"description": "An all-caps buffer upper-cases the whole replacement, whatever casing it was written in.",
+			"trigger": "ppt",
+			"replacement": "PowerPoint",
+			"is_word": false,
+			"auto_expand": true,
+			"buffer": "PPT",
+			"terminator": " ",
+			"expected": {
+				"matched": true,
+				"replacement": "POWERPOINT",
+				"backspace_count": 3
+			}
+		},
+		{
 			"id": "case_literal_folds",
 			"description": "is_case_sensitive WITHOUT strict selects the REGISTRATION shape, not the comparison: the trigger is registered literally — no lower/Title/UPPER family — and still matches any casing, emitting its replacement verbatim. 592 shared entries have this shape, all acronym autocorrections like \"adn\" -> \"ADN\": the literal registration exists so the family cannot generate \"Adn\" -> \"Adn\", and the fold is what lets a capitalised \"Adn\" correct at all. Reading the flag as \"compare exactly\" — which its name invites — makes every one of them silently stop firing on any casing but the one written.",
 			"trigger": "adn",

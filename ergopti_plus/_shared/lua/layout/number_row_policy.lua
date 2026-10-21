@@ -32,6 +32,72 @@ function M.symbols_shift(digit, plain, shifted)
 	return plain_digit
 end
 
+-- What one level of a row key holds: "d" its own digit, "s" another character
+-- or a dead key, "n" nothing.
+local function level_class(digit, value)
+	if not descriptor(value) then return "n" end
+	return (value.Kind == "text" and value.Text == digit) and "d" or "s"
+end
+
+local AVAILABILITY = {
+	sd = { digits = "", symbols = "already_symbols_first" },
+	ds = { digits = "already_digits_first", symbols = "" },
+	dd = { digits = "digits_on_both", symbols = "digits_on_both" },
+	ss = { digits = "symbols_on_both", symbols = "symbols_on_both" },
+	dn = { digits = "incomplete", symbols = "incomplete" },
+	nd = { digits = "incomplete", symbols = "incomplete" },
+}
+
+--- Which ordering options can make the row's base level differ from Shift,
+--- from the ten digit keys of the effective layout (keys 1 to 0, each
+--- { plain = descriptor, shift = descriptor }). "" means usable; otherwise the
+--- refusal reason. Keys that disagree are "mixed" and refuse both options.
+function M.availability(levels)
+	if type(levels) ~= "table" or #levels ~= 10 then
+		error("The number-row availability needs the ten digit keys.")
+	end
+	local first, mixed = nil, false
+	for index, key in ipairs(levels) do
+		local digit = tostring(index % 10)
+		local plain = type(key) == "table" and key.plain or nil
+		local shift = type(key) == "table" and key.shift or nil
+		local class = level_class(digit, plain) .. level_class(digit, shift)
+		if first == nil then first = class elseif class ~= first then mixed = true end
+	end
+	if mixed then return { digits = "mixed", symbols = "mixed" } end
+	local found = AVAILABILITY[first]
+	if found then return { digits = found.digits, symbols = found.symbols } end
+	return { digits = "no_digits", symbols = "no_digits" }
+end
+
+--- The ordering that applies on the effective layout: the stored choice, or
+--- "native" while it cannot reorder this layout (it stays stored).
+function M.effective(mode, availability)
+	mode = M.mode(mode)
+	if mode == nil or mode == "native" then return { mode = "native", reason = "" } end
+	local reason = availability[mode]
+	if reason == "" then return { mode = mode, reason = "" } end
+	return { mode = "native", reason = reason }
+end
+
+--- Whether the three edge keys can join the ordering in effect: each must type
+--- something on both levels, and not the same thing. "" when they can, else
+--- "no_ordering", "edges_incomplete" or "edges_same".
+function M.edges_availability(edges, ordering)
+	if type(edges) ~= "table" or #edges ~= 3 then
+		error("The edge-key availability needs the three edge keys.")
+	end
+	ordering = M.mode(ordering)
+	if ordering == nil or ordering == "native" then return "no_ordering" end
+	for _, key in ipairs(edges) do
+		local plain = type(key) == "table" and key.plain or nil
+		local shift = type(key) == "table" and key.shift or nil
+		if not descriptor(plain) or not descriptor(shift) then return "edges_incomplete" end
+		if plain.Kind == shift.Kind and plain.Text == shift.Text then return "edges_same" end
+	end
+	return ""
+end
+
 function M.capable(platform, mode, symbols)
 	if not M.mode(mode) then return false end
 	if mode == "native" then return platform == "ahk" or platform == "hs" or platform == "linux" end
@@ -72,9 +138,13 @@ end
 function M.native_rows(renderer, commands)
 	if type(renderer) ~= "table" or type(renderer.choice_row) ~= "function"
 		or type(renderer.get_array) ~= "function" or type(commands) ~= "table"
-		or type(commands["number_row_mode"]) ~= "function" then return {} end
+		or type(commands["number_row_mode"]) ~= "function"
+		or type(commands["number_row_edges"]) ~= "function" then return {} end
 	local definitions = renderer.get_array("number_row_policy_rows")
-	local declaration = type(definitions) == "table" and #definitions == 1 and definitions[1]
+	local declaration = type(definitions) == "table" and #definitions == 2 and definitions[1]
+	local edges = type(definitions) == "table" and definitions[2]
+	if type(edges) ~= "table" or edges.type ~= "check" or edges.path ~= "layout.number_row_reorder_edges"
+		or edges.id ~= "number_row_edges" then return {} end
 	local choices = type(declaration) == "table" and declaration.choices
 	if type(choices) ~= "table" or #choices ~= 3
 		then return {} end
@@ -95,7 +165,17 @@ function M.native_rows(renderer, commands)
 			item.disabled_reason_key = "platform_reason.number_row_override_unsupported"
 		end
 	end
-	return { row }
+	-- The edge keys follow the ordering, which these drivers do not apply.
+	if type(renderer.check_row) ~= "function" then return {} end
+	local check = renderer.check_row("number_row_policy_rows", "number_row_edges",
+		{ number_row_edges = commands["number_row_edges"] },
+		{ number_row_edges_enabled = function() return false end })
+	if type(check) ~= "table" then return {} end
+	check.action = nil
+	check.checked = false
+	check.disabled = true
+	check.disabled_reason_key = "platform_reason.number_row_override_unsupported"
+	return { row, check }
 end
 
 return M

@@ -308,7 +308,7 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 				; Raw send sequence — no portable key/modifier form exists for it.
 				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq) }
 		} else {
-				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods),
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods, _EmitId == "paste"),
 						Key: _Emit.Key, Mods: _Emit.Mods }
 		}
 }
@@ -356,8 +356,23 @@ GestureActionIsAssignable(ActionName, AllowNative := false) {
 ; captures the LOOP VARIABLE, so every handler would end up emitting whatever
 ; the last iteration happened to leave there. Passing the values as parameters
 ; gives each closure its own copy.
-_GestureMakeKeyEmitter(Key, Mods) {
+_GestureMakeKeyEmitter(Key, Mods, OwnClipboard := false) {
+		if OwnClipboard
+				return (*) => _GestureWithPasteAdmission(TextPressKey.Bind(Key, Mods))
 		return (*) => TextPressKey(Key, Mods)
+}
+
+; A catalogue paste must not consume a selection capture's clear or another
+; producer's temporary text. Keep the lease only through the actual emission;
+; there is no snapshot or mutation, and user-paste observation stays enabled.
+_GestureWithPasteAdmission(EmitFn) {
+		OwnerToken := CB_TryBeginOwnedTransaction("gesture_paste")
+		if !OwnerToken {
+				try LoggerWarn("gestures", "Paste refused while another clipboard transaction is active.")
+				return false
+		}
+		try return EmitFn.Call()
+		finally CB_EndOwnedTransaction(OwnerToken)
 }
 
 _GestureMakeSeqEmitter(Seq) {
@@ -706,53 +721,50 @@ _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
 }
 
 GesturePastePlain() {
-		if not WinActive("ahk_exe EXCEL.EXE") {
-				; Strip rich formatting only when the clipboard holds text. CB_Read()
-				; returns "" for non-text payloads (image/file list); the self-assign
-				; round-trip on those would destroy them, so we skip the strip and
-				; paste the content as-is instead.
-				if CB_Read() != "" {
-						; Skip the save/restore dance while SendInstant is already mid-flight
-						; to avoid a second thread trampling the in-flight clipboard before
-						; the first paste settles.
-						OwnerToken := CB_TryBeginPasteTransaction("gesture_paste_plain")
-						if !OwnerToken {
-								SendFinalResult("^v")
-								return
-						}
-						; Snapshot the FULL clipboard (all formats) before coercing to
-						; plain text. A_Clipboard := A_Clipboard keeps only the text form,
-						; silently dropping any image/HTML/RTF the user may still want, so
-						; we restore the original after the paste settles -- mirroring
-						; SendInstant's save/paste/deferred-restore guarantee.
-						OldClip := CB_SaveAll()
-						if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
-								CB_EndOwnedTransaction(OwnerToken)
-								try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot failed; using native paste.")
-								SendFinalResult("^v")
-								return
-						}
-						PlainText := CB_Read()
-						OwnedSequence := 0
-						try {
-								if !CB_Write(PlainText)
-										throw Error("clipboard write failed")
-								OwnedSequence := CB_GetSequenceNumber()
-								if !OwnedSequence
-										throw Error("clipboard sequence unavailable")
-								SendFinalResult("^v")
-								SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
-						} catch as e {
-								try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
-										OwnerToken, "gesture_paste_plain_rollback", true,
-										!OwnedSequence)
-								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard rollback retained: {1}.", e.Message)
-						}
-				} else {
-						SendFinalResult("^v")
+		OwnerToken := CB_TryBeginPasteTransaction("gesture_paste_plain")
+		if !OwnerToken {
+				try LoggerWarn("gestures", "Plain paste refused while another clipboard transaction is active.")
+				return
+		}
+		RestoreTimerArmed := false
+		try {
+				if WinActive("ahk_exe EXCEL.EXE") {
+						SendFinalResult("^+v")
+						return
 				}
-		} else {
-				SendFinalResult("^+v")
+				; Keep non-text formats intact and use the application's native paste.
+				if CB_Read() == "" {
+						SendFinalResult("^v")
+						return
+				}
+				; Admission precedes every read, including an empty temporary clear owned
+				; by another selection or paste. Only this owner may snapshot and coerce.
+				OldClip := CB_SaveAll()
+				if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
+						try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot failed; using native paste.")
+						SendFinalResult("^v")
+						return
+				}
+				PlainText := CB_Read()
+				OwnedSequence := 0
+				try {
+						if !CB_Write(PlainText)
+								throw Error("clipboard write failed")
+						OwnedSequence := CB_GetSequenceNumber()
+						if !OwnedSequence
+								throw Error("clipboard sequence unavailable")
+						SendFinalResult("^v")
+						SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
+						RestoreTimerArmed := true
+				} catch as Err {
+						try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+								OwnerToken, "gesture_paste_plain_rollback", true, !OwnedSequence)
+						try LoggerError("gestures", "GesturePastePlain clipboard rollback retained: {1}.", Err.Message)
+				}
+		} finally {
+				; A deferred restore or retry debt retains the exact owner until settled.
+				if !RestoreTimerArmed and !CB_HasRestoreDebtForOwner(OwnerToken)
+						CB_EndOwnedTransaction(OwnerToken)
 		}
 }
 

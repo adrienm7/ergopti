@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: FileSystem Delete Race Regression
 --- DESCRIPTION:
---- A concurrent remover can make the pathname disappear after delete() proves
---- it exists but before os.remove() executes. Errno 2 is then the committed
---- end state, while any other refusal must remain a visible failure.
+--- A concurrent remover can make the pathname disappear before os.remove().
+--- Errno 2 then proves the requested end state without a racy existence probe;
+--- every other native refusal must remain a visible failure.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -64,15 +64,15 @@ local function run_delete(remove_result)
 end
 
 helpers.describe("adapters.file_system — delete race verdict", function()
-	helpers.it("accepts errno 2 after the existence probe", function()
+	helpers.it("accepts authoritative errno 2 from the native removal", function()
 		local deleted, errors, exists_calls, remove_calls = run_delete(function()
 			return nil, "/tmp/hs024-race: No such file or directory", 2
 		end)
 
 		helpers.assert_eq(deleted, true,
 			"a concurrent remover already achieved delete()'s requested end state")
-		helpers.assert_eq(exists_calls, 1,
-			"the regression must exercise the exists-to-remove race")
+		helpers.assert_eq(exists_calls, 0,
+			"an ambiguous stat must never certify deletion before the native call")
 		helpers.assert_eq(remove_calls, 1,
 			"delete() must still attempt the exact observed pathname")
 		helpers.assert_eq(#errors, 0,
@@ -86,7 +86,7 @@ helpers.describe("adapters.file_system — delete race verdict", function()
 
 		helpers.assert_eq(deleted, false,
 			"only authoritative absence may convert a failed remove into success")
-		helpers.assert_eq(exists_calls, 1)
+		helpers.assert_eq(exists_calls, 0)
 		helpers.assert_eq(remove_calls, 1)
 		helpers.assert_eq(#errors, 1,
 			"an actual removal refusal must remain visible")

@@ -34,14 +34,13 @@ function M.new(deps)
 	local applications=setmetatable({}, {__mode='k'})
 	local source={}
 	local function read_source()
-		-- generation() itself rereads classified bytes. Bracket values with its
-		-- private revisions; one bounded refresh permits an enabled/model-only
-		-- edit without borrowing an older backend from another image.
+		-- get_many pins the revision before default/validation callbacks. Finish
+		-- with its RAM fence rather than decoding the same file again merely to
+		-- learn that revision. Each admission still reads fresh classified bytes.
 		for _=1,2 do
-			local before=generation()
-			local values,image=get_many(KEYS)
-			local revision=generation()
-			if before==revision then return values,image,revision end
+			local values,image,revision=get_many(KEYS)
+			if type(revision)=='number' and revision>=0 and revision<=9007199254740991
+				and revision%1==0 and revision_current(revision)==true then return values,image,revision end
 		end
 		return nil,nil,nil,nil
 	end
@@ -64,7 +63,7 @@ function M.new(deps)
 		return identity(state,record,false) and is_enabled()==false and revision==record.preference_revision
 			and values['llm.enabled']==false and values[backend_key]=='ollama'
 			and values['llm.models.ollama']==record.model and same_source(image,record.image)
-			and identity(native_get(),record,false) and generation()==revision
+			and identity(native_get(),record,false) and revision_current(revision)==true
 	end
 	function source.capture()
 		local values,image,revision,state=read()
@@ -98,7 +97,10 @@ function M.new(deps)
 		local restored=record.compensated and revision==record.restored_revision and same_source(image,record.restored_image)
 		local saved=record.candidate~=nil and revision==record.preference_revision+2
 			and image.status=='ok' and image.content==record.candidate
-		return (original or saved or restored) and not record.retired
+		-- Native state readers can observe a newer preference image after read_source.
+		-- Close the notice lifetime with the same RAM-only revision fence as writes.
+		return (original or saved or restored) and revision_current(revision)==true
+			and records[handle]==record and not record.retired
 	end
 	function source.retire(handle)
 		local record=records[handle];if record then record.retired=true end

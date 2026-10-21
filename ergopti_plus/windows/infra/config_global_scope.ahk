@@ -26,7 +26,7 @@ ConfigGlobalScopeApply(Mode, Options := unset) {
 		throw Error("The global scope declares an unsupported separate-file owner.")
 	if !_HCW_FlushNumericWrite(false)
 		return Map("status", "refused", "scope", "global", "mode", Mode, "detail", "pending_numeric_write")
-	Hotstrings := HotstringsScopeFiles(Selected)
+	Hotstrings := HotstringsScopeFiles(Selected, Mode)
 	; The restore brings the recommended layer into a folder without layers.toml
 	; (TapHoldScopeOwner), for the folder the caller names.
 	Tap := TapHoldScopeOwner(Selected.Get("tap_hold_path", _TH_TapHoldConfigPath()),

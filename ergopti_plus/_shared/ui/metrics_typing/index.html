@@ -65,7 +65,7 @@
 					<!-- Sans aucun toggle actif = texte final affiché à l'écran (output) -->
 					<!-- Avec un toggle actif = frappe brute pour produire cet output (input) -->
 					<button
-						class="filter-btn source-toggle"
+						class="filter-btn source-toggle active"
 						id="btn_toggle_llm"
 						onclick="toggle_llm_source()"
 						data-i18n-title="ui_typing.btn_toggle_llm_title"
@@ -73,7 +73,7 @@
 						+ IA
 					</button>
 					<button
-						class="filter-btn source-toggle"
+						class="filter-btn source-toggle active"
 						id="btn_toggle_hs"
 						onclick="toggle_hs_source()"
 						data-i18n-title="ui_typing.btn_toggle_hs_title"
@@ -82,7 +82,7 @@
 					</button>
 
 					<button
-						class="filter-btn"
+						class="filter-btn active"
 						id="btn_case_sensitive"
 						onclick="toggle_filter('btn_case_sensitive')"
 						data-i18n="ui_typing.btn_case_sensitive"
@@ -1281,6 +1281,14 @@
 				// global state and re-render.
 				function apply_prefetch(blob) {
 					if (!blob) return;
+					const has_prefetch = blob._prefetch_data !== undefined;
+					// Reject stale native replies before metadata, mailbox or history
+					// changes; a later live delta must not resurrect rejected history.
+					if (
+						(has_prefetch || blob.range_request_id !== undefined) &&
+						!window.can_receive_range_data(blob.range_request_id ?? null)
+					)
+						return;
 					// A partial rebuild snapshot is labelled until a complete one lands.
 					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
 					window.metrics_manifest = blob.metrics_manifest || {};
@@ -1294,8 +1302,8 @@
 						typeof window.build_keycode_layout_for_driver === 'function'
 							? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
 							: blob.keycode_layout || {};
-					const has_prefetch = blob._prefetch_data !== undefined;
 					let merged = null;
+					let next_historical = cached_historical;
 					if (has_prefetch) {
 						const incoming = blob._prefetch_data || {};
 						let incoming_hist = incoming.historical || {};
@@ -1312,16 +1320,16 @@
 						}
 						// Omission is a live delta; an explicit empty object clears history.
 						if (Object.prototype.hasOwnProperty.call(incoming, 'historical')) {
-							cached_historical = incoming_hist;
+							next_historical = incoming_hist;
 						}
 						merged = {
-							historical: cached_historical || incoming_hist || {},
+							historical: next_historical || incoming_hist || {},
 							today: incoming_today
 						};
 						window._prefetch_data = merged;
 					}
-					// First apply seeds the dashboard (process_manifest does the
-					// initial reset, sets up filters, and triggers request_range_data
+					// First apply seeds the dashboard (process_manifest initializes
+					// dates/apps and triggers request_range_data
 					// — which synchronously paints the loader spinner). Subsequent
 					// live pushes go directly to receive_range_data so the spinner
 					// doesn't clobber the rendered tables every 200 ms.
@@ -1337,8 +1345,15 @@
 					}
 					if (merged && typeof window.receive_range_data === 'function') {
 						try {
-							window._lua_request = null;
-							window.receive_range_data(merged, blob.range_request_id ?? null);
+							// process_manifest can discover a new scope. Recheck before
+							// touching its mailbox and never relabel this response's id.
+							const request_id = blob.range_request_id ?? null;
+							if (window.can_receive_range_data(request_id)) {
+								window._lua_request = null;
+								if (window.receive_range_data(merged, request_id) === true) {
+									cached_historical = next_historical;
+								}
+							}
 						} catch (e) {
 							console.error('receive_range_data failed:', e);
 						}

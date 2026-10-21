@@ -789,7 +789,7 @@ LLM_Tooltip_GetAcceptSnapshot() {
         return 0
     Text := _LLM_SlotGetTextStub(Record.Slots[Record.ActiveIdx])
 	return {
-		Record: Record, Surface: Record,
+		Record: Record, Surface: Record, Lifecycle: Record.Lifecycle,
 		Text: Text, Slots: Record.Slots.Clone(),
         ActiveIdx: Record.ActiveIdx,
         AcceptSource: Record.Lifecycle.AcceptSource,

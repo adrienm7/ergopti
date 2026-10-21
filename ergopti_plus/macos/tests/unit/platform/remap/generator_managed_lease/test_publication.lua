@@ -324,4 +324,94 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 			fixture.write_succeeds = true
 		end)
 	end)
+
+	helpers.it("(deploy-decision-log) logs one INFO decision per deploy and repairs an external edit", function()
+		with_fixture(function(fixture)
+			local Generator = fixture.Generator
+			local decisions = {}
+			local logger = package.loaded["infra.logger"]
+			local previous_info = logger.info
+			logger.info = function(_, format_string, ...)
+				local line = string.format(format_string, ...)
+				if line:find("Karabiner deploy decision", 1, true) then decisions[#decisions + 1] = line end
+			end
+			local incoming = generated_config({ managed_rule(TOKEN, "normal", "current") })
+			local path = "/merge/publish-decisions.json"
+			local personal_only = _G.hs.json.encode({
+				profiles = {
+					{
+						name = "Personal",
+						selected = true,
+						complex_modifications = { rules = { personal_rule("keep me") } },
+					},
+				},
+			})
+			fixture.file_data[path] = personal_only
+			fixture.file_writes = {}
+			fixture.file_reads = {}
+			fixture.parent_prepare_calls = {}
+			fixture.write_succeeds = true
+			fixture.before_publication = nil
+
+			local called, failure = pcall(function()
+				helpers.assert_true(Generator.merge_and_deploy_config(incoming, path))
+				helpers.assert_true(Generator.merge_and_deploy_config(incoming, path))
+				-- Someone removes the managed block by hand: the next regeneration
+				-- reads the file again and puts it back.
+				fixture.file_data[path] = personal_only
+				helpers.assert_true(Generator.merge_and_deploy_config(incoming, path))
+			end)
+			logger.info = previous_info
+			if not called then error(failure, 0) end
+			helpers.assert_eq(#fixture.file_writes, 2, "identical content is never written")
+			helpers.assert_eq(#decisions, 3, "every decision is one INFO line")
+			helpers.assert_true(decisions[1]:find("deployed", 1, true) ~= nil)
+			helpers.assert_true(decisions[2]:find("skipped-identical", 1, true) ~= nil)
+			helpers.assert_true(decisions[3]:find("deployed", 1, true) ~= nil)
+		end)
+	end)
+
+	helpers.it("(deploy-identical-bytes) never writes bytes equal to the file on disk", function()
+		with_fixture(function(fixture)
+			local Generator = fixture.Generator
+			local path = "/merge/publish-identical-bytes.json"
+			local merged = {
+				profiles = {
+					{ name = "Personal", selected = true, complex_modifications = { rules = { personal_rule("keep me") } } },
+				},
+			}
+			local on_disk = _G.hs.json.encode(merged, true)
+			fixture.file_data[path] = on_disk
+			fixture.file_writes = {}
+			fixture.file_reads = {}
+			fixture.parent_prepare_calls = {}
+			fixture.write_succeeds = true
+			fixture.before_publication = nil
+			-- A semantic verdict of "changed" whose encoding is the file itself:
+			-- the bytes decide, and Karabiner must not reload an unchanged file.
+			local original_merge = Generator.merge_into_existing_config
+			Generator.merge_into_existing_config = function()
+				return merged, nil, { status = "ok", content = on_disk }, true
+			end
+			local called, ok, detail, attempts = pcall(Generator.merge_and_deploy_config,
+				generated_config({ managed_rule(TOKEN, "normal", "current") }), path)
+			local raced_ok, raced_detail
+			if called then
+				-- The skip leaves the file as it is, so that file must still be the
+				-- one the merge read.
+				fixture.file_data[path] = on_disk .. "\n"
+				raced_ok, raced_detail = Generator.merge_and_deploy_config(
+					generated_config({ managed_rule(TOKEN, "normal", "current") }), path)
+			end
+			Generator.merge_into_existing_config = original_merge
+			if not called then error(ok, 0) end
+			helpers.assert_true(ok, tostring(detail))
+			helpers.assert_eq(detail, "unchanged")
+			helpers.assert_eq(attempts, 0)
+			helpers.assert_eq(#fixture.file_writes, 0, "identical bytes are never written")
+			helpers.assert_true(raced_ok == false, "a file changed after the read is never confirmed as deployed")
+			helpers.assert_true(tostring(raced_detail):find("source changed", 1, true) ~= nil, tostring(raced_detail))
+			helpers.assert_eq(#fixture.file_writes, 0, "a raced file is never overwritten")
+		end)
+	end)
 end)

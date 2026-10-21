@@ -304,7 +304,9 @@ function M.pending_probes(schema, driver, selected)
 	local probes = {}
 	for id, probe in pairs(schema.probes) do
 		if M.applies(probe, driver) then
-			probes[id] = selected == false and { state = "not_run", reason = "opt_in_required" } or { state = "pending" }
+			-- A local probe reads only the user's own files: it needs no opt-in
+			local opted_out = selected == false and probe["local"] ~= true
+			probes[id] = opted_out and { state = "not_run", reason = "opt_in_required" } or { state = "pending" }
 		end
 	end
 	return probes

@@ -9,9 +9,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = helpers.load_module("tests.fakes")
 
 local held = {}
+local inventory_profiles
 
 local function replace(name, value)
 	if held[name] == nil then held[name] = package.loaded[name] or false end
@@ -22,6 +24,7 @@ local function restore()
 	package.loaded["modules.llm.prediction_engine"] = nil
 	for name, value in pairs(held) do package.loaded[name] = value ~= false and value or nil end
 	held = {}
+	if inventory_profiles then inventory_profiles.assert_no_inventory(); inventory_profiles = nil end
 end
 
 local function fixture(values)
@@ -36,10 +39,11 @@ local function fixture(values)
 		end,
 		set = function() return true end,
 	})
-	replace("modules.llm.profiles", {
-		init = function() end,
+	inventory_profiles = ProfilesFixture.without_inventory({
+		init = function() return true end,
 		is_enabled = function() return true end,
 	})
+	replace("modules.llm.profiles", inventory_profiles)
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local engine = require("modules.llm.prediction_engine")
 	local fired = {}

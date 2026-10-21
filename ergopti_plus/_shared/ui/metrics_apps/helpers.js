@@ -37,7 +37,7 @@ let currentCompareEnabled = false;
 let currentCountAwake = false;
 
 // Dominant colour cache: app_name → '#rrggbb' (computed once per icon via Canvas)
-const _dominantColorCache = {};
+const _dominantColorCache = Object.create(null);
 
 let appsBarChart = null;
 let catPieChart = null;
@@ -90,6 +90,7 @@ const CATEGORY_ID_MAP = {
 	'Developer tools': 'development',
 	Unknown: 'general'
 };
+const CATEGORY_IDS = new Set(Object.values(CATEGORY_ID_MAP));
 
 // Reverse map (any locale label → stable id), populated lazily by translateCategory
 // so getCategoryColor can resolve a translated label back to its id.
@@ -167,26 +168,30 @@ const FIXED_CAT_COLORS = {
 };
 
 /**
- * Resolves a category name to its stable i18n id.
+ * Resolves a preset to its stable i18n id while preserving custom category text.
  * Accepts an English macOS category, a French legacy label, or an already-stable id.
  * @param {string} catName
- * @returns {string} stable id (falls back to 'utility').
+ * @returns {string} Preset id or custom text; empty/invalid input defaults to 'utility'.
  */
 function categoryToId(catName) {
-	if (!catName) return 'utility';
+	if (typeof catName !== 'string' || !catName.trim()) return 'utility';
 	// Direct English → id
-	if (CATEGORY_ID_MAP[catName]) return CATEGORY_ID_MAP[catName];
+	if (Object.prototype.hasOwnProperty.call(CATEGORY_ID_MAP, catName))
+		return CATEGORY_ID_MAP[catName];
 	// French legacy label → id (backward compat with existing user categories)
-	if (_FRENCH_LEGACY_LABELS[catName]) return _FRENCH_LEGACY_LABELS[catName];
+	if (Object.prototype.hasOwnProperty.call(_FRENCH_LEGACY_LABELS, catName))
+		return _FRENCH_LEGACY_LABELS[catName];
 	// Already a stable id?
-	if (FIXED_CAT_COLORS[catName]) return catName;
+	if (CATEGORY_IDS.has(catName)) return catName;
 	// Reverse cache populated by previous translateCategory calls
-	if (_labelToId[catName]) return _labelToId[catName];
-	return 'utility';
+	if (Object.prototype.hasOwnProperty.call(_labelToId, catName)) return _labelToId[catName];
+	return catName;
 }
 
 function translateCategory(catName) {
 	const id = categoryToId(catName);
+	// Custom text is already a display label, not a locale catalogue key.
+	if (!CATEGORY_IDS.has(id)) return id;
 	const label = _t('app_category.' + id);
 	_labelToId[label] = id;
 	return label;
@@ -211,7 +216,7 @@ function getCategoryColor(catName, score) {
 	if (score > 0) return '#30D158';
 	if (score < 0) return '#FF453A';
 	const id = categoryToId(catName);
-	if (FIXED_CAT_COLORS[id]) return FIXED_CAT_COLORS[id];
+	if (Object.prototype.hasOwnProperty.call(FIXED_CAT_COLORS, id)) return FIXED_CAT_COLORS[id];
 	return CHART_PALETTE[paletteIndex(catName)];
 }
 

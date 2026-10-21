@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, spawns = {}, reads = 0, handles = {} }
+	local state = { kills = {}, spawns = {}, reads = 0, handles = {}, close_queue = {} }
 	local fake = {}
 
 	local function handle(kind)
@@ -33,13 +33,14 @@ local function fake_luv(config)
 	function fake.new_pipe() return handle("pipe") end
 	function fake.update_time() -- native void-style clock refresh; explicit simulated exception
 		if options.refresh_error then error("simulated clock refresh failure") end
+		if options.on_refresh then options.on_refresh() end
 	end
 	function fake.new_timer()
 		state.timer = handle("timer")
 		return state.timer
 	end
 	function fake.timer_start(timer, timeout_ms, repeat_ms, callback)
-		if options.refuse == "timer" then return options.refusal, "simulated timer refusal", "EINVAL" end
+		if options.refuse == "timer" and repeat_ms == 0 then return options.refusal, "simulated timer refusal", "EINVAL" end
 		timer.timeout_ms = timeout_ms
 		timer.callback = callback
 		return 0
@@ -56,25 +57,42 @@ local function fake_luv(config)
 	end
 	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
 	function fake.is_closing(value) return value.closing end
-	function fake.close(value) value.closing = true end
+	function fake.close(value, callback)
+		value.closing = true
+		local finish = function() value.closed = true; if callback then callback() end end
+		if options.close_inline then finish() else state.close_queue[#state.close_queue + 1] = finish end
+	end
 	function fake.kill(pid, signal)
+		if signal == 0 then
+			if state.group_absent then return nil, "no such process group", "ESRCH" end
+			return 0
+		end
 		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
 		return true
 	end
 	function fake.spawn(program, spawn_options, callback)
 		state.spawns[#state.spawns + 1] = { program = program, options = spawn_options }
-		if options.spawn_error then return nil, options.spawn_error, "ENOENT" end
+		if options.spawn_error then return nil, options.spawn_error, options.spawn_code or "ENOENT" end
 		state.options = spawn_options
 		state.exit_callback = callback
+		if options.on_spawn then options.on_spawn() end
 		return handle("process"), 7001
 	end
 
-	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
-	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
+	function state.stdout(chunk) local callback = state.options.stdio[2].read_callback; if callback then callback(nil, chunk) end end
+	function state.stderr(chunk) local callback = state.options.stdio[3].read_callback; if callback then callback(nil, chunk) end end
+	function state.drain()
+		while #state.close_queue > 0 do
+			local callbacks = state.close_queue; state.close_queue = {}
+			for _, callback in ipairs(callbacks) do callback() end
+		end
+	end
 	function state.finish(code, signal)
+		state.group_absent = true
 		state.stdout(nil)
 		state.stderr(nil)
 		state.exit_callback(code, signal or 0)
+		state.drain()
 	end
 	return fake, state
 end
@@ -86,11 +104,14 @@ local function fresh_runner(config)
 	local fake, state = fake_luv(config)
 	local previous_luv = package.loaded["luv"]
 	local previous = package.loaded["adapters.process_runner"]
+	local previous_owned = package.loaded["adapters.owned_process"]
 	package.loaded["luv"] = fake
 	package.loaded["adapters.process_runner"] = nil
+	package.loaded["adapters.owned_process"] = config and config.owned_process or nil
 	local runner = require("adapters.process_runner")
 	package.loaded["luv"] = previous_luv
 	package.loaded["adapters.process_runner"] = previous
+	package.loaded["adapters.owned_process"] = previous_owned
 	return runner, state
 end
 
@@ -113,13 +134,15 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 		end)
 	end
 	for _, mode in ipairs({ "raised", "nil" }) do
-		for slot = 1, 3 do
+		for slot = 1, 4 do
 			helpers.it("linux-process-allocation: " .. mode .. " constructor at " .. slot .. " releases prior handles", function()
 				local config = {}
 				config[mode == "raised" and "allocation_failure_at" or "allocation_nil_at"] = slot
 				local runner, state = fresh_runner(config)
 				local dispatched, results = start(runner, "python3", {}, {})
 				helpers.assert_eq(dispatched, false)
+				helpers.assert_eq(#results, slot == 1 and 1 or 0, "partial allocations cannot publish before close ACK")
+				state.drain()
 				helpers.assert_eq(#results, 1)
 				helpers.assert_eq(results[1].exit_code, -1)
 				helpers.assert_eq(results[1].stdout, "")
@@ -143,6 +166,8 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 				local runner, state = fresh_runner(config)
 				local dispatched, results = start(runner, "python3", {}, { timeout_ms = 100 })
 				helpers.assert_eq(dispatched, false)
+				helpers.assert_eq(#results, 0, "supervision refusal cannot publish before native retirement")
+				state.finish(0)
 				helpers.assert_eq(#results, 1)
 				helpers.assert_eq(results[1].exit_code, -1)
 				helpers.assert_eq(results[1].error, "process supervision could not start")
@@ -156,20 +181,16 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 		end
 	end
 
-	helpers.it("linux-relative-clock: simulated refresh exception retires the owned child and handles", function()
+	helpers.it("linux-relative-clock: simulated refresh exception refuses before native allocation", function()
 		local runner, state = fresh_runner({ refresh_error = true })
 		local dispatched, results = start(runner, "python3", { "slow.py" }, {})
 		helpers.assert_eq(dispatched, false)
 		helpers.assert_eq(#results, 1)
 		helpers.assert_contains(results[1].error, "supervision could not start")
-		helpers.assert_eq(state.kills, {
-			{ pid = -7001, signal = "sigterm" },
-			{ pid = -7001, signal = "sigkill" },
-		})
-		helpers.assert_true(state.timer.closing)
-		helpers.assert_true(state.options.stdio[2].closing and state.options.stdio[3].closing)
-		state.finish(0)
-		helpers.assert_eq(#results, 1, "late native exit cannot publish twice")
+		helpers.assert_eq(state.kills, {}, "failed fresh-clock admission must acquire no child")
+		helpers.assert_eq(#state.spawns, 0)
+		helpers.assert_eq(#state.handles, 0)
+		helpers.assert_eq(#results, 1, "clock refusal publishes exactly once without native work")
 	end)
 
 	helpers.it("dispatches without waiting and reports the exit code and output once (layout-registry-convert)", function()
@@ -214,9 +235,11 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 	end)
 
 	helpers.it("tells a program that cannot start from one that fails (layout-registry-convert)", function()
-		local runner = fresh_runner({ spawn_error = "ENOENT: no such file or directory" })
+		local runner, state = fresh_runner({ spawn_error = "ENOENT: no such file or directory" })
 		local dispatched, results = start(runner, "python3", { "--version" }, {})
 		helpers.assert_true(dispatched == false)
+		helpers.assert_eq(#results, 0, "spawn refusal still owns allocated native streams/timers")
+		state.drain()
 		helpers.assert_eq(#results, 1)
 		helpers.assert_true(results[1].not_found, "ENOENT means the program is not installed")
 		helpers.assert_contains(results[1].error, "cannot start python3")
@@ -226,6 +249,8 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 		local runner, state = fresh_runner()
 		local _, results = start(runner, "python3", { "slow.py" }, { timeout_ms = 10 })
 		state.timer.callback()
+		helpers.assert_eq(#results, 0, "deadline is not an exit/close receipt")
+		state.finish(0)
 		helpers.assert_eq(#results, 1)
 		helpers.assert_contains(results[1].error, "did not finish")
 		helpers.assert_eq(state.kills[1].pid, -7001, "the whole group is signalled")
@@ -251,9 +276,157 @@ helpers.describe("process_runner: asynchronous argv processes", function()
 			{ pid = -7001, signal = "sigterm" },
 			{ pid = -7001, signal = "sigkill" },
 		}, "a reaped leader does not mean the process group is empty")
+		helpers.assert_eq(#results, 0, "descendant retirement still requires group absence and close ACK")
+		state.finish(0)
 		helpers.assert_eq(#results, 1)
 		helpers.assert_contains(results[1].error, "did not finish")
-		state.finish(0)
 		helpers.assert_eq(#results, 1, "late EOF must not publish twice")
+	end)
+end)
+
+helpers.describe("layout helper terminal native ownership", function()
+	helpers.it("(layout-helper-shutdown) retains exit and close ACK while suppressing late delivery", function()
+		local runner, state = fresh_runner()
+		local accepted, results = start(runner, "python3", {}, {})
+		helpers.assert_true(accepted)
+		helpers.assert_eq(runner.shutdown(), false)
+		helpers.assert_eq(#state.kills, 2)
+		local rejected, later = start(runner, "python3", {}, {})
+		helpers.assert_eq(rejected, false); helpers.assert_eq(#later, 0)
+		helpers.assert_eq(#state.spawns, 1)
+		state.group_absent = true
+		state.exit_callback(0, 0)
+		helpers.assert_eq(runner.shutdown(), false, "exit alone is not native handle retirement")
+		helpers.assert_eq(#results, 0)
+		state.drain()
+		helpers.assert_true(runner.shutdown())
+		helpers.assert_true(runner.shutdown(), "settled shutdown is idempotent")
+		helpers.assert_eq(#results, 0, "cancelled business callbacks never publish")
+		helpers.assert_eq(#state.kills, 2)
+	end)
+
+	for _, boundary in ipairs({ "spawn", "refresh" }) do
+		helpers.it("(layout-helper-shutdown) closes admission during constructor " .. boundary, function()
+			local runner, first
+			local options = {}
+			options["on_" .. boundary] = function() first = runner.shutdown() end
+			local state
+			runner, state = fresh_runner(options)
+			local accepted, results = start(runner, "python3", {}, {})
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(first, false, "shutdown must retain the native constructor frame")
+			helpers.assert_eq(#results, 0)
+			if boundary == "spawn" then
+				helpers.assert_eq(runner.shutdown(), false)
+				state.finish(0)
+			else helpers.assert_eq(#state.handles, 0) end
+			helpers.assert_true(runner.shutdown())
+			helpers.assert_eq(#results, 0)
+		end)
+	end
+
+	helpers.it("(layout-helper-shutdown) cancelled partial construction still awaits native close ACK", function()
+		local runner, state = fresh_runner({ allocation_nil_at = 2 })
+		local accepted, results = start(runner, "python3", {}, {})
+		helpers.assert_eq(accepted, false); helpers.assert_eq(#results, 0)
+		helpers.assert_eq(runner.shutdown(), false)
+		state.drain()
+		helpers.assert_true(runner.shutdown())
+		helpers.assert_eq(#results, 0)
+	end)
+
+	helpers.it("(layout-helper-shutdown) normal error waits for close callbacks before publication", function()
+		local runner, state = fresh_runner()
+		local accepted, results = start(runner, "python3", {}, {})
+		helpers.assert_true(accepted)
+		state.group_absent = true
+		state.stdout(nil); state.stderr(nil); state.exit_callback(3, 0)
+		helpers.assert_eq(#results, 0)
+		helpers.assert_eq(runner.is_settled(), false)
+		state.drain()
+		helpers.assert_eq(#results, 1)
+		helpers.assert_eq(results[1].exit_code, 3)
+		helpers.assert_true(runner.is_settled())
+	end)
+
+	helpers.it("(layout-helper-shutdown) inline partial close settles only after its constructor returns", function()
+		local runner = fresh_runner({ allocation_nil_at = 2, close_inline = true })
+		local accepted, results = start(runner, "python3", {}, {})
+		helpers.assert_eq(accepted, false)
+		helpers.assert_eq(#results, 1)
+		helpers.assert_eq(results[1].error, "libuv handle allocation failed")
+		helpers.assert_true(runner.is_settled())
+	end)
+
+	helpers.it("(layout-helper-shutdown) a completion can stop before attempting a successor", function()
+		local runner, state = fresh_runner()
+		local callbacks = 0
+		helpers.assert_true(runner.run("python3", {}, {}, function()
+			callbacks = callbacks + 1
+			helpers.assert_true(runner.shutdown(), "the completed operation must already be physically retired")
+			local accepted, later = start(runner, "python3", {}, {})
+			helpers.assert_eq(accepted, false); helpers.assert_eq(#later, 0)
+		end))
+		state.finish(0)
+		helpers.assert_eq(callbacks, 1)
+		helpers.assert_eq(#state.spawns, 1)
+	end)
+
+	helpers.it("(layout-helper-shutdown) ENOENT text cannot override a different native errno", function()
+		local runner, state = fresh_runner({ spawn_error = "ENOENT-looking diagnostic", spawn_code = "EACCES" })
+		local accepted, results = start(runner, "python3", {}, {})
+		helpers.assert_eq(accepted, false); state.drain()
+		helpers.assert_eq(#results, 1)
+		helpers.assert_eq(results[1].not_found, false, "only the native errno identifies a missing executable")
+	end)
+end)
+
+helpers.describe("runner shutdown snapshots exact native claims", function()
+	helpers.it("(layout-helper-shutdown) cancelling one settled claim cannot skip another", function()
+		local operations = {}
+		local owner = { start = function()
+			local settled, listeners, operation = false, {}, { started = true, cancels = 0 }
+			function operation:is_settled() return settled end
+			function operation:on_settled(listener) listeners[#listeners + 1] = listener; return true end
+			function operation:cancel()
+				self.cancels = self.cancels + 1
+				settled = true
+				for _, listener in ipairs(listeners) do listener() end
+				return true
+			end
+			operations[#operations + 1] = operation
+			return operation
+		end }
+		local runner = fresh_runner({ owned_process = owner })
+		local one, first = start(runner, "first", {}, {})
+		local two, second = start(runner, "second", {}, {})
+		helpers.assert_true(one and two)
+		helpers.assert_true(runner.shutdown())
+		helpers.assert_eq(operations[1].cancels, 1); helpers.assert_eq(operations[2].cancels, 1)
+		helpers.assert_eq(#first, 0); helpers.assert_eq(#second, 0)
+		helpers.assert_true(runner.shutdown())
+		helpers.assert_eq(operations[1].cancels, 1); helpers.assert_eq(operations[2].cancels, 1)
+	end)
+
+	helpers.it("(layout-helper-shutdown) a throwing constructor cannot manufacture physical settlement", function()
+		local runner = fresh_runner({ owned_process = { start = function() error("simulated uncertain constructor acquisition") end } })
+		local accepted, results = start(runner, "python3", {}, {})
+		helpers.assert_eq(accepted, false); helpers.assert_eq(#results, 0)
+		helpers.assert_eq(runner.is_settled(), false)
+		helpers.assert_eq(runner.shutdown(), false)
+		helpers.assert_eq(runner.shutdown(), false, "an unknown physical owner remains honest retained debt")
+		local later, callbacks = start(runner, "python3", {}, {})
+		helpers.assert_eq(later, false); helpers.assert_eq(#callbacks, 0)
+	end)
+
+	helpers.it("(layout-helper-shutdown) a replaced public query cannot acknowledge pending native claims", function()
+		local runner, state = fresh_runner()
+		local accepted, callbacks = start(runner, "python3", {}, {})
+		helpers.assert_true(accepted)
+		runner.is_settled = function() return true end
+		helpers.assert_eq(runner.shutdown(), false)
+		state.finish(0)
+		helpers.assert_true(runner.shutdown())
+		helpers.assert_eq(#callbacks, 0)
 	end)
 end)

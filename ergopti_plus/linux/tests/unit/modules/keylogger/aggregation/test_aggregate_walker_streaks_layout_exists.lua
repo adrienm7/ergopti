@@ -267,7 +267,9 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 		helpers.assert_eq(errors.cascade_max_len, 3)
 		helpers.assert_eq(errors.recovery_sum_ms, 140)
 		helpers.assert_eq(errors.recovery_count, 1)
-		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 0)
+		-- The sequences ending in a correction are counted (linux-backspace-sequences);
+		-- nothing is chained after one.
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "a[BS]b"), 0)
 	end)
@@ -281,6 +283,183 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 			helpers.assert_eq(item.esrc.other, 1)
 		end
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
+	end)
+end)
+
+
+
+
+-- ============================================================================
+-- Backspace bigrams and trigrams: the sequences that end in a correction
+-- ============================================================================
+
+-- Windows and macOS push "x[BS]" and "yx[BS]" for every Backspace, so the
+-- dashboard can show which sequences the user goes back over; this walker
+-- counted the unigram only and left both tables without a single correction.
+helpers.describe("aggregate walker: backspace sequences", function()
+	local PAUSE_MS = Fixture.PAUSE_MS
+	local function item(batch, family, token)
+		return batch.ngram[family]["2026-08-06\1app\1" .. token]
+	end
+	it("linux-backspace-sequences: a manual correction ends a bigram and a trigram", function()
+		local batch = Walker.walk({ key("t", 100), key("h", 100), key("e", 100), key("[BS]", 110) },
+			"2026-08-06", "app")
+		local bigram, trigram = item(batch, "ngram_bigrams", "e[BS]"), item(batch, "ngram_trigrams", "he[BS]")
+		helpers.assert_true(bigram ~= nil and trigram ~= nil, "both sequences are counted")
+		helpers.assert_eq(bigram.c, 1)
+		helpers.assert_eq(bigram.td, 110, "the correction's own delay times the sequence")
+		helpers.assert_eq(bigram.cd, 1)
+		helpers.assert_eq(bigram.e, 0)
+		helpers.assert_nil(next(bigram.esrc), "a manual correction has no synthetic source")
+		helpers.assert_eq(trigram.c, 1)
+		helpers.assert_eq(trigram.td, 110)
+		helpers.assert_eq(count_of(batch, "ngram_quadgrams", "the[BS]"), 0,
+			"Windows and macOS stop at trigrams for a correction")
+	end)
+	it("linux-backspace-sequences: consecutive corrections chain with each other", function()
+		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", 90), key("[BS]", 80),
+			key("[BS]", 70) }, "2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "b[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS][BS]"), 2)
+		helpers.assert_eq(item(batch, "ngram_bigrams", "[BS][BS]").td, 150)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "ab[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "b[BS][BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "[BS][BS][BS]"), 1)
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 3, "the error counts are unchanged")
+	end)
+	it("linux-backspace-sequences: nothing chains after a correction", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("b", 100), key("c", 100),
+			key("[BS]", 100) }, "2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 1, "the run restarts at the next character")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "c[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "bc[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "[BS]bc"), 0)
+	end)
+	it("linux-backspace-sequences: a pause before the correction breaks the sequence", function()
+		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", PAUSE_MS) },
+			"2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_chars", "[BS]"), 1, "the correction itself still counts")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "b[BS]"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "ab[BS]"), 0)
+	end)
+	it("linux-backspace-sequences: a pause before the character breaks the sequence", function()
+		local batch = Walker.walk({ key("a", 100), key("b", PAUSE_MS), key("[BS]", 100) },
+			"2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "b[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "ab[BS]"), 0,
+			"two characters either side of a pause are not one sequence")
+	end)
+	it("linux-backspace-sequences: synthetic deletions keep their source and skip the output", function()
+		local batch = Walker.walk({ key("b", 100), key("t", 100), key("w", 100),
+			key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"),
+			key("x", 0, "hotstring"), key("[BS]", 0, "llm") }, "2026-08-06", "app")
+		local erase = item(batch, "ngram_bigrams", "w[BS]")
+		helpers.assert_true(erase ~= nil, "the trigger the expansion erased is counted")
+		helpers.assert_eq(erase.esrc.hotstring, 1)
+		helpers.assert_eq(item(batch, "ngram_trigrams", "tw[BS]").esrc.hotstring, 1)
+		helpers.assert_eq(item(batch, "ngram_trigrams", "w[BS][BS]").esrc.hotstring, 1)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "x[BS]"), 0,
+			"generated text is not a typed sequence, so nothing chains through it")
+		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
+	end)
+	it("linux-backspace-sequences: the writer receives the correction sequences", function()
+		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", 100) }, "2026-08-06", "app")
+		local found = {}
+		for _, group in ipairs(Walker.batches_for_writer(batch)) do
+			for token in pairs(group.ngrams) do found[group.table_name .. ":" .. token] = true end
+		end
+		helpers.assert_true(found["ngram_bigrams:b[BS]"], "the bigram reaches the writer")
+		helpers.assert_true(found["ngram_trigrams:ab[BS]"], "the trigram reaches the writer")
+	end)
+end)
+
+
+
+
+-- ============================================================================
+-- Across the flush boundary: one walk context per application
+-- ============================================================================
+
+-- A flush lands every few seconds, and each walk used to credit everything
+-- still open at its end: every flush with typing became its own session, a
+-- word cut by a flush became two words, and the bigram across the cut was
+-- lost. Windows and macOS carry a per-application context between walks.
+helpers.describe("aggregate walker: cross-flush context", function()
+	local SESSION_GAP_MS = Fixture.SESSION_GAP_MS
+	local DAY = "2026-08-06\1app"
+	--- Walks `text` typed 100 ms apart from `start`, with real stamps.
+	local function walk_typed(ctx, text, start, batch, day)
+		local events, times = typed(text, 100), {}
+		for index = 1, #events do times[index] = start + (index - 1) * 100 end
+		return Walker.walk(events, day or "2026-08-06", "app", batch, { times = times, wall_offset_ms = 0 }, ctx),
+			start + (#events - 1) * 100
+	end
+	it("linux-cross-flush-walk: a session cut by two flushes is one session", function()
+		local ctx = {}
+		local first, last = walk_typed(ctx, "hel", 1000)
+		helpers.assert_nil(next(first.sessions), "an open session is not credited at the flush")
+		local second
+		second, last = walk_typed(ctx, "lo ", last + 100)
+		helpers.assert_nil(next(second.sessions))
+		local settled = Walker.settle(ctx, last + SESSION_GAP_MS + 1)
+		local row = settled and settled.sessions[DAY]
+		helpers.assert_true(row ~= nil, "the session is credited once its gap has passed")
+		helpers.assert_eq(row.count_total, 1)
+		helpers.assert_eq(row.longest_chars, 6)
+		helpers.assert_eq(row.total_active_ms, 500)
+	end)
+	it("linux-cross-flush-walk: a word and a sequence continue across the flush", function()
+		local ctx = {}
+		local first, last = walk_typed(ctx, "hel", 1000)
+		local second = walk_typed(ctx, "lo ", last + 100)
+		helpers.assert_eq(count_of(first, "ngram_words", "hel"), 0, "the open word waits for its end")
+		helpers.assert_eq(count_of(second, "ngram_words", "hello"), 1)
+		helpers.assert_eq(count_of(second, "ngram_words", "lo"), 0)
+		helpers.assert_eq(count_of(second, "ngram_bigrams", "ll"), 1, "the pair across the cut is counted")
+		helpers.assert_eq(count_of(second, "ngram_trigrams", "ell"), 1)
+	end)
+	it("linux-cross-flush-walk: a correction ending a flush chains with the next", function()
+		local ctx = {}
+		local _, last = walk_typed(ctx, "ab", 1000)
+		local bs = Walker.walk({ key("[BS]", 100), key("[BS]", 100) }, "2026-08-06", "app", nil,
+			{ times = { last + 100, last + 200 }, wall_offset_ms = 0 }, ctx)
+		helpers.assert_eq(count_of(bs, "ngram_bigrams", "b[BS]"), 1)
+		local more = Walker.walk({ key("[BS]", 100), key("c", 100) }, "2026-08-06", "app", nil,
+			{ times = { last + 300, last + 400 }, wall_offset_ms = 0 }, ctx)
+		helpers.assert_eq(count_of(more, "ngram_trigrams", "[BS][BS][BS]"), 1)
+		helpers.assert_eq(more.errors[DAY].cascade_count, 1, "three corrections across two flushes are one cascade")
+		helpers.assert_eq(more.errors[DAY].recovery_count, 1)
+	end)
+	it("linux-cross-flush-walk: the stamps cut a session the capped delays cannot", function()
+		local events = { key("a", 100), key("b", Fixture.PAUSE_MS) }
+		local batch = Walker.walk(events, "2026-08-06", "app", nil,
+			{ times = { 1000, 1000 + SESSION_GAP_MS + 1 }, wall_offset_ms = 0 })
+		helpers.assert_eq(batch.sessions[DAY].count_total, 2,
+			"a buffered delay never exceeds the pause cap, so only the stamps see the gap")
+	end)
+	it("linux-cross-flush-walk: settling credits only what its own gap has ended", function()
+		local ctx = {}
+		local _, last = walk_typed(ctx, "ab", 1000)
+		helpers.assert_nil(Walker.settle(ctx, last + 100), "nothing has ended yet")
+		local paused = Walker.settle(ctx, last + Fixture.PAUSE_MS)
+		helpers.assert_eq(count_of(paused, "ngram_words", "ab"), 1, "a pause ends the word")
+		helpers.assert_true(next(paused.bursts) ~= nil, "and the burst")
+		helpers.assert_nil(next(paused.sessions), "but not the session")
+		helpers.assert_nil(Walker.settle(ctx, last + Fixture.PAUSE_MS + 10), "a settled word is credited once")
+		local after = walk_typed(ctx, "c", last + Fixture.PAUSE_MS + 100)
+		helpers.assert_eq(count_of(after, "ngram_bigrams", "bc"), 0, "the pause broke the sequence")
+	end)
+	it("linux-cross-flush-walk: a new day credits the open context to the day it was typed on", function()
+		local ctx = {}
+		local _, last = walk_typed(ctx, "ab", 1000)
+		local next_day = walk_typed(ctx, "c", last + 100, nil, "2026-08-07")
+		helpers.assert_eq(next_day.sessions[DAY].count_total, 1, "the open session ends on its own day")
+		helpers.assert_eq(count_of(next_day, "ngram_words", "ab"), 1)
+		helpers.assert_nil(next_day.ngram.ngram_bigrams["2026-08-07\1app\1bc"], "nothing chains across midnight")
+		local forced = Walker.settle(ctx, nil, nil, true)
+		helpers.assert_eq(forced.sessions["2026-08-07\1app"].count_total, 1, "a forced settle ends everything")
+		helpers.assert_nil(next(ctx), "and leaves nothing to continue")
 	end)
 end)
 

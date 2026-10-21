@@ -117,7 +117,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		-- The cross-session adoption path skips the launch entirely: the weights are
 		-- already resident. A duplicate request must resolve there rather than queue
 		-- behind a startup that will never run.
-		local at = code:find("Adopting MLX server from a previous session", 1, true)
+		local at = code:find("local adopted_owner = {", 1, true)
 		helpers.assert_true(at ~= nil, "the adoption path must still be findable")
 		local body = code:sub(at, at + 700)
 		helpers.assert_true(body:find("obj._server_ready = true", 1, true) ~= nil,

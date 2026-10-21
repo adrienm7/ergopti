@@ -162,6 +162,9 @@ _LDRP_RowFollowsTheForegroundLayout() {
 	Layouts := _LDRP_RealLayouts()
 	SavedProfiles := _DigitRowProfiles
 	SavedDigits := _LDRP_SetLayoutFeature("direct_access_digits", "digits")
+	; The native rows: the built-in Ergopti emulation, which the stubs enable,
+	; owns its own row instead (digit-row-builtin-ergopti-shift).
+	SavedBase := _LDRP_SetLayoutFeature("ergopti_base", false)
 	_DigitRowProfiles := Map()
 	try {
 		Shifted := 0, Direct := 0
@@ -189,6 +192,7 @@ _LDRP_RowFollowsTheForegroundLayout() {
 		}
 	} finally {
 		_LDRP_SetLayoutFeature("direct_access_digits", SavedDigits)
+		_LDRP_SetLayoutFeature("ergopti_base", SavedBase)
 		_DigitRowProfiles := SavedProfiles
 	}
 }
@@ -434,6 +438,66 @@ _LDRP_ErgoptiDigitsFirstOverAzerty() {
 Test("digit row: Ergopti emulated over AZERTY keeps its digits on Shift with digits first (digit-row-ergopti-emulated-shift)",
 	_KLT_WithEmulation.Bind(_LDRP_ErgoptiDigitsFirstOverAzerty))
 
+; The layout manager and the wizard select Ergopti and Ergopti+ as the built-in
+; emulation (ergopti_base on, no registry layout), not as a registry layout:
+; the case above was never reached from a menu. That path resolved the row on
+; the native AZERTY layout, so digits first swapped it and Shift typed
+; « & é " ' ( - è _ ç à » instead of the Ergopti digits, on every row key and
+; with CapsLock too (digit-row-builtin-ergopti-shift).
+_LDRP_BuiltinErgoptiDigitsFirstOverAzerty() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Model, KLE_Id, _DigitRowProfiles
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), KLE_Model, KLE_Id, _DigitRowProfiles]
+	try {
+		Azerty := _LDRP_Layout("0000040C")
+		if !Azerty
+			Azerty := 0x040C040C
+		for Variant in ["ergopti", "ergopti_plus"] {
+			Features := Map("layout", Map("emulated_layout", "", "ergopti_base", true, "ergopti_alt_gr", false,
+				"ergopti_variant", Variant, "direct_access_digits", "digits"))
+			CategoryEnabled := Map("Layout", true)
+			LayerEnabled := false
+			State["initialized"] := false
+			MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+			KLE_Model := 0
+			KLE_Id := ""
+			_DigitRowProfiles := Map()
+			AssertTrue(KS_LayoutDigitsAreShifted(Azerty), "the native AZERTY row really puts its digits behind Shift")
+			for Caps in [false, true] {
+				Where := Variant . (Caps ? " with CapsLock" : "")
+				AssertFalse(DigitRowIsSwapped(Azerty, Caps), Where . ": the built-in Ergopti row needs no swap")
+				Loop 10 {
+					Sc := A_Index + 1
+					Name := Format("SC{:03X}", Sc)
+					Digit := Mod(Sc - 1, 10) . ""
+					Resolution := _DigitRowSwapResolution(Sc, Azerty, Caps)
+					AssertEqual("builtin", Resolution["source"], Where . " " . Name . " reads the built-in Ergopti levels")
+					AssertFalse(Resolution["swap"], Where . " " . Name . " keeps the Ergopti Shift level")
+					AssertEqual("", DigitRowSwapSymbol(Sc, Azerty, Caps), Where . " " . Name . " types no AZERTY symbol")
+					AssertEqual(Digit, SHIFTED_LETTERS.Get(Name, ""), Name . ": the Shift layer that now owns the key types the digit")
+				}
+			}
+		}
+		; Without the built-in emulation the native row is swapped as before.
+		Features["layout"]["ergopti_base"] := false
+		_DigitRowProfiles := Map()
+		AssertTrue(DigitRowIsSwapped(Azerty, false), "the native AZERTY row is still swapped without the emulation")
+		AssertEqual("native", _DigitRowSwapResolution(0x02, Azerty, false)["source"])
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		KLE_Model := Saved[5]
+		KLE_Id := Saved[6]
+		_DigitRowProfiles := Saved[7]
+	}
+}
+Test("digit row: the built-in Ergopti over AZERTY keeps its digits on Shift with digits first (digit-row-builtin-ergopti-shift)",
+	_KLT_WithEmulation.Bind(_LDRP_BuiltinErgoptiDigitsFirstOverAzerty))
+
 ; A swapped source level can be a dead-key action, not a printable symbol.
 ; Inspection preserves both states, and the registered pending-key callback
 ; must route its real press through that source's own action machine.
@@ -452,9 +516,17 @@ _LDRP_TypedSourceSwap() {
 		Modifiers := '<keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect>'
 			. '<keyMapSelect mapIndex="1"><modifier keys="anyShift caps?"/></keyMapSelect>'
 			. '<keyMapSelect mapIndex="2"><modifier keys="caps"/></keyMapSelect>'
-		Maps := '<keyMap index="0"><key code="18" action="row_dead"/><key code="12" action="letter"/></keyMap>'
-			. '<keyMap index="1"><key code="18" output="1"/></keyMap>'
-			. '<keyMap index="2"><key code="18" output="&#xA7;"/></keyMap>'
+		; Digits first applies only when all ten keys have a symbol unshifted and
+		; their digit on Shift (number-row-availability): keys 2 to 0 do too.
+		Plain := "", Shifted := "", Capped := ""
+		for Index, Code in [19, 20, 21, 23, 22, 26, 28, 25, 29] {
+			Plain .= '<key code="' . Code . '" output="&#x2A;"/>'
+			Shifted .= '<key code="' . Code . '" output="' . Mod(Index + 1, 10) . '"/>'
+			Capped .= '<key code="' . Code . '" output="&#x2A;"/>'
+		}
+		Maps := '<keyMap index="0"><key code="18" action="row_dead"/><key code="12" action="letter"/>' . Plain . '</keyMap>'
+			. '<keyMap index="1"><key code="18" output="1"/>' . Shifted . '</keyMap>'
+			. '<keyMap index="2"><key code="18" output="&#xA7;"/>' . Capped . '</keyMap>'
 		Actions := '<action id="row_dead"><when state="none" next="circumflex"/></action>'
 			. '<action id="letter"><when state="none" output="a"/><when state="circumflex" output="&#xE2;"/></action>'
 		Text := _KLT_Doc(_KLT_Layouts(), Modifiers, Maps, Actions)

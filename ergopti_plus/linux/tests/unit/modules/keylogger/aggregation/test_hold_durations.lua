@@ -282,6 +282,7 @@ local function run_hold(transition, expected, options)
 		local state = { paused = false }
 		local noop = function() end
 		local environment = {
+			privacy_owners = {},
 			keylogger = logger,
 			script_actions = { is_paused = function() return state.paused end },
 			MagicKeySource = { cancel_capture = noop },
@@ -295,7 +296,9 @@ local function run_hold(transition, expected, options)
 		environment.input_capture_gate = gate
 		local pause_body = assert(main:match("on_pause_change = function(.-)\n\t\tend,"))
 		local on_pause = source_callback(pause_body, environment)
-		local reset_body = assert(main:match("ScriptActions.new%({%s*reset = function(.-)\n\t\tend,"))
+		-- The constructor may open with comment lines; the field itself anchors
+		-- the body, not its position as the table's first token.
+		local reset_body = assert(main:match("ScriptActions.new%({\n.-\n\t\treset = function(.-)\n\t\tend,"))
 		local reset = source_callback(reset_body, environment)
 		state.pause_callbacks = {}
 		local controller
@@ -315,17 +318,18 @@ local function run_hold(transition, expected, options)
 		state.gate = gate
 		-- Execute the genuine main physical/hold callback closure together, so the
 		-- existing captured-press bookkeeping is shared exactly as in production.
-		local physical = assert(main:match("(local capture_owned_scancodes = {}.-)\n\t%-%- 8.6"))
-		local hold_start = main:find("local hold_token = keylogger.hold_accounting_token", 1, true)
-			or assert(main:find("local function handle_hold", 1, true))
-		local hold_end = assert(main:find("\n\t%-%- Retain the selected inverse publisher", hold_start))
+		local physical = assert(main:match("(local capture_owned_scancodes = {}.-\n\tlocal on_physical = input_capture_gate.guard%(.-\n\t\tend%))"))
+		local hold = assert(main:match("(local hold_token = keylogger.hold_accounting_token.-\n\tlocal on_hold = input_capture_gate.guard%(.-\n\tend%))"))
 		environment.InputEvent = require("infra.input_event")
 		environment.Monotonic = clock
 		environment._cached_app_id = "code"
 		local startup = assert(main:match("keyboard_hook.start%(%{(.-)\n\t%}%)"))
-		local binding = startup:match("onHoldAdmission%s*=%s*([%w_]+),") or "nil"
-		local text = physical .. "\n" .. main:sub(hold_start, hold_end - 1)
-			.. "\nreturn { physical = on_physical, hold = on_hold, admission = " .. binding .. " }"
+		local physical_binding = assert(startup:match("onPhysical%s*=%s*([%w_]+),"))
+		local hold_binding = assert(startup:match("onHold%s*=%s*([%w_]+),"))
+		local admission_binding = assert(startup:match("onHoldAdmission%s*=%s*([%w_]+),"))
+		local text = physical .. "\n" .. hold
+			.. "\nreturn { physical = " .. physical_binding .. ", hold = " .. hold_binding
+			.. ", admission = " .. admission_binding .. " }"
 		local chunk
 		if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
 		else chunk = assert(load(text, "main metrics callbacks", "t", environment)) end

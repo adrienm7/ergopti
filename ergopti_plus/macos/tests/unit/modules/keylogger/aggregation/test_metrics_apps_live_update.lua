@@ -100,7 +100,7 @@ local function load_dashboard(options)
 		end,
 	}
 	package.loaded["modules.keylogger.sqlite_reader"] = {
-		read_manifest = function() return {} end,
+		read_manifest = function() return {}, true end,
 	}
 	package.loaded["modules.keylogger.context_tracker"] = {
 		get_active_app_snapshot = function() return nil end,
@@ -170,9 +170,9 @@ local function load_dashboard(options)
 	end
 	hs_stub.webview.usercontent.new = function()
 		return {
-			setCallback = function(_, callback)
+			setCallback = function(self, callback)
 				context.bridge_callback = callback
-				return true
+				return self
 			end,
 		}
 	end

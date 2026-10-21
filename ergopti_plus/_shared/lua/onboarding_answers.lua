@@ -121,6 +121,32 @@ function M.load(text, driver)
 				max_characters = limit, validation = validation })
 		end
 		walk(page.groups, page)
+		-- A persistent control claims each path its choices write, with every
+		-- value one of them writes there; a control this driver lacks claims
+		-- nothing, so a payload writing one of its paths is refused.
+		for _, control in ipairs(type(page.controls) == "table" and page.controls or {}) do
+			assert(type(control) == "table" and type(control.choices) == "table" and #control.choices >= 2,
+				"the onboarding catalogue has a malformed control")
+			if control.available == true then
+				local controls = {}
+				local order = {}
+				for _, choice in ipairs(control.choices) do
+					assert(type(choice) == "table" and type(choice.writes) == "table" and #choice.writes > 0,
+						"the onboarding catalogue has a control choice without writes")
+					for _, write in ipairs(choice.writes) do
+						assert(type(write) == "table" and type(write.path) == "string" and write.path ~= "",
+							"the onboarding catalogue has an unnamed control write")
+						if not controls[write.path] then
+							controls[write.path] = { kind = "control", default = write.default, values = {} }
+							order[#order + 1] = write.path
+						end
+						local values = controls[write.path].values
+						values[#values + 1] = write.value
+					end
+				end
+				for _, path in ipairs(order) do claim(path, controls[path]) end
+			end
+		end
 	end
 	return { driver = driver, pages = platform.pages, entries = entries, tap_hold_state = tap_hold_state }
 end
@@ -150,6 +176,12 @@ end
 local function refusal(entry, value)
 	if entry.kind == "switch" then
 		return type(value) ~= "boolean" and "a category switch takes true or false" or nil
+	end
+	if entry.kind == "control" then
+		for _, allowed in ipairs(entry.values) do
+			if same(value, allowed) then return nil end
+		end
+		return "a control takes one of the values its choices write"
 	end
 	if entry.kind == "choice" or entry.kind == "tap_hold_key" then
 		if same(value, entry.value) or same(value, entry.default) then return nil end

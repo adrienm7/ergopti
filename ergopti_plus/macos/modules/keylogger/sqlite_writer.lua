@@ -60,11 +60,15 @@ local _device_id = nil
 local _db = nil
 
 --- Unadmitted startup handle whose native SQLite close refused cleanup.
-local _media_startup_db_debt = nil
+local _startup_db_debt = nil
+
+--- A failed close whose native wrapper was consumed or cannot be probed.
+--- It cannot be closed again safely; only a fresh runtime can retire this debt.
+local _terminal_db_close_debt = nil
 
 --- A file close can consume its descriptor before reporting failure. Retain its
 --- exact owner as unresolved debt, but never retry that ambiguous close.
-local _media_schema_close_debt = nil
+local _schema_close_debt = nil
 
 --- Per-device sequential event id counter.
 local _next_event_id = 1
@@ -134,17 +138,35 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 --- resolver (Paths.shared) so the shared root lives in exactly one place.
 local _SCHEMA_SQL_PATH = Paths.shared("data/db/schema.sql")
 
+--- Read and retire one schema stream before admitting its SQL.
+--- @param path string Canonical schema path.
+--- @param label string Non-sensitive schema label for diagnostics.
+--- @return string|nil body Full DDL only after read and close both succeed.
+local function _read_schema_file(path, label)
+	local opened, file, open_error = pcall(io.open, path, "r")
+	if not opened or file == nil then
+		Logger.error(LOG, "Cannot open %s: %s.", label, tostring(opened and open_error or file))
+		return nil
+	end
+	local read_ok, body, read_error = pcall(file.read, file, "*a")
+	local close_ok, closed, close_error = pcall(file.close, file)
+	if not read_ok or type(body) ~= "string" then
+		Logger.error(LOG, "Cannot read %s: %s.", label, tostring(read_ok and read_error or body))
+	end
+	if not close_ok or closed ~= true then
+		_schema_close_debt = file
+		Logger.error(LOG, "Cannot close %s; exact owner retained without retry: %s.",
+			label, tostring(close_ok and close_error or closed))
+		return nil
+	end
+	if not read_ok or type(body) ~= "string" then return nil end
+	return body
+end
+
 --- Read the canonical schema.sql from disk.
 --- @return string|nil The full DDL text, or nil on IO error.
 local function _read_schema_sql()
-	local fh, err = io.open(_SCHEMA_SQL_PATH, "r")
-	if not fh then
-		Logger.error(LOG, "Cannot open schema.sql at %s: %s.",
-			_SCHEMA_SQL_PATH, tostring(err))
-		return nil
-	end
-	local body = fh:read("*a"); fh:close()
-	return body
+	return _read_schema_file(_SCHEMA_SQL_PATH, "schema.sql")
 end
 
 
@@ -157,79 +179,88 @@ end
 -- ===================================
 -- ===================================
 
---- Retire only the unadmitted database acquired for semantic media startup.
---- Native SQLite refusal leaves the exact handle available to close_db, never get_db.
-local function _retire_media_startup_db(db)
+--- Close an owned handle, distinguishing retryable ownership from consumption.
+--- The native binding consumes its database wrapper even when close returns an
+--- error. Retrying that wrapper raises instead of retrying the native close.
+--- @param db userdata Exact database owner.
+--- @return boolean closed True only after the close reports success.
+--- @return boolean retryable True only when the native probe confirms it is open.
+local function _close_owned_db(db)
 	local close_ok, close_result = pcall(db.close, db)
-	if not close_ok or (close_result ~= true and close_result ~= sqlite3.OK) then
-		_media_startup_db_debt = db
-		Logger.error(LOG, "Semantic media startup database close failed; exact handle retained: %s.",
-			tostring(close_result))
+	if close_ok and (close_result == true or close_result == sqlite3.OK) then return true, false end
+	local probe_ok, still_open = pcall(function() return db:isopen() end)
+	if probe_ok and still_open == true then
+		Logger.error(LOG, "SQLite close failed; open handle retained for retry: %s.", tostring(close_result))
+		return false, true
+	end
+	_terminal_db_close_debt = db
+	Logger.error(LOG, "SQLite close failed; consumed or unconfirmed handle quarantined until restart: %s (probe=%s).",
+		tostring(close_result), tostring(still_open))
+	return false, false
+end
+
+--- Retire the unadmitted database acquired for writer startup.
+--- @param db userdata Exact candidate, never exposed through get_db.
+local function _retire_startup_db(db)
+	local closed, retryable = _close_owned_db(db)
+	if not closed and retryable then _startup_db_debt = db end
+end
+
+--- Require the SQLite success code before admitting a startup write.
+--- @param db userdata Candidate SQLite handle.
+--- @param sql string Statement that must succeed.
+--- @param phase string Non-sensitive operation label.
+local function _exec_startup_sql(db, sql, phase)
+	local rc = db:exec(sql)
+	if rc ~= sqlite3.OK then
+		error("SQLite startup " .. phase .. " failed: " .. tostring(db:errmsg()), 0)
 	end
 end
 
---- Open db.sqlite in tmpdir, applying the schema when the file is fresh.
---- Restores persisted counters (next_event_id, today_log_offset, etc.).
---- @return boolean True on success, false on unrecoverable error.
-function M.open_db()
-	if not _require_init("open_db") then return false end
-
-	if _media_startup_db_debt ~= nil or _media_schema_close_debt ~= nil then
-		Logger.error(LOG, "Cannot reopen SQLite while semantic media startup cleanup is unresolved.")
-		return false
+--- Check the canonical completion seed rather than mere file existence.
+--- Opening SQLite creates a file before bootstrap can read or apply the schema.
+--- The schema-version seed is written after every canonical table and index.
+--- @param db userdata Candidate SQLite handle.
+--- @return boolean complete True when the canonical bootstrap reached its seeds.
+local function _schema_bootstrap_completed(db)
+	local has_meta = false
+	for _ in db:nrows("SELECT name FROM sqlite_master WHERE type='table' AND name='meta'") do
+		has_meta = true
 	end
-
-	local existed = fs.attributes(_paths.sqlite_path) ~= nil
-	local db, err = sqlite3.open(_paths.sqlite_path)
-	if not db then
-		Logger.error(LOG, "Cannot open SQLite at %s: %s.",
-			_paths.sqlite_path, tostring(err))
-		return false
+	if not has_meta then return false end
+	local complete = false
+	for _ in db:nrows("SELECT value FROM meta WHERE key='schema_version'") do
+		complete = true
 	end
+	return complete
+end
 
-	db:exec("PRAGMA journal_mode = DELETE;")
-	db:exec("PRAGMA synchronous = FULL;")
-	db:exec("PRAGMA encoding = \"UTF-8\";")
+--- Initialize an acquired database without publishing it to ingest consumers.
+--- @param db userdata Candidate SQLite handle.
+--- @param existed boolean Whether the cache already existed.
+--- @return boolean initialized True after all startup operations completed.
+--- @return number|nil next_event_id Persisted counter, published with the handle.
+local function _initialize_db(db, existed)
+	_exec_startup_sql(db, "PRAGMA journal_mode = DELETE;", "journal mode")
+	_exec_startup_sql(db, "PRAGMA synchronous = FULL;", "synchronous mode")
+	_exec_startup_sql(db, "PRAGMA encoding = \"UTF-8\";", "encoding")
 
-	if not existed then
+	if not existed or not _schema_bootstrap_completed(db) then
 		Logger.start(LOG, "Bootstrapping fresh db.sqlite at %s…", _paths.sqlite_path)
 		local schema = _read_schema_sql()
 		if not schema then
-			db:close()
 			return false
 		end
 		local rc = db:exec(schema)
 		if rc ~= sqlite3.OK then
 			Logger.error(LOG, "Schema apply failed: %s.", db:errmsg())
-			db:close()
 			return false
 		end
 		Logger.success(LOG, "Schema applied (version 1).")
 	end
 
-	local media_opened, media_file, media_open_error = pcall(io.open,
-		Paths.shared("data/db/media_schema.sql"), "r")
-	local media_schema = nil
-	if not media_opened or media_file == nil then
-		Logger.error(LOG, "Cannot open semantic media schema: %s.",
-			tostring(media_opened and media_open_error or media_file))
-	else
-		local read_ok, body, read_error = pcall(media_file.read, media_file, "*a")
-		local close_ok, closed, close_error = pcall(media_file.close, media_file)
-		if not read_ok or type(body) ~= "string" then
-			Logger.error(LOG, "Cannot read semantic media schema: %s.",
-				tostring(read_ok and read_error or body))
-		end
-		if not close_ok or closed ~= true then
-			_media_schema_close_debt = media_file
-			Logger.error(LOG, "Semantic media schema close failed; exact owner retained without retry: %s.",
-				tostring(close_ok and close_error or closed))
-		elseif read_ok and type(body) == "string" then
-			media_schema = body
-		end
-	end
+	local media_schema = _read_schema_file(Paths.shared("data/db/media_schema.sql"), "semantic media schema")
 	if media_schema == nil then
-		_retire_media_startup_db(db)
 		return false
 	end
 	local apply_ok, apply_result = pcall(function()
@@ -241,26 +272,21 @@ function M.open_db()
 		if not rollback_ok or rollback_result ~= sqlite3.OK then
 			Logger.error(LOG, "Semantic media schema rollback failed: %s.", tostring(rollback_result))
 		end
-		_retire_media_startup_db(db)
 		return false
 	end
-
-	_db = db
 
 	-- schema.sql applies only to fresh caches. Keep older caches writable when
 	-- optional LLM accounting columns are introduced; duplicate-column errors are
 	-- avoided by inspecting the published table shape first.
 	local llm_columns = {}
-	for row in _db:nrows("PRAGMA table_info(events_llm)") do
+	for row in db:nrows("PRAGMA table_info(events_llm)") do
 		llm_columns[row.name] = true
 	end
 	for _, column in ipairs(LLM_ACCOUNTING_COLUMNS) do
 		if not llm_columns[column[1]] then
-			local rc = _db:exec("ALTER TABLE events_llm ADD COLUMN " .. column[1] .. " " .. column[2])
+			local rc = db:exec("ALTER TABLE events_llm ADD COLUMN " .. column[1] .. " " .. column[2])
 			if rc ~= sqlite3.OK then
-				Logger.error(LOG, "Cannot migrate events_llm.%s: %s.", column[1], _db:errmsg())
-				_db:close()
-				_db = nil
+				Logger.error(LOG, "Cannot migrate events_llm.%s: %s.", column[1], db:errmsg())
 				return false
 			end
 		end
@@ -279,49 +305,101 @@ function M.open_db()
 		{ "local_data_sql_outbox", "" },
 		{ "aggregate_cache_revision", "0" },
 		{ "rev",              "0"  },
+		{ "last_applied_data_sql_off", "0" },
 	}) do
-		_db:exec(string.format(
+		_exec_startup_sql(db, string.format(
 			"INSERT OR IGNORE INTO meta (key, value) VALUES ('%s', '%s');",
-			kv[1], kv[2]))
+			kv[1], kv[2]), "meta seed " .. kv[1])
 	end
 
+	local next_event_id = 1
 	-- Restore persisted counter.
-	for r in _db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
-		_next_event_id = tonumber(r.value) or 1
+	for r in db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
+		next_event_id = tonumber(r.value) or 1
 	end
 
 	-- Upsert the local device row so name / os_version stay fresh.
-	local stmt = _db:prepare(
+	local stmt = db:prepare(
 		"INSERT OR REPLACE INTO devices "
 		.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
 		.. "VALUES (?, ?, ?, ?, ?, ?, ?)")
-	if stmt then
-		stmt:bind_values(
+	if not stmt then
+		Logger.error(LOG, "Cannot prepare local device startup row: %s.", db:errmsg())
+		return false
+	end
+	local device_ok, device_result = xpcall(function()
+		local bound = stmt:bind_values(
 			_device_obj.device_id, _device_obj.name, _device_obj.os,
 			_device_obj.os_version or "", _device_obj.host_signature,
 			_device_obj.created_at, _now_ts())
-		stmt:step(); stmt:finalize()
+		if bound ~= sqlite3.OK then
+			error("Cannot bind local device startup row: " .. tostring(bound), 0)
+		end
+		local stepped = stmt:step()
+		if stepped ~= sqlite3.DONE then
+			error("Cannot write local device startup row: " .. tostring(stepped), 0)
+		end
+	end, debug.traceback)
+	-- SQLite finalize consumes the statement even when it reports the previous
+	-- step's error. Always attempt it once, including after a bind/step failure.
+	local finalized, finalize_result = pcall(stmt.finalize, stmt)
+	if not device_ok then Logger.error(LOG, "Local device startup failed: %s.", tostring(device_result)) end
+	if not finalized or finalize_result ~= sqlite3.OK then
+		Logger.error(LOG, "Local device startup finalization failed: %s.", tostring(finalize_result))
+	end
+	if not device_ok or not finalized or finalize_result ~= sqlite3.OK then return false end
+
+	return true, next_event_id
+end
+
+--- Open db.sqlite in tmpdir, applying the schema when the file is fresh.
+--- Restores persisted counters only after the complete startup transaction.
+--- @return boolean True on success, false on unrecoverable error.
+function M.open_db()
+	if not _require_init("open_db") then return false end
+	if _db ~= nil or _startup_db_debt ~= nil or _terminal_db_close_debt ~= nil or _schema_close_debt ~= nil then
+		Logger.error(LOG, "Cannot reopen SQLite while a database or startup cleanup is owned.")
+		return false
 	end
 
+	local existed = fs.attributes(_paths.sqlite_path) ~= nil
+	local opened, db, err = pcall(sqlite3.open, _paths.sqlite_path)
+	if not opened or db == nil then
+		Logger.error(LOG, "Cannot open SQLite at %s: %s.",
+			_paths.sqlite_path, tostring(opened and err or db))
+		return false
+	end
+
+	local ok, initialized, next_event_id = xpcall(function()
+		return _initialize_db(db, existed)
+	end, debug.traceback)
+	if not ok or initialized ~= true then
+		if not ok then Logger.error(LOG, "SQLite startup failed: %s.", tostring(initialized)) end
+		_retire_startup_db(db)
+		return false
+	end
+	_next_event_id = next_event_id
+	_db = db
 	return true
 end
 
 --- Close the SQLite handle cleanly without losing retry ownership.
 --- @return boolean closed True only after SQLite accepted close and no startup file debt remains.
 function M.close_db()
-	local db = _media_startup_db_debt or _db
-	if db == nil then return _media_schema_close_debt == nil end
-	local ok, result_or_err = xpcall(function()
-		return db:close()
-	end, debug.traceback)
-	if not ok or (result_or_err ~= true and result_or_err ~= sqlite3.OK) then
-		Logger.error(LOG, "SQLite close failed; exact handle retained: %s.",
-			tostring(result_or_err))
+	if _terminal_db_close_debt ~= nil then return false end
+	local db = _startup_db_debt or _db
+	if db == nil then return _schema_close_debt == nil end
+	local closed, retryable = _close_owned_db(db)
+	if not closed then
+		if not retryable then
+			if _db == db then _db = nil end
+			if _startup_db_debt == db then _startup_db_debt = nil end
+		end
 		return false
 	end
 	if _db == db then _db = nil end
-	if _media_startup_db_debt == db then _media_startup_db_debt = nil end
-	return _db == nil and _media_startup_db_debt == nil and _media_schema_close_debt == nil
+	if _startup_db_debt == db then _startup_db_debt = nil end
+	return _db == nil and _startup_db_debt == nil and _schema_close_debt == nil
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.

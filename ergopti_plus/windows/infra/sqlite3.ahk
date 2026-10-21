@@ -23,6 +23,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include ../adapters/sqlite_native.ahk
 
 
 
@@ -102,9 +103,13 @@ SQLite_StrToUtf8(s, &buf) {
 		return buf.Ptr
 }
 
-SQLite_Utf8ToStr(ptr) {
+SQLite_Utf8ToStr(ptr, byte_count := unset) {
 		if !ptr
 				return ""
+		; SQLite text has an explicit byte count and may contain embedded NUL.
+		; A negative StrGet length decodes all bytes instead of stopping early.
+		if IsSet(byte_count)
+				return byte_count ? StrGet(ptr, -byte_count, "UTF-8") : ""
 		return StrGet(ptr, "UTF-8")
 }
 
@@ -539,7 +544,8 @@ SQLite_ReadDispatch(&module) {
 				type_fn: SQLite_ReadAddress(module, "sqlite3_column_type"),
 				int_fn: SQLite_ReadAddress(module, "sqlite3_column_int64"),
 				double_fn: SQLite_ReadAddress(module, "sqlite3_column_double"),
-				text_fn: SQLite_ReadAddress(module, "sqlite3_column_text")
+				text_fn: SQLite_ReadAddress(module, "sqlite3_column_text"),
+				bytes_fn: SQLite_ReadAddress(module, "sqlite3_column_bytes")
 		}
 }
 
@@ -570,6 +576,7 @@ SQLite_Query(db, sql, YieldOps := 0) {
 				int_fn := dispatch.int_fn
 				double_fn := dispatch.double_fn
 				text_fn := dispatch.text_fn
+				bytes_fn := dispatch.bytes_fn
 
 				if (YieldOps > 0)
 						DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
@@ -627,7 +634,8 @@ SQLite_Query(db, sql, YieldOps := 0) {
 										default:
 												tp := DllCall(text_fn,
 														"Ptr", pstmt, "Int", idx, "Ptr")
-												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp)
+												byte_count := SQLiteNativeColumnBytes(bytes_fn, pstmt, idx)
+												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp, byte_count)
 								}
 						}
 						out.Push(row)
@@ -670,6 +678,7 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 				int_fn := dispatch.int_fn
 				double_fn := dispatch.double_fn
 				text_fn := dispatch.text_fn
+				bytes_fn := dispatch.bytes_fn
 
 				n := StrPut(sql, "UTF-8")
 				sql_buf := Buffer(n, 0)
@@ -719,7 +728,8 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 										default:
 												tp := DllCall(text_fn,
 														"Ptr", pstmt, "Int", idx, "Ptr")
-												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp)
+												byte_count := SQLiteNativeColumnBytes(bytes_fn, pstmt, idx)
+												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp, byte_count)
 								}
 						}
 						try keep_going := consumer.Call(row)

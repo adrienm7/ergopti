@@ -185,27 +185,40 @@ LayerEditor_CurrentEmulation() {
 	Layout := (IsSet(Features) && Features is Map && Features.Has("layout")) ? Features["layout"] : Map()
 	Registry := KeylayoutEmulation_LayerIsActive("ergopti_base")
 	Ergopti := !Registry && Layout.Get("ergopti_base", false) == true
-	Digits := NumberRowPolicyMode(Layout.Get("direct_access_digits", "")) == "digits"
-	return Map("active", Registry || Ergopti,
-		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Digits))
+	; The ordering in effect: a stored choice that is inert on this layout types
+	; nothing. A registry layout types its own « symbols first » levels.
+	Mode := NumberRowEffectiveMode()
+	Ordering := Mode == "digits" ? true : Mode == "symbols" && !Registry ? "symbols" : false
+	return Map("active", Registry || Ergopti || Ordering == "symbols",
+		"character", _LayerEditor_EmulatedCharacter.Bind(Registry, Ergopti, Ordering))
 }
 
 ; What the emulation types unshifted on scan code Sc, in the order its hotkeys
 ; win: the digit row (direct_access_digits, over any layout), a registry layout
 ; (keylayout_emulation.ahk), then the Ergopti base layer, whose characters and
 ; dead keys come from its .keylayout (layout_ergopti.ahk).
+; Digits: true for « digits first », "symbols" for « symbols first » on a row
+; no registry layout owns, false otherwise.
 _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
-	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS
+	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes, KS_DIGIT_ROW_KEYS, ERGOPTI_NUMBER_ROW
 	Code := Integer("0x" . SubStr(Sc, 3))
-	if Digits {
+	; « Also reorder the three edge keys » types the other level.
+	Edge := NumberRowEdgeText(Code, false, NumberRowForegroundLayout(), false)
+	if Edge != ""
+		return Edge
+	if (Digits is String) && Digits == "symbols" {
+		Text := NumberRowSymbolsFirstText(Code, false, NumberRowForegroundLayout(), false)
+		if Text != ""
+			return Text
+	} else if Digits {
 		for _, Key in KS_DIGIT_ROW_KEYS {
 			if (Key[2] == Code)
 				return Chr(Key[1])
 		}
-		Edges := ErgoptiNumberRowEdgeMapping()
-		if Edges.Has(Code)
-			return Edges[Code]
 	}
+	; A row switched off is the OS layout's (LayoutRowIsEmulated).
+	if !LayoutRowIsEmulated(Sc)
+		return ""
 	if Registry {
 		Shift := false
 		if NumberRowEffectiveMode() == "symbols" && NumberRowSymbolsCapable(false) {
@@ -220,6 +233,9 @@ _LayerEditor_EmulatedCharacter(Registry, Ergopti, Digits, Sc) {
 		return ""
 	Spec := ErgoptiLayout_Spec()
 	Base := Spec["levels"]["base"]
+	; The number row types the Ergopti row (RegisterBuiltinNumberRow).
+	if !Base.Has(Sc) && ERGOPTI_NUMBER_ROW.Has(Sc)
+		Base := Spec["number_row_base"]
 	if !Base.Has(Sc)
 		return ""
 	Descriptor := Base[Sc]

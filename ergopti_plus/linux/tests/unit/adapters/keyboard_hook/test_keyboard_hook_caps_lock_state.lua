@@ -36,6 +36,9 @@ local function load_hook()
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_keyboard = function() return nil end,
 		is_key_device = function() return true, nil end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true, nil end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
 	return helpers.load_module("adapters.keyboard_hook"), function()
 		package.loaded["adapters.xkb_capture"] = saved.xkb
@@ -65,6 +68,7 @@ local function backend()
 		read = function() return nil end,
 		poll = function() return false end,
 		close = function() end,
+		read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 		read_bits = function(_, _, count)
 			if count ~= 1 then return string.rep("\0", count) end
 			if leds == nil then return nil, leds_err end

@@ -65,6 +65,7 @@ package.path = table.concat({
 -- wrong against a correct vector.
 local terminators = require("keymap.terminators")
 local Contract = require("tests.e2e.contract")
+local ChildCapture = require("tests.support.e2e.child_capture")
 
 
 -- ============================================================================
@@ -403,6 +404,9 @@ local DAEMON_SCENARIOS = {
 	-- count it, or the first character of the replacement stays ("Aadn").
 	{ name = "Backspace after an end-char expansion restores the trigger", keys = " adn {BS}", screen = " adn" },
 	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
+	-- The restored trigger ends the line without being buffered: the next word-only
+	-- trigger continues that word (unknown-context-resets).
+	{ name = "a word-only trigger does not fire inside a restored trigger", keys = " adn {BS}adn ", screen = " adnadn " },
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
 	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
@@ -563,6 +567,27 @@ local function daemon_child_command(interpreter, env, device, keys, quiet)
 	return table.concat(parts, " ")
 end
 
+
+do
+	local child = os.tmpname()
+	local file = assert(io.open(child, "wb"))
+	assert(file:write([[print('SCREEN "misleading"'); print("E2E_CLEAN_EXIT"); os.exit(23)]]))
+	assert(file:close())
+	local quote = ON_WINDOWS and cmd_quoted or sh_quoted
+	local output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
+	os.remove(child)
+	assert_true("a child error after a forged clean screen is rejected", status == 23
+		and not ChildCapture.accepted(output, status, false))
+	child = os.tmpname()
+	file = assert(io.open(child, "wb"))
+	assert(file:write([[print('SCREEN "misleading"'); print("E2E_EXPECTED_FAILURE injection output_debt=false signals_settled=true"); os.exit(1)]]))
+	assert(file:close())
+	output, status = ChildCapture.run(quote(arg and arg[-1] or "luajit") .. " " .. quote(child))
+	os.remove(child)
+	assert_true("exit one without the injected Writer debt is rejected", status == 1
+		and not ChildCapture.accepted(output, status, true))
+end
+
 do
 	print("\n--- Daemon key scenarios (real main(), scripted keyboard) ---")
 	local interpreter = arg and arg[-1] or "luajit"
@@ -595,9 +620,8 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
-			local pipe = io.popen(command, "r")
-			local output = pipe and pipe:read("*a") or ""
-			if pipe then pipe:close() end
+			local output, status = ChildCapture.run(command)
+			local completed = ChildCapture.accepted(output, status, scenario.magic_repeat == "injection")
 			if scenario.tap_collision_receipt then
 				local receipt = output:match("TAP_COLLISION ([^\r\n]+)")
 				if receipt == scenario.tap_collision_receipt then
@@ -624,11 +648,11 @@ do
 			end
 			local quoted = output:match("SCREEN (%b\"\")")
 			local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
-			if screen == scenario.screen then
+			if screen == scenario.screen and completed then
 				pass(prefix .. scenario.name)
 			else
 				fail(prefix .. scenario.name, string.format("%q", scenario.screen),
-					screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
+					screen and string.format("%q (exit %s, receipt %s)", screen, tostring(status), tostring(completed)) or ("no SCREEN line: " .. output:sub(-300)))
 			end
 		end
 	end
@@ -657,10 +681,9 @@ do
 		parts[#parts + 1] = sh_quoted(interpreter) .. " tests/e2e/startup_child.lua"
 		parts[#parts + 1] = sh_quoted(device) .. " restore_recommended " .. sh_quoted(driver_root)
 		parts[#parts + 1] = sh_quoted(driver_root .. "/_generated/config_template.toml") .. " 2>&1"
-		local pipe = io.popen(table.concat(parts, " "), "r")
-		local output = pipe and pipe:read("*a") or ""
-		if pipe then pipe:close() end
-		if output:find("E2E_FACT restore_committed=true", 1, true) then
+		local output, status = ChildCapture.run(table.concat(parts, " "))
+		if status == 0 and output:find("E2E_DONE restore_recommended", 1, true)
+			and output:find("E2E_FACT restore_committed=true", 1, true) then
 			run_key_scenarios(preset_env, "recommended preset: ")
 		else
 			fail("hardening-e-presets: the recommended preset is committed for the key scenarios",
@@ -678,16 +701,20 @@ do
 	local rows_env = {}
 	for _, pair in ipairs(home_env) do rows_env[#rows_env + 1] = pair end
 	rows_env[#rows_env + 1] = { "ERGOPTI_E2E_MENU_ROWS", rows_file }
-	os.execute(daemon_child_command(interpreter, rows_env, device, "a", true))
+	local rows_output, rows_status = ChildCapture.run(daemon_child_command(interpreter, rows_env, device, "a", false))
 	local rows_fh = io.open(rows_file, "r")
 	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
 	if rows_fh then rows_fh:close() end
 	os.remove(rows_file)
-	if rows and rows > 100 and rows <= MENU_ROW_CEILING then
+	local rows_child_accepted = ChildCapture.accepted(rows_output, rows_status, false)
+	if rows_child_accepted and rows and rows > 100 and rows <= MENU_ROW_CEILING then
 		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
 	else
-		fail("the real tray menu stays navigable", string.format("100 < rows <= %d", MENU_ROW_CEILING),
-			tostring(rows))
+		-- A count inside the bounds still fails when the child itself failed, so
+		-- the receipt names the child's verdict rather than the count alone.
+		fail("the real tray menu stays navigable", string.format("100 < rows <= %d and an accepted child", MENU_ROW_CEILING),
+			string.format("rows=%s child=%s%s", tostring(rows), rows_child_accepted and "accepted" or "failed",
+				rows_child_accepted and "" or ": " .. rows_output:sub(-300)))
 	end
 
 	os.remove(device)
@@ -700,7 +727,7 @@ do
 		pass = pass,
 		fail = fail,
 		skip = function(label) print(string.format("  SKIP  %s", label)) end,
-	}, { driver = driver_root, interpreter = arg and arg[-1] or "luajit" })
+	}, { driver = driver_root, interpreter = arg and arg[-1] or "luajit", capture_child = ChildCapture.run })
 end
 
 do
@@ -713,6 +740,17 @@ do
 		assert_true("linux-digest-owner: updater cancellation preserves a real unrelated digest", result == true or result == 0)
 	else
 		print("  SKIP  native digest owner isolation requires libuv and LuaJIT FFI")
+	end
+end
+
+do
+	if not ON_WINDOWS then
+		local fixture = driver_root .. "/tests/e2e/clipboard_deadline_child.lua"
+		local output, status = ChildCapture.run(sh_quoted(assert(arg[-1])) .. " " .. sh_quoted(fixture))
+		assert_true("clipboard-deadline: refused preparation emits no paste and retains restoration",
+			status == 0 and output == "E2E_CLIPBOARD_DEADLINE_CLEAN\n")
+	else
+		print("  SKIP  clipboard process deadlines require the native POSIX target")
 	end
 end
 

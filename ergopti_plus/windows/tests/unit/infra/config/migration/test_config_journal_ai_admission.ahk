@@ -74,6 +74,36 @@ _CMJ_NewerSchemaAiAdmission(Path) {
 	AssertEqual("error", Messages[1][2]["level"])
 	AssertTrue(FSUtf8ExactMatches(Path, Source), "observation, menu rendering and failure reporting preserve every source byte")
 	AssertFalse(ConfigSchemaCanPrepareWrite(Path), "diagnostic status and notification never grant permission")
+	_CMJ_NewerSchemaPersistenceRows(Path, Source, Getters)
+}
+
+; The switch and the restore named only the generic "resume or open
+; Diagnostics" cause, which neither can lift, and a restore row kept from an
+; earlier build still entered its scope transaction.
+_CMJ_NewerSchemaPersistenceRows(Path, Source, Getters) {
+	AssertTrue(Getters["config_newer_schema"].Call(), "the menus can name the newer configuration")
+	AssertFalse(Getters["llm_scope_ready"].Call(), "the restore is not clickable either")
+	Commands := Map("llm_toggle", (*) => 0, "scope_restore", (*) => 0)
+	Seen := 0
+	for Item in _MR_GetMenuDef("llm_menu") {
+		Id := _MR_Get(Item, "id", "")
+		if Id != "llm_toggle" && Id != "scope_restore"
+			continue
+		Seen += 1
+		Row := Id == "llm_toggle" ? _MR_ToggleRowData(Item, "llm_menu", Commands, Getters)
+			: _MR_CommandRowData(Item, "llm_menu", Commands, Getters)
+		Assert(Row is Map, Id . " is drawn")
+		AssertEqual("menu.read_only.newer_schema", Row["disabled_reason_key"], Id . " names the newer configuration")
+		AssertTrue(Row["disabled"], Id . " is greyed")
+		AssertFalse(Row.Has("action"), Id . " has nothing to run")
+	}
+	AssertEqual(2, Seen, "both AI persistence rows are declared")
+	Messages := []
+	Receipt := (_LLM_ScopeCommands(Map("notify", (Message, Options) => Messages.Push(Message)))["scope_restore"])()
+	AssertEqual("refused", Receipt["status"], "a retained restore rechecks the configuration")
+	AssertEqual(1, Messages.Length)
+	AssertEqual(t("config.read_only.newer_schema"), Messages[1], "the refused restore names the newer configuration")
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "the refused restore writes nothing")
 }
 Test("config journal: newer schema disables AI activation and explains update without changing settings (newer-schema-ai)",
 	_CMJ_WithAiPersistenceState.Bind(_CMJ_NewerSchemaAiAdmission))
@@ -87,6 +117,8 @@ _CMJ_CurrentSchemaAiAdmission(Path) {
 	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
 	Getters := _LLM_Menu_StateGetters()
 	AssertTrue(Getters["llm_toggle_ready"].Call(), "an admitted ordinary current configuration remains available")
+	AssertTrue(Getters["llm_scope_ready"].Call(), "the restore stays available on a current configuration")
+	AssertFalse(Getters["config_newer_schema"].Call(), "a current configuration names no newer cause")
 	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
 	Suspend(true)
 	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")

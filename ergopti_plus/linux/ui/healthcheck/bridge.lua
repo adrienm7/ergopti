@@ -387,6 +387,26 @@ local function collect_permissions(ids)
 	return { items = items }
 end
 
+--- What the configuration probe works with: where the files live, the
+--- manifest, the decoder and a clock. The sections are filled by the probe
+--- (ui.healthcheck.probes), never by phase A.
+--- @param schema table The diagnostics schema.
+--- @param overrides table|nil Replacements for tests: features, path_of, open_fn, clock.
+--- @return table
+function M.configuration_context(schema, overrides)
+	overrides = overrides or {}
+	local names = schema.configuration.file_names
+	return {
+		schema   = schema,
+		driver   = M.DRIVER,
+		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
+		decode   = require("toml_codec").decode,
+		open_fn  = overrides.open_fn,
+		clock    = overrides.clock or function() return require("infra.monotonic").now_ms() end,
+	}
+end
+
 --- The keyboards, mice and touchpads the kernel lists: bus, kind and ids, and
 --- their names only when the user ticked "Include details". Virtual devices,
 --- including the daemon's own output keyboard, are left out.
@@ -489,8 +509,11 @@ end
 --- Builds the synchronous (phase A) snapshot.
 --- @param state table Daemon state.
 --- @param detailed boolean Whether the user ticked "Include details".
+--- @param extensive boolean Whether the user opted into the extensive checks.
+--- @param complete_local boolean|nil Collect the configuration now (a report from
+---   the Debug menu has no page to keep responsive).
 --- @return table
-function M.build_snapshot(state, detailed, extensive)
+function M.build_snapshot(state, detailed, extensive, complete_local)
 	state = type(state) == "table" and state or {}
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts
@@ -507,6 +530,10 @@ function M.build_snapshot(state, detailed, extensive)
 		system      = collect("system", function() return collect_system(facts, state) end),
 		input       = collect("input", function() return collect_input(state) end),
 		features    = collect("features", function() return collect_features(state) end),
+		-- Filled by the configuration probe: reading and decoding the files is far
+		-- over the phase A budget
+		configuration_files = { items = {} },
+		configuration = { items = {} },
 		ai          = collect("ai", function() return collect_ai(state) end),
 		network     = {},
 		permissions = collect("permissions", function() return collect_permissions(permission_ids) end),
@@ -535,6 +562,10 @@ function M.build_snapshot(state, detailed, extensive)
 	if #undeclared > 0 then
 		Logger.error(LOG, "The diagnostics snapshot carries fields the schema does not declare: %s.",
 			table.concat(undeclared, ", "))
+	end
+	if complete_local == true then
+		local err = require("healthcheck.configuration").complete(snapshot, M.configuration_context(schema))
+		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
 	end
 	return snapshot
 end
@@ -578,8 +609,12 @@ end
 --- @param session table The exact window session being refreshed.
 local function archive_cleanup_metadata(session)
 	local rows = {}
+	local declared = M.config().schema.probes
 	for id, result in pairs(session.snapshot.probes) do
-		if result.state == "pending" or (result.cleanup ~= nil and result.cleanup ~= "settled") then
+		-- A local probe owns nothing outside the process (a timer and file
+		-- reads), so its cancellation leaves no cleanup to remember
+		local is_local = declared[id] ~= nil and declared[id]["local"] == true
+		if not is_local and (result.state == "pending" or (result.cleanup ~= nil and result.cleanup ~= "settled")) then
 			local copied = {}
 			for key, value in pairs(result) do copied[key] = value end
 			if copied.state == "pending" then copied.state, copied.cleanup = "cancelled", "pending" end
@@ -595,7 +630,7 @@ end
 --- @param state table Daemon state.
 local function start_probes(session, state)
 	cancel_probes(session)
-	if session.snapshot.extensive ~= true then return end
+	-- Without the extensive opt-in only the local probes run (the configuration)
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths, state,
 		function(id, result, sections)
 			if _session ~= session then return end
@@ -605,7 +640,7 @@ local function start_probes(session, state)
 				for key, value in pairs(values) do target[key] = value end
 			end
 			push(session, { type = "probe", id = id, result = result, sections = sections })
-		end)
+		end, { local_only = session.snapshot.extensive ~= true })
 end
 
 --- The first message of a page: its configuration and the first snapshot.
@@ -620,7 +655,6 @@ local function init_message(session)
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
-			mode      = session.mode,
 		},
 		snapshot = session.snapshot,
 	}
@@ -740,9 +774,7 @@ function M.on_message(payload, state, context)
 		_session = {
 			epoch    = epoch,
 			detailed = false,
-			mode     = M._pending_mode,
 		}
-		M._pending_mode = nil
 		_session.snapshot = M.build_snapshot(state, false)
 		local message = init_message(_session)
 		start_probes(_session, state)
@@ -778,20 +810,16 @@ function M.on_window_closed(epoch)
 	cancel_probes(previous)
 end
 
---- Opens the diagnostics window, in report mode when asked: the page then
---- starts from the preview of what is shared and the report button. An open
---- window is replaced, as on macOS and Windows: bringing it forward would keep
---- its mode and its stale snapshot.
---- @param mode string|nil "report" or nil.
+--- Opens the diagnostics window. An open window is replaced, as on macOS and
+--- Windows: bringing it forward would keep its stale snapshot.
 --- @return boolean opened
-function M.open(mode)
+function M.open()
 	local manager = require("ui.webview_manager")
 	local epoch = manager.current_epoch("healthcheck")
 	if epoch ~= nil and not manager.hide("healthcheck", epoch) then
 		Logger.error(LOG, "The open diagnostics window could not be replaced.")
 		return false
 	end
-	M._pending_mode = mode
 	return manager.show("healthcheck", require("infra.i18n").get_locale())
 end
 

@@ -131,6 +131,19 @@ function M.find_declared_entry_by_path(path)
 	return _path_index[path]
 end
 
+--- Returns the declared entries of one section, in manifest order, without
+--- resolving a native platform default. A section names a list a driver must
+--- not copy (the CapsWord pointer kinds), so its owner reads it from here.
+--- @param section string Exact dotted section (e.g. "shortcuts.caps_word.pointer").
+--- @return table entries Dense array of published declarations.
+function M.declared_section_entries(section)
+	local entries = {}
+	for _, entry in ipairs(_manifest.features) do
+		if entry.section == section then entries[#entries + 1] = entry end
+	end
+	return entries
+end
+
 --- Returns the default value declared for a feature path. FAIL-FAST when the
 --- path is unknown — use this to source a module's `DEFAULT_STATE` from the
 --- single manifest source so a renamed/removed feature surfaces loudly instead

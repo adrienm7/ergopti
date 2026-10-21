@@ -95,11 +95,11 @@ CS_Read() {
 		if (content = "")
 				return out
 
-		; A second lexical grammar silently ignored commented headers and could
-		; not read multiline application opt-outs. Parse the bytes already read
-		; through the canonical reader, retaining native Boolean values and the
-		; metrics-specific unreadable-file latch above.
-		return _ParseTomlFileImpl(path, false, false, content)
+		; Use the same semantic projection as the boot configuration reader.
+		; Dotted assignments, inline namespaces and quoted headers can all name
+		; the metrics section; a flat parse silently loses those consent choices.
+		; Project the bytes already read without publishing another boot snapshot.
+		return ConfigTomlDecodeSnapshot(content).Cache
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an

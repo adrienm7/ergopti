@@ -192,7 +192,7 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 				Builders[Id].Call()
 			BootProfile_StageEnd("menu row " . Id)
 		} catch as Err {
-			BootProfile_StageAbort("menu row " . Id, Err.Message)
+			BootProfile_StageAbort("menu row " . Id, ErrorNet_Describe(Err))
 			throw Err
 		}
 		Dispatched += 1

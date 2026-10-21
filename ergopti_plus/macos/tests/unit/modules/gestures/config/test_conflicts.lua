@@ -78,14 +78,15 @@ end)
 
 --- Loads the conflict module with deterministic macOS preference output.
 --- @param defaults_output string Synthetic output from the defaults tool.
---- @return table, table, table, function Module, warning entries, commands, cleanup.
+--- @return table, table, table, function, table Module, warning entries, commands, cleanup, info entries.
 local function load_with_macos_preferences(defaults_output)
 	local warnings = {}
+	local infos = {}
 	local commands = {}
 	package.loaded["modules.gestures.conflicts"] = nil
 	package.loaded["infra.logger"] = {
 		debug   = function() end,
-		info    = function() end,
+		info    = function(_, message, ...) table.insert(infos, string.format(message, ...)) end,
 		warn    = function(_, message) table.insert(warnings, message) end,
 		error   = function(_, message) table.insert(warnings, message) end,
 		start   = function() end,
@@ -108,7 +109,7 @@ local function load_with_macos_preferences(defaults_output)
 		package.loaded["infra.logger"] = nil
 		package.loaded["adapters.shell_runner"] = nil
 	end
-	return conflicts, warnings, commands, cleanup
+	return conflicts, warnings, commands, cleanup, infos
 end
 
 helpers.describe("Conflicts current macOS preference checks", function()
@@ -127,7 +128,7 @@ helpers.describe("Conflicts current macOS preference checks", function()
 	end)
 
 	helpers.it("keeps the warning when any current macOS source still enables the native gesture", function()
-		local conflicts, warnings, _commands, cleanup = load_with_macos_preferences([[
+		local conflicts, warnings, _commands, cleanup, infos = load_with_macos_preferences([[
 {
     TrackpadThreeFingerHorizSwipeGesture = 2;
     com.apple.trackpad.threeFingerHorizSwipeGesture = 0;
@@ -135,7 +136,25 @@ helpers.describe("Conflicts current macOS preference checks", function()
 ]])
 		local warning = conflicts.on_action_changed("swipe_3_left", "word_prev")
 		helpers.assert_type(warning, "table", "an enabled native gesture remains a real conflict")
-		helpers.assert_eq(#warnings, 1, "the real conflict must remain visible in the diagnostics")
+		helpers.assert_eq(#infos, 1, "the real conflict must remain visible in the diagnostics")
+		helpers.assert_eq(#warnings, 0, "an overlap the user chose and is told about is no warning")
+		cleanup()
+	end)
+
+	helpers.it("logs a conflict once however many menu rebuilds ask for it (issue #95)", function()
+		local conflicts, warnings, _commands, cleanup, infos = load_with_macos_preferences([[
+{
+    TrackpadThreeFingerTapGesture = 2;
+    TrackpadThreeFingerHorizSwipeGesture = 2;
+}
+]])
+		local actions = { tap_3 = "lookup", swipe_3_left = "word_prev" }
+		for _ = 1, 20 do
+			helpers.assert_eq(#conflicts.active_conflicts(actions), 2, "every rebuild still gets its warnings")
+		end
+		helpers.assert_type(conflicts.on_action_changed("tap_3", "lookup"), "table")
+		helpers.assert_eq(#infos, 2, "one line per conflicting group, not one per query")
+		helpers.assert_eq(#warnings, 0)
 		cleanup()
 	end)
 

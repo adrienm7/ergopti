@@ -7,7 +7,7 @@
 --- « comme ahk éteint » — absolutely nothing is recorded. handle_key honoured it,
 --- but context_tracker held no reference to the pause predicate at all, and its
 --- three writer paths are driven by watchers that pause never tears down
---- (hs.window.filter, ProcessLifecycle.onAppActivate, the AX observer — only
+--- (the browser window watchers, ProcessLifecycle.onAppActivate, the AX observer — only
 --- keylogger.M.stop() removes those):
 ---   1. M.update_private_status -> append_log{type="window_switch", prev_title, next_title}
 ---   2. M.app_watcher_cb        -> log_app_switch(prev_app, next_app, duration)

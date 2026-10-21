@@ -26,7 +26,8 @@ local function callback(logger)
 end
 
 --- Renders the real binding providers while omitting unrelated top-level menus.
-local function menu_rows(gestures, path)
+--- @param extra table|nil Further menu context owners, such as the physical magic key.
+local function menu_rows(gestures, path, extra)
 	package.loaded["modules.shortcuts.manager"] = nil
 	local shortcuts = require("modules.shortcuts.manager")
 	shortcuts.init({ persist = true, config_path = path })
@@ -50,8 +51,10 @@ local function menu_rows(gestures, path)
 	-- Select genuine source records through the renderer's actual root and reader.
 	root.top_level = selected
 	package.loaded["ui.menu.menu_builder"] = nil
-	return require("ui.menu.menu_builder").build({ gestures = gestures, shortcuts = shortcuts,
-		is_paused = function() return false end, on_quit = function() end })
+	local ctx = { gestures = gestures, shortcuts = shortcuts,
+		is_paused = function() return false end, on_quit = function() end }
+	for name, value in pairs(extra or {}) do ctx[name] = value end
+	return require("ui.menu.menu_builder").build(ctx)
 end
 
 local function with_case(spec, body)
@@ -634,6 +637,73 @@ helpers.describe("parameter transaction physical boundary", function()
 				helpers.assert_eq(controls.publications, 0)
 				helpers.assert_eq(controls.token, nil, "no parameter lease was acquired")
 				helpers.assert_eq(stopped, 0, "refusal precedes native program retirement")
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("Linux tap key rows and the physical magic key", function()
+	--- Loads the real physical magic key owner over a private preference file.
+	local function magic_source(content)
+		local file = os.tmpname()
+		Sandbox.write_bytes(file, content)
+		package.loaded["modules.hotstrings.magic_key_source"] = nil
+		local Preferences = helpers.load_module("infra.hotstring_preferences")
+		assert(Preferences._set_file_for_test(file))
+		return require("modules.hotstrings.magic_key_source"), file
+	end
+
+	--- Every rendered row title, depth first.
+	local function titles(tree, out)
+		out = out or {}
+		for _, row in ipairs(tree) do
+			if row.title then out[#out + 1] = row.title end
+			if row.menu then titles(row.menu, out) end
+		end
+		return out
+	end
+
+	for _, case in ipairs({
+		{ source = "Backquote", marked = 1, why = "the key left of 1 is the physical magic key and has an action" },
+		{ source = "Minus", marked = 0, why = "Minus has no action, so no row takes the magic key" },
+		{ source = "auto", marked = 0, why = "the automatic source owns no tap key" },
+	}) do
+		helpers.it("(tap-key-magic-override) " .. case.why, function()
+			with_case(CASES[3], function(_, gestures, _, controls, path)
+				local Source, file = magic_source('[hotstrings]\nmagic_key_source = "' .. case.source .. '"\n')
+				local reason = " — " .. require("infra.i18n").get(Source.TAP_OVERRIDE_REASON)
+				helpers.assert_true(reason ~= " — " .. Source.TAP_OVERRIDE_REASON, "the reason is translated")
+				local selected
+				package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+					if options.current == "run_program" then selected = confirm end
+					return true
+				end }
+				local rows = menu_rows(gestures, path, { magic_key_source = Source })
+				local all, marked = titles(rows), {}
+				helpers.assert_true(#all > 20, "actual declared providers must produce a populated menu")
+				for _, title in ipairs(all) do
+					if title:sub(-#reason) == reason then marked[#marked + 1] = title end
+				end
+				helpers.assert_eq(#marked, case.marked, table.concat(marked, " | "))
+				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local function open_current(tree)
+					for _, row in ipairs(tree) do
+						if row.title == picker_label and type(row.fn) == "function" then row.fn() end
+						if selected then return end
+						if row.menu then open_current(row.menu) end
+					end
+				end
+				open_current(rows)
+				helpers.assert_type(selected, "function", "the tap key row opens its picker")
+				local before = #controls.logs
+				helpers.assert_eq(selected("run_program", nil, NEXT), true)
+				local warned = 0
+				for index = before + 1, #controls.logs do
+					if controls.logs[index]:find("takes the physical magic key", 1, true) then warned = warned + 1 end
+				end
+				helpers.assert_eq(warned, case.marked, "the assignment is logged exactly when it takes the magic key")
+				os.remove(file)
 			end)
 		end)
 	end

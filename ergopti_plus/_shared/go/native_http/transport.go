@@ -339,6 +339,9 @@ type Transport struct {
 	IdleTimeout   time.Duration
 	ResolveWorker func() (string, error)
 	Environment   func() map[string]string
+	// Destination repeats the upstream checked dialer's address decision for
+	// routes that never reach that dialer; nil keeps the original policy.
+	Destination func(context.Context, *url.URL) error
 }
 
 // Wrap preserves the original client when the caller did not select this
@@ -378,6 +381,11 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	if request.URL.Scheme != "https" && request.URL.Scheme != "http" || request.URL.User != nil || request.URL.Fragment != "" || request.URL.Hostname() == "" {
 		return nil, fail("protocol")
 	}
+	if t.Destination != nil {
+		if err := t.Destination(request.Context(), request.URL); err != nil {
+			return nil, err
+		}
+	}
 	environment := t.Environment()
 	direct := t.Policy.direct(request.URL, environment)
 	if !direct {
@@ -395,6 +403,12 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 				}
 				clone := transport.Clone()
 				clone.Proxy = http.ProxyURL(relay)
+				if t.Destination != nil {
+					// The checked dialer would see the relay's own address, and
+					// an enterprise relay is usually private: the destination
+					// was already decided above, so the relay hop dials plainly.
+					clone.DialContext = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 3 * time.Minute}).DialContext
+				}
 				clone.TLSClientConfig, err = bootstrapTLSConfig(clone.TLSClientConfig, environment)
 				if err != nil {
 					return nil, err

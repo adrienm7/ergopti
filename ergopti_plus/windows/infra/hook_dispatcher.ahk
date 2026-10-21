@@ -24,7 +24,8 @@
 ; 4. Event types — string constants on HookDispatcherConst match the ones
 ;    used by callers: "keyboard_char", "keyboard_down", "keyboard_up",
 ;    "mouse_ldown", "mouse_lup", "mouse_rdown", "mouse_rup",
-;    "mouse_mdown", "mouse_mup", "mouse_wup", "mouse_wdn",
+;    "mouse_mdown", "mouse_mup", "mouse_x1down", "mouse_x2down",
+;    "mouse_wup", "mouse_wdn",
 ;    "mouse_wright", "mouse_wleft".
 ; 5. Thread safety — every handler that mutates subscriber lists runs under
 ;    Critical so concurrent pseudo-threads cannot corrupt the Arrays.
@@ -87,6 +88,9 @@ class HookDispatcherConst {
 	static EVT_MS_RUP     := "mouse_rup"
 	static EVT_MS_MDOWN   := "mouse_mdown"
 	static EVT_MS_MUP     := "mouse_mup"
+	; The X buttons (back and forward), press only: CapsWord ends on them.
+	static EVT_MS_X1DOWN  := "mouse_x1down"
+	static EVT_MS_X2DOWN  := "mouse_x2down"
 	static EVT_MS_WUP     := "mouse_wup"
 	static EVT_MS_WDN     := "mouse_wdn"
 	static EVT_MS_WRIGHT  := "mouse_wright"
@@ -375,6 +379,7 @@ class HookDispatcher {
 	static _OnX1Down(*) {
 		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity("extra mouse button during hold")
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_X1DOWN)
 	}
 	static _OnX1Up(*) {
 		HookDispatcher._CancelTapHoldActivity("extra mouse button release during hold")
@@ -382,6 +387,7 @@ class HookDispatcher {
 	static _OnX2Down(*) {
 		KS_RecordPhysicalInput()
 		HookDispatcher._CancelTapHoldActivity("extra mouse button during hold")
+		HookDispatcher.Dispatch(HookDispatcherConst.EVT_MS_X2DOWN)
 	}
 	static _OnX2Up(*) {
 		HookDispatcher._CancelTapHoldActivity("extra mouse button release during hold")

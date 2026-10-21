@@ -286,15 +286,20 @@ end
 
 --- Presses a combo on the daemon's uinput device.
 --- @param combo string
+--- @param publication table|nil Retained full-phase and cached-key admission.
 --- @return boolean True when every event was written.
 --- @return table Typed outcome; only an issued unavailable receipt permits fallback.
-function M.press(combo)
+function M.press(combo, publication)
+	if publication ~= nil then
+		local ok, allowed = pcall(publication.current)
+		if not ok or allowed ~= true then return false, outcome("refused") end
+	end
 	local parsed, unknown = M.parse(combo)
 	if not parsed then
 		Logger.error(LOG, "Cannot emit '%s': %s.", tostring(combo), tostring(unknown))
 		return false, outcome("refused")
 	end
-	return M.press_codes(parsed.mods, parsed.keys, combo)
+	return M.press_codes(parsed.mods, parsed.keys, combo, publication)
 end
 
 --- Presses evdev codes on the daemon's uinput device: the modifiers held, the
@@ -306,14 +311,22 @@ end
 --- keystroke, which is the classic way a synthesised chord half-works. The
 --- send_key and send_shortcut actions press codes the user chose rather than a
 --- catalogue combo, which is why this takes codes and not keysym names.
---- A modifier already held by the hand or a tap-hold is neither pressed nor
---- released: releasing it would lift a key this emission does not own.
+--- A requested modifier family already held by the hand or a tap-hold stays
+--- down. Other modifiers are suspended through their exact custody owners so
+--- the trigger's Alt/Shift/Super cannot become part of the emitted chord.
 --- @param mods table Array of modifier evdev codes, pressed in order.
 --- @param keys table Non-empty array of key evdev codes.
 --- @param label string|nil What to call the chord in the log.
+--- @param publication table|nil Retained full-phase and cached-key admission.
 --- @return boolean True when every event was written.
 --- @return table Typed outcome retaining unavailable/native-refusal distinction.
-function M.press_codes(mods, keys, label)
+function M.press_codes(mods, keys, label, publication)
+	local function admitted(cached)
+		if publication == nil then return true end
+		local ok, allowed = pcall(cached and publication.cached or publication.current)
+		return ok and allowed == true
+	end
+	if not admitted(false) then return false, outcome("refused") end
 	if type(mods) ~= "table" or type(keys) ~= "table" or #keys == 0 then
 		Logger.error(LOG, "press_codes() needs a modifier list and at least one key.")
 		return false, outcome("refused")
@@ -338,8 +351,9 @@ function M.press_codes(mods, keys, label)
 	local broker = Broker.for_channel(Writer)
 	local reservation = broker and broker.begin() or nil
 	if broker and not reservation then return false, outcome("refused") end
-	local held = {}
+	local held, suspended = {}, {}
 	local function emit(code, value)
+		if value == PRESS and not admitted(true) then return false end
 		if value == PRESS and not reservation then held[#held + 1] = code end
 		local ok, result = pcall(reservation and reservation.emit or Writer.emit, code, value)
 		if not ok or result ~= true then return false end
@@ -357,12 +371,22 @@ function M.press_codes(mods, keys, label)
 		if type(Hook.emergency_stop) == "function" then Hook.emergency_stop("gesture output custody unresolved") end
 		return false
 	end
+	local function restore_modifiers()
+		local clean = true
+		for index = #suspended, 1, -1 do
+			local called, restored = pcall(reservation.restore, suspended[index])
+			if called and restored == true then table.remove(suspended, index)
+			else clean = false end
+		end
+		return clean
+	end
 	local function cleanup()
 		local clean = true
 		for i = #held, 1, -1 do
 			local ok, result = pcall(reservation and reservation.emit or Writer.emit, held[i], RELEASE)
 			if not ok or result ~= true then clean = false end
 		end
+		if not restore_modifiers() then clean = false end
 		if not settle() then clean = false end
 		return clean
 	end
@@ -377,11 +401,36 @@ function M.press_codes(mods, keys, label)
 		end
 	end
 	local already_down = held_modifier_codes()
+	local requested, families, candidates = {}, {}, {}
+	for _, code in ipairs(mods) do
+		requested[code] = true
+		local family = EvdevCodes.MODIFIER_OF[code]
+		if family then families[family] = true end
+	end
+	for code in pairs(EvdevCodes.MODIFIER_OF) do candidates[code] = true end
+	for code in pairs(already_down) do candidates[code] = true end
+	local foreign = {}
+	for code in pairs(candidates) do
+		if not requested[code] and not families[EvdevCodes.MODIFIER_OF[code]] then
+			local down = reservation and reservation.borrow(code) or (not broker and already_down[code])
+			if down then foreign[#foreign + 1] = code end
+		end
+	end
+	table.sort(foreign)
+	-- A legacy channel cannot suspend another source's modifier safely. Refuse
+	-- before output rather than restore a raw snapshot after that source retires.
+	if #foreign > 0 and not reservation then return false, outcome("refused") end
+	for _, code in ipairs(foreign) do
+		suspended[#suspended + 1] = code
+		local called, neutralized = pcall(reservation.neutralize, code)
+		if not called or neutralized ~= true then return failed() end
+	end
 	local owned_mods = {}
 	for _, code in ipairs(mods) do
 		local borrowed = reservation and reservation.borrow(code) or (not broker and already_down[code])
 		if not borrowed then owned_mods[#owned_mods + 1] = code end
 	end
+	if not admitted(false) then return failed() end
 	for _, code in ipairs(owned_mods) do
 		if not emit(code, PRESS) then return failed() end
 	end
@@ -395,6 +444,7 @@ function M.press_codes(mods, keys, label)
 		if not emit(owned_mods[i], RELEASE) then return failed() end
 	end
 
+	if not restore_modifiers() then return failed() end
 	if not settle() then return false, outcome("custody_unresolved") end
 	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).", name, #owned_mods, #keys)
 	return true, outcome("emitted")

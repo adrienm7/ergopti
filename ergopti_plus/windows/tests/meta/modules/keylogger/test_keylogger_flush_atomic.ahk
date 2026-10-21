@@ -98,14 +98,14 @@ _KLFA_MouseFlushScrollCritical() {
         Assert(InStr(Body, "Critical(previous_critical)") > 0,
                 "KL_Mouse_FlushScroll must restore the caller's Critical state after the atomic snapshot")
 
-	Assert(InStr(Body, "MF_ShouldFilter") > 0,
-		"KL_Mouse_FlushScroll must still call MF_ShouldFilter after releasing Critical")
+	Assert(InStr(Body, "_KL_Mouse_ShouldFilter") > 0,
+		"KL_Mouse_FlushScroll must still call _KL_Mouse_ShouldFilter after releasing Critical")
 
-        ; Restoring the prior Critical state must happen before MF_ShouldFilter,
+        ; Restoring the prior Critical state must happen before _KL_Mouse_ShouldFilter,
         ; which can yield the timer thread.
         PosOff := InStr(Body, "Critical(previous_critical)")
-	PosMF  := InStr(Body, "MF_ShouldFilter")
+	PosMF  := InStr(Body, "_KL_Mouse_ShouldFilter")
 	Assert(PosOff < PosMF,
-                "Critical restoration must appear before MF_ShouldFilter — the helper must not extend its own lock across a yielding call")
+                "Critical restoration must appear before _KL_Mouse_ShouldFilter — the helper must not extend its own lock across a yielding call")
 }
-Test("keylogger: KL_Mouse_FlushScroll releases Critical before MF_ShouldFilter (keylogger-flush-race-condition)", _KLFA_MouseFlushScrollCritical)
+Test("keylogger: KL_Mouse_FlushScroll releases Critical before _KL_Mouse_ShouldFilter (keylogger-flush-race-condition)", _KLFA_MouseFlushScrollCritical)

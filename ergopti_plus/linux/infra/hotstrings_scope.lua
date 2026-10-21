@@ -37,6 +37,10 @@ local LeafRows = require("toml_codec.leaf_rows")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec")
 local Planner = require("hotstrings.scope_overrides")
+local PersonalFiles = require("hotstrings.personal_files")
+
+-- The category personal.toml loads as (ui/hotstring_editor/bridge.lua).
+local PERSONAL_CATEGORY = "personal"
 local ScopeFile = require("config_scope_file")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
@@ -108,7 +112,10 @@ function M.new(options)
 			local sections = {}
 			for section in pairs(category.sections or {}) do sections[#sections + 1] = section end
 			table.sort(sections)
-			groups[#groups + 1] = { id = id, override = { id }, sections = sections, bundled = bundled[id] == true }
+			-- personal.toml (the "personal" category) and each additional personal file.
+			local personal = id == PERSONAL_CATEGORY or PersonalFiles.components(id) ~= nil
+			groups[#groups + 1] = { id = id, override = { id }, sections = sections, bundled = bundled[id] == true,
+				personal = personal }
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)
 		local changes = Planner.plan({ mode = mode, features = Manifest.features(), groups = groups,

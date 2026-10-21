@@ -103,10 +103,11 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, drain_status?, drain_reason? }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
+	local opens = {}
 	local fake = {
 		queued = opts.events or {},
 		cursor = 0,
@@ -138,12 +139,33 @@ function M.evdev_reader(opts)
 	function fake.is_available() return true end
 	function fake.open(path, slot)
 		if opts.open_fails then return false end
-		fake.open_slots[slot or fake.KEYBOARD] = path
+		slot = slot or fake.KEYBOARD
+		fake.open_slots[slot], opens[slot] = path, {}
 		return true
 	end
-	function fake.close(slot) fake.open_slots[slot or fake.KEYBOARD] = nil ; return true end
+	function fake.close(slot)
+		slot = slot or fake.KEYBOARD
+		fake.open_slots[slot], opens[slot] = nil, nil
+		return true
+	end
 	function fake.is_open(slot) return fake.open_slots[slot or fake.KEYBOARD] ~= nil end
 	function fake.device_path(slot) return fake.open_slots[slot or fake.KEYBOARD] end
+	function fake.event_capabilities(slot)
+		slot = slot or fake.KEYBOARD
+		local path, owner = fake.open_slots[slot], opens[slot]
+		if path == nil or owner == nil then return nil, "device is not open" end
+		local provider = opts.event_capabilities
+		local ok, mask, reason = true, provider, nil
+		if type(provider) == "function" then ok, mask, reason = pcall(provider, slot, path)
+		elseif provider == nil then mask = 3 end -- The default scripted keyboard has SYN and KEY.
+		if not ok or opts.event_capabilities ~= provider or fake.open_slots[slot] ~= path or opens[slot] ~= owner then
+			return nil, "event capability query was not acknowledged"
+		end
+		if type(mask) ~= "number" or mask ~= mask or mask < 0 or mask >= 4294967296 or mask % 1 ~= 0 then
+			return nil, type(reason) == "string" and reason or "event capability query was not acknowledged"
+		end
+		return mask
+	end
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
@@ -535,6 +557,8 @@ function M.clipboard(opts)
 		fake.last_pasted = replacement
 		return true
 	end
+
+	require("tests.fakes.clipboard_stage").install(fake, opts)
 
 	return fake
 end

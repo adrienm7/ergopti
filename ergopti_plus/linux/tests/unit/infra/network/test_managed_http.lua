@@ -20,13 +20,14 @@ local data = Json.decode(file:read("*a")); file:close()
 --- Creates independent native-child controls with separate settlement receipts.
 --- @return table coordinator, table state
 local function fresh()
-	local state = { time = 0, proxy = {}, curls = {}, reports = {}, environment = {} }
+	local state = { time = 0, proxy = {}, curls = {}, reports = {}, environment = {}, deadlines = {} }
 	local function child(kind, callback, options)
 		local item = { settled = false, cancelled = false, listeners = {}, callback = callback, options = options }
 		local operation = { started = true }
 		if kind == "proxy" then
 			function operation.is_settled() return item.settled end
 			function operation.cancel()
+				if state.on_cancel then state.on_cancel(item) end
 				if state.refuse_cancel and options.logical_cancel then return false end
 				item.cancelled = true
 				return not state.refuse_cancel
@@ -35,6 +36,7 @@ local function fresh()
 		else
 			function operation:is_settled() return item.settled end
 			function operation:request_cancel()
+				if state.on_cancel then state.on_cancel(item) end
 				if state.refuse_cancel and options.owned_api == false then return false end
 				item.cancelled = true
 				return not state.refuse_cancel
@@ -49,12 +51,19 @@ local function fresh()
 		end
 		return item
 	end
+	local policy = assert(policy_module.new(data))
+	local route = policy.route
+	policy.route = function(...)
+		if state.on_route then state.on_route() end
+		return route(...)
+	end
 	local coordinator = assert(module.new({
-		policy = assert(policy_module.new(data)),
+		policy = policy,
 		proxy = { lookup_owned = function(url, options, callback)
 			local item = child("proxy", callback, options)
 			item.url = url
 			state.proxy[#state.proxy + 1] = item
+			if state.on_proxy then state.on_proxy(item) end
 			return item.operation
 		end },
 		curl = function(url, headers, body, options, on_chunk, on_done)
@@ -62,6 +71,7 @@ local function fresh()
 			item.url, item.chunk = url, on_chunk
 			function item.logical(result) options.on_native_terminal(result) end
 			state.curls[#state.curls + 1] = item
+			if state.on_curl then state.on_curl(item) end
 			return item.operation
 		end,
 		deadline = function(_, _)
@@ -71,16 +81,28 @@ local function fresh()
 				if self.settled then listener() else self.listeners[#self.listeners + 1] = listener end
 				return true
 			end
-			function token:cancel()
-				if self.settled then return true end
+			function token:ack()
+				if self.settled then return end
 				self.settled = true
 				for _, listener in ipairs(self.listeners) do listener() end
+			end
+			function token:cancel()
+				if state.refuse_deadline then return false end
+				if not state.defer_deadline then self:ack() end
 				return true
 			end
+			state.deadlines[#state.deadlines + 1] = token
+			if state.on_deadline then state.on_deadline(token) end
 			return token
 		end,
-		clock = function() return state.time end,
-		environment = function() return state.environment end,
+		clock = function()
+			if state.on_clock then state.on_clock() end
+			return state.time
+		end,
+		environment = function()
+			if state.on_environment then state.on_environment() end
+			return state.environment
+		end,
 		report = function(message) state.reports[#state.reports + 1] = message end,
 	}))
 	return coordinator, state
@@ -342,6 +364,182 @@ helpers.describe("managed_http: actual public ownership sequencing", function()
 			helpers.assert_true(not coordinator.is_active("public-owner"))
 		end)
 	end
+end)
+
+
+helpers.describe("managed_http: terminal physical shutdown ownership", function()
+	helpers.it("retains every owner and queued successor until child and deadline ACKs", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		state.defer_deadline = true
+		local first, first_results = start(coordinator, { owned_api = false })
+		local queued, queued_results = start(coordinator, { owned_api = false })
+		local other, other_results = start(coordinator, { owner = "other" })
+		local settled = 0
+		for _, operation in ipairs({ first, queued, other }) do
+			operation:on_settled(function() settled = settled + 1 end)
+		end
+		helpers.assert_eq(#state.curls, 2, "queued successor cannot dispatch before predecessor ACK")
+		helpers.assert_eq(coordinator.shutdown(), false)
+		helpers.assert_eq(coordinator.shutdown(), false)
+		helpers.assert_eq(coordinator.is_active("public-owner"), false)
+		for _, item in ipairs(state.curls) do item.ack({ ok = true, status = 200, body = "late" }) end
+		helpers.assert_eq(coordinator.shutdown(), false, "child exit cannot acknowledge deadline close")
+		helpers.assert_eq(settled, 0)
+		state.deadlines[1]:ack()
+		state.deadlines[2]:ack()
+		helpers.assert_eq(settled, 2)
+		helpers.assert_eq(coordinator.shutdown(), false, "independent owner still retains its deadline")
+		state.deadlines[3]:ack()
+		helpers.assert_true(coordinator.shutdown())
+		helpers.assert_eq(settled, 3)
+		helpers.assert_eq(#state.curls, 2, "shutdown never promotes the queued successor")
+		helpers.assert_eq({ #first_results, #queued_results, #other_results }, { 0, 0, 0 })
+		local refused, results = start(coordinator)
+		helpers.assert_true(refused:is_settled())
+		helpers.assert_eq(refused.started, false)
+		helpers.assert_eq(#results, 0)
+		helpers.assert_true(coordinator.shutdown())
+	end)
+
+	helpers.it("revokes all delivery before the first native cancellation callback", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		local _, first = start(coordinator, { owned_api = false })
+		local _, second = start(coordinator, { owned_api = false, owner = "other" })
+		state.on_cancel = function()
+			state.on_cancel = nil
+			for _, item in ipairs(state.curls) do item.logical({ ok = true, status = 200, body = "private" }) end
+			helpers.assert_eq(coordinator.shutdown(), false, "reentrant shutdown must retain native frames")
+		end
+		helpers.assert_eq(coordinator.shutdown(), false)
+		helpers.assert_eq({ #first, #second }, { 0, 0 })
+		for _, item in ipairs(state.curls) do item.ack({ ok = true, status = 200, body = "late" }) end
+		helpers.assert_true(coordinator.shutdown())
+	end)
+
+	for _, phase in ipairs({ "clock", "environment", "route", "deadline", "proxy", "curl" }) do
+		local boundary = phase
+		helpers.it("retains shutdown reentry from the " .. phase .. " construction boundary", function()
+			local coordinator, state = fresh()
+			if boundary == "curl" then state.environment.HTTPS_PROXY = "http://environment.invalid:81" end
+			local observed
+			state["on_" .. boundary] = function()
+				state["on_" .. boundary] = nil
+				observed = coordinator.shutdown()
+			end
+			local operation, results = start(coordinator)
+			helpers.assert_eq(observed, false, "shutdown cannot ACK before the calling constructor returns")
+			helpers.assert_eq(#results, 0)
+			if boundary == "proxy" or boundary == "curl" then
+				helpers.assert_eq(operation:is_settled(), false)
+				helpers.assert_eq(coordinator.shutdown(), false)
+				local item = boundary == "proxy" and state.proxy[1] or state.curls[1]
+				helpers.assert_true(item.cancelled, "returned child must still be cancelled and observed")
+				item.ack({ ok = true, status = 200, body = "late" })
+			else
+				helpers.assert_eq(#state.proxy + #state.curls, 0, "no native child may start after revocation")
+			end
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_true(coordinator.shutdown())
+		end)
+	end
+
+	for _, phase in ipairs({ "authorized", "prepare" }) do
+		local boundary = phase
+		helpers.it("retains owned admission while shutdown reenters " .. phase, function()
+			local coordinator, state = fresh()
+			local observed, callbacks = nil, 0
+			local function stop() observed = coordinator.shutdown() end
+			local options = { owner = "owned", timeout_ms = 1000, owned_api = true, buffered = true }
+			local operation = coordinator.start("https://corporate.invalid", {}, nil, options, nil,
+				function() callbacks = callbacks + 1 end, {
+					authorized = function() if boundary == "authorized" then stop() end; return true end,
+					prepare = function() if boundary == "prepare" then stop() end; return options end,
+				})
+			helpers.assert_eq(observed, false)
+			helpers.assert_true(operation:is_settled())
+			helpers.assert_true(coordinator.shutdown())
+			helpers.assert_eq(callbacks, 0)
+			helpers.assert_eq(#state.proxy + #state.curls + #state.deadlines, 0)
+		end)
+	end
+
+	helpers.it("does not retain a resource-free incumbent admission refusal", function()
+		local coordinator, state = fresh()
+		local original = start(coordinator)
+		local options = { owner = "public-owner", timeout_ms = 1000, owned_api = true }
+		local refused = coordinator.start("https://corporate.invalid", {}, nil, options, nil, function() error("not authorized") end,
+			{ authorized = function() error("no source callback for premetadata refusal") end,
+				prepare = function() error("no preparation for premetadata refusal") end })
+		helpers.assert_true(refused:is_settled())
+		helpers.assert_eq(coordinator.shutdown(), false)
+		state.proxy[1].ack(selection())
+		helpers.assert_true(original:is_settled())
+		helpers.assert_true(coordinator.shutdown(), "pure refusal must leave no phantom construction debt")
+	end)
+
+	helpers.it("retains uncertain producer ownership and rejects forged public settlement", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		state.on_curl = function() error("native producer acquired before throwing") end
+		local uncertain = start(coordinator)
+		helpers.assert_eq(coordinator.shutdown(), false)
+		uncertain._settled = true
+		helpers.assert_eq(coordinator.shutdown(), false, "writable public fields are not physical receipts")
+		helpers.assert_eq(#state.reports, 1)
+	end)
+
+	helpers.it("cannot acknowledge a live child from a forged public settlement field", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		local operation, results = start(coordinator)
+		operation._settled = true
+		helpers.assert_eq(coordinator.shutdown(), false)
+		helpers.assert_eq(coordinator.shutdown(), false)
+		operation._settled = false
+		helpers.assert_eq(coordinator.shutdown(), false)
+		state.curls[1].ack({ ok = true, status = 200, body = "late" })
+		helpers.assert_true(coordinator.shutdown())
+		helpers.assert_eq(#results, 0)
+	end)
+
+	helpers.it("suppresses streaming delivery and successor acquisition from settlement listeners", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		local chunks, terminals, settlements = 0, 0, 0
+		local operation = coordinator.start("https://corporate.invalid", {}, "request",
+			{ owner = "stream", timeout_ms = 1000, owned_api = false, buffered = false },
+			function() chunks = chunks + 1 end, function() terminals = terminals + 1 end)
+		state.curls[1].chunk("before stop")
+		operation:on_settled(function()
+			settlements = settlements + 1
+			local successor = start(coordinator, { owner = "new-owner" })
+			helpers.assert_eq(successor.started, false)
+			helpers.assert_true(successor:is_settled())
+		end)
+		helpers.assert_eq(coordinator.shutdown(), false)
+		state.curls[1].chunk("after stop")
+		state.curls[1].logical({ ok = true, status = 200, body = "late" })
+		state.curls[1].ack({ ok = true, status = 200, body = "late" })
+		helpers.assert_true(coordinator.shutdown())
+		helpers.assert_eq({ chunks, terminals, settlements, #state.curls, #state.deadlines }, { 1, 0, 1, 1, 1 })
+	end)
+
+	helpers.it("keeps terminal cancellation when a native signal and deadline cleanup refuse", function()
+		local coordinator, state = fresh()
+		state.environment.HTTPS_PROXY = "http://environment.invalid:81"
+		local operation, results = start(coordinator, { owned_api = false })
+		state.refuse_cancel, state.refuse_deadline = true, true
+		helpers.assert_eq(coordinator.shutdown(), false)
+		state.curls[1].logical({ ok = true, status = 200, body = "late" })
+		state.curls[1].ack({ ok = true, status = 200, body = "late" })
+		helpers.assert_eq(#results, 0)
+		helpers.assert_eq(coordinator.shutdown(), false)
+		state.refuse_cancel, state.refuse_deadline = false, false
+		helpers.assert_true(coordinator.shutdown())
+		helpers.assert_true(operation:is_settled())
+	end)
 end)
 
 return helpers

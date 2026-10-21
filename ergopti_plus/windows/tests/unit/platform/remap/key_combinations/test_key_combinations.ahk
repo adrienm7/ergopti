@@ -22,6 +22,7 @@
 
 #Requires AutoHotkey v2.0
 #Include ../../../../support/altgr_probe_ordinary_owner.ahk
+#Include test_key_combination_semantic_scope.ahk
 
 
 
@@ -591,6 +592,8 @@ _KCT_MenuListsEveryOrderedPair() {
 		Shown := []
 		KeyCombinationShowPairMenu("left_alt_then_caps_lock", "LAlt + CapsLock", (Built) => Shown.Push(Built))
 		AssertEqual(1, Shown.Length, "the pair's menu is built from the manifest and handed over to be shown")
+		AssertTrue(_KeyCombinationPairMenu == Shown[1],
+			"the shown pair menu stays referenced after the call returns, so its click still finds its item")
 		try AssertEqual(4, DllCall("GetMenuItemCount", "ptr", Shown[1].Handle, "int"),
 			"the clear row, the separator, the tap slot and the hold slot")
 		finally Shown[1].Delete()

@@ -13,6 +13,7 @@ local State = require("modules.keymap.one_shot_shift")
 local Keycodes = require("keycodes")
 local Timer = require("adapters.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
+local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local CONTROL = {
 	[Keycodes.BACKSPACE] = "backspace", [Keycodes.FORWARD_DELETE] = "delete",
 	[Keycodes.RETURN] = "enter", [Keycodes.ENTER] = "enter",
@@ -20,7 +21,7 @@ local CONTROL = {
 }
 
 --- Builds an owner before event taps start; configuration I/O occurs only here.
---- @param deps table { magic, data?, event?, now?, emit?, translate? }
+--- @param deps table { magic, data?, event?, now?, emit?, translate?, is_repeat? }
 --- @return table
 function M.new(deps)
 	local data = deps.data
@@ -34,9 +35,25 @@ function M.new(deps)
 	local now = deps.now or function() return Timer.now_ns() / 1e9 end
 	local emit = deps.emit or SyntheticInput.emit_key_strokes
 	local translated = deps.translate or SyntheticInput.keyboard_characters
+	local autorepeat_property = event_api.properties and event_api.properties.keyboardEventAutorepeat
+	local is_repeat = deps.is_repeat or function(event)
+		return event:getProperty(autorepeat_property) ~= 0
+	end
 	assert(type(deps.magic) == "function", "one-shot Shift requires the live magic-key reader")
 	local adapter = {}
 	local pending = nil
+
+	--- Only a native auto-repeat belongs to a claimed press. A fresh press of a
+	--- claimed key proves its release was missed: the claim is dropped so the
+	--- press types, instead of being swallowed as a repeat of the old one.
+	--- @return boolean claimed True when the event repeats a live claim.
+	local function settle_claim(event, code)
+		if not owner:claims(code) then return false end
+		if is_repeat(event) then return true end
+		owner:forget(code)
+		KeystrokeIntegrity.note("stale_claim")
+		return false
+	end
 
 	local function add_shift(event, code, raw_flags)
 		local shifted_flags = raw_flags | event_api.rawFlagMasks.shift
@@ -63,14 +80,16 @@ function M.new(deps)
 
 	--- Claims repeats of an already consumed press, including while paused.
 	function adapter.claim_repeat(event)
-		return next(owner.absorbed) ~= nil and owner.absorbed[event:getKeyCode()] == true
+		if next(owner.absorbed) == nil then return false end
+		local code = event:getKeyCode()
+		return owner.absorbed[code] == true and settle_claim(event, code)
 	end
 
 	--- Changes or consumes one proven physical key-down inside the serializer.
 	function adapter.key_down(event, code)
 		assert(pending == nil, "one-shot callback ownership was not settled")
 		if not owner:active() then return false end
-		if owner.absorbed[code] then return true end
+		if settle_claim(event, code) and owner.absorbed[code] then return true end
 		local control = CONTROL[code]
 		local flags = event:getFlags()
 		if control == nil and (flags.cmd or flags.ctrl) then control = "shortcut" end

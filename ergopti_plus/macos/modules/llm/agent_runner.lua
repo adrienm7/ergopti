@@ -269,7 +269,9 @@ end
 --- @param on_text function Receives the answer.
 --- @param on_fail function Receives a short reason, and { model } when the local
 ---        server does not hold the model (modules/llm/local_model_offer.lua).
-local function chat(backend, payload, on_text, on_fail, use)
+--- @param use string Provider use of this request.
+--- @param current function|nil Original action authority until native dispatch.
+local function chat(backend, payload, on_text, on_fail, use, current)
 	if backend.format == "backboard" then
 		local Remote = dependency("modules.llm.api_remote", "request_backboard")
 		if not Remote then return on_fail("the remote backend is unavailable") end
@@ -279,7 +281,7 @@ local function chat(backend, payload, on_text, on_fail, use)
 			local text = Formats.backboard_text(answer)
 			if type(text) ~= "string" or text == "" then return on_fail("empty_answer") end
 			on_text(text)
-		end, on_fail, use)
+		end, on_fail, use, current)
 		return
 	end
 	if not ProviderUses.format_serves(backend.format, ProviderUses.SYSTEM2) and backend.kind ~= "local" then
@@ -291,12 +293,12 @@ local function chat(backend, payload, on_text, on_fail, use)
 	if backend.kind == "local" then
 		local Ollama = dependency("modules.llm.api_ollama", "request_chat")
 		if not Ollama then return on_fail("the local backend is unavailable") end
-		Ollama.request_chat(body, on_text, on_fail)
+		Ollama.request_chat(body, on_text, on_fail, current)
 		return
 	end
 	local Remote = dependency("modules.llm.api_remote", "request_chat")
 	if not Remote then return on_fail("the remote backend is unavailable") end
-	Remote.request_chat(backend.provider, backend.model, body, on_text, on_fail, use)
+	Remote.request_chat(backend.provider, backend.model, body, on_text, on_fail, use, current)
 end
 
 --- Decodes a JSON text, raising on an invalid one (what the shared parsers expect).
@@ -344,7 +346,8 @@ end
 --- @param sentence string The sentence being typed.
 --- @param ctx table { app }.
 --- @param on_triage function Receives { intent, probability }, or nil when unreadable.
-local function jev_triage(backend, sentence, ctx, on_triage)
+--- @param current function|nil Original typing authority until native dispatch.
+local function jev_triage(backend, sentence, ctx, on_triage, current)
 	local config = M.config()
 	local questions = Agent.jev_questions(config)
 	local state = jev_state(sentence, ctx)
@@ -358,7 +361,7 @@ local function jev_triage(backend, sentence, ctx, on_triage)
 		if not Remote then return on_fail("the remote backend is unavailable") end
 		Remote.request_decisions(backend.provider, backend.model, state, questions, function(answers)
 			on_triage(Agent.parse_jev_answers(config, answers))
-		end, on_fail)
+		end, on_fail, current)
 		return
 	end
 	Remote = dependency("modules.llm.api_remote", "request_backboard")
@@ -377,7 +380,7 @@ local function jev_triage(backend, sentence, ctx, on_triage)
 		end
 		Logger.info(LOG, "System 1 (Jev through Backboard): answers read from '%s'.", tostring(where))
 		on_triage(Agent.parse_jev_answers(config, answers))
-	end, on_fail, ProviderUses.SYSTEM1)
+	end, on_fail, ProviderUses.SYSTEM1, current)
 end
 
 --- The System 1 transport: triages a sentence, with a chat prompt or, for
@@ -387,8 +390,9 @@ end
 --- @param sentence string The sentence being typed.
 --- @param ctx table { app, tools }.
 --- @param on_triage function Receives { intent, probability }, or nil when unreadable.
-function M.system1_transport(backend, sentence, ctx, on_triage)
-	if M.is_jev_backend(backend) then return jev_triage(backend, sentence, ctx, on_triage) end
+--- @param current function|nil Original typing authority until native dispatch.
+function M.system1_transport(backend, sentence, ctx, on_triage, current)
+	if M.is_jev_backend(backend) then return jev_triage(backend, sentence, ctx, on_triage, current) end
 	local config = M.config()
 	chat(backend, {
 		system = Agent.system1_prompt(config, ctx), text = sentence, max_tokens = config.system1.max_tokens,
@@ -400,7 +404,7 @@ function M.system1_transport(backend, sentence, ctx, on_triage)
 		-- System 1 triages what is being typed: a notification, never a dialog
 		if Offer.is_missing(reason, detail) then Offer.offer(detail.model, { automatic = true }) end
 		on_triage(nil)
-	end, ProviderUses.SYSTEM1)
+	end, ProviderUses.SYSTEM1, current)
 end
 
 --- The System 2 transport: asks for the actions of a text. A new System 2
@@ -409,8 +413,9 @@ end
 --- @param payload table { system, text, max_tokens }.
 --- @param on_raw function Receives the raw answer.
 --- @param on_fail function Receives a short reason.
-function M.system2_transport(backend, payload, on_raw, on_fail)
-	chat(backend, payload, on_raw, on_fail, ProviderUses.SYSTEM2)
+--- @param current function|nil Original action authority until native dispatch.
+function M.system2_transport(backend, payload, on_raw, on_fail, current)
+	chat(backend, payload, on_raw, on_fail, ProviderUses.SYSTEM2, current)
 end
 
 --- Calls back with the user's Shortcuts, read again when older than
@@ -588,6 +593,7 @@ local function run_agent(generation, source, text, focus, backend, learning)
 		--- automatic suggestion, to the typing it was made for.
 		local function still_current()
 			if not is_current(generation, "answer") then return false end
+			if is_paused() then return false end
 			if learning and not learning.is_current() then
 				Logger.info(LOG, "Agent suggestion dropped: the user typed since.")
 				return false
@@ -597,23 +603,35 @@ local function run_agent(generation, source, text, focus, backend, learning)
 				Logger.info(LOG, "Agent suggestion dropped (%s).", blocker)
 				return false
 			end
-			return true
+			return generation == _generation
+		end
+		-- A failed request deliberately closes its own surface before offering
+		-- repair. Keep transport authority separate from that later consent.
+		local function request_current()
+			return still_current() and (session == nil or engine.current_request_revision() == session)
 		end
 		local function on_raw(raw)
-			if not still_current() then return end
+			if not request_current() then return end
 			offer_actions(generation, engine, session, raw, tools, learning)
 		end
 		local function on_fail(reason, detail)
-			if not still_current() then return end
+			if not request_current() then return end
 			Logger.warn(LOG, "Agent failed: System 2 gave no answer (%s).", tostring(reason))
-			if not still_current() then return end
-			if session then engine.close_answer_surface(session) end
-			if not still_current() then return end
+			if not request_current() then return end
+			local consent_current = still_current
+			if session then
+				local closed_revision = engine.close_answer_surface(session)
+				if type(closed_revision) ~= "number" then return end
+				consent_current = function()
+					return still_current() and engine.current_request_revision() == closed_revision
+				end
+			end
+			if not consent_current() then return end
 			local Offer = require("modules.llm.local_model_offer")
 			if Offer.is_missing(reason, detail) then
 				-- Named, with its Download button, instead of the vague failure
 				Offer.offer(detail.model, { automatic = learning ~= nil,
-					current = learning == nil and still_current or nil })
+					current = learning == nil and consent_current or nil })
 				return
 			end
 			if not learning then show_notice("llm.agent.failed") end
@@ -622,7 +640,7 @@ local function run_agent(generation, source, text, focus, backend, learning)
 			system = Agent.system2_prompt(config, ctx),
 			text = Agent.system2_user_text(config, text),
 			max_tokens = config.system2.max_tokens,
-		}, on_raw, on_fail)
+		}, on_raw, on_fail, request_current)
 		Logger.info(LOG, "Agent run %d requested (%s, backend '%s', model %s, %d byte(s), %d tool(s)).",
 			generation, source, backend.backend, backend.model, #text, #tools)
 	end)
@@ -972,6 +990,9 @@ local function on_pause(typing)
 			local watched = typing
 			run_agent(generation, "typing", sentence, focus, system2, { app = app, intent = triage.intent,
 				is_current = function() return watched == _typing_generation end, blocked = auto_blocker })
+		end, function()
+			if typing ~= _typing_generation or auto_blocker() ~= nil then return false end
+			return typing == _typing_generation
 		end)
 	end)
 end

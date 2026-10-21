@@ -207,7 +207,7 @@ _LMNM_ModelCaptionCounts(Body) {
 	Join := _LMNM_ExecutableStatement(Body,
 		'm)^[ \t]*(for) Row in DefaultRows[ \t]*\n[ \t]*HeadRows\.Push\(Row\)[ \t]*$', 2)
 	Draw := _LMNM_ExecutableStatement(Body,
-		'm)^[ \t]*(MenuRenderer_AppendRows)\(m, "llm_menu", "llm_model", HeadRows\)[ \t]*$', 1)
+		'm)^[ \t]*(Rows) := HeadRows[ \t]*$', 1)
 	if !(Head && DefaultSeed && DefaultGuard && DefaultPosition && Join && Draw
 		&& Head < DefaultSeed && DefaultSeed < DefaultGuard && DefaultGuard < DefaultPosition
 		&& DefaultPosition < Join && Join < Draw && _LMNM_DefaultBranchContains(Body, DefaultGuard, DefaultPosition, Join))
@@ -240,7 +240,7 @@ _LMNM_DeclaredCaptionRouteControls() {
 	AssertEqual(0, _LMNM_ModelCaptionCounts("").Count)
 	for Needle in ['HeadRows := MenuRenderer_TemplateRows', 'DefaultRows := MenuRenderer_TemplateRows',
 		'default_name := _LLM_DefaultFor', 'if (default_name != "") {',
-		'MenuRenderer_AppendRows(m, "llm_menu", "llm_model", HeadRows)', 'HeadRows.Push(Row)'] {
+		'Rows := HeadRows', 'HeadRows.Push(Row)'] {
 		Assert(InStr(Body, Needle) > 0, "the actual-body mutation must change its real subject")
 		AssertEqual(0, _LMNM_ModelCaptionCounts(StrReplace(Body, Needle, "WithdrawnCaptionRoute")).Count,
 			"a declaration disconnected from its real consumer gets no source credit")
@@ -282,42 +282,45 @@ _LMNM_AddRoute(Tail) {
 	return Capture && Join && ReturnPosition && Capture < Join && Join < ReturnPosition
 }
 
-_LMNM_GenerationRoute(Emit) {
-	CasePosition := _LMNM_ExecutableStatement(Emit, 'm)^[ \t]*(case) "llm_generation_settings":[ \t]*$', 2)
-	Draw := _LMNM_ExecutableStatement(Emit,
-		'm)^[ \t]*(if) !MenuRenderer_AppendGroup\(TargetMenu, "llm_menu", "llm_generation_settings",[ \t]*\n[ \t]*Map\("llm_generation_settings", LLM_Menu_BuildGenerationMenu\), disabled\)', 2)
-	NextCase := _LMNM_ExecutableStatement(Emit, 'm)^[ \t]*(case) "llm_display":[ \t]*$', 2)
-	return CasePosition && Draw && NextCase && CasePosition < Draw && Draw < NextCase
+; The generation group is a declared `group` row: the renderer draws it from the
+; builder map into the detached staged menu, never a native case of its own.
+_LMNM_GenerationRoute(Groups, Build) {
+	Bound := _LMNM_ExecutableStatement(Groups,
+		'm)^[ \t]*(return) Map\([^)]*"llm_generation_settings", LLM_Menu_BuildGenerationMenu\)', 1)
+	Draw := _LMNM_ExecutableStatement(Build,
+		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
+	return Bound && Draw
 }
 
 _LMNM_NativeBindingRouteControls() {
-	Tail := _DriverFuncBody("_LLM_Menu_ModelTailRows"), Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
-	Assert(Tail != "" && Emit != "", "both genuine native binding owners must exist")
+	Tail := _DriverFuncBody("_LLM_Menu_ModelTailRows"), Groups := _DriverFuncBody("_LLM_Menu_GroupBuilders")
+	Build := _DriverFuncBody("LLM_Menu_BuildSubmenu")
+	Assert(Tail != "" && Groups != "" && Build != "", "every genuine native binding owner must exist")
 	AssertTrue(_LMNM_AddRoute(Tail))
-	AssertTrue(_LMNM_GenerationRoute(Emit))
+	AssertTrue(_LMNM_GenerationRoute(Groups, Build))
 	AssertFalse(_LMNM_AddRoute(""))
-	AssertFalse(_LMNM_GenerationRoute(""))
+	AssertFalse(_LMNM_GenerationRoute("", Build))
+	AssertFalse(_LMNM_GenerationRoute(Groups, ""))
 	for Needle in ['AddRows := MenuRenderer_TemplateRows', '"llm_add_model_entry", (*) => LLM_Menu_PromptAddModel()',
 		'TailRows.Push(Row)', 'return TailRows'] {
 		Assert(InStr(Tail, Needle) > 0, "the Add mutation must alter its real native owner")
 		AssertFalse(_LMNM_AddRoute(StrReplace(Tail, Needle, "WithdrawnAddRoute")))
 	}
-	for Needle in ['if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_generation_settings",',
-		'Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu)', 'case "llm_generation_settings":'] {
-		Assert(InStr(Emit, Needle) > 0, "the generation mutation must alter its real native owner")
-		AssertFalse(_LMNM_GenerationRoute(StrReplace(Emit, Needle, "WithdrawnGenerationRoute")))
+	for Needle in ['"llm_generation_settings", LLM_Menu_BuildGenerationMenu', 'return Map('] {
+		Assert(InStr(Groups, Needle) > 0, "the generation mutation must alter its real native owner")
+		AssertFalse(_LMNM_GenerationRoute(StrReplace(Groups, Needle, "WithdrawnGenerationRoute"), Build))
 	}
+	Assert(InStr(Build, '_LLM_Menu_GroupBuilders(),') > 0, "the builder mutation must alter the real renderer call")
+	AssertFalse(_LMNM_GenerationRoute(Groups, StrReplace(Build, '_LLM_Menu_GroupBuilders(),', '"",')))
 	for Prefix in ["; ", '"'] {
 		AssertFalse(_LMNM_AddRoute(StrReplace(Tail, 'AddRows := MenuRenderer_TemplateRows', Prefix . 'AddRows := MenuRenderer_TemplateRows')))
-		AssertFalse(_LMNM_GenerationRoute(StrReplace(Emit, 'if !MenuRenderer_AppendGroup', Prefix . 'if !MenuRenderer_AppendGroup')))
+		AssertFalse(_LMNM_GenerationRoute(Groups, StrReplace(Build, 'MenuRenderer_Build("llm_menu"', Prefix . 'MenuRenderer_Build("llm_menu"')))
 	}
 	; A detached generation group must keep its captured target, not the published global.
-	WrongTarget := StrReplace(Emit,
-		'if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_generation_settings",',
-		'if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",')
-	Assert(WrongTarget != Emit, "the target mutation must alter the genuine generation renderer")
-	AssertFalse(_LMNM_GenerationRoute(WrongTarget), "the generation renderer refuses the published global target")
+	WrongTarget := StrReplace(Build, 'StagedHandle, GroupDisabled)', '_LLM_Menu_Handle, GroupDisabled)')
+	Assert(WrongTarget != Build, "the target mutation must alter the genuine generation renderer")
+	AssertFalse(_LMNM_GenerationRoute(Groups, WrongTarget), "the generation renderer refuses the published global target")
 	AssertTrue(_LMNM_AddRoute(Tail), "exact native Add repair restores source credit")
-	AssertTrue(_LMNM_GenerationRoute(Emit), "exact native generation-group repair restores source credit")
+	AssertTrue(_LMNM_GenerationRoute(Groups, Build), "exact native generation-group repair restores source credit")
 }
 Test("menu_llm: named Add/generation bindings are executable consumed routes, not source data", _LMNM_NativeBindingRouteControls)

@@ -415,8 +415,8 @@ helpers.describe("Linux prediction enable publication", function()
 							local _, same_source = get_many({ "llm.models.ollama" })
 							preferences.set("llm.models.ollama", preferences.get("llm.models.ollama"))
 							preferences.get_many = function(paths)
-								local values = get_many(paths)
-								return values, same_source
+								local values, _, revision = get_many(paths)
+								return values, same_source, revision
 							end
 						else preferences.set("llm.models.ollama", "foreign:model") end
 					end

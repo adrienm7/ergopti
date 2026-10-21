@@ -4,9 +4,8 @@
 ; MODULE: Diagnostics Page Actions And Suggest A Feature (Windows)
 ; DESCRIPTION:
 ; Drives HealthCheck_PerformAction, what the diagnostics page's buttons do once
-; HealthCheck_ValidateAction accepted them, over recorded side effects (Debug >
-; Report a bug opens the page at its preview; its report button sends the
-; "report" action):
+; HealthCheck_ValidateAction accepted them, over recorded side effects (the
+; page's report button and Debug > Report a bug both send the "report" action):
 ; 1. copy writes the redacted report, and a refused clipboard is a failure
 ;    that keeps the window (nothing closes here);
 ; 2. save writes the redacted report under the snapshot's diagnostics folder
@@ -18,10 +17,13 @@
 ; 4. open_path opens the path the host collected, creating a missing folder,
 ;    and refuses a file that does not exist;
 ; 5. an unknown profile folder refuses everything: nothing could be redacted;
-; 6. Suggest a feature opens the feature form with the version and the system.
+; 6. Suggest a feature opens the feature form with the version and the system;
+; 7. Report a bug runs the report action on a fresh snapshot without a window.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+
+#Include test_healthcheck_report_durable.ahk
 
 
 
@@ -268,6 +270,41 @@ _THPA_SuggestFeature() {
 Test("Suggest a feature: opens the feature form with the version and the system (report-bug-flow)",
 	_THPA_SuggestFeature)
 
+; Debug > Report a bug only opened the diagnostics window, so the menu never
+; reached GitHub; it now runs the page's report action on a fresh snapshot
+; (menu-report-bug).
+_THPA_MenuReportBug() {
+	global _SharedDir
+	Calls := []
+	AssertTrue(HealthCheck_ReportBug(_THPA_Effects(Calls)))
+	AssertEqual(4, Calls.Length, _THPA_Join(Calls))
+	for Index, Kind in ["copy:", "save:", "reveal:", "open_url:"]
+		AssertEqual(1, InStr(Calls[Index], Kind), "The menu follows the page's report order: " . _THPA_Join(Calls))
+	Copied := SubStr(Calls[1], StrLen("copy:") + 1)
+	AssertTrue(InStr(Copied, "# ErgoptiPlus diagnostics") = 1, "The clipboard holds the approved report")
+	AssertTrue(InStr(Calls[2], ":" . Copied) > 0, "The attachment holds the same approved report")
+	GitHub := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"]
+	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
+		. "/issues/new?template=bug_report.yml&"
+	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "Not a bare URL: the bug template is selected")
+	AssertEqual("windows", _THPA_QueryValue(Calls[4], "driver"))
+	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
+	AssertTrue(_THPA_QueryValue(Calls[4], "version") != "", "The version is prefilled: " . Calls[4])
+	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"), "The editable report field stays out of the URL")
+}
+Test("Report a bug (menu): copies, saves and opens the prefilled bug form (menu-report-bug)",
+	_THPA_MenuReportBug)
+
+_THPA_MenuReportBugFailureNotifies() {
+	Calls := []
+	AssertFalse(HealthCheck_ReportBug(_THPA_Effects(Calls, Map("clipboard", false))))
+	for Call in Calls
+		AssertTrue(InStr(Call, "open_url:") = 0, "The browser must not open without the report: " . _THPA_Join(Calls))
+	AssertEqual("notify:error", Calls[Calls.Length], "A refused report is said to the user")
+}
+Test("Report a bug (menu): a refused clipboard notifies instead of opening the form (menu-report-bug)",
+	_THPA_MenuReportBugFailureNotifies)
+
 
 /** Replays the same synthetic sharing corpus as the JavaScript and Lua ports. */
 _THPA_SharingVectors() {
@@ -348,7 +385,7 @@ _THPA_TemplateOnlyReport() {
 Test("Diagnostics stable host metadata URL preserves complete local output", _THPA_TemplateOnlyReport)
 
 _THPA_PageObservations() {
-	global _HC_Session, _HC_ResetDone
+	global _HC_Session, _HC_ResetDone, _HC_WindowEpoch, _HC_WebView
 	Config := HealthCheck_Config(), Rows := Map()
 	for Spec in Config["schema"]["diagnostic_checks"]["items"]
 		Rows[Spec["id"]] := Spec.Has("reason") ? Map("state", "not_run", "scope", Spec["scope"], "reason", Spec["reason"])
@@ -366,21 +403,24 @@ _THPA_PageObservations() {
 	AssertContains(Doc["text"], "page_check_observations.results.redaction.ms")
 	AssertEqual("not_run", Doc["snapshot"]["page_check_observations"]["results"]["driver_suites"]["state"])
 	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
+	SavedEpoch := _HC_WindowEpoch, HadView := IsSet(_HC_WebView), SavedView := HadView ? _HC_WebView : 0
 	try {
-		_HC_ResetDone := true ; The actual sender refuses before any WebView operation.
+		_HC_ResetDone := false, _HC_WindowEpoch := 71
+		_HC_WebView := unset ; The actual sender refuses before any WebView operation.
 		Current := _THPA_Snapshot(false), Current["export_revision"] := 1
 		_HC_Session := Map("snapshot", Current)
 		Action["action"] := "export_snapshot", Action["export_sequence"] := 1
 		Action["snapshot_revision"] := 2
-		_HC_PerformPageAction(0, Action, Config)
+		_HC_PerformPageAction(71, Action, Config)
 		AssertFalse(Current.Has("page_check_observations"), "The real host rejects a stale generation")
 		Action["snapshot_revision"] := 1
-		_HC_PerformPageAction(0, Action, Config)
+		_HC_PerformPageAction(71, Action, Config)
 		AssertTrue(Current.Has("page_check_observations"), "The real host retains current observations before formatting")
 		AssertEqual(3, Current["page_check_observations"]["results"]["redaction"]["ms"])
 	} finally {
 		_HC_Session := SavedSession
 		_HC_ResetDone := SavedReset
+		_HC_WindowEpoch := SavedEpoch, _HC_WebView := HadView ? SavedView : unset
 	}
 	Rows["redaction"]["text"] := "PRIVATE_TEXT"
 	AssertFalse(HealthCheck_PageChecks(Rows, Config["schema"]))

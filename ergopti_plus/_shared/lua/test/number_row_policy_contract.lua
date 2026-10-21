@@ -79,6 +79,54 @@ function M.run(helpers, corpus_path)
 				"pause then resume retains epoch")
 
 		end)
+		helpers.it("offers an ordering only where it reorders all ten keys (number-row-availability)", function()
+			local function descriptor(spelling)
+				if spelling == "" then return nil end
+				if spelling:sub(1, 5) == "dead:" then
+					return { Kind = "dead", Text = spelling:sub(6), State = "corpus", Action = "corpus" }
+				end
+				return { Kind = "text", Text = spelling, State = "", Action = "" }
+			end
+			local function levels(case)
+				local out = {}
+				for index = 1, 10 do
+					out[index] = { plain = descriptor(case.plain[index]), shift = descriptor(case.shift[index]) }
+				end
+				return out
+			end
+			helpers.assert_eq(#corpus.availability, 10, "every row shape of the rule is represented")
+			local by_id = {}
+			for _, case in ipairs(corpus.availability) do
+				by_id[case.id] = case
+				local actual = Policy.availability(levels(case))
+				helpers.assert_eq(actual.digits, case.digits, case.id .. ": digits first")
+				helpers.assert_eq(actual.symbols, case.symbols, case.id .. ": symbols first")
+			end
+			for _, case in ipairs(corpus.effective) do
+				local actual = Policy.effective(case.mode, Policy.availability(levels(by_id[case.availability])))
+				helpers.assert_eq(actual.mode, case.effective, case.mode .. " on " .. case.availability)
+				helpers.assert_eq(actual.reason, case.reason, case.mode .. " on " .. case.availability .. ": reason")
+			end
+			helpers.assert_eq(pcall(Policy.availability, {}), false, "the rule needs all ten keys")
+		end)
+		helpers.it("lets the edge keys join an ordering only where swapping them changes them (number-row-edge-keys)", function()
+			local function descriptor(spelling)
+				if spelling == "" then return nil end
+				if spelling:sub(1, 5) == "dead:" then
+					return { Kind = "dead", Text = spelling:sub(6), State = "corpus", Action = "corpus" }
+				end
+				return { Kind = "text", Text = spelling, State = "", Action = "" }
+			end
+			helpers.assert_eq(#corpus.edges, 6, "every edge-key case of the rule is represented")
+			for _, case in ipairs(corpus.edges) do
+				local edges = {}
+				for index = 1, 3 do
+					edges[index] = { plain = descriptor(case.plain[index]), shift = descriptor(case.shift[index]) }
+				end
+				helpers.assert_eq(Policy.edges_availability(edges, case.ordering), case.expected, case.id)
+			end
+			helpers.assert_eq(pcall(Policy.edges_availability, {}, "digits"), false, "the rule needs the three edge keys")
+		end)
 		helpers.it("uses the real renderer for native-only posture and translated disabled choices", function()
 			local Renderer = require("menu.renderer")
 			local shared = corpus_path:gsub("tests/corpus/layouts/number_row_policy%.json$", "")
@@ -100,7 +148,7 @@ function M.run(helpers, corpus_path)
 				local commands = { ["number_row_mode"] = function()
 					attempts = attempts + 1
 					return false
-				end }
+				end, ["number_row_edges"] = function() return false end }
 				local choice_row = renderer.choice_row
 				local borrowed
 				renderer.choice_row = function(key, id, actual_commands, getters)
@@ -113,7 +161,14 @@ function M.run(helpers, corpus_path)
 				helpers.assert_eq(attempts, 1)
 				helpers.assert_eq(#Policy.native_rows(renderer), 0, "missing driver command refuses")
 				helpers.assert_eq(#Policy.native_rows(renderer, { number_row_mode = true }), 0, "noncallable command refuses")
-				helpers.assert_eq(#rows, 1, "one canonical head")
+				helpers.assert_eq(#Policy.native_rows(renderer, { number_row_mode = commands.number_row_mode }), 0,
+					"the edge-key row needs its driver command too")
+				helpers.assert_eq(#rows, 2, "the canonical head and the edge-key checkbox")
+				helpers.assert_eq(rows[2].label, translations["menu.layout.number_row_edges"], "the shared edge-key caption")
+				helpers.assert_eq(rows[2].disabled, true, "the edge keys follow an ordering this driver never applies")
+				helpers.assert_eq(rows[2].checked, false)
+				helpers.assert_eq(rows[2].action, nil, "no writer is acquired")
+				helpers.assert_eq(rows[2].disabled_reason_key, "platform_reason.number_row_override_unsupported")
 				helpers.assert_eq(rows[1].label, "Number row")
 				local expected = { "Native order", "Digits first", "Symbols first" }
 				for index, item in ipairs(rows[1].items) do

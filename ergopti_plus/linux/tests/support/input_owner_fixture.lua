@@ -18,8 +18,17 @@ function M.with_session(options, body)
 	local previous_preload = package.preload.ffi
 	local Input = require("infra.input_event")
 	local queues, paths, descriptors, serial, released_fds = {}, {}, {}, 100, {}
-	for _, id in ipairs({ "a", "b" }) do
-		local path = os.tmpname(); local file = assert(io.open(path, "w"))
+	-- Explicit controlled path names can share a prefix and contain a colon;
+	-- native descriptor/open lifetime issuance remains the original Reader's.
+	local suffixes, source_prefix = options.source_suffixes
+	if suffixes then
+		assert(type(suffixes) == "table" and type(suffixes.a) == "string" and type(suffixes.b) == "string"
+			and suffixes.a ~= suffixes.b and not suffixes.a:find("/", 1, true) and not suffixes.b:find("/", 1, true))
+		source_prefix = os.tmpname(); assert(os.remove(source_prefix))
+	end
+	for _, id in ipairs(options.source_ids or { "a", "b" }) do
+		local path = source_prefix and source_prefix .. suffixes[id] or os.tmpname()
+		local file = assert(io.open(path, "w"))
 		file:write("controlled input-owner source\n"); file:close()
 		paths[id], queues[path] = path, {}
 	end
@@ -44,10 +53,15 @@ function M.with_session(options, body)
 			descriptors[fd] = path; return fd
 		end,
 		close = function(fd)
+			s.source_closes = (s.source_closes or 0) + 1
 			descriptors[fd] = nil; released_fds[#released_fds + 1] = fd
 			return options.fail_reader_close and -1 or 0
 		end,
 		ioctl = function(fd, request, argument)
+			if request == 0x80044520 then
+				argument.bytes = options.event_bits or require("tests.support.evdev_capabilities_fixture").key_bits(fd, request, argument.count)
+				return options.event_result ~= nil and options.event_result or argument.count
+			end
 			if type(argument) == "table" then
 				argument.bytes = string.rep("\0", argument.count or 1)
 				if options.position_bits and request % 256 == 0x18 then
@@ -72,6 +86,7 @@ function M.with_session(options, body)
 			return 0
 		end,
 		read = function(fd, buffer)
+			if options.eof_path == descriptors[fd] then return 0 end
 			local queue = queues[descriptors[fd]]; local bytes = queue and table.remove(queue, 1)
 			if not bytes then return -1 end
 			if options.position_bits then
@@ -122,6 +137,9 @@ function M.with_session(options, body)
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return { paths.a, paths.b }, {} end,
 		is_key_device = function() return true end,
+		-- Controlled keyboard sources have no REL/ABS axes.
+		is_interceptable_key_device = function() return true end,
+		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 		physical_sources = function(devices)
 			local result = {}; for _, path in ipairs(devices) do result[#result + 1] = {
 				path = path, sysfs = "/controlled/source", name = "controlled", physical = s.virtual ~= true } end
@@ -145,6 +163,7 @@ function M.with_session(options, body)
 		s.bootstrap = options.late_reader and "late-reader" or "cold-hook-before-backend"
 		if options.custom_reader then
 			s.reader._set_backend({ open = symbols.open, close = function(fd) symbols.close(fd); return true end,
+				read_event_bits = require("tests.support.evdev_capabilities_fixture").key_bits,
 				ioctl = function() return true end, read_bits = function(_, _, count) return string.rep("\0", count) end,
 				read = function(fd) local queue = queues[descriptors[fd]]; return queue and table.remove(queue, 1) end,
 				poll = function(fd) return #(queues[descriptors[fd]] or {}) > 0 end })
@@ -184,7 +203,7 @@ function M.with_session(options, body)
 		end
 		if options.before_hook then options.before_hook(s) end
 		if not s.hook then s.hook = h.load_module("adapters.keyboard_hook") end
-		s.base = Engine.new({ keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
+		s.base = Engine.new({ keys = options.keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
 			tap_min_ms = 0, one_shot_timeout_ms = 1000,
 			key_text = function(code) return s.hook.key_text(code) end,
 			plan_text = function(text)
@@ -291,7 +310,7 @@ function M.with_manager_session(options, body)
 					s.actions[#s.actions + 1] = { action, binding }
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
 					return true
-				end, action_names = function() return { "copy" } end, on_text_injected = function() end,
+				end, action_names = function() return options.action_names or { "copy" } end, on_text_injected = function() end,
 				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }) == true)
 			s.manager, s.engine, s.owner = manager, manager.configuration_snapshot().engine, manager.configuration_snapshot().combinations
 			s.arm_deadline = function() return s.engine.one_shot_until end

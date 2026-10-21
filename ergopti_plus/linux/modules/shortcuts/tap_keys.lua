@@ -59,7 +59,7 @@ local _binding_catalogue = nil
 -- tap key id -> action id, read once from config.toml over the manifest defaults.
 local _assignments = nil
 
--- Injected by init(): whether the shortcuts feature may act now (on, not paused).
+-- Injected by init(): whether this action may act now (feature on, not paused).
 local function NEVER_ACTIVE() return false end
 local _is_active = NEVER_ACTIVE
 
@@ -287,7 +287,7 @@ end
 -- ===========================================
 
 --- Wires the daemon's state in.
---- @param opts table { is_active = fn() -> boolean, defer = fn(fn) -> boolean }
+--- @param opts table { is_active = fn(action|nil) -> boolean, defer = fn(fn) -> boolean }
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	if type(opts) ~= "table" or type(opts.is_active) ~= "function" or type(opts.defer) ~= "function" then
@@ -314,14 +314,14 @@ function M.on_key(detail)
 		if mods[name] then return false end
 	end
 	local action = M.get_action(id)
-	if action == "none" or not _is_active() then return false end
+	if action == "none" or not _is_active(action) then return false end
 	if not _defer then
 		Logger.error(LOG, "Tap key '%s' pressed before init() — the key is typed instead.", id)
 		return false
 	end
 	local generation = _dispatch_generation
 	local queued = _defer(function()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation or not _is_active() then return end
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation or not _is_active(action) then return end
 		local Gestures = action_catalogue()
 		if not Gestures then return end
 		Logger.debug(LOG, "Tap key '%s' fired → '%s'.", id, action)
@@ -473,16 +473,25 @@ function M.capture_collision_inventory()
 		return true
 	end
 	local enabled = active() == true
+	local admitted = {}
+	for id, action in pairs(actual) do admitted[id] = active(action) == true end
+	local function admission_current()
+		if (active() == true) ~= enabled then return false end
+		for id, action in pairs(actual) do
+			if (active(action) == true) ~= admitted[id] then return false end
+		end
+		return true
+	end
 	local function current()
-		if not runtime() or route("config.toml") ~= path or (active() == true) ~= enabled then return false end
+		if not runtime() or route("config.toml") ~= path or not admission_current() then return false end
 		local content, classification = read(path)
 		return content == bytes and classification == status and route("config.toml") == path
-			and (active() == true) == enabled and runtime()
+			and admission_current() and runtime()
 	end
 	if not current() then return nil end
 	local claims = {}
 	for _, key in ipairs(keys) do
-		if enabled and actual[key.id] ~= "none" then
+		if enabled and admitted[key.id] and actual[key.id] ~= "none" then
 			claims[#claims + 1] = { kind = "chord", binding = M.binding_id(key.id), code = key.linux, mods = {} }
 		end
 	end

@@ -627,3 +627,26 @@ TestFMv2_ApplyInlineCommentsBeforeCoercion() {
 }
 Test("ApplyConfigToml: inline comments precede coercion (AHK-133)",
 	TestFMv2_ApplyInlineCommentsBeforeCoercion)
+
+TestFMv2_LiteralStringsKeepManifestTypes() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("literal_string_types",
+			"[script]`nlocale = 'en'`nlog_level = 'ERROR' # explicit threshold`n"
+			. "[shortcuts.keyboard]`nctrl_b = 'microsoft_bold'`n")
+		AssertEqual(3, ApplyConfigToml(Features, Path, &Rejected, , &Outdated),
+			"literal strings must apply to string, enum and action manifest leaves")
+		AssertEqual("en", Features["script"]["locale"])
+		AssertEqual("ERROR", Features["script"]["log_level"])
+		AssertEqual("microsoft_bold", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		AssertEqual(0, Rejected)
+		AssertEqual(0, Outdated.Count,
+			"valid literal strings must never be proposed for configuration cleanup")
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: literal strings retain manifest types (toml-literal-string-kind)",
+	TestFMv2_LiteralStringsKeepManifestTypes)

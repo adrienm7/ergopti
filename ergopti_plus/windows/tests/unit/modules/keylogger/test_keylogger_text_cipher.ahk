@@ -212,3 +212,63 @@ _KLEnc_WriterPlaintextWhenOff() {
 	AssertContains(rows[1], "visible", "with encryption off the text is stored in clear, as before")
 }
 Test("KL_BuildInserts: stores plaintext when encryption is off (unchanged default)", _KLEnc_WriterPlaintextWhenOff)
+
+
+; Invalid stored IVs must use the same explicit refusal as a wrong-length IV.
+; A cached key reaches hex conversion directly, without a missing-key shortcut.
+_KLEnc_MalformedIv(IvHex) {
+	global KL_ENC_KeyBuffer, KL_ENC_DerivationFailed
+	SavedKey := KL_ENC_KeyBuffer
+	SavedFailed := KL_ENC_DerivationFailed
+	try {
+		KL_ENC_KeyBuffer := Buffer(KL_ENC_KEY_BYTES, 0)
+		KL_ENC_DerivationFailed := false
+		Envelope := KL_ENC_MARKER . KL_ENC_SEPARATOR . IvHex . KL_ENC_SEPARATOR
+			. "AAAAAAAAAAAAAAAAAAAAAA=="
+		AssertEqual("", KL_Enc_Decrypt(Envelope),
+			"malformed IVs must be refused before hex conversion can throw")
+	} finally {
+		KL_ENC_KeyBuffer := SavedKey
+		KL_ENC_DerivationFailed := SavedFailed
+	}
+}
+Test("cipher-malformed-iv: refuses nonhex letters", _KLEnc_MalformedIv.Bind("gggggggggggggggggggggggggggggggg"))
+Test("cipher-malformed-iv: refuses a nonhex final byte", _KLEnc_MalformedIv.Bind("0000000000000000000000000000000g"))
+Test("cipher-malformed-iv: refuses embedded punctuation", _KLEnc_MalformedIv.Bind("000000000000000000000000000000-1"))
+Test("cipher-malformed-iv: keeps wrong-length refusal", _KLEnc_MalformedIv.Bind("000000000000000000000000000000"))
+
+
+; Embedded NUL is data in an AHK string, not an empty-value or decode terminator.
+_KLEnc_NulRoundTrip(Text, ExpectedHex) {
+	global KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed
+	Saved := [KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed]
+	try {
+		ExpectedBytes := _KL_Enc_HexToBuffer(ExpectedHex)
+		Encoded := _KL_Enc_Utf8Buffer(Text)
+		AssertEqual(ExpectedBytes.Size, Encoded.UsedSize, "UTF-8 sizing must include every byte after NUL")
+		loop ExpectedBytes.Size
+			AssertEqual(NumGet(ExpectedBytes, A_Index - 1, "UChar"), NumGet(Encoded, A_Index - 1, "UChar"),
+				"UTF-8 conversion must preserve byte " . A_Index)
+		; A deterministic cached key isolates the AES/string boundary from PBKDF2.
+		KL_ENC_KeyBuffer := Buffer(KL_ENC_KEY_BYTES, 0)
+		KL_ENC_DerivationFailed := false
+		KL_ENC_Enabled := true
+		Stored := KL_Enc_Encrypt("nul-fixture", 1, Text)
+		AssertTrue(KL_Enc_IsEncrypted(Stored), "a leading NUL must never bypass requested encryption")
+		Actual := KL_Enc_Decrypt(Stored)
+		AssertEqual(StrLen(Text), StrLen(Actual), "decryption must retain the complete string length")
+		loop StrLen(Text)
+			AssertEqual(NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort"),
+				NumGet(StrPtr(Actual), (A_Index - 1) * 2, "UShort"),
+				"decryption must preserve UTF-16 unit " . A_Index)
+	} finally {
+		KL_ENC_Enabled := Saved[1]
+		KL_ENC_KeyBuffer := Saved[2]
+		KL_ENC_DerivationFailed := Saved[3]
+	}
+}
+Test("cipher-nul-roundtrip: encrypts a NUL-only string", _KLEnc_NulRoundTrip.Bind(Chr(0), "00"))
+Test("cipher-nul-roundtrip: encrypts after a leading NUL", _KLEnc_NulRoundTrip.Bind(Chr(0) . "hidden", "0068696464656e"))
+Test("cipher-nul-roundtrip: preserves the suffix after NUL", _KLEnc_NulRoundTrip.Bind("before" . Chr(0) . "after", "6265666f7265006166746572"))
+Test("cipher-nul-roundtrip: preserves a trailing NUL", _KLEnc_NulRoundTrip.Bind("suffix" . Chr(0), "73756666697800"))
+Test("cipher-nul-roundtrip: retains multibyte Unicode around NUL", _KLEnc_NulRoundTrip.Bind("é" . Chr(0) . "界" . Chr(0x1F642), "c3a900e7958cf09f9982"))

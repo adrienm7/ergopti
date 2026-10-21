@@ -82,7 +82,29 @@ _CFSL_RateLimitIsDistinguished() {
 }
 
 
+; Without a token the API answers 403 within the hour, and the feed then serves
+; the list: that fallback is expected and was a WARN line on every opening
+; (issue #95). Only exhausted sources warn, as in the shared Lua owner.
+_CFSL_FeedFallbackIsInfo() {
+	Body := _DriverFuncBody("_CLW_SourceFailed")
+	Assert(Body != "", "_CLW_SourceFailed() must exist")
+	StagePos := InStr(Body, 'if (Context.Stage == "api")')
+	Assert(StagePos > 0, "the API stage branch must still exist")
+	FeedPos := InStr(Body, "_CLW_FeedStarter.Call(Feed)", , StagePos)
+	Assert(FeedPos > StagePos, "the API stage must still start the Atom feed")
+	Branch := SubStr(Body, StagePos, FeedPos - StagePos)
+	Assert(InStr(Branch, 'LoggerInfo("Changelog", "GitHub API release list failed') > 0,
+		"the fallback to the Atom feed must be logged at INFO")
+	Assert(InStr(Branch, "LoggerWarn(") == 0,
+		"a fallback the feed can still serve must not warn")
+	Assert(InStr(SubStr(Body, FeedPos), 'LoggerWarn("Changelog", "Release sources exhausted') > 0,
+		"exhausted sources must stay a warning")
+}
+
+
 Test("meta changelog: a non-200 response is logged with its status, not swallowed",
 	_CFSL_EmptyResponseIsLogged)
 Test("meta changelog: a rate-limit is reported as such, not as a network outage",
 	_CFSL_RateLimitIsDistinguished)
+Test("meta changelog: the Atom feed fallback is INFO, exhausted sources warn",
+	_CFSL_FeedFallbackIsInfo)

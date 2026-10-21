@@ -1956,13 +1956,24 @@ local function create_menu(deps)
 										commands      = {
 											llm_toggle = toggle_action,
 											["scope_restore"] = function()
-												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
+												-- A retained row rechecks what greyed it when it was built.
+												if paused or not configuration_writable() then
+													Logger.warn(LOG, "AI settings restore refused: %s.", paused and "the script is paused"
+														or "the configuration is protected from writes")
+													return false
+												end
+												if type(deps.apply_preference_scope) ~= "function" then return false end
 												return deps.apply_preference_scope("llm", "recommended") == true
 											end,
 										},
 										state_getters = {
 												llm_enabled      = function() return state.llm_enabled == true end,
 												llm_toggle_ready = function() return toggle_ready == true and configuration_writable() end,
+												llm_scope_ready  = function() return not paused and configuration_writable() end,
+												config_newer_schema = function()
+													local path = require("ui.menu.menu_paths").get("ConfigTomlPath")
+													return require("config_migrate").read_only_status(path) == "newer"
+												end,
 										},
 								}
 								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}

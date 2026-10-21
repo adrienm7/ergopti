@@ -10,6 +10,13 @@
 ; their menu call sites are unaffected.
 ; ==============================================================================
 
+; Each native picker is constructed anew; default Close would only hide its
+; controls and their captured callbacks instead of retiring the owned window.
+_ActionPickerNativeClose(Window, *) {
+	Window.Destroy()
+	return true
+}
+
 ShowKeyboardSlotPicker(Prefix) {
 		global GESTURE_ACTIONS
 		Slots := []
@@ -36,6 +43,8 @@ ShowKeyboardSlotPicker(Prefix) {
 		for SlotId in Slots
 				SlotLabels.Push(_GestureActionLabel(SlotId))
 		W := Gui_Create("", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
+		W.OnEvent("Close", _ActionPickerNativeClose)
+		W.OnEvent("Escape", _ActionPickerNativeClose)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
@@ -109,6 +118,8 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 				}
 		}
 		W := Gui_Create("", Title)
+		W.OnEvent("Close", _ActionPickerNativeClose)
+		W.OnEvent("Escape", _ActionPickerNativeClose)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
@@ -169,12 +180,13 @@ FilePathsEditor(*) {
 		if _PathsEdWeb_TryOpen()
 				return
 		W := Gui_Create(, t("dialog.config_folder.window_title"))
+		_PathsEdNative_BindCancellation(W)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
 		W.Add("Text", "xm w400", t("dialog.config_folder.label"))
 		DirEdit := W.Add("Edit", "xm w400", StrReplace(_ConfigDir, "\", "/"))
-		W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", (*) => ( (S := Ui_DirSelect("*" . StrReplace(Trim(DirEdit.Value), "/", "\"), 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)) != "" ? DirEdit.Value := StrReplace(S, "\", "/") : 0 ))
+		W.Add("Button", "xm y+6 w80", t("common.browse")).OnEvent("Click", (*) => _PathsEdNative_Browse(W, DirEdit))
 		ConfirmPath(*) {
 				N := StrReplace(Trim(DirEdit.Value), "/", "\")
 				if (N == "")

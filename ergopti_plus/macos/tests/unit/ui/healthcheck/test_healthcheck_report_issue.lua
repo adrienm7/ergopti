@@ -10,7 +10,7 @@
 --- focus), open a folder it collected or a settings page the schema declares.
 --- Whatever the page sent, the home folder and the account name reach neither
 --- the clipboard, the file nor the URL (report-bug-flow). Debug > Report a bug
---- opens the window at its preview.
+--- runs that report action on a fresh snapshot, without the window.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -534,15 +534,62 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 end)
 
 helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
-	helpers.it("Report a bug opens the diagnostics window at its preview", function()
-		local Report = load_report()
-		local opened = nil
-		package.loaded["ui.healthcheck.core"] = { show_window = function(opts) opened = opts; return true end }
-		local state = { keymap = true }
-		helpers.assert_eq(Report.report_bug({ state = state }), true)
-		helpers.assert_eq(opened.mode, "report")
-		helpers.assert_true(opened.state == state, "the menu state reaches the features section")
+	--- Runs Debug > Report a bug over a stubbed core and recorded effects.
+	--- @param adjust function|nil Edits the recorded overrides.
+	--- @return boolean|nil outcome, table calls, table probe
+	local function menu_report_bug(adjust)
+		local Report, calls, overrides = load_report()
+		if adjust then adjust(overrides) end
+		local probe = { window_opened = false }
+		package.loaded["ui.healthcheck.core"] = {
+			DRIVER = "macos",
+			config = documents,
+			show_window = function() probe.window_opened = true; return true end,
+			run = function(opts)
+				probe.run_opts = opts
+				local snapshot = host_snapshot(false)
+				snapshot.sections.paths = paths()
+				return snapshot
+			end,
+		}
+		local completed
+		local ok, err = pcall(Report.report_bug, { state = probe }, async_effects(overrides),
+			function(value) completed = value end)
 		package.loaded["ui.healthcheck.core"] = nil
+		helpers.assert_true(ok, tostring(err))
+		return completed, calls, probe
+	end
+
+	-- The menu row only opened the diagnostics window and never reached GitHub
+	-- (menu-report-bug).
+	helpers.it("Report a bug copies, saves and opens the prefilled bug form (menu-report-bug)", function()
+		local completed, calls, probe = menu_report_bug()
+		helpers.assert_eq(completed, true)
+		helpers.assert_eq(probe.window_opened, false, "the menu reports without the diagnostics window")
+		helpers.assert_true(probe.run_opts.state == probe, "the menu state reaches the features section")
+		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" })
+		helpers.assert_eq(calls.copy[1], approved_text(false), "the clipboard holds the approved report")
+		helpers.assert_eq(calls.save[1].text, approved_text(false), "the attachment holds the same report")
+		local repo = documents().repository
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo
+			.. "/issues/new?template=bug_report.yml&"
+		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix, "not a bare URL: the bug template is selected")
+		helpers.assert_eq(query_value(calls.open_url[1], "version"), "2.4.0")
+		helpers.assert_eq(query_value(calls.open_url[1], "os"), "macos")
+		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "macos")
+		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), nil, "the editable field stays out of the URL")
+		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
+	end)
+
+	helpers.it("Report a bug notifies instead of opening the form when the clipboard refuses (menu-report-bug)", function()
+		local notified = {}
+		local completed, calls = menu_report_bug(function(overrides)
+			overrides.copy = function() return false end
+			overrides.notify = function(_, _, kind) notified[#notified + 1] = kind; return true end
+		end)
+		helpers.assert_eq(completed, false)
+		helpers.assert_eq(#calls.open_url, 0, "the browser must not open without the report")
+		helpers.assert_eq(notified, { "error" })
 	end)
 
 	helpers.it("Suggest a feature opens the feature form with the version and the system", function()

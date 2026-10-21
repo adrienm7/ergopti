@@ -100,8 +100,14 @@ _CWRS_DisableCapsWordUnregistersMouseListeners() {
 	Body := _DriverFuncBody("DisableCapsWord")
 	Assert(Body != "", "DisableCapsWord must be defined — prerequisite for this test")
 
-	Assert(InStr(Body, "HookDispatcher.Unregister") > 0,
-		"DisableCapsWord must call HookDispatcher.Unregister to remove the mouse-click listeners — listeners that are not unregistered keep firing through Suspend and prevent other HookDispatcher subscribers from receiving the events cleanly (AHK-16)")
+	Assert(InStr(Body, "CapsWordAutoOffDisarm()") > 0,
+		"DisableCapsWord must disarm the CapsWord auto-off listeners — listeners that are not unregistered keep firing through Suspend and prevent other HookDispatcher subscribers from receiving the events cleanly (AHK-16)")
+	Disarm := _DriverFuncBody("CapsWordAutoOffDisarm")
+	Assert(Disarm != "", "CapsWordAutoOffDisarm must be defined")
+	Assert(InStr(Disarm, "HookDispatcher.Unregister") > 0,
+		"CapsWordAutoOffDisarm must call HookDispatcher.Unregister for every armed listener (AHK-16)")
+	Assert(InStr(Disarm, '["idle"], 0)') > 0 && InStr(Disarm, '["motion"], 0)') > 0,
+		"CapsWordAutoOffDisarm must stop the delay and pointer-motion timers, which also bypass native Suspend")
 }
 
 Test("capsword: DisableCapsWord unregisters mouse-down listeners via HookDispatcher (capsword-reset-on-suspend)",

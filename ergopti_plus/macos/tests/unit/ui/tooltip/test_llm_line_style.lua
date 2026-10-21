@@ -116,3 +116,94 @@ helpers.describe("tooltip_llm: the colours of a line (llm-line-style)", function
 		end)
 	end)
 end)
+
+local shortcut_corpus_path = helpers.shared("tests/corpus/tooltip/llm_shortcut_vectors.json")
+
+--- Reads the shortcut corpus, or raises: a missing cross-driver contract must fail.
+--- @return table
+local function read_shortcut_corpus()
+	local fh = assert(io.open(shortcut_corpus_path, "r"), "cannot open corpus at " .. shortcut_corpus_path)
+	local raw = fh:read("*a")
+	fh:close()
+	return require("hs").json.decode(raw)
+end
+
+--- Renders two predictions with a validation shortcut and returns every styled
+--- piece built, as { text, attributes }.
+--- @param fixture table Tooltip watcher fixture.
+--- @param shortcut string Display-form validation shortcut.
+--- @return table pieces, table config
+local function shortcut_pieces(fixture, shortcut)
+	local context = fixture.load_tooltip(support.CASES[1])
+	local pieces = {}
+	local real_new = hs.styledtext.new
+	hs.styledtext.new = function(text, attributes)
+		pieces[#pieces + 1] = { text = text, attributes = attributes }
+		return real_new(text, attributes)
+	end
+	local ok, err = pcall(context.tooltip.show_predictions,
+		{ CORRECTING, { chunks = {}, nw = "tout va bien" } }, 1, true, nil, shortcut, 0)
+	hs.styledtext.new = real_new
+	assert(ok, err)
+	return pieces, context.config
+end
+
+--- The first piece with this text, or nil.
+local function piece(pieces, text)
+	for _, candidate in ipairs(pieces) do
+		if candidate.text == text then return candidate end
+	end
+	return nil
+end
+
+helpers.describe("tooltip_llm: the shortcut column (llm-shortcut-column)", function()
+	local shortcuts = read_shortcut_corpus()
+
+	for _, vector in ipairs(shortcuts.vectors) do
+		helpers.it("(llm-shortcut-column) label: " .. vector.id, function()
+			support.with_fixture(function(fixture)
+				local context = fixture.load_tooltip(support.CASES[1])
+				helpers.assert_eq(LlmLine.shortcut_label(vector.index, vector.modifiers,
+					context.config.llm_ui.shortcut_spec), vector.expected.hs, vector.id)
+			end)
+		end)
+	end
+
+	helpers.it("(llm-shortcut-column) every row ends on a right tab stop with its muted chord", function()
+		support.with_fixture(function(fixture)
+			local pieces, config = shortcut_pieces(fixture, "alt")
+			for _, label in ipairs({ "⌥1", "⌥2" }) do
+				local built_label = piece(pieces, label)
+				helpers.assert_true(built_label ~= nil, label .. " is drawn")
+				helpers.assert_eq(built_label.attributes.color, config.colors.cmd_dim, label .. " is muted")
+				helpers.assert_eq(built_label.attributes.font.size, config.sizes.hint, label .. " is at the hint size")
+			end
+			helpers.assert_true(piece(pieces, "\t") ~= nil, "the chord sits after a tab")
+			-- show_predictions assembles the lines once per sizing pass and once
+			-- to draw; each assembly builds one tab and gives both labelled lines
+			-- the stop, always at the same place.
+			local stopped, tabs, location = 0, 0, nil
+			for _, candidate in ipairs(pieces) do
+				if candidate.text == "\t" then tabs = tabs + 1 end
+				local paragraph = type(candidate.attributes) == "table" and candidate.attributes.paragraphStyle
+				if paragraph and paragraph.tabStops then
+					helpers.assert_eq(paragraph.tabStops[1].tabStopType, "right")
+					location = location or paragraph.tabStops[1].location
+					helpers.assert_eq(paragraph.tabStops[1].location, location, "the column never moves")
+					stopped = stopped + 1
+				end
+			end
+			helpers.assert_true(tabs >= 2, "the lines are sized before they are drawn")
+			helpers.assert_eq(stopped, 2 * tabs, "each labelled line starts with the right tab stop")
+		end)
+	end)
+
+	helpers.it("(llm-shortcut-column) bare digits show the digit; no validation shortcut shows nothing", function()
+		support.with_fixture(function(fixture)
+			local pieces = shortcut_pieces(fixture, "\226\128\139")
+			helpers.assert_true(piece(pieces, "1") ~= nil and piece(pieces, "2") ~= nil, "bare digits")
+			pieces = shortcut_pieces(fixture, "none")
+			helpers.assert_eq(piece(pieces, "\t"), nil, "no column without a validation shortcut")
+		end)
+	end)
+end)

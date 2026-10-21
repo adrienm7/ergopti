@@ -6,7 +6,8 @@
 --- Drives the real diagnostics window through its usercontent message handler,
 --- the way the shared page posts to it:
 --- 1. "ready" answers with the page's configuration and the first snapshot,
----    and keeps subprocess probes opt-in;
+---    and keeps subprocess probes opt-in (only the local configuration probe
+---    runs without it);
 --- 2. an action the allowlist refuses changes nothing and is logged;
 --- 3. copy writes the redacted report, and a refused clipboard keeps the
 ---    window open and says so to the page;
@@ -27,7 +28,7 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "adapters.timer_scheduler",
+		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler",
 		"adapters.clipboard", "adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -37,7 +38,7 @@ local function load_window(controls)
 	package.loaded["hs"] = hs_stub
 
 	local context = {
-		scripts = {}, deleted = 0, released = 0, every = 0, cancelled_probes = 0, started_probes = 0,
+		scripts = {}, deleted = 0, released = 0, every = 0, cancelled_probes = 0, started_probes = 0, local_runs = 0, cancelled_local_runs = 0,
 		copied = {}, warnings = {}, errors = {}, opened_urls = {}, spawned = {}, focused = 0, effects = {},
 	}
 	local logger = helpers.make_logger_stub()
@@ -63,7 +64,13 @@ local function load_window(controls)
 		end,
 	}
 	package.loaded["ui.healthcheck.probes"] = {
-		start = function(_, snapshot, on_result)
+		start = function(_, snapshot, on_result, options)
+			-- The local configuration probe runs without the opt-in: it is
+			-- counted apart from the subprocess probes
+			if options and options.local_only == true then
+				context.local_runs = context.local_runs + 1
+				return { cancel = function() context.cancelled_local_runs = context.cancelled_local_runs + 1 end }
+			end
 			context.probe_result = on_result
 			context.started_probes = context.started_probes + 1
 			context.probe_snapshot = snapshot
@@ -87,11 +94,23 @@ local function load_window(controls)
 		end,
 	}
 
-	local webview = {}
+	local webview = setmetatable({}, {})
 	for _, method in ipairs({
 		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows", "allowGestures", "level", "html",
 		"show", "shadow",
 	}) do webview[method] = function(self) return self end end
+	-- The packaged methods have boolean getters, fluent setters and C defaults.
+	function webview:allowNewWindows(value)
+		if value == nil then return self.children ~= false end
+		self.children = value
+		return self
+	end
+	function webview:deleteOnClose(value)
+		if value == nil then return self.automatic_close == true end
+		self.automatic_close = value
+		return self
+	end
+	function webview:show() self.presented = true; return self end
 	webview.windowCallback = function(self, callback) context.window_callback = callback; return self end
 	webview.navigationCallback = function(self, callback) context.navigation_callback = callback; return self end
 	webview.evaluateJavaScript = function(self, script, callback)
@@ -99,8 +118,12 @@ local function load_window(controls)
 		if callback then callback(nil, nil) end
 		return self
 	end
-	webview.delete = function() context.deleted = context.deleted + 1 end
+	webview.delete = function(self) context.deleted = context.deleted + 1; setmetatable(self, nil) end
 	hs_stub.webview.new = function(_, _, controller)
+		if webview.presented or getmetatable(webview) == nil then
+			local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
+			webview = setmetatable(fresh, {})
+		end
 		context.new_controller = controller
 		return webview
 	end
@@ -180,17 +203,18 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 	helpers.it("answers ready with a quick snapshot and starts probes only after explicit opt-in", function()
 		as_jdoe(function()
 			local core, context = load_window()
-			core.show_window({ mode = "report" })
+			core.show_window()
 			context.page({ body = "ready" })
 			local messages = page_messages(context)
 			helpers.assert_eq(#messages, 1)
 			helpers.assert_eq(messages[1].type, "init")
-			helpers.assert_eq(messages[1].config.mode, "report")
+			helpers.assert_eq(messages[1].config.mode, nil, "the page has no report mode")
 			helpers.assert_eq(messages[1].config.schema.schema_version, 2)
 			helpers.assert_eq(messages[1].config.context.home, HOME)
 			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
 			helpers.assert_eq(messages[1].snapshot.driver, "macos")
 			helpers.assert_eq(context.started_probes, 0, "opening the window must not start subprocess probes")
+			helpers.assert_eq(context.local_runs, 1, "opening the window starts only the local configuration probe")
 			helpers.assert_eq(messages[1].snapshot.extensive, false)
 			context.page({ body = { action = "refresh", extensive = true } })
 			helpers.assert_eq(context.started_probes, 1)
@@ -323,6 +347,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			context.page({ body = { action = "close" } })
 			helpers.assert_eq(context.deleted, 1)
 			helpers.assert_eq(context.cancelled_probes, 1)
+			helpers.assert_eq(context.cancelled_local_runs, 1, "the opt-in replaced the local run")
 			helpers.assert_eq(context.released, 1)
 		end)
 	end)

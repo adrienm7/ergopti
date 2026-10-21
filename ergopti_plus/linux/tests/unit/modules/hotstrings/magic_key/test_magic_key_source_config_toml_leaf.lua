@@ -715,5 +715,49 @@ helpers.describe("magic key source: tap assignment admission", function()
 			helpers.assert_eq(calls.typed, { "★" })
 		end)
 	end)
+
+	helpers.it("(magic-key-tap-override) names a tap action that takes the chosen key, and only that one", function()
+		with_source('[hotstrings]\nmagic_key_source = "Backquote"\n', function(Source)
+			helpers.assert_eq(Source.tap_override_reason(41, "send_text"), Source.TAP_OVERRIDE_REASON,
+				"an action on the key left of 1 takes the physical magic key")
+			helpers.assert_nil(Source.tap_override_reason(41, "none"), "none gives the key back to the magic key")
+			helpers.assert_nil(Source.tap_override_reason(41, nil))
+			helpers.assert_nil(Source.tap_override_reason(12, "send_text"), "Minus is not the chosen key")
+			helpers.assert_nil(Source.tap_override_reason(13, "send_text"), "Equal is not the chosen key")
+		end)
+		with_source(nil, function(Source)
+			helpers.assert_nil(Source.tap_override_reason(41, "send_text"), "the automatic source owns no tap key")
+		end)
+		local en = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/en.json", "rb"))
+		local text = en:read("*a"); en:close()
+		helpers.assert_true(text:find('"' .. "menu.shortcuts.tap_keys.overrides_magic_key_source" .. '"', 1, true) ~= nil,
+			"the reason the menu shows is a declared locale key")
+	end)
+
+	helpers.it("(magic-key-tap-override) a press yielding to a tap action is logged once per yield", function()
+		local saved_logger = package.loaded["logger.shim"]
+		local warnings = {}
+		local recorder = setmetatable({ warn = function(_, message, ...)
+			warnings[#warnings + 1] = string.format(message, ...)
+		end }, { __index = function() return function() end end })
+		package.loaded["logger.shim"] = recorder
+		local ok, err = pcall(with_source, '[hotstrings]\nmagic_key_source = "Backquote"\n', function(Source)
+			local state = { active = true, replace = true, typed_ok = true, blocked_code = 41 }
+			local calls = wire(Source, state)
+			for _ = 1, 3 do helpers.assert_eq(Source.on_key({ code = 41, mods = {} }), false) end
+			helpers.assert_eq(#warnings, 1, "a held or repeated key reports its yield once")
+			helpers.assert_true(warnings[1]:find("Backquote", 1, true) ~= nil and warnings[1]:find("tap action", 1, true) ~= nil,
+				"the log names the key and why it types no magic key: " .. tostring(warnings[1]))
+			state.blocked_code = nil
+			helpers.assert_true(Source.on_key({ code = 41, mods = {} }))
+			state.blocked_code = 41
+			helpers.assert_eq(Source.on_key({ code = 41, mods = {} }), false)
+			helpers.assert_eq(#warnings, 2, "a new yield after the key was admitted again is reported again")
+			helpers.assert_eq(calls.typed, { "★" })
+			Source._reset_for_test()
+		end)
+		package.loaded["logger.shim"] = saved_logger
+		if not ok then error(err, 0) end
+	end)
 end)
 

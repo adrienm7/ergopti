@@ -23,7 +23,7 @@ local MUTATED_PACKAGE_SLOTS = {
 	"hs", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer",
 	"infra.logger", "infra.timings", "keylogger.metrics",
 	"modules.keylogger.aggregator", "modules.keylogger.export",
-	"modules.keylogger.log_manager", "modules.keylogger.rotation",
+	"adapters.ledger_append", "modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "modules.keylogger.timestamp",
 	"modules.keylogger.physical_accounting_mode",
 	"tests.stubs.hs",
@@ -145,7 +145,7 @@ end
 local function load_log_manager_fixture(sink_failures, initialize)
 	local restore_runtime = capture_runtime()
 	for _, name in ipairs({
-		"modules.keylogger.log_manager", "modules.keylogger.rotation",
+		"adapters.ledger_append", "modules.keylogger.log_manager", "modules.keylogger.rotation",
 		"modules.keylogger.sqlite_writer", "modules.keylogger.aggregator",
 		"modules.keylogger.export", "keylogger.metrics", "infra.logger",
 		"infra.timings", "adapters.timer_scheduler",

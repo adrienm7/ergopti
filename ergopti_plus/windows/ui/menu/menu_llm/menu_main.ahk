@@ -218,14 +218,17 @@ LLM_Menu_BuildSubmenu() {
 _LLM_Menu_StateGetters() {
 	global _LLM_Menu
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
-		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist())
+		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"config_newer_schema", () => ConfigNewerSchemaReadOnly())
 }
 
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
+; The rows go back to the renderer, which draws them at the declared entry.
 _LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
 	if !(Owner is Menu) || !(TargetMenu is Menu) || TargetMenu != Owner
 		throw Error("An LLM row cannot leave its detached native menu owner.")
-	_LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)
+	return _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)
 }
 
 ; Child builders retain genuine native Menu identities; the manifest owns the parents.
@@ -258,7 +261,10 @@ LLM_Menu_Build() {
 	; The LLM builder owns only a detached child. The root coordinator attaches
 	; it while publishing a complete root, so an asynchronous LLM rebuild can
 	; never expose an IA-only tray or mutate a root currently being staged.
-	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true)
+	; A busy or still-incomplete root replaces the narrow worker with a full
+	; rebuild; the child goes with the request so that rebuild attaches it
+	; instead of constructing the IA submenu a second time.
+	if !RebuildTrayMenu(0, _LLM_Menu_PublishRoot.Bind(StagedHandle), true, true, StagedHandle)
 		throw Error("tray root coordinator refused the LLM subtree")
 	MenuDispatcher_PruneMenu(_LLM_Menu_Handle)
 	_LLM_Menu_InTray := true
@@ -427,18 +433,21 @@ _LLM_MenuLayout_Fallback() {
 }
 
 /**
- * Emits one settings row by its shared-spec id. The spec (_LLM_MenuLayout_Rows)
- * owns the ORDER and the `disabled` flag; this dispatch owns the platform-native
- * label formatting and submenu construction (which read Win32/tray state and so
- * cannot live in shared data). Conditional native-only rows that have no shared
+ * Returns the row DATA of one `dynamic` settings row by its shared-spec id; the
+ * renderer draws it into TargetMenu at the declared entry. The declared `group`
+ * rows never come here: the renderer draws them from _LLM_Menu_GroupBuilders.
+ * The spec (_LLM_MenuLayout_Rows) owns the ORDER and the `disabled` flag; this
+ * dispatch owns the platform-native label formatting and submenu construction
+ * (which read Win32/tray state and so cannot live in shared data). Conditional native-only rows that have no shared
  * entry — the thinking-model info row and the separator after the profile row —
- * are emitted here at their anchor row to preserve menu order.
+ * are returned here with their anchor row to preserve menu order.
  * @param {String}  id                  Row id from the manifest's llm_menu.
  * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
  * @param {Boolean} llm_is_operational  Enabled AND deps ready — gates the health dot.
  * @param {Boolean} has_health_dot      The row's declared health_dot flag. Which row
  *                                      carries the dot is the manifest's call, not this
  *                                      file's, so macOS cannot end up dotting another row.
+ * @returns {Array} Row data for MenuRenderer_Build; empty for an unknown id.
  */
 _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {
 	global _LLM_Menu
@@ -467,12 +476,12 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)
 			if !(BackendRows is Array)
 				throw Error("Declared backend parent frame was withdrawn.")
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)
 		} catch as Err {
 			BackendMenu.Delete()
 			MenuDispatcher_PruneMenu(BackendMenu)
 			throw Err
 		}
+		return BackendRows
 	case "llm_model":
 		; Build the submenu, fire the async probes (backend health + installed-tags
 		; list), then prefix the label with the cached backend-health dot (🟢
@@ -504,7 +513,6 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			; thinking-model row below must agree with the same text.
 			model_shown := _LLM_Menu_ModelDisplayText()
 			ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows)
 		} catch as Err {
 			try _LLM_Menu_ReleaseModelMenu(model_menu)
 			catch as CleanupError
@@ -516,8 +524,11 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			InfoRows := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())
 			if !(InfoRows is Array)
 				throw Error("Declared thinking-model information was refused.")
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_thinking_info", InfoRows)
+			ModelRows := ModelRows.Clone()
+			for Row in InfoRows
+				ModelRows.Push(Row)
 		}
+		return ModelRows
 	case "llm_profile":
 		; Admit the actual boundary and whole frame before building the native child.
 		BoundaryRows := MenuRenderer_TemplateRows("llm_after_profile_boundary", Map(), Map(), Map())
@@ -543,30 +554,15 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)
 			if !(ProfileRows is Array) || ProfileRows.Length != 2
 				throw Error("Declared profile parent frame was withdrawn.")
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)
 		} catch as Err {
 			ProfileMenu.Delete()
 			MenuDispatcher_PruneMenu(ProfileMenu)
 			throw Err
 		}
-	case "llm_trigger":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_trigger",
-			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
-			throw Error("Declared LLM group 'llm_trigger' was refused.")
-	case "llm_generation_settings":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_generation_settings",
-			Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu), disabled)
-			throw Error("Declared LLM group 'llm_generation_settings' was refused.")
-	case "llm_display":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_display",
-			Map("llm_display", LLM_Menu_BuildDisplayMenu), disabled)
-			throw Error("Declared LLM group 'llm_display' was refused.")
-	case "llm_navigation":
-		if !MenuRenderer_AppendGroup(TargetMenu, "llm_menu", "llm_navigation",
-			Map("llm_navigation", LLM_Menu_BuildNavMenu), disabled)
-			throw Error("Declared LLM group 'llm_navigation' was refused.")
+		return ProfileRows
 	default:
 		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in the shared menu manifest — skipped.", id)
+		return []
 	}
 }
 
@@ -578,6 +574,20 @@ _LLM_ScopeCommands(Options := unset) {
 }
 
 _LLM_ApplyScope(Mode, Options) {
+	global ConfigurationFile
+	; A retained row callback rechecks what greyed the row when it was built:
+	; a pause or a configuration refused for the session (a newer schema) stops
+	; it before any scope transaction.
+	Path := Options.Get("path", IsSet(ConfigurationFile) ? ConfigurationFile : "")
+	Refusal := (Path is String) && Path != "" ? TOML_WriteRefusal(Path) : "no configuration destination"
+	if A_IsSuspended || Refusal != "" {
+		if A_IsSuspended {
+			try LoggerWarn("LLM", "AI settings {1} scope refused: the script is paused.", Mode)
+		} else {
+			ConfigReportPersistenceFailure("the AI settings " . Mode . " scope", Options.Get("notify", 0), Refusal)
+		}
+		return Map("status", "refused", "scope", "llm", "mode", Mode)
+	}
 	CandidateOptions := Options.Clone()
 	CandidateOptions["supplement"] := _LLM_Menu_ScopeResetOperations
 	return ConfigScopeApply("llm", Mode, Map(), CandidateOptions)

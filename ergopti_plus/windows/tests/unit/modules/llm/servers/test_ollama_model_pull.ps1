@@ -31,6 +31,7 @@ function Refuse([scriptblock]$Body) {
 $helper = $null; $launcher = $null; $listener = $null; $process = $null
 $oldHost = [Environment]::GetEnvironmentVariable('OLLAMA_HOST', 'Process')
 $oldModels = [Environment]::GetEnvironmentVariable('OLLAMA_MODELS', 'Process')
+$oldCloud = [Environment]::GetEnvironmentVariable('OLLAMA_NO_CLOUD', 'Process')
 try {
 	$helper = Open-OllamaModelSource $helperPath (Get-FileHash -LiteralPath $helperPath -Algorithm SHA256).Hash.ToLowerInvariant()
 	$launcher = Open-OllamaModelSource $launcherPath (Get-FileHash -LiteralPath $launcherPath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -55,10 +56,30 @@ try {
 	Case 'changed admitted model source is refused before import' {
 		Refuse { Open-OllamaModelSource $launcherPath ('f' * 64) }
 	}
+	# The literal is the product decision (local models only): the managed
+	# server must never contact ollama.com, whatever the parent environment says.
+	$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+	$environment = Read-OllamaServeEnvironment $declaration (Get-FileHash -LiteralPath $declaration -Algorithm SHA256).Hash.ToLowerInvariant()
+	Case 'managed serve child carries the shared OLLAMA_NO_CLOUD declaration' {
+		$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+		$digest = (Get-FileHash -LiteralPath $declaration -Algorithm SHA256).Hash.ToLowerInvariant()
+		$environment = Read-OllamaServeEnvironment $declaration $digest
+		Assert-Model ($environment['OLLAMA_NO_CLOUD'] -ceq '1') 'The shared declaration disables Ollama cloud contact.'
+		[Environment]::SetEnvironmentVariable('OLLAMA_NO_CLOUD', '0', 'Process')
+		try {
+			$start = New-OllamaRuntimeStart 'C:\captured\versions\current\ollama.exe' 18148 'C:\captured\models' $environment
+		} finally { [Environment]::SetEnvironmentVariable('OLLAMA_NO_CLOUD', $null, 'Process') }
+		Assert-Model ($start.EnvironmentVariables['OLLAMA_NO_CLOUD'] -ceq '1') 'The managed server cannot inherit cloud contact.'
+		Assert-Model ($start.EnvironmentVariables['OLLAMA_HOST'] -ceq '127.0.0.1:18148') 'The launcher keeps the loopback listener.'
+		Assert-Model ($start.EnvironmentVariables['OLLAMA_MODELS'] -ceq 'C:\captured\models') 'The launcher keeps the model store.'
+		Assert-Model ($start.Arguments -ceq 'serve' -and -not $start.UseShellExecute) 'The child is the exact serve command.'
+		Refuse { Read-OllamaServeEnvironment $declaration ('f' * 64) }
+		Refuse { New-OllamaRuntimeStart 'C:\captured\ollama.exe' 18148 'C:\captured\models' $null }
+	}
 	Case 'model child uses captured executable/tag/environment only' {
 		[Environment]::SetEnvironmentVariable('OLLAMA_HOST', 'https://unowned.invalid:4444', 'Process')
 		[Environment]::SetEnvironmentVariable('OLLAMA_MODELS', 'C:\unowned-personal-models', 'Process')
-		$start = New-OllamaModelStart 'C:\captured\versions\0.24.0\ollama.exe' 'C:\captured\models' 18148 'qwen2.5:3b'
+		$start = New-OllamaModelStart 'C:\captured\versions\0.24.0\ollama.exe' 'C:\captured\models' 18148 'qwen2.5:3b' $environment
 		Assert-Model ($start.FileName -ceq 'C:\captured\versions\0.24.0\ollama.exe' -and -not $start.UseShellExecute) 'The executable is exact without shell/PATH.'
 		Assert-Model ($start.Arguments -ceq 'pull "qwen2.5:3b"') 'The canonical tag is literal.'
 		Assert-Model ($start.EnvironmentVariables['OLLAMA_HOST'] -ceq '127.0.0.1:18148') 'The captured origin replaces ambient host for this child.'
@@ -67,7 +88,7 @@ try {
 	}
 	Case 'display strings and metacharacters are rejected at native boundary' {
 		foreach ($model in @('Qwen Display Name', 'tag" --other', 'tag;Remove-Item', 'tag`nnext')) {
-			Refuse { New-OllamaModelStart 'C:\captured\ollama.exe' 'C:\captured\models' 18148 $model }
+			Refuse { New-OllamaModelStart 'C:\captured\ollama.exe' 'C:\captured\models' 18148 $model $environment }
 		}
 	}
 	$listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -100,6 +121,7 @@ try {
 	if ($null -ne $helper) { $helper.stream.Dispose() }
 	[Environment]::SetEnvironmentVariable('OLLAMA_HOST', $oldHost, 'Process')
 	[Environment]::SetEnvironmentVariable('OLLAMA_MODELS', $oldModels, 'Process')
+	[Environment]::SetEnvironmentVariable('OLLAMA_NO_CLOUD', $oldCloud, 'Process')
 }
 Write-Output ('Managed model import acceptance: ' + $script:passed + ' passed, ' + $script:failed + ' failed.')
 if ($script:failed -ne 0) { exit 1 }

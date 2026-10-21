@@ -26,6 +26,15 @@ local LOG = "adapters.window_manager"
 -- Sentinel HWND used when no real handle is available (matches AHK convention).
 local INVALID_HWND = 0
 
+--- Rejects a chainable focus result after the window's application has exited.
+--- The native Lua focus method returns self even when application() is nil.
+local function focus_attached_window(win, minimized)
+	if win:application() == nil then return false end
+	if minimized then win:unminimize() end
+	local focused = win:focus()
+	return focused ~= nil and focused ~= false and win:application() ~= nil
+end
+
 
 
 
@@ -51,10 +60,7 @@ function M.activate(hwnd_or_spec)
 		local win = type(hwnd_or_spec) == "userdata" and hwnd_or_spec
 			or (hs.window and hs.window.get and hs.window.get(hwnd_or_spec))
 		if win then
-			-- hs.window:focus() returns the window object for chaining, not a
-			-- boolean. Reject nil/false without requiring literal true.
-			local focused = win:focus()
-			return focused ~= nil and focused ~= false
+			return focus_attached_window(win)
 		end
 		return false
 	end)
@@ -305,9 +311,7 @@ end
 --- @return boolean focused
 function M.focus_window(record)
 	local ok, result = pcall(function()
-		if record.minimized then record.window:unminimize() end
-		-- hs.window:focus() returns the window for chaining, not a boolean.
-		return record.window:focus()
+		return focus_attached_window(record.window, record.minimized)
 	end)
 	if not ok then
 		Logger.warn(LOG, "focus_window(): window %s refused focus — %s", tostring(record.id), tostring(result))

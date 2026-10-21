@@ -557,7 +557,8 @@ LoggerWarn(*) => 0
 SUBJECT
 Failures := 0
 for Scenario in ["default", "replacement"] {
- _LLM_Menu := Map("backend", "ollama", "model", Scenario == "default" ? "" : "not-installed")
+ ; A correction readies the model of an enabled AI only (issue #97).
+ _LLM_Menu := Map("enabled", true, "backend", "ollama", "model", Scenario == "default" ? "" : "not-installed")
  OwnedApply := 0, ProbeCalls := 0
  if !LLM_Menu_EnsureModelReady() || _LLM_Menu["model"] != "default-model" || ProbeCalls != 0 {
   FileAppend("PRECONDITION: the original correction did not publish its model." . Chr(10), "**")

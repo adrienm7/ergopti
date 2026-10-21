@@ -292,7 +292,10 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../../_shared/modules/features/number_row_policy.ahk
+#Include ../../_shared/modules/features/layout_rows_policy.ahk
+#Include ../../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
+#Include ../modules/keymap/layout/number_row_send.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
 #Include ../modules/keymap/keylayout/keylayout_parser.ahk
@@ -377,6 +380,9 @@ SFD_ConfigureUiaWorker(
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
 ; Exercised by test_hook_dispatcher.ahk (BoundFunc identity + bind-once contract).
 #Include ../infra/hook_dispatcher.ahk
+; CapsWord auto-off listeners: definitions only (capsword.ahk, with its
+; hotkeys, stays out of the runner; the stubs stand in for DisableCapsWord).
+#Include ../modules/shortcuts/capsword_auto_off.ahk
 #Include ../adapters/keyboard_hook.ahk
 #Include ../ui/editors.ahk
 
@@ -433,6 +439,7 @@ InstallSendNoOps()
 #Include ../ui/paths_editor/init.ahk
 #Include unit/ui/windows/test_paths_editor_logs_dir.ahk
 #Include unit/ui/healthcheck/test_healthcheck_core.ahk
+#Include unit/ui/healthcheck/test_healthcheck_configuration.ahk
 #Include unit/ui/healthcheck/test_diagnostics_collection.ahk
 #Include unit/ui/healthcheck/test_diagnostics_window_control.ahk
 #Include unit/ui/healthcheck/test_healthcheck_owner_snapshots.ahk
@@ -494,6 +501,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/catalogue/test_hotstrings_cache.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstring_language_packs.ahk
 #Include unit/ui/menu/test_menu_languages_and_global_separator.ahk
+#Include unit/ui/menu/test_caps_word_auto_off_submenu.ahk
 #Include unit/modules/dynamic_hotstrings/test_dynamic_hotstrings_module.ahk
 #Include unit/modules/hotstrings/personal/test_user_hotstrings.ahk
 #Include unit/modules/hotstrings/personal/test_user_hotstrings_native.ahk
@@ -575,6 +583,8 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/prefix/test_prefix_finalizer_generation.ahk
 #Include unit/modules/hotstrings/engine/test_synthetic_sends_declare_buffer_effect.ahk
 #Include unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk
+#Include unit/modules/shortcuts/test_caps_word_auto_off_policy.ahk
+#Include unit/modules/shortcuts/test_capsword_auto_off.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
 #Include unit/modules/updater/test_updater_release_fetch.ahk
@@ -776,6 +786,7 @@ _LLM_Deps_State := "ready"
 #Include meta/modules/llm/tooltip/test_llm_markchain_no_rerender.ahk
 #Include meta/modules/llm/menu/test_llm_menu_build_critical.ahk
 #Include meta/modules/llm/menu/test_llm_menu_build_coordinator.ahk
+#Include meta/modules/llm/menu/test_llm_menu_caller_child_full_root.ahk
 _LogBootProgress("LLM modules + tests included")
 
 ; LLM tray menu -> config.toml persistence (contract-driven round-trips).
@@ -884,6 +895,7 @@ _LogBootProgress("loading gestures modules")
 ; The answers contract, the commit and the WebView host are definitions-only
 ; until _Onboarding_TryWeb is called. Include them so the finish payload is
 ; followed to the candidate config.toml without the persistence/reload boundary.
+#Include ../ui/onboarding/translate.ahk
 #Include ../ui/onboarding/answers.ahk
 #Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
@@ -931,6 +943,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/ui/menu/test_tray_menu_separator_popup.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_hold_picker_options.ahk
 #Include unit/ui/menu/test_menu_command_deferral.ahk
+#Include unit/ui/menu/test_menu_reload_replay.ahk
 #Include unit/platform/remap/tap_hold/test_tap_hold_roll.ahk
 #Include unit/infra/config/persistence/test_config_recovery_transactions.ahk
 #Include unit/infra/config/persistence/test_config_commit_gateway.ahk
@@ -1757,6 +1770,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/llm/servers/test_deps_check_epoch_guard.ahk
 #Include meta/modules/updater/test_updater_rebuild_resets_dispatcher.ahk
 #Include meta/platform/remap/keys/test_capsword_reset_on_suspend.ahk
+#Include meta/modules/shortcuts/test_capsword_auto_off_single_source.ahk
 #Include meta/platform/remap/keys/test_capsword_space_release_timeout.ahk
 #Include meta/modules/gestures/test_gesture_toggle_ui_errors_logged.ahk
 #Include meta/ui/wpm/test_wpm_mousewatch_suspend_guard.ahk
@@ -1885,6 +1899,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/platform/remap/altgr/test_altgr_probe_real_layouts.ahk
 #Include unit/modules/keymap/test_layout_digit_row_probe.ahk
 #Include unit/modules/keymap/test_number_row_symbols.ahk
+#Include unit/modules/keymap/test_layout_rows_policy.ahk
 #Include unit/modules/keymap/test_number_row_native_hkl.ahk
 #Include meta/platform/remap/altgr/test_altgr_kana_taphold_entry.ahk
 #Include meta/platform/remap/altgr/test_altgr_prefix_arms_on_press.ahk
@@ -1991,12 +2006,16 @@ _LogBootProgress("keylogger modules + tests included")
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
+; The local reload control rides the Diagnostics endpoint owner above.
+#Include ../infra/driver_control.ahk
+#Include unit/infra/control/test_driver_control.ahk
 #Include ../ui/healthcheck/collection.ahk
 #Include unit/ui/webview/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include ../ui/healthcheck/probes.ahk
 #Include ../ui/healthcheck/report.ahk
 #Include ../ui/healthcheck/actions.ahk
+#Include ../ui/healthcheck/configuration.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_readers.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_lift_respects_owner.ahk
 #Include unit/platform/remap/altgr/test_kana_altgr_ctrl_chords.ahk

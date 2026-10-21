@@ -43,7 +43,7 @@ local RESET_MODULES = {
 	"keylogger.metrics", "modules.keylogger", "modules.keylogger.aggregator",
 	"modules.keylogger.context_tracker", "modules.keylogger.export",
 	"modules.keylogger.init", "modules.keylogger.kc_bridge",
-	"modules.keylogger.log_manager", "modules.keylogger.rotation",
+	"adapters.ledger_append", "modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "modules.keylogger.timestamp",
 	"modules.keylogger.watchers", "modules.keymap", "tests.stubs.hs",
 	"ui.metrics_typing",

@@ -13,14 +13,16 @@ local Atspi = require("adapters.atspi_focus")
 local Timings = require("infra.timings")
 local Clock = require("infra.monotonic")
 local Logger = require("logger.shim")
+local Utf8 = require("compat.utf8")
 
 --- Creates one explicit-action selection owner without loading native libraries.
---- @param options table Live focus and privacy admission callbacks.
+--- @param options table Live focus, privacy and capture_text_owner callbacks.
 --- @return table owner
 function M.new(options)
 	assert(type(options) == "table" and type(options.focus_id) == "function"
 		and type(options.privacy_guard) == "function", "selection admission callbacks required")
-	local owner, active, stopped = {}, nil, false
+	local owner, active, writing, stopped, generation = {}, nil, nil, false, 0
+	local capture_text_owner = options.capture_text_owner
 	local receipts = setmetatable({}, { __mode = "k" })
 	local native_owner = "selection:" .. tostring(owner)
 
@@ -52,8 +54,8 @@ function M.new(options)
 		return false
 	end
 
-	local function capture(focus, authorized, callback)
-		if active or stopped then callback(nil); return false end
+	local function capture(focus, authorized, callback, write, span)
+		if active or (writing and writing ~= write) or stopped then callback(nil); return false end
 		local request = { revoked = false, dispatching = true }
 		active = request
 		local function authorized_request()
@@ -67,7 +69,8 @@ function M.new(options)
 			or "atspi:" .. field.native_bus_name .. ":" .. field.native_object_path ~= focus then
 			active = nil; callback(nil); return false
 		end
-		local deadline = Clock.now_ms() + Timings.ms("privacy", "atspi_probe_timeout_ms")
+		local deadline = write and write.deadline or Clock.now_ms() + Timings.ms("privacy", "atspi_probe_timeout_ms")
+		if Clock.now_ms() >= deadline then active = nil; callback(nil); return false end
 		local function complete()
 			if request.dispatching or request.inconclusive or request.completed or not settled(request) then return end
 			request.completed = true
@@ -79,7 +82,8 @@ function M.new(options)
 		end
 		local ok, operation = pcall(Atspi.start_selection_capture, {
 			bus = field.native_bus_name, path = field.native_object_path, role = field.role,
-		}, { owner = native_owner, authorized = authorized_request }, function(snapshot)
+		}, { owner = native_owner, authorized = authorized_request, span = span,
+			timeout_ms = deadline - Clock.now_ms() }, function(snapshot)
 			if authorized_request() then request.snapshot = snapshot end
 		end)
 		if not ok then
@@ -107,6 +111,107 @@ function M.new(options)
 		return true
 	end
 
+	--- Replaces through staged preparation, range verification and caret verification.
+	--- @param receipt table Original opaque read receipt, consumed at dispatch.
+	--- @param text string Private replacement bytes.
+	--- @param authorized function Original action authority.
+	--- @param construct function Pure constructor for the pinned selected output.
+	--- @param callback function Receives boolean commit and private physical receipt.
+	--- @param on_payload function|nil Invalidates document caches before the next await.
+	--- @return boolean accepted
+	function owner.replace_staged(receipt, text, authorized, construct, callback, on_payload)
+		assert(type(callback) == "function", "selection replacement callback required")
+		local held = receipts[receipt]
+		local length = type(text) == "string" and Utf8.len(text)
+		if not held or active or writing or stopped or not length or length == 0 or type(construct) ~= "function"
+			or (on_payload ~= nil and type(on_payload) ~= "function") then callback(false); return false end
+		local write = { generation = generation, revoked = false,
+			deadline = Clock.now_ms() + Timings.ms("privacy", "atspi_probe_timeout_ms") }
+		writing = write
+		local function retained()
+			return writing == write and not write.revoked and not stopped and generation == write.generation
+				and Clock.now_ms() < write.deadline
+		end
+		local function abandon()
+			write.revoked = true
+			if writing == write then writing = nil end
+			callback(false)
+		end
+		if not admitted(held.focus, authorized) or not retained() then abandon(); return false end
+		local captured, field = pcall(capture_text_owner, held.focus)
+		local current = captured and type(field) == "table" and getmetatable(field) == nil and rawget(field, "current")
+		local cached = captured and type(field) == "table" and getmetatable(field) == nil and rawget(field, "cached")
+		if type(current) ~= "function" or type(cached) ~= "function" or not retained() then abandon(); return false end
+		local checking = false
+		local function check(use_cached)
+			if checking or not retained() then return false end
+			checking = true
+			local ok, allowed = pcall(function()
+				return authorized() == true and retained() and (use_cached and cached or current)() == true
+					and retained() and authorized() == true and cached() == true and retained()
+			end)
+			checking = false
+			return ok and allowed == true and retained()
+		end
+		local publication = { current = function() return check(false) end, cached = function() return check(true) end }
+		if not check(false) then abandon(); return false end
+		receipts[receipt] = nil
+		local built, stage = pcall(construct, text, publication)
+		if not built or type(stage) ~= "table" or getmetatable(stage) ~= nil then
+			write.revoked = true
+			Logger.error("adapters.selection_transaction", "Selected output construction has inconclusive cleanup.")
+			return false
+		end
+		local prepare, payload, reselect, close = rawget(stage, "prepare"), rawget(stage, "payload"), rawget(stage, "reselect"), rawget(stage, "close")
+		if type(prepare) ~= "function" or type(payload) ~= "function" or type(reselect) ~= "function" or type(close) ~= "function" then
+			write.revoked = true; return false
+		end
+		write.close = close
+		local completed, payload_written, keys_clean = false, false, true
+		local function finish(committed, result)
+			if completed then return end
+			completed = true
+			local ok, cleaned = pcall(close)
+			local allowed = committed == true and check(false)
+			write.revoked, write.finished, write.native_clean = true, true, keys_clean
+			cleaned = ok and cleaned == true and keys_clean
+			if cleaned and writing == write then writing = nil end
+			local receipt_result = { ok = allowed and cleaned, cleanup_ok = cleaned, payload_written = payload_written,
+				failed_phase = result and result.failed_phase or "selection observation" }
+			if payload_written and not receipt_result.ok then
+				Logger.warn("adapters.selection_transaction", "Selected payload may have been written; final selection could not be committed.")
+			end
+			callback(receipt_result.ok == true, receipt_result)
+		end
+		if not check(false) then finish(false); return true end
+		local ok, ready = pcall(prepare)
+		if not ok or ready ~= true or not check(false) then finish(false); return true end
+		local original = held.snapshot
+		capture(held.focus, publication.current, function(observed)
+			if not observed or observed.bus ~= original.bus or observed.path ~= original.path or observed.role ~= original.role
+				or observed.first ~= original.first or observed.last ~= original.last or observed.text ~= original.text
+				or not check(false) then finish(false); return end
+			local emitted, result = pcall(payload)
+			local valid = emitted and type(result) == "table" and getmetatable(result) == nil
+			payload_written = valid and rawget(result, "payload_written") == true
+			keys_clean = valid and rawget(result, "native_cleanup_ok") == true
+			local notified = true
+			if payload_written and on_payload then notified = pcall(on_payload) end
+			if not notified or not keys_clean or rawget(result, "ok") ~= true or not check(false) then finish(false, valid and result); return end
+			local span = { first = original.first, last = original.first + length }
+			capture(held.focus, publication.current, function(inserted)
+				if not inserted or inserted.bus ~= original.bus or inserted.path ~= original.path or inserted.role ~= original.role
+					or inserted.first ~= span.first or inserted.last ~= span.last or inserted.text ~= text
+					or not check(false) then finish(false); return end
+				local selected, final = pcall(reselect)
+				local final_valid = selected and type(final) == "table" and getmetatable(final) == nil
+				keys_clean = keys_clean and final_valid and rawget(final, "native_cleanup_ok") == true
+				finish(keys_clean and rawget(final, "ok") == true, final_valid and final)
+			end, write, span)
+		end, write)
+		return true
+	end
+
 	--- Starts a read; accepted dispatch is not a completed native observation.
 	--- @param focus string Exact admitted native field token.
 	--- @param authorized function Originating action remains current.
@@ -122,45 +227,34 @@ function M.new(options)
 		end)
 	end
 
-	--- Revalidates a range and reports commit only after the physical ACK.
-	--- @param receipt table Opaque receipt returned by read().
-	--- @param text string Replacement.
-	--- @param authorized function Originating action remains current.
-	--- @param emit function Physical injector returning its structured receipt.
-	--- @param callback function Receives literal true only for a committed edit.
-	--- @return boolean accepted Workflow accepted; completion requires callback.
-	function owner.replace(receipt, text, authorized, emit, callback)
-		assert(type(callback) == "function", "selection replacement callback required")
-		local held = receipts[receipt]
-		if not held or active or type(text) ~= "string" or text == "" or type(emit) ~= "function" then callback(false); return false end
-		return capture(held.focus, authorized, function(observed)
-			local original = held.snapshot
-			if not observed or observed.bus ~= original.bus or observed.path ~= original.path or observed.role ~= original.role
-				or observed.first ~= original.first or observed.last ~= original.last or observed.text ~= original.text
-				or receipts[receipt] ~= held or not admitted(held.focus, authorized) then callback(false); return end
-			-- Consume before calling the injector: a nested accept cannot reuse it.
-			receipts[receipt] = nil
-			local ok, result = pcall(emit, text)
-			callback(ok and type(result) == "table" and result.ok == true)
-		end)
-	end
-
-	--- Revokes a pending operation while retaining physical cleanup ownership.
+	--- Revokes range and write authority while retaining physical cleanup ownership.
 	--- @return boolean settled
 	function owner.cancel()
-		return not active or retire(active)
+		-- An idle read is an immutable observation, not action authority. A new
+		-- translation may revalidate it after cancelling a superseded tone step.
+		generation = generation + 1
+		if writing then writing.revoked = true end
+		if writing and writing.close then
+			local write = writing
+			local ok, cleaned = pcall(write.close)
+			-- A cleanup ACK may arrive after the admission deadline. It retires
+			-- only an unwound frame with known wire cleanup, never an active await.
+			if ok and cleaned == true and write.finished and write.native_clean and not active and writing == write then writing = nil end
+		end
+		local native_settled = not active or retire(active)
+		return not writing and native_settled
 	end
 
 	--- Reports whether this owner retains any native operation or dispatch frame.
 	--- @return boolean settled
-	function owner.is_settled() return active == nil end
+	function owner.is_settled() return active == nil and writing == nil end
 
 	--- Revokes all range authority and acknowledges only physical settlement.
 	--- @return boolean settled
 	function owner.stop()
 		stopped = true
 		receipts = setmetatable({}, { __mode = "k" })
-		return not active or retire(active)
+		return owner.cancel()
 	end
 
 	return owner

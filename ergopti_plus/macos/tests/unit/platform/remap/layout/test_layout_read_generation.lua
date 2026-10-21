@@ -19,6 +19,9 @@
 --- finished" and "the read currently in flight" were indistinguishable. Each
 --- read now carries a generation stamp and a stale completion returns before
 --- touching anything.
+--- This fixture now delivers its first terminal during terminate; its later
+--- explicit replay is a defensive stale consumer callback, not a second native
+--- ShellRunner completion or an exit delivered after exact settlement.
 ---
 --- WHY IT WAS SILENT: the damage is invisible until the SECOND failure. Read #2
 --- runs unwatched; if it also hangs, nothing releases the guard, and the Sequoia
@@ -36,9 +39,8 @@ local helpers = require("tests.helpers")
 -- ============================================================================
 -- ============================================================================
 
---- Loads platform.remap.watchers with a ShellRunner stub that CAPTURES each
---- spawn's completion callback, so the test can deliver a terminated read's exit
---- late — exactly as the OS does.
+--- Loads a ShellRunner port whose terminate delivers its first terminal and
+--- keeps the consumer callback for an explicitly artificial stale replay.
 --- @return table watchers, table ctx
 local function load_watchers()
 	package.loaded["platform.remap.watchers"] = nil
@@ -49,10 +51,26 @@ local function load_watchers()
 
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(_executable, _args, on_done)
-			local rec = { on_done = on_done, terminated = 0, started = false }
+			local rec = { terminated = 0, started = false, settled = false, observers = {} }
+			rec.on_done = function(...)
+				rec.settled = true
+				on_done(...)
+				local observers = rec.observers
+				rec.observers = {}
+				for _, observer in ipairs(observers) do observer() end
+			end
 			rec.handle = {
 				start     = function() rec.started = true; return true end,
-				terminate = function() rec.terminated = rec.terminated + 1; return true end,
+				terminate = function()
+					rec.terminated = rec.terminated + 1
+					rec.on_done(143, "", "")
+					return true, "settled"
+				end,
+				isSettled = function() return rec.settled end,
+				onSettled = function(callback)
+					if rec.settled then callback() else rec.observers[#rec.observers + 1] = callback end
+					return true
+				end,
 			}
 			table.insert(ctx.spawns, rec)
 			return rec.handle
@@ -131,8 +149,8 @@ helpers.describe("layout poll: a terminated read's late exit cannot dismantle th
 		helpers.assert_eq(#ctx.watchdogs, 2, "read #2 must arm its own watchdog")
 		local watchdog_2 = ctx.watchdogs[2]
 
-		-- The OS now delivers read #1's exit — a terminated process still reports
-		-- its exit code, just late.
+		-- Deliberately replay a stale consumer callback after its first terminal.
+		-- The real ShellRunner would suppress this duplicate native completion.
 		helpers.assert_eq(type(ctx.spawns[1].on_done), "function",
 			"the harness must hold read #1's completion callback, or this test proves nothing")
 		ctx.spawns[1].on_done(143, "", "")

@@ -422,7 +422,7 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 					if Native is Menu && TrayMenuItemCount(Native) > 0
 						ChildObserved := true
 				}
-			if Kind == "valid_rows" || Kind == "valid_parent" {
+			if Kind == "valid_rows" {
 				AssertEqual(2, Held.Length, "the actual folder and file child were allocated before late total")
 				AssertEqual(1, TrayMenuItemCount(Held[1]), "actual folder frame is filled before _HS_NodeTotal observes count")
 				AssertEqual(Held[2].Handle, TrayMenuSubmenuHandle(Held[1].Handle, 0), "real file child is already attached to the exact native folder")
@@ -513,7 +513,6 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 		TF := {path: Path, sections: [], stem: "late_label", count: ActualCount}
 		TF.DeleteProp("count"), TF.DefineProp("count", {Get: ReadCount})
 		Tree := Map("Folder", Map("tomls", [TF], "subfolders", Map()))
-		Parent := Menu(), Menus.Push(Parent)
 		Cleaner := Menu(), Menus.Push(Cleaner)
 		try Cleaner.Delete()
 		finally MenuDispatcher_PruneMenu(Cleaner)
@@ -531,11 +530,9 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 		Rows := [], Caught := false
 		try {
 			if Kind == "valid_rows"
-				Accepted := _HS_RenderTree(Tree, "", Rows, Held)
-			else if Kind == "valid_parent"
-				Accepted := _HS_RenderTree(Tree, Parent, "", Held)
+				Accepted := _HS_RenderTree(Tree, Rows, Held)
 			else
-				Accepted := _HS_RenderTree(Tree, "", Rows)
+				Accepted := _HS_RenderTree(Tree, Rows)
 		} catch Any as Failure {
 			Caught := true
 			AssertTrue((Kind == "total_throw" || Kind == "format_throw") && Failure == Primary, "original late count/formatter primary identity survives production cleanup")
@@ -545,17 +542,13 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 			AssertTrue(Caught)
 		else {
 			AssertFalse(Caught)
-			AssertEqual(Kind == "valid_rows" || Kind == "valid_parent" || Kind == "mapping", Accepted)
+			AssertEqual(Kind == "valid_rows" || Kind == "mapping", Accepted)
 		}
 		AssertEqual(Kind == "missing" ? 0 : 2, CountReads, "genuine file count precedes exactly one late _HS_NodeTotal read")
 		AssertEqual(Kind == "missing" ? 0 : Kind == "total_throw" ? 1 : 2, FormatReads, "original positive count format is not evaluated before late total")
 		if Kind != "missing"
 			AssertTrue(ChildObserved, "real finished registered child exists before late total")
-		if Kind == "valid_parent" {
-			AssertEqual(1, TrayMenuItemCount(Parent), "real native parent receives the same one folder")
-			AssertEqual(Corpus["receipts"][3]["expected"], TrayMenuItemCaption(Parent, 0), "native parent caption matches the independent frozen donor")
-			AssertEqual(Held[1].Handle, TrayMenuSubmenuHandle(Parent.Handle, 0), "native parent owns the exact filled folder")
-		} else if Kind == "valid_rows" || Kind == "mapping" {
+		if Kind == "valid_rows" || Kind == "mapping" {
 			AssertEqual(1, Rows.Length)
 			AssertTrue(Rows[1]["submenu"] is Menu), Menus.Push(Rows[1]["submenu"])
 			AssertEqual(1, TrayMenuItemCount(Rows[1]["submenu"]), "returned exact folder keeps its finished child")
@@ -593,6 +586,23 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 			throw CleanupFailures[1]["failure"]
 	}
 }
-for _HSCS_FolderCaptionKind in ["valid_rows", "valid_parent", "mapping", "missing", "late_withdraw", "total_throw", "format_throw", "root_has", "formatter_call", "parent_call"]
+for _HSCS_FolderCaptionKind in ["valid_rows", "mapping", "missing", "late_withdraw", "total_throw", "format_throw", "root_has", "formatter_call", "parent_call"]
 	Test("shared-personal-folder-caption: genuine filled folder, late total and original owner " . _HSCS_FolderCaptionKind,
 		_HSCS_PersonalFolderCaptionNative.Bind(_HSCS_FolderCaptionKind))
+
+; Every folder level returns row data; the retired mode that appended a level
+; into a caller's Menu natively must stay refused before anything is allocated.
+_HSCS_PersonalFolderRefusesParentMenu() {
+	Parent := Menu(), Held := []
+	try {
+		Refused := false
+		try _HS_RenderTree(Map("Folder", Map("tomls", [], "subfolders", Map())), Parent, Held)
+		catch TypeError
+			Refused := true
+		AssertTrue(Refused, "a native parent menu in place of the row array is refused")
+		AssertEqual(0, Held.Length, "the refusal allocates no folder menu")
+		AssertEqual(0, TrayMenuItemCount(Parent), "the refused parent receives no row")
+	} finally MenuDispatcher_PruneMenu(Parent)
+}
+Test("shared-personal-folder-caption: a folder level never appends into a native parent menu",
+	_HSCS_PersonalFolderRefusesParentMenu)

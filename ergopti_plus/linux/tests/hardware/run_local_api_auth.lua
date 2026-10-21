@@ -14,6 +14,7 @@ local available, uv = pcall(require, "luv")
 if not available then io.stderr:write("ENVIRONMENT: native lua-luv is required\n"); os.exit(2) end
 require("compat.utf8").install()
 local Http = require("adapters.http_client")
+local EventLoop = require("adapters.event_loop")
 local Remote = require("modules.llm.api_remote")
 local Json = require("json")
 local failures, checks, sockets, requests = {}, 0, {}, {}
@@ -30,7 +31,11 @@ end
 local function run_until(predicate)
 	local deadline = uv.now() + 5000
 	local timer = uv.new_timer()
-	uv.timer_start(timer, 10, 10, function() if predicate() or uv.now() > deadline then uv.stop() end end)
+	uv.timer_start(timer, 10, 10, function()
+		-- The real daemon pumps deferred discovery after its keyboard idle callback.
+		EventLoop._run_idle_tick()
+		if predicate() or uv.now() > deadline then uv.stop() end
+	end)
 	uv.run()
 	uv.timer_stop(timer); close(timer); uv.run("nowait")
 	return predicate() == true
@@ -153,7 +158,7 @@ check(discovery_calls == 1 and #Servers.detected() == 4 and Servers.result("omlx
 local backend, writes = "ollama", 0
 local rows = require("ui.menu.local_server_rows").rows({
 	get_backend = function() return backend end,
-	can_configure_local_servers = function() return true end,
+	can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 	set_backend = function(value) backend, writes = value, writes + 1; return true end,
 }, { prompt = function() return nil end, error = function() end }, function() end,
 	{ is_paused = function() return false end })
@@ -222,7 +227,7 @@ for index, configured in ipairs(configured_entries) do
 		configured.provider .. " actual configured discovery retains its exact optional authentication")
 	local configured_rows = require("ui.menu.local_server_rows").rows({
 		get_backend = function() return backend end,
-		can_configure_local_servers = function() return true end,
+		can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 		set_backend = function(value) backend, writes = value, writes + 1; return true end,
 	}, { prompt = function() return nil end, error = function() end }, function() end,
 		{ is_paused = function() return false end })
@@ -275,7 +280,7 @@ end
 check(#Servers.detected() == 6, "empty model lists retain all actual reachable server views")
 local empty_rows = require("ui.menu.local_server_rows").rows({
 	get_backend = function() return backend end,
-	can_configure_local_servers = function() return true end,
+	can_configure_local_servers = function() return true end, is_enabled = function() return true end,
 	set_backend = function() error("empty model rows cannot acquire the backend setter") end,
 }, { prompt = function() return nil end, error = function() end }, function() end,
 	{ is_paused = function() return false end })
@@ -313,6 +318,8 @@ response = { status = 200, body = '{"data":[{"id":"obsolete-after-source-drift"}
 discovery_done = false
 local drift_before = #requests
 Servers.rescan(function() return true end, function() discovery_done = true end)
+-- Preserve this control's acquisition-before-drift premise under idle dispatch.
+EventLoop._run_idle_tick()
 local source_writer = assert(io.open(private_path, "wb")); source_writer:write(exact_source .. "\n"); source_writer:close()
 check(run_until(function() return discovery_done end) and #requests == drift_before + 6,
 	"all six acquired native probes settle across actual private-file drift")

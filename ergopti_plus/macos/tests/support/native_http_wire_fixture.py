@@ -11,6 +11,7 @@ The portable role exercises real peers without claiming native Apple acceptance.
 
 import http.server
 import importlib.util
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -60,12 +61,21 @@ class CommandInputOwner:
 
 
 class WireFixture:
-    def __init__(self, native=True):
+    def __init__(self, native=True, origin_address=None):
+        """Owns the origin, proxies and PAC peers.
+
+        origin_address replaces the unresolvable .test name with an IP literal
+        for callers whose client validates the destination address itself.
+        """
+        if origin_address is not None:
+            # Fail fast: a name here would silently bring back a DNS lookup.
+            ipaddress.ip_address(origin_address)
         self.native = native
         self.closed = False
         self.root = Path(tempfile.mkdtemp(prefix="ergopti-native-http-wire-"))
         os.chmod(self.root, 0o700)
-        self.host = "ergopti-native-" + uuid.uuid4().hex + ".test"
+        self.host = origin_address or "ergopti-native-" + uuid.uuid4().hex + ".test"
+        self.host_is_address = origin_address is not None
         self.ca = self.root / "ca.pem"
         self.command_file_debt = []
         self.command_group_debt = []
@@ -397,12 +407,13 @@ class WireFixture:
 
     def _certificates(self):
         config = self.root / "cert.conf"
+        origin = ("IP:" if self.host_is_address else "DNS:") + self.host
         config.write_text(
             "[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=ca\n"
             "[dn]\nCN=Ergopti owned native wire CA\n[ca]\nbasicConstraints=critical,CA:TRUE\n"
             "keyUsage=critical,keyCertSign,cRLSign\n[server]\nbasicConstraints=critical,CA:FALSE\n"
             "keyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n"
-            f"subjectAltName=DNS:{self.host},IP:127.0.0.1\n",
+            f"subjectAltName={origin},IP:127.0.0.1\n",
             encoding="utf-8",
         )
         openssl = "/usr/bin/openssl"
@@ -590,18 +601,24 @@ class WireFixture:
         class TLSOrigin(Server):
             receiving_kind = "origin"
 
-            def get_request(self):
-                raw, address = super().get_request()
+            def finish_request(self, request, client_address):
+                # The handshake runs in this request's own thread. In
+                # get_request it held the accept loop, so one client stalled
+                # mid-handshake kept every later connection waiting for its
+                # ten-second timeout, as long as the receiving client's own.
                 try:
-                    raw.settimeout(10)
+                    request.settimeout(10)
                     owner._receive("handshake_started")
-                    connection = owner.context.wrap_socket(raw, server_side=True)
+                    connection = owner.context.wrap_socket(request, server_side=True)
                     owner._receive("handshake_complete")
-                    return connection, address
                 except BaseException:
                     owner._receive("handshake_refused")
-                    raw.close()
-                    raise
+                    request.close()
+                    return
+                try:
+                    super().finish_request(connection, client_address)
+                finally:
+                    self.shutdown_request(connection)
 
             def handle_error(self, *_):
                 pass  # The deliberate untrusted-CA test fails before HTTP.
@@ -767,11 +784,19 @@ class WireFixture:
         socks.receiving_kind = "socks"
         self.servers.append(socks)
         self.ports["socks"] = socks.server_address[1]
-        # An owned bound non-listening socket proves ECONNREFUSED while keeping
-        # its port unavailable to an unrelated process throughout the test.
-        self.refused = socket.socket()
-        self.refused.bind(("127.0.0.1", 0))
-        self.ports["refused"] = self.refused.getsockname()[1]
+        # The refused proxy is a port nothing holds. A bound non-listening
+        # socket refuses on Linux, but XNU silently drops a SYN that matches a
+        # TCPS_CLOSED socket (tcp_input: "goto drop", no RST), so CFNetwork
+        # waited on that proxy until the deadline killed the worker (test01's
+        # "default_refused_with_successor" route). A port with no socket gets
+        # a RST on every OS; the kernel just released it, and a reuse by an
+        # unrelated process fails the case instead of passing it.
+        reservation = socket.socket()
+        try:
+            reservation.bind(("127.0.0.1", 0))
+            self.ports["refused"] = reservation.getsockname()[1]
+        finally:
+            reservation.close()
         self.pac = (
             "function FindProxyForURL(url, host) { "
             + "".join(
@@ -949,8 +974,6 @@ class WireFixture:
             except OSError:
                 pass
             connection.close()
-        if hasattr(self, "refused"):
-            self.refused.close()
         if getattr(self, "command_group_debt", ()):
             failures.append("child")
         if failures:

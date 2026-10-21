@@ -112,12 +112,22 @@ end
 local function with_panel(scenario)
 	local owned = {
 		"ui.menu.menu_llm.local_server_panel", "ui.menu.menu_llm.api_panel", "modules.llm",
-		"infra.dialog_util", "infra.notifications",
+		"infra.dialog_util", "infra.notifications", "infra.deferred_work",
 	}
 	with_backend(function(api, LocalServers, world)
 		helpers.with_fresh_modules(owned, function()
 			world.notices, world.persists, world.menus, world.activations, world.warmups = {}, 0, 0, 0, 0
 			world.dialog_answer = { "OK", "" }
+			-- Deferred work runs at once unless a scenario holds it to model the
+			-- menu build that has not returned yet.
+			world.deferred, world.hold_deferred = {}, false
+			package.loaded["infra.deferred_work"] = {
+				after = function(delay, callback, label)
+					world.deferred[#world.deferred + 1] = { delay = delay, label = label, callback = callback }
+					if not world.hold_deferred then callback() end
+					return true
+				end,
+			}
 			package.loaded["modules.llm"] = {
 				api_remote = api,
 				persist_api_entries = function(callback)
@@ -139,7 +149,7 @@ local function with_panel(scenario)
 			}
 			local Panel = require("ui.menu.menu_llm.local_server_panel")
 			local ctx = {
-				state = { llm_backend = "ollama", llm_model = "" },
+				state = { llm_backend = "ollama", llm_model = "", llm_enabled = true },
 				paused = false,
 				is_paused = function() return false end,
 				keymap = {

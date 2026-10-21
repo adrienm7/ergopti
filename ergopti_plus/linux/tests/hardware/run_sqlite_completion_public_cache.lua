@@ -29,19 +29,36 @@ local function oracle()
  assert(assert(W.query_rows("SELECT SUM(bs_total) FROM agg_app_day_errors;"))[1]=="7")
  assert(assert(W.query_rows("SELECT SUM(count_total) FROM agg_app_day_session;"))[1]=="2")
 end
-local function payload() return K.get_dashboard_payload({include_prefetch=false}).metrics_manifest end
+local function payload()
+ local result,reason=K.get_dashboard_payload({include_prefetch=false})
+ assert(type(result)=="table" and reason==nil,"healthy public cache must acknowledge its dashboard payload")
+ assert(type(result.metrics_manifest)=="table","healthy public cache must retain its manifest")
+ return result.metrics_manifest
+end
 local function cell(manifest) return manifest[date] and manifest[date][app] or {} end
 local checks, failures=0,0
 for _,tbl in ipairs({"agg_app_day","agg_app_day_errors","agg_app_day_session"}) do
  oracle(); K.clear_cache()
  assert(W.exec_sql("ALTER TABLE "..tbl.." RENAME TO owned_hidden;"))
- local partial=cell(payload())
+ local result,reason=K.get_dashboard_payload({include_prefetch=false})
+ local partial=type(result)=="table" and type(result.metrics_manifest)=="table" and cell(result.metrics_manifest) or nil
  assert(W.exec_sql("ALTER TABLE owned_hidden RENAME TO "..tbl..";"))
  local recovered=cell(payload())
  oracle(); assert(W.get_revision()==revision)
- print(string.format("OBSERVED %s partial=%s,%s,%s recovered=%s,%s,%s revision=%s",tbl,tostring(partial.llm_chars),tostring(partial.bs_total),tostring(partial.session_count_total),tostring(recovered.llm_chars),tostring(recovered.bs_total),tostring(recovered.session_count_total),tostring(revision)))
+ print(string.format("OBSERVED %s public_refused=%s recovered=%s,%s,%s revision=%s",tbl,tostring(result==nil),tostring(recovered.llm_chars),tostring(recovered.bs_total),tostring(recovered.session_count_total),tostring(revision)))
  checks=checks+1
  local ok,err=xpcall(function()
+  if tbl=="agg_app_day" then
+   assert(result==nil and reason=="SQLite projection unavailable","unreadable categories must refuse the complete public dashboard")
+  else
+   assert(type(result)=="table" and reason==nil and partial~=nil,"derived refusal must preserve the independently available partial manifest")
+   assert(partial.llm_chars==3,"derived refusal lost the independently stored software chars")
+   if tbl=="agg_app_day_errors" then
+    assert(partial.bs_total==nil and partial.session_count_total==2,"partial manifest misreported the refused error source")
+   else
+    assert(partial.bs_total==7 and partial.session_count_total==nil,"partial manifest misreported the refused session source")
+   end
+  end
   assert(recovered.llm_chars==3,"same-revision public cache omitted accepted software chars")
   assert(recovered.bs_total==7,"same-revision public cache omitted SQL-proven error data")
   assert(recovered.session_count_total==2,"same-revision public cache omitted SQL-proven session data")
