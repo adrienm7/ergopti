@@ -3,8 +3,9 @@
 --- Reads the package pin shared by repository onboarding and the macOS builder.
 --- Keep package identity in manifest.json so both launch modes select identical bytes.
 local JsonCodec = require("adapters.json_codec")
+local NativePath = require("native_path")
 local source = debug.getinfo(1, "S").source:sub(2)
-local directory = assert(source:match("^(.*[/\\])"), "Karabiner manifest directory is unavailable")
+local directory = assert(NativePath.directory_prefix(source), "Karabiner manifest directory is unavailable")
 local file = assert(io.open(directory .. "manifest.json", "rb"))
 local content, read_error = file:read("*a")
 local closed, close_error = file:close()

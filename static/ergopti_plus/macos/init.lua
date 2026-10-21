@@ -18,11 +18,11 @@ local logger_shared_root
 do
 	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
 	-- Resolve absolute path when source is relative (Hammerspoon always provides abs)
-	local _abs = _src:match("^[/\\]") and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
+	local _abs = _src:sub(1, 1) == "/" and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
 	-- Strip "init.lua" to get the HS driver root
-	local _hs_root = _abs:match("^(.*)[/\\][^/\\]+$") or _abs
+	local _hs_root = _abs:match("^(.*)/[^/]+$") or _abs
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
-	local _ergopti_plus = _hs_root:match("^(.*)[/\\][^/\\]+$") or _hs_root
+	local _ergopti_plus = _hs_root:match("^(.*)/[^/]+$") or _hs_root
 	logger_shared_root = _ergopti_plus .. "/_shared"
 	local _shared       = logger_shared_root .. "/lua"
 	if not package.path:find(_shared, 1, true) then
@@ -275,8 +275,7 @@ Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 local script_path = debug.getinfo(1, "S").source
 if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 
-local base_dir = script_path:match("^(.*[/\\])") or "./"
-if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
+local base_dir = require("native_path").directory_prefix(script_path) or "./"
 
 -- Boot initialises the RESOLVER, not the path editor: every consumer below
 -- resolves through it, and none of them draws a UI. The editor's reload
@@ -1644,12 +1643,11 @@ ExtensionPacks.discover()
 do
 	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 	local override_path = config_paths.get_config_dir()
-	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
-	override_path = override_path .. "hotstrings_config.toml"
+	override_path = require("native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
 	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
 		current_override_path = function()
-			return config_paths.get_config_dir():gsub("[/\\]+$", "") .. "/hotstrings_config.toml"
+			return require("native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
 		end,
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
@@ -2092,7 +2090,7 @@ ui_restore.restore()
 local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
-	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	personal_hotstrings_dir = require("native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),
 	personal_info_path       = personal_info_toml_path,
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
@@ -2113,7 +2111,7 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	git_roots               = {
 		base_dir,
-		(config_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
+		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
 	},
 })
 if file_watchers_committed ~= true then

@@ -11,6 +11,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local TimerScheduler = require("adapters.timer_scheduler")
 local RunningApplication = require("adapters.running_application")
 
@@ -42,7 +43,7 @@ local _next_notification_id = 0
 -- Safely resolve the absolute path to the favicon based on this file’s location
 pcall(function()
 	local _src  = debug.getinfo(1, "S").source
-	local _base = (_src:sub(1,1) == "@" and _src:sub(2) or _src):match("^(.*[/\\])") or "./"
+	local _base = NativePath.directory_prefix(_src:sub(1,1) == "@" and _src:sub(2) or _src) or "./"
 	_logo_path  = _base .. "../../../img/logo/logo_simple.png"
 end)
 
