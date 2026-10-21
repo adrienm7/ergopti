@@ -128,11 +128,8 @@ the exe gives 6177221 bytes (54 %), which a size cap would let through but an AV
 ## Done
 
 - This analysis (static, on the published assets in the session scratchpad).
-- A CI size budget gate: `tools/ci/windows-exe-size-budget.cjs` owns
-  `WINDOWS_EXE_SIZE_BUDGET_BYTES` (12 MiB, v1.0.4 is 1179136 bytes under it), and the build stage
-  runs it in the step "Check the ErgoptiPlus.exe size budget" after compiling and before signing.
-  The test is `npm run test:windows-exe-size-budget` (js-0451, distribution-and-updates). It has
-  not yet run on a hosted Windows build.
+- No size budget gate: a hard size threshold was added and then reverted by decision. Each file
+  stays as small as possible, without a fixed limit.
 
 ## Remaining
 

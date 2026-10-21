@@ -497,14 +497,6 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-appimage-portability.cjs"],
 			"repro": "node tools/test/test-linux-appimage-portability.cjs"
-		},
-		{
-			"id": "js-0451",
-			"ordinal": 451,
-			"name": "the Windows build stage fails when ErgoptiPlus.exe exceeds its declared size budget",
-			"cmd": "node",
-			"args": ["tools/test/test-windows-exe-size-budget.cjs"],
-			"repro": "npm run test:windows-exe-size-budget"
 		}
 	]
 }
