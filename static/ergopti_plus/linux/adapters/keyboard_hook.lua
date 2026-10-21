@@ -228,6 +228,7 @@ for _, code in pairs(_locks.codes) do _locks.keys[code] = true end
 -- { emit, on_lost, owned }, `owned` when the session locked it itself. Kept in
 -- _locks, not a local of its own: this chunk is near LuaJIT's local budget.
 _locks.word = nil
+_locks.describe_failure = require("error_description").describe
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
@@ -433,23 +434,26 @@ end
 --- The capture goes first: a keymap whose CapsLock key locks nothing
 --- (caps:escape, ctrl:nocaps, caps:shiftlock) is refused before the desktop
 --- receives that key, and its press and release are undone in the capture.
---- @param emit function() -> boolean Presses and releases KEY_CAPSLOCK.
+--- @param emit function() -> boolean, table|nil Presses and releases KEY_CAPSLOCK.
 --- @param locked boolean The Caps Lock state wanted.
 --- @return boolean ok
 --- @return string|nil reason
+--- @return boolean|nil unchanged True only when no native output was attempted.
 function _locks.toggle_word(emit, locked)
 	local captured, capture_err = _locks.capture_tap()
-	if not captured then return false, capture_err end
+	if not captured then return false, capture_err, true end
 	if XkbCapture.caps_locked() ~= locked then
 		local undone, undo_err = _locks.capture_tap()
-		if not undone then return false, undo_err end
-		return false, "the keymap's CapsLock key does not toggle Caps Lock"
+		if not undone then return false, undo_err, true end
+		return false, "the keymap's CapsLock key does not toggle Caps Lock", true
 	end
-	local called, emitted = pcall(emit)
+	local called, emitted, outcome = pcall(emit)
 	if called and emitted == true then return true end
 	local undone, undo_err = _locks.capture_tap()
-	if not undone then return false, undo_err end
-	return false, "the CapsLock key could not be emitted: " .. tostring(emitted)
+	if not undone then return false, undo_err, false end
+	local unchanged = called and type(outcome) == "table" and getmetatable(outcome) == nil
+		and (rawget(outcome, "kind") == "refused" or rawget(outcome, "kind") == "unavailable")
+	return false, "the CapsLock key could not be emitted: " .. _locks.describe_failure(emitted), unchanged == true
 end
 
 --- Ends the session's hold on CapsLock.
@@ -459,15 +463,30 @@ end
 function _locks.end_word(unlock, reason)
 	local word = _locks.word
 	if not word then return true end
-	_locks.word = nil
+	-- The emitter may re-enter stop while native output retires. Neither that
+	-- call nor a successor session can acknowledge the unlock still in flight.
+	if word.releasing then return false end
+	word.releasing = true
 	local ok, err = true, nil
-	if unlock and word.owned and XkbCapture.caps_locked() then
-		ok, err = _locks.toggle_word(word.emit, false)
-		if not ok then Logger.error(LOG, "CapsWord could not unlock CapsLock: %s.", tostring(err)) end
+	if unlock and word.owned then
+		if word.retryable == false then
+			ok, err = false, "the previous CapsLock emission has no acknowledged outcome"
+		elseif not XkbCapture.caps_locked() then
+			ok, err = false, "the capture no longer represents the owned CapsLock"
+		else
+			ok, err, word.retryable = _locks.toggle_word(word.emit, false)
+		end
 	end
-	if reason then
+	word.releasing = false
+	-- A partial or unclassified native emission may already have toggled the
+	-- desktop. Retain that debt without another toggle; retry only a typed
+	-- pre-output refusal, through the exact original emitter.
+	if ok then _locks.word = nil end
+	if not ok then Logger.error(LOG, "CapsWord could not unlock CapsLock: %s.", tostring(err)) end
+	if reason and not word.loss_reported then
+		word.loss_reported = true
 		local told, tell_err = pcall(word.on_lost, reason)
-		if not told then Logger.error(LOG, "CapsWord lock-loss callback failed: %s.", tostring(tell_err)) end
+		if not told then Logger.error(LOG, "CapsWord lock-loss callback failed: %s.", _locks.describe_failure(tell_err)) end
 	end
 	return ok
 end
@@ -2876,8 +2895,8 @@ end
 --- after the session. The hold ends with release_caps_word_lock(), or with
 --- `on_lost(reason)` when the hook ends it: a CapsLock pressed, the hook
 --- stopped, the keyboard handed to a dialog.
---- @param emit function() -> boolean Presses and releases KEY_CAPSLOCK on the
----   daemon's device; kept to unlock it on the session's behalf.
+--- @param emit function() -> boolean, table|nil Presses and releases KEY_CAPSLOCK
+---   on the daemon's device; retains ComboEmitter's typed pre-output refusal.
 --- @param on_lost function(reason) Told once when the hook ends the hold.
 --- @return boolean ok
 --- @return string|nil reason Why the lock was refused.
@@ -2891,9 +2910,16 @@ function M.lock_caps_for_word(emit, on_lost)
 		_locks.word = { emit = emit, on_lost = on_lost, owned = false }
 		return true
 	end
-	local ok, reason = _locks.toggle_word(emit, true)
-	if not ok then return false, reason end
-	_locks.word = { emit = emit, on_lost = on_lost, owned = true }
+	-- Reserve ownership before calling output: a failed native press may have
+	-- toggled the desktop even when its release could not be acknowledged.
+	local word = { emit = emit, on_lost = on_lost, owned = true, releasing = true }
+	_locks.word = word
+	local ok, reason, unchanged = _locks.toggle_word(emit, true)
+	word.releasing = false
+	if not ok then
+		if unchanged then _locks.word = nil else word.retryable = false end
+		return false, reason
+	end
 	return true
 end
 
@@ -2904,7 +2930,7 @@ function M.release_caps_word_lock()
 	return _locks.end_word(true, nil)
 end
 
---- Whether a CapsWord session holds CapsLock.
+--- Whether a CapsWord session owns a lock or unsettled CapsLock output.
 --- @return boolean
 function M.caps_word_lock_held()
 	return _locks.word ~= nil
@@ -4181,7 +4207,10 @@ function M.while_released(fn, opts)
 	end
 	-- Ungrabbed, the keyboard reaches the desktop unseen: a CapsLock pressed
 	-- in the dialog could not be told apart from the session's, so it ends.
-	_locks.end_word(true, "keyboard handed to a dialog")
+	if _locks.end_word(true, "keyboard handed to a dialog") ~= true then
+		observe("refused", { ok = false, reason = "caps_word_retirement_refused" })
+		return nil, "CapsWord lock retirement refused"
+	end
 	local modal_tx = _intercept and original_reader_load and _input_source_owners and _capture_session
 		and _begin_source_transaction() or nil
 	local function stop_modal(reason)
