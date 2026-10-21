@@ -1499,7 +1499,9 @@ if boot_llm_enabled == nil then
 end
 
 local function start_llm_bootstrap()
-	local active_backend = backend_detector.effective_backend()
+	-- The backend config.toml selects, as the menu applies it: its runtime is
+	-- the one to check and to offer, not the Apple-silicon default (#99)
+	local active_backend = backend_detector.effective_backend(boot_saved_prefs.llm_backend)
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
 	-- Each checker owns its retained zero-delay timer, pause admission, exact
 	-- task settlement, and same-epoch replay. A PAUSED caller is rejected and

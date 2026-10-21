@@ -159,11 +159,18 @@ function M.mlx_support()
 	return true, platform
 end
 
---- Returns the effective backend the rest of the stack should use. Honours
---- a user-saved preference when present; otherwise falls back to
---- M.auto_default().
+--- Returns the effective backend the rest of the stack should use: the one
+--- config.toml selects, else a user-saved preference, else M.auto_default().
+--- The boot bootstrap read only the second, which nothing writes, so an
+--- Ollama or API user got the MLX check and its "AI stays off" notice at
+--- every start on Apple silicon (#99).
+--- @param configured any The config.toml selection (state.llm_backend), or nil.
 --- @return string One of M.BACKEND_MLX / M.BACKEND_OLLAMA / M.BACKEND_API.
-function M.effective_backend()
+function M.effective_backend(configured)
+	if configured == M.BACKEND_MLX or configured == M.BACKEND_OLLAMA or configured == M.BACKEND_API then
+		Logger.debug(LOG, "Effective backend = %s (config.toml).", configured)
+		return configured
+	end
 	local saved = Storage.get(SETTING_KEY)
 	if saved == M.BACKEND_MLX or saved == M.BACKEND_OLLAMA or saved == M.BACKEND_API then
 		Logger.debug(LOG, "Effective backend = %s (user-saved).", saved)
