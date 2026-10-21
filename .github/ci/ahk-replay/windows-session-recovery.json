@@ -1,0 +1,17 @@
+{
+	"expected_count": 11,
+	"filters": [
+		{
+			"contains": "metrics-warm-reload-recovery",
+			"expected_count": 4
+		},
+		{
+			"contains": "metrics-warm-ingest-recovery",
+			"expected_count": 3
+		},
+		{
+			"contains": "ollama-paused-readiness",
+			"expected_count": 4
+		}
+	]
+}
