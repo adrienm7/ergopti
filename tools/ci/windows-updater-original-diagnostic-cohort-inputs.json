@@ -59,18 +59,18 @@
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "c4ea711e38ca3827e884dc84dc8ab579cf18086e3df59bd7ecb132c7b23110d4",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "964896291f50265e5222a62591ebe7f9aafa139a15463203f8b930ba8bda15ce",
-		"static/ergopti_plus/windows/tests/run_all.ahk": "4d3e8b9db285678344aa4106f9435c7fe8ab8912c18a75a2a9a342d684c46efa",
-		"static/ergopti_plus/windows/tests/test_framework.ahk": "825f299411b3e8b2535238633415152e9577673e70b608f05cae4a39346b08a0",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "7f02b3add2262a83c1996826fe77a743d6a88e1cdd98f242fa47ee7488912200",
+		"static/ergopti_plus/windows/tests/test_framework.ahk": "f56c597aee16b24b48964ce8b2896b2574b3222b0ced0b699cb3bc60a9a517e6",
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "91cbd592c28a9b473bc9e7c7e28e08703a8a6203b7bce6a6e3a57d2ef36e0266",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
 		"static/ergopti_plus/windows/tests/unit/updater/test_global_config_admission.ahk": "7b18aa55409e939a0e5a7685f041bf2a7a72867c97cfca2018ceae1eb414a5b1",
-		"tools/test/validate-ahk-suite-manifest.cjs": "ba8a3c26d6271e819fb3669e3e7ac95d30793d88c4a20e8173c636f7805da287"
+		"tools/test/validate-ahk-suite-manifest.cjs": "9e93ef4fc7b3c27fc8816c9af7d3f1d0a19674f7b97a4390d339dc663546aa61"
 	},
 	"original_label_oracle_sha256": "2b00c32567273c9e671b3460fe54b52059032b0188f10103076523d58b59eb01",
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "ffa4ee7c21bf1f664d7d0863733d495ecd144473",
+	"source_pin_base": "f2cad3825227cd474bfcbd8b680778a605a91e6e",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
