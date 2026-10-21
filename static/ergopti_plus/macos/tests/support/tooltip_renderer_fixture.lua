@@ -14,7 +14,7 @@ local OWNERS = {
 	"infra.logger", "infra.i18n", "infra.paths", "infra.text_utils", "text_utils",
 	"infra.toml.reader", "toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom",
 	"toml_codec.key_path", "toml_codec.record_scanner",
-	"infra.vscode_bridge", "tooltip.layout", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
 }
 
 --- Loads a fresh production renderer with an observable file-logger surface.
