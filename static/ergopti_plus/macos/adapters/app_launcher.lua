@@ -21,6 +21,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
+local RunningApplication = require("adapters.running_application")
 
 local LOG = "adapters.app_launcher"
 
@@ -83,7 +84,9 @@ end
 --- @return boolean
 function M.isRunning(process_name)
 	local ok, result = pcall(function()
-		local app = hs.application.get(process_name)
+		-- Never hs.application.get: for a process that is not running it searches
+		-- every window of every application on the main thread.
+		local app = RunningApplication.by_name(process_name)
 		return app ~= nil
 	end)
 	if not ok then

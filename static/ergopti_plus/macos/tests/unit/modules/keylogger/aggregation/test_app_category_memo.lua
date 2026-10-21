@@ -21,7 +21,7 @@
 --- there are two structurally different misses.
 ---   * The app resolved but its bundle carries no LSApplicationCategoryType. That
 ---     is a property of the installed bundle and is safe to memoise forever.
----   * hs.application.get() returned nil because the app is not running RIGHT NOW.
+---   * The process list has no such app because it is not running RIGHT NOW.
 ---     That is a property of this instant, not of the name. Memoising it would
 ---     poison the table — and the worst case is the recovery path, which replays
 ---     historic ledger rows whose apps are mostly not running, so one recovery
@@ -43,15 +43,33 @@ local function load_export()
 	_ = helpers.load_with_stubs("infra.logger")
 	package.loaded["infra.i18n"] = { get = function(k) return k end }
 
-	local probes = { get = 0, info = 0 }
+	local probes = { get = 0, info = 0, window_scans = 0 }
+	--- Builds one running application as hs.application.runningApplications lists it.
+	local function running(name)
+		return {
+			name = function() return name end,
+			kind = function() return 1 end,
+			path = function() return "/Applications/" .. name .. ".app" end,
+		}
+	end
 	local Export = helpers.load_with_stubs("modules.keylogger.export", {
 		application = {
-			-- Faithful to the real API's shape: get() returns nil for an app that is
-			-- not running, and a userdata-like object with :path() otherwise.
-			get = function(name)
+			-- The process list holds every app but NOT_RUNNING. Each enumeration is
+			-- one running-application probe.
+			runningApplications = function()
 				probes.get = probes.get + 1
-				if name == NOT_RUNNING then return nil end
-				return { path = function() return "/Applications/" .. name .. ".app" end }
+				return { running(CATEGORISED), running(NO_CATEGORY) }
+			end,
+			-- hs.application.get/find fall back to hs.window.find, which reads every
+			-- window of every application through Accessibility on the main thread
+			-- when nothing matches: 13.4 s on the maintainer's Mac (issue #99).
+			get = function()
+				probes.window_scans = probes.window_scans + 1
+				return nil
+			end,
+			find = function()
+				probes.window_scans = probes.window_scans + 1
+				return nil
 			end,
 			infoForBundlePath = function(path)
 				probes.info = probes.info + 1
@@ -127,10 +145,23 @@ helpers.describe("app category: a not-running app stays re-checkable", function(
 		Export.get_native_app_category(NOT_RUNNING)
 
 		helpers.assert_true(probes().get > after_first,
-			"hs.application.get() returning nil is a property of this instant, not of the "
+			"an app missing from the process list is a property of this instant, not of the "
 			.. "name. Memoising it would poison the table — the recovery path replays "
 			.. "historic ledger rows whose apps are mostly not running, so one pass would pin "
 			.. "dozens of names to the general fallback for the life of the process")
+	end)
+
+	helpers.it("never searches windows for an app that is not running (app-lookup-no-window-scan)", function()
+		local Export, probes = load_export()
+		Export.get_native_app_category(NOT_RUNNING)
+		Export.get_native_app_category(CATEGORISED)
+		helpers.assert_true(probes().get >= 2,
+			"the lookups must actually consult the process list")
+		helpers.assert_eq(probes().window_scans, 0,
+			"hs.application.get/find search every window of every application when no "
+			.. "running app matches; the ingest flush asked for an app that had quit and "
+			.. "froze Hammerspoon for 13.4 s, disabling the event taps and losing the "
+			.. "Karabiner lease (issue #99)")
 	end)
 
 end)

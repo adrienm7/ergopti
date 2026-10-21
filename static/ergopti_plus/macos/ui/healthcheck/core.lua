@@ -385,6 +385,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.running_application",
+		contract = { "by_name", "by_bundle_id", "current" },
+		-- Every application lookup goes through it; none scans windows.
+		wired    = true,
+	},
+	{
 		id       = "adapters.boot_fatal",
 		contract = { "report" },
 		wired    = true,

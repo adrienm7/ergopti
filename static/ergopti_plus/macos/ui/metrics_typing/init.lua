@@ -25,6 +25,7 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local RunningApplication = require("adapters.running_application")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -408,7 +409,9 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 24
 local EXCLUDED_APPS = { Unknown = true, _sys = true, _system = true }
 
 local function get_app_icon(app_name)
-	local app = hs.application.find(app_name)
+	-- Never hs.application.find: for an app that is not running it searches every
+	-- window of every application, once per icon, on the main thread.
+	local app = RunningApplication.by_name(app_name)
 	if app and type(app.bundleID) == "function" then
 		local ok, img = pcall(hs.image.imageFromAppBundle, app:bundleID())
 		if ok and img then

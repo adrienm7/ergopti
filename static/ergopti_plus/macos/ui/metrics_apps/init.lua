@@ -22,6 +22,7 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local RunningApplication = require("adapters.running_application")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -469,7 +470,9 @@ local UI_CACHE_FILE = UI_TMP_DIR .. "ergopti_metrics_apps_cache.json"
 
 --- Resolve a base64 data URL for an app's icon, or nil when unavailable.
 local function get_app_icon(app_name)
-	local app = hs.application.find(app_name)
+	-- Never hs.application.find: for an app that is not running it searches every
+	-- window of every application, once per icon, on the main thread.
+	local app = RunningApplication.by_name(app_name)
 	if app and type(app.bundleID) == "function" then
 		local bid = app:bundleID()
 		if bid then
