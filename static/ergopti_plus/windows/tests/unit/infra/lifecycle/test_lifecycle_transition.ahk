@@ -340,3 +340,5 @@ _LT_UserHotstringsCancellationDebt() {
 }
 Test("lifecycle transition: real programmable cancellation debt gates suspend acknowledgment (user-hotstrings-lifecycle)",
 	_LT_UserHotstringsCancellationDebt)
+
+#Include ../../modules/llm/servers/test_ollama_webview_pause_readiness.ahk
