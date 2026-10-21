@@ -74,13 +74,13 @@
 		},
 		"linux-unit-suite": {
 			"kind": "command",
-			"path": ".github/workflows/ci-linux.yml",
+			"path": ".github/workflows/ci-linux-unit.yml",
 			"args": ["test-linux", "Run the driver unit test suite"],
 			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
 		},
 		"linux-e2e-suite": {
 			"kind": "command",
-			"path": ".github/workflows/ci-linux.yml",
+			"path": ".github/workflows/ci-linux-e2e.yml",
 			"args": ["e2e-linux", "Linux E2E test suite bodies including live fixture chain"],
 			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
 		},

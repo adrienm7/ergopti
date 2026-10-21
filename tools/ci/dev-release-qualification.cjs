@@ -173,11 +173,11 @@ const STABLE_EXTRA_SCOPES = Object.freeze({
 		args: ['e2e-hs', 'Receive actual native model create, pull, inference and retirement']
 	},
 	'linux-unit-suite': {
-		path: '.github/workflows/ci-linux.yml',
+		path: '.github/workflows/ci-linux-unit.yml',
 		args: ['test-linux', 'Run the driver unit test suite']
 	},
 	'linux-e2e-suite': {
-		path: '.github/workflows/ci-linux.yml',
+		path: '.github/workflows/ci-linux-e2e.yml',
 		args: ['e2e-linux', 'Linux E2E test suite bodies including live fixture chain']
 	},
 	'macos-native-pac': {

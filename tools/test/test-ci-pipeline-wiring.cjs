@@ -187,6 +187,8 @@ const COMMON_BOX = '.github/workflows/ci-common.yml';
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
+// The Linux E2E stage file, where the raw harness steps sit before inlining.
+const LINUX_E2E_BOX = '.github/workflows/ci-linux-e2e.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
 // Release verifies every lane against the persisted plan, then publishes.
 const RELEASE_BOX = '.github/workflows/ci-release.yml';
@@ -3495,7 +3497,7 @@ for (const [what, rel, from, to] of [
 	[
 		'a third entry in the Linux lane',
 		LINUX_BOX,
-		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'Install and launch'\n    needs: [package-linux]\n    runs-on: ubuntu-latest\n",
 		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n"
 	],
 	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [e2e-ahk]\n', ''],
@@ -5202,6 +5204,14 @@ const STAGE_LAYOUT = {
 		['package-windows', 'build', 'Build', 'ErgoptiPlus.exe and layout installer'],
 		['launch-windows', 'install', 'Install and launch', 'Compiled ErgoptiPlus.exe'],
 		['windows-ok', 'verdict', 'Verdict', 'Mandatory jobs and launch evidence']
+	],
+	[LINUX_BOX]: [
+		['test-linux', 'unit', 'Unit tests', '${{ matrix.group }}'],
+		['e2e-linux', 'e2e', 'E2E tests', '${{ matrix.shard }}'],
+		['package-linux', 'build', 'Build', '.deb, .rpm, AppImage and archive'],
+		['package-flatpak', 'flatpak', 'Flatpak', 'Build, install and launch'],
+		['install-linux', 'install', 'Install and launch', '${{ matrix.lot }}'],
+		['linux-ok', 'verdict', 'Verdict', 'Mandatory subjects']
 	]
 };
 // The scripts that find a stage job by its rendered name, with the prefix
@@ -7436,7 +7446,7 @@ function linuxSimultaneousWorkflowProblems(files) {
 		return ['Linux raw workflow admission refused'];
 	}
 	const steps = files
-		.filter((entry) => entry.rel === LINUX_BOX)
+		.filter((entry) => entry.rel === LINUX_E2E_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
 		.filter((job) => job.id === 'e2e-linux')
 		.flatMap((job) => pipeline.steps(job.body))
@@ -7469,7 +7479,10 @@ function linuxSimultaneousWorkflowProblems(files) {
 const linuxSimultaneousRawFiles = pipeline.rawFiles();
 errors.push(...linuxSimultaneousWorkflowProblems(linuxSimultaneousRawFiles));
 const linuxSimultaneousRawJob = pipeline
-	.jobsOfText(linuxSimultaneousRawFiles.find((file) => file.rel === LINUX_BOX).text, LINUX_BOX)
+	.jobsOfText(
+		linuxSimultaneousRawFiles.find((file) => file.rel === LINUX_E2E_BOX).text,
+		LINUX_E2E_BOX
+	)
 	.find((job) => job.id === 'e2e-linux');
 const linuxSimultaneousStepBody = pipeline.step(
 	linuxSimultaneousRawJob.body,
@@ -7531,7 +7544,7 @@ for (const [what, from, to] of [
 	const changed = linuxSimultaneousRawFiles.map((entry) => ({
 		...entry,
 		text:
-			entry.rel === LINUX_BOX
+			entry.rel === LINUX_E2E_BOX
 				? entry.text.replace(linuxSimultaneousStepBody, linuxSimultaneousStepBody.replace(from, to))
 				: entry.text
 	}));

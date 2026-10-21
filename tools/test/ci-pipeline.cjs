@@ -774,6 +774,41 @@ function inlinePipeline(loaded) {
 }
 
 /**
+ * Lists a lane file and every file its jobs call, read from one checkout: what
+ * a fixture copy of the lane must hold.
+ * @param {string} root Absolute path of the checkout.
+ * @param {string} laneRel Lane path.
+ * @returns {string[]}
+ */
+function laneFilesAt(root, laneRel) {
+	const text = fs.readFileSync(path.join(root, laneRel), 'utf8');
+	const called = jobsOfText(text, laneRel)
+		.map((job) => field(job.body, 'uses'))
+		.filter((uses) => uses !== null && uses.startsWith('./'))
+		.map((uses) => uses.slice(2));
+	return [laneRel, ...called];
+}
+
+/**
+ * Reads a lane from one checkout as one workflow: inlined when it calls its
+ * stages, as it is otherwise. Lets a check run on a fixture copy that holds
+ * only the lane's files.
+ * @param {string} root Absolute path of the checkout.
+ * @param {string} laneRel Lane path.
+ * @returns {string}
+ */
+function inlineLaneAt(root, laneRel) {
+	const textOf = (rel) => {
+		const abs = path.join(root, rel);
+		return fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : undefined;
+	};
+	const text = textOf(laneRel);
+	if (text === undefined) fail(`${laneRel} does not exist under ${root}`);
+	const staged = jobsOfText(text, laneRel).some((job) => isStageCaller(job, textOf));
+	return staged ? inlineLane(laneRel, text, textOf) : text;
+}
+
+/**
  * Returns the lane a stage file is inlined into, or the file itself when no
  * lane calls it as a stage: where an inlined view shows that file's job.
  * @param {Array<{rel: string, text: string}>} loaded Pipeline files as they are.
@@ -1034,6 +1069,8 @@ module.exports = {
 	inlineLane,
 	inlinePipeline,
 	laneOfFile,
+	laneFilesAt,
+	inlineLaneAt,
 	isStageCaller,
 	callDeclarations,
 	jobMapping,

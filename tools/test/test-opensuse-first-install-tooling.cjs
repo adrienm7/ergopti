@@ -22,7 +22,11 @@ const producerPath =
 	args[0] === '--producer'
 		? args[1]
 		: path.join(root, 'static/ergopti_plus/linux/tests/distro/e2e_install.sh');
-const workflow = fs.readFileSync(workflowPath, 'utf8');
+// The lane is read inlined with its stage files; a selected file is read as it is.
+const workflow =
+	args[0] === '--workflow'
+		? fs.readFileSync(workflowPath, 'utf8')
+		: require('./ci-pipeline.cjs').inlineLaneAt(root, '.github/workflows/ci-linux.yml');
 const { plan } = linuxInstall.read(root, workflow);
 const originPrep =
 	"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo";

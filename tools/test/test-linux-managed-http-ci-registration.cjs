@@ -655,7 +655,8 @@ assert.equal(
 );
 passed++;
 assert.ok(
-	read('.github/workflows/ci-linux.yml').includes(
+	// The Linux lane, read inlined with its stage files.
+	Pipeline.file('.github/workflows/ci-linux.yml').includes(
 		'--setup-diagnostic "$validation_parent/setup.stdout.private"'
 	)
 );

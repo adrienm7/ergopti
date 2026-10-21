@@ -265,19 +265,19 @@ function main() {
 				/native planner selection/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace('Qualify native HTTP streaming receipts', 'Removed native HTTP proof'),
 				/Qualify native HTTP streaming receipts/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace('npm run test:linux:http-stream | tee', 'echo omitted-native-proof | tee'),
 				/test:linux:http-stream/
 			],
 			[
-				'.github/workflows/ci-linux.yml',
+				'.github/workflows/ci-linux-e2e.yml',
 				(source) =>
 					source.replace(
 						'--subject "http-stream-receipts=$http_stream_assertions"',
