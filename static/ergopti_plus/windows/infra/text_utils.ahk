@@ -171,6 +171,22 @@ _TextTailCodeUnits(Text, Count) {
 }
 
 
+/** Returns the final complete scalar, or empty for an orphan UTF-16 tail. */
+_TextCompleteTailScalar(Text) {
+	if !(Text is String)
+		throw TypeError("_TextCompleteTailScalar expects a string.")
+	if Text == ""
+		return ""
+	Tail := SubStr(Text, -_TextTailCodeUnits(Text, 1))
+	if StrLen(Tail) == 1 {
+		Unit := NumGet(StrPtr(Tail), 0, "UShort")
+		if Unit >= 0xD800 && Unit <= 0xDFFF
+			return ""
+	}
+	return Tail
+}
+
+
 /** Returns whole Unicode characters without splitting surrogate pairs. */
 _TextCodepoints(Text) {
 	if !(Text is String)
