@@ -285,6 +285,393 @@ check('a job id defined twice across the pipeline throws', () => {
 	refuses(() => ci.locate('plan'), /job 'plan' is defined 2 times/);
 });
 
+// A lane's stage caller keeps its stage job's id, so the lane's needs context
+// names the jobs the receipt chain admits.
+const STAGE = '.github/workflows/ci-box-unit.yml';
+const STAGE_TEXT = [
+	'name: Unit',
+	'on:',
+	'  workflow_call:',
+	'jobs:',
+	'  unit:',
+	'    runs-on: ubuntu-latest',
+	'    steps:',
+	'      - name: Run units',
+	'        run: echo units',
+	''
+].join('\n');
+const STAGE_CALLER = '  unit:\n    uses: ./.github/workflows/ci-box-unit.yml\n';
+
+check('a stage caller shares its id with the one job of the file it calls', () => {
+	// The real view: this box mixes steps with a stage caller, which no lane may.
+	const ci = fixture({ [BOX]: `${BOX_TEXT}${STAGE_CALLER}`, [STAGE]: STAGE_TEXT }).real();
+	assert.equal(ci.locate('unit').file, STAGE);
+	assert.ok(ci.job('unit').includes('echo units'));
+	assert.equal(ci.locateCaller('unit').file, BOX);
+	assert.equal(pipeline.field(ci.caller('unit'), 'uses'), './.github/workflows/ci-box-unit.yml');
+	assert.equal(ci.locateCaller('box').file, ENTRY);
+	assert.deepEqual(ci.laneFiles(BOX), [BOX, STAGE]);
+	assert.deepEqual(
+		ci.laneJobs(BOX).map((job) => `${job.file}:${job.id}`),
+		[`${BOX}:test`, `${BOX}:gate`, `${STAGE}:unit`]
+	);
+	assert.equal(ci.findStep('Run units').file, STAGE);
+	refuses(() => ci.caller('test'), /job 'test' calls no reusable workflow/);
+});
+
+check('a shared id outside a stage caller and its only job throws', () => {
+	const foreign = fixture({
+		// The stage file is loaded through another caller, so both ids are seen.
+		[BOX]: `${BOX_TEXT}${STAGE_CALLER.replace('ci-box-unit.yml', 'ci-box-other.yml')}  loader:
+    uses: ./.github/workflows/ci-box-unit.yml
+`,
+		[STAGE]: STAGE_TEXT,
+		'.github/workflows/ci-box-other.yml': STAGE_TEXT.replace('  unit:\n', '  other:\n')
+	}).real();
+	foreign.files();
+	refuses(
+		() => foreign.locate('unit'),
+		/a caller may share an id only with the job of the file it calls/
+	);
+	const crowded = fixture({
+		[BOX]: `${BOX_TEXT}${STAGE_CALLER}`,
+		[STAGE]: `${STAGE_TEXT}  extra:\n    runs-on: ubuntu-latest\n`
+	}).real();
+	refuses(
+		() => crowded.locate('unit'),
+		/defines 2 jobs \(unit, extra\); a stage file defines its one job/
+	);
+	const twice = fixture({
+		[ENTRY]: `${ENTRY_TEXT}  unit:\n    uses: ./.github/workflows/ci-box-unit.yml\n`,
+		[BOX]: `${BOX_TEXT}${STAGE_CALLER}`,
+		[STAGE]: STAGE_TEXT
+	}).real();
+	refuses(() => twice.locate('unit'), /job 'unit' is defined 3 times/);
+});
+
+// A lane made only of stage callers, read back as one workflow.
+const LANE = '.github/workflows/ci-lane.yml';
+const LANE_UNIT = '.github/workflows/ci-lane-unit.yml';
+const LANE_GATE = '.github/workflows/ci-lane-gate.yml';
+const LANE_ENTRY = edit(ENTRY_TEXT, 'ci-box.yml', 'ci-lane.yml');
+const RELEASE_INPUT = [
+	'      release:',
+	'        description: True on a release run',
+	'        required: true',
+	'        type: boolean'
+];
+const KEY_SECRET = ['      KEY:', '        description: Signing key', '        required: false'];
+const LANE_TEXT = [
+	'name: Lane',
+	'on:',
+	'  workflow_call:',
+	'    inputs:',
+	...RELEASE_INPUT,
+	'    secrets:',
+	...KEY_SECRET,
+	'',
+	'permissions:',
+	'  contents: read',
+	'',
+	'jobs:',
+	'  # Units first.',
+	'  unit:',
+	"    name: 'Unit tests'",
+	'    uses: ./.github/workflows/ci-lane-unit.yml',
+	'    with:',
+	'      release: ${{ inputs.release }}',
+	'    secrets:',
+	'      KEY: ${{ secrets.KEY }}',
+	'',
+	'  gate:',
+	"    name: 'Verdict'",
+	'    needs: [unit]',
+	'    if: always()',
+	'    uses: ./.github/workflows/ci-lane-gate.yml',
+	'    with:',
+	'      release: ${{ inputs.release }}',
+	'      plan: ${{ needs.unit.outputs.plan }}',
+	'      predecessors: ${{ toJSON(needs) }}',
+	'      predecessor_result: ${{ needs.unit.result }}',
+	''
+].join('\n');
+const STRING_INPUT = (name) => [
+	`      ${name}:`,
+	`        description: ${name} from the lane`,
+	'        required: true',
+	'        type: string'
+];
+const LANE_ENV = ['env:', '  RELEASE: ${{ inputs.release }}'];
+const LANE_UNIT_TEXT = [
+	'name: Unit',
+	'on:',
+	'  workflow_call:',
+	'    inputs:',
+	...RELEASE_INPUT,
+	'    outputs:',
+	'      plan:',
+	'        description: The plan',
+	'        value: ${{ jobs.unit.outputs.plan }}',
+	'    secrets:',
+	...KEY_SECRET,
+	'',
+	'permissions:',
+	'  contents: read',
+	'',
+	...LANE_ENV,
+	'',
+	'jobs:',
+	'  unit:',
+	"    name: '${{ matrix.lot }}'",
+	'    runs-on: ubuntu-latest',
+	'    outputs:',
+	'      plan: ${{ steps.plan.outputs.plan }}',
+	'    steps:',
+	'      - name: Plan',
+	'        id: plan',
+	'        env:',
+	'          KEY: ${{ secrets.KEY }}',
+	'        run: echo plan',
+	''
+].join('\n');
+const LANE_GATE_TEXT = [
+	'name: Gate',
+	'on:',
+	'  workflow_call:',
+	'    inputs:',
+	...RELEASE_INPUT,
+	...STRING_INPUT('plan'),
+	...STRING_INPUT('predecessors'),
+	...STRING_INPUT('predecessor_result'),
+	'',
+	'permissions:',
+	'  contents: read',
+	'',
+	...LANE_ENV,
+	'',
+	'jobs:',
+	'  gate:',
+	"    name: 'Mandatory evidence'",
+	'    runs-on: ubuntu-latest',
+	'    env:',
+	'      PLAN: ${{ inputs.plan }}',
+	'      NEEDS: ${{ inputs.predecessors }}',
+	'      PRIOR: ${{ inputs.predecessor_result }}',
+	'    steps:',
+	'      - name: Judge the lane',
+	'        run: echo "$PLAN"',
+	''
+].join('\n');
+const INLINED_LANE = [
+	'name: Lane',
+	'on:',
+	'  workflow_call:',
+	'    inputs:',
+	...RELEASE_INPUT,
+	'    secrets:',
+	...KEY_SECRET,
+	'',
+	'permissions:',
+	'  contents: read',
+	'',
+	...LANE_ENV,
+	'',
+	'jobs:',
+	'  # Units first.',
+	'  unit:',
+	"    name: 'Unit tests'",
+	'    runs-on: ubuntu-latest',
+	'    outputs:',
+	'      plan: ${{ steps.plan.outputs.plan }}',
+	'    steps:',
+	'      - name: Plan',
+	'        id: plan',
+	'        env:',
+	'          KEY: ${{ secrets.KEY }}',
+	'        run: echo plan',
+	'',
+	'  gate:',
+	"    name: 'Verdict'",
+	'    needs: [unit]',
+	'    if: always()',
+	'    runs-on: ubuntu-latest',
+	'    env:',
+	'      PLAN: ${{ needs.unit.outputs.plan }}',
+	'      NEEDS: ${{ toJSON(needs) }}',
+	'      PRIOR: ${{ needs.unit.result }}',
+	'    steps:',
+	'      - name: Judge the lane',
+	'        run: echo "$PLAN"',
+	''
+].join('\n');
+
+/** A fixture checkout of a lane of two stages, with `overrides` replacing files. */
+function laneFixture(overrides = {}) {
+	return fixture({
+		[ENTRY]: LANE_ENTRY,
+		[BOX]: null,
+		[LANE]: LANE_TEXT,
+		[LANE_UNIT]: LANE_UNIT_TEXT,
+		[LANE_GATE]: LANE_GATE_TEXT,
+		...overrides
+	});
+}
+
+check('a lane of stage callers is read back as one workflow, byte for byte', () => {
+	const ci = laneFixture();
+	assert.deepEqual(
+		ci.files().map((entry) => entry.rel),
+		[ENTRY, LANE]
+	);
+	assert.equal(ci.file(LANE), INLINED_LANE);
+	assert.deepEqual(pipeline.needsOf(ci.job('gate')), ['unit']);
+	assert.equal(pipeline.field(ci.job('gate'), 'if'), 'always()');
+	assert.equal(ci.findStep('Judge the lane').file, LANE);
+	assert.deepEqual(
+		ci
+			.real()
+			.files()
+			.map((entry) => entry.rel),
+		[ENTRY, LANE, LANE_UNIT, LANE_GATE]
+	);
+	assert.equal(ci.real().locate('gate').file, LANE_GATE);
+	assert.equal(ci.real().locateCaller('gate').file, LANE);
+});
+
+check('an inlined lane leaves a step output named like an input untouched', () => {
+	const read = '          GIVEN: ${{ steps.native-pac-inputs.outputs.toolchain }}\n';
+	const ci = laneFixture({
+		[LANE_UNIT]: edit(
+			LANE_UNIT_TEXT,
+			'          KEY: ${{ secrets.KEY }}\n',
+			`          KEY: \${{ secrets.KEY }}\n${read}`
+		)
+	});
+	assert.ok(ci.file(LANE).includes(read));
+});
+
+for (const [label, rel, from, to, pattern] of [
+	[
+		'a stage input the caller does not pass',
+		LANE,
+		'      plan: ${{ needs.unit.outputs.plan }}\n',
+		'',
+		/stage caller 'gate' must pass exactly the inputs/
+	],
+	[
+		'an output read from a job that is not a need',
+		LANE,
+		'${{ needs.unit.outputs.plan }}',
+		'${{ needs.other.outputs.plan }}',
+		/must pass plan from the same output of one of its needs/
+	],
+	[
+		'an output read under another name',
+		LANE,
+		'${{ needs.unit.outputs.plan }}',
+		'${{ needs.unit.outputs.matrix }}',
+		/must pass plan from the same output of one of its needs/
+	],
+	[
+		'a forged needs context',
+		LANE,
+		'      predecessors: ${{ toJSON(needs) }}',
+		"      predecessors: '{}'",
+		/must pass predecessors: \$\{\{ toJSON\(needs\) \}\}/
+	],
+	[
+		'a plan input handed in under another form',
+		LANE,
+		'      release: ${{ inputs.release }}\n    secrets:',
+		'      release: true\n    secrets:',
+		/must pass release: \$\{\{ inputs\.release \}\}, got true/
+	],
+	[
+		'a renamed secret',
+		LANE,
+		'      KEY: ${{ secrets.KEY }}',
+		'      KEY: ${{ secrets.OTHER }}',
+		/must pass the lane's secret KEY as is/
+	],
+	[
+		'a stage job that sets its own needs',
+		LANE_GATE,
+		"    name: 'Mandatory evidence'\n",
+		"    name: 'Mandatory evidence'\n    needs: [unit]\n",
+		/job 'gate' sets needs; its caller owns it/
+	],
+	[
+		'a stage job that sets its own if',
+		LANE_GATE,
+		"    name: 'Mandatory evidence'\n",
+		"    name: 'Mandatory evidence'\n    if: false\n",
+		/job 'gate' sets if; its caller owns it/
+	],
+	[
+		'an output the stage file does not re-export',
+		LANE_UNIT,
+		'      plan:\n        description: The plan\n        value: ${{ jobs.unit.outputs.plan }}\n',
+		'      plan:\n        description: The plan\n        value: ${{ jobs.unit.outputs.other }}\n',
+		/must re-export plan as is/
+	],
+	[
+		'a stage that grants itself more',
+		LANE_UNIT,
+		'permissions:\n  contents: read\n',
+		'permissions:\n  contents: write\n',
+		/must grant exactly the lane's permissions/
+	],
+	[
+		'a stage whose env differs',
+		LANE_GATE,
+		'  RELEASE: ${{ inputs.release }}',
+		'  RELEASE: true',
+		/must set the same env as every stage/
+	],
+	[
+		'a caller that owns a stage key',
+		LANE,
+		"    name: 'Unit tests'\n",
+		"    name: 'Unit tests'\n    strategy:\n      fail-fast: false\n",
+		/stage caller 'unit' sets strategy; the stage job owns them/
+	],
+	[
+		'a caller that hands every secret to its stage',
+		LANE,
+		'    secrets:\n      KEY: ${{ secrets.KEY }}\n',
+		'    secrets: inherit\n',
+		/stage caller 'unit' must list each of its secrets on its own line/
+	],
+	[
+		'a stage with its own concurrency group',
+		LANE_GATE,
+		'permissions:\n  contents: read\n',
+		'concurrency:\n  group: gate\npermissions:\n  contents: read\n',
+		/sets name, on, concurrency, permissions, env; a stage sets only name, on, permissions and env/
+	],
+	[
+		'a stage with another trigger',
+		LANE_GATE,
+		'  workflow_call:\n',
+		'  workflow_call:\n  push:\n',
+		/must be triggered by workflow_call alone/
+	],
+	[
+		'a lane job that runs steps beside its stage callers',
+		LANE,
+		'  # Units first.\n',
+		'  # Units first.\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo lint\n',
+		/mixes stage callers with other jobs/
+	]
+]) {
+	check(`the inlined lane refuses ${label}`, () => {
+		const text = { [LANE]: LANE_TEXT, [LANE_UNIT]: LANE_UNIT_TEXT, [LANE_GATE]: LANE_GATE_TEXT }[
+			rel
+		];
+		refuses(() => laneFixture({ [rel]: edit(text, from, to) }).files(), pattern);
+	});
+}
+
 check('a missing step throws, in a job and across the pipeline', () => {
 	const ci = fixture();
 	refuses(() => pipeline.step(ci.job('test'), 'Missing'), /no step named 'Missing' in this job/);

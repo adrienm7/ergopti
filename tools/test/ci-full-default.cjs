@@ -610,7 +610,10 @@ function validateRaw(files) {
 			`${id}/${name} failure must remain fatal`
 		);
 	}
-	const macText = entries.get('.github/workflows/ci-macos.yml');
+	// The Mac stage contract reads the lane inlined, its stage jobs as one workflow.
+	const macText = raw
+		.inlinePipeline(files)
+		.find((entry) => entry.rel === '.github/workflows/ci-macos.yml').text;
 	const macContract = require('./fixtures/macos-stage-contract.json');
 	const macJobs = YAML.parse(macText).jobs;
 	assert.deepEqual(
@@ -710,53 +713,19 @@ function fromFiles(files) {
 		...entry,
 		text: projectScopedSteps(entry.text, entry.rel)
 	}));
-	const file = (rel) => {
-		const found = projected.find((f) => f.rel === rel);
-		if (!found) refuse(`unknown file ${rel}`);
-		return found.text;
-	};
-	const jobs = (rel) => raw.jobsOfText(file(rel), rel);
-	const locate = (id) => {
-		const found = projected.flatMap((f) => jobs(f.rel)).filter((j) => j.id === id);
-		if (found.length !== 1) refuse(`ambiguous/missing raw job ${id}`);
-		return found[0];
-	};
-	const text = () => projected.map((f) => f.text).join('\n');
-	const findStep = (name) => {
-		const found = projected.flatMap((f) =>
-			jobs(f.rel).flatMap((j) =>
-				raw
-					.steps(j.body)
-					.filter((s) => s.name === name)
-					.map((s) => ({ file: f.rel, job: j.id, body: s.body }))
-			)
-		);
-		if (found.length !== 1) refuse(`ambiguous/missing projected step ${name}`);
-		return found[0];
-	};
+	// The default view reads every lane inlined, as the loader's does; real()
+	// reads the projected files as they are, stage files included.
+	const actual = raw.view(() => projected);
+	const inlined = raw.view(() => raw.inlinePipeline(projected));
 	return {
 		...raw,
-		files: () => projected.map((f) => ({ ...f })),
+		...inlined,
 		rawFiles: () => files.map((f) => ({ ...f })),
-		file,
-		text,
-		jobs,
-		locate,
-		job: (id) => locate(id).body,
-		findStep,
-		textWithout: (id) => {
-			const j = locate(id);
-			return projected
-				.map((f) => (f.rel === j.file ? f.text.replace(j.body, '') : f.text))
-				.join('\n');
-		},
-		calls: (rel = ENTRY_REL) =>
-			jobs(rel)
-				.map((j) => ({ id: j.id, uses: raw.field(j.body, 'uses') }))
-				.filter((j) => j.uses !== null)
+		real: () => ({ ...raw, ...actual }),
+		laneOf: (rel) => raw.laneOfFile(projected, rel)
 	};
 }
 function open(root) {
-	return fromFiles(raw.open(root).files());
+	return fromFiles(raw.open(root).real().files());
 }
 module.exports = { ...open(ROOT), open, fromFiles, validateRaw };
