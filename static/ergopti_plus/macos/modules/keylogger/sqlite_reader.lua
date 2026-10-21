@@ -501,6 +501,21 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 	end, pacer)
 
+	-- agg_app_day_switches_to → switches_to[destination], keyed by source app.
+	-- The shared pages read it for app-pair affinity; it stays absent for an app
+	-- without transitions, and destinations outside the selection are kept.
+	query("agg_app_day_switches_to", function()
+		for r in _rows(db, string.format([[
+			SELECT date, app_from AS app, app_to, SUM(count) AS count
+			FROM agg_app_day_switches_to %s
+			GROUP BY date, app_from, app_to
+		]], date_filter()), pacer) do
+			local a = _get(manifest, r.date, r.app)
+			a.switches_to = a.switches_to or {}
+			a.switches_to[r.app_to] = r.count or 0
+		end
+	end, pacer)
+
 	return complete
 
 end
@@ -510,7 +525,7 @@ local MANIFEST_TABLES = {
 	"agg_app_day", "agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
 	"agg_app_day_chars_class", "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
 	"agg_app_day_kc_hold", "agg_app_day_titles", "agg_app_day_hourly", "agg_app_day_hourly_min5",
-	"ngram_media_keys", "agg_app_day_media_hold",
+	"ngram_media_keys", "agg_app_day_media_hold", "agg_app_day_switches_to",
 }
 
 --- Days per paced manifest window. The largest per-(date, app) tables return
@@ -1000,6 +1015,7 @@ local FINGERPRINT_SOURCES = {
 	{ "agg_app_day_titles",      "c", "ms" },
 	{ "agg_app_day_hourly",      "c", "e", "es", "length(e_buckets_json)" },
 	{ "agg_app_day_hourly_min5", "c", "e", "es", "length(e_buckets_json)" },
+	{ "agg_app_day_switches_to", "count" },
 }
 
 --- Summarizes every row the dashboards read for days up to `through_date`,
