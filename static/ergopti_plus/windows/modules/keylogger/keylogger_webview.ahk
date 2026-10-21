@@ -1171,14 +1171,36 @@ KLWV_OnNavigationCompleted(which, Epoch, *) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return false
 		Entry := KLWV.windows[which]
-		if Entry.Has("navigation_url") {
-				if !(Entry["webview"].Source == Entry["navigation_url"])
+		HasNavigation := Entry.Has("navigation_url")
+		View := HasNavigation ? Entry["webview"] : 0
+		Controller := HasNavigation ? Entry["controller"] : 0
+		NavigationUrl := HasNavigation ? Entry["navigation_url"] : ""
+		if HasNavigation {
+				Source := View.Source
+				if !_KLWV_OwnsNavigation(which, Entry, Epoch, View, HasNavigation, NavigationUrl, Controller)
 						return false
-				Entry["controller"].IsVisible := true
+				if !(Source == NavigationUrl)
+						return false
+				Controller.IsVisible := true
 				try LoggerInfo("Keylogger", "Dashboard {1} page ready in {2} ms.",
 						which, Round(BootClockWallMs() - Entry["open_started"], 2))
 		}
+		if !_KLWV_OwnsNavigation(which, Entry, Epoch, View, HasNavigation, NavigationUrl, Controller)
+				return false
 		return KLWV_ArmFirstPaintTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1)
+}
+
+; A retained controller can serve another session after a Source getter yields.
+; Legacy entries without a navigation URL do not require native view objects.
+_KLWV_OwnsNavigation(which, Entry, Epoch, View, HasNavigation, NavigationUrl, Controller) {
+	if !_KLWV_OwnsDelivery(which, Entry, Epoch)
+		return false
+	if Entry.Has("navigation_url") != HasNavigation
+		return false
+	if !HasNavigation
+		return true
+	return Entry.Get("webview", 0) == View && Entry.Get("controller", 0) == Controller
+		&& Entry["navigation_url"] == NavigationUrl
 }
 
 KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
@@ -1187,8 +1209,19 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return
 		entry := KLWV.windows[which]
-		if entry.Has("navigation_url") && (entry["webview"].Source == entry["navigation_url"])
-				entry["controller"].IsVisible := true
+		HasNavigation := entry.Has("navigation_url")
+		View := HasNavigation ? entry["webview"] : 0
+		Controller := HasNavigation ? entry["controller"] : 0
+		NavigationUrl := HasNavigation ? entry["navigation_url"] : ""
+		if HasNavigation {
+				Source := View.Source
+				if !_KLWV_OwnsNavigation(which, entry, Epoch, View, HasNavigation, NavigationUrl, Controller)
+						return false
+				if Source == NavigationUrl
+						Controller.IsVisible := true
+		}
+		if !_KLWV_OwnsNavigation(which, entry, Epoch, View, HasNavigation, NavigationUrl, Controller)
+				return false
 		; A canceled predecessor may already have armed this callback before its
 		; replacement completed. First-paint ownership is terminal: once the
 		; replacement painted, that older retry must not push or schedule phase 2.
