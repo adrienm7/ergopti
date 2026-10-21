@@ -399,14 +399,20 @@ every pull request into them, and on manual dispatch:
    which tag, version and update channel. The repository-wide gates (hotstring
    TOML formatting, the property tests, the mutation tests and
    `npm run test:js`, one runner per feature lot) run in the
-   `YAML, shared code & web / Unit tests` stage.
+   `YAML, shared code & web / Unit tests` stage; the lots that run real
+   generators, packaging or boot code run next, in its `Integration tests`
+   stage.
 2. Once it passes, four lanes run in parallel, one reusable workflow each:
    **macOS** ([`ci-macos.yml`](.github/workflows/ci-macos.yml)), **Windows**
    ([`ci-windows.yml`](.github/workflows/ci-windows.yml)), **Linux**
    ([`ci-linux.yml`](.github/workflows/ci-linux.yml)) and the shared code and
    web site ([`ci-common.yml`](.github/workflows/ci-common.yml)). Each lane
    file holds its stages as jobs, in the same order on every lane:
-   `Unit tests`, `E2E tests`, `Build`, `Install and launch`, `Verdict`. A
+   `Unit tests`, `Integration tests`, `E2E tests`, `Build`,
+   `Install and launch`, `Verdict`. A unit test checks one module with its
+   neighbours replaced; an integration test runs several real modules, files,
+   processes or the whole driver's startup together; an E2E test drives the
+   driver the way a user does. A
    check therefore reads in two levels, `<lane> / <stage> (<what it tests>)`,
    for example `macOS / E2E tests (Managed Ollama (macOS 15, Intel))` or
    `Windows / Unit tests (core)`. The macOS lane launches the package over
@@ -427,7 +433,7 @@ Validate and plan ─┬─ macOS ───────────────�
                    ├─ Windows ───────────────────┤
                    ├─ Linux ─────────────────────┤
                    └─ YAML, shared code & web ───┘
-each lane: Unit tests ─ E2E tests ─ Build ─ Install and launch ─ Verdict
+each lane: Unit tests ─ Integration tests ─ E2E tests ─ Build ─ Install and launch ─ Verdict
 ```
 
 Each lane has one entry stage and one exit stage, so the run graph draws one

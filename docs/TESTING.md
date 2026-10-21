@@ -22,8 +22,8 @@ calls for that OS:
 [`ci-windows.yml`](../.github/workflows/ci-windows.yml),
 [`ci-macos.yml`](../.github/workflows/ci-macos.yml) or
 [`ci-linux.yml`](../.github/workflows/ci-linux.yml). Each draws one lane,
-`Unit tests → E2E tests → Build → Install and launch → Verdict`, with one job
-per stage. A matrix stage keeps its static name and GitHub appends the row, so
+`Unit tests → Integration tests → E2E tests → Build → Install and launch → Verdict`,
+with one job per stage. A matrix stage keeps its static name and GitHub appends the row, so
 its rows read `Linux / Unit tests (core)` and its graph group
 `Matrix: Linux / Unit tests`; a single job names its subject in parentheses.
 Variants are grouped into one installation matrix per OS.
@@ -31,6 +31,35 @@ Variants are grouped into one installation matrix per OS.
 and runs its XCTest
 (`swift test --package-path static/ergopti_plus/macos/launcher`, macOS only)
 before it builds the app.
+
+The three test stages split by what a test exercises, the same way on every
+row:
+
+- **Unit tests** check one module or one source contract, with its neighbours
+  stubbed.
+- **Integration tests** run several real modules together, or real files,
+  processes, generators, packaging scripts or the driver's own startup. They
+  start only when every Unit row passed.
+- **E2E tests** drive the driver the way a user does (corpus replay, virtual
+  keyboard, native sessions). They start only when Integration passed.
+
+| Row                     | Integration job                                     | What it runs                                                                                                                                                              |
+| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| YAML, shared code & web | `Integration tests (Generators and parity)`         | the `integration-generators-and-parity` feature lot: the generators run and every committed `_generated/` file matches them; the drivers resolve the same manifest values |
+|                         | `Integration tests (Packaging and boot)`            | the `integration-packaging-and-boot` feature lot: the Linux installer and uninstaller in a sandbox, the bundle payloads of every OS and two isolated AHK boot smokes      |
+| Windows                 | `Integration tests (Driver startup)`                | `node tools/test/test-ahk-full-startup-smoke.cjs`: the whole driver boots                                                                                                 |
+|                         | `Integration tests (Fresh clone bootstrap)`         | `node tools/test/test-ahk-fresh-clone-startup.cjs`: a fresh Git clone bootstraps, then starts warm                                                                        |
+|                         | `Integration tests (Native cohorts and contracts)`  | the native desktop AHK cohorts, the Kana layout install, the manifest parity check and the managed Ollama file component                                                  |
+| macOS                   | `Integration tests (Lua module wiring, stubbed hs)` | `lua tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                    |
+| Linux                   | `Integration tests (driver)`                        | `luajit tests/run.lua --module=integration`: the files the `integration` group of `tests/support/module_groups.lua` names                                                 |
+|                         | `Integration tests (native)`                        | the metrics aggregation and histogram equivalence against Python, the XI2 LuaJIT ABI qualification and the manual managed Ollama runtime acceptance                       |
+
+A test moves between Unit and Integration through its owner only: a feature
+lot's `suite.json` folder (the `integration-` prefix marks an Integration
+lot) for the shared row, the `integration` group of each Lua driver's
+`module_groups.lua`, and the lot conditions of `ci-windows.yml`. Selecting
+the Lua `integration` group fails when a file it names is not discovered, so
+a rename cannot silently drop a test.
 
 ---
 
@@ -131,6 +160,7 @@ RUN="static/ergopti_plus/windows/tests/run_all.ahk"
 ```bash
 cd static/ergopti_plus/macos
 lua tests/run.lua                 # unit + meta tests (auto-discovered)
+lua tests/run.lua --module=integration  # only the Integration stage's files
 lua tests/e2e/run_e2e.lua         # E2E virtual-keyboard harness
 ```
 
@@ -144,6 +174,7 @@ with an OVERALL RESULTS block; a non-zero "Failed tests" count is the failure.
 ```bash
 cd static/ergopti_plus/linux
 luajit tests/run.lua
+luajit tests/run.lua --module=integration  # only the Integration stage's files
 ```
 
 ---
