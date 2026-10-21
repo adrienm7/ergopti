@@ -267,6 +267,14 @@ for anything that writes configuration.
       no keyboard device is available, and embed AppImage update information (`appimagetool -u` plus the
       `.zsync` file). Each release is re-tested by the catalog by itself; post `/retest` (from PowerShell,
       not Git Bash) only after fixing a reported failure.
+      Maintainer's goal (October 21): the AppImage should be SELF-CONTAINED and carry its update information.
+      [CODE] (a) Update information: build with `appimagetool -u gh-releases-zsync|adrienm7|ergopti|latest|ErgoptiPlus-*x86_64.AppImage.zsync`
+      (or the equivalent in our packager), publish the `.zsync` file next to the AppImage as a release asset through the
+      release assembly, receipts and verifier, so AppImageUpdate works; the catalog bot warns about its absence. (b)
+      Self-contained: today the AppImage uses the system C library and references glibc 2.34 (bot: 'not self-contained'),
+      which excludes older distributions. Bundle the C library and loader (or build on an older base with only
+      allowed system libraries) and prove it on the distro matrix (Debian 12/13, Fedora, Alpine/musl cannot run glibc
+      binaries: say so), keeping the size reasonable and the tray/appindicator closure intact.
 - [ ] **CI duration.** [CI] Four of the five planned optimisations are in (macOS packaging after
       Unit beside E2E, Build waiting beside E2E for qualified inputs, the Intel XCTest cohorts in
       their own cell, several installed-app scenarios per job, Windows unit shards rebalanced from
