@@ -56,6 +56,8 @@ local function flush_expansion(is_private)
 	local fake_writer = {
 		open_db = function() return true end,
 		register_device = function() return true end,
+		read_open_walk = function() return nil, true end,
+		upsert_open_walk = function() return true end,
 		is_available = function() return true end,
 		bump_rev = function() return true end,
 		insert_typing_events = function(_, events)
@@ -188,6 +190,8 @@ helpers.describe("private mapping: the synthetic character record", function()
 		package.loaded[writer_name] = {
 			open_db = function() return true end,
 			register_device = function() return true end,
+			read_open_walk = function() return nil, true end,
+			upsert_open_walk = function() return true end,
 			is_available = function() return true end,
 			bump_rev = function() return true end,
 			insert_typing_events = function() return true end,

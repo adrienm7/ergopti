@@ -177,6 +177,15 @@ local _flushed_app_sources = {}
 -- A flush adopts its successor only on COMMIT, so a refused one re-walks its
 -- restored events from exactly this state.
 local _walker_contexts = {}
+-- The sessions and bursts a previous process left open, read back from the
+-- open-walk record its last COMMIT wrote. A crash ends them where they were:
+-- the next flush credits them once, and its COMMIT clears this.
+local _recovered_walks = nil
+-- The open-walk record as the last COMMIT left it, so a flush rewrites it only
+-- when it changed: an idle daemon must not open a transaction every interval.
+local _persisted_open_walk = nil
+-- Assigned beside the flush capture; declared here so init() binds the local.
+local decode_open_walk
 -- The monotonic stamp of each application's last manual keystroke. Kept
 -- across flushes: a fresh pending buffer has none, and its first keystroke
 -- then read as zero milliseconds after the previous one, however long ago
@@ -428,6 +437,21 @@ function M.init(opts)
 	-- Open the SQLite database (bootstraps schema on first run).
 	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
 		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+		-- A live walk owns the record; only a fresh process reads back what the
+		-- previous one left open when it stopped without its final flush.
+		if next(_walker_contexts) == nil then
+			local recorded, read_ok = SqliteWriter.read_open_walk(_device_id)
+			-- No record states what an empty one would: nothing is open.
+			_persisted_open_walk, _recovered_walks = recorded or (read_ok and "[]" or nil), nil
+			if recorded then
+				_recovered_walks = decode_open_walk(recorded)
+				if not _recovered_walks then
+					Logger.warn(LOG, "Open session record is malformed; its sessions are not credited.")
+				end
+			elseif not read_ok then
+				Logger.warn(LOG, "Open session record could not be read; sessions left open by a crash are not credited.")
+			end
+		end
 		if SystemMetrics then
 			local database, device = _sqlite_path, _device_id
 			SystemMetrics.bind(database, device, function(date)
@@ -1547,6 +1571,67 @@ local function copy_flush_value(value)
 	return result
 end
 
+-- The numeric cursor fields an open-walk record keeps, in their fixed order.
+-- No typed text: the open word and sequence are not persisted.
+local OPEN_SESSION_FIELDS = { "char_count", "total_ms" }
+local OPEN_BURST_FIELDS = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" }
+
+--- Encodes the sessions and bursts the walk contexts hold open, canonically, so
+--- an unchanged state encodes to the same text and causes no write.
+--- @param contexts table Walk contexts by application id.
+--- @return string encoded JSON array without raw NUL or newline.
+local function encode_open_walk(contexts)
+	local Json = require("json")
+	local function cursor(value, fields)
+		if type(value) ~= "table" then return "null" end
+		local parts = {}
+		for index, field in ipairs(fields) do parts[index] = Json.encode(value[field] or 0) end
+		return "[" .. table.concat(parts, ",") .. "]"
+	end
+	local records = {}
+	for _, ctx in pairs(contexts) do
+		if type(ctx.date) == "string" and type(ctx.app) == "string" and (ctx.session or ctx.burst) then
+			records[#records + 1] = { date = ctx.date, app = ctx.app, text = "{\"date\":" .. Json.encode(ctx.date)
+				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(ctx.session, OPEN_SESSION_FIELDS)
+				.. ",\"burst\":" .. cursor(ctx.burst, OPEN_BURST_FIELDS) .. "}" }
+		end
+	end
+	table.sort(records, function(a, b) return a.date < b.date or (a.date == b.date and a.app < b.app) end)
+	local texts = {}
+	for index, record in ipairs(records) do texts[index] = record.text end
+	return "[" .. table.concat(texts, ",") .. "]"
+end
+
+--- Decodes an open-walk record into settle-ready contexts.
+--- @param encoded string Record text read from the database.
+--- @return table|nil contexts { date, app, session?, burst? } list; nil when malformed.
+decode_open_walk = function(encoded)
+	local Json = require("json")
+	local ok, records = pcall(Json.decode, encoded)
+	if not ok or type(records) ~= "table" or (next(records) ~= nil and #records == 0) then return nil end
+	local function cursor(value, fields)
+		-- The decoder reads JSON null as an empty table.
+		if value == nil or (type(value) == "table" and next(value) == nil) then return true, nil end
+		if type(value) ~= "table" or #value ~= #fields then return false end
+		local result = {}
+		for index, field in ipairs(fields) do
+			if type(value[index]) ~= "number" or value[index] ~= value[index] or value[index] < 0 then return false end
+			result[field] = value[index]
+		end
+		return true, result
+	end
+	local contexts = {}
+	for index, record in ipairs(records) do
+		if type(record) ~= "table" or type(record.date) ~= "string"
+			or not record.date:match("^%d%d%d%d%-%d%d%-%d%d$") or type(record.app) ~= "string" then return nil end
+		local session_ok, session = cursor(record.session, OPEN_SESSION_FIELDS)
+		local burst_ok, burst = cursor(record.burst, OPEN_BURST_FIELDS)
+		if not session_ok or not burst_ok then return nil end
+		contexts[index] = { date = record.date, app = record.app, session = session, burst = burst }
+	end
+	return contexts
+end
+
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
@@ -1618,6 +1703,20 @@ local function capture_flush()
 		end
 		ngram_batch = settled
 	end
+	-- The sessions and bursts a crashed process left open ended with it: each is
+	-- credited once, to its own day, and this flush's COMMIT clears the record.
+	local recovered = _recovered_walks
+	for _, context in ipairs(recovered or {}) do
+		local ok_recover, credited = pcall(AggregateWalker.settle, copy_flush_value(context), nil, ngram_batch, true)
+		if not ok_recover then
+			return nil, "Recovered open session settlement failed; its record remains retained"
+		end
+		ngram_batch = credited
+	end
+	-- What stays open after this flush is recorded in the same transaction, so a
+	-- crash before the next one no longer loses the session in progress.
+	local open_walk = encode_open_walk(walker_contexts)
+	if open_walk ~= _persisted_open_walk then add.open_walk(_device_id, open_walk) end
 	payload.raw.typing = typing_batch
 	if ngram_batch then
 		for _, group in ipairs(AggregateWalker.batches_for_writer(ngram_batch)) do
@@ -1784,7 +1883,7 @@ local function capture_flush()
 		watermarks = {
 			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
 			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
-			walker = walker_contexts,
+			walker = walker_contexts, open_walk = open_walk, recovered = recovered ~= nil,
 		},
 	}
 end
@@ -1853,6 +1952,8 @@ function M.pump_flush()
 			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
 			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
 			_walker_contexts = marks.walker
+			_persisted_open_walk = marks.open_walk
+			if marks.recovered then _recovered_walks = nil end
 			_manifest_cache = { revision = nil, manifest = nil }
 			_last_flush_committed, _flush_state = true, nil
 			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")

@@ -1468,6 +1468,41 @@ function M.upsert_scancodes(device_id, date, app, scancodes)
 	return _exec(sql)
 end
 
+--- The meta key holding one device's still-open sessions and bursts.
+--- @param device_id string
+--- @return string
+local function open_walk_key(device_id)
+	return "open_walk:" .. device_id
+end
+
+--- Replaces the device's open-walk record inside the flush transaction, so the
+--- record and the rows it was cut from commit or roll back together.
+--- @param encoded string JSON array produced by the collector (no raw NUL).
+_derived_sql.open_walk = function(device_id, encoded)
+	assert(type(encoded) == "string" and not encoded:find("[%z\n]"), "Invalid open-walk record")
+	return "INSERT INTO meta(key,value) VALUES ('" .. _sql_escape(open_walk_key(device_id)) .. "','"
+		.. _sql_escape(encoded) .. "') ON CONFLICT(key) DO UPDATE SET value = excluded.value;"
+end
+
+--- Commits one open-walk record outside a flush and returns its native receipt.
+function M.upsert_open_walk(device_id, encoded)
+	if not M.is_available() then return end
+	return _exec(_derived_sql.open_walk(device_id, encoded))
+end
+
+--- Reads the open-walk record the last committed flush left for this device.
+--- @param device_id string
+--- @return string|nil encoded JSON text, nil when no record exists.
+--- @return boolean ok False when the read itself failed.
+function M.read_open_walk(device_id)
+	if not M.is_available() or type(device_id) ~= "string" or device_id == "" then return nil, false end
+	local body = _query_output("SELECT value FROM meta WHERE key='" .. _sql_escape(open_walk_key(device_id)) .. "';")
+	if body == nil then return nil, false end
+	body = body:gsub("\n$", "")
+	if body == "" then return nil, true end
+	return body, true
+end
+
 --- Starts an immutable flush snapshot with one raw/derived transaction.
 --- Reservation gaps are harmless; acknowledged IDs and SQL remain stable across
 --- data-write retries. Only a unique durable marker resolves a lost COMMIT reply.
