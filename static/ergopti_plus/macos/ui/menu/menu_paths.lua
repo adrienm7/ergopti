@@ -24,6 +24,7 @@
 
 local M = {}
 local Json = require("json")
+local NativePath = require("native_path")
 local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")
@@ -188,8 +189,8 @@ end
 local function pick_dir(current, prompt)
 	if type(current) ~= "string" or current == "" then current = nil end
 	local default_dir = current or ConfigPaths.get_config_dir() or "/"
-	if not default_dir:match("[/\\]$") then
-		default_dir = default_dir:match("^(.+[/\\])") or default_dir
+	if not NativePath.has_trailing_separator(default_dir) then
+		default_dir = NativePath.directory_prefix(default_dir) or default_dir
 	end
 	local ok_attr, attr = pcall(hs.fs.attributes, default_dir)
 	if not ok_attr or not attr or attr.mode ~= "directory" then
@@ -221,15 +222,12 @@ local function pick_dir(current, prompt)
 	end
 
 	if type(r2) == "string" and r2 ~= "" then
-		local p = r2:match("^(.-)%s*$")
-		if not p:match("[/\\]$") then p = p .. "/" end
-		return p
+		return NativePath.with_trailing_separator(r2:match("^(.-)%s*$"))
 	end
 	if type(raw) == "string" and raw ~= "" then
 		local stripped = (raw:match('^"(.*)"$') or raw):match("^(.-)%s*$")
 		if stripped ~= "" then
-			if not stripped:match("[/\\]$") then stripped = stripped .. "/" end
-			return stripped
+			return NativePath.with_trailing_separator(stripped)
 		end
 	end
 	return nil

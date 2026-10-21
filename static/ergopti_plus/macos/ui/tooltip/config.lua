@@ -46,6 +46,7 @@
 
 local M = {}
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local LlmLine = require("tooltip.llm_line")
 local LOG = "tooltip_config"
 
@@ -212,10 +213,10 @@ local function load_from_shared()
 	-- macos/ui/tooltip/config.lua → macos/ui/tooltip → macos/ui → macos → ergopti_plus → shared
 	local shared_path = (function()
 		local src = debug.getinfo(1, "S").source:gsub("^@", "")
-		local dir = src:match("^(.*)[/\\][^/\\]+$") or src
-		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
-		dir = dir:match("^(.*)[/\\][^/\\]+$") or dir
-		local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir
+		local dir = NativePath.dirname(src) or src
+		dir = NativePath.dirname(dir) or dir
+		dir = NativePath.dirname(dir) or dir
+		local ergopti_plus = NativePath.dirname(dir) or dir
 		return ergopti_plus .. "/_shared"
 	end)()
 

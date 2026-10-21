@@ -28,6 +28,7 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local NativePath = require("native_path")
 
 local i18n         = require("infra.i18n")
 local toml_writer  = require("infra.toml.writer")
@@ -260,8 +261,8 @@ end
 --- @param config_path string Absolute config.toml path.
 --- @return string
 local function remap_settings_beside(config_path)
-	local name = require("infra.config_paths").get("KarabinerConfigPath"):match("([^/\\]+)$")
-	local folder = type(config_path) == "string" and config_path:match("^(.*)[/\\][^/\\]+$") or nil
+	local name = NativePath.basename(require("infra.config_paths").get("KarabinerConfigPath"))
+	local folder = type(config_path) == "string" and NativePath.dirname(config_path) or nil
 	assert(name and folder, "no remap settings file beside " .. tostring(config_path))
 	return folder .. "/" .. name
 end
@@ -336,10 +337,12 @@ end
 --- @param config_path string Absolute configuration file path.
 --- @return string|nil folder
 local function empty_config_folder(config_path)
-	local folder = type(config_path) == "string" and config_path:match("^(.*[/\\])[^/\\]+$") or nil
+	local parent = type(config_path) == "string" and NativePath.dirname(config_path) or nil
+	local folder = parent and NativePath.directory_prefix(config_path) or nil
 	if not folder or folder:sub(1, 1) ~= "/" or folder:find("%z") then return nil end
 	-- Native configuration files live under the driver's terminal subdirectory.
-	return (folder:gsub("([/\\])hammerspoon[/\\]$", "%1"))
+	if NativePath.basename(parent) == "hammerspoon" then return NativePath.directory_prefix(parent) end
+	return folder
 end
 
 --- Sends the initData payload (locale, strings, folders and the values in
@@ -918,8 +921,7 @@ local function handle_message(body)
 		-- that same source instead of copying another folder's answers into it.
 		local cfg_path = _config_path
 		if chosen ~= "" then
-			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
-			cfg_path = chosen .. "hammerspoon/config.toml"
+			cfg_path = NativePath.with_trailing_separator(chosen) .. "hammerspoon/config.toml"
 		end
 		local import_source = chosen == "" and cfg_path or nil
 		local function import_is_current()
