@@ -174,25 +174,43 @@ OllamaWV_CloseIfEpoch(captured_epoch, *) {
  */
 OllamaWV_Close() {
 	global _OllamaWV_Gui, _OllamaWV_Controller, _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _OllamaWV_Udir, _OllamaWV_MsgSub, _OllamaWV_Epoch
-	_OllamaWV_Epoch += 1
-	_OllamaWV_Ready := false
-	_OllamaWV_Queue := []
-	; Release the subscription handle FIRST, while the controller is still
-	; alive — its __Delete unsubscribes via remove_WebMessageReceived on the
-	; live controller; doing it AFTER Controller.Close() would raise a COM
-	; error against an already-invalidated pointer (see
-	; ui/onboarding/webview.ahk's _OnbWeb_Reset for the sibling ordering fix).
-	_OllamaWV_MsgSub := unset
-	if IsSet(_OllamaWV_Controller)
-		try _OllamaWV_Controller.Close()
-	if IsSet(_OllamaWV_Gui)
-		try _OllamaWV_Gui.Destroy()
-	_OllamaWV_Gui        := unset
-	_OllamaWV_Controller := unset
-	_OllamaWV_WebView    := unset
-	if IsSet(_OllamaWV_Udir) {
-		UdirToDelete := _OllamaWV_Udir
+	Retired := Map()
+	PreviousCritical := Critical("On")
+	try {
+		; Keep every old object alive while detaching the public session. COM
+		; unsubscribe and native cleanup may publish a successor when they yield.
+		Retired["queue"] := _OllamaWV_Queue
+		if IsSet(_OllamaWV_Gui)
+			Retired["gui"] := _OllamaWV_Gui
+		if IsSet(_OllamaWV_Controller)
+			Retired["controller"] := _OllamaWV_Controller
+		if IsSet(_OllamaWV_WebView)
+			Retired["webview"] := _OllamaWV_WebView
+		if IsSet(_OllamaWV_MsgSub)
+			Retired["subscription"] := _OllamaWV_MsgSub
+		if IsSet(_OllamaWV_Udir)
+			Retired["udir"] := _OllamaWV_Udir
+		_OllamaWV_Epoch += 1
+		_OllamaWV_Ready := false
+		_OllamaWV_Queue := []
+		_OllamaWV_MsgSub := unset
+		_OllamaWV_Gui := unset
+		_OllamaWV_Controller := unset
+		_OllamaWV_WebView := unset
 		_OllamaWV_Udir := unset
+	} finally Critical(PreviousCritical)
+	; The subscription must unsubscribe while its captured controller is alive.
+	; Its finalizer runs outside the RAM transaction, before native Close.
+	if Retired.Has("subscription") {
+		Subscription := Retired.Delete("subscription")
+		Subscription := unset
+	}
+	if Retired.Has("controller")
+		try Retired["controller"].Close()
+	if Retired.Has("gui")
+		try Retired["gui"].Destroy()
+	if Retired.Has("udir") {
+		UdirToDelete := Retired["udir"]
 		WebView_RetireProfile(UdirToDelete)
 	}
 }
