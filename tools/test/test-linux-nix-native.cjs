@@ -150,7 +150,7 @@ check('physical owner is reused and no alternate process supervisor', () => {
 	assert.ok(source.includes('sandbox = false\\n')); // Actual single-user build, no claim of Nix sandbox execution.
 });
 check('hosted registration is mandatory and additive', () => {
-	const ci = require('./ci-pipeline.cjs').inlineLaneAt(root, '.github/workflows/ci-linux.yml');
+	const ci = fs.readFileSync(path.join(root, '.github/workflows/ci-linux.yml'), 'utf8');
 	const marker = '      - name: Qualify genuine Nix installed runtime\n';
 	assert.equal(ci.split(marker).length, 2);
 	const step = ci.split(marker)[1].split('\n      - name:')[0];

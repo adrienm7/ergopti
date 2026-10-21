@@ -29,8 +29,7 @@ const read = (name) => fs.readFileSync(path.join(ROOT, name), 'utf8');
 const aliases = JSON.parse(read('package.json')).scripts;
 const inventory = loadInventory(ROOT);
 const coverage = JSON.parse(read('.github/linux-ci-coverage.json'));
-// The Linux lane, read inlined with its stage files.
-const workflow = Pipeline.inlineLaneAt(ROOT, '.github/workflows/ci-linux.yml');
+const workflow = read('.github/workflows/ci-linux.yml');
 const ARCHIVE = 'Qualify native updater archive pipeline';
 const SOURCE = 'Qualify archive crypto and bin parent source controls';
 const SUBJECTS = {

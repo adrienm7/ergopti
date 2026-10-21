@@ -631,7 +631,7 @@ try {
 			run_attempt: 2,
 			head_sha: v.source.candidate,
 			status: 'completed',
-			name: 'macOS / E2E tests / Managed Ollama (macOS 15, Apple silicon)',
+			name: 'macOS / E2E tests (Managed Ollama (macOS 15, Apple silicon))',
 			conclusion: 'failure',
 			steps: [
 				{
@@ -681,7 +681,7 @@ try {
 		const amdArtifact = { ...artifact, name: 'native-http-clock-amd64-123-2' };
 		const amdJob = {
 			...job,
-			name: 'macOS / E2E tests / Managed Ollama (macOS 15, Intel)',
+			name: 'macOS / E2E tests (Managed Ollama (macOS 15, Intel))',
 			steps: [
 				{
 					name: 'Record actual stage role outcome — Managed Ollama (macOS 15, Intel)',
@@ -757,7 +757,7 @@ try {
 			for (const [name, mutate, reason] of [
 				[
 					'wrong human lot',
-					(row) => (row.name = 'macOS / E2E tests / Tooltip canvas (macOS 15, Apple silicon)'),
+					(row) => (row.name = 'macOS / E2E tests (Tooltip canvas (macOS 15, Apple silicon))'),
 					/Official job consistency refused/
 				],
 				[

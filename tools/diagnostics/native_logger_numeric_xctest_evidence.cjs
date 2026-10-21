@@ -106,7 +106,6 @@ function evaluate(text, swiftStatus, captureStatus) {
 /** Binds all compiler inputs and the independently frozen three-case inventory. */
 const INPUTS = Object.freeze([
 	'.github/workflows/ci-macos.yml',
-	'.github/workflows/ci-macos-e2e.yml',
 	'.github/ci/dev_release_qualification_exceptions.json',
 	'.github/ci/stable_release_qualification_exception.json',
 	'tools/diagnostics/native_logger_numeric_xctest_evidence.cjs',

@@ -24,8 +24,7 @@
  *    so a test reads what CI runs rather than a fixed list of paths. A called
  *    file that is missing or empty throws.
  * 2. job(id) returns the unique job body across the whole pipeline and throws
- *    on zero or several matches (but see 7); locate(id) also names its file
- *    and line.
+ *    on zero or several matches; locate(id) also names its file and line.
  * 3. step(body, name) returns the unique step of a job and throws when it is
  *    missing; findStep(name) does the same across the pipeline.
  * 4. Slicing is by indentation, and the layout is enforced rather than assumed:
@@ -38,23 +37,6 @@
  * 6. runOf() returns a step's script line by line, and scriptBlock() with
  *    blockExits() tell whether a brace-delimited block of it ends in a given
  *    exit, so a test can require that a failure branch still fails.
- * 7. A lane delegates each stage to a workflow of its own, called by a job
- *    that keeps the stage job's id, so the lane's `toJSON(needs)` still names
- *    the jobs the receipt chain admits. That is the one duplicate id accepted:
- *    a caller whose `uses:` is the file defining the other job as its only
- *    job. job(id) and locate(id) then return the stage job, caller(id) and
- *    locateCaller(id) the calling job; laneFiles(rel) and laneJobs(rel) read a
- *    lane together with every stage file it calls.
- * 8. The default lookups read every lane inlined (inlineLane): its stage jobs
- *    as one workflow, each under its caller's name, needs and if, with every
- *    value the caller hands in read back from where it comes. The inliner is
- *    the single owner of the stage-call contract and refuses any wiring a
- *    stage could receive differently from the lane (an input not passed or
- *    passed in another form, an output not re-exported, a secret renamed,
- *    permissions or env that differ, a stage job with its own needs or if).
- *    The contract tests therefore read each lane as one workflow and still
- *    fail when a stage or a step disappears; real() reads the files as they
- *    are, for the checks of the layout itself.
  * ==============================================================================
  */
 
@@ -429,534 +411,20 @@ function blockExits(block, code) {
 
 // ======================================
 // ======================================
-// ======= 4/ Resolve A Stage Caller ====
+// ======= 4/ Load A Pipeline ===========
 // ======================================
 // ======================================
 
 /**
- * Resolves every job of one id across the pipeline to the job the lookups
- * return. One job is returned as is. Two are accepted only as a stage caller
- * and its stage: the caller's `uses:` names the stage's file, and that file
- * defines no other job, so the caller can only ever run that stage.
- * @param {string} id Job id.
- * @param {Array<{id: string, file: string, line: number, body: string}>} matches Jobs with that id.
- * @param {(rel: string) => Array<{id: string}>} jobsOf Jobs of one pipeline file.
- * @returns {{stage: object, caller: object|null}}
- */
-function resolveJob(id, matches, jobsOf) {
-	if (matches.length === 0) fail(`no job '${id}' in the pipeline`);
-	if (matches.length === 1) {
-		const only = matches[0];
-		return field(only.body, 'uses') === null
-			? { stage: only, caller: null }
-			: { stage: only, caller: only };
-	}
-	const where = matches.map((m) => `${m.file}:${m.line}`).join(', ');
-	const callers = matches.filter((m) => field(m.body, 'uses') !== null);
-	const stages = matches.filter((m) => field(m.body, 'uses') === null);
-	if (matches.length !== 2 || callers.length !== 1 || stages.length !== 1)
-		fail(`job '${id}' is defined ${matches.length} times: ${where}`);
-	const [caller] = callers;
-	const [stage] = stages;
-	if (field(caller.body, 'uses') !== `./${stage.file}`) {
-		fail(
-			`job '${id}' is defined 2 times: ${where}; a caller may share an id only with the job of the file it calls`
-		);
-	}
-	const siblings = jobsOf(stage.file).map((job) => job.id);
-	if (siblings.length !== 1) {
-		fail(
-			`stage caller '${id}' calls ${stage.file}, which defines ${siblings.length} jobs (${siblings.join(', ')}); a stage file defines its one job`
-		);
-	}
-	return { stage, caller };
-}
-
-// ======================================
-// ======================================
-// ======= 5/ Inline A Lane =============
-// ======================================
-// ======================================
-
-/**
- * Returns the lines of a top-level `key:` block of a workflow, its key line
- * included, up to the next top-level line; null when the workflow has none.
- * @param {string[]} lines Workflow lines.
- * @param {string} key Top-level key.
- * @returns {{at: number, lines: string[]}|null}
- */
-function topLevelBlock(lines, key) {
-	const at = lines.findIndex((line) => line === `${key}:`);
-	if (at < 0) return null;
-	let end = at + 1;
-	while (end < lines.length && (lines[end] === '' || /^\s/.test(lines[end]))) end++;
-	while (end > at + 1 && lines[end - 1] === '') end--;
-	return { at, lines: lines.slice(at, end) };
-}
-
-/**
- * Reads the declarations of one `on.workflow_call` section (inputs, outputs or
- * secrets): each name with its definition lines, in order.
- * @param {string} text Workflow text.
- * @param {string} section Section name.
- * @returns {Map<string, string[]>}
- */
-function callDeclarations(text, section) {
-	const on = topLevelBlock(text.split('\n'), 'on');
-	const found = new Map();
-	if (!on) return found;
-	const at = on.lines.indexOf(`    ${section}:`);
-	if (at < 0) return found;
-	let current = null;
-	for (let index = at + 1; index < on.lines.length; index++) {
-		const line = on.lines[index];
-		if (line !== '' && !/^ {6}/.test(line)) break;
-		const key = /^ {6}([A-Za-z0-9_-]+):\s*$/.exec(line);
-		if (key) {
-			if (found.has(key[1])) fail(`${section}.${key[1]} is declared twice`);
-			current = key[1];
-			found.set(current, [line]);
-		} else if (line !== '') {
-			if (!current) fail(`unreadable ${section} declaration '${line.trim()}'`);
-			found.get(current).push(line);
-		}
-	}
-	return found;
-}
-
-/**
- * Reads a job-level mapping (`with:`, `secrets:`, `outputs:`) of one-line
- * `name: value` entries; null when the job sets none.
- * @param {string} body Job body.
- * @param {string} key Job-level key.
- * @returns {Map<string, string>|null}
- */
-function jobMapping(body, key) {
-	const lines = body.split('\n');
-	const at = lines.findIndex((line) => line === `    ${key}:`);
-	if (at < 0) return null;
-	const found = new Map();
-	for (let index = at + 1; index < lines.length; index++) {
-		const line = lines[index];
-		if (line.trim() === '' || line.trimStart().startsWith('#')) continue;
-		if (indentOf(line) <= 4) break;
-		const entry = /^ {6}([A-Za-z0-9_-]+): (\S.*)$/.exec(line);
-		if (!entry) fail(`unreadable ${key} entry '${line.trim()}'`);
-		if (found.has(entry[1])) fail(`${key}.${entry[1]} is set twice`);
-		found.set(entry[1], entry[2]);
-	}
-	return found;
-}
-
-/** Returns the lines of one job-level key, its continuation lines included, or null. */
-function jobKeyLines(body, key) {
-	const lines = body.split('\n');
-	const at = lines.findIndex((line) => new RegExp(`^ {4}${escapeRegExp(key)}:`).test(line));
-	if (at < 0) return null;
-	let end = at + 1;
-	while (end < lines.length && (lines[end] === '' || indentOf(lines[end]) > 4)) end++;
-	while (end > at + 1 && lines[end - 1] === '') end--;
-	return lines.slice(at, end);
-}
-
-/**
- * True when `job` calls a file that defines it as its one job: a lane's stage
- * caller.
- * @param {{id: string, body: string}} job A job of a pipeline file.
- * @param {(rel: string) => string|undefined} textOf Reads a pipeline file.
- * @returns {boolean}
- */
-function isStageCaller(job, textOf) {
-	const uses = field(job.body, 'uses');
-	if (uses === null || !uses.startsWith('./')) return false;
-	const rel = uses.slice(2);
-	const text = textOf(rel);
-	if (text === undefined) return false;
-	const inner = jobsOfText(text, rel);
-	return inner.length === 1 && inner[0].id === job.id;
-}
-
-/**
- * Inlines a lane: rebuilds it as one workflow whose jobs are its stage jobs,
- * each with its caller's name, needs and if, and with every value its caller
- * hands in read back from where it comes. It refuses any wiring a stage could
- * receive differently from the lane: a stage input the caller does not pass
- * or passes in another form, an output not re-exported as is, a secret not
- * passed through, permissions or env that differ, or a stage job that sets
- * its own needs or if. A missing stage file throws; a lost stage or step is
- * missing from the inlined lane.
- * @param {string} laneRel Lane path.
- * @param {string} laneText Lane text.
- * @param {(rel: string) => string|undefined} textOf Reads a stage file.
- * @returns {string}
- */
-function inlineLane(laneRel, laneText, textOf) {
-	const where = (detail) => `${laneRel}: ${detail}`;
-	const lines = laneText.split('\n');
-	const jobsAt = lines.findIndex((line) => /^jobs:\s*$/.test(line));
-	if (jobsAt < 0) fail(where('no top-level jobs: block'));
-	const header = lines.slice(0, jobsAt);
-	if (topLevelBlock(header, 'env')) fail(where('a lane sets no env; each stage carries it'));
-	const permissions = topLevelBlock(header, 'permissions');
-	if (!permissions) fail(where('a lane declares its permissions'));
-	const laneInputs = callDeclarations(laneText, 'inputs');
-	const laneSecrets = callDeclarations(laneText, 'secrets');
-	const callers = jobsOfText(laneText, laneRel);
-	let env = null;
-	const out = [];
-	let cursor = jobsAt + 1;
-	for (const caller of callers) {
-		const at = caller.line - 1;
-		out.push(...lines.slice(cursor, at), lines[at]);
-		cursor = at + 1 + caller.body.split('\n').length;
-		const who = `stage caller '${caller.id}'`;
-		const uses = field(caller.body, 'uses');
-		if (uses === null) fail(where(`job '${caller.id}' runs steps; a lane only calls stages`));
-		if (!isStageCaller(caller, textOf))
-			fail(where(`${who} must call a file that defines '${caller.id}' as its only job`));
-		const keys = caller.body
-			.split('\n')
-			.filter((line) => JOB_PROPERTY.test(line))
-			.map((line) => line.trim().replace(/:.*$/, ''));
-		const allowed = ['name', 'needs', 'if', 'uses', 'permissions', 'with', 'secrets'];
-		const extra = keys.filter((key) => !allowed.includes(key));
-		if (extra.length) fail(where(`${who} sets ${extra.join(', ')}; the stage job owns them`));
-		// `secrets: inherit` would hand the stage every secret; each one is listed.
-		for (const key of ['with', 'secrets'])
-			if (field(caller.body, key) !== null && !caller.body.split('\n').includes(`    ${key}:`))
-				fail(where(`${who} must list each of its ${key} on its own line`));
-		const stageRel = uses.slice(2);
-		const stageText = textOf(stageRel);
-		const stageLines = stageText.split('\n');
-		const stageJobsAt = stageLines.findIndex((line) => /^jobs:\s*$/.test(line));
-		const stageHeader = stageLines.slice(0, stageJobsAt);
-		// A stage adds nothing at the top: no trigger, concurrency or defaults of its own.
-		const topKeys = stageHeader
-			.filter((line) => /^[^\s#]/.test(line))
-			.map((line) => line.replace(/:.*$/, ''));
-		if (topKeys.some((key) => !['name', 'on', 'permissions', 'env'].includes(key)))
-			fail(
-				where(
-					`${stageRel} sets ${topKeys.join(', ')}; a stage sets only name, on, permissions and env`
-				)
-			);
-		const trigger = topLevelBlock(stageHeader, 'on');
-		if (
-			!trigger ||
-			trigger.lines[1] !== '  workflow_call:' ||
-			trigger.lines.slice(2).some((line) => /^ {2}\S/.test(line))
-		)
-			fail(where(`${stageRel} must be triggered by workflow_call alone`));
-		const stagePermissions = topLevelBlock(stageHeader, 'permissions');
-		if (!stagePermissions || stagePermissions.lines.join('\n') !== permissions.lines.join('\n'))
-			fail(where(`${stageRel} must grant exactly the lane's permissions`));
-		const stageEnv = topLevelBlock(stageHeader, 'env');
-		const envText = stageEnv ? stageEnv.lines.join('\n') : '';
-		if (env === null) env = envText;
-		else if (env !== envText) fail(where(`${stageRel} must set the same env as every stage`));
-		const [stage] = jobsOfText(stageText, stageRel);
-		for (const key of ['needs', 'if'])
-			if (field(stage.body, key) !== null)
-				fail(where(`${stageRel} job '${stage.id}' sets ${key}; its caller owns it`));
-		const stagePermissionLines = jobKeyLines(stage.body, 'permissions');
-		const callerPermissionLines = jobKeyLines(caller.body, 'permissions');
-		if (JSON.stringify(stagePermissionLines) !== JSON.stringify(callerPermissionLines))
-			fail(where(`${who} must grant exactly the permissions its stage job requests`));
-
-		// Inputs: each one the stage declares comes from the caller, in one form.
-		const needs = needsOf(caller.body);
-		const given = jobMapping(caller.body, 'with') ?? new Map();
-		const declared = callDeclarations(stageText, 'inputs');
-		if (JSON.stringify([...given.keys()].sort()) !== JSON.stringify([...declared.keys()].sort()))
-			fail(where(`${who} must pass exactly the inputs ${stageRel} declares`));
-		const handed = new Map();
-		for (const [key, value] of given) {
-			if (laneInputs.has(key)) {
-				if (value !== `\${{ inputs.${key} }}`)
-					fail(where(`${who} must pass ${key}: \${{ inputs.${key} }}, got ${value}`));
-				if (declared.get(key).join('\n') !== laneInputs.get(key).join('\n'))
-					fail(where(`${stageRel} must declare ${key} as the lane does`));
-				continue;
-			}
-			const typed = declared.get(key).some((line) => line === '        type: string');
-			if (!typed) fail(where(`${stageRel} must declare ${key} as a string`));
-			if (key === 'predecessors') {
-				if (value !== '${{ toJSON(needs) }}')
-					fail(where(`${who} must pass predecessors: \${{ toJSON(needs) }}`));
-				handed.set('predecessors', 'toJSON(needs)');
-				continue;
-			}
-			const result = /^\$\{\{ needs\.([A-Za-z0-9_-]+)\.result \}\}$/.exec(value);
-			if (key === 'predecessor_result') {
-				if (!result || needs.length !== 1 || result[1] !== needs[0])
-					fail(where(`${who} must pass predecessor_result from its one need`));
-				handed.set(key, `needs.${result[1]}.result`);
-				continue;
-			}
-			const output = /^\$\{\{ needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+) \}\}$/.exec(value);
-			if (!output || output[2] !== key || !needs.includes(output[1]))
-				fail(where(`${who} must pass ${key} from the same output of one of its needs`));
-			handed.set(key, `needs.${output[1]}.outputs.${key}`);
-		}
-		// Secrets pass through by name.
-		const passed = jobMapping(caller.body, 'secrets') ?? new Map();
-		const stageSecrets = callDeclarations(stageText, 'secrets');
-		if (
-			JSON.stringify([...passed.keys()].sort()) !== JSON.stringify([...stageSecrets.keys()].sort())
-		)
-			fail(where(`${who} must pass exactly the secrets ${stageRel} declares`));
-		for (const [key, value] of passed) {
-			if (value !== `\${{ secrets.${key} }}` || !laneSecrets.has(key))
-				fail(where(`${who} must pass the lane's secret ${key} as is`));
-			if (stageSecrets.get(key).join('\n') !== laneSecrets.get(key).join('\n'))
-				fail(where(`${stageRel} must declare ${key} as the lane does`));
-		}
-		// Outputs are re-exported under their own names.
-		const jobOutputs = jobMapping(stage.body, 'outputs') ?? new Map();
-		const exported = callDeclarations(stageText, 'outputs');
-		if (JSON.stringify([...jobOutputs.keys()]) !== JSON.stringify([...exported.keys()]))
-			fail(where(`${stageRel} must re-export exactly the outputs of '${stage.id}'`));
-		for (const [key, lines_] of exported) {
-			if (!lines_.includes(`        value: \${{ jobs.${stage.id}.outputs.${key} }}`))
-				fail(where(`${stageRel} must re-export ${key} as is`));
-		}
-
-		// The stage job, read back into the lane.
-		const stageBody = stage.body.split('\n');
-		const nameAt = stageBody.findIndex((line) => /^ {4}name:/.test(line));
-		if (nameAt !== 0) fail(where(`${stageRel} job '${stage.id}' must start with its name`));
-		const restored = [
-			...jobKeyLines(caller.body, 'name'),
-			...(jobKeyLines(caller.body, 'needs') ?? []),
-			...(jobKeyLines(caller.body, 'if') ?? []),
-			...stageBody.slice(1)
-		].join('\n');
-		// The inputs context only: not steps.native-pac-inputs.outputs.
-		const read = restored.replace(/(?<![\w.-])inputs\.([A-Za-z0-9_-]+)\b/g, (match, key) => {
-			if (laneInputs.has(key)) return match;
-			if (!handed.has(key)) fail(where(`${stageRel} reads inputs.${key}, which nothing passes`));
-			return handed.get(key);
-		});
-		out.push(read);
-	}
-	out.push(...lines.slice(cursor));
-	const head = [...header];
-	if (env) head.splice(permissions.at + permissions.lines.length, 0, '', ...env.split('\n'));
-	return [...head, 'jobs:', ...out].join('\n');
-}
-
-/**
- * Rebuilds a pipeline with every lane inlined: stage files are folded into the
- * lane that calls them, so the result reads as one workflow per lane.
- * @param {Array<{rel: string, text: string}>} loaded Pipeline files in call order.
- * @returns {Array<{rel: string, text: string}>}
- */
-function inlinePipeline(loaded) {
-	const textOf = (rel) => loaded.find((entry) => entry.rel === rel)?.text;
-	const stages = new Set();
-	const lanes = new Set();
-	for (const entry of loaded) {
-		const jobs = jobsOfText(entry.text, entry.rel);
-		const staged = jobs.filter((job) => isStageCaller(job, textOf));
-		if (staged.length === 0) continue;
-		if (staged.length !== jobs.length)
-			fail(`${entry.rel} mixes stage callers with other jobs; a lane only calls stages`);
-		lanes.add(entry.rel);
-		for (const job of staged) stages.add(field(job.body, 'uses').slice(2));
-	}
-	return loaded
-		.filter((entry) => !stages.has(entry.rel))
-		.map((entry) =>
-			lanes.has(entry.rel)
-				? { rel: entry.rel, text: inlineLane(entry.rel, entry.text, textOf) }
-				: { ...entry }
-		);
-}
-
-/**
- * Writes one inlined lane back into the real files: the inverse of inlineLane.
- * Each job of `text` replaces the job of its stage file, in the stage's own
- * wording (what the caller hands in is read from inputs again), and its name,
- * needs, if and permissions become its caller's. A job `text` drops loses its
- * caller; a job it adds stays a plain job of the lane, which the inliner then
- * refuses. A check written against the one-workflow view can so mutate it and
- * still be validated through the files GitHub runs.
- * @param {Array<{rel: string, text: string}>} files Pipeline files as they are.
- * @param {string} laneRel Lane path.
- * @param {string} text The lane, inlined and possibly changed.
- * @returns {Array<{rel: string, text: string}>}
- */
-function replaceLane(files, laneRel, text) {
-	const textOf = (rel) => files.find((entry) => entry.rel === rel)?.text;
-	const lane = textOf(laneRel);
-	if (lane === undefined) fail(`${laneRel} is not part of the pipeline`);
-	const callers = new Map(
-		jobsOfText(lane, laneRel)
-			.filter((job) => isStageCaller(job, textOf))
-			.map((job) => [job.id, job])
-	);
-	if (callers.size === 0)
-		return files.map((entry) => (entry.rel === laneRel ? { rel: laneRel, text } : { ...entry }));
-	const lines = text.split('\n');
-	const jobsAt = lines.findIndex((line) => /^jobs:\s*$/.test(line));
-	if (jobsAt < 0) fail(`${laneRel}: the inlined lane has no jobs: block`);
-	const head = lines.slice(0, jobsAt);
-	const env = topLevelBlock(head, 'env');
-	const laneHead = env
-		? [...head.slice(0, env.at), ...head.slice(env.at + env.lines.length)]
-		: head;
-	const stageTexts = new Map();
-	const out = [
-		laneHead
-			.join('\n')
-			.replace(/\n{3,}/g, '\n\n')
-			.replace(/\n+$/, '\n'),
-		'jobs:'
-	];
-	let cursor = jobsAt + 1;
-	for (const job of jobsOfText(text, laneRel)) {
-		const at = job.line - 1;
-		out.push(...lines.slice(cursor, at), lines[at]);
-		cursor = at + 1 + job.body.split('\n').length;
-		const caller = callers.get(job.id);
-		if (!caller) {
-			out.push(job.body);
-			continue;
-		}
-		const stageRel = field(caller.body, 'uses').slice(2);
-		const stageText = stageTexts.get(stageRel) ?? textOf(stageRel);
-		const [stage] = jobsOfText(stageText, stageRel);
-		const given = jobMapping(caller.body, 'with') ?? new Map();
-		// The caller's own keys as the inlined job now sets them, then its call.
-		const orderedCaller = [
-			...(jobKeyLines(job.body, 'name') ?? []),
-			...(jobKeyLines(job.body, 'needs') ?? []),
-			...(jobKeyLines(job.body, 'if') ?? []),
-			...(jobKeyLines(caller.body, 'uses') ?? []),
-			...(jobKeyLines(job.body, 'permissions') ?? []),
-			...(jobKeyLines(caller.body, 'with') ?? []),
-			...(jobKeyLines(caller.body, 'secrets') ?? [])
-		];
-		out.push(orderedCaller.join('\n'));
-		// The stage job: its own name, then the inlined body without the caller's keys.
-		const body = job.body.split('\n');
-		const rest = [];
-		for (let index = 0; index < body.length; index++) {
-			const key = /^ {4}([A-Za-z_][A-Za-z0-9_-]*):/.exec(body[index]);
-			if (key && ['name', 'needs', 'if'].includes(key[1])) {
-				while (
-					index + 1 < body.length &&
-					(body[index + 1] === '' || indentOf(body[index + 1]) > 4)
-				) {
-					if (/^ {4}\S/.test(body[index + 1])) break;
-					index++;
-				}
-				continue;
-			}
-			rest.push(body[index]);
-		}
-		let stageBody = [...(jobKeyLines(stage.body, 'name') ?? []), ...rest].join('\n');
-		for (const [key, value] of given) {
-			if (key === 'predecessors')
-				stageBody = stageBody.replaceAll('toJSON(needs)', 'inputs.predecessors');
-			const result = /^\$\{\{ needs\.([A-Za-z0-9_-]+)\.result \}\}$/.exec(value);
-			if (key === 'predecessor_result' && result)
-				stageBody = stageBody.replaceAll(`needs.${result[1]}.result`, 'inputs.predecessor_result');
-			const output = /^\$\{\{ needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+) \}\}$/.exec(value);
-			if (output)
-				stageBody = stageBody.replaceAll(
-					`needs.${output[1]}.outputs.${output[2]}`,
-					`inputs.${key}`
-				);
-		}
-		let rebuilt = stageText.replace(stage.body, () => stageBody);
-		if (env) {
-			const stageLines = rebuilt.split('\n');
-			const at = stageLines.findIndex((line) => /^jobs:\s*$/.test(line));
-			const own = topLevelBlock(stageLines.slice(0, at), 'env');
-			if (own) {
-				stageLines.splice(own.at, own.lines.length, ...env.lines);
-				rebuilt = stageLines.join('\n');
-			}
-		}
-		stageTexts.set(stageRel, rebuilt);
-	}
-	out.push(...lines.slice(cursor));
-	const laneText = out.join('\n');
-	return files.map((entry) =>
-		entry.rel === laneRel
-			? { rel: laneRel, text: laneText }
-			: stageTexts.has(entry.rel)
-				? { rel: entry.rel, text: stageTexts.get(entry.rel) }
-				: { ...entry }
-	);
-}
-
-/**
- * Lists a lane file and every file its jobs call, read from one checkout: what
- * a fixture copy of the lane must hold.
+ * Binds the pipeline lookups to one checkout. The files are read once, on the
+ * first lookup.
  * @param {string} root Absolute path of the checkout.
- * @param {string} laneRel Lane path.
- * @returns {string[]}
+ * @returns {object} The lookups: files, file, text, jobs, locate, job, textWithout, findStep, calls.
  */
-function laneFilesAt(root, laneRel) {
-	const text = fs.readFileSync(path.join(root, laneRel), 'utf8');
-	const called = jobsOfText(text, laneRel)
-		.map((job) => field(job.body, 'uses'))
-		.filter((uses) => uses !== null && uses.startsWith('./'))
-		.map((uses) => uses.slice(2));
-	return [laneRel, ...called];
-}
+function open(root) {
+	let cache = null;
 
-/**
- * Reads a lane from one checkout as one workflow: inlined when it calls its
- * stages, as it is otherwise. Lets a check run on a fixture copy that holds
- * only the lane's files.
- * @param {string} root Absolute path of the checkout.
- * @param {string} laneRel Lane path.
- * @returns {string}
- */
-function inlineLaneAt(root, laneRel) {
-	const textOf = (rel) => {
-		const abs = path.join(root, rel);
-		return fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : undefined;
-	};
-	const text = textOf(laneRel);
-	if (text === undefined) fail(`${laneRel} does not exist under ${root}`);
-	const staged = jobsOfText(text, laneRel).some((job) => isStageCaller(job, textOf));
-	return staged ? inlineLane(laneRel, text, textOf) : text;
-}
-
-/**
- * Returns the lane a stage file is inlined into, or the file itself when no
- * lane calls it as a stage: where an inlined view shows that file's job.
- * @param {Array<{rel: string, text: string}>} loaded Pipeline files as they are.
- * @param {string} rel Repository-relative path.
- * @returns {string}
- */
-function laneOfFile(loaded, rel) {
-	const textOf = (name) => loaded.find((entry) => entry.rel === name)?.text;
-	for (const entry of loaded) {
-		for (const job of jobsOfText(entry.text, entry.rel)) {
-			if (field(job.body, 'uses') === `./${rel}` && isStageCaller(job, textOf)) return entry.rel;
-		}
-	}
-	return rel;
-}
-
-// ======================================
-// ======================================
-// ======= 6/ Load A Pipeline ===========
-// ======================================
-// ======================================
-
-/**
- * Reads ci.yml and every workflow it calls from one checkout, depth first, in
- * call order, refusing a missing or empty file.
- * @param {string} root Absolute path of the checkout.
- * @returns {Array<{rel: string, text: string}>}
- */
-function loadCheckout(root) {
+	/** Reads one workflow of the pipeline, refusing a missing or empty file. */
 	const readWorkflow = (rel, caller) => {
 		const abs = path.join(root, rel);
 		if (!fs.existsSync(abs)) fail(`${rel} (called from ${caller}) does not exist`);
@@ -965,32 +433,24 @@ function loadCheckout(root) {
 		if (!/^jobs:\s*$/m.test(text)) fail(`${rel} has no top-level jobs: block`);
 		return text;
 	};
-	const loaded = [];
-	const seen = new Set();
-	const visit = (rel, caller) => {
-		if (seen.has(rel)) return;
-		seen.add(rel);
-		const text = readWorkflow(rel, caller);
-		loaded.push({ rel, text });
-		for (const match of text.matchAll(LOCAL_CALL)) visit(match[1], rel);
-	};
-	visit(ENTRY_REL, 'the repository');
-	if (loaded.length < 2)
-		fail(`${ENTRY_REL} calls no reusable workflow; the pipeline layout changed`);
-	return loaded;
-}
 
-/**
- * Binds the pipeline lookups to a list of workflow files, read once, on the
- * first lookup.
- * @param {() => Array<{rel: string, text: string}>} read Returns the files in call order.
- * @returns {object} The lookups.
- */
-function view(read) {
-	let cache = null;
+	/** Loads ci.yml and every workflow it calls, depth first, in call order. */
 	const load = () => {
-		if (!cache) cache = read();
-		return cache;
+		if (cache) return cache;
+		const loaded = [];
+		const seen = new Set();
+		const visit = (rel, caller) => {
+			if (seen.has(rel)) return;
+			seen.add(rel);
+			const text = readWorkflow(rel, caller);
+			loaded.push({ rel, text });
+			for (const match of text.matchAll(LOCAL_CALL)) visit(match[1], rel);
+		};
+		visit(ENTRY_REL, 'the repository');
+		if (loaded.length < 2)
+			fail(`${ENTRY_REL} calls no reusable workflow; the pipeline layout changed`);
+		cache = loaded;
+		return loaded;
 	};
 
 	/**
@@ -1032,68 +492,23 @@ function view(read) {
 	 */
 	const jobs = (rel) => jobsOfText(file(rel), rel);
 
-	const resolve = (id) =>
-		resolveJob(
-			id,
-			load()
-				.flatMap((entry) => jobs(entry.rel))
-				.filter((candidate) => candidate.id === id),
-			jobs
-		);
-
 	/**
-	 * Locates the unique job `id` across the pipeline (the stage job when a
-	 * stage caller shares its id).
+	 * Locates the unique job `id` across the pipeline.
 	 * @param {string} id Job id.
 	 * @returns {{id: string, file: string, line: number, body: string}}
 	 */
-	const locate = (id) => resolve(id).stage;
-
-	/**
-	 * Locates the unique job `id` that calls a reusable workflow: a lane in
-	 * ci.yml, or a stage caller in a lane.
-	 * @param {string} id Job id.
-	 * @returns {{id: string, file: string, line: number, body: string}}
-	 */
-	const locateCaller = (id) => {
-		const { caller } = resolve(id);
-		if (!caller) fail(`job '${id}' calls no reusable workflow`);
-		return caller;
+	const locate = (id) => {
+		const matches = load()
+			.flatMap((entry) => jobs(entry.rel))
+			.filter((candidate) => candidate.id === id);
+		if (matches.length === 0) fail(`no job '${id}' in the pipeline`);
+		if (matches.length > 1) {
+			fail(
+				`job '${id}' is defined ${matches.length} times: ${matches.map((m) => `${m.file}:${m.line}`).join(', ')}`
+			);
+		}
+		return matches[0];
 	};
-
-	/**
-	 * Returns the body of the unique job `id` that calls a reusable workflow.
-	 * @param {string} id Job id.
-	 * @returns {string}
-	 */
-	const caller = (id) => locateCaller(id).body;
-
-	/**
-	 * Returns a pipeline file followed by every file it calls, depth first.
-	 * @param {string} rel Repository-relative path of a pipeline file.
-	 * @returns {string[]}
-	 */
-	const laneFiles = (rel) => {
-		file(rel);
-		const found = [];
-		const visit = (current) => {
-			if (found.includes(current)) return;
-			found.push(current);
-			for (const match of file(current).matchAll(LOCAL_CALL)) visit(match[1]);
-		};
-		visit(rel);
-		return found;
-	};
-
-	/**
-	 * Returns the jobs that run steps in a lane and its stage files, in call order.
-	 * @param {string} rel Repository-relative path of a lane file.
-	 * @returns {Array<{id: string, file: string, line: number, body: string}>}
-	 */
-	const laneJobs = (rel) =>
-		laneFiles(rel)
-			.flatMap((current) => jobs(current))
-			.filter((candidate) => field(candidate.body, 'uses') === null);
 
 	/**
 	 * Returns the body of the unique job `id`, without its key line.
@@ -1150,51 +565,13 @@ function view(read) {
 			.map((candidate) => ({ id: candidate.id, uses: field(candidate.body, 'uses') }))
 			.filter((candidate) => candidate.uses !== null);
 
-	return {
-		files,
-		file,
-		text,
-		jobs,
-		locate,
-		job,
-		locateCaller,
-		caller,
-		laneFiles,
-		laneJobs,
-		textWithout,
-		findStep,
-		calls
-	};
-}
-
-/**
- * Binds the lookups to one checkout. The default view reads every lane
- * inlined, one workflow per lane, as the contract tests were written; real()
- * reads the files as they are, stage files included.
- * @param {string} root Absolute path of the checkout.
- * @returns {object} The inlined lookups, plus real().
- */
-function open(root) {
-	const actual = view(() => loadCheckout(root));
-	const inlined = view(() => inlinePipeline(actual.files()));
-	return { ...inlined, real: () => actual, laneOf: (rel) => laneOfFile(actual.files(), rel) };
+	return { files, file, text, jobs, locate, job, textWithout, findStep, calls };
 }
 
 module.exports = {
 	ROOT,
 	ENTRY_REL,
 	open,
-	view,
-	inlineLane,
-	inlinePipeline,
-	laneOfFile,
-	laneFilesAt,
-	inlineLaneAt,
-	replaceLane,
-	isStageCaller,
-	callDeclarations,
-	jobMapping,
-	resolveJob,
 	jobsOfText,
 	field,
 	needsOf,

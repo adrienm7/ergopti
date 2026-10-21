@@ -19,18 +19,11 @@ const JOBS = [
 	['.github/workflows/ci.yml', 'validate', null],
 	['.github/workflows/ci.yml', 'core', null],
 	['.github/workflows/ci.yml', 'prepare-common', null],
-	// Common: each stage caller keeps its stage job's id and predicate; the
-	// stage job in its own file runs whenever its caller does.
 	['.github/workflows/ci-common.yml', 'shared-validation', null],
 	['.github/workflows/ci-common.yml', 'common-unit-verdict', 'always()'],
 	['.github/workflows/ci-common.yml', 'common-e2e', null],
 	['.github/workflows/ci-common.yml', 'common-build', null],
 	['.github/workflows/ci-common.yml', 'common-testbuild', null],
-	['.github/workflows/ci-common-unit.yml', 'shared-validation', null],
-	['.github/workflows/ci-common-e2e.yml', 'common-e2e', null],
-	['.github/workflows/ci-common-build.yml', 'common-build', null],
-	['.github/workflows/ci-common-install.yml', 'common-testbuild', null],
-	['.github/workflows/ci-common-verdict.yml', 'common-unit-verdict', null],
 	['.github/workflows/ci.yml', 'macos', "needs.validate.outputs.lane_macos == 'true'"],
 	['.github/workflows/ci.yml', 'windows', "needs.validate.outputs.lane_windows == 'true'"],
 	['.github/workflows/ci.yml', 'linux', "needs.validate.outputs.lane_linux == 'true'"],
@@ -46,21 +39,11 @@ const JOBS = [
 	['.github/workflows/ci-macos.yml', 'package-macos', null],
 	['.github/workflows/ci-macos.yml', 'launch', null],
 	['.github/workflows/ci-macos.yml', 'macos-ok', 'always()'],
-	['.github/workflows/ci-macos-unit.yml', 'test-hs', null],
-	['.github/workflows/ci-macos-e2e.yml', 'e2e-hs', null],
-	['.github/workflows/ci-macos-build.yml', 'package-macos', null],
-	['.github/workflows/ci-macos-install.yml', 'launch', null],
-	['.github/workflows/ci-macos-verdict.yml', 'macos-ok', null],
 	['.github/workflows/ci-windows.yml', 'test-ahk', null],
 	['.github/workflows/ci-windows.yml', 'e2e-ahk', null],
 	['.github/workflows/ci-windows.yml', 'package-windows', null],
 	['.github/workflows/ci-windows.yml', 'launch-windows', null],
 	['.github/workflows/ci-windows.yml', 'windows-ok', 'always()'],
-	['.github/workflows/ci-windows-unit.yml', 'test-ahk', null],
-	['.github/workflows/ci-windows-e2e.yml', 'e2e-ahk', null],
-	['.github/workflows/ci-windows-build.yml', 'package-windows', null],
-	['.github/workflows/ci-windows-install.yml', 'launch-windows', null],
-	['.github/workflows/ci-windows-verdict.yml', 'windows-ok', null],
 	['.github/workflows/ci-linux.yml', 'test-linux', null],
 	['.github/workflows/ci-linux.yml', 'e2e-linux', null],
 	[
@@ -70,471 +53,435 @@ const JOBS = [
 	],
 	['.github/workflows/ci-linux.yml', 'package-flatpak', null],
 	['.github/workflows/ci-linux.yml', 'install-linux', null],
-	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()'],
-	['.github/workflows/ci-linux-unit.yml', 'test-linux', null],
-	['.github/workflows/ci-linux-e2e.yml', 'e2e-linux', null],
-	['.github/workflows/ci-linux-build.yml', 'package-linux', null],
-	['.github/workflows/ci-linux-flatpak.yml', 'package-flatpak', null],
-	['.github/workflows/ci-linux-install.yml', 'install-linux', null],
-	['.github/workflows/ci-linux-verdict.yml', 'linux-ok', null]
+	['.github/workflows/ci-linux.yml', 'linux-ok', 'always()']
 ];
 const FULL_STEPS = [
 	[
-		'.github/workflows/ci-common-unit.yml',
+		'.github/workflows/ci-common.yml',
 		'shared-validation',
 		'Check hotstring TOML files are sorted and formatted',
 		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
 	],
 	[
-		'.github/workflows/ci-common-build.yml',
+		'.github/workflows/ci-common.yml',
 		'common-build',
 		'Build and seal production site — ${{ matrix.lot }}',
 		null
 	],
 	[
-		'.github/workflows/ci-common-install.yml',
+		'.github/workflows/ci-common.yml',
 		'common-testbuild',
 		'Test received production site — ${{ matrix.lot }}',
 		null
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive closed lease silence transcript controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Execute the actual paired native silence control',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain exact paired-process native receiving',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'lease-silence-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Observe independent native Apple Shortcuts SDK preflight and discovery',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native Apple Shortcuts SDK observation',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-linux-unit.yml',
+		'.github/workflows/ci-linux.yml',
 		'test-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
 		"${{ !cancelled() && matrix.group == 'meta' }}"
 	],
 	[
-		'.github/workflows/ci-linux-unit.yml',
+		'.github/workflows/ci-linux.yml',
 		'test-linux',
 		'Retain actual LuaJIT XI2 diagnostic evidence',
 		"${{ always() && matrix.group == 'meta' }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Prepare genuine pinned Go toolchain',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Acquire and verify genuine pinned upstream inputs',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Build and admit the actual native source asset',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Seal the clean native source build for its receiving cell',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-producer.outcome == 'success') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Hand the clean native source build to its receiving cell',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-seal.outcome == 'success') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive and admit the clean native source asset from its build cell',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual selected number-row Carbon XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive selected-release shell corpus and native guardian cancellation',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain selected number-row Carbon XCTest diagnostics',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify native input-source and launcher XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain native input-source and launcher XCTest diagnostics',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain selected-release native ownership receiving',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Observe the actual no-prompt SDK permission API independently',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'item36-native' && (github.event_name == 'workflow_dispatch' && !inputs.release) && (!cancelled()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Prepare locked native HTTP receiving clients',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive actual private-session and numeric TLS peer controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain actual private-session and numeric TLS peer diagnostics',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual SDK accepted-owner and deadline XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify numeric logger boundary XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual native PAC source ownership XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native SDK XCTest diagnostics',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual native PAC and WPAD XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native PAC XCTest diagnostics',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && matrix.scenario != 'runtime') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive actual independent managed HTTP native clients',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Retain independent native HTTP clock receiving',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true' && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Qualify actual explicit curl stream ownership',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-e2e.yml',
+		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Receive actual native model create, pull, inference and retirement',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.scenario != 'xctest') }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run reporter lifecycle self-tests',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run owned program XCTest notice constructed-policy controls',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Admit native nonreaping Python prerequisites',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Prepare locked managed HTTP native clients',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Prepare scoped native qualification profile',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run portable Brew ownership and refusal controls',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Verify scoped Swift test target exclusion',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Receive actual managed HTTP native clients',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run Swift launcher tests on macOS 26',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain scoped native Brew qualification receipt',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Upload Swift launcher failure transcript',
 		"${{ steps.stage-admission.outcome == 'success' && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain archive diagnostic session',
 		"${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain closed TIS diagnostic session',
 		"${{ steps.stage-admission.outcome == 'success' && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Run signed Hammerspoon program provider inventory',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native Hammerspoon provider inventory',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Observe native notification constructors',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native notification constructor observations',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Observe native global application switcher',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native global application switcher observations',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Observe native Apple Shortcuts discovery',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain native Apple Shortcuts observation',
 		"${{ steps.stage-admission.outcome == 'success' && (always()) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Remove the launcher log the Swift tests wrote',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Self-test the launch verdict',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Receive actual cold native MLX bootstrap',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
 		"${{ steps.stage-admission.outcome == 'success' && (inputs.release) }}"
 	],
 	[
-		'.github/workflows/ci-macos-build.yml',
+		'.github/workflows/ci-macos.yml',
 		'package-macos',
 		'Retain packaged application startup evidence',
 		"${{ steps.stage-admission.outcome == 'success' && (always() && inputs.release) }}"
 	],
-	['.github/workflows/ci-macos-verdict.yml', 'macos-ok', 'Download launch evidence', null],
+	['.github/workflows/ci-macos.yml', 'macos-ok', 'Download launch evidence', null],
+	['.github/workflows/ci-macos.yml', 'macos-ok', 'Download native cold bootstrap evidence', null],
 	[
-		'.github/workflows/ci-macos-verdict.yml',
-		'macos-ok',
-		'Download native cold bootstrap evidence',
-		null
-	],
-	[
-		'.github/workflows/ci-macos-verdict.yml',
+		'.github/workflows/ci-macos.yml',
 		'macos-ok',
 		'Verify mandatory jobs and launch scenarios',
 		null
 	],
-	['.github/workflows/ci-windows-verdict.yml', 'windows-ok', 'Download launch evidence', null],
+	['.github/workflows/ci-windows.yml', 'windows-ok', 'Download launch evidence', null],
 	[
-		'.github/workflows/ci-windows-verdict.yml',
+		'.github/workflows/ci-windows.yml',
 		'windows-ok',
 		'Install locked evidence validation dependencies',
 		null
 	],
 	[
-		'.github/workflows/ci-windows-verdict.yml',
+		'.github/workflows/ci-windows.yml',
 		'windows-ok',
 		'Verify mandatory jobs and launch scenarios',
 		null
 	],
 	[
-		'.github/workflows/ci-linux-flatpak.yml',
+		'.github/workflows/ci-linux.yml',
 		'package-flatpak',
 		'Install the Flatpak the way a user would',
 		null
 	],
-	['.github/workflows/ci-linux-flatpak.yml', 'package-flatpak', 'Launch the Flatpak', null],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Launch the Flatpak', null],
 	[
-		'.github/workflows/ci-linux-flatpak.yml',
+		'.github/workflows/ci-linux.yml',
 		'package-flatpak',
 		'The sandboxed shared data tree resolves and opens',
 		null
 	],
 	[
-		'.github/workflows/ci-linux-build.yml',
+		'.github/workflows/ci-linux.yml',
 		'package-linux',
 		'Unpack and install the tarball the way a user would',
 		null
 	],
+	['.github/workflows/ci-linux.yml', 'package-linux', 'Launch what the tarball installed', null],
 	[
-		'.github/workflows/ci-linux-build.yml',
-		'package-linux',
-		'Launch what the tarball installed',
-		null
-	],
-	[
-		'.github/workflows/ci-linux-build.yml',
+		'.github/workflows/ci-linux.yml',
 		'package-linux',
 		'The installed shared data tree resolves and opens',
 		null
 	],
+	['.github/workflows/ci-linux.yml', 'package-linux', 'Record mandatory package evidence', null],
+	['.github/workflows/ci-linux.yml', 'package-linux', 'Upload mandatory package evidence', null],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Record mandatory Flatpak evidence', null],
+	['.github/workflows/ci-linux.yml', 'package-flatpak', 'Upload mandatory Flatpak evidence', null],
+	['.github/workflows/ci-linux.yml', 'linux-ok', 'Download assertion evidence', null],
 	[
-		'.github/workflows/ci-linux-build.yml',
-		'package-linux',
-		'Record mandatory package evidence',
-		null
-	],
-	[
-		'.github/workflows/ci-linux-build.yml',
-		'package-linux',
-		'Upload mandatory package evidence',
-		null
-	],
-	[
-		'.github/workflows/ci-linux-flatpak.yml',
-		'package-flatpak',
-		'Record mandatory Flatpak evidence',
-		null
-	],
-	[
-		'.github/workflows/ci-linux-flatpak.yml',
-		'package-flatpak',
-		'Upload mandatory Flatpak evidence',
-		null
-	],
-	['.github/workflows/ci-linux-verdict.yml', 'linux-ok', 'Download assertion evidence', null],
-	[
-		'.github/workflows/ci-linux-verdict.yml',
+		'.github/workflows/ci-linux.yml',
 		'linux-ok',
 		'Assert all mandatory subjects ran and passed',
 		null
@@ -586,9 +533,8 @@ function validateRaw(files) {
 	for (const [rel, id, name, condition] of FULL_STEPS) {
 		const job = jobs.find((entry) => entry.file === rel && entry.id === id);
 		const body = raw.step(job.body, name);
-		const expectedCondition = rel.startsWith('.github/workflows/ci-macos')
-			? macRole.metadata(condition, id)
-			: condition;
+		const expectedCondition =
+			rel === '.github/workflows/ci-macos.yml' ? macRole.metadata(condition, id) : condition;
 		requireEqual(raw.stepField(body, 'if'), expectedCondition, `${id}/${name} full step condition`);
 		if (name === 'Check hotstring TOML files are sorted and formatted') {
 			requireEqual(raw.stepField(body, 'id'), 'hotstrings-format', 'mandatory TOML step identity');
@@ -664,10 +610,7 @@ function validateRaw(files) {
 			`${id}/${name} failure must remain fatal`
 		);
 	}
-	// The Mac stage contract reads the lane inlined, its stage jobs as one workflow.
-	const macText = raw
-		.inlinePipeline(files)
-		.find((entry) => entry.rel === '.github/workflows/ci-macos.yml').text;
+	const macText = entries.get('.github/workflows/ci-macos.yml');
 	const macContract = require('./fixtures/macos-stage-contract.json');
 	const macJobs = YAML.parse(macText).jobs;
 	assert.deepEqual(
@@ -767,19 +710,53 @@ function fromFiles(files) {
 		...entry,
 		text: projectScopedSteps(entry.text, entry.rel)
 	}));
-	// The default view reads every lane inlined, as the loader's does; real()
-	// reads the projected files as they are, stage files included.
-	const actual = raw.view(() => projected);
-	const inlined = raw.view(() => raw.inlinePipeline(projected));
+	const file = (rel) => {
+		const found = projected.find((f) => f.rel === rel);
+		if (!found) refuse(`unknown file ${rel}`);
+		return found.text;
+	};
+	const jobs = (rel) => raw.jobsOfText(file(rel), rel);
+	const locate = (id) => {
+		const found = projected.flatMap((f) => jobs(f.rel)).filter((j) => j.id === id);
+		if (found.length !== 1) refuse(`ambiguous/missing raw job ${id}`);
+		return found[0];
+	};
+	const text = () => projected.map((f) => f.text).join('\n');
+	const findStep = (name) => {
+		const found = projected.flatMap((f) =>
+			jobs(f.rel).flatMap((j) =>
+				raw
+					.steps(j.body)
+					.filter((s) => s.name === name)
+					.map((s) => ({ file: f.rel, job: j.id, body: s.body }))
+			)
+		);
+		if (found.length !== 1) refuse(`ambiguous/missing projected step ${name}`);
+		return found[0];
+	};
 	return {
 		...raw,
-		...inlined,
+		files: () => projected.map((f) => ({ ...f })),
 		rawFiles: () => files.map((f) => ({ ...f })),
-		real: () => ({ ...raw, ...actual }),
-		laneOf: (rel) => raw.laneOfFile(projected, rel)
+		file,
+		text,
+		jobs,
+		locate,
+		job: (id) => locate(id).body,
+		findStep,
+		textWithout: (id) => {
+			const j = locate(id);
+			return projected
+				.map((f) => (f.rel === j.file ? f.text.replace(j.body, '') : f.text))
+				.join('\n');
+		},
+		calls: (rel = ENTRY_REL) =>
+			jobs(rel)
+				.map((j) => ({ id: j.id, uses: raw.field(j.body, 'uses') }))
+				.filter((j) => j.uses !== null)
 	};
 }
 function open(root) {
-	return fromFiles(raw.open(root).real().files());
+	return fromFiles(raw.open(root).files());
 }
 module.exports = { ...open(ROOT), open, fromFiles, validateRaw };

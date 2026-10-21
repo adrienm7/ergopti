@@ -9,24 +9,25 @@ only need the layer whose check failed.
 
 | Layer                       | One command                   | CI job                                         | Needs         |
 | --------------------------- | ----------------------------- | ---------------------------------------------- | ------------- |
-| **JS / domain / codegen**   | `npm run test:js`             | `YAML, shared code & web / Unit tests / <lot>` | Node 22       |
-| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests / <category>`            | AutoHotkey v2 |
-| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests / <lot>`                   | Lua 5.4       |
-| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests / <group>`                 | LuaJIT        |
+| **JS / domain / codegen**   | `npm run test:js`             | `YAML, shared code & web / Unit tests (<lot>)` | Node 22       |
+| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / Unit tests (<category>)`            | AutoHotkey v2 |
+| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / Unit tests (<lot>)`                   | Lua 5.4       |
+| **Linux (Lua)**             | `npm run test:linux`          | `Linux / Unit tests (<group>)`                 | LuaJIT        |
 
 `Validate and plan` is the root job of [`ci.yml`](../.github/workflows/ci.yml):
 it validates the release inputs and resolves the plan. The `Core` matrix then
 runs in parallel with the three OS lanes. A check named
-`<OS> / <stage> / <what it tests>` is a job of one stage of the workflow that
-`ci.yml` calls for that OS:
+`<OS> / <stage> (<what it tests>)` is a job of the workflow that `ci.yml`
+calls for that OS:
 [`ci-windows.yml`](../.github/workflows/ci-windows.yml),
 [`ci-macos.yml`](../.github/workflows/ci-macos.yml) or
 [`ci-linux.yml`](../.github/workflows/ci-linux.yml). Each draws one lane,
-`Unit tests → E2E tests → Build → Install and launch → Verdict`, and only calls
-one reusable workflow per stage, named after the lane and the stage: the jobs of
-`macOS / E2E tests` are in `ci-macos-e2e.yml`, those of `Windows / Build` in
-`ci-windows-build.yml`. Variants are grouped into one installation matrix per
-OS. `macOS / Build / ErgoptiPlus.app (macOS 26)` also builds the Swift launcher
+`Unit tests → E2E tests → Build → Install and launch → Verdict`, with one job
+per stage. A matrix stage keeps its static name and GitHub appends the row, so
+its rows read `Linux / Unit tests (core)` and its graph group
+`Matrix: Linux / Unit tests`; a single job names its subject in parentheses.
+Variants are grouped into one installation matrix per OS.
+`macOS / Build (ErgoptiPlus.app, macOS 26)` also builds the Swift launcher
 and runs its XCTest
 (`swift test --package-path static/ergopti_plus/macos/launcher`, macOS only)
 before it builds the app.
@@ -68,13 +69,13 @@ failure means:
 
 **Slow checks**, excluded from the default run: `npm run test:js -- --full` adds
 `test:properties` (fast-check) and `test:mutation` (Stryker). CI exposes them as
-`YAML, shared code & web / Unit tests / Property tests` and
-`… / Mutation tests`, with mutation on `main` only. These lots run independently
+`YAML, shared code & web / Unit tests (Property tests)` and
+`… (Mutation tests)`, with mutation on `main` only. These lots run independently
 of the `test:js` feature lots; the release waits for all of them.
 
 **Not bundled at all**: `python tools/format_toml.py --hotstrings --all --check`
 (hotstring TOML sorting/formatting) is its own lot,
-`YAML, shared code & web / Unit tests / Hotstring TOML formatting`.
+`YAML, shared code & web / Unit tests (Hotstring TOML formatting)`.
 Run it after touching any hotstring `.toml`.
 
 **Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,

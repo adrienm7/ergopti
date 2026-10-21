@@ -495,7 +495,7 @@ for (const [label, jobs, artifacts, pattern] of [
 		'a failed qualifying cell',
 		[qualifier('arm64'), qualifier('amd64', { conclusion: 'failure' })],
 		bothInputs,
-		/E2E tests \/ Managed Ollama \(macOS 15, Intel\) cell concluded failure/
+		/Managed Ollama \(macOS 15, Intel\)\) cell concluded failure/
 	],
 	[
 		'a cancelled qualifying cell',
@@ -547,20 +547,15 @@ for (const [label, jobs, artifacts, pattern] of [
 // ─────────────────────────────────────────────────
 // The workflow uploads and names exactly what the receiver waits for
 // ─────────────────────────────────────────────────
-// The macOS lane, read inlined with its stage files.
-const pipeline = require('./ci-pipeline.cjs');
-const workflow = YAML.parse(pipeline.file('.github/workflows/ci-macos.yml'));
+const workflow = YAML.parse(
+	fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+);
 const e2e = workflow.jobs['e2e-hs'];
 assert.equal(e2e.name, 'E2E tests');
-// GitHub renders a cell 'macOS / E2E tests / <lot>': the stage job is named by its lot.
-assert.equal(
-	YAML.parse(pipeline.real().file('.github/workflows/ci-macos-e2e.yml')).jobs['e2e-hs'].name,
-	'${{ matrix.lot }}'
-);
 for (const architecture of ['arm64', 'amd64'])
 	assert.equal(
 		Handoff.producerJobSuffix(architecture),
-		'E2E tests / ' + roleLot('e2e', 'managed-ollama-build', architecture, '')
+		'E2E tests (' + roleLot('e2e', 'managed-ollama-build', architecture, '') + ')'
 	);
 const hand = e2e.steps.find(
 	(step) => step.name === 'Hand the clean native source build to its receiving cell'
@@ -587,7 +582,7 @@ controls += 5;
 for (const architecture of ['arm64', 'amd64'])
 	assert.equal(
 		Handoff.qualifierJobSuffix(architecture),
-		'E2E tests / ' + roleLot('e2e', 'managed-ollama-native', architecture, '')
+		'E2E tests (' + roleLot('e2e', 'managed-ollama-native', architecture, '') + ')'
 	);
 const qualifiedUpload = e2e.steps.find(
 	(step) => step.name === 'Upload qualified native inputs for the application catalogue'

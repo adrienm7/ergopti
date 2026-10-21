@@ -67,7 +67,6 @@ const NAMES = Object.freeze(
 const FILTER = "--filter '(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)'";
 const INPUTS = Object.freeze([
 	'.github/workflows/ci-macos.yml',
-	'.github/workflows/ci-macos-e2e.yml',
 	'.github/ci/dev_release_qualification_exceptions.json',
 	'.github/ci/stable_release_qualification_exception.json',
 	'tools/diagnostics/native_logger_regression_xctest_evidence.cjs',

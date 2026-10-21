@@ -404,15 +404,12 @@ every pull request into them, and on manual dispatch:
    **macOS** ([`ci-macos.yml`](.github/workflows/ci-macos.yml)), **Windows**
    ([`ci-windows.yml`](.github/workflows/ci-windows.yml)), **Linux**
    ([`ci-linux.yml`](.github/workflows/ci-linux.yml)) and the shared code and
-   web site ([`ci-common.yml`](.github/workflows/ci-common.yml)). A lane file
-   only calls its stages, each a small reusable workflow of its own named
-   after the lane and the stage (`ci-macos-unit.yml`, `ci-macos-e2e.yml`,
-   `ci-macos-build.yml`, `ci-macos-install.yml`, `ci-macos-verdict.yml`, and
-   so on), in the same order on every lane: `Unit tests`, `E2E tests`,
-   `Build`, `Install and launch`, `Verdict`. A check therefore reads
-   `<lane> / <stage> / <what it tests>`, for example
-   `macOS / E2E tests / Managed Ollama (macOS 15, Intel)` or
-   `Windows / Unit tests / core`. The macOS lane launches the package over
+   web site ([`ci-common.yml`](.github/workflows/ci-common.yml)). Each lane
+   file holds its stages as jobs, in the same order on every lane:
+   `Unit tests`, `E2E tests`, `Build`, `Install and launch`, `Verdict`. A
+   check therefore reads in two levels, `<lane> / <stage> (<what it tests>)`,
+   for example `macOS / E2E tests (Managed Ollama (macOS 15, Intel))` or
+   `Windows / Unit tests (core)`. The macOS lane launches the package over
    realistic user states; the Linux lane installs and runs the `.deb`, the
    `.rpm`, the AppImage and the Flatpak and installs the driver on several
    distributions; each `Verdict` then checks every result of its lane. On a

@@ -103,9 +103,8 @@ function checkWorkflow(body) {
 /** Validate every retained wrapper before inspecting this raw native owner. */
 function admittedNativeWorkflow(files) {
 	const admitted = require('./ci-full-default.cjs').fromFiles(files);
-	// The raw Windows lane, its stage files inlined as one workflow.
-	const file = pipeline
-		.inlinePipeline(admitted.rawFiles())
+	const file = admitted
+		.rawFiles()
 		.find((entry) => entry.rel === '.github/workflows/ci-windows.yml');
 	const jobs = pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'test-ahk');
 	assert.equal(jobs.length, 1);
@@ -168,7 +167,7 @@ assert.throws(() =>
 );
 
 checkRunner(runner);
-const body = admittedNativeWorkflow(pipeline.real().files());
+const body = admittedNativeWorkflow(pipeline.files());
 checkWorkflow(body);
 for (const stepName of ['Run native desktop AHK cohorts', 'Publish native desktop AHK evidence']) {
 	const early = pipeline.step(body, stepName);
@@ -181,7 +180,7 @@ for (const [before, after] of [
 	['  macos:', '  omitted-macos:'],
 	['  core:', '  omitted-core:']
 ]) {
-	const files = pipeline.real().files();
+	const files = pipeline.files();
 	const caller = files.find((file) => file.rel === '.github/workflows/ci.yml');
 	assert.equal(caller.text.split(before).length, 2);
 	const changed = files.map((file) =>

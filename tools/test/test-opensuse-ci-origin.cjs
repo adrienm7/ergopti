@@ -20,7 +20,7 @@ const linuxInstall = require('./fixtures/linux-install-source.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 // The install lane admits its canonical map through the actual adjacent transport.
 // The separate layout workflow still owns its inline distribution matrix.
-const workflow = require('./ci-pipeline.cjs').inlineLaneAt(ROOT, '.github/workflows/ci-linux.yml');
+const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8');
 const { plan } = linuxInstall.read(ROOT, workflow);
 const sources = [
 	[

@@ -187,7 +187,6 @@ function sourceReceipt(repository, candidate) {
 	const sources = { ...original.sources };
 	for (const relative of [
 		'.github/workflows/ci-macos.yml',
-		'.github/workflows/ci-macos-e2e.yml',
 		'tools/test/test-macos-swift-launcher-ci.cjs',
 		'tools/test/test-macos-dev-qualification-deferral.cjs'
 	]) {

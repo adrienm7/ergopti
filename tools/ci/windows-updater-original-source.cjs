@@ -32,7 +32,6 @@ const SOURCE_ROOTS = Object.freeze([
 	'.github/ci/stable_release_qualification_exception.json',
 	'.github/workflows/ci.yml',
 	'.github/workflows/ci-windows.yml',
-	'.github/workflows/ci-windows-unit.yml',
 	'.node-version',
 	'package.json',
 	'package-lock.json'

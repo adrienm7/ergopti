@@ -215,8 +215,7 @@ for (const source of [
 	'.github/linux-ci-coverage.json'
 ])
 	assert.ok(planner.selectGates([source]).has('linux-network-runtime'), source);
-// The Linux lane, read inlined with its stage files.
-const workflow = Pipeline.inlineLaneAt(ROOT, '.github/workflows/ci-linux.yml');
+const workflow = read('.github/workflows/ci-linux.yml');
 const coverage = JSON.parse(read('.github/linux-ci-coverage.json'));
 validateRuntimeCI(workflow, coverage);
 let evidenceControls = 1;

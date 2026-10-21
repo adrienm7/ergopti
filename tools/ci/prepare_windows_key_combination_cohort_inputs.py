@@ -41,8 +41,6 @@ ENROLLMENT_INPUTS = {
 }
 BUILD_INPUTS = {
     ".github/workflows/ci-windows.yml",
-    ".github/workflows/ci-windows-unit.yml",
-    ".github/workflows/ci-windows-build.yml",
     ".node-version",
     "package.json",
     "package-lock.json",

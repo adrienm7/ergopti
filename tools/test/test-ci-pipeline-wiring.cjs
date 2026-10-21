@@ -160,12 +160,8 @@ function macStageProblems(source) {
 	}
 }
 function isRetainedQualification(entry, candidate, step) {
-	// The contract names the real file; the inlined view shows it in its lane.
 	const owner = scoped.contract.retained_steps.find(
-		(owner) =>
-			[owner.file, pipeline.laneOf(owner.file)].includes(entry.rel) &&
-			owner.job === candidate.id &&
-			owner.name === step.name
+		(owner) => owner.file === entry.rel && owner.job === candidate.id && owner.name === step.name
 	);
 	if (!owner) return false;
 	assert.equal(
@@ -187,11 +183,51 @@ const COMMON_BOX = '.github/workflows/ci-common.yml';
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
-// The Linux E2E stage file, where the raw harness steps sit before inlining.
-const LINUX_E2E_BOX = '.github/workflows/ci-linux-e2e.yml';
-// The macOS E2E stage file, where the raw native steps sit before inlining.
-const MACOS_E2E_BOX = '.github/workflows/ci-macos-e2e.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
+// GitHub renders a lane job as '<Lane> / <job name>': two levels, the lane
+// caller's name in ci.yml, then the job's own. A matrix job keeps the static
+// stage name and GitHub appends its row, 'Linux / Unit tests (core)'; its graph
+// group reads 'Matrix: Linux / Unit tests'. A name with an expression would make
+// that group, and every row skipped before expansion, show the raw job id
+// instead ('Matrix: Linux / test-linux'), so no lane job name may hold one. A
+// single job names its subject in parentheses, 'Windows / Build (...)'.
+const STAGE_NAMES = Object.freeze({
+	unit: 'Unit tests',
+	e2e: 'E2E tests',
+	build: 'Build',
+	flatpak: 'Flatpak',
+	install: 'Install and launch',
+	verdict: 'Verdict'
+});
+// Each lane job: its stage, and its subject when it is not a matrix (null).
+const LANE_JOB_NAMES = Object.freeze({
+	'shared-validation': ['unit', null],
+	'common-e2e': ['e2e', 'Shared UI rendering'],
+	'common-build': ['build', null],
+	'common-testbuild': ['install', null],
+	'common-unit-verdict': ['verdict', 'Production site receipts'],
+	'test-ahk': ['unit', null],
+	'e2e-ahk': ['e2e', 'Engine E2E corpus'],
+	'package-windows': ['build', 'ErgoptiPlus.exe and layout installer'],
+	'launch-windows': ['install', 'Compiled ErgoptiPlus.exe'],
+	'windows-ok': ['verdict', 'Mandatory jobs and launch evidence'],
+	'test-linux': ['unit', null],
+	'e2e-linux': ['e2e', null],
+	'package-linux': ['build', '.deb, .rpm, AppImage and archive'],
+	'package-flatpak': ['flatpak', 'Build, install and launch'],
+	'install-linux': ['install', null],
+	'linux-ok': ['verdict', 'Mandatory subjects'],
+	'test-hs': ['unit', null],
+	'e2e-hs': ['e2e', null],
+	// The macOS Build states the macOS version HOSTS assigns its runner.
+	'package-macos': [
+		'build',
+		`ErgoptiPlus.app, ${require('../ci/macos-stage-roles.cjs').macosName('host')}`
+	],
+	launch: ['install', null],
+	'macos-ok': ['verdict', 'Mandatory jobs and launch scenarios']
+});
+
 // Release verifies every lane against the persisted plan, then publishes.
 const RELEASE_BOX = '.github/workflows/ci-release.yml';
 // ci.yml's caller of RELEASE_BOX: it alone needs the lanes and grants write.
@@ -510,7 +546,7 @@ const STEP_CONDITIONS = [
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
 	...scoped.contract.retained_steps.map((owner) => [
-		pipeline.laneOf(owner.file),
+		owner.file,
 		owner.job,
 		owner.name,
 		owner.condition
@@ -1940,7 +1976,7 @@ function commonVerdictProblems(source) {
 	try {
 		const job = YAML.parse(source, { uniqueKeys: true }).jobs['common-unit-verdict'];
 		assert.deepEqual(job, {
-			name: 'Verdict',
+			name: 'Verdict (Production site receipts)',
 			needs: ['common-testbuild'],
 			if: 'always()',
 			'runs-on': 'ubuntu-latest',
@@ -2984,40 +3020,32 @@ for (const [what, file, from, to] of [
 ])
 	mustCatch(what, file, from, to, commonProblems);
 
-/**
- * Reject additional issuers, missing consumers and changed readonly union
- * commands. The Unit stage file issues the receipt; the E2E stage file reads it.
- */
+/** Reject additional issuers, missing consumers and changed readonly union commands. */
 function checkCommonReceiptConsumer() {
-	const COMMON_UNIT = '.github/workflows/ci-common-unit.yml';
-	const COMMON_E2E = '.github/workflows/ci-common-e2e.yml';
-	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_E2E);
+	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_BOX);
 	assert.equal(owners.length, 1);
 	const owner = owners[0];
 	assert.equal(owner.job, 'common-e2e');
 	assert.equal(owner.scope, 'core-js-suite');
-	assert.equal(owner.issuer_file, COMMON_UNIT);
 	assert.equal(owner.issuer_job, 'shared-validation');
 	assert.equal(owner.issuer_step, 'Run shared validation suite');
 	assert.equal(owner.issuer_command, 'npm run test:js');
-	const source = pipeline.rawFiles().find((entry) => entry.rel === COMMON_E2E).text;
-	const unit = pipeline.rawFiles().find((entry) => entry.rel === COMMON_UNIT).text;
-	const job = pipeline.jobsOfText(source, COMMON_E2E).find((entry) => entry.id === owner.job);
+	const source = pipeline.rawFiles().find((entry) => entry.rel === COMMON_BOX).text;
+	const job = pipeline.jobsOfText(source, COMMON_BOX).find((entry) => entry.id === owner.job);
 	const step = pipeline.step(job.body, owner.step);
 	assert.equal(pipeline.runOf(step).join('\n'), owner.body);
-	assert.ok(scoped.projectScopedSteps(source, COMMON_E2E));
-	assert.ok(scoped.projectScopedSteps(unit, COMMON_UNIT));
-	const retained = scoped.contract.retained_steps.filter((entry) => entry.file === COMMON_UNIT);
+	assert.ok(scoped.projectScopedSteps(source, COMMON_BOX));
+	const retained = scoped.contract.retained_steps.filter((entry) => entry.file === COMMON_BOX);
 	assert.equal(retained.length, 2);
 	for (const entry of retained) {
 		const child = pipeline
-			.jobsOfText(unit, COMMON_UNIT)
+			.jobsOfText(source, COMMON_BOX)
 			.find((candidate) => candidate.id === entry.job);
 		const transport = pipeline.step(child.body, entry.name).replace(/\n+$/, '');
 		assert.match(transport, /^ {10}overwrite: true$/m);
 		assert.equal(
 			isRetainedQualification(
-				{ rel: COMMON_UNIT },
+				{ rel: COMMON_BOX },
 				{ id: entry.job },
 				{ name: entry.name, body: transport }
 			),
@@ -3027,7 +3055,7 @@ function checkCommonReceiptConsumer() {
 		assert.notEqual(missingOverwrite, transport);
 		assert.throws(() =>
 			isRetainedQualification(
-				{ rel: COMMON_UNIT },
+				{ rel: COMMON_BOX },
 				{ id: entry.job },
 				{ name: entry.name, body: missingOverwrite }
 			)
@@ -3047,12 +3075,12 @@ function checkCommonReceiptConsumer() {
 	]) {
 		const changed = source.replace(before, after);
 		assert.notEqual(changed, source);
-		assert.throws(() => scoped.projectScopedSteps(changed, COMMON_E2E));
+		assert.throws(() => scoped.projectScopedSteps(changed, COMMON_BOX));
 	}
-	assert.throws(() => scoped.projectScopedSteps(source.replace(step, ''), COMMON_E2E));
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, ''), COMMON_BOX));
 	const unknown =
 		'      - name: Unknown receipt reader\n        run: node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json\n';
-	assert.throws(() => scoped.projectScopedSteps(source.replace(step, step + unknown), COMMON_E2E));
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, step + unknown), COMMON_BOX));
 }
 checkCommonReceiptConsumer();
 
@@ -3394,17 +3422,18 @@ for (const [rel, id, unit] of [
 	[MACOS_BOX, 'e2e-hs', 'test-hs'],
 	[LINUX_BOX, 'e2e-linux', 'test-linux']
 ]) {
-	// The inlined macOS lane lists each stage's needs right after its name.
 	const prerequisite =
 		rel === MACOS_BOX
-			? `    name: E2E tests\n    needs:\n      - ${unit}\n`
+			? `      actions: read\n    needs:\n      - ${unit}\n    runs-on: \${{ fromJSON(needs.${unit}`
 			: `    needs: [${unit}]\n`;
 	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
 		mustCatch(
 			`${id} must remain mandatory`,
 			rel,
 			prerequisite,
-			prerequisite + suffix,
+			rel === MACOS_BOX
+				? prerequisite.replace('    runs-on:', suffix + '    runs-on:')
+				: prerequisite + suffix,
 			graphProblems
 		);
 	}
@@ -3412,9 +3441,10 @@ for (const [rel, id, unit] of [
 
 errors.push(...graphProblems(pipeline.files()));
 // E2E and Build both read Actions evidence and need Unit; each anchor names its own runner.
-// The inlined lane lists each stage's needs right after its name.
-const MACOS_E2E_NEEDS = '    name: E2E tests\n    needs:\n      - test-hs\n';
-const MACOS_BUILD_NEEDS = '    name: Build\n    needs:\n      - test-hs\n';
+const MACOS_E2E_NEEDS =
+	'      actions: read\n    needs:\n      - test-hs\n    runs-on: ${{ fromJSON(needs.test-hs';
+const MACOS_BUILD_NEEDS =
+	'      actions: read\n    needs:\n      - test-hs\n    runs-on: macos-latest\n';
 for (const [what, rel, from, to] of [
 	[
 		'a second root in ci.yml',
@@ -3497,15 +3527,15 @@ for (const [what, rel, from, to] of [
 	[
 		'a third entry in the Linux lane',
 		LINUX_BOX,
-		"    name: 'Install and launch'\n    needs: [package-linux]\n    runs-on: ubuntu-latest\n",
+		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
 		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n"
 	],
 	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [e2e-ahk]\n', ''],
 	[
 		'Windows packaging stops waiting for unit tests',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
-		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
 	],
 	[
 		'Windows packaging stops waiting for E2E tests',
@@ -3516,8 +3546,8 @@ for (const [what, rel, from, to] of [
 	[
 		'Windows E2E omits its unit prerequisite',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n",
-		"  e2e-ahk:\n    name: 'E2E tests'\n"
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n    needs: [test-ahk]\n",
+		"  e2e-ahk:\n    name: 'E2E tests (Engine E2E corpus)'\n"
 	],
 	[
 		'a second exit in the macOS lane',
@@ -5029,6 +5059,16 @@ function assertLotTransportControls() {
 }
 assertLotTransportControls();
 
+/** Returns the one name a lane job may carry, or null when it may carry none. */
+function laneJobName(candidate) {
+	const owner = LANE_JOB_NAMES[candidate.id];
+	if (!owner) return null;
+	const [stage, subject] = owner;
+	const matrix = /^ {6}matrix:/m.test(candidate.body);
+	if (matrix !== (subject === null)) return null;
+	return subject === null ? STAGE_NAMES[stage] : `${STAGE_NAMES[stage]} (${subject})`;
+}
+
 /** Checks the names GitHub renders after flattening all four workflows. */
 function namingProblems(files) {
 	const problems = [];
@@ -5057,33 +5097,7 @@ function namingProblems(files) {
 								'publication-plan': 'Verify all lanes and original plan',
 								release: 'Publish'
 							}[candidate.id] === name
-						: entry.rel === COMMON_BOX
-							? {
-									'shared-validation': 'Unit tests',
-									'common-unit-verdict': 'Verdict',
-									'common-e2e': 'E2E tests',
-									'common-build': 'Build',
-									'common-testbuild': 'Install and launch'
-								}[candidate.id] === name
-							: {
-									'test-hs': 'Unit tests',
-									'test-ahk': 'Unit tests',
-									'test-linux': 'Unit tests',
-									'e2e-hs': 'E2E tests',
-									'e2e-ahk': 'E2E tests',
-									'e2e-linux': 'E2E tests',
-									// The macOS Build job states its macOS version (stage layout).
-									'package-macos': 'Build',
-									'package-windows': 'Build',
-									'package-linux': 'Build',
-									'package-flatpak': 'Flatpak',
-									launch: 'Install and launch',
-									'launch-windows': 'Install and launch',
-									'install-linux': 'Install and launch',
-									'macos-ok': 'Verdict',
-									'windows-ok': 'Verdict',
-									'linux-ok': 'Verdict'
-								}[candidate.id] === name;
+						: !name.includes('${{') && !name.includes(' / ') && laneJobName(candidate) === name;
 			if (!valid)
 				problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
 			for (const found of pipeline.steps(candidate.body)) {
@@ -5166,8 +5180,38 @@ for (const [what, rel, from, to] of [
 	[
 		'a repeated lane prefix',
 		MACOS_BOX,
-		'  package-macos:\n    name: Build\n',
-		"  package-macos:\n    name: 'macOS / Build'\n"
+		'  package-macos:\n    name: Build (ErgoptiPlus.app, macOS 26)\n',
+		"  package-macos:\n    name: 'macOS / Build (ErgoptiPlus.app, macOS 26)'\n"
+	],
+	[
+		'a matrix job named by an expression, shown as its raw id in the graph',
+		LINUX_BOX,
+		"  test-linux:\n    name: 'Unit tests'\n",
+		"  test-linux:\n    name: 'Unit tests ${{ matrix.group }}'\n"
+	],
+	[
+		'a matrix row named for its lot alone',
+		MACOS_BOX,
+		'  test-hs:\n    name: Unit tests\n',
+		"  test-hs:\n    name: '${{ matrix.lot }}'\n"
+	],
+	[
+		'a single job that names only its stage',
+		WINDOWS_BOX,
+		"    name: 'E2E tests (Engine E2E corpus)'\n",
+		"    name: 'E2E tests'\n"
+	],
+	[
+		'a single job with a third name level',
+		LINUX_BOX,
+		"    name: 'Verdict (Mandatory subjects)'\n",
+		"    name: 'Verdict / Mandatory subjects'\n"
+	],
+	[
+		'a matrix job that names a subject GitHub would repeat',
+		COMMON_BOX,
+		"    name: 'Build'\n",
+		"    name: 'Build (Production site)'\n"
 	],
 	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
 	['an extra root separator', ENTRY, "name: 'Release plan'", "name: 'Validate / Checks / Plan'"],
@@ -5179,149 +5223,6 @@ for (const [what, rel, from, to] of [
 	]
 ]) {
 	mustCatch(what, rel, from, to, namingProblems);
-}
-
-// =============================================
-// =============================================
-// ======= 7b/ One Reusable Workflow Per Stage ==
-// =============================================
-// =============================================
-
-// GitHub renders a stage job as 'Lane / Stage / Job': the lane caller's name in
-// ci.yml, the stage caller's name in the lane, then the job's own name, which
-// says what the job tests. Each lane stage runs in ci-<lane>-<stage>.yml.
-const STAGE_LAYOUT = {
-	[COMMON_BOX]: [
-		['shared-validation', 'unit', 'Unit tests', '${{ matrix.lot }}'],
-		['common-e2e', 'e2e', 'E2E tests', 'Shared UI rendering'],
-		['common-build', 'build', 'Build', '${{ matrix.lot }}'],
-		['common-testbuild', 'install', 'Install and launch', '${{ matrix.lot }}'],
-		['common-unit-verdict', 'verdict', 'Verdict', 'Production site receipts']
-	],
-	[WINDOWS_BOX]: [
-		['test-ahk', 'unit', 'Unit tests', '${{ matrix.module }}'],
-		['e2e-ahk', 'e2e', 'E2E tests', 'Engine E2E corpus'],
-		['package-windows', 'build', 'Build', 'ErgoptiPlus.exe and layout installer'],
-		['launch-windows', 'install', 'Install and launch', 'Compiled ErgoptiPlus.exe'],
-		['windows-ok', 'verdict', 'Verdict', 'Mandatory jobs and launch evidence']
-	],
-	[LINUX_BOX]: [
-		['test-linux', 'unit', 'Unit tests', '${{ matrix.group }}'],
-		['e2e-linux', 'e2e', 'E2E tests', '${{ matrix.shard }}'],
-		['package-linux', 'build', 'Build', '.deb, .rpm, AppImage and archive'],
-		['package-flatpak', 'flatpak', 'Flatpak', 'Build, install and launch'],
-		['install-linux', 'install', 'Install and launch', '${{ matrix.lot }}'],
-		['linux-ok', 'verdict', 'Verdict', 'Mandatory subjects']
-	],
-	[MACOS_BOX]: [
-		['test-hs', 'unit', 'Unit tests', '${{ matrix.lot }}'],
-		['e2e-hs', 'e2e', 'E2E tests', '${{ matrix.lot }}'],
-		// The Build job states the macOS version HOSTS assigns its runner.
-		[
-			'package-macos',
-			'build',
-			'Build',
-			`ErgoptiPlus.app (${require('../ci/macos-stage-roles.cjs').macosName('host')})`
-		],
-		['launch', 'install', 'Install and launch', '${{ matrix.lot }}'],
-		['macos-ok', 'verdict', 'Verdict', 'Mandatory jobs and launch scenarios']
-	]
-};
-// The scripts that find a stage job by its rendered name, with the prefix
-// each one composes.
-const RENDERED_NAME_READERS = [
-	['tools/ci/validate-js-feature-results.cjs', 'shared-validation'],
-	['tools/ci/site-deploy-admission.cjs', 'common-build'],
-	['tools/ci/site-deploy-admission.cjs', 'common-testbuild'],
-	// These two compose the stage and the lot; the lane prefix is matched apart.
-	['tools/ci/managed-ollama-handoff.cjs', 'e2e-hs'],
-	['tools/ci/native_http_clock_evidence.cjs', 'e2e-hs']
-];
-
-/** Lists how the real files could stop running one stage per reusable workflow. */
-function stageLayoutProblems(files) {
-	const problems = [];
-	const real = pipeline.view(() => files);
-	const unquote = (value) => (value ?? '').replace(/^(['"])(.*)\1$/, '$2');
-	for (const [lane, stages] of Object.entries(STAGE_LAYOUT)) {
-		const base = lane.replace(/\.yml$/, '');
-		const callers = real.jobs(lane);
-		if (JSON.stringify(callers.map((job) => job.id)) !== JSON.stringify(stages.map(([id]) => id)))
-			problems.push(`${lane} must call exactly its stages, in order`);
-		for (const [id, stage, stageName, jobName] of stages) {
-			const rel = `${base}-${stage}.yml`;
-			const caller = callers.find((job) => job.id === id);
-			if (!caller || pipeline.field(caller.body, 'uses') !== `./${rel}`) {
-				problems.push(`${lane} job ${id} must call ${rel}`);
-				continue;
-			}
-			if (unquote(pipeline.field(caller.body, 'name')) !== stageName)
-				problems.push(`${lane} job ${id} must be named for its stage: ${stageName}`);
-			const entry = files.find((file) => file.rel === rel);
-			if (!entry || !entry.text.startsWith(`# ${rel}\n`)) {
-				problems.push(`${rel} must exist and open with its own path`);
-				continue;
-			}
-			const inner = pipeline.jobsOfText(entry.text, rel);
-			if (inner.length !== 1 || inner[0].id !== id) {
-				problems.push(`${rel} must define ${id} as its only job`);
-				continue;
-			}
-			if (unquote(pipeline.field(inner[0].body, 'name')) !== jobName)
-				problems.push(`${rel} job ${id} must say what it tests: ${jobName}`);
-		}
-	}
-	const laneName = (lane) =>
-		unquote(
-			pipeline.field(
-				real.jobs(ENTRY).find((job) => pipeline.field(job.body, 'uses') === `./${lane}`).body,
-				'name'
-			)
-		);
-	for (const [script, id] of RENDERED_NAME_READERS) {
-		const lane = Object.keys(STAGE_LAYOUT).find((rel) =>
-			STAGE_LAYOUT[rel].some(([stage]) => stage === id)
-		);
-		const stageName = STAGE_LAYOUT[lane].find(([stage]) => stage === id)[2];
-		const prefix = `${laneName(lane)} / ${stageName}`;
-		const source = fs.readFileSync(path.resolve(__dirname, '../..', script), 'utf8');
-		const composes =
-			source.includes(`'${prefix} / '`) ||
-			source.includes(`'${stageName} / '`) ||
-			(source.includes(`'${prefix}'`) && source.includes("' / '"));
-		if (!composes)
-			problems.push(`${script} must find ${id} as '${prefix} / <job>', the name GitHub renders`);
-	}
-	return problems;
-}
-errors.push(...stageLayoutProblems(pipeline.real().files()));
-for (const [what, rel, from, to] of [
-	[
-		'a stage caller renamed away from its stage',
-		COMMON_BOX,
-		"  common-build:\n    name: 'Build'\n",
-		"  common-build:\n    name: 'Site'\n"
-	],
-	[
-		'a stage job named for its stage instead of its subject',
-		'.github/workflows/ci-common-e2e.yml',
-		"    name: 'Shared UI rendering'\n",
-		"    name: 'E2E tests'\n"
-	],
-	[
-		'a stage moved into another file name',
-		COMMON_BOX,
-		'    uses: ./.github/workflows/ci-common-verdict.yml\n',
-		'    uses: ./.github/workflows/ci-common-gate.yml\n'
-	]
-]) {
-	const files = pipeline.real().files();
-	const source = files.find((file) => file.rel === rel).text;
-	assert.equal(source.split(from).length, 2, what + ' has one real source seam');
-	const changed = files.map((file) =>
-		file.rel === rel ? { ...file, text: source.replace(from, () => to) } : file
-	);
-	assert.ok(stageLayoutProblems(changed).length > 0, what);
 }
 
 /** Keeps the approved root group as the pipeline's only concurrency owner. */
@@ -7143,7 +7044,7 @@ function nativePacSourceProblems(files) {
 }
 errors.push(...nativePacSourceProblems(pipeline.files()));
 // The actual raw Source10 condition remains mandatory after the retired fast route.
-const rawSourceFiles = require('./ci-pipeline.cjs').real().files();
+const rawSourceFiles = require('./ci-pipeline.cjs').files();
 const rawSourceStep = PAC_SOURCE_STEP;
 assert.doesNotThrow(() => pipeline.validateRaw(rawSourceFiles));
 for (const [replacement, error] of [
@@ -7179,9 +7080,7 @@ for (const [replacement, error] of [
 	]
 ]) {
 	const changed = rawSourceFiles.map((file) =>
-		file.rel === MACOS_E2E_BOX
-			? { ...file, text: file.text.replace(rawSourceStep, replacement) }
-			: file
+		file.rel === MACOS_BOX ? { ...file, text: file.text.replace(rawSourceStep, replacement) } : file
 	);
 	assert.notDeepEqual(changed, rawSourceFiles);
 	assert.throws(() => pipeline.fromFiles(changed), error);
@@ -7469,7 +7368,7 @@ function linuxSimultaneousWorkflowProblems(files) {
 		return ['Linux raw workflow admission refused'];
 	}
 	const steps = files
-		.filter((entry) => entry.rel === LINUX_E2E_BOX)
+		.filter((entry) => entry.rel === LINUX_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
 		.filter((job) => job.id === 'e2e-linux')
 		.flatMap((job) => pipeline.steps(job.body))
@@ -7502,10 +7401,7 @@ function linuxSimultaneousWorkflowProblems(files) {
 const linuxSimultaneousRawFiles = pipeline.rawFiles();
 errors.push(...linuxSimultaneousWorkflowProblems(linuxSimultaneousRawFiles));
 const linuxSimultaneousRawJob = pipeline
-	.jobsOfText(
-		linuxSimultaneousRawFiles.find((file) => file.rel === LINUX_E2E_BOX).text,
-		LINUX_E2E_BOX
-	)
+	.jobsOfText(linuxSimultaneousRawFiles.find((file) => file.rel === LINUX_BOX).text, LINUX_BOX)
 	.find((job) => job.id === 'e2e-linux');
 const linuxSimultaneousStepBody = pipeline.step(
 	linuxSimultaneousRawJob.body,
@@ -7567,7 +7463,7 @@ for (const [what, from, to] of [
 	const changed = linuxSimultaneousRawFiles.map((entry) => ({
 		...entry,
 		text:
-			entry.rel === LINUX_E2E_BOX
+			entry.rel === LINUX_BOX
 				? entry.text.replace(linuxSimultaneousStepBody, linuxSimultaneousStepBody.replace(from, to))
 				: entry.text
 	}));
@@ -7903,7 +7799,7 @@ for (const [label, before, after] of [
 
 // The Darwin receiver is mandatory raw work, never a deferred qualification alias.
 {
-	const files = require('./ci-pipeline.cjs').real().files();
+	const files = require('./ci-pipeline.cjs').files();
 	const name = 'Receive selected-release shell corpus and native guardian cancellation';
 	const head = `      - name: ${name}\n`;
 	const body = pipeline.step(macRole.body(pipeline.file(MACOS_BOX), 'managed-ollama-native'), name);
@@ -7961,16 +7857,12 @@ for (const [label, before, after] of [
 			body.replace('        if: ' + runtimeOnly + '\n', `        if: ${condition}\n`),
 			/full step condition/
 		]);
-	// The raw lane inlined; each mutation is written back into its stage file.
-	const rawLoader = require('./ci-pipeline.cjs');
-	const rawLane = rawLoader.inlinePipeline(files).find((file) => file.rel === MACOS_BOX).text;
 	for (const [label, replacement, error] of mutants) {
-		assert.equal(rawLane.split(body).length, 2, label + ': genuine mutation seam');
-		const changed = rawLoader.replaceLane(
-			files,
-			MACOS_BOX,
-			rawLane.replace(body, () => replacement)
-		);
+		const changed = files.map((file) => {
+			if (file.rel !== MACOS_BOX) return file;
+			assert.equal(file.text.split(body).length, 2, label + ': genuine mutation seam');
+			return { ...file, text: file.text.replace(body, () => replacement) };
+		});
 		assert.notDeepEqual(changed, files, label);
 		assert.throws(() => pipeline.fromFiles(changed), error, label);
 	}
@@ -8012,10 +7904,10 @@ for (const name of [
 		);
 	}
 	const from = macConditionalPrefix(head, 'e2e-hs');
-	const source = rawSourceFiles.find((file) => file.rel === MACOS_E2E_BOX).text;
+	const source = rawSourceFiles.find((file) => file.rel === MACOS_BOX).text;
 	assert.equal(source.split(from).length - 1, 1, 'one exact native producer diagnostic step');
 	const swallowed = rawSourceFiles.map((file) =>
-		file.rel === MACOS_E2E_BOX
+		file.rel === MACOS_BOX
 			? { ...file, text: file.text.replace(from, from + '        continue-on-error: true\n') }
 			: file
 	);
@@ -8030,8 +7922,8 @@ for (const name of [
 // independently of earlier refusals.
 {
 	const files = pipeline.rawFiles();
-	const source = files.find((file) => file.rel === MACOS_E2E_BOX);
-	const jobs = pipeline.jobsOfText(source.text, MACOS_E2E_BOX).filter((job) => job.id === 'e2e-hs');
+	const source = files.find((file) => file.rel === MACOS_BOX);
+	const jobs = pipeline.jobsOfText(source.text, MACOS_BOX).filter((job) => job.id === 'e2e-hs');
 	assert.equal(jobs.length, 1, 'one current native model receiving job');
 	const owner = jobs[0];
 	const buildName = 'Receive and admit the clean native source asset from its build cell';
@@ -8052,7 +7944,7 @@ for (const name of [
 		const changed = owner.body.replace(before, () => after);
 		assert.notEqual(changed, owner.body, label + ': real source mutation');
 		const mutated = files.map((file) =>
-			file.rel === MACOS_E2E_BOX
+			file.rel === MACOS_BOX
 				? { ...file, text: file.text.replace(owner.body, () => changed) }
 				: file
 		);

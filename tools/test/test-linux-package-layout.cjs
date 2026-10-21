@@ -706,8 +706,7 @@ if (!rpmArchMatch) {
 		['.github/workflows/ci-linux.yml', 4],
 		['.github/workflows/ci-release.yml', 3]
 	]) {
-		// A pipeline workflow is read through the loader, a lane with its stage files.
-		const text = rel.startsWith('.github/workflows/') ? pipeline.file(rel) : read(rel);
+		const text = read(rel);
 		const count = text.split(RPM_ASSET).length - 1;
 		if (count < minimum) {
 			errors.push(

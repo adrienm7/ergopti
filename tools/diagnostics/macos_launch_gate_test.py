@@ -404,8 +404,7 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(gate.evaluate("clean", observe()), [])
 
     def test_security_log_workflow_is_failure_owned_and_retained(self):
-        # The E2E stage file of the macOS lane runs the e2e-hs job and its steps.
-        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos-e2e.yml"
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos.yml"
         text = workflow.read_text(encoding="utf-8")
         jobs = re.findall(r"^  e2e-hs:\n(.*?)(?=^  [\w-]+:\n|\Z)", text, re.M | re.S)
         self.assertEqual(len(jobs), 1)
@@ -459,8 +458,7 @@ class VerdictTests(unittest.TestCase):
         )
 
     def test_security_log_workflow_covers_each_failed_native_receiver(self):
-        # The E2E stage file of the macOS lane runs the e2e-hs job and its steps.
-        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos-e2e.yml"
+        workflow = Path(__file__).resolve().parents[2] / ".github/workflows/ci-macos.yml"
         text = workflow.read_text(encoding="utf-8")
         blocks = re.findall(
             r"^      - name: Retain passive security service logs after native receiving failure\n"

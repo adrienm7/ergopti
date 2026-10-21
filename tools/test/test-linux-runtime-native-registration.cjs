@@ -523,8 +523,7 @@ function main() {
 			recursive: true
 		});
 		validate(scratch);
-		// The E2E step runs in the E2E stage file, the manual proof in the unit one.
-		const relative = '.github/workflows/ci-linux-e2e.yml';
+		const relative = '.github/workflows/ci-linux.yml';
 		const workflow = fs.readFileSync(path.join(scratch, relative), 'utf8');
 		const body = Pipeline.step(Pipeline.open(scratch).job('e2e-linux'), STEP);
 		for (const replace of [
@@ -548,8 +547,6 @@ function main() {
 			);
 		}
 		fs.writeFileSync(path.join(scratch, relative), workflow);
-		const unitRelative = '.github/workflows/ci-linux-unit.yml';
-		const unitWorkflow = fs.readFileSync(path.join(scratch, unitRelative), 'utf8');
 		const manualBody = Pipeline.step(Pipeline.open(scratch).job('test-linux'), MANUAL_STEP);
 		for (const replace of [
 			() => '',
@@ -559,15 +556,15 @@ function main() {
 			(text) => text.replace('run_ollama_runtime_acceptance.py', 'echo_skipped_native.py')
 		]) {
 			fs.writeFileSync(
-				path.join(scratch, unitRelative),
-				unitWorkflow.replace(manualBody, replace(manualBody))
+				path.join(scratch, relative),
+				workflow.replace(manualBody, replace(manualBody))
 			);
 			assert.throws(
 				() => validateManual(scratch),
 				'manual proof cannot run automatically, disappear or forgive failure'
 			);
 		}
-		fs.writeFileSync(path.join(scratch, unitRelative), unitWorkflow);
+		fs.writeFileSync(path.join(scratch, relative), workflow);
 		const luaPath = path.join(scratch, MANUAL_FIXTURES[0]);
 		const luaSource = fs.readFileSync(luaPath, 'utf8');
 		for (const [from, to] of [
