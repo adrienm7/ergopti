@@ -731,6 +731,7 @@ if TOML_UnreadableFile(ConfigurationFile) {
 		try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
 }
 ReadScriptConfig(_IniCache)
+HotstringsConfigApplyMagicKey(ScriptInformation["MagicKey"])
 BootProfile_Stamp("Script preferences applied")
 ; Language-pack category gates come from the shared hotstring index, so they are
 ; added before the gates are read from config.toml.
