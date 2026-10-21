@@ -50,7 +50,8 @@ local function with_owner(run)
 				channel = function() return ctx.channel end, is_paused = function() return false end,
 				on_available = function() ctx.notified = ctx.notified + 1; return true end,
 				config = { timing = defaults.timing, state_key = state_key, list_key = list_key,
-					releases_url = "https://fixture.test/releases", timeout_sec = 15 },
+					releases_url = "https://fixture.test/releases",
+					feed_url = "https://fixture.test/releases.atom", timeout_sec = 15 },
 				timer = {
 					after = function(_, callback)
 						local timer = { armed = true, callback = callback }

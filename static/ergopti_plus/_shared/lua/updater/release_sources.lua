@@ -141,6 +141,59 @@ function M.classify_feed(status, body, err)
 	return true, nil
 end
 
+--- Decodes the percent escapes of one URL path segment.
+--- @param segment string
+--- @return string
+local function percent_decode(segment)
+	return (segment:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
+end
+
+--- Reads one attribute of a raw start tag, quoted either way.
+--- @param tag string The start tag text.
+--- @param name string Attribute name.
+--- @return string|nil value
+local function attribute(tag, name)
+	local _, value = tag:match("%s" .. name .. "%s*=%s*([\"'])(.-)%1")
+	return value
+end
+
+--- Lists the releases of a GitHub releases Atom feed as the JSON array the
+--- update check reads: tag_name and published_at (the entry's <updated>),
+--- newest first, as the feed orders them. The rule of _shared/ui/changelog/
+--- atom_feed.js: only an entry whose alternate link is a release tag of the
+--- expected repository counts, and a tag outside [A-Za-z0-9._+-] is dropped.
+--- GitHub publishes no prerelease flag in the feed: channels follow the tag
+--- registry, which reads tags only.
+--- @param body string Feed document text.
+--- @param owner string Expected repository owner.
+--- @param repo string Expected repository name.
+--- @return string|nil list JSON array text.
+--- @return string|nil reason Why the feed gives no list.
+function M.feed_release_list(body, owner, repo)
+	if type(body) ~= "string" or not body:find("<feed[%s>]") then return nil, "not an Atom feed" end
+	local prefix = "https://github.com/" .. tostring(owner) .. "/" .. tostring(repo) .. "/releases/tag/"
+	local rows = {}
+	for entry in body:gmatch("<entry[%s>].-</entry%s*>") do
+		local href
+		for link in entry:gmatch("<link[%s/][^>]*>") do
+			local rel = attribute(link, "rel")
+			if rel == nil or rel == "alternate" then
+				href = attribute(link, "href")
+				if href then break end
+			end
+		end
+		local tag = href and href:sub(1, #prefix) == prefix and percent_decode(href:sub(#prefix + 1)) or nil
+		if tag and tag:match("^[A-Za-z0-9._+-]+$") then
+			local updated = entry:match("<updated[^>]*>%s*([^<]-)%s*</updated>") or ""
+			-- Only an ISO timestamp travels: no feed text reaches the JSON unescaped
+			if not updated:match("^[%dT:.Z+-]+$") then updated = "" end
+			rows[#rows + 1] = string.format('{"tag_name":"%s","published_at":"%s"}', tag, updated)
+		end
+	end
+	if #rows == 0 then return nil, "an Atom feed without a release of " .. tostring(owner) .. "/" .. tostring(repo) end
+	return "[" .. table.concat(rows, ",") .. "]", nil
+end
+
 --- Reports whether a failed API attempt was GitHub throttling the client.
 --- @param status any
 --- @return boolean

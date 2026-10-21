@@ -19,6 +19,7 @@ local Json = require("json")
 local SEED = "7f3a9c21e5b04d68"
 local T0 = 1700000000
 local URL = "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100"
+local FEED_URL = "https://github.com/adrienm7/ergopti/releases.atom"
 
 local function read_defaults()
 	local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
@@ -62,7 +63,7 @@ local function build(opts)
 		end,
 		config = {
 			timing = defaults.timing, state_key = ctx.state_key, list_key = ctx.list_key, releases_url = URL,
-			timeout_sec = 15,
+			feed_url = FEED_URL, timeout_sec = 15,
 		},
 		timer = {
 			after = function(delay, fn)
@@ -574,5 +575,102 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		local answers = check_now(ctx, "dev")
 		helpers.assert_eq(ctx.requests[2].headers["If-None-Match"], '"abc"', "the second request is conditional")
 		helpers.assert_eq(answers[1].state, "available", "the unchanged list still offers the release")
+	end)
+end)
+
+
+
+
+
+-- ======================================================================
+-- ======================================================================
+-- ======= The Atom feed answers when the API gives no list (#99) =======
+-- ======================================================================
+-- ======================================================================
+
+--- One entry of GitHub's releases feed.
+--- @param repo string owner/repo the entry links to.
+--- @param tag string URL-encoded tag.
+--- @param updated string The entry's <updated>.
+--- @return string
+local function feed_entry(repo, tag, updated)
+	return '<entry><id>tag:github.com,2008:Repository/1/' .. tag .. '</id><updated>' .. updated .. '</updated>'
+		.. '<link rel="alternate" type="text/html" href="https://github.com/' .. repo .. '/releases/tag/' .. tag .. '"/>'
+		.. '<title>' .. tag .. '</title><content type="html">&lt;p&gt;Notes&lt;/p&gt;</content></entry>'
+end
+
+local FEED = '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom">'
+	.. feed_entry("adrienm7/ergopti", "v0.0.0-dev.150", "2026-09-02T00:00:00Z")
+	.. feed_entry("someone/else", "v9.9.9", "2026-09-03T00:00:00Z")
+	.. feed_entry("adrienm7/ergopti", "v1.0.0", "2026-08-05T00:00:00Z")
+	.. feed_entry("adrienm7/ergopti", "v0.0.0-dev.149", "2026-09-01T00:00:00Z")
+	.. '</feed>'
+
+local RATE_LIMITED = { ok = false, status = 403,
+	headers = { ["X-RateLimit-Remaining"] = "0", ["x-ratelimit-reset"] = "86400" } }
+
+helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API gives no list (update-check-feed-99)", function()
+	helpers.it("reads the feed's repository tags in order, as the update check's list", function()
+		local ReleaseSources = require("updater.release_sources")
+		local list = assert(ReleaseSources.feed_release_list(FEED, "adrienm7", "ergopti"))
+		helpers.assert_eq(Json.decode(list), {
+			{ tag_name = "v0.0.0-dev.150", published_at = "2026-09-02T00:00:00Z" },
+			{ tag_name = "v1.0.0", published_at = "2026-08-05T00:00:00Z" },
+			{ tag_name = "v0.0.0-dev.149", published_at = "2026-09-01T00:00:00Z" },
+		}, "another repository's entry is dropped")
+		local encoded = assert(ReleaseSources.feed_release_list('<feed>'
+			.. feed_entry("adrienm7/ergopti", "v1.0.0%2Bbuild", '"broken"') .. '</feed>', "adrienm7", "ergopti"))
+		helpers.assert_eq(Json.decode(encoded), { { tag_name = "v1.0.0+build", published_at = "" } },
+			"an escaped tag is decoded and a non-timestamp date never reaches the JSON")
+		helpers.assert_nil(ReleaseSources.feed_release_list("<html>blocked</html>", "adrienm7", "ergopti"))
+		helpers.assert_nil(ReleaseSources.feed_release_list("<feed></feed>", "adrienm7", "ergopti"))
+	end)
+
+	helpers.it("a manual check offers the release the feed lists when the API rate limit is spent", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			RATE_LIMITED, { ok = true, status = 200, body = FEED, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 2, "the API, then the feed")
+		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
+		helpers.assert_eq(ctx.requests[2].headers.Accept, "application/atom+xml")
+		helpers.assert_eq(#answers, 1, "one answer")
+		helpers.assert_eq(answers[1].state, "available", "the user can update: Sparkle installs from the appcast")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+		helpers.assert_eq(answers[1].others, { { channel = "main", tag = "v1.0.0" } })
+		helpers.assert_eq(ctx.owner.latest().tag, "v0.0.0-dev.150", "the About row names it too")
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0, "a check the feed answered succeeded")
+		helpers.assert_nil(ctx.values[ctx.list_key], "the feed never replaces the API copy and its ETag")
+	end)
+
+	helpers.it("a manual check names both causes when the feed fails too", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			RATE_LIMITED, { ok = true, status = 200, body = "<html>proxy page</html>", headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].state, "error")
+		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
+		helpers.assert_contains(answers[1].detail, "Atom feed: HTTP 200 without an Atom feed")
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
+	end)
+
+	helpers.it("a manual check reads no feed for a list the API answered unusable", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = '[{"name":"no tag"}]', headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a reachable API with a bad list is no connection problem")
+		helpers.assert_eq(answers[1].reason_key, "updater.parse_failed")
+	end)
+
+	helpers.it("a background check announces the release the feed lists", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			RATE_LIMITED, { ok = true, status = 200, body = FEED, headers = {} } } })
+		helpers.assert_true(ctx.owner.start())
+		ctx.clock.now = ctx.clock.now + ctx.timing.boot_check_delay_sec
+		fire(ctx)
+		helpers.assert_eq(#ctx.requests, 2)
+		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
+		helpers.assert_eq(ctx.announced, { "v0.0.0-dev.150" })
+		helpers.assert_eq(ctx.values[ctx.state_key].failures, 0)
+		helpers.assert_true(ctx.owner.stop())
 	end)
 end)

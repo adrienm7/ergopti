@@ -579,7 +579,13 @@ unauthenticated GitHub API limit (60 requests per hour per IP), so frequent
 restarts exhaust it. macOS and Windows keep the release list and its ETag across
 restarts and send `If-None-Match`; every driver names an exhausted limit (403 or
 429 with `X-RateLimit-Remaining: 0`) with its UTC reset through one shared
-sentence (`_shared/lua/updater/rate_limit.lua`).
+sentence (`_shared/lua/updater/rate_limit.lua`). When the API gives no list,
+the macOS checks read the public releases Atom feed
+(`release_sources.feed_release_list`): Sparkle installs from the appcast, so
+tags suffice. A Versions-window install needs the API's asset digests, so a
+feed-only list refuses it with a warning on every driver; the Windows and
+Linux checks keep the API only for the same reason. Action: never install a
+release whose digest did not come from the API.
 
 ### project-loopback-probes-use-the-ipv4-literal
 
