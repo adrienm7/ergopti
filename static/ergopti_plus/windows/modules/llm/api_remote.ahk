@@ -1759,7 +1759,7 @@ _LLMRemoteClassifyResponse(Format, Body, Model := "") {
     else if (LLM_REMOTE_RAW_FORMATS.Has(Format) && Root.Has("detail") && Root["detail"] is String)
         ServerMsg := Root["detail"]
     if (StrLen(ServerMsg) > 200)
-        ServerMsg := SubStr(ServerMsg, 1, 200) . "..."
+        ServerMsg := TextHeadWithinUnits(ServerMsg, 200) . "..."
     Result["server_message"] := ServerMsg
     ; Backboard and decisions answers are no chat completion: the caller reads
     ; the decoded object (remote_formats.ahk), so the body itself is the text.
