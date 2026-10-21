@@ -179,6 +179,24 @@ assert.ok(
 	"the catalogue's XEmbed tray check runs without a session bus"
 );
 assert.ok(container.includes("grep -E '^ +0x' | grep -v ' 1x1+'"), 'an icon docked in stalonetray');
+assert.ok(
+	containerSmokeBody.includes('x11-utils xdotool'),
+	'the smoke clicks the icon as the catalogue does'
+);
+assert.ok(
+	container.includes('/"Ergopti\\+": \\(/') && container.includes('Map State: IsViewable'),
+	'the no-keyboard status window the catalogue screenshots is on screen'
+);
+assert.ok(
+	/for button in 1 3; do\n\t\txdotool mousemove [^\n]* click "\$button"\n\t\tif ! wait_for_menu_popups 1; then/.test(
+		container
+	),
+	'a left and a right click on the docked icon each map the tray menu'
+);
+assert.ok(
+	container.includes("grep -q 'Override Redirect State: yes'"),
+	'a menu is an override-redirect popup'
+);
 assert.ok(container.includes(`\nOLDEST_LTS_IMAGE="${Ceiling.OLDEST_LTS_IMAGE}"\n`));
 assert.ok(container.includes('\n\tbash tools/build/build-linux-appimage.sh\n'));
 assert.ok(container.includes('unshare --net -- runuser -u "$SMOKE_USER"'), 'launched offline');

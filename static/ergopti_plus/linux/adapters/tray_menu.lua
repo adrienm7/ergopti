@@ -147,10 +147,10 @@ end
 
 --- Installs the two-row fallback menu: a name and a way out.
 ---
---- The only rows this driver draws outside the shared renderer, and on
---- purpose: they serve when the menu subsystem failed to load, and when the
---- daemon cannot reach the keyboard and holds its icon to say so, so they must
---- not depend on what they survive without. One builder serves both.
+--- Rows drawn outside the shared renderer, and on purpose: they serve when the
+--- menu subsystem failed to load, so they must not depend on what they survive
+--- without. The degraded keyboard-access menu (infra/input_access.lua) is the
+--- other such menu and passes its rows to setMenu itself.
 --- @param title string The first, inert row.
 --- @param quit_label string The translated Quit row.
 --- @param on_quit function Runs when Quit is clicked.
@@ -159,6 +159,19 @@ function M.setFallbackMenu(title, quit_label, on_quit)
 		{ title = title, disabled = true },
 		{ title = quit_label, fn = on_quit },
 	})
+end
+
+--- Shows (or brings back) the status window beside the icon.
+---
+--- Linux-only and outside the port contract: it serves the degraded state the
+--- daemon holds when it cannot reach the keyboard, the one case where the tray
+--- alone does not say enough.
+--- @param title string Window title.
+--- @param text string The explanation.
+--- @return boolean shown
+function M.showStatusWindow(title, text)
+	if not ensure_started() then return false end
+	return Indicator.show_window(title, text) == true
 end
 
 --- Shows the greyed logo while the daemon is paused, as the macOS menu bar and

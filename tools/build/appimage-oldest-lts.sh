@@ -23,7 +23,9 @@
 #     arguments (a desktop launch), no network, a user outside the input group.
 #     Passes when a StatusNotifier host sees the tray icon and its menu and the
 #     app is still running afterwards, then when, with no session bus, the icon
-#     docks in stalonetray as in the catalogue. The host has GTK 3 but no
+#     docks in stalonetray as in the catalogue, the no-keyboard status window
+#     is on screen, and a left and a right click on the docked icon each map
+#     the tray menu (checked with xwininfo, no screenshot). The host has GTK 3 but no
 #     libayatana, like the catalogue's runner: the image brings its own. firejail itself cannot sandbox inside a
 #     container (it takes Docker for a sandbox already in place and runs the
 #     image bare), so a network namespace of its own stands in for --net=none
@@ -82,7 +84,7 @@ container_smoke() {
 	# GTK 3 but no libayatana, as on the catalogue's runner: the image brings its
 	# own tray library. stalonetray and xwininfo replay the catalogue's tray check.
 	apt_install fuse3 xvfb xauth dbus iproute2 python3 python3-gi gir1.2-glib-2.0 \
-		libgtk-3-0 stalonetray x11-utils
+		libgtk-3-0 stalonetray x11-utils xdotool
 	if ldconfig -p | grep -q 'libayatana-appindicator3\.so\.1 '; then
 		echo "ENVIRONMENT: the smoke host must not provide libayatana-appindicator3" >&2
 		return 2
@@ -183,8 +185,67 @@ xembed_smoke() {
 		echo "[ERR] The AppImage exited after docking its icon." >&2
 		return 1
 	fi
-	kill "$app" 2>/dev/null || true
 	echo "[OK] Without libayatana or a session bus, the icon docks in an XEmbed tray."
+
+	# The catalogue screenshots the first named window it finds. Without a
+	# keyboard the app opens its status window, a direct child of the root here
+	# since no window manager runs.
+	local status_window
+	status_window="$(xwininfo -root -children 2>/dev/null | awk '/"Ergopti\+": \(/ { print $1; exit }')"
+	if [ -z "$status_window" ] || ! xwininfo -id "$status_window" | grep -q 'Map State: IsViewable'; then
+		kill "$app" 2>/dev/null || true
+		echo "[ERR] No status window: the catalogue would screenshot the bare tray icon." >&2
+		return 1
+	fi
+	echo "[OK] The status window $status_window is on screen."
+
+	# Then the clicks a user makes on the icon: each must map the tray menu, an
+	# override-redirect popup. A tooltip is one too, hence the minimum height.
+	local icon_id x y w h button
+	icon_id="$(awk '{ print $1 }' <<<"$icon")"
+	read -r x y w h < <(xwininfo -id "$icon_id" | awk '/Absolute upper-left X/ { x = $NF } /Absolute upper-left Y/ { y = $NF }
+		/Width/ { w = $NF } /Height/ { h = $NF } END { print x, y, w, h }')
+	for button in 1 3; do
+		xdotool mousemove $((x + w / 2)) $((y + h / 2)) click "$button"
+		if ! wait_for_menu_popups 1; then
+			kill "$app" 2>/dev/null || true
+			echo "[ERR] Clicking the tray icon with button $button opened no menu." >&2
+			return 1
+		fi
+		echo "[OK] Button $button on the tray icon opens the menu."
+		xdotool key Escape
+		if ! wait_for_menu_popups 0; then
+			kill "$app" 2>/dev/null || true
+			echo "[ERR] The tray menu did not close on Escape." >&2
+			return 1
+		fi
+	done
+	kill "$app" 2>/dev/null || true
+}
+
+# The viewable override-redirect windows at least 60 px tall: popup menus.
+menu_popup_count() {
+	local id count=0 info
+	for id in $(xwininfo -root -children 2>/dev/null | awk '/^ +0x/ { print $1 }'); do
+		info="$(xwininfo -id "$id" 2>/dev/null || true)"
+		grep -q 'Map State: IsViewable' <<<"$info" || continue
+		grep -q 'Override Redirect State: yes' <<<"$info" || continue
+		[ "$(awk '/Height:/ { print $NF }' <<<"$info")" -ge 60 ] || continue
+		count=$((count + 1))
+	done
+	echo "$count"
+}
+
+# Waits up to 10 s for exactly as many popup menus as expected (0, or 1+).
+wait_for_menu_popups() {
+	local expected="$1" count
+	for _ in $(seq 1 40); do
+		count="$(menu_popup_count)"
+		if [ "$expected" = 0 ] && [ "$count" = 0 ]; then return 0; fi
+		if [ "$expected" != 0 ] && [ "$count" -ge "$expected" ]; then return 0; fi
+		sleep 0.25
+	done
+	return 1
 }
 
 # ----------------------------------------------------------------------
