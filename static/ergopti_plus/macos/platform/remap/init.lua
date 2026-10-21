@@ -4138,9 +4138,10 @@ end
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
 --- @param label string Stable operation label for diagnostics.
 --- @param expected_source table|nil Exact bytes a scope backed up before this save.
+--- @param intent table|nil Leaves the user explicitly set (Config.explicit_leaves).
 --- @return boolean committed
 --- @return table|nil receipt Exact native publication ownership.
-local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source)
+local function persist_and_publish_settings(candidate, overwrite_corrupt, label, expected_source, intent)
 	local payload = clone_settings_state(candidate)
 	-- Settings compensation must never roll back a separately owned preference
 	payload.enabled = _state.enabled == true
@@ -4149,7 +4150,8 @@ local function persist_and_publish_settings(candidate, overwrite_corrupt, label,
 		payload,
 		resolve_user_config(),
 		overwrite_corrupt,
-		expected_source
+		expected_source,
+		intent
 	)
 	if not call_ok or saved ~= true then
 		Logger.error(LOG, "%s did not persist; live Karabiner settings were preserved: %s.",
@@ -4690,8 +4692,10 @@ end
 --- failed save cannot leak a partial setter mutation through shared references.
 --- @param mutate function Receives a detached candidate state.
 --- @param overwrite_corrupt boolean|nil Explicit reset-only overwrite intent.
+--- @param leaf string|nil The one leaf the user explicitly sets through this
+---        mutation: only that obsolete leaf may be replaced (Config.explicit_leaves).
 --- @return boolean committed
-local function commit_state_mutation(mutate, overwrite_corrupt)
+local function commit_state_mutation(mutate, overwrite_corrupt, leaf)
 	if not _running or _shutdown_requested then
 		Logger.error(LOG, "Karabiner setting mutation refused while lifecycle is inactive.")
 		return false
@@ -4753,7 +4757,9 @@ local function commit_state_mutation(mutate, overwrite_corrupt)
 			tostring(mutate_err))
 		return false
 	end
-	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation")
+	local intent = leaf ~= nil and { leaves = { [leaf] = true } } or nil
+	local saved, file = persist_and_publish_settings(candidate, overwrite_corrupt, "Karabiner setting mutation",
+		nil, intent)
 	if saved ~= true and file ~= nil then
 		-- The public mutation stayed refused, but its native publication may
 		-- have changed the file and still owns exact cleanup or inverse debt.
@@ -4798,7 +4804,7 @@ function M.set_tap_action(key_id, action_id)
 			hold = cfg.hold or "none",
 			timeout_ms = cfg.timeout_ms,
 		}
-	end)
+	end, nil, "tap_holds.config." .. key_id)
 	if committed then Logger.debug(LOG, "Key '%s' tap → '%s'.", key_id, action_id) end
 	return committed
 end
@@ -4819,7 +4825,7 @@ function M.set_hold_action(key_id, action_id)
 				hold = action_id,
 				timeout_ms = cfg.timeout_ms,
 			}
-		end)
+		end, nil, "tap_holds.config." .. key_id)
 	end)
 	if committed then Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id) end
 	return committed
@@ -4856,7 +4862,7 @@ function M.set_tap_timeout(key_id, ms)
 			hold = cfg.hold or "none",
 			timeout_ms = value,
 		}
-	end)
+	end, nil, "tap_holds.config." .. key_id)
 	if committed then
 		Logger.debug(LOG, "Key '%s' tap/hold timeout override → %s.",
 			key_id, value and (value .. " ms") or "global")
@@ -4920,7 +4926,7 @@ function M.set_combo_tap_action(combo_id, action_id)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_config[combo_id] = update_combo_slot(
 			candidate.mod_combos_config, combo_id, "tap", action_id)
-	end)
+	end, nil, "mod_combos.config." .. combo_id)
 	if committed then Logger.debug(LOG, "Combo '%s' tap → '%s'.", combo_id, action_id) end
 	return committed
 end
@@ -4937,7 +4943,7 @@ function M.set_combo_hold_action(combo_id, action_id)
 		return commit_state_mutation(function(candidate)
 			candidate.mod_combos_config[combo_id] = update_combo_slot(
 				candidate.mod_combos_config, combo_id, "hold", action_id)
-		end)
+		end, nil, "mod_combos.config." .. combo_id)
 	end)
 	if committed then Logger.debug(LOG, "Combo '%s' hold → '%s'.", combo_id, action_id) end
 	return committed
@@ -4952,7 +4958,7 @@ function M.set_combo_combo_action(combo_id, action_id)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_config[combo_id] = update_combo_slot(
 			candidate.mod_combos_config, combo_id, "combo", action_id)
-	end)
+	end, nil, "mod_combos.config." .. combo_id)
 	if committed then Logger.debug(LOG, "Combo '%s' combo → '%s'.", combo_id, action_id) end
 	return committed
 end
@@ -4979,7 +4985,7 @@ function M.set_tap_hold_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
-	end)
+	end, nil, "tap_holds.timeout_ms")
 	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
 	return committed
 end
@@ -5004,7 +5010,7 @@ function M.set_sticky_timeout(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
-	end)
+	end, nil, "tap_holds.sticky_timeout_ms")
 	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
 	return committed
 end
@@ -5029,7 +5035,7 @@ function M.set_simultaneous_threshold(ms)
 	value = math.floor(value)
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
-	end)
+	end, nil, "mod_combos.simultaneous_threshold_ms")
 	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
 	return committed
 end
@@ -5051,7 +5057,7 @@ function M.set_combo_symmetric(value)
 	local normalized = value == true
 	local committed = commit_state_mutation(function(candidate)
 		candidate.combo_symmetric = normalized
-	end)
+	end, nil, "mod_combos.symmetric")
 	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
 	return committed
 end
@@ -5079,7 +5085,7 @@ function M.set_tap_holds_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
-	end)
+	end, nil, "tap_holds.enabled")
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5106,7 +5112,7 @@ function M.set_mod_combos_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_enabled = value
-	end)
+	end, nil, "mod_combos.enabled")
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
 end
