@@ -22,9 +22,11 @@ _KLACSD_Case(PendingDiscovery) {
 	PreviousCritical := Critical("On")
 	HadSaveFn := KLAppCat.HasOwnProp("save_fn")
 	HadWriteOwner := KLAppCat.HasOwnProp("write_owner")
+	HadStoreModel := KLAppCat.HasOwnProp("store_model")
 	Saved := { Categories: KLAppCat.categories, Path: KLAppCat.file_path,
 		Dirty: KLAppCat.dirty, SaveFn: HadSaveFn ? KLAppCat.save_fn : 0,
-		WriteOwner: HadWriteOwner ? KLAppCat.write_owner : 0 }
+		WriteOwner: HadWriteOwner ? KLAppCat.write_owner : 0,
+		StoreModel: HadStoreModel ? KLAppCat.store_model : 0 }
 	Root := A_Temp . "\ergopti_appcat_set_" . A_ScriptHwnd . "_" . ++Serial
 	Path := Root . "\" . KLAppCatConst.FILE_NAME
 	Owned := false, Locked := 0, Primary := 0, CleanupError := 0
@@ -41,12 +43,14 @@ _KLACSD_Case(PendingDiscovery) {
 		; scenario must target only its own callback, never a prior fixture's timer.
 		KLAppCat.categories := Map(), KLAppCat.file_path := ""
 		KLAppCat.dirty := false, KLAppCat.save_fn := FixtureTimer
+		if HadStoreModel
+			KLAppCat.store_model := 0
 		if HadWriteOwner
 			KLAppCat.write_owner := 0
 		AssertTrue(KL_AppCat_Init(Root), "the real category loader must admit the original")
 		if PendingDiscovery {
-			KLAppCat.categories["pending.exe"] := "unknown"
-			KLAppCat.dirty := true
+			AssertEqual("unknown", KL_AppCat_Get("pending.exe"), "the real discovery API owns its pending metadata")
+			AssertTrue(KLAppCat.dirty)
 		}
 		Admitted := KLAppCat.categories
 		BeforeContent := _KL_AppCat_SnapshotContent()
@@ -86,6 +90,10 @@ _KLACSD_Case(PendingDiscovery) {
 			finally {
 				KLAppCat.categories := Saved.Categories, KLAppCat.file_path := Saved.Path
 				KLAppCat.dirty := Saved.Dirty
+				if HadStoreModel
+					KLAppCat.store_model := Saved.StoreModel
+				else if KLAppCat.HasOwnProp("store_model")
+					KLAppCat.DeleteProp("store_model")
 				if HadWriteOwner
 					KLAppCat.write_owner := Saved.WriteOwner
 				if HadSaveFn
