@@ -129,35 +129,51 @@ _JsonObjectMemberSpansAt(&text, position) {
 
 /**
  * Returns exact source spans for ordered elements of a complete JSON array.
- * Validates the whole document with the canonical parser before reusing its
- * token progress. Native numeric/Boolean aliases therefore retain provenance.
+ * Validates the whole document in the same single pass that records the spans,
+ * with the canonical parser's own grammar, depth and trailing-data rules.
+ * Native numeric/Boolean aliases therefore retain provenance in "text".
  * Offsets are one-based UTF-16 positions for SubStr, not byte offsets.
  * @param {string} text Complete JSON array source.
- * @returns {Array} Element start, length and original validated source text.
+ * @returns {Array} Element start, length, original validated source text and
+ *   decoded value (as JsonParse returns it).
  * @throws {Error} Invalid JSON or a root that is not an array.
  */
 JsonArrayElementSpans(text) {
-	parsed := JsonParse(text)
-	if !(parsed is Array)
-		throw TypeError("Selected JSON source is not an array.")
 	position := 1
 	_JsonSkipWs(&text, &position)
+	if SubStr(text, position, 1) != "[" {
+		; Invalid input keeps the parser's own syntax diagnostic.
+		JsonParse(text)
+		throw TypeError("Selected JSON source is not an array.")
+	}
 	position++
 	spans := []
 	_JsonSkipWs(&text, &position)
-	if SubStr(text, position, 1) == "]"
-		return spans
-	loop {
-		_JsonSkipWs(&text, &position)
-		start := position
-		_JsonParseValue(&text, &position, 1)
-		spans.Push(Map("start", start, "length", position - start,
-			"text", SubStr(text, start, position - start)))
-		_JsonSkipWs(&text, &position)
-		if SubStr(text, position, 1) == "]"
-			return spans
+	if SubStr(text, position, 1) == "]" {
 		position++
+	} else {
+		; Mirrors _JsonParseArray at the root's depth, keeping each element's span.
+		loop {
+			_JsonSkipWs(&text, &position)
+			start := position
+			value := _JsonParseValue(&text, &position, 1)
+			spans.Push(Map("start", start, "length", position - start,
+				"text", SubStr(text, start, position - start), "value", value))
+			_JsonSkipWs(&text, &position)
+			c := SubStr(text, position, 1)
+			if (c == "]") {
+				position++
+				break
+			}
+			if (c != ",")
+				throw Error("JSON: expected ',' or ']' at position " . position . ".", -1)
+			position++
+		}
 	}
+	_JsonSkipWs(&text, &position)
+	if (position <= StrLen(text))
+		throw Error("JSON: unexpected trailing data at position " . position . ".", -1)
+	return spans
 }
 
 /**
@@ -322,6 +338,23 @@ _JsonParseArray(&text, &pos, depth) {
 	}
 }
 
+; The NUL-terminated UTF-16 set that ends a plain string run: quote,
+; backslash, backtick and every control character except NUL (which ends the
+; native scan by itself).
+_JsonStringRunDelimiters() {
+	static Delimiters := 0
+	if !Delimiters {
+		Units := [0x22, 0x5C, 0x60]
+		loop 31
+			Units.Push(A_Index)
+		Set := Buffer((Units.Length + 1) * 2, 0)
+		for Index, Unit in Units
+			NumPut("UShort", Unit, Set, (Index - 1) * 2)
+		Delimiters := Set
+	}
+	return Delimiters
+}
+
 _JsonParseString(&text, &pos, ObjectKey := false) {
 	pos++  ; consume opening "
 	out := ""
@@ -388,18 +421,21 @@ _JsonParseString(&text, &pos, ObjectKey := false) {
 			; delimiter (" / \ / backtick) in one slice instead of appending one
 			; char at a time — the per-char ``out .= c`` is O(n^2) over the long
 			; unescaped spans that dominate locale strings (parsed once at boot
-			; for every i18n value). Behaviour is identical: the loop stops on the
-			; same delimiter the outer switch already handles
+			; for every i18n value). One native code-unit scan (wcspbrk) finds the
+			; run end; a per-character AHK loop made a 6 MB GitHub release list
+			; take 33 s. PCRE is not used here: in UTF-16 mode it reads a lone
+			; high surrogate as half of a pair and swallows the delimiter after
+			; it. Behaviour is identical: the run stops on the same delimiters
+			; the outer switch handles, and on a control character, which is
+			; refused; wcspbrk stops at an embedded NUL, which is refused too.
 			runStart := pos
-			pos++
-			while (pos <= len) {
-				cc := SubStr(text, pos, 1)
-				if (Ord(cc) < 0x20)
-					throw Error("JSON: unescaped control character at position " . pos . ".", -1)
-				if (cc == '"' or cc == "\" or cc == '``')
-					break
-				pos++
-			}
+			Base := StrPtr(text)
+			Found := DllCall("msvcrt\wcspbrk", "Ptr", Base + (pos - 1) * 2,
+				"Ptr", _JsonStringRunDelimiters(), "Cdecl Ptr")
+			pos := Found ? (Found - Base) // 2 + 1
+				: pos + DllCall("msvcrt\wcslen", "Ptr", Base + (pos - 1) * 2, "Cdecl UPtr")
+			if (pos <= len && Ord(SubStr(text, pos, 1)) < 0x20)
+				throw Error("JSON: unescaped control character at position " . pos . ".", -1)
 			out .= SubStr(text, runStart, pos - runStart)
 		}
 	}

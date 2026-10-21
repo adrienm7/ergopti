@@ -1710,6 +1710,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/infra/toml/test_json_number_misleading_error.ahk
 #Include unit/infra/toml/test_json_string_fast_path.ahk
 #Include unit/infra/toml/test_json_object_key_nul.ahk
+#Include unit/infra/toml/test_json_native_string_scan.ahk
 #Include unit/modules/llm/servers/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
