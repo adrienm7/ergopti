@@ -17,6 +17,8 @@ local OWNERS = {
 	-- and the timer scheduler admits delays through the number policy.
 	"native_path",
 	"number_policy",
+	-- The real notifications owner focuses the clicked application through this adapter.
+	"adapters.running_application",
 	"program_parameter",
 	"actions.assignable",
 	"_generated.action_catalogue",
