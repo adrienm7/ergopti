@@ -474,15 +474,28 @@ OllamaWV_FlushQueue(captured_epoch := unset) {
 		return
 	if _OllamaWV_Ready   ; Guard: flush must only run once
 		return
-	_OllamaWV_Ready := true
-	; Inject the full locale strings now that the DOM exists. Deferred (see
-	; OllamaWV_EvalJS) so none of these run re-entrantly inside the
-	; WebMessageReceived callback that typically triggers this flush.
+	captured_view := _OllamaWV_WebView
+	captured_queue := _OllamaWV_Queue
+	; Locale I/O and diagnostics may retire this page. Keep it unready so
+	; same-session updates still append to the retained queue during that work.
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
+	PreviousCritical := Critical("On")
+	try {
+		if captured_epoch != _OllamaWV_Epoch or A_IsSuspended
+			return
+		if !IsSet(_OllamaWV_WebView) or !(captured_view == _OllamaWV_WebView)
+			return
+		if _OllamaWV_Ready or !(captured_queue == _OllamaWV_Queue)
+			return
+		; Detach only the admitted queue before any deferred script can run.
+		_OllamaWV_Queue := []
+		_OllamaWV_Ready := true
+	} finally Critical(PreviousCritical)
+	; These callbacks retain the admitted epoch and queue, never a successor's
+	; mutable globals. Execution remains outside WebMessageReceived's stack.
 	SetTimer(OllamaWV_RunScript.Bind(captured_epoch, i18n_js), -1)
-	for _, js in _OllamaWV_Queue
+	for _, js in captured_queue
 		SetTimer(OllamaWV_RunScript.Bind(captured_epoch, js), -1)
-	_OllamaWV_Queue := []
 }
 
 /**
