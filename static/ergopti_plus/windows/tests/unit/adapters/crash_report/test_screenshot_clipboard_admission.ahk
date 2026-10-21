@@ -43,7 +43,13 @@ _GSCA_AdapterPublish(Record, Stage, Args*) {
 		throw Record["admission_error"]
 	AssertEqual(1, Record["admission_calls"], "the loaded native bitmap must reach admission exactly once")
 	AssertEqual(Allowed, Published, "only the canonical Integer1 admission may publish")
-	AssertEqual(0, DllCall("User32\GetOpenClipboardWindow", "Ptr"), "refusal and success must both release the actual lock")
+	; A clipboard history reader may already hold the lock again; only a window
+	; of this process still holding it would be a leak.
+	Holder := DllCall("User32\GetOpenClipboardWindow", "Ptr"), HolderPid := 0
+	if Holder
+		DllCall("User32\GetWindowThreadProcessId", "Ptr", Holder, "UInt*", &HolderPid)
+	AssertTrue(HolderPid != DllCall("Kernel32\GetCurrentProcessId", "UInt"),
+		"refusal and success must both release the actual lock")
 	if Allowed {
 		AssertTrue(Sequence > 0 && Sequence == Record["sequence_after_publish"],
 			"a current admitted bitmap retains its authenticated post-close receipt")

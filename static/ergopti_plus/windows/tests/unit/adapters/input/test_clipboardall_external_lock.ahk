@@ -27,7 +27,7 @@ _CALC_WaitFile(Path, State) {
 }
 
 _CALC_AddBinaryFormat(FormatId) {
-	AssertTrue(DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int"), "the fixture must open its native format publication")
+	AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "the fixture must open its native format publication")
 	Handle := 0
 	try {
 		Handle := DllCall("Kernel32\GlobalAlloc", "UInt", 0x42, "UPtr", 8, "Ptr")
@@ -87,7 +87,7 @@ _CALC_Run(Held) {
 		_CALC_WaitFile(Root . "\ready", State)
 		AssertEqual("ready", FSReadUtf8Exact(Root . "\ready"))
 		if Held {
-			RawOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+			RawOpened := CB_OpenClipboardWithin(A_ScriptHwnd)
 			AssertTrue(RawOpened, "the parent must acquire its real native external lock")
 		}
 		AssertTrue(FSWriteCreateDurable(Root . "\before.request", "probe"))
@@ -99,7 +99,12 @@ _CALC_Run(Held) {
 		SetterCritical := Critical("On")
 		try AssertTrue(CB_RestoreAll(Captured), "the real opaque ClipboardAll setter must accept its same-HWND native reopen")
 		finally Critical(SetterCritical)
-		AssertEqual(0, DllCall("User32\GetOpenClipboardWindow", "Ptr"),
+		; A clipboard history reader may already hold the lock again; only a
+		; window of this process still holding it would be a leak.
+		Holder := DllCall("User32\GetOpenClipboardWindow", "Ptr"), HolderPid := 0
+		if Holder
+			DllCall("User32\GetWindowThreadProcessId", "Ptr", Holder, "UInt*", &HolderPid)
+		AssertTrue(HolderPid != DllCall("Kernel32\GetCurrentProcessId", "UInt"),
 			"the real setter's internal CloseClipboard releases the lock without an external close")
 		RawOpened := false
 		AssertTrue(FSWriteCreateDurable(Root . "\after.request", "probe"))
