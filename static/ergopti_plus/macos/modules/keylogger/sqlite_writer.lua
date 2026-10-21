@@ -28,6 +28,7 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
+local Literal = require("sqlite.literal")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keylogger.text_cipher")
@@ -447,10 +448,12 @@ end
 -- =================================
 
 --- Escape a Lua string for a SQL single-quoted literal. nil → SQL NULL.
+--- db:exec hands SQL to sqlite3_exec as a C string, so NUL (and CR) are spelled
+--- as char() by the shared encoder instead of being embedded raw.
 local function _sql_str(s)
 	if s == nil then return "NULL" end
 	if type(s) ~= "string" then s = tostring(s) end
-	return "'" .. s:gsub("'", "''") .. "'"
+	return "'" .. Literal.escape(s) .. "'"
 end
 
 --- Format a numeric / boolean for SQL.
