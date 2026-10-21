@@ -141,11 +141,13 @@ check(
 	!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
 	'`package-macos` must be gating, not continue-on-error'
 );
-// Fail fast: a red Hammerspoon Unit suite spends no macOS minutes. Packaging
-// runs beside E2E (c5c56c1726); the launch job admits both before any release.
+// Fail fast: a red Hammerspoon Unit or Integration suite spends no macOS
+// minutes. Packaging runs beside E2E (c5c56c1726) once Integration, which needs
+// every Unit cell, passed; the launch job admits both before any release.
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['test-hs']),
-	`package-macos must need exactly the Unit suite it admits, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
+	JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) ===
+		JSON.stringify(['integration-hs']),
+	`package-macos must need exactly the Integration suite it admits, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`
 );
 
 // The launcher build and XCTest precede the app build. LauncherLogTests append
@@ -612,7 +614,7 @@ const ALLOWED_JOB_IFS = {
 	'macos-ok': 'always()',
 	'linux-ok': 'always()',
 	'package-linux':
-		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+		"${{ !cancelled() && needs.e2e-linux.outputs.ci_integration_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 };
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
