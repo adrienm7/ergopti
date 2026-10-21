@@ -428,7 +428,7 @@ end
 M.keyboard_source_answer = keyboard_source_answer
 
 -- The machines a scenario can boot on. `worker` delays are within the lease
---- worker's own budgets (READY_ACK_TIMEOUT_SEC 7.5 s, a command 2.5 s). A
+--- worker's own budgets (READY_ACK_TIMEOUT_SEC 11.5 s, a command 2.5 s). A
 --- `during_resume` event happens once, `after` seconds into the boot's first
 --- RESUME, while its answer is still due.
 M.MACHINES = {
