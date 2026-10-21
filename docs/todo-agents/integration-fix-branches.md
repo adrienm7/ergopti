@@ -59,7 +59,15 @@ github/fix/macos`, `git cherry github/dev github/fix/windows`. Lines starting wi
   conventions lint, format check, teardown-order guard, macOS tests of every touched module (27
   files, run locally with the luv shim).
 - Not validated locally: Linux suite (no Linux LuaJIT on this host), full AHK suite (90 min),
-  `npm run test:js` in full. Hosted CI runs are listed in the final report of this integration.
+  `npm run test:js` in full.
+- Hosted CI, all lanes: run 39616630799 is green for every integrated commit plus the three
+  follow-up fixes on dev `9432f4d963` (branch `tmp/integrate-3`, tip `228db821cf`).
+- After rebasing onto dev `1792356fef` (no conflict), run 39619616096 fails in jobs our range does
+  not touch: macOS fixture residue of `number_policy` (dev `d5c520ce94`) and
+  `adapters.running_application` (dev `0292ec401d`), Windows number-row ownership fixture,
+  `Updater_ParseBody` single-decoder meta and the sealed updater source (dev `8a43bd805c`), a stale
+  `architecture.md`, and the module-level state baseline (28 against 27). Run 39623459261 tests
+  dev `1792356fef` alone (branch `tmp/integrate-devbase`) to confirm those reds belong to dev.
 
 ## Open risks
 
