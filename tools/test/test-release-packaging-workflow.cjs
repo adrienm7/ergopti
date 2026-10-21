@@ -2225,47 +2225,6 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 }
 // PUBLIC_MACOS_PUBLICATION_WIRING_END
 
-// PUBLISHED_ARCHIVE_POLICY_TESTS_BEGIN
-// The published diagnostic consumes the producer's canonical archive bindings.
-// Its current-build and retained-helper branches remain independent ZIP users.
-function publishedArchiveWorkflowProblems(source) {
-	const failures = [];
-	const jobs = pipeline.jobsOfText(source, '.github/workflows/macos-release-launch.yml');
-	const observe = jobs.find((job) => job.id === 'observe');
-	if (!observe) return ['the published archive diagnostic must retain its observe job'];
-	const download = pipeline.step(observe.body, 'Download and verify the published application');
-	if (
-		pipeline.stepField(download, 'if') !==
-		"inputs.scenario == 'published' || inputs.scenario == 'published_with_dependency'"
-	)
-		failures.push('the published archive preference must remain scoped to published scenarios');
-	const commands = pipeline.runOf(download)?.filter((line) => line.trim() !== '') ?? [];
-	if (
-		commands.length !== 2 ||
-		commands[0] !== 'python3 tools/diagnostics/macos_release_launch_test.py' ||
-		commands[1] !== 'python3 tools/diagnostics/macos-release-launch.py --install-published'
-	)
-		failures.push('the published download must qualify and invoke its actual archive helper');
-	const observeLaunch = pipeline.step(
-		observe.body,
-		'Observe the installed release without a waiting open helper'
-	);
-	const launch = pipeline.runOf(observeLaunch) ?? [];
-	if (
-		!launch.includes(
-			'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"'
-		)
-	)
-		failures.push('the installed published archive must retain the actual strict launch observer');
-	return failures;
-}
-errors.push(
-	...publishedArchiveWorkflowProblems(
-		fs.readFileSync(path.join(root, '.github/workflows/macos-release-launch.yml'), 'utf8')
-	)
-);
-// PUBLISHED_ARCHIVE_POLICY_TESTS_END
-
 // ARCHIVE_DESCRIPTOR_READ_CONTROLS_BEGIN
 // Portable descriptor tests retain actual owner logic without launching native tools.
 {

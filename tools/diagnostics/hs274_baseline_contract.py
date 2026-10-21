@@ -6,7 +6,7 @@ version. The diagnostic producer (hs274-stream-source.hpp), CLI transfer
 (hs274-stream-baseline-client.hpp) and Python fixture reader
 (hs274_baseline_frames.py) declare their own. When they differ,
 every native run with the Hammerspoon consumer spends a macOS runner and then
-fails at admission, so hs274-native.yml runs this check first and stops with a
+fails at admission, so a native run starts with this check and stops with a
 named reason until WP4 aligns the producer.
 """
 

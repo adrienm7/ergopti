@@ -165,7 +165,7 @@ jobs:
           archive="$RUNNER_TEMP/tooltip-provisioning/Hammerspoon-$version.zip"
           printf '%s\n' "$url" > "$RUNNER_TEMP/tooltip-provisioning/origin-url.txt"
           curl --proto '=https' --proto-redir '=https' --fail --location --retry 2 --max-time 120 -o "$archive" "$url"
-          # Existing qualified pin from hs274-native.yml/macos-release-launch.yml.
+          # The qualified pin macos_cold_bootstrap.py holds as HAMMERSPOON_ARCHIVE_SHA256.
           printf '%s  %s\n' 11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa "$archive" | shasum -a 256 --check
           shasum -a 256 "$archive" > "$RUNNER_TEMP/tooltip-provisioning/archive.sha256"
           ditto -x -k "$archive" "$RUNNER_TEMP/tooltip-hammerspoon"

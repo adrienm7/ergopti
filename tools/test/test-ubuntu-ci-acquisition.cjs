@@ -14,8 +14,7 @@ const scopes = new Map([
 	['ci-linux.yml', 38],
 	['ci-macos.yml', 2],
 	['ci-common.yml', 1],
-	['linux-layout.yml', 2],
-	['metrics-reader-bench.yml', 1]
+	['linux-layout.yml', 2]
 ]);
 const command = 'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py"';
 
