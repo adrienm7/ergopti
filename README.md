@@ -394,21 +394,28 @@ knowledge.
 [`ci.yml`](.github/workflows/ci.yml) runs on every push to `main` or `dev`, on
 every pull request into them, and on manual dispatch:
 
-1. **Validate and plan** is the single root of the run graph. It first runs
-   the repository-wide gates: hotstring TOML formatting, the property tests,
-   the mutation tests (on `main` only) and `npm run test:js`. Then it reads the
-   git tags and commit subjects and decides whether the run publishes, and with
-   which tag, version and update channel.
-2. Once it passes, three lanes run in parallel, one reusable workflow per OS:
+1. **Validate and plan** is the single root of the run graph. It reads the git
+   tags and commit subjects and decides whether the run publishes, and with
+   which tag, version and update channel. The repository-wide gates (hotstring
+   TOML formatting, the property tests, the mutation tests and
+   `npm run test:js`, one runner per feature lot) run in the
+   `YAML, shared code & web / Unit tests` stage.
+2. Once it passes, four lanes run in parallel, one reusable workflow each:
    **macOS** ([`ci-macos.yml`](.github/workflows/ci-macos.yml)), **Windows**
-   ([`ci-windows.yml`](.github/workflows/ci-windows.yml)) and **Linux**
-   ([`ci-linux.yml`](.github/workflows/ci-linux.yml)). Each lane starts with
-   its driver's `tests` job (`tests (stubbed)` on macOS, whose tests run on
-   Ubuntu against a stubbed Hammerspoon) and continues with its `package` job.
-   The macOS lane then launches the package over realistic user states; the
-   Linux lane installs and runs the `.deb`, the `.rpm` and the AppImage and
-   installs the driver on several distributions, then checks every result in
-   its `evidence gate`; the Windows lane packages on a release run only. On a
+   ([`ci-windows.yml`](.github/workflows/ci-windows.yml)), **Linux**
+   ([`ci-linux.yml`](.github/workflows/ci-linux.yml)) and the shared code and
+   web site ([`ci-common.yml`](.github/workflows/ci-common.yml)). A lane file
+   only calls its stages, each a small reusable workflow of its own named
+   after the lane and the stage (`ci-macos-unit.yml`, `ci-macos-e2e.yml`,
+   `ci-macos-build.yml`, `ci-macos-install.yml`, `ci-macos-verdict.yml`, and
+   so on), in the same order on every lane: `Unit tests`, `E2E tests`,
+   `Build`, `Install and launch`, `Verdict`. A check therefore reads
+   `<lane> / <stage> / <what it tests>`, for example
+   `macOS / E2E tests / Managed Ollama (macOS 15, Intel)` or
+   `Windows / Unit tests / core`. The macOS lane launches the package over
+   realistic user states; the Linux lane installs and runs the `.deb`, the
+   `.rpm`, the AppImage and the Flatpak and installs the driver on several
+   distributions; each `Verdict` then checks every result of its lane. On a
    release run, each lane builds the files that will be published, checks
    those exact files, and uploads them.
 3. **Release** ([`ci-release.yml`](.github/workflows/ci-release.yml)), which
@@ -419,15 +426,15 @@ every pull request into them, and on manual dispatch:
    Sparkle update feed.
 
 ```text
-Validate and plan ─┬─ macOS / tests (stubbed) ─ package ─ launch (matrix) ─────┬─ Release
-                   ├─ Windows / tests ─ package ───────────────────────────────┤
-                   └─ Linux / tests ─ package ─ run the .deb, run the .rpm,    │
-                                                run the AppImage, install,     │
-                                                first install ─ evidence gate ─┘
+Validate and plan ─┬─ macOS ─────────────────────┬─ Release
+                   ├─ Windows ───────────────────┤
+                   ├─ Linux ─────────────────────┤
+                   └─ YAML, shared code & web ───┘
+each lane: Unit tests ─ E2E tests ─ Build ─ Install and launch ─ Verdict
 ```
 
-Each lane has one entry job and one exit job, so the run graph draws one line
-per OS; Release also reads the plan from the root.
+Each lane has one entry stage and one exit stage, so the run graph draws one
+line per lane; Release also reads the plan from the root.
 
 **Channels:** a push to `main` publishes a stable release (`vX.Y.Z`); a push to
 `dev` publishes a pre-release, `v0.0.0-dev.N`, one past the last dev tag. If the
