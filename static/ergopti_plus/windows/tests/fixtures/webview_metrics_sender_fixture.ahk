@@ -130,6 +130,147 @@ _MVSP_Observe(Sender, Args) {
 	_MVSP.Received := true
 }
 
+_MVSP_ObserveOther(Sender, Args) {
+	global _MVSP
+	Other := _MVSP.Other
+	Message := JsonParse(Args.TryGetWebMessageAsString())
+	_MVSP_Require(Message is Map && Message.Get("action", "") == "request_refresh"
+		&& Message.Get("probe", "") == _MVSP.Token, "The other native core posted an unexpected action.")
+	Other.Calls += 1
+	_MVSP_Require(Other.Calls == 1, "The other native core must post exactly once.")
+	Other.Sender := Sender
+	IUnknown := "{00000000-0000-0000-C000-000000000046}"
+	CurrentUnknown := ComObjQuery(_MVSP.View.Ptr, IUnknown)
+	OtherUnknown := ComObjQuery(Other.View.Ptr, IUnknown)
+	CallbackUnknown := ComObjQuery(Sender.Ptr, IUnknown)
+	CurrentCore := ComObjQuery(_MVSP.View.Ptr, WebView2.Core.IID)
+	OtherCore := ComObjQuery(Other.View.Ptr, WebView2.Core.IID)
+	CallbackCore := ComObjQuery(Sender.Ptr, WebView2.Core.IID)
+	Receipt := _MVSP.Receipt
+	Receipt["other_objptr"] := Format("{:X}", ObjPtr(Other.View))
+	Receipt["other_callback_objptr"] := Format("{:X}", ObjPtr(Sender))
+	Receipt["other_iunknown"] := Format("{:X}", ComObjValue(OtherUnknown))
+	Receipt["other_callback_iunknown"] := Format("{:X}", ComObjValue(CallbackUnknown))
+	Receipt["other_current_iunknown"] := Format("{:X}", ComObjValue(CurrentUnknown))
+	Receipt["other_core"] := Format("{:X}", ComObjValue(OtherCore))
+	Receipt["other_callback_core"] := Format("{:X}", ComObjValue(CallbackCore))
+	Receipt["other_current_core"] := Format("{:X}", ComObjValue(CurrentCore))
+	Receipt["other_callback_identity_equal"] := ComObjValue(CallbackUnknown) == ComObjValue(OtherUnknown)
+		&& ComObjValue(CallbackCore) == ComObjValue(OtherCore)
+	Receipt["other_identity_distinct"] := ComObjValue(CallbackUnknown) != ComObjValue(CurrentUnknown)
+		&& ComObjValue(CallbackCore) != ComObjValue(CurrentCore)
+	Receipt["other_same_url"] := Args.Source == _MVSP.Url && Other.View.Source == _MVSP.Url
+		&& _MVSP.View.Source == _MVSP.Url
+	Receipt["other_current_entry"] := KLWV_IsCurrent("apps", 71)
+		&& KLWV.windows.Get("apps", 0) == _MVSP.Entry && _MVSP.Entry["webview"] == _MVSP.View
+	Receipt["other_not_suspended"] := !A_IsSuspended
+	_MVSP_Require(Receipt["other_callback_identity_equal"] && Receipt["other_identity_distinct"],
+		"The callback must be the genuine other COM core, distinct from the current one.")
+	_MVSP_Require(Receipt["other_same_url"] && Receipt["other_current_entry"] && Receipt["other_not_suspended"],
+		"The other core must differ only in native identity at the document admission boundary.")
+	Other.ReceivedAt := A_TickCount
+	Other.Received := true
+}
+
+_MVSP_Navigation(State, Sender, Args) {
+	_MVSP_Require(Args.IsSuccess, "The actual private document navigation failed.")
+	State.Done := true
+}
+
+_MVSP_LoadWithoutMessage(View) {
+	global _MVSP
+	State := {Done: false}
+	Subscription := View.NavigationCompleted(_MVSP_Navigation.Bind(State))
+	try {
+		View.Navigate(_MVSP.Url)
+		while !State.Done && !IsObject(_MVSP.AsyncError)
+			Sleep(10)
+		if IsObject(_MVSP.AsyncError)
+			throw _MVSP.AsyncError
+		_MVSP_Require(View.Source == _MVSP.Url, "The completed private navigation has a different source.")
+	} finally Subscription := 0
+}
+
+_MVSP_RunOtherCore() {
+	global _MVSP
+	_MVSP.Other := {Controller: 0, View: 0, Sender: 0, HostSubscription: 0, ObserverSubscription: 0,
+		BrowserHandle: 0, BrowserPid: 0, Received: false, Calls: 0, ControllerClosed: false}
+	Other := _MVSP.Other
+	_MVSP.Phase := "other-core-controller"
+	; Reusing the genuine Environment creates two distinct cores in one private
+	; browser. No second profile or duplicate process termination is assumed.
+	Other.Controller := WebView2.create(_MVSP.Gui.Hwnd, , _MVSP.View.Environment)
+	Other.View := Other.Controller.CoreWebView2
+	Other.BrowserPid := Other.View.BrowserProcessId
+	if Other.BrowserPid != _MVSP.BrowserPid {
+		; Even an unexpected environment/process split needs an exact owner before
+		; rejecting this prerequisite. This handle is never opened for the shared PID.
+		Other.BrowserHandle := DllCall("OpenProcess", "UInt", 0x100001, "Int", false,
+			"UInt", Other.BrowserPid, "Ptr")
+		_MVSP_Require(Other.BrowserHandle != 0, "The unexpected second browser could not be supervised.")
+	}
+	_MVSP_Require(Other.BrowserPid == _MVSP.BrowserPid, "The reused native environment did not share its browser process.")
+	Bounds := Buffer(16, 0)
+	NumPut("Int", 480, "Int", 320, Bounds, 8)
+	Other.Controller.Bounds := Bounds
+	Other.Controller.IsVisible := true
+	Other.View.SetVirtualHostNameToFolderMapping("ergopti.metrics", _MVSP.Root . "\assets", 1)
+	Other.ObserverSubscription := Other.View.WebMessageReceived(_MVSP_ObserveOther)
+	Other.HostSubscription := Other.View.WebMessageReceived(KLWV_OnWebMessage.Bind("apps", 71))
+	_MVSP_LoadWithoutMessage(_MVSP.View)
+	_MVSP_LoadWithoutMessage(Other.View)
+	_MVSP_Require(_MVSP.Calls == 0 && Other.Calls == 0 && _MVSP.Spawns == 0,
+		"Both actual documents must be ready before either probe action.")
+	_MVSP.Phase := "other-core-message"
+	Other.View.ExecuteScriptAsync("window.emitProbe()").await()
+	while !Other.Received && !IsObject(_MVSP.AsyncError)
+		Sleep(10)
+	if IsObject(_MVSP.AsyncError)
+		throw _MVSP.AsyncError
+	; Let the independently subscribed host finish handling the same event. A
+	; wrong admission remains a business failure with the measured identities.
+	while TickElapsed(Other.ReceivedAt) < 1000
+		Sleep(10)
+	if IsObject(_MVSP.AsyncError)
+		throw _MVSP.AsyncError
+	_MVSP.Receipt["other_worker_spawns"] := _MVSP.Spawns
+	_MVSP.Receipt["other_worker_reserved"] := KLPFWorker.jobs.Has("apps")
+	_MVSP.Receipt["other_native_callbacks"] := Other.Calls
+	_MVSP.Receipt["other_browser_pid"] := Other.BrowserPid
+	_MVSP.Receipt["shared_browser_process"] := Other.BrowserPid == _MVSP.BrowserPid
+	_MVSP_Require(KLPF_CancelBuild("apps"), "An erroneously admitted other-core worker must still retire.")
+	Other.BeforePositive := _MVSP.Spawns
+	_MVSP.Phase := "current-core-after-other"
+	_MVSP.View.ExecuteScriptAsync("window.emitProbe()").await()
+}
+
+_MVSP_CloseOther() {
+	global _MVSP
+	if !_MVSP.HasOwnProp("Other")
+		return
+	Other := _MVSP.Other
+	Other.HostSubscription := 0, Other.ObserverSubscription := 0
+	if IsObject(Other.Controller)
+		Other.Controller.Close()
+	Other.Controller := 0, Other.View := 0, Other.Sender := 0
+	Other.ControllerClosed := true
+}
+
+_MVSP_RetireOtherBrowser() {
+	global _MVSP
+	if !_MVSP.HasOwnProp("Other") || !_MVSP.Other.BrowserHandle
+		return
+	Other := _MVSP.Other
+	State := DllCall("WaitForSingleObject", "Ptr", Other.BrowserHandle, "UInt", 0, "UInt")
+	if State == 258 {
+		_MVSP_Require(DllCall("TerminateProcess", "Ptr", Other.BrowserHandle, "UInt", 0),
+			"The unexpected second browser could not be retired.")
+		State := DllCall("WaitForSingleObject", "Ptr", Other.BrowserHandle, "UInt", 5000, "UInt")
+	}
+	_MVSP_Require(State == 0, "The unexpected second browser exit was not observed.")
+	DllCall("CloseHandle", "Ptr", Other.BrowserHandle), Other.BrowserHandle := 0
+}
+
 _MVSP_Error(Failure, *) {
 	global _MVSP
 	; Keep asynchronous callback failures separate from a valid host refusal.
@@ -149,7 +290,9 @@ _MVSP_Main() {
 	global _MVSP, _ConfigDir
 	Primary := 0, CleanupError := 0
 	try {
-		_MVSP_Require(A_Args.Length == 5, "The probe requires five exact private arguments.")
+		_MVSP_Require(A_Args.Length == 5 || A_Args.Length == 6, "The probe requires five private arguments and at most one exact mode.")
+		_MVSP.Mode := A_Args.Length == 6 ? A_Args[6] : ""
+		_MVSP_Require(_MVSP.Mode == "" || _MVSP.Mode == "other-core", "The native probe mode is invalid.")
 		_MVSP.Root := A_Args[1], _MVSP.Token := A_Args[2]
 		_MVSP_Require(RegExMatch(_MVSP.Token, "^[A-Za-z0-9_-]+$"), "The private probe token is invalid.")
 		_MVSP_Require(!FSStrictExists(_MVSP.Root), "The probe cannot adopt an existing private destination.")
@@ -196,9 +339,15 @@ _MVSP_Main() {
 		Payload := JsonStringLiteral('{"action":"request_refresh","probe":"' . _MVSP.Token . '"}')
 		Html := '<!doctype html><meta charset="utf-8"><title>Owned native sender</title><script>'
 			. 'window.addEventListener("DOMContentLoaded",()=>chrome.webview.postMessage(' . Payload . '));</script>'
+		if _MVSP.Mode == "other-core"
+			Html := '<!doctype html><meta charset="utf-8"><title>Owned native cores</title><script>'
+				. 'window.emitProbe=()=>chrome.webview.postMessage(' . Payload . ');</script>'
 		_MVSP_Require(FSWriteCreateDurable(_MVSP.Root . "\assets\index.html", Html), "The private native page was not created.")
 		_MVSP.Phase := "native-message"
-		_MVSP.View.Navigate(_MVSP.Url)
+		if _MVSP.Mode == "other-core"
+			_MVSP_RunOtherCore()
+		else
+			_MVSP.View.Navigate(_MVSP.Url)
 		while !_MVSP.Received
 			Sleep(10)
 		if IsObject(_MVSP.AsyncError)
@@ -209,6 +358,11 @@ _MVSP_Main() {
 			Sleep(10)
 		if IsObject(_MVSP.AsyncError)
 			throw _MVSP.AsyncError
+		if _MVSP.Mode == "other-core" {
+			while _MVSP.Spawns == _MVSP.Other.BeforePositive && TickElapsed(_MVSP.ReceivedAt) < 1000
+				Sleep(10)
+			_MVSP.Receipt["primary_worker_spawns"] := _MVSP.Spawns - _MVSP.Other.BeforePositive
+		}
 		_MVSP_Require(_MVSP.Calls == 1, "The native callback did not settle exactly once.")
 		_MVSP.Phase := "retirement"
 	} catch as Failure {
@@ -221,6 +375,8 @@ _MVSP_Main() {
 	if !IsObject(Primary) && IsObject(_MVSP.AsyncError)
 		Primary := _MVSP.AsyncError
 	if _MVSP.NativeValid {
+		if _MVSP.Mode == "other-core"
+			_MVSP.Receipt["other_controller_closed"] := _MVSP.Other.ControllerClosed
 		_MVSP.Receipt["native_callbacks"] := _MVSP.Calls
 		_MVSP.Receipt["worker_spawns"] := _MVSP.Spawns
 		_MVSP.Receipt["worker_starts"] := _MVSP.Starts
@@ -237,7 +393,9 @@ _MVSP_Main() {
 		ExitApp(2)
 	}
 	_MVSP_Require(_MVSP.NativeValid, "No valid native callback was received.")
-	if _MVSP.Spawns != 1 || _MVSP.Starts != 1 {
+	if _MVSP.Spawns != 1 || _MVSP.Starts != 1
+		|| (_MVSP.Mode == "other-core" && (_MVSP.Receipt["other_worker_spawns"] != 0
+			|| _MVSP.Receipt["other_worker_reserved"] || _MVSP.Receipt["primary_worker_spawns"] != 1)) {
 		FileAppend("The real metrics host did not admit its current native callback.`n", "**", "UTF-8-RAW")
 		ExitApp(1)
 	}
@@ -249,6 +407,7 @@ _MVSP_Close() {
 	if _MVSP.Closed
 		return
 	SetTimer(_MVSP_Deadline, 0)
+	_MVSP_CloseOther()
 	_MVSP.HostSubscription := 0, _MVSP.ObserverSubscription := 0
 	KLWV.windows := Map()
 	if _MVSP.HasOwnProp("Entry")
@@ -259,6 +418,7 @@ _MVSP_Close() {
 	if IsObject(_MVSP.Controller)
 		_MVSP.Controller.Close()
 	_MVSP.Sender := 0, _MVSP.View := 0, _MVSP.Controller := 0
+	_MVSP_RetireOtherBrowser()
 	if _MVSP.Gui is Gui
 		_MVSP.Gui.Destroy()
 	if _MVSP.BrowserHandle {
