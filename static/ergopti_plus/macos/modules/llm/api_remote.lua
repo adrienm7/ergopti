@@ -3034,7 +3034,17 @@ function M.detect_local_servers(on_done)
 				if not target_is_current() then settle(nil); return end
 				local returned, delivered, buffered = false, false, nil
 				local function deliver(response)
-					if not target_is_current() then settle(nil); return end
+					if not target_is_current() then
+						Logger.debug(LOG, "Local server '%s' probe answer dropped: its settings changed meanwhile.", target.id)
+						settle(nil)
+						return
+					end
+					-- The sweep publishes one line for every server; this one says why
+					-- a server is not listed (#99: "none answers" alone named no cause)
+					local status = type(response) == "table" and tonumber(response.status) or 0
+					Logger.debug(LOG, "Local server '%s' probe answered %s.", target.id,
+						status ~= 0 and ("HTTP " .. tostring(status))
+							or ("nothing (" .. tostring(type(response) == "table" and response.error or "no response") .. ")"))
 					if type(response) == "table" and response.ok == false and response.status == 0
 						and response.error_kind == "native_dispatch" then
 						settle({ ok = false, status = 0, body = "", probe_error = true })
