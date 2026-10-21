@@ -27,6 +27,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
 
 local LOG = "adapters.timer_scheduler"
 
@@ -94,12 +95,15 @@ local function publish_monotonic_sample(source, raw_ns)
 end
 
 --- Invokes one user callback without letting Hammerspoon swallow its failure.
+--- The failure is described without tostring(): an error object whose
+--- __tostring raises would otherwise escape this guard and drop the caller's
+--- remaining work (settlement observers, the native timer callback).
 --- @param kind string Scheduler method owning the callback.
 --- @param fn function User callback.
 local function invoke_callback(kind, fn)
 	local ok, err = xpcall(fn, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s() callback raised: %s", kind, tostring(err))
+		Logger.error(LOG, "%s() callback raised: %s", kind, ErrorDescription.describe(err))
 	end
 end
 

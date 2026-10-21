@@ -54,6 +54,7 @@ local M = {}
 
 local Redact = require("diagnostics.redact")
 local Json = require("json")
+local ErrorDescription = require("error_description")
 local _redact_message = nil
 
 --- Captures canonical privacy rules before bootstrap permits any log output.
@@ -1732,7 +1733,8 @@ local function _guard_timer_cb(fn, kind)
 	return function(...)
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
-			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+			-- Never tostring() a caught object: its own __tostring may raise again.
+			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, ErrorDescription.describe(err))
 		end
 	end
 end
