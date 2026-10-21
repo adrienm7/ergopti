@@ -46,6 +46,14 @@ origin/dev` only when the working tree has no conflicting changes). Prompt: "Int
    Still open afterwards: reproducible PAC helper build (/Brepro), code signing (SignPath, item 132),
    VirusTotal/Defender submission with the new hash, the tester's download matrix T1-T4.
 
+3. **Linux tray menu visible in the AppImage catalog environment** (file `linux-tray-menu-catalog.md`, written by
+   the agent). The catalog test passed on v1.0.4 but its screenshot shows only the tray icon: a click opened
+   nothing visible. Task: publish a real menu in the no-keyboard degraded state (status reason, diagnostics,
+   report a bug, quit), make left and right click open it in an XEmbed tray without SNI watcher, extend the
+   ubuntu:22.04 AppImage smoke to click the icon and assert a menu window appears, i18n, logger. After the
+   next release containing it, the maintainer posts `/retest` on AppImage/appimage.github.io#10422 from
+   PowerShell (never Git Bash).
+
 Finished agents' leftovers are in their files: `issue99-karabiner-input.md`, `issue99-ai-startup-updater.md`,
 `lua-shared-timers-separators.md`, `windows-updater-freeze-menu-census.md`, `config-policy-33-42.md`.
 
