@@ -51,6 +51,11 @@ const JOBS = [
 	['.github/workflows/ci-windows.yml', 'package-windows', null],
 	['.github/workflows/ci-windows.yml', 'launch-windows', null],
 	['.github/workflows/ci-windows.yml', 'windows-ok', 'always()'],
+	['.github/workflows/ci-windows-unit.yml', 'test-ahk', null],
+	['.github/workflows/ci-windows-e2e.yml', 'e2e-ahk', null],
+	['.github/workflows/ci-windows-build.yml', 'package-windows', null],
+	['.github/workflows/ci-windows-install.yml', 'launch-windows', null],
+	['.github/workflows/ci-windows-verdict.yml', 'windows-ok', null],
 	['.github/workflows/ci-linux.yml', 'test-linux', null],
 	['.github/workflows/ci-linux.yml', 'e2e-linux', null],
 	[
@@ -443,15 +448,15 @@ const FULL_STEPS = [
 		'Verify mandatory jobs and launch scenarios',
 		null
 	],
-	['.github/workflows/ci-windows.yml', 'windows-ok', 'Download launch evidence', null],
+	['.github/workflows/ci-windows-verdict.yml', 'windows-ok', 'Download launch evidence', null],
 	[
-		'.github/workflows/ci-windows.yml',
+		'.github/workflows/ci-windows-verdict.yml',
 		'windows-ok',
 		'Install locked evidence validation dependencies',
 		null
 	],
 	[
-		'.github/workflows/ci-windows.yml',
+		'.github/workflows/ci-windows-verdict.yml',
 		'windows-ok',
 		'Verify mandatory jobs and launch scenarios',
 		null

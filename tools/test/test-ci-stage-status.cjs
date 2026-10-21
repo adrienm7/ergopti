@@ -618,8 +618,9 @@ function validateWorkflow(platform, workflow) {
 	}
 }
 for (const platform of Object.keys(names)) {
+	// Each lane, read inlined with its stage files: one workflow per OS.
 	const workflow = yaml.parse(
-		fs.readFileSync(path.join(root, '.github/workflows/ci-' + platform + '.yml'), 'utf8')
+		require('./ci-pipeline.cjs').file('.github/workflows/ci-' + platform + '.yml')
 	);
 	validateWorkflow(platform, workflow);
 	controls++;

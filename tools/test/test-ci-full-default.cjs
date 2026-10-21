@@ -256,7 +256,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
 		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
 	);
-	assert.equal(jobs, 35);
+	assert.equal(jobs, 40);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
@@ -544,7 +544,11 @@ for (const [rel, id, name] of [
 	[MAC, 'e2e-hs', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls'],
 	[MAC, 'macos-ok', 'Verify mandatory jobs and launch scenarios'],
-	['.github/workflows/ci-windows.yml', 'windows-ok', 'Verify mandatory jobs and launch scenarios'],
+	[
+		'.github/workflows/ci-windows-verdict.yml',
+		'windows-ok',
+		'Verify mandatory jobs and launch scenarios'
+	],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'Assert all mandatory subjects ran and passed']
 ]) {
 	const job = Raw.jobsOfText(source.find((entry) => entry.rel === rel).text, rel).find(

@@ -487,6 +487,11 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'ci-common-install.yml': ['common-testbuild'],
 		'ci-common-verdict.yml': ['common-unit-verdict'],
 		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
+		'ci-windows-unit.yml': ['test-ahk'],
+		'ci-windows-e2e.yml': ['e2e-ahk'],
+		'ci-windows-build.yml': ['package-windows'],
+		'ci-windows-install.yml': ['launch-windows'],
+		'ci-windows-verdict.yml': ['windows-ok'],
 		'ci-macos.yml': ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
 		'ci-linux.yml': [
 			'test-linux',
@@ -595,8 +600,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 34);
-	assert.equal(jobs, 35);
+	assert.equal(jobs - 1, 39);
+	assert.equal(jobs, 40);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');

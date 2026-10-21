@@ -1,0 +1,591 @@
+# .github/workflows/ci-windows-unit.yml
+#
+# Windows unit stage: one runner per named test category of the AutoHotkey
+# suite, plus the native, desktop and contract cohorts each category owns.
+# Called by ci-windows.yml as its test-ahk stage.
+
+name: 'Windows unit tests'
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when ci.yml's plan resolved a free release tag
+        required: true
+        type: boolean
+      version:
+        description: Release version without the leading v; empty unless release
+        required: true
+        type: string
+      tag:
+        description: Release tag; empty unless release
+        required: true
+        type: string
+      prerelease:
+        description: "'true' for a dev prerelease; empty unless release"
+        required: true
+        type: string
+      channel:
+        description: Update channel stamped into the exe, main or dev
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
+jobs:
+  test-ahk:
+    name: '${{ matrix.module }}'
+    runs-on: windows-latest
+    # The canonical AHK suite is single-threaded and took over 90 minutes on one
+    # runner. Each runner executes one named test category (run_all.ahk
+    # --module, TEST_MODULE_GROUPS in tests/test_framework.ahk), so a red job
+    # says what kind of test broke. Categories follow the driver's domain
+    # folders, a test belongs to the first one that declares its file, and there
+    # is no catch-all: an undeclared file fails the run. A category is split
+    # only when one runner would be far too long, by sub-domain:
+    #   meta: source-scanning meta tests of the whole driver
+    #   llm-server-panel: local LLM server panel
+    #   llm-servers: other local and managed LLM servers (sharing, Ollama)
+    #   llm-terminal: LLM terminal navigation owner
+    #   llm: the rest of the LLM module (prediction, menus, API clients)
+    #   config-transition: configuration version transitions
+    #   config-scope-global: whole-configuration scope and its manifest
+    #   config-scope-features: per-feature scope (hotstrings, tap-hold, files)
+    #   config-updater: configuration storage, TOML and the updater
+    #   hotstrings-shortcuts: hotstrings, dynamic hotstrings and shortcuts
+    #   keymap-gestures: keyboard remapping, layouts and gestures
+    #   keylogger: keylogger capture, storage and metrics
+    #   ui: menus, windows, onboarding, tooltips and healthcheck
+    #   core: adapters, platform services, shared infrastructure and the runner
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          [
+            meta,
+            llm-server-panel,
+            llm-servers,
+            llm-terminal,
+            llm,
+            config-transition,
+            config-scope-global,
+            config-scope-features,
+            config-updater,
+            hotstrings-shortcuts,
+            keymap-gestures,
+            keylogger,
+            ui,
+            core
+          ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Prepare native PAC source generator
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The twelve unit runners compiled the same evaluator from the same
+      # inputs. They now share one build per exact input set: every file the
+      # builder and its source preparation read, the Python that prepares them
+      # and the runner image that fixes MSVC. Only these unit runners use the
+      # cache; package-windows still compiles and tests the shipped evaluator
+      # clean on every run, and test-ci-pipeline-wiring.cjs refuses any cache
+      # there.
+      - name: Identify the native PAC toolchain
+        id: native-pac-inputs
+        shell: pwsh
+        run: |
+          if (-not $env:ImageOS -or -not $env:ImageVersion) { throw 'The runner image identity is unavailable.' }
+          $python = (python -c 'import sys; print(sys.version.split()[0])')
+          if ($LASTEXITCODE -ne 0 -or -not $python) { throw 'The PAC source generator Python is unavailable.' }
+          "toolchain=$env:ImageOS-$env:ImageVersion-python$python" >> $env:GITHUB_OUTPUT
+
+      - name: Restore the native PAC evaluator built from these exact inputs
+        id: native-pac-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/native/network/**', 'static/ergopti_plus/_shared/modules/network/pac_helpers.js', 'static/ergopti_plus/_shared/modules/network/proxy_policy.json', 'static/ergopti_plus/_shared/modules/updater/defaults.json', 'static/ergopti_plus/_shared/data/linux_native_runtime.json') }}
+
+      - name: Build and test native full-URL PAC evaluator
+        id: native-pac-build
+        if: steps.native-pac-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./tools/build/build_windows_network_pac.ps1 -Publish
+
+      - name: Save the native PAC evaluator for identical unit runs
+        if: steps.native-pac-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
+          key: ${{ steps.native-pac-cache.outputs.cache-primary-key }}
+
+      - name: Retain native PAC artifact and source identity
+        if: ${{ always() && (steps.native-pac-build.outcome == 'success' || steps.native-pac-cache.outputs.cache-hit == 'true') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-pac-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
+
+      # The suites run on the interpreter the release exe ships with: its
+      # version, archive and digest come from the one release contract, so a
+      # runtime bump cannot leave the tests on the old interpreter (the hook's
+      # prefix and key-up rules changed between 2.0.19 and 2.0.23).
+      - name: Read AutoHotkey runtime contract
+        id: ahk-contract
+        shell: pwsh
+        run: |
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
+          "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
+          "sha256=$($contract.runtime.sha256)" >> $env:GITHUB_OUTPUT
+
+      - name: Cache AutoHotkey runtime
+        id: cache-ahk
+        uses: actions/cache@v4
+        with:
+          path: C:\AutoHotkey
+          key: ahk-${{ steps.ahk-contract.outputs.version }}-${{ steps.ahk-contract.outputs.sha256 }}-windows
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Run reporter lifecycle self-tests
+        shell: pwsh
+        run: node tools/test/test-report.cjs
+
+      - run: npm ci
+        shell: pwsh
+
+      - name: Build features manifest
+        run: npm run build:manifest
+        shell: pwsh
+
+      - name: Manifest parity (AHK ↔ HS codegen equivalence)
+        run: npm run test:manifest-parity
+        shell: pwsh
+
+      - name: Download AutoHotkey v2 runtime
+        if: steps.cache-ahk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+              -Uri "${{ steps.ahk-contract.outputs.url }}" `
+              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          $actual = (Get-FileHash -LiteralPath "$env:TEMP\AHK.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne "${{ steps.ahk-contract.outputs.sha256 }}") {
+              throw "AutoHotkey v${{ steps.ahk-contract.outputs.version }} archive digest mismatch: $actual"
+          }
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+
+      - name: Verify AHK source encoding (UTF-8 BOM + LF)
+        # AHK v2 silently aborts mid-file on encoding drift — catch it
+        # before it causes silent test failures with no error message.
+        shell: pwsh
+        run: |
+          $ahkFiles = Get-ChildItem `
+              -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
+              -Recurse -Filter "*.ahk" |
+              Where-Object { -not $_.FullName.Contains("vendor") }
+          $failures = @()
+          foreach ($file in $ahkFiles) {
+              $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+              if ($bytes.Length -lt 3 -or
+                  $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+                  $failures += "MISSING BOM : $($file.FullName)"; continue
+              }
+              $content = [System.IO.File]::ReadAllText(
+                  $file.FullName, [System.Text.Encoding]::UTF8)
+              if ($content -match "`r") {
+                  $failures += "CR BYTE : $($file.FullName)"
+              }
+          }
+          if ($failures.Count -gt 0) {
+              $failures | ForEach-Object { Write-Host "  $_" }
+              Write-Error "AHK encoding violations detected."
+              exit 1
+          }
+          Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
+
+      - name: Disable Windows Defender real-time scanning for AHK tests
+        shell: pwsh
+        run: |
+          # Defender holds intermittent exclusive scan locks on any file the AHK
+          # test suite writes — including temp files in A_Temp — causing FileRead /
+          # FileAppend calls to block for the full 240 s watchdog window.
+          # -DisableRealtimeMonitoring requires admin; add path exclusions as a
+          # belt-and-suspenders fallback that works even without that flag.
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
+          Write-Host "Defender exclusions applied."
+
+      - name: Install the shipped Kana layout for real probes
+        shell: pwsh
+        timeout-minutes: 3
+        run: ./tools/test/install-ci-kana-layout.ps1
+
+      - name: Receive managed Ollama file component
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-ollama-file-component'
+          if (Test-Path -LiteralPath $evidence) { throw 'File component evidence already exists.' }
+          $null = New-Item -ItemType Directory -Path $evidence
+          $root = '${{ github.workspace }}'
+          $modelsOut = Join-Path $evidence 'models.stdout'
+          $modelsErr = Join-Path $evidence 'models.stderr'
+          node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr
+          $modelsExit = $LASTEXITCODE
+          Get-Content -LiteralPath $modelsOut
+          # The failing assertion is on stderr; print it so the job log names the cause.
+          if ($modelsExit -ne 0) { Get-Content -LiteralPath $modelsErr }
+          if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }
+          $windowsPowerShellDirectory = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
+          $oldModulePath = $env:PSModulePath
+          try {
+              $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
+              $out = Join-Path $evidence 'native.stdout'
+              $err = Join-Path $evidence 'native.stderr'
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_install_files.ps1" 1> $out 2> $err
+              $nativeExit = $LASTEXITCODE
+              $stdout = [IO.File]::ReadAllText($out)
+              $stderr = [IO.File]::ReadAllText($err)
+              Write-Host $stdout
+              $testRoot = [regex]::Match($stdout, '(?m)^Evidence root: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              $sourceRoot = [regex]::Match($stdout, '(?m)^Independent source receipts: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              if ((Split-Path $testRoot -Parent) -cne [Environment]::GetFolderPath('LocalApplicationData') -or
+                  (Split-Path $testRoot -Leaf) -cnotmatch '^ergopti-ollama-test-[0-9a-f]{32}$' -or
+                  (Split-Path $sourceRoot -Parent).TrimEnd('\') -ine ([IO.Path]::GetTempPath()).TrimEnd('\') -or
+                  (Split-Path $sourceRoot -Leaf) -cne ('ergopti-ollama-source-' + (Split-Path $testRoot -Leaf).Substring(20)) -or
+                  -not (Test-Path -LiteralPath $testRoot -PathType Container) -or
+                  -not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+                  throw 'Native file component evidence root binding refused.'
+              }
+              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_TEST_ROOT=$testRoot"
+              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_SOURCE_ROOT=$sourceRoot"
+              if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or
+                  @($stdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 31 -or
+                  $stdout -cnotmatch '(?m)^RESULT passed=31 failed=0 skipped=0\r?$') {
+                  throw 'Exact native file component acceptance refused; raw evidence retained.'
+              }
+              [ordered]@{ schema = 1; source_sha = '${{ github.sha }}'; native_exit = $nativeExit;
+                  passed = 31; failed = 0; skipped = 0; native_file_component = $true;
+                  acquisition_qualified = $false; runtime_executed = $false } |
+                  ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding utf8
+          } finally { $env:PSModulePath = $oldModulePath }
+
+      - name: Retain managed Ollama file component evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
+          path: |
+            ${{ runner.temp }}/windows-ollama-file-component/
+          if-no-files-found: error
+
+      - name: Retain exact managed Ollama file roots
+        if: ${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
+          path: |
+            ${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/
+            ${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/
+          if-no-files-found: error
+
+      # Fail fast on the short native cohorts before the long canonical suite.
+      # Their receipt/upload owners remain adjacent and run even on failure.
+      - name: Run native desktop AHK cohorts
+        shell: pwsh
+        timeout-minutes: 25
+        run: |
+          $receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'
+          node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }
+          $mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }
+          if ($mode -ceq 'deferred') {
+              Write-Host '[DEFERRED] windows-native-desktop: qualified=false; no desktop cohort executed.'
+          } elseif ($mode -ceq 'full') {
+              ./tools/test/run-windows-native-desktop.ps1
+          } else {
+              throw 'Invalid native desktop qualification disposition.'
+          }
+
+      - name: Retain the source-bound Windows qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-windows-${{ matrix.module }}
+          path: ${{ runner.temp }}/stable-windows-native-desktop.json
+          if-no-files-found: warn
+
+      - name: Publish native desktop AHK evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: windows-ahk-native-desktop-${{ matrix.module }}
+          path: |
+            ${{ runner.temp }}/windows-ahk-native-desktop/
+            ${{ runner.temp }}/stable-windows-native-desktop.json
+          if-no-files-found: error
+
+      - name: Run AHK test suite
+        shell: pwsh
+        timeout-minutes: 125
+        env:
+          ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
+          ERGOPTI_AHK_MODULE: ${{ matrix.module }}
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          node "${{ github.workspace }}\tools\test\test-ahk-suite-manifest.cjs" --ahk $ahk
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
+          if (-not (Test-Path $runner)) {
+              Write-Error "Test runner not found at $runner"; exit 2
+          }
+          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          $env:ERGOPTI_AHK_RESULTS_FILE = $resultsFile
+          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
+          Write-Host "AHK runtime : $ahk"
+          Write-Host "Test runner : $runner"
+          Write-Host "------------------------------------------------------------"
+          # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
+          # blocks when AHK runs without an inherited console handle, so the
+          # file is the only reliable output channel in CI).
+          # Shared TAP reads expose live progress without changing the native receipt.
+          # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
+          # #Include) errors to stderr and exits non-zero instead of popping a modal
+          # dialog that no one can dismiss headlessly — which otherwise hangs the
+          # runner until the 15 min step timeout. Must precede the script path.
+          $qualificationProfile = node -e "const q=require('./tools/ci/dev-release-qualification.cjs'); const p=q.resolveQualificationProfile(q.environmentContext()); if(p)process.stdout.write(p.id)"
+          if ($LASTEXITCODE -ne 0) { throw "Qualification policy refused." }
+          $qualificationArgument = if ($qualificationProfile) { " --qualification-profile=$qualificationProfile" } else { "" }
+          $stdoutFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-suite.stdout.log'
+          $stderrFile = Join-Path $env:RUNNER_TEMP 'windows-ahk-suite.stderr.log'
+          . "${{ github.workspace }}\tools\ci\ahk-tap-follower.ps1"
+          $tapFollower = New-AhkTapFollower -Path $resultsFile
+          $tapFailure = $null
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`" --module=$env:ERGOPTI_AHK_MODULE$qualificationArgument" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+          # Retain the native handle while the asynchronous child is alive.
+          $null = $proc.Handle
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          while (-not $proc.HasExited) {
+              if ($null -eq $tapFailure) {
+                  try { $tapFollower.Poll() | ForEach-Object { Write-Host $_ } }
+                  catch { $tapFailure = $_.Exception.GetType().Name }
+              }
+              Start-Sleep -Milliseconds 100
+          }
+          $proc.WaitForExit()
+          $exit = $proc.ExitCode
+          if (Test-Path -LiteralPath $stderrFile) {
+              Get-Content -LiteralPath $stderrFile -Encoding utf8 | ForEach-Object { Write-Host $_ }
+          }
+          if ($null -eq $exit) {
+              Write-Host "::error::AHK native process exit receipt is unavailable."
+              exit 2
+          }
+          Write-Host "------------------------------------------------------------"
+          Write-Host "AHK exit code: $exit"
+          if (-not (Test-Path $resultsFile)) {
+              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+          }
+          if ($null -eq $tapFailure) {
+              try { $tapFollower.Finish() | ForEach-Object { Write-Host $_ } }
+              catch { $tapFailure = $_.Exception.GetType().Name }
+          }
+          $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
+          node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
+              --input $resultsFile --json $manifestFile
+          $manifestExit = $LASTEXITCODE
+          if ($manifestExit -ne 0) {
+              Write-Error "AHK planned/executed manifest is incomplete."; exit $manifestExit
+          }
+          if ($qualificationProfile) {
+              node tools/ci/dev-release-qualification.cjs --scope windows-pac-full-url `
+                  --ahk-tap $resultsFile --execution-manifest $manifestFile `
+                  --receipt "$env:RUNNER_TEMP/windows-qualification.json"
+              if ($LASTEXITCODE -ne 0) { throw "Full qualification registry is incomplete or expired." }
+          }
+          if ($exit -ne 0) {
+              Write-Host "::error::AHK native process failed (exit $exit)."
+              Write-Error "Test suite failed (exit $exit)."; exit $exit
+          }
+          if ($null -ne $tapFailure) {
+              Write-Host "::error::AHK TAP progress read failed ($tapFailure); raw native receipts remain authoritative."
+              exit 2
+          }
+
+      # The isolated LLM suites. They cannot join run_all.ahk: each installs
+      # its own global stubs (a WebView2 stand-in, a fake model index) that would
+      # collide with the shared harness, which is why they were written as
+      # separate runners in the first place. They were then referenced by
+      # nothing, so their ten tests had never run and one of them had rotted out
+      # of the code it stubs. tools/test/test-ahk-runners-are-invoked.cjs now
+      # fails if a runner under tests/ is referenced by nothing at all.
+      - name: Run isolated AHK LLM suites
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
+          $failed = 0
+          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk", "run_llm_pointer_dismiss.ahk")) {
+              $runner = Join-Path $tests $name
+              if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
+              $out = "$env:TEMP\$name.out"
+              $err = "$env:TEMP\$name.err"
+              # Keep the main suite's TAP intact for its later annotation.
+              $env:ERGOPTI_AHK_RESULTS_FILE = Join-Path $env:RUNNER_TEMP "windows-ahk-isolated-$name.txt"
+              # Start-Process, not the call operator: AutoHotkey is a GUI-subsystem
+              # binary, so a direct invocation returns neither the exit code nor
+              # stderr (PROJECT_MEMORY, feedback_ahk_ui_syntax_validation).
+              $proc = Start-Process -FilePath $ahk -ArgumentList @("/ErrorStdOut", $runner) `
+                  -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err
+              Write-Host "--- $name (exit $($proc.ExitCode)) ---"
+              if (Test-Path $out) { Get-Content $out | Write-Host }
+              if (Test-Path $err) { Get-Content $err | Write-Host }
+              if ($proc.ExitCode -ne 0) { $failed += 1 }
+              $manifestFile = Join-Path $env:RUNNER_TEMP "windows-ahk-isolated-$name.json"
+              node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
+                  --input $env:ERGOPTI_AHK_RESULTS_FILE --json $manifestFile
+              if ($LASTEXITCODE -ne 0) { $failed += 1 }
+          }
+          if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 1 }
+
+      # Emit GitHub annotations + a JSON summary from the captured TAP. Purely
+      # additive (continue-on-error): the step above remains the gate, so a
+      # reporter hiccup can never flip a red run green or vice-versa.
+      - name: Annotate AHK results
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          if (Test-Path $resultsFile) {
+              node "${{ github.workspace }}\tools\test\report.cjs" --name windows-ahk --json "$env:RUNNER_TEMP\windows-ahk.json" -- PARSE_FILE $resultsFile
+          } else {
+              Write-Host "No AHK results file to annotate."
+          }
+
+      - name: Check for AHK compiler warnings
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
+          # Pass --dry-run so AHK parses all files and emits warnings, then
+          # exits immediately without running any Test() callbacks. This keeps
+          # the warning check fast (~seconds) regardless of corpus size.
+          # /ErrorStdOut keeps a parse/load error from popping a modal dialog that
+          # would hang this step headlessly; the error text is captured via 2>&1.
+          $output = & cmd /c "`"$ahk`" /ErrorStdOut `"$runner`" --dry-run 2>&1"
+          $loadExit = $LASTEXITCODE
+          # /ErrorStdOut reports "<file> (<line>) : ==> Warning: ..." and
+          # "<file> (<line>) : ==> <load error>"; a line-start "Warning:" pattern
+          # never matched them, so this gate used to pass with any warning.
+          $warnings = @($output | Where-Object { $_ -match "==> Warning:" })
+          $errors   = @($output | Where-Object { $_ -match "==> " -and $_ -notmatch "==> Warning:" })
+          if ($loadExit -ne 0) { $errors += "AutoHotkey exited with $loadExit while loading the suite." }
+          if ($errors) {
+              $errors | ForEach-Object { Write-Host "  $_" }
+              Write-Error "$($errors.Count) AHK load-time error(s) — fix before merging."
+              exit 1
+          }
+          if ($warnings) {
+              $warnings | ForEach-Object { Write-Host "  $_" }
+              Write-Error "$($warnings.Count) AHK compiler warning(s) — fix before merging."
+              exit 1
+          }
+          Write-Host "No AHK compiler warnings."
+
+      # hardening-a-startup-zero-error: the real ErgoptiPlus.ahk auto-execute
+      # path, booted over a fresh folder, the neutral defaults and config.toml
+      # files older releases wrote, must reach ready with no ERROR logged. The
+      # JS suite runs on Linux, where this smoke can only skip, so it runs here.
+      - name: Run the full-driver startup smoke
+        # Whole-driver gates, not module tests: one module runner owns them.
+        if: matrix.module == 'hotstrings-shortcuts'
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $env:ERGOPTI_AHK_EXE = $ahk
+          node tools/test/test-ahk-full-startup-smoke.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test fresh Git clone bootstrap and warm startup
+        # Whole-driver gates, not module tests: one module runner owns them.
+        if: matrix.module == 'hotstrings-shortcuts'
+        shell: pwsh
+        timeout-minutes: 24
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { throw "AutoHotkey64.exe not found." }
+          $env:ERGOPTI_AHK_EXE = $ahk
+          node tools/test/test-ahk-fresh-clone-startup.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish AHK execution manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: windows-ahk-execution-manifest-${{ matrix.module }}
+          path: |
+            ${{ runner.temp }}/windows-ahk-execution-manifest.json
+            ${{ runner.temp }}/windows-ahk-suite.stdout.log
+            ${{ runner.temp }}/windows-ahk-suite.stderr.log
+            ${{ runner.temp }}/windows-qualification.json
+            ${{ runner.temp }}/windows-ahk-isolated-*.json
+            ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
+            ${{ runner.temp }}/ergopti-snapshot16-*/**
+            ${{ runner.temp }}/ergopti-startup-diagnostics-*/**
+          if-no-files-found: warn
