@@ -1421,6 +1421,21 @@ try {
 			kind: 'contextual_title',
 			title_key: 'tap_hold.picker.hold_title_prefix',
 			platforms: ['hs']
+		},
+		key_combination_chord_action: {
+			kind: 'contextual_title',
+			title_key: 'menu.shortcuts.key_combinations_chord_title_prefix',
+			platforms: ['hs']
+		},
+		key_combination_tap_action: {
+			kind: 'contextual_title',
+			title_key: 'menu.shortcuts.key_combinations_hold_tap_title_prefix',
+			platforms: ['hs']
+		},
+		key_combination_hold_action: {
+			kind: 'contextual_title',
+			title_key: 'menu.shortcuts.key_combinations_hold_hold_title_prefix',
+			platforms: ['hs']
 		}
 	};
 	for (const [id, declaration] of Object.entries(expected)) {

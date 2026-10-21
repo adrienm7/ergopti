@@ -637,207 +637,132 @@ end)
 
 -- ==========================================
 -- ==========================================
--- ======= 5/ Complete Action Picker Frame ==
+-- ======= 5/ Key-Combination Slots =========
 -- ==========================================
 -- ==========================================
 
---- Finds the real private picker through the public builder's closure graph.
---- No production export, replicated picker or source-text evaluator is introduced.
---- @param fn function Actual native public builder.
---- @param visited table|nil Function identities already inspected.
---- @return function|nil picker
-local function native_tap_hold_picker(fn, visited)
-	visited = visited or {}
-	if visited[fn] then return nil end
-	visited[fn] = true
-	for index = 1, math.huge do
-		local name, value = debug.getupvalue(fn, index)
-		if name == nil then break end
-		if name == "build_action_picker" and type(value) == "function" then return value end
-		if type(value) == "function" then
-			local found = native_tap_hold_picker(value, visited)
-			if found then return found end
-		end
-	end
-	return nil
-end
+-- The pair the combination tests drive: Left Shift held, then Right Shift.
+local SHIFT_PAIR = { id = "shift_pair", label = "Shift pair", group = "Shift",
+	from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } }
 
---- Owns the actual local picker and records catalogue, grouping and mutation reads.
---- @param body function Receives actual picker, effects and renderer.
-local function with_action_picker_frame(body)
-	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"menu.renderer", "infra.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+--- Drives the actual « Combinaisons de touches » group with the shared picker
+--- window replaced by a recorder.
+--- @param body function Receives the pair's slot rows and the observations.
+local function with_pair_picker(body)
+	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu", "infra.i18n",
+		"infra.logger", "ui.menu.menu_utils", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
-		local picker = native_tap_hold_picker(menu.build)
-		helpers.assert_type(picker, "function", "the actual public builder must reach its native picker")
-		local effects = { catalogue_reads = 0, grouped_reads = 0, setters = {}, regenerations = 0,
-			refreshes = 0, receipt = true, actions = {} }
-		local native = setmetatable({
-			regenerate = function() effects.regenerations = effects.regenerations + 1; return true end,
-		}, {
-			__index = function(_, key)
-				if key == "AVAILABLE_ACTIONS" then
-					effects.catalogue_reads = effects.catalogue_reads + 1
-					if effects.on_catalogue_read then effects.on_catalogue_read() end
-					return effects.actions
-				end
+		local observed = { opened = {}, calls = {}, regenerations = 0, refreshes = 0, receipt = true }
+		package.loaded["ui.action_picker"] = {
+			open = function(opts, on_confirm)
+				observed.opened[#observed.opened + 1] = { opts = opts, confirm = on_confirm }
+				return true
 			end,
-		})
-		local utils = require("ui.menu.menu_utils")
-		local actual_grouped_picker = utils.build_action_picker
-		utils.build_action_picker = function(...)
-			effects.grouped_reads = effects.grouped_reads + 1
-			return actual_grouped_picker(...)
+		}
+		local native = remap_double()
+		native.AVAILABLE_ACTIONS = SLOT_CATALOGUE
+		native.MOD_COMBOS = { SHIFT_PAIR }
+		native.get_mod_combos_enabled = function() return true end
+		native.get_combo_combo_action = function() return "enter" end
+		native.get_combo_tap_action = function() return "escape" end
+		native.get_combo_hold_action = function() return "shift" end
+		for _, slot in ipairs({ "combo", "tap", "hold" }) do
+			native["set_combo_" .. slot .. "_action"] = function(cid, aid)
+				observed.calls[#observed.calls + 1] = { slot, cid, aid }
+				if observed.receipt == "throws" then error("independent setter refusal", 0) end
+				return observed.receipt
+			end
 		end
-		local function build(actions, current, slot)
-			effects.actions = actions
-			return picker(native, function(id)
-				effects.setters[#effects.setters + 1] = id
-				if effects.receipt == "throws" then error("independent picker mutation refusal", 0) end
-				return effects.receipt
-			end, current, function() effects.refreshes = effects.refreshes + 1 end, slot)
+		native.regenerate = function() observed.regenerations = observed.regenerations + 1; return true end
+		local rows = menu.build_key_combinations({ karabiner = native,
+			updateMenu = function() observed.refreshes = observed.refreshes + 1 end })
+		local function find(list)
+			for _, row in ipairs(list or {}) do
+				if type(row.title) == "string" and row.title:find("tap_hold.group.left_shift", 1, true) == 1 then
+					return row
+				end
+				local nested = find(row.menu)
+				if nested then return nested end
+			end
 		end
-		return body(build, effects, require("infra.manifest_menu"), utils)
+		local pair = assert(find(rows), "the Left Shift → Right Shift pair has a row")
+		local slots = {}
+		for _, row in ipairs(pair.menu) do
+			if row.title == "menu.shortcuts.key_combinations_chord" then slots.chord = row end
+			if row.title == "menu.shortcuts.key_combinations_hold_tap" then slots.tap = row end
+			if row.title == "menu.shortcuts.key_combinations_hold_hold" then slots.hold = row end
+		end
+		body(slots, observed, pair)
 	end)
 end
 
---- Returns original dynamic source captions and separator markers in their order.
---- @param rows table Actual provider data.
---- @return table labels
-local function picker_frame_labels(rows)
-	local labels = {}
-	for _, row in ipairs(rows) do labels[#labels + 1] = row.separator and "-" or row.label end
-	return labels
-end
+-- The three slots, the shared picker presentation each opens, its current
+-- action and the catalogue it lists.
+local PAIR_SLOT_CASES = {
+	{ slot = "chord", setter_slot = "combo", presentation = "key_combination_chord_action", current = "enter",
+		items = { { type = "heading", level = 1, text = "Navigation" },
+			{ type = "action", id = "escape", label = "Escape" }, { type = "action", id = "enter", label = "Enter" },
+			{ type = "heading", level = 1, text = "Modifiers" }, { type = "action", id = "shift", label = "Shift" } },
+		pick = "shift" },
+	{ slot = "tap", setter_slot = "tap", presentation = "key_combination_tap_action", current = "escape",
+		items = { { type = "heading", level = 1, text = "Navigation" },
+			{ type = "action", id = "escape", label = "Escape" }, { type = "action", id = "enter", label = "Enter" } },
+		pick = "enter", refused = "shift" },
+	{ slot = "hold", setter_slot = "hold", presentation = "key_combination_hold_action", current = "shift",
+		items = { { type = "heading", level = 1, text = "Modifiers" }, { type = "action", id = "shift", label = "Shift" } },
+		pick = "shift", refused = "escape" },
+}
 
-helpers.describe("complete native Tap-Hold action picker frame", function()
-	helpers.it("keeps independently specified Special, grouped and boundary order", function()
-		with_action_picker_frame(function(build, effects)
-			local special = { id = "none", label = "Independent None", category = "Spécial", holdable = true, tappable = true }
-			local grouped = { id = "escape", label = "Independent Escape", category = "Navigation", holdable = true, tappable = true }
-			local cases = {
-				{ actions = { grouped, special }, expected = { special.label, "-", "— Navigation —", grouped.label } },
-				{ actions = { special }, expected = { special.label } },
-				{ actions = { grouped }, expected = { "— Navigation —", grouped.label } },
-				{ actions = {}, expected = {} },
-			}
-			for _, case in ipairs(cases) do
-				local rows = build(case.actions, "none", "tap")
-				helpers.assert_eq(picker_frame_labels(rows), case.expected,
-					"the boundary occurs only when both native sections contribute")
+helpers.describe("the macOS key-combination slots open the shared action picker", function()
+	helpers.it("builds no submenu of actions under a pair (key-combination-action-picker)", function()
+		with_pair_picker(function(slots, observed)
+			for _, case in ipairs(PAIR_SLOT_CASES) do
+				local row = slots[case.slot]
+				helpers.assert_type(row, "table", case.slot .. " slot row")
+				helpers.assert_type(row.fn, "function", case.slot .. " slot is a command")
+				helpers.assert_nil(row.menu, case.slot .. " slot builds no submenu of actions")
 			end
-			helpers.assert_true(effects.catalogue_reads > 0, "the positive source counter is armed")
-			helpers.assert_true(effects.grouped_reads > 0, "the real grouping helper remains in use")
-			helpers.assert_eq(effects.setters, {}, "construction does not mutate native assignments")
-			helpers.assert_eq(effects.regenerations, 0)
-			helpers.assert_eq(effects.refreshes, 0)
+			helpers.assert_eq(#observed.opened, 0, "building the menu opens no window")
 		end)
 	end)
 
-	helpers.it("retains actual tap, hold and combination filtering and checked choices", function()
-		with_action_picker_frame(function(build)
-			local actions = {
-				{ id = "shift", label = "Shift", category = "Modifiers", holdable = true, tappable = false },
-				{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
-				{ id = "escape", label = "Escape", category = "Navigation", holdable = false, tappable = true },
-				{ id = "capsword", label = "CapsWord", category = "Spécial", holdable = false, tappable = true },
-			}
-			local cases = {
-				{ slot = "tap", current = "escape", expected = { "None", "CapsWord", "-", "— Navigation —", "Escape" } },
-				{ slot = "hold", current = "shift", expected = { "None", "-", "— Modifiers —", "Shift" } },
-				{ slot = "combo", current = "capsword", expected = { "None", "CapsWord", "-", "— Modifiers —", "Shift", "— Navigation —", "Escape" } },
-			}
-			for _, case in ipairs(cases) do
-				local rows = build(actions, case.current, case.slot)
-				helpers.assert_eq(picker_frame_labels(rows), case.expected)
-				local checked = {}
-				for _, row in ipairs(rows) do
-					if row.checked then checked[#checked + 1] = row.label end
+	for _, case in ipairs(PAIR_SLOT_CASES) do
+		helpers.it("opens the " .. case.slot .. " picker and persists its pick (key-combination-action-picker)", function()
+			with_pair_picker(function(slots, observed)
+				helpers.assert_true(slots[case.slot].fn())
+				local opts = observed.opened[1].opts
+				helpers.assert_eq(opts.presentation_id, case.presentation)
+				helpers.assert_eq(opts.presentation_suffix, "tap_hold.group.left_shift + tap_hold.group.right_shift",
+					"the title names the pair")
+				helpers.assert_eq(opts.current, case.current, "the current action is the marked choice")
+				helpers.assert_eq(opts.items, case.items)
+				helpers.assert_eq(#observed.calls, 0, "opening the picker writes nothing")
+				local confirm = observed.opened[1].confirm
+				if case.refused then
+					helpers.assert_eq(confirm(case.refused), false, "the slot does not offer " .. case.refused)
+					helpers.assert_eq(#observed.calls, 0)
 				end
-				local expected = { tap = "Escape", hold = "Shift", combo = "CapsWord" }
-				helpers.assert_eq(checked, { expected[case.slot] }, "exactly the actual current choice remains checked")
-			end
-		end)
-	end)
-
-	helpers.it("preserves literal native setter acknowledgements for both selection branches", function()
-		with_action_picker_frame(function(build, effects)
-			local rows = build({
-				{ id = "none", label = "None", category = "Spécial", holdable = true, tappable = true },
-				{ id = "escape", label = "Escape", category = "Navigation", holdable = true, tappable = true },
-			}, "none", "tap")
-			local actions = { { row = rows[1], id = "none" }, { row = rows[4], id = "escape" } }
-			for _, branch in ipairs(actions) do
-				for _, receipt in ipairs({ { value = false }, {}, { value = "accepted" }, { value = "throws" } }) do
-					effects.receipt = receipt.value
-					local before = effects.regenerations
-					local refreshes = effects.refreshes
-					helpers.assert_eq(branch.row.action(), false)
-					helpers.assert_eq(effects.setters[#effects.setters], branch.id)
-					helpers.assert_eq(effects.regenerations, before, "a refusal cannot regenerate")
-					helpers.assert_eq(effects.refreshes, refreshes, "a refusal cannot acknowledge a refresh")
-				end
-				effects.receipt = true
-				local before = effects.regenerations
-				local refreshes = effects.refreshes
-				helpers.assert_eq(branch.row.action(), true)
-				helpers.assert_eq(effects.setters[#effects.setters], branch.id)
-				helpers.assert_eq(effects.regenerations, before + 1)
-				helpers.assert_eq(effects.refreshes, refreshes + 1)
-			end
-		end)
-	end)
-
-	for _, control in ipairs({ "missing", "withdrawn", "missing_boundary", "malformed" }) do
-		helpers.it("refuses " .. control .. " declarations before catalogue or grouping reads", function()
-			with_action_picker_frame(function(build, effects, renderer)
-				local root = renderer.get_root()
-				if control == "missing" then root.tap_hold_action_picker_frame = nil
-				elseif control == "withdrawn" then root.tap_hold_action_picker_frame = {}
-				elseif control == "missing_boundary" then root.tap_hold_action_picker_boundary = {}
-				else root.tap_hold_action_picker_frame[1].type = "unrecognized" end
-				local rows = build({ { id = "none", label = "None", category = "Spécial" } }, "none", "tap")
-				helpers.assert_eq(effects.catalogue_reads, 0, "invalid presentation refuses before real catalogue reads")
-				helpers.assert_eq(effects.grouped_reads, 0, "invalid presentation refuses before real grouping")
-				helpers.assert_nil(rows, "an incomplete picker cannot publish partial choices")
-				helpers.assert_eq(effects.setters, {})
-				helpers.assert_eq(effects.regenerations, 0)
+				helpers.assert_true(confirm(case.pick))
+				helpers.assert_eq(observed.calls, { { case.setter_slot, "shift_pair", case.pick } })
+				helpers.assert_eq(observed.regenerations, 1)
+				helpers.assert_eq(observed.refreshes, 1)
 			end)
 		end)
 	end
 
-	for _, control in ipairs({ "missing", "non_boolean", "raises" }) do
-		helpers.it("refuses " .. control .. " boundary predicates before native source reads", function()
-			with_action_picker_frame(function(build, effects, renderer)
-				local actual_template_rows = renderer.template_rows
-				renderer.template_rows = function(key, commands, getters, children)
-					if key == "tap_hold_action_picker_frame" then
-						if control == "missing" then getters.tap_hold_picker_has_boundary = nil
-						elseif control == "non_boolean" then getters.tap_hold_picker_has_boundary = function() return 1 end
-						else getters.tap_hold_picker_has_boundary = function() error("independent picker boundary refusal", 0) end end
-					end
-					return actual_template_rows(key, commands, getters, children)
+	for _, receipt in ipairs({ { name = "false", value = false }, { name = "nil" },
+		{ name = "truthy", value = "accepted" }, { name = "throwing", value = "throws" } }) do
+		helpers.it("keeps every pair picker open on a " .. receipt.name .. " setter receipt (key-combination-action-picker)", function()
+			with_pair_picker(function(slots, observed)
+				observed.receipt = receipt.value
+				for index, case in ipairs(PAIR_SLOT_CASES) do
+					slots[case.slot].fn()
+					helpers.assert_eq(observed.opened[index].confirm(case.pick), false)
 				end
-				local rows = build({ { id = "none", label = "None", category = "Spécial" } }, "none", "tap")
-				helpers.assert_eq(effects.catalogue_reads, 0)
-				helpers.assert_eq(effects.grouped_reads, 0)
-				helpers.assert_nil(rows)
-				helpers.assert_eq(effects.setters, {})
+				helpers.assert_eq(#observed.calls, 3, "each slot reached its own setter once")
+				helpers.assert_eq(observed.regenerations, 0, "refused persistence cannot regenerate")
+				helpers.assert_eq(observed.refreshes, 0)
 			end)
 		end)
 	end
-
-	helpers.it("refuses publication if a previously admitted native read withdraws the boundary", function()
-		with_action_picker_frame(function(build, effects, renderer)
-			effects.on_catalogue_read = function() renderer.get_root().tap_hold_action_picker_boundary = {} end
-			local rows = build({
-				{ id = "none", label = "None", category = "Spécial", holdable = true },
-				{ id = "escape", label = "Escape", category = "Navigation", holdable = true },
-			}, "none", "tap")
-			helpers.assert_eq(effects.catalogue_reads, 1, "an admitted native read cannot be retroactively undone")
-			helpers.assert_nil(rows, "subsequent declaration withdrawal refuses final publication")
-			helpers.assert_eq(effects.setters, {})
-			helpers.assert_eq(effects.regenerations, 0)
-		end)
-	end)
 end)

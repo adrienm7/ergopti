@@ -30,10 +30,21 @@ local COMMAND_CASES = {
 	},
 }
 
--- The key combinations' slot submenus. A key's own tap and hold open the
--- shared action picker instead; test_menu_tap_holds_hand_sections holds their
--- setter receipts (tap-hold-action-picker).
+-- Every remap slot row: it opens the shared action picker, and a pick there
+-- reaches the slot's own setter.
 local PICKER_ROUTE_CASES = {
+	{
+		setter = "set_tap_action",
+		parent_prefix = "tap_hold.group.left_shift  :",
+		picker_label = "tap_hold.picker.tap",
+		expected_id = "left_shift",
+	},
+	{
+		setter = "set_hold_action",
+		parent_prefix = "tap_hold.group.left_shift  :",
+		picker_label = "tap_hold.picker.hold",
+		expected_id = "left_shift",
+	},
 	{
 		setter = "set_combo_combo_action",
 		parent_prefix = "tap_hold.group.left_shift + tap_hold.group.right_shift  :",
@@ -54,10 +65,9 @@ local PICKER_ROUTE_CASES = {
 	},
 }
 
--- Escape is reachable only through MenuUtils.build_action_picker's grouped,
--- non-Spécial branch; using it prevents a direct-row false green.
+-- Escape is a catalogue action the picker lists; None is the picker's own
+-- clearing row, which the catalogue's entry is not listed beside.
 local GROUPED_PICKER_ACTION = { label = "Escape", id = "escape" }
--- None is reachable only through menu_remap's direct, ungrouped Spécial branch
 local SPECIAL_PICKER_ACTION = { label = "None", id = "none" }
 local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 
@@ -138,7 +148,9 @@ local function find_descendant_prefix(row, prefix)
 	return nil
 end
 
---- Resolves one real picker route down to its concrete action callback.
+--- Resolves one real slot row down to a pick in the shared action picker it
+--- opens: the returned function opens the picker through the row, under a
+--- recording stand-in for the window, and confirms the action there.
 --- @param built table Built top-level Karabiner menu.
 --- @param case table Picker route descriptor.
 --- @param action_label string Exact concrete action label.
@@ -146,9 +158,31 @@ end
 local function find_picker_action(built, case, action_label)
 	local parent = find_descendant_prefix(built, case.parent_prefix)
 	if not parent then return nil end
-	local picker = find_descendant(parent, case.picker_label)
-	if not picker then return nil end
-	return row_action(find_descendant(picker, action_label))
+	local open = row_action(find_descendant(parent, case.picker_label))
+	if type(open) ~= "function" then return nil end
+	local action_id = nil
+	for _, candidate in ipairs(PICKER_ACTION_CASES) do
+		if candidate.label == action_label then action_id = candidate.id end
+	end
+	if action_id == nil then return nil end
+	return function()
+		local saved = package.loaded["ui.action_picker"]
+		local offered, confirm = nil, nil
+		package.loaded["ui.action_picker"] = {
+			open = function(opts, on_confirm) offered, confirm = opts, on_confirm; return true end,
+		}
+		local ok, opened = pcall(open)
+		package.loaded["ui.action_picker"] = saved
+		if not ok then error(opened, 0) end
+		helpers.assert_true(opened, "the slot row opens the shared action picker")
+		helpers.assert_type(confirm, "function")
+		if action_id ~= "none" then
+			local listed = false
+			for _, item in ipairs(offered.items) do listed = listed or item.id == action_id end
+			helpers.assert_true(listed, "the picker lists " .. action_label)
+		end
+		return confirm(action_id)
+	end
 end
 
 --- Builds a logger whose level records make premature SUCCESS observable.
