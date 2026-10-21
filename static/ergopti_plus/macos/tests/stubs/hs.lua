@@ -691,6 +691,10 @@ M.sqlite3 = {
 	MISUSE  = 21,
 	ROW     = 100,
 	DONE    = 101,
+	-- SQLite open flags, exported by Hammerspoon's lsqlite3 (SC(OPEN_*)).
+	OPEN_READONLY  = 0x1,
+	OPEN_READWRITE = 0x2,
+	OPEN_CREATE    = 0x4,
 	open = function(path)
 		table.insert(SQLITE3_CALLS, { op = "open", path = path })
 		-- Returns a stub db handle that succeeds on all calls
