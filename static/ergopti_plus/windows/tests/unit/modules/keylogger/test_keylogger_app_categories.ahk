@@ -109,6 +109,8 @@ Test("KLAppCatConst.DEFAULTS: notepad.exe -> productive", _KLAppCat_Defaults_Not
 
 ; Seed a clean in-memory map before each test group so tests are isolated.
 _KLAppCat_SeedMap() {
+	if KLAppCat.HasOwnProp("store_model")
+		KLAppCat.store_model := 0
 	; Non-empty sentinel so KL_AppCat_RequireInit passes. Must not be a bare
 	; relative name: KL_AppCat_Get() on an unseen app arms the deferred-save
 	; timer, which can fire after this test function returns and write
@@ -193,6 +195,8 @@ Test("KL_AppCat_Get: unseen app sets dirty flag", _KLAppCat_Get_NeverSeenAppSets
 
 ; Reset helper — clears all KLAppCat state so save tests start from a blank slate.
 _KLAppCatReset() {
+	if KLAppCat.HasOwnProp("store_model")
+		KLAppCat.store_model := 0
 	; Every unknown-app lookup schedules this same bound callback.  Cancel it
 	; before replacing the fixture state so an earlier test cannot write a
 	; now-invalid path (or emit a delayed log) while the next test is asserting.
@@ -471,3 +475,5 @@ Test("keylogger_app_categories: shutdown persists discoveries before the deferre
 #Include test_keylogger_app_category_set_durability.ahk
 
 #Include test_keylogger_app_category_set_owner.ahk
+
+#Include test_keylogger_app_category_edit_contract.ahk

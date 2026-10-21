@@ -24,9 +24,11 @@ _KLACSO_Case() {
 	PreviousCritical := Critical("On")
 	HadSaveFn := KLAppCat.HasOwnProp("save_fn")
 	HadWriteOwner := KLAppCat.HasOwnProp("write_owner")
+	HadStoreModel := KLAppCat.HasOwnProp("store_model")
 	Saved := { Categories: KLAppCat.categories, Path: KLAppCat.file_path,
 		Dirty: KLAppCat.dirty, SaveFn: HadSaveFn ? KLAppCat.save_fn : 0,
-		WriteOwner: HadWriteOwner ? KLAppCat.write_owner : 0 }
+		WriteOwner: HadWriteOwner ? KLAppCat.write_owner : 0,
+		StoreModel: HadStoreModel ? KLAppCat.store_model : 0 }
 	Root := A_Temp . "\ergopti_appcat_owner_" . A_ScriptHwnd . "_" . ++Serial
 	Path := Root . "\" . KLAppCatConst.FILE_NAME
 	Owned := false, Primary := 0, CleanupError := 0
@@ -42,6 +44,8 @@ _KLACSO_Case() {
 		KLAppCat.dirty := false, KLAppCat.save_fn := FixtureTimer
 		if HadWriteOwner
 			KLAppCat.write_owner := 0
+		if HadStoreModel
+			KLAppCat.store_model := 0
 		AssertTrue(KL_AppCat_Init(Root))
 		Admitted := KLAppCat.categories
 		Before := _KL_AppCat_SnapshotContent()
@@ -76,6 +80,8 @@ _KLACSO_Case() {
 			KLAppCat.dirty := Saved.Dirty
 			if HadWriteOwner
 				KLAppCat.write_owner := Saved.WriteOwner
+			if HadStoreModel
+				KLAppCat.store_model := Saved.StoreModel
 			if HadSaveFn
 				KLAppCat.save_fn := Saved.SaveFn
 			else if KLAppCat.HasOwnProp("save_fn")

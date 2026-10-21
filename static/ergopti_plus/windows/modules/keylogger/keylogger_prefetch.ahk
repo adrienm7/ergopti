@@ -936,7 +936,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 						return "full_required"
 				blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
 		} else if (which = "apps") {
-				blob := KLPF_BuildApps(db, true)
+				blob := KLPF_BuildApps(db, true, metrics_dir)
 		}
 		t_proj := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
@@ -1265,15 +1265,24 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 ; ======================================
 ; ======================================
 
-KLPF_BuildApps(db, EncodeManifest := false) {
+KLPF_BuildApps(db, EncodeManifest := false, MetricsRoot := "") {
+		Categories := Map()
+		if MetricsRoot != "" {
+				Apps := []
+				for Row in SQLite_Query(db, "SELECT DISTINCT app FROM agg_app_day;")
+						Apps.Push(Row["app"])
+				Categories := KL_AppCat_ProjectAt(MetricsRoot, Apps)
+		}
 		; metrics_apps reads (date, app) totals only — no n-grams. The same
 		; manifest projection covers it.
 		if EncodeManifest
-				return Map("__klpf_manifest_json", KLR_BuildManifestJson(db), "app_icons", Map())
+				return Map("__klpf_manifest_json", KLR_BuildManifestJson(db),
+						"app_icons", Map(), "user_categories", Categories)
 		manifest := KLR_ReadManifest(db)
 		return Map(
 				"metrics_manifest", manifest,
-				"app_icons", Map()
+				"app_icons", Map(),
+				"user_categories", Categories
 		)
 }
 
@@ -1400,10 +1409,10 @@ KLPF_PartialSnapshotPath(which, metrics_dir) {
 ; @param db {Integer} The rebuild's private candidate, borrowed for this call.
 ; @param Partial {Map} oldest / newest rolled-up day.
 ; @returns {String} Dashboard JSON.
-KLPF_BuildPartialJson(which, db, Partial) {
+KLPF_BuildPartialJson(which, db, Partial, MetricsRoot := "") {
 		Blob := (which = "typing")
 				? KLPF_BuildTyping(db, "full", true, FormatTime(A_Now, "yyyy-MM-dd"), true)
-				: KLPF_BuildApps(db, true)
+				: KLPF_BuildApps(db, true, MetricsRoot)
 		Blob["_partial"] := Partial
 		return KLPF_SerializeBlob(Blob)
 }
@@ -1487,7 +1496,7 @@ class KLPFRebuildPublisher {
 				for which in ["typing", "apps"] {
 						; A missed partial only delays the preview; the rebuild goes on.
 						if !KLPF_WriteAtomic(KLPF_PartialSnapshotPath(which, this.metrics_dir),
-										KLPF_BuildPartialJson(which, Info["db"], Partial))
+										KLPF_BuildPartialJson(which, Info["db"], Partial, this.metrics_dir))
 								return false
 				}
 				this.partial_cost := TickElapsed64(Tick, this.clock.Call())

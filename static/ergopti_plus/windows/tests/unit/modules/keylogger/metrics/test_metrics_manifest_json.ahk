@@ -159,7 +159,7 @@ _MMJ_AppsPublication() {
 	global KLPF_LAST_JSON
 	Producer := _DriverFuncBody("KLPF_BuildAndWriteToPath")
 	AssertTrue(Producer != "", "the publication entry must resolve")
-	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*\)") > 0,
+	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*,\s*metrics_dir\s*\)") > 0,
 		"the production Apps path must retain the measured encoded-manifest optimization")
 	HadJson := IsSet(KLPF_LAST_JSON)
 	SavedJson := HadJson ? KLPF_LAST_JSON : 0
