@@ -449,6 +449,675 @@
 			"category": "split_releases_array",
 			"input": { "json": null },
 			"expected_count": 0
+		},
+		{
+			"id": "contract_notes_nested_body_not_notes",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"metadata\":{\"body\":\"Misleading nested notes\"},\"body\":\"Actual release notes\"}"
+			},
+			"expected": "Actual release notes"
+		},
+		{
+			"id": "contract_notes_nested_null_not_notes",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"metadata\":{\"body\":null},\"body\":\"Actual release notes\"}"
+			},
+			"expected": "Actual release notes"
+		},
+		{
+			"id": "contract_notes_missing_root_body",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"metadata\":{\"body\":\"Nested only\"}}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_notes_number_field",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":123}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_notes_boolean_field",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":true}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_notes_object_field",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":{\"body\":\"Nested only\"}}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_notes_array_wrapper",
+			"category": "parse_notes",
+			"input": {
+				"body": "[{\"body\":\"Nested only\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_notes_null_release",
+			"category": "parse_notes",
+			"input": {
+				"body": "null"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_notes_malformed_json",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Not a valid release\"} trailing"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_escaped_digit",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":\"v\\u0031.2.0\"}"
+			},
+			"expected": "v1.2.0"
+		},
+		{
+			"id": "contract_tag_escaped_prefix",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":\"\\u0076\\u0031.2.0\"}"
+			},
+			"expected": "v1.2.0"
+		},
+		{
+			"id": "contract_tag_escaped_key",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_\\u006eame\":\"v1.2.0\"}"
+			},
+			"expected": "v1.2.0"
+		},
+		{
+			"id": "contract_tag_nested_tag_not_release",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"author\":{\"tag_name\":\"v9.9.9\"},\"tag_name\":\"v1.2.0\"}"
+			},
+			"expected": "v1.2.0"
+		},
+		{
+			"id": "contract_tag_nested_only",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"author\":{\"tag_name\":\"v9.9.9\"}}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_single_wrapper",
+			"category": "parse_tag",
+			"input": {
+				"body": "[{\"tag_name\":\"v1.2.0\"}]"
+			},
+			"expected": "v1.2.0"
+		},
+		{
+			"id": "contract_tag_multi_wrapper_first_entry",
+			"category": "parse_tag",
+			"input": {
+				"body": "[{\"tag_name\":\"v1.2.0\"},{\"tag_name\":\"v9.9.9\"}]"
+			},
+			"expected": "v1.2.0"
+		},
+		{
+			"id": "contract_tag_wrapper_missing_first_tag",
+			"category": "parse_tag",
+			"input": {
+				"body": "[{},{\"tag_name\":\"v9.9.9\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_wrapper_nonstring_first_tag",
+			"category": "parse_tag",
+			"input": {
+				"body": "[{\"tag_name\":123},{\"tag_name\":\"v9.9.9\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_wrapper_nonobject_first",
+			"category": "parse_tag",
+			"input": {
+				"body": "[false,{\"tag_name\":\"v9.9.9\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_wrapper_null_first",
+			"category": "parse_tag",
+			"input": {
+				"body": "[null,{\"tag_name\":\"v9.9.9\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_wrapper_nested_first",
+			"category": "parse_tag",
+			"input": {
+				"body": "[{\"author\":{\"tag_name\":\"v9.9.9\"}},{\"tag_name\":\"v2.0.0\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_malformed_trailing",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":\"v1.2.0\"} trailing"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_number_field",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":123}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_boolean_field",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":true}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_object_field",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":{\"tag_name\":\"v9.9.9\"}}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_empty_wrapper",
+			"category": "parse_tag",
+			"input": {
+				"body": "[]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_null_release",
+			"category": "parse_tag",
+			"input": {
+				"body": "null"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_tag_literal_whitespace_retained",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":\" v1.2.0 \"}"
+			},
+			"expected": " v1.2.0 "
+		},
+		{
+			"id": "contract_tag_unicode_identity",
+			"category": "parse_tag",
+			"input": {
+				"body": "{\"tag_name\":\"\\u03b1\"}"
+			},
+			"expected": "α"
+		},
+		{
+			"id": "contract_published_at_escaped_digit",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"2026-10-0\\u0031T00:00:00Z\"}"
+			},
+			"expected": "2026-10-01T00:00:00Z"
+		},
+		{
+			"id": "contract_published_at_escaped_key",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_\\u0061t\":\"2026-10-01T00:00:00Z\"}"
+			},
+			"expected": "2026-10-01T00:00:00Z"
+		},
+		{
+			"id": "contract_published_at_nested_time_not_release",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"author\":{\"published_at\":\"2026-09-29T00:00:00Z\"},\"published_at\":\"2026-10-01T00:00:00Z\"}"
+			},
+			"expected": "2026-10-01T00:00:00Z"
+		},
+		{
+			"id": "contract_published_at_nested_only",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"author\":{\"published_at\":\"2026-09-29T00:00:00Z\"}}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_number_field",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":123}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_boolean_field",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":true}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_null_field",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":null}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_object_field",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":{\"published_at\":\"2026-09-29T00:00:00Z\"}}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_array_field",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":[\"2026-09-29T00:00:00Z\"]}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_object_only_wrapper",
+			"category": "parse_published_at",
+			"input": {
+				"body": "[{\"published_at\":\"2026-09-29T00:00:00Z\"}]"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_null_release",
+			"category": "parse_published_at",
+			"input": {
+				"body": "null"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_number_release",
+			"category": "parse_published_at",
+			"input": {
+				"body": "123"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_malformed_trailing",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"2026-10-01T00:00:00Z\"} trailing"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_malformed_delimiter",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"2026-10-01T00:00:00Z\""
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_published_at_literal_escape_retained",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"2026-10-0\\\\u0031T00:00:00Z\"}"
+			},
+			"expected": "2026-10-0\\u0031T00:00:00Z"
+		},
+		{
+			"id": "contract_published_at_date_policy_unchanged",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"not a timestamp\"}"
+			},
+			"expected": "not a timestamp"
+		},
+		{
+			"id": "contract_published_at_offset_identity",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"2026-10-01T00:00:00+01:00\"}"
+			},
+			"expected": "2026-10-01T00:00:00+01:00"
+		},
+		{
+			"id": "contract_published_at_whitespace_identity",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\" 2026-10-01T00:00:00Z \"}"
+			},
+			"expected": " 2026-10-01T00:00:00Z "
+		},
+		{
+			"id": "contract_published_at_unicode_identity",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"\\u03b1\"}"
+			},
+			"expected": "α"
+		},
+		{
+			"id": "contract_published_at_empty_field",
+			"category": "parse_published_at",
+			"input": {
+				"body": "{\"published_at\":\"\"}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "contract_prerelease_escaped_true_key",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"pre\\u0072elease\":true}"
+			},
+			"expected": true
+		},
+		{
+			"id": "contract_prerelease_escaped_false_key",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"pre\\u0072elease\":false}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_nested_false_before_own_true",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"author\":{\"prerelease\":false},\"prerelease\":true}"
+			},
+			"expected": true
+		},
+		{
+			"id": "contract_prerelease_nested_true_before_own_false",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"author\":{\"prerelease\":true},\"prerelease\":false}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_nested_only",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"author\":{\"prerelease\":true}}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_null_field_nested_true",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"author\":{\"prerelease\":true},\"prerelease\":null}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_string_field",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":\"true\"}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_number_field",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":1}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_object_field",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":{\"prerelease\":true}}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_array_field",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":[{\"prerelease\":true}]}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_object_only_wrapper",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "[{\"prerelease\":true}]"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_malformed_trailing",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":true} trailing"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_null_release",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "null"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_own_false_before_nested_true",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":false,\"author\":{\"prerelease\":true}}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_prerelease_own_true_before_nested_false",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"prerelease\":true,\"author\":{\"prerelease\":false}}"
+			},
+			"expected": true
+		},
+		{
+			"id": "contract_prerelease_field_name_case_exact",
+			"category": "parse_prerelease_flag",
+			"input": {
+				"body": "{\"Prerelease\":true}"
+			},
+			"expected": false
+		},
+		{
+			"id": "contract_split_nested_only",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[[{\"tag_name\":\"v9.9.9\"}]]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_nested_after_object",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.2.0\"},[{\"tag_name\":\"v9.9.9\"}]]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_nested_before_object",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[[{\"tag_name\":\"v9.9.9\"}],{\"tag_name\":\"v1.2.0\"}]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_false_root_element",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[false,{\"tag_name\":\"v1.2.0\"}]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_null_root_element",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[null,{\"tag_name\":\"v1.2.0\"}]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_string_root_element",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[\"ignored\",{\"tag_name\":\"v1.2.0\"}]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_trailing_object",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.2.0\"}] {\"tag_name\":\"v9.9.9\"}"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_incomplete_root_array",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.2.0\"}"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_trailing_comma",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.2.0\"},]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_empty_array",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_object_root",
+			"category": "split_releases_array",
+			"input": {
+				"json": "{\"tag_name\":\"v1.2.0\"}"
+			},
+			"expected_count": 0,
+			"expected_spans": []
+		},
+		{
+			"id": "contract_split_nested_metadata_raw_bytes",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[ {\"tag_name\":\"v1.2.0\",\"author\":{\"releases\":[{\"tag_name\":\"v9.9.9\"}]}} ]"
+			},
+			"expected_count": 1,
+			"expected_spans": [
+				"{\"tag_name\":\"v1.2.0\",\"author\":{\"releases\":[{\"tag_name\":\"v9.9.9\"}]}}"
+			]
+		},
+		{
+			"id": "contract_split_publication_order_and_raw_whitespace",
+			"category": "split_releases_array",
+			"input": {
+				"json": " \n[\t{ \"tag_name\" : \"v1.2.0\", \"body\" : \"Order and bytes\" } , {\n\"tag_name\":\"v9.9.9\"\n} \n]\t "
+			},
+			"expected_count": 2,
+			"expected_spans": [
+				"{ \"tag_name\" : \"v1.2.0\", \"body\" : \"Order and bytes\" }",
+				"{\n\"tag_name\":\"v9.9.9\"\n}"
+			]
+		},
+		{
+			"id": "contract_split_quoted_delimiter_raw_bytes",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.2.0\",\"body\":\"[ ] { } and \\\\ \\\" backslashes\"}]"
+			},
+			"expected_count": 1,
+			"expected_spans": ["{\"tag_name\":\"v1.2.0\",\"body\":\"[ ] { } and \\\\ \\\" backslashes\"}"]
+		},
+		{
+			"id": "contract_split_empty_object_schema_unchanged",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[ {} ]"
+			},
+			"expected_count": 1,
+			"expected_spans": ["{}"]
+		},
+		{
+			"id": "contract_split_quoted_object_not_release",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[\"{ \\\"tag_name\\\" : \\\"v1.2.0\\\", \\\"body\\\" : \\\"Order and bytes\\\" }\"]"
+			},
+			"expected_count": 0,
+			"expected_spans": []
 		}
 	]
 }

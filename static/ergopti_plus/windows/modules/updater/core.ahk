@@ -2656,8 +2656,9 @@ _Updater_RecordOtherChannels(Request, Json, Channel) {
 		|| (Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
 		return
 	Releases := []
-	for _, Chunk in _Updater_SplitReleasesArray(Json)
-		Releases.Push(Map("tag", Updater_ParseTagName(Chunk), "published_at", _Updater_ParsePublishedAt(Chunk)))
+	for _, Span in _Updater_DecodeReleaseList(Json)
+		Releases.Push(Map("tag", _Updater_ReleaseString(Span["value"], "tag_name"),
+			"published_at", _Updater_ReleaseString(Span["value"], "published_at")))
 	Request.OtherChannels := UpdateChannels_NewerElsewhere(Releases, Channel, Updater_CurrentVersion())
 }
 
@@ -2674,16 +2675,16 @@ _Updater_RequestOtherChannels(Request) {
 ; reverse), or UPDATER_NO_CHANNEL_RELEASE when the list holds none.
 _Updater_SelectChannelRelease(Json, Channel) {
 	global UPDATER_NO_CHANNEL_RELEASE
-	Chunks := _Updater_SplitReleasesArray(Json)
+	Releases := _Updater_DecodeReleaseList(Json)
 	Tags := []
-	for _, Chunk in Chunks
-		Tags.Push(Updater_ParseTagName(Chunk))
+	for _, Span in Releases
+		Tags.Push(_Updater_ReleaseString(Span["value"], "tag_name"))
 	Best := UpdateChannels_PickLatest(Tags, Channel)
 	if !Best {
-		try LoggerInfo("Updater", "No release of channel '{1}' among the {2} listed.", Channel, Chunks.Length)
+		try LoggerInfo("Updater", "No release of channel '{1}' among the {2} listed.", Channel, Releases.Length)
 		return UPDATER_NO_CHANNEL_RELEASE
 	}
-	return Chunks[Best]
+	return Releases[Best]["text"]
 }
 
 ; Reports whether a fetch answered that its channel has no release yet.
@@ -3532,57 +3533,71 @@ Updater_FetchReleasesListJson(Channel := "") {
 	return Json
 }
 
-; Splits the top-level JSON array of releases into one substring per object,
-; honouring quoted strings and escape sequences so a "}" inside a release body
-; cannot fool the depth counter. Returns an Array of object-JSON strings.
+; Strictly decodes one release document with the shared JSON owner, or returns
+; 0 when it is not complete valid JSON. Every metadata field is then read from
+; the selected release object itself (never from a nested object such as the
+; author or an asset), with its escapes decoded exactly once, as the shared Lua
+; release parser does.
+; @param Json {String} One release object (or, for tags, a raw release list).
+; @returns {Map|Array|Integer|String|Object} The decoded root, or 0.
+_Updater_DecodeRelease(Json) {
+	if _Updater_JsonPayloadIsFailure(Json)
+		return 0
+	try return JsonParse(Json)
+	catch
+		return 0
+}
+
+; The release object's own string field; "" for an absent, null or non-string
+; value, or when the release is not an object.
+_Updater_ReleaseString(Release, Key) {
+	if !(Release is Map)
+		return ""
+	Value := Release.Get(Key, "")
+	return Value is String ? Value : ""
+}
+
+; Decodes a complete release list once: the exact raw span of every root
+; object, in publication order, with its decoded value. A document that is not
+; an array of objects offers no release at all: a nested array, a scalar or a
+; string that only looks like a release object never reaches version selection.
+; @param Json {String} The release list returned by the GitHub API.
+; @returns {Array} Maps with "text" (raw object span) and "value" (decoded Map).
+_Updater_DecodeReleaseList(Json) {
+	if _Updater_JsonPayloadIsFailure(Json) || SubStr(LTrim(Json, " `t`r`n"), 1, 1) != "["
+		return []
+	try Spans := JsonArrayElementSpans(Json)
+	catch
+		return []
+	for _, Span in Spans {
+		if !(Span["value"] is Map)
+			return []
+	}
+	return Spans
+}
+
+; Splits the top-level JSON array of releases into the exact raw text of each
+; root object. Returns an Array of object-JSON strings (see
+; _Updater_DecodeReleaseList for what is refused).
 _Updater_SplitReleasesArray(Json) {
 	out := []
-	Trimmed := LTrim(Json)
-	if (SubStr(Trimmed, 1, 1) != "[")
-		return out
-	len := StrLen(Trimmed)
-	pos := 2
-	depth := 0
-	start := 0
-	in_str := false
-	esc := false
-	while (pos <= len) {
-		c := SubStr(Trimmed, pos, 1)
-		if in_str {
-			if esc {
-				esc := false
-			} else if (c == "\") {
-				esc := true
-			} else if (c == '"') {
-				in_str := false
-			}
-		} else {
-			if (c == '"') {
-				in_str := true
-			} else if (c == "{") {
-				if (depth == 0)
-					start := pos
-				depth += 1
-			} else if (c == "}") {
-				depth -= 1
-				if (depth == 0 and start > 0) {
-					out.Push(SubStr(Trimmed, start, pos - start + 1))
-					start := 0
-				}
-			}
-		}
-		pos += 1
-	}
+	for _, Span in _Updater_DecodeReleaseList(Json)
+		out.Push(Span["text"])
 	return out
 }
 
 ; Extracts GitHub's boolean "prerelease" flag (the release workflow sets it
 ; from the channel's github_prerelease). Channel membership itself is decided
-; by the tag, through the shared registry. Defaults to false when absent.
+; by the tag, through the shared registry. True only for the release object's
+; own Boolean true: the shared parser folds true and the number 1 into one
+; value, so the member's own source token is the proof.
 _Updater_ParsePrerelease(Json) {
-	if RegExMatch(Json, '"prerelease"\s*:\s*(true|false)', &M)
-		return M[1] == "true"
-	return false
+	if _Updater_JsonPayloadIsFailure(Json)
+		return false
+	try Members := JsonObjectMemberSpans(Json)
+	catch
+		return false
+	return Members.Has("prerelease") && Members["prerelease"]["text"] == "true"
 }
 
 ; Extracts the "html_url" field from a single-release JSON object.
@@ -3592,11 +3607,10 @@ _Updater_ParseHtmlUrl(Json) {
 	return ""
 }
 
-; Extracts the "published_at" ISO-8601 timestamp from a release object.
+; Extracts the release object's own "published_at" timestamp, decoded once.
+; Timestamp validation stays with its consumers.
 _Updater_ParsePublishedAt(Json) {
-	if RegExMatch(Json, '"published_at"\s*:\s*"([^"]+)"', &M)
-		return M[1]
-	return ""
+	return _Updater_ReleaseString(_Updater_DecodeRelease(Json), "published_at")
 }
 
 ; Build an array of release records from the raw JSON list. With a ViewChannel,
@@ -3604,20 +3618,21 @@ _Updater_ParsePublishedAt(Json) {
 ; its own releases and those of every more stable channel), so the dev view
 ; shows every nightly side by side with the stable releases.
 ;
-; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease, RawJson }. The original
+; Each entry: { Tag, Body, HtmlUrl, PublishedAt, RawJson }. The original
 ; API order is preserved (GitHub returns most-recent first) so callers do not
 ; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
-; can resolve the authenticated asset via _Updater_FindAsset (AHK-07).
+; can resolve the authenticated asset via _Updater_FindAsset (AHK-07). The list
+; is decoded once; no consumer reads a per-release prerelease flag here.
 Updater_ParseReleasesList(Json, ViewChannel := "") {
 	out := []
-	for _, chunk in _Updater_SplitReleasesArray(Json) {
+	for _, Span in _Updater_DecodeReleaseList(Json) {
+		Release := Span["value"]
 		rec := {
-			Tag:         Updater_ParseTagName(chunk),
-			Body:        Updater_ParseBody(chunk),
-			HtmlUrl:     _Updater_ParseHtmlUrl(chunk),
-			PublishedAt: _Updater_ParsePublishedAt(chunk),
-			Prerelease:  _Updater_ParsePrerelease(chunk),
-			RawJson:     chunk
+			Tag:         _Updater_ReleaseString(Release, "tag_name"),
+			Body:        _Updater_ReleaseString(Release, "body"),
+			HtmlUrl:     _Updater_ParseHtmlUrl(Span["text"]),
+			PublishedAt: _Updater_ReleaseString(Release, "published_at"),
+			RawJson:     Span["text"]
 		}
 		if (rec.Tag == "")
 			continue
@@ -3628,42 +3643,27 @@ Updater_ParseReleasesList(Json, ViewChannel := "") {
 	return out
 }
 
-; Extracts the "tag_name" field from a GitHub release JSON payload.
-; Handles both a release object and a raw releases array (its first entry).
+; Extracts the release object's own "tag_name", decoded once.
+; Handles both a release object and a raw releases array: its first entry
+; decides, even when that entry carries no usable tag.
 Updater_ParseTagName(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""
-	; Unwrap array if callers pass raw list JSON (defensive — normally already
-	; unwrapped by Updater_FetchLatestJson or Updater_ParseReleasesList).
-	if (SubStr(LTrim(Json), 1, 1) == "[")
-		Json := RegExReplace(Json, "^\s*\[", "")
-	if RegExMatch(Json, '"tag_name"\s*:\s*"([^"]+)"', &M)
-		return M[1]
-	return ""
+	Release := _Updater_DecodeRelease(Json)
+	if Release is Array
+		Release := Release.Length ? Release[1] : 0
+	return _Updater_ReleaseString(Release, "tag_name")
 }
 
-; Extracts the "body" field (release notes markdown) from a GitHub release JSON.
-; Returns "" when the field is absent, null, or an empty string — callers
-; display t("updater.changelog_empty") in that case.
+; Extracts the release object's own "body" (release notes markdown), decoded
+; once by the shared parser. Returns "" when the field is absent, null, not a
+; string or empty — callers display t("updater.changelog_empty") in that case.
+; Carriage returns are kept: both note views normalize line endings when
+; rendering (_Updater_ReleaseNotesChangelog, the shared release-notes page).
 Updater_ParseBody(Json) {
 	if _Updater_JsonPayloadIsFailure(Json)
 		return ""
-	; Unwrap array defensively — normally already done by Updater_FetchLatestJson.
-	if (SubStr(LTrim(Json), 1, 1) == "[")
-		Json := RegExReplace(Json, "^\s*\[", "")
-	; GitHub sets "body": null (not "") when a release has no description.
-	; Detect null before trying the quoted-string pattern.
-	if RegExMatch(Json, '"body"\s*:\s*null', &_)
-		return ""
-	; Possessive quantifier (*+) prevents catastrophic backtracking on large bodies.
-	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]++|\\.)*+)"', &M) {
-		try return JsonStringDecodeContents(M[1])
-		catch as Err {
-			try LoggerWarn("Updater", "Release body JSON decode failed: {1}.", Err.Message)
-			return ""
-		}
-	}
-	return ""
+	return _Updater_ReleaseString(_Updater_DecodeRelease(Json), "body")
 }
 
 _Updater_AttachManagedNetworkFailure(Owner) {

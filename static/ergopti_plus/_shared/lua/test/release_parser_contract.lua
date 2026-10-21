@@ -4,9 +4,10 @@
 --- MODULE: Shared Lua Release Metadata Contract
 --- DESCRIPTION:
 --- Pins selected-object metadata, tag-wrapper order and established CR removal.
---- Windows still scans raw tag, publication-time and prerelease fields and has historical notes wrapper/CR
---- differences. Universal notes escapes remain in the cross-driver corpus;
---- this owner pins the Lua metadata contract without hiding those differences.
+--- These vectors are also replayed by every driver through the cross-driver
+--- corpus (contract_* in _shared/tests/corpus/updater/release_parser_vectors.json),
+--- except CR removal: Windows keeps carriage returns in decoded notes and
+--- normalizes line endings where it renders them.
 --- ==============================================================================
 
 local M = {}

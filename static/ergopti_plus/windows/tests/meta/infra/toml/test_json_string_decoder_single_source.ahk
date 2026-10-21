@@ -15,9 +15,14 @@ _JSDS_AllDecodersDelegate() {
 		Assert(Body != "" && InStr(Body, "JsonStringDecodeContents(") > 0,
 			Name . " must delegate to the shared complete JSON string decoder")
 	}
+	; Release metadata decodes the whole release object with the complete parser
+	; rather than a captured string slice, so it never needs the contents decoder.
 	UpdaterBody := _DriverFuncBody("Updater_ParseBody")
-	Assert(UpdaterBody != "" && InStr(UpdaterBody, "JsonStringDecodeContents(") > 0,
-		"Updater_ParseBody must decode captured string contents through the shared parser")
+	Assert(UpdaterBody != "" && InStr(UpdaterBody, "_Updater_DecodeRelease(") > 0,
+		"Updater_ParseBody must decode the release object through the shared release decoder")
+	DecoderBody := _DriverFuncBody("_Updater_DecodeRelease")
+	Assert(DecoderBody != "" && InStr(DecoderBody, "JsonParse(") > 0,
+		"the release decoder must use the complete shared JSON parser")
 }
 Test("JSON decode: every compatibility boundary uses one complete decoder (json-string-decoder-single-source)",
 	_JSDS_AllDecodersDelegate)
