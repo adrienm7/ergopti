@@ -87,3 +87,5 @@ for Outcome in ["delivered", "refused", "replaced", "inflight"]
 #Include test_metrics_apps_owned_gui.ahk
 
 #Include test_metrics_native_sender_identity.ahk
+
+#Include test_metrics_apps_dom_native.ahk
