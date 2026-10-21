@@ -13,7 +13,8 @@ const Policy = require('../ci/dev-release-qualification.cjs');
 const Scoped = require('./fixtures/ci-scoped-full-branches.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
 const Publication = require('../ci/publication-plan.cjs');
-const source = Raw.files();
+// The real files, stage files included: what Full.fromFiles validates.
+const source = Raw.real().files();
 const MAC = '.github/workflows/ci-macos.yml';
 const ENTRY = '.github/workflows/ci.yml';
 let passed = 0;
@@ -197,7 +198,7 @@ check('raw loader and full view retain every exact source byte', () => {
 	assert.deepEqual(view.rawFiles(), source);
 	for (const entry of source) {
 		assert.equal(entry.text, fs.readFileSync(`${Raw.ROOT}/${entry.rel}`, 'utf8'));
-		assert.equal(view.file(entry.rel), Scoped.projectScopedSteps(entry.text, entry.rel));
+		assert.equal(view.real().file(entry.rel), Scoped.projectScopedSteps(entry.text, entry.rel));
 	}
 	assert.equal(
 		view.text(),
@@ -217,7 +218,10 @@ check('every scoped full body remains owned; all other product scripts remain ex
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
 			jobs++;
-			const retainedJob = Full.job(job.id);
+			// By file: a stage caller and its stage job share one id.
+			const retainedJob = Full.real()
+				.jobs(entry.rel)
+				.find((candidate) => candidate.id === job.id).body;
 			assert.equal(Full.field(retainedJob, 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
 				if (!step.name) continue;

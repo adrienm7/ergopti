@@ -90,7 +90,8 @@ function projectScopedSteps(text, rel) {
 				const consumer = consumers[0];
 				const issuer = contract.slots.filter(
 					(slot) =>
-						slot.file === rel &&
+						// The issuer may run in an earlier stage file of the same lane.
+						slot.file === consumer.issuer_file &&
 						slot.job === consumer.issuer_job &&
 						slot.step === consumer.issuer_step
 				);
@@ -102,8 +103,8 @@ function projectScopedSteps(text, rel) {
 				);
 				assert.equal(
 					policy.scopes[consumer.scope].path,
-					rel,
-					'consumer workflow must match issuer'
+					consumer.issuer_file,
+					'consumer scope must name its issuer workflow'
 				);
 				assert.equal(
 					policy.scopes[consumer.scope].args[0],
