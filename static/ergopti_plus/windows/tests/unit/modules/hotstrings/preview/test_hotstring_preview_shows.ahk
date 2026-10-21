@@ -230,7 +230,13 @@ _HPS_WatcherStampsBeforeFeeding() {
 	OnChar := _StripFullLineComments(_DriverFuncBody("_OnPrefixChar"))
 	Assert(OnChar != "", "_OnPrefixChar must exist in the driver source")
 	EnsurePos := InStr(OnChar, "_PrefixEnsureInputContext()")
-	StampPos := InStr(OnChar, "AppState_TouchLastSentKey(Char)")
+	StampPos := InStr(OnChar, "_PrefixStampCompletedInput(Char)")
+	Stamp := _StripFullLineComments(_DriverFuncBody("_PrefixStampCompletedInput"))
+	Assert(Stamp != "", "the completed-character timestamp owner must exist")
+	AdmissionPos := InStr(Stamp, '_TextCompleteTailScalar(DeliveredChar) != ""')
+	TouchPos := InStr(Stamp, "AppState_TouchLastSentKey(DeliveredChar, ObservedTick)")
+	Assert(AdmissionPos > 0 && TouchPos > AdmissionPos,
+		"the timestamp owner must stamp completed observed characters and exclude orphan units")
 	FeedPos := InStr(OnChar, "HSEMatch := HSE_FeedChar(Char, true)")
 	Assert(StampPos > 0,
 		"_OnPrefixChar must stamp every observed character: only the layout emulation stamped before, so a key typed through the OS layout failed every time gate (hotstring-preview-shows)")

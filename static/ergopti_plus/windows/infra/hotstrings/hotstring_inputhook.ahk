@@ -665,6 +665,7 @@ _PrefixInvalidateDeferredEffects() {
 ; resume re-arms it exactly once; shutdown drains it before KL_Stop closes the
 ; durable keylogger sinks and then invalidates every remaining timer owner.
 HotstringPrefixWatcherOnSuspend() {
+	_PrefixRevokeIncompleteFragments()
 	_PrefixInvalidateDeferredEffects()
 	HotstringPrefixWatcherClearVisibleDecisions()
 }
@@ -936,6 +937,7 @@ HotstringPrefixWatcherRebuildIndex() {
 ; preview from the tray menu or before reloading.
 HotstringPrefixWatcherStop() {
 	global _PrefixInputHook, _PrefixIndex
+	_PrefixRevokeIncompleteFragments()
 	TooltipPositionWarmStop()
 	if IsSet(LLM_Bridge_CancelPrefixObserver)
 		LLM_Bridge_CancelPrefixObserver()
@@ -970,6 +972,7 @@ HotstringPrefixWatcherStop() {
 ; until HotstringPrefixWatcherStop is called.
 _StartInputHook() {
 	global _PrefixInputHook
+	_PrefixRevokeIncompleteFragments()
 	; I1 filters only low-level synthetic input (the driver's SendInput/Event
 	; bursts use the default SendLevel 0) while preserving every physical key.
 	; This is event provenance, unlike the former 60-ms time window that also
@@ -978,23 +981,91 @@ _StartInputHook() {
 	Hook.KeyOpt("{All}", "+N")            ; notify OnKeyDown for every key
 	Hook.OnChar    := _OnPrefixCharGuarded
 	Hook.OnKeyDown := _OnPrefixKeyDownGuarded
-	Hook.Start()
 	_PrefixInputHook := Hook
+	try Hook.Start()
+	catch {
+		_PrefixInputHook := 0
+		throw
+	}
 }
 
 ; InputHook permanently disables one of its callbacks when an exception escapes
 ; that callback. Keep this boundary outside both the profiler and the workers so
 ; setup calls added before their narrower try regions cannot silence the hook.
 _OnPrefixCharGuarded(IH, Char) {
+	if !_PrefixHookStillCurrent(IH)
+		return
 	try _OnPrefixCharProfiled(IH, Char)
 	catch as Err
 		try LoggerError("PrefixWatcher", "OnChar callback failed: {1}.", Err.Message)
 }
 
 _OnPrefixKeyDownGuarded(IH, VK, SC) {
+	if !_PrefixHookStillCurrent(IH)
+		return
 	try _OnPrefixKeyDown(IH, VK, SC)
 	catch as Err
 		try LoggerError("PrefixWatcher", "OnKeyDown callback failed: {1}.", Err.Message)
+}
+
+; Queued callbacks cannot acquire the replacement hook's input context.
+_PrefixHookStillCurrent(IH) {
+	global _PrefixInputHook
+	return IsObject(IH) && IsObject(_PrefixInputHook)
+		&& ObjPtr(IH) == ObjPtr(_PrefixInputHook)
+}
+
+; Existing buffers own incomplete visible units; no second pending-text queue.
+_PrefixHasIncompleteFragment() {
+	global HSE_Buffer, _PrefixBuffer
+	return (HSE_Buffer != "" && _TextCompleteTailScalar(HSE_Buffer) == "")
+		|| (_PrefixBuffer != "" && _TextCompleteTailScalar(_PrefixBuffer) == "")
+		|| (IsSet(LLM_Bridge_HasIncompleteInput) && LLM_Bridge_HasIncompleteInput())
+}
+
+; Caret/lifecycle boundaries cannot join a low unit to a previous input owner.
+_PrefixRevokeIncompleteFragments() {
+	global HSE_Buffer, _PrefixBuffer, _PrefixFocusedControlToken
+	if (HSE_Buffer != "" && _TextCompleteTailScalar(HSE_Buffer) == "")
+		|| (_PrefixBuffer != "" && _TextCompleteTailScalar(_PrefixBuffer) == "")
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+	else if IsSet(LLM_Bridge_DiscardIncompleteInput)
+		LLM_Bridge_DiscardIncompleteInput()
+}
+
+; Context probes are needed before a split scalar can join the old mirrors.
+; Complete BMP/chunk admission keeps its existing single context check.
+_PrefixPrepareScalarContext(Char, ContextFn := unset, IH := 0) {
+	if !_PrefixHasIncompleteFragment() && (Char == "" || _TextCompleteTailScalar(Char) != "")
+		return 0
+	_PrefixApplyIdleReset(A_TickCount)
+	if !(IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext())
+		return -1
+	if A_IsSuspended || (IsObject(IH) && !_PrefixHookStillCurrent(IH))
+		return -1
+	if _PrefixHasIncompleteFragment() && Char != "" {
+		FirstUnit := NumGet(StrPtr(Char), 0, "UShort")
+		if !(FirstUnit >= 0xDC00 && FirstUnit <= 0xDFFF)
+			_PrefixRevokeIncompleteFragments()
+	}
+	return 1
+}
+
+; Stamp only completed characters, including a pair split across callbacks.
+_PrefixStampCompletedInput(Char) {
+	global HSE_Buffer
+	Observed := Char
+	if Char != "" && HSE_Buffer != "" {
+		First := NumGet(StrPtr(Char), 0, "UShort")
+		Last := NumGet(StrPtr(HSE_Buffer), (StrLen(HSE_Buffer) - 1) * 2, "UShort")
+		if First >= 0xDC00 && First <= 0xDFFF && Last >= 0xD800 && Last <= 0xDBFF
+			Observed := SubStr(HSE_Buffer, -1) . Char
+	}
+	ObservedTick := A_TickCount
+	for DeliveredChar in _TextCodepoints(Observed) {
+		if _TextCompleteTailScalar(DeliveredChar) != ""
+			AppState_TouchLastSentKey(DeliveredChar, ObservedTick)
+	}
 }
 
 ; Profiling shim around _OnPrefixChar: times the entire per-keystroke match +
@@ -1054,6 +1125,8 @@ _PrefixCommitInputContext(FocusToken := 0, KnownBoundary := true) {
 	ContentGeneration := _PrefixSetBuffer("")
 	_PrefixFocusedControlToken := FocusToken
 	_PrefixInputContextGeneration += 1
+	if IsSet(LLM_Bridge_DiscardIncompleteInput)
+		LLM_Bridge_DiscardIncompleteInput()
 	return {
 		ClearedBuffer: ClearedBuffer,
 		Generation: _PrefixInputContextGeneration,
@@ -1309,6 +1382,7 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		; paused or the Hotstrings master gate is off — this watcher uses its OWN
 		; InputHook, so the HookDispatcher guard does not cover it.
 		if A_IsSuspended {
+			_PrefixRevokeIncompleteFragments()
 			_PrefixRecordMagicOutcome(Char, "paused")
 			return
 		}
@@ -1320,6 +1394,13 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 			_PrefixRecordMagicOutcome(Char, "terminal_replay")
 			return
 		}
+		; A split scalar must bind its screen context before either mirror appends
+		; the low unit. Ordinary complete BMP/chunk admission retains its ordering.
+		ContextStatus := _PrefixPrepareScalarContext(Char,
+			IsSet(ContextFn) ? ContextFn : unset, IH)
+		if ContextStatus < 0
+			return
+		ContextChecked := ContextStatus > 0
 		; I1 excludes this driver's synthetic output before OnChar.  Keep the HSE
 		; fallback guard for standalone/manual HSE suppression, but do not treat the
 		; prefix render guard as evidence that this physical character is synthetic.
@@ -1339,9 +1420,9 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 			; the idle rule; after OnKeyDown the gap reads zero.
 			_PrefixApplyIdleReset(A_TickCount)
 			FocusStarted := HotPath_Now()
-			ContextReady := IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext()
+			ContextReady := ContextChecked || (IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext())
 			HotPath_LogIfSlow("Prefix.FocusAdmission", FocusStarted)
-			if !ContextReady {
+			if !ContextReady || A_IsSuspended || (IsObject(IH) && !_PrefixHookStillCurrent(IH)) {
 				_PrefixRecordMagicOutcome(Char, "focus_refused")
 				return
 			}
@@ -1391,6 +1472,8 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		Critical("On")
 		if ContextReleased && !(IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext())
 			return
+		if A_IsSuspended || (IsObject(IH) && !_PrefixHookStillCurrent(IH))
+			return
 		; The Hotstrings gate comes after the wrap: wrapping a selection is a
 		; shortcut of its own, and with an OS layout it worked only while
 		; Hotstrings was also on (selection-wrap-without-hotstrings).
@@ -1421,13 +1504,7 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 			; (the neutral layout setting) was never stamped, so every time-gated
 			; hotstring failed closed in _HSE_PrepareDispatchDecision: no expansion
 			; and no preview bubble (hotstring-preview-shows).
-			if StrLen(Char) > 1 {
-				ObservedTick := A_TickCount
-				for DeliveredChar in _TextCodepoints(Char)
-					AppState_TouchLastSentKey(DeliveredChar, ObservedTick)
-			} else {
-				AppState_TouchLastSentKey(Char)
-			}
+			_PrefixStampCompletedInput(Char)
 			; Feed HSE — when HSE_FeedChar reports a match, fire the
 			; expansion right here. HSE_LastEndChar is the authoritative end
 			; character: empty for star (immediate) triggers, the just-typed
@@ -1449,6 +1526,12 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 					_HSE_TerminalOwner["TrailingText"] .= Char
 					_HSE_TerminalOwner["TrailingChars"].Push(Char)
 				}
+				_PrefixAppendTypedChar(Char)
+				return
+			}
+			; Raw visible halves belong in both buffers, never in user-code,
+			; fallback, preview or dispatch decisions before scalar completion.
+			if _TextCompleteTailScalar(HSE_Buffer) == "" && Char != "" {
 				_PrefixAppendTypedChar(Char)
 				return
 			}
@@ -1661,6 +1744,8 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		AltGrHeld := _PrefixAltGrMasksCtrl(KS_IsDown("RAlt"), KS_IsDown("SC138"))
 		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
 			return
+		if ResetVKs.Has(VK) || (!_PrefixIsModifierVK(VK) && _PrefixShortcutModifierHeld())
+			_PrefixRevokeIncompleteFragments()
 		; An arrow key is an arrow under any modifier: it belongs to
 		; hotstrings.arrow_resets_word, in the ResetVKs branch below.
 		IsArrow := (VK >= 0x25 and VK <= 0x28)
@@ -1752,7 +1837,7 @@ _PrefixWordTail(Buf) {
 	while Position > 0 {
 		Start := _TextCodepointStart(Buf, Position)
 		Ch := SubStr(Buf, Start, Position - Start + 1)
-		if InStr(Boundaries, Ch)
+		if _TextCompleteTailScalar(Ch) != "" && InStr(Boundaries, Ch)
 			break
 		Tail := Ch . Tail
 		Position := Start - 1
@@ -1842,10 +1927,18 @@ _PrefixFeedBackspace() {
 ; replacement that was never typed.
 _PrefixAppendTypedChar(Char) {
 	global _PrefixBuffer, _MAX_BUFFER_LEN
+	NextBuffer := _TextTailWithinUnits(_PrefixBuffer . Char, _MAX_BUFFER_LEN)
+	CompletedScalar := _TextCompleteTailScalar(NextBuffer)
+	if CompletedScalar == "" && NextBuffer != "" {
+		_PrefixSetBuffer(NextBuffer)
+		_PrefixCancelRender()
+		_PrefixDismissStaleSuggestion("IncompleteScalar")
+		return
+	}
 	; A callback chunk is already visible in full. Derive its final word
 	; once rather than dispatching edits between virtual character steps.
-	if StrLen(Char) > 1 {
-		Tail := _PrefixWordTail(_PrefixBuffer . Char)
+	if StrLen(Char) > 1 || StrLen(CompletedScalar) > 1 {
+		Tail := _PrefixWordTail(NextBuffer)
 		if Tail == "" {
 			_ResetPrefixBuffer(false)
 		} else {
@@ -1859,7 +1952,7 @@ _PrefixAppendTypedChar(Char) {
 	; live trigger prefix. HSE_Buffer deliberately keeps the terminator (triggers
 	; may contain one as a non-final char); the preview only tracks the current
 	; word, so it starts fresh here.
-	if InStr(_PrefixWordBoundaries(), Char) {
+	if CompletedScalar != "" && InStr(_PrefixWordBoundaries(), CompletedScalar) {
 		_ResetPrefixBuffer(false)
 		; The boundary itself may be the body of a boundary-leading star trigger
 		; (for example " ★"). HSE_Buffer retains it, so ask the canonical oracle
@@ -1871,7 +1964,7 @@ _PrefixAppendTypedChar(Char) {
 	; invalidate it synchronously through TooltipHide's Win32-only fast teardown;
 	; the replacement remains debounced, so GUI/UIA work never moves onto OnChar.
 	_PrefixDismissStaleSuggestion("PrefixChanged")
-	NextPrefixBuffer := _TextTailWithinUnits(_PrefixBuffer . Char, _MAX_BUFFER_LEN)
+	NextPrefixBuffer := NextBuffer
 	_PrefixSetBuffer(NextPrefixBuffer)
 	if LoggerIsDebugEnabled()
 		LoggerDebug("PrefixWatcher", "Render scheduled: buffer_units={1}.", _PrefixLogSafe(_PrefixBuffer))
@@ -2549,6 +2642,10 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 		Critical(PreviousCritical)
 	}
 	Len := StrLen(PrefixSnapshot)
+	; A flush already dispatched before the high unit can take its snapshot
+	; after that unit. Timer cancellation alone cannot revoke this invocation.
+	if Len > 0 && _TextCompleteTailScalar(PrefixSnapshot) == ""
+		return false
 	; This render is scheduled by the post-fire buffer sync, so it prints the
 	; resolved replacement without the user typing anything further — the one
 	; DEBUG site that fires on the expansion itself rather than on a keystroke.

@@ -132,6 +132,57 @@ _LLM_Bridge_ClearBuffer() {
 	return _LLM_Bridge_ApplyBufferEdit()
 }
 
+/** Reports incomplete text retained by either bridge-owned context. */
+LLM_Bridge_HasIncompleteInput() {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer
+	return (_LLM_Bridge_Buffer != "" && _TextCompleteTailScalar(_LLM_Bridge_Buffer) == "")
+		|| (_LLM_Bridge_AgentBuffer != "" && _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == "")
+}
+
+; Retire derived work without notifying an observer with invalid UTF-16.
+_LLM_Bridge_InvalidateIncompleteTyping(InvalidatePrediction := true) {
+	global _LLM_Bridge_Active, _LLM_Engine
+	LLM_Bridge_CancelPrefixObserver()
+	if InvalidatePrediction && _LLM_Bridge_Active {
+		LLM_Engine_CancelTimer()
+		_LLM_Engine["request_id"] := _LLM_Engine.Get("request_id", 0) + 1
+		_LLM_Engine["active_request_signature"] := ""
+	}
+	if IsSet(LLM_Agent_InvalidateTyping)
+		LLM_Agent_InvalidateTyping()
+}
+
+; A new unrelated character cannot make an abandoned half valid retroactively.
+_LLM_Bridge_PrepareInput(Char) {
+	if !LLM_Bridge_HasIncompleteInput() || Char == ""
+		return
+	First := NumGet(StrPtr(Char), 0, "UShort")
+	if !(First >= 0xDC00 && First <= 0xDFFF)
+		LLM_Bridge_DiscardIncompleteInput()
+}
+
+/** Discards only incomplete contexts when their input owner is revoked. */
+LLM_Bridge_DiscardIncompleteInput() {
+	global _LLM_Bridge_Buffer, _LLM_Bridge_AgentBuffer
+	PreviousCritical := Critical("On")
+	try {
+		IncompletePrediction := _LLM_Bridge_Buffer != ""
+			&& _TextCompleteTailScalar(_LLM_Bridge_Buffer) == ""
+		IncompleteAgent := _LLM_Bridge_AgentBuffer != ""
+			&& _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == ""
+		if !IncompletePrediction && !IncompleteAgent
+			return false
+		if IncompletePrediction
+			_LLM_Bridge_ClearBuffer()
+		if IncompleteAgent
+			_LLM_Bridge_AgentBuffer := ""
+		_LLM_Bridge_InvalidateIncompleteTyping()
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 ; Pure admission policy for a deferred LLM output. Maps keep the test seam
 ; readable while every production field remains mandatory and strictly typed.
 ; The three epochs are complementary: physical input catches mouse/chords,
@@ -1011,7 +1062,12 @@ _LLM_Bridge_UnregisterDispatcherFallback() {
 ; which left this path as the only unattributed candidate. Two QPC reads, and the
 ; line is gated by the profiler floor so ordinary typing logs nothing.
 _LLM_Bridge_OnDispatcherChar(ih, ch) {
-	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
+	if A_IsSuspended || (IsSet(_PrefixInputHook) && _PrefixInputHook)
+		return
+	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
+		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
+		return
+	if _PrefixPrepareScalarContext(ch) < 0
 		return
 	_hpLlmChar := HotPath_Now()
 	LLM_Bridge_OnChar(ch)
@@ -1019,8 +1075,14 @@ _LLM_Bridge_OnDispatcherChar(ih, ch) {
 }
 
 _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
-	if (IsSet(_PrefixInputHook) && _PrefixInputHook)
+	if A_IsSuspended || (IsSet(_PrefixInputHook) && _PrefixInputHook)
 		return
+	if !IsObject(ih) || !IsObject(HookDispatcher._ih)
+		|| ObjPtr(ih) != ObjPtr(HookDispatcher._ih)
+		return
+	if vk != 0x08 && ((vk >= 0x21 && vk <= 0x28) || vk == 0x2D || vk == 0x2E
+		|| vk == 0x09 || vk == 0x0D || vk == 0x1B)
+		_PrefixRevokeIncompleteFragments()
 	LLM_Bridge_FeedKeyDownIfActive(vk)
 }
 
@@ -1078,6 +1140,8 @@ LLM_Bridge_OnPrefixWatcherReady() {
  * @param {string} ch - Character from the prefix InputHook.
  */
 LLM_Bridge_FeedCharIfActive(ch) {
+	if A_IsSuspended
+		return false
 	if (IsSet(_LLM_Bridge_Active) && _LLM_Bridge_Active)
 		LLM_Bridge_OnChar(ch)
 	else
@@ -1094,9 +1158,10 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		AgentWantedFn := unset) {
 	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _LLM_Bridge_AgentBuffer
 	global _LLM_Bridge_PrefixObserver, _LLM_Engine, _LLM_Bridge_ReadLiveFocus
-	global _PrefixDeferredGeneration
+	global _PrefixDeferredGeneration, _LLM_Bridge_Buffer
 	if !A_IsCritical
 		throw Error("Prefix character mirroring requires a serialized input transaction.")
+	_LLM_Bridge_PrepareInput(ch)
 	Active := _LLM_Bridge_Active
 	if Active {
 		_LLM_Bridge_ApplyBufferEdit(0, ch)
@@ -1115,7 +1180,15 @@ LLM_Bridge_FeedCharForPrefix(ch, ScheduleFn := TimerSetCallback, FocusFn := unse
 		}
 		LLM_Bridge_MirrorAgentEdit(0, ch)
 	}
-	return _LLM_Bridge_SchedulePrefixObserver(ch,
+	Buffer := Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+	if Buffer != "" && _TextCompleteTailScalar(Buffer) == "" {
+		_LLM_Bridge_InvalidateIncompleteTyping(false)
+		return false
+	}
+	ObservedChar := ch
+	if StrLen(ch) == 1 && StrLen(_TextCompleteTailScalar(Buffer)) == 2
+		ObservedChar := _TextCompleteTailScalar(Buffer)
+	return _LLM_Bridge_SchedulePrefixObserver(ObservedChar,
 		ScheduleFn, IsSet(FocusFn) ? FocusFn : _LLM_Bridge_ReadLiveFocus)
 }
 
@@ -1176,6 +1249,9 @@ _LLM_Bridge_RunPrefixObserver(Owner) {
 		; Read the canonical buffer after any expansion, never the original trigger.
 		ContentGeneration := _LLM_Bridge_ContentGeneration
 		CurrentFn := _LLM_Bridge_PrefixObserverStillCurrent.Bind(Owner, ContentGeneration)
+		Buffer := Owner.Active ? _LLM_Bridge_Buffer : _LLM_Bridge_AgentBuffer
+		if Buffer != "" && _TextCompleteTailScalar(Buffer) == ""
+			return false
 		if Owner.Active {
 			LLM_Engine_CancelInflight(CurrentFn)
 			if !CurrentFn.Call()
@@ -1337,16 +1413,33 @@ _LLM_Bridge_DeferredTooltipHide(ExpectedRecord, accepted) {
  */
 LLM_Bridge_OnChar(ch) {
 	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
-	if !_LLM_Bridge_Active
+	if !_LLM_Bridge_Active || A_IsSuspended
 		return
 
-	_LLM_Bridge_ApplyBufferEdit(0, ch)
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_Bridge_PrepareInput(ch)
+		_LLM_Bridge_ApplyBufferEdit(0, ch)
+		if _TextCompleteTailScalar(_LLM_Bridge_Buffer) == "" && _LLM_Bridge_Buffer != "" {
+			_LLM_Bridge_InvalidateIncompleteTyping()
+			return false
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
 	return _LLM_Bridge_NotifyChar(ch, _LLM_Bridge_Buffer)
 }
 
 _LLM_Bridge_NotifyChar(ch, Buffer, PublishGuard := unset) {
 	if IsSet(PublishGuard) && !PublishGuard.Call()
 		return false
+	if Buffer != "" {
+		CompletedScalar := _TextCompleteTailScalar(Buffer)
+		if CompletedScalar == ""
+			return false
+		if StrLen(ch) == 1 && StrLen(CompletedScalar) == 2
+			ch := CompletedScalar
+	}
 	; The AI agent's automatic mode waits for a pause in the same typing, and
 	; every keystroke retires its flow in flight, hotstring tooltip or not
 	if IsSet(LLM_Agent_OnTyping)
@@ -1468,7 +1561,12 @@ _LLM_Bridge_ObserveAgentTyping(DeleteFromEnd, InsertedText) {
 	global _LLM_BRIDGE_AGENT_FEED_ERROR_THROTTLE_MS
 	if !_LLM_Bridge_AgentFeedIsWanted()
 		return false
+	_LLM_Bridge_PrepareInput(InsertedText)
 	LLM_Bridge_MirrorAgentEdit(DeleteFromEnd, InsertedText)
+	if _LLM_Bridge_AgentBuffer != "" && _TextCompleteTailScalar(_LLM_Bridge_AgentBuffer) == "" {
+		_LLM_Bridge_InvalidateIncompleteTyping(false)
+		return false
+	}
 	try {
 		LLM_Agent_OnTyping(_LLM_Bridge_AgentBuffer)
 	} catch as Err {
