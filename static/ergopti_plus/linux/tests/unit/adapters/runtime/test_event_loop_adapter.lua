@@ -728,3 +728,29 @@ helpers.describe("linux-pump-periodic-wall-clock", function()
 		helpers.assert_eq(ticks, 0)
 	end)
 end)
+
+helpers.describe("linux-pump-periodic-finite-admission", function()
+	for _, value in ipairs({ 0 / 0, math.huge, -math.huge, 1e308 }) do
+		helpers.it("linux-pump-periodic-finite-admission: refuses " .. tostring(value) .. " before pumping", function()
+			local loop = load_pump_loop()
+			local idles, ticks = 0, 0
+			local ok, err = pcall(loop.run, { periodSec = value,
+				onIdle = function() idles = idles + 1; if idles > 3 then loop.stop() end end,
+				onPeriodic = function() ticks = ticks + 1 end })
+			helpers.assert_eq(ok, false, "a nonfinite period must not tick every iteration or never")
+			helpers.assert_contains(tostring(err), "must be finite")
+			helpers.assert_eq(idles, 0)
+			helpers.assert_eq(ticks, 0)
+			helpers.assert_eq(loop.isRunning(), false)
+			local healthy = 0
+			loop.run({ periodSec = 0.001, onPeriodic = function() healthy = healthy + 1; loop.stop() end })
+			helpers.assert_eq(healthy, 1, "a refused period leaves the loop reusable")
+		end)
+	end
+	helpers.it("linux-pump-periodic-finite-admission: an idle-only loop ignores an unused period", function()
+		local loop = load_pump_loop()
+		local idles = 0
+		loop.run({ periodSec = 0 / 0, onIdle = function() idles = idles + 1; loop.stop() end })
+		helpers.assert_eq(idles, 1)
+	end)
+end)

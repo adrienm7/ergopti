@@ -165,6 +165,22 @@ local function _cleanup_luv()
 	end
 end
 
+--- Admits a periodic duration in both units before either loop allocates.
+--- libuv bindings can turn nonfinite values into a dormant huge timer or an
+--- unintended 1 ms repeat; the pump would tick on every iteration or never.
+--- @param periodSec number Resolved duration in seconds.
+--- @return number milliseconds Finite, not yet clamped.
+local function _periodic_ms(periodSec)
+	if not NumberPolicy.is_finite(periodSec) then
+		error("Event loop periodic duration must be finite", 0)
+	end
+	local milliseconds = periodSec * 1000
+	if not NumberPolicy.is_finite(milliseconds) then
+		error("Event loop periodic milliseconds must be finite", 0)
+	end
+	return milliseconds
+end
+
 --- Starts a native luv event loop with idle + periodic callbacks.
 --- @param opts table { onIdle = function, onPeriodic = function, periodSec = number }
 local function _run_luv(opts)
@@ -172,18 +188,7 @@ local function _run_luv(opts)
 	local onPeriodic = opts.onPeriodic
 	local periodSec  = tonumber(opts.periodSec) or 0.25
 	local periodMs
-	if onPeriodic then
-		-- Admit both units before clamping: libuv bindings can turn nonfinite
-		-- values into a dormant huge timer or an unintended 1 ms repeat.
-		if not NumberPolicy.is_finite(periodSec) then
-			error("Event loop periodic duration must be finite", 0)
-		end
-		periodMs = periodSec * 1000
-		if not NumberPolicy.is_finite(periodMs) then
-			error("Event loop periodic milliseconds must be finite", 0)
-		end
-		periodMs = math.max(1, math.floor(periodMs))
-	end
+	if onPeriodic then periodMs = math.max(1, math.floor(_periodic_ms(periodSec))) end
 
 	-- Idle handle: fires whenever the event loop has nothing else to do.
 	-- This replaces the tight while loop for keyboard-hook + tray pumping.
@@ -250,14 +255,14 @@ local function _run_pump(opts)
 	-- tick slipped by as much as the callbacks blocked. Without luv the wall
 	-- clock counts whole seconds; its resolution is subtracted so a second
 	-- boundary crossed a millisecond after the last tick cannot fire early.
-	local period_ms = periodSec * 1000
+	local period_ms = onPeriodic and _periodic_ms(periodSec) or 0
 	local last_tick = Monotonic.now_ms()
 	local iteration = 0
 
 	-- Iteration-based cadence for the coarse wall clock: a tiny test value
 	-- (0.001 s) fires on the very first idle tick while the default (0.25 s)
 	-- fires every ~250 ticks at ~1 ms each — proportional to the interval.
-	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(periodSec * 1000))
+	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(period_ms))
 
 	while _running do
 		_safe_idle(onIdle)
