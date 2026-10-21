@@ -13,7 +13,7 @@ global _MVSP := {Phase: "initialization", Root: _MAD_Root, Profile: "", Gui: 0, 
 	View: 0, Sender: 0, HostSubscription: 0, ObserverSubscription: 0, BrowserHandle: 0,
 	BrowserPid: 0, BrowserRetired: false, ProfileRetired: false, Closed: false}
 global _MAD := {Failure: 0, Closed: false, Actors: Map(), Hwnds: [], Messages: [], NativeFrames: [],
-	Inputs: 0, Pickers: 0, Action: "", WorkerRole: false, AssetHashes: Map()}
+	Inputs: 0, Pickers: 0, ButtonReceipts: [], Action: "", WorkerRole: false, AssetHashes: Map()}
 OnError(_MAD_InitializationError, 0)
 OnError(_MAD_Error)
 OnExit(_MAD_Close)
@@ -194,7 +194,7 @@ _MAD_Act() {
 				Button := Control
 			}
 		_MVSP_Require(IsObject(Button), "The actual owned surface has no OK button.")
-		ControlClick(Button.Hwnd, "ahk_id " . Hwnd)
+		_MAD.ButtonReceipts.Push(_TestClickOwnedNativeButton(NativeGui, Button.Hwnd))
 	} catch as Failure {
 		_MAD_Error(Failure)
 	}
@@ -378,7 +378,9 @@ _MAD_Main() {
 		_MAD.Receipt := Map("source_sha256", _MAD.SourceHash, "runtime_sha256", _MAD.RuntimeHash,
 			"host_pid", DllCall("GetCurrentProcessId", "UInt"), "messages", Counts, "real_prompts", _MAD.Inputs,
 			"real_pickers", _MAD.Pickers, "real_workers", _MAD.WorkerReceipts.Length, "worker_receipts", _MAD.WorkerReceipts, "assets", _MAD.AssetHashes, "native_frames", _MAD.NativeFrames,
-			"worker_substituted", false, "scope", "native DOM-dialog-store-worker integration, not resident boot E2E")
+			"worker_substituted", false, "button_transport", "semantic-native-bm-click",
+			"native_button_receipts", _MAD.ButtonReceipts,
+			"scope", "native DOM-dialog-store-worker integration, not resident boot E2E")
 	} catch as Failure {
 		Primary := Failure
 	}

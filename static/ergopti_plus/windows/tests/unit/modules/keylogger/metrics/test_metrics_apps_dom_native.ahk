@@ -28,6 +28,9 @@ _MAD_Source(Root) {
 		. 'global _VendorDir := _MAD_DriverDir . "\vendor"' . "`n"
 	for Vendor in ["ComVar.ahk", "Promise.ahk", "WebView2.ahk"]
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
+	ButtonHelper := _DriverDir . "\tests\fixtures\native_owned_button.ahk"
+	AssertTrue(FSStrictExists(ButtonHelper), "the standalone child must include its actual native button transport")
+	Source .= "#Include " . ButtonHelper . "`n"
 	Seen := Map()
 	for Symbol in ["LocaleTableData", "WindowTitle", "LoggerTrace", "WallClockTimestamp", "Redact_Apply", "JsonParse",
 		"FSReadStrict", "CryptoSha256Bytes", "WebView_WatchProfile", "ConfigTransitionNormalizeConfigDir",
@@ -114,6 +117,12 @@ _MAD_Native() {
 		}
 		AssertEqual(1, Receipt["real_pickers"])
 		AssertEqual(4, Receipt["real_prompts"])
+		AssertEqual("semantic-native-bm-click", Receipt["button_transport"])
+		AssertEqual(5, Receipt["native_button_receipts"].Length)
+		for ButtonReceipt in Receipt["native_button_receipts"] {
+			AssertEqual("semantic-native-bm-click", ButtonReceipt["transport"])
+			AssertEqual(1, ButtonReceipt["send_ack"], "send acknowledgement alone does not replace the dialog/store/DOM assertions")
+		}
 		AssertEqual("", State.ErrorText)
 	} catch as Failure {
 		Primary := Failure
