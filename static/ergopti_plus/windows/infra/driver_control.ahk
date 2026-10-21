@@ -446,7 +446,8 @@ DriverControl_Start() {
 /** Retires the local reload control. */
 DriverControl_Stop() {
 	global _DriverControl
-	if !IsObject(_DriverControl)
+	; 0 until a session owns the control, so this is the init guard.
+	if !_DriverControl
 		return
 	_DriverControl.Stop()
 	_DriverControl := 0
