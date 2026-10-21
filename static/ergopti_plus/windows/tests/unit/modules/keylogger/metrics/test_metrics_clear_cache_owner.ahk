@@ -4,8 +4,9 @@
 ; MODULE: Metrics Cache Reset Message Owner Tests
 ; DESCRIPTION:
 ; A real purge diagnostic may replace its dashboard or pause the driver. The
-; resumed message must preserve the successor's actual scheduler job. Only the
-; external worker process is passive; cache reset, files, logger and dispatch run.
+; resumed message must preserve the successor's actual scheduler job. An
+; admitted paused reset retains its recovery debt. Only the external worker
+; process is passive; cache reset, files, logger and dispatch run.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -124,6 +125,8 @@ _MWCP_Check(World) {
 		AssertTrue(KLRCache.last_sizes == World.ReaderSizes)
 		AssertEqual(0, World.Handles.Length)
 		AssertEqual(0, KLPFWorker.jobs.Count)
+		AssertFalse(World.Entry.Has("pending_full_build_retry"),
+			"a message refused before cache deletion cannot create a recovery debt")
 		AssertEqual(World.Mode == "wrong-sender" ? 0 : 1, World.SourceReads)
 		AssertEqual(World.Mode == "paused" ? 1 : 0, World.PayloadReads)
 		return
@@ -155,10 +158,23 @@ _MWCP_Check(World) {
 		AssertEqual(0, World.Handles[1].Terminations)
 	} else {
 		AssertTrue(A_IsSuspended, "the real purge sink must have paused the driver")
-		AssertFalse(World.Entry.Has("pending_full_build_retry"),
-			"a revoked purge cannot deliver a canceled terminal that queues another build on resume")
-		AssertEqual(0, World.Handles.Length)
+		AssertTrue(KLWV.windows["typing"] == World.Entry)
+		AssertTrue(World.Entry["webview"] == World.View)
+		AssertEqual(0, World.Handles.Length, "the admitted reset must not spawn while paused")
 		AssertEqual(0, KLPFWorker.jobs.Count)
+		AssertTrue(World.Entry.Has("pending_full_build_retry"),
+			"a paused reset that already removed its caches must retain a resumable operation")
+		Pending := World.Entry["pending_full_build_retry"]
+		AssertTrue(Pending is Map)
+		AssertEqual(82, Pending["epoch"])
+		AssertEqual(0, Pending["attempt"], "pause must not consume the reset's retry budget")
+		RetryOwner := Pending["owner"]
+		AssertTrue(RetryOwner is Map)
+		AssertTrue(World.Entry["full_build_retry_owner"] == RetryOwner)
+		AssertEqual(0, RetryOwner["revision"])
+		AssertEqual(0, RetryOwner["attempt"])
+		AssertEqual(RetryOwner["revision"], World.Entry["full_build_retry_revision"])
+		AssertFalse(World.Entry.Get("full_build_retry_exhausted", false))
 	}
 }
 
