@@ -530,7 +530,7 @@ _MKTB_ChildSource() {
 		}
 		AssertEqual(1, Found, "the actual suite must name one complete data owner: " . Basename)
 	}
-	for Symbol in ["HotPath_Now", "_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned", "HotstringsTerminatorRestore"] {
+	for Symbol in ["HotPath_Now", "UnescapeTomlString", "_FeatureBuildSinglePlan", "MasterGateState", "_TextCodepointLength", "HSE_Register", "ModifyMagicKey", "SIHO_StartOwned", "HotstringsTerminatorRestore"] {
 		Owner := _DriverProductionFileForSymbol(Symbol, Symbol == "HotstringsTerminatorRestore" ? _SharedDir : _DriverDir)
 		AssertTrue(Owner != "", "the real round-trip dependency requires its unique owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
@@ -572,6 +572,24 @@ _MKTB_WriterProfilerGraph() {
 }
 Test("Magic-key terminator child: actual writer retains its native profiler (magic-terminator-writer-graph)",
 	_MKTB_WriterProfilerGraph)
+
+_MKTB_OverrideDecoderGraph() {
+	Caller := _DriverFuncBody("_ParseGlobalKey")
+	AssertTrue(Caller != "", "the admitted historical override reader must remain genuine")
+	AssertTrue(InStr(Caller, "UnescapeTomlString(", true) > 0,
+		"the regression must cover the real override reader's decoder")
+	Owner := _DriverProductionFileForSymbol("UnescapeTomlString")
+	AssertTrue(Owner != "", "the override decoder requires its actual complete owner")
+	Code := _MKTB_ChildSource()
+	StrReplace(Code, "#Include " . Owner . "`n", "", true, &Count)
+	AssertEqual(1, Count, "the generated child must import the whole native TOML loader once")
+	AssertEqual("★§¤¤", UnescapeTomlString('★\u00A7¤¤'),
+		"the actual decoder must preserve historical order and duplicate scalar intent")
+	AssertEqual(Chr(0x1F600), UnescapeTomlString('\U0001F600'),
+		"the actual shared codec must decode a complete supplementary scalar")
+}
+Test("Magic-key terminator child: historical overrides retain their actual TOML decoder (magic-terminator-override-graph)",
+	_MKTB_OverrideDecoderGraph)
 
 _MKTB_Complete(State, Code, Output, ErrorText) {
 	State.Code := Code, State.Output := Output, State.ErrorText := ErrorText, State.Calls += 1
