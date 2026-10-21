@@ -1140,11 +1140,14 @@ local function main()
 
 		-- A pause longer than hotstrings.idle_reset_seconds ends the word: the
 		-- buffered text was typed before it and this key starts a new one, so a
-		-- word-start hotstring fires again instead of reading stale context.
+		-- word-start hotstring fires again instead of reading stale context. An
+		-- empty buffer at a word start has nothing to forget and keeps the empty
+		-- line a terminal Enter left (reset_after_pause).
 		if WordReset.observe_key(now_ms) then
 			_last_offered = nil
-			engine:reset()
-			Logger.debug(LOG, "Idle pause — the next key starts a new word.")
+			if engine:reset_after_pause() then
+				Logger.debug(LOG, "Idle pause — the next key starts a new word.")
+			end
 		end
 
 		-- Detect current app for per-app keylogger stats. Read from the
@@ -1221,6 +1224,9 @@ local function main()
 		-- Ordinary and single-field dynamic expansions share the admitted field.
 		-- Tabs between explicitly configured fields keep their separate protocol.
 		if result and not destination then result = nil end
+		-- A bare Enter in a terminal submitted the line: the next prompt is
+		-- empty, and a Backspace there deletes nothing (word_reset rule 7).
+		if not result then WordReset.apply_typed_newline(engine, ch, app_id) end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1629,8 +1635,9 @@ local function main()
 		-- A Backspace under Ctrl, Alt or Super deletes a word (or undoes, in some
 		-- applications): how much text went is unknown. It must neither undo an
 		-- expansion, whose erase count assumes one character went, nor edit the
-		-- buffer by one character; it restarts the buffer at a position that is
-		-- not known to start a word, as Windows and macOS do.
+		-- buffer by one character; it restarts the buffer, at a word start for
+		-- Ctrl+Backspace (the caret is where the deleted word began) and at an
+		-- unknown position otherwise, as Windows and macOS do.
 		local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
 		local one_character = key_name == "backspace" and not (mods.ctrl or mods.alt or mods.meta)
 
@@ -1673,14 +1680,15 @@ local function main()
 		-- Backspace edits the buffer as it edited the text. An arrow and a
 		-- shortcut follow hotstrings.arrow_resets_word, shortcut_resets_word or,
 		-- for a chord a tap-hold produced, tap_hold_resets_word: a new word when
-		-- on, the word kept when off. Every other control key (and a
-		-- word-deleting Backspace) moves the caret by an unknown amount, so what
-		-- follows is not known to start a word; Escape leaves it where it was.
+		-- on, the word kept when off. Ctrl+Backspace always starts a word. Every
+		-- other control key (Alt+Backspace included) moves the caret by an
+		-- unknown amount, so what follows is not known to start a word; Escape
+		-- leaves it where it was.
 		local effect = "edited"
 		if one_character then
 			engine:backspace()
 		else
-			effect = WordReset.apply_control(engine, key_name, detail)
+			effect = WordReset.apply_control(engine, key_name, detail, _cached_app_id)
 		end
 		-- Withdraw any LLM prediction on Backspace or Escape. Withdraw, not
 		-- cancel: the buffer was just edited above, and cancel resets it.

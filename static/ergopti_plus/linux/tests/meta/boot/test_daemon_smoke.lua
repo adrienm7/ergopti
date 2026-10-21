@@ -133,7 +133,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
       -- Control keys reset through the word-reset owner; the undo restore resets
       -- at an unknown word start (unknown-context-resets).
-      helpers.assert_true(control_body:find("WordReset.apply_control(engine, key_name, detail)", 1, true) ~= nil,
+      helpers.assert_true(control_body:find("WordReset.apply_control(engine, key_name, detail, _cached_app_id)", 1, true) ~= nil,
         "control keys must reset text and its aligned timing history")
       helpers.assert_true(control_body:find("engine:reset(false)", 1, true) ~= nil,
         "the undo restore must reset text at an unknown word start")

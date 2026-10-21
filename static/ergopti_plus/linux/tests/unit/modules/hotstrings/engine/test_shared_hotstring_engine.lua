@@ -820,3 +820,81 @@ helpers.describe("shared hotstring engine — atomic catalogue publication", fun
 		helpers.assert_eq(match(engine, "old"), "old-result", "restored old mapping really executes")
 	end)
 end)
+
+helpers.describe("shared hotstring engine — erasing what was typed starts a word (bs-word-start)", function()
+
+	local function type_into(e, text)
+		local result
+		for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do result = e:on_char(ch) end
+		return result
+	end
+
+	local function word_start_engine()
+		local e = engine_mod.new()
+		e:load_mappings({
+			{ auto_expand = true, is_word = true, trigger = "c★", replacement = "c’est" },
+			{ auto_expand = true, is_word = true, trigger = "j★", replacement = "j’ai" },
+			{ auto_expand = true, is_word = true, trigger = "ct★", replacement = "c’était" },
+		})
+		return e
+	end
+
+	helpers.it("bs-word-start: the Backspace that erases every typed letter puts the caret at a word start", function()
+		for _, probe in ipairs({ "c★", "C★", "j★", "J★", "ct★", "Ct★" }) do
+			local e = word_start_engine()
+			e:reset(false)
+			type_into(e, "ab")
+			e:backspace()
+			e:backspace()
+			local result = type_into(e, probe)
+			helpers.assert_true(result ~= nil, probe .. " must expand after « ab » was erased")
+		end
+	end)
+
+	helpers.it("bs-word-start: a correction keeps the word open", function()
+		local e = word_start_engine()
+		type_into(e, "ab")
+		e:backspace()
+		helpers.assert_nil(type_into(e, "c★"), "« ac★ » is inside a word")
+	end)
+
+	helpers.it("bs-word-start: a Backspace past the typed letters makes the start unknown again", function()
+		local e = word_start_engine()
+		type_into(e, "ab")
+		e:backspace()
+		e:backspace()
+		e:backspace()
+		helpers.assert_nil(type_into(e, "c★"), "the third Backspace deleted text the engine never saw")
+	end)
+
+	helpers.it("bs-word-start: at the start of an empty line a Backspace deletes nothing", function()
+		local e = word_start_engine()
+		e:reset(true, true)
+		type_into(e, "c★")
+		for _ = 1, 6 do e:backspace() end
+		helpers.assert_true(type_into(e, "C★") ~= nil,
+			"six Backspaces over « c’est » at an empty prompt keep the word start (ledger of 2026-10-21)")
+		local plain = word_start_engine()
+		plain:reset(true)
+		plain:backspace()
+		helpers.assert_nil(type_into(plain, "c★"), "an ordinary word start promises no empty line")
+		local unknown = word_start_engine()
+		unknown:reset(false, true)
+		unknown:backspace()
+		helpers.assert_nil(type_into(unknown, "c★"), "no line start without a known boundary")
+	end)
+
+	helpers.it("bs-word-start: a pause keeps the empty line and forgets a typed word", function()
+		local e = word_start_engine()
+		e:reset(true, true)
+		helpers.assert_eq(e:reset_after_pause(), false, "an empty buffer at a word start has nothing to forget")
+		e:backspace()
+		helpers.assert_true(type_into(e, "c★") ~= nil, "the empty line survived the pause")
+		local typed = word_start_engine()
+		typed:reset(true, true)
+		type_into(typed, "ab")
+		helpers.assert_eq(typed:reset_after_pause(), true, "a typed word is forgotten")
+		typed:backspace()
+		helpers.assert_nil(type_into(typed, "c★"), "the forgotten word still sits left of the caret")
+	end)
+end)
