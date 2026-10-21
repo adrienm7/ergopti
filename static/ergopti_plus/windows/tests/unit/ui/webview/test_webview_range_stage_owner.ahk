@@ -95,3 +95,5 @@ for Mode in ["consume", "stale-ack", "stale-native", "invalid", "wrong-sender", 
 #Include ../../modules/keylogger/metrics/test_metrics_message_owner.ahk
 
 #Include test_webview_core_identity.ahk
+
+#Include ../../modules/keylogger/metrics/test_metrics_clear_cache_owner.ahk
