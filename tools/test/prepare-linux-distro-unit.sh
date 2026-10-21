@@ -99,9 +99,11 @@ print("Native ordinary-user fixture writes: 2 directories admitted")
 # a private TMPDIR and HOME: the whole suite in one process held every archive
 # cell for about four minutes. A shared HOME let one group's writes to the
 # user's ~/.config/ergopti_plus reach another group's fixture that proves its
-# parent bootstrap stays untouched. Logs print whole, in group order, under one
-# header each, so the workflow diagnostic still reads one runner summary per
-# group.
+# parent bootstrap stays untouched. openSUSE's sudo session adds pam_env's
+# XDG_*_HOME defaults (aaa_base xdg.conf) from the ACCOUNT home, which outrank
+# HOME, so they are removed too or every group shares one ~/.config again.
+# Logs print whole, in group order, under one header each, so the workflow
+# diagnostic still reads one runner summary per group.
 mapfile -t unit_groups < <("$interpreter" -e 'for _, group in ipairs(dofile("tests/support/module_groups.lua").GROUPS) do print(group.name) end')
 test "${#unit_groups[@]}" -gt 0
 unit_logs="$(mktemp -d "$native_root/logs.XXXXXXXX")"
@@ -111,6 +113,7 @@ for unit_group in "${unit_groups[@]}"; do
 	group_home="$(mktemp -d "$native_root/home-$unit_group.XXXXXXXX")"
 	chown ergopti-ci "$group_tmp" "$group_home"
 	sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
+		-u XDG_CONFIG_HOME -u XDG_DATA_HOME -u XDG_CACHE_HOME -u XDG_STATE_HOME \
 		LUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" HOME="$group_home" "$interpreter" tests/run.lua --module="$unit_group" \
 		>"$unit_logs/$unit_group.log" 2>&1 &
 	unit_pids+=("$!")
