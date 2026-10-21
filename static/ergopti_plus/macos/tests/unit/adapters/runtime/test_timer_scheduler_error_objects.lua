@@ -58,9 +58,9 @@ helpers.describe("TimerScheduler: a hostile error object stays inside the guard 
 		local TS, timer_stub, logs = load_scheduler()
 		local calls = {}
 		TS.every(1, function() error(hostile_error(calls)) end)
-		helpers.assert_true(pcall(timer_stub.fire, 1), "the first tick must stay contained")
-		helpers.assert_true(pcall(timer_stub.fire, 1), "the second tick must stay contained")
-		helpers.assert_eq(#logs, 2)
+		local ticks = { (pcall(timer_stub.fire, 1)), (pcall(timer_stub.fire, 1)) }
+		helpers.assert_eq(ticks, { true, true }, "each tick's failure must stay inside the guard")
+		helpers.assert_eq(#logs, 2, "each contained failure must still be reported")
 	end)
 
 	helpers.it("delivers every settlement observer after one raises a hostile object", function()
@@ -69,8 +69,9 @@ helpers.describe("TimerScheduler: a hostile error object stays inside the guard 
 		local delivered = {}
 		TS.onSettled(handle, function() error(hostile_error({})) end)
 		TS.onSettled(handle, function() delivered[#delivered + 1] = "second" end)
-		helpers.assert_true(pcall(timer_stub.fire, 1), "settlement must stay contained")
-		helpers.assert_eq(delivered, { "second" }, "a failing observer must not drop its successors")
+		local contained = pcall(timer_stub.fire, 1)
+		helpers.assert_eq({ contained, delivered }, { true, { "second" } },
+			"a failing observer must neither escape nor drop its successors")
 	end)
 
 	helpers.it("keeps primitive failure text", function()
