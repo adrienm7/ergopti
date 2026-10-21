@@ -34,10 +34,28 @@
 ; =======================================================
 ; =======================================================
 
+; Windows path APIs, and the AHK built-ins over them, read a caller String
+; only up to its first NUL code unit: "a.txt" NUL "x" names a.txt, so a refused
+; delete removed that prefix file and a refused read returned its bytes. Every
+; entry below admits a path through this check before any native call.
+; @param Path {Any} Caller value.
+; @return {Boolean} True only for a non-empty String without a NUL code unit.
+FSPathIsAdmissible(Path) {
+	return Path is String && Path != "" && !RegExMatch(Path, "\x00")
+}
+
+; Strict entries refuse an inadmissible path with an exception, as they do for
+; every other native failure; the message never repeats the refused bytes.
+_FSRequirePath(Path, Operation) {
+	if !FSPathIsAdmissible(Path)
+		throw ValueError(Operation . " requires a non-empty path without NUL.")
+}
+
 ; Reads UTF-8 text using AHK's BOM handling and preserves native read failures.
 ; @param Path {String} File path.
 ; @return {String} Text contents; throws when the read fails.
 FSReadStrict(Path) {
+	_FSRequirePath(Path, "A strict read")
 	return FileRead(Path, "UTF-8")
 }
 
@@ -45,6 +63,7 @@ FSReadStrict(Path) {
 ; @param Path {String} File path.
 ; @return {Buffer} The bytes; throws when the read fails.
 FSReadBytesStrict(Path) {
+	_FSRequirePath(Path, "A strict byte read")
 	return FileRead(Path, "RAW")
 }
 
@@ -54,6 +73,7 @@ FSReadBytesStrict(Path) {
 ; @param Encoding {String} Optional encoding; omission retains the native default.
 ; @return {File|0} Native file result; native exceptions remain visible.
 FSOpenStrict(Path, Flags, Encoding := unset) {
+	_FSRequirePath(Path, "A strict open")
 	if IsSet(Encoding)
 		return FileOpen(Path, Flags, Encoding)
 	return FileOpen(Path, Flags)
@@ -63,7 +83,7 @@ FSOpenStrict(Path, Flags, Encoding := unset) {
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.
 FSRead(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	try {
 		local FH := FileOpen(Path, "r", "UTF-8-RAW")
@@ -95,7 +115,7 @@ FSWrite(Path, Content, OpenFn := 0, DeleteFn := 0, WriteFn := 0) {
 ; deletion of the partial artifact. OpenFn/DeleteFn make the short-write boundary
 ; deterministic in tests without weakening the public FileSystem port.
 _FSWriteComplete(Path, Content, OpenFn, DeleteFn, WriteFn := 0) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	if !(Content is String)
 		Content := ""
@@ -135,7 +155,7 @@ FSWriteDurable(Path, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn 
 }
 
 _FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn, WriteFn := 0) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	if !(Content is String)
 		Content := ""
@@ -172,7 +192,7 @@ _FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn, WriteFn := 0) 
 ; FileSystem port. A failed partial creation is removed only when this call
 ; actually created it; a collision is byte-preserving.
 FSWriteCreateDurable(Path, Content) {
-	if !(Path is String) or Path = "" or !(Content is String)
+	if !FSPathIsAdmissible(Path) or !(Content is String)
 		return 0
 	static GENERIC_WRITE := 0x40000000
 	static CREATE_NEW := 1
@@ -250,7 +270,7 @@ FSAppend(Path, Content) {
 ; Unlike an overwrite stage, a partially appended user file cannot be safely
 ; deleted or rolled back, so callers must receive failure and retain ownership.
 _FSAppendComplete(Path, Content, OpenFn, WriteFn := 0) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	if !(Content is String)
 		Content := ""
@@ -299,7 +319,7 @@ _FSNativeWrite(Handle, Bytes, ByteCount, &Written) {
 ; @param Path {String} Absolute path to test.
 ; @return {Boolean} True on success, false on error.
 FSExists(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	; FileExist returns a non-empty attribute string on match, "" on miss
 	return FileExist(Path) != "" ? true : false
@@ -309,8 +329,8 @@ FSExists(Path) {
 ; not-found statuses mean absence; access, device, or filesystem errors throw
 ; so recovery never mistakes "could not inspect" for "does not exist".
 FSStrictExists(Path) {
-	if !(Path is String) or Path = ""
-		throw ValueError("A strict existence probe requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A strict existence probe requires a non-empty path without NUL.")
 	Attributes := DllCall("kernel32\GetFileAttributesW", "Str", Path, "UInt")
 	if (Attributes != 0xFFFFFFFF)
 		return 1
@@ -368,7 +388,7 @@ FSListDirectoryStrict(Path, Directories := false) {
  * @throws {Error|OSError} Missing directories or incomplete native resolution.
  */
 FSResolveDirectoryPath(Path) {
-	if Path == "" || InStr(Path, "*") || InStr(Path, "?")
+	if !FSPathIsAdmissible(Path) || InStr(Path, "*") || InStr(Path, "?")
 		throw Error("Startup working directory cannot be resolved")
 	if !DirExist(Path)
 		throw Error("Startup working directory does not exist")
@@ -398,8 +418,8 @@ FSResolveDirectoryPath(Path) {
 ; @return {Boolean} True only after native exclusive creation succeeds.
 ; @throws {ValueError|OSError} Invalid paths and all native failures are explicit.
 FSCreateDirectoryExclusiveStrict(Path) {
-	if !(Path is String) || Path == ""
-		throw ValueError("Exclusive directory creation requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("Exclusive directory creation requires a non-empty path without NUL.")
 	Created := DllCall("kernel32\CreateDirectoryW", "WStr", Path, "Ptr", 0, "Int")
 	ErrorCode := A_LastError
 	if !Created
@@ -412,8 +432,8 @@ FSCreateDirectoryExclusiveStrict(Path) {
 ; @return {Boolean} True when it was created, false when it already existed.
 ; @throws {Error} When it cannot be created.
 FSEnsureDirectoryStrict(Path) {
-	if !(Path is String) || Path == ""
-		throw ValueError("A directory creation requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A directory creation requires a non-empty path without NUL.")
 	if DirExist(Path)
 		return false
 	DirCreate(Path)
@@ -436,7 +456,7 @@ _FSDeleteNativeReceipt(Path) {
 }
 
 _FSDeleteWith(Path, DeleteFn) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	try {
 		Receipt := DeleteFn.Call(Path)
@@ -458,6 +478,8 @@ _FSDeleteWith(Path, DeleteFn) {
 ; The callback must return true only for an artifact owned by its caller.
 ; Sharing/identity failures retain the file for a later retry.
 FSDeleteVerified(Path, VerifyFn) {
+	if !FSPathIsAdmissible(Path)
+		return false
 	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
 		"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x00200000, "Ptr", 0, "Ptr")
 	if Handle = -1
@@ -498,8 +520,8 @@ FSDeleteVerified(Path, VerifyFn) {
 ; @param Path {String} Guard path in an existing owned directory.
 ; @returns {Integer} Owned handle, or 0 when unavailable or not an ordinary file.
 FSOpenExclusiveGuard(Path) {
-	if !(Path is String) || Path = ""
-		throw ValueError("An exclusive guard requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("An exclusive guard requires a non-empty path without NUL.")
 	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0xC0000000,
 		"UInt", 0, "Ptr", 0, "UInt", 4, "UInt", 0x00200080, "Ptr", 0, "Ptr")
 	if Handle = -1
@@ -524,8 +546,8 @@ FSCloseExclusiveGuard(Handle) {
 ; does not route through FileExist (whose empty result conflates absence with
 ; an OS probe failure). Non-absence failures are surfaced to the journal.
 FSDeleteStrict(Path) {
-	if !(Path is String) or Path = ""
-		throw ValueError("A strict delete requires a non-empty path.")
+	if !FSPathIsAdmissible(Path)
+		throw ValueError("A strict delete requires a non-empty path without NUL.")
 	Receipt := _FSDeleteNativeReceipt(Path)
 	if Receipt["deleted"]
 		return 1
@@ -540,7 +562,7 @@ FSDeleteStrict(Path) {
 ; Kept outside the portable port map for transactional file protocols that must
 ; validate an artifact without exposing AHK FileGetSize to domain modules.
 FSSize(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return -1
 	try return FileGetSize(Path)
 	catch
@@ -551,7 +573,7 @@ FSSize(Path) {
 ; This prevents a malformed sidecar from turning an early-boot capability check
 ; into an unbounded allocation.
 FSReadBounded(Path, MaxBytes) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		or !IsNumber(MaxBytes) or MaxBytes <= 0
 		return false
 	FH := 0
@@ -602,7 +624,7 @@ FSReadUtf8ExactBounded(Path, MaxBytes) {
 }
 
 _FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {
-	if !(Path is String) || Path == ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	static GENERIC_READ := 0x80000000
 	static FILE_SHARE_READ := 0x00000001
@@ -709,8 +731,8 @@ FSAtomicTempOwnerIsGone(FileName, TargetName) {
 ; native information on invalid arguments or a DllCall exception.
 FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
 	NativeError := 0
-	if !(Source is String) or Source = ""
-		or !(Destination is String) or Destination = ""
+	if !FSPathIsAdmissible(Source)
+		or !FSPathIsAdmissible(Destination)
 		return false
 	static MOVEFILE_REPLACE_EXISTING := 0x00000001
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
@@ -731,8 +753,8 @@ FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
 ; MOVEFILE_REPLACE_EXISTING makes the directory-entry operation atomic and
 ; collision-preserving; WRITE_THROUGH makes the rename a durable boundary.
 FSAtomicMoveCreate(Source, Destination) {
-	if !(Source is String) or Source = ""
-		or !(Destination is String) or Destination = ""
+	if !FSPathIsAdmissible(Source)
+		or !FSPathIsAdmissible(Destination)
 		return 0
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
 	try return DllCall("kernel32\MoveFileExW", "Str", Source,
@@ -744,7 +766,7 @@ FSAtomicMoveCreate(Source, Destination) {
 ; Atomically replaces Destination with Source when both are on the same volume.
 ; Kept in the adapter so domain modules never call FileMove directly.
 FSMove(Source, Destination, Overwrite := false) {
-        if !(Source is String) or Source = "" or !(Destination is String) or Destination = ""
+        if !FSPathIsAdmissible(Source) or !FSPathIsAdmissible(Destination)
                 return false
         try {
                 FileMove(Source, Destination, Overwrite)
@@ -756,6 +778,7 @@ FSMove(Source, Destination, Overwrite := false) {
 
 /** Open a BOM-aware UTF-8 reader; native refusal reaches the identity owner. */
 FSOpenReadStrict(Path) {
+	_FSRequirePath(Path, "A strict reader")
 	return FileOpen(Path, "r", "UTF-8")
 }
 
@@ -769,7 +792,7 @@ FSOpenReadStrict(Path) {
 ; @param Path {String} Absolute path to the file.
 ; @return {Object|String} An AHK file object, or "" on any error.
 FSOpenRead(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return ""
 	try {
 		local FH := FileOpen(Path, "r", "UTF-8-RAW")
@@ -784,7 +807,7 @@ FSOpenRead(Path) {
 ; @param Path {String} Absolute path to the file.
 ; @return {Object|String} An AHK file object, or "" on any error.
 FSOpenWrite(Path) {
-	if !(Path is String) or Path = ""
+	if !FSPathIsAdmissible(Path)
 		return ""
 	try {
 		local FH := FileOpen(Path, "w", "UTF-8-RAW")
@@ -843,6 +866,8 @@ FSBufferMove(Destination, Source, ByteCount) {
 ; @param BlankNul {Boolean} Whether to replace every NUL byte with a space.
 ; @return {Map} ok, buffer, snapshot (FSHandleSnapshot), nul_bytes.
 FSReadRange(Path, Start, Count, BlankNul := false) {
+	if !FSPathIsAdmissible(Path)
+		return Map("ok", false)
 	local Buf := Buffer(Max(Count, 1), 0)
 	local FH := FileOpen(Path, "r")
 	if !IsObject(FH)
@@ -876,7 +901,7 @@ FSReadRange(Path, Start, Count, BlankNul := false) {
 ; @return {Boolean} True only for a complete, verified copy; a mismatched copy
 ;   is removed.
 FSCopyCreateVerified(Source, Destination) {
-	if !(Source is String) || Source == "" || !(Destination is String) || Destination == ""
+	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
 		return false
 	try FileCopy(Source, Destination, false)
 	catch
@@ -892,6 +917,8 @@ FSCopyCreateVerified(Source, Destination) {
 ; @param PathB {String}
 ; @return {Boolean} False when either cannot be read.
 FSSameBytes(PathA, PathB) {
+	if !FSPathIsAdmissible(PathA) || !FSPathIsAdmissible(PathB)
+		return false
 	try {
 		A := FileRead(PathA, "RAW")
 		B := FileRead(PathB, "RAW")
@@ -911,7 +938,7 @@ FSSameBytes(PathA, PathB) {
 ; @param Destination {String} File replaced (or created).
 ; @return {Boolean}
 FSCopyReplaceAtomic(Source, Destination) {
-	if !(Source is String) || Source == "" || !(Destination is String) || Destination == ""
+	if !FSPathIsAdmissible(Source) || !FSPathIsAdmissible(Destination)
 		return false
 	Stage := Destination . ".ergopti-restore.tmp"
 	try FileCopy(Source, Stage, true)
@@ -928,7 +955,7 @@ FSCopyReplaceAtomic(Source, Destination) {
 ; @param Path {String}
 ; @return {Boolean}
 FSIsReparsePoint(Path) {
-	return InStr(FileExist(Path), "L") > 0
+	return FSPathIsAdmissible(Path) && InStr(FileExist(Path), "L") > 0
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
@@ -951,7 +978,7 @@ FSConfigReadUtf8Exact(Path, &NativeOpenError := 0) {
 	if OriginalRead != FSReadUtf8Exact || HandleRead != _FSReadUtf8ExactHandle
 			|| Enter != FileReadActivityEnter || Bind != FileReadActivityBind || Leave != FileReadActivityLeave
 		return false
-	if !(Path is String) || Path == ""
+	if !FSPathIsAdmissible(Path)
 		return false
 	static GENERIC_READ := 0x80000000
 	static FILE_SHARE_READ := 0x00000001
