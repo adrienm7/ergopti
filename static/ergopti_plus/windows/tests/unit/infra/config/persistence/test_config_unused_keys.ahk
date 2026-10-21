@@ -764,4 +764,132 @@ _CUK_ProtectedSourceHasNoCleanupOffer() {
 Test("config unused keys: protected schema refuses preview and startup offer (protected-schema-cleanup)",
 	_CUK_ProtectedSourceHasNoCleanupOffer)
 
+
+
+
+
+; ============================================
+; ============================================
+; ======= 5/ Semantic Source Spellings =======
+; ============================================
+; ============================================
+
+; Boot reads config.toml through the typed document, so a leaf it warns about
+; may be spelled as a root dotted key, an inline table member or a dotted key
+; inside a section. The cleanup once scanned a flat [section] key = value view:
+; it missed the first two spellings and offered the third under a literal
+; dotted name whose deletion changed nothing while reporting "removed".
+_CUK_WriteSemanticSubject(Dir, Body) {
+	Path := Dir . "\config.toml"
+	AssertEqual(1, FSWriteCreateDurable(Path, Body . "`n" . _CUK_CurrentMetadata()))
+	_CUK_AdmitCurrentSource(Path)
+	return Path
+}
+
+_CUK_RootDottedAndInlineLeavesAreOffered() {
+	Dir := _CUK_NewDir()
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		Path := _CUK_WriteSemanticSubject(Dir, "metrics.obsolete_metric = true`n"
+			. "layout = { ergopti_base = false, retired_flag = 1 } # kept comment`n")
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected)
+		AssertEqual(0, Rejected)
+		Warned := 0
+		for Line in Lines {
+			if InStr(Line, "[WARNING]") && InStr(Line, "unused configuration key")
+					&& InStr(Line, "[metrics].obsolete_metric") && InStr(Line, "[layout].retired_flag")
+				Warned += 1
+		}
+		AssertEqual(1, Warned, "control: boot warns about both semantic unknown leaves")
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		_CUK_AssertIds("layout.retired_flag=leaf|metrics.obsolete_metric=leaf", Scan["keys"])
+		AssertEqual("1", _CUK_RequireId(Scan["keys"], "layout.retired_flag=leaf")["value"])
+		AssertEqual("true", _CUK_RequireId(Scan["keys"], "metrics.obsolete_metric=leaf")["value"])
+		Source := FSReadUtf8Exact(Path)
+		Result := ConfigUnusedKeysRemove(Path, Scan["keys"], "20990101-000400", 0, 0, Source)
+		AssertEqual("removed", Result["status"])
+		AssertEqual(Source, FSReadUtf8Exact(Result["backup"]))
+		After := FSReadUtf8Exact(Path)
+		Doc := TOML_ParseDocument(After)
+		AssertFalse(Doc["layout"].Has("retired_flag"))
+		AssertFalse(Doc.Has("metrics") && Doc["metrics"].Has("obsolete_metric"))
+		AssertEqual(false, Doc["layout"]["ergopti_base"].Value, "the known inline sibling survives")
+		AssertTrue(InStr(After, "# kept comment") > 0, "the unrelated comment survives the cleanup")
+		AssertEqual(0, ConfigUnusedKeysFind(Path)["keys"].Length, "a second scan finds nothing left")
+	} finally {
+		LoggerClearTestSink()
+		DirDelete(Dir, true)
+	}
+}
+Test("config unused keys: root dotted and inline leaves warned by boot are offered and removed "
+	. "(config-unused-keys-semantic-shapes)", _CUK_RootDottedAndInlineLeavesAreOffered)
+
+_CUK_InlineFeatureChildrenAreOffered() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteSemanticSubject(Dir, "[hotstrings]`n"
+			. 'autocorrection = { names = { enabled = "yes" }, caps = { enabled = false } }' . "`n")
+		Target := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Target, Path, &Rejected, , &Outdated)
+		AssertEqual(0, Rejected)
+		AssertTrue(Outdated.Has("hotstrings.autocorrection.names`nenabled"),
+			"control: boot classifies the inline child value as outdated")
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		_CUK_AssertIds("hotstrings.autocorrection.caps=leaf|hotstrings.autocorrection.names.enabled=leaf",
+			Scan["keys"])
+		AssertEqual('"yes"', _CUK_RequireId(Scan["keys"], "hotstrings.autocorrection.names.enabled=leaf")["value"])
+		Result := ConfigUnusedKeysRemove(Path, Scan["keys"], "20990101-000401")
+		AssertEqual("removed", Result["status"])
+		Doc := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertFalse(Doc["hotstrings"]["autocorrection"].Has("caps"))
+		AssertFalse(Doc["hotstrings"]["autocorrection"]["names"].Has("enabled"))
+		AssertEqual(0, ConfigUnusedKeysFind(Path)["keys"].Length)
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: inline feature children boot ignores are offered and removed "
+	. "(config-unused-keys-semantic-shapes)", _CUK_InlineFeatureChildrenAreOffered)
+
+_CUK_SectionDottedLeafIsReallyRemoved() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteSemanticSubject(Dir, "[metrics]`nenabled = true`nold.flag = true`n")
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		_CUK_AssertIds("metrics.old.flag=section", Scan["keys"])
+		AssertEqual("metrics.old", Scan["keys"][1]["section"], "the row names the semantic table, not a dotted key")
+		AssertEqual("flag", Scan["keys"][1]["key"])
+		Result :=ConfigUnusedKeysRemove(Path, Scan["keys"], "20990101-000402")
+		AssertEqual("removed", Result["status"])
+		Doc := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertFalse(Doc["metrics"].Has("old"), "a reported removal must change the source")
+		AssertEqual(true, Doc["metrics"]["enabled"].Value)
+		AssertEqual(0, ConfigUnusedKeysFind(Path)["keys"].Length)
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: a dotted leaf inside a section is offered by its real path and removed "
+	. "(config-unused-keys-semantic-shapes)", _CUK_SectionDottedLeafIsReallyRemoved)
+
+; A preview row that names no record of the current source cannot be removed;
+; reporting "removed" for an unchanged file hid the defect above.
+_CUK_AbsentPreviewPathIsNeverRemoved() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteSemanticSubject(Dir, "[metrics]`nenabled = true`n")
+		Source := FSReadUtf8Exact(Path)
+		Stamp := "20990101-000403"
+		Entry := Map("section", "metrics", "key", "absent_leaf", "kind", "leaf", "value", "1")
+		Result := ConfigUnusedKeysRemove(Path, [Entry], Stamp)
+		AssertEqual("changed", Result["status"])
+		AssertEqual(0, Result["removed"])
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		AssertFalse(FileExist(ConfigUnusedKeysBackupPath(Path, Stamp)), "nothing to remove needs no backup")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: a preview row absent from the source is never reported removed "
+	. "(config-unused-keys-semantic-shapes)", _CUK_AbsentPreviewPathIsNeverRemoved)
+
 #Include test_config_cleanup_refresh_lifecycle.ahk
