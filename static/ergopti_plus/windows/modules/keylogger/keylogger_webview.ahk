@@ -620,11 +620,23 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 	entry := KLWV.windows[which]
 	if !entry.Has("webview") || !(sender == entry["webview"])
 		return
-	if entry.Has("navigation_url") && !(args.Source == entry["navigation_url"])
-		return
+	View := entry["webview"]
+	HasNavigation := entry.Has("navigation_url")
+	NavigationUrl := HasNavigation ? entry["navigation_url"] : ""
+	if HasNavigation {
+		Source := args.Source
+		if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
+			return
+		if !(Source == NavigationUrl)
+			return
+	}
 		msg := ""
 		try msg := args.TryGetWebMessageAsString()
+		if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
+			return
 		_KLWV_LogBridgeReceipt(which, msg)
+		if !_KLWV_OwnsMessage(which, entry, Epoch, View, HasNavigation, NavigationUrl)
+			return
 		if (msg = "")
 				return
 		; Route by the action verb; owners of typed commands validate the full
@@ -703,6 +715,15 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
 								KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
 		}
+}
+
+; COM getters and diagnostic sinks can retire a page before dispatch resumes.
+; Keep this check RAM-only so admission itself cannot replace the captured owner.
+_KLWV_OwnsMessage(which, Entry, Epoch, View, HasNavigation, NavigationUrl) {
+	return _KLWV_OwnsDelivery(which, Entry, Epoch)
+		&& Entry.Get("webview", 0) == View
+		&& Entry.Has("navigation_url") == HasNavigation
+		&& (!HasNavigation || Entry["navigation_url"] == NavigationUrl)
 }
 
 ; Parse and validate the selected-range request emitted by metrics_typing/data.js.
