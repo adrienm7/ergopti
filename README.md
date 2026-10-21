@@ -411,8 +411,10 @@ every pull request into them, and on manual dispatch:
    its `evidence gate`; the Windows lane packages on a release run only. On a
    release run, each lane builds the files that will be published, checks
    those exact files, and uploads them.
-3. **Release** runs only when the plan says the run publishes and all three
-   lanes succeeded. It creates the tag and the GitHub release with every
+3. **Release** ([`ci-release.yml`](.github/workflows/ci-release.yml)), which
+   `ci.yml` calls once every lane has finished, first checks every lane result
+   against the plan. It publishes only when the plan says the run publishes and
+   every lane succeeded: it creates the tag and the GitHub release with every
    platform's files and an auto-generated changelog, then publishes the macOS
    Sparkle update feed.
 

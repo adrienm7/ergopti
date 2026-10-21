@@ -46,7 +46,7 @@ brew install --cask ergoptiplus@dev   # dev channel: every 0.0.0-dev.N prereleas
   preferences and caches.
 
 The release job (`Publish Homebrew cask` in
-[`ci.yml`](../../../.github/workflows/ci.yml)) renders the released channel's
+[`ci-release.yml`](../../../.github/workflows/ci-release.yml)) renders the released channel's
 cask with [`tools/build/homebrew-cask.cjs`](../../../tools/build/homebrew-cask.cjs)
 and pushes it to the tap. It needs the `HOMEBREW_TAP_TOKEN` repository secret:
 a fine-grained token with _Contents: read and write_ on

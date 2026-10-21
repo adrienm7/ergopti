@@ -679,7 +679,15 @@ function rootCallersMatch(callers) {
 }
 
 // Release requires all four lanes and the root's canonical publication plan.
-const callers = pipeline.calls();
+// ci.yml calls Release (ci-release.yml) apart from the four lanes.
+const RELEASE_REL = '.github/workflows/ci-release.yml';
+const publicationCalls = pipeline.calls().filter((call) => call.id === 'publication');
+check(
+	JSON.stringify(publicationCalls) ===
+		JSON.stringify([{ id: 'publication', uses: `./${RELEASE_REL}` }]),
+	`ci.yml must call Release once, as publication, got ${JSON.stringify(publicationCalls)}`
+);
+const callers = pipeline.calls().filter((call) => call.id !== 'publication');
 check(
 	rootCallersMatch(callers),
 	`ci.yml must call exactly Common and the three OS lanes, got ${JSON.stringify(callers)}`
@@ -704,7 +712,7 @@ check(
 	'release waits only on its complete publication admission'
 );
 check(
-	JSON.stringify(pipeline.needsOf(pipeline.job('publication-plan')).sort()) ===
+	JSON.stringify(pipeline.needsOf(pipeline.job('publication')).sort()) ===
 		JSON.stringify(['core', 'macos', 'windows', 'linux'].sort()),
 	'publication admission requires the four actual lane results'
 );
@@ -721,8 +729,8 @@ for (const needed of ['publication-plan']) {
 	);
 	// locate() throws when the needed job no longer exists under that id.
 	check(
-		pipeline.locate(needed).file === pipeline.ENTRY_REL,
-		`release's need \`${needed}\` must be a job of ${pipeline.ENTRY_REL}`
+		pipeline.locate(needed).file === RELEASE_REL,
+		`release's need \`${needed}\` must be a job of ${RELEASE_REL}`
 	);
 }
 // No status function: implicit success() requires Common and all three OSes.

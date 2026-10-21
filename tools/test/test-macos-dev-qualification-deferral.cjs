@@ -33,6 +33,8 @@ function guardedStep(role, text) {
 }
 const workflow = fullDefault.file('.github/workflows/ci-macos.yml');
 const caller = fullDefault.file('.github/workflows/ci.yml');
+// Release and its preflight run in ci-release.yml, called by ci.yml's publication job.
+const releaseWorkflow = fullDefault.file('.github/workflows/ci-release.yml');
 // Wrapper assertions inspect validated raw source, independently of full-branch projection.
 const rawWorkflow = fullDefault
 	.rawFiles()
@@ -618,11 +620,15 @@ function sourceProblems(pkg, mac, rootCaller) {
 			`ERGOPTI_DEV_RELEASE_${field}: \${{ inputs.${field.toLowerCase()} }}`,
 			'plan-env-' + field
 		);
-	const publicationJobs = pipeline.jobsOfText(rootCaller, '.github/workflows/ci.yml');
-	const preflight = publicationJobs.filter((job) => job.id === 'publication-plan');
-	const releaseJobs = publicationJobs.filter((job) => job.id === 'release');
+	const preflight = pipeline
+		.jobsOfText(rootCaller, '.github/workflows/ci.yml')
+		.filter((job) => job.id === 'publication');
+	const releaseJobs = pipeline
+		.jobsOfText(releaseWorkflow, '.github/workflows/ci-release.yml')
+		.filter((job) => job.id === 'release');
 	if (
 		preflight.length !== 1 ||
+		pipeline.field(preflight[0].body, 'uses') !== './.github/workflows/ci-release.yml' ||
 		JSON.stringify(pipeline.needsOf(preflight[0].body).sort()) !==
 			JSON.stringify(['core', 'macos', 'windows', 'linux'].sort())
 	)
@@ -662,7 +668,7 @@ function run({ includeLeafControls = true } = {}) {
 	// Lane declaration order may change the graph without changing release custody.
 	const publication = pipeline
 		.jobsOfText(caller, '.github/workflows/ci.yml')
-		.filter((job) => job.id === 'publication-plan');
+		.filter((job) => job.id === 'publication');
 	assert.equal(publication.length, 1, 'One actual publication prerequisite owner is required.');
 	const publicationNeeds = /^    needs:\n(?:      - [a-z][a-z0-9-]*\n)+/m.exec(publication[0].body);
 	assert.ok(publicationNeeds, 'The actual publication prerequisite block is required.');

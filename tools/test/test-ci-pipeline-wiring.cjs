@@ -184,6 +184,10 @@ const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
+// Release verifies every lane against the persisted plan, then publishes.
+const RELEASE_BOX = '.github/workflows/ci-release.yml';
+// ci.yml's caller of RELEASE_BOX: it alone needs the lanes and grants write.
+const PUBLICATION = 'publication';
 // The run graph's single root: the repository-wide checks, then the release
 // plan every lane and release read.
 const ROOT = 'validate';
@@ -575,15 +579,15 @@ const STEP_CONDITIONS = [
 		'Check hotstring TOML files are sorted and formatted',
 		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
 	],
-	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
+	[RELEASE_BOX, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
-		ENTRY,
+		RELEASE_BOX,
 		'release',
 		'Create draft release, verify assets and publish',
 		"steps.preflight.outputs.create_release == 'true'"
 	],
 	[
-		ENTRY,
+		RELEASE_BOX,
 		'release',
 		'Publish channel feed for Sparkle',
 		"steps.preflight.outputs.skip_feed != 'true'"
@@ -1397,7 +1401,7 @@ function planReferenceProblems(files) {
 			)
 				continue;
 			if (
-				file.rel === ENTRY &&
+				file.rel === RELEASE_BOX &&
 				owner?.id === 'release' &&
 				match[1] === 'publication-plan' &&
 				planOutputs.has(match[2])
@@ -1757,7 +1761,54 @@ function callerInputProblems(id, inputs) {
 	return problems;
 }
 
-const callers = pipeline.calls();
+// Release reads only the dispatch selection and the lane results, and its
+// publication secrets only on a push: the release job cannot run otherwise.
+const PUBLICATION_INPUTS = [
+	['os_lanes', "${{ inputs.os_lanes || 'all' }}"],
+	['lane_results', '${{ toJSON(needs) }}']
+];
+const PUBLICATION_SECRETS = [
+	'PAT_ERGOPTI',
+	'HOMEBREW_TAP_TOKEN',
+	'WINDOWS_SIGNING_CERTIFICATE_BASE64',
+	'WINDOWS_SIGNING_CERTIFICATE_PASSWORD',
+	'WINDOWS_SIGNER_SUBJECT'
+];
+/** Lists how the Release caller could leak a secret or forge the lane results. */
+function publicationCallerProblems(body) {
+	const problems = [];
+	const inputs = [...(mappingOf(body, 'with', PUBLICATION) ?? new Map())];
+	if (JSON.stringify(inputs) !== JSON.stringify(PUBLICATION_INPUTS))
+		problems.push(`${PUBLICATION} must pass exactly ${JSON.stringify(PUBLICATION_INPUTS)}`);
+	const secrets = [...(mappingOf(body, 'secrets', PUBLICATION) ?? new Map())];
+	const expected = PUBLICATION_SECRETS.map((key) => [
+		key,
+		`\${{ github.event_name == 'push' && secrets.${key} || '' }}`
+	]);
+	if (JSON.stringify(secrets) !== JSON.stringify(expected))
+		problems.push(`${PUBLICATION} must pass each publication secret on a push only`);
+	if (pipeline.field(body, 'if') !== MANUAL_VERDICT_IF)
+		problems.push(`${PUBLICATION} must run after every lane, whatever their results`);
+	return problems;
+}
+const publicationBody = pipeline.job(PUBLICATION);
+errors.push(...publicationCallerProblems(publicationBody));
+for (const [label, before, after] of [
+	['dropped lane results', '      lane_results: ${{ toJSON(needs) }}\n', ''],
+	['forged selection', "${{ inputs.os_lanes || 'all' }}", "'all'"],
+	[
+		'ungated token',
+		"PAT_ERGOPTI: ${{ github.event_name == 'push' && secrets.PAT_ERGOPTI || '' }}",
+		'PAT_ERGOPTI: ${{ secrets.PAT_ERGOPTI }}'
+	],
+	['skipped on a red lane', 'if: always() && !cancelled()', 'if: success()']
+]) {
+	const altered = publicationBody.replace(before, after);
+	assert.notEqual(altered, publicationBody, label);
+	assert.ok(publicationCallerProblems(altered).length > 0, label);
+}
+
+const callers = pipeline.calls().filter((call) => call.id !== PUBLICATION);
 if (callers.length !== 4)
 	errors.push(`ci.yml must call Common and the three OS lanes, found ${callers.length} call(s)`);
 let gatedSecrets = 0;
@@ -2989,14 +3040,16 @@ function checkCommonReceiptConsumer() {
 }
 checkCommonReceiptConsumer();
 
-// Release waits for every original job. The dispatch-only verdict cannot run
-// on a release push and is checked independently below.
+// Release waits for every original job: its caller in ci.yml must reach every
+// other job of ci.yml through needs, and inside ci-release.yml publication
+// waits for the preflight. The dispatch-only verdict cannot run on a release
+// push and is checked independently below.
 const topJobs = pipeline.jobs(ENTRY);
 const needsById = new Map(
 	topJobs.map((candidate) => [candidate.id, pipeline.needsOf(candidate.body)])
 );
 const awaited = new Set();
-const pending = [...(needsById.get('release') ?? [])];
+const pending = [...(needsById.get(PUBLICATION) ?? [])];
 while (pending.length > 0) {
 	const id = pending.pop();
 	if (awaited.has(id)) continue;
@@ -3004,10 +3057,16 @@ while (pending.length > 0) {
 	pending.push(...(needsById.get(id) ?? []));
 }
 for (const candidate of topJobs) {
-	if (candidate.id !== 'release' && !awaited.has(candidate.id)) {
+	if (candidate.id !== PUBLICATION && !awaited.has(candidate.id)) {
 		errors.push(`release can publish without waiting for ${candidate.id}`);
 	}
 }
+if (pipeline.field(pipeline.job(PUBLICATION), 'uses') !== `./${RELEASE_BOX}`)
+	errors.push(`${PUBLICATION} must call ${RELEASE_BOX}`);
+if (
+	JSON.stringify(pipeline.needsOf(pipeline.job('release'))) !== JSON.stringify(['publication-plan'])
+)
+	errors.push('release must wait for its publication preflight');
 
 // ============================================
 // ============================================
@@ -3072,7 +3131,9 @@ function graphProblems(files) {
 			`ci.yml must have exactly the formatter and release-plan roots, ${ROOT}, that needs nothing; got [${roots.join(', ')}]`
 		);
 	}
-	const lanes = topLevel.filter((candidate) => pipeline.field(candidate.body, 'uses') !== null);
+	const lanes = topLevel.filter(
+		(candidate) => pipeline.field(candidate.body, 'uses') !== null && candidate.id !== PUBLICATION
+	);
 	for (const lane of lanes) {
 		const needs = pipeline.needsOf(lane.body);
 		if (JSON.stringify(needs) !== JSON.stringify([ROOT, 'prepare-common'])) {
@@ -3081,39 +3142,45 @@ function graphProblems(files) {
 			);
 		}
 	}
-	const release = topLevel.find((candidate) => candidate.id === 'release');
+	const releaseEntry = files.find((entry) => entry.rel === RELEASE_BOX);
+	const releaseJobs = releaseEntry ? pipeline.jobsOfText(releaseEntry.text, RELEASE_BOX) : [];
+	const release = releaseJobs.find((candidate) => candidate.id === 'release');
 	const releaseNeeds = release ? [...pipeline.needsOf(release.body)].sort() : [];
 	const expectedRelease = ['publication-plan'];
 	if (JSON.stringify(releaseNeeds) !== JSON.stringify(expectedRelease)) {
 		problems.push(
-			`release must need exactly the root, Common and the three OS lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
+			`release must need exactly its publication preflight, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
 		);
 	}
-	const verdict = topLevel.find((candidate) => candidate.id === 'publication-plan');
+	const preflight = releaseJobs.find((candidate) => candidate.id === 'publication-plan');
+	if (!preflight || pipeline.needsOf(preflight.body).length !== 0) {
+		problems.push(`the publication preflight must be the entry of ${RELEASE_BOX}`);
+	}
+	if (
+		JSON.stringify(releaseJobs.map((job) => job.id)) !==
+		JSON.stringify(['publication-plan', 'release'])
+	) {
+		problems.push(`${RELEASE_BOX} must contain only the publication preflight and release`);
+	}
+	const verdict = topLevel.find((candidate) => candidate.id === PUBLICATION);
 	if (
 		!verdict ||
+		pipeline.field(verdict.body, 'uses') !== `./${RELEASE_BOX}` ||
 		JSON.stringify(pipeline.needsOf(verdict.body)) !==
 			JSON.stringify(['macos', 'windows', 'linux', 'core'])
 	) {
-		problems.push('the manual verdict must wait for the root, shared core and every OS result');
+		problems.push('the release caller must wait for the shared core and every OS result');
 	}
 	if (
-		topLevel.length !== 8 ||
+		topLevel.length !== 7 ||
 		topLevel.some(
 			(job) =>
-				![
-					'prepare-common',
-					'validate',
-					'core',
-					'macos',
-					'windows',
-					'linux',
-					'publication-plan',
-					'release'
-				].includes(job.id)
+				!['prepare-common', 'validate', 'core', 'macos', 'windows', 'linux', PUBLICATION].includes(
+					job.id
+				)
 		)
 	) {
-		problems.push('ci.yml must contain only the original jobs and the manual verdict');
+		problems.push('ci.yml must contain only the plan roots, the four lane callers and Release');
 	}
 	for (const rel of BOXES) {
 		const entry = files.find((candidate) => candidate.rel === rel);
@@ -3361,7 +3428,7 @@ for (const [what, rel, from, to] of [
 	],
 	[
 		'release that stops reading the plan from the root',
-		ENTRY,
+		RELEASE_BOX,
 		'    needs: [publication-plan]\n',
 		'    needs: [macos, windows, linux]\n'
 	],
@@ -3469,33 +3536,40 @@ for (const [what, rel, from, to] of [
  */
 function topJobProblems(files) {
 	const problems = [];
-	const jobs = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY);
+	const jobs = [ENTRY, RELEASE_BOX].flatMap((rel) => {
+		const entry = files.find((candidate) => candidate.rel === rel);
+		if (!entry) {
+			problems.push(`${rel} is not part of the pipeline`);
+			return [];
+		}
+		return pipeline.jobsOfText(entry.text, rel);
+	});
 	for (const candidate of jobs) {
 		const expected =
-			candidate.id === 'release'
+			candidate.file === RELEASE_BOX && candidate.id === 'release'
 				? RELEASE_IF
-				: candidate.id === 'publication-plan'
+				: candidate.file === ENTRY && candidate.id === PUBLICATION
 					? MANUAL_VERDICT_IF
-					: ['windows', 'macos', 'linux'].includes(candidate.id)
+					: candidate.file === ENTRY && ['windows', 'macos', 'linux'].includes(candidate.id)
 						? LANE_IF(candidate.id)
 						: null;
 		const condition = pipeline.field(candidate.body, 'if');
 		if (condition !== expected) {
 			problems.push(
 				expected === null
-					? `ci.yml job ${candidate.id} must set no job-level if (got: ${condition}): a skipped lane reads as green`
-					: `ci.yml job ${candidate.id} must keep exactly if: ${expected}, got: ${condition}`
+					? `${candidate.file} job ${candidate.id} must set no job-level if (got: ${condition}): a skipped lane reads as green`
+					: `${candidate.file} job ${candidate.id} must keep exactly if: ${expected}, got: ${condition}`
 			);
 		}
 		const forgiven = pipeline.field(candidate.body, 'continue-on-error');
 		if (forgiven !== null) {
 			problems.push(
-				`ci.yml job ${candidate.id} sets continue-on-error: ${forgiven}; its failure must fail the run`
+				`${candidate.file} job ${candidate.id} sets continue-on-error: ${forgiven}; its failure must fail the run`
 			);
 		}
 	}
-	if (!jobs.some((candidate) => candidate.id === 'release'))
-		problems.push('ci.yml has no release job');
+	if (!jobs.some((candidate) => candidate.file === RELEASE_BOX && candidate.id === 'release'))
+		problems.push(`${RELEASE_BOX} has no release job`);
 	return problems;
 }
 
@@ -3503,8 +3577,8 @@ function topJobProblems(files) {
  * Rejects permissions outside each exact role: three Common custody jobs, and
  * the macOS caller with its E2E stage (whose managed Ollama cells receive the
  * parallel clean build artifact) and its Build (which waits beside E2E for the
- * qualified native inputs), may read Actions evidence; release alone may write
- * repository contents.
+ * qualified native inputs), may read Actions evidence; release and its caller
+ * in ci.yml alone may write repository contents.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
@@ -3539,7 +3613,8 @@ function permissionProblems(files) {
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const value = pipeline.field(candidate.body, 'permissions');
 			const expected =
-				entry.rel === ENTRY && candidate.id === 'release'
+				(entry.rel === RELEASE_BOX && candidate.id === 'release') ||
+				(entry.rel === ENTRY && candidate.id === PUBLICATION)
 					? 'contents: write'
 					: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
 						? 'contents: read actions: read'
@@ -3579,14 +3654,25 @@ for (const [what, from, to] of [
 		'  windows:\n',
 		'  windows:\n    continue-on-error: true\n'
 	],
+	[
+		'continue-on-error on the Release caller',
+		`  ${PUBLICATION}:\n`,
+		`  ${PUBLICATION}:\n    continue-on-error: true\n`
+	],
+	['if: false on the Release caller', `    if: ${MANUAL_VERDICT_IF}\n`, '    if: false\n']
+]) {
+	mustCatch(what, ENTRY, from, to, topJobProblems);
+}
+for (const [what, from, to] of [
 	['continue-on-error on release', '  release:\n', '  release:\n    continue-on-error: true\n'],
 	[
 		'a status function in release.if',
 		`    if: ${RELEASE_IF}\n`,
 		`    if: \${{ always() && ${RELEASE_IF} }}\n`
-	]
+	],
+	['if: false on the preflight', '  publication-plan:\n', '  publication-plan:\n    if: false\n']
 ]) {
-	mustCatch(what, ENTRY, from, to, topJobProblems);
+	mustCatch(what, RELEASE_BOX, from, to, topJobProblems);
 }
 for (const [what, rel, from, to] of [
 	['missing token permissions', ENTRY, 'permissions:\n  contents: read\n', ''],
@@ -3607,6 +3693,18 @@ for (const [what, rel, from, to] of [
 		ENTRY,
 		"    name: 'macOS'\n",
 		"    name: 'macOS'\n    permissions:\n      contents: write\n"
+	],
+	[
+		'a write grant on the preflight',
+		RELEASE_BOX,
+		"    name: 'Verify all lanes and original plan'\n",
+		"    name: 'Verify all lanes and original plan'\n    permissions:\n      contents: write\n"
+	],
+	[
+		'write-all at the top of ci-release.yml',
+		RELEASE_BOX,
+		'permissions:\n  contents: read\n',
+		'permissions: write-all\n'
 	]
 ]) {
 	mustCatch(what, rel, from, to, permissionProblems);
@@ -4932,41 +5030,46 @@ function namingProblems(files) {
 								core: 'YAML, shared code & web',
 								macos: 'macOS',
 								windows: 'Windows',
-								linux: 'Linux'
+								linux: 'Linux',
+								[PUBLICATION]: 'Release'
 							}[candidate.id] === name
 						: {
 								'prepare-common': 'Check formatting and plan unit tests',
-								validate: 'Release plan',
-								'publication-plan': 'Release / Verify all lanes and original plan',
-								release: 'Release / Publish'
+								validate: 'Release plan'
 							}[candidate.id] === name
-					: entry.rel === COMMON_BOX
+					: entry.rel === RELEASE_BOX
 						? {
-								'shared-validation': 'Unit tests',
-								'common-unit-verdict': 'Verdict',
-								'common-e2e': 'E2E tests',
-								'common-build': 'Build',
-								'common-testbuild': 'Install and launch'
+								// Rendered as 'Release / <name>' under ci.yml's Release caller.
+								'publication-plan': 'Verify all lanes and original plan',
+								release: 'Publish'
 							}[candidate.id] === name
-						: {
-								'test-hs': 'Unit tests',
-								'test-ahk': 'Unit tests',
-								'test-linux': 'Unit tests',
-								'e2e-hs': 'E2E tests',
-								'e2e-ahk': 'E2E tests',
-								'e2e-linux': 'E2E tests',
-								// The macOS Build states the macOS version it runs on.
-								'package-macos': 'Build (macOS 26)',
-								'package-windows': 'Build',
-								'package-linux': 'Build',
-								'package-flatpak': 'Flatpak',
-								launch: 'Install and launch',
-								'launch-windows': 'Install and launch',
-								'install-linux': 'Install and launch',
-								'macos-ok': 'Verdict',
-								'windows-ok': 'Verdict',
-								'linux-ok': 'Verdict'
-							}[candidate.id] === name;
+						: entry.rel === COMMON_BOX
+							? {
+									'shared-validation': 'Unit tests',
+									'common-unit-verdict': 'Verdict',
+									'common-e2e': 'E2E tests',
+									'common-build': 'Build',
+									'common-testbuild': 'Install and launch'
+								}[candidate.id] === name
+							: {
+									'test-hs': 'Unit tests',
+									'test-ahk': 'Unit tests',
+									'test-linux': 'Unit tests',
+									'e2e-hs': 'E2E tests',
+									'e2e-ahk': 'E2E tests',
+									'e2e-linux': 'E2E tests',
+									// The macOS Build states the macOS version it runs on.
+									'package-macos': 'Build (macOS 26)',
+									'package-windows': 'Build',
+									'package-linux': 'Build',
+									'package-flatpak': 'Flatpak',
+									launch: 'Install and launch',
+									'launch-windows': 'Install and launch',
+									'install-linux': 'Install and launch',
+									'macos-ok': 'Verdict',
+									'windows-ok': 'Verdict',
+									'linux-ok': 'Verdict'
+								}[candidate.id] === name;
 			if (!valid)
 				problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
 			for (const found of pipeline.steps(candidate.body)) {
@@ -4975,6 +5078,7 @@ function namingProblems(files) {
 				}
 				if (
 					entry.rel !== ENTRY &&
+					entry.rel !== RELEASE_BOX &&
 					// A macOS version ("macOS 26") states the cell's OS release, not the lane zone.
 					/\b(?:macOS(?! \d)|Linux|Windows(?! Defender))\b/.test(found.name) &&
 					!isRetainedQualification(entry, candidate, found) &&
@@ -5042,6 +5146,8 @@ for (const [what, rel, from, to] of [
 		'  unknown-validation:\n'
 	],
 	['an unqualified root name', ENTRY, "name: 'Release plan'", "name: 'Validate'"],
+	['a doubled Release prefix', RELEASE_BOX, "name: 'Publish'", "name: 'Release / Publish'"],
+	['an incorrect Release caller name', ENTRY, "name: 'Release'", "name: 'Publish'"],
 	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
 	[
 		'a repeated lane prefix',
@@ -5694,7 +5800,13 @@ function manualLaneProblems(files) {
 	const text = files.find((entry) => entry.rel === ENTRY).text;
 	const jobs = pipeline.jobsOfText(text, ENTRY);
 	const root = jobs.find((job) => job.id === ROOT);
-	const verdict = jobs.find((job) => job.id === 'publication-plan');
+	const caller = jobs.find((job) => job.id === PUBLICATION);
+	const releaseEntry = files.find((entry) => entry.rel === RELEASE_BOX);
+	const verdict = releaseEntry
+		? pipeline
+				.jobsOfText(releaseEntry.text, RELEASE_BOX)
+				.find((job) => job.id === 'publication-plan')
+		: undefined;
 	const expectedInput = `  workflow_dispatch:
     inputs:
       os_lanes:
@@ -5757,13 +5869,21 @@ function manualLaneProblems(files) {
 		pipeline.stepField(check[0].body, 'run') !==
 			'node tools/ci/publication-plan.cjs receive publication-plan/ci-publication-plan.json' ||
 		pipeline.stepField(check[0].body, 'env') !==
-			"CI_OS_SELECTION: ${{ inputs.os_lanes || 'all' }} CI_JOB_RESULTS: ${{ toJSON(needs) }}"
+			'CI_OS_SELECTION: ${{ inputs.os_lanes }} CI_JOB_RESULTS: ${{ inputs.lane_results }}'
 	) {
 		problems.push(
 			'the manual verdict must pass the actual complete needs receipt to the same selector owner'
 		);
 	}
-	if (!verdict || pipeline.field(verdict.body, 'if') !== MANUAL_VERDICT_IF)
+	if (
+		!caller ||
+		!caller.body.includes("      os_lanes: ${{ inputs.os_lanes || 'all' }}\n") ||
+		!caller.body.includes('      lane_results: ${{ toJSON(needs) }}\n')
+	)
+		problems.push(
+			'the Release caller must forward the actual selection and complete needs receipt'
+		);
+	if (!caller || pipeline.field(caller.body, 'if') !== MANUAL_VERDICT_IF)
 		problems.push('manual verdict must run after failed or skipped dependencies only on dispatch');
 	return problems;
 }
@@ -5774,7 +5894,7 @@ for (const [from, to] of [
 	['          - windows+linux\n', '          - windows+macos+linux\n'],
 	['node tools/ci/manual-ci-lanes.cjs select', 'echo lane_windows=true'],
 	['CI_EVENT: ${{ github.event_name }}', 'CI_EVENT: workflow_dispatch'],
-	['CI_JOB_RESULTS: ${{ toJSON(needs) }}', 'CI_JOB_RESULTS: {}'],
+	['lane_results: ${{ toJSON(needs) }}', 'lane_results: {}'],
 	[`    if: ${MANUAL_VERDICT_IF}\n`, '    if: always()\n'],
 	["    if: needs.validate.outputs.lane_windows == 'true'\n", ''],
 	[

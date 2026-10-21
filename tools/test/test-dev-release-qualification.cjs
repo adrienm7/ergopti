@@ -472,16 +472,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 {
 	const pipeline = require('./ci-pipeline.cjs');
 	const workflows = {
-		'ci.yml': [
-			'prepare-common',
-			'validate',
-			'macos',
-			'windows',
-			'linux',
-			'core',
-			'publication-plan',
-			'release'
-		],
+		'ci.yml': ['prepare-common', 'validate', 'macos', 'windows', 'linux', 'core', 'publication'],
+		'ci-release.yml': ['publication-plan', 'release'],
 		'ci-common.yml': [
 			'shared-validation',
 			'common-e2e',
@@ -504,7 +496,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		macos: "needs.validate.outputs.lane_macos == 'true'",
 		windows: "needs.validate.outputs.lane_windows == 'true'",
 		linux: "needs.validate.outputs.lane_linux == 'true'",
-		'publication-plan': 'always() && !cancelled()',
+		publication: 'always() && !cancelled()',
 		release: "github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'",
 		'common-unit-verdict': 'always()',
 		'windows-ok': 'always()',
@@ -586,21 +578,30 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			)
 		);
 	}
-	assert.equal(jobs - 1, 28);
-	assert.equal(jobs, 29);
+	assert.equal(jobs - 1, 29);
+	assert.equal(jobs, 30);
 	assert(steps > 150, 'full step inventory cannot be vacuous');
 	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
 	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
-	const release = rootJobs.find((job) => job.id === 'release');
+	const releaseSource = fs.readFileSync(
+		path.join(ROOT, '.github/workflows/ci-release.yml'),
+		'utf8'
+	);
+	const releaseJobs = pipeline.jobsOfText(releaseSource, '.github/workflows/ci-release.yml');
+	const release = releaseJobs.find((job) => job.id === 'release');
 	assert(release, 'the real release owner is retained');
 	assert.equal(
 		pipeline.field(release.body, 'if'),
 		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
 	assert.deepEqual(pipeline.needsOf(release.body), ['publication-plan']);
-	const publicationPlan = rootJobs.find((job) => job.id === 'publication-plan');
+	const publicationPlan = releaseJobs.find((job) => job.id === 'publication-plan');
 	assert(publicationPlan, 'the ordinary source-bound publication preflight is retained');
-	assert.deepEqual(pipeline.needsOf(publicationPlan.body), ['macos', 'windows', 'linux', 'core']);
+	assert.deepEqual(pipeline.needsOf(publicationPlan.body), []);
+	const publication = rootJobs.find((job) => job.id === 'publication');
+	assert(publication, 'the caller of the publication preflight is retained');
+	assert.equal(pipeline.field(publication.body, 'uses'), './.github/workflows/ci-release.yml');
+	assert.deepEqual(pipeline.needsOf(publication.body), ['macos', 'windows', 'linux', 'core']);
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-retired-fast-cli-'));
 	try {
 		for (const event of ['push', 'pull_request', 'workflow_dispatch']) {
@@ -815,7 +816,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 
 // Both fresh clock and artifact guards must immediately precede each external channel push.
 {
-	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-release.yml'), 'utf8');
 	const guard = 'node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null';
 	const signatureGuard = 'node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null';
 	function requirePublicationGuard(source, push) {

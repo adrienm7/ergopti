@@ -273,7 +273,7 @@ passed++;
 // "linux-" prefix; only the AppImage must stay without it.
 for (const [relative, minimum] of [
 	['.github/workflows/ci-linux.yml', 2],
-	['.github/workflows/ci.yml', 3],
+	['.github/workflows/ci-release.yml', 3],
 	['src/lib/js/getGitHubRelease.js', 1],
 	['src/routes/ergopti-plus/Hero.svelte', 0],
 	['src/routes/ergopti-plus/Platforms.svelte', 0],

@@ -17,7 +17,7 @@
  * section started, so no viewer could reorder it.
  *
  * FEATURES & RATIONALE:
- * 1. Real CI body: the release-body step of .github/workflows/ci.yml is
+ * 1. Real CI body: the release-body step of .github/workflows/ci-release.yml is
  *    interpreted (heredocs, echo lines inside the body group, the changelog
  *    sed) instead of being copied into a fixture, so a workflow edit that drops
  *    or garbles a section marker fails here. An unrecognised statement throws
@@ -49,7 +49,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const CHANGELOG_UI = path.join(SHARED, 'ui', 'changelog');
 const CORPUS = path.join(SHARED, 'tests', 'corpus', 'updater');
-const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'ci.yml');
+const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'ci-release.yml');
 const BODY_STEP = 'Write release body with platform sections';
 const qualification = require('../ci/dev-release-qualification.cjs');
 const signing = require('../ci/windows-stable-signing.cjs');
@@ -124,7 +124,7 @@ const CHANGELOG_MD = [
 function releaseBodyScript() {
 	const lines = fs.readFileSync(WORKFLOW, 'utf8').replace(/\r\n?/g, '\n').split('\n');
 	const nameAt = lines.findIndex((line) => line.trim() === `- name: ${BODY_STEP}`);
-	if (nameAt === -1) throw new Error(`ci.yml has no "${BODY_STEP}" step`);
+	if (nameAt === -1) throw new Error(`ci-release.yml has no "${BODY_STEP}" step`);
 	const stepIndent = lines[nameAt].indexOf('-');
 	let runAt = -1;
 	for (let i = nameAt + 1; i < lines.length; i++) {

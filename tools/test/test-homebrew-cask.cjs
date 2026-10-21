@@ -43,7 +43,8 @@ const BUILD_SCRIPT = fs.readFileSync(
 	path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'),
 	'utf8'
 );
-const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+// Release (tag, feed, cask and notes) runs in ci-release.yml.
+const WORKFLOW = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci-release.yml'), 'utf8');
 const MACOS_README = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'README.md'),
 	'utf8'
@@ -160,7 +161,7 @@ check(
 		assert.ok(stable.text.includes(`url "${base}appcast-main.xml"`));
 		assert.ok(
 			WORKFLOW.includes(`branch="${Cask.APPCAST_BRANCH}"`),
-			'ci.yml publishes the appcasts on another branch'
+			'ci-release.yml publishes the appcasts on another branch'
 		);
 	}
 );
@@ -190,7 +191,7 @@ check(
 		const tap = WORKFLOW.match(
 			/TAP_REPOSITORY: \$\{\{ github\.repository_owner \}\}\/(homebrew-[a-z-]+)/
 		);
-		assert.ok(tap, 'ci.yml names no tap repository');
+		assert.ok(tap, 'ci-release.yml names no tap repository');
 		const owner = Cask.SOURCE_REPOSITORY.split('/')[0];
 		const shortTap = `${owner}/${tap[1].replace(/^homebrew-/, '')}`;
 		assert.ok(

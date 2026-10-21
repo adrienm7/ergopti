@@ -104,7 +104,12 @@ for (const file of [
 		selectGates([file]).has('macos-tooltip-canvas'),
 		`${file}: pure canvas controls must be selected`
 	);
-assert(selectGates(['.github/workflows/ci-macos.yml']).has('js'));
+for (const file of [
+	'.github/workflows/ci-macos.yml',
+	'.github/workflows/ci.yml',
+	'.github/workflows/ci-release.yml'
+])
+	assert(selectGates([file]).has('js'), `${file}: workflow contract tests run in test:js`);
 
 assert.equal(GATE_COMMANDS['linux-http-stream'].npm, 'test:linux:http-stream');
 for (const file of [

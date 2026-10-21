@@ -7,7 +7,7 @@
  * Every file the release notes advertise as a release asset must be a file some
  * build job actually uploads. The download tables and the upload lists live in
  * different workflows of the CI pipeline — the notes in the release job of
- * `.github/workflows/ci.yml`, the uploads in each OS box it calls — and nothing
+ * `.github/workflows/ci-release.yml`, the uploads in each OS box — and nothing
  * compared them.
  *
  * ROOT CAUSE ENCODED:

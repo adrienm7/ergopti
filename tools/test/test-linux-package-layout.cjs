@@ -704,7 +704,7 @@ if (!rpmArchMatch) {
 	const RPM_ASSET = `ErgoptiPlus-linux-${rpmArch}.rpm`;
 	for (const [rel, minimum] of [
 		['.github/workflows/ci-linux.yml', 4],
-		['.github/workflows/ci.yml', 3]
+		['.github/workflows/ci-release.yml', 3]
 	]) {
 		const text = read(rel);
 		const count = text.split(RPM_ASSET).length - 1;

@@ -252,7 +252,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
 		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
 	);
-	assert.equal(jobs, 29);
+	assert.equal(jobs, 30);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
@@ -658,9 +658,15 @@ check('release keeps real full predicates and implicit successful dependency adm
 		'github',
 		'return (' + expression.replaceAll('needs.publication-plan', "needs['publication-plan']") + ');'
 	);
+	// The preflight runs in ci-release.yml; ci.yml's publication caller owns
+	// its lane needs and its always-run predicate.
 	const preflight = Raw.job('publication-plan');
-	assert.equal(Raw.field(preflight, 'if'), 'always() && !cancelled()');
-	assert.deepEqual(Raw.needsOf(preflight), ['macos', 'windows', 'linux', 'core']);
+	const publication = Raw.job('publication');
+	assert.equal(Raw.field(preflight, 'if'), null);
+	assert.deepEqual(Raw.needsOf(preflight), []);
+	assert.equal(Raw.field(publication, 'if'), 'always() && !cancelled()');
+	assert.deepEqual(Raw.needsOf(publication), ['macos', 'windows', 'linux', 'core']);
+	assert.equal(Raw.field(publication, 'uses'), './.github/workflows/ci-release.yml');
 	assert.deepEqual(Raw.needsOf(Raw.job('release')), ['publication-plan']);
 	const names = ['validate', 'core', 'macos', 'windows', 'linux'];
 	let cases = 0;

@@ -179,9 +179,14 @@ try {
 	fs.rmSync(directory, { recursive: true, force: true });
 }
 
-/** Requires the actual scheduler and artifact channels before trusting a plan. */
+/**
+ * Requires the actual scheduler and artifact channels before trusting a plan:
+ * ci.yml validates and calls Release once every lane finished; ci-release.yml
+ * receives the lane results and the selection from that caller alone.
+ */
 function validateWorkflow(workflow) {
-	const jobs = workflow.jobs;
+	const jobs = workflow.root.jobs;
+	const releaseJobs = workflow.release.jobs;
 	const producer = jobs.validate.steps;
 	const createStep = producer.at(-2);
 	const upload = producer.at(-1);
@@ -216,29 +221,39 @@ function validateWorkflow(workflow) {
 	assert.equal(upload.with.overwrite, true);
 	for (const lane of ['core', 'windows', 'macos', 'linux'])
 		assert.deepEqual(jobs[lane].needs, ['validate', 'prepare-common']);
-	const preflight = jobs['publication-plan'];
-	assert.deepEqual(preflight.needs, ['macos', 'windows', 'linux', 'core']);
-	assert.equal(preflight.if, 'always() && !cancelled()');
+	const caller = jobs.publication;
+	assert.equal(caller.uses, './.github/workflows/ci-release.yml');
+	assert.deepEqual(caller.needs, ['macos', 'windows', 'linux', 'core']);
+	assert.equal(caller.if, 'always() && !cancelled()');
+	assert.deepEqual(caller.with, { os_lanes: selection, lane_results: '${{ toJSON(needs) }}' });
+	assert.deepEqual(Object.keys(releaseJobs), ['publication-plan', 'release']);
+	assert.deepEqual(Object.keys(workflow.release.on.workflow_call.inputs), [
+		'os_lanes',
+		'lane_results'
+	]);
+	const preflight = releaseJobs['publication-plan'];
+	assert.equal(preflight.needs, undefined);
+	assert.equal(preflight.if, undefined);
 	assert.ok(!preflight.permissions && !JSON.stringify(preflight).includes('secrets.'));
 	const download = preflight.steps.find((step) => step.uses === 'actions/download-artifact@v4');
 	assert.equal(download.with.name, upload.with.name);
 	assert.equal(download.with.path, 'publication-plan');
 	const receiveStep = preflight.steps.at(-1);
 	assert.equal(receiveStep.id, 'plan');
-	assert.equal(receiveStep.env.CI_JOB_RESULTS, '${{ toJSON(needs) }}');
-	assert.equal(receiveStep.env.CI_OS_SELECTION, selection);
+	assert.equal(receiveStep.env.CI_JOB_RESULTS, '${{ inputs.lane_results }}');
+	assert.equal(receiveStep.env.CI_OS_SELECTION, '${{ inputs.os_lanes }}');
 	assert.equal(
 		receiveStep.run,
 		'node tools/ci/publication-plan.cjs receive publication-plan/ci-publication-plan.json'
 	);
 	for (const key of FIELDS.filter((key) => !key.startsWith('lane_')))
 		assert.equal(preflight.outputs[key], '${{ steps.plan.outputs.' + key + ' }}');
-	assert.deepEqual(jobs.release.needs, ['publication-plan']);
+	assert.deepEqual(releaseJobs.release.needs, ['publication-plan']);
 	assert.equal(
-		jobs.release.if,
+		releaseJobs.release.if,
 		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
-	assert.ok(!JSON.stringify(jobs.release).includes('needs.validate.outputs.'));
+	assert.ok(!JSON.stringify(releaseJobs.release).includes('needs.validate.outputs.'));
 	for (const field of [
 		'tag',
 		'version',
@@ -248,43 +263,57 @@ function validateWorkflow(workflow) {
 		'linux_bundle',
 		'native_qualification_profile'
 	])
-		assert.ok(JSON.stringify(jobs.release).includes('needs.publication-plan.outputs.' + field));
+		assert.ok(
+			JSON.stringify(releaseJobs.release).includes('needs.publication-plan.outputs.' + field)
+		);
 }
-const workflow = YAML.parse(
-	fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci.yml'), 'utf8')
-);
+const readWorkflow = (file) =>
+	YAML.parse(fs.readFileSync(path.resolve(__dirname, '../../.github/workflows', file), 'utf8'));
+const workflow = { root: readWorkflow('ci.yml'), release: readWorkflow('ci-release.yml') };
 validateWorkflow(workflow);
 checks++;
 for (const mutate of [
 	(w) => {
-		w.jobs.validate.steps.pop();
+		w.root.jobs.validate.steps.pop();
 	},
 	(w) => {
-		w.jobs.validate.steps.at(-2).env.CI_PLAN_RELEASE = 'true';
+		w.root.jobs.validate.steps.at(-2).env.CI_PLAN_RELEASE = 'true';
 	},
 	(w) => {
-		w.jobs.validate.steps.at(-1).with.name = 'unbound';
+		w.root.jobs.validate.steps.at(-1).with.name = 'unbound';
 	},
 	(w) => {
-		w.jobs.core.needs = [];
+		w.root.jobs.core.needs = [];
 	},
 	(w) => {
-		w.jobs['publication-plan'].steps.at(-1).env.CI_JOB_RESULTS = '{}';
+		w.release.jobs['publication-plan'].steps.at(-1).env.CI_JOB_RESULTS = '{}';
 	},
 	(w) => {
-		w.jobs['publication-plan'].steps.at(-1).run = 'echo release=true >> "$GITHUB_OUTPUT"';
+		w.root.jobs.publication.with.lane_results = '{}';
 	},
 	(w) => {
-		w.jobs['publication-plan'].outputs.tag = '${{ inputs.tag }}';
+		w.root.jobs.publication.needs = ['macos', 'windows', 'linux'];
 	},
 	(w) => {
-		w.jobs.release.needs = ['validate'];
+		w.root.jobs.publication.if = 'success()';
 	},
 	(w) => {
-		w.jobs.release.if = 'always()';
+		w.release.jobs['publication-plan'].needs = ['release'];
 	},
 	(w) => {
-		w.jobs.release.env.ERGOPTI_DEV_RELEASE_TAG = '${{ needs.validate.outputs.tag }}';
+		w.release.jobs['publication-plan'].steps.at(-1).run = 'echo release=true >> "$GITHUB_OUTPUT"';
+	},
+	(w) => {
+		w.release.jobs['publication-plan'].outputs.tag = '${{ inputs.tag }}';
+	},
+	(w) => {
+		w.release.jobs.release.needs = ['validate'];
+	},
+	(w) => {
+		w.release.jobs.release.if = 'always()';
+	},
+	(w) => {
+		w.release.jobs.release.env.ERGOPTI_DEV_RELEASE_TAG = '${{ needs.validate.outputs.tag }}';
 	}
 ]) {
 	const changed = clone(workflow);
@@ -300,7 +329,7 @@ for (const lane of ['core', 'windows', 'macos', 'linux'])
 		['validate', 'prepare-common', 'core']
 	]) {
 		const changed = clone(workflow);
-		changed.jobs[lane].needs = needs;
+		changed.root.jobs[lane].needs = needs;
 		refuses(() => validateWorkflow(changed));
 	}
 console.log(`Publication plan controls: ${checks} passed; no publication or native qualification.`);

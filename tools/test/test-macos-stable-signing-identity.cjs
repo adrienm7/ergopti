@@ -578,7 +578,11 @@ check(
 
 // macos-release-launch.yml re-signs a downloaded release ad hoc for a launch
 // diagnostic that is never distributed; that is the only other ad hoc site.
-for (const rel of ['.github/workflows/ci-macos.yml', '.github/workflows/ci.yml']) {
+for (const rel of [
+	'.github/workflows/ci-macos.yml',
+	'.github/workflows/ci.yml',
+	'.github/workflows/ci-release.yml'
+]) {
 	const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
 	check(
 		!/codesign[^\n]*--sign -/.test(text),
