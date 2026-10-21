@@ -27,8 +27,7 @@ const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const JOB = 'e2e-linux';
-// The Linux lane, read inlined with its stage files.
-const WORKFLOW = pipeline.file(LINUX_BOX);
+const WORKFLOW = fs.readFileSync(path.join(ROOT, LINUX_BOX), 'utf8');
 const MANIFEST = JSON.parse(
 	fs.readFileSync(path.join(ROOT, '.github/linux-ci-coverage.json'), 'utf8')
 );

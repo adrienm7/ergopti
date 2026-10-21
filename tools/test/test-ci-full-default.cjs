@@ -13,10 +13,7 @@ const Policy = require('../ci/dev-release-qualification.cjs');
 const Scoped = require('./fixtures/ci-scoped-full-branches.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
 const Publication = require('../ci/publication-plan.cjs');
-// The real files, stage files included: what Full.fromFiles validates.
-const source = Raw.real().files();
-// The same files with every lane inlined: where a job reads as one workflow.
-const inlinedSource = Raw.inlinePipeline(source);
+const source = Raw.files();
 const MAC = '.github/workflows/ci-macos.yml';
 const ENTRY = '.github/workflows/ci.yml';
 let passed = 0;
@@ -24,69 +21,11 @@ function check(name, fn) {
 	fn();
 	passed++;
 }
-/** Records a missing mutation seam so that no expected refusal can absorb it. */
-function seamFailure(message) {
-	process.exitCode = 1;
-	console.error(
-		'[FAIL] ' +
-			new Error().stack
-				.split('\n')
-				.slice(3, 6)
-				.map((line) => line.trim())
-				.join(' <- ') +
-			': ' +
-			message
-	);
-	throw new Error(message);
-}
-/** The real file holding a seam: the lane itself, or the one stage file that holds it. */
-/**
- * A seam as the real stage file writes it: what a stage reads from its lane
- * comes in as inputs, which the inlined lane reads back from needs.
- */
-function realSeam(text) {
-	return text
-		.replaceAll('toJSON(needs)', 'inputs.predecessors')
-		.replace(/needs\.[A-Za-z0-9_-]+\.outputs\.([A-Za-z0-9_-]+)/g, 'inputs.$1')
-		.replace(/needs\.[A-Za-z0-9_-]+\.result/g, 'inputs.predecessor_result');
-}
-function holderOf(rel, before) {
-	const text = (name) => source.find((entry) => entry.rel === name)?.text ?? '';
-	if (text(rel).includes(before)) return rel;
-	const holders = Raw.real()
-		.laneFiles(rel)
-		.slice(1)
-		.filter((name) => text(name).includes(before));
-	// Fails the run even inside an assert.throws callback that expects a refusal.
-	if (holders.length !== 1) seamFailure(`one stage file of ${rel} holds the seam: ${before}`);
-	return holders[0];
-}
-/**
- * Applies one mutation of the inlined lane to the real file that holds it: the
- * lane, a stage file in its own wording, or, when only the producer of a
- * handed output changes, the lane caller that passes that output.
- */
 function changed(rel, before, after) {
-	const own = source.find((entry) => entry.rel === rel)?.text ?? '';
-	let from = before;
-	let to = after;
-	if (!own.includes(before)) {
-		from = realSeam(before);
-		to = realSeam(after);
-		if (from === to && before !== after) {
-			const producer = /needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/;
-			const [, was, key] = producer.exec(before) ?? [];
-			const [, now] = producer.exec(after) ?? [];
-			if (!was || !now || was === now) seamFailure('an untranslatable mutation: ' + before);
-			from = key + ': ${{ needs.' + was + '.outputs.' + key + ' }}';
-			to = key + ': ${{ needs.' + now + '.outputs.' + key + ' }}';
-		}
-	}
-	const target = holderOf(rel, from);
 	return source.map((entry) => {
-		if (entry.rel !== target) return { ...entry };
-		if (entry.text.split(from).length !== 2) seamFailure(`one genuine mutation seam: ${from}`);
-		return { ...entry, text: entry.text.replace(from, () => to) };
+		if (entry.rel !== rel) return { ...entry };
+		assert.equal(entry.text.split(before).length, 2, `one genuine mutation seam: ${before}`);
+		return { ...entry, text: entry.text.replace(before, () => after) };
 	});
 }
 function assertNativeHTTPClockWorkflow(workflow, expected) {
@@ -147,8 +86,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 }
 function receiveClockWorkflow(files) {
 	const YAML = require('yaml');
-	// The macOS lane read inlined, its stage files included.
-	const actual = Raw.inlinePipeline(files).find((entry) => entry.rel === MAC);
+	const actual = files.find((entry) => entry.rel === MAC);
 	assert.ok(actual, 'Actual macOS workflow source must be present.');
 	const expected = YAML.parse(
 		fs.readFileSync(
@@ -177,7 +115,7 @@ for (const [name, before, after] of [
 	],
 	[
 		'clock deferred artifact must remain skipped',
-		"        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true' && env.MACOS_STAGE_SCENARIO != 'xctest') }}\n",
+		"        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}\n",
 		'        if: always()\n'
 	],
 	[
@@ -259,7 +197,7 @@ check('raw loader and full view retain every exact source byte', () => {
 	assert.deepEqual(view.rawFiles(), source);
 	for (const entry of source) {
 		assert.equal(entry.text, fs.readFileSync(`${Raw.ROOT}/${entry.rel}`, 'utf8'));
-		assert.equal(view.real().file(entry.rel), Scoped.projectScopedSteps(entry.text, entry.rel));
+		assert.equal(view.file(entry.rel), Scoped.projectScopedSteps(entry.text, entry.rel));
 	}
 	assert.equal(
 		view.text(),
@@ -279,10 +217,7 @@ check('every scoped full body remains owned; all other product scripts remain ex
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
 			jobs++;
-			// By file: a stage caller and its stage job share one id.
-			const retainedJob = Full.real()
-				.jobs(entry.rel)
-				.find((candidate) => candidate.id === job.id).body;
+			const retainedJob = Full.job(job.id);
 			assert.equal(Full.field(retainedJob, 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
 				if (!step.name) continue;
@@ -317,9 +252,9 @@ check('every scoped full body remains owned; all other product scripts remain ex
 		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
 		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
 	);
-	assert.equal(jobs, 51);
+	assert.equal(jobs, 30);
 	assert.equal(
-		inlinedSource
+		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
 			.filter(
 				(job) =>
@@ -440,7 +375,7 @@ check('mandatory default predicates are the actual workflow predicates', () => {
 	);
 });
 check('Common TOML receiving retains its owned step, identity and check command', () => {
-	const rel = '.github/workflows/ci-common-unit.yml';
+	const rel = '.github/workflows/ci-common.yml';
 	const original = source.find((entry) => entry.rel === rel);
 	const job = Raw.jobsOfText(original.text, rel).find((entry) => entry.id === 'shared-validation');
 	const step = Raw.step(job.body, 'Check hotstring TOML files are sorted and formatted');
@@ -454,7 +389,7 @@ check('Common TOML receiving retains its owned step, identity and check command'
 	}
 });
 check('Unit refuses withdrawn, deferred, foreign or late human-lot selection', () => {
-	const original = inlinedSource.find((entry) => entry.rel === MAC);
+	const original = source.find((entry) => entry.rel === MAC);
 	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'test-hs');
 	const step = Raw.step(job.body, 'Admit the authored unit lot');
 	for (const mutant of [
@@ -480,7 +415,7 @@ for (const [id, prior, predecessor, output] of [
 	['launch', 'testbuild', 'package-macos', 'testbuild']
 ]) {
 	check(`${id} preserves the genuine receiver admission before products`, () => {
-		const original = inlinedSource.find((entry) => entry.rel === MAC);
+		const original = source.find((entry) => entry.rel === MAC);
 		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === id);
 		const step = Raw.step(job.body, 'Admit complete successful predecessor stage');
 		for (const mutant of [
@@ -503,9 +438,9 @@ for (const [id, prior, predecessor, output] of [
 				binding.replace(`${output}_metadata`, `${output}_matrix`),
 				binding.replace(' }}', '[matrix.lot] }}')
 			]) {
-				assert.notEqual(replacement, binding, 'the whole-map binding mutation is effective');
-				assert.equal(job.body.split(binding).length, 2, 'one whole-map binding');
-				assert.throws(() => Full.fromFiles(changed(MAC, binding, replacement)));
+				const mutant = job.body.replace(binding, replacement);
+				assert.notEqual(mutant, job.body, 'the whole-map binding mutation is effective');
+				assert.throws(() => Full.fromFiles(changed(MAC, job.body, mutant)));
 			}
 		}
 	});
@@ -583,70 +518,30 @@ for (const lane of ['macos', 'windows', 'linux']) {
 }
 for (const [rel, id, name] of [
 	[
-		'.github/workflows/ci-common-unit.yml',
+		'.github/workflows/ci-common.yml',
 		'shared-validation',
 		'Check hotstring TOML files are sorted and formatted'
 	],
 	[
-		'.github/workflows/ci-common-build.yml',
+		'.github/workflows/ci-common.yml',
 		'common-build',
 		'Build and seal production site — ${{ matrix.lot }}'
 	],
 	[
-		'.github/workflows/ci-common-install.yml',
+		'.github/workflows/ci-common.yml',
 		'common-testbuild',
 		'Test received production site — ${{ matrix.lot }}'
 	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Qualify actual selected number-row Carbon XCTest controls'
-	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Retain selected number-row Carbon XCTest diagnostics'
-	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Qualify native input-source and launcher XCTest controls'
-	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Retain native input-source and launcher XCTest diagnostics'
-	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Observe the actual no-prompt SDK permission API independently'
-	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Qualify actual SDK accepted-owner and deadline XCTest controls'
-	],
-	[
-		'.github/workflows/ci-macos-e2e.yml',
-		'e2e-hs',
-		'Qualify actual native PAC and WPAD XCTest controls'
-	],
-	[
-		'.github/workflows/ci-macos-verdict.yml',
-		'macos-ok',
-		'Verify mandatory jobs and launch scenarios'
-	],
-	[
-		'.github/workflows/ci-windows-verdict.yml',
-		'windows-ok',
-		'Verify mandatory jobs and launch scenarios'
-	],
-	[
-		'.github/workflows/ci-linux-verdict.yml',
-		'linux-ok',
-		'Assert all mandatory subjects ran and passed'
-	]
+	[MAC, 'e2e-hs', 'Qualify actual selected number-row Carbon XCTest controls'],
+	[MAC, 'e2e-hs', 'Retain selected number-row Carbon XCTest diagnostics'],
+	[MAC, 'e2e-hs', 'Qualify native input-source and launcher XCTest controls'],
+	[MAC, 'e2e-hs', 'Retain native input-source and launcher XCTest diagnostics'],
+	[MAC, 'e2e-hs', 'Observe the actual no-prompt SDK permission API independently'],
+	[MAC, 'e2e-hs', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
+	[MAC, 'e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls'],
+	[MAC, 'macos-ok', 'Verify mandatory jobs and launch scenarios'],
+	['.github/workflows/ci-windows.yml', 'windows-ok', 'Verify mandatory jobs and launch scenarios'],
+	['.github/workflows/ci-linux.yml', 'linux-ok', 'Assert all mandatory subjects ran and passed']
 ]) {
 	const job = Raw.jobsOfText(source.find((entry) => entry.rel === rel).text, rel).find(
 		(entry) => entry.id === id
@@ -674,7 +569,7 @@ check(
 	'actual no-prompt SDK observation keeps its full default condition and cannot disappear',
 	() => {
 		const name = 'Observe the actual no-prompt SDK permission API independently';
-		const job = Raw.jobsOfText(inlinedSource.find((entry) => entry.rel === MAC).text, MAC).find(
+		const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
 			(entry) => entry.id === 'e2e-hs'
 		);
 		const body = Raw.step(job.body, name);
@@ -863,7 +758,7 @@ check('full Linux package retains cancellation and manual receiving allowance', 
 	assert.equal(cases, 432);
 });
 check('package duplicate HTTP receiving scopes only the native wire command', () => {
-	const job = Raw.jobsOfText(inlinedSource.find((entry) => entry.rel === MAC).text, MAC).find(
+	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
 		(entry) => entry.id === 'package-macos'
 	);
 	const code = Raw.runOf(Raw.step(job.body, 'Receive actual managed HTTP native clients')).join(
@@ -887,7 +782,7 @@ check('package duplicate HTTP receiving scopes only the native wire command', ()
 	);
 });
 check('package duplicate keeps both mandatory failure acknowledgments', () => {
-	const original = inlinedSource.find((entry) => entry.rel === MAC);
+	const original = source.find((entry) => entry.rel === MAC);
 	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
 	const step = Raw.step(job.body, 'Receive actual managed HTTP native clients');
 	for (const command of [
@@ -959,7 +854,7 @@ check(
 check(
 	'package Swift duplicate scopes only the existing PAC classes and preserves the full body',
 	() => {
-		const original = inlinedSource.find((entry) => entry.rel === MAC);
+		const original = source.find((entry) => entry.rel === MAC);
 		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
 		const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 		assert.ok(
@@ -1005,7 +900,7 @@ check(
 	}
 );
 check('embedded Swift admission refuses omitted collector binding or changed source gate', () => {
-	const original = inlinedSource.find((entry) => entry.rel === MAC);
+	const original = source.find((entry) => entry.rel === MAC);
 	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
 	const step = Raw.step(job.body, 'Run Swift launcher tests on macOS 26');
 	const receiptOption = ' --pac-qualification-receipt "$pac_receipt"';
@@ -1017,7 +912,7 @@ check('embedded Swift admission refuses omitted collector binding or changed sou
 	assert.throws(() => Full.fromFiles(changed(MAC, step, changedGate)), /admission/);
 });
 check('Swift PAC arguments preserve empty and selected arrays under nounset', () => {
-	const original = inlinedSource.find((entry) => entry.rel === MAC);
+	const original = source.find((entry) => entry.rel === MAC);
 	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
 	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 	const safe = '${pac_skip_args[@]+"${pac_skip_args[@]}"}';
@@ -1065,7 +960,7 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 
 // The same closed manual receiver now owns two real matrix cells in E2E.
 {
-	const sourceMac = inlinedSource.find((entry) => entry.rel === MAC).text;
+	const sourceMac = source.find((entry) => entry.rel === MAC).text;
 	const job = Raw.jobsOfText(sourceMac, MAC).find((job) => job.id === 'e2e-hs');
 	const lease = macRole.selected(job.body, 'lease-silence-native');
 	const first = lease[0].body;
@@ -1075,11 +970,7 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 	for (const [label, before, after] of [
 		['role absent', first, ''],
 		['role duplicate', first, first + '\n' + first],
-		[
-			'role coupled',
-			'  e2e-hs:\n    name: E2E tests\n    needs:\n      - test-hs\n',
-			'  e2e-hs:\n    name: E2E tests\n    needs:\n      - package-macos\n'
-		],
+		['role coupled', '    needs:\n      - test-hs\n', '    needs:\n      - package-macos\n'],
 		['role forgiven', '  e2e-hs:\n', '  e2e-hs:\n    continue-on-error: true\n'],
 		['release output', '  e2e-hs:\n', '  e2e-hs:\n    outputs:\n      assets: fake\n'],
 		['secret inherited', '  e2e-hs:\n', '  e2e-hs:\n    secrets: inherit\n'],
@@ -1090,13 +981,16 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 		],
 		[
 			'ARM host authority wrong',
-			'    runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}\n',
-			'    runs-on: ubuntu-latest\n'
+			job.body,
+			job.body.replace(
+				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ubuntu-latest'
+			)
 		],
 		[
 			'Intel plan absent',
-			'      matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}\n',
-			'      matrix: ${{ fromJSON(inputs.foreign) }}\n'
+			job.body,
+			job.body.replace('needs.test-hs.outputs.e2e_matrix', 'inputs.foreign')
 		],
 		[
 			'source runner wrong',
@@ -1120,8 +1014,11 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 		],
 		[
 			'native budget widened',
-			'    timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}\n',
-			'    timeout-minutes: 360\n'
+			job.body,
+			job.body.replace(
+				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: 360'
+			)
 		]
 	])
 		check('lease silence: ' + label, () => {
@@ -1185,7 +1082,7 @@ check(
 	}
 );
 check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	const item = Raw.jobsOfText(entry.text, MAC).find((job) => job.id === 'e2e-hs');
 	assert.equal(
 		Raw.stepField(
@@ -1219,7 +1116,7 @@ check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt
 	assert.match(retain, /^ {10}if-no-files-found: error$/m);
 });
 check('v101 managed PAC admission retains Worker filter and exact collector authority', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'e2e-hs');
 	const step = Raw.step(job.body, 'Qualify actual native PAC and WPAD XCTest controls');
 	const code = Raw.runOf(step).join('\n');
@@ -1283,7 +1180,7 @@ node() {
 	}
 });
 check('v101 HTTP receiver defers only wire and preserves both mandatory statuses', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	for (const [id, name] of [
 		['e2e-hs', 'Receive actual independent managed HTTP native clients'],
 		['package-macos', 'Receive actual managed HTTP native clients']
@@ -1435,7 +1332,7 @@ owned_python() {
 	}
 });
 check('v101 package joins only validated PAC and Brew identities', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
 	const step = Raw.step(job.body, 'Run Swift launcher tests on macOS 26');
 	const code = Raw.runOf(step).join('\n');
@@ -1460,7 +1357,7 @@ check('v101 package joins only validated PAC and Brew identities', () => {
 	assert.equal(full.includes('--brew-qualification-receipt'), false);
 });
 check('v103 package defers Brew and owned-runtime only while PAC stays mandatory', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
 	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 	const start = code.indexOf('pac_receipt=');
@@ -1516,7 +1413,7 @@ node() {
 });
 
 check('v101 Shortcuts keeps portable/full work and publishes its validated exact receipt', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'package-macos');
 	const probe = Raw.step(job.body, 'Observe native Apple Shortcuts discovery');
 	const code = Raw.runOf(probe).join('\n');
@@ -1542,7 +1439,7 @@ check('v101 Shortcuts keeps portable/full work and publishes its validated exact
 });
 
 check('v101 AppleEvents records only exact transport rows and preserves installed launch', () => {
-	const entry = inlinedSource.find((file) => file.rel === MAC);
+	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((candidate) => candidate.id === 'launch');
 	// One lot launches several scenarios; each records and validates its own receipt first.
 	const code = Raw.runOf(

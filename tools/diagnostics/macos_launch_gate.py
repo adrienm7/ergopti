@@ -149,7 +149,7 @@ SCENARIOS = (
 # symlink_config), so they stay with the release gate, which launches every
 # scenario on Apple silicon and Intel. A new scenario joins both profiles.
 RELEASE_ONLY_SCENARIOS = ("source_logs", "symlink_config_documents")
-# The one source of the launch-gate matrix: ci-macos-build.yml reads a profile
+# The one source of the launch-gate matrix: ci-macos.yml reads a profile
 # through --print-matrix instead of repeating scenario names.
 PROFILES = {
     "ci": tuple(name for name in SCENARIOS if name not in RELEASE_ONLY_SCENARIOS),

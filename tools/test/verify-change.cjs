@@ -36,18 +36,6 @@ const { PRETTIER_EXTENSIONS } = require('../lint/format.cjs');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS_TESTS = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
 const RUN_ALL = path.join(WINDOWS_TESTS, 'run_all.ahk');
-// The Linux lane and the stage workflows it calls: a native harness step can
-// move with any of them. test-verify-change-full-plan.cjs pins this list to the
-// lane's actual files.
-const LINUX_LANE_WORKFLOWS = [
-	'.github/workflows/ci-linux.yml',
-	'.github/workflows/ci-linux-unit.yml',
-	'.github/workflows/ci-linux-e2e.yml',
-	'.github/workflows/ci-linux-build.yml',
-	'.github/workflows/ci-linux-flatpak.yml',
-	'.github/workflows/ci-linux-install.yml',
-	'.github/workflows/ci-linux-verdict.yml'
-];
 
 // Candidate install locations for the AHK v2 interpreter, in preference order.
 // Absent on CI and on non-Windows checkouts, where the AHK gates are skipped
@@ -522,7 +510,7 @@ const RULES = [
 				'static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua',
 				'static/ergopti_plus/_shared/lua/shortcuts/magic_editor.lua',
 				'tools/test/run-linux-xkb-source.cjs',
-				...LINUX_LANE_WORKFLOWS
+				'.github/workflows/ci-linux.yml'
 			].includes(f) || f.startsWith('static/ergopti_plus/_shared/modules/layouts/')
 	},
 	{
@@ -545,7 +533,7 @@ const RULES = [
 				'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py',
 				'static/ergopti_plus/linux/tests/hardware/run_window_switch_operation.lua',
 				'tools/test/run-linux-window-switch-receipts.cjs',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json',
 				'static/ergopti_plus/linux/tests/hardware/native_fixture_family.py',
 				'static/ergopti_plus/linux/tests/hardware/run_native_fixture_family_receipts.py'
@@ -588,7 +576,7 @@ const RULES = [
 				'static/ergopti_plus/_shared/modules/llm/local_servers.json',
 				'static/ergopti_plus/_shared/lua/llm/local_model_policy.lua',
 				'tools/test/run-linux-http-stream-receipts.cjs',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
 	},
@@ -635,7 +623,7 @@ const RULES = [
 				'static/ergopti_plus/_shared/lua/updater/transfer_budget.lua',
 				'static/ergopti_plus/_shared/modules/updater/defaults.json',
 				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
 	},
@@ -676,7 +664,7 @@ const RULES = [
 				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
 				'static/ergopti_plus/_shared/modules/updater/defaults.json',
 				'static/ergopti_plus/_shared/lua/updater/transfer_budget.lua',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
 	},
@@ -700,7 +688,7 @@ const RULES = [
 				'static/ergopti_plus/linux/install.sh',
 				'static/ergopti_plus/_shared/data/linux_native_runtime.json',
 				'tools/codegen/codegen-linux-native-runtime.cjs',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
 	},
@@ -763,7 +751,7 @@ const RULES = [
 				'tools/lib/git_bash.py',
 				'tools/__init__.py',
 				'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
 	},
@@ -792,7 +780,7 @@ const RULES = [
 				'tools/test/test-linux-nix-native.cjs',
 				'tools/test/run-linux-managed-http-phase.py',
 				'.github/linux-ci-coverage.json',
-				...LINUX_LANE_WORKFLOWS
+				'.github/workflows/ci-linux.yml'
 			].includes(f)
 	},
 	{
@@ -814,7 +802,7 @@ const RULES = [
 				'tools/test/linux-network-runtime-evidence.cjs',
 				'tools/test/fixtures/linux-network-runtime-factory.lua',
 				'.github/linux-ci-coverage.json',
-				...LINUX_LANE_WORKFLOWS
+				'.github/workflows/ci-linux.yml'
 			].includes(f)
 	},
 	{
@@ -831,7 +819,7 @@ const RULES = [
 				'static/ergopti_plus/linux/infra/native_timer.lua',
 				'static/ergopti_plus/linux/infra/monotonic.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_native_subreaper.py',
-				...LINUX_LANE_WORKFLOWS,
+				'.github/workflows/ci-linux.yml',
 				'.github/linux-ci-coverage.json'
 			].includes(f)
 	},
@@ -849,7 +837,7 @@ const RULES = [
 				'tools/test/test-linux-portable-network-runtime.cjs',
 				'tools/test/run-linux-portable-network-native.cjs',
 				'tools/test/test-linux-portable-network-registration.cjs',
-				...LINUX_LANE_WORKFLOWS
+				'.github/workflows/ci-linux.yml'
 			].includes(f)
 	},
 	{
@@ -877,7 +865,7 @@ const RULES = [
 				'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_http_owned_post_native.py',
 				'tools/test/run-linux-runtime-native.cjs',
-				...LINUX_LANE_WORKFLOWS
+				'.github/workflows/ci-linux.yml'
 			].includes(f)
 	},
 	{
@@ -1187,7 +1175,6 @@ function main() {
 // The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
 // exactly as before.
 module.exports = {
-	LINUX_LANE_WORKFLOWS,
 	RULES,
 	GATE_COMMANDS,
 	changedFiles,

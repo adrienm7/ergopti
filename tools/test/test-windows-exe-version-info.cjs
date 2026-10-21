@@ -75,7 +75,7 @@ assert.deepEqual(expectedVersionInfo('1.2.3'), {
 assert.equal(expectedVersionInfo('').FileVersion, UNSTAMPED_VERSION);
 
 // 3. The build stage checks the compiled exe after compiling and before signing.
-const workflow = read('.github/workflows/ci-windows-build.yml');
+const workflow = read('.github/workflows/ci-windows.yml');
 const compile = workflow.indexOf('- name: Compile ErgoptiPlus.ahk');
 const verify = workflow.indexOf('- name: Verify the ErgoptiPlus.exe version resource');
 const sign = workflow.indexOf('- name: Sign and verify ErgoptiPlus.exe');

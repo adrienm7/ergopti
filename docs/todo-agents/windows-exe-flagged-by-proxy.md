@@ -83,7 +83,7 @@ PE comparison of v1.0.0, v1.0.3 and v1.0.4 (7-Zip PE resource listing):
    v1.0.3, but the PowerShell launch and the compile cost stay.
 2. **Add product version metadata to the exe.** Set `;@Ahk2Exe-SetProductName`, `CompanyName`,
    `FileDescription`, `ProductVersion`/`FileVersion` stamped from the release version, and
-   `LegalCopyright` in `ErgoptiPlus.ahk` (or as Ahk2Exe options in `ci-windows-build.yml`). This
+   `LegalCopyright` in `ErgoptiPlus.ahk` (or as Ahk2Exe options in `ci-windows.yml`). This
    gives a proper identity instead of the bare runtime defaults.
 3. **Make `ergopti_network_pac.exe` reproducible.** Link it with `/Brepro` (and no random PDB GUID)
    in `tools/build/build_windows_network_pac.ps1`, so that unchanged sources keep a known hash.

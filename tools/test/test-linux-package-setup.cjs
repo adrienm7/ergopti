@@ -258,10 +258,7 @@ fi`
 	// The Fedora job is a nonlogin container: HOME is supplied, while USER and
 	// LOGNAME need the real account query before privacy admission in --help.
 	const pipeline = require('./ci-pipeline.cjs');
-	const workflow = require('./ci-pipeline.cjs').inlineLaneAt(
-		ROOT,
-		'.github/workflows/ci-linux.yml'
-	);
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8');
 	const installJob = pipeline
 		.jobsOfText(workflow, '.github/workflows/ci-linux.yml')
 		.filter((job) => job.id === 'install-linux');

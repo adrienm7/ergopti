@@ -27,11 +27,10 @@
 --- this is a stubbed virtual-keyboard replay and not real macOS/Hammerspoon
 --- coverage.
 ---
---- The harness runs in the separate `e2e-hs` job after unit tests, in
---- .github/workflows/ci-macos-e2e.yml, the E2E stage that ci-macos.yml calls,
---- which ci.yml calls as its 'macOS' box, so its check reads
---- 'macOS / E2E tests / <lot>'. This test is a source-invariant check on those
---- files: the step that runs the harness and the job that owns it must
+--- The harness runs in the separate `e2e-hs` job after unit tests in
+--- .github/workflows/ci-macos.yml, which ci.yml calls as its 'macOS' box, so
+--- its check reads 'macOS / <job name>'. This test is a source-invariant check
+--- on that file: the step that runs the harness and the job that owns it must
 --- both say "stub", the comment block right above the step must explain why,
 --- and no job or step may be named a bare 'E2E'. Every lookup asserts, so a
 --- check cannot pass against a step or a file that is no longer there.
@@ -46,8 +45,6 @@ local REPO_ROOT   = DRIVER_ROOT:gsub("[/\\]static[/\\]ergopti_plus[/\\]macos[/\\
 
 local PIPELINE  = ".github/workflows/ci.yml"
 local MACOS_BOX = ".github/workflows/ci-macos.yml"
-local MACOS_UNIT = ".github/workflows/ci-macos-unit.yml"
-local MACOS_E2E = ".github/workflows/ci-macos-e2e.yml"
 local HARNESS   = "tests/e2e/run_e2e.lua"
 local ROLE_PLAN = "tools/ci/macos-stage-roles.cjs"
 
@@ -61,13 +58,6 @@ local function read_repo_file(rel)
 	local src = fh:read("*a"); fh:close()
 	helpers.assert_true(#src > 0, rel .. " must not be empty")
 	return src
-end
-
---- Reads the macOS Unit and E2E stage files, then the lane that calls them, as
---- one text: each job is found before the lane's caller of the same id.
---- @return string
-local function macos_source()
-	return read_repo_file(MACOS_UNIT) .. read_repo_file(MACOS_E2E) .. read_repo_file(MACOS_BOX)
 end
 
 --- Returns a YAML scalar without its surrounding whitespace and quotes.
@@ -91,28 +81,18 @@ local function matrix_harness_name(src, job_at, step_at, name, roles)
 		local at = text:find(literal, 1, true)
 		helpers.assert_true(at ~= nil and text:find(literal, at + #literal, true) == nil, reason)
 	end
-	-- The stage job is named by its human lot; its caller names the stage.
-	helpers.assert_eq(name, "${{ matrix.lot }}",
-		"the stage job must be named by its human lot")
-	once(src, "\n  e2e-hs:\n    name: E2E tests\n    needs:\n      - test-hs\n"
-		.. "    uses: ./" .. MACOS_E2E .. "\n",
-		"the lane must call the E2E stage under its literal symmetric title")
-	for _, forwarded in ipairs({
-		"      e2e_matrix: ${{ needs.test-hs.outputs.e2e_matrix }}\n",
-		"      e2e_metadata: ${{ needs.test-hs.outputs.e2e_metadata }}\n",
-	}) do
-		once(src, forwarded, "the E2E caller must forward the actual Unit plan output")
-	end
+	helpers.assert_eq(name, "E2E tests",
+		"the stage name must retain its literal symmetric title")
 	local job_end = src:find("\n  [%w_%-]+:[ \t]*\n", job_at + 1) or (#src + 1)
 	local job = src:sub(job_at, job_end - 1)
-	once(job, "      matrix: ${{ fromJSON(inputs.e2e_matrix) }}",
+	once(job, "      matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}",
 		"the harness matrix must consume the actual Unit plan output")
 	for _, binding in ipairs({
-		"      MACOS_STAGE_METADATA: ${{ inputs.e2e_metadata }}",
-		"      MACOS_STAGE_ROLE: ${{ fromJSON(inputs.e2e_metadata)[matrix.lot].role }}",
-		"      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(inputs.e2e_metadata)[matrix.lot]) }}",
-		"    runs-on: ${{ fromJSON(inputs.e2e_metadata)[matrix.lot].runner }}",
-		"    timeout-minutes: ${{ fromJSON(inputs.e2e_metadata)[matrix.lot].timeout_minutes }}",
+		"      MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_metadata }}",
+		"      MACOS_STAGE_ROLE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].role }}",
+		"      MACOS_STAGE_CELL: ${{ toJSON(fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot]) }}",
+		"    runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
+		"    timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}",
 	}) do
 		once(job, binding, "the human lot must retain its complete canonical role metadata")
 	end
@@ -173,7 +153,7 @@ local function matrix_harness_name(src, job_at, step_at, name, roles)
 		.. "\treturn {\n\t\tmatrix: { lot: lots },\n"
 		.. "\t\tmetadata: Object.fromEntries(lots.map((lot, index) => [lot, rows[index]]))\n\t};",
 		"the single visible lot axis must pair with the entire original role map")
-	return "E2E tests / Virtual-keyboard replay (stubbed)"
+	return name .. " (Virtual-keyboard replay (stubbed))"
 end
 
 
@@ -244,12 +224,10 @@ helpers.describe("F-HIGH-30: the macOS virtual-keyboard CI job no longer overcla
 		local src = read_repo_file(PIPELINE)
 		helpers.assert_true(src:find("uses: ./" .. MACOS_BOX, 1, true) ~= nil,
 			PIPELINE .. " must call " .. MACOS_BOX .. ", or the harness below never runs")
-		helpers.assert_true(read_repo_file(MACOS_BOX):find("uses: ./" .. MACOS_E2E, 1, true) ~= nil,
-			MACOS_BOX .. " must call " .. MACOS_E2E .. ", or the harness below never runs")
 	end)
 
 	helpers.it("the harness step and its job flag themselves as stubbed / not real Hammerspoon", function()
-		local harness = locate_harness(macos_source())
+		local harness = locate_harness(read_repo_file(MACOS_BOX))
 		helpers.assert_true(harness.job_id == "e2e-hs",
 			"the stubbed harness must run in the Hammerspoon E2E job e2e-hs (got: " .. harness.job_id .. ")")
 		helpers.assert_true(flags_stub(harness.step_name),
@@ -262,7 +240,7 @@ helpers.describe("F-HIGH-30: the macOS virtual-keyboard CI job no longer overcla
 	end)
 
 	helpers.it("no macOS job or step is named a bare, overclaiming 'E2E'", function()
-		local src = macos_source()
+		local src = read_repo_file(MACOS_BOX)
 		local names = 0
 		for raw in src:gmatch("\n +%-? *name:([^\n]*)") do
 			local name = unquote(raw)
@@ -274,8 +252,8 @@ helpers.describe("F-HIGH-30: the macOS virtual-keyboard CI job no longer overcla
 		helpers.assert_true(names >= 10, MACOS_BOX .. " must declare its job and step names (found " .. names .. ")")
 	end)
 
-	helpers.it("ci-macos-e2e.yml documents WHY the harness is not real macOS/Hammerspoon coverage", function()
-		local src = macos_source()
+	helpers.it("ci-macos.yml documents WHY the harness is not real macOS/Hammerspoon coverage", function()
+		local src = read_repo_file(MACOS_BOX)
 		local harness = locate_harness(src)
 
 		-- The explanatory comment block sits directly above the step.
@@ -353,7 +331,7 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 		return source:sub(1, at - 1) .. after .. source:sub(at + #before)
 	end
 	helpers.it("the actual role label resolves and a changed producer label cannot claim stub coverage", function()
-		local workflow, roles = macos_source(), read_repo_file(ROLE_PLAN)
+		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
 		local original = locate_harness(workflow, roles)
 		helpers.assert_true(flags_stub(original.job_name))
 		local changed = replace_once(roles,
@@ -365,7 +343,7 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 			and reason:find("the displayed stub lot must retain its stubbed runtime", 1, true) ~= nil)
 	end)
 	helpers.it("a stubbed host moved onto a macOS runner cannot keep the stub label", function()
-		local workflow, roles = macos_source(), read_repo_file(ROLE_PLAN)
+		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
 		local changed = replace_once(roles,
 			"stubbed: Object.freeze({ runner: 'ubuntu-latest', macos: null }),",
 			"stubbed: Object.freeze({ runner: 'macos-15', macos: null }),")
@@ -375,18 +353,15 @@ helpers.describe("F-HIGH-30: matrix role name custody", function()
 			and reason:find("the replay retains its non-Hammerspoon runner", 1, true) ~= nil)
 	end)
 	helpers.it("foreign matrix, output, command and role bindings cannot borrow the stub label", function()
-		local workflow, roles = macos_source(), read_repo_file(ROLE_PLAN)
+		local workflow, roles = read_repo_file(MACOS_BOX), read_repo_file(ROLE_PLAN)
 		for _, mutation in ipairs({
 			{ "e2e_metadata: ${{ steps.stage-plan.outputs.e2e_metadata }}", "e2e_metadata: {}",
 				"the Unit output must forward the complete role map" },
-			{ "MACOS_STAGE_ROLE: ${{ fromJSON(inputs.e2e_metadata)[matrix.lot].role }}",
-				"MACOS_STAGE_ROLE: ${{ fromJSON(inputs.e2e_metadata)[matrix.foreign].role }}",
+			{ "MACOS_STAGE_ROLE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].role }}",
+				"MACOS_STAGE_ROLE: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.foreign].role }}",
 				"the human lot must retain its complete canonical role metadata" },
-			{ "fromJSON(inputs.e2e_matrix)", "fromJSON(inputs.foreign)",
+			{ "fromJSON(needs.test-hs.outputs.e2e_matrix)", "fromJSON(needs.test-hs.outputs.foreign)",
 				"the harness matrix must consume the actual Unit plan output" },
-			{ "      e2e_matrix: ${{ needs.test-hs.outputs.e2e_matrix }}",
-				"      e2e_matrix: ${{ needs.package-macos.outputs.e2e_matrix }}",
-				"the E2E caller must forward the actual Unit plan output" },
 			{ "e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}", "e2e_matrix: []",
 				"the Unit output must forward its actual role-plan step" },
 			{ "run: node tools/ci/macos-stage-roles.cjs plan e2e", "run: echo fake-plan",

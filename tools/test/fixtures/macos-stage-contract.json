@@ -479,7 +479,7 @@
 		{
 			"id": "package-macos",
 			"metadata": {
-				"name": "Build",
+				"name": "Build (ErgoptiPlus.app, macOS 26)",
 				"permissions": {
 					"contents": "read",
 					"actions": "read"
@@ -913,7 +913,7 @@
 		{
 			"id": "macos-ok",
 			"metadata": {
-				"name": "Verdict",
+				"name": "Verdict (Mandatory jobs and launch scenarios)",
 				"needs": ["launch"],
 				"if": "always()",
 				"runs-on": "ubuntu-latest",

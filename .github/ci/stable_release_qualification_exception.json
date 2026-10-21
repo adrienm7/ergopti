@@ -33,31 +33,31 @@
 		},
 		"macos-native-pac": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos-e2e.yml",
+			"path": ".github/workflows/ci-macos.yml",
 			"args": ["e2e-hs", "Qualify actual native PAC and WPAD XCTest controls"],
 			"reason": "Native PAC/WPAD wire tests remain failing or incomplete; native PAC/network qualification is deferred, never inferred from packaging."
 		},
 		"macos-native-http": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos-e2e.yml",
+			"path": ".github/workflows/ci-macos.yml",
 			"args": ["e2e-hs", "Receive actual independent managed HTTP native clients"],
 			"reason": "Independent native HTTP client receiving remains failing or incomplete; transport qualification is deferred."
 		},
 		"macos-stubbed-unit": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos-unit.yml",
+			"path": ".github/workflows/ci-macos.yml",
 			"args": ["test-hs", "Run unit + meta tests"],
 			"reason": "The stubbed macOS Lua unit/meta harness has known failures and is not qualified for this release."
 		},
 		"macos-stubbed-e2e": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos-e2e.yml",
+			"path": ".github/workflows/ci-macos.yml",
 			"args": ["e2e-hs", "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)"],
 			"reason": "The stubbed macOS virtual-keyboard harness has known failures and is not qualified for this release."
 		},
 		"windows-native-desktop": {
 			"kind": "command",
-			"path": ".github/workflows/ci-windows-unit.yml",
+			"path": ".github/workflows/ci-windows.yml",
 			"args": ["test-ahk", "Run native desktop AHK cohorts"],
 			"reason": "Native desktop wrapper receiving remains failing or incomplete; desktop harness qualification is deferred. Main AHK and compiled startup remain mandatory."
 		},
@@ -74,25 +74,25 @@
 		},
 		"linux-unit-suite": {
 			"kind": "command",
-			"path": ".github/workflows/ci-linux-unit.yml",
+			"path": ".github/workflows/ci-linux.yml",
 			"args": ["test-linux", "Run the driver unit test suite"],
 			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
 		},
 		"linux-e2e-suite": {
 			"kind": "command",
-			"path": ".github/workflows/ci-linux-e2e.yml",
+			"path": ".github/workflows/ci-linux.yml",
 			"args": ["e2e-linux", "Linux E2E test suite bodies including live fixture chain"],
 			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
 		},
 		"core-js-suite": {
 			"kind": "command",
-			"path": ".github/workflows/ci-common-unit.yml",
+			"path": ".github/workflows/ci-common.yml",
 			"args": ["shared-validation", "npm run test:js"],
 			"reason": "Six hosted JavaScript guards fail on the approved wrapper shapes; the JS suite is explicitly unqualified, not inferred passed. Properties, mutation, build/package/integrity and install remain mandatory."
 		},
 		"macos-native-model-receiving": {
 			"kind": "command",
-			"path": ".github/workflows/ci-macos-e2e.yml",
+			"path": ".github/workflows/ci-macos.yml",
 			"args": ["e2e-hs", "Receive actual native model create, pull, inference and retirement"],
 			"reason": "Hosted native model receiving timed out restoring trust after actual producer build and catalogue checks passed. Model receiving remains unqualified; no TLS, trust or permission workaround is authorized."
 		}

@@ -29,7 +29,7 @@ function fixture(target = 'main') {
 			['YAML, shared code & web / Install and launch', 'Test received production site']
 		].map(([name, writer], i) => ({
 			id: 201 + i + cellIndex * 10,
-			name: name + ' / ' + siteLot(cellTarget),
+			name: name + ' (' + siteLot(cellTarget) + ')',
 			run_id: 123,
 			head_sha: source,
 			run_attempt: i + 1,

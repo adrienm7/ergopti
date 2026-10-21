@@ -647,8 +647,7 @@ try {
 				'const read = fs.readFileSync;',
 				'fs.readFileSync = function(file, ...args) {',
 				'  const result = read.call(this, file, ...args);',
-				// The Windows unit stage file holds the runner script the loader inlines.
-				"  if (path.basename(String(file)) === 'ci-windows-unit.yml' && typeof result === 'string') {",
+				"  if (path.basename(String(file)) === 'ci-windows.yml' && typeof result === 'string') {",
 				`    return result.replace(${JSON.stringify(removed)}, '# missing native receipt owner');`,
 				'  }',
 				'  return result;',
@@ -834,8 +833,7 @@ function assertCompleteAhkWatchdogBudget() {
 		path.join(root, 'static/ergopti_plus/windows/tests/run_all.ahk'),
 		'utf8'
 	);
-	// The Windows lane, read inlined with its stage files.
-	const workflow = pipeline.file('.github/workflows/ci-windows.yml');
+	const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8');
 	function checkBudget(source, yamlSource) {
 		const active = source.replace(/[^\n]/g, ' ').split('');
 		for (const token of scriptTokens(source, '.ahk')) {
