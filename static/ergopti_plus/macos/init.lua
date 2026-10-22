@@ -103,7 +103,14 @@ do
 	local InstanceAdmission = require("infra.instance_admission")
 	local process_info = type(hs.processInfo) == "table" and hs.processInfo or {}
 	local admission_mode = Logger.classify_async_sink_boot_environment()
-	local decision = InstanceAdmission.decide(admission_mode, process_info.bundleID)
+	-- An unanswerable identity is treated as foreign: refusing never quits a process
+	local identity_ok, local_source = pcall(function() return require("modules.updater").is_local_source() end)
+	if not identity_ok then
+		Logger.error("init", "Runtime identity unavailable; treating this Hammerspoon as foreign: %s.",
+			tostring(local_source))
+	end
+	local packaged_runtime = identity_ok and local_source == false
+	local decision = InstanceAdmission.decide(admission_mode, packaged_runtime)
 	if decision ~= InstanceAdmission.ADMIT then
 		local launcher_ok, launcher_app = pcall(function()
 			return require("adapters.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
