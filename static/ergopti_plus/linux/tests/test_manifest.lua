@@ -558,6 +558,7 @@ return {
 	"tests.unit.modules.shortcuts.actions.test_action_catalogue_parity",
 	"tests.unit.modules.shortcuts.actions.test_action_handlers_declared_every_action",
 	"tests.unit.modules.shortcuts.actions.test_action_handlers_declared_web_search",
+	"tests.unit.modules.shortcuts.actions.test_open_selection",
 	"tests.unit.modules.gestures.engine.test_gesture_combo_fallback",
 	"tests.unit.modules.gestures.engine.test_combo_emitter",
 	"tests.unit.modules.gestures.engine.test_combo_press_order",

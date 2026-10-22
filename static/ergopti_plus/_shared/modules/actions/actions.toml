@@ -1036,13 +1036,20 @@ requires_linux = ["tool:xdg-open"]
 platform = "all"
 
 [sg_actions.copy_selected_path]
-# In a file manager: copy the path of the selection. Elsewhere: open the
-# selected link or path, or search the web for the selected text (macOS
-# copy_or_open_path, Windows Search). Linux is not implemented yet, not
-# impossible: a file manager publishes its selection as text/uri-list after
-# Ctrl+C, which the clipboard adapter cannot read by MIME type, and the search
-# engine it would fall back to is a Windows-only setting (shortcuts.search).
-platform = "hs,ahk"
+# In a file manager: copy the path of the selection. Elsewhere: open what the
+# selection names (a URL with or without its scheme, an IP address, localhost,
+# a mail address, a file or folder, a registry key on Windows) or search the
+# web for plain text; the rule is _shared/lua/open_target, ported by
+# windows/infra/open_target.ahk and pinned by
+# _shared/tests/corpus/shortcuts/open_target_vectors.json (macOS
+# copy_or_open_path, Windows Search). A registry key, a Windows path and the
+# ms-settings: and shell: URIs open on Windows only; macOS and Linux report
+# them instead of searching. Linux opens the primary selection; its
+# file-manager path copy is not implemented, not impossible: a file manager
+# publishes its selection as text/uri-list after Ctrl+C, which the clipboard
+# adapter cannot read by MIME type.
+platform = "all"
+requires_linux = ["tool:xclip", "tool:xdg-open"]
 
 [sg_actions.search_web]
 platform = "all"
