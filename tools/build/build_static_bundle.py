@@ -17,7 +17,7 @@ FEATURES & RATIONALE:
         every _StaticDir, _SharedDir and _VendorDir read site resolves the same
         file from source and from the extracted bundle.
 3. Ship only what the driver reads: first launch extracts every entry with
-        Expand-Archive, whose cost grows with the file count, so test corpora, Lua
+        the system tar.exe, whose cost grows with the file count, so test corpora, Lua
         modules, documentation and other-driver data stay out.
 4. Fail fast: a missing include source or required asset, an unknown manifest
         key or a shipped path under a not_shipped entry aborts the build instead of
