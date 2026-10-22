@@ -318,28 +318,55 @@ JsonStringLiteral(value, escapeHtml := false) {
 	if !RegExMatch(text, '[\x00-\x1f"\\\x{2028}\x{2029}]')
 			&& (!escapeHtml || !RegExMatch(text, '[&<>]'))
 		return '"' . text . '"'
-	out := '"'
-	; Loop Parse stops at NUL. Walk the stored UTF-16 length so escaping cannot
-	; silently discard that code unit and every character following it.
-	loop StrLen(text) {
-		code := NumGet(StrPtr(text), (A_Index - 1) * 2, "UShort")
-		switch code {
-			case 0x08: out .= "\b"
-			case 0x09: out .= "\t"
-			case 0x0A: out .= "\n"
-			case 0x0C: out .= "\f"
-			case 0x0D: out .= "\r"
-			case 0x22: out .= '\"'
-			case 0x5C: out .= "\\"
-			default:
-				if (code < 0x20 or code = 0x2028 or code = 0x2029
-						or (escapeHtml and (code = 0x26 or code = 0x3C or code = 0x3E)))
-					out .= Format("\u{:04x}", code)
-				else
-					out .= SubStr(text, A_Index, 1)
-		}
+	; StrReplace stops at the first NUL, while RegExMatch and SubStr walk the
+	; stored length: escape each NUL-free run on its own and join the runs.
+	Escaped := '"'
+	Pos := 1
+	while (Found := RegExMatch(text, "\x00", , Pos)) {
+		Escaped .= _JsonEscapeNulFreeRun(SubStr(text, Pos, Found - Pos), escapeHtml)
+			. Format("\u{:04x}", 0)
+		Pos := Found + 1
 	}
-	return out . '"'
+	return Escaped . _JsonEscapeNulFreeRun(SubStr(text, Pos), escapeHtml) . '"'
+}
+
+/**
+ * Escapes the contents of a JSON string literal for text without NUL.
+ * @param {string} text Text holding no NUL code unit.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters.
+ * @returns {string} Escaped contents, without the surrounding quotes.
+ */
+_JsonEscapeNulFreeRun(text, escapeHtml) {
+	if (text == "")
+		return ""
+	; Native passes, not a per-character script loop: the Versions window hands
+	; the page a release list of about 2 MB, which the loop took 3 s to escape on
+	; the thread that also runs the keyboard hook. Backslash goes first so the
+	; escapes added after it are not doubled.
+	out := StrReplace(text, "\", "\\", true)
+	out := StrReplace(out, '"', '\"', true)
+	out := StrReplace(out, "`n", "\n", true)
+	out := StrReplace(out, "`r", "\r", true)
+	out := StrReplace(out, "`t", "\t", true)
+	out := StrReplace(out, Chr(0x08), "\b", true)
+	out := StrReplace(out, Chr(0x0C), "\f", true)
+	; A class naming a non-ASCII unit makes the scan below 20 times slower, so
+	; the fixed units are replaced natively too.
+	out := StrReplace(out, Chr(0x2028), Format("\u{:04x}", 0x2028), true)
+	out := StrReplace(out, Chr(0x2029), Format("\u{:04x}", 0x2029), true)
+	if escapeHtml {
+		out := StrReplace(out, "&", Format("\u{:04x}", 0x26), true)
+		out := StrReplace(out, "<", Format("\u{:04x}", 0x3C), true)
+		out := StrReplace(out, ">", Format("\u{:04x}", 0x3E), true)
+	}
+	; The other C0 units have no short escape and are rare: walk their matches.
+	Escaped := ""
+	Pos := 1
+	while (Found := RegExMatch(out, '[\x01-\x1f]', , Pos)) {
+		Escaped .= SubStr(out, Pos, Found - Pos) . Format("\u{:04x}", Ord(SubStr(out, Found, 1)))
+		Pos := Found + 1
+	}
+	return Escaped . SubStr(out, Pos)
 }
 
 /**

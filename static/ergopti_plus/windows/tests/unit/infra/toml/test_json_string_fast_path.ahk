@@ -30,3 +30,14 @@ _JsonFastPath_AllCodeUnits(Html) {
 for Html in [false, true]
 	Test("JSON strings: exhaustive code units HTML=" . Html . " (json-safe-string-fast-path)",
 		_JsonFastPath_AllCodeUnits.Bind(Html))
+
+_JsonFastPath_AdjacentEscapes() {
+	; Native passes run one escape at a time: each must leave the others intact
+	; when they touch, and the C0 walk must keep the text between its matches.
+	Text := Chr(1) . Chr(0x1F) . "\" . '"' . "`n" . Chr(0x2028) . "<" . Chr(2) . "a" . Chr(0x0B)
+	AssertEqual('"\u0001\u001f\\\"\n\u2028<\u0002a\u000b"', JsonStringLiteral(Text))
+	AssertEqual('"\u0001\u001f\\\"\n\u2028\u003c\u0002a\u000b"', JsonStringLiteral(Text, true))
+	AssertEqual(Text, JsonParse(JsonStringLiteral(Text, true)))
+}
+Test("JSON strings: adjacent escapes of every kind (json-safe-string-fast-path)",
+	_JsonFastPath_AdjacentEscapes)
