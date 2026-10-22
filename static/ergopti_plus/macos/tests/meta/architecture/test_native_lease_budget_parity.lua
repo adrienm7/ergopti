@@ -178,6 +178,32 @@ helpers.describe("native Karabiner lease budgets stay ordered", function()
 			ack, command, MIN_LUA_LATENCY_MARGIN_SEC))
 	end)
 
+	-- Lua sends the next PING only after reading the last PONG, and the inner
+	-- fences on silence: an Ergopti menu kept open past that budget lost a
+	-- healthy lease (issue #100). An on-time deadline therefore writes a
+	-- keepalive at once and every heartbeat interval after it, and both must
+	-- land inside the inner's budget while the outer is idle.
+	helpers.it("(lease-output-keepalive) keepalives reach the inner before its silence budget ends", function()
+		local swift = swift_constants()
+		local lua = lua_constants()
+		local heartbeat = evaluate(lua, "HEARTBEAT_INTERVAL_SEC")
+		local inner_budget = heartbeat + evaluate(swift, "kLeaseInnerSilenceSlackSeconds")
+		local command_deadline = evaluate(lua, "COMMAND_ACK_TIMEOUT_SEC")
+		local ready_deadline = evaluate(lua, "READY_ACK_TIMEOUT_SEC")
+		local outer_command = evaluate(swift, "kPrivateCommandAckTimeoutSeconds")
+		helpers.assert_true(command_deadline < inner_budget, string.format(
+			"the first keepalive after an unread PONG (%.2f s) must precede the inner's silence fence (%.2f s)",
+			command_deadline, inner_budget))
+		helpers.assert_true(ready_deadline < inner_budget, string.format(
+			"the first keepalive after an unread READY (%.2f s after launch) must precede the inner's silence fence (%.2f s)",
+			ready_deadline, inner_budget))
+		helpers.assert_true(heartbeat < inner_budget,
+			"the keepalive cadence must stay inside the inner's silence budget")
+		helpers.assert_true(command_deadline >= outer_command and heartbeat >= outer_command, string.format(
+			"keepalives (first at %.2f s, then every %.2f s) must find the outer idle past its %.2f s command budget",
+			command_deadline, heartbeat, outer_command))
+	end)
+
 	-- The worker's budgets start once it runs; READY also waits for the outer
 	-- and its suspended inner to launch. Issue #99 activated leases in 3.4 to
 	-- 6.0 s on a loaded Mac and failed every slower one at 7.5 s, each failure
