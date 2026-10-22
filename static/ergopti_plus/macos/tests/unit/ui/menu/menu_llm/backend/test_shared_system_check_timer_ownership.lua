@@ -79,10 +79,13 @@ local function with_fixture(callback)
 				end
 				return "100"
 			end,
+			-- The check finds its own process by PID (adapters.running_application),
+			-- never by a name lookup that can fall back to reading every window.
+			processInfo = { processID = 4242 },
 			application = {
-				get = function()
-					if fixture.application_mode == "get_throw" then
-						error("system-check application.get failure")
+				applicationForPID = function()
+					if fixture.application_mode == "pid_throw" then
+						error("system-check application lookup failure")
 					end
 					if fixture.reentrant_pause_on_application_get then
 						fixture.child_present_during_application_get =
@@ -91,12 +94,8 @@ local function with_fixture(callback)
 					end
 					return nil
 				end,
-				find = function()
-					if fixture.application_mode == "find_throw" then
-						error("system-check application.find failure")
-					end
-					return nil
-				end,
+				get = function() error("the system check must not look itself up by name") end,
+				find = function() error("the system check must not look itself up by name") end,
 			},
 			focus = function()
 				fixture.focus_calls = (fixture.focus_calls or 0) + 1
@@ -352,7 +351,7 @@ helpers.describe("shared system-check exact timer requirement ownership", functi
 		end)
 	end
 
-	for _, mode in ipairs({ "get_throw", "find_throw" }) do
+	for _, mode in ipairs({ "pid_throw" }) do
 		helpers.it("settles the parent when application lookup " .. mode, function()
 			with_fixture(function(fixture)
 				fixture.application_mode = mode
