@@ -3,36 +3,59 @@
 --- ==============================================================================
 --- MODULE: POSIX Path Separator Owner Guard
 --- DESCRIPTION:
---- Class-wide guard: driver code splits, joins and trims real macOS paths only
---- through the shared owner _shared/lua/native_path.lua.
+--- Class-wide guard: the macOS driver, the Linux driver and the shared Lua they
+--- both load split, join and trim real POSIX paths only through the shared
+--- owner _shared/lua/native_path.lua.
 ---
 --- ROOT CAUSE ENCODED:
---- A backslash is an ordinary filename byte on macOS, but about 85 sites in 30
---- files spelled the separator class as [/\\], [^/\\] or [\\/]. Above a folder
---- named "back\slash" the bootstrap walk stepped into "back"; a group or file
---- name holding a backslash lost its first half. The owner applies the host
---- rule once (backslash separates only on a Windows host, where the headless
---- suite runs). A per-site fix does not hold on this driver, so every new class
---- spelling outside the owner fails here unless it is listed below with a reason
---- (posix-backslash-separator-owner).
+--- A backslash is an ordinary filename byte on macOS and Linux, but about 85
+--- macOS sites, 25 shared ones and 8 Linux ones spelled the separator class as
+--- [/\\], [^/\\] or [\\/]. Above a folder named "back\slash" the bootstrap walk
+--- stepped into "back"; a group or file name holding a backslash lost its first
+--- half; a configuration folder ending in a backslash lost that byte. The owner
+--- applies the host rule once (backslash separates only on a Windows host,
+--- where the headless suite runs). A per-site fix does not hold, so every new
+--- class spelling outside the owner fails here unless it is listed below with a
+--- reason (posix-backslash-separator-owner). The shared Lua is read here because
+--- macOS loads it: a shared site cuts a macOS path exactly like a driver site.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- The whole driver tree is read except tests/: the harness itself runs on a
--- Windows checkout and parses its own Windows paths.
-local EXCLUDED_PREFIX = "tests/"
+-- Each tree is read except its test harness, which runs on a Windows checkout
+-- and parses its own Windows paths. Floors: a walk that reads nothing, or an
+-- owner nobody calls, must not pass.
+local TREES = {
+	{ dir = "macos", excluded = "macos/tests/", min_files = 300, min_owner_calls = 60 },
+	{ dir = "_shared/lua", excluded = "_shared/lua/test/", min_files = 80, min_owner_calls = 15 },
+	{ dir = "linux", excluded = "linux/tests/", min_files = 150, min_owner_calls = 6 },
+}
 
--- Justified remaining spellings: path = { count, reason }. Empty while every
--- macOS filesystem path goes through the owner.
-local BASELINE = {}
+-- The owner itself spells the classes it hands out.
+local OWNER = "_shared/lua/native_path.lua"
 
--- Floors: a walk that reads nothing, or an owner nobody calls, must not pass.
-local MIN_FILES = 300
-local MIN_OWNER_CALLS = 60
+-- Genuine Windows-path parsers, which must see both separators on every host:
+-- path = { count, reason }.
+local WINDOWS_PATH_PARSERS = {
+	["_shared/lua/program_parameter.lua"] = { 3, "validates a drive or UNC executable typed for the AHK driver" },
+	["_shared/lua/diagnostics/redact.lua"] = { 1, "redacts the home folder in both slash spellings a log can hold" },
+	["_shared/lua/open_target/init.lua"] = { 3, "classifies a drive, UNC or %VARIABLE% target as Windows-only" },
+	["_shared/lua/updater/config_backup.lua"] = { 1,
+		"refuses a shipped backup name that would not be one component on Windows" },
+}
 
--- The separator class in each spelling, as raw Lua source text.
-local SPELLINGS = { "[/\\\\", "[^/\\\\", "[\\\\/", "[^\\\\/" }
+-- Unconverted sites, each owned by a concurrent change and converted next:
+-- path = { count, reason }. The goal is an empty table.
+local BASELINE = {
+	["_shared/lua/config_migrate.lua"] = { 2, "config migration owner: split the backup path through NativePath" },
+	["_shared/lua/config_unused_keys.lua"] = { 2, "unused-key owner: split the backup path through NativePath" },
+	["_shared/lua/llm/profile_selector.lua"] = { 2, "LLM owner: resolve the profiles file through NativePath" },
+	["linux/modules/keylogger/sqlite_writer.lua"] = { 1, "keylogger owner: take the database folder through NativePath" },
+}
+
+-- The separator class in each spelling, as raw Lua source text. The last two
+-- are the escaped form "[\\\\/]" that the first four do not contain.
+local SPELLINGS = { "[/\\\\", "[^/\\\\", "[\\\\/", "[^\\\\/", "[\\\\\\\\/", "[^\\\\\\\\/" }
 
 
 
@@ -101,41 +124,58 @@ end
 -- ==================================================
 -- ==================================================
 
-helpers.describe("macOS paths split only through the shared owner (posix-backslash-separator-owner)", function()
-	helpers.it("posix-backslash-separator-owner: no [/\\] separator class outside native_path.lua", function()
-		local root = helpers.driver_root()
-		local files = {}
-		local all = {}
-		collect(root:gsub("/$", ""), all)
-		for _, path in ipairs(all) do
-			if path:gsub("^.*/macos/", ""):sub(1, #EXCLUDED_PREFIX) ~= EXCLUDED_PREFIX then files[#files + 1] = path end
-		end
-		helpers.assert_true(#files >= MIN_FILES, string.format(
-			"the source walk found %d driver .lua files (floor %d): the guard would be vacuous", #files, MIN_FILES))
-
-		local offenders, owner_calls, seen = {}, 0, {}
-		for _, path in ipairs(files) do
+--- Reads every production source of one tree.
+--- @param base string The ergopti_plus folder, with a trailing slash.
+--- @param tree table One TREES entry.
+--- @return table sources Array of { rel, text }, rel relative to base.
+local function tree_sources(base, tree)
+	local all, sources = {}, {}
+	collect(base .. tree.dir, all)
+	for _, path in ipairs(all) do
+		local rel = path:sub(#base + 1)
+		assert(path:sub(1, #base) == base, "the walk left the ergopti_plus folder: " .. path)
+		if rel:sub(1, #tree.excluded) ~= tree.excluded and rel ~= OWNER then
 			local handle = assert(io.open(path, "rb"), "unreadable driver source " .. path)
-			local source = handle:read("*a"); handle:close()
-			local rel = path:gsub("^.*/macos/", "")
-			local found = 0
-			for _, spelling in ipairs(SPELLINGS) do found = found + count(source, spelling) end
-			owner_calls = owner_calls + count(source, "NativePath.") + count(source, 'require("native_path").')
-			local allowed = BASELINE[rel]
-			seen[rel] = true
-			if found ~= (allowed and allowed[1] or 0) then
-				offenders[#offenders + 1] = string.format("%s (%d, baseline %d)", rel, found, allowed and allowed[1] or 0)
-			end
+			sources[#sources + 1] = { rel = rel, text = handle:read("*a") }
+			handle:close()
 		end
-		for rel in pairs(BASELINE) do
-			if not seen[rel] then offenders[#offenders + 1] = rel .. " (baseline names a missing file)" end
+	end
+	return sources
+end
+
+helpers.describe("POSIX paths split only through the shared owner (posix-backslash-separator-owner)", function()
+	helpers.it("posix-backslash-separator-owner: no [/\\] separator class outside native_path.lua", function()
+		local base = (helpers.driver_root():gsub("\\", "/"):gsub("/$", ""):gsub("[^/]+$", ""))
+		local offenders, seen = {}, {}
+		for _, tree in ipairs(TREES) do
+			local sources = tree_sources(base, tree)
+			helpers.assert_true(#sources >= tree.min_files, string.format(
+				"the %s walk found %d .lua files (floor %d): the guard would be vacuous",
+				tree.dir, #sources, tree.min_files))
+			local owner_calls = 0
+			for _, source in ipairs(sources) do
+				local found = 0
+				for _, spelling in ipairs(SPELLINGS) do found = found + count(source.text, spelling) end
+				owner_calls = owner_calls + count(source.text, "NativePath.") + count(source.text, 'require("native_path").')
+				local allowed = WINDOWS_PATH_PARSERS[source.rel] or BASELINE[source.rel]
+				seen[source.rel] = true
+				if found ~= (allowed and allowed[1] or 0) then
+					offenders[#offenders + 1] = string.format("%s (%d, allowed %d)", source.rel, found,
+						allowed and allowed[1] or 0)
+				end
+			end
+			helpers.assert_true(owner_calls >= tree.min_owner_calls, string.format(
+				"only %d native path owner calls found in %s (floor %d): the scan is not reading the converted sites",
+				owner_calls, tree.dir, tree.min_owner_calls))
+		end
+		for _, listed in ipairs({ WINDOWS_PATH_PARSERS, BASELINE }) do
+			for rel in pairs(listed) do
+				if not seen[rel] then offenders[#offenders + 1] = rel .. " (listed, but no such source)" end
+			end
 		end
 		table.sort(offenders)
 		helpers.assert_true(#offenders == 0, "separator classes outside _shared/lua/native_path.lua treat a "
-			.. "backslash as a separator although it is a macOS filename byte. Use the owner, or list a "
-			.. "justified Windows-path parser in BASELINE: " .. table.concat(offenders, ", "))
-		helpers.assert_true(owner_calls >= MIN_OWNER_CALLS, string.format(
-			"only %d native path owner calls found (floor %d): the scan is not reading the converted sites",
-			owner_calls, MIN_OWNER_CALLS))
+			.. "backslash as a separator although it is a macOS and Linux filename byte. Use the owner, or "
+			.. "list a genuine Windows-path parser in WINDOWS_PATH_PARSERS: " .. table.concat(offenders, ", "))
 	end)
 end)

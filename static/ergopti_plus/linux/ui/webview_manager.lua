@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
@@ -306,9 +307,10 @@ local function _driver_root()
 	-- the driver's UI was reorganised by feature to match macOS and Windows, and a
 	-- stale depth here resolves to a directory that exists but holds nothing —
 	-- which is how every other wrong-depth path in this driver failed.
-	return (src:match("^(.*)[/\\\\]ui[/\\\\]webview_manager%.lua$")
-		or src:match("^(.*)[/\\\\]ui$")
-		or "."):gsub("\\", "/")
+	-- A backslash is a Linux filename byte: it neither splits nor is rewritten.
+	if NativePath.basename(src) == "webview_manager.lua" then src = NativePath.dirname(src) or "" end
+	if NativePath.basename(src) ~= "ui" then return "." end
+	return NativePath.dirname(src) or "."
 end
 
 --- Where each shared-UI app's bridge lives, as an explicit table rather than a

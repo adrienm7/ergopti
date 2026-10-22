@@ -23,6 +23,8 @@
 
 local M = {}
 
+local NativePath = require("native_path")
+
 -- How many file names a reload line lists before summarising the rest.
 M.MAX_LISTED_PATHS = 5
 
@@ -46,7 +48,7 @@ M.SLOW_PROCESS_MS = 1000
 --- @param path string
 --- @return string
 local function basename(path)
-	return (tostring(path):match("([^/\\]+)[/\\]*$")) or tostring(path)
+	return NativePath.basename(NativePath.without_trailing_separators(tostring(path))) or tostring(path)
 end
 
 --- Describes the files behind a reload as "N file(s): a, b, +K more".

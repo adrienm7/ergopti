@@ -35,6 +35,7 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Logger = require("logger.shim")
 local LayerPreset = require("keymap.layer_preset")
+local NativePath = require("native_path")
 local LOG = "infra.tap_hold_scope"
 local _owner, _sequence = nil, 0
 
@@ -52,7 +53,7 @@ end
 --- @return table|nil import What LayerPreset.import_if_absent() returned.
 --- @return string|nil err Why the absent file could not be created.
 local function import_layer(options, files)
-	local config_dir = assert(options.tap_hold_path:match("^(.*)[/\\][^/\\]+$"),
+	local config_dir = assert(NativePath.dirname(options.tap_hold_path),
 		"tap-hold scope needs tap_hold.toml inside a configuration folder")
 	local ok, import, err = pcall(LayerPreset.import_if_absent, {
 		shared_root = options.shared_root or require("infra.paths").shared_root(),

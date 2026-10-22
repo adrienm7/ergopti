@@ -24,6 +24,7 @@
 local M = {}
 
 local TomlWriter = require("toml_codec.writer")
+local NativePath = require("native_path")
 
 
 
@@ -70,7 +71,7 @@ local function folder(config_dir)
 	if type(config_dir) ~= "string" or config_dir == "" then
 		error("layer_preset: the configuration folder is unknown", 3)
 	end
-	return (config_dir:gsub("[/\\]+$", ""))
+	return NativePath.without_trailing_separators(config_dir)
 end
 
 
@@ -89,7 +90,7 @@ end
 --- @return table preset { text, user_file, layer_id }
 function M.read(shared_root, toml_decode)
 	if type(shared_root) ~= "string" or shared_root == "" then error("layer_preset: the _shared tree is unreachable", 2) end
-	local root = shared_root:gsub("[/\\]+$", "")
+	local root = NativePath.without_trailing_separators(shared_root)
 	local vocabulary = toml_decode(read_shipped(root .. "/" .. M.VOCABULARY_FILE))
 	local meta = type(vocabulary) == "table" and vocabulary._meta or nil
 	if type(meta) ~= "table" or type(meta.user_file) ~= "string" or meta.user_file == "" then

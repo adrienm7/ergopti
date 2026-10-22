@@ -21,6 +21,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
@@ -481,7 +482,7 @@ local function _build(loaded, boot)
  local issued={loaded=loaded,catalogue=copy_fields(loaded.catalog),keys=copy_fields(loaded.keys),holds=copy_fields(loaded.hold_picker)}
 	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
-	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
+	local config_dir = assert(NativePath.dirname(_user_path), "tap-hold path needs a configuration folder")
 	local nav_eligible = nav_ports_current()
 	local root_port = nav_eligible and original_shared_root or Paths.shared_root
 	local shared_root = root_port()

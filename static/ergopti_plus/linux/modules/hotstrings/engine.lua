@@ -29,7 +29,9 @@ local _this_file = debug.getinfo(1, "S").source:gsub("^@", "")
 -- resolves by hand rather than through lib.paths: requiring the resolver here
 -- would need the very path it is computing. tools/test/
 -- test-linux-shared-path-resolver.cjs asserts this depth instead.
-local _linux_root = _this_file:match("^(.*[/\\])modules[/\\]hotstrings[/\\]")
+-- A backslash is a Linux filename byte, and the shared path owner is not yet
+-- reachable: split at slashes alone.
+local _linux_root = _this_file:match("^(.*/)modules/hotstrings/")
 local _shared_lua = _linux_root and (_linux_root .. "../_shared/lua") or nil
 
 if _shared_lua then
