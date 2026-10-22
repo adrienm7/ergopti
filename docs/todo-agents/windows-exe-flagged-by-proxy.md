@@ -211,9 +211,17 @@ SHA-256 and release URL, asking for an allow-list or re-scan).
   `FileRecycleEmpty`), the screen brightness adapter (WMI, reachable through `ComObjGet`), and the elevated touchpad registry
   scripts (`modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`). The updater,
   crash report, curl, managed network, Ollama and diagnostics workers are vendor scripts: kept.
-  The updater bootstrap (base64 fragments in environment variables, `[ScriptBlock]::Create`,
-  `-EncodedCommand`) is the pattern scored hardest after the unzip; moving it to a bundled
-  `-File` worker is the next candidate, held at its ceiling by the gate meanwhile.
+- Done: the updater bootstrap (base64 fragments in environment variables, `[ScriptBlock]::Create`,
+  `-EncodedCommand`) is gone. The updater runs `vendor/ergopti_updater_staging.ps1` with `-File`
+  and one `-TransportPrefix` argument (release data stays in inherited environment values), the
+  staging worker copies `vendor/ergopti_updater_swap.ps1` next to the staged exe, and the
+  crash-report minimal writer is `vendor/ergopti_crash_fallback_worker.ps1`. Measured on a local
+  Ahk2Exe build, compiled script before/after: `-EncodedCommand` 3/0, `[ScriptBlock]::Create` 1/0,
+  `FromBase64String` 2/0, `ExecutionPolicy Bypass` 18/17, `WindowStyle Hidden` 4/3 (the swap
+  worker's `Start-Process -WindowStyle Hidden` moved to the bundle). The gate now forbids the first
+  three in the script and `-EncodedCommand` in the bundle. `-ExecutionPolicy Bypass` stays on the
+  `-File` launches: it is process scope only, and the default Windows client policy (Restricted)
+  refuses every script file without an override.
 - "keylogger" names the typing metrics in about 1 070 shipped strings and identifiers (and 10 600
   repository occurrences in 1 350 files across the three drivers, config keys and locales). A
   rename to typing metrics is a cross-driver campaign of its own; the gate reports the count.
