@@ -422,6 +422,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.event_clock",
+		contract = { "lateness_ms", "duration_ms" },
+		-- The keymap taps and the physical fence read every key event's lateness.
+		wired    = true,
+	},
+	{
 		id       = "adapters.keyboard_geometry",
 		contract = { "initialize", "event_type", "form", "native_code", "physical_code" },
 		wired    = true,
