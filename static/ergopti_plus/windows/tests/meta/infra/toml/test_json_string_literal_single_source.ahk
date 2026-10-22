@@ -60,3 +60,18 @@ _JSLSS_ContentsRoundTripEveryControl() {
 }
 Test("JSON strings: unquoted shared contents round-trip controls (json-string-literal-single-source)",
 	_JSLSS_ContentsRoundTripEveryControl)
+
+_JSLSS_LiteralEscapesNatively() {
+	; The Versions window escapes a release list of about 2 MB on the thread that
+	; runs the keyboard hook: a script loop per code unit took 3 s there.
+	for Name in ["JsonStringLiteral", "_JsonEscapeNulFreeRun"] {
+		Body := _StripFullLineComments(_DriverFuncBody(Name))
+		Assert(Body != "", Name . " must be found")
+		Assert(!RegExMatch(Body, "i)\bloop\s+StrLen\("),
+			Name . " must not walk its input one code unit at a time")
+	}
+	Assert(InStr(_StripFullLineComments(_DriverFuncBody("_JsonEscapeNulFreeRun")), "StrReplace(") > 0,
+		"the shared JSON string encoder must escape through native replacement passes")
+}
+Test("JSON strings: the shared encoder escapes in native passes (json-string-literal-single-source)",
+	_JSLSS_LiteralEscapesNatively)
