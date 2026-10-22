@@ -130,8 +130,14 @@ in its handoff file in [`docs/todo-agents/`](todo-agents/).
 | Backspace and the word start: erase, Ctrl+Backspace, empty terminal and address-bar lines (three drivers)                | [backspace-resets-word-start.md](todo-agents/backspace-resets-word-start.md)               | On dev (0bac8b672e, 969f49998a, d01c21e0f9, 273962f885, afc704b454); root cause proven from the typing ledger; run 39678425941 green on Windows and Linux, macOS red only on the tap-hold lease tests, fixed by b4ce3759b6; Windows Terminal and browser checks in the file |
 
 **The dev reds of f0fb919379 are fixed** (architecture.md, macOS fixture residue, `require_state` back to 27,
-`Updater_ParseBody`, number-row fixture: see [dev-red-fixes.md](todo-agents/dev-red-fixes.md)); no full run has
-qualified the tip yet. Still to review from the integration: the macOS typing dashboard now refuses a history whose
+`Updater_ParseBody`, number-row fixture: see [dev-red-fixes.md](todo-agents/dev-red-fixes.md)). **Full run
+39716207498 is green on every lane at 79b11fe954**, ready for 1.0.5. The reds of run 39700749511 were fixed at the
+root: the macOS open-target fixture now restores its stubs (c77c7cc3a5), the updater source pins were resealed for
+run_all.ahk (3f3c62467b), the Linux non-/tmp watcher fixture no longer writes into the driver tree (3f94f28eba), and
+the missing site artifact was only the downstream refusal of the common unit red. Three slow-runner flakes were made
+robust: the native listener fixture uses .NET calls only with a 30 s bound (c55404baff), curl-literal-paths waits
+30 s for its cold children (79b11fe954), and the Linux dry-run dispatch test counts calls with the JIT off, since
+LuaJIT calls no hook from a compiled trace (545465665f). Still to review from the integration: the macOS typing dashboard now refuses a history whose
 database reads were incomplete (Codex's design) instead of showing partial counts.
 
 Rules every continuing agent must keep: dev and main stay linear (never `git merge`); a release is a
