@@ -231,7 +231,7 @@ helpers.describe("ordered editing source and program retirement",function()
 		local manifest=require("infra.manifest_reader")
 		helpers.assert_eq(manifest.recommended_for("shortcuts.key_combination_taps.alt_gr_then_left_alt"),"ctrl_backspace")
 		helpers.assert_eq(manifest.recommended_for("shortcuts.key_combination_taps.alt_gr_then_caps_lock"),"ctrl_delete")
-		helpers.assert_eq(manifest.recommended_for("shortcuts.key_combination_taps.left_alt_then_caps_lock"),"none")
+		helpers.assert_eq(manifest.recommended_for("shortcuts.key_combination_taps.left_alt_then_caps_lock"),"caps_word")
 	end)
 end)
 

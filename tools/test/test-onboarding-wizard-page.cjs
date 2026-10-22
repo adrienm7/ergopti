@@ -740,16 +740,14 @@ function cataloguePaths(driver) {
 		items.map((item) => [item.path, item.value]),
 		[
 			['shortcuts.key_combination_taps.alt_gr_then_left_alt', 'ctrl_backspace'],
-			['shortcuts.key_combination_taps.alt_gr_then_caps_lock', 'ctrl_delete']
+			['shortcuts.key_combination_taps.alt_gr_then_caps_lock', 'ctrl_delete'],
+			// Linux recommends the Windows LAlt then CapsLock CapsWord (2026-10-22).
+			['shortcuts.key_combination_taps.left_alt_then_caps_lock', 'caps_word']
 		]
 	);
 	assert.deepEqual(
 		described.sub_switch.items,
 		items.map((item) => item.path)
-	);
-	assert.equal(
-		items.some((item) => item.value === 'caps_word'),
-		false
 	);
 	const open = (current = {}) => {
 		const page = openWizard({ platform: 'linux', current });
@@ -800,7 +798,7 @@ function cataloguePaths(driver) {
 		)
 	);
 	const rows = checkRows(withoutPairs).filter((row) => names.has(row.name));
-	assert.equal(rows.length, 2);
+	assert.equal(rows.length, items.length);
 	rows.forEach(toggle);
 	assert.deepEqual(
 		combinations(withoutPairs),

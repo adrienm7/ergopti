@@ -4860,6 +4860,28 @@
 										]
 									},
 									{
+										"path": "shortcuts.key_combination_taps.left_alt_then_caps_lock",
+										"value": "caps_word",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "tap_hold.group.left_alt"
+											},
+											{
+												"text": " + "
+											},
+											{
+												"key": "tap_hold.group.caps_lock"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.caps_word"
+											}
+										]
+									},
+									{
 										"path": "shortcuts.keyboard.ctrl_g",
 										"value": "open_chatgpt",
 										"default": "none",
@@ -4922,7 +4944,8 @@
 							"default": true,
 							"items": [
 								"shortcuts.key_combination_taps.alt_gr_then_left_alt",
-								"shortcuts.key_combination_taps.alt_gr_then_caps_lock"
+								"shortcuts.key_combination_taps.alt_gr_then_caps_lock",
+								"shortcuts.key_combination_taps.left_alt_then_caps_lock"
 							]
 						}
 					},
@@ -4932,7 +4955,140 @@
 						"question_key": "menu.gestures.enable",
 						"description_key": "onboarding.gestures.desc",
 						"consent": false,
-						"groups": [],
+						"groups": [
+							{
+								"items": [
+									{
+										"path": "gestures.swipe_3_down",
+										"value": "tab_close",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_3_down"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.tab_close"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_3_left",
+										"value": "tab_prev",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_3_left"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.tab_prev"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_3_right",
+										"value": "tab_next",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_3_right"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.tab_next"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_3_up",
+										"value": "tab_new",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_3_up"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.tab_new"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_left",
+										"value": "desktop_prev",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_left"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.desktop_prev"
+											}
+										]
+									},
+									{
+										"path": "gestures.swipe_4_right",
+										"value": "desktop_next",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.swipe_4_right"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.desktop_next"
+											}
+										]
+									},
+									{
+										"path": "gestures.tap_3",
+										"value": "left_click_toggle",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.tap_3"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.left_click_toggle"
+											}
+										]
+									},
+									{
+										"path": "gestures.tap_4",
+										"value": "alt_tab_monitor",
+										"default": "none",
+										"recommended": true,
+										"label": [
+											{
+												"key": "menu.gestures.tap_4"
+											}
+										],
+										"value_label": [
+											{
+												"key": "sg_actions.alt_tab_monitor"
+											}
+										]
+									}
+								]
+							}
+						],
 						"master": {
 							"path": "gestures.enabled",
 							"default": false

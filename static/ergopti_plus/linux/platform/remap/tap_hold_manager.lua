@@ -159,8 +159,6 @@ local function _run_tap(action, binding)
 	-- CapsWord is an ordinary catalogue action, as on Windows: the executor
 	-- toggles the shortcuts manager's session, the one the tray row shows,
 	-- which locks CapsLock and ends on the [shortcuts.caps_word] settings.
-	-- Returning its id would ask the hook for the engine's own per-letter
-	-- mode instead, a second CapsWord with neither those endings nor the row.
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -515,7 +513,6 @@ local function _build(loaded, boot)
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
-		caps_word_plan = function(text) return _hook.plan_caps_word(text) end,
 		one_shot_result = _one_shot_result,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,

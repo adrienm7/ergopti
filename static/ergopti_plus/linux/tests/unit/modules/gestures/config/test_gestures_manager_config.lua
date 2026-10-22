@@ -133,16 +133,14 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(all.tap_4 ~= nil)
   end)
 
-  helpers.it("reset_defaults returns every slot to unbound", function()
-    -- This asserted `ws_prev`, which was the shipped default until 2026-08-05.
-    -- Linux now ships no bindings at all: the touchpad is read WITHOUT a grab
-    -- (grabbing it kills the cursor), evdev is broadcast, and every desktop that
-    -- claims 3- and 4-finger swipes — GNOME 47+, KWin, Hyprland, cosmic-comp —
-    -- would fire its action alongside ours on a fresh install.
+  helpers.it("reset_defaults restores the Windows recommendation, not the neutral default", function()
+    -- A fresh install still binds nothing (the touchpad is read without a
+    -- grab, so the desktop sees every gesture), but an explicit restore gives
+    -- the Windows recommendation since the decision of 2026-10-22.
     M.set_action("swipe_3_left", "vol_up")
     M.reset_defaults()
-    helpers.assert_eq(M.get_action("swipe_3_left"), "none",
-      "reset must return the slot to unbound, not to a binding the user never chose")
+    helpers.assert_eq(M.get_action("swipe_3_left"), "tab_prev")
+    helpers.assert_eq(M.DEFAULT_GESTURES.swipe_3_left, "none", "the neutral default stays unbound")
   end)
 
   helpers.it("keeps parameterized action values isolated per gesture binding", function()

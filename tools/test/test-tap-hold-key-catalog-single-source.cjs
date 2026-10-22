@@ -408,7 +408,7 @@ function savedLinuxOneShotClosure(sources) {
 		runtime: luaBody(
 			hook,
 			'local function _input_runtime_current(ctx, active)',
-			'local function _caps_semantics_current(ctx)'
+			'local function _input_guard_current(ctx)'
 		),
 		guard: luaBody(
 			hook,
@@ -425,13 +425,7 @@ function savedLinuxOneShotClosure(sources) {
 			'function M.input_owner_current(lease)',
 			'function M.arm_one_shot(lease)'
 		),
-		arm: luaBody(hook, 'function M.arm_one_shot(lease)', 'function M.arm_caps_word(lease)'),
-		caps: luaBody(hook, 'function M.arm_caps_word(lease)', 'function M.plan_caps_word(text)'),
-		semantics: luaBody(
-			hook,
-			'local function _caps_semantics_current(ctx)',
-			'local function _input_guard_current(ctx)'
-		)
+		arm: luaBody(hook, 'function M.arm_one_shot(lease)', 'local function _forward_raw(ev, source)')
 	};
 	if (Object.values(bodies).some((body) => body === '')) return false;
 	const assignment = bodies.build.match(
@@ -446,8 +440,6 @@ function savedLinuxOneShotClosure(sources) {
 		'capture_input_owner',
 		'input_owner_current',
 		'arm_one_shot',
-		'arm_caps_word',
-		'plan_caps_word',
 		'set_remapper',
 		'stop',
 		'emergency_stop',
@@ -477,7 +469,7 @@ function savedLinuxOneShotClosure(sources) {
 		// Hook would start the engine's second, settings-less CapsWord.
 		bodies.tap.startsWith('if action == "one_shot_shift" then return action end') &&
 		!bodies.tap.includes('"caps_word"') &&
-		!/(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(manager) &&
+		!/(?:capture_input_owner|input_owner_current|arm_one_shot)\s*\(/.test(manager) &&
 		bodies.frame.includes('origin_view.origin == "native-evdev" and _remapper_input_owner') &&
 		bodies.frame.includes('origin_view.source == source') &&
 		bodies.frame.includes('callback = _on_tap, at_ms = at_ms') &&
@@ -487,15 +479,15 @@ function savedLinuxOneShotClosure(sources) {
 		bodies.frame.includes(
 			'if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end'
 		) &&
-		bodies.frame.includes('if tap == "one_shot_shift" or tap == "caps_word" then') &&
-		bodies.frame.includes(
-			'local arm = tap == "caps_word" and original_input_hook_ports.arm_caps_word or original_input_hook_ports.arm_one_shot'
-		) &&
-		bodies.frame.includes('return arm(lease) == true') &&
+		bodies.frame.includes('if tap == "one_shot_shift" then') &&
+		// The engine's per-letter CapsWord mode is gone: CapsWord never arms
+		// the input owner and runs through the executor like any action.
+		!bodies.frame.includes('"caps_word"') &&
+		!/caps_word|CapsWord/.test(bodies.capture + bodies.arm + bodies.guard + bodies.runtime) &&
+		!/arm_caps_word|plan_caps_word|ack_caps_word|adapters\/caps_word\.lua/.test(hook) &&
+		bodies.frame.includes('return original_input_hook_ports.arm_one_shot(lease) == true') &&
 		bodies.frame.includes('and original_input_hook_ports.input_owner_current(lease) == true') &&
-		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(
-			bodies.frame
-		) &&
+		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot)\s*\(/.test(bodies.frame) &&
 		protectedPorts.every((token) => /^"[a-z_]+"$/.test(token)) &&
 		new Set(protectedPorts).size === protectedPorts.length &&
 		requiredPorts.every((name) => protectedPorts.includes(JSON.stringify(name))) &&
@@ -530,21 +522,9 @@ function savedLinuxOneShotClosure(sources) {
 		) &&
 		bodies.arm.includes('pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)') &&
 		bodies.arm.includes('if not ctx or ctx.action ~= "one_shot_shift" or ctx.used or ctx.arming') &&
-		bodies.caps.includes('ctx.action ~= "caps_word"') &&
-		bodies.caps.includes('pcall(caps_ports.capture)') &&
-		bodies.caps.includes('pcall(_input_ports.arm_caps_word, ctx.issuer, current)') &&
-		bodies.caps.includes('published ~= true or not _input_runtime_current(ctx, true)') &&
-		bodies.semantics.includes('if ctx.action ~= "caps_word" then return true end') &&
-		bodies.semantics.includes('NativeCapsWord.capture ~= caps_ports.capture') &&
-		bodies.semantics.includes('caps_ports.current(ctx.semantic_owner) ~= true') &&
-		bodies.semantics.includes(
-			'_input_reader_ports.event_current(ctx.letter_origin, ctx.letter_event,'
-		) &&
-		bodies.guard.includes(
-			'and _caps_semantics_current(ctx) and _input_runtime_current(ctx, false)'
-		) &&
-		hook.includes('local original_caps_constructor = assert(caps_constructor_source') &&
-		hook.includes('local NativeCapsWord = assert(original_caps_constructor())')
+		bodies.capture.includes(
+			'if not ctx or ctx.action ~= "one_shot_shift" or not _input_runtime_current(ctx, true) then return nil end'
+		)
 	);
 }
 
@@ -600,7 +580,8 @@ function simultaneousLinuxAdmission(
 		owner.includes('buffered_settings[configured]') &&
 		owner.includes('options.files == nil and options.route == nil') &&
 		owner.includes('action~=\"one_shot_shift\"') &&
-		owner.includes('action~=\"caps_word\"') &&
+		// Chord slots run CapsWord through the executor, as pair taps do.
+		!owner.includes('action~=\"caps_word\"') &&
 		wrapper.includes('buffered_settings_current') &&
 		wrapper.includes('buffer_request') &&
 		hook.includes('capture_buffered_input') &&
@@ -625,7 +606,8 @@ function orderedLinuxAdmission(declaration, sources) {
 	return (
 		row?.platforms?.join(',') === 'ahk,hs,linux' &&
 		row.reason_key === 'platform_reason.remap_engine_is_per_driver' &&
-		capsWord?.recommended_per_platform?.linux === 'none' &&
+		capsWord?.recommended === 'caps_word' &&
+		capsWord.recommended_per_platform === undefined &&
 		(declaration.menu.key_combinations_group
 			.filter((item) => ['combo_symmetric', 'combo_timings', 'copy_tap_to_combo'].includes(item.id))
 			.every((item) => item.platforms?.join(',') === 'hs') ||
@@ -667,7 +649,7 @@ for (const [index, token] of [
 	[0, 'require("platform.remap.key_combination_engine")'],
 	[1, 'receipt.physical == true'],
 	[1, 'current.source == receipt.source'],
-	[2, 'action~=\"caps_word\"'],
+	[2, 'action~=\"one_shot_shift\"'],
 	[3, 'Scope.edit(rows,ctx.is_paused,source)']
 ]) {
 	const changed = linuxSources.slice();
@@ -693,24 +675,13 @@ for (const [index, token] of [
 		4,
 		'if not lease or original_input_hook_ports.input_owner_current(lease) ~= true then return false end'
 	],
-	[4, 'return arm(lease) == true'],
-	[4, 'if tap == "one_shot_shift" or tap == "caps_word" then'],
+	[4, 'return original_input_hook_ports.arm_one_shot(lease) == true'],
+	[4, 'if tap == "one_shot_shift" then'],
+	[4, 'if not ctx or ctx.action ~= "one_shot_shift" or ctx.used or ctx.arming'],
 	[
 		4,
-		'local arm = tap == "caps_word" and original_input_hook_ports.arm_caps_word or original_input_hook_ports.arm_one_shot'
+		'if not ctx or ctx.action ~= "one_shot_shift" or not _input_runtime_current(ctx, true) then return nil end'
 	],
-	[4, 'if not ctx or ctx.action ~= "one_shot_shift" or ctx.used or ctx.arming'],
-	[4, 'ctx.action ~= "caps_word"'],
-	[4, 'pcall(caps_ports.capture)'],
-	[4, 'pcall(_input_ports.arm_caps_word, ctx.issuer, current)'],
-	[4, 'published ~= true or not _input_runtime_current(ctx, true)'],
-	[4, 'if ctx.action ~= "caps_word" then return true end'],
-	[4, 'NativeCapsWord.capture ~= caps_ports.capture'],
-	[4, 'caps_ports.current(ctx.semantic_owner) ~= true'],
-	[4, '_input_reader_ports.event_current(ctx.letter_origin, ctx.letter_event,'],
-	[4, 'and _caps_semantics_current(ctx) and _input_runtime_current(ctx, false)'],
-	[4, 'local original_caps_constructor = assert(caps_constructor_source'],
-	[4, 'local NativeCapsWord = assert(original_caps_constructor())'],
 	[4, 'and original_input_hook_ports.input_owner_current(lease) == true'],
 	[4, '"stop", "emergency_stop", "key_text"'],
 	[4, '"refresh_capture"'],
@@ -758,13 +729,23 @@ unsupported.menu.shortcuts_menu.find((row) => row.id === 'key_combinations').pla
 ];
 if (orderedLinuxAdmission(unsupported, linuxSources))
 	errors.push('An unsupported Linux declaration must remain unavailable');
-const unavailableTap = structuredClone(manifest);
-unavailableTap.feature_records.find(
+// Linux recommends the Windows LAlt then CapsLock CapsWord (decision of
+// 2026-10-22); the former Linux "none" must fail.
+const divergentTap = structuredClone(manifest);
+const divergentCapsWord = divergentTap.feature_records.find(
 	(row) =>
 		row.section_path === 'shortcuts.key_combination_taps' && row.id === 'left_alt_then_caps_lock'
-).recommended_per_platform.linux = 'caps_word';
-if (orderedLinuxAdmission(unavailableTap, linuxSources))
-	errors.push('Linux must not recommend an undispatched native-only pair tap');
+);
+delete divergentCapsWord.recommended;
+divergentCapsWord.recommended_per_platform = { ahk: 'caps_word', linux: 'none' };
+if (orderedLinuxAdmission(divergentTap, linuxSources))
+	errors.push('Linux must recommend the Windows LAlt then CapsLock CapsWord');
+// The engine's per-letter CapsWord mode had no production caller and was
+// removed; restoring its Hook port must fail.
+const perLetterSources = linuxSources.slice();
+perLetterSources[4] += '\nfunction M.arm_caps_word(lease) return false end\n';
+if (orderedLinuxAdmission(manifest, perLetterSources))
+	errors.push('The Linux Hook must not regain the per-letter CapsWord mode');
 for (const inherited of [false, true]) {
 	const unavailableOneShot = structuredClone(manifest);
 	const tap = unavailableOneShot.feature_records.find(

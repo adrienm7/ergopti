@@ -3,7 +3,72 @@
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { isDeepStrictEqual } = require('node:util');
 const paths = require('../lib/paths.cjs');
+
+// Linux recommends exactly what Windows recommends (maintainer decision,
+// 2026-10-22). Each exception names a Windows value Linux cannot run; the
+// gate proves that reason still holds, so a stale exception fails too.
+const LINUX_RECOMMENDATION_EXCEPTIONS = {
+	// win_app_prev and win_app_next are absent from the Linux catalogue.
+	'gestures.swipe_4_down': { linux: 'none', reason: 'windows-action-absent-on-linux' },
+	'gestures.swipe_4_up': { linux: 'none', reason: 'windows-action-absent-on-linux' },
+	// Linux only reports the layout's own number row (number_row_policy).
+	'layout.direct_access_digits': { linux: 'native', reason: 'native-number-row-only' }
+};
+
+/**
+ * Resolves the platforms of one manifest entry, inheriting from its sections.
+ * @param {object} manifest Parsed manifest with flattened entries.
+ * @param {object} entry One flattened feature entry.
+ * @returns {string[]} Effective platforms.
+ */
+function entryPlatforms(manifest, entry) {
+	if (Array.isArray(entry.platforms) && entry.platforms.length > 0) return entry.platforms;
+	const parts = entry.section.split('.');
+	while (parts.length > 0) {
+		let node = manifest.sections;
+		for (const part of parts) node = node?.[part];
+		if (Array.isArray(node?.platforms) && node.platforms.length > 0) return node.platforms;
+		parts.pop();
+	}
+	return ['ahk', 'hs', 'linux'];
+}
+
+/**
+ * Lists every entry whose Linux recommendation differs from the Windows one
+ * without a still-valid declared exception.
+ * @param {object} manifest Parsed manifest with flattened entries.
+ * @param {Set<string>} linuxActions Single-fire actions Linux can run.
+ * @returns {string[]} One message per drifting or stale entry.
+ */
+function linuxRecommendationDrift(manifest, linuxActions) {
+	const drift = [];
+	const seen = new Set();
+	for (const entry of manifest.entries) {
+		const platforms = entryPlatforms(manifest, entry);
+		if (!platforms.includes('ahk') || !platforms.includes('linux')) continue;
+		const name = `${entry.section}.${entry.id}`;
+		const windows = entry.recommended_per_platform?.ahk ?? entry.recommended;
+		const linux = entry.recommended_per_platform?.linux ?? entry.recommended;
+		const exception = LINUX_RECOMMENDATION_EXCEPTIONS[name];
+		if (!exception) {
+			if (!isDeepStrictEqual(windows, linux))
+				drift.push(`${name}: linux ${JSON.stringify(linux)} != ahk ${JSON.stringify(windows)}`);
+			continue;
+		}
+		seen.add(name);
+		const reasonHolds =
+			exception.reason === 'windows-action-absent-on-linux'
+				? entry.type === 'action' && !linuxActions.has(windows)
+				: exception.reason === 'native-number-row-only' && windows !== 'native';
+		if (linux !== exception.linux || !reasonHolds)
+			drift.push(`${name}: the declared Linux exception (${exception.reason}) no longer holds`);
+	}
+	for (const name of Object.keys(LINUX_RECOMMENDATION_EXCEPTIONS))
+		if (!seen.has(name)) drift.push(`${name}: the declared Linux exception names no entry`);
+	return drift;
+}
 
 /** Verify explicit neutral and recommended projections before driver boot. */
 async function main() {
@@ -203,6 +268,35 @@ async function main() {
 		projectedSlots.length,
 		2,
 		'both single and axis gesture defaults must come from the manifest'
+	);
+	const actionCatalogue = parseSource(
+		fs.readFileSync(paths.shared('modules/actions/actions.toml'), 'utf8')
+	);
+	const linuxActions = new Set(
+		Object.entries(actionCatalogue.sg_actions)
+			.filter(([, action]) => {
+				const tokens = String(action.platform).split(',');
+				return tokens.includes('all') || tokens.includes('linux');
+			})
+			.map(([id]) => id)
+	);
+	assert(linuxActions.has('caps_word'), 'the Linux action catalogue must be loaded');
+	assert.deepEqual(
+		linuxRecommendationDrift(manifest, linuxActions),
+		[],
+		'Linux must recommend what Windows recommends (decision of 2026-10-22)'
+	);
+	const legacy = structuredClone(manifest);
+	const capsWordSlot = legacy.entries.find(
+		(entry) =>
+			entry.section === 'shortcuts.key_combination_taps' && entry.id === 'left_alt_then_caps_lock'
+	);
+	delete capsWordSlot.recommended;
+	capsWordSlot.recommended_per_platform = { ahk: 'caps_word', linux: 'none' };
+	assert.deepEqual(
+		linuxRecommendationDrift(legacy, linuxActions),
+		['shortcuts.key_combination_taps.left_alt_then_caps_lock: linux "none" != ahk "caps_word"'],
+		'the parity gate must reject the former Linux LAlt then CapsLock recommendation'
 	);
 	assert.deepEqual(manifest.scopes.llm.restore_exclude, ['llm.enabled']);
 	assert.deepEqual(manifest.scopes.metrics.restore_exclude, [

@@ -138,10 +138,11 @@ stop, an emergency stop and `while_released` end the hold, unlocking while the
 daemon still owns the keyboard; an LED reseed restores the session's lock,
 which the grabbed keyboard's LED never shows. The `caps_word` catalogue action
 (a keyboard slot, a key-combination tap such as Windows' LAlt then CapsLock, a
-tap-hold, a gesture) toggles the same session through the executor:
-`tap_hold_manager._run_tap` no longer hands it to the hook as intent, so the
-engine's per-letter owner (`adapters/caps_word.lua`, `arm_caps_word`) has no
-production caller, and chord slots still refuse it. Action: end a session only
+simultaneous chord, a tap-hold, a gesture) toggles the same session through the
+executor: `tap_hold_manager._run_tap` never hands it to the hook as intent, and
+the engine's former per-letter mode (`arm_caps_word`, `adapters/caps_word.lua`)
+was removed on 2026-10-22. Only the one-shot Shift still arms the hook's input
+owner. Action: end a session only
 through `end_caps_word`, which unlocks; never type a capital of the daemon's
 own; a desktop that keeps one lock state per keyboard (sway without keyboard
 grouping, in `--no-grab` mode) needs a real-machine check.

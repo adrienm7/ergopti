@@ -9,9 +9,9 @@ local settings_current = ConfigOwner.buffered_settings_current
 local M = {}
 local input_issuers = setmetatable({}, { __mode = "k" })
 local input_receipts = setmetatable({}, { __mode = "k" })
-local engine_input_ports = { arm = Engine.arm_one_shot, state = Engine.input_arm_state, clear = Engine.clear_input_arm, caps = Engine.arm_caps_word, caps_ack = Engine.ack_caps_word }
+local engine_input_ports = { arm = Engine.arm_one_shot, state = Engine.input_arm_state, clear = Engine.clear_input_arm }
 local BASE_INPUT_PORT_NAMES = { "process", "tick", "activity", "handles", "release_all", "take_custody", "output_holder",
-	"combination_hold", "combination_release", "combination_first_available", "combination_lift", "combination_restore", "arm_one_shot", "input_arm_state", "clear_input_arm", "arm_caps_word", "ack_caps_word" }
+	"combination_hold", "combination_release", "combination_first_available", "combination_lift", "combination_restore", "arm_one_shot", "input_arm_state", "clear_input_arm" }
 local OWNER_INPUT_PORT_NAMES = { "process", "tick", "activity", "activate", "configure", "set_tap_holds_enabled",
 	"begin_delivery", "end_delivery", "release_all", "ack_retirement", "take_custody", "output_holder" }
 local original_engine_ports = {}
@@ -455,7 +455,7 @@ local function revoke_event(code, source)
 		end,
 		guard = function(selected, action)
 			local exact = input_frames[selected]
-			if not exact or exact.action ~= action or (action ~= "one_shot_shift" and action ~= "caps_word") or not acting
+			if not exact or exact.action ~= action or action ~= "one_shot_shift" or not acting
 				or pending or delivery or retirement or disabled or exact.epoch ~= epoch then return nil end
 			local function current()
 				return not retirement and not disabled and epoch == exact.epoch
@@ -505,8 +505,7 @@ function M.capture_input_owner(owner)
 		owner_metatable = getmetatable(owner), input_revision = record.input_revision(),
 		timeout = rawget(record.base, "one_shot_timeout_ms"),
 		key_text = rawget(record.base, "key_text"), plan_text = rawget(record.base, "plan_text"),
-		one_shot_result = rawget(record.base, "one_shot_result"),
-		caps_word_plan = rawget(record.base, "caps_word_plan") }
+		one_shot_result = rawget(record.base, "one_shot_result") }
 	return receipt
 end
 
@@ -528,8 +527,6 @@ local function input_owner_current(receipt)
 		and Engine.clear_input_arm == engine_input_ports.clear and package.loaded["platform.remap.tap_hold_engine"] == Engine
 		and rawget(owned.issuer.base, "key_text") == owned.key_text and rawget(owned.issuer.base, "plan_text") == owned.plan_text
 		and rawget(owned.issuer.base, "one_shot_result") == owned.one_shot_result
-		and rawget(owned.issuer.base, "caps_word_plan") == owned.caps_word_plan
-		and Engine.arm_caps_word == engine_input_ports.caps and Engine.ack_caps_word == engine_input_ports.caps_ack
 end
 
 M.input_owner_current = input_owner_current
@@ -552,24 +549,6 @@ end
 function M.arm_one_shot(receipt, now_ms, guard)
 	if not input_owner_current(receipt) or type(guard) ~= "function" then return false end
 	return engine_input_ports.arm(input_receipts[receipt].issuer.base, now_ms, guard)
-end
-
---- Publishes the distinct persistent mode through an original action owner.
---- @param receipt table Original issuer receipt.
---- @param guard function Original Hook currentness guard.
---- @return boolean
-function M.arm_caps_word(receipt, guard)
-	if not input_owner_current(receipt) or type(guard) ~= "function" then return false end
-	return engine_input_ports.caps(input_receipts[receipt].issuer.base, guard)
-end
-
---- Completes only a matching prepared character batch after acknowledged delivery.
---- @param receipt table Original issuer receipt.
---- @param rows table Original prepared output rows.
---- @return boolean
-function M.ack_caps_word(receipt, rows)
-	if not input_owner_current(receipt) then return false end
-	return engine_input_ports.caps_ack(input_receipts[receipt].issuer.base, rows)
 end
 
 --- Observes cleanup state only for the retained original issuer epoch.
