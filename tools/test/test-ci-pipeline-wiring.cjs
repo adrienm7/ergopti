@@ -7204,7 +7204,7 @@ function linuxAudioPrerequisiteProblems(files) {
 		}
 	}
 	if (
-		pipeline.stepField(setup[0].body, 'timeout-minutes') !== '10' ||
+		pipeline.stepField(setup[0].body, 'timeout-minutes') !== '20' ||
 		JSON.stringify(logicalLines(setup[0].body)) !==
 			JSON.stringify([LINUX_AUDIO_INSTALL, LINUX_AUDIO_LOCALES])
 	) {
