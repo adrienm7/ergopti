@@ -168,7 +168,7 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
 				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
 				: KLR_NgramProjectionQueries(start_date, end_date)
 		for code, sql in queries {
-				for r in SQLite_Query(db, sql)
+				for r in KLR_ProjectionQuery(db, sql, "range", "historical " . code)
 						out[code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
 								r["hs"], r["llm"], r["o"])
 		}
@@ -194,14 +194,21 @@ KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset
 						sql := "SELECT " . KLR_SqlJsonObjectAgg("token", "json_object("
 								. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)") . " AS j"
 								. " FROM (" . queries[code] . ")"
-						rows := SQLite_Query(db, sql)
-						if rows.Length != 1 || !rows[1].Has("j")
-								throw Error("Historical n-gram JSON projection returned no aggregate for " . code)
-						fragment := rows[1]["j"]
+						fragment := KLR_PartialStep("range", "historical " . code,
+								KLR__HistoricalFragment.Bind(db, sql, code), "{}")
 				}
 				out .= (out = "{" ? "" : ",") . JsonStringLiteral(code) . ":" . fragment
 		}
 		return out . "}"
+}
+
+; One historical type's aggregate. A missing aggregate row is a reader defect,
+; not a refused read, so it stays fatal even inside a partial read.
+KLR__HistoricalFragment(db, sql, code) {
+		rows := SQLite_Query(db, sql)
+		if rows.Length != 1 || !rows[1].Has("j")
+				throw Error("Historical n-gram JSON projection returned no aggregate for " . code)
+		return rows[1]["j"]
 }
 
 ; Fast path used by the 500 ms live update tick. Returns the same
@@ -248,7 +255,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 						. "        WHERE date = " . SQLite_Q(today) . app_clause
 						. "        GROUP BY app, token" . limit_clause . ")"
 						. " GROUP BY app"
-				for r in SQLite_Query(db, sql)
+				for r in KLR_ProjectionQuery(db, sql, "range", "today " . code)
 						KLR__StashAppTypeJson(per_app, r["app"], code, r["j"])
 		}
 
@@ -259,7 +266,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, keycode)"
 				. " GROUP BY app"
-		for r in SQLite_Query(db, kc_sql)
+		for r in KLR_ProjectionQuery(db, kc_sql, "range", "today kc")
 				KLR__StashAppTypeJson(per_app, r["app"], "kc", r["j"])
 
 		; Scancode heatmap (Windows / hardware scancode side).
@@ -268,7 +275,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, scancode)"
 				. " GROUP BY app"
-		for r in SQLite_Query(db, sc_kb_sql)
+		for r in KLR_ProjectionQuery(db, sc_kb_sql, "range", "today sc_kb")
 				KLR__StashAppTypeJson(per_app, r["app"], "sc_kb", r["j"])
 
 		; Shortcuts + shortcut bigrams.
@@ -277,7 +284,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, token)"
 				. " GROUP BY app"
-		for r in SQLite_Query(db, sc_sql)
+		for r in KLR_ProjectionQuery(db, sc_sql, "range", "today sc")
 				KLR__StashAppTypeJson(per_app, r["app"], "sc", r["j"])
 
 		scbg_sql := "SELECT app, " . KLR_SqlJsonObjectAgg("token", AuxValue) . " AS j"
@@ -285,7 +292,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, token)"
 				. " GROUP BY app"
-		for r in SQLite_Query(db, scbg_sql)
+		for r in KLR_ProjectionQuery(db, scbg_sql, "range", "today sc_bg")
 				KLR__StashAppTypeJson(per_app, r["app"], "sc_bg", r["j"])
 
 		; Stitch the per-app dict into one outer JSON object. We trust the
@@ -367,7 +374,7 @@ KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
 						. " GROUP BY app, token"
 						. " ORDER BY c DESC"
 						. " LIMIT " . KLR_FAST_LIMIT
-				for r in SQLite_Query(db, sql) {
+				for r in KLR_ProjectionQuery(db, sql, "range", "today " . code) {
 						app := r["app"]
 						if !today_idx.Has(app)
 								today_idx[app] := KLR_NewTodayBucket()
@@ -406,7 +413,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 		kc_sql := "SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes"
 				. " WHERE date = " . SQLite_Q(today) . app_clause
 				. " GROUP BY app, keycode"
-		for r in SQLite_Query(db, kc_sql) {
+		for r in KLR_ProjectionQuery(db, kc_sql, "range", "today kc") {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
@@ -417,7 +424,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 		sc_kb_sql := "SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes"
 				. " WHERE date = " . SQLite_Q(today) . app_clause
 				. " GROUP BY app, scancode"
-		for r in SQLite_Query(db, sc_kb_sql) {
+		for r in KLR_ProjectionQuery(db, sc_kb_sql, "range", "today sc_kb") {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
@@ -428,7 +435,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 		sc_sql := "SELECT app, token, SUM(c) AS c FROM ngram_shortcuts"
 				. " WHERE date = " . SQLite_Q(today) . app_clause
 				. " GROUP BY app, token"
-		for r in SQLite_Query(db, sc_sql) {
+		for r in KLR_ProjectionQuery(db, sc_sql, "range", "today sc") {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
@@ -437,7 +444,7 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 		scbg_sql := "SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams"
 				. " WHERE date = " . SQLite_Q(today) . app_clause
 				. " GROUP BY app, token"
-		for r in SQLite_Query(db, scbg_sql) {
+		for r in KLR_ProjectionQuery(db, scbg_sql, "range", "today sc_bg") {
 				app := r["app"]
 				if !today_idx.Has(app)
 						today_idx[app] := KLR_NewTodayBucket()
@@ -472,7 +479,7 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
 						. " WHERE date = " . SQLite_Q(today) . app_clause
 						. " GROUP BY app, token"
 						. " LIMIT " . KLReadConst.MAX_NGRAM_ROWS
-				for r in SQLite_Query(db, sql) {
+				for r in KLR_ProjectionQuery(db, sql, "range", "today " . code) {
 						app := r["app"]
 						if !today_idx.Has(app)
 								today_idx[app] := KLR_NewTodayBucket()
