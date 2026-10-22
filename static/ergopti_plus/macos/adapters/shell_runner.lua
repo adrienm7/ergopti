@@ -150,6 +150,71 @@ function M.exact_stdin_pipeline(cmd, input)
 	return "set -o pipefail; printf '%b' '" .. operand .. "' | " .. cmd
 end
 
+-- Native boundary of exec_private_stdin(); replaced only by tests, which cannot
+-- start a real openssl. Fields: popen, tmpname, open, remove.
+local DEFAULT_PRIVATE_STDIN_NATIVE = { popen = io.popen, tmpname = os.tmpname, open = io.open, remove = os.remove }
+local _private_stdin_native = DEFAULT_PRIVATE_STDIN_NATIVE
+
+--- Replaces the native boundary of exec_private_stdin(); nil restores it.
+--- @param native table|nil Table with popen, tmpname, open and remove.
+function M._set_private_stdin_native(native)
+	_private_stdin_native = type(native) == "table" and native or DEFAULT_PRIVATE_STDIN_NATIVE
+end
+
+--- Runs `cmd` with `input` written to its standard input by this process, and
+--- returns its stdout after a zero exit. Unlike exact_stdin_pipeline, the
+--- bytes never become part of the command: an `sh -c` argument is readable by
+--- every local account through the process table, so a secret (typed text, a
+--- machine id) must not travel there. stdout goes to a mkstemp(3) file (mode
+--- 0600) that is read back and removed, because popen(3) has one direction.
+--- @param cmd string Composed consumer command without NUL.
+--- @param input string Exact standard-input bytes, NUL included.
+--- @return string|nil stdout Exact output after a verified zero exit.
+--- @return string|nil reason Fixed refusal text; it never quotes the command or input.
+function M.exec_private_stdin(cmd, input)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	if type(input) ~= "string" then return nil, "input must be a string" end
+	local native = _private_stdin_native
+	local made, out_path = pcall(native.tmpname)
+	-- The path is spliced unquoted into the command, so only a plain path is admitted
+	if not made or type(out_path) ~= "string" or not out_path:match("^/[%w/._-]+$") then
+		return nil, "no private output file could be created"
+	end
+	local function discard()
+		local removed, remove_err = pcall(native.remove, out_path)
+		if not removed then
+			Logger.error(LOG, "exec_private_stdin() could not remove its output file: %s.",
+				tostring(remove_err))
+		end
+	end
+	local started_ms = now_ms()
+	local opened, pipe = pcall(native.popen, cmd .. " > " .. out_path, "w")
+	if not opened or not pipe then
+		discard()
+		return nil, "the native shell pipe could not be opened"
+	end
+	local written_ok, written = pcall(function() return pipe:write(input) end)
+	local closed_ok, status, exit_type, rc = pcall(function() return pipe:close() end)
+	if closed_ok then _record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms) end
+	local read_ok, output = pcall(function()
+		local handle = native.open(out_path, "rb")
+		if not handle then return nil end
+		local data = handle:read("a")
+		handle:close()
+		return data
+	end)
+	discard()
+	-- A short write means the consumer saw a prefix: its output is not the value's
+	if not written_ok or not written then return nil, "standard input was not fully delivered" end
+	if not closed_ok or exit_type ~= "exit" or rc ~= 0 or status ~= true then
+		return nil, string.format("the shell ended by %s with status %s",
+			tostring(exit_type), tostring(rc))
+	end
+	if not read_ok or type(output) ~= "string" then return nil, "the command output could not be read" end
+	return output
+end
+
 
 -- =========================================
 -- =========================================

@@ -38,6 +38,7 @@ and Ergopti+, the free, local-first typing-automation suite that works on _any_ 
 - [CI and releases](#ci-and-releases)
 - [Website deployment](#website-deployment)
 - [Contributing](#contributing)
+- [Code signing policy](#code-signing-policy)
 - [License](#license)
 
 ---
@@ -153,7 +154,8 @@ A compiled AutoHotkey v2 executable; the AHK runtime is embedded, nothing else t
 install.
 
 1. Download `ErgoptiPlus.exe` and double-click it.
-2. On first launch, resources are extracted to `%LOCALAPPDATA%\Ergopti`.
+2. On first launch, resources are extracted to `%LOCALAPPDATA%\Ergopti` with
+   the `tar.exe` that Windows 10 (version 1803 or later) and Windows 11 ship.
 
 **macOS — `ErgoptiPlus.app.zip`**
 
@@ -486,6 +488,51 @@ Issues and PRs are welcome — in **English**, so everyone can collaborate.
   `main` and `dev` keep a **linear history** (squash, no merge commits).
 - Non-obvious lessons about the codebase belong in
   [docs/memory/README.md](docs/memory/README.md) so they never evaporate.
+
+---
+
+## Code signing policy
+
+Windows releases are being prepared for free code signing provided by
+[SignPath.io](https://about.signpath.io), with a certificate issued to
+[SignPath Foundation](https://signpath.org). Until that signing is active,
+`ErgoptiPlus.exe` is published unsigned.
+
+- Only `ErgoptiPlus.exe`, built from this repository by the
+  [Windows workflow](.github/workflows/ci-windows.yml) on a GitHub-hosted
+  runner, is submitted for signing. No binary built elsewhere is signed.
+- Committers and reviewers:
+  [the members of this repository](https://github.com/adrienm7/ergopti/graphs/contributors).
+  Changes from other contributors are reviewed by a maintainer before they are
+  merged.
+- Approver: [Adrien MOYAUX](https://github.com/adrienm7) approves every signing
+  request by hand.
+- Every team member uses multi-factor authentication on GitHub and on SignPath.
+
+### Privacy
+
+Ergopti+ runs locally. This project has no server, and the application sends
+nothing about you or what you type to anyone. Its network requests are:
+
+- **Components from official sources**: the keyboard layout files you select
+  are downloaded from this repository, and on macOS the first run downloads
+  Karabiner-Elements from its official release when it is missing.
+
+- **Update checks**: once a day by default, it asks the GitHub API for the
+  latest release of this repository, and downloads the release asset when you
+  accept an update. The About menu changes the frequency or turns the checks
+  off ("never").
+- **Optional AI features**: only once you enable them, it talks to the local
+  Ollama or MLX server you chose, and downloads that runtime or the models you
+  pick from their official sources.
+- **Bug reports**: only when you choose to report one, it opens a prefilled
+  GitHub issue in your browser, which you review before posting.
+
+The typing metrics are off by default. Once you turn them on, the keystroke
+statistics stay on your computer (optionally encrypted); password fields,
+private browsing windows and the applications you exclude are never recorded,
+and nothing is uploaded. See the
+[metrics privacy notes](static/ergopti_plus/docs/security/keylogger_privacy.md).
 
 ---
 
