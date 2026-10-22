@@ -8,9 +8,9 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One clock domain: CGEventGetTimestamp and hs.timer.absoluteTime() both
----    count mach_absolute_time, which stops while the Mac sleeps. Hammerspoon
----    1.1.1 converts the second to nanoseconds; the first is handed over raw,
----    which is nanoseconds on Intel and 125/3 ns ticks on Apple silicon.
+---    derive from mach_absolute_time. Hammerspoon 1.1.1 converts the second to
+---    nanoseconds and hands the first over raw, documented as nanoseconds but
+---    possibly raw ticks (125/3 ns on Apple silicon); both readings are tried.
 --- 2. No guessed architecture: the event stamp is read under each candidate
 ---    scale and the smallest plausible age is used. The wrong scale reads an
 ---    Apple silicon stamp as almost the whole uptime and an Intel stamp as a
