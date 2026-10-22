@@ -88,6 +88,14 @@ assert.equal(
 	keys[79].value,
 	'config is literal text'
 );
+assert.equal(elements.keys.children[0].children[0].textContent, '[obsolete] setting_0');
+// A bare root key (section "") is named without an empty "[]" section.
+sandbox.receiveConfigCleanup({
+	...ready,
+	keys: [{ section: '', key: 'stale_root', value: '1' }, ...keys]
+});
+assert.equal(elements.keys.children[0].children[0].textContent, 'stale_root');
+sandbox.receiveConfigCleanup(ready);
 assert.equal(elements['btn-clean'].disabled, false);
 elements['btn-clean'].click();
 elements['btn-clean'].click();

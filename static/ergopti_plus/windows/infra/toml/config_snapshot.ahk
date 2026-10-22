@@ -56,11 +56,31 @@ _ConfigTomlArrayMember(Document, Parts) {
 
 /**
  * Builds detached cache/feature projections using the actual typed document owner.
+ * ArrayRows names each outermost ``[[x]]`` table array once, by the section and
+ * key that hold it, so the loader and the cleanup judge it like any other row;
+ * its generations never enter Cache or Rows.
  * @param {String} Source - Exact source admitted by the configuration reader.
- * @returns {Object} Source, Document, Cache, Rows and SkippedRecords.
+ * @returns {Object} Source, Document, Cache, Rows, ArrayRows and SkippedRecords.
  */
 ConfigTomlDecodeSnapshot(Source) {
-	Document := TOML_ParseDocument(Source, &Records)
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	ArrayRows := [], ArrayPaths := Map()
+	ArrayPaths.CaseSense := "On"
+	for Record in Physical {
+		if Record.Kind != "header" || SubStr(LTrim(Record.Text), 1, 2) != "[["
+			continue
+		Parts := TOML_ParseKeyPath(Record.Section, true)
+		Name := _TOML_ConfigPathName(Parts)
+		if ArrayPaths.Has(Name) || _ConfigTomlArrayMember(Document, Parts)
+			continue
+		ArrayPaths[Name] := true
+		Value := _TOML_DocumentLookup(Document, Parts)["value"]
+		if !(Value is Array)
+			throw ValueError("Configuration table-array header has no array owner")
+		ArrayRows.Push({ Section: _ConfigTomlSection(Parts), Key: Parts[Parts.Length],
+			Value: _ConfigTomlNativeValue(Value), Typed: _ConfigTomlNativeValue(Value, false),
+			Raw: TOML_RenderValue(Value) })
+	}
 	Cache := Map(), Rows := [], SkippedRecords := 0
 	Cache.CaseSense := "On"
 	Namespaces := Map()
@@ -86,7 +106,7 @@ ConfigTomlDecodeSnapshot(Source) {
 			Namespaces, Cache, Rows)
 	}
 	return { Source: Source, Document: Document, Cache: Cache,
-		Rows: Rows, SkippedRecords: SkippedRecords }
+		Rows: Rows, ArrayRows: ArrayRows, SkippedRecords: SkippedRecords }
 }
 
 ; Reuses the actual inline-table owner to preserve each child literal spelling.

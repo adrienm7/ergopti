@@ -380,7 +380,8 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	if TomlSectionIsDynamicPersonalNamespace(SectionPath)
 		return ""
 	Node := Features
-	Parts := TomlConfigSectionParts(SectionPath)
+	; A bare root key sits in the tree root itself, so it is a leaf there.
+	Parts := SectionPath == "" ? [] : TomlConfigSectionParts(SectionPath)
 	if !(Parts is Array)
 		return "section"
 	for _, Part in Parts {
@@ -406,6 +407,25 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	; Dynamic keyboard slots belong to ConfigIO only outside the manifest tree.
 	ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
 	return ForeignOwner != "" ? "" : "leaf"
+}
+
+; Judges one outermost ``[[x]]`` table array (a snapshot ArrayRows entry). No
+; manifest setting is a table array, so the loader never applies one. Returns
+; "skip" inside a reserved or obsolete namespace (its own reader or the retired
+; cleanup owns it), "" for a registered foreign or dynamic personal owner, the
+; TomlConfigUnknownKind result for an unknown path, and "outdated" for a path
+; this build knows under another shape. The boot loader and the unused-key
+; cleanup both call this, so the arrays boot names are the ones cleanup offers.
+TomlConfigTableArrayKind(Features, Section, Key) {
+	Path := _TOML_ConfigPathName(_TOML_ConfigPath(Section, Key))
+	if TomlConfigSectionSkipKind(Section) != "" || TomlConfigSectionSkipKind(Path) != ""
+		return "skip"
+	if TomlSectionIsDynamicPersonalNamespace(Path)
+		return ""
+	Kind := TomlConfigUnknownKind(Features, Section, Key, &ForeignOwner)
+	if Kind != "" || ForeignOwner != "" || TomlSectionIsDynamicPersonalNamespace(Section)
+		return Kind
+	return "outdated"
 }
 
 ; Why the loader leaves a manifest-known ``[Section].Key`` value unapplied as
@@ -880,6 +900,19 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			RejectedOverrides += 1
 			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)
+		}
+	}
+
+	; Table-array generations never apply (their records are counted above as
+	; skipped); an unknown or outdated one is named like any other unused row.
+	for Row in Snapshot.ArrayRows {
+		ArrayKind := TomlConfigTableArrayKind(Features, Row.Section, Row.Key)
+		if ArrayKind == "outdated" {
+			OutdatedEntries[Row.Section . "`n" . Row.Key] := "this build reads no table array at this path"
+			OutdatedNames .= (OutdatedNames == "" ? "" : ", ") . "[" . Row.Section . "]." . Row.Key
+		} else if ArrayKind == "section" || ArrayKind == "leaf" {
+			UnknownKeys += 1
+			UnknownNames .= (UnknownNames == "" ? "" : ", ") . "[" . Row.Section . "]." . Row.Key
 		}
 	}
 
