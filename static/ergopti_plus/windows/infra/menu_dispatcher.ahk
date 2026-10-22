@@ -545,6 +545,26 @@ _MenuCommandRegistrationSnapshot(Registration) {
 		return {ItemId: AcceptedItem, Token: AcceptedToken}
 }
 
+/**
+ * Whether a menu command must wait before it runs: a configuration write or
+ * read is in progress, or a terminal transition (a scoped configuration
+ * commit, a reload preflight) is still on its way to a successor launch or a
+ * release. AutoHotkey lets the tray open over such a transition, and the
+ * click then runs on top of the thread that owns it, so the command could
+ * only be refused (« another configuration transaction is already in
+ * progress », seen on 2026-10-22 when the private-browsing filter was clicked
+ * during a scoped commit). Once the successor launched, MenuReloadReplay_Hold
+ * hands the command over instead; a barrier retained after a failed rollback
+ * lasts until exit, so waiting for it would only delay the refusal.
+ * @returns {Boolean}
+ */
+MenuCommandConfigBusy() {
+		if ConfigMutationBusy()
+				return true
+		return _ConfigWriteTerminalIsActive() && !ReloadTerminalHandoffActive()
+				&& !(ConfigTransitionRetainedBarrier() is Object)
+}
+
 /** Checks the actual dispatcher token table; legacy commands explicitly pass zero. */
 _MenuCommandRegistrationCurrent(Registration) {
 		global _MenuDispatchTokens
@@ -595,7 +615,7 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 						try LoggerError("MenuDispatcher", "The menu command waiting for the reload successor could not be scheduled: {1}; it runs now.", Err.Message)
 				}
 		}
-		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigMutationBusy()
+		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : MenuCommandConfigBusy()
 		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
 				if (Attempt == 0)
 						try LoggerInfo("MenuDispatcher", "Menu command deferred: a configuration write is in progress; it runs when that write ends.")
