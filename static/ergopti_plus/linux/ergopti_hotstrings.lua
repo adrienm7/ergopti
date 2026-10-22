@@ -55,7 +55,9 @@
 local SCRIPT_DIR = (function()
 	local src = debug.getinfo(1, "S").source
 	local path = src:match("^@(.+)$") or "."
-	return path:match("^(.*)[/\\][^/\\]+$") or "."
+	-- Runs before the shared path owner is on package.path, on Linux only,
+	-- where a backslash is a filename byte: split at slashes alone.
+	return path:match("^(.*)/[^/]+$") or "."
 end)()
 
 -- Prepend the script directory and the shared Lua library to the search path.

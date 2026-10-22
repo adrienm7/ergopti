@@ -34,6 +34,7 @@
 
 local M = {}
 local TomlCodec = require("toml_codec.codec")
+local NativePath = require("native_path")
 
 -- The file naming an extension, at the root of its directory.
 local MANIFEST_NAME = "manifest.toml"
@@ -223,7 +224,7 @@ local function read_pack(dir, id, list_files, read_file, skip_file)
 	local toml_files, bound_files = {}, {}
 	local bound_found = {}
 	for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
-		local stem = path:match("([^/\\]+)%.toml$")
+		local stem = (NativePath.basename(path) or ""):match("^(.+)%.toml$")
 		if stem and stem:find(UNADDRESSABLE_PATTERN) then
 			-- A backup such as words.old.toml costs that file, not its siblings.
 			local err = "Extension hotstring file stem cannot carry a dot or a colon (content withheld)"
@@ -275,7 +276,7 @@ local function root_dirs(root, list_dirs)
 		if type(root.pack) ~= "string" or root.pack == "" then
 			error("Invalid extension pack root (content withheld)", 0)
 		end
-		return { (root.pack:gsub("[/\\]+$", "")) }
+		return { NativePath.without_trailing_separators(root.pack) }
 	end
 	if type(root) == "string" and root ~= "" then return list_dirs(root) or {} end
 	return {}
@@ -317,7 +318,7 @@ function M.scan(roots, io_fns)
 			dirs = {}
 		end
 		for _, dir in ipairs(dirs or {}) do
-			local id = dir:match("([^/\\]+)[/\\]?$")
+			local id = NativePath.basename(NativePath.without_trailing_separators(dir))
 			if id and id ~= "" then
 				local read, record = true, nil
 				if on_error then
