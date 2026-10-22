@@ -12,7 +12,7 @@
 ; 1. KLR_ReadNgrams: full historical n-gram read (all tables, all date range).
 ;    Used on first paint (slow but complete).
 ; 2. KLR_BuildTodayIdxJson: SQL-side JSON projection for today's n-grams.
-;    Pushes json_group_object aggregation into SQLite, avoiding thousands of
+;    Pushes JSON object aggregation into SQLite, avoiding thousands of
 ;    per-row AHK Map allocations on the hot 500 ms live-tick path.
 ; 3. KLR_ReadRangeSplitTodayFast: lightweight 500 ms live-tick path — skips
 ;    heavy tables (penta/hexa/hepta) and caps each table at KLR_FAST_LIMIT rows.
@@ -115,6 +115,20 @@ KLR_NgramSourceProjection(esrc_column := "esrc_json") {
 				. valid_json . ") AS src),0)) AS o"
 }
 
+/**
+ * Spells a JSON object aggregate whose keys survive an embedded NUL.
+ * The vendored SQLite cuts a json_group_object key at its first NUL, so a
+ * token or title "a\u0000b" came back as a second "a" key and the page kept
+ * whichever arrived last. The walker's histogram merges use the same spelling.
+ * @param KeyExpr {String} SQL expression of each member's key.
+ * @param ValueExpr {String} SQL expression of each member's JSON value.
+ * @returns {String} SQL expression of the object, "{}" over no row.
+ */
+KLR_SqlJsonObjectAgg(KeyExpr, ValueExpr) {
+		return "COALESCE('{' || group_concat(json_quote(" . KeyExpr . ") || ':' || "
+				. ValueExpr . ", ',') || '}', '{}')"
+}
+
 KLR_NewNgramItem(c, t, e, hs := 0, llm := 0, other := 0) {
 		return Map("c", c, "t", t, "e", e,
 				"hs", hs, "llm", llm, "o", other)
@@ -177,8 +191,8 @@ KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset
 		for code, _ in KLR_NewTodayBucket() {
 				fragment := "{}"
 				if db {
-						sql := "SELECT json_group_object(token, json_object("
-								. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)) AS j"
+						sql := "SELECT " . KLR_SqlJsonObjectAgg("token", "json_object("
+								. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)") . " AS j"
 								. " FROM (" . queries[code] . ")"
 						rows := SQLite_Query(db, sql)
 						if rows.Length != 1 || !rows[1].Has("j")
@@ -200,7 +214,7 @@ KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset
 KLR_FAST_LIMIT := 500
 
 ; SQL-side JSON projection. Builds the entire today_idx JSON string
-; directly via SQLite's json_group_object / json_object aggregations.
+; directly via SQLite's json_quote / json_object aggregations.
 ; Iterating thousands of n-gram rows in AHK + per-row Map allocation
 ; was making the live tick take ~1 s; this version pushes the work
 ; into SQLite which produces the final JSON in well under 100 ms.
@@ -225,8 +239,8 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 		tables := Complete ? KLR_NGRAM_TYPE_TABLE : KLR_NGRAM_LIVE_TABLE
 		limit_clause := Complete ? " LIMIT " . KLReadConst.MAX_NGRAM_ROWS : ""
 		for code, tbl in tables {
-				sql := "SELECT app, json_group_object(token, json_object("
-						. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)) AS j"
+				sql := "SELECT app, " . KLR_SqlJsonObjectAgg("token", "json_object("
+						. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)") . " AS j"
 						. " FROM (SELECT app, token,"
 						. "        SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
 						. KLR_NgramSourceProjection()
@@ -239,8 +253,8 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 		}
 
 		; Keycode heatmap (macOS / virtual keycode side).
-		kc_sql := "SELECT app, json_group_object(CAST(keycode AS TEXT), json_object("
-				. "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+		AuxValue := "json_object('c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)"
+		kc_sql := "SELECT app, " . KLR_SqlJsonObjectAgg("CAST(keycode AS TEXT)", AuxValue) . " AS j"
 				. " FROM (SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes"
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, keycode)"
@@ -249,8 +263,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				KLR__StashAppTypeJson(per_app, r["app"], "kc", r["j"])
 
 		; Scancode heatmap (Windows / hardware scancode side).
-		sc_kb_sql := "SELECT app, json_group_object(CAST(scancode AS TEXT), json_object("
-				. "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+		sc_kb_sql := "SELECT app, " . KLR_SqlJsonObjectAgg("CAST(scancode AS TEXT)", AuxValue) . " AS j"
 				. " FROM (SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes"
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, scancode)"
@@ -259,8 +272,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				KLR__StashAppTypeJson(per_app, r["app"], "sc_kb", r["j"])
 
 		; Shortcuts + shortcut bigrams.
-		sc_sql := "SELECT app, json_group_object(token, json_object("
-				. "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+		sc_sql := "SELECT app, " . KLR_SqlJsonObjectAgg("token", AuxValue) . " AS j"
 				. " FROM (SELECT app, token, SUM(c) AS c FROM ngram_shortcuts"
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, token)"
@@ -268,8 +280,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 		for r in SQLite_Query(db, sc_sql)
 				KLR__StashAppTypeJson(per_app, r["app"], "sc", r["j"])
 
-		scbg_sql := "SELECT app, json_group_object(token, json_object("
-				. "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+		scbg_sql := "SELECT app, " . KLR_SqlJsonObjectAgg("token", AuxValue) . " AS j"
 				. " FROM (SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams"
 				. "        WHERE date = " . SQLite_Q(today) . app_clause
 				. "        GROUP BY app, token)"
@@ -278,7 +289,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay
 				KLR__StashAppTypeJson(per_app, r["app"], "sc_bg", r["j"])
 
 		; Stitch the per-app dict into one outer JSON object. We trust the
-		; per-type fragments coming from json_group_object are valid JSON
+		; per-type fragments coming from KLR_SqlJsonObjectAgg are valid JSON
 		; objects already.
 		if (per_app.Count = 0)
 				return "{}"
