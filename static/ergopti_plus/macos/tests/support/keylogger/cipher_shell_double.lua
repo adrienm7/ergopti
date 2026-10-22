@@ -16,6 +16,9 @@
 ---    and the printf %b pipeline decoded by tests.support.posix_printf_model.
 --- 3. The return shape is hs.execute's: output, status, "exit", code. Faults
 ---    can make a stage print partial output and exit non-zero.
+--- 4. A popen(3) double models ShellRunner.exec_private_stdin: the command and
+---    the bytes written to its stdin are recorded apart, so a test can prove a
+---    secret never reached a command line.
 --- ==============================================================================
 
 local PrintfModel = require("tests.support.posix_printf_model")
@@ -54,18 +57,15 @@ local function split(command)
 	return nil, command, false
 end
 
---- Builds an hs.execute double.
+--- Builds the hs.execute double and the popen(3) double of
+--- ShellRunner.exec_private_stdin, which share one openssl model.
 --- @param faults table|nil { encrypt|decrypt|derive = { stdout, code }, producer = code }.
---- @return function execute, table seen
+--- @return function execute, table seen, table native
 function M.new(faults)
 	faults = faults or {}
 	local seen = {}
-	local function execute(command)
-		seen[#seen + 1] = command
-		local c_string = command:match("^[^%z]*")
-		local stdin, consumer, pipefail = split(c_string)
-		-- A failed producer delivers only part of the payload before exiting.
-		if faults.producer and stdin then stdin = stdin:sub(1, 1) end
+	-- Openssl's answer to one consumer command fed with the given stdin.
+	local function respond(consumer, stdin)
 		local stdout, code
 		if consumer:find("ioreg", 1, true) then
 			stdout, code = "0123456789ABCDEF\n", 0
@@ -84,11 +84,68 @@ function M.new(faults)
 		else
 			stdout, code = "", 127
 		end
+		return stdout, code
+	end
+	local function execute(command)
+		seen[#seen + 1] = command
+		local c_string = command:match("^[^%z]*")
+		local stdin, consumer, pipefail = split(c_string)
+		-- A failed producer delivers only part of the payload before exiting.
+		if faults.producer and stdin then stdin = stdin:sub(1, 1) end
+		local stdout, code = respond(consumer, stdin)
 		-- Without pipefail the shell reports only the last stage.
 		if faults.producer and pipefail then code = faults.producer end
 		return stdout, code == 0 and true or nil, "exit", code
 	end
-	return execute, seen
+
+	-- In-memory files stand for mkstemp(3) outputs; host paths differ per OS.
+	local files, next_file = {}, 0
+	local native = {}
+	function native.tmpname()
+		next_file = next_file + 1
+		local path = "/tmp/lua_cipher_double_" .. next_file
+		files[path] = ""
+		return path
+	end
+	function native.popen(command, mode)
+		seen[#seen + 1] = command
+		local c_string = command:match("^[^%z]*")
+		local consumer, out_path = c_string:match("^(.-) > (/%S+)$")
+		if mode ~= "w" or not consumer then return nil end
+		local parts = {}
+		local pipe = {}
+		function pipe:write(data)
+			-- A failed delivery hands the consumer only the first byte.
+			if faults.producer then parts[#parts + 1] = data:sub(1, 1); return nil, "Broken pipe" end
+			parts[#parts + 1] = data
+			return self
+		end
+		function pipe:close()
+			local stdout, code = respond(consumer, table.concat(parts))
+			files[out_path] = stdout
+			return code == 0 and true or nil, "exit", code
+		end
+		return pipe
+	end
+	function native.open(path, mode)
+		if files[path] == nil or mode ~= "rb" then return nil end
+		local data = files[path]
+		return {
+			read = function(_, format) return format == "a" and data or nil end,
+			close = function() return true end,
+		}
+	end
+	function native.remove(path)
+		files[path] = nil
+		return true
+	end
+	--- Lists the output files still present, which must be none after a call.
+	function native.leftover_files()
+		local left = {}
+		for path in pairs(files) do left[#left + 1] = path end
+		return left
+	end
+	return execute, seen, native
 end
 
 --- Models hs.hash.new("SHA256") deterministically over the exact bytes.

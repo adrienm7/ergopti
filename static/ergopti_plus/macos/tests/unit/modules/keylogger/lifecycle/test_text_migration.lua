@@ -61,10 +61,12 @@ end
 --- @return table The recorded commands.
 local _real_hs_execute = nil
 local _real_hs_hash = nil
+local _private_stdin_native = nil
 local function install_shell()
 	if _real_hs_execute == nil then _real_hs_execute = hs.execute end
 	if _real_hs_hash == nil then _real_hs_hash = hs.hash end
-	local execute, seen = CipherDouble.new()
+	local execute, seen, native = CipherDouble.new()
+	_private_stdin_native = native
 	hs.execute = execute
 	hs.hash = CipherDouble.native_hash()
 	return seen
@@ -73,6 +75,9 @@ end
 local function restore_shell()
 	if _real_hs_execute ~= nil then hs.execute = _real_hs_execute end
 	hs.hash = _real_hs_hash
+	_private_stdin_native = nil
+	local runner = package.loaded["adapters.shell_runner"]
+	if type(runner) == "table" and runner._set_private_stdin_native then runner._set_private_stdin_native(nil) end
 end
 
 --- Builds an in-memory stand-in for events_typing.
@@ -132,6 +137,8 @@ local function load_runner(store)
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["modules.keylogger.text_cipher"] = nil
 	package.loaded["modules.keylogger.text_migration"] = nil
+	-- Secret input is written to a popen(3) pipe, never to hs.execute.
+	require("adapters.shell_runner")._set_private_stdin_native(_private_stdin_native)
 	local cipher = require("modules.keylogger.text_cipher")
 	cipher._set_machine_id_command("echo ioreg-stub")
 	local migration = require("modules.keylogger.text_migration")

@@ -13,7 +13,10 @@
 ---    (cipher-exit-receipt-2026-10-21);
 --- 3. trust only the last pipeline stage, so a producer that delivered part of
 ---    the payload and failed still yielded a stored envelope
----    (cipher-pipeline-receipt-2026-10-21).
+---    (cipher-pipeline-receipt-2026-10-21);
+--- 4. carry the typed text and the hardware UUID as a printf operand of the
+---    `sh -c` command, which every local account can read in the process table
+---    (cipher-plaintext-argv-2026-10-22).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -24,10 +27,10 @@ local MODULES = { "adapters.crypto", "adapters.shell_runner", "modules.keylogger
 
 --- Runs a callback against a real cipher over the native shell double.
 --- @param faults table|nil Faults forwarded to the double.
---- @param callback function Receives (cipher, seen, logs).
+--- @param callback function Receives (cipher, seen, logs, native).
 local function with_cipher(faults, callback)
 	helpers.with_fresh_modules(MODULES, function()
-		local execute, seen = Double.new(faults)
+		local execute, seen, native = Double.new(faults)
 		helpers.load_with_stubs("adapters.shell_runner", { execute = execute, hash = Double.native_hash() })
 		local logs = {}
 		local logger = helpers.make_logger_stub()
@@ -35,10 +38,13 @@ local function with_cipher(faults, callback)
 		package.loaded["infra.logger"] = logger
 		package.loaded["adapters.shell_runner"] = nil
 		package.loaded["adapters.crypto"] = nil
+		require("adapters.shell_runner")._set_private_stdin_native(native)
 		local cipher = require("modules.keylogger.text_cipher")
 		cipher._set_machine_id_command("/usr/sbin/ioreg -rd1 -c IOPlatformExpertDevice")
 		cipher.set_enabled(true)
-		callback(cipher, seen, logs)
+		local ok, err = pcall(callback, cipher, seen, logs, native)
+		require("adapters.shell_runner")._set_private_stdin_native(nil)
+		if not ok then error(err, 0) end
 	end)
 end
 
@@ -115,6 +121,34 @@ helpers.describe("keylogger.text_cipher: every pipeline stage is supervised (cip
 		with_cipher({ producer = 1 }, function(cipher)
 			helpers.assert_eq(cipher.encrypt("mac", 7, "twenty-seven typed bytes!!"), nil,
 				"a ciphertext of one delivered byte must not be stored for the whole value")
+		end)
+	end)
+end)
+
+
+helpers.describe("keylogger.text_cipher: secrets never reach a command line (cipher-plaintext-argv-2026-10-22)", function()
+	local SECRET = "my bank PIN is 4711"
+	helpers.it("keeps the typed text and the hardware UUID out of every shell command", function()
+		with_cipher(nil, function(cipher, seen, _, native)
+			local envelope = cipher.encrypt("mac", 7, SECRET)
+			helpers.assert_true(TextCrypto.is_encrypted(envelope), "encryption must produce an envelope")
+			helpers.assert_eq(cipher.decrypt(envelope), SECRET, "the envelope must still round-trip")
+			helpers.assert_true(#seen >= 3, "derivation, encryption and decryption must all run")
+			for _, command in ipairs(seen) do
+				helpers.assert_true(command:find(SECRET, 1, true) == nil,
+					"typed text in an sh -c argument is readable by every local account")
+				helpers.assert_true(command:find("0123456789ABCDEF", 1, true) == nil,
+					"the hardware UUID is the key material and must not be an argument")
+			end
+			helpers.assert_eq(#native.leftover_files(), 0, "every private output file must be removed")
+		end)
+	end)
+
+	helpers.it("refuses an envelope when standard input was only partly delivered", function()
+		with_cipher({ producer = 1 }, function(cipher, _, _, native)
+			helpers.assert_eq(cipher.encrypt("mac", 7, SECRET), nil,
+				"openssl saw a prefix, so its ciphertext is not the typed value's")
+			helpers.assert_eq(#native.leftover_files(), 0, "a refused call must remove its output file")
 		end)
 	end)
 end)
