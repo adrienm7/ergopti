@@ -306,6 +306,8 @@ local function make_fixture(options)
 		function event:setUnicodeString(value) self.unicode = value; return self end
 		function event:setType(value) self.type = value; return self end
 		function event:getType() return self.type end
+		-- Nil unless a test names the physical key, as an event without one reads.
+		function event:getKeyCode() return self.keycode end
 		function event:setProperty(property, value)
 			if self.kind == "trigger" and options.trigger_set_property_fail then
 				error("trigger setProperty exploded")
@@ -334,6 +336,7 @@ local function make_fixture(options)
 			if options.physical_copy_nil and self.kind == "external" then return nil end
 			local copy = make_event(self.kind, self.key, self.isDown)
 			copy.type = self.type
+			copy.keycode = self.keycode
 			copy.source_pid = self.source_pid
 			copy.unicode = self.unicode
 			copy.modifiers = self.modifiers
