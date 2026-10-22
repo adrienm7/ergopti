@@ -200,9 +200,18 @@ Not started:
       PAC is the only proxy source: there is no static fallback to use.
 - [ ] **AI off must be inert on macOS.** [CODE] Profile shortcuts are still bound, `ollama list`
       still runs and the MLX download still resumes with the AI off (Windows and Linux are inert).
-- [ ] **Menu clicks during a reload on macOS and Linux.** [CODE] Windows holds such a click and
-      replays it in the successor (85a926ba27, replay schema v3 fb877dbd51); check the Lua drivers
-      for the same window and give them the same contract.
+- [x] **Menu clicks during a reload on macOS and Linux.** Done (b0fb0f585b, c280aa4eaf,
+      8c4314524a, local): macOS holds a click during a reload, hands it to the new instance and
+      replays it with the intended state; a stale menu resolves on a fresh tree. Linux replays a
+      click on a retired row on the republished menu, and a hotstring reload rebuilds the tray.
+      Shared intent rule `_shared/lua/menu/click_intent.lua`. Left:
+  - [ ] Linux `perform_reload` logs "Hotstrings reloaded" and the local command answers
+        `completed` although `load_all` refused (second value false, e.g.
+        `personal-source-pending`).
+  - [ ] [DECISION] A click on Reload during a reload is replayed in the new instance, so a second
+        reload runs (Windows probably too, unchecked): should that row join the reload in flight?
+  - [ ] Linux `actual Linux ordered-pair translations` (`test_key_combinations_menu.lua`) stops
+        the runner without a result, already on HEAD.
 - [ ] **AppImage self-contained, with update information.** [CODE] Build with
       `appimagetool -u gh-releases-zsync|adrienm7|ergopti|latest|ErgoptiPlus-*x86_64.AppImage.zsync`
       and publish the `.zsync` through the release assembly, receipts and verifier; bundle the C
