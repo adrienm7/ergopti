@@ -228,8 +228,8 @@ Not started:
       `_NET_CLIENT_LIST`): add it to the Openbox e2e, and add wmctrl to the RPM and Flatpak
       dependencies.
 - [ ] **Linux single instance outside `launch.sh`.** [CODE] `launch.sh` locks every daemon launch
-      (35dd2d262e), but the AppImage AppRun, the Nix wrapper and a manual `luajit
-  ergopti_hotstrings.lua` still start without the flock: take the lock in Lua
+      (35dd2d262e), but the AppImage AppRun, the Nix wrapper and a manual
+      `luajit ergopti_hotstrings.lua` still start without the flock: take the lock in Lua
       (`infra/session_lock.lua`) when no marker is present, without breaking the tests that load
       the entry several times in one process.
 - [ ] **Linux test manifest lists four deleted caps_word modules.** [CODE] They fail at load in
