@@ -105,35 +105,38 @@ _HSCS_PersonalFrameNativeRefusal() {
 		TomlModel := ReadPersonalToml(), LabelMap := _HS_BuildDisambiguatedSectionLabels(TomlModel)
 		ParentKey := "hotstring_personal_default_parent", ParentDefinition := Root[ParentKey]
 		BeforeSource := FSReadUtf8Exact(Fixture.path), BeforeCaption := _PrevDefaultLabel
-		try {
-			Root.Delete(ParentKey)
-			AssertFalse(_SetPersonalDefaultSection("alpha", LivePersonal, TomlModel, LiveDefault, LabelMap),
-				"withdrawn old/new caption admission refuses before the original setter")
-			AssertEqual(BeforeSource, FSReadUtf8Exact(Fixture.path), "caption refusal performs no preference write")
-			AssertEqual(BeforeCaption, _PrevDefaultLabel)
-			AssertEqual(1, _CTC_CountLabel(LivePersonal, DefaultCaption), "caption refusal does not rename the retained parent")
-			loop TrayMenuItemCount(LiveDefault)
-				AssertEqual(BeforeFlags[A_Index], DllCall("GetMenuState", "ptr", DefaultHandle, "uint", A_Index - 1, "uint", 0x400, "uint"),
-					"caption refusal performs no Check or Uncheck")
-			Root[ParentKey] := ParentDefinition
-			BadLabels := LabelMap.Clone(), BadLabels["alpha"] := false
-			AssertFalse(_SetPersonalDefaultSection("alpha", LivePersonal, TomlModel, LiveDefault, BadLabels),
-				"a refused second caption receipt performs no setter after admitting the original caption")
-			AssertEqual(BeforeSource, FSReadUtf8Exact(Fixture.path))
-			AssertEqual(BeforeCaption, _PrevDefaultLabel)
-			loop TrayMenuItemCount(LiveDefault)
-				AssertEqual(BeforeFlags[A_Index], DllCall("GetMenuState", "ptr", DefaultHandle, "uint", A_Index - 1, "uint", 0x400, "uint"))
-			AssertEqual(1, _CTC_CountLabel(LivePersonal, DefaultCaption))
-			AlphaCallback := false
+		; The original callbacks hold the renderer's handle on this exact child.
+		ChoiceCallback(Label, &Id) {
+			global _MenuDispatchCallbacks
 			loop TrayMenuItemCount(LiveDefault) {
-				if _MUR_LabelAt(LiveDefault, A_Index - 1) == LabelMap["alpha"] {
-					AlphaId := DllCall("GetMenuItemID", "ptr", DefaultHandle, "int", A_Index - 1, "uint")
-					Assert(_MenuDispatchCallbacks.Has(AlphaId), "the actual default choice has its original registered callback")
-					AlphaCallback := _MenuDispatchCallbacks[AlphaId]
-					break
+				if _MUR_LabelAt(LiveDefault, A_Index - 1) == Label {
+					Id := DllCall("GetMenuItemID", "ptr", DefaultHandle, "int", A_Index - 1, "uint")
+					Assert(_MenuDispatchCallbacks.Has(Id), "the actual default choice has its original registered callback")
+					return _MenuDispatchCallbacks[Id]
 				}
 			}
-			Assert(HasMethod(AlphaCallback, "Call"))
+			return false
+		}
+		AlphaCallback := ChoiceCallback(LabelMap["alpha"], &AlphaId), BetaCallback := ChoiceCallback(LabelMap["beta"], &BetaId)
+		Assert(HasMethod(AlphaCallback, "Call") && HasMethod(BetaCallback, "Call"))
+		AssertUnchanged(Why) {
+			global _PrevDefaultLabel
+			AssertEqual(BeforeSource, FSReadUtf8Exact(Fixture.path), Why . " performs no preference write")
+			AssertEqual(BeforeCaption, _PrevDefaultLabel)
+			AssertEqual(1, _CTC_CountLabel(LivePersonal, DefaultCaption), Why . " does not rename the retained parent")
+			loop TrayMenuItemCount(LiveDefault)
+				AssertEqual(BeforeFlags[A_Index], DllCall("GetMenuState", "ptr", DefaultHandle, "uint", A_Index - 1, "uint", 0x400, "uint"),
+					Why . " performs no Check or Uncheck")
+		}
+		try {
+			Root.Delete(ParentKey)
+			AssertFalse(AlphaCallback.Call(), "withdrawn old/new caption admission refuses before the original setter")
+			AssertUnchanged("caption refusal")
+			Root[ParentKey] := ParentDefinition
+			_PrevDefaultLabel := {}
+			try AssertFalse(AlphaCallback.Call(), "a refused old caption receipt performs no setter")
+			finally _PrevDefaultLabel := BeforeCaption
+			AssertUnchanged("old caption refusal")
 			AlphaCallback.Call()
 			AssertEqual("alpha", _EditorPrefGet("DefaultSection", ""), "the original callback still reaches the genuine native preference writer")
 			AssertEqual(LabelMap["alpha"], _PrevDefaultLabel)
@@ -144,12 +147,18 @@ _HSCS_PersonalFrameNativeRefusal() {
 				"repaint retains the same actual callback and target instead of rebuilding")
 			Assert(InStr(FSReadUtf8Exact(Fixture.path), 'keep = "personal-frame-source"'), "the genuine write preserves unknown source data")
 			; Restore the fixture's original desired default through that same native UI owner.
-			_SetPersonalDefaultSection("beta", LivePersonal, TomlModel, LiveDefault, LabelMap)
+			AssertTrue(BetaCallback.Call())
 			AssertEqual("beta", _EditorPrefGet("DefaultSection", ""))
 		} finally {
 			Root[ParentKey] := ParentDefinition
 		}
 		ReleaseRows()
+		; A callback retained past its child's release finds no published child to
+		; repaint, so it changes no preference (stale-default-child-repaint).
+		ReleasedSource := FSReadUtf8Exact(Fixture.path)
+		AssertFalse(AlphaCallback.Call(), "a released default child refuses its retained callback")
+		AssertEqual(ReleasedSource, FSReadUtf8Exact(Fixture.path), "the stale callback writes no preference")
+		AssertEqual("beta", _EditorPrefGet("DefaultSection", ""))
 		for Key, Original in Originals {
 			Root.Delete(Key)
 			loop 2 {

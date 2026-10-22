@@ -584,6 +584,12 @@ with scanner variants. Reload, Quit and the top-level captions come from
 canonical native-platform variants. On Windows a `dynamic` handler returns its
 row data and `MenuRenderer_Build` draws it at the entry (a non-Array answer
 refuses the build); only `action` handlers still draw into the menu they get.
+A Windows submenu whose callbacks repaint it without a rebuild is a renderer
+template child: reserve it with `MenuRenderer_TemplateChild(OwnedMenus)` before
+building the commands that need its handle, fill it once with
+`MenuRenderer_FillTemplateChild`, and repaint only through
+`MenuRenderer_RepaintTemplateChild`, which refuses before the commit once the
+child is released or no longer attached to the given parent.
 
 ### project-github-release-api-rate-limit
 
