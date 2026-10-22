@@ -472,7 +472,8 @@ local function with_fixture(spec, body)
 				end
 				return false
 			end,
-			state = {},
+			-- Readiness runs with the AI on: an off manager arms no warm-up timer
+			state = { llm_enabled = true },
 			keymap = {},
 		}, {}, function() return 0 end)
 		helpers.assert_eq(#timers, 1)

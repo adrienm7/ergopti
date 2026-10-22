@@ -84,6 +84,7 @@ local function make_ctx(keymap, models_mgr, captured_timers)
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() end,
 		get_profile_hks = function() return {} end,
+		disarm_shortcuts = function() return true end,
 	}
 end
 

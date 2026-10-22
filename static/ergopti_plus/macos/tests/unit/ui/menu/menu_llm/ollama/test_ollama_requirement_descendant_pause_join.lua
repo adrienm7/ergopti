@@ -460,7 +460,8 @@ local function with_fixture(callback)
 			}
 			local manager = require("ui.menu.menu_llm.models_manager_ollama").new({
 				active_tasks = {},
-				state = {},
+				-- Maintenance runs with the AI on: an off manager arms no warm-up timer
+				state = { llm_enabled = true },
 				keymap = {},
 				script_control = manager_control,
 				save_prefs = function() return true end,

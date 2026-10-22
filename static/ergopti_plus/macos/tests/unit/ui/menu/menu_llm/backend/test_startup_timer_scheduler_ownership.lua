@@ -122,7 +122,8 @@ local function with_fixture(callback)
 				decode = function() return { log_path = "/tmp/fixture.log" } end,
 			},
 		})
-		local state = { llm_enabled = false, llm_backend = "mlx" }
+		-- The reattachment and shortcut restore run only with the AI on
+		local state = { llm_enabled = true, llm_backend = "mlx" }
 		fixture.state = state
 		fixture.check_startup, fixture.scope_idle = Startup.new({
 			state = state,
@@ -163,6 +164,7 @@ local function with_fixture(callback)
 				return true
 			end,
 			get_profile_hks = function() return {} end,
+			disarm_shortcuts = function() return true end,
 			prediction_locks = {
 				apply_preference = function() return true end,
 				acquire = function() return true end,

@@ -319,6 +319,7 @@ local function with_startup(options, callback)
 			get_startup_silence = function() return false end,
 			set_startup_silence = function() end,
 			get_profile_hks = function() return {} end,
+			disarm_shortcuts = function() return true end,
 		})
 		helpers.assert_eq(check_startup(), true, "the startup is accepted")
 		-- The installed-models poll retries every second, ten times at most
