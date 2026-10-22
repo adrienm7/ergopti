@@ -7,10 +7,6 @@ answer once, then move the answered line below.
 
 ## Open
 
-- **Tap-hold hold rows on Windows and Linux (October 21):** the tap and, on macOS, the hold now open the shared action
-  picker. The Windows and Linux « Hold → … » rows still list the seven shared hold options (none, five modifiers, the
-  navigation layer) in a submenu, because they are hold options, not actions. Default meanwhile: kept as a submenu. Say
-  if they should open a picker window too ([handoff](todo-agents/macos-tap-hold-action-picker.md)).
 - **Site deploy reads its receiver from main:** `deploy-site.yml` takes its receiver from `main`, so
   the site lags `dev` until the next release. Default meanwhile: unchanged. Say if the deploy
   should follow `dev`.
@@ -30,20 +26,14 @@ answer once, then move the answered line below.
   window cannot install from the Atom feed (no digests) and warns. Default meanwhile: refused.
   Option: hand a click on the channel's newest release to Sparkle (needs a page phase and 21
   locale strings). Say if wanted.
-- **SignPath: apply now or later (item 132):** the conditions are in the checklist. Default
-  meanwhile: not applied, unsigned stable releases authorised.
-- **Issue #100: model download through a PAC proxy with an Ollama started outside ErgoptiPlus
-  (October 22):** 2353a72eed relaxed the #99 refusal for a foreign daemon (Ollama.app, Homebrew,
-  PATH): `ollama pull` only asks that daemon to fetch with its own network settings, which
-  Ergopti cannot govern, so the pull now runs and its own failure is reported; a daemon of
-  unknown or Ergopti origin stays fail-closed. Default meanwhile: relaxed (on dev, after v1.0.5).
-  Confirm or ask for a revert.
-- **macOS 2.8-3.2 s freeze when a webview window opens (October 22):** `wv:hswindow()` scans every
-  window of every application on the main thread. Default meanwhile: not changed. Say if an agent
-  should fix it by looking only among Hammerspoon's own windows.
 
 ## Answered
 
+- **October 22 answers:** issue #100: keep 2353a72eed (a foreign Ollama daemon pulls through a PAC
+  proxy; a daemon of unknown or Ergopti origin stays fail-closed); the macOS webview-open freeze
+  (`wv:hswindow()` scanning every window) is fixed now; SignPath Foundation: apply now; the
+  Windows and Linux tap-hold « Hold → … » rows open the shared action picker with holdable
+  actions only, like macOS. Agents are on each; details in the checklist.
 - **Merge commits on `dev` (answered October 21):** no merge commits, `dev` and `main` stay linear. Integrate by
   rebasing and fast-forwarding; the merge `330cbe4c04` was rewritten into linear commits (`dev` force-pushed once, with a lease).
 - **Replies on GitHub (answered October 21):** not posted, by the maintainer's choice; issues #84 and #95-#97
