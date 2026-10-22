@@ -425,9 +425,14 @@ streamed chunk, which `shell_runner` then drops: issue #100 lost seven leases
 "0.00 s late" with no worker stderr at all. Never judge a streaming child
 silent from a timer alone; prove a read turn with
 `adapters/task_output_turn.lua` (a `/bin/cat` echo) first, as the lease ACK
-deadlines do (`lease-output-turn`). The lease worker's inner still fences on
-its own silence budget (17.5 s) if a menu stays open that long with a PING in
-flight.
+deadlines do (`lease-output-turn`). Writing stdin works in every mode, so while
+that probe is pending the lease writes keepalive PINGs (at the deadline, then
+every heartbeat tick, never two within the outer's 2.5 s command budget: the
+outer exits 74 on an overlapping PING) and consumes their PONGs without a
+deadline; without them the worker's inner fenced itself after 17.5 s of an
+open menu (`lease-output-keepalive`, pinned against the Swift budgets in
+`test_native_lease_budget_parity.lua`). An answer read after a failure is
+logged as late, not missing.
 
 ### project-hs-webview-becomes-key-only-with-text-entry
 
@@ -518,6 +523,44 @@ binding-level or fault-injection test.
 
 Every synthetic keyboard event goes through one adapter with an exact provenance
 tag and destination transaction. PID, timing, and text equality are not identity.
+
+### project-hs-physical-fence-pairs-key-ups
+
+`SyntheticInput.claim_physical_fence` consumes a physical event that arrives
+behind queued output and replays it after. A key-up is held back only while
+its own key-down still waits unposted in that FIFO: holding the release of a
+key whose press already reached the application kept it down for the length of
+the expansion (the press-and-hold popup on a plain tap). A physical event whose
+callback is `STALE_PHYSICAL_EVENT_MS` late (`adapters/event_clock.lua`
+lateness: age minus the smallest age of the last 32 events, so a constant clock
+offset cancels) is never consumed, replayed or answered: macOS stops waiting
+for a tap that holds an event too long and delivers it without the tap, and a
+copy would type it twice. The keymap passes such a key-down untouched and
+restarts its buffer. Action: a new fence or emission path must keep both rules
+(`key-up-fence-pairing`, `stale-physical-event`).
+
+### project-hs-key-taps-never-ask-accessibility
+
+Every Accessibility call runs on the main thread with the event taps, and
+macOS lets a call to a hung application wait six seconds. Boot sets one
+process-wide messaging timeout (`AccessibilityPermission.bound_messaging_timeout`,
+1 s, before the first input owner), and code reached from a key tap reads the
+typing application from NSWorkspace (`hs.application.frontmostApplication`),
+never `hs.window.focusedWindow()` (`text_sender.focusedAppIdentity`, called on
+every deleting expansion and every Return, Cmd+A, Cmd+L). Action: no new AX read
+inside a tap callback; an off-tap read relies on the timeout, not on luck.
+
+### project-hs-key-event-health-counters
+
+`infra/key_event_health.lua` counts per session what the keymap taps see:
+key-ups without key-down, key-downs whose key-up was lost, keys stuck 3 s,
+character keys held 500 ms or more (with autorepeats and the rule switch they
+crossed: lease fence, karabiner.json reload, tap outage), late callbacks, stale
+keys passed untouched and lease failures by kind. Every line carries the
+session totals and no key code or character. Read those lines first in a
+macOS report of swallowed keys or an unasked accent popup: a long hold of
+macOS's own stamps with no late callback points upstream (Karabiner), a late
+key-up points at the main thread.
 
 ### project-hs-native-eventtap-disable-recovery
 
