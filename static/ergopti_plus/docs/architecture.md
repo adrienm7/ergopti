@@ -116,6 +116,7 @@ graph TD
         MACOS_network_info["NetworkInfo.lua"]
         MACOS_notifier["Notifier.lua"]
         MACOS_one_shot_shift["OneShotShift.lua"]
+        MACOS_own_window["OwnWindow.lua"]
         MACOS_owned_program_runner["OwnedProgramRunner.lua"]
         MACOS_physical_context_probe["PhysicalContextProbe.lua"]
         MACOS_physical_history_context["PhysicalHistoryContext.lua"]
