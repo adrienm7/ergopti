@@ -48,6 +48,33 @@ function collectJournals(directory) {
 }
 
 /** Bind every actual Unit and Integration lot to its unique highest successful execution. */
+/**
+ * Whether a job the API still reports in progress has in fact finished and
+ * succeeded. Run 39836200270 read a lot as "in_progress" for half an hour after
+ * every step, its runner's "Complete job" included, had completed with success
+ * and its dependants had started: the job record is never refreshed, so a
+ * re-read cannot help. The step records are the proof instead.
+ * @param {object} job One API job.
+ * @returns {boolean}
+ */
+function finishedBySteps(job) {
+	if (job.status !== 'in_progress' || job.conclusion !== null || !Array.isArray(job.steps))
+		return false;
+	const steps = job.steps;
+	if (steps.length === 0) return false;
+	const last = steps.reduce((a, b) => (Number(b.number) > Number(a.number) ? b : a));
+	// A skipped conditional step is part of a successful job; the writer step
+	// itself is still required to succeed by the check that follows.
+	return (
+		last.name === 'Complete job' &&
+		last.status === 'completed' &&
+		last.conclusion === 'success' &&
+		steps.every(
+			(step) => step.status === 'completed' && ['success', 'skipped'].includes(step.conclusion)
+		)
+	);
+}
+
 function selectUnitJobs(plan, jobs, identity) {
 	const fail = (ok, message) => {
 		if (!ok) throw new Error('Common Unit admission refused: ' + message);
@@ -96,7 +123,7 @@ function selectUnitJobs(plan, jobs, identity) {
 		fail(newest.length === 1, 'ambiguous latest Unit execution');
 		const job = newest[0];
 		fail(
-			job.status === 'completed' && job.conclusion === 'success',
+			(job.status === 'completed' && job.conclusion === 'success') || finishedBySteps(job),
 			'latest Unit lot did not succeed: ' +
 				JSON.stringify({
 					lot: name,
