@@ -38,6 +38,7 @@ local M = {}
 
 local hs         = hs
 local Logger     = require("infra.logger")
+local KeyEventHealth = require("infra.key_event_health")
 local NativePath = require("native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
@@ -3420,6 +3421,8 @@ function M.merge_and_deploy_config(
 		"Karabiner deploy decision: deployed (%s; %d bytes; Karabiner reloads every rule).",
 		source_snapshot.status == "absent" and "no karabiner.json yet"
 			or "the managed rules on disk differ", #content)
+	-- A key held across the reload is the one most likely to lose its key-up.
+	pcall(KeyEventHealth.note_transition, "a karabiner.json reload")
 	return true, deploy_detail or "ok", 1
 end
 

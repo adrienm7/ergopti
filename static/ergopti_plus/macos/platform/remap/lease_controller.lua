@@ -34,6 +34,7 @@ local LeaseContract  = require("platform.remap.lease_contract")
 local LeaseHelper    = require("platform.remap.lease_helper")
 local TaskOutputTurn = require("adapters.task_output_turn")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local KeyEventHealth = require("infra.key_event_health")
 
 local LOG = "karabiner.lease"
 
@@ -793,6 +794,8 @@ local function fail_generation(generation, reason)
 	if generation.ready then
 		KeystrokeIntegrity.note_exposure("a Karabiner lease fence that switched Ergopti's rules off")
 	end
+	-- The session totals the next issue report carries (infra/key_event_health.lua).
+	pcall(KeyEventHealth.note_lease_failure, reason)
 	if _state.current == generation then
 		_state.current = nil
 		_state.retiring[generation.token] = generation
