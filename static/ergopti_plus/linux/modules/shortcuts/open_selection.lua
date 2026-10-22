@@ -3,10 +3,12 @@
 --- ==============================================================================
 --- MODULE: Open the Selection (Linux)
 --- DESCRIPTION:
---- The copy_selected_path action on Linux: opens what the primary selection
---- names (a URL, an IP address, localhost, a mail address, a file or a folder)
---- through xdg-open, or searches the web for plain text. The classification is
---- _shared/lua/open_target, shared with macOS and ported to Windows.
+--- The copy_selected_path action on Linux. In a file manager it copies the
+--- selected files' paths, as Explorer and Finder do on the other drivers;
+--- elsewhere it opens what the primary selection names (a URL, an IP address,
+--- localhost, a mail address, a file or a folder) through xdg-open, or searches
+--- the web for plain text. The classification is _shared/lua/open_target,
+--- shared with macOS and ported to Windows.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The target reaches xdg-open as one argument through
@@ -15,15 +17,19 @@
 --- 2. A recognised target that cannot be opened (a missing path, a bare file
 ---    name, a registry key or a Windows path) is logged and notified, never
 ---    searched instead: the user asked to open that thing.
---- 3. The file-manager branch of the action (copying the selected files'
----    paths) is not implemented: a file manager publishes its selection as
----    text/uri-list after Ctrl+C, which the clipboard adapter cannot read by
----    MIME type.
+--- 3. A file manager publishes its selection as text/uri-list after Ctrl+C.
+---    The clipboard adapter reads that target, _shared/lua/file_selection
+---    decodes its file: URIs, and the clipboard keeps the paths, one per line.
+---    Ctrl+C is sent only to a known file manager: in a terminal it would
+---    interrupt the running program. A compositor that names no focused
+---    application (GNOME and KDE under Wayland) therefore keeps the opening
+---    behaviour.
 --- ==============================================================================
 
 local M = {}
 
 local OpenTarget = require("open_target")
+local FileSelection = require("file_selection")
 local Logger = require("logger.shim")
 
 local LOG = "shortcuts.open_selection"
@@ -36,12 +42,31 @@ local REPORT_KEYS = {
 	failed = "open_target.open_failed",
 }
 
+-- The focused application identities (X11 process names, Wayland app ids)
+-- of the file managers whose Ctrl+C publishes the selected files. A
+-- reverse-DNS id also matches by its last component (org.gnome.Nautilus).
+local FILE_MANAGERS = {
+	["nautilus"] = true, ["nemo"] = true, ["caja"] = true, ["thunar"] = true,
+	["dolphin"] = true, ["konqueror"] = true, ["pcmanfm"] = true, ["pcmanfm-qt"] = true,
+	["spacefm"] = true, ["krusader"] = true, ["doublecmd"] = true, ["peony"] = true,
+	["io.elementary.files"] = true, ["pantheon-files"] = true,
+}
+
 local DEFAULT_DEPS = {
 	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
 	exists = function(path) return require("adapters.file_system").exists(path) end,
 	notify = function(message) return require("adapters.notifier").send(message, { level = "error" }) end,
 	message = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
+	focused_app = function() return require("adapters.window_info").getFocused().appId end,
+	read_uri_list = function()
+		return require("adapters.clipboard").read_selection_uri_list(
+			require("modules.gestures.combo_emitter").press, require("adapters.event_loop").sleep_ms)
+	end,
+	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
+	notify_success = function(message)
+		return require("adapters.notifier").send(message, { level = "success" })
+	end,
 }
 local deps = DEFAULT_DEPS
 
@@ -101,6 +126,47 @@ end
 
 
 
+--- Whether a focused application identity names a known file manager.
+--- @param app any
+--- @return boolean
+local function is_file_manager(app)
+	if type(app) ~= "string" or app == "" then return false end
+	local id = app:lower()
+	return FILE_MANAGERS[id] == true or FILE_MANAGERS[id:match("([^.]+)$")] == true
+end
+
+--- Copies the file manager's selected paths to the clipboard.
+--- @return boolean|nil copied True when copied, false when refused, nil when
+---   no file is selected (the caller then opens the primary selection).
+local function copy_file_selection()
+	local ok, uri_list, reason = deps.read_uri_list()
+	if not ok then
+		if reason == "no_file_selection" then return nil end
+		Logger.error(LOG, "copy_selected_path: the file manager's selection could not be read (%s).", tostring(reason))
+		return false
+	end
+	local paths, why = FileSelection.parse_uri_list(uri_list)
+	if not paths then
+		Logger.error(LOG, "copy_selected_path refused: the selection is not a list of local files (%s).", tostring(why))
+		return false
+	end
+	if #paths == 0 then return nil end
+	local text = table.concat(paths, "\n")
+	if deps.write_clipboard(text) ~= true then
+		Logger.error(LOG, "copy_selected_path: the %d selected path(s) could not be written to the clipboard.", #paths)
+		return false
+	end
+	Logger.success(LOG, "Copied the path of %d selected item(s) from the file manager.", #paths)
+	local message = (tostring(deps.message("shortcuts.copy_path_notif")):gsub("%%s", function() return text end))
+	if deps.notify_success(message) ~= true then
+		Logger.warn(LOG, "The copied-path notice was not shown.")
+	end
+	return true
+end
+
+
+
+
 -- ===============================
 -- ===============================
 -- ======= 2/ Public API =========
@@ -138,6 +204,20 @@ function M.open(text)
 	end
 	report("failed", target, "unexpected target kind " .. tostring(kind))
 	return false
+end
+
+--- Runs the copy_selected_path action: copies the selected files' paths in a
+--- file manager, otherwise opens what the primary selection names.
+--- @param read_primary function () -> string, read only when it is needed.
+--- @return boolean True when paths were copied or a target was opened.
+function M.copy_selected_path(read_primary)
+	local app = deps.focused_app()
+	if is_file_manager(app) then
+		local copied = copy_file_selection()
+		if copied ~= nil then return copied end
+		Logger.info(LOG, "copy_selected_path: no file is selected in %s — opening the primary selection.", app)
+	end
+	return M.open(read_primary())
 end
 
 --- Replaces the native boundaries; nil restores them.

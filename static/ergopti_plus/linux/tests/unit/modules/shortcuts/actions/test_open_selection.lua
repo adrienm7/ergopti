@@ -54,8 +54,42 @@ local function record(existing)
 		exists = function(path) return (existing or {})[path] == true end,
 		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
+		focused_app = function() return "" end,
 	})
 	return world, Subject
+end
+
+--- Installs recording deps for a focused application and its copied selection.
+--- @param app string The focused application identity.
+--- @param read table|nil { ok, uri_list, reason } the clipboard answers.
+--- @return table world { opened, notices, successes, written, copies, primary_reads }
+--- @return table Subject
+local function record_in(app, read)
+	local world = { opened = {}, notices = {}, successes = {}, written = {}, copies = 0, primary_reads = 0 }
+	local Subject = require("modules.shortcuts.open_selection")
+	Subject._set_deps_for_test({
+		open = function(target, on_done)
+			world.opened[#world.opened + 1] = target
+			on_done({ ok = true })
+			return {}
+		end,
+		exists = function() return true end,
+		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
+		notify_success = function(message) world.successes[#world.successes + 1] = message; return true end,
+		message = function(key) return key == "shortcuts.copy_path_notif" and "Path copied: %s" or key end,
+		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
+		focused_app = function() return app end,
+		read_uri_list = function()
+			world.copies = world.copies + 1
+			return read.ok, read.uri_list or "", read.reason
+		end,
+		write_clipboard = function(text) world.written[#world.written + 1] = text; return true end,
+	})
+	local function primary()
+		world.primary_reads = world.primary_reads + 1
+		return "https://example.com"
+	end
+	return world, Subject, primary
 end
 
 helpers.describe("copy_selected_path replays the shared open-target corpus", function()
@@ -139,5 +173,72 @@ helpers.describe("copy_selected_path opens the primary selection (open-target-ip
 		Subject.open("bonjour le monde")
 		Subject._set_deps_for_test(nil)
 		helpers.assert_eq(world.opened, { OpenTarget.DEFAULT_SEARCH_URL .. "bonjour%20le%20monde" })
+	end)
+end)
+
+helpers.describe("copy_selected_path copies the selected files' paths in a file manager (linux-copy-path-file-manager)", function()
+	local NAUTILUS_COPY = "file:///home/ada/Docs/r%C3%A9sum%C3%A9.pdf\r\nfile:///home/ada/My%20Folder\r\n"
+
+	helpers.it("(linux-copy-path-file-manager) copies the decoded paths, one per line, and opens nothing", function()
+		local world, Subject, primary = record_in("nautilus", { ok = true, uri_list = NAUTILUS_COPY })
+		local done = Subject.copy_selected_path(primary)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_true(done)
+		helpers.assert_eq(world.written, { "/home/ada/Docs/résumé.pdf\n/home/ada/My Folder" })
+		helpers.assert_eq(world.successes, { "Path copied: /home/ada/Docs/résumé.pdf\n/home/ada/My Folder" })
+		helpers.assert_eq(world.opened, {}, "a file manager's selection is copied, never opened or searched")
+		helpers.assert_eq(world.primary_reads, 0)
+	end)
+
+	for _, app in ipairs({ "org.gnome.Nautilus", "org.kde.dolphin", "Thunar", "nemo", "pcmanfm-qt" }) do
+		helpers.it("(linux-copy-path-file-manager) recognises " .. app .. " as a file manager", function()
+			local world, Subject, primary = record_in(app, { ok = true, uri_list = "file:///tmp/a\n" })
+			Subject.copy_selected_path(primary)
+			Subject._set_deps_for_test(nil)
+			helpers.assert_eq(world.written, { "/tmp/a" })
+		end)
+	end
+
+	helpers.it("(linux-copy-path-file-manager) sends no Ctrl+C outside a file manager", function()
+		for _, app in ipairs({ "gnome-terminal-server", "firefox", "" }) do
+			local world, Subject, primary = record_in(app, { ok = true, uri_list = "file:///tmp/a\n" })
+			Subject.copy_selected_path(primary)
+			Subject._set_deps_for_test(nil)
+			helpers.assert_eq(world.copies, 0, "Ctrl+C would interrupt a terminal's program in '" .. app .. "'")
+			helpers.assert_eq(world.opened, { "https://example.com" })
+		end
+	end)
+
+	helpers.it("(linux-copy-path-file-manager) opens the primary selection when no file is selected", function()
+		local world, Subject, primary = record_in("nautilus", { ok = false, reason = "no_file_selection" })
+		Subject.copy_selected_path(primary)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(world.written, {})
+		helpers.assert_eq(world.opened, { "https://example.com" })
+	end)
+
+	helpers.it("(linux-copy-path-file-manager) refuses an unreadable or remote selection without opening anything", function()
+		for _, read in ipairs({
+			{ ok = false, reason = "xsel cannot read a text/uri-list" },
+			{ ok = true, uri_list = "file:///tmp/a\nsftp://host/b\n" },
+		}) do
+			local world, Subject, primary = record_in("dolphin", read)
+			local done = Subject.copy_selected_path(primary)
+			Subject._set_deps_for_test(nil)
+			helpers.assert_eq(done, false)
+			helpers.assert_eq(world.written, {}, "no partial list reaches the clipboard")
+			helpers.assert_eq(world.opened, {})
+			helpers.assert_eq(world.primary_reads, 0)
+		end
+	end)
+
+	helpers.it("(linux-copy-path-file-manager) the gesture dispatcher runs the file-manager branch", function()
+		local G = helpers.load_module("modules.gestures.manager")
+		G.init({ enabled = false })
+		local world, Subject = record_in("nautilus", { ok = true, uri_list = "file:///home/ada/notes.txt\n" })
+		with_selection("ignored", function() G.execute_action("copy_selected_path", "tap_3") end)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(world.written, { "/home/ada/notes.txt" })
+		helpers.assert_eq(world.opened, {})
 	end)
 end)
