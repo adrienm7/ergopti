@@ -70,7 +70,7 @@ helpers.describe("karabiner lease controller: operations a Stop supersedes", fun
 				resumed_ok, resume_reason = ok, reason
 			end))
 
-			ctx.fire_latest_timer()
+			ctx.fire_ack_deadline()
 			helpers.assert_eq(controller.status(), "fencing", "a silent worker is fenced as a failure")
 			-- The failed RESUME settles once the exact native revoker completed.
 			local revoker = support.find_native_revoke(ctx, variables)

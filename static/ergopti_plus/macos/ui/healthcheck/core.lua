@@ -564,6 +564,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.task_output_turn",
+		contract = { "request" },
+		-- The Karabiner lease ACK deadlines prove a task output turn before failing.
+		wired    = true,
+	},
+	{
 		id       = "adapters.text_sender",
 		contract = { "send" },
 		wired    = true,
