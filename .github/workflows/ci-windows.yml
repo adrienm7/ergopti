@@ -1054,6 +1054,16 @@ jobs:
               Write-Host "$($field.Name): $value"
           }
 
+      # Proxies and antivirus engines read the plain-text compiled script: v1.0.4
+      # was blocked after an inline PowerShell P/Invoke stage reached it. The
+      # policy (tools/ci/windows-exe-av-surface.json) forbids such stages and
+      # holds the remaining PowerShell launch patterns at their measured counts.
+      - name: Check the ErgoptiPlus.exe antivirus surface
+        shell: pwsh
+        run: |
+          node tools/ci/windows-exe-av-surface.cjs "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          if ($LASTEXITCODE -ne 0) { throw "ErgoptiPlus.exe exceeds its antivirus surface policy." }
+
       - name: Sign and verify ErgoptiPlus.exe
         if: inputs.release
         shell: pwsh
@@ -1203,9 +1213,10 @@ jobs:
         #
         # The wait ends on process exit or a runtime error dialog. The bundle
         # marker is diagnostic only; it must never admit an incomplete boot.
-        # Elapsed time is no verdict. The first launch expands about 550
-        # files through Windows PowerShell while Defender scans each of them,
-        # and this step took 8-19 s on the green runs 582-613, so the former
+        # Elapsed time is no verdict. The first launch expands a few hundred
+        # files while Defender scans each of them (through PowerShell
+        # Expand-Archive until it moved to tar.exe), and this step took
+        # 8-19 s on the green runs 582-613, so the former
         # 20 s deadline read the slow end of a healthy extraction as a dialog
         # (run 613, green on re-run). The hang bound only stops a launch that
         # neither finishes nor raises a dialog.
