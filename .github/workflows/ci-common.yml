@@ -403,17 +403,13 @@ jobs:
         with:
           node-version-file: '.node-version'
 
-      # A skipped or failed site stage uploaded no proof; skipping the
-      # downloads lets the receiver name that stage instead of a missing artifact.
       - name: Receive stable production browser proof
-        if: env.SITE_PREDECESSOR_RESULT == 'success'
         uses: actions/download-artifact@v4
         with:
           name: common-site-testbuild-main
           path: site-proof/main
 
       - name: Receive development production browser proof
-        if: env.SITE_PREDECESSOR_RESULT == 'success'
         uses: actions/download-artifact@v4
         with:
           name: common-site-testbuild-dev
