@@ -1,0 +1,41 @@
+{
+	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur in the compiled script; a ceiling may not be exceeded (lower it when a launcher is removed). Patterns are case-insensitive JavaScript regular expressions. See docs/todo-agents/windows-exe-flagged-by-proxy.md.",
+	"schema": 1,
+	"script": {
+		"forbidden": {
+			"inline_csharp_compile": "Add-Type",
+			"pinvoke_declaration": "DllImport",
+			"pinvoke_type_definition": "TypeDefinition",
+			"powershell_screen_capture": "CopyFromScreen",
+			"powershell_unzip": "Expand-Archive",
+			"inline_expression_eval": "Invoke-Expression|\\bIEX\\s*[\\(\\$]",
+			"autorun_registry_key": "CurrentVersion\\\\Run\\b",
+			"scheduled_task": "schtasks",
+			"remote_thread_injection": "CreateRemoteThread|WriteProcessMemory|VirtualAllocEx"
+		},
+		"ceilings": {
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 18 },
+			"powershell_encoded_command": { "pattern": "-EncodedCommand", "max": 3 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 4 },
+			"base64_decode": { "pattern": "FromBase64String", "max": 2 },
+			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
+			"elevated_run": { "pattern": "\\*RunAs", "max": 3 }
+		},
+		"reported": {
+			"keylogger_wording": "keylog",
+			"powershell_mentions": "powershell"
+		}
+	},
+	"bundle": {
+		"ceilings": {
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 2 },
+			"powershell_encoded_command": { "pattern": "-EncodedCommand", "max": 0 },
+			"inline_csharp_compile": { "pattern": "Add-Type", "max": 19 },
+			"pinvoke_declaration": { "pattern": "DllImport", "max": 33 },
+			"base64_decode": { "pattern": "FromBase64String", "max": 1 }
+		},
+		"reported": {
+			"keylogger_wording": "keylog"
+		}
+	}
+}

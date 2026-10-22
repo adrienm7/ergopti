@@ -514,6 +514,7 @@
 		"sync:agent-skills": "node ./tools/agents/sync-skills.cjs write",
 		"test:windows-bundle-stamp-encoding": "node ./tools/test/test-windows-bundle-stamp-encoding.cjs",
 		"test:windows-exe-version-info": "node ./tools/test/test-windows-exe-version-info.cjs",
+		"test:windows-exe-av-surface": "node ./tools/test/test-windows-exe-av-surface.cjs",
 		"test:ahk-e2e-manifest": "node ./tools/test/test-ahk-e2e-manifest.cjs",
 		"test:menu-shared-delegation": "node ./tools/test/test-menu-shared-delegation.cjs",
 		"test:linux:fd-sha256-native": "node ./tools/test/run-linux-fd-sha256-native.cjs",

@@ -434,6 +434,14 @@
 			"args": ["tools/test/run-hs274-diagnostics-tests.cjs"],
 			"repro": "npm run test:hs274-diagnostics",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-0454",
+			"ordinal": 454,
+			"name": "ErgoptiPlus.exe antivirus surface: no inline P/Invoke or PowerShell unzip stage, launch patterns held at their ceilings",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-exe-av-surface.cjs"],
+			"repro": "npm run test:windows-exe-av-surface"
 		}
 	]
 }
