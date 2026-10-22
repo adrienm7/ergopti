@@ -469,7 +469,12 @@ no keyboard; its tray retry docks XEmbed icons into stalonetray. v1.0.3 held its
 library was missing. The image therefore bundles libayatana-appindicator3 and
 its non-GTK libraries (`TRAY_LIBRARIES` in `stage-linux-network-runtime.py`);
 without a watcher the library falls back to an XEmbed GtkStatusIcon. The smoke
-replays that check on a host without libayatana. Action: read the catalogue's
+replays that check on a host without libayatana. Its tray pass left-clicks the
+icon (libayatana's GtkStatusIcon fallback pops the menu on both buttons), then
+right-clicks the same spot, which closes the grabbed override-redirect menu
+before the screenshot; only a named visible window survives into it, so the
+no-keyboard state opens an "Ergopti+" status window (`infra/input_access.lua`).
+Action: read the catalogue's
 full log (`gh run view <id> --repo AppImage/appimage.github.io --log`) before
 trusting its "first error", which is only the first stderr line.
 
