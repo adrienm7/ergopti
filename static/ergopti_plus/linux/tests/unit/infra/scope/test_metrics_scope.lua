@@ -477,4 +477,27 @@ helpers.describe("metrics retained native release debt", function()
 			restored(collector, widget, readout, controls, path, claim)
 		end)
 	end)
+
+	helpers.it("logs a privacy-filter click refused by a held metrics transaction (menu-click-during-scoped-transition)", function()
+		-- Windows refused the same click with an error window; here it was
+		-- dropped without a word. The refusal stays, and now it is logged.
+		with_scope(function(_owner, collector)
+			local Preferences = require("infra.metrics_preferences")
+			local Logger = require("logger.shim")
+			local claim = { pending = function() return false end }
+			helpers.assert_true(Preferences.acquire(claim))
+			local logged, original = {}, Logger.error
+			Logger.error = function(_tag, fmt, ...) logged[#logged + 1] = string.format(fmt, ...) end
+			local ok, err = pcall(function()
+				helpers.assert_eq(collector.set_private_filter_enabled(true), false)
+				helpers.assert_eq(collector.get_privacy_state().private_filter_enabled, false,
+					"a refused click changes nothing")
+			end)
+			Logger.error = original
+			helpers.assert_true(Preferences.release(claim))
+			if not ok then error(err, 0) end
+			helpers.assert_eq(#logged, 1, "the refused click is logged once")
+			helpers.assert_true(logged[1]:find("Private-browsing filter change refused", 1, true) ~= nil, logged[1])
+		end)
+	end)
 end)
