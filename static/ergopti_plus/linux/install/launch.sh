@@ -61,7 +61,15 @@ for arg in "$@"; do
 	fi
 done
 
-if "$SESSION_START"; then
+# Every daemon launch takes the instance lock, not only the graphical ones: a
+# terminal launch next to the tray daemon would otherwise start a second grab
+# of the keyboard. --help starts no daemon and stays lock-free.
+DAEMON_LAUNCH=true
+for arg in "$@"; do
+	if [ "$arg" = --help ] || [ "$arg" = -h ]; then DAEMON_LAUNCH=false; fi
+done
+
+if "$DAEMON_LAUNCH"; then
 	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
 	install -d -m 700 "$lock_root"
 	exec 9>"$lock_root/ergopti.lock"
@@ -74,7 +82,13 @@ if "$SESSION_START"; then
 		:
 	else
 		status=$?
-		if [ "$status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then exit 0; fi
+		if [ "$status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then
+			echo "Ergopti+ is already running in this session ($lock_root/ergopti.lock is held); this launch was refused." >&2
+			# A second session start (autostart racing the unit, a tray relaunch)
+			# is expected and succeeds; a direct launch reports the refusal.
+			if "$SESSION_START"; then exit 0; fi
+			exit 75
+		fi
 		if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
 		exit "$status"
 	fi

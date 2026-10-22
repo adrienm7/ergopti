@@ -147,7 +147,7 @@ else echo "users input uinput"; fi`
 		'flock',
 		logCall +
 			'\n[ "$*" = "-n 9" ] || { echo "unsupported flock arguments" >&2; exit 64; }\n' +
-			'if [ "$TEST_CASE" = busy ]; then exit 1; fi\n' +
+			'case "$TEST_CASE" in busy|direct-busy) exit 1;; esac\n' +
 			'if [ "$TEST_CASE" = lock-error ]; then echo "flock: Bad file descriptor" >&2; exit 1; fi'
 	);
 	if (process.platform === 'win32') {
@@ -174,6 +174,16 @@ else echo "users input uinput"; fi`
 		['busy', ['--service', '--tray'], 0, /flock /, /luajit|pkexec/],
 		['lock-error', ['--service', '--tray'], 1, /flock /, /luajit|pkexec/],
 		['help', ['--help'], 0, /luajit .* --help/, /flock|pkexec|systemctl/],
+		['help-short', ['--verbose', '-h'], 0, /luajit .* --verbose -h/, /flock|pkexec|systemctl/],
+		// A terminal launch is a daemon too: it takes the same instance lock.
+		[
+			'direct',
+			['--verbose'],
+			0,
+			/^flock -n 9\nluajit .*ergopti_hotstrings\.lua --verbose$/m,
+			/pkexec|systemctl/
+		],
+		['direct-busy', ['--verbose'], 75, /flock /, /luajit|pkexec|systemctl/],
 		[
 			'stale',
 			['--service', '--tray', "an argument's value"],
@@ -197,6 +207,13 @@ else echo "users input uinput"; fi`
 		const invoked = fs.readFileSync(callLog, 'utf8');
 		assert.match(invoked, expected, scenario);
 		assert.doesNotMatch(invoked, forbidden, scenario);
+		if (scenario === 'busy' || scenario === 'direct-busy') {
+			assert.match(
+				launched.stderr,
+				/Ergopti\+ is already running in this session \(.*ergopti\.lock is held\); this launch was refused\./,
+				`${scenario}: a refused launch must say why`
+			);
+		}
 		if (scenario === 'lock-error') {
 			assert.match(
 				launched.stderr,
