@@ -2959,7 +2959,11 @@ local function _build_llm(ctx)
 	-- whatever Ollama reports and no static entry can enumerate them.
 	local function ollama_model_rows()
 		if type(llm.get_models) ~= "function" then return {} end
-		local models = llm.get_models()
+		-- With the AI off no tray build may ask Ollama for its models: the
+		-- inventory GET (/api/tags) is a probe, and the AI is inert until the
+		-- switch-on, as on Windows and macOS (ai-off-inert-linux-2026-10-22)
+		local ai_on = type(llm.is_enabled) == "function" and llm.is_enabled() == true
+		local models = ai_on and llm.get_models() or {}
 		if type(models) ~= "table" then return {} end
 		local current = llm.get_current_model and llm.get_current_model() or nil
 		local rows = {}

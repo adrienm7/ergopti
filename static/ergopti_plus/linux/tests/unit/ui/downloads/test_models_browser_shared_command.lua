@@ -138,6 +138,7 @@ helpers.describe("declared model picker tail boundary", function()
 	helpers.it("retains the native empty-list condition and installed-model/browser order", function()
 		for _, models in ipairs({{}, {"installed-one", "installed-two"}}) do
 			with_browser(function(f)
+				f.ctx.llm.is_enabled = function() return true end
 				f.ctx.llm.get_models = function() return models end
 				helpers.assert_eq(picker_boundary_owner(f.renderer).status_rows.model_picker_tail, {{type="---"}})
 				local browser = find_row(f.builder.build(f.ctx), "menu.llm.browse_models_entry")
@@ -158,6 +159,7 @@ helpers.describe("declared model picker tail boundary", function()
 
 	helpers.it("consumes the shared inert presentation and keeps exact native browser acknowledgement", function()
 		with_browser(function(f)
+			f.ctx.llm.is_enabled=function()return true end
 			f.ctx.llm.get_models=function()return{"native-model"}end
 			picker_boundary_owner(f.renderer).status_rows.model_picker_tail={{type="label",i18n="common.restore_recommended"}}
 			local rows=f.builder.build(f.ctx)
@@ -175,6 +177,7 @@ helpers.describe("declared model picker tail boundary", function()
 	for _, mode in ipairs({"missing", "wrong_owner", "clicked", "extra_callback"}) do
 		helpers.it("refuses " .. mode .. " boundary while retaining native model and browser data",function()
 			with_browser(function(f)
+				f.ctx.llm.is_enabled=function()return true end
 				f.ctx.llm.get_models=function()return{"native-model"}end
 				local owner=picker_boundary_owner(f.renderer)
 				local effects=0
@@ -196,4 +199,30 @@ helpers.describe("declared model picker tail boundary", function()
 			end)
 		end)
 	end
+end)
+
+helpers.describe("AI off: the tray asks Ollama for no model (ai-off-inert-linux-2026-10-22)", function()
+	helpers.it("builds the model rows without an inventory read while off, and with one once on", function()
+		with_browser(function(f)
+			local enabled = false
+			local reads = 0
+			f.ctx.llm.is_enabled = function() return enabled end
+			f.ctx.llm.get_models = function()
+				reads = reads + 1
+				return { "installed-one" }
+			end
+			helpers.assert_type(find_row(f.builder.build(f.ctx), "menu.llm.browse_models_entry"), "table",
+				"the model browser stays reachable with the AI off")
+			helpers.assert_eq(reads, 0, "a tray build with the AI off must not probe the Ollama inventory")
+
+			enabled = true
+			local rows = f.builder.build(f.ctx)
+			helpers.assert_eq(reads, 1, "the switch-on lets the tray list the installed models")
+			helpers.assert_type(find_row(rows, "installed-one"), "table")
+
+			enabled = false
+			f.builder.build(f.ctx)
+			helpers.assert_eq(reads, 1, "the switch-off stops the inventory reads again")
+		end)
+	end)
 end)
