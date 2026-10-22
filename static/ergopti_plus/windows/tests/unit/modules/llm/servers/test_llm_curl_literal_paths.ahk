@@ -9,11 +9,18 @@
 
 #Requires AutoHotkey v2.0
 
+; The first cmd.exe and curl.exe of a shard can take seconds to start on a
+; loaded hosted runner: one wait expired at 5.5 s in run 39713353269 where
+; the whole test usually takes 0.7 s. Every wait ends as soon as its
+; condition holds, so the generous bound costs nothing on success.
+global _CLP_CHILD_WAIT_MS := 30000
+
 _CLP_RunOwnedCommand(Command) {
+	global _CLP_CHILD_WAIT_MS
 	Owner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun, Command, "", "Hide", &Pid)
 	try {
 		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
-		while !_LLM_CurlProcessExited(Owner) && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 5000
+		while !_LLM_CurlProcessExited(Owner) && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < _CLP_CHILD_WAIT_MS
 			Sleep(10)
 		AssertTrue(_LLM_CurlProcessExited(Owner), "the bounded file-only curl Job must finish")
 		AssertTrue(Owner.Get("terminal", 0) is Map, "the exact native completion must carry its exit code")
@@ -22,11 +29,12 @@ _CLP_RunOwnedCommand(Command) {
 }
 
 _CLP_RetireOwner(Owner) {
+	global _CLP_CHILD_WAIT_MS
 	if !(Owner is Map)
 		return
 	Started := DllCall("Kernel32\GetTickCount64", "UInt64")
 	Retired := _LLM_CurlReleaseProcess(Owner, true)
-	while !Retired && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 5000 {
+	while !Retired && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < _CLP_CHILD_WAIT_MS {
 		Sleep(10)
 		Retired := _LLM_CurlReleaseProcess(Owner, true)
 	}
@@ -269,6 +277,7 @@ _CLP_OpenSilentListener() {
 }
 
 _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
+	global _CLP_CHILD_WAIT_MS
 	Root := A_Temp . "\ergopti_curl_tree_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
 	AssertFalse(DirExist(Root))
 	DirCreate(Root)
@@ -284,7 +293,7 @@ _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
 		RunFn := WithJobWitness ? _CLP_RunWithJobWitness.Bind(Witness) : _LLM_CurlArtifactRun
 		Owner := _LLM_CurlRunOwned(RunFn, Command, "", "Hide", &Pid)
 		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
-		while (Peer == -1 || !Child) && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 5000 {
+		while (Peer == -1 || !Child) && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < _CLP_CHILD_WAIT_MS {
 			if Peer == -1 {
 				Peer := DllCall("Ws2_32\accept", "Ptr", Listener["socket"], "Ptr", 0, "Ptr", 0, "Ptr")
 				if Peer == -1
@@ -341,7 +350,7 @@ _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
 			Witness["root"] := 0
 		}
 		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
-		while !Retired && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 5000 {
+		while !Retired && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < _CLP_CHILD_WAIT_MS {
 			Sleep(10)
 			Retired := _LLM_CurlReleaseProcess(Owner, true)
 		}
