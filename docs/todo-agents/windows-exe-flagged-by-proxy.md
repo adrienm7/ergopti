@@ -145,16 +145,78 @@ the exe gives 6177221 bytes (54 %), which a size cap would let through but an AV
   `BUNDLE_VERSION` (an unstamped local build reads `0.0.0-dev`). The Windows build stage checks the
   compiled exe ("Verify the ErgoptiPlus.exe version resource"); the test is js-0451.
 
+## v1.0.5 follow-up (October 22): passed once, blocked two hours later
+
+Report: v1.0.5 (published 2026-10-22 09:02 Paris) downloaded fine on the tester's PC, then the
+proxy blocked it on another PC two hours later; v1.0.2 still downloads there.
+
+| Asset                  | Bytes    | SHA-256                                                          |
+| ---------------------- | -------- | ---------------------------------------------------------------- |
+| v1.0.2 ErgoptiPlus.exe | 11194368 | 1292b8d5d8222ed4d54d7b5fbbbcc3998addaa65993c627cb7c4835d4df2e670 |
+| v1.0.4 ErgoptiPlus.exe | 11403776 | a4ed8e50de44c4ec4116bdefeb7cb71c7feb54913cebfc837a9b433ce230ad13 |
+| v1.0.5 ErgoptiPlus.exe | 11521024 | 631e50c2051854a4940ca5a41f9e55cc1167ce3b0e9efd8691ba2a600d73af35 |
+
+Static comparison (assets never executed):
+
+- PE: `.text`, `.rdata`, `.data`, `.pdata`, imports (16 DLLs, same functions), manifest and
+  timestamp are identical in the three; no packer, no overlay, no Authenticode directory. Whole
+  file entropy 7.2 comes from the deflated bundle resource (7.998), present since v1.0.0.
+- Version resource: bare AutoHotkey 2.0.26 defaults in v1.0.2 and v1.0.4, complete Ergopti+
+  identity in v1.0.5.
+- Compiled script (`tools/ci/windows-exe-av-surface.cjs` counts): v1.0.4 alone has Add-Type 4,
+  DllImport 6, TypeDefinition 1; v1.0.5 has none, like v1.0.2. Unchanged in all three:
+  ExecutionPolicy Bypass 19, -EncodedCommand 3, FromBase64String 2, ScriptBlock::Create 1, \*RunAs
+  3, hidden windows 4-5, about 640 "keylogger" identifiers and about 430 more in the bundle.
+- Bundle: no new binary between v1.0.4 and v1.0.5 (`ergopti_network_pac.exe` is now reproducible,
+  same hash in both; fix 3 is done by `/Brepro`). Only `vendor/ergopti_curl_attempt.ps1` changed.
+
+Conclusion: v1.0.5 carries nothing that v1.0.2 does not, so the verdict is not a content
+signature. "Allowed first, blocked later" is the patient-zero pattern of cloud sandboxes
+(Netskope, Zscaler): an unknown unsigned file is released or held, detonated, and later
+downloads follow the sandbox verdict. The detonation sees what the first launch does: an unsigned
+exe that drops about 330 files, including PowerShell scripts, through a hidden
+`powershell -ExecutionPolicy Bypass` child, then installs a keyboard hook. v1.0.2 passes because
+its hash was cleared (or never re-scored) before. Every release resets this, so the durable fix
+is a signed publisher (item 132, [SignPath application](signpath-foundation-application.md)).
+
+Done on dev: `3d2c78d7b7` (first launch extracts with System32 `tar.exe`, no script host),
+`745f07fa51` (build gate over the compiled exe, js-0454), `61fb29d64d` (SignPath signing wired,
+off until configured), `c6db589c76` (README code signing policy and privacy).
+
+### Microsoft false-positive submission (maintainer, https://www.microsoft.com/wdsi/filesubmission)
+
+Submit as "Software developer", product "Microsoft Defender Antivirus", file v1.0.5
+`ErgoptiPlus.exe` (SHA-256 above), "Incorrectly detected as malware/malicious". Text:
+
+> ErgoptiPlus.exe is the Windows build of Ergopti+, an open-source (MIT) keyboard productivity
+> tool: text expansion, key remapping and tap-hold keys, built with AutoHotkey v2. It is built by
+> GitHub Actions from https://github.com/adrienm7/ergopti and published at
+> https://github.com/adrienm7/ergopti/releases/tag/v1.0.5. Corporate proxies and antivirus
+> engines block its download. Like every text expander it installs a low-level keyboard hook; its
+> optional typing statistics are off by default, stored locally only, and never uploaded. On
+> first launch it extracts its own resources to `%LOCALAPPDATA%\Ergopti`. It contacts only the GitHub
+> API for update checks. Please review the detection and clear this file. Earlier hash for the
+> same product: a4ed8e50de44c4ec4116bdefeb7cb71c7feb54913cebfc837a9b433ce230ad13 (v1.0.4).
+
+Also ask the tester for the exact block page text (vendor and detection name): with a named
+engine, use that vendor's false-positive form too (Netskope: the Service Desk ticket with the
+SHA-256 and release URL, asking for an allow-list or re-scan).
+
 ## Remaining
 
-- Fix 3 (reproducible `ergopti_network_pac.exe`, `/Brepro` in
-  `tools/build/build_windows_network_pac.ps1`) and fix 4 (code signing, item 132).
+- Fix 4 (code signing, item 132): apply to SignPath Foundation and switch it on
+  ([steps](signpath-foundation-application.md)). Fix 3 is done (`/Brepro`, verified above).
 - Other hidden PowerShell launchers that AHK could replace, not changed (they were present in the
   builds that pass): the Recycle Bin action (`GESTURE_SYS_EMPTY_TRASH_COMMAND`, AHK has
-  `FileRecycleEmpty`), the screen brightness adapter (WMI, reachable through `ComObjGet`), the
-  bundle unzip (`_Bundle_BuildUnzipCommand`, `Expand-Archive`), and the elevated touchpad registry
+  `FileRecycleEmpty`), the screen brightness adapter (WMI, reachable through `ComObjGet`), and the elevated touchpad registry
   scripts (`modules/gestures/config.ahk`, `ui/onboarding/gesture_registration.ahk`). The updater,
   crash report, curl, managed network, Ollama and diagnostics workers are vendor scripts: kept.
+  The updater bootstrap (base64 fragments in environment variables, `[ScriptBlock]::Create`,
+  `-EncodedCommand`) is the pattern scored hardest after the unzip; moving it to a bundled
+  `-File` worker is the next candidate, held at its ceiling by the gate meanwhile.
+- "keylogger" names the typing metrics in about 1 070 shipped strings and identifiers (and 10 600
+  repository occurrences in 1 350 files across the three drivers, config keys and locales). A
+  rename to typing metrics is a cross-driver campaign of its own; the gate reports the count.
 - After the next build that contains both fixes: hash its `ErgoptiPlus.exe`
   (`sha256sum` or `Get-FileHash`), look the hash up on VirusTotal and give it to the tester for
   T4, with the Service Desk ticket if it is still blocked. Keep the v1.0.4 hash above for the
