@@ -77,7 +77,7 @@ _MAD_Source(Root, OwnerReceipt) {
 		"PLC_CreateProcessWithInheritedHandles", "WMHandleExists",
 		"ParseTomlFile", "IniCacheGet", "TimingsLoadShared", "t", "I18nGetLocale", "Gui_Create", "AppPicker_Show",
 		"KL_WriteAtomic", "KL_AppCat_Init", "KL_Hook_HasPendingInput", "KL_Watchers_IdleTick", "SQLite_Open", "KeyloggerWalkerLoadTimings", "KLW_WalkTypingEntry",
-		"KLW_BuildBatchSql", "KLR_ListLedgerPaths", "KLR_BuildDatabase", "KLR_CacheAttach",
+		"KLW_BuildBatchSql", "KLR_ListLedgerPaths", "KLR_BuildDatabase", "KLR_CacheAttach", "KLR_BeginPartialRead",
 		"KLR_BuildColdCandidateAuto", "KLR_ReadManifest", "KLR_BuildManifestJson", "KLR_BuildRangeSplitTodayJson",
 		"KLPF_RequestBuild", "KLWV_OnWebMessage", "TimerSetCallback", "HotPath_Now"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
@@ -115,7 +115,7 @@ _MAD_Native() {
 	Script := Root . "\subject.ahk"
 	SourceOwners := []
 	AssertTrue(FSWriteCreateDurable(Script, _MAD_Source(Root . "\store", SourceOwners)))
-	AssertEqual(43, SourceOwners.Length, "all generated and authored owner lookups must finish before native launch")
+	AssertEqual(44, SourceOwners.Length, "all generated and authored owner lookups must finish before native launch")
 	Hash := CryptoSha256Bytes(FSReadBytesStrict(Script))
 	RuntimeHash := CryptoSha256Bytes(FSReadBytesStrict(A_AhkPath))
 	_TestPrint("# apps-dom-source-built " . KL_JsonEncode(Map("source_sha256", Hash,
