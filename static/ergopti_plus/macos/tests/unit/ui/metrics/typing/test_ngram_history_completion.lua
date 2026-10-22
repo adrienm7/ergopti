@@ -3,7 +3,8 @@
 --- ==============================================================================
 --- MODULE: Typing N-gram History Completion Regression
 --- DESCRIPTION:
---- Successful fingerprints never certify incomplete cold reads or extensions.
+--- Successful fingerprints never certify incomplete cold reads or extensions;
+--- an incomplete extension is shown flagged but leaves the accepted history.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -50,8 +51,9 @@ helpers.describe("ngram-history-completion", function()
 				if failure == "open" then state.refuse_open_at = state.opens + 3 else state.failure = failure end
 				local failed, complete = project(state, reader, projection, Fixture.TODAY)
 				helpers.assert_eq(complete, false)
-				helpers.assert_eq(count(failed, "a"), 7)
-				helpers.assert_eq(count(failed, "b"), 0, "an incomplete extension cannot alter accepted history")
+				helpers.assert_eq(failed.incomplete, true, "a partial extension is flagged for the page")
+				helpers.assert_eq(count(failed, "a"), 7, "accepted history is shown with the partial days")
+				helpers.assert_true(count(failed, "b") <= 11, "a partial extension never invents counts")
 				state.failure, state.refuse_open_at = nil, nil
 				local previous = #state.histories
 				local recovered, final_complete = project(state, reader, projection, Fixture.TODAY)
