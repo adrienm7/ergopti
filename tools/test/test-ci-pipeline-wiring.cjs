@@ -2113,11 +2113,13 @@ function commonVerdictProblems(source) {
 				{ uses: 'actions/setup-node@v4', with: { 'node-version-file': '.node-version' } },
 				{
 					name: 'Receive stable production browser proof',
+					if: "env.SITE_PREDECESSOR_RESULT == 'success'",
 					uses: 'actions/download-artifact@v4',
 					with: { name: 'common-site-testbuild-main', path: 'site-proof/main' }
 				},
 				{
 					name: 'Receive development production browser proof',
+					if: "env.SITE_PREDECESSOR_RESULT == 'success'",
 					uses: 'actions/download-artifact@v4',
 					with: { name: 'common-site-testbuild-dev', path: 'site-proof/dev' }
 				},
