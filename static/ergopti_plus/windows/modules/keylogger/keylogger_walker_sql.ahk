@@ -52,8 +52,11 @@ KLW_EsrcMergeExpr(EsrcMap) {
 
 ; Merge numeric distributions without interpolating bucket labels as JSON paths.
 ; Both live flushes and cold replay drain the batch, so replacement loses history.
+; The object is spelled with json_quote rather than json_group_object, which
+; cuts a key at an embedded NUL: "a\u0000b" came back as "a", merged into a
+; second "a" key and the stored map stopped describing what was counted.
 KLW_BucketMergeExpr(Column) {
-		return "(SELECT json_group_object(key,total) FROM (SELECT key,SUM(value) AS total FROM ("
+		return "(SELECT COALESCE('{' || group_concat(json_quote(key) || ':' || total, ',') || '}', '{}') FROM (SELECT key,SUM(value) AS total FROM ("
 				. "SELECT key,value FROM json_each(COALESCE(" . Column . ",'{}')) UNION ALL "
 				. "SELECT key,value FROM json_each(excluded." . Column . ")) GROUP BY key))"
 }
