@@ -238,7 +238,9 @@ for (const driver of ['windows', 'macos', 'linux']) {
 	const sources = walk(path.join(SP, driver), []).filter((file) =>
 		/caps_?word/i.test(path.basename(file))
 	);
-	check(sources.length >= 2, `${driver}: expected at least two CapsWord sources to scan`);
+	// Linux keeps one since its per-letter engine mode was removed (2026-10-22):
+	// modules/shortcuts/caps_word_auto_off.lua.
+	check(sources.length >= 1, `${driver}: expected a CapsWord source to scan`);
 	for (const file of sources) {
 		const source = fs.readFileSync(file, 'utf8');
 		const rel = path.relative(SP, file).replace(/\\/g, '/');

@@ -1693,14 +1693,11 @@ description_key = "menu.metrics.wpm_widget_y"
 [[features.metrics]]
 id = "wpm_widget_colors"
 platforms = ["ahk", "linux"]
-# The two drivers disagree, and the disagreement is recorded here rather than
-# resolved. Windows ships the pill neutral; Linux has shipped it coloured by
-# keystroke origin since its widget existed. Picking one is a product decision
-# about what a fresh install looks like, not something to settle inside a
-# refactor — and silently flipping Linux would change what every existing user
-# sees on their next start, for no reason they could find.
-default_per_platform = { ahk = false, linux = true }
-recommended_per_platform = { ahk = false, linux = true }
+# Linux used to colour the pill by keystroke origin while Windows ships it
+# neutral. The maintainer decided on 2026-10-22 that Linux recommends what
+# Windows recommends, and a pure parameter's default is its recommendation.
+default = false
+recommended = false
 input_altering = false
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_colors"
@@ -2049,7 +2046,7 @@ description_key = "menu.shortcuts.key_combinations"
 id = "left_alt_then_caps_lock"
 platforms = ["ahk", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "caps_word", linux = "none" }
+recommended = "caps_word"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
@@ -2563,6 +2560,10 @@ description_key = "menu.caps_word.pointer.other_buttons"
 # Windows (GESTURE_FACTORY_DEFAULTS) build what « Restaurer les valeurs
 # conseillées » writes from them rather than from a copy of their own;
 # test-gesture-defaults-single-source.cjs holds both drivers to this list.
+# Linux recommends the Windows binding of every slot both drivers have
+# (maintainer decision, 2026-10-22), except the four-finger vertical swipes:
+# their Windows actions, win_app_prev and win_app_next, do not exist in the
+# Linux catalogue, so those two stay unassigned there.
 [[features.gestures]]
 id = "enabled"
 platforms = ["ahk", "hs", "linux"]
@@ -2576,7 +2577,7 @@ description_key = "menu.gestures.enabled"
 id = "swipe_3_down"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
+recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "tab_close" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
@@ -2585,7 +2586,7 @@ description_key = "menu.gestures.swipe_3_down"
 id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
+recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "tab_prev" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
@@ -2594,7 +2595,7 @@ description_key = "menu.gestures.swipe_3_left"
 id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
+recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "tab_next" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
@@ -2603,7 +2604,7 @@ description_key = "menu.gestures.swipe_3_right"
 id = "swipe_3_up"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
+recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "tab_new" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
@@ -2621,7 +2622,7 @@ description_key = "menu.gestures.swipe_4_down"
 id = "swipe_4_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "desktop_prev" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
@@ -2630,7 +2631,7 @@ description_key = "menu.gestures.swipe_4_left"
 id = "swipe_4_right"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "desktop_next" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
@@ -2648,7 +2649,7 @@ description_key = "menu.gestures.swipe_4_up"
 id = "tap_3"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "none" }
+recommended = "left_click_toggle"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_3"
@@ -2657,7 +2658,7 @@ description_key = "menu.gestures.tap_3"
 id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "none" }
+recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "alt_tab_monitor" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_4"
@@ -3675,6 +3676,8 @@ type = "boolean"
 description_key = "menu.layout.ergopti_base"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
+# Linux and macOS only report the layout's own number row (number_row_policy
+# native_rows); no writer reorders it there, so they cannot recommend digits.
 [[features.layout]]
 id = "direct_access_digits"
 platforms = ["ahk", "hs", "linux"]

@@ -42,7 +42,6 @@ graph TD
         LINUX_atspi_focus_watch["AtspiFocusWatch.lua"]
         LINUX_atspi_focus_watch_worker["AtspiFocusWatchWorker.lua"]
         LINUX_atspi_native_identity["AtspiNativeIdentity.lua"]
-        LINUX_caps_word["CapsWord.lua"]
         LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_curl_http_client["CurlHttpClient.lua"]

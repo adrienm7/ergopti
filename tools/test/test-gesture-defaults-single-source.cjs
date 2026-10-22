@@ -219,9 +219,28 @@ if (
 		'Linux must project and restore explicit gesture recommendations separately from initialization.'
 	);
 }
+// Linux recommends the Windows binding of every slot both drivers have
+// (decision of 2026-10-22). Fresh configurations still start neutral: only an
+// explicit restore applies these. The four-finger vertical swipes stay
+// unassigned because win_app_prev and win_app_next do not exist on Linux.
+const windowsRecommendations = manifestDefaults('ahk');
+const LINUX_UNASSIGNED = new Set(['swipe_4_down', 'swipe_4_up']);
 for (const [slot, action] of manifestDefaults('linux')) {
-	if (action !== 'none')
-		errors.push(`Linux gesture recommendation gestures.${slot} must remain opt-in (none).`);
+	if (!windowsRecommendations.has(slot)) continue;
+	const expected = LINUX_UNASSIGNED.has(slot) ? 'none' : windowsRecommendations.get(slot);
+	if (action !== expected)
+		errors.push(
+			`Linux gesture recommendation gestures.${slot} must be ${expected}, found ${action}.`
+		);
+}
+const linuxDefaults = (() => {
+	const entries = parseToml(read('_shared/modules/features/manifest.toml')).features.gestures;
+	return entries.filter((entry) => (entry.platforms || []).includes('linux'));
+})();
+for (const entry of linuxDefaults) {
+	const neutral = entry.default_per_platform?.linux ?? entry.default;
+	if (entry.type === 'action' && neutral !== 'none')
+		errors.push(`Linux gesture default gestures.${entry.id} must stay neutral (none).`);
 }
 
 if (errors.length > 0) {
