@@ -35,8 +35,11 @@ local MAX_HELD_CLICKS = 8
 --- @return boolean admitted
 local function notify_lost()
 	local I18n = require("infra.i18n")
+	-- A notification, not a menu row: named first so the menu-row census of
+	-- ui/menu/ does not read `title = I18n.get(...)` as a row built here.
+	local title = I18n.get("menu.reload_replay.lost_title")
 	return require("adapters.notifier").send(I18n.get("menu.reload_replay.lost"), {
-		title = I18n.get("menu.reload_replay.lost_title"), level = "warning",
+		title = title, level = "warning",
 	})
 end
 
