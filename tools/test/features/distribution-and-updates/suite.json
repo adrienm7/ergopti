@@ -425,6 +425,15 @@
 			"cmd": "node",
 			"args": ["tools/test/test-windows-exe-version-info.cjs"],
 			"repro": "npm run test:windows-exe-version-info"
+		},
+		{
+			"id": "js-0453",
+			"ordinal": 453,
+			"name": "HS-274 producer and native-fixture tooling: Python suites and portable C++ tests",
+			"cmd": "node",
+			"args": ["tools/test/run-hs274-diagnostics-tests.cjs"],
+			"repro": "npm run test:hs274-diagnostics",
+			"platforms": ["linux"]
 		}
 	]
 }
