@@ -29,7 +29,7 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 	try {
 		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD")
 		_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW")
-		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
+		FileAppend(FileRead(_Updater_SwapWorkerPath(), "UTF-8"), SwapScriptPath, "UTF-8-RAW")
 		ParentExitHandle := _USTX_StartParentGate(TestId, &ParentPid)
 		Assert(ParentPid > 0 and ProcessExist(ParentPid),
 			"positive control: the crash-before-FinalExit parent must be alive")
@@ -137,7 +137,7 @@ _USTX_CreateProcessCancellationCannotOrphanSuspendedChild(BeforeCleanupFn := uns
 	Failure := 0
 	DirCreate(TestDir)
 	try {
-		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
+		FileAppend(FileRead(_Updater_SwapWorkerPath(), "UTF-8"), SwapScriptPath, "UTF-8-RAW")
 		_UpdaterSwapOwner := 0
 		_UpdaterExitIntent := 0
 		_UpdaterExitInvocation := 0

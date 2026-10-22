@@ -76,7 +76,7 @@ _CurlCaptureNativeHybridNamespace(UseJunction := false) {
 		Script := "$ErrorActionPreference='Stop';[IO.File]::WriteAllBytes('" . Path
 			. "',[byte[]](1,2,3,4));Start-Sleep -Milliseconds 30000"
 		Worker := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-			["-NoProfile", "-NonInteractive", "-EncodedCommand", _Updater_EncodePowerShellCommand(Script)],
+			["-NoProfile", "-NonInteractive", "-EncodedCommand", _UpdaterTestEncodedCommand(Script)],
 			, , ObjBindMethod(Capture, "OnNativeAdopt"))
 		Capture.Attach(Worker)
 		AssertTrue(Worker.start(), "the actual owned native writer starts")
@@ -427,7 +427,7 @@ _CurlCaptureMoveProbeAllocatedNamespace(Phase, LiveBody := false, HeldLease := f
 			Script := "$ErrorActionPreference='Stop';[IO.File]::WriteAllBytes('" . Path
 				. "',[byte[]](1,2,3,4));Start-Sleep -Milliseconds 30000"
 			Worker := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-				["-NoProfile", "-NonInteractive", "-EncodedCommand", _Updater_EncodePowerShellCommand(Script)],
+				["-NoProfile", "-NonInteractive", "-EncodedCommand", _UpdaterTestEncodedCommand(Script)],
 				, , ObjBindMethod(Capture, "OnNativeAdopt"))
 			Capture.Attach(Worker)
 			AssertTrue(Worker.start(), "the diagnostic body has a real independently owned native Job")

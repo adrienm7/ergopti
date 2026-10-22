@@ -85,8 +85,8 @@ and dispatches the correct reactor once.
    COM, file persistence, the Content-Length and minimum-size checks and the swap-script
    creation would each freeze the keyboard for their whole duration.
 
-   _Defence_: all of it lives in the PowerShell text returned by
-   `_Updater_BuildStagingWorkerScript` and runs in the child process, which reports back
-   a single `READY` token. Paths and URLs are passed as `argv`, never interpolated into
-   the script, so release metadata cannot alter the commands. Do not move any of that
-   work back onto the AHK side.
+   _Defence_: all of it lives in the bundled `vendor/ergopti_updater_staging.ps1`, which
+   the driver runs with `-File` in the child process, and which reports back a single
+   `READY` token. Paths and URLs are inherited environment values named by the
+   `-TransportPrefix` argument, never interpolated into a script, so release metadata
+   cannot alter the commands. Do not move any of that work back onto the AHK side.

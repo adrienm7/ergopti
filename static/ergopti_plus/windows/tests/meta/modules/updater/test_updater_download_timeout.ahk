@@ -35,7 +35,7 @@
 ; Returns the isolated worker body. The timeout must be owned by the worker,
 ; otherwise an AHK poll ceiling could still leave a blocked network request alive.
 _UDTO_FindPollBlock() {
-	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Worker := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Assert(InStr(Worker, '$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick') > 0,
 		"timeout guard must follow the actual selected download owner and immutable original clock")
 	SplitPath(A_ScriptDir, , &Root)

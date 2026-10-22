@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater Self-Update Bak Rollback Meta Test
 ; DESCRIPTION:
-; Guards the generated PowerShell transaction that replaces the executable.
+; Guards the bundled PowerShell transaction that replaces the executable.
 ; New and old-good candidates must be completed off-path before one atomic
 ; Replace publishes Current. Fallbacks survive until the replacement signals
 ; the post-_DriverReady event and passes probation. Rollback terminates by exact
@@ -14,10 +14,8 @@
 
 
 _USBR_SwapScript() {
-	Body := _DriverFuncBody("_Updater_BuildSwapWorkerScript")
-	Assert(Body != "", "_Updater_BuildSwapWorkerScript must exist")
-	Script := _Updater_BuildSwapWorkerScript()
-	Assert(Script != "", "the generated swap worker must not be empty")
+	Script := FileRead(_Updater_SwapWorkerPath(), "UTF-8")
+	Assert(Script != "", "the bundled swap worker must not be empty")
 	return Script
 }
 

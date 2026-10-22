@@ -211,24 +211,20 @@ _UpdaterNativeSetupDetailControls() {
 Test("updater fixture: setup details require direct closed compiler provenance", _UpdaterNativeSetupDetailControls)
 
 
-_UpdaterNativeObservedSourceBudget() {
-	global UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
-	Original := _Updater_BuildStagingWorkerScript()
+; The observed wrapper redeclares the bundled worker's one-line parameter block,
+; so @PSBoundParameters forwards exactly what the -File worker would receive.
+_UpdaterNativeObservedSourceHeader() {
+	Original := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
+	Assert(RegExMatch(Original, "m)^param\(\[string\]\$TransportPrefix.*\)$", &Header),
+		"the bundled staging worker declares its transport prefix parameter on one line")
 	Observed := _UpdaterNativeObservedStagingScript(Original)
-	Payload := _Updater_EncodePowerShellCommand(Observed)
-	AssertTrue(Ceil(StrLen(Payload) / UPDATER_STAGING_ENV_MAX_CHARS) <= UPDATER_STAGING_MAX_SCRIPT_CHUNKS,
-		"the exact observed native worker fits the unchanged production transport bound")
-	Transport := _Updater_BuildStagingTransport(Observed, _Updater_BuildSwapWorkerScript(),
-		"https://fixture.invalid/staging", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		"C:\fixture\new.exe", "C:\fixture\swap.ps1", "C:\fixture\current.exe", 524288, 5000)
-	try AssertEqual(Observed, _UST_DecodeUtf16Base64(Transport.ScriptPayload),
-		"the actual bounded environment transport preserves the full observed worker")
-	finally _Updater_ClearStagingTransport(Transport)
+	AssertEqual(1, InStr(Observed, Header[0] . "`n"),
+		"the observed wrapper starts with the exact bundled parameter declaration")
 }
-Test("updater native: exact observed source fits unchanged encoded chunk transport", _UpdaterNativeObservedSourceBudget)
+Test("updater native: observed wrapper forwards the bundled worker parameters", _UpdaterNativeObservedSourceHeader)
 
 _UpdaterNativeObservedSourceLiteral() {
-	Original := _Updater_BuildStagingWorkerScript()
+	Original := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Observed := _UpdaterNativeObservedStagingScript(Original)
 	Start := InStr(Observed, "$StagingSource=@'`n")
 	AssertTrue(Start > 0, "the real constructor contains its quoted literal boundary")
