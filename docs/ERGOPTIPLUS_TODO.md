@@ -218,9 +218,22 @@ Not started:
       library and loader (or build on an older base) and prove it on the distro matrix (musl cannot
       run glibc binaries: say so), keeping the tray closure. Polish: with no keyboard device the
       notice still names input groups.
-- [ ] **Linux `copy_selected_path` in a file manager.** [CODE] A file manager publishes its
-      selection as `text/uri-list`, which the clipboard adapter cannot read by MIME type. Known
-      limits elsewhere: Unicode IDNs and a zoned IPv6 are searched, not opened.
+- [x] **Linux `copy_selected_path` in a file manager.** Done (8edb31edba, xclip sentinel
+      d2a7bc9c5b, local): in a known file manager the action copies the selected paths. Left:
+  - [ ] GNOME and KDE on Wayland do not name the foreground application, so the action there
+        always opens the PRIMARY selection; identify the app through the AT-SPI active frame.
+        Known limits elsewhere: Unicode IDNs and a zoned IPv6 are searched, not opened.
+- [ ] **Linux X11 window list not proven on a real WM.** [CODE] `getAll()` (one `wmctrl -lp` plus
+      `/proc/<pid>/comm`, fcb0168fb5) is covered by unit tests only (the WSLg WM publishes no
+      `_NET_CLIENT_LIST`): add it to the Openbox e2e, and add wmctrl to the RPM and Flatpak
+      dependencies.
+- [ ] **Linux single instance outside `launch.sh`.** [CODE] `launch.sh` locks every daemon launch
+      (35dd2d262e), but the AppImage AppRun, the Nix wrapper and a manual `luajit
+  ergopti_hotstrings.lua` still start without the flock: take the lock in Lua
+      (`infra/session_lock.lua`) when no marker is present, without breaking the tests that load
+      the entry several times in one process.
+- [ ] **Linux test manifest lists four deleted caps_word modules.** [CODE] They fail at load in
+      `--only` passes since fa965e42f2 removed them.
 
 ## Backlog (one line each)
 
