@@ -85,20 +85,16 @@ _TH_KeyRows(Hand) {
 		; resolve the wrong function body (see HIGH-07 regression guard).
 		_HoldRowsBuilder := _TH_HoldPickerRows
 
-		DelayRows := MenuRenderer_TemplateRows("tap_hold_key_delay_rows",
-			Map("tap_hold_key_delay_set", _TH_MakeDelayPickerFn(KeyId)), Map(), Map())
-		if !(DelayRows is Array)
-			continue
 		DelayCaption := Round(TapHoldDuration(MasterGateDesiredTapHold(TapHold), KeyId) * 1000) . " ms"
 		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
 			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
-				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl)),
+				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
+				"tap_hold_key_delay", _TH_MakeDelayPickerFn(KeyId)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
 				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl),
 				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption)),
-			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId),
-				"tap_hold_key_delay", DelayRows))
+			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId)))
 		if !(KeyRows is Array)
 			continue
 		Rows.Push(Map(

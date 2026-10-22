@@ -190,9 +190,9 @@ _THHS_KeyChildren(KeyId) {
 
 _THHS_KeyHeadRows(KeyId) {
 	Rows := _THHS_KeyChildren(KeyId)
-	Assert(Rows.Length > 1 && Rows[Rows.Length]["items"] is Array
-		&& Rows[Rows.Length]["items"].Length == 1,
-		"the existing head must be followed by one genuine Windows custom-delay command")
+	Assert(Rows.Length > 1 && !Rows[Rows.Length].Has("items")
+		&& HasMethod(Rows[Rows.Length].Get("action", 0), "Call"),
+		"the existing head must be followed by the genuine Windows delay command row")
 	Head := []
 	for Index, Row in Rows {
 		if Index < Rows.Length
@@ -314,9 +314,9 @@ _THHS_KeyDelayVisible(TargetPath) {
 	AssertEqual(5, Rows.Length, "Windows exposes the complete head and genuine per-key delay")
 	AssertEqual(StrReplace(t("menu.tapholds.key_tap_delay"), "%s", "350 ms"),
 		Rows[5]["label"], "caption reads the authoritative inherited/effective per-key duration")
-	AssertEqual(1, Rows[5]["items"].Length, "Windows exposes custom delay without an invented global reset")
-	AssertEqual(t("menu.tapholds.key_tap_delay_set"), Rows[5]["items"][1]["label"])
-	Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"), "the actual custom command has a native callback")
+	; The delay row opens the prompt itself: the one-row submenu is retired (2026-10-22).
+	Assert(!Rows[5].Has("items") && !Rows[5].Has("submenu"), "the delay row is a command, not a submenu")
+	Assert(HasMethod(Rows[5]["action"], "Call"), "clicking the delay row runs the native prompt owner")
 	Rendered := Menu()
 	try {
 		AssertEqual(4, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
@@ -334,18 +334,20 @@ Test("tap-holds: Windows exposes real per-key delay after the original head (tap
 
 ; Exercise the real per-key provider and retained command, not a synthetic wrapper call.
 _THHS_KeyDelayProviderContract(TargetPath) {
-	Definition := _MR_GetMenuDef("tap_hold_key_delay_rows")[1]
+	Definition := _MR_FindItemById("tap_hold_key_delay_tail", "tap_hold_key_delay")
+	Assert(Definition is Map && Definition["type"] == "command", "the declared delay row is a command")
 	PreviousCaption := Definition["i18n"]
 	PreviousCommand := Definition["id"]
 	try {
 		for Hand in ["left", "right"]
 			AssertEqual(TapHoldKeyDefsOfHand(Hand).Length, _TH_KeyRows(Hand).Length,
 				"the actual provider renders every declared physical key without a construction exception")
-		Definition["i18n"] := "menu.shortcuts.title"
+		Definition["i18n"] := "menu.tapholds.simultaneous_title"
 		Rows := _THHS_KeyChildren("caps_lock")
-		AssertEqual(t("menu.shortcuts.title"), Rows[5]["items"][1]["label"],
-			"the real delay child consumes its shared command caption")
-		Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"),
+		Prefix := StrSplit(t("menu.tapholds.simultaneous_title"), "%s")[1]
+		AssertEqual(Prefix, SubStr(Rows[5]["label"], 1, StrLen(Prefix)),
+			"the real delay row consumes its shared command caption")
+		Assert(HasMethod(Rows[5]["action"], "Call"),
 			"caption mutation retains the actual native delay owner")
 		Definition["id"] := "unowned_delay_command"
 		AssertEqual(0, _TH_KeyRows("left").Length,
@@ -362,7 +364,7 @@ Test("tap-holds: actual delay provider constructs both hands and refuses unowned
 _THHS_KeyDelayRetainedOwnerRefusal(TargetPath) {
 	global TapHold
 	Rows := _THHS_KeyChildren("caps_lock")
-	DelayCommand := Rows[5]["items"][1]
+	DelayCommand := Rows[5]
 	Previous := TapHold
 	try {
 		TapHold := 0

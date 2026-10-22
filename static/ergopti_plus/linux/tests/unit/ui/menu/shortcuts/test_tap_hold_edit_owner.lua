@@ -58,14 +58,13 @@ local function with_editor(body, options)
 		locate(rows); assert(caps, "actual CapsLock menu")
 		local caption = I18n.get("tap_hold.picker.tap"); local prefix = caption:match("^(.-)%%s") or caption
 		for _, row in ipairs(caps.menu) do if row.fn and row.title:sub(1, #prefix) == prefix then s.tap = row.fn end end
-		local declaration = require("infra.manifest_menu").get_array("tap_hold_key_delay_rows")[1]
-		local function delay(items)
-			for _, row in ipairs(items) do
-				if row.fn and row.title == I18n.get(declaration.i18n) then s.delay = row.fn end
-				if row.menu then delay(row.menu) end
-			end
+		local declaration = require("infra.manifest_menu").get_array("tap_hold_key_delay_tail")[2]
+		assert(declaration.id == "tap_hold_key_delay", "the declared delay row")
+		local delay_caption = I18n.get(declaration.i18n); local delay_prefix = delay_caption:match("^(.-)%%s") or delay_caption
+		for _, row in ipairs(caps.menu) do
+			if row.fn and row.title:sub(1, #delay_prefix) == delay_prefix then s.delay = row.fn end
 		end
-		delay(caps.menu); assert(s.tap and s.delay, "actual tap and delay callbacks")
+		assert(s.tap and s.delay, "actual tap and delay callbacks")
 		s.pause = function(value) s.paused = value; assert(manager.set_paused(value)) end
 		s.prompt = function(callback) Prompt.ask = function() callback(); return "450" end end
 		s.stage = function(callback)

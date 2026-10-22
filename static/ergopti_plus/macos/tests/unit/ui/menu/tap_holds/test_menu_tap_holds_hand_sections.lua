@@ -260,7 +260,7 @@ helpers.describe("the declared complete per-key head", function()
 
 	helpers.it("opens the shared picker from both slot rows and keeps the native delay tail (tap-hold-key-head)", function()
 		with_head(nil, function(rows, observed)
-			helpers.assert_eq(#rows, 6, "four shared head rows, native separator and delay")
+			helpers.assert_eq(#rows, 7, "four shared head rows, native separator, delay and global reset")
 			helpers.assert_eq(rows[1].title, "menu.tapholds.nothing_tap_hold")
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_eq(rows[3].title, "tap_hold.picker.tap")
@@ -271,6 +271,7 @@ helpers.describe("the declared complete per-key head", function()
 			helpers.assert_nil(rows[4].menu, "the hold row builds no submenu of actions")
 			helpers.assert_eq(rows[5].title, "-")
 			helpers.assert_eq(rows[6].title, "menu.tapholds.key_tap_delay")
+			helpers.assert_eq(rows[7].title, "menu.tapholds.key_tap_delay_use_global")
 			helpers.assert_eq(#observed.calls, 0)
 		end)
 	end)
@@ -293,7 +294,7 @@ helpers.describe("the declared complete per-key head", function()
 
 	helpers.it("honors declared platform hiding in the actual provider (tap-hold-key-head)", function()
 		with_head(function(head) head[3].platforms = { "ahk", "linux" } end, function(rows)
-			helpers.assert_eq(#rows, 5)
+			helpers.assert_eq(#rows, 6)
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_eq(rows[3].title, "tap_hold.picker.hold")
 			helpers.assert_type(rows[3].fn, "function")
@@ -510,10 +511,10 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 			end
 			local ok, err = pcall(function()
 				local children = rows()
-				helpers.assert_eq(#children, 6)
+				helpers.assert_eq(#children, 7)
 				helpers.assert_eq(children[5].title, "-")
 				helpers.assert_eq(children[6].title, "Delay: 1,5 s", "existing native formatting survives")
-				local reset = children[6].menu[2]
+				local reset = children[7]
 				helpers.assert_eq(reset.title, "Global: 200 ms")
 				helpers.assert_eq(reset.checked == true, false)
 				helpers.assert_eq(reset.disabled == true, false)
@@ -523,7 +524,7 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 				helpers.assert_eq(observed.regenerations, 1)
 				children = rows()
 				helpers.assert_eq(children[6].title, "Delay: 200 ms")
-				reset = children[6].menu[2]
+				reset = children[7]
 				helpers.assert_true(reset.checked)
 				helpers.assert_true(reset.disabled)
 				helpers.assert_eq(reset.fn(), false, "declared readiness refuses an inherited reset")
@@ -534,25 +535,43 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 		end)
 	end)
 
-	helpers.it("reads actual delay order/caption declarations without losing native child owners (tap-hold-key-delay)", function()
+	helpers.it("opens the delay prompt from the row itself, with no submenu (tap-hold-key-delay)", function()
+		with_delay_native(function(rows, observed)
+			local row = rows()[6]
+			helpers.assert_eq(row.title, "menu.tapholds.key_tap_delay")
+			helpers.assert_nil(row.menu, "the delay row is a command, not a one-row submenu")
+			helpers.assert_type(row.fn, "function", "clicking the delay row opens the prompt")
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_true(observed.script:find('default answer "1500"', 1, true) ~= nil,
+				"the prompt starts from the key's current delay")
+			helpers.assert_eq(observed.calls, { { kid = "left_shift", value = 375 } },
+				"the answer is saved through the per-key setter")
+			helpers.assert_eq(observed.regenerations, 1)
+			helpers.assert_eq(observed.refreshes, 1)
+		end)
+	end)
+
+	helpers.it("reads actual delay order/caption declarations without losing native row owners (tap-hold-key-delay)", function()
 		with_delay_native(function(rows, observed, manifest)
-			local delay = manifest.get_array("tap_hold_key_delay_rows")
-			local set, reset = delay[1], delay[2]
+			local tail = manifest.get_array("tap_hold_key_delay_tail")
+			local set, reset = tail[2], tail[3]
+			helpers.assert_eq(set.id, "tap_hold_key_delay")
+			helpers.assert_eq(reset.id, "tap_hold_key_delay_use_global")
 			local original_caption = set.i18n
 			local ok, err = pcall(function()
 				set.i18n = "menu.shortcuts.title"
-				local children = rows()[6].menu
-				helpers.assert_eq(children[1].title, "menu.shortcuts.title")
-				helpers.assert_eq(children[1].fn(), true)
+				local children = rows()
+				helpers.assert_eq(children[6].title, "menu.shortcuts.title")
+				helpers.assert_eq(children[6].fn(), true)
 				helpers.assert_eq(observed.calls[1], { kid = "left_shift", value = 375 })
-				delay[1], delay[2] = reset, set
-				children = rows()[6].menu
-				helpers.assert_eq(children[1].title, "menu.tapholds.key_tap_delay_use_global")
-				helpers.assert_eq(children[2].title, "menu.shortcuts.title")
-				helpers.assert_eq(children[1].fn(), true)
+				tail[2], tail[3] = reset, set
+				children = rows()
+				helpers.assert_eq(children[6].title, "menu.tapholds.key_tap_delay_use_global")
+				helpers.assert_eq(children[7].title, "menu.shortcuts.title")
+				helpers.assert_eq(children[6].fn(), true)
 				helpers.assert_eq(observed.calls[2], { kid = "left_shift" })
 			end)
-			set.i18n = original_caption; delay[1], delay[2] = set, reset
+			set.i18n = original_caption; tail[2], tail[3] = set, reset
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -561,18 +580,18 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 		{ name = "truthy", value = "accepted" } }) do
 		helpers.it("retains actual delay " .. receipt.name .. " persistence refusal and retry (tap-hold-key-delay)", function()
 			with_delay_native(function(rows, observed)
-				local delay = rows()[6].menu
+				local delay = rows()
 				observed.receipt = receipt.value
-				helpers.assert_eq(delay[1].fn(), false)
-				helpers.assert_eq(delay[2].fn(), false)
+				helpers.assert_eq(delay[6].fn(), false)
+				helpers.assert_eq(delay[7].fn(), false)
 				helpers.assert_eq(observed.calls, { { kid = "left_shift", value = 375 }, { kid = "left_shift" } })
 				helpers.assert_eq(observed.value, 1500)
 				helpers.assert_eq(observed.regenerations, 0, "refused setter cannot regenerate")
 				helpers.assert_eq(observed.refreshes, 0, "refused setter cannot acknowledge refresh")
 				observed.receipt = true
-				helpers.assert_eq(delay[1].fn(), true)
+				helpers.assert_eq(delay[6].fn(), true)
 				helpers.assert_eq(observed.value, 375)
-				helpers.assert_eq(delay[2].fn(), true)
+				helpers.assert_eq(delay[7].fn(), true)
 				helpers.assert_nil(observed.value)
 				helpers.assert_eq(observed.regenerations, 2)
 				helpers.assert_eq(observed.refreshes, 2)
@@ -582,7 +601,7 @@ helpers.describe("the complete macOS per-key delay declaration", function()
 
 	helpers.it("retains cancellation and invalid-value refusal before setters (tap-hold-key-delay)", function()
 		with_delay_native(function(rows, observed)
-			local callback = rows()[6].menu[1].fn
+			local callback = rows()[6].fn
 			observed.dialog_ok = false; callback()
 			observed.dialog_ok, observed.answer = true, "bad native result"; callback()
 			observed.answer = { ["text returned"] = "-1" }; callback()
@@ -599,7 +618,7 @@ helpers.describe("native per-key delay prompt refusal", function()
 		helpers.it("refuses " .. value .. " before a native override can be cleared (tap-hold-key-delay)", function()
 			with_delay_native(function(rows, observed)
 				observed.answer = { ["text returned"] = value }
-				helpers.assert_eq(rows()[6].menu[1].fn(), false)
+				helpers.assert_eq(rows()[6].fn(), false)
 				helpers.assert_eq(#observed.calls, 0)
 				helpers.assert_eq(observed.value, 1500)
 				helpers.assert_eq(observed.regenerations, 0)
@@ -610,7 +629,7 @@ helpers.describe("native per-key delay prompt refusal", function()
 	helpers.it("refuses a throwing native dialog without publishing or regenerating (tap-hold-key-delay)", function()
 		with_delay_native(function(rows, observed)
 			hs.osascript.applescript = function() error("controlled native dialog refusal") end
-			helpers.assert_eq(rows()[6].menu[1].fn(), false)
+			helpers.assert_eq(rows()[6].fn(), false)
 			helpers.assert_eq(#observed.calls, 0)
 			helpers.assert_eq(observed.value, 1500)
 			helpers.assert_eq(observed.regenerations, 0)
@@ -618,7 +637,7 @@ helpers.describe("native per-key delay prompt refusal", function()
 	end)
 	helpers.it("retained custom command refuses a withdrawn native setter (tap-hold-key-delay)", function()
 		with_delay_native(function(rows, observed, _, native)
-			local callback = rows()[6].menu[1].fn
+			local callback = rows()[6].fn
 			local setter = native.set_tap_timeout
 			native.set_tap_timeout = nil
 			helpers.assert_eq(callback(), false)

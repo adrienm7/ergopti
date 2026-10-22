@@ -2936,6 +2936,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 }
 
 // Complete per-key delay metadata: independent declarations and actual owners.
+// The delay row is a command opening the prompt itself (2026-10-22): the
+// submenu whose only row did that is gone on the three drivers.
 {
 	const assert = require('node:assert/strict');
 	const corpus = JSON.parse(
@@ -2944,12 +2946,20 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
 	assert.deepEqual(manifest[corpus.complete_section], corpus.complete);
 	assert.deepEqual(manifest[corpus.tail_section], corpus.tail);
-	assert.deepEqual(manifest[corpus.children_section], corpus.children);
+	const delayRow = manifest[corpus.tail_section].find((row) => row.id === 'tap_hold_key_delay');
+	assert.equal(delayRow.type, 'command', 'the delay row opens its prompt, not a submenu');
+	assert.equal(delayRow.platforms, undefined, 'the delay row is drawn on the three drivers');
+	assert.equal(manifest.tap_hold_key_delay_rows, undefined, 'the one-row delay submenu is retired');
 	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
 	assert.equal(locales.length, 21);
 	for (const code of locales) {
 		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, code + '.json'), 'utf8'));
-		for (const row of [...corpus.tail, ...corpus.children]) {
+		assert.equal(
+			strings['menu.tapholds.key_tap_delay_set'],
+			undefined,
+			code + ': retired row label'
+		);
+		for (const row of corpus.tail) {
 			if (!row.i18n) continue;
 			assert.equal(typeof strings[row.i18n], 'string', code + ': ' + row.i18n);
 			assert.notEqual(strings[row.i18n], row.i18n, 'caption resolves to a translation');
@@ -2967,9 +2977,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'local function build_one_tap_hold_item(',
 			'--- Builds the tap / hold rows of one hand',
 			[
-				'tap_hold_key_delay_set',
-				'tap_hold_key_delay_use_global',
 				'tap_hold_key_delay',
+				'tap_hold_key_delay_use_global',
 				'tap_hold_key_delay_is_global',
 				'tap_hold_key_delay_has_override',
 				'tap_hold_key_delay_caption',
@@ -2980,7 +2989,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'linux/ui/menu/menu_builder.lua',
 			'local function hand_rows(hand)',
 			'local providers = {',
-			['tap_hold_key_delay_set', 'tap_hold_key_delay', 'tap_hold_key_delay_caption']
+			['tap_hold_key_delay', 'tap_hold_key_delay_caption']
 		]
 	]) {
 		const text = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
@@ -2993,24 +3002,17 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				candidate.includes('ManifestMenu.template_rows("tap_hold_key_rows"'),
 				'actual complete provider'
 			);
-			assert(
-				candidate.includes('ManifestMenu.template_rows("tap_hold_key_delay_rows"'),
-				'actual declared delay children'
-			);
 			for (const id of required)
 				assert(
-					new RegExp('\\["' + id + '"\\]\\s*=\\s*(?:function|delay_rows)').test(candidate),
+					new RegExp('\\["' + id + '"\\]\\s*=\\s*function').test(candidate),
 					'actual delay binding: ' + id
 				);
 		}
 		wiring(source);
-		for (const id of ['tap_hold_key_rows', 'tap_hold_key_delay_rows', ...required])
+		for (const id of ['tap_hold_key_rows', ...required])
 			assert.throws(() => wiring(source.replaceAll('"' + id + '"', '"missing_owner"')), /actual/);
-		for (const key of [
-			'menu.tapholds.key_tap_delay',
-			'menu.tapholds.key_tap_delay_set',
-			'menu.tapholds.key_tap_delay_use_global'
-		])
+		assert(!source.includes('tap_hold_key_delay_rows'), 'no provider renders the retired submenu');
+		for (const key of ['menu.tapholds.key_tap_delay', 'menu.tapholds.key_tap_delay_use_global'])
 			assert(!source.includes('"' + key + '"'), 'native providers retire caption metadata: ' + key);
 	}
 	const windows = readFileSync(
@@ -3018,26 +3020,21 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'utf8'
 	);
 	assert(windows.includes('MenuRenderer_TemplateRows("tap_hold_key_rows"'));
-	for (const binding of [
-		'tap_hold_key_delay_rows',
-		'tap_hold_key_delay_set',
-		'tap_hold_key_delay',
-		'tap_hold_key_delay_caption'
-	])
-		assert(
-			windows.includes('"' + binding + '"'),
-			'Windows binds a genuine per-key timing owner: ' + binding
-		);
+	assert(!windows.includes('tap_hold_key_delay_rows'), 'Windows renders no delay submenu');
 	assert(
-		windows.includes('_TH_MakeDelayPickerFn(KeyId)'),
-		'Windows captures the physical key for its real prompt'
+		/"tap_hold_key_delay",\s*_TH_MakeDelayPickerFn\(KeyId\)/.test(windows),
+		'Windows binds the delay row itself to the real prompt of the physical key'
+	);
+	assert(
+		windows.includes('"tap_hold_key_delay_caption"'),
+		'Windows captions the delay row with the current value'
 	);
 	assert(
 		windows.includes('WriteTapHoldDuration(KeyId, Ms / 1000, 0, 0, 0, 0, SourceWitness)'),
 		'Windows persists through the existing native transaction owner'
 	);
 	console.log(
-		'Tap-Hold per-key delay: independent platform/state metadata, existing keys resolved in 21 locales and actual native owners.'
+		'Tap-Hold per-key delay: one command row on three drivers, existing keys resolved in 21 locales and actual native owners.'
 	);
 }
 

@@ -578,7 +578,7 @@ helpers.describe("declared complete per-key delay tail", function()
 						tap_hold_key_no_action = function() return true end,
 						tap_hold_key_tap = function() return true end,
 						tap_hold_key_hold_action = function() return true end,
-						tap_hold_key_delay_set = function() calls[#calls + 1] = "set" end,
+						tap_hold_key_delay = function() calls[#calls + 1] = "set" end,
 						tap_hold_key_delay_use_global = function() calls[#calls + 1] = "reset"; return true end,
 					}
 					local getters = {
@@ -590,24 +590,22 @@ helpers.describe("declared complete per-key delay tail", function()
 						tap_hold_key_delay_is_global = function() return inherited end,
 						tap_hold_key_delay_has_override = function() return not inherited end,
 					}
-					local delay = assert(renderer.template_rows(corpus.children_section, commands, getters))
 					local rows = assert(renderer.template_rows(corpus.complete_section, commands, getters, {
-						tap_hold_key_delay = delay, tap_hold_key_hold = {},
+						tap_hold_key_hold = {},
 					}))
 					local expected = corpus.platforms[platform]
 					helpers.assert_eq(#rows, expected.key_rows, code .. ": " .. platform)
-					helpers.assert_eq(#delay, expected.delay_children)
 					helpers.assert_eq(#calls, 0, "construction never invokes native mutations")
-					if expected.delay_index then
-						local parent = rows[expected.delay_index]
-						helpers.assert_eq(parent.label, string.format(strings["menu.tapholds.key_tap_delay"], "1,5 s"))
-						helpers.assert_eq(parent.items[1].label, strings["menu.tapholds.key_tap_delay_set"])
-						helpers.assert_nil(parent.items[1].action(), "original notification callback has no receipt")
-						helpers.assert_eq(calls, { "set" })
-					end
+					local row = rows[expected.delay_index]
+					helpers.assert_eq(row.label, string.format(strings["menu.tapholds.key_tap_delay"], "1,5 s"))
+					helpers.assert_nil(row.items, "the delay row opens no submenu")
+					helpers.assert_nil(row.submenu, "the delay row opens no submenu")
+					helpers.assert_type(row.action, "function", "clicking the delay row opens the prompt")
+					helpers.assert_nil(row.action(), "original notification callback has no receipt")
+					helpers.assert_eq(calls, { "set" })
 					if platform == "hs" then
 						helpers.assert_true(rows[5].separator, "only macOS retains a separator before delay")
-						local reset = delay[2]
+						local reset = rows[expected.delay_index + 1]
 						helpers.assert_eq(reset.label, string.format(strings["menu.tapholds.key_tap_delay_use_global"], "200 ms"))
 						helpers.assert_eq(reset.checked == true, inherited)
 						helpers.assert_eq(reset.disabled == true, inherited)
@@ -635,12 +633,13 @@ helpers.describe("declared complete per-key delay tail", function()
 			local i18n = require("infra.i18n")
 			local key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
 			helpers.assert_eq(key.menu[5].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
-			helpers.assert_type(key.menu[5].menu[1].fn, "function", "caption retains original dialog owner")
+			helpers.assert_nil(key.menu[5].menu, "the delay row is a command, not a submenu")
+			helpers.assert_type(key.menu[5].fn, "function", "caption retains original dialog owner")
 			restore(Manager); Manager = nil
 			group.platforms = { "hs" }
 			section, Manager = build({}, {})
 			key = assert(find(key_rows(section), i18n.get("tap_hold.group.left_shift")))
-			helpers.assert_eq(#key.menu, 4, "shared absence policy hides the whole delay group")
+			helpers.assert_eq(#key.menu, 4, "shared absence policy hides the delay row")
 		end)
 		group.i18n, group.caption_getter, group.platforms = caption, getter, platforms
 		if Manager then restore(Manager) end
@@ -676,7 +675,8 @@ helpers.describe("declared complete per-key delay tail", function()
 			local i18n = require("infra.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("tap_hold.group.left_ctrl")))
-			local callback = ctrl.menu[5].menu[1].fn
+			helpers.assert_nil(ctrl.menu[5].menu, "the delay row opens the prompt itself")
+			local callback = ctrl.menu[5].fn
 			local malformed = "[tap_hold.keys.left_ctrl\n"
 			during_prompt = malformed
 			helpers.assert_eq(callback(), false, "refused native duration has an explicit refusal receipt")

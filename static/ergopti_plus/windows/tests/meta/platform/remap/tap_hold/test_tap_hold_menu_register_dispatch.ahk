@@ -96,7 +96,7 @@ _THRD_KeyRowsReturnData() {
 	Assert(InStr(Body, 'MenuRenderer_TemplateRows("tap_hold_key_rows"') > 0,
 		"_TH_KeyRows must delegate the complete child head to the shared template")
 	for Id, Fn in Map("tap_hold_key_native", "_TH_MakeDisableFn",
-		"tap_hold_key_tap", "_TH_MakeTapPickerFn") {
+		"tap_hold_key_tap", "_TH_MakeTapPickerFn", "tap_hold_key_delay", "_TH_MakeDelayPickerFn") {
 		Assert(RegExMatch(Body, Chr(34) . Id . Chr(34) . "\s*,\s*" . Fn),
 			"_TH_KeyRows must bind " . Fn . " to its declared command " . Id . " (HIGH-07)")
 	}
@@ -110,7 +110,7 @@ _THRD_KeyRowsReturnData() {
 		&& Head[1]["section"] == "tap_hold_key_native_commands",
 		"the shared head must include its actual native command declaration")
 	for Section, Id in Map("tap_hold_key_native_commands", "tap_hold_key_native",
-		"tap_hold_key_head", "tap_hold_key_tap") {
+		"tap_hold_key_head", "tap_hold_key_tap", "tap_hold_key_delay_tail", "tap_hold_key_delay") {
 		Item := _MR_FindItemById(Section, Id)
 		Assert(Item is Map && Item["type"] == "command" && _MR_IsForAhk(Item),
 			"the bound callback must remain a reachable Windows command: " . Id)
@@ -124,7 +124,7 @@ _THRD_KeyRowsReturnData() {
 	Assert(RegExMatch(_DriverFuncBody("_MR_CommandRowData"),
 		Chr(34) . "action" . Chr(34) . "\s*,\s*Commands\[CmdId\]"),
 		"canonical command data must retain its callback as an action field (HIGH-07)")
-	Assert(InStr(_DriverFuncBody("_MR_RenderRows"), 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))') > 0,
+	Assert(InStr(_DriverFuncBody("_MR_RenderRows"), 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""), Row.Get("checked_fn", 0))') > 0,
 		"the actual native renderer must register action data through the WM_COMMAND retry owner")
 	_THRD_KeyRowsPolicy(Owners)
 	Mutant := Owners.Clone()
@@ -150,7 +150,7 @@ _THRD_KeyRowsReturnData() {
 	; Replay metadata accompanies the same reliable native callback. Neither an
 	; old three-argument registration nor another declaration's identity suffices.
 	for Vector in [
-		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))',
+		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""), Row.Get("checked_fn", 0))',
 			'RegisterMenuItem(TargetMenu, Label, Row["action"])',
 			"the shared renderer must register the row action with reliable dispatch"],
 		["_MR_RenderRows", 'Row.Get("replay_id", "")', 'Row.Get("foreign", "")',
@@ -173,13 +173,13 @@ _THRD_KeyRowsPolicy(Owners) {
 	Assert(!_THRD_ExecutablePattern(Body, "i)RegisterMenuItem\s*\(", "RegisterMenuItem"), "per-key providers cannot register their own callbacks")
 	NativePattern := 'i)MenuRenderer_TemplateRows\(\s*"tap_hold_key_rows"\s*,\s*'
 		. 'Map\(\s*"tap_hold_key_native"\s*,\s*_TH_MakeDisableFn\(\s*KeyId\s*\)\s*,\s*'
-		. '"tap_hold_key_tap"\s*,\s*_TH_MakeTapPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*,\s*TapLbl\s*\)\s*\)\s*,\s*'
+		. '"tap_hold_key_tap"\s*,\s*_TH_MakeTapPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*,\s*TapLbl\s*\)\s*,\s*'
+		. '"tap_hold_key_delay"\s*,\s*_TH_MakeDelayPickerFn\(\s*KeyId\s*\)\s*\)\s*,\s*'
 		. 'Map\(\s*"tap_hold_key_configured"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*IsConfigured\s*\)\s*,'
 		. '\s*"tap_hold_key_tap_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*TapLbl\s*\)\s*,'
 		. '\s*"tap_hold_key_hold_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*HoldLbl\s*\)\s*,'
 		. '\s*"tap_hold_key_delay_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*DelayCaption\s*\)\s*\)\s*,'
-		. '\s*Map\(\s*"tap_hold_key_hold"\s*,\s*_HoldRowsBuilder\(\s*KeyId\s*\)\s*,'
-		. '\s*"tap_hold_key_delay"\s*,\s*DelayRows\s*\)\s*\)'
+		. '\s*Map\(\s*"tap_hold_key_hold"\s*,\s*_HoldRowsBuilder\(\s*KeyId\s*\)\s*\)\s*\)'
 	Assert(_THRD_ExecutablePattern(Body, NativePattern, "MenuRenderer_TemplateRows"),
 		"native and tap callbacks plus configured state must reach the child template")
 	Template := Owners["MenuRenderer_TemplateRows"]
@@ -207,7 +207,7 @@ _THRD_KeyRowsPolicy(Owners) {
 	Renderer := Owners["_MR_RenderRows"]
 	Assert(_THRD_ExecutablePattern(Renderer,
 		'i)RegisterMenuItem\(\s*TargetMenu\s*,\s*Label\s*,\s*Row\["action"\]\s*,'
-		. '\s*Row\.Get\(\s*"replay_id"\s*,\s*""\s*\)\s*\)', "RegisterMenuItem"),
+		. '\s*Row\.Get\(\s*"replay_id"\s*,\s*""\s*\)\s*,\s*Row\.Get\(\s*"checked_fn"\s*,\s*0\s*\)\s*\)', "RegisterMenuItem"),
 		"the shared renderer must register the row action with reliable dispatch")
 }
 
@@ -290,7 +290,7 @@ _THRD_GlobalAndLocalTokenBoundaries() {
 		["_MR_CommandRowData", 'Map("label", IsSet(Label) ? Label : t(I18nKey), "action", Commands[CmdId],'
 			. "`n`t`t" . '"replay_id", _MR_ReplayIdentity(ManifestKey, Id))',
 			"the declared command must construct the renderer action"],
-		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))',
+		["_MR_RenderRows", 'RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""), Row.Get("checked_fn", 0))',
 			"the shared renderer must register the row action with reliable dispatch"],
 		["_MR_TemplateRows", "Row := MenuRenderer_CommandRow(ManifestKey, Id, Commands, StateGetters)",
 			"the child template must materialize callbacks through the command owner"],

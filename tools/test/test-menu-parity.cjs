@@ -710,7 +710,6 @@ const OPENS_SUBMENU = {
 	// Both hand providers render this declared fixed command under every native key.
 	tap_hold_keys_left: 'tap_hold_key_rows',
 	tap_hold_keys_right: 'tap_hold_key_rows',
-	tap_hold_key_delay: 'tap_hold_key_delay_rows',
 	key_combinations: ['key_combinations_group'],
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
@@ -1848,7 +1847,7 @@ function project(menuKey, platform, visiting = new Set(), rowId) {
 	const assert = require('node:assert/strict');
 	const root = manifest.tap_hold_key_rows;
 	assert.equal(project('tap_hold_key_rows', 'ahk').length, 5);
-	assert.equal(project('tap_hold_key_rows', 'hs').length, 6);
+	assert.equal(project('tap_hold_key_rows', 'hs').length, 7);
 	assert.equal(project('tap_hold_key_rows', 'linux').length, 5);
 	const original = root.slice();
 	try {
