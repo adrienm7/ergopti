@@ -89,6 +89,10 @@ M.SESSION_BLOCK_HISTORY_LIMIT = 64
 -- instead of letting each consumer manufacture its own action boundary.
 M.STALE_CONTEXT_DEDUPE_LIMIT = M.RECORD_LIMIT
 M.PUMP_DELIVERY_TIMEOUT_SEC = 0.25
+-- A physical event reaching a tap this much later than the freshest recent
+-- events waited behind the main thread: it is never consumed, replayed or
+-- answered with output, which macOS may already have overtaken.
+M.STALE_PHYSICAL_EVENT_MS = 500
 M.PUMP_MOUSE_BUTTON = 31
 M.PUMP_WATCHDOG_MAX_FAILURES = 5
 M.ACTION_LISTENER_RETRY_SEC = 0.05
@@ -4048,6 +4052,12 @@ end
 function M.claim_physical_fence(event)
 	if _pending_count == 0 and _pending_loopback_count == 0
 		and _ordered_input.count == 0 then return nil end
+	-- A callback this late waited behind the main thread. macOS stops waiting
+	-- for a tap that holds an event too long (kCGEventTapDisabledByTimeout) and
+	-- delivers it without the tap, so the original may already be in the
+	-- application and a replayed copy would type it twice. It passes untouched.
+	local lateness = require("adapters.event_clock").lateness_ms(event)
+	if lateness ~= nil and lateness >= M.STALE_PHYSICAL_EVENT_MS then return nil end
 	_lifecycle_defer_depth = _lifecycle_defer_depth + 1
 	local ok, adoption_or_err = xpcall(function()
 		local adoption

@@ -101,6 +101,43 @@ helpers.describe("synthetic input: a key-up waits only behind its own key-down (
 		helpers.assert_eq(posted[2].keycode, KEYCODE_A)
 	end)
 
+	-- After a main-thread stall the taps see keys macOS may already have
+	-- delivered without them (kCGEventTapDisabledByTimeout). Replaying a copy
+	-- typed such a key twice, or after its release (stale-physical-event).
+	helpers.it("never consumes or replays a key that waited behind the main thread (stale-physical-event)", function()
+		local fixture, synthetic = typing_expansion()
+		local host_ns = 3600 * 1e9
+		local saved_absolute = hs.timer.absoluteTime
+		hs.timer.absoluteTime = function() return host_ns end
+		package.loaded["adapters.event_clock"] = nil
+		local EventClock = require("adapters.event_clock")
+		local function stamp_ms_ago(event, ms)
+			local stamp = math.floor(host_ns - ms * 1e6)
+			event.timestamp = function() return stamp end
+			return event
+		end
+		local ok, err = pcall(function()
+			-- The freshest recent event sets the floor lateness is measured from.
+			helpers.assert_eq(EventClock.lateness_ms(stamp_ms_ago({}, 1)), 0)
+			local pending = synthetic.stats().pending
+			-- 900 ms: a stall the #100 log shows many of (error window, AX probe).
+			local stale_down = stamp_ms_ago(physical(fixture, KEYCODE_A, true), 901)
+			local fence = synthetic.claim_physical_fence(stale_down)
+			helpers.assert_true(fence == nil or fence.consume_original ~= true,
+				"a key that waited behind the main thread passes untouched")
+			helpers.assert_eq(synthetic.stats().pending, pending, "no replay was queued for it")
+			helpers.assert_true(synthetic.STALE_PHYSICAL_EVENT_MS <= 900,
+				"the threshold sits below the lateness at which macOS has given up on the tap")
+			local fresh_down = stamp_ms_ago(physical(fixture, KEYCODE_E, true), 2)
+			helpers.assert_true(synthetic.claim_physical_fence(fresh_down).consume_original,
+				"a fresh key behind typing output is still replayed in order")
+		end)
+		hs.timer.absoluteTime = saved_absolute
+		package.loaded["adapters.event_clock"] = nil
+		if not ok then error(err, 0) end
+		drain(fixture, synthetic)
+	end)
+
 	helpers.it("lets a key-up go once its replayed key-down has been posted", function()
 		local fixture, synthetic = typing_expansion()
 		helpers.assert_true(synthetic.claim_physical_fence(physical(fixture, KEYCODE_A, true)).consume_original)

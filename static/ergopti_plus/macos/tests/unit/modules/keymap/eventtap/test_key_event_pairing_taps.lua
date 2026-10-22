@@ -119,6 +119,32 @@ helpers.describe("keymap taps feed the key pairing counters (key-event-pairing)"
 		helpers.assert_eq(counts.downs_without_up, 1)
 	end)
 
+	-- A key the keymap tap sees after a main-thread stall may already be in the
+	-- application: hotstring work on it deleted or retyped the wrong text
+	-- (stale-physical-event).
+	helpers.it("passes a key that waited behind the main thread untouched and counts it", function()
+		local fixture = load_fixture()
+		local host_ns = 3600 * 1e9
+		local saved = hs.timer.absoluteTime
+		hs.timer.absoluteTime = function() return host_ns end
+		local ok, err = pcall(function()
+			local function stamped(event, ms_ago)
+				local stamp = math.floor(host_ns - ms_ago * 1e6)
+				event.timestamp = function() return stamp end
+				return event
+			end
+			fixture.down(stamped(physical(fixture, KEYCODE_E, true), 1))
+			fixture.up(stamped(physical(fixture, KEYCODE_E, false), 1))
+			local consumed = fixture.down(stamped(physical(fixture, KEYCODE_A, true), 1200))
+			helpers.assert_true(consumed ~= true, "a late key reaches the application as typed")
+			local counts = fixture.health.counts()
+			helpers.assert_eq(counts.stale_passed, 1, "the late key is counted for the next report")
+			helpers.assert_eq(counts.late_downs, 1)
+		end)
+		hs.timer.absoluteTime = saved
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("never counts Ergopti's own tagged output as typing", function()
 		local fixture = load_fixture()
 		local synthetic = require("adapters.synthetic_input")

@@ -1494,7 +1494,7 @@ end
 -- backspace handling, buffer tracking and expansions.
 local _interceptor_error_logged = {}
 
-local function onKeyDownRaw(e, provenance, provenance_status)
+local function onKeyDownRaw(e, provenance, provenance_status, stale)
 	-- A stale internal loopback has lost the live transaction identity required to
 	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
 	-- every state (including pause) instead of leaking F16 to the frontmost app.
@@ -1579,6 +1579,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
 	-- 9-branch `or` chain further down, saving ~10 comparisons per keystroke.
 	if FAST_EXIT_KEYCODES[keyCode] then return false end
+
+	-- A key that waited behind the main thread may already be in the application
+	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
+	-- it now would delete or retype text the user never saw that way. It passes
+	-- untouched and the buffer starts over.
+	if stale then
+		invalidate_observed_context()
+		pcall(KeyEventHealth.note_stale_pass)
+		return false
+	end
 
 	-- Fast-exit when a Hammerspoon webview has focus. The is_ignored_window cache
 	-- makes this nearly free on repeated keystrokes; it already treats the HS app
@@ -1953,6 +1963,7 @@ local function onKeyDown(e)
 	local provenance = nil
 	local provenance_status = EventProvenance.STATUS_UNREADABLE
 	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
+	local stale = false
 	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil, replay_or_nil = pcall(
 		EventProvenance.classify_with_fence, e, "keymap")
 	local fence_events = nil
@@ -1966,6 +1977,8 @@ local function onKeyDown(e)
 		end
 		if provenance_status == EventProvenance.STATUS_FOREIGN and replay_or_nil ~= true then
 			observe_key_health(e, "down", event_lateness_ms, event_stamp)
+			stale = event_lateness_ms ~= nil
+				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
 		end
 	else
 		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
@@ -1999,7 +2012,7 @@ local function onKeyDown(e)
 			fence_events
 	end
 
-	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status)
+	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status, stale)
 	local returned_events = nil
 	local abort_requires_consumption = false
 	if ok then

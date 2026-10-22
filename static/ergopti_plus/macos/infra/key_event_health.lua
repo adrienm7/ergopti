@@ -65,7 +65,7 @@ function M.reset()
 		downs = 0, ups = 0, repeats = 0,
 		ups_without_down = 0, downs_without_up = 0, stuck = 0,
 		long_holds = 0, long_holds_across_transition = 0,
-		late_downs = 0, late_ups = 0, max_late_ms = 0, unclocked = 0,
+		late_downs = 0, late_ups = 0, max_late_ms = 0, unclocked = 0, stale_passed = 0,
 	}
 	_lease_failures = {}
 	_pending = {}
@@ -101,12 +101,12 @@ function M.summary()
 		.. " %d key-down(s) without key-up, %d key(s) stuck over %.1f s,"
 		.. " %d character key(s) held %d ms or more (%d across a rule switch),"
 		.. " %d key-down(s) and %d key-up(s) seen %d ms or more late (max %.0f ms),"
-		.. " %d Karabiner lease failure(s)%s",
+		.. " %d late key event(s) passed untouched, %d Karabiner lease failure(s)%s",
 		_counts.downs, _counts.ups, _counts.ups_without_down,
 		_counts.downs_without_up, _counts.stuck, M.STUCK_MS / 1000,
 		_counts.long_holds, M.LONG_HOLD_MS, _counts.long_holds_across_transition,
 		_counts.late_downs, _counts.late_ups, M.LATE_CALLBACK_MS, _counts.max_late_ms,
-		lease_total, #lease_parts > 0 and (" (" .. table.concat(lease_parts, ", ") .. ")") or "")
+		_counts.stale_passed, lease_total, #lease_parts > 0 and (" (" .. table.concat(lease_parts, ", ") .. ")") or "")
 end
 
 --- Writes every line queued during the last run-loop turn.
@@ -255,6 +255,13 @@ function M.note_transition(cause)
 	assert(type(cause) == "string" and cause ~= "",
 		"infra.key_event_health.note_transition: cause must be non-empty")
 	for _, entry in pairs(_held) do entry.crossed = cause end
+end
+
+--- Counts one key event that reached a tap so late that the driver passed it
+--- untouched instead of consuming, replaying or answering it.
+function M.note_stale_pass()
+	_counts.stale_passed = _counts.stale_passed + 1
+	queue("warn", "Key events that waited behind the main thread passed untouched: no replay, no expansion")
 end
 
 --- Classifies a lease failure reason without keeping its text.
