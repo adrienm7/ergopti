@@ -197,7 +197,9 @@ Current-schema admission uses a shared deferred `BEGIN`; real writes keep
 SQLite itself, not only the CLI, cuts text at NUL in `json_group_object`
 (a merged `{"a\u0000b":1}` came back as a second `"a"` key) and in
 `length()`/`substr()`; the CLI's `-json` mode cuts every raw TEXT column.
-Rebuild merged maps from `json_quote(key)` with `group_concat`, and project
+The Windows walker's `KLW_BucketMergeExpr` hit the same trap through the
+vendored `sqlite3.dll`. Rebuild merged maps from `json_quote(key)` with
+`group_concat` on every driver, and project
 any text that can hold NUL through `json_quote` and decode it in Lua. The
 shared `Json.decode_lossless` returns nil for malformed text instead of
 raising, so a `pcall` around it validates nothing: test the result's type.
