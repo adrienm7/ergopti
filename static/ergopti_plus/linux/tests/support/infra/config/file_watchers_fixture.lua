@@ -35,10 +35,24 @@ end
 --- the base_dir-in-pump-mode test needs a directory OUTSIDE that prefix to
 --- exercise the per-file .lua watcher at all (file-watcher-tmp-prefix-filter-
 --- excludes-own-test-fixture).
+---
+--- It is a private mktemp directory under the platform temp root, never the
+--- working directory: the runner's working directory is the driver root, so a
+--- "./" fixture with an init.lua inside became production source for a
+--- parallel group's walk of that tree, which then read it after removal
+--- (fw-nontmp-outside-source-tree).
+--- @return string dir Absolute path whose spelling does not start with /tmp/.
 local function make_non_tmp_dir()
-	_dir_seq = _dir_seq + 1
-	local dir = "./ergopti_fw_nontmp_" .. os.time() .. "_" .. _dir_seq
-	os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	local base = os.getenv("TMPDIR") or os.getenv("TEMP")
+	if not base or base:find("^/tmp") then base = "/var/tmp" end
+	local template = base .. "/ergopti_fw_nontmp_XXXXXX"
+	local pipe = assert(io.popen("mktemp -d '" .. template:gsub("'", "'\\''") .. "'", "r"))
+	local dir = pipe:read("*l")
+	pipe:close()
+	assert(dir and dir ~= "", "mktemp -d refused " .. template)
+	assert(not dir:find("^/tmp/"), "the non-/tmp fixture resolved under /tmp/: " .. dir)
+	local root = helpers.driver_root()
+	assert(dir:sub(1, #root + 1) ~= root .. "/", "the non-/tmp fixture is inside the driver tree: " .. dir)
 	return dir
 end
 
