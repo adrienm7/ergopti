@@ -702,10 +702,14 @@ ActivateHotstrings() {
 ; hotkey thread with ClipWait freezes every low-level hook dispatch behind it.
 ; Keep one owned capture job and poll with a zero-timeout probe instead; callers
 ; receive the text only while the original foreground context is still current.
+; "A newer user action" is a newer physical key-down, mouse-down or wheel: the
+; KS_GetPhysicalInputGeneration ticket. A_TimeIdlePhysical also moves for the
+; key-ups that finish the initiating chord (releasing S, then Win, of Win+S),
+; so a capture judged by it cancelled itself whenever the copy took longer than
+; the user's key release (copy_selected_path then did nothing at all).
 global _SelectionCaptureJob := false
 global _SelectionCaptureNextId := 0
 global SELECTION_CAPTURE_POLL_MS := 15
-global SELECTION_CAPTURE_INPUT_GRACE_MS := 20
 
 GetSelectionAsync(OnReady, Ports := 0) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
@@ -733,16 +737,22 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				Ports := Map()
 		SaveFn := Ports.Get("save", CB_SaveAll)
 		ClearFn := Ports.Get("clear", CB_Write.Bind(""))
-		SendFn := Ports.Get("send", SendEvent.Bind("^c"))
+		SendFn := Ports.Get("send", _SelectionSendCopy)
 		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
 		RestoreFn := Ports.Get("restore", CB_RestoreAll)
 		ForegroundFn := Ports.Get("foreground", _SelectionCaptureForeground)
+		GenerationFn := Ports.Get("physical_generation", KS_GetPhysicalInputGeneration)
 		BusyFn := Ports.Get("report_busy", _SelectionReportClipboardBusy)
 
+		; The dispatcher has already counted the key-down which started this
+		; action (InputHook callbacks run before the hotkey thread), so only a
+		; later physical action can advance the generation captured here.
 		Job := Map(
 				"id", CaptureId,
 				"callback", OnReady,
 				"started", A_TickCount,
+				"physical_generation", GenerationFn.Call(),
+				"generation_fn", GenerationFn,
 				"foreground", 0,
 				"clipboard", "",
 				"clear_sequence", 0,
@@ -811,6 +821,15 @@ _SelectionCaptureForeground() {
 		return WinExist("A")
 }
 
+; The copy chord is driver output, not a stand-in for a physical key, so it goes
+; out at TEXT_SENDER_SEND_LEVEL. From the #InputLevel 2 Win broker it used to
+; be sent at level 2, where the driver's own "I1" InputHooks took it for the
+; user's typing: the keylogger recorded a "Win+C", and the physical-input
+; generation this capture is judged by advanced on its own Ctrl+C.
+_SelectionSendCopy(SendFn := SendEvent.Bind("^c")) {
+		_TextSenderAtSendLevel(SendFn)
+}
+
 ; Tells the user which program holds the clipboard when the snapshot that must
 ; precede Ctrl+C failed, and logs the same holder evidence.
 _SelectionReportClipboardBusy() {
@@ -825,6 +844,13 @@ _SelectionReportClipboardBusy() {
 		catch as Err {
 				try LoggerError("hotstring_engine", "The busy-clipboard notice could not be shown: {1}.", Err.Message)
 		}
+}
+
+; Names the new foreground window's process for a "foreground changed" log.
+_SelectionForegroundProcess() {
+		try return WinGetProcessName("A")
+		catch as Err
+				return "unavailable (" . Err.Message . ")"
 }
 
 _SelectionCaptureStartCurrent(Job) {
@@ -865,19 +891,18 @@ _SelectionCaptureReleaseTimer(Job) {
 
 _SelectionCapturePoll(Job) {
 		global _SelectionCaptureJob, GET_SELECTION_TIMEOUT_SEC
-		global SELECTION_CAPTURE_INPUT_GRACE_MS
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
-	Elapsed := TickElapsed(Job["started"])
+		Elapsed := TickElapsed(Job["started"])
 		if A_IsSuspended {
 				_SelectionCaptureFinish(Job, "", false, "suspended")
 				return
 		}
 		; If a new physical action happened after the shortcut, never inject into
-		; its potentially different selection. The small grace absorbs the key-up
-		; events that complete the initiating chord.
-		if (Elapsed - A_TimeIdlePhysical > SELECTION_CAPTURE_INPUT_GRACE_MS) {
+		; its potentially different selection. Releasing the initiating chord is
+		; not a new action and leaves the generation unchanged.
+		if (Job["generation_fn"].Call() != Job["physical_generation"]) {
 				_SelectionCaptureFinish(Job, "", false, "superseded by input")
 				return
 		}
@@ -959,12 +984,19 @@ _SelectionCaptureProbeSequence(SequenceFn) {
 _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		SequenceFn := 0, ContextFn := 0) {
 		global _SelectionCaptureJob, _SelectionCaptureNextId
-		global SELECTION_CAPTURE_INPUT_GRACE_MS
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
 		_SelectionCaptureReleaseTimer(Job)
 		_SelectionCaptureJob := false
+		Job["end_reason"] := Reason
+		; A user action that ends without its selection must say why: these
+		; endings used to be silent, so a shortcut that "does nothing" left no
+		; trace. A timeout already logged its own warning.
+		if (!Deliver and Reason != "timeout")
+				try LoggerInfo("hotstring_engine",
+						"Selection capture ended without a selection: {1} (foreground: {2}).",
+						Reason, _SelectionForegroundProcess())
 
 		; Restore only the clear or received-copy sequence this job admitted.
 		; Sampling current contents here would authorize overwriting a newer
@@ -987,9 +1019,17 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		; the restore or the context probe before invoking the continuation.
 		Context := IsObject(ContextFn) ? ContextFn.Call(Job)
 				: _SelectionCaptureCurrentContext(Job)
-		if (Context["foreground"] != Job["foreground"]
-				or Context["elapsed"] - Context["idle"] > SELECTION_CAPTURE_INPUT_GRACE_MS)
+		if (Context["foreground"] != Job["foreground"]) {
+				try LoggerInfo("hotstring_engine",
+						"Selection read but not delivered: the foreground changed to {1}.",
+						_SelectionForegroundProcess())
 				return
+		}
+		if (Context["physical_generation"] != Job["physical_generation"]) {
+				try LoggerInfo("hotstring_engine",
+						"Selection read but not delivered: a newer physical action superseded it.")
+				return
+		}
 		if A_IsSuspended or _SelectionCaptureNextId != Job["id"]
 				return
 		try Job["callback"].Call(Text)
@@ -1016,7 +1056,7 @@ GetSelectionCancel(*) {
 
 _SelectionCaptureCurrentContext(Job) {
 		return Map("foreground", WinExist("A"),
-				"elapsed", TickElapsed(Job["started"]), "idle", A_TimeIdlePhysical)
+				"physical_generation", Job["generation_fn"].Call())
 }
 
 _SelectionClipboardSequence() {

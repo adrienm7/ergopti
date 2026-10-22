@@ -356,8 +356,12 @@ if Features["shortcuts"]["search"]["enabled"] {
 
 		_SearchSelectionReady(Text, SearchInExplorer) {
 				SelectedText := Trim(Text)
-				if (SelectedText = "")
+				; As on Linux, an empty selection opens nothing; the log says so,
+				; so the shortcut never ends without a trace.
+				if (SelectedText = "") {
+						LoggerInfo("Search", "copy_selected_path: the selection is empty; nothing opened.")
 						return
+				}
 				if SearchInExplorer {
 						GetPath(SelectedText)
 						return

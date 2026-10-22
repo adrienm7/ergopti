@@ -442,7 +442,26 @@ must succeed (`CB_IsBusy` and the restore-debt retry stay single-shot by
 design). In tests, "the lock was released" means no window of this process
 holds it; a foreign reader may already hold it again. The region custody suite
 reproduces contention with a second-process holder released from the
-capture's `contended` probe.
+capture's `contended` probe. `ClipboardAll()` already waits the same one second
+(measured: a 600 ms foreign hold succeeds after ~440 ms, a 1.6 s hold fails at
+1000 ms), so a failed snapshot means a holder kept the lock for over a second;
+log `CB_DescribeClipboardHolder()` (GetOpenClipboardWindow's process, own flag,
+data owner) with any such failure rather than retrying longer.
+
+### project-selection-capture-judged-by-physical-generation
+
+A_TimeIdlePhysical moves for every physical event, key-ups included, so a
+deferred action judged by it cancels itself when the user releases the chord
+that started it: GetSelectionAsync compared it against a 20 ms grace and
+copy_selected_path (Win+S) silently opened nothing whenever the copy outlasted
+the key release. Action: judge "a newer user action" by
+`KS_GetPhysicalInputGeneration()` (the dispatcher counts physical key-downs,
+mouse-downs and wheels, never releases; its InputHook callback runs before the
+hotkey thread, so the initiating key-down is already counted), and send any
+synthetic chord such a capture needs through `_TextSenderAtSendLevel`: the Win
+broker hotkeys run at #InputLevel 2, and a Ctrl+C sent at that level reaches the
+driver's "I1" InputHooks as if typed (the keylogger recorded it as "Win+C") and
+advances the very generation the capture is judged by.
 
 ### project-ahk-sendinput-falls-back-to-sendevent
 
