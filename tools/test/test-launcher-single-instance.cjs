@@ -15,6 +15,9 @@
  * Info.plist from scratch via a heredoc (no static template — see the function's
  * own docstring for why). This guard fails if that heredoc stops declaring
  * <key>LSMultipleInstancesProhibited</key><true/>.
+ * That key covers other user sessions only, so the guard also pins the
+ * launcher's own flock, its embedded-only stale-runtime replacement and the Lua
+ * admission's bundle identifiers (hs-second-instance-2026-10-22).
  * ==============================================================================
  */
 
@@ -89,6 +92,51 @@ if (!/embeddedApplicationBundleURL\(binaryPath: binaryPath\)/.test(launcher)) {
 }
 if (/proc\.executableURL\s*=/.test(launcher)) {
 	errors.push('the embedded AppKit GUI must not be executed directly as a Process.');
+}
+
+// A second launcher started by `open -n`, a direct exec or an update relaunch
+// is not stopped by LSMultipleInstancesProhibited (which only covers other
+// user sessions); the sole-launcher lock must run before any child start.
+const finishAt = launcher.indexOf('func applicationDidFinishLaunching(');
+const lockAt = launcher.indexOf('acquireSoleLauncherOwnership(attempt: 0)', finishAt);
+const soleAt = launcher.indexOf('private func finishLaunchingAsSoleLauncher()');
+const seedAt = launcher.indexOf('seedConfigDirDefault()', soleAt);
+const startAt = launcher.indexOf('startManagedHammerspoon(at: hsBinary)', soleAt);
+if (finishAt < 0 || lockAt < 0 || soleAt < lockAt || seedAt < soleAt || startAt < seedAt) {
+	errors.push(
+		'main.swift: applicationDidFinishLaunching must take the sole-launcher lock before it seeds ' +
+			'MJConfigFile or starts embedded Hammerspoon (hs-second-instance-2026-10-22).'
+	);
+}
+const ownership = read(
+	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherInstanceOwnership.swift'
+);
+if (!/O_CLOEXEC/.test(ownership) || !/LOCK_EX \| LOCK_NB/.test(ownership)) {
+	errors.push(
+		'LauncherInstanceOwnership.swift: the launcher lock must be a non-blocking exclusive flock ' +
+			'on a close-on-exec descriptor.'
+	);
+}
+if (!/candidate\.bundleIdentifier == embeddedBundleId/.test(ownership)) {
+	errors.push(
+		'LauncherInstanceOwnership.swift: stale-runtime replacement must select the embedded bundle ' +
+			'identity only, so a Hammerspoon the user installed is never terminated.'
+	);
+}
+const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');
+const luaEmbeddedId = admission.match(/^M\.EMBEDDED_RUNTIME_BUNDLE_ID = "([^"]+)"$/m)?.[1];
+const luaLauncherId = admission.match(/^M\.LAUNCHER_BUNDLE_ID = "([^"]+)"$/m)?.[1];
+const updaterEmbeddedId = read('static/ergopti_plus/macos/modules/updater/init.lua').match(
+	/^local BUNDLED_ID = "([^"]+)"$/m
+)?.[1];
+if (luaEmbeddedId !== embeddedId || updaterEmbeddedId !== embeddedId) {
+	errors.push(
+		"instance_admission.lua and modules/updater/init.lua must name the build script's " +
+			'HAMMERSPOON_BUNDLE_ID.'
+	);
+}
+if (luaLauncherId !== outerId) {
+	errors.push("instance_admission.lua must name the build script's launcher BUNDLE_ID.");
 }
 
 if (errors.length > 0) {
