@@ -106,12 +106,19 @@ helpers.describe("wpm widget: what gets written", function()
 	end)
 
 	helpers.it("remembers the colour mode", function()
+		-- The choice away from what ships, whichever way the manifest ships it:
+		-- a choice equal to the default is not stored, by the rule above.
+		local shipped = require("infra.manifest_reader").default_for("metrics.wpm_widget_colors")
+		helpers.assert_type(shipped, "boolean")
 		local widget, storage = load_over_storage()
-		widget.set_use_source_colors(false)
+		widget.set_use_source_colors(not shipped)
 		local stored = storage.get("metrics.wpm_widget_colors")
+		widget.set_use_source_colors(shipped)
+		local cleared = not storage.has("metrics.wpm_widget_colors")
 		drop_storage()
-		helpers.assert_eq(stored, false,
+		helpers.assert_eq(stored, not shipped,
 			"the second of the two choices, and it reverted the same way")
+		helpers.assert_true(cleared, "choosing the shipped mode again drops the entry")
 	end)
 
 	helpers.it("keeps the durable visibility and colour state when writes fail", function()
