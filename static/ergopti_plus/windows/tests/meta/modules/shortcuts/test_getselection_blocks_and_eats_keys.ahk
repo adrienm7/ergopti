@@ -60,12 +60,24 @@ Test("hotstring_engine: selection capture is timer-driven (getselection-blocks-a
 	_GSBlk_GetSelectionIsTimerDriven)
 
 ; The poll must cancel a stale selection when the user moves on or changes
-; window, preventing delayed output from targeting a new selection.
+; window, preventing delayed output from targeting a new selection. "Moves on"
+; is a newer physical key-down, mouse-down or wheel (the generation ticket):
+; A_TimeIdlePhysical also moves for the key-ups that finish the initiating
+; chord, which made Win+S cancel its own capture (selection-chord-release).
 _GSBlk_PollCancelsStaleContexts() {
-	Src := _GSBlk_ReadSource("infra/hotstrings/hotstring_engine.ahk")
+	for Name in ["_SelectionCapturePoll", "_SelectionCaptureFinish", "_SelectionCaptureCurrentContext"] {
+		Seg := _DriverFuncBody(Name)
+		Assert(Seg != "", Name . " must exist")
+		Assert(InStr(Seg, "A_TimeIdlePhysical") = 0,
+			Name . " must not judge a newer user action by A_TimeIdlePhysical")
+	}
 	Seg := _DriverFuncBody("_SelectionCapturePoll")
-	Assert(InStr(Seg, "A_TimeIdlePhysical") > 0 and InStr(Seg, "WinExist") > 0,
-		"selection poll must cancel delayed callbacks after physical input or a foreground-window change")
+	Assert(InStr(Seg, 'Job["generation_fn"].Call() != Job["physical_generation"]') > 0
+			and InStr(Seg, "WinExist") > 0,
+		"selection poll must cancel delayed callbacks after a newer physical action or a foreground-window change")
+	Seg := _DriverFuncBody("GetSelectionAsync")
+	Assert(InStr(Seg, 'Ports.Get("physical_generation", KS_GetPhysicalInputGeneration)') > 0,
+		"the capture ticket must be the dispatcher's physical-input generation")
 }
 Test("hotstring_engine: selection poll cancels stale contexts (getselection-blocks-and-eats-keys)",
 	_GSBlk_PollCancelsStaleContexts)
