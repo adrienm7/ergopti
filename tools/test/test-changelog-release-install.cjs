@@ -25,6 +25,10 @@
  * 4. A host that cannot install (a source run) greys every button with its
  *    reason; a host that announced no build shows none.
  * 5. The restore banner names the backup and posts restore_backup with its id.
+ * 6. Feed-only list (the API gave none): a host whose updater verifies on its
+ *    own (macOS, Sparkle) offers the channel's newest release only, through
+ *    install_through_updater and the handed_off phase; older rows, hosts
+ *    without that updater and API lists keep the direct request.
  * ==============================================================================
  */
 
@@ -329,7 +333,215 @@ function checkLinuxAnnouncesItsContext() {
 
 // ==========================================
 // ==========================================
-// ======= 4/ Report =======================
+// ======= 4/ Feed-Only Lists ===============
+// ==========================================
+// ==========================================
+
+// The Atom feed of the same releases plus a later stable one, newest first. It
+// names no files and no digests (sparkle-handoff-2026-10-22).
+const FEED_TAGS = [
+	'v1.4.0',
+	'v0.0.0-dev.142',
+	'v1.3.0',
+	'v0.0.0-dev.141',
+	'v0.0.0-dev.140',
+	'v0.0.0-dev.139'
+];
+const FEED = [
+	'<?xml version="1.0" encoding="UTF-8"?>',
+	'<feed xmlns="http://www.w3.org/2005/Atom">',
+	...FEED_TAGS.map(
+		(tag, index) =>
+			`<entry><updated>2026-10-${String(20 - index).padStart(2, '0')}T10:00:00Z</updated>` +
+			`<link rel="alternate" type="text/html" href="https://github.com/adrienm7/ergopti/releases/tag/${tag}"/>` +
+			`<title>${tag}</title><content type="html">&lt;p&gt;Notes&lt;/p&gt;</content></entry>`
+	),
+	'</feed>'
+].join('\n');
+
+/**
+ * Opens the page on the least stable channel and lists the feed.
+ * @param {Object} globals - Host seeds.
+ */
+function openFeedPage(globals) {
+	const page = runPage({
+		_i18n_strings: EN,
+		__ergopti_host: 'linux',
+		__subscribed_channel: LEAST_STABLE,
+		...globals
+	});
+	page.sandbox.injectReleasesFeed(FEED, LEAST_STABLE);
+	const el = (id) => page.document.getElementById(id);
+	const tags = () =>
+		el('release-list')
+			.children.map((item) => item.children[0] && item.children[0].textContent)
+			.filter(Boolean);
+	return {
+		...page,
+		el,
+		tags,
+		shown: (id) => el(id).style.display !== 'none',
+		select: (tag) => page.sandbox.selectRelease(tags().indexOf(tag)),
+		payloads: (action) =>
+			page.posted.map((message) => message.payload).filter((p) => p && p.action === action)
+	};
+}
+
+function checkFeedNewestReleaseIsHandedToTheUpdater() {
+	const page = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
+	expect(
+		page.tags()[0] === 'v1.4.0' && page.tags().includes('v0.0.0-dev.142'),
+		`the dev view lists the feed, newest first (got ${page.tags().join(', ')})`
+	);
+	page.select('v0.0.0-dev.142');
+	expect(page.shown('btn-install'), 'the channel’s newest feed release carries the button');
+	expect(
+		page.el('btn-install').textContent === EN['changelog_window.install_release'] &&
+			page.el('btn-install').disabled === false,
+		'it reads « Install this version » and is usable'
+	);
+	expect(
+		page.shown('install-note') &&
+			page.el('install-note').textContent === EN['changelog_window.install_handoff_note'],
+		'the note says the built-in updater installs it after checking its signature'
+	);
+	page.el('btn-install').dispatch('click');
+	const handoffs = page.payloads('install_through_updater');
+	expect(
+		handoffs.length === 1 &&
+			handoffs[0].tag === 'v0.0.0-dev.142' &&
+			handoffs[0].channel === LEAST_STABLE &&
+			Object.keys(handoffs[0]).sort().join(',') === 'action,channel,tag',
+		`one click must post exactly install_through_updater with the tag and the channel (got ${JSON.stringify(handoffs)})`
+	);
+	expect(page.payloads('install_release').length === 0, 'the hand-off is not a direct install');
+	expect(
+		page.shown('install-panel') &&
+			page.el('install-text').textContent ===
+				fill('changelog_window.install_handed_off', { tag: 'v0.0.0-dev.142' }),
+		'the window says the updater checks the signature and asks in its own window'
+	);
+	expect(page.el('btn-install').disabled === true, 'the button waits for the host');
+	page.el('btn-install').dispatch('click');
+	expect(page.payloads('install_through_updater').length === 1, 'no second hand-off meanwhile');
+
+	page.sandbox.setInstallProgress({ tag: 'v0.0.0-dev.142', phase: 'handed_off' });
+	expect(
+		page.el('install-text').textContent ===
+			fill('changelog_window.install_handed_off', { tag: 'v0.0.0-dev.142' }) &&
+			page.el('install-panel').className === '',
+		'the handed_off phase is shown as progress, not as a failure'
+	);
+	expect(
+		page.el('btn-install').disabled === false,
+		'once handed off the updater owns it: its dialog may be cancelled, so the button is free'
+	);
+	expect(!page.shown('btn-install-retry'), 'a hand-off offers no Retry');
+
+	page.sandbox.setInstallProgress({
+		tag: 'v0.0.0-dev.142',
+		phase: 'failed',
+		reason_key: 'changelog_window.install_error_handoff'
+	});
+	expect(
+		page.el('install-text').textContent === EN['changelog_window.install_error_handoff'],
+		'a refused hand-off names its reason'
+	);
+	page.el('btn-install-retry').dispatch('click');
+	expect(
+		page.payloads('install_through_updater').length === 2 &&
+			page.payloads('install_release').length === 0,
+		'Retry hands off again and never turns into a direct install'
+	);
+}
+
+function checkFeedOlderReleasesKeepTheWarning() {
+	const page = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
+	for (const tag of ['v1.4.0', 'v1.3.0', 'v0.0.0-dev.141', 'v0.0.0-dev.139']) {
+		page.select(tag);
+		expect(
+			!page.shown('install-note') ||
+				page.el('install-note').textContent !== EN['changelog_window.install_handoff_note'],
+			`${tag}: only the channel’s newest release is installed by the updater`
+		);
+		page.el('btn-install').dispatch('click');
+		page.sandbox.setInstallProgress({
+			tag,
+			phase: 'failed',
+			reason_key: 'changelog_window.install_error_no_details'
+		});
+		expect(
+			page.el('install-text').textContent === EN['changelog_window.install_error_no_details'],
+			`${tag}: the host's no-details warning is shown`
+		);
+	}
+	expect(
+		page.payloads('install_through_updater').length === 0 &&
+			page.payloads('install_release').length === 4,
+		'older rows post the direct install, which the host refuses with the existing warning'
+	);
+}
+
+function checkFeedOtherChannelOffersItsOwnNewest() {
+	const page = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
+	page.sandbox.setChannel('main');
+	expect(
+		page.payloads('fetch').length === 0 && page.tags()[0] === 'v1.4.0',
+		'a tab filters the feed locally'
+	);
+	page.select('v1.4.0');
+	page.el('btn-install').dispatch('click');
+	const handoffs = page.payloads('install_through_updater');
+	expect(
+		handoffs.length === 1 && handoffs[0].tag === 'v1.4.0' && handoffs[0].channel === 'main',
+		'a switch of channel hands that channel’s newest release to the updater (the shared offer rule)'
+	);
+}
+
+function checkFeedHandoffNeedsTheHostAndTheFeed() {
+	const noHost = openFeedPage({ __installed_version: INSTALLED });
+	noHost.select('v0.0.0-dev.142');
+	noHost.el('btn-install').dispatch('click');
+	expect(
+		noHost.payloads('install_through_updater').length === 0 &&
+			noHost.payloads('install_release').length === 1,
+		'a host without a verifying updater (Windows, Linux) keeps the direct request and its warning'
+	);
+
+	const api = openPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
+	api.select('v0.0.0-dev.142');
+	api.el('btn-install').dispatch('click');
+	expect(
+		api.payloads('install_through_updater').length === 0 &&
+			api.payloads('install_release').length === 1,
+		'an API list names the digests: its newest release installs directly'
+	);
+
+	const upToDate = openFeedPage({
+		__installed_version: '0.0.0-dev.142',
+		__feed_install_handoff: true
+	});
+	upToDate.select('v0.0.0-dev.141');
+	upToDate.el('btn-install').dispatch('click');
+	expect(
+		upToDate.payloads('install_through_updater').length === 0,
+		'nothing newer on the installed channel: the updater is offered nothing'
+	);
+
+	const failedLoad = openFeedPage({ __installed_version: INSTALLED, __feed_install_handoff: true });
+	failedLoad.sandbox.injectError('x');
+	failedLoad.sandbox.injectReleases(RELEASES, LEAST_STABLE);
+	failedLoad.select('v0.0.0-dev.142');
+	failedLoad.el('btn-install').dispatch('click');
+	expect(
+		failedLoad.payloads('install_through_updater').length === 0,
+		'a later API list replaces the feed and its hand-off'
+	);
+}
+
+// ==========================================
+// ==========================================
+// ======= 5/ Report =======================
 // ==========================================
 // ==========================================
 
@@ -339,6 +551,10 @@ checkProgressFailureAndRetry();
 checkSourceRunGreysEveryButton();
 checkNoAnnouncedBuildShowsNoButton();
 checkLinuxAnnouncesItsContext();
+checkFeedNewestReleaseIsHandedToTheUpdater();
+checkFeedOlderReleasesKeepTheWarning();
+checkFeedOtherChannelOffersItsOwnNewest();
+checkFeedHandoffNeedsTheHostAndTheFeed();
 
 if (failures.length > 0) {
 	console.error(
