@@ -251,7 +251,8 @@ class WebViewHost {
 		; The caller checks the return value: if falsy, build the native fallback.
 		;
 		; Opts keys (all optional unless noted):
-		;   Title (required)     — window title string
+		;   Title                — brandless contextual caption label; default is the
+		;                          manifest title_key translated. Gui_Create brands it.
 		;   OnMessage (required) — (Host, Payload) => void; called with parsed JSON
 		;   OnReady              — (Host) => void; called once when page is ready
 		;   MinSize              — override manifest min-size ("WxH"); auto-computed
@@ -364,13 +365,27 @@ class WebViewHost {
 		}
 
 		/**
+		 * Returns the brandless label of this window's caption. The manifest owns it;
+		 * a caller supplies Title only for a contextual label. Gui_Create adds the
+		 * product name, so a label that already carries it would show it twice.
+		 * @returns {string} The translated, brandless caption label.
+		 */
+		_CaptionLabel() {
+				if this.Opts.Has("Title")
+						return this.Opts["Title"]
+				Entry := this._ManifestEntry()
+				if !Entry.Has("title_key") || Entry["title_key"] == ""
+						throw ValueError("WebViewHost: the manifest declares no title_key for this window.", -1, this.AppId)
+				return t(Entry["title_key"])
+		}
+
+		/**
 		 * Creates the native host window before attaching the WebView controller.
 		 * @param {string} MinSize - The manifest's minimum window dimensions.
 		 * @returns {Gui} The window with a shared-policy caption.
 		 */
 		_NewWindow(MinSize) {
-				Title := this.Opts.Get("Title", "")
-				return Gui_Create("+Resize +MinSize" . MinSize, Title)
+				return Gui_Create("+Resize +MinSize" . MinSize, this._CaptionLabel())
 		}
 
 		; --------------------------------------------------------------------------

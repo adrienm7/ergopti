@@ -33,7 +33,7 @@ local function run_window(module_name, scenario)
 		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
+		"app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
 		"modules.keylogger.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, controllers = {}, timers = {} }
@@ -76,6 +76,9 @@ local function run_window(module_name, scenario)
 				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }
 			end },
 		})
+		-- The cleanup window is named by the shared manifest through the real
+		-- translator; the loader's passthrough would leave it a bare key, refused.
+		if module_name == "ui.config_cleanup" then package.loaded["infra.i18n"] = nil end
 		if module_name == "ui.onboarding" then require("tests.support.onboarding_shared_data").install() end
 		if module_name == "ui.changelog" then
 			local files = require("adapters.file_system")
