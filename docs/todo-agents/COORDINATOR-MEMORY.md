@@ -24,12 +24,10 @@ Every agent of October 21 finished and its work is on dev: the Codex fix-branch 
 f0fb919379), the Windows image capture without PowerShell plus exe version info (03d9c017ed..1965c2ffac, exe text
 965ff7569b), the Linux status window and tray menu for the AppImage catalog (98d41e630b, 3061ae1160), and the dev red
 fixes (40e283e555..b0d4acd718; that agent stopped on an API error after recording its work). The `tmp/*`, `fix/*`
-branches and the `D:\_int`, `D:\_lin` clones are deleted. Leftovers live in the handoff files:
-`integration-fix-branches.md`, `windows-exe-flagged-by-proxy.md` (PAC helper /Brepro, signing, VirusTotal and T1-T4),
-`linux-tray-menu-catalog.md`, `dev-red-fixes.md`, `issue99-karabiner-input.md`, `issue99-ai-startup-updater.md`,
-`lua-shared-timers-separators.md`, `windows-updater-freeze-menu-census.md`, `config-policy-33-42.md`.
-
-Next: release 1.0.5 (full CI on dev, fix the reds, push to main with `Release-As: 1.0.5`).
+branches and the `D:\_int`, `D:\_lin` clones are deleted. v1.0.5 was released on October 22 (tag 17d4a3f421);
+finished handoff files were retired into the checklist on October 22. Leftovers live in the remaining handoff files:
+`windows-exe-flagged-by-proxy.md` (PAC helper /Brepro, signing, VirusTotal and T1-T4), `issue99-karabiner-input.md`,
+`issue99-ai-startup-updater.md`, `macos-tap-hold-action-picker.md`, `config-policy-33-42.md`.
 
 ## Maintainer rules and decisions (all sessions)
 

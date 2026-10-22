@@ -21,11 +21,11 @@
 
 ## Remaining, with next steps
 
-1. AI lane: `ui/menu/menu_llm/models_manager.lua` and `models_manager_mlx_hf.lua` still call
-   `hs.application.get`/`find("Hammerspoon")`. Replace them with
-   `require("adapters.running_application").current()`, then empty `DIRECT_LOOKUP_BASELINE` in
-   `tests/meta/runloop/test_app_lookup_never_scans_windows.lua`.
-2. Startup lane: at 09:40:03 a second, standalone Hammerspoon instance started with the launcher
+Done since: the AI prompts use `RunningApplication.current()` and `DIRECT_LOOKUP_BASELINE` is
+empty (e57f4cce77); the healthcheck `config` nil call was fixed by `c25c0d65c4`; on-time PONG/READY
+deadlines with the menu open are read through an echo probe (25411ee080, issue #100).
+
+2. Startup lane (decision 10, Hammerspoon coexistence, in the checklist's Wave 2): at 09:40:03 a second, standalone Hammerspoon instance started with the launcher
    one. It used `~/.config/ergopti_plus`, emitted the `karabiner_kc.log` warnings, aborted at
    `native_logger_environment` behind a blocking fatal dialog, and its KC poll timer kept writing to
    the shared daily log for at least 17 s. Find who launched it at the 1.0.4 install/relaunch, and
@@ -36,8 +36,6 @@
 4. Recovery churn: every fresh lease generation redeploys the 743 KB karabiner.json (token-scoped
    variable names change every rule), five times "during input after the 5.0 s typing deferral
    bound" in five minutes. Consider waiting for a typing pause while the rules are fenced anyway.
-5. Healthcheck: `ui/healthcheck/helpers.lua:322` "attempt to call a nil value (field 'config')"
-   (diagnostics `probes.configuration` = error); possibly fixed by `c25c0d65c4`, re-check.
 
 ## Only the Mac can confirm
 
