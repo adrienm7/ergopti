@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  .signpath/artifact-configuration.xml
+
+  SignPath artifact configuration "ergoptiplus-exe", the slug that
+  .github/workflows/ci-windows.yml submits. SignPath stores the active copy in
+  its project settings; this file is the reviewed source to paste there.
+  upload-artifact delivers a ZIP, so the root is <zip-file>; it must hold
+  exactly one ErgoptiPlus.exe, which receives an Authenticode signature.
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+	<zip-file>
+		<pe-file path="ErgoptiPlus.exe" min-matches="1" max-matches="1">
+			<authenticode-sign />
+		</pe-file>
+	</zip-file>
+</artifact-configuration>
