@@ -43,6 +43,7 @@ local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
 local ModifierBroker = require("adapters.modifier_broker")
 local broker_for_channel = ModifierBroker.for_channel
+local NumberPolicy = require("number_policy")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -158,9 +159,15 @@ end
 --- Never busy-waits on the standard CPU clock: on Linux it reports process CPU
 --- time, so spinning on it would burn a full core for the delay rather than
 --- yield it.
+--- Every fallback refuses a wait above the shared timer ceiling, as the FFI
+--- binding does: luv and the sleep command would otherwise take a wait that
+--- never ends (or a NaN) as an ordinary pause.
 --- @param ms integer Milliseconds to sleep.
 local function sleep_ms(ms)
-	if ms <= 0 then return end
+	if type(ms) == "number" and ms <= 0 then return end
+	if not NumberPolicy.within_timer_ceiling(ms) then
+		error("injector sleep refused: " .. tostring(ms) .. " ms is not finite or exceeds the timer ceiling", 0)
+	end
 	local nap = nanosleep()
 	if nap then
 		nap(ms / 1000)
