@@ -1,9 +1,10 @@
 // tools/test/test-windows-exe-av-surface.cjs
 // Fails when the ErgoptiPlus.exe antivirus-surface gate could let the v1.0.4
 // class of verdict through: the PE resource reader must find the compiled
-// script and the bundle, a forbidden inline PowerShell P/Invoke stage must
-// fail, a ceiling must not be exceeded, and the build stage must run the gate
-// on the compiled exe before it is signed. Synthetic PE images keep the test
+// script and the bundle, a forbidden inline PowerShell P/Invoke stage or an
+// encoded-command stage must fail, a ceiling must not be exceeded, and the
+// build stage must run the gate on the compiled exe before it is signed.
+// Synthetic PE images keep the test
 // independent of a compiler; CI runs the same gate on the real build.
 'use strict';
 const assert = require('node:assert/strict');
@@ -181,19 +182,41 @@ assert.match(
 	/forbidden powershell_unzip/
 );
 
-// 5. A ceiling fails when exceeded and asks to be lowered when undershot.
-const encodedMax = policy.script.ceilings.powershell_encoded_command.max;
-const tooMany = CLEAN_SCRIPT + '"-EncodedCommand"\n'.repeat(encodedMax + 1);
+// 5. The v1.0.5 updater stage: worker source carried as Base64 in the
+// environment, decoded, compiled with ScriptBlock::Create and launched through
+// -EncodedCommand. Sandboxes score that chain as a malware stage.
+const v105Stage =
+	CLEAN_SCRIPT +
+	'Args := ["-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Payload]\n' +
+	"Bootstrap := '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($p));$worker=[ScriptBlock]::Create($source)'\n";
+const v105Errors = scanExecutable(exe(v105Stage), policy).errors.join('\n');
+for (const id of ['powershell_encoded_command', 'scriptblock_create', 'base64_decode'])
+	assert.match(
+		v105Errors,
+		new RegExp(`script: forbidden ${id}`),
+		`${id} must be forbidden in the script`
+	);
+assert.match(
+	scanExecutable(
+		exe(CLEAN_SCRIPT, [['vendor/a.ps1', 'powershell -EncodedCommand AAAA']]),
+		policy
+	).errors.join('\n'),
+	/bundle: forbidden powershell_encoded_command/,
+	'a bundled worker cannot launch an encoded command either'
+);
+
+// 6. A ceiling fails when exceeded and asks to be lowered when undershot.
+const bypassMax = policy.script.ceilings.powershell_policy_bypass.max;
+const tooMany = CLEAN_SCRIPT + '"-ExecutionPolicy", "Bypass"\n'.repeat(bypassMax + 1);
 assert.match(
 	scanExecutable(exe(tooMany), policy).errors.join('\n'),
-	new RegExp(`powershell_encoded_command .* occurs ${encodedMax + 1} times, ceiling ${encodedMax}`)
+	new RegExp(`powershell_policy_bypass .* occurs ${bypassMax + 1} times, ceiling ${bypassMax}`)
 );
-if (encodedMax > 0)
-	assert.ok(
-		scanExecutable(exe(CLEAN_SCRIPT), policy).notes.some((note) =>
-			note.includes('powershell_encoded_command dropped to 0; lower its ceiling')
-		)
-	);
+assert.ok(
+	scanExecutable(exe(CLEAN_SCRIPT), policy).notes.some((note) =>
+		note.includes('powershell_policy_bypass dropped to 0; lower its ceiling')
+	)
+);
 const bundleBypass = policy.bundle.ceilings.powershell_policy_bypass.max;
 assert.match(
 	scanExecutable(
@@ -209,7 +232,7 @@ assert.equal(
 	'binary bundle members are not scanned as text'
 );
 
-// 6. The keylogger wording is measured on every build without gating it.
+// 7. The keylogger wording is measured on every build without gating it.
 assert.ok(
 	scanExecutable(exe(CLEAN_SCRIPT + 'KeyloggerInit()\n'), policy).notes.includes(
 		'script: keylogger_wording = 1 (reported only)'
@@ -221,7 +244,7 @@ assert.throws(
 	'an unknown policy schema must be refused'
 );
 
-// 7. The build stage runs the gate on the compiled exe between compile and sign.
+// 8. The build stage runs the gate on the compiled exe between compile and sign.
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8');
 const compile = workflow.indexOf('- name: Compile ErgoptiPlus.ahk');
 const gate = workflow.indexOf('- name: Check the ErgoptiPlus.exe antivirus surface');

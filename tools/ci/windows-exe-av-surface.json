@@ -1,5 +1,5 @@
 {
-	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur in the compiled script; a ceiling may not be exceeded (lower it when a launcher is removed). Patterns are case-insensitive JavaScript regular expressions. See docs/todo-agents/windows-exe-flagged-by-proxy.md.",
+	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur in the compiled script; a ceiling may not be exceeded (lower it when a launcher is removed). Patterns are case-insensitive JavaScript regular expressions. PowerShell stages are bundled scripts run with -File, never encoded commands or code compiled from transported text. See docs/todo-agents/windows-exe-flagged-by-proxy.md.",
 	"schema": 1,
 	"script": {
 		"forbidden": {
@@ -11,14 +11,14 @@
 			"inline_expression_eval": "Invoke-Expression|\\bIEX\\s*[\\(\\$]",
 			"autorun_registry_key": "CurrentVersion\\\\Run\\b",
 			"scheduled_task": "schtasks",
-			"remote_thread_injection": "CreateRemoteThread|WriteProcessMemory|VirtualAllocEx"
+			"remote_thread_injection": "CreateRemoteThread|WriteProcessMemory|VirtualAllocEx",
+			"powershell_encoded_command": "-EncodedCommand",
+			"scriptblock_create": "\\[ScriptBlock\\]::Create",
+			"base64_decode": "FromBase64String"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 18 },
-			"powershell_encoded_command": { "pattern": "-EncodedCommand", "max": 3 },
-			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 4 },
-			"base64_decode": { "pattern": "FromBase64String", "max": 2 },
-			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 17 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
 			"elevated_run": { "pattern": "\\*RunAs", "max": 3 }
 		},
 		"reported": {
@@ -27,9 +27,13 @@
 		}
 	},
 	"bundle": {
+		"forbidden": {
+			"powershell_encoded_command": "-EncodedCommand"
+		},
 		"ceilings": {
 			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 2 },
-			"powershell_encoded_command": { "pattern": "-EncodedCommand", "max": 0 },
+			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
+			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
 			"inline_csharp_compile": { "pattern": "Add-Type", "max": 19 },
 			"pinvoke_declaration": { "pattern": "DllImport", "max": 33 },
 			"base64_decode": { "pattern": "FromBase64String", "max": 1 }
