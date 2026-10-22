@@ -197,11 +197,15 @@ function problems(text, manifest = MANIFEST) {
 // ─────────────────────────────────────────────────
 assert.deepEqual(problems(WORKFLOW), []);
 
-// The fixture inventory is the former single job: 158 steps, six shared.
+// The fixture inventory is the former single job plus the model pull install: 159 steps, six shared.
 const listed = [...FIXTURE.shared, ...Object.values(FIXTURE.shards).flat()];
 assert.equal(new Set(listed).size, listed.length, 'a step is listed twice');
 assert.equal(FIXTURE.shared.length, 6);
-assert.equal(listed.length, 158, 'the former E2E job had 158 steps; none may be lost');
+assert.equal(
+	listed.length,
+	159,
+	'the former E2E job had 158 steps and gained the model pull install; none may be lost'
+);
 assert.deepEqual(
 	Object.keys(FIXTURE.subjects),
 	Object.keys(FIXTURE.shards),

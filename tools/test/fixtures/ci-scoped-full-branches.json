@@ -1049,6 +1049,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install the model pull window prerequisites",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Successful native model pulls retire stale retries",
 			"protocol": 10
 		},
