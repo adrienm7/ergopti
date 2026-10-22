@@ -382,8 +382,8 @@ Test("Shortcuts: keep-awake retains a refused cancellation hook for retry (AHK-1
 _SPT_AssertRecordingBoundary() {
 	Body := _DriverFuncBody("SearchPath")
 	Code := _DriverMaskNonCode(&Body)
-	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run\)"),
-		"the search launch seam must retain its explicit native default")
+	AssertTrue(RegExMatch(Code, "i)^\s*SearchPath\(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened\)"),
+		"the search launch and report seams must retain their explicit native defaults")
 	AssertFalse(RegExMatch(Code, "i)\bRun\s*\("), "the recording probe must never reach a raw native launch")
 	Assignments := 0, Calls := 0
 	Position := 1
@@ -399,7 +399,9 @@ _SPT_AssertRecordingBoundary() {
 				"each actual launch port must preserve its exception boundary")
 		}
 	}
-	AssertEqual(5, Calls, "every original launch branch must use the recording boundary")
+	; Four launches remain: the search engine, a search query, a path and a URL
+	; (a domain without its scheme is a URL once classified, not its own branch).
+	AssertEqual(4, Calls, "every launch branch must use the recording boundary")
 }
 
 _SPT_SearchTarget(Input, Expected) {
@@ -438,7 +440,7 @@ for _SPT_VectorIndex, _SPT_Vector in [
 	Test("Shortcuts/search: exact URI target " . _SPT_VectorIndex . " (search-uri-component)",
 		_SPT_SearchTarget.Bind(_SPT_Vector[1], _SPT_Vector[2]))
 
-; Actual filesystem observations retain the existing path-existence boundary.
+; Actual filesystem observations retain the path-existence boundary.
 _SPT_SearchFileBoundary() {
 	global Features
 	Saved := Features
@@ -458,16 +460,22 @@ _SPT_SearchFileBoundary() {
 		Launches := []
 		Launch := (Target, WorkingDir := "", Options := "") =>
 			Launches.Push(Map("target", Target, "options", Options))
-		SearchPath(Existing, Launch)
+		Reports := []
+		Report := (Key, Target, Reason) => Reports.Push(Map("key", Key, "target", Target))
+		AssertTrue(SearchPath(Existing, Launch, Report), "an existing file is handed to the shell")
 		AssertEqual(1, Launches.Length)
-		AssertTrue(Launches[1]["target"] == Existing, "an existing file path remains byte-identical")
+		AssertTrue(Launches[1]["target"] == '"' . Existing . '"',
+			"an existing file path stays byte-identical inside the quotes that make it one file")
 		AssertEqual("Max", Launches[1]["options"])
+		AssertEqual(0, Reports.Length, "an opened file reports nothing")
+		; A missing path is reported, not searched: the user asked to open it
+		; (open-target-missing-path-reported).
 		Missing := Root . "\missing.txt"
-		SearchPath(Missing, Launch)
-		AssertEqual(2, Launches.Length)
-		AssertTrue(Launches[2]["target"] == "https://search.invalid/?q=" . UriEncode(Missing),
-			"a missing path still falls through to an encoded search")
-		AssertEqual("", Launches[2]["options"])
+		AssertFalse(SearchPath(Missing, Launch, Report), "a missing path is not opened")
+		AssertEqual(1, Launches.Length, "a missing path must launch nothing, not even a search")
+		AssertEqual(1, Reports.Length, "a missing path must be reported")
+		AssertEqual("open_target.missing_path", Reports[1]["key"])
+		AssertTrue(Reports[1]["target"] == Missing, "the report names the exact missing path")
 	} finally {
 		Features := Saved
 		if Owned
