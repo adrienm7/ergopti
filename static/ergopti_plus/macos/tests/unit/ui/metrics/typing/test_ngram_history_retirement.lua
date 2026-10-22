@@ -133,7 +133,8 @@ helpers.describe("ngram-history-retirement", function()
 			helpers.assert_eq(state.entry().through, Fixture.PAST)
 			helpers.assert_eq(state.entry().json, old_json)
 			helpers.assert_eq(Fixture.count(state.entry().data, "b"), 0)
-			helpers.assert_eq(state.merges, 0)
+			-- The partial extension is merged into a copy so the page can show it
+			helpers.assert_true(state.merges > 0, "the partial counts are merged for display")
 			state.sql_refusal = false
 			state.request(72)
 			state.drain()

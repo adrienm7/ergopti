@@ -21,6 +21,9 @@
 ---    re-encodes only today's slice instead of the whole history.
 --- 4. Bounded memory: at most MAX_RANGE_ENTRIES n-gram histories are kept, and
 ---    `reset()` drops everything (dashboard Reset clears the disk snapshot too).
+--- 5. Partial reads are shown, never cached. A read that missed rows still
+---    returns the counts it read, flagged `incomplete`, and leaves the cache as
+---    it was so the next request retries the whole read.
 --- ==============================================================================
 
 local M = {}
@@ -208,7 +211,8 @@ function M.session(reader, sqlite_path, today, pacer)
 	--- @param start_date string|nil Inclusive lower bound.
 	--- @param end_date string|nil Inclusive upper bound.
 	--- @param apps table|nil Requested apps.
-	--- @return string json Encoded { historical, today }.
+	--- @return string json Encoded { historical, today }, plus `"incomplete":true`
+	---     when a read missed rows.
 	--- @return boolean range_complete All requested historical and today reads succeeded.
 	function session.range(start_date, end_date, apps)
 		if start_date == "" then start_date = nil end
@@ -231,10 +235,11 @@ function M.session(reader, sqlite_path, today, pacer)
 					local added
 					added, history_complete = reader.read_ngrams(
 						sqlite_path, reader.next_day(cached.through), through, apps, pacer)
-					-- A refused day cannot alter the accepted history or its watermark.
+					-- Merged into a copy: a refused day cannot alter the accepted
+					-- history or its watermark, yet its partial counts are shown.
+					data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data), added)
+					json = PacedJson.encode(data, pacer)
 					if history_complete == true then
-						data = reader.merge_ngrams(reader.merge_ngrams({}, cached.data), added)
-						json = PacedJson.encode(data, pacer)
 						Logger.info(LOG, "N-gram history extended from %s to %s.", cached.through, through)
 					end
 				end
@@ -256,12 +261,14 @@ function M.session(reader, sqlite_path, today, pacer)
 					end
 				end
 			else
-				Logger.warn(LOG, "N-gram history read incomplete through %s; accepted cache unchanged and next request retries.", through)
+				Logger.warn(LOG, "N-gram history read incomplete through %s; partial counts shown, accepted cache unchanged and next request retries.", through)
 			end
 			historical_json = json
 		end
 		local today_idx, today_complete = reader.read_today_split(sqlite_path, start_date, end_date, apps, pacer, today)
-		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer) .. "}", history_complete == true and today_complete == true
+		local range_complete = history_complete == true and today_complete == true
+		return '{"historical":' .. historical_json .. ',"today":' .. PacedJson.encode(today_idx, pacer)
+			.. (range_complete and "" or ',"incomplete":true') .. "}", range_complete
 	end
 
 	return session
