@@ -1549,9 +1549,20 @@ function M.load_all(personal_owner, cold_boot)
 		unavailable = common_unavailable and { "autocorrection" } or {} }
 end
 
+--- Re-reads every hotstring source, then asks for a menu rebuild.
+---
+--- A reload changes counts, categories and checkmarks. Without the rebuild the
+--- tray kept the pre-reload rows live, so a click made against an old
+--- checkmark toggled the reloaded state back; the rebuild retires those rows
+--- and their clicks replay on the refreshed menu with the state they asked for.
+--- @return any ... The load_all() results, unchanged.
 function M.reload()
 	Logger.info(LOG, "Reload requested — re-scanning…")
-	return M.load_all()
+	local results = { n = 0 }
+	local function capture(...) results = { n = select("#", ...), ... } end
+	capture(M.load_all())
+	notify_change()
+	return (table.unpack or unpack)(results, 1, results.n)
 end
 
 
