@@ -86,8 +86,9 @@ local function callback_of(row)
 	return nil
 end
 
---- Finds the delay row's callback: the one leaf of a per-key submenu, two
---- levels down, whose click shells out to `zenity --entry`.
+--- Finds the delay row's callback: the leaf of a per-key submenu, one level
+--- down, whose click shells out to `zenity --entry`. The row that shows the
+--- key's delay is itself the command (no nested delay submenu).
 --- @param mb table The loaded menu builder.
 --- @param manager table An initialised tap-hold manager.
 --- @return function|nil
@@ -101,14 +102,12 @@ local function find_delay_row(mb, manager)
 	end
 	helpers.assert_true(section ~= nil, "Tap-Holds section present in menu")
 	for _, key_row in ipairs(children_of(section) or {}) do
-		for _, sub in ipairs(children_of(key_row) or {}) do
-			for _, row in ipairs(children_of(sub) or {}) do
-				local cb = callback_of(row)
-				if cb and children_of(row) == nil then
-					local commands = with_zenity("", 1, function() pcall(cb) end)
-					for _, cmd in ipairs(commands) do
-						if cmd:find("zenity", 1, true) and cmd:find("--entry", 1, true) then return cb end
-					end
+		for _, row in ipairs(children_of(key_row) or {}) do
+			local cb = callback_of(row)
+			if cb and children_of(row) == nil then
+				local commands = with_zenity("", 1, function() pcall(cb) end)
+				for _, cmd in ipairs(commands) do
+					if cmd:find("zenity", 1, true) and cmd:find("--entry", 1, true) then return cb end
 				end
 			end
 		end
