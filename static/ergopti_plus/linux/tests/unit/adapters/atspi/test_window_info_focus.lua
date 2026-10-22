@@ -557,3 +557,96 @@ helpers.describe("window_info: compositor privacy context binding", function()
 		end)
 	end
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Window list ==========================================
+-- =================================================================
+-- =================================================================
+
+-- Real `wmctrl -lp` output: id, desktop (-1 for a sticky window), pid (0 when
+-- the client sets no _NET_WM_PID), client machine padded to one width, title.
+local WMCTRL_LIST = table.concat({
+	"0x02400003  0 1337   host Ergopti — Mozilla Firefox",
+	"0x02400010  0 1337   host Second Firefox window",
+	"0x03000007 -1 4242   host ",
+	"0x03200004  1 0       N/A Pid-less client",
+	"",
+}, "\n")
+
+helpers.describe("window_info: X11 window list (linux-x11-window-list-app-ids)", function()
+	helpers.it("(linux-x11-window-list-app-ids) names every window by its process in one query", function()
+		local wi, log = under("x11", "xfce", {
+			{ "command -v 'wmctrl'", true },
+			{ "wmctrl -lp", WMCTRL_LIST },
+		})
+		local reads = {}
+		wi._set_proc_comm_reader_for_test(function(pid)
+			reads[#reads + 1] = pid
+			return ({ [1337] = "firefox", [4242] = "xfce4-panel" })[pid] or ""
+		end)
+		local infos = wi.getAll()
+		wi._reset_state()
+		restore()
+		helpers.assert_eq(#infos, 4)
+		helpers.assert_eq(infos[1], { appId = "firefox", windowTitle = "Ergopti — Mozilla Firefox",
+			bundleId = "", executablePath = "" })
+		helpers.assert_eq(infos[2].appId, "firefox")
+		helpers.assert_eq(infos[3], { appId = "xfce4-panel", windowTitle = "", bundleId = "", executablePath = "" })
+		helpers.assert_eq(infos[4].appId, "", "a client without a pid has no process to name")
+		helpers.assert_eq(infos[4].windowTitle, "Pid-less client")
+		helpers.assert_eq(reads, { 1337, 4242 }, "each process is read once, from /proc")
+		local spawned = 0
+		for _, command in ipairs(log) do
+			if not command:find("command -v", 1, true) then spawned = spawned + 1 end
+			helpers.assert_true(not command:find("getwindowname", 1, true) and not command:find("/proc/", 1, true),
+				"no per-window command on the menu path: " .. command)
+		end
+		helpers.assert_eq(spawned, 1, "one window-list query, whatever the number of windows")
+	end)
+
+	helpers.it("(linux-x11-window-list-app-ids) states once that wmctrl is missing", function()
+		local wi, log = under("x11", "xfce", {})
+		local warnings = {}
+		local Logger = require("logger.shim")
+		local original = Logger.warn
+		Logger.warn = function(_, message) warnings[#warnings + 1] = message end
+		local first, second = wi.getAll(), wi.getAll()
+		Logger.warn = original
+		restore()
+		helpers.assert_eq(first, {})
+		helpers.assert_eq(second, {})
+		helpers.assert_eq(#warnings, 1, "the missing tool is logged once")
+		helpers.assert_true(warnings[1]:find("wmctrl", 1, true) ~= nil, warnings[1])
+		for _, command in ipairs(log) do
+			helpers.assert_true(command:find("command -v", 1, true) ~= nil, "nothing but the probe runs: " .. command)
+		end
+	end)
+
+	helpers.it("(linux-x11-window-list-app-ids) reports a failed query instead of an empty desktop", function()
+		local wi = under("x11", "xfce", {
+			{ "command -v 'wmctrl'", true },
+			{ "wmctrl -lp", { ok = false, output = "", error = "Cannot get client list properties." } },
+		})
+		local errors = {}
+		local Logger = require("logger.shim")
+		local original = Logger.error
+		Logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
+		local infos = wi.getAll()
+		Logger.error = original
+		restore()
+		helpers.assert_eq(infos, {})
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_true(errors[1]:find("Cannot get client list", 1, true) ~= nil, errors[1])
+	end)
+
+	helpers.it("(linux-x11-window-list-app-ids) parses the wmctrl columns", function()
+		local wi = under("x11", "xfce", {})
+		local parsed = wi._parse_wmctrl_list("0x0100000a  2 99     my-host A title  with  spaces\r\n")
+		restore()
+		helpers.assert_eq(parsed, { { id = "0x0100000a", pid = 99, title = "A title  with  spaces" } })
+	end)
+end)

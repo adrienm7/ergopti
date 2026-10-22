@@ -160,7 +160,7 @@ Version: $VERSION
 Architecture: $ARCH
 Maintainer: Ergopti Contributors <ergopti@example.com>
 Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, lua-luv, openssl, sqlite3, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libssl3t64 | libssl3
-Recommends: lua-luv, lua-filesystem, openssl, xdotool, wl-clipboard
+Recommends: lua-luv, lua-filesystem, openssl, xdotool, wmctrl, wl-clipboard
 Section: utils
 Priority: optional
 Homepage: https://github.com/adrienm7/ergopti

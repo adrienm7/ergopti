@@ -81,7 +81,7 @@
                 --add-flags "$out/lib/ergopti/ergopti_hotstrings.lua" \
                 --set LUA_PATH "$out/lib/ergopti/?.lua;$out/lib/ergopti/?/init.lua;$out/lib/ergopti/_shared/lua/?.lua;$out/lib/ergopti/_shared/lua/?/init.lua;;" \
                 --prefix PATH : ${nixpkgs.lib.makeBinPath (with pkgs; [
-                  xclip wl-clipboard xdotool libxkbcommon libnotify curl
+                  xclip wl-clipboard xdotool wmctrl libxkbcommon libnotify curl
                   # Metrics must not borrow key derivation, SQLite or directory
                   # creation commands from the user's optional login profile.
                   openssl sqlite coreutils
