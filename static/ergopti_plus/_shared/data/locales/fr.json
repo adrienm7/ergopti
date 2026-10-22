@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Script mis en pause",
 	"script_control.resume_failed": "Impossible de reprendre le script ; il reste en pause.",
 	"script_control.resumed": "Script réactivé",
+	"selection.clipboard_busy": "%s occupe le presse-papiers : la sélection n’a pas pu être lue. Réessayez.",
+	"selection.clipboard_busy_unknown": "Un autre programme occupe le presse-papiers : la sélection n’a pas pu être lue. Réessayez.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Virgule réduit les bigrammes de même doigt",
 	"sfbsreduction.ecirc": "Ê réduit les bigrammes de même doigt",

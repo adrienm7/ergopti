@@ -580,9 +580,50 @@ CB_SaveAll() {
 	try {
 		return ClipboardAll()
 	} catch as Err {
-		try LoggerWarn("Clipboard", "CB_SaveAll failed: {1}.", Err.Message)
+		try LoggerWarn("Clipboard", "CB_SaveAll failed: {1} (holder: {2}).",
+			RTrim(Err.Message, "."), CB_DescribeClipboardHolder()["summary"])
 		return "__CB_SAVE_ERROR__"
 	}
+}
+
+; Identifies who holds the native clipboard lock, for failure logs and notices.
+; GetOpenClipboardWindow is 0 both when the lock is free again and when it was
+; opened without a window (OpenClipboard(NULL)), which names no process; the
+; summary says so instead of guessing. GetClipboardOwner is the window whose
+; data the clipboard currently holds, which may differ from the lock holder.
+; Windows-local diagnostics: not part of the cross-driver Clipboard port.
+; @return {Map} hwnd, pid, process ("" when unknown), own, owner_process, summary.
+CB_DescribeClipboardHolder() {
+	Hwnd := DllCall("User32\GetOpenClipboardWindow", "Ptr")
+	Holder := _CB_DescribeClipboardWindow(Hwnd)
+	Owner := _CB_DescribeClipboardWindow(DllCall("User32\GetClipboardOwner", "Ptr"))
+	if !Hwnd
+		Summary := "no window holds the lock (released since, or opened without a window)"
+	else
+		Summary := Format("hwnd=0x{:X} pid={} process={} own_process={}", Hwnd,
+			Holder["pid"], Holder["label"], Holder["own"] ? "yes" : "no")
+	Summary .= "; data owner " . Owner["label"]
+	return Map("hwnd", Hwnd, "pid", Holder["pid"], "process", Holder["process"],
+		"own", Holder["own"], "owner_process", Owner["process"], "summary", Summary)
+}
+
+_CB_DescribeClipboardWindow(Hwnd) {
+	Pid := 0, ProcName := "", Label := "none"
+	if Hwnd {
+		DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid)
+		if Pid {
+			try {
+				ProcName := ProcessGetName(Pid)
+				Label := ProcName
+			} catch as Err {
+				Label := "pid " . Pid . " (name unavailable: " . RTrim(Err.Message, ".") . ")"
+			}
+		} else {
+			Label := "unknown (window gone)"
+		}
+	}
+	return Map("pid", Pid, "process", ProcName, "label", Label,
+		"own", Pid != 0 && Pid == DllCall("Kernel32\GetCurrentProcessId", "UInt"))
 }
 
 ; Restores a previously saved all-formats clipboard snapshot.

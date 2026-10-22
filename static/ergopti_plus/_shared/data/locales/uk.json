@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Скрипт призупинено",
 	"script_control.resume_failed": "Не вдалося відновити роботу скрипту; він залишається призупиненим.",
 	"script_control.resumed": "Скрипт відновлено",
+	"selection.clipboard_busy": "%s утримує буфер обміну, тому виділення не вдалося прочитати. Спробуйте ще раз.",
+	"selection.clipboard_busy_unknown": "Інша програма утримує буфер обміну, тому виділення не вдалося прочитати. Спробуйте ще раз.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Кома зменшує біграми одного пальця",
 	"sfbsreduction.ecirc": "Ê зменшує біграми одного пальця",

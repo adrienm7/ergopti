@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Skript pausiert",
 	"script_control.resume_failed": "Das Skript konnte nicht fortgesetzt werden; es bleibt pausiert.",
 	"script_control.resumed": "Skript fortgesetzt",
+	"selection.clipboard_busy": "%s blockiert die Zwischenablage, daher konnte die Auswahl nicht gelesen werden. Versuchen Sie es erneut.",
+	"selection.clipboard_busy_unknown": "Ein anderes Programm blockiert die Zwischenablage, daher konnte die Auswahl nicht gelesen werden. Versuchen Sie es erneut.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Komma reduziert Bigramme desselben Fingers",
 	"sfbsreduction.ecirc": "Ê reduziert Bigramme desselben Fingers",

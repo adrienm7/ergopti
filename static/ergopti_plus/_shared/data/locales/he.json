@@ -2031,6 +2031,8 @@
 	"script_control.paused": "מושהה",
 	"script_control.resume_failed": "לא ניתן היה להמשיך את הסקריפט; הוא נשאר מושהה.",
 	"script_control.resumed": "הסקריפט חודש",
+	"selection.clipboard_busy": "%s מחזיק את הלוח, ולכן לא ניתן היה לקרוא את הבחירה. נסה שוב.",
+	"selection.clipboard_busy_unknown": "תוכנה אחרת מחזיקה את הלוח, ולכן לא ניתן היה לקרוא את הבחירה. נסה שוב.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "פסיק מצמצם ביגרמות של אותו אצבע",
 	"sfbsreduction.ecirc": "Ê מצמצם ביגרמות של אותו אצבע",

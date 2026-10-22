@@ -2031,6 +2031,8 @@
 	"script_control.paused": "脚本已暂停",
 	"script_control.resume_failed": "无法恢复脚本；它仍处于暂停状态。",
 	"script_control.resumed": "脚本已恢复",
+	"selection.clipboard_busy": "%s 正在占用剪贴板，因此无法读取所选内容。请重试。",
+	"selection.clipboard_busy_unknown": "另一个程序正在占用剪贴板，因此无法读取所选内容。请重试。",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "逗号减少同指二合字母",
 	"sfbsreduction.ecirc": "Ê 减少同指二合字母",

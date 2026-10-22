@@ -483,5 +483,50 @@ Test("hotstrings: startup rollback yields to a newer clipboard (selection-startu
 Test("hotstrings: startup rollback preserves its settlement successor (selection-startup-owner-settlement)",
 	_SCO_StartupSettlement.Bind(false))
 
+; A clipboard another program holds past ClipboardAll's one-second wait is
+; reported to the user with its holder; it used to raise an ERROR that opened
+; the generic error window.
+_SCBusy_Run() {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live capture")
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	PreviousId := _SelectionCaptureNextId
+	State := Map("busy", 0, "clears", 0, "sends", 0, "restores", 0)
+	Ports := Map("save", (*) => "__CB_SAVE_ERROR__",
+		"clear", (*) => (State["clears"] += 1, true),
+		"send", (*) => State["sends"] += 1,
+		"restore", (Saved) => (State["restores"] += 1, true),
+		"sequence", (*) => 42, "foreground", (*) => 101,
+		"report_busy", (*) => State["busy"] += 1)
+	try {
+		AssertFalse(GetSelectionAsync((*) => 0, Ports), "a busy clipboard cannot start a capture")
+		AssertEqual(1, State["busy"], "the busy clipboard must be reported once, naming its holder")
+		AssertEqual(0, State["clears"], "nothing may be cleared without a snapshot")
+		AssertEqual(0, State["sends"], "no Ctrl+C may be sent without a snapshot")
+		AssertEqual(0, State["restores"])
+		AssertFalse(IsObject(_SelectionCaptureJob))
+		AssertEqual(0, CBClipboardOwner.active.Count, "the transaction owner must be released")
+	} finally {
+		_SelectionCaptureJob := false
+		_SelectionCaptureNextId := PreviousId
+	}
+}
+Test("hotstrings: a held clipboard is reported instead of raising an error (selection-clipboard-busy)", _SCBusy_Run)
+
+; GetOpenClipboardWindow names the lock holder: the test process holds the real
+; lock itself, so the description must name this process and flag it as ours.
+_SCHolder_Run() {
+	AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "the test must hold the real clipboard lock")
+	try Holder := CB_DescribeClipboardHolder()
+	finally DllCall("User32\CloseClipboard", "Int")
+	SplitPath(A_AhkPath, &ExeName)
+	AssertEqual(A_ScriptHwnd, Holder["hwnd"])
+	AssertEqual(DllCall("Kernel32\GetCurrentProcessId", "UInt"), Holder["pid"])
+	AssertEqual(StrLower(ExeName), StrLower(Holder["process"]))
+	AssertTrue(Holder["own"], "the holder must be flagged as this process")
+	Assert(InStr(Holder["summary"], "own_process=yes") > 0, "the log summary must say the holder is ours")
+}
+Test("clipboard: the busy-clipboard evidence names the holding process (clipboard-holder-evidence)", _SCHolder_Run)
+
 
 #Include test_selection_admitted_clipboard_sequence.ahk

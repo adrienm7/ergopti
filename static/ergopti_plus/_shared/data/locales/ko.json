@@ -2031,6 +2031,8 @@
 	"script_control.paused": "스크립트 일시 정지됨",
 	"script_control.resume_failed": "스크립트를 다시 시작할 수 없습니다. 일시 중지된 상태로 유지됩니다.",
 	"script_control.resumed": "스크립트 재개됨",
+	"selection.clipboard_busy": "%s이(가) 클립보드를 사용 중이라 선택 내용을 읽을 수 없습니다. 다시 시도하세요.",
+	"selection.clipboard_busy_unknown": "다른 프로그램이 클립보드를 사용 중이라 선택 내용을 읽을 수 없습니다. 다시 시도하세요.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "쉼표가 같은 손가락 바이그램을 줄입니다",
 	"sfbsreduction.ecirc": "Ê가 같은 손가락 바이그램을 줄입니다",

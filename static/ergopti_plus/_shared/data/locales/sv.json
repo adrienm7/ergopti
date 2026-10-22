@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Pausad",
 	"script_control.resume_failed": "Skriptet kunde inte återupptas; det förblir pausat.",
 	"script_control.resumed": "Skriptet återupptogs",
+	"selection.clipboard_busy": "%s håller urklipp, så markeringen kunde inte läsas. Försök igen.",
+	"selection.clipboard_busy_unknown": "Ett annat program håller urklipp, så markeringen kunde inte läsas. Försök igen.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Komma minskar bigrammen för samma finger",
 	"sfbsreduction.ecirc": "Ê minskar bigrammen för samma finger",

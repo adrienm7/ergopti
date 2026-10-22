@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Skrypt wstrzymany",
 	"script_control.resume_failed": "Nie udało się wznowić skryptu; pozostaje wstrzymany.",
 	"script_control.resumed": "Skrypt wznowiony",
+	"selection.clipboard_busy": "%s blokuje schowek, więc nie udało się odczytać zaznaczenia. Spróbuj ponownie.",
+	"selection.clipboard_busy_unknown": "Inny program blokuje schowek, więc nie udało się odczytać zaznaczenia. Spróbuj ponownie.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Przecinek zmniejsza bigramy tego samego palca",
 	"sfbsreduction.ecirc": "Ê zmniejsza bigramy tego samego palca",

@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Script en pausa",
 	"script_control.resume_failed": "No se pudo reanudar el script; permanece en pausa.",
 	"script_control.resumed": "Script reanudado",
+	"selection.clipboard_busy": "%s está ocupando el portapapeles, así que no se pudo leer la selección. Inténtelo de nuevo.",
+	"selection.clipboard_busy_unknown": "Otro programa está ocupando el portapapeles, así que no se pudo leer la selección. Inténtelo de nuevo.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "La coma reduce bigramas del mismo dedo",
 	"sfbsreduction.ecirc": "Ê reduce bigramas del mismo dedo",

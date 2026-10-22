@@ -2031,6 +2031,8 @@
 	"script_control.paused": "スクリプト一時停止中",
 	"script_control.resume_failed": "スクリプトを再開できませんでした。一時停止のままです。",
 	"script_control.resumed": "スクリプト再開",
+	"selection.clipboard_busy": "%s がクリップボードを使用中のため、選択範囲を読み取れませんでした。もう一度お試しください。",
+	"selection.clipboard_busy_unknown": "別のプログラムがクリップボードを使用中のため、選択範囲を読み取れませんでした。もう一度お試しください。",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "カンマが同指バイグラムを減らす",
 	"sfbsreduction.ecirc": "Êが同指バイグラムを減らす",

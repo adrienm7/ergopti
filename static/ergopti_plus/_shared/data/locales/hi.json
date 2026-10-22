@@ -2031,6 +2031,8 @@
 	"script_control.paused": "रुका हुआ",
 	"script_control.resume_failed": "स्क्रिप्ट को फिर से शुरू नहीं किया जा सका; यह रुकी हुई है।",
 	"script_control.resumed": "स्क्रिप्ट फिर से शुरू की गई",
+	"selection.clipboard_busy": "%s ने क्लिपबोर्ड रोक रखा है, इसलिए चयन पढ़ा नहीं जा सका। फिर से प्रयास करें।",
+	"selection.clipboard_busy_unknown": "किसी अन्य प्रोग्राम ने क्लिपबोर्ड रोक रखा है, इसलिए चयन पढ़ा नहीं जा सका। फिर से प्रयास करें।",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "कॉमा एक ही उंगली के बाइग्राम को कम करता है",
 	"sfbsreduction.ecirc": "Ê एक ही उंगली के बाइग्राम को कम करता है",

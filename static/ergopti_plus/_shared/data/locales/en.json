@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Script paused",
 	"script_control.resume_failed": "The script could not be resumed; it remains paused.",
 	"script_control.resumed": "Script resumed",
+	"selection.clipboard_busy": "%s is holding the clipboard, so the selection could not be read. Try again.",
+	"selection.clipboard_busy_unknown": "Another program is holding the clipboard, so the selection could not be read. Try again.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Comma reduces same-finger bigrams",
 	"sfbsreduction.ecirc": "Ê reduces same-finger bigrams",
