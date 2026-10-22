@@ -651,8 +651,14 @@ _MCDF_ReplayCarriesTheRequestedState() {
 		"a plain row carries no requested state")
 	Schema := JsonStringLiteral(MENU_RELOAD_REPLAY_SCHEMA)
 	for Command in ['{"labels":["A"],"desired":2}', '{"labels":["A"],"desired":"0"}', '{"labels":["A"]}']
-		AssertThrows(() => _MenuReloadReplayDecode('{"schema":' . Schema . ',"commands":[' . Command . ']}'),
-			"an invalid requested state is refused: " . Command)
+		_MCDF_AssertReplayCommandRefused(Schema, Command)
+}
+
+; A helper so the closure reads a parameter: a closure over the for variable
+; would read it unset, and AssertThrows would pass on that UnsetError.
+_MCDF_AssertReplayCommandRefused(Schema, Command) {
+	Encoded := '{"schema":' . Schema . ',"commands":[' . Command . ']}'
+	AssertThrows(() => _MenuReloadReplayDecode(Encoded), "an invalid requested state is refused: " . Command)
 }
 Test("menu check rows: the reload hand-off carries the requested state (menu-toggle-replay-double-flip)",
 	_MCDF_ReplayCarriesTheRequestedState)
