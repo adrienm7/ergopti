@@ -104,7 +104,7 @@ local function keyboard_echo_contract(raw, wrapper)
 	local classify_at = wrapper_code:find(
 		'pcall%s*%(%s*EventProvenance%.classify_with_fence%s*,%s*e%s*,%s*"keymap"%s*%)')
 	local raw_call_at = wrapper_code:find(
-		'pcall%s*%(%s*onKeyDownRaw%s*,%s*e%s*,%s*provenance%s*,%s*provenance_status%s*[,)]')
+		'pcall%s*%(%s*onKeyDownRaw%s*,%s*e%s*,%s*provenance%s*,%s*provenance_status%s*%)')
 	if not (classify_at and raw_call_at and classify_at < raw_call_at) then return false end
 
 	local unreadable_at = raw_code:find(

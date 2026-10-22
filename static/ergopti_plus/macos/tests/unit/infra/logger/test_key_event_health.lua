@@ -58,10 +58,10 @@ helpers.describe("infra.key_event_health (key-event-pairing)", function()
 		Health.observe(phase, key, autorepeat == true, true, lateness, stamp)
 	end
 
+	--- What the keymap tap watchdog does every second, off the taps.
 	local function flush()
-		local pending = deferred
-		deferred = {}
-		for _, callback in ipairs(pending) do callback() end
+		helpers.assert_eq(#deferred, 0, "recording never arms a timer inside the event tap")
+		Health.flush()
 	end
 
 	local function reset()
