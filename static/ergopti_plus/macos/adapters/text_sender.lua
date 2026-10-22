@@ -112,26 +112,23 @@ function M.isTerminalInputHost(bundle_id, app_name)
 	return TERMINAL_BUNDLE_IDS[bundle] == true or TERMINAL_APP_NAMES[name] == true
 end
 
---- The application that receives typing: the focused window's, else the
---- frontmost one.
+--- The application that receives typing: the frontmost one.
+---
+--- Read from the process list (NSWorkspace), never through Accessibility: both
+--- callers run inside the keyboard event tap (each expansion that deletes, each
+--- bare Return, Cmd+A and Cmd+L). hs.window.focusedWindow() asks the focused
+--- application over Accessibility and waits for it, up to six seconds for an
+--- application that does not answer, while every key of every application
+--- waits behind the tap; macOS then disables the tap and the queued keys come
+--- out late, swallowed or in a held state (issues #99 and #100).
 --- @return userdata|table|nil app
 local function focused_application()
-	local app = nil
-	local ok_window, window = pcall(function()
-		return hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
+	local ok_front, front = pcall(function()
+		return hs.application and hs.application.frontmostApplication
+			and hs.application.frontmostApplication()
 	end)
-	if ok_window and window then
-		local ok_app, focused_app = pcall(function() return window:application() end)
-		if ok_app then app = focused_app end
-	end
-	if app == nil then
-		local ok_front, front = pcall(function()
-			return hs.application and hs.application.frontmostApplication
-				and hs.application.frontmostApplication()
-		end)
-		if ok_front then app = front end
-	end
-	return app
+	if ok_front then return front end
+	return nil
 end
 
 --- The identity of the application that receives typing.
