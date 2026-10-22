@@ -40,7 +40,8 @@
 			var row = document.createElement('li');
 			var key = document.createElement('span');
 			key.className = 'setting-key';
-			key.textContent = '[' + entry.section + '] ' + entry.key;
+			// A bare root key has no section to name.
+			key.textContent = (entry.section === '' ? '' : '[' + entry.section + '] ') + entry.key;
 			var value = document.createElement('span');
 			value.className = 'setting-value';
 			value.textContent = entry.value;

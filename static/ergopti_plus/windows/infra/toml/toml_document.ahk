@@ -855,8 +855,14 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	for Update in Updates {
 		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
 		_TOML_ConfigSet(Expected, Parts, Update)
-		if Update.HasOwnProp("Delete") && Update.Delete == 1
+		if Update.HasOwnProp("Delete") && Update.Delete == 1 {
 			Deleted.Push(Parts)
+			; A deleted array owns every [[...]] generation header and record
+			; beneath it; keeping a header would recreate an empty generation.
+			Original := _TOML_DocumentLookup(Document, Parts)
+			if Original["found"] && Original["value"] is Array
+				Dropped.Push(Parts)
+		}
 		Owned[_TOML_ConfigPathName(Parts)] := Parts
 	}
 	_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned)
