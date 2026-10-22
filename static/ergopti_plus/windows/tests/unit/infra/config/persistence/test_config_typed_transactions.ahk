@@ -135,3 +135,48 @@ Test("config: detached LLM transaction types Boolean values before real renderin
 	. "(config-typed-llm-real)", _CTT_DetachedLlm.Bind(false))
 Test("config: detached LLM transaction types Boolean values before injected builder "
 	. "(config-typed-llm-injected)", _CTT_DetachedLlm.Bind(true))
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 3/ Parses per Transaction =======
+; =========================================
+; =========================================
+
+; Every document-mode write parsed its source twice (once for the source model,
+; once again for the expected model it then mutates) before parsing the final
+; candidate. The expected model now starts from the one source parse
+; (config-parse-per-transaction).
+_CTT_ParsesPerWrite() {
+	global _TOML_DocumentParses
+	Runtime := _CFGFS_CaptureRuntime()
+	Path := _CTU_NewPath()
+	try {
+		AssertTrue(FSWrite(Path, _CMJFixtureCurrentSource("[layout]`nergopti_base = true`n[metrics]`nenabled = true`n")))
+		_CFGFS_Prepare(Path)
+		Source := FSReadUtf8Exact(Path)
+		Before := _TOML_DocumentParses
+		Built := TOML_BuildConfigDocumentCandidate(Source, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }], [])
+		AssertEqual(2, _TOML_DocumentParses - Before, "one source parse and one final candidate parse")
+		AssertFalse(Built["preserve_source"])
+		AssertEqual(false, TOML_ParseDocument(Built["content"])["layout"]["ergopti_base"].Value)
+		AssertEqual(true, TOML_ParseDocument(Source)["layout"]["ergopti_base"].Value, "the source model is never the mutated one")
+		Before := _TOML_DocumentParses
+		TOML_BuildConfigDocumentCandidate(Source, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }], [])
+		AssertEqual(1, _TOML_DocumentParses - Before, "an unchanged source needs its one source parse only")
+		Before := _TOML_DocumentParses
+		AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(false) }]))
+		; The schema journal admits the final candidate with its own parse: it is
+		; an independent admission owner and never trusts the builder model.
+		AssertEqual(3, _TOML_DocumentParses - Before, "one real write: source, candidate, journal admission")
+		AssertEqual(false, TOML_ParseDocument(FSReadUtf8Exact(Path))["layout"]["ergopti_base"].Value)
+	} finally {
+		_CFGFS_RestoreRuntime(Runtime)
+		FSDelete(Path)
+	}
+}
+Test("config: one document-mode write spends one source parse "
+	. "(config-parse-per-transaction)", _CTT_ParsesPerWrite)
