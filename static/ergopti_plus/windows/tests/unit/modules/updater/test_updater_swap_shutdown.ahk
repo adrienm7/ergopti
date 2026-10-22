@@ -32,7 +32,7 @@ _USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation(BeforeCleanup := 0) {
 	try {
 		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD")
 		_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW")
-		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
+		FileAppend(FileRead(_Updater_SwapWorkerPath(), "UTF-8"), SwapScriptPath, "UTF-8-RAW")
 		TransactionId := 2000000 + _USTX_TransactionCounter
 		Owner := _Updater_CreateSuspendedSwapOwner(SwapScriptPath, NewExe,
 			CurrentExe, TransactionId)

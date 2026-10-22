@@ -350,7 +350,7 @@ const stagingResult = spawnSync(
 		'-File',
 		path.join(__dirname, 'test_updater_staging_observation.ps1'),
 		'-WorkerSourcePath',
-		path.join(__dirname, '../../static/ergopti_plus/windows/modules/updater/self_update.ahk'),
+		path.join(__dirname, '../../static/ergopti_plus/windows/vendor/ergopti_updater_staging.ps1'),
 		'-HelperPath',
 		path.join(
 			__dirname,
@@ -378,7 +378,7 @@ finishStagingObservation(
 	true
 );
 
-// Exercise only the actual generated digest/integrity region with module
+// Exercise only the actual bundled digest/integrity region with module
 // autoload disabled: no download, TLS, certificate store or resident driver.
 const digestOwned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-staging-digest-'));
 const digestResult = spawnSync(
@@ -391,7 +391,7 @@ const digestResult = spawnSync(
 		'-File',
 		path.join(__dirname, 'test_updater_staging_digest.ps1'),
 		'-WorkerSourcePath',
-		path.join(__dirname, '../../static/ergopti_plus/windows/modules/updater/self_update.ahk'),
+		path.join(__dirname, '../../static/ergopti_plus/windows/vendor/ergopti_updater_staging.ps1'),
 		'-OwnedFilePath',
 		path.join(digestOwned, 'pure-fact.json')
 	],

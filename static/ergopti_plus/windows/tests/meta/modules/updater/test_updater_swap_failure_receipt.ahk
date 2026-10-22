@@ -12,10 +12,26 @@
 #Requires AutoHotkey v2.0
 
 
+; Returns the exit code of the real PowerShell parser over one file: 0 when the
+; file parses without error.
+_USFR_ParsePowerShellFile(Path) {
+	ParserPath := A_Temp . "\ergopti-swap-receipt-parse-" . A_TickCount . ".ps1"
+	try {
+		FileAppend('param([string]$Path)' . "`n"
+			. '$Errors=$null;$null=[Management.Automation.Language.Parser]::ParseFile($Path,[ref]$null,[ref]$Errors)' . "`n"
+			. 'if($Errors.Count -ne 0){exit 3};exit 0' . "`n", ParserPath, "UTF-8-RAW")
+		return RunWait(_Updater_QuoteCreateProcessArg(_Updater_PowerShellPath())
+			. " -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "
+			. _Updater_QuoteCreateProcessArg(ParserPath) . " -Path "
+			. _Updater_QuoteCreateProcessArg(Path), , "Hide")
+	} finally {
+		try FileDelete(ParserPath)
+	}
+}
+
 _USFR_DurableTerminalPrecedesRollbackRelaunch() {
-	ScriptBody := _DriverFuncBody("_Updater_BuildSwapWorkerScript")
-	Assert(ScriptBody != "", "the swap-worker generator must exist")
-	Script := _Updater_BuildSwapWorkerScript()
+	Script := FileRead(_Updater_SwapWorkerPath(), "UTF-8")
+	Assert(Script != "", "the bundled swap worker must exist")
 	WritePos := InStr(Script, "WriteTerminal $TerminalPath")
 	EnvPos := InStr(Script, 'ERGOPTI_UPDATER_SWAP_TERMINAL', , Max(WritePos, 1))
 	CanonicalRelaunchPos := InStr(Script,
@@ -28,22 +44,8 @@ _USFR_DurableTerminalPrecedesRollbackRelaunch() {
 		"the exact durable terminal must be inherited by every old-good relaunch")
 	Assert(InStr(Script, '[IO.File]::Move($Temp,$Path)') > 0,
 		"the failure receipt must publish atomically instead of exposing partial text")
-	ScriptPath := A_Temp . "\ergopti-swap-receipt-parse-" . A_TickCount . ".ps1"
-	try {
-		FileAppend(Script, ScriptPath, "UTF-8-RAW")
-		PowerShellPath := StrReplace(ScriptPath, "'", "''")
-		ParserSource := "$ErrorActionPreference='Stop';"
-			. "[ScriptBlock]::Create([IO.File]::ReadAllText('"
-			. PowerShellPath . "'))|Out-Null"
-		ParseCommand := _Updater_QuoteCreateProcessArg(_Updater_PowerShellPath())
-			. " -NoProfile -NonInteractive -EncodedCommand "
-			. _Updater_EncodePowerShellCommand(ParserSource)
-		ParseExit := RunWait(ParseCommand, , "Hide")
-		AssertEqual(0, ParseExit,
-			"the generated durable-receipt swap worker must remain valid PowerShell")
-	} finally {
-		try FileDelete(ScriptPath)
-	}
+	AssertEqual(0, _USFR_ParsePowerShellFile(_Updater_SwapWorkerPath()),
+		"the bundled durable-receipt swap worker must remain valid PowerShell")
 }
 
 Test("updater swap: rollback relaunch inherits an atomic failure receipt (updater-swap-failure-receipt-2026-08-28)",

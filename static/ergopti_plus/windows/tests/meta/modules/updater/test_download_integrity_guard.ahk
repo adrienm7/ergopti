@@ -82,7 +82,7 @@ Test("updater: UPDATER_MIN_EXE_SIZE_BYTES constant declared (download-no-integri
 ; delegates response streaming to the exact vendor helper selected at launch.
 _DIG_StagingOwnerClosure() {
 	Start := _DriverFuncBody("_Updater_StartStagingWorker")
-	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Worker := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Assert(InStr(Start, '_VendorDir . "\ergopti_updater_download.ps1"') > 0,
 		"actual staging launch must bind the exact native download helper path")
 	Assert(InStr(Worker, '  . $DownloadModulePath') > 0
@@ -107,14 +107,14 @@ Test("updater: install path reads Content-Length header to detect truncated down
 
 _DIG_MinSizeCheckPresent() {
 	Start := _DriverFuncBody("_Updater_StartStagingWorker")
-	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Worker := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Assert(InStr(Start, "UPDATER_MIN_EXE_SIZE_BYTES") > 0 and InStr(Worker, "$ActualSize -lt $MinimumSize") > 0,
 		"Worker must reject downloads below UPDATER_MIN_EXE_SIZE_BYTES to guard against error-page responses (download-no-integrity-partial-safety)")
 }
 Test("updater: install path rejects downloads smaller than UPDATER_MIN_EXE_SIZE_BYTES (download-no-integrity-partial-safety)", _DIG_MinSizeCheckPresent)
 
 _DIG_PartialFileDeleted() {
-	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Worker := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Mismatch := InStr(Worker, "$ActualSize -ne $ExpectedSize")
 	Remove := InStr(Worker, 'CleanWorker $NewExe "staged_executable"', false, Mismatch)
 	CatchPos := InStr(Worker, "} catch {", false, Mismatch)

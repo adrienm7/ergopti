@@ -193,14 +193,13 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
 		this.Transport := _Updater_BuildStagingTransport(
-			_UpdaterNativeObservedStagingScript(_Updater_BuildStagingWorkerScript()), this.SwapBytes,
+			_UpdaterNativeStagingWorkerPath(this), _Updater_SwapWorkerPath(),
 			Url, this.Digest, this.NewExe, this.SwapPath, this.CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, 5000, _VendorDir . "\ergopti_updater_download.ps1",
 			this.DeadlineMs, this.StartedTick, _SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json", this.Size)
 		try {
-			ScriptName := this.Transport.Environment[1].Name
-			Prefix := SubStr(ScriptName, 1, StrLen(ScriptName) - StrLen("_SCRIPT"))
+			Prefix := this.Transport.Prefix
 			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
 			RouteShapePair := {Name: Prefix . "_TEST_ROUTE_SHAPE", Value: this.RouteShapeDiagnosticPath}
 			for Pair in [DiagnosticPair, RouteShapePair] {
@@ -214,9 +213,7 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 				. ';$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';'
 				. '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl="";Proxy="' . ProxyValue . '";Bypass="";NativeError=0;FailureOrigin=""}};'
 				. '$environment={param($Name)return ""};'
-			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
-			Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand",
-				_Updater_EncodePowerShellCommand(Bootstrap)]
+			Args := _UpdaterNativeStagingLaunchArgs(this, Admission)
 			this.Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(), Args,
 				ObjBindMethod(this, "OnDone"), , ObjBindMethod(this, "OnNativeAdopt"), 8192)
 			AssertTrue(this.Handle.start(), "real authenticated artifact stage private Job starts")
@@ -313,7 +310,7 @@ _ArtifactCurlProductionDispatchJoin() {
 	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset), "the actual parser accepts independently supplied release metadata")
 	AssertEqual(524288, Asset.Size, "the parser retains the independent byte bound")
-	Script := _Updater_BuildStagingWorkerScript()
+	Script := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	AssertContains(Script, 'if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload',
 		"the real produced worker selects curl for authenticated release assets")
 	AssertContains(Script, '$DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment}',
@@ -326,7 +323,7 @@ _ArtifactCurlProductionDispatchJoin() {
 	Ready := InStr(Script, 'Write-Output "READY"')
 	Assert(DigestCheck > 0 && Ready > DigestCheck,
 		"the actual produced worker authenticates persisted bytes before readiness")
-	Transport := _Updater_BuildStagingTransport(Script, "exit 0", Asset.Url, Asset.Digest,
+	Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(), Asset.Url, Asset.Digest,
 		"C:\Temp\review-staged.exe", "C:\Temp\review-swap.ps1", "C:\Temp\review-current.exe",
 		1024, 5000, _VendorDir . "\ergopti_updater_download.ps1", 30000, 123456,
 		_SharedDir . "\modules\network\proxy_policy.json",
@@ -342,8 +339,10 @@ _ArtifactCurlProductionDispatchJoin() {
 			}
 		}
 		Assert(SizeName != "", "the actual inherited size member exists")
-		AssertContains(Transport.Bootstrap, '-AuthenticatedSize ([int64]$env:' . SizeName . ')',
-			"the real bootstrap reads the same private size with an explicit integer type")
+		AssertEqual(Transport.Prefix . "_AUTHENTICATED_SIZE", SizeName,
+			"the size is published under the prefix the -File worker receives")
+		AssertContains(Script, '[int64]$AuthenticatedSize = Read-ErgoptiStagingInput "AUTHENTICATED_SIZE" $false',
+			"the bundled worker reads the same private size with an explicit integer type")
 	} finally _Updater_ClearStagingTransport(Transport)
 	AssertEqual("", EnvGet(SizeName), "the temporary transport retires its inherited size")
 }

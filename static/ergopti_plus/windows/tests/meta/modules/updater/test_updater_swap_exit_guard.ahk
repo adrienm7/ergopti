@@ -121,7 +121,7 @@ _TUSEG_ChildWaitsForFinalExitAndExactParent() {
 	NativeCreateBody := _DriverFuncBody("PLC_CreateProcessWithInheritedHandles")
 	Assert(CreateBody != "" and OpenBody != "" and NativeCreateBody != "",
 		"the exact swap-worker creator and process adapters must exist")
-	Script := _Updater_BuildSwapWorkerScript()
+	Script := FileRead(_Updater_SwapWorkerPath(), "UTF-8")
 	ReadyPos := InStr(Script, "$R.Set()")
 	CommitWaitPos := InStr(Script, '@($C,$P)')
 	AckPos := InStr(Script, "$A.Set()", , CommitWaitPos)

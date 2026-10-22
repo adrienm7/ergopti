@@ -1,15 +1,10 @@
 # tools/test/test_updater_staging_digest.ps1
-# Actual generated digest/integrity controls: owned bytes, no transport or trust.
+# Actual bundled digest/integrity controls: owned bytes, no transport or trust.
 param([string]$WorkerSourcePath, [string]$OwnedFilePath)
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -ne 5) { throw 'Windows PowerShell 5 is required.' }
-$Source = [IO.File]::ReadAllText($WorkerSourcePath)
-$Start = $Source.IndexOf('_Updater_BuildStagingWorkerScript() {', [StringComparison]::Ordinal)
-if ($Start -lt 0) { throw 'Actual staging generator is required.' }
-$Body = $Source.Substring($Start).Split([string[]]@("`n}"), [StringSplitOptions]::None)[0]
-$Parts = [regex]::Matches($Body, "(?:return |\. )'([^']*)'")
-if ($Parts.Count -ne 36) { throw 'The actual staging expression changed.' }
-$Worker = (@($Parts | ForEach-Object { $_.Groups[1].Value }) -join "`n") + "`n"
+# The worker is the bundled vendor/ergopti_updater_staging.ps1 the driver runs with -File.
+$Worker = [IO.File]::ReadAllText($WorkerSourcePath)
 $From = $Worker.IndexOf('  if ($ExpectedSha256 -cnotmatch ', [StringComparison]::Ordinal)
 $To = $Worker.IndexOf('  $SwapSource=', [StringComparison]::Ordinal)
 if ($From -lt 0 -or $To -le $From) { throw 'Actual digest and comparison must be present.' }
