@@ -80,6 +80,7 @@ its own outcome — a false red costs as much trust as a false green.
 | `python3` / `python`      | Node, or `tools/format_toml.py` via the `python` the CI uses |
 | `rg`                      | the Grep tool (the shell wrapper falls back noisily)         |
 | `sleep` in the foreground | a background command with an `until` loop                    |
+| `TZ=Europe/Paris date`    | PowerShell `Get-Date` (Git Bash has no tzdata: prints UTC)   |
 
 `awk` and `sed` are available (Git Bash). Prefer the Read/Edit/Grep tools over
 shell text-mangling on tracked files — they preserve encoding.
