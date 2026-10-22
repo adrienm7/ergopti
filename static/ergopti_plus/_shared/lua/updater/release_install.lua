@@ -38,6 +38,11 @@ M.REASON = {
 	verify = "changelog_window.install_error_verify",
 	install = "changelog_window.install_error_install",
 	unknown_release = "changelog_window.install_error_unknown_release",
+	-- A feed-only list: no driver verifies a download without the API's digest
+	-- or checksum asset. The macOS window hands the channel's newest release to
+	-- Sparkle instead (ui/changelog/init.lua); Windows and Linux have no updater
+	-- that verifies a release on its own (the Windows exe is not signed on every
+	-- channel, and the Linux tarball has no signed update metadata).
 	no_details = "changelog_window.install_error_no_details",
 }
 

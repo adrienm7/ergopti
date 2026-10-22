@@ -205,7 +205,9 @@ function checkMacosInstallCallers() {
 			[
 				'modules/updater/auto_check.lua',
 				'ui/menu/menu_about.lua',
-				'ui/update_check/init.lua'
+				'ui/update_check/init.lua',
+				// The Versions window's click on a feed-only list's newest release.
+				'modules/updater/feed_handoff.lua'
 			].sort()
 		),
 		`macOS: Sparkle is asked for an update from an unreviewed file: ${sparkle.join(', ')}`
@@ -221,6 +223,49 @@ function checkMacosInstallCallers() {
 		requests.length === 1 &&
 			/function\(\) UpdateLauncher\.request_check\(release\.channel\) end\)/.test(requests[0]),
 		'macOS: the automatic check may reach Sparkle only from the notification click handler'
+	);
+	// The feed hand-off reaches Sparkle in its request() only; only the Versions
+	// window loads it, and calls request() from one function, called only by the
+	// bridge's install_through_updater click.
+	const handoff = fs.readFileSync(
+		path.join(DRIVERS, 'macos', 'modules/updater/feed_handoff.lua'),
+		'utf8'
+	);
+	const handoffRequests = handoff
+		.split('\n')
+		.filter((line) => line.includes('UpdateLauncher.request_check('));
+	expect(
+		handoffRequests.length === 1 &&
+			handoff.indexOf('UpdateLauncher.request_check(') > handoff.indexOf('function M.request('),
+		'macOS: the feed hand-off may reach Sparkle only from its request()'
+	);
+	const handoffUsers = luaCallers('macos', /require\("modules\.updater\.feed_handoff"\)/);
+	expect(
+		same(handoffUsers, ['ui/changelog/init.lua']),
+		`macOS: the feed hand-off is loaded from an unreviewed file: ${handoffUsers.join(', ')}`
+	);
+	const versions = fs.readFileSync(path.join(DRIVERS, 'macos', 'ui/changelog/init.lua'), 'utf8');
+	const versionLines = versions.split('\n');
+	const handOffDefinition = versions.indexOf('local function hand_off_to_updater(');
+	const handOffEnd = versions.indexOf('\nend\n', handOffDefinition);
+	const requestCalls = versionLines.filter((line) => /Handoff\.request\b/.test(line));
+	const requestAt = versions.search(/Handoff\.request\b/);
+	expect(
+		requestCalls.length === 1 &&
+			handOffDefinition > 0 &&
+			requestAt > handOffDefinition &&
+			requestAt < handOffEnd,
+		'macOS: the Versions window may reach Sparkle only inside hand_off_to_updater'
+	);
+	const handOffCalls = versionLines
+		.map((line, index) => ({ line, index }))
+		.filter(({ line }) => /\bhand_off_to_updater\(/.test(line) && !/local function/.test(line));
+	expect(
+		handOffCalls.length === 1 &&
+			/action == "install_through_updater"/.test(
+				versionLines.slice(Math.max(0, handOffCalls[0].index - 3), handOffCalls[0].index).join('\n')
+			),
+		'macOS: hand_off_to_updater may be called only by the install_through_updater click'
 	);
 	const staged = luaCallers('macos', /installer\.(stage|arm_swap)\(/);
 	expect(
