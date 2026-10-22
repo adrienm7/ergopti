@@ -70,6 +70,11 @@ local FAMILY_FOR_LENGTH = {
 -- What a backspace marker looks like in the buffered stream.
 local BACKSPACE_MARKER = "[BS]"
 
+-- The longest sequence a correction ends: Windows and macOS push "x[BS]" and
+-- "yx[BS]" for a Backspace and no longer token, while a character typed after
+-- one ends every family ("[BS]x" up to the heptagrams).
+local CORRECTION_MAX_LENGTH = 3
+
 -- A run of at least this many consecutive backspaces is one cascade rather than
 -- N separate corrections — the shared constant, so the three drivers agree on
 -- what counts as having to go back and fix a whole word.
@@ -235,17 +240,13 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	if ctx and ctx.date and ctx.date ~= date_str then M.settle(ctx, nil, batch, true) end
 	local carried = ctx or {}
 
-	-- The tail of the current run, newest last. Cleared by a pause, a backspace
-	-- or a switch to synthetic output, because each of those means the next
-	-- character does not follow the previous one from the same hand.
+	-- The tail of the current run, newest last, Backspace markers included as on
+	-- Windows and macOS: a correction ends "e[BS]" and "he[BS]", and what follows
+	-- continues from it ("[BS]x", "e[BS]x"), which is the sequence the hands
+	-- made. Cleared by a pause or a switch to synthetic output, because each of
+	-- those means the next character does not follow the previous one.
 	local run = carried.run or {}
 	local word, previous_word = carried.word or "", carried.previous_word
-	-- The two tokens before the current position, Backspace markers included,
-	-- for the bigrams and trigrams that END in a correction ("e[BS]",
-	-- "he[BS]", "e[BS][BS]"): which sequences the user goes back over, the
-	-- tokens Windows and macOS push. Kept apart from `run`, which a correction
-	-- breaks: nothing is chained AFTER a marker, so "[BS]x" is never a pair.
-	local before_last, last = carried.before_last, carried.last
 	-- The monotonic stamp of the last manual keystroke. The buffered delays are
 	-- capped at the pause threshold, so only the stamps can tell a session gap.
 	local last_time = carried.last_time
@@ -440,20 +441,16 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 
 		if char == BACKSPACE_MARKER then
 			-- After a real pause the correction does not continue what came before.
-			if not is_synthetic and delay >= MAX_KEYSTROKE_DELAY_MS then before_last, last = nil, nil end
+			if not is_synthetic and delay >= MAX_KEYSTROKE_DELAY_MS then run = {} end
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
-			if last then
-				Helpers.push_ngram(batch, "ngram_bigrams", date_str, app, last .. char, delay, false, source)
-				if before_last then
-					Helpers.push_ngram(batch, "ngram_trigrams", date_str, app,
-						before_last .. last .. char, delay, false, source)
-				end
+			for length = 2, math.min(CORRECTION_MAX_LENGTH, #run + 1) do
+				Helpers.push_ngram(batch, FAMILY_FOR_LENGTH[length], date_str, app,
+					table.concat(run, "", #run - length + 2, #run) .. char, delay, false, source)
 			end
-			before_last, last = last, char
-			-- A correction. The run is broken because what follows continues from
-			-- a different character than it appears to, and the partial word is
-			-- abandoned rather than recorded — the user was not writing it.
-			run = {}
+			run[#run + 1] = char
+			if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
+			-- A correction. The partial word is abandoned rather than recorded —
+			-- the user was not writing it.
 			word = ""
 			-- A correction breaks the finger runs too: what follows continues from
 			-- a different character than it appears to, so the two keystrokes
@@ -476,7 +473,6 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, 0, false, source)
 			run = {}
 			word = ""
-			before_last, last = nil, nil
 			-- An expansion is not something the hands did, so it cannot extend a
 			-- same-finger run. Counting it would make the layout look worse the
 			-- more the driver types for the user, which is backwards.
@@ -506,11 +502,9 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 				flush_word()
 				run = {}
 				previous_word = nil
-				before_last, last = nil, nil
 			end
 
 			run[#run + 1] = char
-			before_last, last = last, char
 			-- Only the last seven matter, and holding more would grow without bound
 			-- on a long session.
 			if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
@@ -542,7 +536,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	if ctx then
 		ctx.date, ctx.app = date_str, app
 		ctx.run, ctx.word, ctx.previous_word = run, word, previous_word
-		ctx.before_last, ctx.last, ctx.last_time = before_last, last, last_time
+		ctx.last_time = last_time
 		ctx.backspace_run = backspace_run
 		ctx.last_finger, ctx.finger_run = last_finger, finger_run
 		ctx.last_hand, ctx.hand_run = last_hand, hand_run
@@ -595,7 +589,7 @@ function M.settle(ctx, now_ms, batch, force)
 		end
 		if (ctx.word or "") ~= "" then end_word(target(), date_str, app, ctx.previous_word, ctx.word) end
 		ctx.word, ctx.previous_word = "", nil
-		ctx.run, ctx.before_last, ctx.last = {}, nil, nil
+		ctx.run = {}
 	end
 	if ctx.burst and ended(BURST_GAP_MS) then
 		Helpers.finalize_burst(target(), date_str, app, ctx.burst)
