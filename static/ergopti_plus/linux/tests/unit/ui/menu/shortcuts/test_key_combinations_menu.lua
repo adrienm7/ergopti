@@ -39,10 +39,9 @@ local function with_menu(body)
 		state.rows=Menu.build({tap_holds={key_catalog=function() return keys end,hold_options=function() return holds end},
 			gestures=gestures,is_paused=function() return state.paused end},{manifest=renderer,get=t,key_label=function(entry) return t(entry.label_key) end,
 			action_label=function(action) return action end,error=function() state.errors=state.errors+1 end,
-			prompt_hold=function(_,_,choices)
-				state.prompts=state.prompts+1;state.choices=choices
-				if state.on_prompt then state.on_prompt() end
-				return state.selected
+			open_hold_picker=function(label,current,items,callback)
+				state.prompts=state.prompts+1;state.hold={label=label,current=current,items=items,confirm=callback}
+				return true
 			end,open_picker=function(_,_,_,callback) state.pickers=state.pickers+1;state.confirm=callback;return true end})
 		state.keys,state.holds,state.owner,state.translate=keys,holds,owner,t
 		local function walk(rows,visit)
@@ -71,24 +70,38 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			helpers.assert_eq(state.prompts,0);helpers.assert_eq(state.pickers,0)
 		end)
 	end)
-	helpers.it("opens the real catalogue choices only on click and publishes an exact hold",function()
+	-- The maintainer's decision of 2026-10-22: the hold slot opens the shared
+	-- action picker on the hold options, as the tap slot opens it on actions.
+	helpers.it("opens the shared picker on the hold options only on click and publishes an exact hold (key-combination-hold-picker)",function()
 		with_menu(function(state)
-			state.selected=state.translate("tap_hold.hold.shift")
-			state.click(state.find("Hold 1 + hold 2 → "))
-			helpers.assert_eq(state.prompts,1);helpers.assert_eq(#state.choices,#state.holds)
+			local row=state.find("Hold 1 + hold 2 → ")
+			helpers.assert_nil(row.items or row.submenu or row.menu,"the hold slot opens no submenu")
+			helpers.assert_eq(state.prompts,0,"nothing opens before the click")
+			state.click(row)
+			helpers.assert_eq(state.prompts,1);helpers.assert_eq(state.pickers,0,"not the action catalogue")
+			helpers.assert_eq(#state.hold.items,#state.holds-1,"every hold option but the picker's own none row")
+			for index,item in ipairs(state.hold.items) do
+				helpers.assert_eq(item.id,state.holds[index+1].id)
+				helpers.assert_eq(item.label,HoldOptions.label(state.holds[index+1],state.translate))
+			end
+			helpers.assert_eq(state.hold.current,Shared.NONE,"an empty slot marks the none row")
+			helpers.assert_eq(#state.edits,0,"opening writes nothing")
+			helpers.assert_eq(state.hold.confirm("shift"),true)
 			helpers.assert_eq(#state.edits,1);helpers.assert_eq(state.edits[1][1].section,Shared.HOLD_SECTION)
 			helpers.assert_eq(state.edits[1][1].value,"shift")
 		end)
 	end)
 	for _,mode in ipairs({"cancel","unknown","source","paused"}) do
-		helpers.it("refuses "..mode.." without any publication",function()
+		helpers.it("refuses "..mode.." without any publication and keeps the picker open (key-combination-hold-picker)",function()
 			with_menu(function(state)
-				if mode~="cancel" then state.selected=mode=="unknown" and "unoffered" or state.translate("tap_hold.hold.shift") end
-				state.on_prompt=function()
-					if mode=="source" then state.source="[unrelated]\nchanged=true\n" end
-					if mode=="paused" then state.paused=true end
+				state.click(state.find("Hold 1 + hold 2 → "))
+				if mode=="source" then state.source="[unrelated]\nchanged=true\n" end
+				if mode=="paused" then state.paused=true end
+				if mode~="cancel" then
+					helpers.assert_eq(state.hold.confirm(mode=="unknown" and "copy" or "shift"),false,
+						"a refused pick returns false, so the bridge keeps the picker open")
 				end
-				state.click(state.find("Hold 1 + hold 2 → "));helpers.assert_eq(#state.edits,0)
+				helpers.assert_eq(#state.edits,0)
 			end)
 		end)
 	end
@@ -143,7 +156,10 @@ local function with_canonical_locale_menu(callback)
 			key_label = function(entry) return i18n.get(entry.label_key) end,
 			action_label = function(action) return actions.get_action_label(action) end,
 			error = function() state.errors = state.errors + 1 end,
-			prompt_hold = function() return i18n.get("tap_hold.hold.shift") end,
+			open_hold_picker = function(label, current, items, confirm)
+				state.last_hold = { label = label, current = current, items = items, confirm = confirm }
+				return true
+			end,
 			open_picker = function(label, current, binding, confirm)
 				last_pick = { label = label, current = current, binding = binding, confirm = confirm }
 				return true
@@ -235,6 +251,7 @@ helpers.describe("actual Linux ordered-pair translations", function()
 			helpers.assert_eq(#state.edits, 1)
 			helpers.assert_eq(state.edits[1], {{ section = "shortcuts.key_combination_taps", key = "escape_then_tab", value = "copy" }})
 			state.click(second[1].menu[3])
+			helpers.assert_eq(state.last_hold.confirm("shift"), true)
 			helpers.assert_eq(state.edits[2], {{ section = "shortcuts.key_combination_holds", key = "escape_then_tab", value = "shift" }})
 			local third = check_locale_matrix(state, state.build("en"), english)
 			helpers.assert_eq(third[1].title, saved_label)

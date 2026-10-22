@@ -7433,24 +7433,17 @@ i18n = "tap_hold.picker.tap"
 caption_getter = "tap_hold_key_tap_caption"
 platforms = ["ahk", "hs", "linux"]
 
-[[menu.tap_hold_key_head]]
-type = "group"
-id = "tap_hold_key_hold"
-i18n = "tap_hold.picker.hold"
-caption_getter = "tap_hold_key_hold_caption"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
-# macOS holds take actions of its remap catalogue (modifiers, chords, sticky
-# keys, the layer), so its hold opens the shared action picker like the tap;
-# Windows and Linux hold one of the seven [tap_hold.hold_picker] options.
+# The hold opens the shared action picker like the tap, listing only what a
+# hold can be: on macOS the holdable actions of its remap catalogue
+# (modifiers, chords, sticky keys, the layer), on Windows and Linux the
+# options of [tap_hold.hold_picker] (the modifiers, their combinations and
+# the navigation layer). The maintainer's decision of 2026-10-22.
 [[menu.tap_hold_key_head]]
 type = "command"
 id = "tap_hold_key_hold_action"
 i18n = "tap_hold.picker.hold"
 caption_getter = "tap_hold_key_hold_caption"
-platforms = ["hs"]
-unavailable = "hide"
+platforms = ["ahk", "hs", "linux"]
 
 # Native absent-module branches retain disabled status without acquiring an action.
 [[menu.linux_hotstrings_absent_rows]]

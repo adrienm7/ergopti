@@ -277,7 +277,7 @@ helpers.describe("the declared complete per-key head", function()
 	end)
 
 	helpers.it("follows shared Tap/Hold order in the actual per-key provider (tap-hold-key-head)", function()
-		with_head(function(head) head[3], head[5] = head[5], head[3] end, function(rows)
+		with_head(function(head) head[3], head[4] = head[4], head[3] end, function(rows)
 			helpers.assert_eq(rows[3].title, "tap_hold.picker.hold")
 			helpers.assert_eq(rows[4].title, "tap_hold.picker.tap")
 			helpers.assert_type(rows[3].fn, "function")

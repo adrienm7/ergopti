@@ -54,13 +54,26 @@ ShowKeyboardSlotPicker(Prefix) {
 
 ; BindingId, when given, is the binding the choice is for: the picker opens its
 ; own editor on the value that binding already holds for a send_* action.
-ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := "") {
+; Slot, when given, is a slot that does not take gesture actions (a hold):
+; Map("items", its own picker items, "after_close", a callable taking the
+; picked id). Its pick is committed while the picker is still open: OnConfirm
+; returns the integer 1 to close the picker, then after_close runs (the
+; reload); any other answer keeps the picker open, as on macOS and Linux.
+ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := "", Slot := 0) {
+		AfterClose := 0
+		if (Slot is Map) {
+				if !(Slot.Get("items", 0) is Array) || !HasMethod(Slot.Get("after_close", 0), "Call")
+						throw ValueError("A picker slot needs its items and its after_close step.", -1)
+				AfterClose := Slot["after_close"]
+		} else if !((Slot is Integer) && Slot == 0) {
+				throw TypeError("A picker slot is a Map.", -1, Type(Slot))
+		}
 		; Prefer the shared WebView2 picker (identical UI to macOS and Linux). It
 		; receives the ordered items of the generated catalogue, headings already
 		; localized with their level; the page injects its own native/none rows.
 		; The native searchable ListBox below remains as an automatic fallback.
-		PickerItems := GestureActionPickerItems()
-		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative, BindingId)
+		PickerItems := (Slot is Map) ? Slot["items"] : GestureActionPickerItems()
+		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative, BindingId, AfterClose)
 				return
 		AllItems := []
 		_PushItem(Id, Label, Cat) {
@@ -151,9 +164,36 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := ""
 				ChosenId := FilteredIds[Idx]
 				if (ChosenId == "")
 						return
+				Mapped := (ChosenId == "__native__") ? "" : ChosenId
+				if HasMethod(AfterClose, "Call") {
+						; A refused pick keeps this dialog open for another pick.
+						if !_ActionPickerSlotCommitted(OnConfirm, Mapped)
+								return
+						W.Destroy()
+						AfterClose.Call(Mapped)
+						return
+				}
 				W.Destroy()
-				OnConfirm((ChosenId == "__native__") ? "" : ChosenId)
+				OnConfirm(Mapped)
 		}
+}
+
+; Commits a slot's pick while its picker is open (ShowActionPicker's Slot).
+; @param OnConfirm {Func} The slot's owner; the integer 1 means committed.
+; @param PickId {String} The picked id.
+; @returns {Boolean} True when the owner committed the pick.
+_ActionPickerSlotCommitted(OnConfirm, PickId) {
+		Committed := false
+		try Committed := OnConfirm(PickId)
+		catch as Err {
+				try LoggerError("ActionPicker", "The pick '{1}' could not be saved: {2}. The picker stays open.",
+						PickId, Err.Message)
+				return false
+		}
+		if (Committed is Integer) && Committed == 1
+				return true
+		try LoggerWarn("ActionPicker", "The pick '{1}' was refused. The picker stays open.", PickId)
+		return false
 }
 
 ShowKeyboardShortcutPicker(SlotId) {

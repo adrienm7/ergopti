@@ -191,4 +191,41 @@ function M.label(option, translate)
 	return translate(option.i18n)
 end
 
+--- The id the shared action picker gives one option: the picker's own « none »
+--- row is the no-hold sentinel, every other option is its stored id.
+--- @param option table One entry of M.build().
+--- @return string
+function M.picker_id(option)
+	if type(option) ~= "table" then error("a hold option must be a table", 2) end
+	return option.kind == "none" and "none" or option.id
+end
+
+--- The shared action picker's items for a hold slot, a key's or a key
+--- combination's: every option of M.build() in its order, except the no-hold
+--- sentinel, which the picker draws as its own « none » row. A hold is never
+--- a gesture action, so the slot lists these options rather than the action
+--- catalogue: they are what a hold can be.
+--- @param options table The ordered result of M.build().
+--- @param translate function Takes an i18n key, returns the translated string.
+--- @return table items Picker items { type = "action", id, label }.
+--- @return table by_id Picker id → option, "none" included.
+function M.picker_items(options, translate)
+	if type(options) ~= "table" then error("hold picker items need the hold options", 2) end
+	local items, by_id = {}, {}
+	for _, option in ipairs(options) do
+		local id = M.picker_id(option)
+		if by_id[id] ~= nil then
+			error(string.format("hold option id '%s' is offered twice", tostring(id)), 2)
+		end
+		by_id[id] = option
+		if option.kind ~= "none" then
+			items[#items + 1] = { type = "action", id = id, label = M.label(option, translate) }
+		end
+	end
+	if by_id.none == nil or by_id.none.kind ~= "none" then
+		error("hold picker items need the no-hold sentinel", 2)
+	end
+	return items, by_id
+end
+
 return M

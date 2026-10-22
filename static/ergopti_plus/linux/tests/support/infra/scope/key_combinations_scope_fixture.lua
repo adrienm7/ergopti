@@ -145,7 +145,9 @@ local function with_menu(body, public_chords)
 		local ui={manifest=renderer,get=i18n.get,key_label=function(key) return key.id end,
 			action_label=function(action) return action end,error=function() s.errors=(s.errors or 0)+1 end,
 			parameter=function() error("Program parameter must come from the native picker") end,
-			prompt_hold=function(_,_,choices) s.hold_choices=choices;return s.hold_selection end,
+			open_hold_picker=function(label,current,items,confirm)
+				s.hold_picker={label=label,current=current,items=items,confirm=confirm};return true
+			end,
 			prompt_delay=function(current,declared)
 				s.delay_prompt={current,declared};if s.on_delay then s.on_delay() end;return s.delay_selection
 			end,

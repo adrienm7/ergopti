@@ -480,6 +480,23 @@ _KCT_SlotsAreWrittenToTheConfiguration() {
 		AssertFalse(Section().Has("left_alt_then_caps_lock"), "an empty hold slot leaves no key")
 		AssertThrows(() => SetKeyCombinationHold("left_alt_then_caps_lock", "hyper", Fixture.path, ReloadFn),
 			"a hold the picker does not offer is refused")
+		; The hold slot's shared picker (2026-10-22): its pick is written while
+		; the picker is open, and the reload waits for the picker to close.
+		Opened := []
+		Capture(Title, Current, OnConfirm, ShowNative, BindingId, Slot) {
+			Opened.Push({ OnConfirm: OnConfirm, Slot: Slot })
+			return true
+		}
+		KeyCombinationShowHoldPicker("left_alt_then_caps_lock", "LAlt + CapsLock", Capture, Fixture.path, ReloadFn)
+		AssertFalse(Opened[1].OnConfirm.Call("hyper"), "a pick the hold does not offer keeps the picker open")
+		AssertFalse(Section().Has("left_alt_then_caps_lock"), "and writes nothing")
+		AssertEqual(1, Opened[1].OnConfirm.Call("nav"), "the navigation layer is a holdable pick")
+		AssertEqual("nav", Section().Get("left_alt_then_caps_lock", ""), "the picked hold is written")
+		AssertEqual(2, Reloads.Length, "the pick itself does not reload")
+		Opened[1].Slot["after_close"].Call("nav")
+		AssertEqual(3, Reloads.Length, "the driver reloads once the picker has closed")
+		AssertEqual(1, Opened[1].OnConfirm.Call("none"), "the none row empties the slot")
+		AssertFalse(Section().Has("left_alt_then_caps_lock"))
 		AssertThrows(() => SetKeyCombinationHold("left_alt_then_left_alt", "ctrl", Fixture.path, ReloadFn),
 			"a pair of one key twice is refused")
 		Assert(FSWriteDurable(Fixture.path, _CMJFixtureCurrentSource('[shortcuts.key_combination_taps]`nspace_then_enter = "caps_word"`n'
@@ -587,7 +604,8 @@ _KCT_MenuListsEveryOrderedPair() {
 		AssertEqual(2, Slots.Length, "a pair has a tap slot and a hold slot")
 		Assert(HasMethod(Slots[1]["action"], "Call"), "the tap slot opens the action picker")
 		Assert(InStr(Slots[1]["label"], GestureActionDisplayLabel("caps_word")) > 0, "and names its action")
-		AssertEqual(TapHoldHoldOptions().Length, Slots[2]["items"].Length, "the hold slot lists the shared hold options")
+		Assert(!Slots[2].Has("items") && HasMethod(Slots[2].Get("action", 0), "Call"),
+			"the hold slot opens the shared action picker, not a submenu")
 		Assert(InStr(Slots[2]["label"], _TH_HoldOptionLabel("ctrl")) > 0, "and names its hold")
 		Shown := []
 		KeyCombinationShowPairMenu("left_alt_then_caps_lock", "LAlt + CapsLock", (Built) => Shown.Push(Built))
@@ -597,14 +615,20 @@ _KCT_MenuListsEveryOrderedPair() {
 		try AssertEqual(4, DllCall("GetMenuItemCount", "ptr", Shown[1].Handle, "int"),
 			"the clear row, the separator, the tap slot and the hold slot")
 		finally Shown[1].Delete()
-		Picker := KeyCombinationHoldPickerRows("left_alt_then_caps_lock")
-		AssertEqual(TapHoldHoldOptions().Length, Picker.Length, "the hold picker offers the shared hold options")
-		Ticked := 0
-		for _, Row in Picker
-			Ticked += Row["checked"] ? 1 : 0
-		AssertEqual(1, Ticked, "exactly the current hold is ticked")
-		Empty := KeyCombinationHoldPickerRows("caps_lock_then_left_alt")
-		AssertTrue(Empty[1]["checked"], "an empty hold slot ticks « none »")
+		Opened := []
+		Capture(Title, Current, OnConfirm, ShowNative, BindingId, Slot) {
+			Opened.Push({ Title: Title, Current: Current, OnConfirm: OnConfirm, Slot: Slot })
+			return true
+		}
+		KeyCombinationShowHoldPicker("left_alt_then_caps_lock", "LAlt + CapsLock", Capture)
+		AssertEqual(t("menu.shortcuts.key_combinations_hold_hold_title_prefix") . "LAlt + CapsLock", Opened[1].Title,
+			"the hold picker is titled by its slot and the pair")
+		AssertEqual("ctrl", Opened[1].Current, "the current hold is marked")
+		AssertEqual(TapHoldHoldOptions().Length - 1, Opened[1].Slot["items"].Length,
+			"the hold picker offers the shared hold options, its none row aside")
+		KeyCombinationShowHoldPicker("caps_lock_then_left_alt", "CapsLock + LAlt", Capture)
+		AssertEqual("none", Opened[2].Current, "an empty hold slot marks « none »")
+		AssertFalse(Opened[2].OnConfirm.Call("caps_word"), "a tap action is not a hold: the picker stays open")
 	}
 	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map("left_alt_then_caps_lock", "ctrl"), Body)
 	; The two hands and the separator between them are the manifest's, shared

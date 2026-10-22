@@ -115,7 +115,10 @@ _GR_CheckRefusals(Key, Root) {
 	} finally Child.Delete()
 }
 
-Test("declared parent: physical TapHold captions read once and retain EN/FR literal data", _GR_PhysicalCaptions)
+; The Tap-Hold hold row was this physical caption group until it opened the
+; shared action picker (2026-10-22); the agent's System 1 row is the next one
+; Windows and Linux share.
+Test("declared parent: physical captions read once and retain EN/FR literal data", _GR_PhysicalCaptions)
 
 _GR_PhysicalCaptions() {
 	global _I18nCache, _I18nCacheLoaded, _SharedDir
@@ -127,20 +130,20 @@ _GR_PhysicalCaptions() {
 			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Reads := Map("count", 0)
-			Getters := Map("tap_hold_key_hold_caption", _GR_ReadCaption.Bind(Reads, "12% / 🦀"))
-			Row := MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child, Getters)
+			Getters := Map("agent_system_backend_current_caption", _GR_ReadCaption.Bind(Reads, "12% / 🦀"))
+			Row := MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child, Getters)
 			AssertTrue(Row is Map, "the physical canonical caption group must project")
-			AssertEqual(StrReplace(_I18nCache["tap_hold.picker.hold"], "%s", "12% / 🦀"), Row["label"])
+			AssertEqual(StrReplace(_I18nCache["menu.agent.system1"], "{1}", "12% / 🦀"), Row["label"])
 			AssertEqual(1, Reads["count"])
 			AssertTrue(Row["submenu"] == Child)
-			AssertFalse(MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child, Map()))
-			AssertFalse(MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child,
-				Map("tap_hold_key_hold_caption", (*) => 17)))
-			AssertTrue(MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child, Getters) is Map,
+			AssertFalse(MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child, Map()))
+			AssertFalse(MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child,
+				Map("agent_system_backend_current_caption", (*) => 17)))
+			AssertTrue(MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child, Getters) is Map,
 				"explicit repair restores the genuine source-selected caption")
 		}
-		AssertFalse(MenuRenderer_GroupRow(Map(), "tap_hold_key_hold", Child, Map()))
-		AssertFalse(MenuRenderer_GroupRow("tap_hold_key_head", Map(), Child, Map()))
+		AssertFalse(MenuRenderer_GroupRow(Map(), "agent_system1", Child, Map()))
+		AssertFalse(MenuRenderer_GroupRow("agent_linux_system1_frame", Map(), Child, Map()))
 	} finally {
 		try Child.Delete()
 		finally {
@@ -169,21 +172,21 @@ _GR_PhysicalCaptionPolicy() {
 	HadLoaded := IsSet(_I18nCacheLoaded), PreviousLoaded := HadLoaded ? _I18nCacheLoaded : false
 	Child := Menu()
 	try {
-		for Language, Expected in Map("en", "Hold → 12% / 🦀", "fr", "Hold → 12% / 🦀") {
+		for Language, Expected in Map("en", "⚡ System 1 (fast): 12% / 🦀", "fr", "⚡ Système 1 (rapide) : 12% / 🦀") {
 			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Calls := Map("count", 0)
 			Getter := _MM_InertCaptionCount.Bind(Calls, "12% / 🦀")
-			AssertFalse(MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child, Map()),
+			AssertFalse(MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child, Map()),
 				"the published caption requires its actual named native getter")
-			Row := MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child,
-				Map("tap_hold_key_hold_caption", Getter))
+			Row := MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child,
+				Map("agent_system_backend_current_caption", Getter))
 			AssertTrue(Row is Map)
 			AssertEqual(Expected, Row["label"], "handwritten complete caption with literal native percent")
 			AssertEqual(1, Calls["count"], "the genuine physical caption getter is read once")
 			AssertTrue(Row["submenu"] == Child, "the genuine empty Menu is not rebuilt")
-			AssertFalse(MenuRenderer_GroupRow("tap_hold_key_head", "tap_hold_key_hold", Child,
-				Map("tap_hold_key_hold_caption", (*) => 7)), "nonstrings cannot become parent captions")
+			AssertFalse(MenuRenderer_GroupRow("agent_linux_system1_frame", "agent_system1", Child,
+				Map("agent_system_backend_current_caption", (*) => 7)), "nonstrings cannot become parent captions")
 		}
 	} finally {
 		try Child.Delete()

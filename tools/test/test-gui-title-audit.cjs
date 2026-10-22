@@ -1509,7 +1509,7 @@ try {
 		tap_hold_hold_action: {
 			kind: 'contextual_title',
 			title_key: 'tap_hold.picker.hold_title_prefix',
-			platforms: ['hs']
+			platforms: ['linux', 'hs']
 		},
 		key_combination_chord_action: {
 			kind: 'contextual_title',
@@ -1524,7 +1524,7 @@ try {
 		key_combination_hold_action: {
 			kind: 'contextual_title',
 			title_key: 'menu.shortcuts.key_combinations_hold_hold_title_prefix',
-			platforms: ['hs']
+			platforms: ['hs', 'linux']
 		}
 	};
 	for (const [id, declaration] of Object.entries(expected)) {
@@ -1594,7 +1594,7 @@ try {
 	);
 	assert.match(
 		after.lua,
-		/kind = "contextual_title", title_key = "tap_hold.picker.hold_title_prefix", platforms = \{"hs"\}/
+		/kind = "contextual_title", title_key = "tap_hold.picker.hold_title_prefix", platforms = \{"linux", "hs"\}/
 	);
 	assert.match(
 		after.lua,
