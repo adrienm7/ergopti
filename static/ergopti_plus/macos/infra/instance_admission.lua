@@ -22,16 +22,15 @@
 ---    the embedded runtime (a stock install whose configuration points at
 ---    Ergopti) is told why the driver did not start, and keeps running: an
 ---    os.exit there would quit the user's application.
---- 4. Pure: the environment mode and the process identity are passed in, so
----    every branch is tested without a live Hammerspoon.
+--- 4. Pure: the environment mode and whether this is the packaged runtime
+---    (Updater.is_local_source(), the one owner of that question) are passed
+---    in, so every branch is tested without a live Hammerspoon.
 --- ==============================================================================
 
 local M = {}
 
--- Bundle identifiers written by tools/build/build_macos_app.sh; the Swift
--- launcher and modules/updater carry the same values, pinned together by
--- tools/test/test-launcher-single-instance.cjs.
-M.EMBEDDED_RUNTIME_BUNDLE_ID = "com.ergoptiplus.app.hammerspoon"
+-- The launcher's bundle identifier, written by tools/build/build_macos_app.sh
+-- and pinned to it by tools/test/test-launcher-single-instance.cjs.
 M.LAUNCHER_BUNDLE_ID = "com.ergoptiplus.app"
 
 M.ADMIT = "admit"
@@ -53,10 +52,10 @@ M.FOREIGN_HAMMERSPOON = "foreign_hammerspoon"
 --- here on purpose: the launcher is alive to report it, and the logger
 --- boundary in init.lua refuses it with its fatal report.
 --- @param logger_mode string "managed", "standalone" or "invalid", from Logger.classify_async_sink_boot_environment().
---- @param bundle_id string|nil This process's bundle identifier.
+--- @param packaged_runtime boolean Whether this process is the embedded runtime.
 --- @return string decision M.ADMIT, M.STRAY_RUNTIME or M.FOREIGN_HAMMERSPOON.
-function M.decide(logger_mode, bundle_id)
-	if bundle_id ~= M.EMBEDDED_RUNTIME_BUNDLE_ID then
+function M.decide(logger_mode, packaged_runtime)
+	if packaged_runtime ~= true then
 		-- No launcher ever starts another bundle with its authority: refuse every mode
 		if logger_mode == "managed" then return M.ADMIT end
 		return M.FOREIGN_HAMMERSPOON

@@ -124,15 +124,20 @@ if (!/candidate\.bundleIdentifier == embeddedBundleId/.test(ownership)) {
 	);
 }
 const admission = read('static/ergopti_plus/macos/infra/instance_admission.lua');
-const luaEmbeddedId = admission.match(/^M\.EMBEDDED_RUNTIME_BUNDLE_ID = "([^"]+)"$/m)?.[1];
-const luaLauncherId = admission.match(/^M\.LAUNCHER_BUNDLE_ID = "([^"]+)"$/m)?.[1];
+const luaLauncherId = admission.match(/^M.LAUNCHER_BUNDLE_ID = "([^"]+)"$/m)?.[1];
 const updaterEmbeddedId = read('static/ergopti_plus/macos/modules/updater/init.lua').match(
 	/^local BUNDLED_ID = "([^"]+)"$/m
 )?.[1];
-if (luaEmbeddedId !== embeddedId || updaterEmbeddedId !== embeddedId) {
+if (updaterEmbeddedId !== embeddedId) {
+	errors.push("modules/updater/init.lua must name the build script's HAMMERSPOON_BUNDLE_ID.");
+}
+const rootBoot = read('static/ergopti_plus/macos/init.lua');
+if (
+	!rootBoot.includes('require("modules.updater").is_local_source()') ||
+	!rootBoot.includes('InstanceAdmission.decide(admission_mode, packaged_runtime)')
+) {
 	errors.push(
-		"instance_admission.lua and modules/updater/init.lua must name the build script's " +
-			'HAMMERSPOON_BUNDLE_ID.'
+		'init.lua must ask Updater.is_local_source() whether it is the packaged runtime before admission.'
 	);
 }
 if (luaLauncherId !== outerId) {

@@ -23,14 +23,14 @@ helpers.describe("init: instance admission runs before any side effect (hs-secon
 	helpers.it("decides admission after privacy and before settings writes, paths, timers and modules", function()
 		local code = init_code()
 		local privacy_at = code:find("Logger.initialize_privacy(raw)", 1, true)
-		local decide_at = code:find("InstanceAdmission.decide(admission_mode, process_info.bundleID)", 1, true)
+		local decide_at = code:find("InstanceAdmission.decide(admission_mode, packaged_runtime)", 1, true)
 		helpers.assert_true(privacy_at ~= nil and decide_at ~= nil, "privacy and admission must be locatable")
 		helpers.assert_true(privacy_at < decide_at, "no line may be logged before privacy admission")
 		for _, later in ipairs({
 			"Storage.migrate_legacy_namespace()",
 			'require("adapters.timer_scheduler")\n',
 			"config_paths.init(base_dir)",
-			'require("modules.',
+			'require("modules.gestures")',
 			"Storage.set(",
 		}) do
 			local at = code:find(later, 1, true)
