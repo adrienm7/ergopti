@@ -391,6 +391,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.own_window",
+		contract = { "webview_window_number", "for_webview", "console", "is_webview_focused" },
+		-- Every webview and console window lookup; none scans other applications.
+		wired    = true,
+	},
+	{
 		id       = "adapters.boot_fatal",
 		contract = { "report" },
 		wired    = true,

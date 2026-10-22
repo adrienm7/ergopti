@@ -26,6 +26,7 @@
 local M = {}
 local WebviewResult = require("adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
+local OwnWindow = require("adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -803,14 +804,9 @@ function M.show()
 	end
 	if M._wv then
 		local generation, webview = _generation, M._wv
-		local already_focused = false
-		pcall(function()
-			local win     = webview:hswindow()
-			if win then
-				local focused   = hs.window.focusedWindow()
-				already_focused = focused and focused:id() == win:id()
-			end
-		end)
+		-- A failed lookup reads as not focused, so the dashboard is presented.
+		local ok_focused, focused = pcall(OwnWindow.is_webview_focused, webview)
+		local already_focused = ok_focused and focused == true
 		if not delivery_is_current(generation, webview) then return false end
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")
