@@ -112,6 +112,59 @@ async function run() {
 		assert.throws(() => selectUnitJobs(plan, missing, identity), /missing Unit lot/);
 		controls++;
 	}
+	// A job record left "in_progress" after every step, "Complete job" included,
+	// succeeded is admitted on its steps (run 39836200270); any gap still refuses.
+	const staleRecord = (mutateSteps) => {
+		const changed = structuredClone(jobs);
+		changed[0].status = 'in_progress';
+		changed[0].conclusion = null;
+		changed[0].steps = [
+			...changed[0].steps.map((step, index) => ({ ...step, number: index + 2 })),
+			{
+				name: 'Post Run actions/checkout@v4',
+				status: 'completed',
+				conclusion: 'skipped',
+				number: 20
+			},
+			{ name: 'Complete job', status: 'completed', conclusion: 'success', number: 21 }
+		];
+		mutateSteps(changed[0].steps);
+		return changed;
+	};
+	assert.equal(
+		selectUnitJobs(
+			plan,
+			staleRecord(() => {}),
+			identity
+		).menus.job_id,
+		'1'
+	);
+	controls++;
+	for (const mutateSteps of [
+		(steps) => steps.pop(),
+		(steps) => {
+			steps.at(-1).conclusion = 'failure';
+		},
+		(steps) => {
+			steps.at(-1).status = 'in_progress';
+		},
+		(steps) => {
+			steps[0].conclusion = 'cancelled';
+		}
+	]) {
+		assert.throws(
+			() => selectUnitJobs(plan, staleRecord(mutateSteps), identity),
+			/Common Unit admission refused/
+		);
+		controls++;
+	}
+	const queuedRecord = staleRecord(() => {});
+	queuedRecord[0].status = 'queued';
+	assert.throws(
+		() => selectUnitJobs(plan, queuedRecord, identity),
+		/latest Unit lot did not succeed/
+	);
+	controls++;
 	const retained = structuredClone(jobs);
 	retained[0].run_attempt = 1;
 	assert.equal(selectUnitJobs(plan, retained, identity).menus.run_attempt, '1');
