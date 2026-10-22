@@ -15,6 +15,11 @@
  * that data is loading, and a failed update must keep the snapshot's date
  * visible instead of leaving a permanent "updating" notice. A delayed older
  * state must never cover a newer one.
+ *
+ * A failed SQLite read used to make the typing dashboard refuse the whole
+ * history. Hosts now show the partial counts, flagged per part (manifest,
+ * n-gram range), and the banner must say the history is incomplete until both
+ * parts arrive complete again.
  * ==============================================================================
  */
 
@@ -89,6 +94,27 @@ if (api) {
 	);
 }
 
+// ── 2b. Incomplete reads are labelled until every part is complete ─────────
+if (api) {
+	check(typeof api.describe_incomplete === 'function', `${REL}: must expose describe_incomplete`);
+	if (typeof api.describe_incomplete === 'function') {
+		check(
+			api.describe_incomplete({ manifest: true, range: false }, fr) ===
+				fr['ui_metrics_freshness.incomplete'],
+			`${REL}: an incomplete manifest must show the incomplete-history notice`
+		);
+		check(
+			api.describe_incomplete({ manifest: false, range: true }, en) ===
+				en['ui_metrics_freshness.incomplete'],
+			`${REL}: an incomplete n-gram range must show the incomplete-history notice`
+		);
+		check(
+			api.describe_incomplete({ manifest: false, range: false }, en) === '',
+			`${REL}: complete data shows no incomplete notice`
+		);
+	}
+}
+
 // ── 3. The typing dashboard routes every host state through the banner ─────
 const html = fs.readFileSync(p.join(UI, 'metrics_typing', 'index.html'), 'utf8');
 check(
@@ -106,6 +132,16 @@ check(
 	/window\.setTypingMetricsFreshness = function \(freshness, revision\)/.test(data),
 	'metrics_typing/data.js: the host needs a data-less freshness entry point'
 );
+check(
+	/mark_incomplete_read\('manifest', payload\.manifest_incomplete === true\)/.test(data) &&
+		/mark_incomplete_read\('range', payload\.incomplete === true\)/.test(data),
+	'metrics_typing/data.js: macOS publications and range replies must forward their incomplete flags'
+);
+check(
+	/blob\.metrics_manifest_incomplete === true/.test(html) &&
+		/incomplete: next_historical_incomplete \|\| incoming\.incomplete === true/.test(html),
+	'metrics_typing/index.html: Windows and Linux blobs must forward their incomplete flags'
+);
 
 // ── 4. Every locale carries the strings and their placeholders ─────────────
 for (const file of fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'))) {
@@ -114,7 +150,8 @@ for (const file of fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'))) {
 		'ui_metrics_freshness.stale': ['{date}'],
 		'ui_metrics_freshness.loading': [],
 		'ui_metrics_freshness.failed': ['{date}'],
-		'ui_metrics_freshness.failed_empty': []
+		'ui_metrics_freshness.failed_empty': [],
+		'ui_metrics_freshness.incomplete': []
 	};
 	for (const [key, needed] of Object.entries(placeholders)) {
 		const text = strings[key];
