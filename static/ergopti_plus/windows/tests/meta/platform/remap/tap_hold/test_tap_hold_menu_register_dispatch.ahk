@@ -96,7 +96,8 @@ _THRD_KeyRowsReturnData() {
 	Assert(InStr(Body, 'MenuRenderer_TemplateRows("tap_hold_key_rows"') > 0,
 		"_TH_KeyRows must delegate the complete child head to the shared template")
 	for Id, Fn in Map("tap_hold_key_native", "_TH_MakeDisableFn",
-		"tap_hold_key_tap", "_TH_MakeTapPickerFn", "tap_hold_key_delay", "_TH_MakeDelayPickerFn") {
+		"tap_hold_key_tap", "_TH_MakeTapPickerFn", "tap_hold_key_hold_action", "_TH_MakeHoldPickerFn",
+		"tap_hold_key_delay", "_TH_MakeDelayPickerFn") {
 		Assert(RegExMatch(Body, Chr(34) . Id . Chr(34) . "\s*,\s*" . Fn),
 			"_TH_KeyRows must bind " . Fn . " to its declared command " . Id . " (HIGH-07)")
 	}
@@ -139,8 +140,8 @@ _THRD_KeyRowsReturnData() {
 	_THRD_KeyRowsRefuses(Mutant, "native and tap callbacks plus configured state must reach the child template")
 	Mutant := Owners.Clone()
 	Mutant["_TH_KeyRows"] := StrReplace(Owners["_TH_KeyRows"],
-		"_HoldRowsBuilder(KeyId)", "_HoldRowsBuilder(0)", true, &Changed)
-	AssertEqual(1, Changed, "the wrong fourth-argument child mutation must change the actual child owner")
+		"_TH_MakeHoldPickerFn(KeyId, KeyLabel)", "_TH_MakeHoldPickerFn(0, KeyLabel)", true, &Changed)
+	AssertEqual(1, Changed, "the wrong hold picker mutation must change the actual hold owner")
 	_THRD_KeyRowsRefuses(Mutant, "native and tap callbacks plus configured state must reach the child template")
 	Mutant := Owners.Clone()
 	Mutant["_MR_CommandRowData"] := StrReplace(Owners["_MR_CommandRowData"],
@@ -174,12 +175,13 @@ _THRD_KeyRowsPolicy(Owners) {
 	NativePattern := 'i)MenuRenderer_TemplateRows\(\s*"tap_hold_key_rows"\s*,\s*'
 		. 'Map\(\s*"tap_hold_key_native"\s*,\s*_TH_MakeDisableFn\(\s*KeyId\s*\)\s*,\s*'
 		. '"tap_hold_key_tap"\s*,\s*_TH_MakeTapPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*,\s*TapLbl\s*\)\s*,\s*'
+		. '"tap_hold_key_hold_action"\s*,\s*_TH_MakeHoldPickerFn\(\s*KeyId\s*,\s*KeyLabel\s*\)\s*,\s*'
 		. '"tap_hold_key_delay"\s*,\s*_TH_MakeDelayPickerFn\(\s*KeyId\s*\)\s*\)\s*,\s*'
 		. 'Map\(\s*"tap_hold_key_configured"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*IsConfigured\s*\)\s*,'
 		. '\s*"tap_hold_key_tap_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*TapLbl\s*\)\s*,'
 		. '\s*"tap_hold_key_hold_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*HoldLbl\s*\)\s*,'
 		. '\s*"tap_hold_key_delay_caption"\s*,\s*\(\(Value\)\s*=>\s*Value\)\.Bind\(\s*DelayCaption\s*\)\s*\)\s*,'
-		. '\s*Map\(\s*"tap_hold_key_hold"\s*,\s*_HoldRowsBuilder\(\s*KeyId\s*\)\s*\)\s*\)'
+		. '\s*Map\(\s*\)\s*\)'
 	Assert(_THRD_ExecutablePattern(Body, NativePattern, "MenuRenderer_TemplateRows"),
 		"native and tap callbacks plus configured state must reach the child template")
 	Template := Owners["MenuRenderer_TemplateRows"]
@@ -255,20 +257,18 @@ _THRD_KeyRowsRefuses(Owners, ExpectedMessage) {
 Test("meta fix-tapholds-menu-raw-add: the per-key provider returns data, not a menu",
 	_THRD_KeyRowsReturnData)
 
-_THRD_HoldPickerReturnsData() {
-	Body := _DriverFuncBody("_TH_HoldPickerRows")
-	Assert(Body != "", "_TH_HoldPickerRows must be present in the driver source")
-
-	Assert(!RegExMatch(Body, "\bMenu\(\)"),
-		"_TH_HoldPickerRows must return row data, never build a Menu (HIGH-07)")
-	Assert(!InStr(Body, "RegisterMenuItem("),
-		"_TH_HoldPickerRows must not register menu items itself (HIGH-07)")
-	Assert(RegExMatch(Body, Chr(34) . "action" . Chr(34) . "\s*,\s*_TH_MakeHoldFn"),
-		"_TH_HoldPickerRows must carry _TH_MakeHoldFn as an " . Chr(34) . "action" . Chr(34)
-		. " row field so the renderer wires it (HIGH-07)")
+; The hold opens the shared action picker (2026-10-22): no hold submenu
+; builder is left, and the opener hands the picker the hold options.
+_THRD_HoldOpensSharedPicker() {
+	Body := _DriverFuncBody("_TH_OpenHoldPicker")
+	Assert(Body != "", "_TH_OpenHoldPicker must be present in the driver source")
+	Assert(!RegExMatch(Body, "\bMenu\(\)"), "the hold opener never builds a Menu (HIGH-07)")
+	Assert(InStr(Body, "ShowActionPicker") > 0, "the hold opens the shared action picker")
+	Assert(InStr(Body, "TapHoldHoldPickerItems()") > 0, "with the hold options as its items")
+	AssertEqual("", _DriverFuncBodyOrEmpty("_TH_HoldPickerRows"), "the hold submenu builder is retired")
 }
-Test("meta fix-tapholds-menu-raw-add: the hold picker returns data, not a menu",
-	_THRD_HoldPickerReturnsData)
+Test("meta fix-tapholds-menu-raw-add: the hold opens the shared action picker (tap-hold-hold-action-picker)",
+	_THRD_HoldOpensSharedPicker)
 
 _THRD_GlobalAndLocalTokenBoundaries() {
 	Owners := Map()

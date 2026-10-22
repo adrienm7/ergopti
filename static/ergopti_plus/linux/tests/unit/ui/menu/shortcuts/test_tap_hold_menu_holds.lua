@@ -74,7 +74,9 @@ helpers.describe("Linux Tap-Holds menu", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("sets a hold from the picker, the navigation layer included", function()
+	-- The maintainer's decision of 2026-10-22: the hold opens the shared action
+	-- picker, as the tap does, never a submenu of the hold options.
+	helpers.it("sets a hold from the shared picker, the navigation layer included (tap-hold-hold-action-picker)", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
@@ -82,18 +84,80 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local caps = find(key_rows(section), i18n.get("tap_hold.group.caps_lock"))
 			helpers.assert_true(caps ~= nil, "a CapsLock row")
 			local hold = find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
-			helpers.assert_true(hold ~= nil and type(hold.menu) == "table", "a hold picker")
-			local nav = find(hold.menu, i18n.get("tap_hold.hold.nav_layer"))
-			helpers.assert_true(nav ~= nil, "the navigation layer is offered")
-			nav.fn()
-			helpers.assert_eq(calls[1][1], "set_hold")
-			helpers.assert_eq(calls[1][2], "caps_lock")
-			helpers.assert_eq(calls[1][3], "layer")
-			helpers.assert_eq(calls[1][4], "nav")
+			helpers.assert_true(hold ~= nil, "a hold row")
+			helpers.assert_nil(hold.menu, "the hold row opens no submenu")
+			helpers.assert_type(hold.fn, "function", "the hold row is a command")
+			helpers.assert_eq(hold.fn(), true, "the hold row opens the picker")
+			helpers.assert_eq(picked.opts.presentation_id, "tap_hold_hold_action")
+			helpers.assert_eq(picked.opts.presentation_suffix, i18n.get("tap_hold.group.caps_lock"))
+			helpers.assert_nil(picked.opts.allow_native, "the picker's own none row clears the hold")
+			helpers.assert_eq(picked.opts.current, "ctrl", "CapsLock holds Ctrl by default")
+			local nav
+			for _, item in ipairs(picked.opts.items) do
+				if item.id == "nav" then nav = item end
+			end
+			helpers.assert_not_nil(nav, "the navigation layer is offered")
+			helpers.assert_eq(nav.label, i18n.get("tap_hold.hold.nav_layer"))
+			helpers.assert_eq(#calls, 0, "opening the picker writes nothing")
+			helpers.assert_eq(picked.confirm("nav"), true)
+			helpers.assert_eq(calls[1], { "set_hold", "caps_lock", "layer", "nav" })
+			helpers.assert_eq(picked.confirm("none"), true, "the picker's none row clears the hold")
+			helpers.assert_eq(calls[2], { "set_hold", "caps_lock", "none", "" })
 		end)
 		restore(Manager)
 		if not ok then error(err, 0) end
 	end)
+
+	helpers.it("lists only the hold options, in their shared order (tap-hold-hold-action-picker)", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked)
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local HoldOptions = require("tap_hold.hold_options")
+			local options = Manager.hold_options()
+			local shift = find(key_rows(section), i18n.get("tap_hold.group.left_shift"))
+			find(shift.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4)).fn()
+			helpers.assert_eq(#picked.opts.items, #options - 1, "every option but the none row the picker draws")
+			for index, item in ipairs(picked.opts.items) do
+				local option = options[index + 1]
+				helpers.assert_eq(item.type, "action")
+				helpers.assert_eq(item.id, option.id)
+				helpers.assert_eq(item.label, HoldOptions.label(option, i18n.get))
+				helpers.assert_true(item.id ~= "copy" and item.id ~= "paste", "no tap action is offered for a hold")
+			end
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	for _, receipt in ipairs({ "unoffered", "false", "nil", "throw" }) do
+		helpers.it("keeps the hold picker open on a refused pick: " .. receipt .. " (tap-hold-hold-action-picker)", function()
+			local calls, picked = {}, {}
+			local section, Manager = build(calls, picked)
+			local writer = package.loaded[WRITER]
+			local set_hold = writer.set_hold
+			local execute = os.execute
+			local ok, err = pcall(function()
+				local i18n = require("infra.i18n")
+				if receipt == "false" then writer.set_hold = function() return false end
+				elseif receipt == "nil" then writer.set_hold = function() return nil end
+				elseif receipt == "throw" then writer.set_hold = function() error("controlled write failure") end end
+				os.execute = function(command)
+					if command:find("zenity", 1, true) then return 1 end
+					return execute(command)
+				end
+				local caps = find(key_rows(section), i18n.get("tap_hold.group.caps_lock"))
+				find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4)).fn()
+				helpers.assert_eq(picked.confirm(receipt == "unoffered" and "copy" or "shift"), false,
+					"a refused pick returns false, so the bridge keeps the picker open")
+				helpers.assert_eq(#calls, 0, "nothing is written")
+			end)
+			os.execute = execute
+			writer.set_hold = set_hold
+			restore(Manager)
+			if not ok then error(err, 0) end
+		end)
+	end
 
 	helpers.it("picks a tap from the catalogue, with the key itself as an option", function()
 		local calls, picked = {}, {}
@@ -129,14 +193,16 @@ helpers.describe("Linux Tap-Holds menu", function()
 			helpers.assert_contains(alt_gr.title, "  /  " .. i18n.get("tap_hold.hold.alt_gr"),
 				"the row shows the hold's label")
 			helpers.assert_nil(alt_gr.title:find("alt_gr", 1, true), "not the id the file stores")
-			local hold = find(alt_gr.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
+			find(alt_gr.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4)).fn()
 			local combo = i18n.get("tap_hold.hold.ctrl") .. " + " .. i18n.get("tap_hold.hold.shift")
-			helpers.assert_true(find(hold.menu, combo) ~= nil, "the picker offers '" .. combo .. "'")
-			helpers.assert_true(#hold.menu > 30, "every hold option is a row")
-			for _, row in ipairs(hold.menu) do
-				helpers.assert_true(type(row.title) == "string", "every hold row has a title")
-				helpers.assert_nil(row.title:find("[%w_]%+[%w_]"), "raw combination id: " .. row.title)
-				helpers.assert_nil(row.title:find("_", 1, true), "raw modifier id: " .. row.title)
+			local offered = false
+			for _, item in ipairs(picked.opts.items) do offered = offered or item.label == combo end
+			helpers.assert_true(offered, "the picker offers '" .. combo .. "'")
+			helpers.assert_true(#picked.opts.items > 30, "every hold option is an item")
+			for _, item in ipairs(picked.opts.items) do
+				helpers.assert_true(type(item.label) == "string", "every hold item has a label")
+				helpers.assert_nil(item.label:find("[%w_]%+[%w_]"), "raw combination id: " .. item.label)
+				helpers.assert_nil(item.label:find("_", 1, true), "raw modifier id: " .. item.label)
 			end
 		end)
 		restore(Manager)
@@ -151,12 +217,8 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local combo = i18n.get("tap_hold.hold.ctrl") .. " + " .. i18n.get("tap_hold.hold.shift")
 			local caps = find(key_rows(section), i18n.get("tap_hold.group.caps_lock"))
 			helpers.assert_contains(caps.title, "  /  " .. combo)
-			local hold = find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
-			local checked = {}
-			for _, row in ipairs(hold.menu) do
-				if row.checked then checked[#checked + 1] = row.title end
-			end
-			helpers.assert_eq(checked, { combo }, "the picker ticks the option in force")
+			find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4)).fn()
+			helpers.assert_eq(picked.opts.current, "ctrl+shift", "the picker marks the option in force")
 		end)
 		restore(Manager)
 		if not ok then error(err, 0) end
@@ -438,12 +500,15 @@ helpers.describe("declared complete per-key head", function()
 			helpers.assert_eq(rows[1].title, i18n.get("tap_hold.action.disable"))
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_true(type(rows[3].fn) == "function" and rows[3].menu == nil)
-			helpers.assert_true(type(rows[4].menu) == "table" and rows[4].fn == nil)
+			helpers.assert_true(type(rows[4].fn) == "function" and rows[4].menu == nil)
 			rows[3].fn()
 			helpers.assert_eq(picked.opts.current, "copy")
 			picked.confirm("paste")
 			helpers.assert_eq(calls[1], { "set_tap", "left_shift", "paste" })
-			assert(find(rows[4].menu, i18n.get("tap_hold.hold.nav_layer"))).fn()
+			rows[4].fn()
+			helpers.assert_eq(picked.opts.presentation_id, "tap_hold_hold_action")
+			helpers.assert_eq(picked.opts.current, "shift")
+			picked.confirm("nav")
 			helpers.assert_eq(calls[2], { "set_hold", "left_shift", "layer", "nav" })
 		end)
 	end)
@@ -451,8 +516,10 @@ helpers.describe("declared complete per-key head", function()
 	helpers.it("follows declared Tap/Hold order with original payload (tap-hold-key-head)", function()
 		with_head(function(rows) rows[3], rows[4] = rows[4], rows[3] end, function(rows, calls, picked)
 			helpers.assert_eq(rows[2].title, "-")
-			helpers.assert_type(rows[3].menu, "table")
+			helpers.assert_type(rows[3].fn, "function")
 			helpers.assert_type(rows[4].fn, "function")
+			rows[3].fn()
+			helpers.assert_eq(picked.opts.presentation_id, "tap_hold_hold_action", "the hold row comes first")
 			rows[4].fn()
 			helpers.assert_eq(picked.opts.current, "copy")
 			helpers.assert_eq(#calls, 0, "opening a picker does not write")
@@ -473,7 +540,9 @@ helpers.describe("declared complete per-key head", function()
 		with_head(function(rows) rows[3].platforms = { "ahk" } end, function(rows, calls, _, i18n)
 			helpers.assert_eq(#rows, 4)
 			helpers.assert_eq(rows[2].title, "-")
-			assert(find(rows[3].menu, i18n.get("tap_hold.hold.nav_layer"))).fn()
+			helpers.assert_eq(rows[3].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
+			rows[3].fn()
+			picked.confirm("nav")
 			helpers.assert_eq(calls[1], { "set_hold", "left_shift", "layer", "nav" })
 		end)
 	end)
@@ -504,9 +573,7 @@ helpers.describe("declared complete per-key head", function()
 						tap_hold_key_hold_action = function() calls[#calls + 1] = "hold"; return true end,
 					}, { tap_hold_key_configured = function() return configured end,
 						tap_hold_key_tap_caption = function() return "copy 100%" end,
-						tap_hold_key_hold_caption = function() return "Ctrl / {}" end }, {
-						tap_hold_key_hold = { { label = "hold-child" } },
-					})
+						tap_hold_key_hold_caption = function() return "Ctrl / {}" end }, {})
 					local expected = corpus.platforms[platform]
 					helpers.assert_eq(#rows, 4, code .. ": " .. platform)
 					helpers.assert_eq(rows[1].label, strings[platform == "hs" and "menu.tapholds.nothing_tap_hold" or "tap_hold.action.disable"])
@@ -516,7 +583,6 @@ helpers.describe("declared complete per-key head", function()
 					helpers.assert_eq(rows[4].label, string.format(strings[expected.hold_label], "Ctrl / {}"))
 					helpers.assert_eq(type(rows[3][expected.tap_kind]), expected.tap_kind == "action" and "function" or "table")
 					helpers.assert_eq(type(rows[4][expected.hold_kind]), expected.hold_kind == "action" and "function" or "table")
-					if expected.hold_kind == "items" then helpers.assert_eq(rows[4].items[1].label, "hold-child") end
 					helpers.assert_eq(#calls, 0)
 					configured = false
 					helpers.assert_eq(rows[1].action(), false, "included retained callback rechecks the original gate")
@@ -526,21 +592,22 @@ helpers.describe("declared complete per-key head", function()
 		end
 	end)
 
-	for _, mutation in ipairs({ "missing include", "cyclic include", "missing caption getter", "non-callable caption getter", "non-string caption", "missing children" }) do
+	for _, mutation in ipairs({ "missing include", "cyclic include", "missing caption getter", "non-callable caption getter", "non-string caption", "missing hold command" }) do
 		helpers.it("refuses " .. mutation .. " as a complete template (tap-hold-key-head)", function()
 			local renderer = require("infra.manifest_menu")
 			local head = renderer.get_array("tap_hold_key_head")
 			local include, getter = head[1].section, head[3].caption_getter
-			local commands = { tap_hold_key_native = function() end, tap_hold_key_tap = function() end }
+			local commands = { tap_hold_key_native = function() end, tap_hold_key_tap = function() end,
+				tap_hold_key_hold_action = function() end }
 			local getters = { tap_hold_key_configured = function() return true end,
 				tap_hold_key_tap_caption = function() return "Tap" end, tap_hold_key_hold_caption = function() return "Hold" end }
-			local children = { tap_hold_key_hold = {} }
+			local children = {}
 			if mutation == "missing include" then head[1].section = "absent_child_template" end
 			if mutation == "cyclic include" then head[1].section = "tap_hold_key_head" end
 			if mutation == "missing caption getter" then head[3].caption_getter = "absent_getter" end
 			if mutation == "non-callable caption getter" then getters.tap_hold_key_tap_caption = 42 end
 			if mutation == "non-string caption" then getters.tap_hold_key_tap_caption = function() return 42 end end
-			if mutation == "missing children" then children.tap_hold_key_hold = nil end
+			if mutation == "missing hold command" then commands.tap_hold_key_hold_action = nil end
 			local ok, err = pcall(function()
 				helpers.assert_nil(renderer.template_rows("tap_hold_key_head", commands, getters, children))
 			end)

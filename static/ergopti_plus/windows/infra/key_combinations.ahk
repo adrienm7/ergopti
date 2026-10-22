@@ -757,8 +757,8 @@ KeyCombinationShowPairMenu(PairId, PairLabel, ShowFn := 0) {
 }
 
 ; The list provider of the manifest's "key_combination_slots" entry: the tap
-; slot, which opens the shared action picker, and the hold slot, which lists
-; the shared hold options.
+; slot and the hold slot, which both open the shared action picker, the hold
+; on the shared hold options (the maintainer's decision of 2026-10-22).
 ; @param PairId {String} A pair id.
 ; @param PairLabel {String} « First + Second », the title of the action picker.
 ; @returns {Array} Two rows.
@@ -766,31 +766,48 @@ KeyCombinationSlotRows(PairId, PairLabel) {
 	TapRow := Map("action", (*) => ShowActionPicker(PairLabel, KeyCombinationTapOf(PairId),
 		(ActionName) => SetKeyCombinationTap(PairId, ActionName), false, KeyCombinationBindingId(PairId)))
 	TapRow["label"] := StrReplace(t("menu.shortcuts.key_combinations_hold_tap"), "%s", _KeyCombinationTapLabel(PairId))
-	HoldRow := Map("items", KeyCombinationHoldPickerRows(PairId))
+	HoldRow := Map("action", (*) => KeyCombinationShowHoldPicker(PairId, PairLabel))
 	HoldRow["label"] := StrReplace(t("menu.shortcuts.key_combinations_hold_hold"), "%s", _KeyCombinationHoldLabel(PairId))
 	return [TapRow, HoldRow]
 }
 
-; The rows of a pair's hold picker: every option of the shared hold picker,
-; the current one ticked.
+; Opens the shared action picker on a pair's hold slot: the shared hold
+; options, the current one marked, the window titled by the slot and the pair.
+; A pick is committed while the picker is open; the script reloads once it
+; has closed.
 ; @param PairId {String} A pair id.
-; @returns {Array} Rows of Map("label", ..., "checked", ..., "action", ...).
-KeyCombinationHoldPickerRows(PairId) {
-	global KEY_COMBINATION_NONE
-	Current := KeyCombinationHoldOf(PairId)
-	Rows := []
-	for _, Option in TapHoldHoldOptions()
-		Rows.Push(_KeyCombinationHoldOptionRow(PairId, Option, Current))
-	return Rows
+; @param PairLabel {String} « First + Second ».
+; @param OpenFn {Func} Replaces ShowActionPicker in tests.
+; @param Path {String} The config.toml to write; ConfigurationFile by default.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Any} What the picker returns.
+KeyCombinationShowHoldPicker(PairId, PairLabel, OpenFn := 0, Path := "", ReloadFn := 0) {
+	if !(KeyCombinationParsePair(PairId) is Map)
+		throw ValueError("Unknown key combination.", -1, PairId)
+	Slot := Map("items", TapHoldHoldPickerItems(),
+		"after_close", (*) => HasMethod(ReloadFn, "Call") ? ReloadFn.Call() : ReloadPreservingSuspend())
+	Open := HasMethod(OpenFn, "Call") ? OpenFn : ShowActionPicker
+	return Open.Call(t("menu.shortcuts.key_combinations_hold_hold_title_prefix") . PairLabel,
+		KeyCombinationHoldOf(PairId), KeyCombinationCommitHoldPick.Bind(PairId, Path), false, "", Slot)
 }
 
-; One row of the hold picker; its own function so its click keeps its option.
-_KeyCombinationHoldOptionRow(PairId, Option, Current) {
+; Writes a hold picked for a pair, without reloading: the picker reloads
+; once it has closed.
+; @param PairId {String} A pair id.
+; @param Path {String} The config.toml to write; ConfigurationFile when "".
+; @param PickId {String} The picked id ("none" empties the slot).
+; @returns {Integer|Boolean} 1 when written, false to keep the picker open.
+KeyCombinationCommitHoldPick(PairId, Path, PickId) {
 	global KEY_COMBINATION_NONE
+	Option := TapHoldHoldOptionForPick(PickId)
+	if !(Option is Map) {
+		LoggerError("KeyCombinations", "The hold of pair '{1}' does not offer the picked action '{2}'.",
+			PairId, (PickId is String) ? PickId : Type(PickId))
+		return false
+	}
 	HoldId := (Option["kind"] == "none") ? KEY_COMBINATION_NONE : Option["id"]
-	Label := (Option["i18n"] != "") ? t(Option["i18n"]) : _TH_HoldOptionLabel(Option["id"])
-	return Map("label", Label, "checked", HoldId == Current,
-		"action", (*) => SetKeyCombinationHold(PairId, HoldId))
+	Written := SetKeyCombinationHold(PairId, HoldId, Path, (*) => 1)
+	return ((Written is Integer) && Written == 1) ? 1 : false
 }
 
 ; Standard AltGr reaches AHK as fake SC01D followed by SC138. Its custom

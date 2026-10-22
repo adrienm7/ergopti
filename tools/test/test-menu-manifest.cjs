@@ -2547,10 +2547,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		]) {
 			const declaration =
 				consumer === 'MenuRenderer_TemplateRows'
-					? new RegExp('"' + binding + '"\\s*,\\s*(?:_TH_Make|_HoldRowsBuilder|\\(\\(Value\\))')
-					: new RegExp(
-							'\\["' + binding + '"\\]\\s*=\\s*(?:function|hold_rows|build_action_picker)'
-						);
+					? new RegExp('"' + binding + '"\\s*,\\s*(?:_TH_Make|\\(\\(Value\\))')
+					: new RegExp('\\["' + binding + '"\\]\\s*=\\s*(?:function|build_action_picker)');
 			assert(declaration.test(source), 'actual provider supplies literal binding: ' + binding);
 		}
 	}
@@ -2560,7 +2558,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'MenuRenderer_TemplateRows',
 			'tap_hold_key_native',
 			'tap_hold_key_tap',
-			'tap_hold_key_hold',
+			'tap_hold_key_hold_action',
 			'_TH_KeyRows(Hand) {',
 			'; Return the "none" hold option'
 		],
@@ -2578,7 +2576,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'ManifestMenu.template_rows',
 			'tap_hold_key_native',
 			'tap_hold_key_tap',
-			'tap_hold_key_hold',
+			'tap_hold_key_hold_action',
 			'local function hand_rows(hand)',
 			'local providers = {'
 		]

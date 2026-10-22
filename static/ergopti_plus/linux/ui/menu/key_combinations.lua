@@ -90,24 +90,21 @@ function M.build(ctx,ui)
 			return edit(rows,source)
 		end,items)
 	end
+	-- The hold slot opens the shared action picker on the shared hold options;
+	-- a pick it does not offer, a stale source or a refused write keeps it open.
 	local function pick_hold(pair,label,current)
 		local source=snapshot();if not source then return feedback(false) end
-		if type(ui.prompt_hold)~="function" then return feedback(false) end
-		local choices,values={},{}
-		for _,choice in ipairs(holds) do
-			local display=HoldOptions.label(choice,t)
-			-- A translated duplicate cannot authorize an ambiguous scalar.
-			if values[display]~=nil then return feedback(false) end
-			choices[#choices+1]=display
-			values[display]=choice.kind=="none" and Shared.NONE or choice.id
-		end
-		local selected=ui.prompt_hold(label,current,choices)
-		if selected==nil then return false end
-		local value=values[selected]
-		local checked,exact=pcall(source.guard)
-		if value==nil or not checked or exact~=true
-			or pairs.validate_slot("hold",pair,value)~=true then return feedback(false) end
-		return edit({{section=Shared.HOLD_SECTION,key=pair,value=value}},source)
+		if type(ui.open_hold_picker)~="function" then return feedback(false) end
+		local items,by_id=HoldOptions.picker_items(holds,t)
+		local chosen=hold_option(current)
+		return ui.open_hold_picker(label,chosen and HoldOptions.picker_id(chosen) or Shared.NONE,items,function(picked)
+			local choice=type(picked)=="string" and by_id[picked] or nil
+			local value=choice and (choice.kind=="none" and Shared.NONE or choice.id) or nil
+			local checked,exact=pcall(source.guard)
+			if value==nil or not checked or exact~=true
+				or pairs.validate_slot("hold",pair,value)~=true then return feedback(false) end
+			return edit({{section=Shared.HOLD_SECTION,key=pair,value=value}},source)
+		end)
 	end
 	local function hand_rows(hand)
 		local rows={}
@@ -132,7 +129,7 @@ function M.build(ctx,ui)
 						{["key_combination_slots"]=function() local slots={
 							{label=string.format(t("menu.shortcuts.key_combinations_hold_tap"),tap_label),disabled=not editable,
 								action=function() return pick(pair,label,tap) end},
-							{label=string.format(t("menu.shortcuts.key_combinations_hold_hold"),hold_label),disabled=not editable,action=function() return pick_hold(pair,label,hold_label) end},
+							{label=string.format(t("menu.shortcuts.key_combinations_hold_hold"),hold_label),disabled=not editable,action=function() return pick_hold(pair,label,hold) end},
 						}
 						if chord_pair then slots[#slots+1]={
 							label=string.format(t("menu.shortcuts.key_combinations_chord"),action_label(chord)),disabled=not editable,

@@ -307,6 +307,54 @@ IsTapHoldHoldActive(KeyId, HoldOpt) {
 	return false
 }
 
+; The shared action picker's items for a hold slot, a key's or a key
+; combination's: every hold option in its order, except the "none" sentinel,
+; which the picker draws as its own row. A hold is never a gesture action, so
+; the slot lists these options rather than the action catalogue: they are what
+; a hold can be. _shared/lua/tap_hold/hold_options.lua's picker_items builds
+; the same list for Linux from the same [tap_hold.hold_picker].
+; @returns {Array} Objects { Type: "action", Id, Label }.
+TapHoldHoldPickerItems() {
+	Items := []
+	Seen := Map("none", true)
+	for _, Opt in TapHoldHoldOptions() {
+		if (Opt["kind"] == "none")
+			continue
+		Id := Opt["id"]
+		if Seen.Has(Id)
+			throw ValueError("A hold option id must be distinct and never the picker's none.", -1, Id)
+		Seen[Id] := true
+		Label := (Opt["i18n"] != "") ? t(Opt["i18n"]) : _TH_HoldOptionLabel(Id)
+		Items.Push({ Type: "action", Id: Id, Label: Label })
+	}
+	return Items
+}
+
+; The hold option a pick of the shared action picker names: its « none » row
+; is the "none" sentinel, any other id the option of that id.
+; @param PickId {String} The picked id.
+; @returns {Map|Integer} The option, or 0 when the hold does not offer the id.
+TapHoldHoldOptionForPick(PickId) {
+	if !(PickId is String)
+		return 0
+	for _, Opt in TapHoldHoldOptions() {
+		if (Opt["kind"] == "none") ? (PickId == "none") : (Opt["id"] == PickId)
+			return Opt
+	}
+	return 0
+}
+
+; The id the shared action picker marks as a key's current hold.
+; @param KeyId {String} The key.
+; @returns {String} The option's id, or "none" for no hold.
+TapHoldCurrentHoldPickId(KeyId) {
+	for _, Opt in TapHoldHoldOptions() {
+		if IsTapHoldHoldActive(KeyId, Opt)
+			return (Opt["kind"] == "none") ? "none" : Opt["id"]
+	}
+	return "none"
+}
+
 
 
 

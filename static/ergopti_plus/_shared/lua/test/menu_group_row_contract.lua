@@ -146,12 +146,15 @@ end
 local register_previous = M.register
 
 --- A published caption group of each driver. The Tap-Hold delay row was the
---- shared one until it became a command (2026-10-22).
+--- shared one until it became a command, then the Tap-Hold hold row until it
+--- opened the shared action picker (both 2026-10-22). The expected captions
+--- are handwritten; "%s" marks where the native caption goes.
 local CAPTION_GROUPS = {
 	macos = { section = "gesture_swipe_slot_menu", id = "gesture_mode_options",
 		getter = "gesture_mode_current_label", en = "Mode: %s", fr = "Mode : %s" },
-	linux = { section = "tap_hold_key_head", id = "tap_hold_key_hold",
-		getter = "tap_hold_key_hold_caption", en = "Hold → %s", fr = "Hold → %s" },
+	linux = { section = "agent_linux_system1_frame", id = "agent_system1",
+		getter = "agent_system_backend_current_caption",
+		en = "⚡ System 1 (fast): %s", fr = "⚡ Système 1 (rapide) : %s" },
 }
 
 --- Builds the getters table naming the fixture's caption getter.

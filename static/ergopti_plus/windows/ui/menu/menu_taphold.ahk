@@ -15,8 +15,8 @@
 
 
 ; Build the TapHolds submenu — one entry per physical key, each with a
-; tap picker (modal GUI, same UI as gesture/shortcut pickers) and a hold
-; picker submenu, mirroring the macOS Karabiner menu design.
+; tap row and a hold row that both open the shared action picker (the same
+; window as the gesture and shortcut pickers), as on macOS and Linux.
 ;
 ; Render shape:
 ;
@@ -31,7 +31,7 @@
 ;       ↳ Rien (désactiver)
 ;       ↳ ---
 ;       ↳ Tap  → "Alt-Tab"             [opens modal action picker GUI]
-;       ↳ Hold → "Alt"                 [opens hold picker submenu]
+;       ↳ Hold → "Alt"                 [opens the action picker on the hold options]
 ;     ↳ …                              [down to Space]
 ;     ↳ ---
 ;     ↳ — Main droite — Tap / Hold —   [manifest header]
@@ -43,9 +43,10 @@
 ; between the hands are the manifest's.
 ;
 ; Tap picker: full GESTURE_ACTIONS list in the searchable modal GUI (ShowActionPicker).
-; Hold picker: fixed set from _TH_HoldOptions (modifiers + nav layer + none).
-; Both pickers persist immediately via WriteTapHoldTap / WriteTapHoldHold and
-; reload the script to refresh the menu.
+; Hold picker: the same window on the hold options of _TH_HoldOptions (the
+; modifiers, their combinations and the nav layer; its « none » row clears it).
+; Both pickers persist immediately via WriteTapHoldTap / TapHoldSetHold and
+; reload the script to refresh the menu; a refused hold keeps its picker open.
 _BuildTapHoldsSubmenu() {
 	Commands := _TH_ScopeCommands()
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
@@ -57,10 +58,10 @@ _BuildTapHoldsSubmenu() {
 
 ; List provider: one row per configurable key of one hand.
 ;
-; Row DATA since 2026-08-07. The tree is three levels — the key, its disable /
-; tap / hold rows, and the hold picker's options — which is what the renderer
-; allows, and none of it mutates a live menu: every action writes the user's
-; tap_hold.toml and reloads the script, which rebuilds the tray from scratch.
+; Row DATA since 2026-08-07. The tree is two levels — the key, then its
+; disable / tap / hold / delay rows, the tap and the hold opening the shared
+; action picker — and none of it mutates a live menu: every action writes the
+; user's tap_hold.toml and reloads the script, which rebuilds the tray.
 ; @param Hand {String} "left" or "right".
 _TH_KeyRows(Hand) {
 	global TapHold
@@ -80,21 +81,17 @@ _TH_KeyRows(Hand) {
 			: (TapLbl . "  /  " . HoldLbl)
 		ParentLabel := KeyLabel . "  :  " . ComboLabel
 
-		; Indirection avoids a call-site occurrence of the function name before
-		; its definition, which would cause the meta test's body-extractor to
-		; resolve the wrong function body (see HIGH-07 regression guard).
-		_HoldRowsBuilder := _TH_HoldPickerRows
-
 		DelayCaption := Round(TapHoldDuration(MasterGateDesiredTapHold(TapHold), KeyId) * 1000) . " ms"
 		KeyRows := MenuRenderer_TemplateRows("tap_hold_key_rows",
 			Map("tap_hold_key_native", _TH_MakeDisableFn(KeyId),
 				"tap_hold_key_tap", _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl),
+				"tap_hold_key_hold_action", _TH_MakeHoldPickerFn(KeyId, KeyLabel),
 				"tap_hold_key_delay", _TH_MakeDelayPickerFn(KeyId)),
 			Map("tap_hold_key_configured", ((Value) => Value).Bind(IsConfigured),
 				"tap_hold_key_tap_caption", ((Value) => Value).Bind(TapLbl),
 				"tap_hold_key_hold_caption", ((Value) => Value).Bind(HoldLbl),
 				"tap_hold_key_delay_caption", ((Value) => Value).Bind(DelayCaption)),
-			Map("tap_hold_key_hold", _HoldRowsBuilder(KeyId)))
+			Map())
 		if !(KeyRows is Array)
 			continue
 		Rows.Push(Map(
@@ -308,30 +305,65 @@ class _TH_DelayPickerFnObj {
 	}
 }
 
-class _TH_HoldFnObj {
-	KeyId   := ""
-	HoldOpt := ""
-	Call(Args*) {
-		return _TH_ApplyHold(this.KeyId, this.HoldOpt)
+class _TH_HoldPickerFnObj {
+	KeyId    := ""
+	KeyLabel := ""
+	Call(*) {
+		return _TH_OpenHoldPicker(this.KeyId, this.KeyLabel)
 	}
 }
 
-; Apply a hold option chosen from the hold picker. The write goes through the
-; owner that brings the navigation layer along with a key that enters it: the
+; Open the shared action picker on a key's hold: the hold options, the current
+; one marked, the window titled « Hold action — <key> ». A pick is written
+; while the picker is open; the script reloads once it has closed.
+; @param KeyId {String} The key.
+; @param KeyLabel {String} Its translated name, for the title.
+; @param OpenFn {Func} Replaces ShowActionPicker in tests.
+; @param SetHoldFn {Func} Replaces TapHoldSetHold in tests.
+; @param ReloadFn {Func} Replaces the reload in tests.
+; @returns {Any} What the picker returns.
+_TH_OpenHoldPicker(KeyId, KeyLabel, OpenFn := 0, SetHoldFn := 0, ReloadFn := 0) {
+	Current := TapHoldCurrentHoldPickId(KeyId)
+	try LoggerDebug("TapHoldMenu", "Opening hold picker for '{1}' (current='{2}').", KeyId, Current)
+	Slot := Map("items", TapHoldHoldPickerItems(),
+		"after_close", _TH_AfterHoldPick.Bind(KeyId, ReloadFn))
+	Open := HasMethod(OpenFn, "Call") ? OpenFn : ShowActionPicker
+	return Open.Call(t("tap_hold.picker.hold_title_prefix") . KeyLabel, Current,
+		_TH_CommitHoldPick.Bind(KeyId, SetHoldFn), false, "", Slot)
+}
+
+; Write a hold picked in the picker. The write goes through the owner that
+; brings the navigation layer along with a key that enters it: the
 ; configuration folder is handed over here, by the tray alone.
-_TH_ApplyHold(KeyId, HoldOpt) {
+; @param KeyId {String} The key.
+; @param SetHoldFn {Func} Replaces TapHoldSetHold in tests; 0 in production.
+; @param PickId {String} The picked id ("none" clears the hold).
+; @returns {Integer|Boolean} 1 when written, false to keep the picker open.
+_TH_CommitHoldPick(KeyId, SetHoldFn, PickId) {
 	global _ConfigDir
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return _TH_ApplyHold(KeyId, HoldOpt)
+		try return _TH_CommitHoldPick(KeyId, SetHoldFn, PickId)
 		finally Critical(InheritedCritical)
+	}
+	HoldOpt := TapHoldHoldOptionForPick(PickId)
+	if !(HoldOpt is Map) {
+		try LoggerError("TapHoldMenu", "The hold of '{1}' does not offer the picked action '{2}'.",
+			KeyId, (PickId is String) ? PickId : Type(PickId))
+		return false
 	}
 	try LoggerInfo("TapHoldMenu", "Hold picker selection for '{1}': kind='{2}', id='{3}' (pid={4}).",
 		KeyId, HoldOpt["kind"], HoldOpt["id"], DriverPid)
-	if !TapHoldSetHold(KeyId, HoldOpt, _ConfigDir)
-		return false
-	return _TH_ReloadTapHoldMenu("hold_set", KeyId)
+	Written := HasMethod(SetHoldFn, "Call") ? SetHoldFn.Call(KeyId, HoldOpt, _ConfigDir)
+		: TapHoldSetHold(KeyId, HoldOpt, _ConfigDir)
+	return ((Written is Integer) && Written == 1) ? 1 : false
+}
+
+; Reload once the hold picker has closed on a written hold.
+_TH_AfterHoldPick(KeyId, ReloadFn, *) {
+	return HasMethod(ReloadFn, "Call") ? ReloadFn.Call("hold_set", KeyId)
+		: _TH_ReloadTapHoldMenu("hold_set", KeyId)
 }
 
 ; Build a bound callback that clears both tap and hold for a key.
@@ -344,6 +376,14 @@ _TH_MakeDisableFn(KeyId) {
 ; Build a bound callback that opens the action picker modal for the tap slot.
 _TH_MakeTapPickerFn(KeyId, KeyLabel, TapLbl) {
 	obj := _TH_TapPickerFnObj()
+	obj.KeyId    := KeyId
+	obj.KeyLabel := KeyLabel
+	return ObjBindMethod(obj, "Call")
+}
+
+; Build a bound callback that opens the action picker modal for the hold slot.
+_TH_MakeHoldPickerFn(KeyId, KeyLabel) {
+	obj := _TH_HoldPickerFnObj()
 	obj.KeyId    := KeyId
 	obj.KeyLabel := KeyLabel
 	return ObjBindMethod(obj, "Call")
@@ -461,34 +501,6 @@ _TH_ApplyTap(KeyId, ActionId) {
 	if !WriteTapHoldTap(KeyId, ActionId)
 		return false
 	return _TH_ReloadTapHoldMenu("tap_set", KeyId)
-}
-
-; Build the hold picker submenu for a given key. Shows the fixed hold options
-; from _TH_HoldOptions; current selection is checked.
-_TH_HoldPickerRows(KeyId) {
-	global _TH_HoldOptions
-	Rows := []
-	for _, HoldOpt in _TH_HoldOptions {
-		Label    := ""
-		if (HoldOpt["kind"] == "modifier" && HoldOpt["i18n"] == "") {
-			Label := _TH_HoldOptionLabel(HoldOpt["id"])
-		} else {
-			Label := t(HoldOpt["i18n"])
-		}
-		Rows.Push(Map(
-			"label",   Label,
-			"checked", IsTapHoldHoldActive(KeyId, HoldOpt),
-			"action",  _TH_MakeHoldFn(KeyId, HoldOpt)))
-	}
-	return Rows
-}
-
-; Build a bound callback that writes a hold option for a key, then reloads.
-_TH_MakeHoldFn(KeyId, HoldOpt) {
-	obj := _TH_HoldFnObj()
-	obj.KeyId   := KeyId
-	obj.HoldOpt := HoldOpt
-	return ObjBindMethod(obj, "Call")
 }
 
 ; Shared reload helper — keeps menu-triggered updates observable in debug logs.

@@ -3503,25 +3503,15 @@
 			]
 		},
 		{
-			"type": "group",
-			"id": "tap_hold_key_hold",
-			"i18n": "tap_hold.picker.hold",
-			"caption_getter": "tap_hold_key_hold_caption",
-			"platforms": [
-				"ahk",
-				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
 			"type": "command",
 			"id": "tap_hold_key_hold_action",
 			"i18n": "tap_hold.picker.hold",
 			"caption_getter": "tap_hold_key_hold_caption",
 			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+				"ahk",
+				"hs",
+				"linux"
+			]
 		}
 	],
 	"linux_hotstrings_absent_rows": [

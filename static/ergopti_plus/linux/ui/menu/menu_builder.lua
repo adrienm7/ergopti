@@ -3991,8 +3991,20 @@ local function _build_shortcuts(ctx)
 				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
 					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
 			end,
-			prompt_hold = function(label, current, choices)
-				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
+			-- A pair's hold opens the shared action picker, titled by its slot
+			-- and the pair, with the hold options the provider lists.
+			open_hold_picker = function(pair_label, current, items, on_confirm)
+				local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+				if not ok_picker or type(Picker.open) ~= "function" then
+					Logger.error(LOG, "Action picker is unavailable for the hold of '%s'.", tostring(pair_label))
+					return false
+				end
+				return Picker.open({
+					presentation_id = "key_combination_hold_action",
+					presentation_suffix = pair_label,
+					current = current,
+					items = items,
+				}, function(picked) return on_confirm(picked) end) == true
 			end,
 			parameter = function(context, gestures, binding, action, spec)
 				local prior = gestures.get_action_parameter(binding, action)
@@ -4408,6 +4420,45 @@ local function _build_tap_holds(ctx)
 		end)
 	end
 
+	--- Opens the shared action picker on a key's hold, listing what a hold can
+	--- be: the options of [tap_hold.hold_picker] (the modifiers, their
+	--- combinations and the navigation layer). A pick is written by the same
+	--- set_hold as the former submenu; an id the hold does not offer, or a
+	--- refused write, keeps the picker open.
+	--- @param catalog_entry table The key's entry of the manager's key_catalog().
+	--- @param current table|nil The key's hold option now.
+	--- @return boolean opened
+	local function pick_hold(catalog_entry, current)
+		local key_id = catalog_entry.id
+		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+		if not ok_picker or type(Picker.open) ~= "function" then
+			Logger.error(LOG, "Action picker is unavailable for the hold of '%s'.", key_id)
+			return false
+		end
+		local items, by_id = HoldOptions.picker_items(options, i18n_safe)
+		local opened = Picker.open({
+			presentation_id = "tap_hold_hold_action",
+			presentation_suffix = _tap_hold_key_label(catalog_entry),
+			current = current and HoldOptions.picker_id(current) or "none",
+			items = items,
+		}, function(picked)
+			local option = type(picked) == "string" and by_id[picked] or nil
+			if not option then
+				Logger.error(LOG, "The hold of '%s' does not offer the picked action '%s'.", key_id, tostring(picked))
+				return false
+			end
+			local called, persisted = pcall(Writer.set_hold, key_id, option.kind, option.id)
+			local accepted = called and persisted == true
+			changed(accepted)
+			return accepted
+		end)
+		if opened ~= true then
+			Logger.error(LOG, "The hold picker of '%s' did not open.", key_id)
+			return false
+		end
+		return true
+	end
+
 	--- Asks for a key's own delay, in milliseconds.
 	local function ask_delay(key_id, current_ms)
 		local guard, setter = edit_guard("set_threshold")
@@ -4450,25 +4501,17 @@ local function _build_tap_holds(ctx)
 			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
 			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
 
-			local hold_rows = {}
-			for _, option in ipairs(options) do
-				hold_rows[#hold_rows + 1] = {
-					label = HoldOptions.label(option, i18n_safe),
-					checked = (hold == option) or nil,
-					action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
-				}
-			end
-
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
+				["tap_hold_key_hold_action"] = function() return pick_hold(catalog_entry, hold) end,
 				["tap_hold_key_delay"] = function() return ask_delay(key_id, ms) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
 				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
-			}, { ["tap_hold_key_hold"] = hold_rows })
+			}, {})
 			if key_rows then
 
 				rows[#rows + 1] = {
