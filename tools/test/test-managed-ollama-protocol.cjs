@@ -752,7 +752,7 @@ package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.
 _G.hs = require("hs")
 assert(loadfile(driver .. "/tests/unit/ui/menu/menu_llm/ollama/test_managed_ollama_pull_activation.lua"))()
 local results = require("tests.helpers").get_results()
-assert(results.failed == 0 and results.passed == 16, "all pull activation controls must pass")
+assert(results.failed == 0 and results.passed == 17, "all pull activation controls must pass")
 print("Managed pull activation controls passed: " .. results.passed)
 `;
 const pullResult = spawnSync(runtime, ['-e', pullProgram], {
