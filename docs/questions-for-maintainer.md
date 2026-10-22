@@ -7,28 +7,23 @@ answer once, then move the answered line below.
 
 ## Open
 
-- **Site deploy reads its receiver from main:** `deploy-site.yml` takes its receiver from `main`, so
-  the site lags `dev` until the next release. Default meanwhile: unchanged. Say if the deploy
-  should follow `dev`.
-- **macOS typing dashboard and a partial SQLite history:** since the Codex integration (f0fb919379)
-  the dashboard refuses a history whose database reads were incomplete instead of showing partial
-  counts (dev had chosen "shown but not cached"). Default meanwhile: refuse. Say if users should
-  see partial counts during a transient SQLite error.
-- **Number-row switches against the October 13 request:** a row is emulated or native as a whole;
-  the base and Shift levels cannot be emulated independently. Default meanwhile: per-row switches
-  only. Say if they cover the request.
-- **#99: automatic proxy discovery without a WPAD server for Ollama pulls:** an Ergopti-started
-  Ollama refuses to pull when the system proxy is PAC, WPAD or SOCKS-only (its Go client cannot
-  follow an automatic proxy). Default meanwhile: refused, the log names the mode. Once
-  `scutil --proxy` is read on the Mac, say if "Auto Proxy Discovery" with no server should be
-  admitted (`apply_opaque_system_network`, `macos/modules/llm/network-retry.sh`).
-- **Versions window with a feed-only list (macOS):** when the API gives no list, the Versions
-  window cannot install from the Atom feed (no digests) and warns. Default meanwhile: refused.
-  Option: hand a click on the channel's newest release to Sparkle (needs a page phase and 21
-  locale strings). Say if wanted.
+None at the moment.
 
 ## Answered
 
+- **#99: automatic proxy discovery without a WPAD server (answered October 22):** not the
+  maintainer's setup, no change. His Mac has Auto Proxy Discovery off and Automatic Proxy
+  Configuration on with a corporate PAC URL; the static Web (HTTP), Secure Web (HTTPS), SOCKS
+  and other proxies are all off, so the PAC file is the only proxy source. Resolving a PAC for an Ergopti-started Ollama is a
+  checklist item; his own Ollama.app is covered by 2353a72eed.
+- **October 22 answers, second batch:** the site deploy design is confirmed (`main` -> ergopti.fr, `dev` ->
+  ergopti.fr/dev/); the workflow definition being read from `main` (a `workflow_run` workflow) is
+  accepted, no change; the macOS typing
+  dashboard shows a partial history's counts, not cached, with an "incomplete history" mention
+  (parity checked on Windows and Linux); the per-row number-row switches do not cover the
+  October 13 request, which becomes a per-layer layout composer (big item 4 of the checklist);
+  the Versions window hands a click on the channel's newest release to Sparkle when the list came
+  from the feed.
 - **October 22 answers:** issue #100: keep 2353a72eed (a foreign Ollama daemon pulls through a PAC
   proxy; a daemon of unknown or Ergopti origin stays fail-closed); the macOS webview-open freeze
   (`wv:hswindow()` scanning every window) is fixed now; SignPath Foundation: apply now; the

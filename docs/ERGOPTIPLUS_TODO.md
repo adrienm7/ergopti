@@ -99,6 +99,17 @@ a sealed Windows updater source, reseal with
       send/dispatch, text sender and config I/O still call SendInput. Measure expansions, pastes and
       predictions (latency, lost or interleaved keys) before choosing.
 
+## Big item 4: layout composed from layers, all three OS (October 13 request)
+
+- [ ] **Per-layer layout composer.** [CODE] Decided 2026-10-22: the per-row number-row switches do
+      not cover the October 13 request. Not started. Spec: split the layout into four layers (base,
+      Shift, AltGr, Shift+AltGr), each with a dropdown that takes that layer from any layout (for
+      example base QWERTY, Shift AZERTY, AltGr Ergopti, Shift+AltGr Ergo-L); add a shortcuts layer
+      where the user says what a key gives under each held modifier (Ctrl+A when Ctrl is held,
+      Win+A with Win, and so on); let the user tune each layer key by key, up to their own complete
+      keylayout. Windows, macOS and Linux, from one shared declaration (the layout registry is
+      `.keylayout`).
+
 ## Wave 2: mid-size work
 
 In progress (agent), October 22:
@@ -132,6 +143,13 @@ In progress (agent), October 22:
 - [ ] **HS-274 orphan tools (decision 9).** `tools/diagnostics/hs274_*_test.py`,
       `hs274-native.swift`, `karabiner_candidate_install.py` lost their workflows: delete them if
       useless, or run them in a CI lane. **In progress (agent).**
+- [ ] **macOS typing dashboard with a partial SQLite history (decided 2026-10-22).** [CODE] Show
+      the partial counts, never cached, with an "incomplete history" mention (dev's choice before
+      the Codex integration f0fb919379, which refuses the history instead); check that Windows and
+      Linux behave the same. **In progress (agent).**
+- [ ] **Versions window with a feed-only list (macOS, decided 2026-10-22).** [CODE] When the API
+      gives no list, a click on the channel's newest release is handed to Sparkle (a page phase and
+      21 locale strings); older releases stay refused with the warning. **In progress (agent).**
 - [ ] **macOS webview-open freeze (decided 2026-10-22).** [CODE] Opening a webview window freezes
       the main thread 2.8-3.2 s because `wv:hswindow()` scans every window of every application;
       look only among Hammerspoon's own windows. **In progress (agent).**
@@ -168,6 +186,13 @@ Not started:
       still publishes. Update the literal pins in `tools/test/menu-hotstring-language-binding.cjs`,
       then `node tools/test/test-native-menu-rows.cjs --update-baseline` to zero. Captions, order,
       unavailable reasons and child commands stay identical.
+- [ ] **Ergopti-started Ollama behind a PAC proxy.** [CODE] Resolve the PAC through the system for
+      the model registry host (macOS CFNetwork `CFNetworkExecuteProxyAutoConfigurationURL` /
+      SystemConfiguration; Windows WinHTTP auto-proxy; the Linux equivalent) and pass the resulting
+      `HTTPS_PROXY` to the managed Ollama, instead of refusing the pull. A user-started daemon
+      (Ollama.app, Homebrew, PATH) is covered by 2353a72eed. The maintainer's Mac uses a corporate
+      PAC URL with Auto Proxy Discovery off and every static proxy (HTTP, HTTPS, SOCKS) off, so the
+      PAC is the only proxy source: there is no static fallback to use.
 - [ ] **AI off must be inert on macOS.** [CODE] Profile shortcuts are still bound, `ollama list`
       still runs and the MLX download still resumes with the AI off (Windows and Linux are inert).
 - [ ] **Menu clicks during a reload on macOS and Linux.** [CODE] Windows holds such a click and
@@ -346,7 +371,7 @@ Standing checks:
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.
-- [ ] **Issue #99**: `memory_pressure | tail -1` during lease errors; `scutil --proxy` (Auto Proxy Discovery without a WPAD server?); oMLX listed (DEBUG
+- [ ] **Issue #99**: `memory_pressure | tail -1` during lease errors; oMLX listed (DEBUG
       line `Local server 'omlx' probe answered ...`, else
       `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models` and
       `lsof -nP -iTCP -sTCP:LISTEN | grep -i omlx`); `Ollama bootstrap failed (exit=137)` with an
