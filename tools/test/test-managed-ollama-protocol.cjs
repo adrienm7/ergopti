@@ -763,7 +763,7 @@ const pullResult = spawnSync(runtime, ['-e', pullProgram], {
 assert.equal(pullResult.error, undefined, 'the original pull receiver must start');
 assert.equal(pullResult.signal, null, 'the original pull receiver must settle');
 assert.equal(pullResult.status, 0, pullResult.stderr || pullResult.stdout);
-assert.match(pullResult.stdout, /Managed pull activation controls passed: 16\s*$/);
+assert.match(pullResult.stdout, /Managed pull activation controls passed: 17\s*$/);
 process.stdout.write(pullResult.stdout);
 process.stdout.write(pullResult.stderr);
 process.stdout.write(
