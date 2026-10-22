@@ -296,7 +296,110 @@ function checkViewsListTheirChannelTags() {
 
 // ==========================================
 // ==========================================
-// ======= 5/ Report =======================
+// ======= 5/ Local Tab Switches ===========
+// ==========================================
+// ==========================================
+
+const MIXED_RELEASES = [
+	{ tag_name: 'v0.0.0-dev.12', body: 'dev', prerelease: true },
+	{ tag_name: 'v1.4.0', body: 'stable', prerelease: false }
+];
+
+/** Whether the page shows its spinner. */
+function loading(page) {
+	return page.el('loading-overlay').style.display !== 'none';
+}
+
+function checkTabFiltersTheCompleteList() {
+	// Every host fetches the same list (about 2 MB) whatever the channel: a tab
+	// that asked again paid a download, an escape on the Windows hook thread and
+	// a re-parse for a list the page already held.
+	const page = openPage({ __subscribed_channel: LEAST_STABLE });
+	page.answer({ action: 'releases', channel: LEAST_STABLE, json: JSON.stringify(MIXED_RELEASES) });
+	const before = page.posted.length;
+	page.clickTab(MOST_STABLE);
+	expect(
+		page.posted.length === before,
+		'a tab must not post anything once the complete list is on the page'
+	);
+	expect(!loading(page), 'a tab switch over the complete list must not show the spinner');
+	expect(
+		JSON.stringify(listedTags(page)) === JSON.stringify(['v1.4.0']),
+		`the local ${MOST_STABLE} view must list only its tags (got ${JSON.stringify(listedTags(page))})`
+	);
+	expect(
+		page.el('release-tag').textContent === 'v1.4.0',
+		'the local switch must select the newest release of the view'
+	);
+	expect(page.shown('subscribe-banner'), 'the local switch must still offer the subscription');
+	page.clickTab(LEAST_STABLE);
+	expect(page.posted.length === before, 'switching back must not post anything either');
+	expect(
+		JSON.stringify(listedTags(page)) === JSON.stringify(['v0.0.0-dev.12', 'v1.4.0']),
+		`the local ${LEAST_STABLE} view must list its tags and the more stable ones`
+	);
+	expect(!page.shown('subscribe-banner'), 'back on the subscribed channel the banner hides');
+
+	// Windows hands the same text to injectReleasesJson.
+	const windows = openPage({ __subscribed_channel: MOST_STABLE });
+	windows.sandbox.injectReleasesJson(JSON.stringify(MIXED_RELEASES), MOST_STABLE);
+	const sent = windows.posted.length;
+	windows.clickTab(LEAST_STABLE);
+	expect(
+		windows.posted.length === sent && listedTags(windows).length === 2,
+		'a list delivered as JSON text must also serve every tab locally'
+	);
+}
+
+function checkPartialOrFailedListsAskTheHost() {
+	// The Linux interim answer carries one cached release, not the list.
+	const page = openPage({ __subscribed_channel: LEAST_STABLE });
+	page.answer({
+		action: 'releases',
+		channel: LEAST_STABLE,
+		releases: [MIXED_RELEASES[0]],
+		cache_miss: false
+	});
+	page.clickTab(MOST_STABLE);
+	expect(
+		page.payloads('fetch').length === 1,
+		'a tab over an interim answer must still ask the host for the list'
+	);
+
+	// After an error the hosts drop their list too: a tab asks again, and the
+	// error is never hidden behind an older list.
+	const failed = openPage({ __subscribed_channel: LEAST_STABLE });
+	failed.answer({
+		action: 'releases',
+		channel: LEAST_STABLE,
+		json: JSON.stringify(MIXED_RELEASES)
+	});
+	failed.answer({ action: 'releases_error', error_key: 'changelog_window.error_network' });
+	failed.clickTab(MOST_STABLE);
+	expect(
+		failed.payloads('fetch').length === 1 && loading(failed),
+		'a tab after a failed refresh must load again instead of reusing the dropped list'
+	);
+
+	// Retry always reaches the host, list or not.
+	const retried = openPage({ __subscribed_channel: LEAST_STABLE });
+	retried.answer({
+		action: 'releases',
+		channel: LEAST_STABLE,
+		json: JSON.stringify(MIXED_RELEASES)
+	});
+	retried.el('btn-retry').dispatch('click');
+	expect(retried.payloads('fetch').length === 1, 'Retry must ask the host again');
+	retried.clickTab(MOST_STABLE);
+	expect(
+		retried.payloads('fetch').length === 2,
+		'a tab while a load is in flight must ask for that channel'
+	);
+}
+
+// ==========================================
+// ==========================================
+// ======= 6/ Report =======================
 // ==========================================
 // ==========================================
 
@@ -309,6 +412,8 @@ checkRefusalIsShown();
 checkRestartIsConfirmedFirst();
 checkMenuChangesReachTheOpenPage();
 checkViewsListTheirChannelTags();
+checkTabFiltersTheCompleteList();
+checkPartialOrFailedListsAskTheHost();
 
 if (failures.length > 0) {
 	console.error(`\x1b[31m[FAIL] Versions page channel sync (${failures.length}/${checks}):\x1b[0m`);
