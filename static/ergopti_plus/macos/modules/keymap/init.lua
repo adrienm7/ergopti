@@ -42,6 +42,8 @@ local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local KeyEventHealth = require("infra.key_event_health")
+local EventClock = require("adapters.event_clock")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
 local M   = {}
@@ -1902,6 +1904,27 @@ local function merge_returned_events(older, newer)
 	return merged
 end
 
+local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
+
+--- Feeds one physical key event to the session's pairing counters
+--- (infra/key_event_health.lua). Never changes what the key does: every read
+--- is protected and the counters only write tables.
+--- @param e table Physical keyDown or keyUp event.
+--- @param phase string "down" or "up".
+--- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
+--- @param stamp integer|nil Raw event stamp from adapters/event_clock.lua.
+local function observe_key_health(e, phase, lateness_ms, stamp)
+	local ok_code, keycode = pcall(e.getKeyCode, e)
+	if not ok_code or keycode == nil then return end
+	local autorepeat = false
+	if phase == "down" then
+		local ok_repeat, value = pcall(e.getProperty, e, AUTOREPEAT_PROPERTY)
+		autorepeat = ok_repeat and value ~= nil and value ~= 0
+	end
+	local ok_char, character = pcall(Keycodes.character_for, keycode)
+	KeyEventHealth.note(phase, keycode, autorepeat, ok_char and character ~= nil, lateness_ms, stamp)
+end
+
 --- pcall wrapper around onKeyDownRaw to prevent keyboard lockups on uncaught errors.
 --- Latency sampling is gated on Perf.is_enabled() so the measurement path adds
 --- no steady-state cost in production; when disabled the wrapper is a single
@@ -1929,7 +1952,8 @@ local function onKeyDown(e)
 	-- independent of Quartz tap insertion order.
 	local provenance = nil
 	local provenance_status = EventProvenance.STATUS_UNREADABLE
-	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil = pcall(
+	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
+	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil, replay_or_nil = pcall(
 		EventProvenance.classify_with_fence, e, "keymap")
 	local fence_events = nil
 	local fence_consumes_original = false
@@ -1939,6 +1963,9 @@ local function onKeyDown(e)
 		if fence_or_nil then
 			fence_events = fence_or_nil.events
 			fence_consumes_original = fence_or_nil.consume_original == true
+		end
+		if provenance_status == EventProvenance.STATUS_FOREIGN and replay_or_nil ~= true then
+			observe_key_health(e, "down", event_lateness_ms, event_stamp)
 		end
 	else
 		pcall(Logger.error, LOG, "Synthetic event provenance classification failed: %s.",
@@ -2055,8 +2082,12 @@ tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 -- consumes the down phase; this minimal sibling consumes the exact tagged up
 -- phase so an application/hotkey cannot observe an orphan F16 release.
 loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
-	local provenance, status, fence = EventProvenance.classify_with_fence(
+	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
+	local provenance, status, fence, replay = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
+	if status == EventProvenance.STATUS_FOREIGN and replay ~= true then
+		observe_key_health(e, "up", event_lateness_ms, event_stamp)
+	end
 	local fence_events = fence and fence.events or nil
 	if fence and fence.consume_original == true then return true, fence_events end
 	if provenance and (provenance.loopback or provenance.stale_loopback) then
@@ -2404,6 +2435,9 @@ tap_watchdog = function(timer, generation)
 	-- A press made while the tap was off reached the application undecided:
 	-- name the outage when the user was typing around it.
 	if keydown_revived then KeystrokeIntegrity.note_exposure("a keyDown event-tap outage") end
+	if keydown_revived or keyup_revived then
+		pcall(KeyEventHealth.note_transition, "a keymap event-tap outage")
+	end
 	if (keydown_revived or keyup_revived) and _one_shot_shift then _one_shot_shift.reset() end
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)

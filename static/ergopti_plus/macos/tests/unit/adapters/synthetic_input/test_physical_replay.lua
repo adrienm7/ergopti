@@ -124,11 +124,14 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 				physical_replay = event
 				replay_seen = replay_seen + 1
 				for _, consumer in ipairs({ "keymap", "keylogger", "shortcuts" }) do
-					local owned, status, replay_fence = provenance.classify_with_fence(event, consumer)
+					local owned, status, replay_fence, is_replay = provenance.classify_with_fence(event, consumer)
 					helpers.assert_nil(owned)
 					helpers.assert_eq(status, provenance.STATUS_FOREIGN)
 					helpers.assert_nil(replay_fence,
 						"a tagged physical replay must not recursively fence itself")
+					-- The key pairing counters already saw the original arrive
+					-- (key-event-pairing): the copy must not count twice.
+					helpers.assert_true(is_replay == true, "a physical replay names itself")
 				end
 			end
 		end
