@@ -117,6 +117,14 @@ atomically: a regex that takes one PCRE frame per code unit overflows on a large
 literal. `InStr` with a NUL needle fails on stored UTF-16 text, so never use it
 to detect an embedded NUL.
 
+### project-ahk-strreplace-stops-at-nul
+
+`StrReplace` treats its haystack as ending at the first NUL: nothing after it
+is replaced, while `RegExMatch` and `SubStr` honour the stored length. Bulk text
+escaping should still use native `StrReplace` passes (a per-code-unit script
+loop took 3 s on a 2 MB release list), but split the text on NUL with
+`RegExMatch(text, "\x00")` first, as `JsonStringLiteral` does.
+
 ## Startup and callbacks
 
 ### project-ahk-entry-smoke-is-the-startup-proof

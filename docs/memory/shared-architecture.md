@@ -45,6 +45,19 @@ bounded window geometry, a scrollable list and a permanently visible action
 footer. The obsolete-settings cleanup is the reference: preview every entry,
 keep confirmation explicit, and preserve the backup-first transaction.
 
+### project-a-caption-label-is-brandless
+
+The window composer (`WindowTitle`, `window_titles.compose`) is the only place
+that adds the product name, and the factories name a manifest window from its
+`title_key`: Windows `WebViewHost._CaptionLabel`, macOS `show_webview` with an
+`app_id`, Linux `webview_manager.app_caption`. A caller that brands a label, or
+a locale caption that already starts with the brand, shows it twice (the
+cleanup window and the API-entry dialog both did). The static audit could not
+see either: it resolves call arguments, not an option read back later or a
+parameter passed through a helper. `(window-title-brand-once)` builds every
+manifest window in all 21 locales on each driver; open a new window by its app
+identity rather than a translated title.
+
 ### feedback-ui-must-be-i18n
 
 All user-facing text uses the locale system in every supported language. English
