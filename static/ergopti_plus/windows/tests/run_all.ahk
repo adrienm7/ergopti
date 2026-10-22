@@ -201,6 +201,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/text_utils.ahk
 #Include ../infra/text_case.ahk
 #Include ../infra/wrap_pair.ahk
+#Include ../infra/open_target.ahk
 #Include ../infra/send_input_parameter.ahk
 #Include ../infra/tap_keys.ahk
 #Include ../infra/key_combinations.ahk
@@ -629,6 +630,7 @@ InstallSendNoOps()
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
 ; include paths are resolved relative to the tests/ directory.
 #Include unit/modules/shortcuts/test_shortcuts.ahk
+#Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
 #Include unit/suite/test_runner_shard.ahk
 
