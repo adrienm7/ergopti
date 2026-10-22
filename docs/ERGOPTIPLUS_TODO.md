@@ -136,8 +136,9 @@ Not started:
 
 - [ ] **macOS ISO/ANSI selector (decision 2).** [CODE] Configuration choice Automatic, ISO, ANSI for
       the Karabiner virtual keyboard type, in config, declared once in the shared manifest, 21
-      locales, four-combination table test. Automatic resolves to ANSI (356d14a3f3, what works on
-      the maintainer's Mac); an explicit choice is never overridden.
+      locales, four-combination table test. Automatic resolves to ANSI (356d14a3f3, confirmed on
+      the maintainer's Mac on 2026-10-22: an action assigned to the key left of "1" lands on that
+      key, no longer on the ISO 105th key); an explicit choice is never overridden.
 - [ ] **Ollama redirect policy and Go compile (decision 5).** [CODE] [CI] When a proxy or the
       native worker carries the request, an unresolved download host is left to it; literal
       private, loopback, link-local and CGNAT addresses stay refused, as do names that resolve
@@ -337,9 +338,7 @@ Standing checks:
 - [ ] **Issue #100 retest** (after v1.0.5: 2353a72eed, 25411ee080, e57f4cce77): with Ollama.app and
       a PAC proxy, enabling the AI downloads the model; with the Ergopti menu held open, no lease
       timeout.
-- [ ] **Issue #99**: Karabiner-EventViewer, key left of "1" on the internal keyboard shows
-      `non_us_backslash` (else revert 356d14a3f3; item 118); `memory_pressure | tail -1` during lease
-      errors; `scutil --proxy` (Auto Proxy Discovery without a WPAD server?); oMLX listed (DEBUG
+- [ ] **Issue #99**: `memory_pressure | tail -1` during lease errors; `scutil --proxy` (Auto Proxy Discovery without a WPAD server?); oMLX listed (DEBUG
       line `Local server 'omlx' probe answered ...`, else
       `curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/v1/models` and
       `lsof -nP -iTCP -sTCP:LISTEN | grep -i omlx`); `Ollama bootstrap failed (exit=137)` with an
