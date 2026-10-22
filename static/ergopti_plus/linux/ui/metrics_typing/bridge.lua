@@ -18,6 +18,8 @@
 ---    answer, so the page applies it exactly as it applies a reply.
 --- 3. The user's reset drops the kept payload with the keylogger's caches, so a
 ---    reset is a clean rebuild.
+--- 4. A payload built from an incomplete SQLite read is answered (the page says
+---    the history is incomplete) but never kept, so the next opening retries.
 --- ==============================================================================
 
 local M = {}
@@ -39,6 +41,27 @@ local REFRESH_DELAY_MS = 250
 local _cached_ready = nil
 local _cached_keylogger, _cached_generation = nil, nil
 local _refresh_generation = 0
+-- True while the last answered payload came from an incomplete read.
+local _incomplete_reported = false
+
+--- Returns whether a payload holds every row the database stores, logging the
+--- start and the end of a run of incomplete reads once each.
+--- @param payload table|nil Dashboard payload.
+--- @return boolean complete
+local function payload_complete(payload)
+	if type(payload) ~= "table" then return false end
+	local prefetch = payload._prefetch_data
+	local complete = payload.metrics_manifest_incomplete ~= true
+		and not (type(prefetch) == "table" and prefetch.incomplete == true)
+	if not complete and not _incomplete_reported then
+		_incomplete_reported = true
+		Logger.warn(LOG, "Typing metrics history read incomplete; partial counts shown with a notice, not cached.")
+	elseif complete and _incomplete_reported then
+		_incomplete_reported = false
+		Logger.info(LOG, "Typing metrics history read complete again; caching resumed.")
+	end
+	return complete
+end
 
 --- Builds the dashboard payload from the daemon state.
 --- @param state table
@@ -49,6 +72,14 @@ local function build_payload(state, include_prefetch)
 		return state.keylogger.get_dashboard_payload({ include_prefetch = include_prefetch })
 	end
 	return AppsBridge.build_payload(state)
+end
+
+--- Builds the dashboard payload with whether it may be kept for the next opening.
+--- @param state table
+--- @return table|nil payload, boolean cacheable
+local function build_ready(state)
+	local payload = build_payload(state, true)
+	return payload, payload_complete(payload)
 end
 
 --- Default deferral: the daemon's event loop.
@@ -92,7 +123,7 @@ local function schedule_refresh(state, context, request)
 			return
 		end
 		Requests.run(state, context, function()
-			return build_payload(state, true), true
+			return build_ready(state)
 		end, false, true)
 	end, REFRESH_DELAY_MS)
 	if not queued then
@@ -114,11 +145,13 @@ local function handle(payload, state, context, request)
 			return _cached_ready
 		end
 		Logger.debug(LOG, "Typing metrics UI ready — first payload of this session.")
-		return build_payload(state, true), true
+		return build_ready(state)
 	end
 	if action == "refresh" then
 		Logger.debug(LOG, "Typing metrics UI requested refresh.")
-		return build_payload(state, false)
+		local refreshed = build_payload(state, false)
+		payload_complete(refreshed)
+		return refreshed
 	end
 	-- The dashboard's reset control. It clears the filters in the page and asks
 	-- the backend to drop its caches so the next payload is a clean rebuild.
@@ -138,10 +171,10 @@ local function handle(payload, state, context, request)
 			Logger.error(LOG, "Reset requested but the keylogger exposes no clear_cache — nothing was cleared.")
 		end
 		if not request.valid() then return nil end
-		local fresh = build_payload(state, true)
+		local fresh, complete = build_ready(state)
 		if not fresh then return nil end
 		fresh.cleared = cleared
-		return fresh, cleared
+		return fresh, cleared and complete
 	end
 
 	if action == "range" and type(payload) == "table" then
@@ -150,13 +183,16 @@ local function handle(payload, state, context, request)
 			if not range or not request.valid() then return nil end
 			local dashboard = build_payload(state, false)
 			if not dashboard then return nil end
-			return {
+			local reply = {
 				metrics_manifest = dashboard.metrics_manifest,
+				metrics_manifest_incomplete = dashboard.metrics_manifest_incomplete,
 				app_icons = {},
 				_prefetch_data = range,
 				range_request_id = payload.request_id,
 				driver_meta = { os = "linux", heatmap_id = "kc" },
 			}
+			payload_complete(reply)
+			return reply
 		end
 	end
 	return nil
@@ -193,6 +229,7 @@ function M._reset()
 	Requests.reset()
 	_cached_ready, _cached_keylogger, _cached_generation = nil, nil, nil
 	_refresh_generation = 0
+	_incomplete_reported = false
 	M._defer = default_defer
 	M._push = default_push
 end

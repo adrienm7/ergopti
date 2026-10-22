@@ -966,17 +966,20 @@ local function add_live_manifest_delta(manifest)
 	return result
 end
 
+--- @return table manifest Persisted manifest, partial when a query failed.
+--- @return boolean complete Whether every native query was accepted.
 local function persisted_manifest()
-	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {} end
+	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {}, true end
 	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
 	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
-		return _manifest_cache.manifest
+		return _manifest_cache.manifest, true
 	end
 	local fresh, complete = SqliteReader.read_manifest(_sqlite_path)
+	-- A partial manifest is shown but never cached, so the next read retries
 	if complete then
 		_manifest_cache = { revision = revision, manifest = fresh }
 	end
-	return fresh
+	return fresh, complete == true
 end
 
 --- Drops the cached projection so the next read rebuilds from the database.
@@ -1087,6 +1090,8 @@ end
 --- Builds the shared manifest/prefetch contract consumed by both metrics UIs.
 --- Historical rows come from SQLite; only the unflushed in-memory delta is
 --- layered on top, so refreshing a dashboard never double-counts a session.
+--- A failed SQLite query still yields the rows that were read, flagged with
+--- `metrics_manifest_incomplete` or `_prefetch_data.incomplete`.
 --- @return table Metrics prefetch payload matching the macOS/Windows schema.
 function M.get_dashboard_payload(opts)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
@@ -1097,7 +1102,8 @@ function M.get_dashboard_payload(opts)
 		categories = SqliteReader.read_user_categories(_sqlite_path, _device_id)
 		if categories == nil then return nil, "SQLite projection unavailable" end
 	end
-	local manifest = add_live_manifest_delta(persisted_manifest())
+	local persisted, manifest_complete = persisted_manifest()
+	local manifest = add_live_manifest_delta(persisted)
 	local prefetch = nil
 	if options.include_prefetch ~= false then
 		prefetch = M.get_range_payload(nil, nil, nil)
@@ -1107,6 +1113,7 @@ function M.get_dashboard_payload(opts)
 		user_categories  = categories,
 		app_icons        = {},
 		_prefetch_data   = prefetch,
+		metrics_manifest_incomplete = not manifest_complete or nil,
 		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },
 	}
 end
@@ -1119,10 +1126,12 @@ function M.get_range_payload(start_date, end_date, apps)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
 	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local bounds = SqliteReader.split_bounds(start_date, end_date)
-	local payload = { historical = empty_ngrams(), today = {} }
+	local payload, complete = { historical = empty_ngrams(), today = {} }, true
 	if SqliteWriter and SqliteWriter.is_available() then
-		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
+		payload, complete = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
+	-- The page shows the partial counts and says the history is incomplete
+	payload.incomplete = not complete or nil
 	payload.historical = payload.historical or empty_ngrams()
 	payload.today = payload.today or {}
 	if bounds.includes_today then payload.today = add_live_ngram_delta(payload.today, apps) end
