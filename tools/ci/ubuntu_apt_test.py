@@ -285,6 +285,8 @@ class UbuntuArchiveControls(unittest.TestCase):
         self.assertIn("APT::Get::AllowUnauthenticated=false", calls[0])
         self.assertIn("Acquire::AllowInsecureRepositories=false", calls[0])
         self.assertIn("Acquire::AllowDowngradeToInsecureRepositories=false", calls[0])
+        self.assertIn("Acquire::http::Timeout=30", calls[0])
+        self.assertIn("Acquire::Retries=5", calls[1])
         self.assertEqual(roots[0], roots[1])
         self.assertFalse(roots[0].exists())
 

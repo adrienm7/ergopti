@@ -315,6 +315,11 @@ def command_prefix(directory):
         "APT::Get::AllowUnauthenticated": "false",
         "Acquire::AllowInsecureRepositories": "false",
         "Acquire::AllowDowngradeToInsecureRepositories": "false",
+        # A stalled mirror connection held one package for 120 s per try, so a
+        # 41 MB install outlasted its 10-minute step (run 39850037912). A stall
+        # now fails within 30 s and the retry moves to the next listed mirror.
+        "Acquire::http::Timeout": "30",
+        "Acquire::Retries": "5",
     }
     return ["/usr/bin/apt-get"] + [
         value for key, item in options.items() for value in ("-o", key + "=" + item)
