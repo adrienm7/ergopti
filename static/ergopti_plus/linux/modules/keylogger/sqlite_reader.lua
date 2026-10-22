@@ -600,20 +600,30 @@ local function grouped_ngram_sql(table_name, where, by_app)
 		.. table_name .. where .. conjunction .. "NOT (" .. numeric .. ");"
 end
 
+--- Reads the n-grams of an inclusive range, every family summed across apps.
+--- @param sqlite_path string Database path.
+--- @param start_date string|nil Inclusive lower bound.
+--- @param end_date string|nil Inclusive upper bound.
+--- @param apps table|nil Selected application names.
+--- @return table ngrams Partial or complete n-gram dictionaries.
+--- @return boolean complete Whether every native query was accepted.
 function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	local out = empty_ngrams()
+	local complete = true
 	local where = filters(start_date, end_date, apps)
 	for _, code in ipairs(NGRAM_CODES) do
-		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
+		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
+		if not accepted then complete = false end
 		for _, row in ipairs(rows) do
 			merge_ngram(out[code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
-	local sc_rows = read_rows(sqlite_path, string.format(
+	local sc_rows, sc_accepted = read_rows(sqlite_path, string.format(
 		"SELECT scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY scancode;",
 		filters(start_date, end_date, apps)))
+	if not sc_accepted then complete = false end
 	for _, row in ipairs(sc_rows) do merge_ngram(out.sc_kb, tostring(row.scancode), row.c) end
-	return out
+	return out, complete
 end
 
 --- Resolves inclusive date bounds against one captured local calendar day.
@@ -647,29 +657,32 @@ end
 --- @param apps table|nil Selected application names.
 --- @param today string|nil Current day captured by the projection owner.
 --- @return table { historical, today }.
+--- @return boolean complete Whether every native query was accepted.
 function M.read_range_split_today(sqlite_path, start_date, end_date, apps, today)
 	local bounds = M.split_bounds(start_date, end_date, today)
 	today = bounds.today
 	local historical_end = bounds.historical_end
-	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
+	local historical, complete = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
-	if not bounds.includes_today then return { historical = historical, today = today_by_app } end
+	if not bounds.includes_today then return { historical = historical, today = today_by_app }, complete end
 	local today_where = filters(today, today, apps)
 	for _, code in ipairs(NGRAM_CODES) do
-		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
+		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
+		if not accepted then complete = false end
 		for _, row in ipairs(rows) do
 			today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
 			merge_ngram(today_by_app[row.app][code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
-	local sc_rows = read_rows(sqlite_path, string.format(
+	local sc_rows, sc_accepted = read_rows(sqlite_path, string.format(
 		"SELECT json_quote(app) AS app_json, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",
 		filters(today, today, apps)))
+	if not sc_accepted then complete = false end
 	for _, row in ipairs(sc_rows) do
 		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
 		merge_ngram(today_by_app[row.app].sc_kb, tostring(row.scancode), row.c)
 	end
-	return { historical = historical, today = today_by_app }
+	return { historical = historical, today = today_by_app }, complete
 end
 
 return M
