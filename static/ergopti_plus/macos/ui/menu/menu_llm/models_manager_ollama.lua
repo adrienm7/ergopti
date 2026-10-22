@@ -18,6 +18,7 @@ local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
+local RuntimeChoice = require("core.llm.ollama_runtime_choice")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local NetworkEnv = require("modules.llm.network_env")
 local ManagedPullReceipt = require("adapters.managed_ollama_pull")
@@ -1406,7 +1407,17 @@ function M.new(deps, presets, ram_getter)
 		local managed_handle
 		local pull_executable, pull_arguments, pull_command
 		if managed ~= true then
-			local network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+			-- `ollama pull` only asks the daemon to fetch. A daemon Ergopti did not
+			-- start (Ollama.app, Homebrew, PATH) downloads with its own network
+			-- settings, so refusing a PAC or WPAD route here only guaranteed that the
+			-- model never came (issue #100); its own failure is reported instead.
+			local foreign_daemon = RuntimeChoice.classify(bin_source) == "foreign"
+			local network, network_err
+			if foreign_daemon then
+				network, network_err = NetworkEnv.prelude("OLLAMA-PULL")
+			else
+				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+			end
 			if not network then
 				Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))
 				settle_cancel("network_policy_missing")
