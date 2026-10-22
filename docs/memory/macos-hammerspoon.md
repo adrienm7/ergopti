@@ -1452,3 +1452,23 @@ The macOS configuration writer rechecks bytes under its canonical writer lease
 before a conditional unlink, but the lease is advisory: an editor that does not
 cooperate can still replace the path between compare and unlink. Its
 capabilities are process-local, not a journal that survives a crash or VM exit.
+
+### project-macos-embedded-runtime-starts-without-launcher
+
+macOS can start the embedded `com.ergoptiplus.app.hammerspoon` by itself,
+without the launcher's environment, beside the launcher's own child: issue
+#99 (09:40:03, 1.0.4 update relaunch) and #100 (10:28:12, launcher PID 1051,
+right after a reboot) both show two "session opened" banners in the same
+millisecond, one with no `ERGOPTI_*` key and a config dir from the default
+`~/.config/ergopti_plus`. No Ergopti code launches that bundle without the
+environment, so treat session restore (loginwindow reopening every running
+app, the nested one included) as the trigger until a launcher.log proves
+otherwise. `infra/instance_admission.lua` therefore runs before any settings
+write, timer or path resolution and quits such a stray runtime silently; a
+stock Hammerspoon pointed at Ergopti is refused without `os.exit`, which would
+quit the user's application. The launcher holds a per-user flock
+(`LauncherInstanceOwnership.swift`): `LSMultipleInstancesProhibited` only
+covers other user sessions, not `open -n`, a direct exec or a racing update
+relaunch. A modal `hs.dialog.blockAlert` keeps the run loop turning, so any
+producer armed at require time (the KC ledger bridge) must be stopped before a
+fatal dialog.
