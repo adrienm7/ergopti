@@ -266,24 +266,23 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		return add_binding_to(group.prefix, ctx)
 	end
 	-- The group's restore and clear: the Shortcuts scope narrowed to its slots.
-	local function scope_action(mode)
-		return function()
-			if not getters.keyboard_group_ready() or type(ctx.apply_keyboard_group_scope) ~= "function" then
-				return false
-			end
-			return ctx.apply_keyboard_group_scope(group.prefix, mode) == true
+	local function apply_scope(mode)
+		if not getters.keyboard_group_ready() or type(ctx.apply_keyboard_group_scope) ~= "function" then
+			return false
 		end
+		return ctx.apply_keyboard_group_scope(group.prefix, mode) == true
 	end
-	local commands = {
-		keyboard_group_add = add_action,
-		scope_restore = scope_action("recommended"),
-		scope_clear = scope_action("clear"),
-	}
+	local function restore_action() return apply_scope("recommended") end
+	local function clear_action() return apply_scope("clear") end
 	local function fixed_provider() return fixed end
 	local function assigned_provider() return assigned end
 	-- Admit the entire declared frame before querying the genuine assignment and
 	-- parameter owners. Empty assigned data exercises the same renderer policy.
-	local admission = ManifestMenu.template_rows("keyboard_group_frame", commands, getters, {
+	local admission = ManifestMenu.template_rows("keyboard_group_frame", {
+		keyboard_group_add = add_action,
+		scope_restore = restore_action,
+		scope_clear = clear_action,
+	}, getters, {
 		keyboard_group_fixed_rows = fixed_provider,
 		keyboard_group_assigned_rows = assigned_provider,
 	})
@@ -309,7 +308,11 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		}
 	end
 
-	local rows = ManifestMenu.template_rows("keyboard_group_frame", commands, getters, {
+	local rows = ManifestMenu.template_rows("keyboard_group_frame", {
+		keyboard_group_add = add_action,
+		scope_restore = restore_action,
+		scope_clear = clear_action,
+	}, getters, {
 		keyboard_group_fixed_rows = fixed_provider,
 		keyboard_group_assigned_rows = assigned_provider,
 	})
