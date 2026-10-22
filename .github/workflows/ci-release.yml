@@ -35,6 +35,9 @@ on:
       WINDOWS_SIGNER_SUBJECT:
         description: Read only to tell whether Windows signing is configured
         required: false
+      SIGNPATH_API_TOKEN:
+        description: Read only to tell whether Windows signing is configured
+        required: false
 
 permissions:
   contents: read
@@ -103,7 +106,7 @@ jobs:
       ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.publication-plan.outputs.channel }}
       ERGOPTI_DEV_RELEASE_TAG: ${{ needs.publication-plan.outputs.tag }}
       ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.publication-plan.outputs.version }}
-      ERGOPTI_WINDOWS_SIGNING_CONFIGURED: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 != '' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD != '' && secrets.WINDOWS_SIGNER_SUBJECT != '' && 'true' || 'false' }}
+      ERGOPTI_WINDOWS_SIGNING_CONFIGURED: ${{ (secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 != '' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD != '' && secrets.WINDOWS_SIGNER_SUBJECT != '' || secrets.SIGNPATH_API_TOKEN != '' && secrets.WINDOWS_SIGNER_SUBJECT != '' && vars.SIGNPATH_PROJECT_SLUG != '' && vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_SIGNING_POLICY_SLUG != '') && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@v4

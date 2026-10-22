@@ -46,6 +46,9 @@ on:
       WINDOWS_SIGNER_SUBJECT:
         description: Expected Authenticode subject; passed on release runs only
         required: false
+      SIGNPATH_API_TOKEN:
+        description: SignPath CI user API token; passed on release runs only
+        required: false
 
 permissions:
   contents: read
@@ -1064,10 +1067,51 @@ jobs:
           node tools/ci/windows-exe-av-surface.cjs "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
           if ($LASTEXITCODE -ne 0) { throw "ErgoptiPlus.exe exceeds its antivirus surface policy." }
 
+      # SignPath (Foundation open-source signing) is switched on by the
+      # repository variable SIGNPATH_PROJECT_SLUG, together with
+      # SIGNPATH_ORGANIZATION_ID, SIGNPATH_SIGNING_POLICY_SLUG and the
+      # SIGNPATH_API_TOKEN secret. SignPath fetches this artifact from GitHub,
+      # verifies that this workflow built it, waits for a maintainer to
+      # approve the request, and returns the signed exe. Its artifact
+      # configuration is .signpath/artifact-configuration.xml. The next step
+      # verifies the publisher and refuses any partial configuration. Only
+      # stable releases are submitted: each request waits for an approval.
+      - name: Upload the unsigned ErgoptiPlus.exe for SignPath
+        id: signpath-unsigned
+        if: inputs.release && inputs.prerelease != 'true' && vars.SIGNPATH_PROJECT_SLUG != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ergoptiplus-exe-unsigned
+          retention-days: 1
+          if-no-files-found: error
+          path: static/ergopti_plus/windows/ErgoptiPlus.exe
+
+      # Pinned to the commit of tag v3.0: this third-party action receives the
+      # SignPath API token.
+      - name: Submit the SignPath signing request
+        if: inputs.release && inputs.prerelease != 'true' && vars.SIGNPATH_PROJECT_SLUG != ''
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ergoptiplus-exe
+          github-artifact-id: ${{ steps.signpath-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # Every Foundation request waits for a manual approval.
+          wait-for-completion-timeout-in-seconds: 7200
+          output-artifact-directory: ${{ runner.temp }}/signpath-signed
+
       - name: Sign and verify ErgoptiPlus.exe
         if: inputs.release
         shell: pwsh
         env:
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_SIGNED_DIR: ${{ runner.temp }}/signpath-signed
           ERGOPTI_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
           ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
           ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
@@ -1078,6 +1122,44 @@ jobs:
           WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
           WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
         run: |
+          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          function Test-Unset([string] $Name) {
+              [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($Name))
+          }
+          $signPathKeys = @(
+              "SIGNPATH_PROJECT_SLUG",
+              "SIGNPATH_ORGANIZATION_ID",
+              "SIGNPATH_SIGNING_POLICY_SLUG",
+              "SIGNPATH_API_TOKEN")
+          $signPathMissing = @($signPathKeys | Where-Object { Test-Unset $_ })
+          # Dev prereleases stay unsigned: each SignPath request waits for a manual approval.
+          if ($env:ERGOPTI_RELEASE_PRERELEASE -cne "true" -and $signPathMissing.Count -ne $signPathKeys.Count) {
+              if ($signPathMissing.Count -gt 0) {
+                  throw "Partial SignPath configuration; missing: $($signPathMissing -join ', ')."
+              }
+              if (Test-Unset "WINDOWS_SIGNER_SUBJECT") {
+                  throw "SignPath signing requires the WINDOWS_SIGNER_SUBJECT secret to verify the publisher."
+              }
+              if (-not ((Test-Unset "WINDOWS_SIGNING_CERTIFICATE_BASE64") -and (Test-Unset "WINDOWS_SIGNING_CERTIFICATE_PASSWORD"))) {
+                  throw "SignPath and a PFX certificate are both configured; keep exactly one signer."
+              }
+              $signed = @(Get-ChildItem -LiteralPath $env:SIGNPATH_SIGNED_DIR -Recurse -File -Filter "ErgoptiPlus.exe")
+              if ($signed.Count -ne 1) {
+                  throw "SignPath returned $($signed.Count) ErgoptiPlus.exe files, expected exactly one."
+              }
+              Copy-Item -LiteralPath $signed[0].FullName -Destination $exe -Force
+              $signature = Get-AuthenticodeSignature -LiteralPath $exe
+              if ($signature.Status -ne 'Valid') {
+                  throw "ErgoptiPlus.exe Authenticode status is '$($signature.Status)', expected 'Valid'."
+              }
+              if ($null -eq $signature.SignerCertificate -or
+                  $signature.SignerCertificate.Subject -cne $env:WINDOWS_SIGNER_SUBJECT) {
+                  throw "Unexpected Authenticode publisher '$($signature.SignerCertificate.Subject)'."
+              }
+              Write-Host "Verified SignPath Authenticode publisher: $($signature.SignerCertificate.Subject)"
+              exit 0
+          }
+
           $required = @(
               "WINDOWS_SIGNING_CERTIFICATE_BASE64",
               "WINDOWS_SIGNING_CERTIFICATE_PASSWORD",

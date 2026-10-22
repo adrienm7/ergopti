@@ -463,6 +463,7 @@ jobs:
       WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 || '' }}
       WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD || '' }}
       WINDOWS_SIGNER_SUBJECT: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
+      SIGNPATH_API_TOKEN: ${{ needs.validate.outputs.release == 'true' && secrets.SIGNPATH_API_TOKEN || '' }}
 
   # ─────────────────────────────────────────────────
   # 2.3) Linux — unit tests, E2E, package, installations and verdict
@@ -529,3 +530,4 @@ jobs:
       WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ github.event_name == 'push' && secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 || '' }}
       WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ github.event_name == 'push' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD || '' }}
       WINDOWS_SIGNER_SUBJECT: ${{ github.event_name == 'push' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
+      SIGNPATH_API_TOKEN: ${{ github.event_name == 'push' && secrets.SIGNPATH_API_TOKEN || '' }}

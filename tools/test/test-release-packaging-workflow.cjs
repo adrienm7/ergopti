@@ -1015,6 +1015,39 @@ if (windowsSigningStep !== null) {
 			errors.push(`the Windows signing gate is missing ${token}`);
 		}
 	}
+	// SignPath: a partial configuration, a second signer or an unexpected
+	// publisher fails; the returned exe replaces the unsigned one only after
+	// its signature verifies.
+	for (const token of [
+		'Partial SignPath configuration',
+		'SignPath and a PFX certificate are both configured',
+		'SIGNPATH_SIGNED_DIR',
+		'SignPath signing requires the WINDOWS_SIGNER_SUBJECT secret',
+		'$env:ERGOPTI_RELEASE_PRERELEASE -cne "true" -and $signPathMissing.Count -ne $signPathKeys.Count'
+	]) {
+		if (!body.includes(token)) errors.push(`the SignPath signing branch is missing ${token}`);
+	}
+	const submit = releaseStep('Submit the SignPath signing request', WINDOWS_BOX);
+	if (submit !== null) {
+		if (!/uses: signpath\/github-action-submit-signing-request@[0-9a-f]{40}\n/.test(submit))
+			errors.push('the SignPath action receives the API token, so it must be pinned to a commit');
+		const configuration = fs.readFileSync(
+			path.join(root, '.signpath/artifact-configuration.xml'),
+			'utf8'
+		);
+		if (
+			!submit.includes('artifact-configuration-slug: ergoptiplus-exe') ||
+			!configuration.includes('"ergoptiplus-exe"') ||
+			!configuration.includes('<pe-file path="ErgoptiPlus.exe"')
+		)
+			errors.push('the SignPath request must name the tracked ergoptiplus-exe configuration');
+		for (const token of [
+			'github-artifact-id: ${{ steps.signpath-unsigned.outputs.artifact-id }}',
+			'wait-for-completion: true',
+			'output-artifact-directory: ${{ runner.temp }}/signpath-signed'
+		])
+			if (!submit.includes(token)) errors.push(`the SignPath request is missing ${token}`);
+	}
 	if (!body.includes('ERGOPTI_RELEASE_PRERELEASE -ceq "true"')) {
 		errors.push('only an explicit dev prerelease may omit every Windows signing secret');
 	}

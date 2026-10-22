@@ -251,6 +251,8 @@ const LINUX_INTEGRATION_NATIVE_ROW = "matrix.group == 'native'";
 const LINUX_INTEGRATION_DRIVER_ROW = "matrix.group == 'driver'";
 // The Windows Integration lot that owns the native cohorts and real install files.
 const WINDOWS_NATIVE_LOT = "matrix.lot == 'Native cohorts and contracts'";
+const SIGNPATH_STABLE_RELEASE =
+	"inputs.release && inputs.prerelease != 'true' && vars.SIGNPATH_PROJECT_SLUG != ''";
 const MANUAL_RUNTIME_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && " +
 	LINUX_INTEGRATION_NATIVE_ROW +
@@ -787,6 +789,14 @@ const STEP_CONDITIONS = [
 	],
 	[WINDOWS_BOX, 'e2e-ahk', 'Download E2E runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
+	// SignPath runs only once the maintainer configures it, and never for a dev prerelease.
+	[
+		WINDOWS_BOX,
+		'package-windows',
+		'Upload the unsigned ErgoptiPlus.exe for SignPath',
+		SIGNPATH_STABLE_RELEASE
+	],
+	[WINDOWS_BOX, 'package-windows', 'Submit the SignPath signing request', SIGNPATH_STABLE_RELEASE],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
 	[WINDOWS_BOX, 'e2e-ahk', 'Retain E2E native streams', 'always()'],
@@ -1939,7 +1949,8 @@ const PUBLICATION_SECRETS = [
 	'HOMEBREW_TAP_TOKEN',
 	'WINDOWS_SIGNING_CERTIFICATE_BASE64',
 	'WINDOWS_SIGNING_CERTIFICATE_PASSWORD',
-	'WINDOWS_SIGNER_SUBJECT'
+	'WINDOWS_SIGNER_SUBJECT',
+	'SIGNPATH_API_TOKEN'
 ];
 /** Lists how the Release caller could leak a secret or forge the lane results. */
 function publicationCallerProblems(body) {
