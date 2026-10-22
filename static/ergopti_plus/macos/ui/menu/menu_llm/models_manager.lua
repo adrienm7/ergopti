@@ -19,6 +19,7 @@ local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
 local Logger    = require("infra.logger")
 local dialog    = require("infra.dialog_util")
+local RunningApplication = require("adapters.running_application")
 local llm_mod   = require("modules.llm")
 local i18n      = require("infra.i18n")
 local Paths     = require("infra.paths")
@@ -475,15 +476,9 @@ function M.new(deps)
 						and owner.requirement_registered == true
 				end
 				if not owner_current_or_cancel() then return true end
-				local app_ok, hs_app = xpcall(function()
-					local application = hs.application
-					local app = application and application.get
-						and application.get("Hammerspoon") or nil
-					if not app and application and application.find then
-						app = application.find("Hammerspoon")
-					end
-					return app
-				end, debug.traceback)
+				-- By PID: a name lookup that misses falls back to reading every
+				-- window of every application (issue #99).
+				local app_ok, hs_app = xpcall(RunningApplication.current, debug.traceback)
 				if app_ok ~= true then
 					Logger.error(LOG, "Model system-check application lookup raised: %s.",
 						tostring(hs_app))

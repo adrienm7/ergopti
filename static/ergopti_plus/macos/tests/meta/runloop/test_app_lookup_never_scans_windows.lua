@@ -23,14 +23,9 @@ local helpers = require("tests.helpers")
 local DRIVER_ROOT = helpers.driver_root()
 
 -- Production modules that still call hs.application.get/find directly, with
--- their count of calls. Only ever lower these. The AI model manager resolves
--- its own running process by name ("Hammerspoon" always matches, so the window
--- fallback cannot run); it belongs to the AI lane and moves to
--- RunningApplication.current() there.
-local DIRECT_LOOKUP_BASELINE = {
-	["ui.menu.menu_llm.models_manager"] = 2,
-	["ui.menu.menu_llm.models_manager_mlx_hf"] = 2,
-}
+-- their count of calls. Only ever lower these; the AI model managers now find
+-- their own process with RunningApplication.current(), so none remains.
+local DIRECT_LOOKUP_BASELINE = {}
 
 --- Lists production Lua files recursively without relying on LuaFileSystem.
 --- @param directory string Absolute directory path.
