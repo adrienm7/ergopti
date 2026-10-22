@@ -554,7 +554,12 @@ helpers.describe("declared keyboard action contextual title receiving", function
 		fixture(function(state, builder, _, _, titles, open)
 			helpers.assert_nil(titles.presentation_for_app("action_picker", "keyboard_slot_action", "linux"),
 				"a macOS-only context is not Linux's")
-			helpers.assert_nil(titles.presentation_for_app("action_picker", "tap_hold_hold_action", "linux"))
+			helpers.assert_nil(titles.presentation_for_app("action_picker", "key_combination_tap_action", "linux"))
+			-- The hold contexts are shared with Linux since its hold opens the
+			-- shared picker too (2026-10-22): each driver reads its own declaration.
+			helpers.assert_type(titles.presentation_for_app("action_picker", "tap_hold_hold_action", "linux"), "table")
+			helpers.assert_nil(titles.presentation_for_app("action_picker", "tap_hold_hold_action", "ahk"),
+				"Windows titles its hold picker natively")
 			helpers.assert_eq(open({ presentation_id = "linux_only_context", presentation_suffix = "K1", items = {} }), false)
 			helpers.assert_eq(builder.show_webview({ app_id = "action_picker", presentation_id = "keyboard_slot_action",
 				presentation_receipt = {} }), nil)
