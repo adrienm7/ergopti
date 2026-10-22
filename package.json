@@ -176,6 +176,7 @@
 		"test:text-case-vectors-shared": "node ./tools/test/test-text-case-vectors-shared.cjs",
 		"test:desktop-navigation-vectors-shared": "node ./tools/test/test-desktop-navigation-vectors-shared.cjs",
 		"test:wrap-pair-vectors-shared": "node ./tools/test/test-wrap-pair-vectors-shared.cjs",
+		"test:open-target-vectors-shared": "node ./tools/test/test-open-target-vectors-shared.cjs",
 		"test:llm-prompt-actions-single-source": "node ./tools/test/test-llm-prompt-actions-single-source.cjs",
 		"test:windows-rewrite-prompt-wiring": "node ./tools/test/test-windows-rewrite-prompt-wiring.cjs",
 		"test:windows-llm-accept-injection": "node ./tools/test/test-windows-llm-accept-injection.cjs",
