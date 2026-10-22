@@ -225,7 +225,10 @@ for Source in ["engine.v2", "engine[0]", 'engine"quoted', "engine\path", "engine
 ; SQLite's json_group_object cuts an object key at an embedded NUL, so a merged
 ; map turned "a\u0000b" into a second "a" key on the Linux writer. Every numeric
 ; map this walker merges (n-gram sources, error buckets, burst lengths) shares
-; KLW_BucketMergeExpr, so each one is replayed through the vendored DLL twice.
+; KLW_BucketMergeExpr, so each one merges a delta into a stored map holding a
+; NUL key through the vendored DLL. The stored key is written in SQL because an
+; AutoHotkey Map key ends at its first NUL: "a\0b" and "a" are one Map key, so no
+; batch can carry it, while the column can hold it from another writer.
 _WJFM_NulMapKey(Kind) {
 	SavedBatch := KLW.batch
 	Db := _WJFM_OpenMemory()
@@ -233,17 +236,17 @@ _WJFM_NulMapKey(Kind) {
 		AssertTrue(KLR_LoadSchema(Db))
 		loop 2 {
 			KLW_ResetBatch()
-			Counts := Map("a" . Chr(0) . "b", 1, "a", 10)
+			Counts := Map("a", 10)
 			Row := Map("date", "2026-09-08", "app", "merge.exe")
 			switch Kind {
 				case "ngram":
 					Key := "2026-09-08" . Chr(1) . "merge.exe" . Chr(1) . "x"
 					KLW.batch["ngram"]["ngram_chars"][Key] := Map("c", 0, "td", 0,
-						"cd", 0, "e", 11, "esrc", Counts)
+						"cd", 0, "e", 10, "esrc", Counts)
 					Table := "ngram_chars", Column := "esrc_json"
 				case "hourly", "hourly_min5":
 					Row["hour"] := "10", Row["slot"] := "10:00"
-					Row["e"] := 11, Row["em"] := 11, Row["es"] := 0
+					Row["e"] := 10, Row["em"] := 10, Row["es"] := 0
 					Row["e_buckets"] := Counts
 					KLW.batch[Kind]["fixture"] := Row
 					Table := Kind = "hourly" ? "agg_app_day_hourly" : "agg_app_day_hourly_min5"
@@ -256,13 +259,17 @@ _WJFM_NulMapKey(Kind) {
 					Table := "agg_app_day_burst", Column := "length_buckets_json"
 			}
 			_WJFM_Flush(Db)
+			if (A_Index = 1)
+				AssertTrue(SQLite_Exec(Db, "UPDATE " . Table . " SET " . Column . " = '{"
+					. Chr(34) . "a\u0000b" . Chr(34) . ":1," . Chr(34) . "a" . Chr(34) . ":10}';"),
+					"the stored map must take a NUL key from SQL")
 		}
 		Rows := SQLite_Query(Db, "SELECT json_valid(" . Column . ") AS valid, (SELECT group_concat(h, ',') FROM "
 			. "(SELECT hex(key) || '|' || value AS h FROM json_each(" . Column . ") ORDER BY hex(key))) AS keys FROM "
 			. Table . ";")
 		AssertEqual(1, Rows.Length)
 		AssertEqual(1, Rows[1]["valid"], "the merged map must stay valid JSON")
-		AssertEqual("61|20,610062|2", Rows[1]["keys"],
+		AssertEqual("61|20,610062|1", Rows[1]["keys"],
 			"a NUL key must merge beside its own prefix; json_group_object folds it into a second 'a'")
 	} finally {
 		KLW.batch := SavedBatch
