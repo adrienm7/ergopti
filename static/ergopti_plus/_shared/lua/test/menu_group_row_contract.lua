@@ -145,21 +145,39 @@ end
 
 local register_previous = M.register
 
+--- A published caption group of each driver. The Tap-Hold delay row was the
+--- shared one until it became a command (2026-10-22).
+local CAPTION_GROUPS = {
+	macos = { section = "gesture_swipe_slot_menu", id = "gesture_mode_options",
+		getter = "gesture_mode_current_label", en = "Mode: %s", fr = "Mode : %s" },
+	linux = { section = "tap_hold_key_head", id = "tap_hold_key_hold",
+		getter = "tap_hold_key_hold_caption", en = "Hold → %s", fr = "Hold → %s" },
+}
+
+--- Builds the getters table naming the fixture's caption getter.
+--- @param group table A CAPTION_GROUPS entry.
+--- @param getter function The caption getter.
+--- @return table
+local function caption_getters(group, getter)
+	return { [group.getter] = getter }
+end
+
 --- Extends the selected parent contract with the published physical caption owner.
 --- @param helpers table Native assertions.
 --- @param driver string Native driver root.
 function M.register(helpers, driver)
 	register_previous(helpers, driver)
+	local group = assert(CAPTION_GROUPS[driver], "a caption group for each driver")
 	helpers.describe("declared parent existing caption policy", function()
 		for _, code in ipairs({ "en", "fr" }) do
 			local language = code
-			helpers.it("reads the authentic TapHold group caption once in " .. language, function()
+			helpers.it("reads the authentic caption group once in " .. language, function()
 				with_physical_parent(driver, language, function(menu)
 					local reads, calls = 0, 0
 					local child = { { title = "Native child", fn = function() calls = calls + 1 end } }
-					local row = assert(menu.group_row("tap_hold_key_delay_tail", "tap_hold_key_delay", child,
-						{ tap_hold_key_delay_caption = function() reads = reads + 1; return "12% / 🦀" end }))
-					helpers.assert_eq(row.label, ({ en = "Tap delay: 12% / 🦀", fr = "Délai de tap : 12% / 🦀" })[language])
+					local row = assert(menu.group_row(group.section, group.id, child,
+						caption_getters(group, function() reads = reads + 1; return "12% / 🦀" end)))
+					helpers.assert_eq(row.label, (group[language]:gsub("%%s", "12%% / 🦀")))
 					helpers.assert_eq(reads, 1)
 					helpers.assert_true(rawequal(row.submenu, child))
 					helpers.assert_eq(calls, 0)
@@ -169,11 +187,11 @@ function M.register(helpers, driver)
 		helpers.it("refuses a missing actual caption getter and admits its explicit repaired receipt", function()
 			with_physical_parent(driver, "en", function(menu)
 				local child = {}
-				helpers.assert_nil(menu.group_row("tap_hold_key_delay_tail", "tap_hold_key_delay", child, {}))
+				helpers.assert_nil(menu.group_row(group.section, group.id, child, {}))
 				local reads = 0
-				local row = assert(menu.group_row("tap_hold_key_delay_tail", "tap_hold_key_delay", child,
-					{ tap_hold_key_delay_caption = function() reads = reads + 1; return "30 ms" end }))
-				helpers.assert_eq(row.label, "Tap delay: 30 ms")
+				local row = assert(menu.group_row(group.section, group.id, child,
+					caption_getters(group, function() reads = reads + 1; return "30 ms" end)))
+				helpers.assert_eq(row.label, (group.en:gsub("%%s", "30 ms")))
 				helpers.assert_eq(reads, 1)
 				helpers.assert_true(rawequal(row.submenu, child))
 			end)
@@ -183,13 +201,13 @@ function M.register(helpers, driver)
 			helpers.it("refuses the actual " .. case .. " caption receipt", function()
 				with_physical_parent(driver, "en", function(menu)
 					local reads = 0
-					local row = menu.group_row("tap_hold_key_delay_tail", "tap_hold_key_delay", {},
-						{ tap_hold_key_delay_caption = function()
+					local row = menu.group_row(group.section, group.id, {},
+						caption_getters(group, function()
 							reads = reads + 1
 							if case == "false" then return false end
 							if case == "number" then return 17 end
 							if case == "table" then return {} end
-						end })
+						end))
 					helpers.assert_nil(row)
 					helpers.assert_eq(reads, 1)
 				end)
@@ -200,15 +218,15 @@ function M.register(helpers, driver)
 			helpers.it("refuses " .. case .. " before reading the native caption", function()
 				with_physical_parent(driver, "en", function(menu)
 					local declaration
-					for _, item in ipairs(menu.get_array("tap_hold_key_delay_tail")) do
-						if item.id == "tap_hold_key_delay" then declaration = item end
+					for _, item in ipairs(menu.get_array(group.section)) do
+						if item.id == group.id then declaration = item end
 					end
 					assert(declaration, "the actual caption group must be published")
 					if case == "unknown key" then declaration.i18n = "future.unknown_group_caption"
 					else declaration.caption_layout = "prefix"; declaration.caption_joiner = "" end
 					local reads = 0
-					helpers.assert_nil(menu.group_row("tap_hold_key_delay_tail", "tap_hold_key_delay", {},
-						{ tap_hold_key_delay_caption = function() reads = reads + 1; return "30 ms" end }))
+					helpers.assert_nil(menu.group_row(group.section, group.id, {},
+						caption_getters(group, function() reads = reads + 1; return "30 ms" end)))
 					helpers.assert_eq(reads, 0)
 				end)
 			end)

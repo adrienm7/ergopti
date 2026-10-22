@@ -5233,18 +5233,16 @@ type = "---"
 platforms = ["hs"]
 unavailable = "hide"
 
+# The row naming the key's delay opens the driver's delay prompt itself: the
+# maintainer retired the submenu whose only row did that (2026-10-22), since
+# a row that opens a submenu is never clicked.
 [[menu.tap_hold_key_delay_tail]]
-type = "group"
+type = "command"
 id = "tap_hold_key_delay"
 i18n = "menu.tapholds.key_tap_delay"
 caption_getter = "tap_hold_key_delay_caption"
 
-[[menu.tap_hold_key_delay_rows]]
-type = "command"
-id = "tap_hold_key_delay_set"
-i18n = "menu.tapholds.key_tap_delay_set"
-
-[[menu.tap_hold_key_delay_rows]]
+[[menu.tap_hold_key_delay_tail]]
 type = "check"
 id = "tap_hold_key_delay_use_global"
 i18n = "menu.tapholds.key_tap_delay_use_global"

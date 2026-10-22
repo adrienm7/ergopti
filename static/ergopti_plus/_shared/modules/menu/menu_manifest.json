@@ -1570,17 +1570,10 @@
 			"unavailable": "hide"
 		},
 		{
-			"type": "group",
+			"type": "command",
 			"id": "tap_hold_key_delay",
 			"i18n": "menu.tapholds.key_tap_delay",
 			"caption_getter": "tap_hold_key_delay_caption"
-		}
-	],
-	"tap_hold_key_delay_rows": [
-		{
-			"type": "command",
-			"id": "tap_hold_key_delay_set",
-			"i18n": "menu.tapholds.key_tap_delay_set"
 		},
 		{
 			"type": "check",

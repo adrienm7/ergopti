@@ -19,7 +19,7 @@ local NUMERIC_DIALOGS = {
 	{ row = "menu.tapholds.tap_hold_title", key = "menu.tapholds.tap_hold_dialog_title", default = 200 },
 	{ row = "menu.tapholds.sticky_title", key = "menu.tapholds.sticky_dialog_title", default = 1000 },
 	{ row = "menu.tapholds.simultaneous_title", key = "menu.tapholds.simultaneous_dialog_title", default = 50 },
-	{ row = "menu.tapholds.key_tap_delay_set", key = "menu.tapholds.key_tap_delay_dialog_title", default = 200 },
+	{ row = "menu.tapholds.key_tap_delay", key = "menu.tapholds.key_tap_delay_dialog_title", default = 200 },
 }
 local TITLE_KEYS = { ["llm.unreachable.title"] = true }
 for _, spec in ipairs(NUMERIC_DIALOGS) do TITLE_KEYS[spec.key] = true end

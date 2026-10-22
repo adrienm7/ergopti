@@ -479,9 +479,17 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		and NONE_DISPLAY
 		or  (tap_slbl .. "  /  " .. hold_slbl)
 
-	-- Native delay dialogs and persistence retain their existing mutation owners.
-	local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
-		["tap_hold_key_delay_set"] = function()
+	local key_submenu = ManifestMenu.template_rows("tap_hold_key_rows", {
+		["tap_hold_key_tap"] = function()
+			return open_slot_picker(karabiner, { slot = "tap", id = kid, presentation_id = "tap_hold_action",
+				suffix = key_label, getter = "get_tap_action", setter = "set_tap_action" }, update_menu)
+		end,
+		["tap_hold_key_hold_action"] = function()
+			return open_slot_picker(karabiner, { slot = "hold", id = kid, presentation_id = "tap_hold_hold_action",
+				suffix = key_label, getter = "get_hold_action", setter = "set_hold_action" }, update_menu)
+		end,
+		-- The delay row opens the native dialog itself; persistence keeps its owner.
+		["tap_hold_key_delay"] = function()
 			hs.focus()
 			local prompt = string.format(
 				i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
@@ -506,22 +514,6 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 				return karabiner.set_tap_timeout(kid, nil)
 			end, update_menu)
 		end,
-	}, {
-		["tap_hold_key_global_delay_caption"] = function() return fmt_delay(global_ms) end,
-		["tap_hold_key_delay_is_global"] = function() return per_key_ms == nil end,
-		["tap_hold_key_delay_has_override"] = function() return per_key_ms ~= nil end,
-	})
-	if not delay_rows then return nil end
-
-	local key_submenu = ManifestMenu.template_rows("tap_hold_key_rows", {
-		["tap_hold_key_tap"] = function()
-			return open_slot_picker(karabiner, { slot = "tap", id = kid, presentation_id = "tap_hold_action",
-				suffix = key_label, getter = "get_tap_action", setter = "set_tap_action" }, update_menu)
-		end,
-		["tap_hold_key_hold_action"] = function()
-			return open_slot_picker(karabiner, { slot = "hold", id = kid, presentation_id = "tap_hold_hold_action",
-				suffix = key_label, getter = "get_hold_action", setter = "set_hold_action" }, update_menu)
-		end,
 		["tap_hold_key_no_action"] = function()
 			return run_bulk_menu_command(
 				karabiner,
@@ -538,8 +530,9 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		["tap_hold_key_tap_caption"] = function() return tap_slbl end,
 		["tap_hold_key_hold_caption"] = function() return hold_slbl end,
 		["tap_hold_key_delay_caption"] = function() return fmt_delay(effective_ms) end,
-	}, {
-		["tap_hold_key_delay"] = delay_rows,
+		["tap_hold_key_global_delay_caption"] = function() return fmt_delay(global_ms) end,
+		["tap_hold_key_delay_is_global"] = function() return per_key_ms == nil end,
+		["tap_hold_key_delay_has_override"] = function() return per_key_ms ~= nil end,
 	})
 	if not key_submenu then return nil end
 
@@ -896,7 +889,7 @@ local function picker_fingerprint(karabiner, enabled)
 	local parts = { enabled and "1" or "0", i18n.get_locale() }
 	local ok_sym, sym = pcall(karabiner.get_combo_symmetric)
 	parts[#parts + 1] = (ok_sym and sym) and "1" or "0"
-	-- The global tap/hold timeout is rendered in every per-key delay submenu
+	-- The global tap/hold timeout is rendered in every key's delay rows
 	-- (the "use global (%s)" label and the effective value when no override), so a
 	-- global change must invalidate the cached picker trees as well.
 	local ok_g, g = pcall(karabiner.get_tap_hold_timeout)

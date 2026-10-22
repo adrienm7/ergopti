@@ -4430,20 +4430,16 @@ local function _build_tap_holds(ctx)
 				}
 			end
 
-			local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
-				["tap_hold_key_delay_set"] = function() return ask_delay(key_id, ms) end,
-			})
-			if not delay_rows then return nil end
-
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
+				["tap_hold_key_delay"] = function() return ask_delay(key_id, ms) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
 				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
-			}, { ["tap_hold_key_hold"] = hold_rows, ["tap_hold_key_delay"] = delay_rows })
+			}, { ["tap_hold_key_hold"] = hold_rows })
 			if key_rows then
 
 				rows[#rows + 1] = {
