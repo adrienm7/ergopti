@@ -17,8 +17,60 @@ const sharedManifest = JSON.parse(fs.readFileSync(path.join(repository, titles.S
 const localeDirectory = path.join(repository, 'static/ergopti_plus/_shared/data/locales');
 const localeNames = fs.readdirSync(localeDirectory).filter((name) => name.endsWith('.json'));
 assert.equal(localeNames.length, 21, 'every shipped locale participates in the title policy');
+/**
+ * Lists every locale key that names a native caption: each declared app and
+ * presentation title, and every key spelled as a window or dialog title.
+ * @param {object} manifest - The shared UI manifest.
+ * @param {object} strings - One locale's strings.
+ * @returns {string[]} Caption keys, each one fed to a brand-adding composer.
+ */
+function captionKeys(manifest, strings) {
+	const keys = new Set();
+	for (const entry of Object.values(manifest.apps)) {
+		keys.add(entry.title_key);
+		for (const variant of Object.values(entry.presentations || {})) keys.add(variant.title_key);
+	}
+	for (const entry of Object.values(manifest.native_presentations || {})) keys.add(entry.title_key);
+	for (const key of Object.keys(strings))
+		if (/(?:^|[._])(?:window|dialog)_title$/.test(key)) keys.add(key);
+	return [...keys];
+}
+/**
+ * Rejects a caption translation that already carries the product prefix.
+ * @param {object} manifest - The shared UI manifest.
+ * @param {Object<string, object>} locales - Strings by locale file name.
+ * @returns {string[]} One "locale: key" entry per branded caption.
+ */
+function brandedCaptions(manifest, locales) {
+	const found = [];
+	for (const [locale, strings] of Object.entries(locales))
+		for (const key of captionKeys(manifest, strings))
+			if (typeof strings[key] === 'string' && /^\s*Ergopti(?:Plus)?\b/.test(strings[key]))
+				found.push(`${locale}: ${key}`);
+	return found;
+}
+const shippedLocales = Object.fromEntries(
+	localeNames.map((locale) => [
+		locale,
+		JSON.parse(fs.readFileSync(path.join(localeDirectory, locale), 'utf8'))
+	])
+);
+assert.deepEqual(
+	brandedCaptions(sharedManifest, shippedLocales),
+	[],
+	'(window-title-brand-once) caption translations stay brandless: the composer adds the brand'
+);
+// The scan sees the original doubled dialog caption and a branded app title.
+for (const [key, value] of [
+	['menu.llm.api_dialog_title', 'ErgoptiPlus — API endpoint'],
+	['dialog.unused_keys.title', 'ErgoptiPlus — Réglages inutilisés'],
+	['menu.paths.window_title', 'Ergopti — Paths']
+]) {
+	const mutant = { 'fr.json': { ...shippedLocales['fr.json'], [key]: value } };
+	assert.deepEqual(brandedCaptions(sharedManifest, mutant), [`fr.json: ${key}`]);
+}
 for (const locale of localeNames) {
-	const strings = JSON.parse(fs.readFileSync(path.join(localeDirectory, locale), 'utf8'));
+	const strings = shippedLocales[locale];
 	for (const [app, entry] of Object.entries(sharedManifest.apps)) {
 		assert.equal(
 			typeof strings[entry.title_key],
