@@ -38,6 +38,22 @@ deadlines with the menu open are read through an echo probe (25411ee080, issue #
    variable names change every rule), five times "during input after the 5.0 s typing deferral
    bound" in five minutes. Consider waiting for a typing pause while the rules are fenced anyway.
 
+## Swallowed keys and the accent popup (2026-10-22, local dev)
+
+- `03a2c2fa4b` key taps read the typing application from NSWorkspace, never Accessibility.
+- `d026f3e024` every Accessibility call is bounded to 1 s (was 6 s per hung application).
+- `a414e83fb7` `infra/key_event_health.lua`: per-session counters of key-ups without key-down,
+  lost key-ups, stuck keys, long character holds (with the rule switch they crossed), late
+  callbacks and lease failures, in the driver log.
+- `19fa9fa872` a key-up is held behind queued output only when its own key-down is.
+- `89cbcae90b` a key event that waited behind the main thread is never replayed or expanded.
+- `9b500a9e8c` keepalive PINGs while lease answers are unread (open menu, modal window); the
+  inner no longer fences itself after 17.5 s; late answers are logged.
+- `c21e920d7e` model test: a fence at any moment of a press leaves no key down.
+- Still open: the karabiner.json redeploy on every recovery (item 4), the per-keystroke AXValue
+  read of `context_tracker.handle_ax_value_changed`, and stale-event handling in the taps other
+  than the keymap (tap keys, script control).
+
 ## Only the Mac can confirm
 
 - Starvation hypothesis for the silent PONG/READY timeouts: run `memory_pressure | tail -1` while
