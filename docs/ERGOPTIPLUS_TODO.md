@@ -184,16 +184,13 @@ Not started:
       CapsLock action (`caps_word`) and every other recommended value identical on both, with a
       parity test over the manifest. With it: Linux chord slots refuse `caps_word`; the engine's
       unused per-letter CapsWord mode can be removed.
-- [ ] **54/81. Last three native Windows menu rows.** [CODE] Census Windows 3, macOS 0, Linux 0
-      (`npm run test:native-menu-rows`). The rows are the `MenuRenderer_AppendTemplate` calls of the
-      default-section, file and folder submenus in `menu_hotstrings.ahk`. Design: a renderer
-      template-child row (`MenuRenderer_TemplateChildRow`) that builds the child menu and returns
-      the parent row plus a repaint handle only the renderer can redraw
-      (`MenuRenderer_RepaintTemplateChild`); the personal file/folder parent rows and
-      `_MakeSetDefaultSectionFn` take that handle, so a repaint acts only on a child the renderer
-      still publishes. Update the literal pins in `tools/test/menu-hotstring-language-binding.cjs`,
-      then `node tools/test/test-native-menu-rows.cjs --update-baseline` to zero. Captions, order,
-      unavailable reasons and child commands stay identical.
+- [x] **54/81. Last three native Windows menu rows.** Done in 02b63912f1 (local): census Windows
+      0, macOS 0, Linux 0. The default-section, file and folder submenus are renderer template
+      children (`MenuRenderer_TemplateChild` reserves, `MenuRenderer_FillTemplateChild` fills,
+      `MenuRenderer_RepaintTemplateChild` repaints only a child the renderer still publishes); a
+      kept callback after a rebuild is now refused before any write. Left: manual check 17
+      (installed menus, default choice after restart); the shared-tree census is red on Linux only
+      while `linux/ui/menu/rebuild_owner.lua:39` (another agent's uncommitted edit) is in flight.
 - [ ] **Ergopti-started Ollama behind a PAC proxy.** [CODE] Resolve the PAC through the system for
       the model registry host (macOS CFNetwork `CFNetworkExecuteProxyAutoConfigurationURL` /
       SystemConfiguration; Windows WinHTTP auto-proxy; the Linux equivalent) and pass the resulting
