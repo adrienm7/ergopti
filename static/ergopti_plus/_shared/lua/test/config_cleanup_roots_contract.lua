@@ -120,7 +120,8 @@ function M.register(h, ports)
 			local found=Engine.find({path='/virtual/config.toml',collect=ports.collect,whole_unread_roots=true,
 				read=function() return content,'ok' end})
 			h.assert_eq(found.status,'ok')
-			for _,row in ipairs(found.keys) do if row.path[1]=='hotstrings' then rows[#rows+1]=row end end
+			-- Only the array: whether this driver reads trigger_char is its own policy.
+			for _,row in ipairs(found.keys) do if row.path[1]=='hotstrings' and row.path[2]=='old_rows' then rows[#rows+1]=row end end
 			return rows
 		end
 		local rows=scan(source)

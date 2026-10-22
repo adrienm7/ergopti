@@ -49,6 +49,8 @@ local ConfigOutdated = require("config_outdated")
 local RecordList = require("toml_codec.record_list")
 local LOG           = "config_unused_keys"
 local BOM           = string.char(0xEF, 0xBB, 0xBF)
+-- nil under LuaJIT (the Linux daemon); only Lua 5.4 distinguishes integers.
+local math_type     = math.type
 
 local RootCleanup = require("toml_codec.cleanup_roots")
 local root_receipts = setmetatable({}, { __mode = "k" })
@@ -478,7 +480,8 @@ end
 local function same_value(left, right)
 	if type(left) ~= type(right) then return false end
 	if type(left) ~= "table" then
-		if type(left) == "number" and math.type and math.type(left) ~= math.type(right) then return false end
+		-- Lua 5.4 tells integers from floats; LuaJIT has one number type.
+		if type(left) == "number" and math_type and math_type(left) ~= math_type(right) then return false end
 		return left == right or (type(left) == "number" and left ~= left and right ~= right)
 	end
 	for key, value in pairs(left) do if not same_value(value, right[key]) then return false end end
