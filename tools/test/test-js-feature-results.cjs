@@ -502,7 +502,7 @@ console.log(
 require('./fixtures/common-unit-admission-controls.cjs')
 	.run()
 	.then((count) => {
-		assert.equal(count, 61, 'complete source plan, Unit writer admission and refusal diagnostics');
+		assert.equal(count, 63, 'complete source plan, Unit writer admission and refusal diagnostics');
 	})
 	.catch((error) => {
 		console.error(error);

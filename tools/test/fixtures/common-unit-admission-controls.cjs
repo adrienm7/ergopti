@@ -337,6 +337,38 @@ async function run() {
 	assert.equal(admitted.result, null);
 	assert.equal(Object.keys(admitted.selected).length, 5);
 	controls++;
+	// A completed lot whose writer step record still reads "pending" is re-read,
+	// not refused, and stays refused when the record never completes (run 39785389458).
+	const laggingReader = (lagReads) => {
+		const base = reader(model()).readApi;
+		let jobReads = 0;
+		return (endpoint) => {
+			const value = base(endpoint);
+			if (!/\/jobs\?/.test(endpoint) || ++jobReads > lagReads) return value;
+			for (const job of value.jobs)
+				for (const step of job.steps || [])
+					if (step.name.startsWith('Run shared')) {
+						step.status = 'pending';
+						step.conclusion = null;
+					}
+			return value;
+		};
+	};
+	const pauses = [];
+	const recordPause = async (ms) => {
+		pauses.push(ms);
+	};
+	const caughtUp = await receiveUnit(inventory, actualEnv, laggingReader(2), null, recordPause);
+	assert.equal(Object.keys(caughtUp.selected).length, 5);
+	assert.deepEqual(pauses, [10000, 10000], 'each lagging observation waits once before a re-read');
+	controls++;
+	pauses.length = 0;
+	await assert.rejects(
+		() => receiveUnit(inventory, actualEnv, laggingReader(Infinity), null, recordPause),
+		/missing or failed Unit writer/
+	);
+	assert.equal(pauses.length, 5, 'a writer that never completes is refused after six reads');
+	controls++;
 	const singleInventory = {
 		...inventory,
 		checks: inventory.features.map((feature, index) => ({

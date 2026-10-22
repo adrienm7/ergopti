@@ -18,6 +18,11 @@ const STAGE_JOBS = Object.freeze({
 	}
 });
 const WRITERS = Object.values(STAGE_JOBS).map((stage) => stage.writer);
+// A completed lot's writer step record lags its job by seconds; six reads 10 s
+// apart cover that lag and still refuse a writer that never completes.
+const WRITER_LAG_READS = 6;
+const WRITER_LAG_INTERVAL_MS = 10000;
+const WRITER_LAG_PAUSE = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function collectJournals(directory) {
 	const result = [];
@@ -111,26 +116,36 @@ function selectUnitJobs(plan, jobs, identity) {
 			writers.every((step) => step.name === writer),
 			'Unit writer of another stage: ' + JSON.stringify({ lot: name, feature: row.feature })
 		);
-		fail(
-			writers.length === 1 &&
-				writers[0].status === 'completed' &&
-				writers[0].conclusion === 'success',
-			'missing or failed Unit writer: ' +
-				JSON.stringify({
-					lot: name,
-					feature: row.feature,
-					suite: row.suite,
-					job_id: String(job.id),
-					run_attempt: String(latest),
-					writer_count: writers.length,
-					writers_truncated: writers.length > 3,
-					writers: writers.slice(0, 3).map((step) => ({
-						number: Number.isSafeInteger(step.number) ? step.number : null,
-						status: typeof step.status === 'string' ? step.status.slice(0, 64) : null,
-						conclusion: typeof step.conclusion === 'string' ? step.conclusion.slice(0, 64) : null
-					}))
-				})
-		);
+		// The API publishes a job's success before its step records: run 39785389458
+		// read a completed successful lot whose writer step was still "pending". The
+		// refusal is marked so the caller re-reads it; every other writer state refuses.
+		const writerLags =
+			writers.length === 1 && ['pending', 'queued', 'in_progress'].includes(writers[0].status);
+		try {
+			fail(
+				writers.length === 1 &&
+					writers[0].status === 'completed' &&
+					writers[0].conclusion === 'success',
+				'missing or failed Unit writer: ' +
+					JSON.stringify({
+						lot: name,
+						feature: row.feature,
+						suite: row.suite,
+						job_id: String(job.id),
+						run_attempt: String(latest),
+						writer_count: writers.length,
+						writers_truncated: writers.length > 3,
+						writers: writers.slice(0, 3).map((step) => ({
+							number: Number.isSafeInteger(step.number) ? step.number : null,
+							status: typeof step.status === 'string' ? step.status.slice(0, 64) : null,
+							conclusion: typeof step.conclusion === 'string' ? step.conclusion.slice(0, 64) : null
+						}))
+					})
+			);
+		} catch (error) {
+			if (writerLags) error.writerStepLag = true;
+			throw error;
+		}
 		selected[row.feature] = {
 			suite: row.suite,
 			job_id: String(job.id),
@@ -141,7 +156,7 @@ function selectUnitJobs(plan, jobs, identity) {
 }
 
 /** Admit the current run before reading journals; a failed matrix cannot become a skip. */
-async function receiveUnit(inventory, env, readApi, readJournals) {
+async function receiveUnit(inventory, env, readApi, readJournals, pause = WRITER_LAG_PAUSE) {
 	if (env.COMMON_PREDECESSOR_RESULT !== 'success')
 		throw new Error('Common Unit matrix did not succeed');
 	const { admitPlan } = require('./js-feature-matrix.cjs');
@@ -152,12 +167,20 @@ async function receiveUnit(inventory, env, readApi, readJournals) {
 		env.COMMON_PLAN
 	);
 	const first = await readCurrentRun(env, readApi);
-	const jobs = await collect(
-		readApi,
-		'/repos/' + env.GITHUB_REPOSITORY + '/actions/runs/' + first.run_id + '/jobs?filter=all',
-		'jobs'
-	);
-	const selected = selectUnitJobs(plan, jobs, first);
+	let selected = null;
+	for (let read = 1; selected === null; read++) {
+		const jobs = await collect(
+			readApi,
+			'/repos/' + env.GITHUB_REPOSITORY + '/actions/runs/' + first.run_id + '/jobs?filter=all',
+			'jobs'
+		);
+		try {
+			selected = selectUnitJobs(plan, jobs, first);
+		} catch (error) {
+			if (!error.writerStepLag || read >= WRITER_LAG_READS) throw error;
+			await pause(WRITER_LAG_INTERVAL_MS);
+		}
+	}
 	let result = null;
 	if (readJournals) {
 		result = validateFeatureJournals(inventory, readJournals(), {
