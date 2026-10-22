@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Script pausado",
 	"script_control.resume_failed": "Não foi possível retomar o script; ele permanece pausado.",
 	"script_control.resumed": "Script retomado",
+	"selection.clipboard_busy": "%s está a ocupar a área de transferência, por isso não foi possível ler a seleção. Tente novamente.",
+	"selection.clipboard_busy_unknown": "Outro programa está a ocupar a área de transferência, por isso não foi possível ler a seleção. Tente novamente.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Vírgula reduz bigramas do mesmo dedo",
 	"sfbsreduction.ecirc": "Ê reduz bigramas do mesmo dedo",

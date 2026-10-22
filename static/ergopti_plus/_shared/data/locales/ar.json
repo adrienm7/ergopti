@@ -2031,6 +2031,8 @@
 	"script_control.paused": "النص البرمجي مُعلَّق",
 	"script_control.resume_failed": "تعذّر استئناف البرنامج النصي؛ ولا يزال متوقفًا مؤقتًا.",
 	"script_control.resumed": "تمت استعادة النص البرمجي",
+	"selection.clipboard_busy": "يحتجز %s الحافظة، لذا تعذّرت قراءة التحديد. حاول مرة أخرى.",
+	"selection.clipboard_busy_unknown": "يحتجز برنامج آخر الحافظة، لذا تعذّرت قراءة التحديد. حاول مرة أخرى.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "الفاصلة تقلل ثنائيات الإصبع الواحد",
 	"sfbsreduction.ecirc": "Ê تقلل ثنائيات الإصبع الواحد",

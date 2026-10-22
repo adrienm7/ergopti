@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Skript pozastaven",
 	"script_control.resume_failed": "Skript se nepodařilo obnovit; zůstává pozastavený.",
 	"script_control.resumed": "Skript obnoven",
+	"selection.clipboard_busy": "Schránku drží %s, výběr proto nebylo možné přečíst. Zkuste to znovu.",
+	"selection.clipboard_busy_unknown": "Schránku drží jiný program, výběr proto nebylo možné přečíst. Zkuste to znovu.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Čárka snižuje bigramy stejného prstu",
 	"sfbsreduction.ecirc": "Ê snižuje bigramy stejného prstu",

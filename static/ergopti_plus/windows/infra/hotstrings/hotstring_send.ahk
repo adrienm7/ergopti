@@ -737,6 +737,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 		SequenceFn := Ports.Get("sequence", _SelectionClipboardSequence)
 		RestoreFn := Ports.Get("restore", CB_RestoreAll)
 		ForegroundFn := Ports.Get("foreground", _SelectionCaptureForeground)
+		BusyFn := Ports.Get("report_busy", _SelectionReportClipboardBusy)
 
 		Job := Map(
 				"id", CaptureId,
@@ -769,9 +770,14 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
 				Job["clipboard"] := SaveFn.Call()
+				; Another program holding the clipboard past ClipboardAll's own
+				; one-second wait is an external condition, not a driver fault:
+				; name the holder to the user instead of opening the error window.
 				if (Type(Job["clipboard"]) == "String"
-						and Job["clipboard"] == "__CB_SAVE_ERROR__")
-						throw Error("clipboard snapshot failed")
+						and Job["clipboard"] == "__CB_SAVE_ERROR__") {
+						BusyFn.Call()
+						return false
+				}
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
 				if !ClearFn.Call()
@@ -803,6 +809,22 @@ GetSelectionAsync(OnReady, Ports := 0) {
 
 _SelectionCaptureForeground() {
 		return WinExist("A")
+}
+
+; Tells the user which program holds the clipboard when the snapshot that must
+; precede Ctrl+C failed, and logs the same holder evidence.
+_SelectionReportClipboardBusy() {
+		Holder := CB_DescribeClipboardHolder()
+		try LoggerWarn("hotstring_engine",
+				"GetSelectionAsync could not snapshot the clipboard; the selection was not read (holder: {1}).",
+				Holder["summary"])
+		Message := Holder["process"] != ""
+				? StrReplace(t("selection.clipboard_busy"), "%s", Holder["process"])
+				: t("selection.clipboard_busy_unknown")
+		try TrayTip(Message, t("notify.clipboard"), "Iconx Mute")
+		catch as Err {
+				try LoggerError("hotstring_engine", "The busy-clipboard notice could not be shown: {1}.", Err.Message)
+		}
 }
 
 _SelectionCaptureStartCurrent(Job) {

@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Script onderbroken",
 	"script_control.resume_failed": "Het script kon niet worden hervat; het blijft gepauzeerd.",
 	"script_control.resumed": "Script hervat",
+	"selection.clipboard_busy": "%s houdt het klembord bezet, dus de selectie kon niet worden gelezen. Probeer het opnieuw.",
+	"selection.clipboard_busy_unknown": "Een ander programma houdt het klembord bezet, dus de selectie kon niet worden gelezen. Probeer het opnieuw.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Komma vermindert bigrammen van dezelfde vinger",
 	"sfbsreduction.ecirc": "Ê vermindert bigrammen van dezelfde vinger",

@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Script in pausa",
 	"script_control.resume_failed": "Impossibile riprendere lo script; rimane in pausa.",
 	"script_control.resumed": "Script ripreso",
+	"selection.clipboard_busy": "%s sta occupando gli appunti, quindi non è stato possibile leggere la selezione. Riprova.",
+	"selection.clipboard_busy_unknown": "Un altro programma sta occupando gli appunti, quindi non è stato possibile leggere la selezione. Riprova.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "La virgola riduce i bigrammi dello stesso dito",
 	"sfbsreduction.ecirc": "Ê riduce i bigrammi dello stesso dito",

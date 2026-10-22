@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Betik duraklatıldı",
 	"script_control.resume_failed": "Betik sürdürülemedi; duraklatılmış olarak kalıyor.",
 	"script_control.resumed": "Betik devam etti",
+	"selection.clipboard_busy": "%s panoyu tutuyor, bu nedenle seçim okunamadı. Yeniden deneyin.",
+	"selection.clipboard_busy_unknown": "Başka bir program panoyu tutuyor, bu nedenle seçim okunamadı. Yeniden deneyin.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Virgül aynı parmak bigramlarını azaltır",
 	"sfbsreduction.ecirc": "Ê aynı parmak bigramlarını azaltır",

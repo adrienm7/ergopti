@@ -2031,6 +2031,8 @@
 	"script_control.paused": "Sat på pause",
 	"script_control.resume_failed": "Scriptet kunne ikke genoptages; det forbliver sat på pause.",
 	"script_control.resumed": "Script genoptaget",
+	"selection.clipboard_busy": "%s holder udklipsholderen, så markeringen kunne ikke læses. Prøv igen.",
+	"selection.clipboard_busy_unknown": "Et andet program holder udklipsholderen, så markeringen kunne ikke læses. Prøv igen.",
 	"sfbsreduction.bu": "À + ★ → BU",
 	"sfbsreduction.comma": "Komma reducerer bigrammer for samme finger",
 	"sfbsreduction.ecirc": "Ê reducerer bigrammer for samme finger",
