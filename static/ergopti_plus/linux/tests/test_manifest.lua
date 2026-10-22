@@ -313,6 +313,7 @@ return {
 	"tests.meta.boot.test_i18n_is_ready_before_the_tray",
 	"tests.unit.infra.i18n.test_i18n_persistence",
 	"tests.unit.modules.hotstrings.injector.test_injector_commands",
+	"tests.unit.modules.hotstrings.injector.test_injector_sleep_ceiling",
 	"tests.unit.modules.hotstrings.injector.test_injector_race",
 	"tests.unit.modules.hotstrings.injector.test_injector_terminator_contract",
 	"tests.unit.modules.hotstrings.injector.test_injector_output_observer",
