@@ -61,7 +61,9 @@ a sealed Windows updater source, reseal with
       unsigned hash. Done on dev: first launch extracts with tar.exe, no hidden PowerShell
       (3d2c78d7b7); build gate over the compiled exe (745f07fa51). Left: signing (132), the
       Microsoft false-positive submission (text and hashes in the handoff), the tester's retry,
-      and the "keylogger" naming (about 1 070 shipped strings) as a cross-driver rename. Analysis,
+      and the "keylogger" naming (about 1 070 shipped strings) as a cross-driver rename to
+      `keystats` (maintainer, October 22; one word, code, config keys and logs; queued until the
+      parallel agents finish). Analysis,
       playbook and download matrix: [handoff](todo-agents/windows-exe-flagged-by-proxy.md).
 
 ## Big item 2: macOS Karabiner input reliability (items 31, 117, 140)
@@ -215,6 +217,69 @@ Not started:
       limits elsewhere: Unicode IDNs and a zoned IPv6 are searched, not opened.
 
 ## Backlog (one line each)
+
+Added October 22 (from the agents' reports; details in their commits):
+
+- [ ] **Release 1.0.6 with the macOS swallowed-keys fixes.** [CI] Order: the running agents
+      finish, rename keylogger to `keystats`, full CI green, then publish. The macOS fixes (03a2c2fa4b,
+      d026f3e024, a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) need a Mac
+      day of typing with the `key_event_health` counters; handoff in
+      [issue99-karabiner-input.md](todo-agents/issue99-karabiner-input.md).
+- [ ] **Rename keylogger to `keystats` and make renames cheap.** [CODE] 12 191 occurrences in
+      1 360 files (953 tests, 579 paths). Declare each persisted name once (database, config
+      namespace, log tag, data file names), make tests read names from that source instead of
+      pinning spellings, regenerate seals and generated files through their owners, keep the
+      maintainer's existing data readable, and end with a repository grep that finds no
+      `keylogger` outside history.
+- [ ] **macOS input follow-ups (swallowed keys).** [CODE] Each lease recovery rewrites the 743 KB
+      karabiner.json while typing (reuse the token once its writers retire);
+      `context_tracker.handle_ax_value_changed` reads the whole AXValue on the main thread at each
+      keystroke (coalesce or defer); apply "a late key passes through" to tap_keys, script_control
+      and modifier_injector; add the `key_event_health` counters to the Markdown diagnostics; no
+      error window for a lease failure that recovered by itself.
+- [ ] **Last path-separator sites.** [CODE] macOS, `_shared/lua` and Linux go through
+      `native_path.lua` (6c317ffd43), guarded by `test_posix_path_separator_owner.lua`. Four sites
+      remain in its BASELINE: `config_migrate.lua` (2), `config_unused_keys.lua` (2),
+      `llm/profile_selector.lua` (2), `linux/modules/keylogger/sqlite_writer.lua` (1). No-FFI
+      injector sleeps refuse the ceiling (e73fadfa84); left: the periodic clock diagnostic without
+      luv.
+- [ ] **Linux correction parity remainders.** [CODE] On Backspace the word is dropped instead of
+      popped, erased n-grams get no `e`, and synthetic output breaks the chain (Windows chains
+      through it). `[BS]x` pairs are aligned (aa1ca02f18).
+- [ ] **Windows typing dashboard partial history remainders.** [CODE] Done for Typing (0010418934,
+      reader NUL keys a6a4274a8d); left: the mention on the Apps dashboard and the Edge fallback
+      (no WebView2), which does not open on an incomplete read.
+- [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
+      by hand, then update from it to the next release: the exe is replaced and restarts, the
+      three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
+      `-File ...ergopti_updater_staging.ps1` and no `-EncodedCommand`.
+- [ ] **Config policy remainders (33, 42).** [CODE] 33: macOS Hotstrings category authority and
+      Windows `api_entries` per-row validation; 42: the `--config FILE.toml` watcher (needs a
+      Linux host). Parse cost: the schema journal still parses the candidate on its own; profile
+      the tokenizer.
+- [ ] **Linux xkb capture receivers without callers.** [CODE] `capture_chord_output`,
+      `chord_output_current`, `with_chord_output` in `linux/adapters/xkb_capture.lua` lost their
+      only caller with the per-letter CapsWord mode (fa965e42f2): delete them with
+      `test_caps_word_output_custody.lua` and the xkb tests that exercise them.
+- [ ] **Linux AI off remainders.** [CODE] The menu switch-off does not stop an app-started
+      `ollama serve` nor a running model download, as pause does (the agent auto mode and bound
+      `llm_*` chords are a maintainer question).
+- [ ] **HS-274 vendor-header C++ tests.** [CI] stream-protocol, -inventory, -source, -clock,
+      key-state, baseline-v2 and accept-test need the Karabiner-Elements 9312593e vendor headers:
+      run them in the future `remap-runtime-build.yml`. The portable tests run in js-0453
+      (17d2f1a7fd). The `hs274_persistence_test.py` cases are dead (their fixture moved into
+      `test_physical_history_persistence.lua`): repair or retire them.
+- [ ] **Linux CI installs packages inside short test steps.** [CI] 25 Linux steps still run apt
+      inside a test step with a short timeout (a649f2930a moved the network-ai one out); move the
+      installs to their own steps.
+- [ ] **History hygiene of October 22.** Commits with another agent's message, already on dev:
+      c6db589c76 (macOS cipher argv fix under a README subject), 90da28c725 (config snapshot test
+      under a CI subject), 18ca214ead (also deletes ten handoff files), 6d9c659 ("applied for now"
+      instead of "apply now"). Keep, or rewrite dev once with a lease: maintainer's call.
+- [ ] **Signing and antivirus: maintainer actions.** Apply to SignPath at signpath.org/apply (the
+      HubSpot form does not load in an automated browser; answers in
+      [signpath-foundation-application.md](todo-agents/signpath-foundation-application.md)), submit
+      the Defender false positive, and ask the tester for the exact block page.
 
 - [ ] **36. Windows updater production coupling.** [CODE] The "original23" collector stays inactive
       (`docs/handovers/2026-10-12-group6-ci/INACTIVE-ORIGINAL23-SOURCE.md`) until enrolled.
