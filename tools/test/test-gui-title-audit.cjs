@@ -994,6 +994,43 @@ const cases = [
 		0,
 		'removing the prefix repairs the same call'
 	],
+	[
+		'windows',
+		'Host.Opts := Map("Title", "ErgoptiPlus — " . t("common.error_title"),\n\t"NoActivate", true)',
+		1,
+		'original cleanup window host label branded before the host composes it'
+	],
+	[
+		'windows',
+		'Host.Opts := Map("NoActivate", true, "Title", t("common.error_title"))',
+		0,
+		'a brandless host label in any option position'
+	],
+	[
+		'windows',
+		'Host.Opts := Map("Title", t("editor.personal_info.window_title"))',
+		1,
+		'translated host label cannot retain stale branding'
+	],
+	[
+		'windows',
+		'Label := "ErgoptiPlus — Tools"\nHost.Opts := Map("Title", Label)',
+		1,
+		'host label aliases are followed'
+	],
+	[
+		'windows',
+		'Existing.Opts["Title"] := "ErgoptiPlus — " . t("common.error_title")',
+		1,
+		'a retitled host label cannot be branded'
+	],
+	['windows', 'Existing.Opts["Title"] := t("common.error_title")', 0, 'brandless retitle'],
+	[
+		'windows',
+		'Found := Map("Ok", true, "Title", "ErgoptiPlus — Tools")',
+		1,
+		'every Title option is a host caption label'
+	],
 	['windows', 'g := Gui("+Resize", "Unbranded")', 1, 'raw Gui still needs a prefix'],
 	[
 		'windows',

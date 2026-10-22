@@ -225,11 +225,49 @@ function auditSource(source, lua, locales, relative = '') {
 		}
 		return found;
 	}
+	// A Windows WebViewHost receives its caption label through Opts "Title" and
+	// Gui_Create brands it, so a branded value there is branded twice. The host
+	// reads that option dynamically; the label is only resolvable at its writer.
+	function auditHostTitle(expr, line, call) {
+		stats.checked++;
+		const resolved = values(expr, expr[0] ? ts.indexOf(expr[0]) : 0);
+		if (resolved.length === 0) {
+			stats.dynamic++;
+			return;
+		}
+		const bad = resolved.filter((v) => BRAND.test(v.value));
+		if (bad.length)
+			findings.push({
+				line,
+				call,
+				reason: 'branded input to a prefix-adding wrapper',
+				values: bad
+			});
+	}
+	if (!lua)
+		for (let i = 1; i + 3 < ts.length; i++) {
+			const [open, key, close, assign] = ts.slice(i, i + 4);
+			if (open.string || open.value !== '[' || !key.string || key.value !== 'Title') continue;
+			if (close.string || close.value !== ']' || assign.string || assign.value !== ':=') continue;
+			const expr = [];
+			for (let j = i + 4; j < ts.length && ts[j].line === assign.line; j++) expr.push(ts[j]);
+			auditHostTitle(expr, key.line, '["Title"]');
+		}
 	for (let i = 0; i < ts.length - 1; i++) {
 		const t = ts[i],
 			name = t.value;
 		if (t.string || ts[i + 1].value !== '(') continue;
 		if (ts[i - 1]?.value === 'function' || ts[i - 3]?.value === 'function') continue;
+		if (!lua && name === 'Map') {
+			const call = argumentsAt(ts, i + 1);
+			if (!call) continue;
+			for (let a = 0; a + 1 < call.args.length; a += 2) {
+				const key = call.args[a];
+				if (key.length === 1 && key[0].string && key[0].value === 'Title')
+					auditHostTitle(call.args[a + 1], key[0].line, 'Map("Title")');
+			}
+			continue;
+		}
 		const wrapper = [
 			'Gui_Create',
 			'Ui_MsgBox',

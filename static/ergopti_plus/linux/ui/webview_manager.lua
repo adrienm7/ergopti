@@ -916,6 +916,13 @@ local function _app_title(app_name)
 end
 M._app_title = _app_title
 
+--- Composes a manifest app's native caption: its translated name, branded once.
+--- @param app_name string The app directory name.
+--- @return string
+function M.app_caption(app_name)
+	return M.window_title(_app_title(app_name))
+end
+
 
 -- =========================================
 -- ======= 7/ GTK Window Operations ========
@@ -975,7 +982,7 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
 
 		-- Contextual content never changes this generic native app caption.
-		local caption = M.window_title(_app_title(app_name))
+		local caption = M.app_caption(app_name)
 		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
 
 		-- ── Create the GTK window ──
