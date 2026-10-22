@@ -310,28 +310,43 @@ const startupDispatcher = 'windows/infra/menu_dispatcher.ahk';
 for (const [name, before, after] of [
 	[
 		'old native signature',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {',
-		'RegisterMenuItem(MenuObj, ItemName, Callback) {'
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {'
 	],
 	[
 		'required replay argument',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity) {'
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity, CheckedFn := 0) {'
 	],
 	[
 		'nonempty replay default',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "foreign") {'
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "foreign", CheckedFn := 0) {'
+	],
+	[
+		'required checkmark argument',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn) {'
+	],
+	[
+		'nonzero checkmark default',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 1) {'
+	],
+	[
+		'removed checkmark guard',
+		'\t\t_MenuDispatchRequireCheckedFn(CheckedFn)\n\t\tglobal _MenuDispatchCallbacks',
+		'\t\tglobal _MenuDispatchCallbacks'
 	],
 	[
 		'removed replay type guard',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif !(ReplayIdentity is String)',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif false'
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {\n\t\tif !(ReplayIdentity is String)',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {\n\t\tif false'
 	],
 	[
 		'wrong replay type guard',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif !(ReplayIdentity is String)',
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif !(ReplayIdentity is Integer)'
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {\n\t\tif !(ReplayIdentity is String)',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {\n\t\tif !(ReplayIdentity is Integer)'
 	]
 ]) {
 	const original = startup.sources[startupDispatcher];

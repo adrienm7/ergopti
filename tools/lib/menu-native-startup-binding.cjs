@@ -457,11 +457,12 @@ function nativeStartupRows(inputs, platform) {
 	// RegisterMenuItem callee. Full dispatcher lifecycle remains its own suite.
 	const native = body(
 		dispatcher,
-		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {'
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {'
 	);
 	const prefix = tokensOf(`
     if !(ReplayIdentity is String)
       throw TypeError("A menu replay identity must be a String.")
+    _MenuDispatchRequireCheckedFn(CheckedFn)
     global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
     TrackedObj := { ItemId: 0, Callback: Callback, Epoch: _MenuDispatcherEpoch, Token: 0 }
     Wrapper := (Args*) => _TrackedDispatch(TrackedObj, Args*)
