@@ -219,6 +219,22 @@ names it with a Download button that the AI menu's installer
 opening a modal. Route any new local-model consumer through that transport and
 offer (`ai-agent-local-model`).
 
+### project-macos-ai-off-is-inert
+
+With the AI switch off nothing of the AI runs, as on Windows
+(`LLM_Menu_ActivateRuntime`) and Linux. `startup_controller` logs the Windows
+line ("Restored AI menu state activated with the AI off…") and returns before
+the MLX download reattachment and the profile-shortcut restore;
+`trigger_orchestrator.apply_llm_profile_shortcut` keeps a shortcut chosen while
+off as a preference with no native hotkey; `models_manager_ollama` neither
+pre-warms nor refreshes `ollama list` while `deps.state.llm_enabled` is false.
+The switch commit (`commit_enabled` in `menu_llm/init.lua`) calls
+`sync_ai_runtime`, which arms (`arm_shortcuts`, `startup_runtime.arm`) or
+disarms them; a startup that turns the AI off releases the hotkeys through
+`ctx.disarm_shortcuts`. Any new AI hotkey, probe, task or timer gates on the
+switch and joins that pair; extend `test_ai_off_runtime_inert.lua`, whose
+fakes count bindings, tasks and timers.
+
 ### project-macos-local-openai-servers-are-keyless-api-entries
 
 Servers the user runs (oMLX, LM Studio, llama-server/LocalAI, Jan) come from

@@ -290,6 +290,8 @@ local function with_trigger_fixture(options, body)
 		}
 
 		local state = {
+			-- Profile hotkeys bind only with the AI on
+			llm_enabled = options.llm_enabled ~= false,
 			llm_active_profile = options.active_profile or "basic",
 			llm_profile_shortcuts = clone(options.profile_shortcuts or {}),
 			llm_user_profiles = runtime_profiles,

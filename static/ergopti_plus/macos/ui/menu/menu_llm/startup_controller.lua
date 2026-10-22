@@ -29,6 +29,9 @@ local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 local LOG = "startup_ctrl"
+-- The lifecycle line Windows writes for the same boot (menu_llm/init.ahk)
+local AI_OFF_STARTUP_MESSAGE =
+	"Restored AI menu state activated with the AI off: its hotkeys and probes wait for the switch-on."
 
 
 
@@ -60,7 +63,10 @@ local LOG = "startup_ctrl"
 ---   get_startup_silence       function Returns the current _startup_silence flag.
 ---   set_startup_silence       function Sets the _startup_silence flag.
 ---   get_profile_hks           function Returns the current _llm_profile_hks map.
+---   disarm_shortcuts          function Releases the profile hotkeys once the AI is off.
 --- @return function check_startup The startup function to call once.
+--- @return function scope_idle Whether no startup work remains owned.
+--- @return table runtime_switch arm()/disarm() for the AI switch-on and switch-off.
 function M.new(ctx)
 	local state                      = ctx.state
 	local keymap                     = ctx.keymap
@@ -77,6 +83,7 @@ function M.new(ctx)
 	local get_startup_silence        = ctx.get_startup_silence
 	local set_startup_silence        = ctx.set_startup_silence
 	local get_profile_hks            = ctx.get_profile_hks
+	local disarm_shortcuts           = ctx.disarm_shortcuts
 	local prediction_locks = type(ctx.prediction_locks) == "table"
 		and ctx.prediction_locks or PredictionLockRegistry.new({
 			state = state,
@@ -119,6 +126,12 @@ function M.new(ctx)
 	local _startup_sync_in_progress = false
 	local _restart_requirements_cycle = nil
 	local _reattach_callback = nil
+	-- Set by a startup with the AI off: the switch-on arms the reattachment
+	local _reattach_awaits_enable = false
+	-- The AI switch's share of this startup: arm()/disarm() of the download
+	-- reattachment an off boot left waiting, defined below the startup sequence.
+	-- The trigger orchestrator owns the profile hotkeys.
+	local runtime_switch = {}
 	local _reattach_callback_in_progress = false
 	local _reattach_active = false
 	local _reattach_dispatch_in_progress = false
@@ -682,6 +695,15 @@ function M.new(ctx)
 			end
 			return callback_result == true
 		end
+		-- With the AI off nothing of it runs: no download reattachment, no profile
+		-- hotkey, no requirement probe. The switch-on arms them (runtime_switch and
+		-- the trigger orchestrator), as Windows and Linux do (ai-off-inert-macos).
+		if state.llm_enabled ~= true then
+			_reattach_awaits_enable = true
+			Logger.info(LOG, AI_OFF_STARTUP_MESSAGE)
+			return true
+		end
+		_reattach_awaits_enable = false
 		if arm_startup_timer("reattach", 0.5, _reattach_callback) ~= true then
 			Logger.error(LOG, "Download reattachment timer could not be armed.")
 		end
@@ -786,6 +808,7 @@ function M.new(ctx)
 			state.llm_enabled = false
 			local preference_applied = false
 			local prefs_saved = false
+			local shortcuts_released = false
 			local menu_updated = false
 			local offered = false
 			local function finalize_disable()
@@ -801,6 +824,18 @@ function M.new(ctx)
 				if not prefs_saved then
 					if save_prefs() ~= true then return false end
 					prefs_saved = true
+					if _startup_paused == true then return false end
+				end
+				if not shortcuts_released then
+					-- The AI is off now: its profile hotkeys must not stay bound
+					if type(disarm_shortcuts) ~= "function" then
+						Logger.error(LOG, "Profile hotkeys cannot be released: no shortcut owner.")
+						return false
+					end
+					local ok, released = Logger.callback(LOG,
+						"Disabled startup shortcut release", disarm_shortcuts)
+					if ok ~= true or released ~= true then return false end
+					shortcuts_released = true
 					if _startup_paused == true then return false end
 				end
 				if not menu_updated then
@@ -1292,7 +1327,35 @@ function M.new(ctx)
 			and _startup_prediction_lock == nil and next(_timer_slots) == nil
 			and _startup_settlement_observer == nil
 	end
-	return check_startup, scope_idle
+
+	--- Arms the reattachment a startup with the AI off left waiting.
+	--- @return boolean settled True when nothing waits or the timer is armed.
+	function runtime_switch.arm()
+		if state.llm_enabled ~= true then
+			Logger.error(LOG, "AI startup runtime cannot be armed while the AI is off.")
+			return false
+		end
+		if _reattach_awaits_enable ~= true or type(_reattach_callback) ~= "function" then return true end
+		if arm_startup_timer("reattach", 0.5, _reattach_callback) ~= true then
+			Logger.error(LOG, "Download reattachment timer could not be armed at the AI switch-on.")
+			return false
+		end
+		_reattach_awaits_enable = false
+		Logger.info(LOG, "AI switched on: the interrupted download reattachment is armed.")
+		return true
+	end
+
+	--- Cancels a reattachment that has not fired yet when the AI is switched off.
+	--- @return boolean settled True when no reattachment timer remains armed.
+	function runtime_switch.disarm()
+		if _timer_slots.reattach == nil then return true end
+		if cancel_startup_timer("reattach") ~= true then return false end
+		_reattach_awaits_enable = true
+		Logger.info(LOG, "AI switched off: the pending download reattachment is disarmed.")
+		return true
+	end
+
+	return check_startup, scope_idle, runtime_switch
 end
 
 return M
