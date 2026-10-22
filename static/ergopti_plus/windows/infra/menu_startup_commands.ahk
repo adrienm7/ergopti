@@ -110,8 +110,10 @@ class MenuStartupCommands {
 				catch as Err
 					try LoggerError("MenuDispatcher", "The tray could not be read for a retained startup selection: {1}.", Err.Message)
 			}
-			if Path is Array
+			if Path is Array {
+				MenuReloadReplay_CarryDesired(Path, Entry.Identity)
 				Paths.Push(Path)
+			}
 			else
 				try LoggerError("MenuDispatcher", "A retained startup selection is not reachable from the tray; it cannot be handed to the reload successor.")
 		}
@@ -132,6 +134,10 @@ class MenuStartupCommands {
 				return false
 			Identity := IsObject(Registration)
 				? {ItemId: Registration.ItemId, Token: Registration.Token} : 0
+			; A check row's requested state survives the wait, so a late run
+			; never undoes a later click (menu-toggle-replay-double-flip).
+			if IsObject(Registration) && Registration.HasOwnProp("Desired")
+				Identity.Desired := Registration.Desired
 			RepeatCallback := Callback is MenuStartupRepeatableToggleCommand ? Callback.Callback : 0
 			RepeatId := Callback is MenuStartupRepeatableToggleCommand ? Callback.Id : ""
 			if RepeatId == "llm_toggle" && IsObject(Identity)

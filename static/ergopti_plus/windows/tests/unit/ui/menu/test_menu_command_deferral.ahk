@@ -139,8 +139,10 @@ Test("menu command deferral: a write in progress is an owned path outside a term
 _MCD_DispatcherDefersBothPaths() {
 	Native := _DriverFuncBody("_TrackedDispatch")
 	Assert(Native != "", "native dispatch must exist")
-	Assert(InStr(Native, "MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0, TrackedObj)") > 0,
+	Assert(InStr(Native, "MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0,") > 0,
 		"a native menu dispatch must go through the deferral")
+	Assert(InStr(Native, "_MenuDispatchClickRegistration(TrackedObj.ItemId, TrackedObj.Token, Args)") > 0,
+		"with the registration and requested check state of the click")
 	Assert(!InStr(Native, "TrackedObj.Callback.Call("), "and must not call the command directly")
 	Bypass := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Bypass != "", "fallback dispatch must exist")
@@ -568,3 +570,153 @@ _MCDT_DispatcherUsesTheTransitionAwarePredicate() {
 }
 Test("menu command deferral: the dispatcher waits for an in-flight transition (menu-click-during-scoped-transition)",
 	_MCDT_DispatcherUsesTheTransitionAwarePredicate)
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 5/ Late check-row commands =======
+; ==========================================
+; ==========================================
+
+; On 2026-10-22 the private-browsing filter was clicked during startup (the
+; click was retained), then clicked again while that first commit was still
+; writing, against the unchanged checkmark. The second click waited, ran in the
+; reload successor and toggled the filter back on: the row « did nothing » and
+; stayed checked (menu-toggle-replay-double-flip). A click now records the state
+; it asks for, and a late command that would only re-apply it is skipped.
+
+_MCDF_Toggle(ToggleState, *) {
+	ToggleState.Runs += 1
+	ToggleState.On := !ToggleState.On
+	return "done"
+}
+
+_MCDF_Checked(ToggleState) {
+	return ToggleState.On
+}
+
+_MCDF_TwoDeferredClicksBody(Fixture) {
+	global _MenuDispatchTokens, _MenuDispatchCallbacks
+	ToggleState := {On: true, Runs: 0}
+	ToggleMenu := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(ToggleMenu, "toggle", _MCDF_Toggle.Bind(ToggleState), "",
+			_MCDF_Checked.Bind(ToggleState)), "a check row registers its checkmark predicate")
+		ToggleMenu.Check("toggle")
+		ItemId := _MenuItemIdAtPosition(ToggleMenu, 0)
+		Token := _MenuDispatchTokens[ItemId]
+		Callback := _MenuDispatchCallbacks[ItemId]
+		Args := ["toggle", 1, ToggleMenu]
+		First := _MenuDispatchClickRegistration(ItemId, Token, Args)
+		AssertEqual(0, First.Desired, "a click on a checked row asks for it unchecked")
+		AssertEqual("", MenuCommandRun(Callback, Args, 0, 0, _MCDR_Arm.Bind(Fixture.Schedule), First))
+		; The checkmark has not changed yet: the first command is still waiting.
+		Second := _MenuDispatchClickRegistration(ItemId, Token, Args)
+		AssertEqual(0, Second.Desired, "the second click asks for the same state as the first")
+		AssertEqual("", MenuCommandRun(Callback, Args, 0, 0, _MCDR_Arm.Bind(Fixture.Schedule), Second))
+		AssertEqual(0, ToggleState.Runs, "both clicks wait for the write")
+		AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+		_MCDR_Drain(Fixture.Schedule)
+		AssertEqual(1, ToggleState.Runs, "the second late command is skipped instead of toggling back")
+		AssertFalse(ToggleState.On, "the row ends in the state both clicks asked for")
+		ToggleMenu.Uncheck("toggle")
+		Third := _MenuDispatchClickRegistration(ItemId, Token, Args)
+		AssertEqual(1, Third.Desired, "a click on the refreshed unchecked row asks for it checked")
+		AssertEqual("done", MenuCommandRun(Callback, Args, 0, 0, _MCDR_Arm.Bind(Fixture.Schedule), Third))
+		AssertTrue(ToggleState.On, "a fresh click still toggles")
+		AssertEqual(2, ToggleState.Runs)
+	} finally {
+		ToggleMenu.Delete()
+		MenuDispatcher_PruneMenu(ToggleMenu)
+	}
+}
+Test("menu check rows: two deferred clicks against the same checkmark apply once (menu-toggle-replay-double-flip)",
+	(*) => _MCDR_Run(_MCDF_TwoDeferredClicksBody))
+
+_MCDF_ReplayCarriesTheRequestedState() {
+	global MENU_RELOAD_REPLAY_SCHEMA
+	Path :=["Metrics", "Private browsing"]
+	MenuReloadReplay_CarryDesired(Path, {ItemId: 1, Token: 1, Desired: 0})
+	Decoded := _MenuReloadReplayDecode(_MenuReloadReplayEncode([Path]))
+	AssertEqual(1, Decoded.Length)
+	AssertTrue(Decoded[1].HasOwnProp("ReplayDesired"), "the reload hand-off keeps the click's requested state")
+	AssertEqual(0, Decoded[1].ReplayDesired)
+	AssertEqual("Private browsing", Decoded[1][2])
+	Plain := ["Metrics", "Dashboard"]
+	MenuReloadReplay_CarryDesired(Plain, {ItemId: 2, Token: 2})
+	AssertFalse(_MenuReloadReplayDecode(_MenuReloadReplayEncode([Plain]))[1].HasOwnProp("ReplayDesired"),
+		"a plain row carries no requested state")
+	Schema := JsonStringLiteral(MENU_RELOAD_REPLAY_SCHEMA)
+	for Command in ['{"labels":["A"],"desired":2}', '{"labels":["A"],"desired":"0"}', '{"labels":["A"]}']
+		AssertThrows(() => _MenuReloadReplayDecode('{"schema":' . Schema . ',"commands":[' . Command . ']}'),
+			"an invalid requested state is refused: " . Command)
+}
+Test("menu check rows: the reload hand-off carries the requested state (menu-toggle-replay-double-flip)",
+	_MCDF_ReplayCarriesTheRequestedState)
+
+; End to end on the real private-browsing row: its real command, its real
+; checked_when predicate and a real config file. Two clicks reach the bypass
+; dispatch while an interrupted writer holds the lease; once it ends, the value
+; is persisted, the checkmark reads unchecked and private windows are no
+; longer filtered.
+_MCDF_PrivateFilterBody(Fixture) {
+	global ConfigurationFile, _SaveFullConfigReady, _MenuDispatchLastFire, _MET_STATE_GETTERS
+	global MENU_COMMAND_DEFERRAL_RETRY_MS
+	SavedPath := ConfigurationFile
+	HadReady := IsSet(_SaveFullConfigReady)
+	SavedReady := HadReady ? _SaveFullConfigReady : false
+	SavedPrivate := MetricsFilters.private_browsing
+	Scope := 0, RowMenu := 0, Lease := 0
+	Effects := {Reloads: 0, Notices: 0}
+	Title := "New tab - Mozilla Firefox Private Browsing"
+	try {
+		AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease), "this case owns its own writer on the real config")
+		Scope := _ScopeOwnerFixture('[metrics]`nprivate_filter_enabled = true`n')
+		ConfigurationFile := Scope.path
+		_SaveFullConfigReady := true
+		MetricsFilters.private_browsing := true
+		AssertTrue(MF_ShouldFilterFor("firefox.exe", Title), "the filter starts on")
+		CheckedFn := MenuRenderer_ResolveCheckedWhen.Bind("metrics_menu", "filter_private", _MET_STATE_GETTERS)
+		AssertTrue(CheckedFn.Call(), "the row starts checked")
+		Command := (*) => _MetricsToggleFilterAndReload("private_browsing", 0,
+			(*) => (Effects.Notices += 1, 1), (*) => (Effects.Reloads += 1, 1))
+		RowMenu := Menu()
+		AssertEqual(1, RegisterMenuItem(RowMenu, "private", Command, "", CheckedFn))
+		ItemId := _MenuItemIdAtPosition(RowMenu, 0)
+		Lease := _ConfigWriteLeaseTryAcquire(Scope.path, "interrupted-writer")
+		AssertTrue(Lease is Object, "the interrupted writer owns the real config")
+		Loop 2
+			_DispatchIfMissed(ItemId, _MenuDispatchLastFire[ItemId])
+		AssertTrue(MetricsFilters.private_browsing, "neither click runs on top of the writer")
+		AssertTrue(_ConfigWriteLeaseRelease(Lease))
+		Lease := 0
+		; Both retries run from real one-shot timers; let the second one fire too.
+		Deadline := A_TickCount + 5000
+		while Effects.Reloads == 0 && Effects.Notices == 0 && A_TickCount < Deadline
+			Sleep(10)
+		Sleep(4 * MENU_COMMAND_DEFERRAL_RETRY_MS)
+		AssertEqual(0, Effects.Notices, "no click is refused")
+		AssertEqual(1, Effects.Reloads, "one commit, one reload")
+		AssertFalse(MetricsFilters.private_browsing, "the runtime value is the one the clicks asked for")
+		AssertFalse(CheckedFn.Call(), "the row's checkmark reads unchecked")
+		AssertFalse(MF_ShouldFilterFor("firefox.exe", Title), "private windows are no longer filtered")
+		AssertTrue(InStr(FSRead(Scope.path), "private_filter_enabled = false") > 0, "the value is persisted")
+	} finally {
+		if Lease is Object
+			_ConfigWriteLeaseRelease(Lease)
+		if RowMenu is Menu {
+			RowMenu.Delete()
+			MenuDispatcher_PruneMenu(RowMenu)
+		}
+		ConfigurationFile := SavedPath
+		_SaveFullConfigReady := HadReady ? SavedReady : unset
+		MetricsFilters.private_browsing := SavedPrivate
+		if Scope is Object
+			_ScopeOwnerCleanup(Scope)
+	}
+}
+Test("menu check rows: two late private-browsing clicks persist, uncheck and disable the filter once (menu-toggle-replay-double-flip)",
+	(*) => _MCDR_Run(_MCDF_PrivateFilterBody))

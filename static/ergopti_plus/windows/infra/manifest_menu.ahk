@@ -514,7 +514,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 		} else if (Row.Has("action") and (Row["action"] is Func
 				or Row["action"] is MenuStartupUiCommand
 				or Row["action"] is MenuStartupRepeatableToggleCommand) and !Greyed) {
-			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))
+			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""), Row.Get("checked_fn", 0))
 			if RequireTracking && Tracked != 1
 				throw Error("Native leaf command registration was refused")
 		} else {
@@ -670,8 +670,11 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 		"replay_id", _MR_ReplayIdentity(ManifestKey, Id))
 	if Disabled
 		Row["disabled"] := true
-	if ItemType == "check"
+	if ItemType == "check" {
 		Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
+		; The dispatcher reads the live checkmark when a late command runs.
+		Row["checked_fn"] := MenuRenderer_ResolveCheckedWhen.Bind(ManifestKey, Id, StateGetters)
+	}
 	return Row
 }
 
@@ -1828,7 +1831,8 @@ _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 		"label",   t(I18nKey),
 		"action",  Commands[CmdId],
 		"replay_id", _MR_ReplayIdentity(ManifestKey, Id),
-		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
+		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters),
+		"checked_fn", MenuRenderer_ResolveCheckedWhen.Bind(ManifestKey, Id, StateGetters))
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 		if ReasonKey != "" && !_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey)
@@ -1837,6 +1841,7 @@ _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 			Row["disabled_reason_key"] := ReasonKey
 			Row.Delete("action")
 			Row.Delete("replay_id")
+			Row.Delete("checked_fn")
 		}
 	}
 	return Row
@@ -2582,7 +2587,8 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 		return false
 	Active[Identity] := true
 	Fields := Map("label", true, "separator", true, "action", true, "items", true,
-		"submenu", true, "checked", true, "disabled", true, "disabled_reason_key", true, "icon", true, "replay_id", true, "replay_group", true)
+		"submenu", true, "checked", true, "disabled", true, "disabled_reason_key", true, "icon", true, "replay_id", true, "replay_group", true,
+		"checked_fn", true)
 	loop Rows.Length {
 		if !Rows.Has(A_Index)
 			return false
@@ -2605,6 +2611,9 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 				return false
 		}
 		if (Row.Has("replay_id") && !Row.Has("action")) || (Row.Has("replay_group") && !Row.Has("items") && !Row.Has("submenu"))
+			return false
+		; A checkmark predicate belongs to a check row's command only.
+		if Row.Has("checked_fn") && (!Row.Has("action") || !Row.Has("checked") || !(Row["checked_fn"] is Func))
 			return false
 		if Row.Has("icon") && Type(Row["icon"]) != "String"
 			return false
@@ -3113,7 +3122,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 _MR_FrameLeafAdmitted(Data) {
 	if !_MR_AppendTemplateRowsAdmitted(Data, 1, Map())
 		return false
-	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true, "replay_id", true)
+	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true, "replay_id", true, "checked_fn", true)
 	for Row in Data {
 		for Name in Row
 			if !Allowed.Has(Name)

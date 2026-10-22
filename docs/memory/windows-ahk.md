@@ -300,7 +300,10 @@ I/O before it launches a successor or releases, and the tray opens over it
 (the private-browsing filter was refused this way on 2026-10-22). The
 dispatcher therefore waits on `MenuCommandConfigBusy()`, which also counts an
 active bundle while no successor is pending and no recovery barrier is
-retained.
+retained. A late command must not toggle relative to the state it finds: a
+check row registers its checkmark predicate and each click records the state
+it asked for, so a deferred, retained or replayed toggle that would only
+re-apply it is skipped instead of flipping it back.
 
 ### project-ahk-reload-sees-the-long-script-path
 
