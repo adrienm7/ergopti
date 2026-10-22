@@ -95,6 +95,54 @@ do
 	end
 end
 local Storage            = require("adapters.storage")
+
+-- Instance admission comes before every settings write, timer, watcher and
+-- path resolution: a process that may not run the driver must leave no trace
+-- beyond its refusal line (see infra/instance_admission.lua).
+do
+	local InstanceAdmission = require("infra.instance_admission")
+	local process_info = type(hs.processInfo) == "table" and hs.processInfo or {}
+	local admission_mode = Logger.classify_async_sink_boot_environment()
+	local decision = InstanceAdmission.decide(admission_mode, process_info.bundleID)
+	if decision ~= InstanceAdmission.ADMIT then
+		local launcher_ok, launcher_app = pcall(function()
+			return require("adapters.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
+		end)
+		local identity = InstanceAdmission.describe({
+			pid = process_info.processID,
+			bundle_id = process_info.bundleID,
+			bundle_path = process_info.bundlePath,
+			launcher_running = launcher_ok and launcher_app ~= nil or "unknown",
+		})
+		local timers_ok, timers_err = pcall(function() require("adapters.timer_scheduler").cancelAll() end)
+		if not timers_ok then
+			Logger.error("init", "Refused instance could not cancel its timers: %s.", tostring(timers_err))
+		end
+		if InstanceAdmission.may_exit_process(decision) then
+			Logger.warn("init", "Refusing a second Ergopti runtime started without the launcher (%s); "
+				.. "exiting before any module starts.", identity)
+			require("adapters.boot_journal").append("WARNING",
+				"Stray Ergopti runtime refused before boot: " .. identity .. ".")
+			os.exit(0)
+			return
+		end
+		Logger.warn("init", "Ergopti driver not started in this Hammerspoon (%s, launcher authority %s); "
+			.. "it keeps running without the driver.", identity, tostring(admission_mode))
+		if InstanceAdmission.shows_dialog(decision) then
+			local shown_ok, shown_err = pcall(function()
+				local i18n_boot = require("infra.i18n")
+				i18n_boot.set_locale_injector(function(code) require("infra.locale").set_locale(code) end)
+				i18n_boot.init()
+				hs.dialog.blockAlert(i18n_boot.get("launcher.fatal.title"),
+					i18n_boot.get("startup.native_logger_unavailable"), i18n_boot.get("common.ok"))
+			end)
+			if not shown_ok then
+				Logger.error("init", "Foreign Hammerspoon refusal dialog could not be shown: %s.", tostring(shown_err))
+			end
+		end
+		return
+	end
+end
 local TimerScheduler     = require("adapters.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
@@ -249,6 +297,20 @@ end
 local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	local message = i18n.get(alert_key or "dialog.fatal_error.cannot_start")
 	local launcher_notified = BootFatal.report(stage, detail, message)
+	-- Modules required before the abort may already poll (the KC ledger bridge
+	-- arms a timer and a path watcher at load). A modal dialog keeps the run
+	-- loop turning, so they are stopped first or they write to the shared log
+	-- for as long as the dialog stays up.
+	local quiet_ok, quiet_err = pcall(function()
+		if TimerScheduler.cancelAll() ~= true then error("a native timer refused to stop") end
+		local kc_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		if type(kc_bridge) == "table" and kc_bridge.stop() ~= true then
+			error("the KC ledger bridge did not stop")
+		end
+	end)
+	if not quiet_ok then
+		Logger.error(LOG, "Pre-runtime boot abort could not stop every producer: %s.", tostring(quiet_err))
+	end
 	if before_exit ~= nil then
 		local cleanup_ok, cleanup_result = xpcall(before_exit, debug.traceback)
 		if not cleanup_ok or cleanup_result ~= true then
