@@ -23,9 +23,11 @@
 ---    and line ending survives. The rewrite is published only while the file
 ---    still holds the bytes that were backed up.
 --- 4. Conservative addressing. Keys outside any table, quoted keys, and
----    array-of-tables records are never offered: removing them by text alone
----    cannot be proven exact. Metadata tables ([_meta] and any other [_*]) are
----    never offered either, as on Windows.
+---    single array-of-tables records are never offered: removing them by text
+---    alone cannot be proven exact. An unread root, or an unread table array
+---    below a root a reader consumes, is offered whole instead, and its removal
+---    is proven against the typed document. Metadata tables ([_meta] and any
+---    other [_*]) are never offered, as on Windows.
 --- 5. Outdated members of an inline table. An owner can report one member of
 ---    `keys = { at_hash = true, ctrl_s = true }` as outdated while another is
 ---    live. That member is offered on its own, and its removal rewrites only
@@ -255,6 +257,60 @@ local function inline_members(record, outdated, decoded)
 	return entries
 end
 
+--- The outermost ``[[x]]`` table arrays of a bare header path, keyed by
+--- their dotted path. A nested array belongs to its outer array.
+--- @param scan table Result of scan_records.
+--- @return table order Outermost array paths (segment lists) in source order.
+local function outermost_arrays(scan)
+	local paths, seen, order = {}, {}, {}
+	for _, header in ipairs(scan.headers) do
+		if header.array and header.segments then paths[table.concat(header.segments, ".")] = true end
+	end
+	for _, header in ipairs(scan.headers) do
+		local segments = header.array and header.segments
+		local id = segments and table.concat(segments, ".")
+		if segments and not seen[id] then
+			seen[id] = true
+			local nested = false
+			for length = 1, #segments - 1 do
+				if paths[table.concat(segments, ".", 1, length)] then nested = true; break end
+			end
+			if not nested then order[#order + 1] = segments end
+		end
+	end
+	return order
+end
+
+--- Offers each unread table array below a root a reader consumes. None of its
+--- records is addressable alone, so the root-level cleanup and the record
+--- cleanup both left it in the file forever; the complete array is one entry,
+--- removed whole with every generation. A root-level array is a whole root
+--- and stays with the root projection; [_*] metadata is never offered.
+--- @param scan table Result of scan_records.
+--- @param decoded table Decoded document.
+--- @param consumption table Consumption marks of the driver's readers.
+--- @param whole_roots table Roots already offered whole.
+--- @return table entries
+function M.unread_table_arrays(scan, decoded, consumption, whole_roots)
+	local entries = {}
+	for _, segments in ipairs(outermost_arrays(scan)) do
+		local root = segments[1]
+		if #segments >= 2 and not whole_roots[root] and not protected_root(root)
+			and not consumption.touches(segments) then
+			local parent = {}
+			for index = 1, #segments - 1 do parent[index] = segments[index] end
+			entries[#entries + 1] = {
+				section = table.concat(parent, "."),
+				key     = segments[#segments],
+				value   = TomlCodec.encode_value(lookup(decoded, segments)),
+				kind    = consumption.touches(parent) and "leaf" or "section",
+				path    = segments,
+			}
+		end
+	end
+	return entries
+end
+
 --- Lists the unused keys of already-read content.
 --- @param source string Exact file content.
 --- @param collect function `collect(decoded, mark, shapes)`: the driver's readers; receipt is optional for old consumers.
@@ -289,6 +345,12 @@ local function find_in_source(source, collect, whole_unread_roots, file_path)
 					collect = collect, consumed = false }
 				keys[#keys + 1] = entry; whole_roots[root] = true
 			end
+		end
+	end
+	-- Whole arrays share the explicit whole-value capability of whole roots.
+	if whole_unread_roots then
+		for _, entry in ipairs(M.unread_table_arrays(scan, decoded, consumption, whole_roots)) do
+			keys[#keys + 1] = entry
 		end
 	end
 	for _, record in ipairs(scan.records) do
@@ -409,6 +471,98 @@ function M.backup_path(path, stamp)
 	return dir .. stem .. ".backup-" .. stamp .. ext
 end
 
+--- Compares two decoded values, integers and floats apart.
+--- @param left any
+--- @param right any
+--- @return boolean
+local function same_value(left, right)
+	if type(left) ~= type(right) then return false end
+	if type(left) ~= "table" then
+		if type(left) == "number" and math.type and math.type(left) ~= math.type(right) then return false end
+		return left == right or (type(left) == "number" and left ~= left and right ~= right)
+	end
+	for key, value in pairs(left) do if not same_value(value, right[key]) then return false end end
+	for key in pairs(right) do if left[key] == nil then return false end end
+	return true
+end
+
+--- Splits the entries naming a complete outermost table array of source.
+--- @param source string Exact file content.
+--- @param keys table Keys from find().
+--- @return table|nil arrays Array paths to remove whole.
+--- @return table|string others Remaining entries, or a failure detail.
+local function array_selection(source, keys)
+	local scan, detail = M.scan_records(source)
+	if not scan then return nil, detail end
+	local current = {}
+	for _, segments in ipairs(outermost_arrays(scan)) do current[table.concat(segments, ".")] = true end
+	local arrays, others = {}, {}
+	for _, entry in ipairs(keys) do
+		local path = type(entry.path) == "table" and #entry.path >= 2 and type(entry.inline) ~= "table"
+			and not root_receipts[entry] and table.concat(entry.path, ".")
+		if path and current[path] and entry.section .. "." .. entry.key == path then
+			arrays[#arrays + 1] = entry.path
+		else
+			others[#others + 1] = entry
+		end
+	end
+	return arrays, others
+end
+
+--- Cuts every header and record of the selected table arrays and proves that
+--- only those paths left the typed document.
+--- @param source string Exact file content.
+--- @param arrays table Array paths (segment lists) to remove.
+--- @return string|nil candidate
+--- @return number|string count Arrays removed, or a failure detail.
+local function without_arrays(source, arrays)
+	local scan, detail = M.scan_records(source)
+	if not scan then return nil, detail end
+	local function selected(segments)
+		if not segments then return false end
+		for _, path in ipairs(arrays) do
+			local under = #segments >= #path
+			for index = 1, #path do
+				if not under or segments[index] ~= path[index] then under = false; break end
+			end
+			if under then return true end
+		end
+		return false
+	end
+	local dropped = {}
+	for _, header in ipairs(scan.headers) do
+		if selected(header.segments) then dropped[header.index] = true end
+	end
+	for _, record in ipairs(scan.records) do
+		if record.header and dropped[record.header.index] then
+			for index = record.first, record.last do dropped[index] = true end
+		end
+	end
+	local chunks = {}
+	for index, line in ipairs(scan.lines) do
+		if not dropped[index] then chunks[#chunks + 1] = line.text .. line.eol end
+	end
+	local candidate = table.concat(chunks)
+	if source:sub(1, #BOM) == BOM and candidate:sub(1, #BOM) ~= BOM then candidate = BOM .. candidate end
+	local before_ok, expected = pcall(TomlCodec.decode, source)
+	local after_ok, actual = pcall(TomlCodec.decode, candidate)
+	if not before_ok or not after_ok or type(expected) ~= "table" or type(actual) ~= "table" then
+		return nil, "the table-array cleanup candidate would not parse"
+	end
+	for _, path in ipairs(arrays) do
+		local parent = expected
+		for index = 1, #path - 1 do parent = type(parent) == "table" and parent[path[index]] or nil end
+		if type(parent) ~= "table" or parent[path[#path]] == nil then
+			return nil, "a selected table array is no longer in the source"
+		end
+		parent[path[#path]] = nil
+	end
+	if not same_value(expected, actual) then
+		return nil, "the table-array cleanup candidate changes another typed value"
+	end
+	return candidate, #arrays
+end
+
 --- Cuts the listed keys out of source, byte for byte.
 ---
 --- A listed key that is no longer in the file is simply absent from the count,
@@ -433,6 +587,18 @@ function M.remove_from_source(source, keys)
 		local rendered, content, count = pcall(RecordList.cleanup, source, candidate, keys)
 		if not rendered then return nil, tostring(content) end
 		return content, removed + count
+	end
+	local arrays, others = array_selection(source, keys)
+	if not arrays then return nil, others end
+	if #arrays > 0 then
+		local candidate, count = without_arrays(source, arrays)
+		if not candidate then return nil, count end
+		if #others > 0 then
+			local remainder, removed = M.remove_from_source(candidate, others)
+			if not remainder then return nil, removed end
+			candidate, count = remainder, count + removed
+		end
+		return candidate, count
 	end
 	local roots, root_error = root_selection(source, keys)
 	if not roots then return nil, root_error end
