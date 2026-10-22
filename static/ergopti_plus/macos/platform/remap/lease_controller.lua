@@ -32,6 +32,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local LeaseHelper    = require("platform.remap.lease_helper")
+local TaskOutputTurn = require("adapters.task_output_turn")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
 
 local LOG = "karabiner.lease"
@@ -69,6 +70,14 @@ local SLOW_READY_REPORT_SEC = 1.0
 -- while a heartbeat was in flight saw "timeout waiting for PONG 159".
 local PARKED_RUN_LOOP_LATENESS_SEC = 0.5
 local ACK_GRACE_SEC = 1.0
+-- A deadline that fires on time proves nothing either: hs.task hands a child's
+-- output to Lua only in the default run loop mode, timers fire in every mode,
+-- and an open menubar menu runs the event tracking mode. Issue #100 failed
+-- seven healthy leases "0.00 s late" while the user browsed the Ergopti menu.
+-- Such a deadline first waits for adapters/task_output_turn.lua to prove that
+-- task output is read again, at most this long; meanwhile the worker's inner
+-- still fences on its own silence budget if Hammerspoon really went away.
+local OUTPUT_TURN_CEILING_SEC = 30.0
 local HEARTBEAT_INTERVAL_SEC = 5 -- Bounds Core Service reset recovery without a 1 Hz CLI loop.
 local HEARTBEAT_RETRY_SEC = 1.0
 local MAX_CONSECUTIVE_HEARTBEAT_FAILURES = 2
@@ -585,6 +594,19 @@ end
 local function cancel_ack_timer(generation)
 	retry_timer_cleanup()
 	release_generation_timer(generation, "ack_timer", "Lease ACK timer")
+	local probe = generation.output_turn_probe
+	if probe then
+		generation.output_turn_probe = nil
+		probe.cancel()
+		if not generation.failed and not generation.stop_requested then
+			-- The answer was waiting in the pipe: without this line nothing would
+			-- tell a held-back ACK from a timely one (issue #100).
+			Logger.info(LOG,
+				"Karabiner lease %s read %s %.2f s after its deadline; task output was not being read meanwhile (an open menu or a modal window).",
+				generation.token, tostring(generation.output_turn_expected),
+				TimerScheduler.awake_time() - (generation.output_turn_since or 0))
+		end
+	end
 end
 
 --- Cancels the sole recurring heartbeat owned by one exact generation.
@@ -813,18 +835,75 @@ local function reject_unlaunched_generation(generation, reason)
 		generation.token, tostring(reason))
 end
 
+local arm_ack_timer
+
+--- Fails a generation whose deadline passed, naming the wait and the lateness.
+--- @param generation table Generation awaiting the ACK.
+--- @param expected string Expected protocol line.
+--- @param since number When the first deadline for this ACK was armed.
+--- @param lateness number How late the deciding timer fired, in seconds.
+local function fail_on_deadline(generation, expected, since, lateness)
+	-- The wait and the timer's own lateness tell a silent worker (on time,
+	-- nothing in the pipe) from a held Hammerspoon run loop (late), which the
+	-- bare reason could not: issue #99 logged six of them without either. The
+	-- reason itself stays exact: the diagnostics report parses it.
+	Logger.warn(LOG,
+		"Karabiner lease %s waited %.2f s for %s; the deadline timer fired %.2f s late.",
+		generation.token, TimerScheduler.awake_time() - since, expected, math.max(0, lateness))
+	fail_generation(generation, "timeout waiting for " .. expected)
+end
+
+--- Defers an on-time deadline until task output is proven to be read again.
+--- @param generation table Generation awaiting the ACK.
+--- @param expected string Expected protocol line.
+--- @param since number When the first deadline for this ACK was armed.
+--- @return boolean deferred True when a probe now owns the verdict.
+local function defer_until_output_turn(generation, expected, since)
+	-- The ceiling is armed first: arming cancels any older probe.
+	arm_ack_timer(generation, expected, "output_turn", since)
+	if generation.failed or generation.ack_timer == nil then return true end
+	generation.output_turn_expected = expected
+	generation.output_turn_since = TimerScheduler.awake_time()
+	local probe
+	local probe_err
+	probe, probe_err = TaskOutputTurn.request("Karabiner lease " .. generation.token,
+		function(delivered, reason)
+			if probe == nil or generation.output_turn_probe ~= probe or generation.failed
+				or generation.awaiting ~= expected then return end
+			generation.output_turn_probe = nil
+			if not delivered then
+				Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
+					generation.token, tostring(reason))
+			end
+			fail_on_deadline(generation, expected, since, 0)
+		end)
+	if not probe then
+		Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
+			generation.token, tostring(probe_err))
+		fail_on_deadline(generation, expected, since, 0)
+		return true
+	end
+	generation.output_turn_probe = probe
+	Logger.debug(LOG,
+		"Karabiner lease %s: %s deadline passed on time; reading pending task output before judging the worker.",
+		generation.token, expected)
+	return true
+end
+
 --- Arms a bounded timeout for one expected protocol acknowledgement.
 --- @param generation table Generation awaiting the ACK.
 --- @param expected string Expected protocol line.
---- @param grace boolean|nil Whether this is the one extension after a parked run loop.
+--- @param stage string|nil nil for the first deadline, "grace" for the one
+---   extension after a parked run loop, "output_turn" for the ceiling of a probe.
 --- @param awaited_since number|nil When the first deadline for this ACK was armed.
-local function arm_ack_timer(generation, expected, grace, awaited_since)
+arm_ack_timer = function(generation, expected, stage, awaited_since)
 	cancel_ack_timer(generation)
 	generation.awaiting = expected
 	local timeout = COMMAND_ACK_TIMEOUT_SEC
 	if expected == "READY" then timeout = READY_ACK_TIMEOUT_SEC end
 	if expected == "STOPPED" then timeout = STOP_ACK_TIMEOUT_SEC end
-	if grace then timeout = ACK_GRACE_SEC end
+	if stage == "grace" then timeout = ACK_GRACE_SEC end
+	if stage == "output_turn" then timeout = OUTPUT_TURN_CEILING_SEC end
 	local armed_at = TimerScheduler.awake_time()
 	local since = awaited_since or armed_at
 	local timer = nil
@@ -843,21 +922,24 @@ local function arm_ack_timer(generation, expected, grace, awaited_since)
 		generation.ack_timer = nil
 		local fired_at = TimerScheduler.awake_time()
 		local lateness = fired_at - armed_at - timeout
-		if not grace and lateness > PARKED_RUN_LOOP_LATENESS_SEC then
+		if stage == nil and lateness > PARKED_RUN_LOOP_LATENESS_SEC then
 			Logger.debug(LOG,
 				"Karabiner lease %s: %s timeout fired late after a parked run loop; reading the pipe first.",
 				generation.token, expected)
-			arm_ack_timer(generation, expected, true, since)
+			arm_ack_timer(generation, expected, "grace", since)
 			return
 		end
-		-- The wait and the timer's own lateness tell a silent worker (on time,
-		-- nothing in the pipe) from a held Hammerspoon run loop (late), which the
-		-- bare reason could not: issue #99 logged six of them without either. The
-		-- reason itself stays exact: the diagnostics report parses it.
-		Logger.warn(LOG,
-			"Karabiner lease %s waited %.2f s for %s; the deadline timer fired %.2f s late.",
-			generation.token, fired_at - since, expected, math.max(0, lateness))
-		fail_generation(generation, "timeout waiting for " .. expected)
+		-- STOPPED keeps its direct verdict: a stop already retires the rules, and
+		-- its fallback revoker reaches the same safe state as a late STOPPED.
+		if stage == nil and expected ~= "STOPPED" then
+			defer_until_output_turn(generation, expected, since)
+			return
+		end
+		if stage == "output_turn" then
+			Logger.warn(LOG, "Karabiner lease %s: task output stayed unread for %.1f s after the %s deadline.",
+				generation.token, OUTPUT_TURN_CEILING_SEC, expected)
+		end
+		fail_on_deadline(generation, expected, since, lateness)
 	end)
 	if schedule_ok then timer = timer_or_err end
 	generation.ack_timer = timer

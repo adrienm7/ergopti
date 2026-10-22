@@ -413,6 +413,22 @@ lease ACK timeout fenced the live lease ("timeout waiting for PONG 159") until
 a timeout that fires late got one grace of running time to read the pipe
 (`lease-parked-run-loop`).
 
+### project-hs-task-output-is-read-in-default-mode-only
+
+Hammerspoon 1.1.1 reads a streaming `hs.task` with `readInBackgroundAndNotify`
+(`libtask.m`), whose notification runs in the default run loop mode only,
+while `hs.timer` (`NSRunLoopCommonModes`) and the task's termination handler
+(main dispatch queue) run in every mode. During an open menubar menu (event
+tracking) or a modal panel, a deadline therefore fires on time while the
+child's answer sits unread, and a completion can arrive before the last
+streamed chunk, which `shell_runner` then drops: issue #100 lost seven leases
+"0.00 s late" with no worker stderr at all. Never judge a streaming child
+silent from a timer alone; prove a read turn with
+`adapters/task_output_turn.lua` (a `/bin/cat` echo) first, as the lease ACK
+deadlines do (`lease-output-turn`). The lease worker's inner still fences on
+its own silence budget (17.5 s) if a menu stays open that long with a PING in
+flight.
+
 ### project-hs-webview-becomes-key-only-with-text-entry
 
 A Hammerspoon webview window becomes key only while it allows text entry

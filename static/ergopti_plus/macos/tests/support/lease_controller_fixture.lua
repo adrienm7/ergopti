@@ -19,6 +19,7 @@ local UUIDS = {
 local function load_controller(options)
 	options = options or {}
 	package.loaded["platform.remap.lease_controller"] = nil
+	package.loaded["adapters.task_output_turn"] = nil
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["adapters.storage"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
@@ -277,6 +278,33 @@ local function load_controller(options)
 		error("no live timer to fire")
 	end
 
+	--- Returns the newest output turn probe, the /bin/cat echo an on-time
+	--- deadline starts before it may judge the worker.
+	--- @return table|nil task Probe spawn, or nil when none was started.
+	--- @return integer|nil index Its spawn index.
+	function ctx.output_probe()
+		for index = #ctx.spawns, 1, -1 do
+			local task = ctx.spawns[index]
+			if task.executable == "/bin/cat" then return task, index end
+		end
+		return nil, nil
+	end
+
+	--- Delivers the newest probe's echo: the run loop reads task output again.
+	function ctx.deliver_output_turn()
+		local task = ctx.output_probe()
+		helpers.assert_true(task ~= nil, "an on-time deadline must start an output turn probe")
+		helpers.assert_eq(task.inputs[1], "turn\n", "the probe writes one line to echo")
+		task.on_chunk(task, task.inputs[1], "")
+	end
+
+	--- Fires the latest ACK deadline on time and then lets task output be read,
+	--- so a worker that never answered is judged silent.
+	function ctx.fire_ack_deadline()
+		ctx.fire_latest_timer()
+		ctx.deliver_output_turn()
+	end
+
 	--- Fires the retained heartbeat timer without consuming its recurring handle.
 	function ctx.fire_heartbeat_timer()
 		for index = #ctx.timers, 1, -1 do
@@ -311,7 +339,7 @@ end
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.lease_controller", "adapters.shell_runner", "adapters.storage",
+		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "adapters.storage",
 		"adapters.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
 		"infra.logger",
 	}, function()
