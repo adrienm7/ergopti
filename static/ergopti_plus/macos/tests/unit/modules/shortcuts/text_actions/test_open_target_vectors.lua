@@ -37,40 +37,45 @@ local function notice(key, target)
 	return (tostring(require("infra.i18n").get(key)):gsub("%%s", function() return target end))
 end
 
---- Loads the apps actions with recording ports.
+--- The modules a fixture replaces; with_fresh_modules restores each one, so a
+--- recording port never reaches the next test file the runner loads.
+local OWNED_MODULES = {
+	"modules.shortcuts.actions.apps", "adapters.window_info", "adapters.shell_runner",
+	"adapters.file_system", "infra.notifications", "infra.logger",
+}
+
+--- Runs a case against the apps actions with recording ports.
 --- @param existing table|nil Paths that exist.
---- @return table world { apps, urls, opened, notices }
-local function load_apps(existing)
-	local world = { urls = {}, opened = {}, notices = {} }
-	for _, name in ipairs({
-		"modules.shortcuts.actions.apps", "adapters.window_info", "adapters.shell_runner",
-		"adapters.file_system", "infra.notifications", "infra.logger",
-	}) do package.loaded[name] = nil end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
-	package.loaded["infra.notifications"] = {
-		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
-	}
-	package.loaded["adapters.file_system"] = {
-		exists = function(path) return (existing or {})[path] == true end,
-	}
-	package.loaded["adapters.shell_runner"] = {
-		open = function(target, on_done)
-			world.opened[#world.opened + 1] = target
-			on_done(true)
-			return true, {
-				isSettled = function() return true end,
-				onSettled = function(observer) observer(); return true end,
-				terminate = function() return true, "settled" end,
-			}
-		end,
-		applescript = function() return false end,
-	}
-	world.apps = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
-		urlevent = { openURL = function(url) world.urls[#world.urls + 1] = url; return true end },
-		http = { encodeForQuery = function(value) return (value:gsub(" ", "+")) end },
-	})
-	return world
+--- @param body function Receives world { apps, urls, opened, notices }.
+local function with_apps(existing, body)
+	helpers.with_fresh_modules(OWNED_MODULES, function()
+		local world = { urls = {}, opened = {}, notices = {} }
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
+		package.loaded["infra.notifications"] = {
+			notify = function(message) world.notices[#world.notices + 1] = message; return true end,
+		}
+		package.loaded["adapters.file_system"] = {
+			exists = function(path) return (existing or {})[path] == true end,
+		}
+		package.loaded["adapters.shell_runner"] = {
+			open = function(target, on_done)
+				world.opened[#world.opened + 1] = target
+				on_done(true)
+				return true, {
+					isSettled = function() return true end,
+					onSettled = function(observer) observer(); return true end,
+					terminate = function() return true, "settled" end,
+				}
+			end,
+			applescript = function() return false end,
+		}
+		world.apps = helpers.load_with_stubs("modules.shortcuts.actions.apps", {
+			urlevent = { openURL = function(url) world.urls[#world.urls + 1] = url; return true end },
+			http = { encodeForQuery = function(value) return (value:gsub(" ", "+")) end },
+		})
+		body(world)
+	end)
 end
 
 helpers.describe("copy_selected_path replays the shared open-target corpus", function()
@@ -101,41 +106,46 @@ helpers.describe("copy_or_open_path opens the selection (open-target-ip-address)
 		{ "ada@example.com", "mailto:ada@example.com" },
 	}) do
 		helpers.it("open-target: opens '" .. case[1] .. "' as " .. case[2] .. ", not a web search", function()
-			local world = load_apps()
-			helpers.assert_eq(world.apps._open_or_search(case[1]), true)
-			helpers.assert_eq(world.urls, { case[2] })
-			helpers.assert_eq(#world.notices, 0)
+			with_apps(nil, function(world)
+				helpers.assert_eq(world.apps._open_or_search(case[1]), true)
+				helpers.assert_eq(world.urls, { case[2] })
+				helpers.assert_eq(#world.notices, 0)
+			end)
 		end)
 	end
 
 	helpers.it("open-target: an existing file or folder goes to open(1) as one argument", function()
-		local world = load_apps({ ["/Users/ada/Mes documents/a b.pdf"] = true })
-		helpers.assert_eq(world.apps._open_or_search("\"/Users/ada/Mes documents/a b.pdf\""), true)
-		helpers.assert_eq(world.opened, { "/Users/ada/Mes documents/a b.pdf" })
-		helpers.assert_eq(#world.urls, 0, "a path is not searched")
+		with_apps({ ["/Users/ada/Mes documents/a b.pdf"] = true }, function(world)
+			helpers.assert_eq(world.apps._open_or_search("\"/Users/ada/Mes documents/a b.pdf\""), true)
+			helpers.assert_eq(world.opened, { "/Users/ada/Mes documents/a b.pdf" })
+			helpers.assert_eq(#world.urls, 0, "a path is not searched")
+		end)
 	end)
 
 	helpers.it("open-target: a missing path is reported, never searched (open-target-missing-path-reported)", function()
-		local world = load_apps()
-		helpers.assert_eq(world.apps._open_or_search("/Users/ada/nowhere.txt"), false)
-		helpers.assert_eq(#world.urls + #world.opened, 0, "nothing must open, not even a search")
-		helpers.assert_eq(world.notices, { notice("open_target.missing_path", "/Users/ada/nowhere.txt") })
+		with_apps(nil, function(world)
+			helpers.assert_eq(world.apps._open_or_search("/Users/ada/nowhere.txt"), false)
+			helpers.assert_eq(#world.urls + #world.opened, 0, "nothing must open, not even a search")
+			helpers.assert_eq(world.notices, { notice("open_target.missing_path", "/Users/ada/nowhere.txt") })
+		end)
 	end)
 
 	helpers.it("open-target: a registry key and a bare file name are reported, not searched", function()
-		local world = load_apps()
-		world.apps._open_or_search("HKCU\\Software")
-		world.apps._open_or_search("notes.txt")
-		helpers.assert_eq(#world.urls + #world.opened, 0)
-		helpers.assert_eq(world.notices, {
-			notice("open_target.windows_only", "HKEY_CURRENT_USER\\Software"),
-			notice("open_target.bare_file_name", "notes.txt"),
-		})
+		with_apps(nil, function(world)
+			world.apps._open_or_search("HKCU\\Software")
+			world.apps._open_or_search("notes.txt")
+			helpers.assert_eq(#world.urls + #world.opened, 0)
+			helpers.assert_eq(world.notices, {
+				notice("open_target.windows_only", "HKEY_CURRENT_USER\\Software"),
+				notice("open_target.bare_file_name", "notes.txt"),
+			})
+		end)
 	end)
 
 	helpers.it("open-target: plain text is searched with the shared default engine", function()
-		local world = load_apps()
-		world.apps._open_or_search("bonjour le monde")
-		helpers.assert_eq(world.urls, { OpenTarget.DEFAULT_SEARCH_URL .. "bonjour+le+monde" })
+		with_apps(nil, function(world)
+			world.apps._open_or_search("bonjour le monde")
+			helpers.assert_eq(world.urls, { OpenTarget.DEFAULT_SEARCH_URL .. "bonjour+le+monde" })
+		end)
 	end)
 end)
