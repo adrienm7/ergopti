@@ -99,7 +99,11 @@ it through `_PrefixRestoreIdleForgottenWord`, macOS skips the wipe for a bare
 Backspace, Linux never idle-resets on a control key), and Ctrl+Backspace
 (Option+Backspace on macOS) starts a word. The ledger's `typing` rows are
 batched about every 200 ms, so a sequence must be rebuilt across rows from the
-per-key delays, never read row by row.
+per-key delays, never read row by row. Known limits, not bugs: after a
+browser's inline autocompletion the first Backspace deletes the suggestion, not
+a typed letter, so the buffer runs one character ahead (no driver reads the
+field's text); Linux sees no modifiers on a typed newline, so Shift+Enter in a
+terminal TUI also reads as submitting the line.
 
 ### project-hotstring-delay-architecture
 
