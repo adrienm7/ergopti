@@ -96,7 +96,7 @@ local function wrapper_has_single_fenced_route(raw, wrapper)
 	local classify_at = wrapper_code:find(
 		'pcall%s*%(%s*EventProvenance%.classify_with_fence%s*,%s*e%s*,%s*"keymap"%s*%)')
 	local route_at = wrapper_code:find(
-		'pcall%s*%(%s*onKeyDownRaw%s*,%s*e%s*,%s*provenance%s*,%s*provenance_status%s*%)')
+		'pcall%s*%(%s*onKeyDownRaw%s*,%s*e%s*,%s*provenance%s*,%s*provenance_status%s*[,)]')
 	return classify_at ~= nil and route_at ~= nil and classify_at < route_at
 end
 
