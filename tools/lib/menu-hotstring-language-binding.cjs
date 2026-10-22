@@ -1746,14 +1746,14 @@ const PERSONAL_DEFAULT_CHOICES = {
 		init: 'DefaultRows := []',
 		append: 'DefaultRows.Push(DefaultChoice)',
 		refusal: 'if !(DefaultChoice is Map)\n\t\t\t\treturn []',
-		call: 'DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",\n\t\t\t\tMap("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)),\n\t\t\t\tMap("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),\n\t\t\t\t\t"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))',
+		call: 'DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",\n\t\t\t\tMap("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)),\n\t\t\t\tMap("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),\n\t\t\t\t\t"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))',
 		frame:
-			'DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))\n\t\tDefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)\n\t\tDefaultProviders := Map("personal_default_choices", (*) => DefaultRows)\n\t\tDefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)',
+			'DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels))\n\t\tDefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)\n\t\tDefaultProviders := Map("personal_default_choices", (*) => DefaultRows)\n\t\tDefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)',
 		prefix:
 			'DefaultRows := []\n\t\tfor _, SecName in TomlData["sections_order"] {\n\t\t\tif (SecName == "-")\n\t\t\t\tcontinue\n\t\t\tif !TomlData["sections"].Has(SecName)\n\t\t\t\tcontinue\n\t\t\tSecLabel := DisambiguatedLabels[SecName]',
 		enclosure: 'if (PersonalTomlData != false) {',
 		enclosureDepth: 1,
-		sink: 'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []'
+		sink: 'if MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []'
 	},
 	hs: {
 		signature: 'function M.build_custom(ctx, counts)',
@@ -2707,7 +2707,10 @@ function personalSectionChoicePublication(source, platform, manifest) {
 
 module.exports.personalSectionChoicePublication = personalSectionChoicePublication;
 
-/** Finite physical contract: frozen pre-change donor plus exactly two reviewed edits. */
+/**
+ * Finite physical contract: frozen pre-change donor plus the reviewed edits, the
+ * last of which hand the child to a renderer-reserved template child.
+ */
 function personalFileCaptionPublication(source) {
 	try {
 		const donor =
@@ -2720,7 +2723,20 @@ function personalFileCaptionPublication(source) {
 			[
 				'\tResult := Map(\n\t\t"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",\n\t\t"submenu", TFMenu)',
 				'\t; Keep original late reads and native concatenation coercion before projection.\n\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))\n\tif !(Result is Map)\n\t\treturn false'
-			]
+			],
+			[
+				'\n\tTFMenu := Menu(), HandedOff := false',
+				'\n\tTFMenus := [], TFChild := MenuRenderer_TemplateChild(TFMenus), HandedOff := false'
+			],
+			[
+				'\tif MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame",',
+				'\tif MenuRenderer_FillTemplateChild(TFChild, "hotstring_personal_file_frame",'
+			],
+			[
+				'CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))',
+				'CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFChild))'
+			],
+			['_HS_PersonalReleaseMenus([TFMenu])', '_HS_PersonalReleaseMenus(TFMenus)']
 		];
 		let expected = donor;
 		for (const [before, after] of edits) {
@@ -2738,8 +2754,8 @@ module.exports.personalFileCaptionPublication = personalFileCaptionPublication;
 
 /**
  * Finite folder contract: complete original owner plus two unique presentation
- * edits and the retirement of its caller-less parent-menu mode, whose native
- * append no production level reached.
+ * edits, the retirement of its caller-less parent-menu mode, whose native
+ * append no production level reached, and the renderer-reserved folder child.
  */
 function personalFolderCaptionPublication(source) {
 	try {
@@ -2769,7 +2785,16 @@ function personalFolderCaptionPublication(source) {
 			[
 				'\tif Rows is Array {\n\t\tfor Row in Rendered\n\t\t\tRows.Push(Row)\n\t} else if MenuRenderer_AppendTemplate(ParentMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != FolderRows.Length || !WholeTreeAdmitted\n\t\treturn false\n',
 				'\tfor Row in Rendered\n\t\tRows.Push(Row)\n'
-			]
+			],
+			[
+				'\t\tFolderMenu := Menu()\n\t\tOwnedMenus.Push(FolderMenu)\n',
+				'\t\tFolderChild := MenuRenderer_TemplateChild(OwnedMenus)\n'
+			],
+			[
+				'if MenuRenderer_AppendTemplate(FolderMenu, "hotstring_personal_directory_frame",',
+				'if MenuRenderer_FillTemplateChild(FolderChild, "hotstring_personal_directory_frame",'
+			],
+			['FolderCount, FolderMenu))', 'FolderCount, FolderChild))']
 		];
 		let expected = donor;
 		for (const [before, after] of edits) {

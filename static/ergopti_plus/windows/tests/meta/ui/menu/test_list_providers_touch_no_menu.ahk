@@ -139,7 +139,7 @@ _LPTM_ProvidersTouchNoMenu() {
 		; they all do since 2026-08-07 — touches a menu through these entry points, so
 		; without them the scan finds nothing to check and the floor below fires.
 		Pos := 1
-		while (Pos := RegExMatch(Body, "MenuRenderer_(?:AppendRows|AppendTemplate|FillFromList)\(\s*(\w+)", &Mf, Pos)) {
+		while (Pos := RegExMatch(Body, "MenuRenderer_(?:AppendRows|AppendTemplate|FillTemplateChild|FillFromList)\(\s*(\w+)", &Mf, Pos)) {
 			Targets.Push(Mf[1])
 			Pos += Mf.Len[0]
 		}
@@ -199,21 +199,27 @@ _LPTM_ProvidersReturnRows() {
 Test("list-providers: every provider can actually produce a row", _LPTM_ProvidersReturnRows)
 
 
-; The actual provider keeps both native menus for repaint; typed row rendering
-; still mutates its owned target, whereas literal/comment examples do not.
-_LPTM_AppendTemplateTargetProof() {
+; The actual provider reserves its default-section child from the renderer and
+; fills it there: it draws into no Menu of its own (native menu row census), and
+; the reservation it fills is locally created; literal or comment examples are no proof.
+_LPTM_TemplateChildTargetProof() {
 	Body := _DriverFuncBody("_HS_PersonalRows")
+	Assert(Body != "", "the genuine personal provider must exist")
 	Code := _DriverMaskNonCode(&Body)
-	Assert(RegExMatch(Code, "MenuRenderer_AppendTemplate\(\s*(\w+)", &Target) > 0,
-		"the genuine personal provider must still render into its retained native menu")
-	AssertEqual("DefaultSectionMenu", Target[1])
-	Assert(_LPTM_IsAssignedIn(Code, Target[1]), "the real renderer target is locally created")
-	WithoutOwner := StrReplace(Code, "DefaultSectionMenu := Menu()", "")
+	AssertEqual(0, RegExMatch(Code, "MenuRenderer_Append\w*\("),
+		"the personal provider draws no row into a native menu itself")
+	Assert(RegExMatch(Code, "MenuRenderer_FillTemplateChild\(\s*(\w+)", &Target) > 0,
+		"the genuine personal provider must fill its renderer-reserved child")
+	AssertEqual("DefaultChild", Target[1])
+	Assert(_LPTM_IsAssignedIn(Code, Target[1]), "the real renderer target is locally reserved")
+	Reservation := "DefaultChild := MenuRenderer_TemplateChild(OwnedMenus)"
+	Assert(InStr(Code, Reservation) > 0, "the child is reserved from the renderer into the provider's release ledger")
+	WithoutOwner := StrReplace(Code, Reservation, "")
 	AssertFalse(_LPTM_IsAssignedIn(WithoutOwner, Target[1]), "withdrawing the actual owner defeats the assignment proof")
-	Decoy := '; MenuRenderer_AppendTemplate(ForeignMenu, Map())' . "`n"
-		. 'Text := "MenuRenderer_AppendTemplate(ForeignMenu, Map())"'
+	Decoy := '; MenuRenderer_FillTemplateChild(ForeignChild, Map())' . "`n"
+		. 'Text := "MenuRenderer_FillTemplateChild(ForeignChild, Map())"'
 	Masked := _DriverMaskNonCode(&Decoy)
-	AssertEqual(0, RegExMatch(Masked, "MenuRenderer_AppendTemplate\(\s*(\w+)"),
+	AssertEqual(0, RegExMatch(Masked, "MenuRenderer_FillTemplateChild\(\s*(\w+)"),
 		"a comment or quoted call cannot stand in for native menu mutation")
 }
-Test("list-providers: actual AppendTemplate target ownership and non-code decoys", _LPTM_AppendTemplateTargetProof)
+Test("list-providers: actual template-child target ownership and non-code decoys", _LPTM_TemplateChildTargetProof)

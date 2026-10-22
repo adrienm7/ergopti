@@ -74,39 +74,33 @@ _MakeOpenSectionFn(SecName) {
 		return (*) => OpenPersonalEditor(SecName)
 }
 ; DisambiguatedLabels is the Map built by _HS_BuildDisambiguatedSectionLabels —
-; Check/Uncheck must target the SAME (possibly-suffixed) label the menu was
+; the tick must land on the SAME (possibly-suffixed) label the menu was
 ; actually built with, or a duplicate description would resolve to the wrong
 ; item (duplicate-personal-section-desc-menu-mistarget).
-_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
+; DefaultChild is the renderer's handle on the default-section child: the
+; renderer refuses the whole change, preference write included, once it no
+; longer publishes that child under PersonalMenu.
+_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels) {
 		global _PrevDefaultLabel
 		NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
 				: (DisambiguatedLabels.Has(SecName) ? DisambiguatedLabels[SecName] : SecName)
 		OldCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
-			DefaultSectionMenu, Map("personal_default_label", (*) => _PrevDefaultLabel))
+			DefaultChild, Map("personal_default_label", (*) => _PrevDefaultLabel))
 		NewCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
-			DefaultSectionMenu, Map("personal_default_label", (*) => NewLabel))
+			DefaultChild, Map("personal_default_label", (*) => NewLabel))
 		if !(OldCaption is Map) || !(NewCaption is Map)
 			return false
-		_EditorPrefSet("DefaultSection", SecName)
-		DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
-		for _, SN in TomlData["sections_order"] {
-				if (SN == "-")
-						continue
-				if !TomlData["sections"].Has(SN)
-						continue
-				try DefaultSectionMenu.Uncheck(DisambiguatedLabels[SN])
-		}
-		if (SecName == "") {
-				DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
-		} else if (TomlData["sections"].Has(SecName)) {
-				DefaultSectionMenu.Check(DisambiguatedLabels[SecName])
-		}
-		try PersonalMenu.Rename(OldCaption["label"], NewCaption["label"])
+		Checked := (SecName == "") ? t("menu.hotstrings.default_none")
+				: (TomlData["sections"].Has(SecName) ? DisambiguatedLabels[SecName] : "")
+		if !MenuRenderer_RepaintTemplateChild(DefaultChild, PersonalMenu, OldCaption, NewCaption, Checked,
+			(*) => _EditorPrefSet("DefaultSection", SecName))
+			return false
 		_PrevDefaultLabel := NewLabel
+		return true
 }
 
-_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels) {
-		return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)
+_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels) {
+		return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)
 }
 _TogglePersonalCloseOnAdd(PersonalMenu) {
 		Label  := t("menu.hotstrings.close_on_add")

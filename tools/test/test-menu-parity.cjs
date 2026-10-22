@@ -489,7 +489,7 @@ const OPENS_SUBMENU = {
 						caption_joiner: ''
 					},
 					owner_signature: '_HS_PersonalRows(Options := unset) {',
-					call: 'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption", DefaultSectionMenu, Map("personal_default_label", (*) => CurDefaultLabel))',
+					call: 'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption", DefaultChild, Map("personal_default_label", (*) => CurDefaultLabel))',
 					handoff: 'DefaultParent := [DefaultCaption]',
 					consumer: '"personal_default_parent", (*) => DefaultParent,'
 				}
@@ -2373,7 +2373,7 @@ const {
 			'missing, malformed, foreign or multirow selected declarations earn no whole-section credit'
 		);
 	const actualCall =
-		'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",\n\t\t\tDefaultSectionMenu, Map("personal_default_label", (*) => CurDefaultLabel))';
+		'DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",\n\t\t\tDefaultChild, Map("personal_default_label", (*) => CurDefaultLabel))';
 	assert(
 		source.includes(actualCall),
 		'the actual two-line native caption capture is present before mutation'
@@ -2443,7 +2443,7 @@ const {
 				'DefaultProviders := Map("personal_default_choices", (*) => [])'
 			],
 			[
-				'_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)',
+				'_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)',
 				'((*) => false)'
 			]
 		],
@@ -2568,16 +2568,16 @@ const {
 				'DefaultRows := []\n\t\tfor _, SecName in [] {'
 			],
 			[
-				'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []',
+				'if MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []',
 				'if false\n\t\t\treturn []'
 			],
 			[
-				'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",',
-				'DefaultRows := []\n\t\tif MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",'
+				'if MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame",',
+				'DefaultRows := []\n\t\tif MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame",'
 			],
 			[
-				'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",',
-				'DefaultProviders := Map()\n\t\tif MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",'
+				'if MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame",',
+				'DefaultProviders := Map()\n\t\tif MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame",'
 			],
 			['!= DefaultRows.Length + 1 || !WholeTreeAdmitted', '!= DefaultRows.Length + 1 || false']
 		],
@@ -8459,7 +8459,7 @@ function languageParentSource(source, driver) {
 		'actual complete donor owner with only the two approved scalar policy edits'
 	);
 	const late =
-		'\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))';
+		'\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFChild))';
 	assert.equal(
 		source.split(late).length - 1,
 		1,
@@ -8504,7 +8504,7 @@ function languageParentSource(source, driver) {
 	);
 	assert.equal(deadTry.replace(refused, original), source, 'false try wrapper exact inverse');
 	const io =
-		'\n\tif MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted)';
+		'\n\tif MenuRenderer_FillTemplateChild(TFChild, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted)';
 	assert.equal(original.split(io).length - 1, 1, 'complete genuine native fill coordinate unique');
 	const deadIoOwner = original.replace(io, '\n\tif false' + io);
 	assert.notEqual(
@@ -8550,8 +8550,8 @@ function languageParentSource(source, driver) {
 		'class Foreign {\n' + original + '\n}',
 		original.replace('\n\ttry {', '\n\tif false\n\ttry {'),
 		original.replace(
-			'\n\t\tif MenuRenderer_AppendTemplate(FolderMenu,',
-			'\n\t\tif false\n\t\tif MenuRenderer_AppendTemplate(FolderMenu,'
+			'\n\t\tif MenuRenderer_FillTemplateChild(FolderChild,',
+			'\n\t\tif false\n\t\tif MenuRenderer_FillTemplateChild(FolderChild,'
 		),
 		original.replace(
 			'\n\t\tFolderTotal := _HS_NodeTotal(Node)',
@@ -8562,8 +8562,8 @@ function languageParentSource(source, driver) {
 			'FolderCount := FmtCount(FolderTotal) . ""'
 		),
 		original.replace(
-			'CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu)',
-			'Foreign.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu)'
+			'CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderChild)',
+			'Foreign.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderChild)'
 		)
 	];
 	for (const altered of alteredOwners) {
