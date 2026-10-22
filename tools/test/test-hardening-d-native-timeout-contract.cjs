@@ -219,7 +219,11 @@ const readyLua = luaSeconds(leaseLua, 'READY_ACK_TIMEOUT_SEC', LEASE_LUA);
 const commandLua = luaSeconds(leaseLua, 'COMMAND_ACK_TIMEOUT_SEC', LEASE_LUA);
 const stopLua = luaSeconds(leaseLua, 'STOP_ACK_TIMEOUT_SEC', LEASE_LUA);
 {
-	const armStart = leaseLua.search(/local function arm_ack_timer\s*\(/);
+	// A forward-declared local (`local arm_ack_timer`, then `arm_ack_timer =
+	// function(`) is the same function: it and the output-turn probe call each other.
+	const armStart = leaseLua.search(
+		/local function arm_ack_timer\s*\(|^arm_ack_timer\s*=\s*function\s*\(/m
+	);
 	const armBody = armStart < 0 ? '' : leaseLua.slice(armStart, armStart + 1200);
 	const wants = [
 		['local timeout = COMMAND_ACK_TIMEOUT_SEC', 'PONG, PAUSED and RESUMED wait COMMAND_ACK'],
