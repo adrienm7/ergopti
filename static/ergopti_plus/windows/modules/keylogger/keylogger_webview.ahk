@@ -800,7 +800,8 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				KLPF_DeletePrivateStage(stage)
 				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
 		}
-		if (status != "ok") {
+		; An incomplete range stage carries its own flag for the page.
+		if (status != "ok" && status != "incomplete") {
 				KLPF_DeletePrivateStage(stage)
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, status)
 		}
@@ -1319,7 +1320,9 @@ KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) 
 						return false
 				if A_IsSuspended
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
-				if (status != "ok")
+				; An incomplete manifest read is painted from its private stage; the
+				; full build armed below reads the history again.
+				if (status != "ok" && status != "incomplete")
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
 				if !KLWV_FirstPaintPush(which, Epoch, SnapshotPath)
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, "push failed")
@@ -1333,11 +1336,13 @@ KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) 
 		}
 }
 
-KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
+KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) {
 		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
+				if !A_IsSuspended && (status = "incomplete")
+						return KLWV_DeliverIncompleteFull(which, Epoch, attempt, SnapshotPath)
 				if A_IsSuspended || (status != "ok")
 						return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, status)
 				if !KLWV_FirstPaintPush(which, Epoch)
@@ -1346,6 +1351,21 @@ KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
 		} finally {
 				KLWV_ScheduleIngestDrain(which, Epoch)
 		}
+}
+
+; Show a full read that SQLite could not wholly answer, then read again. The
+; window keeps no complete history from it: full_build_done stays false, so the
+; bounded full retry and every later ingest ask for the whole history again.
+; @param SnapshotPath {String} Private stage of the partial read.
+; @returns {Boolean} True when a retry was armed.
+KLWV_DeliverIncompleteFull(which, Epoch, attempt, SnapshotPath) {
+		entry := KLWV.windows[which]
+		entry["full_build_done"] := false
+		if !KLWV_FirstPaintPush(which, Epoch, SnapshotPath)
+				return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "push failed")
+		if !KLWV_CommitPaint(which, Epoch)
+				return false
+		return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "incomplete")
 }
 
 KLWV_OnBuildTerminal(which, Epoch, status, SnapshotPath := "", *) {
@@ -1365,7 +1385,9 @@ KLWV_OnBuildTerminal(which, Epoch, status, SnapshotPath := "", *) {
 								KLWV_QueueFirstPaintRetry(which, Epoch, 0, false)
 						return false
 				}
-				if (status != "ok") {
+				; A partial live or manifest read is shown with its incomplete flag;
+				; it was never published, so the next read starts from the history.
+				if (status != "ok" && status != "incomplete") {
 						if first_paint_pending
 								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, status)
 						return false
@@ -1835,7 +1857,9 @@ KLWV_SettleRebuildProgress(which, Epoch, status) {
 		for Slot in ["progress_stamp", "partial_stamp"]
 				if Entry.Has(Slot)
 						Entry.Delete(Slot)
-		State := (status = "ok") ? "done" : "failed"
+		; The rebuild finished even when the read after it was incomplete; the
+		; page's incomplete-history notice reports that read.
+		State := (status = "ok" || status = "incomplete") ? "done" : "failed"
 		if State = "failed"
 				try LoggerWarn("Keylogger", "Metrics rebuild worker for '{1}' ended with '{2}'; the dashboard shows the failure.",
 						which, status)
@@ -1968,7 +1992,7 @@ KLWV_WarmRun(Index := 1, ExpectedStore := "", *) {
 ; full-build steps stand down while a job exists), so the result is delivered as
 ; that window's full build. The next key starts one turn later, after this job
 ; has retired from the registry.
-KLWV_OnWarmTerminal(which, Index, MetricsDir, status, *) {
+KLWV_OnWarmTerminal(which, Index, MetricsDir, status, SnapshotPath := "", *) {
 	if (status = "ok") {
 		try LoggerInfo("Keylogger", "Metrics sidecar warm-up published '{1}'.", which)
 	} else {
@@ -1981,7 +2005,7 @@ KLWV_OnWarmTerminal(which, Index, MetricsDir, status, *) {
 			; This background job had no window budget at launch. Start that
 			; window's budget explicitly at its current revision and attempt zero.
 			KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, status,
-				0, Entry.Get("ingest_revision", 0))
+				0, Entry.Get("ingest_revision", 0), SnapshotPath)
 		else
 			; Its first-paint timer may already have stood down for this job.
 			; An old store can retire, but cannot certify this window's history.
@@ -2141,21 +2165,29 @@ KLWV_ResumeWarmWindow(which, Entry, Epoch, Owner) {
 	return Started
 }
 
-KLWV_OnWarmWindowTerminal(which, Entry, Epoch, MetricsDir, Owner, Status, *) {
+KLWV_OnWarmWindowTerminal(which, Entry, Epoch, MetricsDir, Owner, Status, SnapshotPath := "", *) {
 	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir, Owner)
 		return KLWV_RetireWarmWindow(Entry, Owner)
 	KLWV_RetireWarmWindow(Entry, Owner)
 	return KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status,
-		Owner["attempt"], Owner["revision"])
+		Owner["attempt"], Owner["revision"], SnapshotPath)
 }
 
-KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt, BudgetRevision) {
+KLWV_DeliverWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt, BudgetRevision, SnapshotPath := "") {
 	if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
 		return false
 	KLWV_SettleRebuildProgress(which, Epoch, Status)
 	try {
 		if !KLWV_WarmOwnsWindow(which, Entry, Epoch, MetricsDir)
 			return false
+		if !A_IsSuspended && Status = "incomplete" {
+			; Show the partial read from its private stage, keep no complete
+			; history from it, and let the bounded warm retry read again.
+			Entry["full_build_done"] := false
+			if KLWV_FirstPaintPush(which, Epoch, SnapshotPath)
+				KLWV_CommitPaint(which, Epoch)
+			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt, BudgetRevision)
+		}
 		if A_IsSuspended || Status != "ok"
 			return KLWV_QueueWarmWindow(which, Entry, Epoch, MetricsDir, Status, Attempt, BudgetRevision)
 		Pushed := KLWV_FirstPaintPush(which, Epoch)

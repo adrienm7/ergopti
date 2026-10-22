@@ -74,7 +74,7 @@ KLR_ReadManifestBase(db, start_date := "", end_date := "", IncludeTitles := true
 KLR__SumSwitchesTo(db, manifest, where) {
 		sql := "SELECT date, app_from, app_to, COALESCE(SUM(count), 0) AS count"
 				. " FROM agg_app_day_switches_to" . where . " GROUP BY date, app_from, app_to"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "switches_to") {
 				a := KLR_GetCell(manifest, r["date"], r["app_from"])
 				if !a.Has("switches_to")
 						a["switches_to"] := Map()
@@ -93,7 +93,7 @@ KLR__SumSystemDay(db, manifest, where) {
 		Sql .= ",MIN(CASE WHEN battery_count>0 THEN battery_min END) AS battery_min"
 				. ",MAX(CASE WHEN battery_count>0 THEN battery_max END) AS battery_max"
 				. " FROM agg_system_day" . where . " GROUP BY date;"
-		for Row in SQLite_Query(db, Sql) {
+		for Row in KLR_ProjectionQuery(db, Sql, "manifest", "system_day") {
 				Day := Row["date"]
 				Row.Delete("date")
 				for Field in ["battery_min", "battery_max"]
@@ -198,7 +198,7 @@ KLR__SumAppDay(db, manifest, where) {
 				. " SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,"
 				. " SUM(app_time_ms) AS app_time_ms, MAX(category) AS category"
 				. " FROM agg_app_day" . where . " GROUP BY date, app"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "app_day") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["chars"] := r["chars"]
 				a["pauses"] := r["pauses"]
@@ -223,7 +223,7 @@ KLR__SumBuckets(db, manifest, where) {
 				. " SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,"
 				. " SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c"
 				. " FROM agg_app_day_buckets" . where . " GROUP BY date, app, bucket_ms"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "buckets") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				k := String(r["bucket_ms"])
 				KLR_BumpMap(a["time_buckets"], k, r["time_sum"])
@@ -300,7 +300,7 @@ KLR__SumBurst(db, manifest, where) {
 				. " SUM(inter_delay_sumsq) AS inter_sumsq, length_buckets_json, COUNT(*) AS source_rows"
 				. " FROM agg_app_day_burst" . where
 				. " GROUP BY date, app, length_buckets_json"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "burst") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["burst_count_total"] += KLR_NumberOrZero(r["count_total"])
 				max_cpm := KLR_NumberOrZero(r["max_cpm"])
@@ -320,7 +320,7 @@ KLR__SumBurst(db, manifest, where) {
 KLR__SumSession(db, manifest, where) {
 		sql := "SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json"
 				. " FROM agg_app_day_session" . where
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "session") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["session_count_total"] += KLR_NumberOrZero(r["count_total"])
 				if (IsNumber(r["longest_ms"]) && r["longest_ms"] > a["session_longest_ms"])
@@ -339,7 +339,7 @@ KLR__SumCharsClass(db, manifest, where) {
 				. " SUM(space) AS space, SUM(other) AS other,"
 				. " MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min"
 				. " FROM agg_app_day_chars_class" . where . " GROUP BY date, app"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "chars_class") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["char_letter"] := r["letter"]
 				a["char_digit"] := r["digit"]
@@ -357,7 +357,7 @@ KLR__SumErrors(db, manifest, where) {
 				. " MAX(cascade_max_len) AS cascade_max_len, SUM(recovery_sum_ms) AS recovery_sum,"
 				. " SUM(recovery_count) AS recovery_count"
 				. " FROM agg_app_day_errors" . where . " GROUP BY date, app"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "errors") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["bs_total"] := r["bs_total"]
 				a["cascade_count_total"] := r["cascade_count"]
@@ -373,7 +373,7 @@ KLR__SumErgo(db, manifest, where) {
 				. " MAX(same_hand_streak_max) AS h_max,"
 				. " SUM(auto_repeat_count) AS ar_count"
 				. " FROM agg_app_day_ergo" . where . " GROUP BY date, app"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "ergo") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["same_finger_streak_max"] := r["f_max"]
 				a["same_hand_streak_max"] := r["h_max"]
@@ -384,7 +384,7 @@ KLR__SumErgo(db, manifest, where) {
 KLR__SumLayouts(db, manifest, where) {
 		sql := "SELECT date, app, layout, SUM(count) AS count"
 				. " FROM agg_app_day_layouts" . where . " GROUP BY date, app, layout"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "layouts") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				KLR_BumpMap(a["layouts_seen"], r["layout"], r["count"])
 		}
@@ -395,7 +395,7 @@ KLR__SumKcHold(db, manifest, where) {
 				. " SUM(sum_ms) AS s, SUM(count) AS c, MAX(max_ms) AS mx,"
 				. " SUM(tap_count) AS t, SUM(hold_count) AS h"
 				. " FROM agg_app_day_kc_hold" . where . " GROUP BY date, app, keycode"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "kc_hold") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["kc_hold"][String(r["keycode"])] := Map(
 						"s", r["s"],
@@ -432,6 +432,9 @@ KLR__MediaProjectionRows(db, where, ExecFn := unset) {
 		if PressDeclarations != 1 || HoldDeclarations != 1
 				throw Error("The shared semantic media schema declarations are unsupported.")
 		FailureMessage := ""
+		; A native refusal or a policy refusal of the rows is a refused read; any
+		; other failure type is a defect and stays fatal.
+		FailureIsRefusal := false
 		Rows := Map()
 		try {
 				if Exec.Call(db, Schema) != true
@@ -456,6 +459,7 @@ KLR__MediaProjectionRows(db, where, ExecFn := unset) {
 				}
 		} catch as Failure {
 				FailureMessage := Failure.Message
+				FailureIsRefusal := Type(Failure) == "Error"
 		}
 		CleanupFailed := false
 		for Name in Names {
@@ -466,6 +470,9 @@ KLR__MediaProjectionRows(db, where, ExecFn := unset) {
 						CleanupFailed := true
 				}
 		}
+		; Retired temporary owners leave nothing behind, so a partial read may go on.
+		if FailureIsRefusal && !CleanupFailed
+				throw KLRReadRefusal(FailureMessage)
 		if FailureMessage != "" || CleanupFailed
 				throw Error((FailureMessage != "" ? FailureMessage : "Semantic media projection refused.")
 						. (CleanupFailed ? " Native temporary-owner cleanup remains unresolved." : ""))
@@ -473,7 +480,8 @@ KLR__MediaProjectionRows(db, where, ExecFn := unset) {
 }
 
 KLR__SumMedia(db, manifest, where) {
-		Rows := KLR__MediaProjectionRows(db, where)
+		Rows := KLR_PartialStep("manifest", "media", KLR__MediaProjectionRows.Bind(db, where),
+				Map("keys", [], "holds", []))
 		for Row in Rows["keys"] {
 				Cell := KLR_GetCell(manifest, Row["date"], Row["app"])
 				Cell["media_keys"][Row["media_id"]] := Row["c"]
@@ -488,7 +496,7 @@ KLR__SumMedia(db, manifest, where) {
 KLR__SumTitles(db, manifest, where) {
 		sql := "SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms"
 				. " FROM agg_app_day_titles" . where . " GROUP BY date, app, title"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "titles") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				a["win_titles"][r["title"]] := Map("c", r["c"], "ms", r["ms"])
 		}
@@ -500,7 +508,7 @@ KLR__SumHourly(db, manifest, where) {
 				. " e_buckets_json, COUNT(*) AS source_rows"
 				. " FROM agg_app_day_hourly" . where
 				. " GROUP BY date, app, hour, e_buckets_json"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "hourly") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				hour := r["hour"]
 				if !a["hourly"].Has(hour)
@@ -522,7 +530,7 @@ KLR__SumHourlyMin5(db, manifest, where) {
 				. " e_buckets_json, COUNT(*) AS source_rows"
 				. " FROM agg_app_day_hourly_min5" . where
 				. " GROUP BY date, app, slot, e_buckets_json"
-		for r in SQLite_Query(db, sql) {
+		for r in KLR_ProjectionQuery(db, sql, "manifest", "hourly_min5") {
 				a := KLR_GetCell(manifest, r["date"], r["app"])
 				slot := r["slot"]
 				if !a["hourly_min5"].Has(slot)

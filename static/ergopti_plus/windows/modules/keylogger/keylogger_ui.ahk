@@ -147,6 +147,12 @@ KLUI_OnPrefetchTerminal(which, url, title, Attempt, status, *) {
 		if KLUI.pending.Get(which, 0) != Attempt
 				return
 		KLUI.pending.Delete(which)
+		if (status = "incomplete") {
+				; Edge reads only the published snapshot, and a partial read is never
+				; published; the next open reads the whole history again.
+				try LoggerWarn("Keylogger", "Edge metrics prefetch for '{1}' read an incomplete history; the Edge fallback cannot show an unpublished partial read, so the dashboard was not launched.", which)
+				return
+		}
 		if (status != "ok") {
 				try LoggerError("Keylogger", "Edge metrics prefetch failed for '{1}' (status={2}); dashboard was not launched.", which, status)
 				return

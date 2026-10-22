@@ -67,7 +67,7 @@ KLR_EncodedTitles(db, Where) {
 				. "SELECT date,app,title,SUM(c) AS c,SUM(ms) AS ms FROM agg_app_day_titles"
 				. Where . " GROUP BY date,app,title) GROUP BY date,app"
 		Titles := Map()
-		for Row in SQLite_Query(db, Sql) {
+		for Row in KLR_ProjectionQuery(db, Sql, "manifest", "titles") {
 				if !Titles.Has(Row["date"])
 						Titles[Row["date"]] := Map()
 				; Match the shared encoder's JavaScript line-separator contract.
@@ -101,7 +101,7 @@ KLR_EncodedTimeSeries(db, FiveMinute, Where, NormalizeHistogram := unset) {
 				. Where . (Where = "" ? " WHERE " : " AND ")
 				. "e_buckets_json IS NOT NULL AND e_buckets_json != '' AND e_buckets_json != '{}'"
 				. " GROUP BY date,app," . Key . ",e_buckets_json"
-		for Row in SQLite_Query(db, Sql) {
+		for Row in KLR_ProjectionQuery(db, Sql, "manifest", Field . " histograms") {
 				Day := Row["date"]
 				App := Row["app"]
 				if !Errors.Has(Day)
@@ -129,7 +129,7 @@ KLR_EncodedTimeSeries(db, FiveMinute, Where, NormalizeHistogram := unset) {
 				. (FiveMinute ? "" : ",'em',COALESCE(SUM(em),0)") . ") AS payload FROM " . Table
 				. Where . " GROUP BY date,app," . Key
 		Output := Map()
-		for Row in SQLite_Query(db, Sql) {
+		for Row in KLR_ProjectionQuery(db, Sql, "manifest", Field) {
 				Day := Row["date"]
 				App := Row["app"]
 				if !Output.Has(Day)
