@@ -138,6 +138,7 @@ graph TD
         MACOS_system_switcher_sampler["SystemSwitcherSampler.lua"]
         MACOS_task_environment["TaskEnvironment.lua"]
         MACOS_task_lifecycle["TaskLifecycle.lua"]
+        MACOS_task_output_turn["TaskOutputTurn.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
         MACOS_text_sender["TextSender.lua"]
         MACOS_timer_scheduler["TimerScheduler.lua"]
