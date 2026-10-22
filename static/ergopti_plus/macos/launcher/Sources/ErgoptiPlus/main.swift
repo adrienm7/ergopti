@@ -629,13 +629,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	/// - Parameters:
 	///   - attempt: Retries already spent on a held lock.
 	///   - proceed: Continues startup once the lock is held.
-	private func acquireSoleLauncherOwnership(attempt: Int, then proceed: @escaping () -> Void) {
+	@MainActor
+	private func acquireSoleLauncherOwnership(attempt: Int, then proceed: @escaping @MainActor () -> Void) {
 		switch instanceLock.acquire() {
 		case .acquired:
 			LauncherLog.write("launcher stage: sole-launcher lock held at \(instanceLock.path)")
 			proceed()
 		case .heldByAnotherLauncher where attempt < kLauncherLockRetryAttempts:
-			DispatchQueue.main.asyncAfter(deadline: .now() + kLauncherLockRetryIntervalSeconds) { [weak self] in
+			Task { @MainActor [weak self] in
+				try? await Task.sleep(nanoseconds: UInt64(kLauncherLockRetryIntervalSeconds * 1_000_000_000))
 				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, then: proceed)
 			}
 		case .heldByAnotherLauncher:
@@ -645,7 +647,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			)
 			let ownPid = ProcessInfo.processInfo.processIdentifier
 			for other in runningApplicationsReader(kErgoptiBundleId) where other.processIdentifier != ownPid {
-				other.activate()
+				_ = other.activate(options: [])
 			}
 			applicationIsTerminating = true
 			applicationTerminator(self)
@@ -655,6 +657,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	/// Startup that only the sole launcher performs.
+	@MainActor
 	private func finishLaunchingAsSoleLauncher() {
 		// Hide the launcher from the Dock — Hammerspoon's own menubar item
 		// is the only UI affordance the user should see.
