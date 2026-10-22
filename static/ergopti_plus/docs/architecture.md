@@ -91,6 +91,7 @@ graph TD
         MACOS_boot_journal["BootJournal.lua"]
         MACOS_clipboard["Clipboard.lua"]
         MACOS_crypto["Crypto.lua"]
+        MACOS_event_clock["EventClock.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
         MACOS_file_system["FileSystem.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
