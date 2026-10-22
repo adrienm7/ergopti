@@ -21,14 +21,14 @@
 --- 3. Late callbacks: an event the taps saw LATE_CALLBACK_MS or more later than
 ---    the freshest recent events (adapters/event_clock.lua) waited behind the
 ---    main thread; a late key-up is a key-up every application received late.
---- 4. Off the event tap: recording is table writes; every line is written on a
----    later run-loop turn and coalesced per turn.
+--- 4. Off the event tap: recording is table writes, never a timer or a file
+---    write; the keymap tap watchdog (every second) and a lease failure call
+---    flush(), which writes the queued lines, coalesced, with the totals.
 --- ==============================================================================
 
 local M = {}
 
 local Logger       = require("infra.logger")
-local DeferredWork = require("infra.deferred_work")
 local Timer        = require("adapters.timer_scheduler")
 local EventClock   = require("adapters.event_clock")
 
@@ -55,7 +55,6 @@ local _held_count = 0
 local _counts = {}
 local _lease_failures = {}
 local _pending = {}
-local _pending_scheduled = false
 
 --- Clears every counter and held key; tests and a full driver stop use it.
 function M.reset()
@@ -69,7 +68,6 @@ function M.reset()
 	}
 	_lease_failures = {}
 	_pending = {}
-	_pending_scheduled = false
 end
 
 M.reset()
@@ -109,9 +107,9 @@ function M.summary()
 		_counts.stale_passed, lease_total, #lease_parts > 0 and (" (" .. table.concat(lease_parts, ", ") .. ")") or "")
 end
 
---- Writes every line queued during the last run-loop turn.
-local function flush_pending()
-	_pending_scheduled = false
+--- Writes every line queued since the last flush. Never call it from an event
+--- tap: it writes the log.
+function M.flush()
 	local pending = _pending
 	_pending = {}
 	if #pending == 0 then return end
@@ -123,7 +121,7 @@ local function flush_pending()
 	end
 end
 
---- Queues one line for the next run-loop turn, coalescing identical texts.
+--- Queues one line for the next flush(), coalescing identical texts.
 --- @param level string "info" or "warn".
 --- @param text string Line without the session totals.
 local function queue(level, text)
@@ -135,8 +133,6 @@ local function queue(level, text)
 	end
 	if #_pending >= M.MAX_HELD then return end
 	_pending[#_pending + 1] = { level = level, text = text, repeats = 1 }
-	if _pending_scheduled then return end
-	_pending_scheduled = DeferredWork.after(0, flush_pending, "key event health report")
 end
 
 --- Names the class of a key without naming the key.
@@ -284,6 +280,8 @@ function M.note_lease_failure(reason)
 	_lease_failures[kind] = (_lease_failures[kind] or 0) + 1
 	M.note_transition("a Karabiner lease fence")
 	queue("warn", "A Karabiner lease failed (" .. kind .. ")")
+	-- A lease fails from a timer or a task callback, never inside a key tap.
+	M.flush()
 end
 
 --- Records from a path whose own outcome a diagnostic failure must never change.

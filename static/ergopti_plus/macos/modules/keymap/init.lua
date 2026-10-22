@@ -1494,7 +1494,13 @@ end
 -- backspace handling, buffer tracking and expansions.
 local _interceptor_error_logged = {}
 
-local function onKeyDownRaw(e, provenance, provenance_status, stale)
+-- What the wrapper already read of the physical key-down it hands to
+-- onKeyDownRaw: its key code (read once per event, the keycode budget the
+-- ignored-window tests pin) and whether it waited behind the main thread.
+-- Declared above onKeyDownRaw for the same reason; cleared after every call.
+local _key_down_context = { keycode = nil, stale = false }
+
+local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A stale internal loopback has lost the live transaction identity required to
 	-- re-enter the LLM, but it is still an Ergopti-only control key. Consume it in
 	-- every state (including pause) instead of leaking F16 to the frontmost app.
@@ -1544,7 +1550,7 @@ local function onKeyDownRaw(e, provenance, provenance_status, stale)
 	end
 
 	-- Single getKeyCode() call — reused for every subsequent keyCode check
-	local keyCode = e:getKeyCode()
+	local keyCode = _key_down_context.keycode or e:getKeyCode()
 
 	-- Explicit user-data tags are the only synthetic identity. The wrapper reads
 	-- provenance once before its physical-ordering fence and passes the result in,
@@ -1584,7 +1590,7 @@ local function onKeyDownRaw(e, provenance, provenance_status, stale)
 	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
 	-- it now would delete or retype text the user never saw that way. It passes
 	-- untouched and the buffer starts over.
-	if stale then
+	if _key_down_context.stale then
 		invalidate_observed_context()
 		pcall(KeyEventHealth.note_stale_pass)
 		return false
@@ -1923,9 +1929,10 @@ local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 --- @param phase string "down" or "up".
 --- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
 --- @param stamp integer|nil Raw event stamp from adapters/event_clock.lua.
+--- @return any keycode The key code read, or nil when it could not be read.
 local function observe_key_health(e, phase, lateness_ms, stamp)
 	local ok_code, keycode = pcall(e.getKeyCode, e)
-	if not ok_code or keycode == nil then return end
+	if not ok_code or keycode == nil then return nil end
 	local autorepeat = false
 	if phase == "down" then
 		local ok_repeat, value = pcall(e.getProperty, e, AUTOREPEAT_PROPERTY)
@@ -1933,6 +1940,7 @@ local function observe_key_health(e, phase, lateness_ms, stamp)
 	end
 	local ok_char, character = pcall(Keycodes.character_for, keycode)
 	KeyEventHealth.note(phase, keycode, autorepeat, ok_char and character ~= nil, lateness_ms, stamp)
+	return keycode
 end
 
 --- pcall wrapper around onKeyDownRaw to prevent keyboard lockups on uncaught errors.
@@ -1964,6 +1972,7 @@ local function onKeyDown(e)
 	local provenance_status = EventProvenance.STATUS_UNREADABLE
 	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
 	local stale = false
+	local physical_keycode = nil
 	local classify_ok, provenance_or_err, status_or_nil, fence_or_nil, replay_or_nil = pcall(
 		EventProvenance.classify_with_fence, e, "keymap")
 	local fence_events = nil
@@ -1976,7 +1985,7 @@ local function onKeyDown(e)
 			fence_consumes_original = fence_or_nil.consume_original == true
 		end
 		if provenance_status == EventProvenance.STATUS_FOREIGN and replay_or_nil ~= true then
-			observe_key_health(e, "down", event_lateness_ms, event_stamp)
+			physical_keycode = observe_key_health(e, "down", event_lateness_ms, event_stamp)
 			stale = event_lateness_ms ~= nil
 				and event_lateness_ms >= SyntheticInput.STALE_PHYSICAL_EVENT_MS
 		end
@@ -2012,7 +2021,11 @@ local function onKeyDown(e)
 			fence_events
 	end
 
-	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status, stale)
+	_key_down_context.keycode = physical_keycode
+	_key_down_context.stale = stale
+	local ok, result = pcall(onKeyDownRaw, e, provenance, provenance_status)
+	_key_down_context.keycode = nil
+	_key_down_context.stale = false
 	local returned_events = nil
 	local abort_requires_consumption = false
 	if ok then
@@ -2098,8 +2111,9 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	local event_lateness_ms, event_stamp = EventClock.lateness_ms(e)
 	local provenance, status, fence, replay = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
+	local observed_keycode = nil
 	if status == EventProvenance.STATUS_FOREIGN and replay ~= true then
-		observe_key_health(e, "up", event_lateness_ms, event_stamp)
+		observed_keycode = observe_key_health(e, "up", event_lateness_ms, event_stamp)
 	end
 	local fence_events = fence and fence.events or nil
 	if fence and fence.consume_original == true then return true, fence_events end
@@ -2109,7 +2123,8 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	-- Release phase of a Karabiner control sentinel: its key-down was deleted by
 	-- the keyDown tap, so an orphan release must not reach the application.
 	if provenance == nil and status == EventProvenance.STATUS_FOREIGN then
-		local ok, keycode = pcall(e.getKeyCode, e)
+		local ok, keycode = true, observed_keycode
+		if keycode == nil then ok, keycode = pcall(e.getKeyCode, e) end
 		if ok and ControlSentinels.claim_key(keycode, false) then return true, fence_events end
 		if ok and _one_shot_shift then
 			local settled, consumed = pcall(_one_shot_shift.key_up, e, keycode)
@@ -2454,6 +2469,8 @@ tap_watchdog = function(timer, generation)
 	if (keydown_revived or keyup_revived) and _one_shot_shift then _one_shot_shift.reset() end
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
+	-- The key pairing lines queued by the taps are written here, off the taps.
+	pcall(KeyEventHealth.flush)
 	-- Only the keyDown tap feeds the buffer, so only its outage invalidates it.
 	if keydown_revived and CoreState.processing_paused ~= true then
 		invalidate_observed_context()
