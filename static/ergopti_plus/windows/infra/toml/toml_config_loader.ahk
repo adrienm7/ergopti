@@ -301,12 +301,20 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
+; A binding its owner publishes is owned by that publication, not by spelling:
+; a physical keyboard slot keeps its scan-code case (win_SC03A), which the
+; lowercase grammar alone would offer for deletion. An unpublished domain keeps
+; the lowercase grammar.
 TomlConfigActionParameterIsOwned(Key) {
 	static Actions := GestureActionCatalogueData().Actions
-	if !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
+	if Type(Key) != "String" || !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__([A-Za-z0-9]+(?:_[A-Za-z0-9]+)*)__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
 		return false
-	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
-		&& TomlConfigActionParameterBindingStatus(Key) != "retired"
+	if !Actions.Has(Match[2]) || Actions[Match[2]].Parameter == ""
+		return false
+	Status := TomlConfigActionParameterBindingStatus(Key)
+	if Status == "current"
+		return true
+	return Status != "retired" && RegExMatch(Match[1], "^[a-z0-9_]+$")
 }
 
 TomlConfigForeignOwner(SectionPath, Key) {

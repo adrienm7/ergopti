@@ -892,4 +892,31 @@ _CUK_AbsentPreviewPathIsNeverRemoved() {
 Test("config unused keys: a preview row absent from the source is never reported removed "
 	. "(config-unused-keys-semantic-shapes)", _CUK_AbsentPreviewPathIsNeverRemoved)
 
+; A live physical keyboard slot keeps a scan-code spelling (win_SC03A). Its
+; action parameter failed the lowercase grammar of the parameter owner, so the
+; cleanup offered a live parameter for deletion (keyboard-slot-publication).
+_CUK_PhysicalKeyboardSlotParameterIsOwned() {
+	Live := "keyboard__win_SC03A__open_url"
+	AssertEqual("current", TomlConfigActionParameterBindingStatus(Live), "control: the slot is published")
+	AssertTrue(TomlConfigActionParameterIsOwned(Live))
+	AssertEqual("keyboard", ConfigScopeActionParameterDomain("action_parameters." . Live))
+	Tree := ManifestBuildFeaturesMap()
+	AssertEqual("", TomlConfigUnknownKind(Tree, "action_parameters", Live, &Owner))
+	AssertEqual("Gestures", Owner)
+	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__win_SC0FF__open_url"), "an unpublished scan stays retired")
+	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__win_SC03A__no_such_action"))
+	AssertFalse(TomlConfigActionParameterIsOwned("keyboard__win_SC03A__Open_url"), "the action keeps its exact spelling")
+	AssertFalse(TomlConfigActionParameterIsOwned("gesture__Swipe_up__open_url"),
+		"an unpublished domain keeps the lowercase grammar")
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteSemanticSubject(Dir, "[action_parameters]`n" . Live . ' = "https://example.invalid/"`n')
+		Scan := ConfigUnusedKeysFind(Path)
+		AssertEqual("ok", Scan["status"])
+		AssertEqual(0, Scan["keys"].Length, "a live slot parameter is never offered")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: a physical keyboard slot parameter belongs to the gesture owner "
+	. "(keyboard-slot-publication)", _CUK_PhysicalKeyboardSlotParameterIsOwned)
+
 #Include test_config_cleanup_refresh_lifecycle.ahk
