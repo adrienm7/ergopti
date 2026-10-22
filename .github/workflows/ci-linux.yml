@@ -2188,7 +2188,9 @@ jobs:
           else
               exit 1
           fi
-        timeout-minutes: 10
+        # pulseaudio needs libasound2-plugins, which brings 40 MB of codec libraries;
+        # the Azure mirror served them at 60 kB/s on run 39862893510.
+        timeout-minutes: 20
 
       - name: Parse native virtual audio state independently of user locale
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
