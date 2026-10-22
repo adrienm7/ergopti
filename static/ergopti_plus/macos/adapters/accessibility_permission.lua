@@ -22,6 +22,11 @@
 ---    in System Settings while refusing the new binary, and the user sees a
 ---    permission that looks granted but is not. Resetting this app's own entry
 ---    lets the next prompt add a switch that matches the running binary.
+--- 5. Bounded waits: every Accessibility call runs on the main thread, where
+---    the keyboard event taps also run. macOS lets a call to an application
+---    that does not answer wait six seconds; the taps then time out, macOS
+---    disables them and every key typed meanwhile comes out late, held or lost
+---    (issues #99 and #100). One process-wide messaging timeout bounds them all.
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +34,27 @@ local M = {}
 local hs = hs
 
 local SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+
+-- The longest any Accessibility call may hold the main thread. macOS disables
+-- an event tap that holds a key for about a second; an application that has
+-- not answered by then is hung, and its read fails instead of freezing input.
+M.MESSAGING_TIMEOUT_SEC = 1.0
+
+--- Sets the process-wide Accessibility messaging timeout. macOS applies the
+--- system-wide element's timeout to every element without its own, which is
+--- every element the driver reads (AXUIElementSetMessagingTimeout).
+--- @return boolean bounded True when macOS accepted the timeout.
+--- @return string|nil detail Exact failure when bounded is false.
+function M.bound_messaging_timeout()
+	local window = type(hs) == "table" and hs.window or nil
+	if type(window) ~= "table" or type(window.timeout) ~= "function" then
+		return false, "hs.window.timeout is unavailable"
+	end
+	local ok, accepted = pcall(window.timeout, M.MESSAGING_TIMEOUT_SEC)
+	if not ok then return false, tostring(accepted) end
+	if accepted ~= true then return false, "macOS refused the messaging timeout" end
+	return true
+end
 
 --- Reports whether this process is currently trusted for Accessibility.
 --- @return boolean|nil trusted Nil when the native query itself failed.

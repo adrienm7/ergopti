@@ -1416,6 +1416,13 @@ if accessibility_trusted ~= true then
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
+-- Before any input owner: an Accessibility call to a hung application must
+-- fail within a second instead of holding every event tap for six.
+local ax_bounded, ax_bound_err = AccessibilityPermission.bound_messaging_timeout()
+if ax_bounded ~= true then
+	Logger.error(LOG, "Accessibility calls stay unbounded (macOS waits up to 6 s per hung application): %s.",
+		tostring(ax_bound_err))
+end
 Boot.mark("Accessibility permission")
 Boot.stage("Shortcuts pre-start")
 
