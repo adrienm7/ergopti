@@ -23,6 +23,7 @@
 local M = {}
 local WebviewResult = require("adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
+local OwnWindow = require("adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -851,7 +852,7 @@ local function raise_now(generation, wv)
 	end
 	if not invoke("show", function() wv:show() end) then return false end
 	if not invoke("application focus", hs.focus) then return false end
-	local ok, win = invoke("window lookup", function() return wv:hswindow() end)
+	local ok, win = invoke("window lookup", function() return OwnWindow.for_webview(wv) end)
 	if not ok then return false end
 	if win then
 		if not invoke("window raise", function() win:raise() end) then return false end

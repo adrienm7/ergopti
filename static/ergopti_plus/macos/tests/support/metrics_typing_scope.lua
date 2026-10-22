@@ -14,6 +14,8 @@ local OWNERS = {
 	"diagnostics.operation_reporter",
 	-- The real dashboard resolves application icons through this adapter.
 	"adapters.running_application",
+	-- It also tells whether its own window is focused through this adapter.
+	"adapters.own_window",
 	"adapters.file_system", "adapters.timer_scheduler", "infra.logger", "infra.paths",
 	"infra.i18n", "infra.fs_dir", "infra.text_utils", "text_utils",
 	"hs.fs", "hs.json", "json", "ui.ui_builder", "ui.metrics_typing",

@@ -840,6 +840,18 @@ admits no new direct `get`/`find` call. A timer callback that holds the main
 thread over a second is now named by the runtime capture ("held the main
 thread for N ms"): read that line first when taps restart or a lease fences.
 
+### project-hs-hswindow-scans-every-window
+
+`webview:hswindow()` and `hs.console.hswindow()` push the native window number
+and call `hs.window.windowForID`, an alias of `hs.window.get`, i.e. `find()`
+over `hs.window.allWindows()`: every window of every application, on the main
+thread. Each webview open paid 2.8 s to 3.2 s on macOS 26 (#100), and the focus
+retry repeated it. Resolve webview and console windows through
+`adapters/own_window.lua`, which records that number with `windowForID`
+swapped for the synchronous call and then matches it among this process's own
+windows (by PID). `tests/meta/runloop/test_app_lookup_never_scans_windows.lua`
+admits no other `hswindow()` caller and ratchets every global enumeration.
+
 ### project-touchdevice-dormancy-is-kernel
 
 macOS touch-device readiness is gated by the kernel until first physical touch.
