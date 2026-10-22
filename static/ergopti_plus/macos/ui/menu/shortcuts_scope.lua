@@ -31,6 +31,30 @@ function M.script_chord_rows(path)
 		or path:sub(1, #SCRIPT_CHORD_PARAMETERS) == SCRIPT_CHORD_PARAMETERS
 end
 
+--- The rows of one modifier group of the keyboard slots (Option, Ctrl,
+--- Ctrl+Shift, Cmd, Cmd+Shift), whose restore and clear narrow the scope to
+--- the group's slots and the parameters of the bindings they dispatch under.
+--- @param slot_ids table Array of the group's slot ids, as its submenu lists them.
+--- @param binding_id function Slot id -> binding id (keyboard_shortcuts.binding_id).
+--- @return function select Configuration path -> boolean.
+function M.keyboard_group_rows(slot_ids, binding_id)
+	assert(type(slot_ids) == "table" and #slot_ids > 0 and type(binding_id) == "function",
+		"a keyboard group scope needs its slots and their binding identity")
+	local paths, parameter_prefixes = {}, {}
+	for _, slot in ipairs(slot_ids) do
+		assert(type(slot) == "string" and slot ~= "", "keyboard group slot ids must be strings")
+		paths["shortcuts.keyboard." .. slot] = true
+		parameter_prefixes[#parameter_prefixes + 1] = "gestures.action_parameters." .. binding_id(slot) .. "__"
+	end
+	return function(path)
+		if paths[path] then return true end
+		for _, prefix in ipairs(parameter_prefixes) do
+			if path:sub(1, #prefix) == prefix then return true end
+		end
+		return false
+	end
+end
+
 local function clone(value)
 	if type(value) ~= "table" then return value end
 	local result = {}

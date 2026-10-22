@@ -2502,25 +2502,20 @@ KeyboardSlotRows() {
 		Rows := []
 		for GroupInfo in KEYBOARD_SLOT_GROUPS {
 				Prefix := GroupInfo["prefix"]
-				Items := []
 				if Prefix == "magic_" {
 						Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", MagicEditorSlotRows()))
 						continue
 				}
+				; The group opens with its restore and clear, declared by
+				; keyboard_group_scope_controls like on the two other drivers.
+				Items := MenuRenderer_TemplateRows("keyboard_group_scope_controls", Map(
+						"scope_restore", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
+						"scope_clear", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
+						Map("keyboard_group_ready", (*) => true), Map())
+				if !(Items is Array) || Items.Length != 3
+						throw Error("The keyboard group scope rows are not declared.")
 				for Slot, Action in KeyboardShortcutAssignments {
-						if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
-								continue
-						; A slot only belongs to the LONGEST prefix that matches it, or
-						; "ctrl_shift_v" would appear in the Ctrl group as well
-						IsExactPrefix := true
-						for OtherGroup in KEYBOARD_SLOT_GROUPS {
-								OtherPrefix := OtherGroup["prefix"]
-								if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
-										IsExactPrefix := false
-										break
-								}
-						}
-						if !IsExactPrefix or (Action == "none")
+						if KeyboardSlotGroupOf(Slot) != Prefix or (Action == "none")
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
@@ -2535,6 +2530,86 @@ KeyboardSlotRows() {
 				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
 		}
 		return Rows
+}
+
+/**
+ * The keyboard-slot group a slot is listed in: the LONGEST group prefix that
+ * matches it, or "ctrl_shift_v" would also belong to the Ctrl group. The tray
+ * and the group's restore and clear ask this one rule.
+ * @param {String} Slot Persisted slot id.
+ * @returns {String} The group prefix, or "" when no group lists the slot.
+ */
+KeyboardSlotGroupOf(Slot) {
+		global KEYBOARD_SLOT_GROUPS
+		Found := ""
+		for GroupInfo in KEYBOARD_SLOT_GROUPS {
+				Prefix := GroupInfo["prefix"]
+				if SubStr(Slot, 1, StrLen(Prefix)) == Prefix && StrLen(Prefix) > StrLen(Found)
+						Found := Prefix
+		}
+		return Found
+}
+
+; Whether one configuration row belongs to a modifier group: its slot, or an
+; action parameter of the binding that slot dispatches under.
+_KeyboardSlotGroupOwnsRow(Prefix, Row) {
+		if Row.Section == "shortcuts.keyboard"
+				return KeyboardSlotGroupOf(Row.Key) == Prefix
+		BindingPrefix := GestureBindingId("keyboard", "")
+		if Row.Section != "action_parameters" || SubStr(Row.Key, 1, StrLen(BindingPrefix)) != BindingPrefix
+				return false
+		Rest := SubStr(Row.Key, StrLen(BindingPrefix) + 1)
+		Separator := InStr(Rest, "__")
+		return Separator > 1 && KeyboardSlotGroupOf(SubStr(Rest, 1, Separator - 1)) == Prefix
+}
+
+/**
+ * The rows that put one modifier group of the keyboard slots back to its
+ * preset ("recommended": each shipped slot of the group takes its recommended
+ * action and the slots the user added are removed) or empty it ("clear").
+ * They are the Shortcuts scope's own rows narrowed to the group, so the group
+ * restores exactly what the whole Shortcuts restore would.
+ * @param {String} Prefix A bindable group prefix of KEYBOARD_SLOT_GROUPS.
+ * @param {String} Mode "recommended" or "clear".
+ * @returns {Array} Sparse configuration rows.
+ */
+KeyboardSlotGroupScopeRows(Prefix, Mode) {
+		global KEYBOARD_SLOT_GROUPS
+		if !(Mode == "recommended" or Mode == "clear")
+				throw ValueError("Unknown keyboard group scope mode.", -1, Mode)
+		Bindable := false
+		for GroupInfo in KEYBOARD_SLOT_GROUPS
+				Bindable := Bindable || (GroupInfo["prefix"] == Prefix && Prefix != "magic_")
+		if !Bindable
+				throw ValueError("Unknown keyboard slot group.", -1, Prefix)
+		Owners := Map("action_parameter_domain", ConfigScopeActionParameterDomain)
+		Inventory := ManifestScopeInventory("shortcuts", Map("parameters", ConfigScopeActionParameterPaths), Owners)
+		Rows := []
+		for Row in ManifestScopePlan("shortcuts", Mode, Inventory, Owners).operations {
+				if _KeyboardSlotGroupOwnsRow(Prefix, Row)
+						Rows.Push(Row)
+		}
+		for Row in ConfigIOShortcutScopeOperations("shortcuts", Mode) {
+				if _KeyboardSlotGroupOwnsRow(Prefix, Row)
+						Rows.Push(Row)
+		}
+		return Rows
+}
+
+; Restores or clears one modifier group the way every scope row does: a
+; backup, one conditional write, then the reload that reads it (no question).
+; @param Prefix {String} The group prefix.
+; @param Mode {String} "recommended" or "clear".
+; @param Options {Map} Scope ports (path, reload...) for tests.
+; @return {Map} The scope receipt.
+KeyboardSlotGroupApplyScope(Prefix, Mode, Options := unset) {
+		return ConfigScopeCommitOperations("shortcuts", Mode, KeyboardSlotGroupScopeRows.Bind(Prefix, Mode),
+				IsSet(Options) ? Options : Map())
+}
+
+; Menu callback: the native menu arguments never reach the scope options.
+_KeyboardSlotGroupScopeCommand(Prefix, Mode, *) {
+		return KeyboardSlotGroupApplyScope(Prefix, Mode)
 }
 
 /**
