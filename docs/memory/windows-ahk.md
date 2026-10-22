@@ -294,6 +294,13 @@ progress » (2026-10-01). Every menu command, native or rescued by the retry,
 now goes through `MenuCommandRun`, which waits for `ConfigWriteLeaseBusy()` to
 clear on a one-shot timer (bounded, then the command runs and reports its own
 refusal). A new dispatch path must go through it too.
+A terminal bundle does not always last until exit: a scoped commit
+(`ConfigScopeCommitOperations`) or a reload preflight holds one across durable
+I/O before it launches a successor or releases, and the tray opens over it
+(the private-browsing filter was refused this way on 2026-10-22). The
+dispatcher therefore waits on `MenuCommandConfigBusy()`, which also counts an
+active bundle while no successor is pending and no recovery barrier is
+retained.
 
 ### project-ahk-reload-sees-the-long-script-path
 

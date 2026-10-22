@@ -480,3 +480,91 @@ Test("menu startup registration: real startup and writer timers refuse an item r
 	_MCDS_WriterRetry.Bind(true))
 Test("menu startup registration: real startup and writer timers execute the live native selection exactly once",
 	_MCDS_WriterRetry.Bind(false))
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 4/ Click during a terminal transition =======
+; =====================================================
+; =====================================================
+
+; On 2026-10-22 a scoped configuration commit (ConfigScopeCommitOperations)
+; held the terminal bundle across its durable I/O; the tray opened over it and
+; the private-browsing filter click ran on top of that thread. The deferral
+; treated a terminal bundle as « until exit » and ran the click at once, so it
+; was refused (« another configuration transaction is already in progress »)
+; with an error window (menu-click-during-scoped-transition).
+
+/** Records whether the click could take a configuration lease when it ran. */
+_MCDT_Command(ClickState, ClickPath, *) {
+	Owner := _ConfigWriteLeaseTryAcquire(ClickPath, "menu-click-test")
+	ClickState.Runs.Push(Owner is Object ? "persisted" : "refused")
+	if Owner is Object
+		_ConfigWriteLeaseRelease(Owner)
+	return "done"
+}
+
+_MCDT_InFlightTransitionDefersTheClick() {
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the fixture cannot adopt a terminal transition")
+	AssertFalse(ReloadTerminalHandoffActive(), "the fixture runs without a reload successor")
+	Base := A_Temp . "\ergopti_mcdt_" . A_ScriptHwnd
+	ClickState := {Runs: []}
+	ScheduleState := {Armed: []}
+	Bundle := _ConfigWriteTerminalTryAcquire([Base . "\config.toml"])
+	AssertTrue(Bundle is Object, "the actual terminal issuer must open the scoped transition")
+	Released := false
+	try {
+		MenuCommandRun(_MCDT_Command.Bind(ClickState, Base . "\click.toml"), ["Row", 1, 0], 0, 0,
+			_MCDR_Arm.Bind(ScheduleState))
+		AssertEqual(0, ClickState.Runs.Length,
+			"the click must not run on top of the transition it interrupted: it could only be refused")
+		AssertTrue(MenuCommandConfigBusy(), "a transition on its way to a reload or a release is worth waiting for")
+		AssertEqual(1, ScheduleState.Armed.Length, "one retry is scheduled")
+		_MCDR_Drain(ScheduleState)
+		AssertEqual(0, ClickState.Runs.Length, "a transition still open keeps the click waiting")
+		AssertEqual(1, ScheduleState.Armed.Length, "on one timer")
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Released := true
+		_MCDR_Drain(ScheduleState)
+		AssertEqual(1, ClickState.Runs.Length, "the click runs once the transition released its barrier")
+		AssertEqual("persisted", ClickState.Runs[1], "and gets the configuration lease it needs")
+		AssertEqual(0, ScheduleState.Armed.Length)
+	} finally {
+		ScheduleState.Armed := []
+		if !Released
+			_ConfigWriteTerminalRelease(Bundle)
+	}
+}
+Test("menu command deferral: a click during a scoped transition waits for its release (menu-click-during-scoped-transition)",
+	_MCDT_InFlightTransitionDefersTheClick)
+
+; A barrier retained after a failed rollback lasts until the process exits.
+_MCDT_RetainedBarrierIsNotAwaited() {
+	global _ConfigTransitionRetainedBarrier
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the fixture cannot adopt a terminal transition")
+	PriorRetained := _ConfigTransitionRetainedBarrier
+	Bundle := _ConfigWriteTerminalTryAcquire([A_Temp . "\ergopti_mcdt_retained_" . A_ScriptHwnd . "\config.toml"])
+	AssertTrue(Bundle is Object)
+	try {
+		_ConfigTransitionRetainedBarrier := Bundle
+		AssertFalse(MenuCommandConfigBusy(),
+			"a retained recovery barrier never ends before exit: waiting would only delay the refusal")
+	} finally {
+		_ConfigTransitionRetainedBarrier := PriorRetained
+		_ConfigWriteTerminalRelease(Bundle)
+	}
+	AssertFalse(MenuCommandConfigBusy(), "an idle table is not busy")
+}
+Test("menu command deferral: a retained recovery barrier is not awaited (menu-click-during-scoped-transition)",
+	_MCDT_RetainedBarrierIsNotAwaited)
+
+_MCDT_DispatcherUsesTheTransitionAwarePredicate() {
+	Body := _DriverFuncBody("MenuCommandRun")
+	Assert(InStr(Body, ": MenuCommandConfigBusy()") > 0,
+		"the dispatch deferral must wait for an in-flight terminal transition, not only an owned path")
+}
+Test("menu command deferral: the dispatcher waits for an in-flight transition (menu-click-during-scoped-transition)",
+	_MCDT_DispatcherUsesTheTransitionAwarePredicate)
