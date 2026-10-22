@@ -721,3 +721,17 @@ helpers.describe("file_watchers", function()
 	end)
 end)
 
+
+helpers.describe("file watcher fixture directories", function()
+	helpers.it("(fw-nontmp-outside-source-tree) the non-/tmp fixture is a private directory outside the driver tree", function()
+		local dir = make_non_tmp_dir()
+		local root = helpers.driver_root()
+		local writable = write_file(dir .. "/init.lua", "return {}")
+		rm_dir(dir)
+		helpers.assert_true(writable, "mktemp must create a writable directory: " .. dir)
+		helpers.assert_true(dir:sub(1, 1) == "/" or dir:find("^%a:[/\\]") ~= nil, "the fixture path is absolute: " .. dir)
+		helpers.assert_true(not dir:find("^/tmp/"), "the watcher's /tmp/ filter must not hide the fixture: " .. dir)
+		helpers.assert_true(dir:sub(1, #root + 1) ~= root .. "/",
+			"a fixture inside the driver tree is read by every production source walk: " .. dir)
+	end)
+end)
