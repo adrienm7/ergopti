@@ -47,16 +47,22 @@ a sealed Windows updater source, reseal with
       conditions on signpath.org/foundation (open-source license, public repository, build and
       signing from CI with a maintainer approval per signing request, a published code-signing
       policy and privacy statement, a reputable project; the keylogger-like metrics module and the
-      hooks need a clear explanation). Decided 2026-10-22: apply now. **In progress (agent):** the
-      antivirus agent prepares the application and the signing workflow wiring.
+      hooks need a clear explanation). Decided 2026-10-22: apply now. Done: SignPath wired in
+      `ci-windows.yml`, off until configured (61fb29d64d); README code signing policy and privacy
+      (c6db589c76). Left (maintainer): apply, then set the variables and secrets; eligibility table,
+      form answers and switch-on steps in the
+      [handoff](todo-agents/signpath-foundation-application.md).
 - [ ] **`ErgoptiPlus.exe` flagged by a corporate proxy (Netskope, Airbus tester).** [CODE] [PHYS-W]
       'ERR00: "ErgoptiPlus.exe" a peut-etre ete infecte par un virus' on v1.0.4; v1.0.0 and v1.0.3
       pass, so it is a threat-engine verdict on the new bytes or hash. Done: no hidden PowerShell
       clipboard stage (6d9eae1f94), own version resource (1965c2ffac), English metadata
-      (965ff7569b), all in v1.0.5. Left: the reproducible PAC helper, signing (132), the tester's
-      T1-T4 retry on v1.0.5. Candidates, playbook and download matrix:
-      [handoff](todo-agents/windows-exe-flagged-by-proxy.md). **In progress (agent):** antivirus
-      and signing investigation.
+      (965ff7569b), all in v1.0.5. v1.0.5 then passed once and was blocked two hours later: its
+      content holds nothing v1.0.2 lacks, so the verdict is a sandbox and reputation one on a new
+      unsigned hash. Done on dev: first launch extracts with tar.exe, no hidden PowerShell
+      (3d2c78d7b7); build gate over the compiled exe (745f07fa51). Left: signing (132), the
+      Microsoft false-positive submission (text and hashes in the handoff), the tester's retry,
+      and the "keylogger" naming (about 1 070 shipped strings) as a cross-driver rename. Analysis,
+      playbook and download matrix: [handoff](todo-agents/windows-exe-flagged-by-proxy.md).
 
 ## Big item 2: macOS Karabiner input reliability (items 31, 117, 140)
 

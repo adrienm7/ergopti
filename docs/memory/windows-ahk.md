@@ -164,7 +164,7 @@ initialised before tray staging: `user_code.ahk` is included early in
 ### project-compiled-first-launch-extraction-takes-seconds
 
 The compiled exe's first launch expands its bundle of several hundred files
-through Windows PowerShell's `Expand-Archive`, and only then commits the
+(with System32 `tar.exe` since 2026-10-22, `Expand-Archive` before), and only then commits the
 staging tree that holds `.bundle-version`. With Defender scanning every file
 on a hosted runner this takes seconds, so a fixed deadline on the marker failed
 a healthy launch ("did not extract its runtime bundle within 20s", green on
@@ -172,6 +172,18 @@ re-run). Action: a launch check detects a blocking dialog by a `#32770` window
 of the launched process, never by a wall clock. Before tightening the launch
 smoke's hang bound, re-measure from the `OK: ... after N s` lines of recent
 step logs; the `windows-launch-evidence` artifact expires after 7 days.
+
+### project-compiled-exe-is-scanned-as-plain-text
+
+Ahk2Exe stores the compiled script as an uncompressed RCDATA resource, so
+proxy and antivirus engines read every string in it, and cloud sandboxes
+detonate the first launch. v1.0.4 was blocked after an inline PowerShell
+`Add-Type`/`DllImport` stage reached the script; v1.0.5, clean of it, was
+still blocked as a new unsigned hash. Action: no inline P/Invoke, script host
+unzip or other dropper-like stage in the compiled exe; do the work in process
+(GDI+, `DllCall`) or in a bundled `-File` worker. `tools/ci/windows-exe-av-surface.json`
+gates the built exe; lower a ceiling when a launcher goes, and never raise one
+without a reason in the commit. Reputation comes only from signing (SignPath).
 
 ### project-ahk-loop-capture-copy-freezes-nothing
 
