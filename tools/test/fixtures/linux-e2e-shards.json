@@ -102,6 +102,7 @@
 			"Qualify native managed HTTP public and retained output",
 			"Qualify native updater archive pipeline",
 			"Qualify archive crypto and bin parent source controls",
+			"Install the model pull window prerequisites",
 			"Successful native model pulls retire stale retries"
 		],
 		"platform-metrics": [
@@ -253,6 +254,9 @@
 			"Install WebKit2GTK and lgi"
 		],
 		"The WPM widget and tray readout draw on a real display": ["Install WebKit2GTK and lgi"],
-		"What each page raises while loading": ["Install WebKit2GTK and lgi"]
+		"What each page raises while loading": ["Install WebKit2GTK and lgi"],
+		"Successful native model pulls retire stale retries": [
+			"Install the model pull window prerequisites"
+		]
 	}
 }
