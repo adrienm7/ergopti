@@ -9136,7 +9136,35 @@ platforms = ["linux"]
 unavailable = "hide"
 label_prefix = "    "
 
+# The first rows of every modifier group of the keyboard slots (Alt, Ctrl,
+# Ctrl+Shift, Win on Windows; Option, Ctrl, Ctrl+Shift, Cmd, Cmd+Shift on
+# macOS; Ctrl, Ctrl+Shift, Alt, Super on Linux), on the three drivers: the
+# Shortcuts scope narrowed to that group's slots and their action parameters.
+# The restore puts each shipped slot of the group back to its recommended
+# action and removes the slots the user added; the clear empties every slot of
+# the group. Both apply at once, without a question, like every scope row (the
+# maintainer's decision of 2026-09-30); the owner backs up first.
+[[menu.keyboard_group_scope_controls]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+disabled_when = ["keyboard_group_ready"]
+
+[[menu.keyboard_group_scope_controls]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+disabled_when = ["keyboard_group_ready"]
+
+[[menu.keyboard_group_scope_controls]]
+type = "---"
+
 # Complete native keyboard-group content; only the genuine binding callbacks stay native.
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_scope_controls"
+present_when = "keyboard_group_has_scope"
+
 [[menu.keyboard_group_frame]]
 type = "include"
 section = "keyboard_group_fixed_frame"

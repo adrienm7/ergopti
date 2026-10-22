@@ -1346,6 +1346,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		return committed
 	end
+	--- « Restaurer » and « Tout effacer » at the top of one modifier group of
+	--- the keyboard slots: the Shortcuts scope narrowed to that group's slots
+	--- and their parameters, at once and without a question.
+	--- @param prefix string The group's slot prefix (SLOT_GROUPS).
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean committed
+	local function apply_keyboard_group_scope(prefix, mode)
+		local owner = preference_scope_owner("shortcuts")
+		if not owner then return false end
+		local Shortcuts = require("modules.shortcuts")
+		local slot_ids = {}
+		for _, slot in ipairs(Shortcuts.available_keyboard_slots(prefix)) do slot_ids[#slot_ids + 1] = slot.id end
+		if #slot_ids == 0 then
+			Logger.error(LOG, "Keyboard group '%s' has no slot: its %s is refused.", tostring(prefix), tostring(mode))
+			return false
+		end
+		local committed = owner.apply(mode,
+			require("ui.menu.shortcuts_scope").keyboard_group_rows(slot_ids, Shortcuts.keyboard_binding_id))
+		if committed == true then
+			Builder.invalidate_cache()
+			updateMenu()
+		end
+		return committed
+	end
 	local global_scope = nil
 	apply_global_scope = function(mode)
 		if read_only_reason ~= nil then return false end
@@ -1427,6 +1451,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
 		apply_script_chords_scope = apply_script_chords_scope,
+		apply_keyboard_group_scope = apply_keyboard_group_scope,
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,

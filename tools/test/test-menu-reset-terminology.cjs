@@ -70,6 +70,7 @@ const EXPECTED_ROWS = {
 	configuration_menu: [1, 1],
 	gestures_menu: [1, 1],
 	hotstrings_menu: [1, 1],
+	keyboard_group_scope_controls: [1, 1],
 	layout_menu: [1, 1],
 	llm_menu: [1, 0],
 	metrics_menu: [1, 0],

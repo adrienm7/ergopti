@@ -3868,6 +3868,31 @@ local function _build_shortcuts(ctx)
 			end
 			return assigned
 		end
+		-- The restore and the clear at the top of a bindable group: the
+		-- Shortcuts scope narrowed to that group's slots and parameters, at once
+		-- and without a question, like every scope row.
+		local function group_scope_rows(prefix)
+			local function apply_group_scope(mode)
+				if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+				local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "keyboard_group:" .. prefix)
+				if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return committed
+			end
+			local rows = ManifestMenu.template_rows("keyboard_group_scope_controls", {
+				["scope_restore"] = function() return apply_group_scope("recommended") end,
+				["scope_clear"] = function() return apply_group_scope("clear") end,
+			}, {
+				["keyboard_group_ready"] = function()
+					return ctx.paused ~= true and type(ctx.is_paused) == "function" and ctx.is_paused() == false
+				end,
+			}, {})
+			-- A withdrawn declaration withdraws both rows: no half-declared group.
+			if type(rows) ~= "table" or #rows ~= 3 then
+				Logger.error(LOG, "Keyboard group '%s' scope rows refused by the manifest.", prefix)
+				return {}
+			end
+			return rows
+		end
 		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
@@ -3892,6 +3917,10 @@ local function _build_shortcuts(ctx)
 			-- A group with no slot is the key catalogue failing to load: drawing it
 			-- anyway put three submenus that open onto nothing in the tray.
 			if #rows > 0 then
+				if group.add_key ~= nil then
+					local scope_rows = group_scope_rows(group.prefix)
+					for index = #scope_rows, 1, -1 do table.insert(rows, 1, scope_rows[index]) end
+				end
 				out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
 			else
 				skipped[#skipped + 1] = group.prefix

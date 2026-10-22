@@ -99,6 +99,7 @@ const EXPECTED_MENUS = [
 	'configuration_menu',
 	'gestures_menu',
 	'hotstrings_menu',
+	'keyboard_group_scope_controls',
 	'layout_menu',
 	'llm_menu',
 	'metrics_menu',
@@ -192,6 +193,10 @@ function checkMenu(menu, rows, errors) {
 	if (menu === 'wrap_symbols_global_controls') {
 		checkWrapBulkHead(rows, errors);
 		return 0;
+	}
+	if (menu === 'keyboard_group_scope_controls') {
+		checkKeyboardGroupHead(rows, errors);
+		return PLATFORMS.length;
 	}
 	let checked = 0;
 	for (const row of rows) {
@@ -316,6 +321,34 @@ function checkWrapBulkHead(rows, errors) {
 				JSON.stringify(row.platforms) !== JSON.stringify(WRAP_CONTROLS.platforms)
 			)
 				errors.push('Wrapping controls must keep their declared native capability boundary.');
+		}
+	}
+}
+
+/**
+ * The first group of every modifier group of the keyboard slots
+ * (keyboard-group-scope-2026-10-22) is a fragment each driver draws above
+ * that group's slot rows, so its trailing separator is the boundary the
+ * projection would drop at the end of the fragment: check it uncollapsed.
+ * Every platform draws exactly restore, clear, then the separator.
+ * @param {object[]} rows Manifest rows.
+ * @param {string[]} errors Collected failures.
+ */
+function checkKeyboardGroupHead(rows, errors) {
+	for (const platform of PLATFORMS) {
+		const shown = rows.filter((row) => shownOn(row, platform));
+		const kinds = shown.map((row) => (row.type === '---' ? '---' : scopeKind(row)));
+		if (JSON.stringify(kinds) !== JSON.stringify(['restore', 'clear', '---']))
+			errors.push(
+				`keyboard_group_scope_controls (${platform}) must be [restore, clear, ---], found [${shown.map(describe).join(', ')}].`
+			);
+		for (const row of shown) {
+			const kind = scopeKind(row);
+			const want = kind === 'restore' ? RESTORE : kind === 'clear' ? CLEAR : null;
+			if (want && (row.type !== 'command' || row.id !== want.id || row.i18n !== want.i18n))
+				errors.push(
+					`keyboard_group_scope_controls (${platform}) row "${row.id}" must be ${want.id}.`
+				);
 		}
 	}
 }

@@ -5888,7 +5888,33 @@
 			"label_prefix": "    "
 		}
 	],
+	"keyboard_group_scope_controls": [
+		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended",
+			"disabled_when": [
+				"keyboard_group_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system",
+			"disabled_when": [
+				"keyboard_group_ready"
+			]
+		},
+		{
+			"type": "---"
+		}
+	],
 	"keyboard_group_frame": [
+		{
+			"type": "include",
+			"section": "keyboard_group_scope_controls",
+			"present_when": "keyboard_group_has_scope"
+		},
 		{
 			"type": "include",
 			"section": "keyboard_group_fixed_frame",

@@ -1487,6 +1487,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/modules/shortcuts/test_shortcuts_personal_data_native_port.ahk
 #Include unit/modules/shortcuts/test_shortcuts_extension_results.ahk
 #Include unit/modules/shortcuts/test_shortcuts_menu_groups_unique.ahk
+#Include unit/modules/shortcuts/test_keyboard_slot_group_scope.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/ui/menu/test_list_providers_touch_no_menu.ahk
 #Include meta/modules/keylogger/metrics/test_menu_metrics_disabled_when.ahk

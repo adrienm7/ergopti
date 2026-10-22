@@ -253,6 +253,7 @@ return {
 	"tests.unit.infra.scope.test_shortcuts_scope_terminal_shortcut",
 	"tests.unit.infra.scope.test_shortcuts_scope_shortcut_retained_native",
 	"tests.unit.infra.scope.test_shortcuts_scope_configured_wrap_symbol",
+	"tests.unit.infra.scope.test_shortcuts_scope_keyboard_group",
 	"tests.unit.infra.scope.test_tap_hold_scope",
 	"tests.unit.infra.scope.test_tap_hold_scope_obsolete",
 	"tests.unit.infra.config.test_paths_shared_root_layouts",

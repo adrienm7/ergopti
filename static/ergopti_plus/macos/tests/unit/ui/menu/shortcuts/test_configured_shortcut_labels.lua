@@ -85,7 +85,9 @@ helpers.describe("configured shortcut row labels", function()
 						end } }
 				local label, expected
 				if surface == "keyboard" then
-					label = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)[1].items[1].label
+					-- The group opens with its restore, clear and separator; the
+					-- assigned slot is the first row after them.
+					label = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)[1].items[4].label
 					expected = parameters[keyboard_binding("hs_ctrl_a")]
 				elseif surface == "tap" then
 					label = require("ui.menu.menu_tap_keys").provide_rows(ctx)[1].label
