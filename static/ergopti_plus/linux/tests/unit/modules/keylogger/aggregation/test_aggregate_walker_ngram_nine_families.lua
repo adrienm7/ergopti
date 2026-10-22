@@ -17,8 +17,9 @@
 --- THE THREE RULES THAT MAKE THE COUNTS MEAN SOMETHING:
 --- A long pause breaks the run — two characters either side of a coffee break
 --- are not a bigram, and counting them as one puts a pair into the same-finger
---- analysis that no hand ever typed. A backspace breaks it — what follows
---- continues from a different character than it appears to. And synthetic output
+--- analysis that no hand ever typed. A backspace is a token of the run, as on
+--- Windows and macOS: "a[BS]b" is a sequence the hands made, "ab" is not. And
+--- synthetic output
 --- never chains: a hotstring's expansion is text the user did not type, and
 --- folding it into the bigram counts would make the layout look better the more
 --- expansions they use, which is backwards for a tool that measures effort.
@@ -127,7 +128,7 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			"and the run restarts cleanly afterwards")
 	end)
 
-	it("does not chain across a correction", function()
+	it("chains through a correction, never across it", function()
 		local batch = Walker.walk({
 			key("a", 100), key("b", 100),
 			key("[BS]", 100),
@@ -137,6 +138,8 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 0,
 			"after a backspace the next character continues from a different one "
 				.. "than it appears to; 'bc' is a pair the user never produced")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]c"), 1,
+			"the correction itself is what the next character follows, as on Windows and macOS")
 	end)
 
 	it("counts a hotstring's output without chaining it", function()
