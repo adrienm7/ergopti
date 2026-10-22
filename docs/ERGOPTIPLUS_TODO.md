@@ -47,7 +47,8 @@ a sealed Windows updater source, reseal with
       conditions on signpath.org/foundation (open-source license, public repository, build and
       signing from CI with a maintainer approval per signing request, a published code-signing
       policy and privacy statement, a reputable project; the keylogger-like metrics module and the
-      hooks need a clear explanation). When to apply is a maintainer question.
+      hooks need a clear explanation). Decided 2026-10-22: apply now. **In progress (agent):** the
+      antivirus agent prepares the application and the signing workflow wiring.
 - [ ] **`ErgoptiPlus.exe` flagged by a corporate proxy (Netskope, Airbus tester).** [CODE] [PHYS-W]
       'ERR00: "ErgoptiPlus.exe" a peut-etre ete infecte par un virus' on v1.0.4; v1.0.0 and v1.0.3
       pass, so it is a threat-engine verdict on the new bytes or hash. Done: no hidden PowerShell
@@ -131,6 +132,13 @@ In progress (agent), October 22:
 - [ ] **HS-274 orphan tools (decision 9).** `tools/diagnostics/hs274_*_test.py`,
       `hs274-native.swift`, `karabiner_candidate_install.py` lost their workflows: delete them if
       useless, or run them in a CI lane. **In progress (agent).**
+- [ ] **macOS webview-open freeze (decided 2026-10-22).** [CODE] Opening a webview window freezes
+      the main thread 2.8-3.2 s because `wv:hswindow()` scans every window of every application;
+      look only among Hammerspoon's own windows. **In progress (agent).**
+- [ ] **Tap-hold hold rows open the shared picker on Windows and Linux (decided 2026-10-22).**
+      [CODE] Replace the seven-option « Hold → … » submenu (and a pair's hold: submenu on Windows,
+      list dialog on Linux) with the shared action picker listing holdable actions only, as on
+      macOS ([handoff](todo-agents/macos-tap-hold-action-picker.md)). **In progress (agent).**
 
 Not started:
 
@@ -273,7 +281,7 @@ Fixes of October 22 (dev, after v1.0.5):
 - [ ] **Keyboard group restore and clear** (c80bd4dcf2): Shortcuts > a modifier group > « Tout
       effacer », then « Restaurer les valeurs conseillées »; only that group changes.
 - [ ] **Tap-hold and key-combination pickers**: a key's and a pair's « Tap → … » open the shared
-      picker; « Hold → … » keeps the seven hold options (pending question).
+      picker; « Hold → … » opens it with holdable actions once the Wave 2 item lands.
 - [ ] **Versions tabs** (fb78c66d1f): switching channel tabs repaints at once, no spinner; Retry
       still fetches.
 - [ ] **Window titles** (df0b4776c7, a22b920373): the unused-settings window and the API endpoint
