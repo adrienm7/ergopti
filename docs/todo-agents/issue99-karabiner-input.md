@@ -18,6 +18,7 @@
   XCTests run only on macOS CI).
 - `cfac383d36` docs(memory): the `hs.application.get` window scan.
 - `356d14a3f3` fix(macos): deploy the ANSI virtual keyboard so the ISO pair passes through.
+  Confirmed on the maintainer's Mac on 2026-10-22: the key left of "1" is the right one.
 
 ## Remaining, with next steps
 
@@ -39,8 +40,6 @@ deadlines with the menu open are read through an echo probe (25411ee080, issue #
 
 ## Only the Mac can confirm
 
-- ISO model: in Karabiner-EventViewer, press the key left of 1 on the internal keyboard; it must
-  show `non_us_backslash`. If it shows `grave_accent_and_tilde`, revert `356d14a3f3`.
 - Starvation hypothesis for the silent PONG/READY timeouts: run `memory_pressure | tail -1` while
   lease errors occur.
 
