@@ -1345,10 +1345,21 @@ function M.set_secure_field(is_secure)
 	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
 end
 
+--- Admits one privacy-filter change, or says why it was refused. A metrics
+--- scope that still owes a rollback holds the preferences; the click then
+--- changes nothing, and it must not do so silently.
+--- @param label string Filter name for the log.
+--- @return boolean
+local function admit_filter_change(label)
+	if Preferences.admit() then return true end
+	Logger.error(LOG, "%s filter change refused: a metrics configuration transaction still owns the preferences. Nothing was changed.", label)
+	return false
+end
+
 --- Toggles the private-browsing filter.
 --- @param enabled boolean
 function M.set_private_filter_enabled(enabled)
-	if not Preferences.admit() then return false end
+	if not admit_filter_change("Private-browsing") then return false end
 	local wanted = (enabled == true)
 	if not store_bool("private_filter_enabled", wanted) then
 		Logger.error(LOG, "Private-browsing filter state was not persisted — it was not changed.")
@@ -1363,7 +1374,7 @@ end
 --- Toggles the secure-field / password-manager filter.
 --- @param enabled boolean
 function M.set_secure_filter_enabled(enabled)
-	if not Preferences.admit() then return false end
+	if not admit_filter_change("Secure-field") then return false end
 	local wanted = (enabled == true)
 	if not store_bool("secure_filter_enabled", wanted) then
 		Logger.error(LOG, "Secure-field filter state was not persisted — it was not changed.")
@@ -1378,7 +1389,7 @@ end
 --- Toggles the OS authentication-prompt filter.
 --- @param enabled boolean
 function M.set_system_auth_filter_enabled(enabled)
-	if not Preferences.admit() then return false end
+	if not admit_filter_change("System-auth") then return false end
 	local wanted = (enabled == true)
 	if not store_bool("system_auth_filter_enabled", wanted) then
 		Logger.error(LOG, "System-auth filter state was not persisted — it was not changed.")
