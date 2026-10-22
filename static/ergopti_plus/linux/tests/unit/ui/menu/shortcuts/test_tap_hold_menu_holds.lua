@@ -537,7 +537,7 @@ helpers.describe("declared complete per-key head", function()
 	end)
 
 	helpers.it("hides declared tap row without dropping hold payload (tap-hold-key-head)", function()
-		with_head(function(rows) rows[3].platforms = { "ahk" } end, function(rows, calls, _, i18n)
+		with_head(function(rows) rows[3].platforms = { "ahk" } end, function(rows, calls, picked, i18n)
 			helpers.assert_eq(#rows, 4)
 			helpers.assert_eq(rows[2].title, "-")
 			helpers.assert_eq(rows[3].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("tap_hold.hold.shift")))
