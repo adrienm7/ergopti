@@ -24,6 +24,7 @@ local Manifest         = require("infra.manifest_reader")
 
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
+local ClickGate     = require("ui.menu.click_gate")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
@@ -141,8 +142,12 @@ M._active_tasks = {}
 --- menubar's config pathwatcher and theme watcher are held here instead — so
 --- they could still fire during the Lua-state teardown window, which is exactly
 --- the hazard that loop's own comment cites. This module holds the handles, so
---- it is the only place that can stop them.
+--- it is the only place that can stop them. It also hands the menu clicks held
+--- during a reload to the reloaded menu (ui.menu.click_gate).
 function M.stop_watchers()
+	-- Clicks held while this reload was pending go to the reloaded menu; this
+	-- is the last menu step before the Lua state is replaced.
+	if M._click_gate then M._click_gate.handoff() end
 	local function stop_owned(field, label)
 		local watcher = M[field]
 		if watcher == nil then return true end
@@ -219,6 +224,36 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- whose implementation is defined further down.
 	local schedule_menu_refresh
 	local push_static_menu
+	local refresh_for_click
+
+	-- Every row runs through this gate: a click during a reload is held and
+	-- handed to the reloaded menu, a click on a stale tree resolves on a fresh
+	-- one, and a late check-row click never toggles its row back.
+	local click_gate = ClickGate.new({
+		terminal_pending = function()
+			if type(TerminationCoordinator.is_initialized) == "function"
+				and TerminationCoordinator.is_initialized() ~= true then
+				return false
+			end
+			return TerminationCoordinator.is_pending() == true
+		end,
+		is_reloading = function() return require("infra.reload_guard").is_reloading() == true end,
+		stale = function() return _menu_dirty == true end,
+		refresh = function() return refresh_for_click() end,
+		current_items = function() return _cached_menu_items end,
+		store = Storage,
+		schedule = function(delay, callback)
+			local _, committed = TimerScheduler.after(delay, callback)
+			return committed == true
+		end,
+		notify_lost = function()
+			return notifications.notify(i18n.get("menu.reload_replay.lost_title"),
+				i18n.get("menu.reload_replay.lost"), "warning")
+		end,
+		now = os.time,
+	})
+	M._click_gate = click_gate
+	click_gate.inherit()
 
 	local state = Preferences.build_initial_state(hotfiles, menu_mods, core_mods)
 
@@ -1525,6 +1560,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
 		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000
 		if ok_b and type(items) == "table" then
+			click_gate.wrap(items)
 			-- The generated tree is only a candidate until AppKit accepts it. Keep
 			-- the previous cache and dirty debt on refusal so the live dynamic menu
 			-- retries instead of serving a tree the native tray never received.
@@ -1546,6 +1582,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
+	refresh_for_click = function()
+		ctx.paused = core_mods.shortcuts_mod
+			and type(core_mods.shortcuts_mod.is_paused) == "function"
+			and core_mods.shortcuts_mod.is_paused() or false
+		if rebuild_menu_cache() ~= true then return nil end
+		return _cached_menu_items
+	end
 
 	-- Refresh the static menu now: re-read the live pause state into ctx (the tree
 	-- bakes it) and rebuild. Coalesced by schedule_menu_refresh so bursts of state
@@ -1623,6 +1666,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				and core_mods.shortcuts_mod.is_paused() or false
 			_menu_primed = true
 			rebuild_menu_cache()
+			-- Clicks held across the reload that started this generation.
+			click_gate.replay_inherited()
 			-- The boot sequence is complete by now, and this runs once per session:
 			-- the natural point for the one-line environment summary every driver
 			-- logs after boot. A probe failure is reported, never allowed to unwind
