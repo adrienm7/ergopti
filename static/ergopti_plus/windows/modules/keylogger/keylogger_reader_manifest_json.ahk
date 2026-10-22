@@ -62,8 +62,8 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset, Now
 ; Titles are already grouped across devices. Keep their private strings inside
 ; native JSON instead of allocating nested Maps and escaping every title again.
 KLR_EncodedTitles(db, Where) {
-		Sql := "SELECT date,app,json_group_object(COALESCE(title,''),json_object("
-				. "'c',COALESCE(c,''),'ms',COALESCE(ms,''))) AS payload FROM ("
+		Sql := "SELECT date,app," . KLR_SqlJsonObjectAgg("COALESCE(title,'')", "json_object("
+				. "'c',COALESCE(c,''),'ms',COALESCE(ms,''))") . " AS payload FROM ("
 				. "SELECT date,app,title,SUM(c) AS c,SUM(ms) AS ms FROM agg_app_day_titles"
 				. Where . " GROUP BY date,app,title) GROUP BY date,app"
 		Titles := Map()

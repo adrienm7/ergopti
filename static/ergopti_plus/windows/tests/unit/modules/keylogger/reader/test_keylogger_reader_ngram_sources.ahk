@@ -229,3 +229,45 @@ _KLRAppSelection_AllNoneSubsetStayDistinct() {
 }
 Test("Keylogger reader: all, none, and subset app selections stay distinct (AHK-27)",
 	_KLRAppSelection_AllNoneSubsetStayDistinct)
+
+; The vendored SQLite cuts a json_group_object key at an embedded NUL, so the
+; token "a\u0000b" came back as a second "a" key beside the real one and the
+; page kept whichever arrived last. Every SQL-built reader object is checked:
+; the historical index and the complete and live today indexes.
+_KLRNul_Keys(Db, Json, Path) {
+	Rows := SQLite_Query(Db, "SELECT json_valid(" . SQLite_Q(Json) . ") AS valid,"
+		. " (SELECT group_concat(h, ',') FROM (SELECT hex(key) || '|' || json_extract(value, '$.c') AS h"
+		. " FROM json_each(" . SQLite_Q(Json) . ", " . SQLite_Q(Path) . ") ORDER BY hex(key))) AS keys")
+	AssertEqual(1, Rows[1]["valid"], "the reader must emit valid JSON")
+	return Rows[1]["keys"]
+}
+
+_KLRNul_TokenKeysStayDistinct() {
+	db := _KLRSource_OpenFixture()
+	try {
+		today := FormatTime(A_Now, "yyyy-MM-dd")
+		yesterday := KLR_PrevDay(today)
+		Sql := ""
+		for Day in [today, yesterday]
+			for Spec in [["ngram_chars", "a" . Chr(0) . "b", 1], ["ngram_chars", "a", 10],
+					["ngram_shortcuts", "x" . Chr(0) . "y", 2], ["ngram_shortcuts", "x", 20]]
+				Sql .= "INSERT INTO " . Spec[1] . " (device_id,date,app,token,c) VALUES ('nul',"
+					. SQLite_Q(Day) . ",'nul.exe'," . SQLite_Q(Spec[2]) . "," . Spec[3] . ");"
+		AssertTrue(SQLite_Exec(db, Sql), "the NUL-key fixture must load")
+		Expected := Map("c", "61|10,610062|1", "sc", "78|20,780079|2")
+		History := KLR_BuildNgramsJson(db, yesterday, yesterday, ["nul.exe"])
+		for Code, Keys in Expected
+			AssertEqual(Keys, _KLRNul_Keys(db, History, "$." . Code),
+				"historical " . Code . ": a NUL token must stay beside its prefix")
+		for Complete in [true, false] {
+			TodayJson := KLR_BuildTodayIdxJson(db, ["nul.exe"], Complete, today)
+			for Code, Keys in Expected
+				AssertEqual(Keys, _KLRNul_Keys(db, TodayJson, '$."nul.exe".' . Code),
+					"today " . Code . " (complete=" . Complete . "): a NUL token must stay beside its prefix")
+		}
+	} finally {
+		try SQLite_Close(db)
+	}
+}
+Test("Keylogger reader: a NUL token stays a distinct JSON key (windows-reader-nul-json-keys)",
+	_KLRNul_TokenKeysStayDistinct)
