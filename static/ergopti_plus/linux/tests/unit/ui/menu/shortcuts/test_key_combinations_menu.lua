@@ -124,6 +124,29 @@ local function read_locale_data(relative)
 	return assert(require("json").decode(bytes))
 end
 
+--- Replaces the native availability probes of the action picker for one callback.
+--- Every pick rebuilds the whole catalogue and each build probes the machine
+--- (tool lookups, session kind, workspace backend) through spawned shells: with
+--- 21 locales and 182 pairs that was thousands of spawns and the run never ended.
+--- Availability only greys rows; this test asserts labels, identities and edits.
+--- @param callback function Runs with the probes answering without a spawn.
+local function with_controlled_probes(callback)
+	local targets = {
+		{ require("adapters.shell_runner"), "has_command", function() return true end },
+		{ require("adapters.window_switch"), "available", function() return true, nil, nil end },
+		{ require("modules.gestures.program_owner"), "available", function() return true end },
+		{ require("modules.gestures.workspace_switcher"), "detect", function() return {}, nil end },
+	}
+	local originals = {}
+	for index, target in ipairs(targets) do
+		originals[index] = target[1][target[2]]
+		target[1][target[2]] = target[3]
+	end
+	local ok, err = pcall(callback)
+	for index, target in ipairs(targets) do target[1][target[2]] = originals[index] end
+	if not ok then error(err, 0) end
+end
+
 --- Keeps real locale, renderer, Pair and catalogue owners across live builds.
 --- Only preference persistence, dialog presentation and publication are controlled.
 --- @param callback function Receives the actual locale/provider fixture.
@@ -183,7 +206,7 @@ local function with_canonical_locale_menu(callback)
 			return assert(last_pick)
 		end
 		state.i18n, state.preference = i18n, function() return preference end
-		callback(state)
+		with_controlled_probes(function() callback(state) end)
 	end)
 end
 
