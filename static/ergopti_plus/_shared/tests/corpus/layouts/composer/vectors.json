@@ -1,0 +1,42 @@
+{
+	"description": "What typing on the composition of composition.json produces, written by hand from the layers it takes (QWERTY base, AZERTY Shift, Ergopti AltGr, Ergo-L Shift+AltGr, the Ctrl shortcuts from AZERTY base, the Alt shortcuts from Ergo-L Shift) and its overrides. composed.keylayout is compiled from composition.json by tools/codegen/codegen-layout-composer-corpus.cjs. Presses and scan codes are those of keylayout_vectors.json; a shortcut vector names the held modifier (meta is Win/Cmd). Every driver's composer test replays this file through its own reader; the layout is registered under the id `composed` with the iso keycode convention.",
+	"layout": "composed",
+	"convention": "iso",
+	"vectors": [
+		{ "id": "base_is_qwerty", "press": ["SC010"], "types": "q" },
+		{ "id": "shift_is_azerty", "press": ["shift SC010"], "types": "A" },
+		{ "id": "caps_takes_the_shift_cell_of_a_letter", "press": ["caps SC010"], "types": "A" },
+		{ "id": "altgr_is_ergopti", "press": ["altgr SC010"], "types": "`" },
+		{
+			"id": "shift_altgr_dead_key_is_ergol_and_composes_the_qwerty_letter",
+			"press": ["altgr shift SC010", "SC012"],
+			"types": "ê"
+		},
+		{
+			"id": "azerty_dead_key_composes_the_qwerty_letter",
+			"press": ["shift SC01A", "SC012"],
+			"types": "ë"
+		},
+		{
+			"id": "azerty_dead_key_then_space_types_it_alone",
+			"press": ["shift SC01A", "SC039"],
+			"types": "¨"
+		},
+		{ "id": "override_nothing", "press": ["SC011"], "types": "" },
+		{ "id": "override_text", "press": ["shift SC012"], "types": "É" },
+		{
+			"id": "meta_follows_the_default_entry",
+			"shortcut": "SC010",
+			"modifier": "meta",
+			"sends": "q"
+		},
+		{ "id": "ctrl_follows_its_own_entry", "shortcut": "SC010", "modifier": "ctrl", "sends": "a" },
+		{ "id": "alt_follows_its_own_entry", "shortcut": "SC010", "modifier": "alt", "sends": "Q" },
+		{
+			"id": "a_dead_key_in_a_chord_types_nothing",
+			"shortcut": "SC01A",
+			"modifier": "ctrl",
+			"sends": ""
+		}
+	]
+}

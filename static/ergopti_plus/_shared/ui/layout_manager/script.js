@@ -29,7 +29,10 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'uninstall',
 	'select',
 	'open_homepage',
-	'close'
+	'close',
+	'composer_open',
+	'composer_save',
+	'composer_remove'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -393,12 +396,14 @@ function render() {
  * Posts one allowlisted action to the host.
  * @param {string} action
  * @param {string} [id] - Registry id the action applies to.
+ * @param {Object} [extra] - More fields of the message (the composer's save).
  */
-function send(action, id) {
+function send(action, id, extra) {
 	if (!LAYOUT_MANAGER_ACTIONS.includes(action))
 		throw new Error('layout manager: unknown action ' + action);
 	const payload = { action };
 	if (id !== undefined) payload.id = id;
+	if (extra !== undefined) Object.assign(payload, extra);
 	setTimeout(function () {
 		_post(payload);
 	}, 0);

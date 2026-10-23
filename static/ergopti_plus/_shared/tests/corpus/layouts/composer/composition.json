@@ -1,0 +1,20 @@
+{
+	"schema_version": 1,
+	"name": "Composer Corpus",
+	"keycode_convention": "iso",
+	"layers": {
+		"base": { "source": "qwerty" },
+		"shift": { "source": "azerty" },
+		"altgr": { "source": "ergopti" },
+		"shift_altgr": { "source": "ergol" }
+	},
+	"shortcuts": {
+		"default": { "source": "qwerty", "layer": "base" },
+		"ctrl": { "source": "azerty", "layer": "base" },
+		"alt": { "source": "ergol", "layer": "shift" }
+	},
+	"overrides": {
+		"base": { "KeyW": null },
+		"shift": { "KeyE": "É" }
+	}
+}

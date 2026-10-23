@@ -52,7 +52,8 @@ global LAYMGR_HOST_ACCESS_ALLOW := 1
 ; The only actions the page may send (the page and the Lua hosts declare the
 ; same list; tools/test/test-layout-manager-page.cjs pins the three).
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
-	"uninstall", true, "select", true, "open_homepage", true, "close", true)
+	"uninstall", true, "select", true, "open_homepage", true, "close", true,
+	"composer_open", true, "composer_save", true, "composer_remove", true)
 
 
 
@@ -201,7 +202,8 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 	}
 	Action := Payload["action"]
 	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
-			|| Action == "uninstall" || Action == "select") {
+			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
+			|| Action == "composer_remove") {
 		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
 		return false
 	}
@@ -219,6 +221,8 @@ LayoutManager_HandleMessage(Payload, Deps := 0) {
 		Deps["close"].Call()
 		return true
 	}
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
+		return LayoutComposer_Handle(Action, Payload, Deps)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)

@@ -31,6 +31,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const { parse: parseToml } = require('smol-toml');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 
@@ -45,6 +46,18 @@ const LAYOUT_DEFAULTS = JSON.parse(
 );
 const REGISTRY_DIR = path.join(REPO_ROOT, ...LAYOUT_DEFAULTS.registry.folder.split('/'));
 const INDEX_PATH = path.join(REGISTRY_DIR, LAYOUT_DEFAULTS.registry.index_file);
+
+// Ids a registry layout may not take: the composer's own id and the reference
+// layouts a composition can start from (docs/layout-composer.md), which share
+// the registry's namespace.
+const RESERVED_IDS = new Set([LAYOUT_DEFAULTS.composer.id]);
+{
+	const sandbox = vm.createContext({});
+	const referencePath = shared('ui', 'layout_composer', 'reference_layouts.js');
+	vm.runInContext(fs.readFileSync(referencePath, 'utf8'), sandbox, { filename: referencePath });
+	for (const id of Object.keys(vm.runInContext('LAYOUT_COMPOSER_REFERENCE', sandbox)))
+		RESERVED_IDS.add(id);
+}
 
 // The repository's own licence: layouts under it are covered by the root
 // LICENSE, every other licence must ship its text next to the layout.
@@ -510,6 +523,10 @@ function buildIndex(registryDir) {
 	const files = new Map();
 	const extensions = new Map();
 	for (const id of ids) {
+		if (RESERVED_IDS.has(id)) {
+			errors.push(`${id}: the id is reserved for the layout composer`);
+			continue;
+		}
 		const folder = path.join(registryDir, id);
 		const metaPath = path.join(folder, 'meta.toml');
 		const layoutPath = path.join(folder, `${id}.keylayout`);
