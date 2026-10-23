@@ -149,7 +149,7 @@ _MBPT_ChildSource(Directory) {
 	for GeneratedSymbol in ["LocaleTableData", "UpdateChannelRegistryData", "UpdateScheduleData"]
 		Code .= "#Include " . _MBPT_GeneratedOwner(GeneratedSymbol) . "`n"
 	Owners := Map()
-	for Symbol in ["t", "I18nGetLocale", "LLM_GetModelIndex", "LLM_Defaults_Load",
+	for Symbol in ["HotPath_Now", "t", "I18nGetLocale", "LLM_GetModelIndex", "LLM_Defaults_Load",
 		"LLM_DisplayIndentValues", "LLM_Option_TryNormalize", "_TrayRootErrorIsSilent",
 		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "MagicEditorPhysicalCatalogue", "NotifierSend", "MasterGateDesiredFeatures",
 		"MetricsFiltersApplyManifestDefaults", "MS_SaveBuiltToIni", "WPMWidget_Show",
@@ -164,7 +164,7 @@ _MBPT_ChildSource(Directory) {
 		if Symbol == "LLM_Defaults_Load"
 			Code .= "LLM_Defaults_Load()`n"
 	}
-	AssertEqual(22, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
+	AssertEqual(23, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
 	Fixture := _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	return Code . "#Include " . Fixture . "`n"
