@@ -138,6 +138,16 @@ UpdateLastSentCharacter(Character) {
 ; drained — restoring strict per-key ordering. Same SendEvent semantics
 ; (``{Blind}`` / AltGr / modifiers unchanged); only ordering is enforced. There is
 ; NO Sleep on this path, so Critical's guarantee holds (a Sleep would yield it).
+; It stays a SendEvent rather than a SendInput on purpose. Measured on the live
+; driver (2026-10-23, several hundred keystrokes, SetKeyDelay 0): mean 2.1 to
+; 2.6 ms and worst 5.7 ms per emitted key, so SendInput could gain about 2 ms a
+; key, below what typing can feel. Against that, this emit is the only trace of
+; the key its level-2 hotkey suppresses and must reach the prefix watcher in
+; order, {Blind} and AltGr/Kana modifier handling are those of the hook path,
+; every SendInput reinstalls AutoHotkey's hook in front of the native owner, and
+; with another AutoHotkey hook it falls back to SendEvent anyway. A hotstring's
+; own output is the opposite case and already a SendInput (see
+; project-hotstring-output-is-final in docs/memory/windows-ahk.md).
 ; Profiled because this is the FIRST stage of every remapped keystroke and the
 ; only one that had no segment at all: an "OnChar" line that looked slow could
 ; equally have been a slow SendEvent that had already finished before OnChar
