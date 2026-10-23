@@ -156,6 +156,157 @@
 			"context": { "home": "C:\\Users\\Jane", "user": "Jane", "case_insensitive": true },
 			"input": "[ERROR] [Updater] Cannot open C:\\Users\\svc-install\\AppData\\Local\\Ergopti\\bundle\\a.zip (copied from /home/jane-old/dl)",
 			"expected": "[ERROR] [Updater] Cannot open C:\\Users\\<user>\\AppData\\Local\\Ergopti\\bundle\\a.zip (copied from /home/<user>/dl)"
+		},
+		{
+			"id": "config_dir_masks_pack_and_file_names_after_a_quote",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "Loaded 'D:\\Work\\config\\ergopti_plus\\hotstrings\\perso_test\\cat_a\\item_1_root.toml' (12 entries)",
+			"expected": "Loaded '<config>\\hotstrings\\<name>\\<name>\\<name>' (12 entries)"
+		},
+		{
+			"id": "config_dir_keeps_the_names_the_product_ships",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "Read D:\\Work\\config\\ergopti_plus\\autohotkey\\config.toml and D:\\Work\\config\\ergopti_plus\\autohotkey\\tap_hold.toml: 136 applied",
+			"expected": "Read <config>\\autohotkey\\config.toml and <config>\\autohotkey\\tap_hold.toml: 136 applied"
+		},
+		{
+			"id": "config_dir_bare_names_may_hold_spaces_before_a_separator",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "Skipped D:\\Work\\config\\ergopti_plus\\hotstrings\\my pack\\a.toml because it is empty",
+			"expected": "Skipped <config>\\hotstrings\\<name>\\<name> because it is empty"
+		},
+		{
+			"id": "config_dir_quoted_names_may_hold_spaces_and_apostrophes",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "Parsing \"D:\\Work\\config\\ergopti_plus\\hotstrings\\Zoe's pack\\my words.toml\": ok",
+			"expected": "Parsing \"<config>\\hotstrings\\<name>\\<name>\": ok"
+		},
+		{
+			"id": "config_dir_under_home_is_found_raw_and_after_the_home_pass",
+			"context": {
+				"home": "/Users/jdoe",
+				"user": "jdoe",
+				"config_dir": "/Users/jdoe/.config/ergopti_plus",
+				"case_insensitive": false
+			},
+			"input": "Opened /Users/jdoe/.config/ergopti_plus/hotstrings/perso/a.toml and (older line) ~/.config/ergopti_plus/hotstrings/perso/b.toml and ~/.config/ergopti_plus2/x",
+			"expected": "Opened <config>/hotstrings/<name>/<name> and (older line) <config>/hotstrings/<name>/<name> and ~/.config/ergopti_plus2/x"
+		},
+		{
+			"id": "config_dir_compares_like_the_file_system",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\Config\\Ergopti_Plus",
+				"case_insensitive": true
+			},
+			"input": "d:\\work\\config\\ergopti_plus\\HotStrings\\Mine\\x.toml",
+			"expected": "<config>\\HotStrings\\<name>\\<name>"
+		},
+		{
+			"id": "config_dir_posix_compares_exactly",
+			"context": {
+				"home": "/home/jdoe",
+				"user": "jdoe",
+				"config_dir": "/home/jdoe/Cfg",
+				"case_insensitive": false
+			},
+			"input": "/home/jdoe/cfg/hotstrings/p/a.toml and /home/jdoe/Cfg/hotstrings/p/a.toml",
+			"expected": "~/cfg/hotstrings/p/a.toml and <config>/hotstrings/<name>/<name>"
+		},
+		{
+			"id": "config_dir_a_shortened_path_keeps_its_known_name",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "Reading 'D:\\Work\\config\\ergopti_plus\\autohotkey\\config.toml'… and D:\\Work\\config\\ergopti_plus\\autohotkey\\config.toml… done",
+			"expected": "Reading '<config>\\autohotkey\\config.toml'… and <config>\\autohotkey\\config.toml… done"
+		},
+		{
+			"id": "config_dir_without_context_is_untouched",
+			"context": {},
+			"input": "D:\\Work\\config\\ergopti_plus\\hotstrings\\perso\\a.toml",
+			"expected": "D:\\Work\\config\\ergopti_plus\\hotstrings\\perso\\a.toml"
+		},
+		{
+			"id": "config_dir_prefix_lookalike_is_untouched",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "D:\\Work\\config\\ergopti_plus_old\\hotstrings\\perso",
+			"expected": "D:\\Work\\config\\ergopti_plus_old\\hotstrings\\perso"
+		},
+		{
+			"id": "config_dir_trailing_separator_in_context",
+			"context": {
+				"home": "/home/jdoe",
+				"user": "jdoe",
+				"config_dir": "/home/jdoe/cfg/",
+				"case_insensitive": false
+			},
+			"input": "/home/jdoe/cfg/hotstrings/p/a.toml",
+			"expected": "<config>/hotstrings/<name>/<name>"
+		},
+		{
+			"id": "config_dir_non_ascii_names_are_masked_whole",
+			"context": {
+				"home": "C:\\Users\\Jane",
+				"user": "Jane",
+				"config_dir": "D:\\Work\\config\\ergopti_plus",
+				"case_insensitive": true
+			},
+			"input": "'D:\\Work\\config\\ergopti_plus\\hotstrings\\Café Été\\mots.toml'",
+			"expected": "'<config>\\hotstrings\\<name>\\<name>'"
+		},
+		{
+			"id": "profile_folder_with_a_space_is_redacted_whole",
+			"context": { "home": "C:\\Users\\Jane", "user": "Jane", "case_insensitive": true },
+			"input": "C:\\Users\\John Smith\\AppData\\Local\\x and C:\\Users\\Mary Ann Lee\\Documents and \"C:\\Users\\Zoe Blue\" and C:\\Users\\Bob see D:\\x",
+			"expected": "C:\\Users\\<user>\\AppData\\Local\\x and C:\\Users\\<user>\\Documents and \"C:\\Users\\<user>\" and C:\\Users\\<user> see D:\\x"
+		},
+		{
+			"id": "profile_folder_with_non_ascii_letters_is_redacted_whole",
+			"context": {},
+			"input": "/home/José/notes and /Users/Zoë Müller/x",
+			"expected": "/home/<user>/notes and /Users/<user>/x"
+		},
+		{
+			"id": "profile_folder_keeps_the_sentence_that_follows",
+			"context": {},
+			"input": "Opened /home/jdoe2 and then closed it.",
+			"expected": "Opened /home/<user> and then closed it."
+		},
+		{
+			"id": "profile_folder_with_a_space_at_the_end_of_the_line",
+			"context": {},
+			"input": "profile C:\\Users\\John Smith",
+			"expected": "profile C:\\Users\\<user>"
 		}
 	]
 }

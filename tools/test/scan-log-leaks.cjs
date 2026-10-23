@@ -12,8 +12,10 @@
  * the rule to the three ports.
  *
  * USAGE:
- *   node tools/test/scan-log-leaks.cjs [logs-directory]
- * Without an argument it scans the log folder of the current platform. This is
+ *   node tools/test/scan-log-leaks.cjs [logs-directory] [config-directory]
+ * Without an argument it scans the log folder of the current platform. The
+ * configuration directory (its folder and file names are chosen by the user)
+ * is a class of its own only when it is given, because it can live anywhere. This is
  * a maintainer tool, not a CI gate: CI has no personal logs, and the gate that
  * pins each rule is test-diagnostics-redaction-vectors.cjs.
  * ==============================================================================
@@ -90,6 +92,15 @@ function count(lines) {
 }
 
 const dir = process.argv[2] || defaultLogDir();
+const configDir = process.argv[3] ? process.argv[3].replace(/[\\/]+$/, '') : '';
+if (configDir) {
+	// Either slash style, and the home-relative spelling an older log already holds
+	const spellings = new Set();
+	for (const base of [configDir, configDir.split(home).join('~')])
+		for (const slash of ['/', '\\'])
+			spellings.add(base.replace(/[\\/]/g, slash).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+	classes.config_dir = new RegExp([...spellings].join('|'), folded ? 'i' : '');
+}
 if (!fs.existsSync(dir)) {
 	console.error(`[FAIL] log folder not found: ${path.basename(dir)}`);
 	process.exit(1);
@@ -98,7 +109,7 @@ const Redact = loadRedactor();
 const rules = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
 );
-const context = { home, user, case_insensitive: folded };
+const context = { home, user, config_dir: configDir || undefined, case_insensitive: folded };
 const raw = [];
 for (const name of fs.readdirSync(dir))
 	if (name.endsWith('.log'))

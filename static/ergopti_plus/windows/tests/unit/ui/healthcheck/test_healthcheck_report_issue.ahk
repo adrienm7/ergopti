@@ -453,3 +453,16 @@ _THPA_RecentErrorFacts() {
 	}
 }
 Test("Diagnostics export: closed recent error observations exclude private text", _THPA_RecentErrorFacts)
+
+_THPA_ConfigDirContext() {
+	Config := HealthCheck_Config()
+	Dir := "D:\Work\config\ergopti_plus"
+	Effects := _THPA_Effects([])
+	Effects["identity"] := () => Map("home", "C:\Users\JDoe", "user", "JDoe", "config_dir", Dir)
+	Context := HealthCheck_RedactionContext(Effects)
+	AssertEqual(Dir, Context["config_dir"], "the redaction context carries the configuration directory")
+	AssertEqual("read '<config>\hotstrings\<name>\<name>'",
+		Redact_Apply("read '" . Dir . "\hotstrings\my_pack\a.toml'", Config["redaction"], Context),
+		"a hotstring pack name under the configuration directory never reaches a report")
+}
+Test("Diagnostics export: the redaction context masks the configuration directory (config-dir-masking)", _THPA_ConfigDirContext)
