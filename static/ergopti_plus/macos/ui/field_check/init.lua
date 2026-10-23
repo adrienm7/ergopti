@@ -31,6 +31,7 @@ M.ROWS = {
 	field_check_owned_runtime = { check = "owned_runtime", title = "menu.debug.field_check_owned_runtime" },
 	field_check_network = { check = "network", title = "menu.debug.field_check_network" },
 	field_check_toolchain = { check = "toolchain", title = "menu.debug.field_check_toolchain" },
+	field_check_login_items = { check = "login_items", title = "menu.debug.field_check_login_items" },
 	field_check_key_accounting = { check = "key_accounting", title = "menu.debug.field_check_key_accounting", watches_keys = true },
 }
 
