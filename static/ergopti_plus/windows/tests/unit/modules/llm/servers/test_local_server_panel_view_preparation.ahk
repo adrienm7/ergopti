@@ -608,3 +608,5 @@ Test("local-server-retire-final-settlement: final retry can complete reversible 
 Test("local-server-retire-final-settlement: final retry can complete closed-owner cancellation", _LSPN_FinalSettlementRetirement.Bind(true, true))
 Test("local-server-retire-final-settlement: unsettled reversible cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, false))
 Test("local-server-retire-final-settlement: unsettled closed-owner cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, true))
+
+#Include test_local_server_record_lifetime.ahk
