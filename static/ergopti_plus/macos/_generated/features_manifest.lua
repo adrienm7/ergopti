@@ -54,7 +54,7 @@ M.sections = {
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs" }, subsections = {  } },
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
-	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "linux" }, subsections = {  } },
+	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "hs", "linux" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
@@ -392,10 +392,10 @@ M.features = {
 		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs", "linux" }, recommended = 3, input_altering = false,
 	},
 	{
-		path = "llm.trigger.disabled_apps", id = "disabled_apps", section = "llm.trigger", default = {  }, type = "array", description_key = "menu.llm.title", platforms = { "hs" }, recommended = {  }, input_altering = false,
+		path = "llm.trigger.disabled_apps", id = "disabled_apps", section = "llm.trigger", default = {  }, type = "array", description_key = "menu.llm.title", platforms = { "ahk", "hs" }, recommended = {  }, input_altering = false,
 	},
 	{
-		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 200, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" }, recommended = 200, input_altering = false,
+		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 500, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" }, recommended = 500, input_altering = false,
 	},
 	{
 		path = "llm.trigger.instant_on_word_end", id = "instant_on_word_end", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.instant_on_word_end", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
@@ -410,7 +410,7 @@ M.features = {
 		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "llm.navigation.nav_modifiers", id = "nav_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.nav_modifiers_prompt", platforms = { "hs", "linux" }, recommended = {  }, input_altering = false,
+		path = "llm.navigation.nav_modifiers", id = "nav_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.nav_modifiers_prompt", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{
 		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
@@ -438,6 +438,12 @@ M.features = {
 	},
 	{
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" }, recommended = "https://chat.openai.com", input_altering = false,
+	},
+	{
+		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "hs", "linux" }, recommended = 100, input_altering = false,
+	},
+	{
+		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
 		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
@@ -1077,12 +1083,6 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", reason_key = "", platforms = { "ahk", "linux" },
-	},
-	{
-		path = "mod_combos.simultaneous_threshold_ms", section = "mod_combos", reason_key = "platform_reason.remap_engine_is_per_driver", platforms = { "linux" },
-	},
-	{
-		path = "mod_combos.symmetric", section = "mod_combos", reason_key = "platform_reason.remap_engine_is_per_driver", platforms = { "linux" },
 	},
 	{
 		path = "shortcuts.personal.laptop_broken_key", section = "shortcuts.personal", reason_key = "", platforms = { "ahk" },

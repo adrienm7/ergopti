@@ -474,7 +474,7 @@ num_predictions = 3
 
 [llm.trigger]
 disabled_apps = []
-debounce_ms = 200
+debounce_ms = 500
 instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
@@ -511,6 +511,14 @@ float_colors = true
 [shortcuts]
 enabled = false
 chatgpt_url = "https://chat.openai.com"
+
+
+
+
+
+[mod_combos]
+simultaneous_threshold_ms = 100
+symmetric = false
 
 
 

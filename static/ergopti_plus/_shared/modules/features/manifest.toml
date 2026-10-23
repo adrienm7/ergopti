@@ -240,7 +240,7 @@ platforms = ["hs"]
 # Linux native simultaneous timing and symmetry. Third slots remain neutral.
 [sections.mod_combos]
 description_key = "menu.shortcuts.key_combinations"
-platforms = ["linux"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [sections.shortcuts.key_combination_taps]
@@ -1496,12 +1496,12 @@ recommended = []
 input_altering = false
 type = "array"
 description_key = "menu.llm.title"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 
 [[features.llm.trigger]]
 id = "debounce_ms"
-default_per_platform = { ahk = 500, hs = 200, linux = 500 }
-recommended_per_platform = { ahk = 500, hs = 200, linux = 500 }
+default = 500
+recommended = 500
 input_altering = false
 type = "number"
 description_key = "menu.llm.trigger.debounce_ms"
@@ -1569,7 +1569,6 @@ recommended = []
 input_altering = false
 type = "array"
 description_key = "menu.llm.nav_modifiers_prompt"
-platforms = ["hs", "linux"]
 
 [[features.llm.navigation]]
 id = "val_modifiers"
@@ -2045,7 +2044,7 @@ description_key = "menu.shortcuts.key_combinations"
 # Linux declares its own values; no runtime fallback to Mac hs_timeouts.
 [[features.mod_combos]]
 id = "simultaneous_threshold_ms"
-platforms = ["linux"]
+platforms = ["hs", "linux"]
 default = 100
 recommended = 100
 input_altering = false
@@ -2055,7 +2054,7 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[features.mod_combos]]
 id = "symmetric"
-platforms = ["linux"]
+platforms = ["hs", "linux"]
 default = false
 recommended = false
 input_altering = false
