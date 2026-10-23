@@ -252,3 +252,5 @@ _KLRLlmAccepted_RetrySnapshotNeverMergesIntoLiveInput() {
 }
 Test("Keystats journal: invalidated snapshots stay separate from newer input (llm-accepted-metrics)",
 	_KLRLlmAccepted_RetrySnapshotNeverMergesIntoLiveInput)
+
+#Include test_buffer_snapshot_publication_owner.ahk
