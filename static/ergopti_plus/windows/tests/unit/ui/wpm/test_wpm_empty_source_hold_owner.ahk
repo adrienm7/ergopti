@@ -17,6 +17,26 @@ _WPMZ_ObserveToken(Source, Token, Replacement) {
 	return SubStr(Source, 1, Found.Pos - 1) . Replacement . SubStr(Source, Found.Pos + Found.Len)
 }
 
+; The framework's ordinary body cache deliberately handles block definitions.
+; Retain the actual unique arrow line too, without copying its arithmetic.
+_WPMZ_DeltaSource(Source) {
+	Masked := _DriverMaskNonCode(&Source)
+	Pattern := "im)^_WPMWidget_TickDelta\([^`r`n)]*\)[ `t`r`n]*(=>|\{)"
+	AssertTrue(RegExMatch(Masked, Pattern, &Definition) > 0, "The real delta definition must exist")
+	AssertEqual(0, RegExMatch(Masked, Pattern, , Definition.Pos + Definition.Len), "The real delta definition must be unique")
+	if Definition[1] == "{" {
+		Body := _DriverExtractFunctionBody(&Source, "_WPMWidget_TickDelta")
+		AssertTrue(Body != "", "The actual block definition must be extracted")
+		return Body
+	}
+	LineEnd := InStr(Source, "`n", , Definition.Pos + Definition.Len)
+	if !LineEnd
+		LineEnd := StrLen(Source) + 1
+	AssertTrue(Trim(SubStr(Masked, Definition.Pos + Definition.Len,
+		LineEnd - Definition.Pos - Definition.Len), " `t`r") != "", "The real arrow expression must be nonempty")
+	return SubStr(Source, Definition.Pos, LineEnd - Definition.Pos)
+}
+
 _WPMZ_ChildSource(Canon) {
 	global _DriverDir
 	Owner := _DriverProductionFileForSymbol("WPMWidget_Tick", _DriverDir)
@@ -32,7 +52,7 @@ _WPMZ_ChildSource(Canon) {
 	for Symbol in ["_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
 		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex"] {
-		Body := _DriverFuncBody(Symbol)
+		Body := Symbol == "_WPMWidget_TickDelta" ? _WPMZ_DeltaSource(Source) : _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "Each reached genuine function must exist: " . Symbol)
 		for FunctionName, Phase in Map("WPMWidget_Push", "push", "WPMWidget_Calc", "calc", "WPMWidget_Tick", "tick") {
 			if Symbol == FunctionName

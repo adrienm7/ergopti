@@ -17,6 +17,26 @@ _WPMR_ClockSource(Source, Symbol) {
 	return SubStr(Source, 1, Clock.Pos - 1) . "_WPMR_Now()" . SubStr(Source, Clock.Pos + Clock.Len)
 }
 
+; The framework's ordinary body cache deliberately handles block definitions.
+; Retain the actual unique arrow line too, without copying its arithmetic.
+_WPMR_DeltaSource(Source) {
+	Masked := _DriverMaskNonCode(&Source)
+	Pattern := "im)^_WPMWidget_TickDelta\([^`r`n)]*\)[ `t`r`n]*(=>|\{)"
+	AssertTrue(RegExMatch(Masked, Pattern, &Definition) > 0, "The real delta definition must exist")
+	AssertEqual(0, RegExMatch(Masked, Pattern, , Definition.Pos + Definition.Len), "The real delta definition must be unique")
+	if Definition[1] == "{" {
+		Body := _DriverExtractFunctionBody(&Source, "_WPMWidget_TickDelta")
+		AssertTrue(Body != "", "The actual block definition must be extracted")
+		return Body
+	}
+	LineEnd := InStr(Source, "`n", , Definition.Pos + Definition.Len)
+	if !LineEnd
+		LineEnd := StrLen(Source) + 1
+	AssertTrue(Trim(SubStr(Masked, Definition.Pos + Definition.Len,
+		LineEnd - Definition.Pos - Definition.Len), " `t`r") != "", "The real arrow expression must be nonempty")
+	return SubStr(Source, Definition.Pos, LineEnd - Definition.Pos)
+}
+
 _WPMR_ChildSource() {
 	global _DriverDir
 	Owner := _DriverProductionFileForSymbol("WPMWidget_Calc", _DriverDir)
@@ -30,7 +50,7 @@ _WPMR_ChildSource() {
 		Code .= State[0] . "`n"
 	}
 	for Symbol in ["_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "WPMWidget_Push", "WPMWidget_Calc"] {
-		Body := _DriverFuncBody(Symbol)
+		Body := Symbol == "_WPMWidget_TickDelta" ? _WPMR_DeltaSource(Source) : _DriverFuncBody(Symbol)
 		AssertTrue(Body != "", "Every genuine WPM function must be nonempty: " . Symbol)
 		if Symbol == "WPMWidget_Push" || Symbol == "WPMWidget_Calc"
 			Body := _WPMR_ClockSource(Body, Symbol)
