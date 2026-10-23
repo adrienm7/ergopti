@@ -26,6 +26,7 @@ class _CNR_Request {
 	__New(Status, Body) {
 		this.Status := Status
 		this.ResponseText := Body
+		this.ResponseEncodingValid := true
 		this.AbortCount := 0
 	}
 
