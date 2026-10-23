@@ -677,3 +677,4 @@ Test("Updater: the release list and its ETag survive a restart (#95)", _UpdaterT
 
 #Include test_updater_managed_json_utf8.ahk
 #Include test_updater_latest_json_utf8.ahk
+#Include test_updater_latest_async_json_utf8.ahk
