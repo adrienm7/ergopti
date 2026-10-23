@@ -324,7 +324,13 @@ helpers.describe("metrics_apps: lifecycle transaction", function()
 		local first_generation_timers = timer_snapshot(context)
 		first_generation_timers[5].callback()
 		local refresh_timer = context.timers[#context.timers]
+		local position, callbacks_before = #context.timers, #context.webkit_callbacks
 		refresh_timer.callback()
+		-- The refresh is cut into bounded slices; deliver them up to the WebKit yield.
+		while #context.webkit_callbacks == callbacks_before and position < #context.timers do
+			position = position + 1
+			context.timers[position].callback()
+		end
 		local stale_completion = context.webkit_callbacks[#context.webkit_callbacks]
 		helpers.assert_type(stale_completion, "function",
 			"the real refresh path must reach an asynchronous WebKit completion")
@@ -336,6 +342,50 @@ helpers.describe("metrics_apps: lifecycle transaction", function()
 
 		helpers.assert_eq(#context.evaluations, evaluations_before_stale_completion,
 			"a completion from the closed window must not inject into its replacement")
+	end)
+
+	-- Issue #101: one refresh callback read the manifest, looked up icons, encoded
+	-- the payloads and wrote the disk cache, and held the main thread for 1.1 s.
+	helpers.it("cuts a refresh into bounded slices instead of one long callback (issue-101-metrics-apps-slices)", function()
+		local dashboard, context = load_dashboard()
+		helpers.assert_eq(dashboard.show(), true)
+		local encodes, cache_opens = 0, 0
+		local json_stub = package.loaded["hs.json"]
+		local original_encode, original_open = json_stub.encode, io.open
+		json_stub.encode = function(value)
+			encodes = encodes + 1
+			return original_encode(value)
+		end
+		io.open = function(path, ...)
+			if tostring(path):find("ergopti_metrics_apps_cache", 1, true) then
+				cache_opens = cache_opens + 1
+				return nil, "refused by the test"
+			end
+			return original_open(path, ...)
+		end
+		local ok, err = xpcall(function()
+			context.timers[5].callback()
+			local position = #context.timers
+			local refresh_timer = context.timers[position]
+			local function deliver_next_slice()
+				helpers.assert_true(position < #context.timers, "the refresh must arm its next slice")
+				position = position + 1
+				context.timers[position].callback()
+			end
+			encodes, cache_opens = 0, 0
+			refresh_timer.callback()
+			helpers.assert_eq(encodes, 0, "the manifest read must not also encode the payloads")
+			deliver_next_slice()
+			helpers.assert_eq(encodes, 0, "the icon lookups are their own slice")
+			deliver_next_slice()
+			helpers.assert_true(encodes > 0, "the payload slice encodes and publishes")
+			helpers.assert_eq(cache_opens, 0, "the disk cache is written by a later slice")
+			deliver_next_slice()
+			helpers.assert_eq(cache_opens, 1, "the last slice writes the disk cache")
+		end, debug.traceback)
+		json_stub.encode = original_encode
+		io.open = original_open
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("subscribes once and schedules live refresh through the owned timer adapter", function()

@@ -167,7 +167,14 @@ local function with_apps(callback)
 					local function refresh(next_revision)
 						if next_revision then revision = next_revision end
 						helpers.assert_true(dashboard.push_live_update())
-						pending[#pending]()
+						-- The refresh is cut into bounded slices, one timer turn each:
+						-- deliver the one just armed, then every slice it arms.
+						local index = #pending
+						pending[index]()
+						while #pending > index do
+							index = index + 1
+							pending[index]()
+						end
 					end
 					local function observed() return saves, #evaluations end
 					callback(dashboard, state, refresh, observed)

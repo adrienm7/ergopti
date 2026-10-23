@@ -960,37 +960,55 @@ local function load_and_inject(generation, webview)
 	end
 	if not is_current_window(generation, webview) then return false end
 
-	-- App icon collection (capped to keep first paint fast).
-	local app_icons    = {}
-	local icon_lookups = 0
-	local seen_apps    = {}
-	for _, day_data in pairs(manifest) do
-		for app_name, _ in pairs(day_data) do
-			if not seen_apps[app_name] then
-				seen_apps[app_name] = true
-				local cached = M._app_icon_cache[app_name]
-				if cached ~= nil then
-					if cached then app_icons[app_name] = cached end
-				elseif icon_lookups < MAX_ICON_LOOKUPS_PER_OPEN then
-					local icon = get_app_icon(app_name)
-					M._app_icon_cache[app_name] = icon or false
-					if icon then app_icons[app_name] = icon end
-					icon_lookups = icon_lookups + 1
+	-- The rest is cut into bounded slices, one main-loop turn each: the icon
+	-- lookups, the JSON encodes plus the injection, and the disk-cache write used
+	-- to run in this single callback (issue #101: 1.1 s held on the main thread).
+	local function continue_load(label, step)
+		if schedule_continuation(BRIDGE_DEFER_DELAY_SEC, generation, webview, step, label) then
+			return true
+		end
+		close_window_generation(generation, webview, true, label .. " timer refusal")
+		return false
+	end
+
+	return continue_load("Apps dashboard icon collection", function()
+		-- App icon collection (capped to keep first paint fast).
+		local app_icons    = {}
+		local icon_lookups = 0
+		local seen_apps    = {}
+		for _, day_data in pairs(manifest) do
+			for app_name, _ in pairs(day_data) do
+				if not seen_apps[app_name] then
+					seen_apps[app_name] = true
+					local cached = M._app_icon_cache[app_name]
+					if cached ~= nil then
+						if cached then app_icons[app_name] = cached end
+					elseif icon_lookups < MAX_ICON_LOOKUPS_PER_OPEN then
+						local icon = get_app_icon(app_name)
+						M._app_icon_cache[app_name] = icon or false
+						if icon then app_icons[app_name] = icon end
+						icon_lookups = icon_lookups + 1
+					end
 				end
 			end
 		end
-	end
 
-	local cached_manifest_json = json.encode(manifest)
-	local manifest_json        = json.encode(with_live_active_app_duration(manifest))
-	local user_cats_json = json.encode(user_cats)
-	local app_icons_json = json.encode(app_icons)
+		continue_load("Apps dashboard payload publication", function()
+			local cached_manifest_json = json.encode(manifest)
+			local manifest_json        = json.encode(with_live_active_app_duration(manifest))
+			local user_cats_json = json.encode(user_cats)
+			local app_icons_json = json.encode(app_icons)
 
-	save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json, app_icons = app_icons_json })
-	if not is_current_window(generation, webview) then return false end
+			inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
+				MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision,
+				categories_revision)
 
-	return inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
-		MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision, categories_revision)
+			continue_load("Apps dashboard disk cache save", function()
+				save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json,
+					app_icons = app_icons_json })
+			end)
+		end)
+	end)
 end
 
 local function prefill_from_disk_cache(generation, webview)
