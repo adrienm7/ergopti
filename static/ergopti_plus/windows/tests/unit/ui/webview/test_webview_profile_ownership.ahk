@@ -184,3 +184,5 @@ Test("WebView profile: late abandon preserves confirmed cleanup (profile-ownersh
 #Include test_hcw_startup_owner.ahk
 
 #Include test_personal_toml_startup_owner.ahk
+
+#Include test_model_browser_close_pause_owner.ahk
