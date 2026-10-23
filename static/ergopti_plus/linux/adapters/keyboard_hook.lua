@@ -60,6 +60,7 @@ for _, name in ipairs(INPUT_READER_PORT_NAMES) do
 end
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
+local Perf = require("infra.perf_counters")
 local InputEvent = require("infra.input_event")
 local XkbCapture = require("adapters.xkb_capture")
 local ModifierBroker = require("adapters.modifier_broker")
@@ -948,6 +949,9 @@ end
 
 local function _forward_raw(ev, source)
 	if not _intercept or not _emit_raw or ev.type ~= EVDEV_TYPE_KEY then return true end
+	-- The events written back to the desktop under the grab: what the user's
+	-- keystrokes became after the tap-hold engine and the layout.
+	Perf.count("input.forwarded_events")
 	local key = source_key(source, ev.code)
 	local prior = _forwarded_down[key]
 	local owner = _output_owners[key]
@@ -2146,7 +2150,10 @@ local function _dispatch_event(ev, source)
 			local receipt = _remapper.has_combinations and _combination_source(source) or nil
 			local previous_buffer = _buffer_dispatch
 			_buffer_dispatch = {engine=_remapper,event=ev,source=source,origin=origin,at_ms=at_ms}
+			local process_started = Perf.clock()
 			local called,rows,requested,selected,owned_frame = pcall(_remapper.process,_remapper,ev.code,ev.value,at_ms,receipt)
+			Perf.span("taphold.process", process_started)
+			Perf.count("taphold.processed")
 			_buffer_dispatch = previous_buffer
 			if not called then error(rows,0) end
 			out,tap,binding,frame=rows,requested,selected,owned_frame
@@ -2349,6 +2356,7 @@ end
 --- @param now_ms number
 _tick_remapper = function(now_ms)
 	if not (_remapper and _intercept) then return end
+	Perf.count("taphold.ticks")
 	local exact, generation, output = _remapper, _remapper_generation, _broker
 	local due_rows = exact:tick(now_ms)
 	if exact.take_custody then
@@ -2519,6 +2527,7 @@ end
 function M.pump()
 	if not _running then return end
 	if _source_reconciliation then return end
+	Perf.count("input.pump_calls")
 	local open_keyboards = 0
 	local sources = {}
 	for _, path in ipairs(_devices) do
@@ -2563,9 +2572,14 @@ function M.pump()
 		end
 		local selected_event = _pending_events[selected.slot]
 		_pending_events[selected.slot] = nil
+		Perf.count("input.events")
 		if selected.keyboard then
+			local dispatch_started = Perf.clock()
+			Perf.count("input.key_events")
 			_dispatch_event(selected_event, selected.path)
+			Perf.span("input.dispatch", dispatch_started)
 		else
+			Perf.count("input.pointer_events")
 			-- The pointer is not grabbed: its events reached the desktop when
 			-- they happened, and only keep the events' clock fresh here.
 			if _remapper and _intercept then _event_time_ms(selected_event) end
@@ -2582,6 +2596,22 @@ function M.pump()
 		local now_ms = _event_clock_now_ms()
 		if now_ms then _tick_remapper(now_ms) end
 	end
+end
+
+--- Sleeps the idle loop until an input source has data, at most `timeout_ms`.
+---
+--- The daemon's event loop calls it between pumps, so an idle daemon wakes on
+--- input or on the timeout instead of spinning, and a key is pumped the moment
+--- it arrives. An event already read and not yet dispatched (a drain that hit
+--- its bound) must not sleep behind the wait, so it answers at once.
+--- @param timeout_ms integer Longest wait.
+--- @return boolean|nil ready True when a source can be read now, false after a
+---   quiet wait, nil when no wait is possible (hook stopped or reacquiring,
+---   no open source): the loop then yields a fixed millisecond.
+function M.idle_wait(timeout_ms)
+	if not _running or _reacquiring or _source_reconciliation then return nil end
+	if next(_pending_events) ~= nil then return true end
+	return EvdevReader.wait_any_readable(timeout_ms)
 end
 
 --- The text a key would type now, in the live layout and with the modifiers

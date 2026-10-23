@@ -31,6 +31,10 @@ local _origin_ms = nil
 -- Start time of each open stage, keyed by stage name.
 local _open = {}
 
+-- Closed stages, in order, as { name, milliseconds }: the evidence summary at
+-- complete() reads them, so a boot is comparable from one log line.
+local _done_stages = {}
+
 -- Total boot duration frozen by complete(); nil while booting.
 local _boot_ms = nil
 
@@ -76,6 +80,7 @@ function M.stage_done(name, detail)
 		return
 	end
 	_open[name] = nil
+	_done_stages[#_done_stages + 1] = { name, Monotonic.now_ms() - started }
 	local suffix = (type(detail) == "string" and detail ~= "") and (": " .. detail) or ""
 	Logger.success(LOG, "Boot stage '%s' done in %.0f ms%s (total %.0f ms).",
 		name, Monotonic.now_ms() - started, suffix, M.elapsed_ms())
@@ -95,6 +100,14 @@ function M.complete()
 		Logger.warn(LOG, "Boot completed with unclosed stage(s): %s.", table.concat(still_open, ", "))
 	end
 	Logger.info(LOG, "Boot complete in %.0f ms.", _boot_ms)
+	-- One never-collapsed summary: every stage's milliseconds and the heap, so
+	-- startup cost and its memory are read from a single line.
+	local parts = {}
+	for _, stage in ipairs(_done_stages) do
+		parts[#parts + 1] = string.format("%s=%.0fms", stage[1], stage[2])
+	end
+	Logger.evidence(LOG, "Boot summary: total=%.0fms heap=%dKB stages: %s.", _boot_ms,
+		math.floor(collectgarbage("count")), table.concat(parts, " "))
 	return _boot_ms
 end
 
@@ -106,7 +119,7 @@ end
 
 --- Resets every piece of state. Tests only.
 function M._reset_for_test()
-	_origin_ms, _open, _boot_ms = nil, {}, nil
+	_origin_ms, _open, _boot_ms, _done_stages = nil, {}, nil, {}
 end
 
 return M

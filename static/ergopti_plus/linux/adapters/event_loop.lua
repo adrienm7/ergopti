@@ -55,11 +55,25 @@ end
 --- already, so nanosleep is always available where the daemon actually runs;
 --- the forked form survives only for an interpreter with neither.
 --- @return function sleep(seconds)
-local nap = (function()
+local native_nap = (function()
 	local ok_ffi, ffi = pcall(require, "ffi")
 	-- The shared binding resumes the remainder after a libuv child's SIGCHLD.
-	return require("infra.native_sleep").bind(ok_ffi and ffi or nil) or command_nap
+	return require("infra.native_sleep").bind(ok_ffi and ffi or nil)
 end)()
+local nap = native_nap or command_nap
+
+-- How long the luv idle tick yields after its callbacks. libuv polls with a
+-- zero timeout while an idle handle is active, so without this wait the daemon
+-- spun a whole core (measured 99.997 % of one core, 180 000 ticks/s, with
+-- nothing to do). It is the pump fallback's 1 ms, so both loops give the same
+-- input latency. Never a forked sleep: only the native wait is used here.
+local IDLE_YIELD_S = 0.001
+
+-- The longest an idle tick sleeps when the daemon supplies an input wait. Input
+-- ends the wait at once, so this bounds only the cadence of the work no
+-- descriptor announces (tray, GTK pump, deferred callbacks): 8 ms is above
+-- 120 Hz, finer than any frame the webviews paint.
+local IDLE_WAIT_MS = 8
 
 --- True when the luv library is available and the event loop is native.
 M.HAS_LUV = (luv ~= nil)
@@ -91,8 +105,10 @@ local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
 local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
+local _idle_wait = nil      -- Optional input wait supplied by run(); see _yield_idle().
 
 local Monotonic = require("infra.monotonic")
+local Perf = require("infra.perf_counters")
 
 
 -- =========================================
@@ -145,13 +161,43 @@ local function _run_idle_handlers()
 	end
 end
 
+--- Yields the CPU at the end of an idle tick. With a supplied input wait the tick
+--- sleeps until a descriptor is readable (at most IDLE_WAIT_MS); without one, or
+--- when the wait declines (nil), it sleeps a fixed millisecond, as the pump
+--- fallback does. A stop() from a callback returns at once.
+local function _yield_idle()
+	if not _running then return end
+	if _idle_wait then
+		local ok, ready = pcall(_idle_wait, IDLE_WAIT_MS)
+		if not ok then
+			-- Dropped after one report: the fixed yield below keeps the loop
+			-- correct, and a raising wait must not log on every tick.
+			Logger.error(LOG, "Idle input wait raised: %s; falling back to a fixed yield.",
+				ErrorDescription.describe(ready))
+			_idle_wait = nil
+		elseif ready ~= nil then
+			Perf.count(ready and "loop.idle_wakes_input" or "loop.idle_timeouts")
+			return
+		end
+	end
+	if native_nap then pcall(native_nap, IDLE_YIELD_S) end
+end
+
 --- Runs the periodic callback.  Same exception isolation as _safe_idle.
 --- @param onPeriodic function|nil
 local function _safe_periodic(onPeriodic)
 	if type(onPeriodic) ~= "function" then return end
+	local started = Perf.clock()
+	Perf.count("loop.periodic_ticks")
 	local ok, err = pcall(onPeriodic)
 	if not ok then
 		Logger.error(LOG, "onPeriodic callback raised: %s", ErrorDescription.describe(err))
+	end
+	Perf.span("loop.periodic", started)
+	-- The interval summary rides the loop's own tick: no extra timer.
+	local flushed, flush_error = pcall(Perf.maybe_flush)
+	if not flushed then
+		Logger.error(LOG, "Counter summary raised: %s", ErrorDescription.describe(flush_error))
 	end
 end
 
@@ -204,8 +250,12 @@ local function _run_luv(opts)
 			end
 			return
 		end
+		local started = Perf.clock()
+		Perf.count("loop.idle_ticks")
 		_safe_idle(onIdle)
 		_run_idle_handlers()
+		Perf.span("loop.idle", started)
+		_yield_idle()
 	end)
 	if idle_started == nil or idle_started == false then
 		error("Unable to start event loop idle handle: " .. tostring(idle_error), 0)
@@ -331,6 +381,9 @@ function M.run(opts)
 	end
 
 	local options = type(opts) == "table" and opts or {}
+	if options.idleWait ~= nil and type(options.idleWait) ~= "function" then
+		error("idleWait must be a function(timeout_ms) -> boolean|nil", 2)
+	end
 
 	-- Guard: an empty loop would spin forever with nothing to stop it.
 	if type(options.onIdle) ~= "function" and type(options.onPeriodic) ~= "function" then
@@ -340,6 +393,7 @@ function M.run(opts)
 
 	_run_active = true
 	_running = true
+	_idle_wait = options.idleWait
 	local ran, run_error
 
 	if luv then
@@ -355,6 +409,7 @@ function M.run(opts)
 
 	_running = false
 	_run_active = false
+	_idle_wait = nil
 	Logger.debug(LOG, "Event loop exited.")
 	if not ran then error(run_error, 0) end
 end

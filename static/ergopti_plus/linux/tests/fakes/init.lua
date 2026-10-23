@@ -178,6 +178,8 @@ function M.evdev_reader(opts)
 		return opts.active_leds or {}
 	end
 	function fake.wait_readable() return fake.cursor < #fake.queued end
+	--- The multi-source wait: queued events make it ready at once, none is a quiet wait.
+	function fake.wait_any_readable() return fake.cursor < #fake.queued end
 	function fake.read_event()
 		if fake.cursor >= #fake.queued then return nil end
 		fake.cursor = fake.cursor + 1

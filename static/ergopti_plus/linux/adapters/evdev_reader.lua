@@ -146,6 +146,9 @@ local SYN_REPORT = 0
 -- keeps pointer slots read-only.
 local _slots = {}
 
+-- Descriptors handed to the multi-source wait, reused so a wait allocates nothing.
+local _wait_fds = {}
+
 --- The state for a slot, created on first use.
 --- @param slot string|nil Defaults to the keyboard.
 --- @return table { fd, grabbed, path, close_error }
@@ -233,6 +236,8 @@ local function build_ffi_backend()
 	local size = _codec.native_size()
 	local buf  = ffi.new("char[?]", size)
 	local pfd  = ffi.new("struct pollfd[1]")
+	local many_capacity = 8
+	local many = ffi.new("struct pollfd[?]", many_capacity)
 	local native_open, native_close, native_ioctl = ffi.C.open, ffi.C.close, ffi.C.ioctl
 	local native_read, native_poll = ffi.C.read, ffi.C.poll
 	local native_cast, native_new, native_string, native_errno = ffi.cast, ffi.new, ffi.string, ffi.errno
@@ -286,6 +291,22 @@ local function build_ffi_backend()
 			pfd[0].events = POLLIN
 			pfd[0].revents = 0
 			local rc = tonumber(native_poll(pfd, 1, timeout_ms))
+			return rc ~= nil and rc > 0
+		end,
+		-- Waits for any of several descriptors; the idle loop sleeps here instead
+		-- of waking to find nothing. One array, regrown on demand, so a wait
+		-- allocates nothing in steady state.
+		poll_many = function(fds, count, timeout_ms)
+			if count > many_capacity then
+				many_capacity = count * 2
+				many = native_new("struct pollfd[?]", many_capacity)
+			end
+			for index = 1, count do
+				many[index - 1].fd = fds[index]
+				many[index - 1].events = POLLIN
+				many[index - 1].revents = 0
+			end
+			local rc = tonumber(native_poll(many, count, timeout_ms))
 			return rc ~= nil and rc > 0
 		end,
 		close = function(fd)
@@ -604,6 +625,36 @@ function M.wait_readable(timeout_ms, slot)
 	local ok, readable = pcall(_backend.poll, st.fd, timeout_ms or 0)
 	_busy = false
 	return ok and readable == true
+end
+
+--- Blocks until any open source has data, or the timeout expires.
+---
+--- The daemon's idle loop calls it with every keyboard, pointer and touchpad
+--- open, so an idle daemon wakes once per timeout instead of spinning, and a key
+--- wakes it at once. Nothing is read: the pump still owns every event.
+--- @param timeout_ms integer Milliseconds; 0 returns at once.
+--- @return boolean|nil ready True when a source is readable (or in error, so the
+---   pump sees and retires it); false on timeout; nil when no wait is possible
+---   (busy reader, no open source, or a backend without a multi-descriptor wait),
+---   so the caller yields another way instead of treating it as a quiet wait.
+function M.wait_any_readable(timeout_ms)
+	if _busy or _native_debt or not _backend then return nil end
+	local many = rawget(_backend, "poll_many")
+	if type(many) ~= "function" then return nil end
+	local count = 0
+	for _, st in pairs(_slots) do
+		if st.fd ~= nil then
+			count = count + 1
+			_wait_fds[count] = st.fd
+		end
+	end
+	if count == 0 then return nil end
+	for index = count + 1, #_wait_fds do _wait_fds[index] = nil end
+	_busy = true
+	local ok, ready = pcall(many, _wait_fds, count, timeout_ms)
+	_busy = false
+	if not ok then return nil end
+	return ready == true
 end
 
 --- Checks private provider/session identity, not an unobserved kernel state lease.
