@@ -920,13 +920,22 @@ class LLM_LocalServerPanel {
 	}
 
 	_ArmRepair(Record) {
-		if !this._RepairCurrent(Record)
+		ClaimCritical := Critical("On")
+		try {
+			Held := this.RepairRecords.Get(ObjPtr(Record), 0) == Record
+			Callback := Held ? Record["timer"] : 0
+		} finally Critical(ClaimCritical)
+		if !Held || !this._RepairCurrent(Record)
 			return this._DropRepair(Record)
-		this._RepairTimer(Record["timer"], -TimingsGet("llm", "poll_interval_ms"))
+		this._RepairTimer(Callback, -TimingsGet("llm", "poll_interval_ms"))
 		if !this._RepairCurrent(Record) {
-			; A yielding timer port may arm after reentrant cancellation. The
-			; exact old callback remains cleanup debt, never a successor's timer.
-			this.RepairRecords[ObjPtr(Record)] := Record
+			; A yielding timer port may arm after reentrant cancellation cleared
+			; the field. Restore only this old capability as its cleanup debt.
+			ClaimCritical := Critical("On")
+			try {
+				Record["timer"] := Callback
+				this.RepairRecords[ObjPtr(Record)] := Record
+			} finally Critical(ClaimCritical)
 			return this._DropRepair(Record)
 		}
 		return true
@@ -941,13 +950,20 @@ class LLM_LocalServerPanel {
 	}
 
 	_DropRepair(Record) {
-		if !this.RepairRecords.Has(ObjPtr(Record))
-			return true
-		this._RepairTimer(Record["timer"], 0)
 		ClaimCritical := Critical("On")
 		try {
-			if this.RepairRecords.Has(ObjPtr(Record))
+			if this.RepairRecords.Get(ObjPtr(Record), 0) != Record
+				return true
+			Callback := Record["timer"]
+		} finally Critical(ClaimCritical)
+		this._RepairTimer(Callback, 0)
+		ClaimCritical := Critical("On")
+		try {
+			if this.RepairRecords.Get(ObjPtr(Record), 0) == Record {
 				this.RepairRecords.Delete(ObjPtr(Record))
+				; A running frame or prepared view may still legitimately hold Record.
+				Record["timer"] := 0
+			}
 			if this.Repair is Map && this.Repair == Record
 				this.Repair := 0
 			if this.Discovery is Map && this.Discovery == Record
