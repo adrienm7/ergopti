@@ -56,7 +56,7 @@ KL_NowTimestamp() {
 		_KFPO_Require(!A_IsCritical, "The timestamp cutpoint must remain interruptible.")
 		_KFPO_Require(_PrefixDeferredCanPublish(_KFPO.OldGeneration),
 			"The real old guard must still be current when the append requests its timestamp.")
-		_KFPO_Require(Keylogger._pending_entries.Length == 0,
+		_KFPO_Require(Keystats._pending_entries.Length == 0,
 			"No canonical row may precede the controlled native interruption.")
 		_KFPO.BeforeTimer := true
 		SetTimer(_KFPO.Timer, -1)
@@ -75,7 +75,7 @@ _KFPO_Interrupt() {
 	try {
 		_KFPO_Require(!A_IsCritical && _KFPO.BeforeTimer,
 			"The native timer must run after the admitted guard and before append mutation.")
-		_KFPO_Require(Keylogger._pending_entries.Length == 0,
+		_KFPO_Require(Keystats._pending_entries.Length == 0,
 			"The timer must win before any old row is published.")
 		_KFPO.TimerCalls += 1
 		Suspend(1)
@@ -88,7 +88,7 @@ _KFPO_Interrupt() {
 		}
 		_KFPO_Require(!_PrefixDeferredCanPublish(_KFPO.OldGeneration),
 			"A resumed native driver cannot restore the old generation's authority.")
-		_KFPO.RowsAtRevocation := Keylogger._pending_entries.Length
+		_KFPO.RowsAtRevocation := Keystats._pending_entries.Length
 	} catch Any as Failure {
 		_KFPO.Failure := Failure
 	} finally {
@@ -104,7 +104,7 @@ _KFPO_Queue(Trigger, Replacement) {
 _KFPO_Observe(Stage) {
 	global _KFPO, _HSE_FireLogQueue, _PrefixDeferredGeneration
 	FileAppend("RECEIPT keylogger-fire-owner stage=" . Stage . " mode=" . _KFPO.Mode
-		. " rows=" . Keylogger._pending_entries.Length . " fires=" . _HSE_FireLogQueue.Length
+		. " rows=" . Keystats._pending_entries.Length . " fires=" . _HSE_FireLogQueue.Length
 		. " old_generation=" . _KFPO.OldGeneration . " generation=" . _PrefixDeferredGeneration
 		. " timer_calls=" . _KFPO.TimerCalls . " clock_calls=" . _KFPO.TimeCalls
 		. " paused=" . A_IsSuspended . " roi=" . _KFPO.Roi.Length . " wpm=" . _KFPO.Wpm . "`n", "*", "UTF-8")
@@ -112,8 +112,8 @@ _KFPO_Observe(Stage) {
 
 _KFPO_Exercise() {
 	global _KFPO, _HSE_FireLogQueue, _HSE_FireLogTimer, _PrefixDeferredGeneration
-	Keylogger.initialized := true
-	Keylogger.session_app := "private-fixture.exe"
+	Keystats.initialized := true
+	Keystats.session_app := "private-fixture.exe"
 	MetricsFilters.secure_field := false
 	MetricsFocusCache.state := {valid: true, process_name: "private-fixture.exe", title: "private fixture", class: "Fixture"}
 	_KFPO.OldGeneration := _PrefixDeferredGeneration
@@ -134,22 +134,22 @@ _KFPO_Exercise() {
 		_KFPO_Require(A_IsSuspended == (_KFPO.Mode == "paused"), "Native pause state must match the requested cutpoint.")
 	}
 	if _KFPO.Mode == "resumed" {
-		BeforeReference := Keylogger._pending_entries.Length
+		BeforeReference := Keystats._pending_entries.Length
 		Rejected := false
 		_KFPO_Require(!KL_AppendLog(Map("type", "hotstring", "trigger", "stale-control"),
 			&Rejected, _PrefixDeferredCanPublish.Bind(_KFPO.OldGeneration)),
 			"The unchanged central owner fence must reject the old generation after native resume.")
-		_KFPO_Require(Keylogger._pending_entries.Length == BeforeReference,
+		_KFPO_Require(Keystats._pending_entries.Length == BeforeReference,
 			"The central negative reference cannot mutate the queue.")
 	}
 	_KFPO_Observe("old-return")
 	if _KFPO.Mode == "current" {
-		_KFPO_Require(_KFPO.DrainResult && Keylogger._pending_entries.Length == 2,
+		_KFPO_Require(_KFPO.DrainResult && Keystats._pending_entries.Length == 2,
 			"An uninterrupted real drain must publish both current fires.")
 		_KFPO_Require(_HSE_FireLogQueue.Length == 0 && _KFPO.Roi.Length == 2 && _KFPO.Wpm == 25,
 			"Current publication must consume once and preserve the legitimate metrics.")
 	} else {
-		_KFPO_Require(Keylogger._pending_entries.Length == 0,
+		_KFPO_Require(Keystats._pending_entries.Length == 0,
 			"A revoked old fire must not enter the canonical queue after its timestamp returns.")
 		_KFPO_Require(!_KFPO.DrainResult && _HSE_FireLogQueue.Length == 2
 			&& _HSE_FireLogQueue[1] == _KFPO.First && _HSE_FireLogQueue[2] == _KFPO.Suffix,
@@ -163,16 +163,16 @@ _KFPO_Exercise() {
 		_KFPO_Require(!KL_AppendLog(Map("type", "hotstring", "trigger", "stale-control"),
 			&Rejected, _PrefixDeferredCanPublish.Bind(_KFPO.OldGeneration)),
 			"The genuine central owner guard must still reject its revoked generation.")
-		_KFPO_Require(Keylogger._pending_entries.Length == 0, "The central reference cannot publish a stale row.")
+		_KFPO_Require(Keystats._pending_entries.Length == 0, "The central reference cannot publish a stale row.")
 		HotstringPrefixWatcherOnResume()
 		_KFPO_Require(_HSE_DrainFireLog(_PrefixDeferredGeneration), "A fresh owner must drain the actual retained batch.")
-		_KFPO_Require(Keylogger._pending_entries.Length == 2 && _HSE_FireLogQueue.Length == 0,
+		_KFPO_Require(Keystats._pending_entries.Length == 2 && _HSE_FireLogQueue.Length == 0,
 			"Fresh transfer must consume both retained fires exactly once.")
 		_KFPO_Require(_KFPO.Roi.Length == 2 && _KFPO.Wpm == 25,
 			"The fresh owner must retain the legitimate pre-pause metrics.")
 	}
-	_KFPO_Require(Keylogger._pending_entries[1]["trigger"] == "first"
-		&& Keylogger._pending_entries[2]["trigger"] == "suffix", "Retained fire order cannot change.")
+	_KFPO_Require(Keystats._pending_entries[1]["trigger"] == "first"
+		&& Keystats._pending_entries[2]["trigger"] == "suffix", "Retained fire order cannot change.")
 	_KFPO_Queue("new", "new-result")
 	NewFire := _HSE_FireLogQueue[1]
 	if _KFPO.Mode != "current" {
@@ -181,8 +181,8 @@ _KFPO_Exercise() {
 			"A late old callback cannot consume the successor's queued fire.")
 	}
 	_KFPO_Require(_HSE_DrainFireLog(_PrefixDeferredGeneration), "The actual new fire must reach its current drain.")
-	_KFPO_Require(Keylogger._pending_entries.Length == 3 && _HSE_FireLogQueue.Length == 0
-		&& Keylogger._pending_entries[3]["trigger"] == "new" && _KFPO.Roi.Length == 3 && _KFPO.Wpm == 35,
+	_KFPO_Require(Keystats._pending_entries.Length == 3 && _HSE_FireLogQueue.Length == 0
+		&& Keystats._pending_entries[3]["trigger"] == "new" && _KFPO.Roi.Length == 3 && _KFPO.Wpm == 35,
 		"A current successor fire and its metrics must publish exactly once.")
 	_KFPO_Observe("complete")
 }
@@ -203,7 +203,7 @@ _KFPO_Main() {
 		_PrefixInvalidateDeferredEffects()
 		TimerCancelAll()
 		Suspend(0)
-		Keylogger.initialized := false
+		Keystats.initialized := false
 		_KFPO.Timer := 0
 	}
 	if IsObject(Primary) {
