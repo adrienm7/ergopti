@@ -127,43 +127,100 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_Gui := g
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	Installed := false
 	try {
-		_ActPickWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
-	} catch as Err {
-		try LoggerError("ActionPicker", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
-		try g.Destroy()
-		_ActPickWeb_Reset()
-		_ActPickWeb_Gui := 0
-		return false
+		try {
+			; Environment boot and controller creation both pump native Close.
+			; Keep the returned resources private until this session admits them.
+			Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
+		} catch as Err {
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try LoggerError("ActionPicker", "WebView2 create failed: {1} — falling back to native dialog.", Err.Message)
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try g.Destroy()
+			_ActPickWeb_Reset()
+			_ActPickWeb_Gui := 0
+			return false
+		}
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		View := Controller.CoreWebView2
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		try {
+			s := View.Settings
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.AreDevToolsEnabled := false
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.AreDefaultContextMenusEnabled := false
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.IsStatusBarEnabled := false
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.AreBrowserAcceleratorKeysEnabled := false
+			if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			s.IsSwipeNavigationEnabled := false
+		}
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		MsgSub := View.WebMessageReceived(_ActPickWeb_OnWebMessage.Bind(SessionEpoch))
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		NavSub := View.NavigationCompleted(_ActPickWeb_OnNavigationCompleted.Bind(SessionEpoch))
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		try View.SetVirtualHostNameToFolderMapping(ACTPICK_VHOST, _SharedDir, ACTPICK_HOST_ACCESS_ALLOW)
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		try View.AddScriptToExecuteOnDocumentCreated(_ActPickWeb_I18nSeed())
+
+		; Publish only RAM references. Local subscription aliases are withdrawn in
+		; this transaction so Close can unsubscribe before closing the controller.
+		PreviousCritical := Critical("On")
+		try {
+			if _ActPickWeb_StartupCurrent(SessionEpoch, g) {
+				_ActPickWeb_Controller := Controller
+				_ActPickWeb_WebView := View
+				_ActPickWeb_MsgSub := MsgSub
+				_ActPickWeb_NavSub := NavSub
+				MsgSub := unset
+				NavSub := unset
+				Installed := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Installed || !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		; Navigation may synchronously deliver lifecycle messages. It follows
+		; publication, while every COM use still retains this frame's own view.
+		try View.Navigate(_ActPickWeb_HtmlUrl())
+		if !_ActPickWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		try Controller.Fill()
+		if _ActPickWeb_StartupCurrent(SessionEpoch, g)
+			try LoggerSuccess("ActionPicker", "Action picker shown via WebView2 ({1} item(s)).", Items.Length)
+		return true
+	} finally {
+		if !Installed {
+			; A revoked open is consumed: never Reset a replacement or ask the
+			; public caller to reopen its native fallback after the user canceled.
+			MsgSub := unset
+			NavSub := unset
+			if IsSet(Controller) {
+				try Controller.Close()
+				catch as Err
+					try LoggerError("ActionPicker", "Retired browser cleanup failed: {1}.", Err.Message)
+			}
+		}
 	}
-
-	_ActPickWeb_WebView := _ActPickWeb_Controller.CoreWebView2
-	; This controller/webview pair is fresh — re-arm the Reset() guard so this
-	; session's close actually tears it down instead of short-circuiting on a
-	; flag left behind by an earlier _ActPickWeb_Reset() call.
-
-	try {
-		s := _ActPickWeb_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-		s.IsSwipeNavigationEnabled         := false
-	}
-
-	; Store the subscription handles in persistent globals (see header note).
-	global _ActPickWeb_MsgSub := _ActPickWeb_WebView.WebMessageReceived(_ActPickWeb_OnWebMessage.Bind(SessionEpoch))
-	global _ActPickWeb_NavSub := _ActPickWeb_WebView.NavigationCompleted(_ActPickWeb_OnNavigationCompleted.Bind(SessionEpoch))
-
-	; Map the virtual host BEFORE navigating; seed the i18n base + active locale
-	; before page scripts run so the shared i18n.js fetches the right locale JSON.
-	try _ActPickWeb_WebView.SetVirtualHostNameToFolderMapping(ACTPICK_VHOST, _SharedDir, ACTPICK_HOST_ACCESS_ALLOW)
-	try _ActPickWeb_WebView.AddScriptToExecuteOnDocumentCreated(_ActPickWeb_I18nSeed())
-	try _ActPickWeb_WebView.Navigate(_ActPickWeb_HtmlUrl())
-	try _ActPickWeb_Controller.Fill()
-
-	try LoggerSuccess("ActionPicker", "Action picker shown via WebView2 ({1} item(s)).", Items.Length)
-	return true
 }
 
 
@@ -222,6 +279,13 @@ _ActPickWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
 _ActPickWeb_SessionCurrent(SessionEpoch) {
 	global _ActPickWeb_SessionEpoch
 	return SessionEpoch == _ActPickWeb_SessionEpoch
+}
+
+; A constructor must still own the exact singleton after a browser wait.
+_ActPickWeb_StartupCurrent(SessionEpoch, Window) {
+	global _ActPickWeb_Gui, _ActPickWeb_ResetDone
+	return _ActPickWeb_SessionCurrent(SessionEpoch) && !_ActPickWeb_ResetDone
+		&& _ActPickWeb_Gui == Window
 }
 
 _ActPickWeb_SessionCall(SessionEpoch, Callback, Params*) {
