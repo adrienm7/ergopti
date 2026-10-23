@@ -525,3 +525,23 @@ require("test.layout_composer_contract")(helpers, Json, {
 	registry_text = registry_file,
 	selections = function(state) return #state.selected end,
 })
+
+require("test.composer_check_contract")(helpers, Json, {
+	name = "macOS",
+	manager = manager,
+	files = shipped_files,
+	config_dir = "/cfg/",
+	local_dir = LOCAL_DIR,
+	installed_copy = LAYOUTS_DIR .. "composed.keylayout",
+	-- The system lists the composition among its enabled keyboard layouts.
+	manager_options = { active = { { id = "Composer Check", name = "Composer Check", selected = false } } },
+	env = function(overrides)
+		return helpers.load_with_stubs("modules.keymap.composer_check").env(overrides)
+	end,
+	selections = function(state) return #state.selected end,
+	ready_step = "composer_ready=pass:enabled",
+	existing_ready_step = "composer_ready=pass:enabled",
+	-- The input source cannot be enabled: the install works, the host is not ready.
+	readiness_failure = function(fresh) return fresh({ enable_fails = true }) end,
+	readiness_failure_step = "composer_ready=fail:not_enabled",
+})

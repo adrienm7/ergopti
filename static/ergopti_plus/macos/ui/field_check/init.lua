@@ -35,6 +35,12 @@ M.ROWS = {
 	field_check_key_accounting = { check = "key_accounting", title = "menu.debug.field_check_key_accounting", watches_keys = true },
 }
 
+--- Rows every driver shows (declared for all platforms in the shared manifest), as
+--- opposed to the Mac-only ones above.
+M.SHARED_ROWS = {
+	composer_check = { check = "composer", title = "menu.debug.composer_check" },
+}
+
 --- Native services, replaceable by tests.
 local function native()
 	return {
@@ -53,7 +59,7 @@ end
 --- @param services table|nil Test doubles for native services.
 --- @return boolean started
 function M.run(row_id, services)
-	local row = M.ROWS[row_id]
+	local row = M.ROWS[row_id] or M.SHARED_ROWS[row_id]
 	assert(row ~= nil, "field check: unknown menu row " .. tostring(row_id))
 	local env = services or native()
 	if Engine.is_running() then

@@ -799,6 +799,42 @@ local function composer_operations(deps)
 	})
 end
 
+--- The composer's own settings (the reserved id, its folder and bounds).
+--- @return table|nil settings
+--- @return string|nil error
+function M.composer_settings()
+	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	return Composer.settings(layout_defaults)
+end
+
+--- The text of an installed layout's copy, for the Debug check of the composer.
+--- @param id string Layout id.
+--- @param deps table|nil
+--- @return string|nil text
+--- @return string|nil error
+function M.read_local_copy(id, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	local text = resolved.read(resolved.layouts_dir .. id .. ".keylayout")
+	if type(text) ~= "string" then return nil, "the installed copy of '" .. tostring(id) .. "' is unreadable" end
+	return text, nil
+end
+
+--- The digest of a text, through the driver's own digest port (the Debug check of
+--- the composer compares an installed copy with its record).
+--- @param text string
+--- @param on_done function on_done(digest|nil, error|nil)
+--- @param deps table|nil
+function M.sha256_text(text, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		on_done(nil, deps_err)
+		return
+	end
+	resolved.transport.sha256(text, on_done)
+end
+
 --- Sends the composer page its sources and stored composition.
 --- @param on_done function on_done(data)
 --- @param deps table|nil

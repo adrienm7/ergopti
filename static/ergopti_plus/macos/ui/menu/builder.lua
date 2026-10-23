@@ -878,6 +878,7 @@ function M.generate(ctx, menu_mods, actions)
 				["field_check_toolchain"] = function() require("ui.field_check").run("field_check_toolchain") end,
 				["field_check_login_items"] = function() require("ui.field_check").run("field_check_login_items") end,
 				["field_check_key_accounting"] = function() require("ui.field_check").run("field_check_key_accounting") end,
+				["composer_check"] = function() require("ui.field_check").run("composer_check") end,
 				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
 				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
 				["show_error_dialog"] = actions.toggle_error_dialog,

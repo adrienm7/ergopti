@@ -605,6 +605,20 @@ function M.login_items(ports, report, finish)
 	end)
 end
 
+--- The composed layout: installs the shipped check composition through the
+--- composer's real path, verifies it, asks the system whether it is enabled and
+--- removes it again (a user's own composition is only read). The steps are the
+--- shared ones (_shared/lua/layouts/composer_check.lua).
+function M.composer(ports, report, finish)
+	local env = ports.composer_env()
+	if not env then
+		report.step("composer_fixture", STATE.fail, "unusable")
+		finish()
+		return
+	end
+	require("layouts.composer_check").run(env, report, finish)
+end
+
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
 	network = M.network,
@@ -613,6 +627,7 @@ M.checks = {
 	key_accounting = M.key_accounting,
 	toolchain = M.toolchain,
 	login_items = M.login_items,
+	composer = M.composer,
 }
 
 return M
