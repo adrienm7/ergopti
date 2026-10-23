@@ -171,9 +171,14 @@ _Updater_SaveCheckState(State) {
 }
 
 ; Records one completed background check. Ok means GitHub answered with a
-; usable release list (up to date, a new release or no release yet).
-_Updater_RecordBackgroundCheck(Ok) {
+; usable release list (up to date, a new release or no release yet). The result
+; logger and record/clock acquisition may yield after the callback's first gate.
+_Updater_RecordBackgroundCheck(Ok, Request) {
+	if !_Updater_RequestMayPublish(Request)
+		return false
 	Next := UpdateSchedule_RecordCheck(_Updater_CheckState(), _Updater_EpochNow(), Ok)
+	if !_Updater_RequestMayPublish(Request)
+		return false
 	_Updater_SaveCheckState(Next)
 	try LoggerInfo("Updater", "Background check recorded: {1} (consecutive failures: {2}).",
 		Ok ? "success" : "failure", Next["failures"])
@@ -637,23 +642,23 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	; and what did it find" is the first question when an update never arrives.
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerInfo("Updater", "Background check result: network unreachable.")
-		_Updater_RecordBackgroundCheck(false)
+		_Updater_RecordBackgroundCheck(false, Request)
 		return
 	}
 	if _Updater_JsonIsNoChannelRelease(Json) {
 		try LoggerInfo("Updater", "Background check result: no release on channel {1} yet (current {2}).",
 			Request.Channel, Current)
-		_Updater_RecordBackgroundCheck(true)
+		_Updater_RecordBackgroundCheck(true, Request)
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		; This used to be reported as "up to date", hiding a malformed response.
 		try LoggerWarn("Updater", "Background check result: the release response carried no tag (current {1}).", Current)
-		_Updater_RecordBackgroundCheck(false)
+		_Updater_RecordBackgroundCheck(false, Request)
 		return
 	}
-	_Updater_RecordBackgroundCheck(true)
+	_Updater_RecordBackgroundCheck(true, Request)
 	if !UpdateChannels_ShouldOffer(
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
