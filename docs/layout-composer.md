@@ -28,10 +28,7 @@ composition code and no driver that re-implements the composition.
  └────────────────────┘
 ```
 
-The declaration (`composition.json`) exists only so the page can reopen the
-composition; no driver reads it. A driver reads `composed.keylayout` and the
-two facts the page writes next to it (the keycode convention is inside the
-declaration, repeated in the small `composed.meta.json` the host verifies).
+The declaration (`composition.json`) exists only so the page can reopen the composition; no driver reads it. A driver installs the compiled `composed.keylayout` (see below).
 
 ## Shared data model
 
@@ -129,26 +126,44 @@ longest output.
 
 ## How each driver consumes it
 
-The composition has the reserved registry-shaped id `composed`.
+The composition has the reserved registry-shaped id `composed`. The registry and
+the reference layouts may not use it (`tools/build/build-layouts-index.cjs`
+refuses it); the id, the `layout_composer` folder of the configuration folder
+and the bounds are declared once in the `composer` table of
+`_shared/modules/layouts/defaults.json`. A driver stores `composition.json` as
+sent and installs the compiled file as an installed layout of that id, with a
+record entry built from the file (size, SHA-256, keycode convention, name), so
+the picker, the verified local copy, the uninstall and the selection work on it
+like on a registry layout. The page lives in the layout manager window, opened
+by "Compose a layout…", and speaks three more host messages: `composer_open`
+(answered by `composerData`: every verified registry layout as a source, the
+stored declaration, whether the composition is in use, and `shortcuts`
+"full" or "single"), `composer_save` (declaration, keylayout, use) and
+`composer_remove`; the answer is `composerResult`. The hosts re-check what the
+page sends (bounds, schema, name, map set) and never trust it.
 
 - **Windows.** `[layout] emulated_layout = "composed"` (an existing key, so no
-  new switch: the default `""` keeps the composer dormant).
-  `KeylayoutEmulation_Boot` reads `<config>/layout_composer/composed.keylayout`
-  instead of the verified registry copy and takes the convention from the
-  declaration. The emulation looks the Ctrl, Alt and Win chords up in their own
-  keyMap (6, 7, 5) and falls back to the Command level for layouts that do not
-  select one, so Ergopti and Ergo-L type exactly as before.
-- **macOS.** The file is installed as a system input source by the same code
-  that installs a registry layout (`macos/modules/keymap/layout_install.lua`),
-  fed a locally generated entry (size and sha256 of the compiled file, `id =
-composed`). Karabiner is not involved: the system types the layout. No file
-  of `macos/platform/remap/` is touched.
+  new switch: the default `""` keeps the composer dormant). The emulation
+  reads the verified copy and the convention from the record. It looks the
+  Ctrl, Alt and Win chords of the layout `composed` up in their own keyMap
+  (6, 7, 5) and falls back to the Command level when the layout selects none;
+  every other layout still types all chords from its Command level, so Ergopti
+  and Ergo-L type exactly as before. Boot never downloads `composed`. The host
+  is `windows/ui/layout_manager/composer.ahk`.
+- **macOS.** The file is installed as a system input source by the code that
+  installs a registry layout (`macos/modules/keymap/layout_registry.lua`,
+  `install_local`). Karabiner is not involved: the system types the layout. No
+  file of `macos/platform/remap/` is touched. As for an updated registry
+  layout, macOS may read a rewritten file only after the input source is
+  toggled or the user logs in again.
 - **Linux.** The file goes through the converter the registry layouts use
-  (`static/ergopti/linux/xkb_generation`, `linux/modules/keymap/layout_registry.lua`).
-  XKB has four levels per key and no chord maps: the base, Shift, AltGr and
-  Shift+AltGr layers and the dead keys convert; the `ctrl`, `alt`, `meta`
-  shortcut layers do not exist in XKB and are reported as not applicable on
-  Linux in the composer page, with the reason text.
+  (`static/ergopti/linux/xkb_generation`, `linux/modules/keymap/layout_registry.lua`,
+  `install_local`, with a one-layout index written next to the copy). XKB has
+  one level for every chord modifier (Level5 of `ERGOPTI_SEVEN_LEVEL`), which
+  the converter fills from the keyMap the Command modifier selects, here the
+  composer's Win/Cmd map. The composition's Ctrl and Alt layers do not exist
+  there: the host sends `shortcuts: "single"` and the page locks those rows and
+  says why.
 
 ## What exists already, and how it relates
 
@@ -173,12 +188,10 @@ composed`). Karabiner is not involved: the system types the layout. No file
   against the source layout, mixed compositions, dead-key composition across
   sources, overrides, shortcuts, validation, and a round trip of every
   serialized composition through the reader.
-- Per driver: Windows AHK unit tests, macOS Lua runner, Linux Lua through WSL
-  (see each layer's commit).
+- Per driver, all replaying the shared corpus: Windows AHK (`test_layout_composer_host.ahk`), the shared Lua contract (`_shared/lua/test/layout_composer_contract.lua`) run by the macOS and Linux registry tests, and the converter test `test_composer_corpus.py` (WSL, `python3 -m unittest`).
 
 ## What needs a person
 
 Typing the composed layout on a real keyboard on each OS (the compiled file is
 proven by the readers and by the shared vectors; the system or hook that
-delivers keys is not). The composer page carries a one-click check in the
-Debug menu for that.
+delivers keys is not). A one-click Debug-menu check ("Test the composed layout": installed copy, record and, per OS, loaded emulation, enabled input source or installed XKB layout) is not built yet.

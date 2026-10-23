@@ -512,3 +512,16 @@ require("test.layout_installed_extension_manager_contract")(helpers, Json, {
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
 	end,
 })
+
+require("test.layout_composer_contract")(helpers, Json, {
+	name = "macOS",
+	platform = "macos",
+	shortcuts = "full",
+	manager = manager,
+	files = shipped_files,
+	config_dir = "/cfg/",
+	local_dir = LOCAL_DIR,
+	installed_copy = LAYOUTS_DIR .. "composed.keylayout",
+	registry_text = registry_file,
+	selections = function(state) return #state.selected end,
+})
