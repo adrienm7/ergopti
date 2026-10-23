@@ -61,6 +61,26 @@ local function schedule_editor(callback)
 	return handle, true
 end
 
+--- Keeps an editor draft retryable until its exact profile mutation commits.
+--- Reentrant Save messages never share an in-flight registry transaction, while
+--- a refused transaction leaves the same native draft eligible for recovery.
+--- @param callback function Existing strict profile save transaction.
+--- @return function save Receives one editor payload and returns a literal receipt.
+local function retryable_editor_save(callback)
+	local saving, committed = false, false
+	return function(value)
+		if saving or committed then return false end
+		saving = true
+		local ok, accepted = Logger.callback(LOG, "Profile editor save transaction", callback, value)
+		saving = false
+		if ok == true and accepted == true then
+			committed = true
+			return true
+		end
+		return false
+	end
+end
+
 
 
 
@@ -672,7 +692,6 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 	-- edit, not back in the menu.
 	if prompt_editor and type(prompt_editor.open) == "function" then
 		local timer_fired = false
-		local editor_settled = false
 		local function open_clone_editor()
 			if timer_fired then return false end
 			timer_fired = true
@@ -682,9 +701,7 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				"Cloned-profile editor",
 				prompt_editor.open,
 				copy,
-				function(updated)
-				if editor_settled then return false end
-				editor_settled = true
+				retryable_editor_save(function(updated)
 				if type(updated) ~= "table" then return false end
 				if not is_ready() or not settle_profile_mutation_recovery(deps)
 					or not is_ready() then return false end
@@ -694,7 +711,7 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				end
 				copy = updated
 				return true
-				end)
+				end))
 			return editor_ok == true and editor_result ~= false
 		end
 		local _, timer_committed = schedule_editor(open_clone_editor)
@@ -1083,7 +1100,6 @@ local function build_profile_menu(
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
-						local editor_settled = false
 						local function open_profile_editor()
 							if timer_fired then return false end
 							timer_fired = true
@@ -1092,9 +1108,7 @@ local function build_profile_menu(
 								"Custom-profile editor",
 								prompt_editor.open,
 								profile,
-								function(updated)
-									if editor_settled then return false end
-									editor_settled = true
+								retryable_editor_save(function(updated)
 									if type(updated) ~= "table" then return false end
 									if not settle_profile_mutation_recovery(deps) then return false end
 									if type(replace_profile) ~= "function"
@@ -1107,7 +1121,7 @@ local function build_profile_menu(
 										ProfileLabel.format(updated.label, state.llm_num_predictions),
 										"success")
 									return true
-								end)
+								end))
 							return editor_ok == true and editor_result ~= false
 						end
 						local _, timer_committed = schedule_editor(open_profile_editor)
@@ -1167,7 +1181,6 @@ local function build_profile_menu(
 			or not create_ready() then return false end
 		if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 		local timer_fired = false
-		local editor_settled = false
 		local function open_create_editor()
 			if timer_fired then return false end
 			timer_fired = true
@@ -1177,9 +1190,7 @@ local function build_profile_menu(
 				"Profile creation editor",
 				prompt_editor.open,
 				nil,
-				function(new_profile)
-					if editor_settled then return false end
-					editor_settled = true
+				retryable_editor_save(function(new_profile)
 					if type(new_profile) ~= "table" then return false end
 					if not create_ready() or not settle_profile_mutation_recovery(deps)
 						or not create_ready() then return false end
@@ -1194,7 +1205,7 @@ local function build_profile_menu(
 						"success")
 					Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
 					return true
-				end)
+				end))
 			return editor_ok == true and editor_result ~= false
 		end
 		local _, timer_committed = schedule_editor(open_create_editor)
