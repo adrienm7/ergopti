@@ -10,9 +10,9 @@
 
 #Requires AutoHotkey v2.0
 
-_MBSO_ChildSource() {
+_MBSO_ChildSource(Directory) {
 	global _DriverDir
-	Code := _MBPT_ChildSource()
+	Code := _MBPT_ChildSource(Directory)
 	Previous := "#Include " . _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk`n"
 	Fixture := _DriverDir . "\tests\fixtures\model_browser_sort_owner_body.ahk"
 	AssertTrue(FileExist(Fixture), "The private sorting body must be present")
@@ -34,7 +34,7 @@ _MBSO_Case(Mode) {
 	PreviousCritical := Critical("Off")
 	try {
 		_MBPT_StageAssets(Directory)
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MBSO_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MBSO_ChildSource(Directory)) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _MBPT_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine model catalogue sorting child must start")
