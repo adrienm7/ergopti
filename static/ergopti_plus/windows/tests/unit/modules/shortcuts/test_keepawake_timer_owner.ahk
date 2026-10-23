@@ -110,7 +110,7 @@ _KATO_Source(Receipt) {
 	for Nested in ["gpt", "take_note", "search"]
 		Source .= 'Features["shortcuts"]["' . Nested . '"] := Map("enabled", false)' . "`n"
 	Seen := Map()
-	for Symbol in ["LoggerInfo", "WallClockTimestamp", "KS_AltGrKeyName", "CryptoSha256Bytes",
+	for Symbol in ["LoggerInfo", "WallClockTimestamp", "TickElapsed", "KS_AltGrKeyName", "CryptoSha256Bytes",
 		"KL_JsonEncode", "JsonStringLiteral", "t"] {
 		Path := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Path != "" && _DriverFuncBody(Symbol) != "", "the real child dependency must resolve: " . Symbol)
