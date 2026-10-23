@@ -710,8 +710,10 @@ _LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
 	; Teardown can pump a pause or a new browser session. Commit the selection
 	; before those callouts, and close only the session which requested it.
 	try Applied := LLM_Menu_SetModel(Name)
-	catch
+	catch as Err {
+		LoggerError("LLM.browser", "Model selection failed: {1}.", Err.Message)
 		return
+	}
 	if (Applied is Integer) && Applied == 1
 			&& ExpectedEpoch == _LLM_MBW_SessionEpoch
 		_LLM_MBW_OnClose()
