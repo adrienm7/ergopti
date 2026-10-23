@@ -63,7 +63,9 @@ _EDOT_Source(Root) {
 
 _EDOT_Assets(Root) {
 	global _SharedDir
-	for Subdir in ["config", "logs", "vendor\64bit", "shared\modules\diagnostics", "shared\modules\updater", "shared\data\locales"]
+	; Exclusive native creation requires each parent before its children.
+	for Subdir in ["config", "logs", "vendor", "vendor\64bit", "shared", "shared\modules",
+		"shared\modules\diagnostics", "shared\modules\updater", "shared\data", "shared\data\locales"]
 		FSCreateDirectoryExclusiveStrict(Root . "\" . Subdir)
 	for Relative in ["modules\diagnostics\schema.json", "modules\diagnostics\redaction.json", "modules\diagnostics\issue_templates.json",
 		"modules\diagnostics\error_policy.json", "modules\diagnostics\recent_issues.json", "modules\updater\defaults.json",
