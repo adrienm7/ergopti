@@ -29,6 +29,7 @@ _WinHttpTransport_ExpectedControls() {
 		"untrusted_certificate_is_refused_with_a_closed_receipt",
 		"connect_tunnel_authenticates_then_still_verifies_the_certificate",
 		"connect_refusal_is_attributed_to_the_proxy",
+		"server_certificate_context_exists_exactly_after_a_tls_negotiation",
 		"capability_is_observed_from_the_installed_providers"
 	]
 }
