@@ -438,7 +438,7 @@ GestureScreenshotInstant() {
 				GestureCaptureRegion(WX, WY, WW, WH, "save", FilePath, GestureScreenshotComplete.Bind("Instant", "save", FilePath))
 		} catch as Err {
 				LoggerError("gestures", "GestureScreenshotInstant launch failed: {1}", Err.Message)
-				try TrayTip("Screenshot could not start.", "ErgoptiPlus", "Iconx Mute")
+				try TrayTip(t("notify.screenshot_start_failed"), "ErgoptiPlus", "Iconx Mute")
 		}
 }
 
@@ -518,7 +518,7 @@ GestureOpenConfiguredURL(BindingId := "") {
 		try Run(URL)
 		catch as Err {
 				LoggerError("gestures", "open_url launch failed for binding '{1}': {2}", BindingId, Err.Message)
-				try TrayTip("Could not open the configured URL.", "ErgoptiPlus", "Iconx Mute")
+				try TrayTip(t("notify.open_url_failed"), "ErgoptiPlus", "Iconx Mute")
 		}
 }
 
@@ -544,7 +544,7 @@ GesturePickColor() {
 				TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
 		} catch as Err {
 				LoggerError("gestures", "GesturePickColor failed: {1}", Err.Message)
-				TrayTip("Color copy failed.", "ErgoptiPlus", "Iconx Mute")
+				TrayTip(t("notify.color_copy_failed"), "ErgoptiPlus", "Iconx Mute")
 		}
 }
 

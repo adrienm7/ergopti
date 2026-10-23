@@ -82,6 +82,25 @@ local MOD_LABELS = {
 	meta = "Super",
 }
 
+-- The localized key names a menu row shows, from the catalogue the layer
+-- editor already uses. `meta` stays "Super": the desktops name that key so.
+-- MOD_LABELS above is the chord's recorded identity (chord_name), not a label.
+local MOD_LABEL_KEYS = {
+	ctrl = "layer_editor.key.ctrl",
+	shift = "layer_editor.key.shift",
+	alt = "layer_editor.key.alt",
+}
+
+--- The text a menu row uses for one modifier, in the active language.
+--- @param name string "ctrl", "shift", "alt" or "meta".
+--- @return string
+local function mod_label(name)
+	if name == "meta" or name == "super" then return MOD_LABELS.meta end
+	local key = MOD_LABEL_KEYS[name]
+	if key == nil then return name end
+	return require("infra.i18n").get(key)
+end
+
 -- The slot suffix of a key the hook reports by the character it types.
 local SUFFIX_OF_IDENTITY = {
 	[" "] = "space",
@@ -92,8 +111,8 @@ local SUFFIX_OF_IDENTITY = {
 
 -- Suffixes that name a key rather than spelling it.
 local SPECIAL_KEYS = {
-	space = "Espace",
-	enter = "Entrée",
+	space = "layer_editor.key.space",
+	enter = "layer_editor.key.enter",
 	period = ".",
 	comma = ",",
 }
@@ -280,7 +299,7 @@ end
 --- @return string
 function M.get_slot_label(slot_id, reason)
 	if slot_id == MagicEditor.SLOT_ID then
-		local label = MOD_LABELS.meta .. " + " .. require("modules.hotstrings.magic_key").get()
+		local label = mod_label("meta") .. " + " .. require("modules.hotstrings.magic_key").get()
 		if reason then label = label .. " (" .. require("infra.i18n").get("menu.shortcuts.keyboard.magic_editor_reason." .. reason) .. ")" end
 		return label
 	end
@@ -288,7 +307,7 @@ function M.get_slot_label(slot_id, reason)
 	if physical then
 		local parts = {}
 		for _, name in ipairs(PhysicalSlots.modifiers()) do
-			if physical.mods[name] then parts[#parts + 1] = name == "super" and MOD_LABELS.meta or MOD_LABELS[name] end
+			if physical.mods[name] then parts[#parts + 1] = mod_label(name) end
 		end
 		parts[#parts + 1] = physical.code
 		return table.concat(parts, " + ")
@@ -296,8 +315,11 @@ function M.get_slot_label(slot_id, reason)
 	local mods, suffix = split_slot(slot_id)
 	if not mods then return tostring(slot_id) end
 	local parts = {}
-	for _, mod in ipairs(mods) do parts[#parts + 1] = MOD_LABELS[mod] or mod end
+	for _, mod in ipairs(mods) do parts[#parts + 1] = mod_label(mod) end
 	local key_label = SPECIAL_KEYS[suffix]
+	if key_label ~= nil and key_label:find("^layer_editor%.key%.") then
+		key_label = require("infra.i18n").get(key_label)
+	end
 	if not key_label then
 		for _, entry in ipairs(catalogue_keys() or {}) do
 			if entry.id == suffix then key_label = entry.label end

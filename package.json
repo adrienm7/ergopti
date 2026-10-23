@@ -53,6 +53,7 @@
 		"test:keymap-layers-corpus": "node ./tools/test/test-keymap-layers-corpus.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
 		"test:audit-translations-scope": "node ./tools/test/test-audit-translations-scope.cjs",
+		"test:visible-text-is-localized": "node ./tools/test/test-visible-text-is-localized.cjs",
 		"test:config-migrations": "node ./tools/test/test-config-migrations.cjs",
 		"test:config-template-spacing": "node ./tools/test/test-config-template-spacing.cjs",
 		"test:magic-key-source": "node ./tools/test/test-magic-key-source.cjs",
