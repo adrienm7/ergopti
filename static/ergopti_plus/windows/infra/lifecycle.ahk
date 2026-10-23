@@ -471,6 +471,22 @@ _SuspendPendingPoll() {
 		Suspend(1)
 		_SuspendStateWatchdog()
 }
+; Stop reports false both for absence and for retained cleanup. Accept its
+; explicit acknowledgment; normalize only genuine absence under the same short
+; state fence used by the worker owner, with no process or timer call inside it.
+_LifecycleStopUIAWorkerForSuspend() {
+	Result := UIASW_Stop("canceled")
+	if (Result is Integer) && Result == 1
+		return true
+	PreviousCritical := Critical("On")
+	try return !IsObject(UIASWState.handle) && UIASWState.worker_hwnd == 0
+		&& UIASWState.worker_process_handle == 0 && !IsObject(UIASWState.pending)
+		&& !IsObject(UIASWState.start_deadline_fn) && UIASWState.start_failure_tick == 0
+		&& UIASWState.cleanup_debt.Length == 0 && UIASWState.process_cleanup_debt.Length == 0
+		&& !UIASWState.cleanup_draining && !UIASWState.process_cleanup_draining
+	finally Critical(PreviousCritical)
+}
+
 Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
@@ -598,7 +614,7 @@ Ergopti_OnSuspendEnter() {
 		; cannot stop it, so retire request ownership and its process tree before
 		; entering the paused state.
 	_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
-		UIASW_Stop.Bind("canceled"))
+		_LifecycleStopUIAWorkerForSuspend, true)
 		; Preserve an hours-long at-rest proof scan at its exact stream cursor while
 		; disarming its one-shot slice/marker timers. Native Suspend does not stop
 		; timers, so the migration must be lifecycle-owned explicitly.
