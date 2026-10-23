@@ -206,3 +206,132 @@ helpers.describe("plain paste retains its destination before reading the clipboa
 		end
 	end
 end)
+
+--- Runs one compound action through the real dispatcher and text output owners.
+--- @param action string Catalogue action id.
+--- @param change string Controlled destination retirement or native refusal.
+--- @return table world Independently recorded output and handler result.
+local function observe_compound_action(action, change)
+	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
+		"adapters.modifier_broker", "adapters.uinput_writer", "adapters.event_loop",
+		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
+		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
+		"adapters.window_info" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local world = { events = {}, held = {}, downs = {}, changed = false }
+	local injector
+	local ok, detail = pcall(function()
+		fixture.with(function(guard, state, _, _, watch)
+			local function retire(point)
+				if world.changed or change ~= point then return end
+				world.changed = true
+				state.path = "/field/successor"
+				if change == "password" then state.role = 40 end
+				watch.barrier()
+				if change == "aba" then state.path = "/field/original"; watch.barrier() end
+			end
+			package.loaded["adapters.shell_runner"] = {
+				quote = function(v) return "'" .. v .. "'" end,
+				has_command = function() return false end,
+			}
+			package.loaded["infra.display_server"] = {
+				UNKNOWN = "unknown", kind = function() return "x11" end,
+				is_x11 = function() return true end, is_wayland = function() return false end,
+			}
+			package.loaded["adapters.keyboard_hook"] = {}
+			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["adapters.event_loop"] = { sleep_ms = function() return true end }
+			package.loaded["adapters.window_info"] = { focused_app_id = function()
+				retire("metrics"); return "owned-editor"
+			end }
+			local first_navigation = action == "select_word" and 106 or 102
+			local data_count = 0
+			local writer = {
+				is_open = function() return change ~= "closed" end,
+				emit = function(code, value)
+					if change == "native-refused" and value == 1 and code == first_navigation then
+						world.refused = true; return false
+					end
+					world.events[#world.events + 1] = { code = code, value = value, target = state.path }
+					world.held[code] = value == 1 or nil
+					if value == 1 then
+						world.downs[#world.downs + 1] = { code = code, target = state.path, after_change = world.changed }
+						if code == 10 or code == 11 then data_count = data_count + 1 end
+						if code == first_navigation then retire("during-down") end
+					elseif code == first_navigation and not world.changed then
+						retire("after-navigation"); retire("password"); retire("aba")
+					elseif code == 10 and data_count == 1 then retire("after-opening") end
+					return true
+				end,
+			}
+			package.loaded["adapters.uinput_writer"] = writer
+			local Layout = helpers.load_module("adapters.keyboard_layout")
+			Layout._set_table_for_test({ ["("] = { keycode = 10, level = 2, mods = {"shift"} },
+				[")"] = { keycode = 11, level = 2, mods = {"shift"} } })
+			package.loaded["adapters.clipboard"] = nil
+			injector = helpers.load_module("modules.hotstrings.injector")
+			injector._set_uinput(writer); injector._set_nanosleep_for_test(function() end)
+			for _, name in ipairs({"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter"}) do package.loaded[name] = nil end
+			local Shortcuts = require("modules.shortcuts.manager")
+			initialize_from_main(Shortcuts, change ~= "absent" and guard.capture_text_owner or nil)
+			local original = assert(guard.capture_text_owner())
+			local handlers = require("modules.shortcuts.action_handlers").compose({}, Shortcuts)
+			local perform = assert(handlers[action])
+			handlers[action] = function(...)
+				world.action_result = perform(...)
+				return world.action_result
+			end
+			local Gestures = require("modules.gestures.manager")
+			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
+			world.dispatch_result = Gestures.execute_action(action, "tap_3")
+			world.original_current = original.current()
+			world.final_field = state.path
+		end)
+	end)
+	if injector then
+		injector._set_uinput(nil)
+		world.injector_closed = injector.close_fast_channel()
+		injector._set_nanosleep_for_test(nil)
+	end
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(detail, 0) end
+	return world
+end
+
+helpers.describe("compound actions retain one originating text destination", function()
+	for _, action in ipairs({ "surround_parens", "select_word", "select_line" }) do
+		local vectors = { "stable", "after-navigation", "aba", "password", "absent", "metrics", "during-down", "closed", "native-refused" }
+		if action == "surround_parens" then vectors[#vectors + 1] = "after-opening" end
+		for _, change in ipairs(vectors) do
+			helpers.it("compound-action-owner " .. action .. " " .. change, function()
+				local observation = observe_compound_action(action, change)
+				helpers.assert_eq(next(observation.held), nil, "all acknowledged owned DOWNs must have cleanup UPs")
+				helpers.assert_true(observation.injector_closed, "injector owner must be closed")
+				if change == "stable" then
+					helpers.assert_true(observation.action_result)
+					local actual = {}
+					for _, event in ipairs(observation.downs) do
+						helpers.assert_eq(event.target, "/field/original")
+						if event.code ~= 29 and event.code ~= 42 then actual[#actual + 1] = event.code end
+					end
+					local expected = action == "surround_parens" and { 102, 10, 107, 11, 102 }
+						or action == "select_word" and { 106, 105 } or { 102, 107 }
+					helpers.assert_eq(actual, expected, "stable operation retains the intended exact sequence")
+				elseif change == "closed" or change == "native-refused" then
+					helpers.assert_eq(observation.action_result, false)
+					if change == "closed" then helpers.assert_eq(#observation.downs, 0) end
+				else
+					if change ~= "absent" then
+						helpers.assert_true(observation.changed, "the intended real focus boundary must run")
+						helpers.assert_eq(observation.original_current, false, "an observed successor permanently retires the original owner")
+					end
+					for _, event in ipairs(observation.downs) do
+						helpers.assert_eq(event.after_change, false, "no business DOWN is allowed after original text ownership retired")
+					end
+					if change == "absent" then helpers.assert_eq(#observation.downs, 0, "missing original authority must refuse before output") end
+					helpers.assert_eq(observation.action_result, false, "retired compound operation must not report delivery success")
+				end
+			end)
+		end
+	end
+end)
