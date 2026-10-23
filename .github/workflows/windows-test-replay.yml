@@ -16,6 +16,14 @@ on:
         required: false
         default: .github/ci/ahk-replay/windows-fixes.json
         type: string
+      child_timeout_ms:
+        description: Maximum duration of each native replay child in milliseconds
+        required: false
+        default: '120000'
+        type: choice
+        options:
+          - '120000'
+          - '300000'
 
 permissions:
   contents: read
@@ -235,10 +243,12 @@ jobs:
         shell: pwsh
         env:
           ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
+          ERGOPTI_REPLAY_CHILD_TIMEOUT_MS: "${{ inputs.child_timeout_ms || '120000' }}"
           ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-fixes.json' }}
         run: |
           $output = Join-Path $env:RUNNER_TEMP 'ahk-replay-evidence'
-          node tools/ci/windows-test-replay.cjs --ahk "$env:ERGOPTI_REPLAY_AHK" --selection "$env:ERGOPTI_REPLAY_SELECTION" --output "$output"
+          Write-Host "Replay child timeout (ms): $env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"
+          node tools/ci/windows-test-replay.cjs --ahk "$env:ERGOPTI_REPLAY_AHK" --selection "$env:ERGOPTI_REPLAY_SELECTION" --timeout-ms "$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS" --output "$output"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Retain exact native execution evidence
