@@ -88,6 +88,36 @@ SortArray(arr) {
 ; Parse result cache: keyed by file path, invalidated by TOML_BatchWrite.
 global _ParseTomlCache := Map()
 
+; Active read generations are private and leave no tombstones after retirement.
+; A nested read or invalidation revokes an older owner even when both observe
+; an absent cache entry. Retain the cache Map identity across whole-map changes.
+_TOML_ParseCacheOwners() {
+	static Owners := Map()
+	return Owners
+}
+
+_TOML_ParseCacheReadCurrent(Owner) {
+	global _ParseTomlCache
+	if !IsObject(Owner)
+		return true
+	Owners := _TOML_ParseCacheOwners()
+	return Owners.Get(Owner.key, 0) == Owner && _ParseTomlCache == Owner.cache
+}
+
+; Every production invalidator uses this even when the cache key is absent.
+_TOML_InvalidateParseCache(Path) {
+	global _ParseTomlCache
+	Key := _TOML_WriteRefusalKey(Path)
+	Owners := _TOML_ParseCacheOwners()
+	PreviousCritical := Critical("On")
+	try {
+		if Owners.Has(Key)
+			Owners.Delete(Key)
+		if _ParseTomlCache.Has(Path)
+			_ParseTomlCache.Delete(Path)
+	} finally Critical(PreviousCritical)
+}
+
 ; Paths whose last parse could not READ the file, as opposed to reading an
 ; empty one. ParseTomlFile must stay non-throwing, and an empty Map cannot
 ; carry that distinction — so writers ask here before rebuilding a file from a
@@ -164,12 +194,21 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 		DiscardedArrays := 0
 		if PreserveBooleanLiterals && (UseCache || StoreCache)
 				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
-		if UseCache && _ParseTomlCache.Has(Path)
+		Key := _TOML_WriteRefusalKey(Path)
+		Owners := _TOML_ParseCacheOwners()
+		PreviousCritical := Critical("On")
+		try {
+			if UseCache && _ParseTomlCache.Has(Path)
 				return _ParseTomlCache[Path]
-		Sections := Map()
-		; Map.Delete raises on a missing key, so this must be guarded.
-		if _TomlReadFailures.Has(Path)
+			Owner := !IsSet(ProvidedContent) || StoreCache
+				? {key: Key, cache: _ParseTomlCache} : 0
+			if IsObject(Owner)
+				Owners[Owner.key] := Owner
+			if _TomlReadFailures.Has(Path)
 				_TomlReadFailures.Delete(Path)
+		} finally Critical(PreviousCritical)
+	try {
+		Sections := Map()
 		if !IsSet(ProvidedContent) && !FileExist(Path)
 				return Sections
 		Content := ""
@@ -186,7 +225,15 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				; a genuinely empty file, and TOML_BatchWrite SEEDS ITS REWRITE from it
 				; — so without this flag "I could not read your config" silently became
 				; "your config was empty" and the next write persisted that as truth.
-				_TomlReadFailures[Path] := true
+				Present := FileExist(Path) != ""
+				PreviousCritical := Critical("On")
+				try {
+					if _TOML_ParseCacheReadCurrent(Owner) {
+						_TomlReadFailures[Path] := true
+						if Present
+							_TomlUnreadableFiles[Path] := true
+					}
+				} finally Critical(PreviousCritical)
 				; Raise the STICKY sentinel too, exactly as ReadTomlFile does for the
 				; same file. _TomlReadFailures is deleted at the top of the very next
 				; parse of this path, so a lock that clears between the boot snapshot
@@ -194,15 +241,16 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				; and _IniCache, the widest reader of config.toml, is taken through
 				; here. Only for an existing file: a missing one legitimately parses
 				; empty, and flagging it would block the first save of a fresh install.
-				if FileExist(Path)
-						_TomlUnreadableFiles[Path] := true
 				try LoggerError("TomlParse", "Cannot read '{1}': {2}. Reported as unreadable so writers refuse to rebuild from it.", Path, Err.Message)
 				return Sections
 		}
 		; A successful read clears the sticky flag: what follows is the real file,
 		; so anything derived from it is safe to persist again.
-		if _TomlUnreadableFiles.Has(Path)
+		PreviousCritical := Critical("On")
+		try {
+			if _TOML_ParseCacheReadCurrent(Owner) && _TomlUnreadableFiles.Has(Path)
 				_TomlUnreadableFiles.Delete(Path)
+		} finally Critical(PreviousCritical)
 		if SubStr(Content, 1, 1) == Chr(0xFEFF)
 				Content := SubStr(Content, 2)
 		if (Content = "")
@@ -311,9 +359,21 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
 		}
-		if StoreCache
-			_ParseTomlCache[Path] := Sections
+		if StoreCache {
+			PreviousCritical := Critical("On")
+			try {
+				if _TOML_ParseCacheReadCurrent(Owner)
+					_ParseTomlCache[Path] := Sections
+			} finally Critical(PreviousCritical)
+		}
 		return Sections
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(Owner) && Owners.Get(Owner.key, 0) == Owner
+				Owners.Delete(Owner.key)
+		} finally Critical(PreviousCritical)
+	}
 }
 
 ; The assignment separator belongs outside quoted keys. A value may itself
@@ -1054,9 +1114,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				; Detached builds never own the live reader cache. An ordinary
 				; write must retire its now-stale snapshot after actual source drift.
 				if !BuildOnly {
-						global _ParseTomlCache
-						if _ParseTomlCache.Has(Path)
-								_ParseTomlCache.Delete(Path)
+						_TOML_InvalidateParseCache(Path)
 				}
 				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': the source changed during candidate preparation. No file was changed.", Mode, Path)
 				return false
@@ -1095,9 +1153,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					try LoggerError("TomlWrite", "Refusing unchanged-source acknowledgment: genuine native admission was withdrawn.")
 					return false
 				}
-				global _ParseTomlCache
-				if _ParseTomlCache.Has(Path)
-						_ParseTomlCache.Delete(Path)
+				_TOML_InvalidateParseCache(Path)
 				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
 					"unchanged source namespaces; " . Updates.Length . " operation(s)")
 				return true
@@ -1110,9 +1166,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					try LoggerError("TomlWrite", "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
 					return false
 				}
-				global _ParseTomlCache
-				if _ParseTomlCache.Has(Path)
-						_ParseTomlCache.Delete(Path)
+				_TOML_InvalidateParseCache(Path)
 				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
 					"unchanged image; " . Updates.Length . " operation(s)")
 				return true
@@ -1138,9 +1192,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		try {
 				f := FileOpen(tmp, "w", "UTF-8")
 				if !f {
-						global _ParseTomlCache
-						if _ParseTomlCache.Has(Path)
-								_ParseTomlCache.Delete(Path)
+						_TOML_InvalidateParseCache(Path)
 						; Logged, not merely returned. This branch fails without throwing, and
 						; every caller that discarded the boolean turned it into a silent
 						; no-op: the menu and the engine went on showing a state that never
@@ -1156,9 +1208,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 				f := 0
 				StageWritten := true
 		} catch as Err {
-				global _ParseTomlCache
-				if _ParseTomlCache.Has(Path)
-						_ParseTomlCache.Delete(Path)
+				_TOML_InvalidateParseCache(Path)
 				try LoggerError("TomlWrite", "Writing the staging file for '{1}' failed: {2}. The change is NOT persisted.", Path, Err.Message)
 				return false
 		} finally {
@@ -1168,17 +1218,13 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 						_TOML_RemoveOwnedStage(tmp)
 		}
 		if !_TOML_StageMatches(tmp, body) {
-				global _ParseTomlCache
-				if _ParseTomlCache.Has(Path)
-						_ParseTomlCache.Delete(Path)
+				_TOML_InvalidateParseCache(Path)
 				try LoggerError("TomlWrite", "The staging file for '{1}' did not match the complete canonical image. The previous contents are intact, so the change is NOT persisted.", Path)
 				_TOML_RemoveOwnedStage(tmp)
 				return false
 		}
 	if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
-		global _ParseTomlCache
-		if _ParseTomlCache.Has(Path)
-			_ParseTomlCache.Delete(Path)
+		_TOML_InvalidateParseCache(Path)
 		try LoggerError("TomlWrite", "Refusing TOML publication for '{1}': the exact source changed after staging. No file was replaced.", Path)
 		_TOML_RemoveOwnedStage(tmp)
 		return false
@@ -1191,9 +1237,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		? FSConfigAtomicMoveReplace(tmp, Path, &MoveError, FinalAdmission)
 		: FSAtomicMoveReplace(tmp, Path, &MoveError)
 	if !((Moved is Integer) && Moved == 1) {
-		global _ParseTomlCache
-		if _ParseTomlCache.Has(Path)
-			_ParseTomlCache.Delete(Path)
+		_TOML_InvalidateParseCache(Path)
 		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted (native error {2}).", Path, MoveError)
 		_TOML_RemoveOwnedStage(tmp)
 		return false
@@ -1201,9 +1245,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 
 		; Invalidate the parse cache so the next ParseTomlFile call re-reads
 		; the updated file rather than returning a stale snapshot.
-		global _ParseTomlCache
-		if _ParseTomlCache.Has(Path)
-				_ParseTomlCache.Delete(Path)
+		_TOML_InvalidateParseCache(Path)
 
 		HotPath_LogIfSlow("Config.TomlWrite", _hpTomlWrite, Updates.Length . " update(s)")
 		return true

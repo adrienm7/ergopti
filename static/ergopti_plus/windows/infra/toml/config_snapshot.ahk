@@ -298,10 +298,14 @@ ParseConfigTomlFile(Path) {
 	}
 	; Admitted absence is a boot generation too. The existing writer retires
 	; this identity when first-use settings are actually published.
-	_ParseTomlCache[Path] := Snapshot.Cache
-	if IsSet(_TomlFileCache)
-		_TomlFileCache[Path] := Snapshot.Source
-	_ConfigTomlSnapshots[Path] := Snapshot
+	PreviousCritical := Critical("On")
+	try {
+		_TOML_InvalidateParseCache(Path)
+		_ParseTomlCache[Path] := Snapshot.Cache
+		if IsSet(_TomlFileCache)
+			_TomlFileCache[Path] := Snapshot.Source
+		_ConfigTomlSnapshots[Path] := Snapshot
+	} finally Critical(PreviousCritical)
 	return Snapshot.Cache
 }
 
