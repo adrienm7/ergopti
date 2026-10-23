@@ -102,6 +102,12 @@ local function with_pending_warmup(callback)
 			local cleaned, cleanup_error = xpcall(action, debug.traceback)
 			if not cleaned then cleanup_errors[#cleanup_errors + 1] = tostring(cleanup_error) end
 		end
+		-- Fence results, then join each taskless native callback before compound
+		-- owner finalization. A successful cancel assertion must retain its meaning.
+		cleanup(function() client.cancel() end)
+		for _, request in ipairs(fixture.requests) do
+			cleanup(function() request.done(-1, "owned warmup fixture cleanup", {}) end)
+		end
 		cleanup(function() if fixture.finalize then fixture.finalize() end end)
 		notifications.notify = original_notify
 		cleanup(function()
