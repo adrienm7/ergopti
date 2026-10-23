@@ -260,6 +260,7 @@
 		"codegen:hid-key-identity:hs": "node ./tools/codegen/codegen-hid-key-identity-hs.cjs",
 		"codegen:gesture-emit-actions:linux": "node ./tools/codegen/codegen-gesture-emit-actions-linux.cjs",
 		"codegen:action-catalogue": "node ./tools/codegen/codegen-action-catalogue.cjs",
+		"codegen:config-schema-metrics": "node ./tools/codegen/codegen-config-schema-metrics.cjs",
 		"codegen:unicode-case": "node ./tools/codegen/codegen-unicode-case.cjs",
 		"codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",
 		"codegen:update-channels": "node ./tools/codegen/codegen-update-channels.cjs",

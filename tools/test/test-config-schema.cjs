@@ -382,6 +382,24 @@ if (DRIVERS.length < MIN_DRIVERS) {
 	assert.deepEqual(absentErrors, [], 'absence is not a malformed mode or a default flush');
 }
 
+// The metrics definition is generated from the manifest: it must not drift, must
+// reject an undeclared key, and must not require a key a driver may omit.
+{
+	const assert = require('node:assert/strict');
+	const { generate } = require('../codegen/codegen-config-schema-metrics.cjs');
+	const { current, next } = generate();
+	assert.equal(current, next, 'run npm run codegen:config-schema-metrics');
+	const typo = [];
+	validate({ metrics: { enabled: true, wpm_widget_typo: true } }, schema, '', typo);
+	assert(typo.length > 0, 'an undeclared metrics key must fail the schema');
+	const wrongType = [];
+	validate({ metrics: { wpm_widget_visible: 'yes' } }, schema, '', wrongType);
+	assert(wrongType.length > 0, 'a declared metrics key keeps its manifest type');
+	const partial = [];
+	validate({ metrics: { wpm_widget_visible: true } }, schema, '', partial);
+	assert.deepEqual(partial, [], 'no metrics key is required');
+}
+
 // Native macOS wrap persistence has typed canonical state and custom-pair shapes.
 {
 	const assert = require('node:assert/strict');
