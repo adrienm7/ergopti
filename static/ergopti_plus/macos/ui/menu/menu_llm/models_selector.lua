@@ -851,7 +851,7 @@ function M.build(ctx)
 					active_backend = active_backend,
 					active_model   = state.llm_model,
 					models_mgr     = models_mgr,
-					on_select      = function(name) switch_model(name) end,
+					on_select      = function(name) return switch_model(name) end,
 				})
 				if ok and opened == true then return end
 				Logger.error(LOG, "Model browser (web) failed — falling back to chooser: %s", tostring(opened))
