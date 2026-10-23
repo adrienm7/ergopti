@@ -169,6 +169,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 	helpers.it("refuses, writes nothing and restarts nothing for an invalid save", function()
 		local dir = make_config_dir()
 		local world = make_state(dir)
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
 		local refused = {
 			{ text = nil, code = "invalid_payload" },
 			{ text = {}, code = "invalid_payload" },
@@ -285,6 +286,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		local original = hook.engine
 		world.on_reload = Manager.reload
 		local text = read_file(FIXTURE)
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
 		local outcome = Bridge.on_message({ action = "save", text = text }, world.state)
 		local written = read_file(dir .. "/layers.toml")
 		local engine = hook.engine
@@ -325,6 +327,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 			defaults_path = SHARED_ROOT .. "/tap_hold/defaults.toml", user_path = dir .. "/tap_hold.toml" })
 		local original, before_enabled = hook.engine, Manager.file_enabled()
 		world.on_reload = Manager.reload
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
 		local outcome = Bridge.on_message({ action = "save", text = read_file(FIXTURE) }, world.state)
 		local current, active, keys = hook.engine, Manager.is_active(), Manager.keys()
 		Manager._reset_for_test()
@@ -342,6 +345,7 @@ helpers.describe("Linux navigation layer editor bridge", function()
 		local dir = make_config_dir()
 		local world = make_state(dir)
 		world.restart_result = false
+		helpers.assert_eq(Bridge.on_message("ready", world.state).pushed, true)
 		local outcome = Bridge.on_message({ action = "save", text = read_file(FIXTURE) }, world.state)
 		remove_config_dir(dir)
 		helpers.assert_eq(outcome.saved, true)

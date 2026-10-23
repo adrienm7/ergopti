@@ -368,6 +368,7 @@ return {
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_ngram_source_map",
 	"tests.unit.modules.keystats.aggregation.test_keystats_utils",
 	"tests.unit.ui.editors.test_layer_editor_bridge",
+	"tests.unit.ui.editors.layer_editor.test_source_owner",
 	"tests.unit.modules.hotstrings.catalogue.test_linux_loader_delegates_toml_codec",
 	"tests.unit.modules.hotstrings.menu.test_list_providers_cover_manifest",
 	"tests.unit.modules.llm.prediction.test_llm_linux_bridge",
