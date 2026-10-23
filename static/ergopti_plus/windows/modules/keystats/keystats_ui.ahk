@@ -51,6 +51,9 @@ class KLUI {
 		; atomically published the sidecar.  This prevents a first open from
 		; silently rendering an empty dashboard while the data is still building.
 		static pending := Map()
+
+		; Test seam for the Edge launch; 0 launches the real browser.
+		static launch_edge_fn := 0
 }
 
 
@@ -76,10 +79,19 @@ KLUI_ResolveAssetUrl(which, metrics_dir) {
 		; Embed the prefetch file path in the hash so the page bootstrap can
 		; fetch from %TEMP% instead of the repo directory. Hash fragments are
 		; safe on file:// URLs in Chromium (no request, no cache-buster issue).
-		prefetch_url := FilePathToUrl(KLPF_PrefetchPath(which, metrics_dir))
+		return KLUI_WithPrefetchPath(url, KLPF_PrefetchPath(which, metrics_dir))
+}
+
+; Point a dashboard page URL at the sidecar it must fetch.
+; @param page_url {String} The page's file URL, with or without a fragment.
+; @param prefetch_path {String} Absolute path of the JSON the page reads.
+; @returns {String} The page URL carrying exactly one "#prefetch=" fragment.
+KLUI_WithPrefetchPath(page_url, prefetch_path) {
+		fragment_at := InStr(page_url, "#prefetch=")
+		if fragment_at
+				page_url := SubStr(page_url, 1, fragment_at - 1)
 		; URLSearchParams decodes one layer before fetch parses the nested URL.
-		url .= "#prefetch=" . UriEncode(prefetch_url)
-		return url
+		return page_url . "#prefetch=" . UriEncode(FilePathToUrl(prefetch_path))
 }
 
 KLUI_EnsureUrls(metrics_dir) {
@@ -143,21 +155,28 @@ KLUI_LaunchWindow(url, title, metrics_dir) {
 		return 0
 }
 
-KLUI_OnPrefetchTerminal(which, url, title, Attempt, status, *) {
+KLUI_OnPrefetchTerminal(which, url, title, Attempt, status, stage := "") {
 		if KLUI.pending.Get(which, 0) != Attempt
 				return
 		KLUI.pending.Delete(which)
+		Launch := IsObject(KLUI.launch_edge_fn) ? KLUI.launch_edge_fn : KLUI_LaunchEdge
 		if (status = "incomplete") {
-				; Edge reads only the published snapshot, and a partial read is never
-				; published; the next open reads the whole history again.
-				try LoggerWarn("Keystats", "Edge metrics prefetch for '{1}' read an incomplete history; the Edge fallback cannot show an unpublished partial read, so the dashboard was not launched.", which)
+				; A partial read is never published as the reusable snapshot, so the
+				; page gets a private copy of its stage (flagged incomplete, which the
+				; page labels) and the next open reads the whole history again.
+				if (stage = "" || !FileExist(stage)) {
+						try LoggerError("Keystats", "Edge metrics prefetch for '{1}' read an incomplete history but handed over no stage; dashboard was not launched.", which)
+						return
+				}
+				try LoggerWarn("Keystats", "Edge metrics prefetch for '{1}' read an incomplete history; the dashboard shows the partial counts.", which)
+				Launch.Call(which, url, title, stage)
 				return
 		}
 		if (status != "ok") {
 				try LoggerError("Keystats", "Edge metrics prefetch failed for '{1}' (status={2}); dashboard was not launched.", which, status)
 				return
 		}
-		KLUI_LaunchEdge(which, url, title)
+		Launch.Call(which, url, title)
 }
 
 _KLUI_GetEdgeOwner(which) {
@@ -227,7 +246,10 @@ _KLUI_CancelEdgeOwner(which, ExpectedOwner := 0) {
 		return Terminated
 }
 
-KLUI_LaunchEdge(which, url, title) {
+; @param partial_stage {String} Stage of an incomplete read, or "" for the
+;   published sidecar. The stage is copied into the launch's own profile
+;   folder, so it is retired with the profile and never becomes the snapshot.
+KLUI_LaunchEdge(which, url, title, partial_stage := "") {
 
 		edge := KLUI_FindMsedge()
 		; --app=URL launches a chromeless window pinned to URL. --user-data-dir
@@ -242,6 +264,19 @@ KLUI_LaunchEdge(which, url, title) {
 		udir := WebView_NewProfilePath("ergopti_metrics_edge_")
 		WebView_SweepStaleProfiles("ergopti_metrics_edge_")
 		DirCreate(udir)
+		if (partial_stage != "") {
+				PartialPath := udir . "\partial_prefetch.json"
+				try {
+						FileCopy(partial_stage, PartialPath, 1)
+						url := KLUI_WithPrefetchPath(url, PartialPath)
+				} catch as err {
+						WebView_AbandonProfile(udir)
+						try LoggerError("Keystats", "Could not hand the partial '{1}' read to Edge: {2}", which, err.Message)
+						Ui_MsgBox(Format(t("keystats_ui.launch_error"), err.Message),
+								t("common.error_title"), "Iconx")
+						return false
+				}
+		}
 		; --allow-file-access-from-files: lift the same-origin restriction that
 		; treats every file:// URL as a unique origin. Without it, the page
 		; bootstrap's fetch('./prefetch.json') is blocked by Chromium's

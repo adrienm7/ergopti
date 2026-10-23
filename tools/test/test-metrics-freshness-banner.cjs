@@ -143,6 +143,21 @@ check(
 	'metrics_typing/index.html: Windows and Linux blobs must forward their incomplete flags'
 );
 
+// ── 3b. The apps dashboard labels an incomplete Windows read too ───────────
+const apps_html = fs.readFileSync(p.join(UI, 'metrics_apps', 'index.html'), 'utf8');
+check(
+	apps_html.indexOf('<script src="../metrics_freshness.js"></script>') > 0 &&
+		apps_html.indexOf('<script src="../metrics_freshness.js"></script>') <
+			apps_html.indexOf('<script src="main.js"></script>'),
+	'metrics_apps/index.html: must load the freshness banner before main.js'
+);
+check(
+	/mark_incomplete\(\s*'manifest',\s*blob\.metrics_manifest_incomplete === true\s*\)/.test(
+		apps_html
+	),
+	'metrics_apps/index.html: a prefetch blob must forward its metrics_manifest_incomplete flag'
+);
+
 // ── 4. Every locale carries the strings and their placeholders ─────────────
 for (const file of fs.readdirSync(LOCALES).filter((f) => f.endsWith('.json'))) {
 	const strings = JSON.parse(fs.readFileSync(p.join(LOCALES, file), 'utf8'));
