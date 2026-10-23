@@ -63,14 +63,17 @@ _LMCT_ChildSource() {
 		Code .= "#Include " . _LMCT_GeneratedOwner(Symbol) . "`n"
 	Seen := Map()
 	for Symbol in ["UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_IsLocalSource",
-		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled"] {
+		"ErgoptiLayout_BuiltinVariant", "LayoutCatalogue_WriteInstalled", "LayoutExtension_Problem"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The public catalogue path requires its genuine whole owner: " . Symbol)
+		Source := FSReadStrict(Owner)
+		AssertTrue(_DriverExtractFunctionBody(&Source, Symbol) != "",
+			"The imported catalogue dependency must have a real nonempty declaration: " . Symbol)
 		AssertFalse(Seen.Has(Owner), "Every additional layout data owner must be distinct")
 		Seen[Owner] := true
 		Code .= "#Include " . Owner . "`n"
 	}
-	AssertEqual(5, Seen.Count, "The real catalogue, built-in data and source-mode refresh owners must all be present")
+	AssertEqual(6, Seen.Count, "The real catalogue, extension validation, built-in data and source-mode refresh owners must all be present")
 	Owner := _DriverProductionFileForSymbol("LayoutManager_Open")
 	Source := FSReadStrict(Owner)
 	for Symbol in ["LayoutManager_Open", "_LayMgrWeb_OnWebMessage", "_LayMgrWeb_SessionCall", "LayoutManager_HandleMessage"]
