@@ -346,3 +346,5 @@ Test("lifecycle transition: real programmable cancellation debt gates suspend ac
 #Include ../../modules/llm/servers/test_ollama_webview_deferred_delivery.ahk
 
 #Include test_external_suspend_program_owner.ahk
+
+#Include test_suspend_prefetch_receipt.ahk
