@@ -51,7 +51,10 @@ local function routed_gestures()
 		end,
 	}
 	package.loaded[names.injector] = {
-		inject = function(backspaces, text)
+		inject = function(backspaces, text, _, _, publication)
+			helpers.assert_true(type(publication) == "table" and type(publication.current) == "function"
+				and type(publication.cached) == "function", "printable input retains its captured destination")
+			helpers.assert_true(publication.current() and publication.cached(), "the controlled destination still admits this input")
 			log.injected[#log.injected + 1] = tostring(backspaces) .. "|" .. text
 			return { ok = true }
 		end,
@@ -71,6 +74,11 @@ local function routed_gestures()
 	package.loaded["modules.shortcuts.manager"] = nil
 
 	local Shortcuts = require("modules.shortcuts.manager")
+	-- This parameter-routing fixture owns a stable destination; real field
+	-- retirement is exercised by test_selection_action_destination.lua.
+	Shortcuts.init({ persist = false, capture_text_owner = function()
+		return { current = function() return true end, cached = function() return true end }
+	end })
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
 	local noop = function() end
