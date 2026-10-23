@@ -110,6 +110,22 @@ terminal TUI also reads as submitting the line.
 Typing delays live in shared timing constants with explicit per-driver
 interpretation. Do not introduce a second driver-local default.
 
+### project-hotstring-expansion-delay-definition
+
+The expansion delay is the time between the LAST LETTER OF THE INPUT and the
+EXPANDER, to decide whether to give the output. The expander is the magic key
+when the trigger ends with it (the last letter is then the one before it),
+otherwise the end character that completes the trigger; for the Space tap-hold
+the expander is the key's press, not the release that decides the tap. The
+reference is always the character typed immediately before the expander, with
+its key-down tick as the start and the expander's key-down tick as the end.
+Windows builds it with `HSE_TimeGateReferenceChar` and passes the press tick
+(`TapHoldRollTapDownTick`); macOS measures the preceding-key interval; Linux
+reports `expander_gap_ms`. The vectors in
+`_shared/tests/corpus/hotstrings/time_gate_vectors.json` are replayed by all
+three drivers. The exact-equality instant is deliberately not a vector (Windows
+and Linux fire at it, macOS expires there).
+
 ### project-hotstring-case-flags-are-orthogonal
 
 Case conformity, case sensitivity, and ending-character behavior are independent

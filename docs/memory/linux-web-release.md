@@ -111,7 +111,7 @@ tap-hold engine masks a lone Alt or Super release with KEY_F24.
 When luv is unavailable while `infra/monotonic` loads, its source is
 `os.time() * 1000`: two keys typed together can read 1000 ms apart across a
 second boundary. Action: subtract `Monotonic.resolution_ms()` when comparing
-a gap, as `within_interkey_delay` and `keyboard_hook` do. Daemon scenarios pin
+a gap, as `within_expansion_delay` and `keyboard_hook` do. Daemon scenarios pin
 that clock with `ERGOPTI_E2E_CLOCK=seconds` and `{TICK}`.
 
 Native signal ownership still requires luv. A coarse-clock fixture hides luv

@@ -759,7 +759,7 @@ helpers.describe("programmable native Linux runtime", function()
 		with_runtime(function(f)
 			f.type_suffix(501); helpers.assert_eq(f.User.request("@é"), false)
 			f.engine:reset(); f.type_suffix(500)
-			helpers.assert_eq(f.engine:tail_timing_receipt(3), { max_interkey_gap_ms = 500 })
+			helpers.assert_eq(f.engine:tail_timing_receipt(3), { expander_gap_ms = 500 })
 			for _, bad in ipairs({ 0, -1, 1.5, 4, math.huge }) do helpers.assert_nil(f.engine:tail_timing_receipt(bad)) end
 			helpers.assert_true(f.User.request("@é")); f.now = f.now + 5000; drain()
 			helpers.assert_eq(f.calls, 1); helpers.assert_eq(#f.outputs, 1)
