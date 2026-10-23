@@ -335,3 +335,183 @@ helpers.describe("compound actions retain one originating text destination", fun
 		end
 	end
 end)
+
+--- Executes printable insertion through the daemon's real composed dispatcher.
+--- The document is a receiver observation, independent from the retained guard.
+--- @param session string Controlled clipboard display backend.
+--- @param action string The actual send_* action.
+--- @param route string Direct layout text, clipboard text or a named command.
+--- @param change string The desktop boundary which retires the original field.
+--- @return table observations Independent output, clipboard and owner receipts.
+local function observe_configured_insertion(session, action, route, change)
+	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
+		"adapters.modifier_broker", "adapters.uinput_writer", "adapters.event_loop",
+		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
+		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+	local world = { documents = { ["/field/original"] = "", ["/field/successor"] = "" },
+		clipboard = "saved clipboard", events = {}, downs = {}, held = {}, reads = 0, writes = 0, changed = false }
+	local injector, configuration_path
+	local ok, detail = pcall(function()
+		fixture.with(function(guard, state, _, _, watch)
+			local original = assert(guard.capture_text_owner())
+			local function retire(point)
+				local boundary = (change == "password" or change == "aba") and "snapshot" or change
+				if world.changed or boundary ~= point then return end
+				world.changed = true
+				state.path = "/field/successor"
+				if change == "password" then state.role = 40 end
+				-- Direct per-key admission observes the same resident event a real
+				-- watch publishes; blocking clipboard paths must request their probe.
+				if point == "after-first" or change == "aba" then watch.barrier() end
+				if change == "aba" then state.path = "/field/original"; watch.barrier() end
+			end
+			local pending
+			package.loaded["adapters.shell_runner"] = {
+				quote = function(value) return "'" .. value .. "'" end,
+				has_command = function() return true end,
+				exec_checked = function()
+					world.reads = world.reads + 1
+					retire("snapshot")
+					return true, world.clipboard
+				end,
+				with_exact_stdin = function(command, text) pending = text; return command end,
+				run = function()
+					world.clipboard = pending
+					world.writes = world.writes + 1
+					if world.writes == 1 then retire("publication") end
+					return true
+				end,
+			}
+			package.loaded["infra.display_server"] = {
+				UNKNOWN = "unknown", kind = function() return session end,
+				is_x11 = function() return session == "x11" end,
+				is_wayland = function() return session == "wayland" end,
+			}
+			package.loaded["adapters.keyboard_hook"] = {}
+			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
+			package.loaded["adapters.event_loop"] = { sleep_ms = function() return true end }
+			local writer = {
+				is_open = function() return true end,
+				emit = function(code, value)
+					if change == "native-refused" and value == 1 and (code == 24 or code == 47) then
+						world.native_refused = true; return false
+					end
+					world.events[#world.events + 1] = { code = code, value = value, target = state.path }
+					world.held[code] = value == 1 or nil
+					if value == 1 then
+						world.downs[#world.downs + 1] = { code = code, target = state.path, retired = world.changed }
+						local character = code == 24 and "o" or code == 37 and "k" or nil
+						if character then world.documents[state.path] = world.documents[state.path] .. character end
+						if code == 47 then world.documents[state.path] = world.documents[state.path] .. world.clipboard end
+					elseif code == 24 then retire("after-first") end
+					return true
+				end,
+			}
+			package.loaded["adapters.uinput_writer"] = writer
+			local layout = helpers.load_module("adapters.keyboard_layout")
+			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
+			package.loaded["adapters.clipboard"] = nil
+			injector = helpers.load_module("modules.hotstrings.injector")
+			injector._set_uinput(writer)
+			injector._set_nanosleep_for_test(function() retire("settle") end)
+			for _, name in ipairs({ "modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }) do
+				package.loaded[name] = nil
+			end
+			local Shortcuts = require("modules.shortcuts.manager")
+			local capture = guard.capture_text_owner
+			if change == "absent" then capture = nil
+			elseif change == "capture-refused" then capture = function() return nil end
+			elseif change == "capture-threw" then capture = function() error("controlled capture refusal") end end
+			initialize_from_main(Shortcuts, capture)
+			if change == "configuration" then
+				configuration_path = os.tmpname()
+				local file = assert(io.open(configuration_path, "wb")); assert(file:write("[shortcuts]\nenabled = true\n")); assert(file:close())
+				Shortcuts.init({ persist = true, config_path = configuration_path, capture_text_owner = capture })
+				world.configuration_token = {}; assert(Shortcuts.acquire_configuration(world.configuration_token))
+			end
+			local handlers = require("modules.shortcuts.action_handlers").compose({}, Shortcuts)
+			local perform = assert(handlers[action])
+			handlers[action] = function(...)
+				world.action_result = perform(...)
+				return world.action_result
+			end
+			local Gestures = require("modules.gestures.manager")
+			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
+			local parameter = route == "clipboard" and "é" or route == "direct" and (action == "send_text" and "ok" or "o") or route
+			assert(Gestures.set_action_parameter("tap_3", action, parameter))
+			world.dispatch_result = Gestures.execute_action(action, "tap_3")
+			if world.configuration_token then assert(Shortcuts.release_configuration(world.configuration_token)) end
+			world.original_current = original.current()
+			world.final_field = state.path
+			world.parameter = parameter
+		end)
+	end)
+	if injector then
+		injector._set_uinput(nil)
+		world.injector_closed = injector.close_fast_channel()
+		injector._set_nanosleep_for_test(nil)
+	end
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if configuration_path then assert(os.remove(configuration_path)) end
+	if not ok then error(detail, 0) end
+	return world
+end
+
+helpers.describe("configured printable insertions retain their original destination", function()
+	for _, action in ipairs({ "send_text", "send_key" }) do
+		for _, route in ipairs({ "direct", "clipboard" }) do
+			for _, session in ipairs(route == "clipboard" and { "x11", "wayland" } or { "x11" }) do
+				local changes = route == "clipboard" and { "stable", "snapshot", "publication", "settle", "password", "aba", "absent", "capture-refused", "capture-threw", "configuration", "native-refused" }
+					or { "stable", "absent", "capture-refused", "capture-threw", "configuration", "native-refused" }
+				if route == "direct" and action == "send_text" then changes[#changes + 1] = "after-first" end
+				for _, change in ipairs(changes) do
+					helpers.it("configured-insertion-owner " .. action .. " " .. route .. " " .. session .. " " .. change, function()
+						local observation = observe_configured_insertion(session, action, route, change)
+						helpers.assert_true(observation.dispatch_result, "the actual gesture dispatcher must invoke the configured action")
+						helpers.assert_eq(next(observation.held), nil, "every owned DOWN must have a cleanup UP")
+						helpers.assert_true(observation.injector_closed, "the injector's clipboard lifetime must settle")
+						helpers.assert_eq(observation.clipboard, "saved clipboard", "even refusal must restore the user's clipboard")
+						if change == "stable" then
+							helpers.assert_true(observation.action_result)
+							helpers.assert_true(observation.original_current)
+							helpers.assert_eq(observation.documents["/field/original"], observation.parameter)
+							helpers.assert_eq(observation.documents["/field/successor"], "")
+						elseif change == "native-refused" then
+							helpers.assert_true(observation.native_refused, "the real output transaction must reach the native refusal")
+							helpers.assert_eq(observation.action_result, false)
+						else
+							if change == "snapshot" or change == "publication" or change == "settle" or change == "password"
+								or change == "aba" or change == "after-first" then
+								helpers.assert_true(observation.changed, "the intended real output boundary must run")
+								helpers.assert_eq(observation.original_current, false, "the independent real field owner must retire")
+							end
+							helpers.assert_eq(observation.documents["/field/successor"], "", "old insertion must never deliver configured bytes into field B (delivery ACK: " .. tostring(observation.action_result) .. ")")
+							for _, event in ipairs(observation.downs) do
+								helpers.assert_eq(event.retired, false, "no business DOWN is admitted after an observed destination retirement")
+							end
+							if change == "absent" or change:match("^capture") or change == "configuration" then
+								helpers.assert_eq(#observation.events, 0, "missing authority must refuse before reserving output")
+								helpers.assert_eq(observation.reads, 0, "missing authority must refuse before reading the clipboard")
+							end
+							helpers.assert_eq(observation.action_result, false, "destination refusal is not a successful delivery")
+						end
+					end)
+				end
+			end
+		end
+	end
+	for _, vector in ipairs({ { "send_key", "Tab", 15 }, { "send_key", "Enter", 28 },
+		{ "send_key", "page_down", 109 }, { "send_shortcut", "alt+F4", 62 }, { "send_shortcut", "super+Tab", 15 } }) do
+		helpers.it("configured-insertion-owner preserves non-text command " .. vector[1] .. " " .. vector[2], function()
+			local observation = observe_configured_insertion("x11", vector[1], vector[2], "capture-threw")
+			helpers.assert_true(observation.action_result, "named/global commands do not require a text field owner")
+			local found = false
+			for _, event in ipairs(observation.downs) do if event.code == vector[3] then found = true end end
+			helpers.assert_true(found, "the actual requested command must still reach the receiver")
+			helpers.assert_eq(next(observation.held), nil)
+			helpers.assert_true(observation.injector_closed)
+			helpers.assert_eq(observation.reads, 0)
+		end)
+	end
+end)
