@@ -101,6 +101,7 @@ _OHTC_PidReceipt_Port(State) {
 	return Map(
 		"open_process", (*) => State["handle"],
 		"terminate_process", _OHTC_PidReceipt_Terminate.Bind(State),
+		"wait_process", (*) => 0,
 		"close_process", _OHTC_PidReceipt_Close.Bind(State),
 		"read_terminal", _OHTC_PidReceipt_ReadTerminal.Bind(State))
 }

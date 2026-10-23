@@ -337,6 +337,7 @@ _OllamaPidReceipt_CompleteGenerationPrecedesDeadline() {
 		"open_process", (*) => 9201,
 		"close_process", (*) => (State["close_calls"] += 1, true),
 		"terminate_process", (*) => (State["terminate_calls"] += 1, true),
+		"wait_process", (*) => 0,
 		"read_terminal", (*) => Map(
 			"complete", true, "exit", 0, "status", 200,
 			"body_read", true,
@@ -394,6 +395,7 @@ _OllamaPidReceipt_CancelUsesExactHandle() {
 			State["terminate_calls"] += 1,
 			State["terminated_handle"] := Handle,
 			true),
+		"wait_process", (*) => 0,
 		"read_terminal", (*) => Map(
 			"complete", false, "exit", -1, "status", 0,
 			"body_read", false, "body", ""))
@@ -486,14 +488,14 @@ Test("Ollama process cleanup: close refusal retains exact ownership "
 _OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen() {
 	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
 	State := Map("terminate_calls", 0, "wait_calls", 0, "close_calls", 0,
-		"accept_terminate", false)
+		"accept_terminate", false, "wait_result", 258)
 	TerminateProcess(Handle) {
 		State["terminate_calls"] += 1
 		return State["accept_terminate"]
 	}
 	WaitProcess(Handle) {
 		State["wait_calls"] += 1
-		return 258
+		return State["wait_result"]
 	}
 	CloseProcess(Handle) {
 		State["close_calls"] += 1
@@ -515,6 +517,8 @@ _OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen() {
 	AssertEqual(1, _LLM_CurlCleanupDebt.Count)
 
 	State["accept_terminate"] := true
+	; The retry receives a separate exact exit observation after termination.
+	State["wait_result"] := 0
 	_LLM_CurlCleanupRetryTimer := 0
 	AssertTrue(LLM_CurlRetryCleanupDebt())
 	AssertTrue(Owner["released"])
