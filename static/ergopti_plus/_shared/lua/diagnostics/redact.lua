@@ -4,8 +4,9 @@
 --- MODULE: Diagnostics Redaction (Shared Lua)
 --- DESCRIPTION:
 --- Removes what must not leave the machine from diagnostic text before it is
---- copied, saved or sent to a GitHub issue: token-like secrets, the home
---- folder and the account name. The rules are data in
+--- copied, saved or sent to a GitHub issue: token-like secrets (URL credentials
+--- included), the home folder, the account name, other accounts' profile folders
+--- and e-mail addresses. The rules are data in
 --- _shared/modules/diagnostics/redaction.json; the AHK port
 --- (windows/infra/redact.ahk) replays the same vectors
 --- (_shared/tests/corpus/diagnostics/redaction_vectors.json).
