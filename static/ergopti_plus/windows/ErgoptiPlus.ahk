@@ -442,6 +442,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/send_input_parameter.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
+#Include infra/capsword_state.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,

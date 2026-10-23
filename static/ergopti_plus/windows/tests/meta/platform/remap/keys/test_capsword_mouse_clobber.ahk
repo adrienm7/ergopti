@@ -13,16 +13,10 @@
 ; statically creates duplicate hooks, undefined ordering, and prevents the
 ; fan-out from reaching other subscribers reliably while CapsWord is active.
 ;
-; The fix removes the static hotkeys and instead calls:
-;   HookDispatcher.Register(HookDispatcherConst.EVT_MS_LDOWN, ...)
-;   HookDispatcher.Register(HookDispatcherConst.EVT_MS_RDOWN, ...)
-; when CapsWord activates, and the matching Unregister() calls when it
-; deactivates (both in ToggleCapsWord and DisableCapsWord).
-;
-; This is a meta-static test (scans source text) because capsword.ahk contains
-; top-level #HotIf / hotkey blocks that the headless runner cannot #Include.
-; If the static hotkeys are reintroduced or the dynamic registration is removed,
-; this test fails immediately.
+; The fix removed the static hotkeys; the listeners subscribe through
+; HookDispatcher, which unit/modules/shortcuts/test_capsword_auto_off.ahk and
+; test_capsword_state.ahk drive by behaviour. A static hotkey cannot be
+; observed without registering it, so its absence stays a source guard.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -53,40 +47,3 @@ _CWMC_NoStaticRButton() {
 		"capsword.ahk must NOT contain a static ~RButton:: hotkey label -- use HookDispatcher.Register() instead")
 }
 Test("capsword: no static ~RButton:: hotkey label (F24 capsword-mouse-clobber)", _CWMC_NoStaticRButton)
-
-
-
-
-
-; ================================================
-; ================================================
-; ======= 3/ Dynamic registration present  =======
-; ================================================
-; ================================================
-
-; HookDispatcher.Register must be called with an LButton event type constant so
-; the module subscribes to left-click down through the unified fan-out.
-_CWMC_DynamicLButtonPresent() {
-	Src := _DriverDirConcat("modules/shortcuts")
-	; The registration must reference the EVT_MS_LDOWN constant
-	Assert(InStr(Src, "EVT_MS_LDOWN"),
-		"capsword.ahk must call HookDispatcher.Register with EVT_MS_LDOWN to cancel CapsWord on left click")
-}
-Test("capsword: dynamic HookDispatcher.Register for EVT_MS_LDOWN present (F24 capsword-mouse-clobber)", _CWMC_DynamicLButtonPresent)
-
-; Same check for right-click.
-_CWMC_DynamicRButtonPresent() {
-	Src := _DriverDirConcat("modules/shortcuts")
-	Assert(InStr(Src, "EVT_MS_RDOWN"),
-		"capsword.ahk must call HookDispatcher.Register with EVT_MS_RDOWN to cancel CapsWord on right click")
-}
-Test("capsword: dynamic HookDispatcher.Register for EVT_MS_RDOWN present (F24 capsword-mouse-clobber)", _CWMC_DynamicRButtonPresent)
-
-; The matching Unregister calls must also be present so the listener is torn
-; down when CapsWord deactivates and does not linger as a stale subscriber.
-_CWMC_UnregisterPresent() {
-	Src := _DriverDirConcat("modules/shortcuts")
-	Assert(InStr(Src, "HookDispatcher.Unregister"),
-		"capsword.ahk must call HookDispatcher.Unregister to remove the mouse listener when CapsWord deactivates")
-}
-Test("capsword: HookDispatcher.Unregister call present (F24 capsword-mouse-clobber)", _CWMC_UnregisterPresent)
