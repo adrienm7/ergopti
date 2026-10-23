@@ -2081,6 +2081,21 @@ boot_note("Remap guardian status reported by the launcher: %s.",
 if type(karabiner) ~= "table" or karabiner.set_script_chords_source(shortcuts.karabiner_script_chords) ~= true then
 	error("karabiner.set_script_chords_source did not commit")
 end
+-- The virtual keyboard type the deployed karabiner.json carries is the user's
+-- choice (config.toml [layout] virtual_keyboard, Automatic by default). It is
+-- read from the file on every regeneration, so a choice persisted by the menu is
+-- the one the next deploy writes. An unreadable file refuses the deploy instead
+-- of guessing a product.
+do
+	local virtual_keyboard_default = require("infra.manifest_reader").default_for("layout.virtual_keyboard")
+	local registered = type(karabiner) == "table" and karabiner.set_virtual_keyboard_source(function()
+		local flat = Preferences.current_view(config_paths.get("ConfigTomlPath"))
+		if flat == nil then error("config.toml cannot be read, so the virtual keyboard choice is unknown") end
+		if flat.layout_virtual_keyboard == nil then return virtual_keyboard_default end
+		return flat.layout_virtual_keyboard
+	end)
+	if registered ~= true then error("karabiner.set_virtual_keyboard_source did not commit") end
+end
 if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
 	error("karabiner.init did not commit")
 end

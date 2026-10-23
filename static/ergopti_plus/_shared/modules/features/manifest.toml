@@ -3688,6 +3688,27 @@ type = "enum"
 enum_values = ["native", "digits", "symbols"]
 description_key = "menu.layout.number_row"
 
+# The Karabiner virtual keyboard type macOS deploys
+# (karabiner.json virtual_hid_keyboard.keyboard_type_v2). It decides which
+# keycode the ISO-only key pair (the key left of 1 and the extra key left of Z)
+# reaches: the ANSI product passes an Apple ISO keyboard's pair through
+# unswapped, the ISO product swaps it once more (issue #99). "auto" resolves to
+# ANSI (modules/keymap/layout.lua AUTOMATIC_VIRTUAL_KEYBOARD_PRODUCT); an
+# explicit "iso" or "ansi" is deployed as chosen and never replaced by what the
+# active layout would suggest. Only macOS has a virtual keyboard: Windows
+# (SC029/SC056) and Linux (evdev 41/86) name these keys by position. Not
+# input-altering on its own: it only decides how the generated rules name keys.
+[[features.layout]]
+id = "virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
+default = "auto"
+recommended = "auto"
+input_altering = false
+type = "enum"
+enum_values = ["auto", "iso", "ansi"]
+description_key = "menu.layout.virtual_keyboard"
+
 # Whether « digits first » and « symbols first » also swap the two levels of the
 # three edge keys of the number row (left of 1, the two right of 0). Off: the
 # ordering moves the ten digit keys only and the edge keys type what the
@@ -5899,6 +5920,15 @@ unavailable = "hide"
 # The input sources macOS has enabled, under a header of their own (« Sources
 # de saisie »): without it the list read as more Ergopti settings.
 [[menu.layout_menu]]
+# The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
+[[menu.layout_menu]]
+type = "choice"
+id = "virtual_keyboard"
+path = "layout.virtual_keyboard"
+i18n = "menu.layout.virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
+
 type = "section_header"
 i18n = "menu.layout.active_layouts"
 platforms = ["hs"]
