@@ -1,0 +1,156 @@
+{
+	"schema_version": 1,
+	"plans": [
+		{
+			"name": "every origin direct needs no relay",
+			"entries": [
+				{ "origin": "https://a.example", "route": "direct" },
+				{ "origin": "https://b.example", "route": "direct" }
+			],
+			"expect": { "proxy": "direct", "no_proxy": "" }
+		},
+		{
+			"name": "one relay for every origin",
+			"entries": [
+				{ "origin": "https://a.example", "route": "http://relay.corp:3128" },
+				{ "origin": "https://b.example", "route": "http://relay.corp:3128" }
+			],
+			"expect": { "proxy": "http://relay.corp:3128", "no_proxy": "" }
+		},
+		{
+			"name": "a redirect target the PAC sends direct is excluded from the relay",
+			"entries": [
+				{ "origin": "https://registry.example", "route": "http://relay.corp:3128" },
+				{ "origin": "https://Blobs.Example", "route": "direct" }
+			],
+			"expect": { "proxy": "http://relay.corp:3128", "no_proxy": "blobs.example" }
+		},
+		{
+			"name": "a socks relay is exportable",
+			"entries": [{ "origin": "https://a.example", "route": "socks5://10.0.0.2:1080" }],
+			"expect": { "proxy": "socks5://10.0.0.2:1080", "no_proxy": "" }
+		},
+		{
+			"name": "an IPv6 relay keeps its brackets",
+			"entries": [{ "origin": "https://a.example", "route": "http://[fd00::1]:3128" }],
+			"expect": { "proxy": "http://[fd00::1]:3128", "no_proxy": "" }
+		},
+		{
+			"name": "the same origin twice with the same route is one entry",
+			"entries": [
+				{ "origin": "https://a.example", "route": "direct" },
+				{ "origin": "https://A.example", "route": "direct" },
+				{ "origin": "https://b.example", "route": "http://relay.corp:3128" }
+			],
+			"expect": { "proxy": "http://relay.corp:3128", "no_proxy": "a.example" }
+		},
+		{
+			"name": "two different relays cannot be exported through one variable",
+			"entries": [
+				{ "origin": "https://a.example", "route": "http://relay-a.corp:3128" },
+				{ "origin": "https://b.example", "route": "http://relay-b.corp:3128" }
+			],
+			"expect": { "reason": "route-plan-conflict" }
+		},
+		{
+			"name": "the same origin with two routes is a conflict",
+			"entries": [
+				{ "origin": "https://a.example", "route": "direct" },
+				{ "origin": "https://a.example", "route": "http://relay.corp:3128" }
+			],
+			"expect": { "reason": "route-plan-conflict" }
+		},
+		{
+			"name": "no entry is refused",
+			"entries": [],
+			"expect": { "reason": "route-plan-empty" }
+		},
+		{
+			"name": "an unsupported route scheme is refused",
+			"entries": [{ "origin": "https://a.example", "route": "ftp://relay.corp:21" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a route with a space is refused",
+			"entries": [{ "origin": "https://a.example", "route": "http://a b.example:1" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a route without a port is refused",
+			"entries": [{ "origin": "https://a.example", "route": "http://relay.corp" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a port out of range is refused",
+			"entries": [{ "origin": "https://a.example", "route": "http://relay.corp:70000" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a plain http origin is refused",
+			"entries": [{ "origin": "http://a.example", "route": "direct" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "an origin with a path is refused",
+			"entries": [{ "origin": "https://a.example/path", "route": "direct" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "an origin with credentials is refused",
+			"entries": [{ "origin": "https://u:p@a.example", "route": "direct" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "an invalid entry wins over a conflict",
+			"entries": [
+				{ "origin": "https://a.example", "route": "http://relay-a.corp:3128" },
+				{ "origin": "https://b.example", "route": "http://relay-b.corp:3128" },
+				{ "origin": "https://c.example", "route": "garbage" }
+			],
+			"expect": { "reason": "route-plan-invalid" }
+		}
+	],
+	"redirects": {
+		"plan": [
+			{ "origin": "https://registry.example", "route": "http://relay.corp:3128" },
+			{ "origin": "https://blobs.example", "route": "direct" }
+		],
+		"targets": [
+			{
+				"name": "a planned origin keeps its relay",
+				"url": "https://registry.example/v2/blob",
+				"expect": { "route": "proxy" }
+			},
+			{
+				"name": "a planned direct origin stays direct",
+				"url": "https://BLOBS.example./obj?x=1",
+				"expect": { "route": "direct" }
+			},
+			{
+				"name": "credentials and a port do not change the host",
+				"url": "https://user:secret@blobs.example:443/obj",
+				"expect": { "route": "direct" }
+			},
+			{
+				"name": "an unplanned host is refused, not guessed",
+				"url": "https://elsewhere.example/obj",
+				"expect": { "reason": "route-plan-unplanned-host" }
+			},
+			{
+				"name": "a downgrade to http is refused",
+				"url": "http://blobs.example/obj",
+				"expect": { "reason": "route-plan-invalid" }
+			},
+			{
+				"name": "a target without a host is refused",
+				"url": "https:///obj",
+				"expect": { "reason": "route-plan-invalid" }
+			},
+			{
+				"name": "garbage is refused",
+				"url": "not a url",
+				"expect": { "reason": "route-plan-invalid" }
+			}
+		]
+	}
+}
