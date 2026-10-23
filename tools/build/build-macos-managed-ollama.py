@@ -112,11 +112,23 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
             # requests ignored PAC, proxies and enterprise anchors, so a pull
             # behind a PAC-only proxy failed there. Redirect targets get no
             # registry exemption, as upstream NewRedirectClient decides.
+            # Upstream also refuses any redirect host this machine cannot
+            # resolve (ValidateRedirectTarget does a local lookup), which
+            # rejected every pull where only the proxy or the native worker
+            # resolves the download host: both validation calls use the port,
+            # which leaves an unresolved name to the carrier and keeps refusing
+            # literal and locally resolved non-public addresses.
             text = replace_once(
                 text,
                 "\tclient := transfer.NewRedirectClient(requestURL.String(), opts.Insecure)\n",
                 "\tclient := transfer.NewRedirectClient(requestURL.String(), opts.Insecure)\n"
-                '\tclient.Transport = nativehttp.WrapChecked(client.Transport, "", opts.Insecure)\n',
+                '\tclient.Transport = nativehttp.WrapChecked(client.Transport, "", opts.Insecure)\n'
+                "\tclient.CheckRedirect = nativehttp.RedirectPolicy(requestURL.String(), opts.Insecure)\n",
+            )
+            text = replace_once(
+                text,
+                "transfer.ValidateRedirectTarget(ctx, loc, requestURL.String(), opts.Insecure)",
+                "nativehttp.ValidateRedirectTarget(ctx, loc, requestURL.String(), opts.Insecure)",
             )
             text = replace_once(
                 text,

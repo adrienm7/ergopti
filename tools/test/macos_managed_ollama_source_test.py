@@ -105,6 +105,17 @@ class Hooks(unittest.TestCase):
             'client.Transport = nativehttp.WrapChecked(client.Transport, "", opts.Insecure)',
             download,
         )
+        # Upstream's redirect validation does a local lookup and refused every
+        # host only the proxy could resolve; both calls use the port instead.
+        self.assertIn(
+            "client.CheckRedirect = nativehttp.RedirectPolicy(requestURL.String(), opts.Insecure)",
+            download,
+        )
+        self.assertIn(
+            "nativehttp.ValidateRedirectTarget(ctx, loc, requestURL.String(), opts.Insecure)",
+            download,
+        )
+        self.assertNotIn("transfer.ValidateRedirectTarget(", download)
         self.assertIn("resp, err := nativehttp.Do(client, req)", download)
         self.assertNotIn("resp, err := client.Do(req)", download)
 

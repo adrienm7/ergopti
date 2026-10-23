@@ -153,6 +153,8 @@
 			"TestDestinationPolicyIndependentUpstreamVectors",
 			"TestDestinationPolicyRefusesNonPublicBeforeNativeWorker",
 			"TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer",
+			"TestValidateRedirectTargetLeavesUnresolvedHostToTheCarrier",
+			"TestRedirectPolicyStopsAfterTenHops",
 			"TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
 			"TestServeEnvironmentDisablesOllamaCloud",
 			"TestServeEnvironmentRefusesInvalidDeclarations"
