@@ -261,41 +261,155 @@ end
 ---  3. Applies it inside a transaction (INSERT OR IGNORE — replay is safe).
 ---  4. Bumps the watermark in the `devices` row.
 ---
---- Returns the byte offset (within `chunk`) of the end of the LAST complete
---- "COMMIT;" — i.e. the boundary up to which the chunk holds whole batches. 0 when
---- there is no complete batch yet (a torn cross-device copy of a mid-append file).
---- Exposed for testing (F-M3): applying past this boundary would exec an orphan
---- BEGIN and leave the connection in an open transaction.
---- @param chunk string Raw bytes read from a foreign data.sql past the watermark.
---- @return integer Offset of the last complete batch (0 if none).
-function M._last_complete_batch_offset(chunk)
+--- Locate the one canonical typing tuple without interpreting arbitrary values.
+--- Mac/Windows writers and the standalone compactor retain device_id,id first.
+local function _typing_values_start(line)
+	local upper = line:upper()
+	if not upper:match("^%s*INSERT%s") then return nil, false end
+	local target = upper:match("^%s*INSERT.-%s+INTO%s+([^%s%(]+)")
+	if not target then return nil, true end
+	local normalized = target:gsub('[`"%[%]]', "")
+	if normalized ~= "EVENTS_TYPING" and not normalized:match("%.EVENTS_TYPING$") then return nil, false end
+	local verb, columns, opening = upper:match(
+		"^%s*(INSERT.-)%s+INTO%s+EVENTS_TYPING%s*%((.-)%)%s*VALUES%s*()%(")
+	if not verb then return nil, true end
+	verb = verb:gsub("%s+", " ")
+	if verb ~= "INSERT" and verb ~= "INSERT OR IGNORE" and verb ~= "INSERT OR REPLACE" then return nil, true end
+	if not columns:match("^%s*DEVICE_ID%s*,%s*ID%s*,") then return nil, true end
+	return opening, false
+end
+
+--- Read only the known first device literal and numeric id of one tuple.
+local function _typing_tuple_id(chunk, opening, device_sql)
+	local at = opening + 1
+	while chunk:sub(at, at):match("%s") do at = at + 1 end
+	if chunk:sub(at, at + #device_sql - 1) ~= device_sql then return nil end
+	at = at + #device_sql
+	while chunk:sub(at, at):match("%s") do at = at + 1 end
+	if chunk:sub(at, at) ~= "," then return nil end
+	at = at + 1
+	while chunk:sub(at, at):match("%s") do at = at + 1 end
+	local first = at
+	while chunk:sub(at, at):match("%d") do at = at + 1 end
+	local id = tonumber(chunk:sub(first, at - 1))
+	while chunk:sub(at, at):match("%s") do at = at + 1 end
+	if math.type(id) ~= "integer" or id < 0 or chunk:sub(at, at) ~= "," then return nil end
+	return id
+end
+
+--- One lexical owner for complete SQL boundaries and optional rollover facts.
+--- Unknown producer forms cannot authorize resets; markerless continuity remains.
+local function _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
 	chunk = chunk or ""
-	local last_commit, i, n = 0, 1, #chunk
-	local in_string, in_comment = false, false
+	local last_commit, i, n, line_start = 0, 1, #chunk, 1
+	local in_string, in_comment, in_batch = false, false, false
+	local in_block = false
+	local max_id, committed_max, invalid_at, lower_id = nil, nil, nil, nil
+	local values_at, depth, tuple_seen = nil, 0, false
+	local markers, ids = {}, {}
 	while i <= n do
 		local ch = chunk:sub(i, i)
-		if in_comment then
+		local blocked = in_block
+		if device_sql and not in_string and not in_comment then
+			if in_block then
+				if ch == "*" and chunk:sub(i + 1, i + 1) == "/" then in_block = false; i = i + 1 end
+			elseif ch == "/" and chunk:sub(i + 1, i + 1) == "*" then
+				-- Unsupported block contents cannot hide a later real producer marker.
+				in_block, blocked, invalid_at = true, true, invalid_at or i
+			end
+		end
+		if not blocked and device_sql and not in_string and not in_comment then
+			if i == line_start then
+				local ending = chunk:find("\n", i, true) or (n + 1)
+				local line = chunk:sub(i, ending - 1)
+				if line:upper():match("^%s*BEGIN[%s;]") then in_batch = true end
+				if not in_batch and is_rollover(line) then
+					markers[#markers + 1] = { at = i, id = max_id }
+					lower_id = max_id
+				end
+				local opening, unknown = _typing_values_start(line)
+				if unknown then invalid_at = invalid_at or i end
+				if opening then values_at, depth, tuple_seen = i + opening - 1, 0, false end
+			end
+			if values_at and i >= values_at then
+				if ch == "(" then
+					if depth == 0 then
+						local id = not tuple_seen and _typing_tuple_id(chunk, i, device_sql) or nil
+						if id == nil or (lower_id and id <= lower_id) then invalid_at = invalid_at or i
+						else
+							max_id = math.max(max_id or id, id)
+							if collect_ids then ids[#ids + 1] = { at = i, id = id } end
+						end
+						tuple_seen = true
+					end
+					depth = depth + 1
+				elseif ch == ")" then depth = depth - 1
+				elseif ch == ";" then values_at = nil end
+			end
+		end
+		if blocked then
+			-- Fact scans skip block tokens; the public legacy offset scan is unchanged.
+		elseif in_comment then
 			if ch == "\n" then in_comment = false end
 		elseif in_string then
 			if ch == "'" then
-				-- SQLite represents a literal apostrophe by doubling it.
 				if chunk:sub(i + 1, i + 1) == "'" then i = i + 1
 				else in_string = false end
 			end
 		elseif ch == "-" and chunk:sub(i + 1, i + 1) == "-" then
 			in_comment = true
 			i = i + 1
-		elseif ch == "'" then
-			in_string = true
+		elseif ch == "'" then in_string = true
 		elseif ch == "\n" and chunk:sub(i + 1, i + 8) == "COMMIT;\n" then
-			-- The marker must be a SQL statement, not user text embedded in a
-			-- multi-line literal.  The lexical state above makes that distinction.
-			last_commit = i + 8
+			-- Keep the legacy byte-offset contract: only an outside-literal COMMIT.
+			last_commit, committed_max, in_batch = i + 8, max_id, false
 			i = i + 8
+			line_start = i + 1
 		end
+		if ch == "\n" then line_start = i + 1 end
 		i = i + 1
 	end
-	return last_commit
+	if not device_sql then return last_commit end
+	local trailing = is_rollover(chunk:sub(last_commit + 1))
+	local facts = { cutoffs = {}, ids = {}, max_id = committed_max, has_markers = false,
+		unreadable = invalid_at ~= nil and invalid_at <= last_commit }
+	for _, marker in ipairs(markers) do
+		if marker.at <= last_commit or trailing then
+			facts.has_markers = true
+			if marker.id ~= nil and facts.cutoffs[#facts.cutoffs] ~= marker.id then
+				facts.cutoffs[#facts.cutoffs + 1] = marker.id
+			end
+		end
+	end
+	for _, item in ipairs(ids) do
+		if item.at <= last_commit then facts.ids[item.id] = true end
+	end
+	return last_commit, facts
+end
+
+--- Return the legacy last complete LF-terminated COMMIT byte offset.
+---@param chunk string
+---@return integer
+function M._last_complete_batch_offset(chunk)
+	local offset = _scan_ledger(chunk)
+	return offset
+end
+
+--- Read authoritative per-device typing cutoffs from uncompacted producer SQL.
+--- Multi-tuple/unknown INSERT forms are refused when marker facts are required.
+---@param chunk string
+---@param device_sql string SQL-escaped device literal from the canonical writer.
+---@param collect_ids boolean|nil Collect ids only for the bounded local outbox.
+---@param is_rollover function Strict canonical suffix predicate owned by LogManager.
+---@return table|nil facts
+---@return string|nil error_message
+function M._typing_rollover_boundaries(chunk, device_sql, collect_ids, is_rollover)
+	assert(type(is_rollover) == "function", "canonical rollover predicate required")
+	local _, facts = _scan_ledger(chunk, device_sql, collect_ids, is_rollover)
+	if facts.has_markers and facts.unreadable then
+		return nil, "unsupported or ambiguous typing SQL at a rollover boundary"
+	end
+	return facts
 end
 
 --- Read a ledger suffix only after the committed offset and file close agree.
