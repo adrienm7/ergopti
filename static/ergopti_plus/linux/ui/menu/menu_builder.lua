@@ -45,7 +45,6 @@ local Modal = require("ui.modal")
 local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
-local LlmConfigGuard = require("ui.menu.llm_config_guard")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
@@ -2763,8 +2762,9 @@ local function _build_llm(ctx)
 		if not rows then return end
 		-- The profile parent writes config.toml: it names the same cause as the
 		-- switch, and its retained rows recheck it at click time.
-		local blocked = LlmConfigGuard.reason()
-		LlmConfigGuard.protect(rows)
+		local ConfigGuard = require("ui.menu.llm_config_guard")
+		local blocked = ConfigGuard.reason()
+		ConfigGuard.protect(rows)
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
@@ -3017,9 +3017,10 @@ local function _build_llm(ctx)
 		-- These rows write config.toml: name the cause when it refuses writes and
 		-- recheck it when a retained row is clicked.
 		if type(rows) == "table" then
-			local blocked = LlmConfigGuard.reason()
-			LlmConfigGuard.protect(rows)
-			LlmConfigGuard.grey_list(rows, blocked, blocked and i18n_safe(blocked) or "")
+			local ConfigGuard = require("ui.menu.llm_config_guard")
+			local blocked = ConfigGuard.reason()
+			ConfigGuard.protect(rows)
+			ConfigGuard.grey_list(rows, blocked, blocked and i18n_safe(blocked) or "")
 		end
 		return rows
 	end
