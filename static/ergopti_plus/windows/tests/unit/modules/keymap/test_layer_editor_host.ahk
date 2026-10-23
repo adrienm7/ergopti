@@ -429,3 +429,5 @@ _LEH_LayerKeysFollowTheTapHolds() {
 	AssertEqual(0, LayerEditor_LayerKeys(Map("keys", Map())).Length, "no tap-hold, no layer key")
 }
 Test("layer editor host: the layer key comes from the tap-hold configuration", _LEH_LayerKeysFollowTheTapHolds)
+
+#Include test_layer_editor_save_admission.ahk
