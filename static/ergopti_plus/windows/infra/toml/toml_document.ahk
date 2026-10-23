@@ -464,12 +464,12 @@ TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
 	Roots := _TOML_ForeignArrayRoots(Physical)
 	Projection := _TOML_FlatDocument(_TOML_ArrayProjectionSections(Before, Roots))
-	TOML_ParseDocument(Candidate)
+	TOML_ParseDocument(Candidate, , &CandidatePhysical)
 	InlineAdmitted := _TOML_AdmitInlineTerminatorParent(Source, Document, Physical, Before, After, Candidate, Updates, Prefixes)
 	if InlineAdmitted is Map
 		return InlineAdmitted
 	if TOML_SameValue(Document, Projection) {
-		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes)
+		Content := _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes, Physical, CandidatePhysical)
 		if !TOML_SameValue(TOML_ParseDocument(Content), _TOML_FlatDocument(After))
 			throw ValueError("The physical TOML candidate differs from the requested model")
 		return Map("content", Content, "preserve_source", false)
@@ -506,9 +506,13 @@ _TOML_RecordOwned(Record, Owners, Prefixes) {
 ; Unmatched physical records are user data. Keep their complete lexical spans,
 ; including comments inside multiline arrays, instead of re-encoding values.
 ; Explicitly owned rows still come from the existing canonical serializer.
-_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
-	TOML_ParseDocument(Source, , &Physical)
-	TOML_ParseDocument(Candidate, , &Canonical)
+_TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes, Physical := 0, Canonical := 0) {
+	; A caller that already parsed one side hands over its lexical records, so a
+	; transaction does not tokenize the same text twice. Both lists are only read.
+	if !(Physical is Array)
+		TOML_ParseDocument(Source, , &Physical)
+	if !(Canonical is Array)
+		TOML_ParseDocument(Candidate, , &Canonical)
 	Owners := Map(), Rows := Map(), Headers := Map(), Order := []
 	Spacing := "", Separator := ""
 	for Update in Updates {
