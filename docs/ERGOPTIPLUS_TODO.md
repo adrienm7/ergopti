@@ -289,8 +289,14 @@ Added October 22 (from the agents' reports; details in their commits):
       (17d2f1a7fd). The `hs274_persistence_test.py` cases are dead (their fixture moved into
       `test_physical_history_persistence.lua`): repair or retire them.
 - [ ] **Linux CI installs packages inside short test steps.** [CI] 25 Linux steps still run apt
-      inside a test step with a short timeout (a649f2930a moved the network-ai one out); move the
-      installs to their own steps.
+      inside a test step with a short timeout (a649f2930a moved the network-ai one out; f1b5c7f684
+      fails a stalled mirror within 30 s; 409d0faac7 moved the window-switch one); move the
+      installs to their own steps (about twenty left).
+- [ ] **CI partial rerun refused by the site verdict.** [CI] `gh run rerun --failed` makes the site
+      verdict fail with "Build receipt differs from selected writer attempt", so only full runs
+      can be retried today; admit a rerun attempt of the writer.
+- [ ] **macOS "Quit did not end both processes within 10 s".** [CI] Seen once in the October 23
+      CI, passed on rerun; find the cause (green run 39889203911 at e0dd6629e4).
 - [ ] **History hygiene of October 22.** Commits with another agent's message, already on dev:
       c6db589c76 (macOS cipher argv fix under a README subject), 90da28c725 (config snapshot test
       under a CI subject), 18ca214ead (also deletes ten handoff files), 6d9c659 ("applied for now"
