@@ -120,13 +120,13 @@ a sealed Windows updater source, reseal with
 - [ ] **50. SendEvent against SendInput.** [PHYS-W] `SendMode("Event")` is set, yet the hotstring
       send/dispatch, text sender and config I/O still call SendInput. Measure expansions, pastes and
       predictions (latency, lost or interleaved keys) before choosing.
-      Status 2026-10-24: Debug > Measure SendEvent vs SendInput is in; first measurement here: all
-      repetitions exact, expansion 152 ms (SendInput) vs 262 ms (SendEvent), prediction 198 vs 386 ms,
-      paste 16 vs 9 ms. Left: the run on the maintainer's PC with the driver as the only hook, and the
-      interleave test against a second process.
-
-## Big item 4: layout composed from layers, all three OS (October 13 request)
-
+      Measured on the maintainer's PC (8 repetitions per scenario, all exact, 0 lost, 0 interleaved in
+      both modes): expansion median 50.6 ms (SendInput) vs 136.8 ms (SendEvent), prediction 56.1 vs
+      191.0 ms, paste 3.6 vs 3.8 ms, a concurrent key during the send 201 vs 282 ms. SendInput is 2.7
+      to 3.4 times faster and no less exact, so the hotstring send/dispatch, text sender and config I/O
+      keep SendInput; the global `SendMode("Event")` stays only where a consumer needs the hook-order
+      semantics of item 49. Left: drop or justify that global once the hook-order check (item 49) has
+      run on the PC.
 - [ ] **Per-layer layout composer.** [CODE] Decided 2026-10-22: the per-row number-row switches do
       not cover the October 13 request. Not started. Spec: split the layout into four layers (base,
       Shift, AltGr, Shift+AltGr), each with a dropdown that takes that layer from any layout (for
@@ -251,7 +251,7 @@ Added October 22 (from the agents' reports; details in their commits):
       line cap judged per line (5deb892d58); Ollama 412 upgrade request shown (08aaeaf3c2);
       diagnostics PAC probe on the three OS (f798aae1f9); one-click Debug checks (lease, owned
       runtime, network, 30 s key accounting). Left: (1) read the Mac's next log lines `Slow ingest
-    tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
+  tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
       phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
       Jan) all answer "Network request failed"; (4) `keymap/utils.lua` ignored-window TTL probe
       (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
