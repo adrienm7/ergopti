@@ -97,5 +97,7 @@ TrayStartupOnboarding() {
 /** Executes admitted intents through the ordinary menu command owner. */
 TrayStartupCommand(Id) {
 	Commands := Map("suspend", ToggleSuspend, "reload", ActivateReload, "quit", ActivateExitApp)
-	return MenuCommandRun(MenuStartupSafeCommand(Commands[Id]), [])
+	; A retained Reload meets a reload already in flight like a click on the row.
+	Command := Id == "reload" ? MenuStartupReloadCommand(Commands[Id]) : MenuStartupSafeCommand(Commands[Id])
+	return MenuCommandRun(Command, [])
 }

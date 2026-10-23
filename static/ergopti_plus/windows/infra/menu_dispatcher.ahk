@@ -700,6 +700,14 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 				try LoggerWarn("MenuDispatcher", "Menu command refused because its native registration was retired.")
 				return false
 		}
+		; A Reload click made while a reload is in flight joins it: the successor
+		; is already loading from what is on disk, so the click is logged and
+		; dropped, never held and replayed as a second reload (Linux and macOS
+		; follow the same rule).
+		if !Held && Callback is MenuStartupReloadCommand && ReloadTerminalHandoffActive() {
+			try LoggerInfo("MenuDispatcher", "Menu click on the Reload row joined the reload in flight; no second reload.")
+			return ""
+		}
 		if !Held && MenuStartupCommands_Defer(Callback, Args, Registration)
 			return ""
 		; From the successor's launch to this instance's exit the terminal barrier

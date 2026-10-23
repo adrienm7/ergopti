@@ -358,6 +358,16 @@ class DriverControlSession {
 			this.Report(Fields)
 			return false
 		}
+		; A reload already in flight is joined, as on Linux and macOS for a menu
+		; click: its successor completes this request too. The result file holds
+		; one record, so the newest request takes over the report.
+		InFlight := this.InFlightSuccessor()
+		if InFlight > 0 {
+			try LoggerInfo("DriverControl", "Reload request {1} joined the reload in flight (successor pid {2}); no second reload.",
+				Id, InFlight)
+			this.Report(Map("request_id", Id, "state", "requested", "successor_pid", InFlight))
+			return true
+		}
 		try LoggerInfo("DriverControl", "Reload request {1} admitted; the reload owner decides.", Id)
 		Started := this.Ports["reload"].Call(0, 0, ObjBindMethod(this, "Refused", Id),
 			ObjBindMethod(this, "StageRefused", Id))
@@ -380,6 +390,14 @@ class DriverControlSession {
 			try LoggerInfo("DriverControl", "Reload request {1} requested; successor pid {2} completes it once ready.", Id, Successor)
 			return true
 		} finally Critical(PreviousCritical)
+	}
+
+	/** The pid of the successor an earlier reload already launched, 0 when none is in flight. */
+	InFlightSuccessor() {
+		Pending := this.Ports["pending"].Call()
+		Successor := (Pending is Map) && (Pending.Get("successor", 0) is Map)
+			? Pending["successor"].Get("pid", 0) : 0
+		return (Successor is Integer) && Successor > 0 ? Successor : 0
 	}
 
 	/** The reload owner refused after launching the successor. */
