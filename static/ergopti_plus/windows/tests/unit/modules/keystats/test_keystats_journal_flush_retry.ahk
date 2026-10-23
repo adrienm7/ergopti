@@ -62,3 +62,5 @@ for RefuseFlush in [false, true] {
 		Test("keystats: real journal retry flush=" . RefuseFlush . " append=" . RejectSecond
 			. " (keystats-journal-flush-retry)", _KJFR_Retry.Bind(RefuseFlush, RejectSecond))
 }
+
+#Include test_keylogger_fire_publication_owner.ahk
