@@ -275,6 +275,30 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.runtime_owner_ports",
+		contract = { "new", "unpinned_count" },
+		-- Required only by the remap bridge after the hidden `runtime = "owned"` opt-in.
+		wired    = true,
+	},
+	{
+		id       = "adapters.runtime_capture_port",
+		contract = { "new" },
+		-- Built by the owned runtime ports; dormant at default boot.
+		wired    = true,
+	},
+	{
+		id       = "adapters.installed_physical_source",
+		contract = { "new", "module_path" },
+		-- Built by the owned runtime's capture port and the owned runtime field check.
+		wired    = true,
+	},
+	{
+		id       = "adapters.karabiner_coexistence",
+		contract = { "new" },
+		-- Built by the owned runtime ports and the field check; acts only when consented.
+		wired    = true,
+	},
+	{
 		id       = "adapters.system_switcher_sampler",
 		contract = { "new" },
 		wired    = true,
