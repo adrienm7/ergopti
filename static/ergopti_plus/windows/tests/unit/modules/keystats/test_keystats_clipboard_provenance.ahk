@@ -236,3 +236,5 @@ Test("keystats clipboard: the paste observer keeps the exact Ctrl+V and Shift+In
 	_KCP_PasteChordsKeepTheirExactModifiers)
 
 #Include test_clipboard_provenance_owner.ahk
+
+#Include test_clipboard_paste_burst_owner.ahk
