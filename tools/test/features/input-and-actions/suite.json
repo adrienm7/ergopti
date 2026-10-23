@@ -634,6 +634,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-neutral-installation.cjs"],
 			"repro": "npm run test:neutral-installation"
+		},
+		{
+			"id": "js-0458",
+			"ordinal": 458,
+			"name": "the owned Karabiner runtime pin is all-or-nothing and its driver pin equals the build tooling's",
+			"cmd": "node",
+			"args": ["tools/test/test-remap-runtime-manifest.cjs"],
+			"repro": "npm run test:remap-runtime-manifest"
 		}
 	]
 }

@@ -4,50 +4,56 @@
 --- MODULE: Owned Runtime Ports (Hammerspoon)
 --- DESCRIPTION:
 --- The real Mac side of platform/remap/runtime_owner.lua: file existence,
---- read-only launchd and system extension queries, a count of other active
---- Karabiner processes, and the spawn of the owned Console process. Only
---- required when the user opts in to the owned runtime.
+--- read-only launchd and system extension queries, the detection and the consented
+--- closing of another Karabiner, the pinned artifact, the physical capture and a
+--- timer. Only required when the user opts in to the owned runtime.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-Only Observation: launchd is only ever asked to print a job and the
 ---    system extension tool only to list; the privileged jobs belong to the
 ---    installer.
---- 2. Stock Karabiner Is Counted, Never Touched: the coexistence port detects
----    the official application by name and binds no closer. The owner therefore
----    reports an explicit unavailable state instead of quitting a user's own
----    Karabiner until a reviewed closer exists.
---- 3. Artifact Not Shipped: no pinned runtime manifest exists yet (WP5), so the
----    artifact port says so, and the owner stays unavailable with that reason
----    rather than guessing a driver version or a capture executable.
---- 4. One Command Runner: bounded commands reuse the field check's runner.
+--- 2. One Place Acts On Stock Karabiner: coexistence is adapters/karabiner_coexistence.lua,
+---    which runs Karabiner's own quit steps and only when the owner holds the
+---    user's consent.
+--- 3. No Process Here: the Console is owned by the launcher's installed-source
+---    role behind the capture port, so this module spawns nothing.
+--- 4. Artifact From The Manifest: the pinned artifact is whatever
+---    vendor/remap-runtime/manifest.json pins completely; an unpinned manifest is a
+---    named refusal, never a guessed driver version.
+--- 5. One Command Runner: bounded commands reuse the field check's runner.
 --- ==============================================================================
 
 local M = {}
 
 local FileSystem = require("adapters.file_system")
 local FieldCheckPorts = require("adapters.field_check_ports")
-local ShellRunner = require("adapters.shell_runner")
+local NativePath = require("native_path")
 
 -- Seconds an observation may take before it is a failure rather than an answer.
 local COMMAND_TIMEOUT = 5
 -- launchctl's exit status for a service that is not loaded.
 local UNKNOWN_SERVICE_STATUS = 113
 
---- Counts the non-empty lines of a command output.
---- @param text any Command output.
---- @return integer
-local function count_lines(text)
-	local count = 0
-	for line in tostring(text or ""):gmatch("[^\r\n]+") do
-		if line:match("%S") then count = count + 1 end
+-- The runtime manifest, relative to this module's directory.
+local MANIFEST_RELATIVE = "../vendor/remap-runtime/manifest.lua"
+
+--- Reads and judges the shipped runtime manifest.
+--- @return table|nil pinned The owner's pinned facts.
+--- @return string|nil reason Why there are none.
+local function pinned_artifact()
+	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
+	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
+	if not loaded or type(manifest) ~= "table" then
+		return nil, "the runtime manifest could not be read"
 	end
-	return count
+	return require("platform.remap.runtime_manifest").pinned(manifest)
 end
 
 --- The ports of the real Mac.
 --- @return table ports For platform.remap.runtime_owner.init.
 function M.new()
 	local exec = FieldCheckPorts.exec
+	local Coexistence = require("adapters.karabiner_coexistence").new()
 	return {
 		fs = {
 			exists = FileSystem.exists,
@@ -70,25 +76,14 @@ function M.new()
 			end,
 		},
 		coexistence = {
-			detect = function(callback)
-				exec("/usr/bin/pgrep", { "-f", "Karabiner-Elements" }, COMMAND_TIMEOUT, function(code, output)
-					-- pgrep exits 1 when nothing matches; a timeout or any other status is unknown.
-					if code == 0 then return callback(count_lines(output)) end
-					callback(code == 1 and 0 or nil)
-				end)
-			end,
-		},
-		process = {
-			owner_pid = function() return hs.processInfo.processID end,
-			spawn = function(executable, arguments, environment, on_exit)
-				return ShellRunner.spawn(executable, arguments, function(code) on_exit(code) end, nil, environment)
-			end,
+			detect = Coexistence.detect,
+			close = Coexistence.close,
 		},
 		artifact = {
-			pinned = function()
-				return nil, "no runtime artifact manifest ships with this build"
-			end,
+			pinned = pinned_artifact,
 		},
+		capture = require("adapters.runtime_capture_port").new(),
+		timer = require("adapters.timer_scheduler"),
 	}
 end
 

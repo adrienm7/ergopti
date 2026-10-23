@@ -26,7 +26,7 @@ local Fixture = require("tests.support.platform.remap.runtime_owner_fixture")
 --- @return string|nil explanation
 local function admit(owner, options)
 	local settled = {}
-	local start_options = { close_other_instances = true, capture = false }
+	local start_options = { close_other_instances = true }
 	for key, value in pairs(options or {}) do start_options[key] = value end
 	helpers.assert_true(owner.start(start_options, function(...) settled = table.pack(...) end))
 	return settled[1], settled[2], settled[3]
@@ -51,7 +51,8 @@ helpers.describe("owned runtime owner: dormant until asked", function()
 		for _, group in pairs(world.ports) do
 			if type(group) == "table" then
 				for name, fn in pairs(group) do
-					if type(fn) == "function" then
+					-- Registering the loss callback is part of binding: it reads nothing.
+					if type(fn) == "function" and name ~= "on_lost" then
 						group[name] = function(...) touched = touched + 1; return fn(...) end
 					end
 				end
@@ -60,7 +61,7 @@ helpers.describe("owned runtime owner: dormant until asked", function()
 		helpers.assert_true(owner.init(world.ports))
 		helpers.assert_eq(touched, 0)
 		helpers.assert_eq(owner.status().state, "idle")
-		helpers.assert_eq(#world.calls.spawn, 0)
+		helpers.assert_eq(#world.calls.capture_start, 0)
 		helpers.assert_eq(owner.admitted(), false)
 	end)
 
@@ -81,15 +82,23 @@ helpers.describe("owned runtime owner: dormant until asked", function()
 		helpers.assert_throws(function() owner.init(world.ports) end)
 		helpers.assert_eq(owner.status().state, "uninitialized")
 		local other = Fixture.new_world()
-		other.ports.process.owner_pid = nil
+		other.ports.capture.on_lost = nil
 		helpers.assert_throws(function() owner.init(other.ports) end)
+		local timerless = Fixture.new_world()
+		timerless.ports.timer = nil
+		helpers.assert_throws(function() owner.init(timerless.ports) end)
+		local captureless = Fixture.new_world()
+		captureless.ports.capture = nil
+		helpers.assert_throws(function() owner.init(captureless.ports) end)
+		helpers.assert_eq(owner.status().state, "uninitialized")
 	end)
 
 	helpers.it("rejects a start before initialization and invalid start options", function()
 		local owner = Fixture.load_owner()
-		helpers.assert_throws(function() owner.start({ close_other_instances = true, capture = false }) end)
+		helpers.assert_throws(function() owner.start({ close_other_instances = true }) end)
 		helpers.assert_true(owner.init(Fixture.new_world().ports))
-		helpers.assert_throws(function() owner.start({ capture = false }) end)
+		helpers.assert_throws(function() owner.start({}) end)
+		helpers.assert_throws(function() owner.start({ close_other_instances = "yes" }) end)
 	end)
 end)
 
@@ -104,7 +113,7 @@ end)
 -- ==========================================
 
 helpers.describe("owned runtime owner: admission", function()
-	helpers.it("admits a complete, compatible, uncontested runtime without spawning anything", function()
+	helpers.it("admits a complete, compatible, uncontested runtime without starting anything", function()
 		local owner, world = Fixture.load_owner(), Fixture.new_world()
 		owner.init(world.ports)
 		local admitted, reason = admit(owner)
@@ -112,7 +121,8 @@ helpers.describe("owned runtime owner: admission", function()
 		helpers.assert_nil(reason)
 		helpers.assert_eq(owner.status().state, "admitted")
 		helpers.assert_eq(owner.admitted(), true)
-		helpers.assert_eq(#world.calls.spawn, 0)
+		helpers.assert_eq(#world.calls.capture_start, 0)
+		helpers.assert_eq(#world.calls.timers, 0)
 		helpers.assert_eq(world.calls.close, 0)
 	end)
 
@@ -154,7 +164,7 @@ helpers.describe("owned runtime owner: admission", function()
 		helpers.assert_contains(explanation, "confirmation")
 		helpers.assert_eq(job_reads, 0)
 		helpers.assert_eq(world.calls.close, 0)
-		helpers.assert_eq(#world.calls.spawn, 0)
+		helpers.assert_eq(#world.calls.capture_start, 0)
 		helpers.assert_eq(owner.admitted(), false)
 		helpers.assert_eq(owner.status().explanation, explanation)
 	end)
@@ -295,20 +305,21 @@ end)
 -- ==================================
 
 helpers.describe("owned runtime owner: physical capture admission", function()
-	helpers.it("refuses a requested capture the artifact does not declare", function()
+	helpers.it("refuses an artifact that declares no capture, since the capture is the only way to a Console", function()
 		local owner, world = Fixture.load_owner(), Fixture.new_world()
 		world.pinned.capture = nil
 		owner.init(world.ports)
-		local _, reason = admit(owner, { capture = true })
+		local _, reason, explanation = admit(owner)
 		helpers.assert_eq(reason, "capture_unpinned")
+		helpers.assert_contains(explanation, "capture")
+		helpers.assert_eq(#world.calls.capture_start, 0)
 	end)
 
-	helpers.it("refuses a requested capture when no capture owner is bound", function()
+	helpers.it("takes no capture option: the user side of the runtime always runs with the capture", function()
 		local owner, world = Fixture.load_owner(), Fixture.new_world()
-		world.ports.capture = nil
 		owner.init(world.ports)
-		local _, reason = admit(owner, { capture = true })
-		helpers.assert_eq(reason, "capture_unbound")
+		helpers.assert_eq((admit(owner, { capture = false })), true)
+		helpers.assert_eq(#world.calls.capture_start, 0)
 	end)
 end)
 
@@ -328,8 +339,7 @@ helpers.describe("owned runtime owner: results that arrive late", function()
 		world.deferred = true
 		owner.init(world.ports)
 		local settled = false
-		helpers.assert_true(owner.start({ close_other_instances = true, capture = false },
-			function() settled = true end))
+		helpers.assert_true(owner.start({ close_other_instances = true }, function() settled = true end))
 		helpers.assert_eq(owner.status().state, "starting")
 		helpers.assert_eq(owner.stop(), true)
 		world.flush()
@@ -342,7 +352,7 @@ helpers.describe("owned runtime owner: results that arrive late", function()
 		local owner, world = Fixture.load_owner(), Fixture.new_world()
 		world.deferred = true
 		owner.init(world.ports)
-		helpers.assert_true(owner.start({ close_other_instances = true, capture = false }))
-		helpers.assert_eq(owner.start({ close_other_instances = true, capture = false }), false)
+		helpers.assert_true(owner.start({ close_other_instances = true }))
+		helpers.assert_eq(owner.start({ close_other_instances = true }), false)
 	end)
 end)

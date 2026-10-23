@@ -6776,7 +6776,9 @@ function M._owned.start()
 	end
 	M._owned.owner = Owner
 	local epoch = _lifecycle_epoch
-	local accepted = Owner.start({ close_other_instances = Owner.CLOSE_OTHER_INSTANCES_DEFAULT, capture = false },
+	-- The user's consent to closing an official Karabiner is the hidden key, whose
+	-- absent default is the decided `true`; it is never assumed here.
+	local accepted = Owner.start({ close_other_instances = _state.close_other_instances == true },
 		function(admitted, reason, explanation)
 			if epoch ~= _lifecycle_epoch or not _running then return end
 			if admitted ~= true then
@@ -6934,6 +6936,7 @@ function M.init(file_system)
 	_state = {
 		enabled                   = user_cfg.enabled,
 		runtime                   = runtime,
+		close_other_instances     = user_cfg.close_other_instances,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,

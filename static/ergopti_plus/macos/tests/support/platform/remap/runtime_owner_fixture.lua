@@ -4,10 +4,11 @@
 --- MODULE: Owned Runtime Owner Fixture
 --- DESCRIPTION:
 --- A modelled Mac for platform/remap/runtime_owner.lua: an in-memory filesystem,
---- launchd, system extension listing, other-Karabiner processes, a process
---- spawner and a physical capture, every one of them recording its calls. A
---- test that needs a callback to arrive later sets `world.deferred = true` and
---- delivers the queue itself with `world.flush()`.
+--- launchd, system extension listing, other-Karabiner processes, a physical
+--- capture and a manual timer, every one of them recording its calls. A test
+--- that needs a callback to arrive later sets `world.deferred = true` and
+--- delivers the queue itself with `world.flush()`; a test that needs time to pass
+--- calls `world.tick()`.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -41,12 +42,13 @@ function M.new_world()
 		others = 0,
 		close_result = true,
 		others_after_close = 0,
-		calls = { spawn = {}, terminate = 0, capture_start = {}, capture_stop = 0, close = 0, states = {} },
-		pinned = { virtual_hid_version = M.VHID_VERSION, capture = { executable = "/owned/cli" } },
+		calls = { capture_start = {}, capture_stop = 0, close = 0, states = {}, timers = {}, cancelled = 0 },
+		pinned = { virtual_hid_version = M.VHID_VERSION, capture = { requirement = "pinned" } },
 		capture_accepts = true,
 		capture_settles_sync = true,
-		peer_starts = true,
-		peer_settles_on_terminate = true,
+		capture_state = "starting",
+		timers = {},
+		timer_commits = true,
 	}
 	for _, path in ipairs({ KePaths.OWNED.CLI, KePaths.OWNED.CORE_SERVICE, KePaths.OWNED.CONSOLE,
 		KePaths.OWNED.CORE_JOB_FILE, "/home/user/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json" }) do
@@ -64,8 +66,21 @@ function M.new_world()
 	function world.flush()
 		while #world.pending > 0 do table.remove(world.pending, 1)() end
 	end
+	--- Lets the armed timers fire once, oldest first.
+	--- @return integer fired
+	function world.tick()
+		local due = world.timers
+		world.timers = {}
+		local fired = 0
+		for _, timer in ipairs(due) do
+			if not timer.cancelled then
+				fired = fired + 1
+				timer.callback()
+			end
+		end
+		return fired
+	end
 
-	local peer_exit
 	world.ports = {
 		fs = {
 			exists = function(path) return world.files[path] == true end,
@@ -93,23 +108,6 @@ function M.new_world()
 				deliver(callback, world.close_result)
 			end,
 		},
-		process = {
-			owner_pid = function() return 4242 end,
-			spawn = function(executable, arguments, environment, on_exit)
-				world.calls.spawn[#world.calls.spawn + 1] = { executable = executable, arguments = arguments,
-					environment = environment }
-				peer_exit = on_exit
-				local handle = { settled = false }
-				function handle.start() return world.peer_starts end
-				function handle.isSettled() return handle.settled end
-				function handle.terminate()
-					world.calls.terminate = world.calls.terminate + 1
-					if world.peer_settles_on_terminate then world.exit_peer(0) end
-				end
-				world.peer = handle
-				return handle
-			end,
-		},
 		artifact = {
 			pinned = function()
 				if world.pinned == nil then return nil, "manifest absent" end
@@ -127,17 +125,25 @@ function M.new_world()
 				world.capture_stop_callback = callback
 				return false
 			end,
-			status = function() return { state = "capturing", settled = true } end,
+			status = function() return { state = world.capture_state } end,
+			on_lost = function(callback) world.lost_callback = callback end,
+		},
+		timer = {
+			after = function(seconds, callback)
+				world.calls.timers[#world.calls.timers + 1] = seconds
+				local handle = { callback = callback }
+				if not world.timer_commits then return handle, false end
+				world.timers[#world.timers + 1] = handle
+				return handle, true
+			end,
+			cancel = function(handle)
+				handle.cancelled = true
+				world.calls.cancelled = world.calls.cancelled + 1
+				return true
+			end,
 		},
 		observer = function(state) world.calls.states[#world.calls.states + 1] = state end,
 	}
-
-	--- Makes the spawned peer exit, as the process owner would report it.
-	--- @param code integer Exit code.
-	function world.exit_peer(code)
-		world.peer.settled = true
-		peer_exit(code)
-	end
 	return world
 end
 
