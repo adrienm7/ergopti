@@ -323,3 +323,47 @@ helpers.describe("updater restart: the daemon restarts on an installed update", 
 	end)
 
 end)
+
+
+helpers.describe("Main restart pause wiring", function()
+	local function main_source()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		return source
+	end
+
+	helpers.it("passes pause through both actual Main helpers", function()
+		local source = main_source()
+		for _, name in ipairs({ "restart_daemon", "restart_on_installed_release" }) do
+			local first = assert(source:find("local function " .. name .. "(", 1, true))
+			local last = assert(source:find("\nend\n", first, true))
+			local text = source:sub(first, last + 4):gsub("^local function " .. name, "return function", 1)
+			local received, shutdowns
+			local environment = setmetatable({ arg = { "--tray", "space ' apostrophe" },
+				updater = { installed_launcher = function() return "/installed/launcher" end },
+				shutdown = { request = function() shutdowns = true end },
+				require = function(module)
+					helpers.assert_true(module == "infra.daemon_restart" or module == "modules.updater.restarter")
+					return { restart = function(opts) received = opts; return "relay" end }
+				end }, { __index = _G })
+			local chunk
+			if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
+			else chunk = assert(load(text, "Main restart pause helper", "t", environment)) end
+			local helper = chunk()
+			if name == "restart_daemon" then helpers.assert_true(helper("configuration restored", true))
+			else helpers.assert_true(helper(true)) end
+			helpers.assert_eq(received.paused, true, "the Main helper must forward live pause")
+			helpers.assert_eq(received.args, { "--tray", "space ' apostrophe" })
+			helpers.assert_true(shutdowns)
+		end
+	end)
+
+	helpers.it("captures current pause at all three complete-restart callsites", function()
+		local source = main_source()
+		local _, update_calls = source:gsub("restart_on_installed_release%(script_actions%.is_paused%(%)%)", "")
+		helpers.assert_eq(update_calls, 2, "both update completion and Versions must pass live controller state")
+		helpers.assert_contains(source,
+			"restart = function(reason) return restart_daemon(reason, script_actions.is_paused()) end",
+			"wizard and restore share the controller-local restart closure")
+	end)
+end)

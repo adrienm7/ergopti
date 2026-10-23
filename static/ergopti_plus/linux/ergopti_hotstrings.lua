@@ -629,13 +629,15 @@ end
 --- Starts the release the updater just installed in place of this daemon: an
 --- update from the menu or the update-check window, or a release chosen in the
 --- Versions window.
+--- @param paused boolean The live script controller state.
 --- @return boolean started Whether systemd or the relay took the restart over.
-local function restart_on_installed_release()
+local function restart_on_installed_release(paused)
 	local launch_args = {}
 	for index = 1, #arg do launch_args[index] = arg[index] end
 	local how = require("modules.updater.restarter").restart({
 		wrapper = updater.installed_launcher(),
 		args = launch_args,
+		paused = paused,
 	})
 	if how == "relay" then shutdown.request("update installed") end
 	return how ~= nil
@@ -644,11 +646,12 @@ end
 --- Restarts the daemon on the same installation, for a configuration every
 --- module reads at start (the setup wizard's, a restored backup).
 --- @param reason string
+--- @param paused boolean The live script controller state.
 --- @return boolean started
-local function restart_daemon(reason)
+local function restart_daemon(reason, paused)
 	local launch_args = {}
 	for index = 1, #arg do launch_args[index] = arg[index] end
-	local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args })
+	local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args, paused = paused })
 	if how == "relay" then shutdown.request(reason) end
 	return how ~= nil
 end
@@ -998,7 +1001,7 @@ local function main()
 			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end
 			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
 			-- modifier held through the pause is released.
-			TapHold.set_paused(paused)
+			local remapper_paused = TapHold.set_paused(paused)
 			-- A pause turns the AI's live mode off; resuming leaves it off.
 			if prediction_engine then prediction_engine.on_pause_change(paused) end
 			local servers = package.loaded["modules.llm.local_servers"]
@@ -1006,8 +1009,15 @@ local function main()
 				Logger.warn("pause", "Local API discovery still owns native cleanup debt.")
 			end
 			if rebuild_tray_menu then rebuild_tray_menu() end
+			return remapper_paused == true
 		end,
 	})
+
+	local pause_restored, pause_detail = require("infra.restart_pause").restore(script_actions)
+	if not pause_restored then
+		Logger.error(LOG, "Startup refused: %s.", tostring(pause_detail))
+		return
+	end
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
@@ -2207,7 +2217,7 @@ local function main()
 					notifier.send(i18n_mod.get("updater.installed_restarting")
 						:gsub("{1}", (tostring(tag):gsub("%%", "%%%%"))), { title = title, level = "info" })
 				end
-				restart_on_installed_release()
+				restart_on_installed_release(script_actions.is_paused())
 			end,
 			-- Adding a delimiter needs a text field, and this driver's only text
 			-- field is the settings window. Opening it is honest; a native prompt
@@ -2471,10 +2481,10 @@ local function main()
 			end,
 			-- A release chosen in the Versions window is installed: the daemon
 			-- restarts on it like after an update.
-			restart_after_update = function() return restart_on_installed_release() end,
+			restart_after_update = function() return restart_on_installed_release(script_actions.is_paused()) end,
 			-- The setup wizard writes config.toml, which every module reads when
 			-- it starts: the daemon restarts on it, as the other drivers reload.
-			restart = restart_daemon,
+			restart = function(reason) return restart_daemon(reason, script_actions.is_paused()) end,
 			notify_restart_required = function()
 				if notifier and ok_i18n and i18n_mod then
 					notifier.send(i18n_mod.get("onboarding.done.restart_required"), {
