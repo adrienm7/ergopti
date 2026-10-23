@@ -71,3 +71,8 @@ answer once, then move the answered line below.
   left by an older Ergopti copy at another path, or something else?
 - **Items 46, 47, 48 (asked 2026-10-24):** the original audit context cannot be found; only the macOS Ollama
   process-termination debt (120) is known. Re-state them or retire them?
+- **Expansion delay with Shift or Alt (asked 2026-10-24):** macOS widens the delay for keystrokes typed with Shift or
+  Alt (`COMPLEX_DELAY_MULT` in the keymap) while Windows and Linux do not. All other time-gate rules are now
+  identical on the three drivers (commit 1e12217b92). Which should win: remove the multiplier on macOS, or declare it
+  once in the shared constants and apply it on all three (it helps slow Shift typing but lengthens the window on
+  Windows and Linux)?
