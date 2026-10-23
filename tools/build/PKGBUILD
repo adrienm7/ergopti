@@ -19,6 +19,7 @@ optdepends=('lua-luv: async I/O for timers and HTTP'
             'openssl: SHA-256 hashing for metrics privacy'
             'libayatana-appindicator: tray icon'
             'xdotool: focused-window identity on X11'
+            'wmctrl: window list of the excluded-applications picker on X11'
             'wl-clipboard: clipboard fallback on Wayland')
 makedepends=('git' 'nodejs' 'lua')
 source=("ergopti::git+https://github.com/adrienm7/ergopti.git#branch=dev")
