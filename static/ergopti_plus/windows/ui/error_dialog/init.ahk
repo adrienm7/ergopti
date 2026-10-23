@@ -305,22 +305,23 @@ _ErrorDialog_Present(Record) {
 		_ED_TimerFn.Call(_ErrorDialog_Present.Bind(Record), -ED_BOOT_RETRY_MS)
 		return
 	}
-	_ED_PendingRecord := 0
-	; The startup smoke test boots the real driver headless: a window there
-	; would outlive the check, as the fatal MsgBox would (infra/error_net.ahk)
+	; Release this exact request before logging: a nested error may admit its successor.
 	if IsSet(_DriverStartupSmokeDir) && (_DriverStartupSmokeDir != "") {
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		try {
+			if _ED_PendingRecord != Record
+				return
+			_ED_PendingRecord := 0
+			_ED_Busy := false
+			_ED_Folded := 0
+		} finally Critical(PreviousCritical)
 		LoggerInfo("ErrorDialog", "Startup smoke run: the error window for '{1}' is not opened.", Record["module"])
-		_ED_Busy := false
-		_ED_Folded := 0
 		return
 	}
-		if !_ErrorDialog_Open(Record) {
-		; A window that could not open frees the policy for the next error
-		_ED_Busy := false
-		_ED_Folded := 0
-	}
+	; Opening owns its failure cleanup; this frame must never free a successor.
+	_ErrorDialog_Open(Record)
 }
-
 ; Keep native title construction independently testable without reporting a real error.
 _ErrorDialog_NewWindow() {
 	return Gui_Create("+Resize +MinSize440x320", t("common.error_title"))
@@ -332,117 +333,263 @@ _ErrorDialog_NewWindow() {
 _ErrorDialog_Open(Record) {
 	global _VendorDir, _SharedDir, _I18nLocale, ED_WIDTH, ED_HEIGHT, ED_VHOST, ED_HOST_ACCESS_ALLOW
 	global _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone, _ED_WindowEpoch, _ED_Session
-	LoggerStart("ErrorDialog", "Opening the error window…")
-	try Fields := _ErrorDialog_BuildReport(Record)
-	catch as Err {
-		LoggerError("ErrorDialog", "The error report could not be built: {1}", Err.Message)
-		return false
-	}
-	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
-		&& !WebView_ShouldUseNativeFallback()
-	if !UseWV {
-		; Without WebView2 there is no page to show: the error is announced and
-		; stays in the errors file
-		NotifierSend(t("error_dialog.heading") . "`n`n" . Record["message"], Map("title", "ErgoptiPlus", "level", "error"))
-		LoggerWarn("ErrorDialog", "WebView2 is unavailable; the error was announced by a notification.")
-		return false
-	}
-
-	G := _ErrorDialog_NewWindow()
-	G.MarginX := 0
-	G.MarginY := 0
-	ContentCtl := G.Add("Text", "x0 y0 w" . ED_WIDTH . " h" . ED_HEIGHT, "")
-	G.WVC := 0
-	G.OnEvent("Close",  (*) => _ErrorDialog_CloseWindow())
-	G.OnEvent("Escape", (*) => _ErrorDialog_CloseWindow())
-	G.OnEvent("Size",   _ErrorDialog_OnSize.Bind(ContentCtl))
-	; NoActivate: the window appears above the user's work and leaves the
-	; keyboard where it was
-	G.Show("NoActivate w" . ED_WIDTH . " h" . ED_HEIGHT)
-	_ED_Gui := G
-
+	global _ED_PendingRecord
+	PreviousCritical := A_IsCritical
+	Critical("On")
 	try {
-		WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll"))
-		G.WVC := WVC
+		if _ED_PendingRecord != Record || !_ED_ResetDone
+			return false
+		_ED_PendingRecord := 0
+		_ED_ResetDone := false
+		_ED_WindowEpoch += 1
+		Epoch := _ED_WindowEpoch
+	} finally Critical(PreviousCritical)
+	G := 0, WVC := 0, WV := 0, Subscription := 0, Committed := false, Primary := 0
+	try {
+		LoggerStart("ErrorDialog", "Opening the error window…")
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		try Fields := _ErrorDialog_BuildReport(Record)
+		catch as Err {
+			Primary := Err
+			LoggerError("ErrorDialog", "The error report could not be built: {1}", Err.Message)
+			return false
+		}
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll")
+			&& !WebView_ShouldUseNativeFallback()
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		if !UseWV {
+			Heading := t("error_dialog.heading")
+			if !_ErrorDialog_IsCurrent(Epoch)
+				return false
+			NotifierSend(Heading . "`n`n" . Record["message"], Map("title", "ErgoptiPlus", "level", "error"))
+			if _ErrorDialog_IsCurrent(Epoch)
+				LoggerWarn("ErrorDialog", "WebView2 is unavailable; the error was announced by a notification.")
+			return false
+		}
+		G := _ErrorDialog_NewWindow()
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		G.MarginX := 0
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		G.MarginY := 0
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		ContentCtl := G.Add("Text", "vErrorDialogContent x0 y0 w" . ED_WIDTH . " h" . ED_HEIGHT, "")
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		G.WVC := 0
+		; Bind only the epoch. The native event supplies its exact Gui, without a Gui cycle.
+		G.OnEvent("Close", _ErrorDialog_OnClose.Bind(Epoch))
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		G.OnEvent("Escape", _ErrorDialog_OnClose.Bind(Epoch))
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		G.OnEvent("Size", _ErrorDialog_OnSize.Bind(Epoch))
+		if !_ErrorDialog_IsCurrent(Epoch)
+			return false
+		Fields["epoch"] := Epoch
+		Fields["record"] := Record
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		try {
+			if !_ErrorDialog_IsCurrent(Epoch)
+				return false
+			_ED_Gui := G
+			_ED_Session := Fields
+		} finally Critical(PreviousCritical)
+		; Publish the host before Show can dispatch Close or Size.
+		G.Show("NoActivate w" . ED_WIDTH . " h" . ED_HEIGHT)
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		Environment := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		HostHwnd := ContentCtl.Hwnd
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		try WVC := WebView2.create(HostHwnd, , Environment)
+		catch as Err {
+			Primary := Err
+			LoggerError("ErrorDialog", "WebView2 could not be created for the error window: {1}", Err.Message)
+			return false
+		}
+		; Until publication, this stack alone owns the returned controller, even if stale.
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		WV := WVC.CoreWebView2
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		try {
+			s := WV.Settings
+			if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+				return false
+			s.AreDevToolsEnabled := false
+			if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+				return false
+			s.AreDefaultContextMenusEnabled := false
+			if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+				return false
+			s.IsStatusBarEnabled := false
+			if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+				return false
+			s.AreBrowserAcceleratorKeysEnabled := false
+		}
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+		try WV.AddScriptToExecuteOnDocumentCreated(
+			"window.__i18n_base='https://" . ED_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		Subscription := WV.WebMessageReceived(_ErrorDialog_OnWebMessage.Bind(Epoch))
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		try WV.SetVirtualHostNameToFolderMapping(ED_VHOST, _SharedDir, ED_HOST_ACCESS_ALLOW)
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		try {
+			if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+				return false
+			G.WVC := WVC
+			_ED_Controller := WVC
+			_ED_WebView := WV
+			_ED_MsgSub := Subscription
+			Subscription := 0
+			Committed := true
+		} finally Critical(PreviousCritical)
+		try WV.Navigate("https://" . ED_VHOST . "/ui/error_dialog/index.html?cb=" . A_TickCount)
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		try WVC.Fill()
+		if !_ErrorDialog_IsCurrent(Epoch, G, Fields)
+			return false
+		LoggerSuccess("ErrorDialog", "Error window opened.")
+		return _ErrorDialog_IsCurrent(Epoch, G, Fields)
 	} catch as Err {
-		LoggerError("ErrorDialog", "WebView2 could not be created for the error window: {1}", Err.Message)
-		_ErrorDialog_CloseWindow()
-		return false
+		Primary := Err
+		throw Err
+	} finally {
+		if !Committed {
+			; Revoke only this owner, then release private COM outside the RAM transaction.
+			Retired := _ErrorDialog_ResetWindow(Epoch)
+			Subscription := 0
+			WV := 0
+			CleanupFailure := 0
+			if WVC {
+				try WVC.Close()
+				catch as Err {
+					CleanupFailure := Err
+					try LoggerError("ErrorDialog", "Retired browser cleanup failed: {1}.", Err.Message)
+				}
+			}
+			; Native Close may already have destroyed this exact private host.
+			if G
+				try G.Destroy()
+			if IsObject(CleanupFailure) && !IsObject(Primary)
+				throw CleanupFailure
+		}
 	}
-	_ED_Controller := WVC
-	_ED_WebView := WVC.CoreWebView2
-	_ED_ResetDone := false
-	_ED_WindowEpoch += 1
-	Epoch := _ED_WindowEpoch
-	Fields["epoch"] := Epoch
-	Fields["record"] := Record
-	_ED_Session := Fields
+}
 
-	try {
-		s := _ED_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-	}
-	Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
-	try _ED_WebView.AddScriptToExecuteOnDocumentCreated(
-		"window.__i18n_base='https://" . ED_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
-	_ED_MsgSub := _ED_WebView.WebMessageReceived(_ErrorDialog_OnWebMessage.Bind(Epoch))
-	try _ED_WebView.SetVirtualHostNameToFolderMapping(ED_VHOST, _SharedDir, ED_HOST_ACCESS_ALLOW)
-	try _ED_WebView.Navigate("https://" . ED_VHOST . "/ui/error_dialog/index.html?cb=" . A_TickCount)
-	try _ED_Controller.Fill()
-	LoggerSuccess("ErrorDialog", "Error window opened.")
+; Pure owner checks also support the existing headless action tests.
+_ErrorDialog_IsCurrent(Epoch, Window := 0, Session := 0) {
+	global _ED_WindowEpoch, _ED_ResetDone, _ED_Gui, _ED_Session
+	return !_ED_ResetDone && Epoch == _ED_WindowEpoch
+		&& (!Window || (IsSet(_ED_Gui) && _ED_Gui == Window))
+		&& (!Session || _ED_Session == Session)
+}
+
+
+; Direct report actions also run headless, with their response port disabled.
+; Reset atomically revokes both this epoch and session before any teardown callout.
+_ErrorDialog_SessionCurrent(Epoch, Session) {
+	global _ED_WindowEpoch, _ED_Session
+	return Session is Map && Epoch == _ED_WindowEpoch && _ED_Session == Session
+}
+
+_ErrorDialog_OnClose(Epoch, GuiObj, *) {
+	if _ErrorDialog_IsCurrent(Epoch, GuiObj)
+		_ErrorDialog_CloseWindow(Epoch, GuiObj)
 	return true
 }
-
 ; Keeps the page filling the window when it is resized.
-_ErrorDialog_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
-	global _ED_Controller, _ED_ResetDone
-	if (MinMax == -1)
+_ErrorDialog_OnSize(Epoch, GuiObj, MinMax, Width, Height) {
+	global _ED_Controller
+	if MinMax == -1 || !_ErrorDialog_IsCurrent(Epoch, GuiObj)
+		return
+	ContentCtl := GuiObj["ErrorDialogContent"]
+	if !_ErrorDialog_IsCurrent(Epoch, GuiObj)
 		return
 	ContentCtl.Move(0, 0, Width, Height)
-	if !_ED_ResetDone && IsSet(_ED_Controller)
-		try _ED_Controller.Fill()
+	Controller := IsSet(_ED_Controller) ? _ED_Controller : 0
+	if !_ErrorDialog_IsCurrent(Epoch, GuiObj)
+		return
+	if Controller
+		try Controller.Fill()
 }
-
 ; Closes the window: the controller first, while its host window lives, then
 ; the window; and frees the policy for the next error.
-_ErrorDialog_CloseWindow() {
-	global _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone, _ED_WindowEpoch, _ED_Session
-	global _ED_Busy, _ED_Folded, _ED_PendingRecord
-	_ED_PendingRecord := 0
-	SavedGui := IsSet(_ED_Gui) ? _ED_Gui : 0
-	if !_ED_ResetDone {
-		_ED_ResetDone := true
-		_ED_MsgSub := unset
-		try {
-			if IsSet(_ED_Controller)
-				_ED_Controller.Close()
-		}
-		_ED_Controller := unset
-		_ED_WebView := unset
-	}
-	_ED_WindowEpoch += 1
-	_ED_Session := 0
-	_ED_Busy := false
-	_ED_Folded := 0
-	try {
-		if SavedGui
-			SavedGui.Destroy()
-	}
-	_ED_Gui := unset
+_ErrorDialog_CloseWindow(Epoch := unset, Window := 0) {
+	Retired := IsSet(Epoch) ? _ErrorDialog_ResetWindow(Epoch, Window) : _ErrorDialog_ResetWindow()
+	if !Retired
+		return
+	; Strong local references keep releases and native teardown outside Critical.
+	Retired.Subscription := 0
+	if Retired.Window
+		Retired.Window.WVC := 0
+	if Retired.Controller
+		try Retired.Controller.Close()
+	Retired.WebView := 0
+	Retired.Controller := 0
+	if Retired.Window
+		try Retired.Window.Destroy()
 	LoggerInfo("ErrorDialog", "Error window closed.")
 }
 
+; Detach every old reference before any destructor, Close, Destroy or logger can pump.
+_ErrorDialog_ResetWindow(Epoch := unset, Window := 0) {
+	global _ED_Gui, _ED_Controller, _ED_WebView, _ED_MsgSub, _ED_ResetDone, _ED_WindowEpoch, _ED_Session
+	global _ED_Busy, _ED_Folded, _ED_PendingRecord
+	PreviousCritical := A_IsCritical
+	Critical("On")
+	try {
+		if IsSet(Epoch) && !_ErrorDialog_IsCurrent(Epoch, Window)
+			return 0
+		Retired := {Window: IsSet(_ED_Gui) ? _ED_Gui : 0,
+			Controller: IsSet(_ED_Controller) ? _ED_Controller : 0,
+			WebView: IsSet(_ED_WebView) ? _ED_WebView : 0,
+			Subscription: IsSet(_ED_MsgSub) ? _ED_MsgSub : 0, Session: _ED_Session,
+			Pending: _ED_PendingRecord}
+		_ED_ResetDone := true
+		_ED_WindowEpoch += 1
+		_ED_PendingRecord := 0
+		_ED_Session := 0
+		_ED_Busy := false
+		_ED_Folded := 0
+		_ED_Gui := unset
+		_ED_Controller := unset
+		_ED_WebView := unset
+		_ED_MsgSub := unset
+		return Retired
+	} finally Critical(PreviousCritical)
+}
 ; Sends one message into the window's page.
 ; @param Epoch {Integer}
 ; @param Json {String}
 _ErrorDialog_Send(Epoch, Json) {
 	global _ED_WebView, _ED_WindowEpoch, _ED_ResetDone
-	if _ED_ResetDone || (Epoch != _ED_WindowEpoch) || !IsSet(_ED_WebView)
+	WebView := IsSet(_ED_WebView) ? _ED_WebView : 0
+	if _ED_ResetDone || (Epoch != _ED_WindowEpoch) || !WebView
 		return
-	WebView_RunScriptAsync(_ED_WebView, "if(window.receiveErrorDialog)window.receiveErrorDialog(" . Json . ")",
+	WebView_RunScriptAsync(WebView, "if(window.receiveErrorDialog)window.receiveErrorDialog(" . Json . ")",
 		"ErrorDialog")
 }
 
@@ -474,11 +621,15 @@ _ErrorDialog_OnWebMessage(Epoch, Handler, Args) {
 		LoggerWarn("ErrorDialog", "An error window message could not be read: {1}.", Err.Message)
 		return
 	}
+	if !_ErrorDialog_IsCurrent(Epoch)
+		return
 	; The callback bypasses native Suspend, and deliberately: the window changes
 	; nothing ErgoptiPlus does (it copies, opens a file or GitHub), and an error
 	; is worth reporting whether or not the driver is paused
 	if A_IsSuspended
 		LoggerDebug("ErrorDialog", "An error window message arrived while suspended; the window stays usable.")
+	if !_ErrorDialog_IsCurrent(Epoch)
+		return
 	SetTimer(_ErrorDialog_HandleMessage.Bind(Epoch, Raw), -1)
 }
 
@@ -488,10 +639,11 @@ _ErrorDialog_OnWebMessage(Epoch, Handler, Args) {
 ; @param PerformFn {Func|Integer} Replacement of HealthCheck_PerformAction (tests only).
 _ErrorDialog_HandleMessage(Epoch, Raw, PerformFn := 0) {
 	global _ED_WindowEpoch, _ED_ResetDone, _ED_Session, ED_PAGE_ACTIONS
-	if _ED_ResetDone || (Epoch != _ED_WindowEpoch) || !(_ED_Session is Map)
+	Session := _ED_Session
+	if !_ErrorDialog_IsCurrent(Epoch, 0, Session) || !(Session is Map)
 		return
 	if (Raw == "ready") {
-		try _ErrorDialog_Send(Epoch, _ErrorDialog_InitJson(_ED_Session))
+		try _ErrorDialog_Send(Epoch, _ErrorDialog_InitJson(Session))
 		catch as Err
 			LoggerError("ErrorDialog", "The error window could not be initialised: {1}", Err.Message)
 		return
@@ -522,14 +674,18 @@ _ErrorDialog_HandleMessage(Epoch, Raw, PerformFn := 0) {
 ; @param PerformFn {Func|Integer} Replacement of HealthCheck_PerformAction (tests only).
 _ErrorDialog_Perform(Epoch, ActionName, PerformFn := 0) {
 	global _ED_Session
+	Session := _ED_Session
+	if !_ErrorDialog_SessionCurrent(Epoch, Session)
+		return
 	if (ActionName == "close") {
-		_ErrorDialog_CloseWindow()
+		_ErrorDialog_CloseWindow(Epoch)
 		return
 	}
-	Session := _ED_Session
 	Report := Session["report"]
 	if ActionName == "copy" || ActionName == "report"
 		Report := HealthCheck_ShareDocument(Session["snapshot"], Session["config"]["schema"])
+	if !_ErrorDialog_SessionCurrent(Epoch, Session)
+		return
 	switch ActionName {
 		case "copy":
 			PageAction := Map("action", "copy", "text", Report["text"])
