@@ -111,8 +111,7 @@ a sealed Windows updater source, reseal with
       Measured on the maintainer's PC (Debug > Record keyboard hook order, 2026-10-24): before a
       SendInput the test hook is first; after it the AutoHotkey hook is first, so SendInput does
       reinstall the AutoHotkey hook in front of any hook installed earlier. SendEvent does not
-      (and hotstring chaining needs SendEvent, item 50), which is one more reason hotstring output
-      stays on SendEvent. Consumers that rely on their own hook staying ahead of AutoHotkey's (the
+      (item 50: hotstring output already uses SendInput at level 0, so it is exposed to this rehook). Consumers that rely on their own hook staying ahead of AutoHotkey's (the
       native nav owner DLL, item 91) lose that position at the first SendInput of the other paths.
       Consumer audit:
       [windows-input-hooks-items-49-50.md](todo-agents/windows-input-hooks-items-49-50.md). Left:
@@ -128,15 +127,21 @@ a sealed Windows updater source, reseal with
       predictions (latency, lost or interleaved keys) before choosing.
       Measured on the maintainer's PC (8 repetitions per scenario, all exact, 0 lost, 0 interleaved in
       both modes): expansion median 50.6 ms (SendInput) vs 136.8 ms (SendEvent), prediction 56.1 vs
-      191.0 ms, paste 3.6 vs 3.8 ms, a concurrent key during the send 201 vs 282 ms. **Decision
-      (maintainer, 2026-10-24): the SendEvent behaviour for hotstring output must persist**: a
-      hotstring's output must be able to trigger another hotstring, itself triggering another
-      (`SendMode("Event")` in `ErgoptiPlus.ahk`, `#InputLevel 2` registration); SendInput hides the
-      script's own keys from its own hooks. The roughly 90 ms per expansion is the accepted price.
-      No hotstring emission moves to SendInput; the output of the TextSender stays at level 0
-      (invisible to the hotstring layer) as designed. Left: a regression test that a chain of three
-      hotstrings expands end to end through the real engine (Windows PC), and a note in the
-      windows-ahk memory.
+      191.0 ms, paste 3.6 vs 3.8 ms, a concurrent key during the send 201 vs 282 ms. \*\*Finding
+      (2026-10-24, real engine on the maintainer's PC): hotstring expansion already used SendInput
+      (`HSE_DispatchMatch`); there are no native `Hotstring()` registrations left, so a hotstring's
+      output is final on every driver and does not trigger another hotstring (the comment on
+      `SendMode("Event")` described the retired native engine; `SendMode` now only affects `Send`,
+      `Click`, `MouseMove`). One real bug fixed (0c85debc93): the Space tap-hold completed a trigger
+      from its level-2 thread, and with another AutoHotkey hook SendInput fell back to SendEvent, so
+      the burst re-entered the watcher and cascaded (final text `foo qbar qzz` instead of
+      `foo qzy `); all engine output now goes at level 0. Open question (docs/questions-for-maintainer.md):
+      deliberate hotstring-to-hotstring cascading would be a new feature on all drivers (124 of 2786
+      shared replacements end with their own trigger, 131 with another trigger). Suspected separate
+      defect: `_SpaceTap` emits its space with `TextPressKey("Space", "")`, which the buffer treats as
+      an edit and resets both buffers, so an end-character trigger cannot complete from the Space
+      tap-hold; check on the PC with the Space tap-hold on. Left: wire
+      `test_hotstring_output_is_final.ahk` into `run_all.ahk`.
 - [ ] **Per-layer layout composer.** [CODE] Decided 2026-10-22: the per-row number-row switches do
       not cover the October 13 request. Not started. Spec: split the layout into four layers (base,
       Shift, AltGr, Shift+AltGr), each with a dropdown that takes that layer from any layout (for
