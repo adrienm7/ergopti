@@ -290,7 +290,7 @@ helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)"
 						if name == "AXRole" then return "AXSecureTextField" end
 						if name == "AXValue" then return "" end
 					end }
-					controls.ax_callback(secure, "AXFocusedUIElementChanged", scenario.state.ax_observer)
+					controls.ax_callback(scenario.state.ax_observer, secure, "AXFocusedUIElementChanged", {})
 					helpers.assert_eq(scenario.state.is_secure_field, true, "the real registered classifier publishes secure state")
 				end
 				helpers.assert_eq(core.context_allows_logging(), true)
@@ -441,7 +441,7 @@ helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)"
 					if name == "AXValue" then return "" end
 				end }
 				local observer = scenario.state.ax_observer
-				observer.retained_callback(secure, "AXFocusedUIElementChanged", observer)
+				observer.retained_callback(observer, secure, "AXFocusedUIElementChanged", {})
 				helpers.assert_eq(scenario.state.is_secure_field, true)
 				helpers.assert_eq(core.context_allows_logging(), false)
 				core.set_system_auth_filter_enabled(false)

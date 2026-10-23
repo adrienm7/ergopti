@@ -19,6 +19,15 @@ local M = {}
 -- Every module the scenario loads or replaces, restored after each run so no
 -- keystats, aggregator or accounting state leaks into a sibling test.
 local OWNED_MODULES = {
+	"lfs", "native_path", "error_description", "number_policy", "toml_codec.source_open",
+	"adapters.http_client", "adapters.managed_ollama_daemon",
+	"adapters.owned_program_runner", "adapters.running_application",
+	"core.llm.managed_ollama_daemon_receipt", "infra.notifications",
+	"llm.local_model_policy", "modules.llm.api_mlx_fetch",
+	"modules.llm.api_mlx_inference", "modules.llm.api_ollama",
+	"modules.llm.mlx_stream_retirement", "modules.llm.network_env",
+	"modules.llm.ollama_endpoint", "modules.llm.ollama_server_command",
+	"modules.llm.opaque_network_admission", "modules.llm.progressive_reveal",
 	"hs", "tests.stubs.hs", "infra.logger", "infra.manifest_reader", "infra.config_paths",
 	"infra.dialog_util", "infra.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
@@ -84,7 +93,8 @@ end
 ---   state                           the keystats's CoreState.
 --- @param callback function Scenario body.
 function M.run(callback)
-	helpers.with_stub_scope(OWNED_MODULES, function()
+	local native_lfs = rawget(_G, "lfs")
+	local outcome = table.pack(pcall(helpers.with_stub_scope, OWNED_MODULES, function()
 		local fixture = Fixture.load_keystats()
 		local handle_key = find_upvalue(fixture.keystats.start, "handle_key")
 		local types = fixture.hs.eventtap.event.types
@@ -171,7 +181,10 @@ function M.run(callback)
 		end
 
 		callback(scenario)
-	end)
+	end))
+	rawset(_G, "lfs", native_lfs)
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 M.DAY = DAY
