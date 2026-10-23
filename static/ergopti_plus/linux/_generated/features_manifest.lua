@@ -692,7 +692,7 @@ M.unavailable = {
 		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "metrics.metrics_disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
+		path = "metrics.disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },
@@ -1182,9 +1182,6 @@ M.unavailable = {
 	},
 	{
 		path = "category_enabled.magic_key", section = "category_enabled", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.disabled_apps", section = "metrics", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "metrics.menubar_wpm", section = "metrics", reason_key = "", platforms = { "hs" },

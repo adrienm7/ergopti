@@ -14,7 +14,7 @@
 ;   enabled                    = true
 ;   private_filter_enabled     = true
 ;   system_auth_filter_enabled = true
-;   metrics_disabled_apps      = ["chrome.exe", "firefox.exe"]
+;   disabled_apps              = ["chrome.exe", "firefox.exe"]
 ;
 ; FEATURES & RATIONALE:
 ; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
@@ -194,11 +194,11 @@ _CS_RequireString(Value, Key) {
 
 _CS_RequireDisabledApps(Value) {
 		if !(Value is Array)
-				throw TypeError("metrics.metrics_disabled_apps must be a TOML array")
+				throw TypeError("metrics.disabled_apps must be a TOML array")
 		Result := Map()
 		for AppName in Value {
 				if !(AppName is String)
-						throw TypeError("metrics.metrics_disabled_apps items must be TOML strings")
+						throw TypeError("metrics.disabled_apps items must be TOML strings")
 				Normalized := Trim(AppName)
 				if (Normalized != "")
 						Result[StrLower(Normalized)] := true
@@ -214,9 +214,9 @@ _CS_ValidateMetricsSection(Section) {
 				if Section.Has(Key)
 						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
 		}
-		if Section.Has("metrics_disabled_apps")
-				Validated["metrics_disabled_apps"] :=
-						_CS_RequireDisabledApps(Section["metrics_disabled_apps"])
+		if Section.Has("disabled_apps")
+				Validated["disabled_apps"] :=
+						_CS_RequireDisabledApps(Section["disabled_apps"])
 		return Validated
 }
 
@@ -255,8 +255,8 @@ CS_Load() {
 		if Validated.Has("encrypt")
 				MetricsFilters.encrypt := Validated["encrypt"]
 
-		if Validated.Has("metrics_disabled_apps")
-				MetricsFilters.disabled_apps := Validated["metrics_disabled_apps"]
+		if Validated.Has("disabled_apps")
+				MetricsFilters.disabled_apps := Validated["disabled_apps"]
 }
 
 ; Commit an explicit metrics candidate through the one atomic config.toml

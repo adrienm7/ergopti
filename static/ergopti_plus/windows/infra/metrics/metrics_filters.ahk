@@ -243,7 +243,7 @@ _MF_BuildDisabledAppsPlan(Selected, Receipt := 0) {
 		Persisted.Push(Key)
 	}
 	return {
-		updates: [{ Section: "metrics", Key: "metrics_disabled_apps",
+		updates: [{ Section: "metrics", Key: "disabled_apps",
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}
@@ -851,7 +851,7 @@ _MF_BuildDisabledAppTogglePlan(ProcessName, Outcome) {
 	for Name, _ in Candidate
 		Persisted.Push(Name)
 	return {
-		updates: [{ Section: "metrics", Key: "metrics_disabled_apps",
+		updates: [{ Section: "metrics", Key: "disabled_apps",
 			Value: Persisted }],
 		publish: _MF_PublishDisabledAppsCandidate.Bind(Candidate)
 	}

@@ -94,7 +94,11 @@ async function main() {
 	);
 	assert.deepEqual(
 		manifest.entries
-			.filter((entry) => entry.section === 'metrics' && entry.id === 'metrics_enabled')
+			.filter(
+				(entry) =>
+					entry.section === 'metrics' &&
+					['metrics_enabled', 'metrics_disabled_apps'].includes(entry.id)
+			)
 			.map((entry) => entry.id),
 		[],
 		'no metrics key repeats its section name: one spelling per setting'

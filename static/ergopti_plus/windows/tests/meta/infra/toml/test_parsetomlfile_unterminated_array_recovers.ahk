@@ -23,7 +23,7 @@
 _PTUA_AssertRecovers() {
 	tmp := A_Temp . "\ergopti_test_unterm_array_" . A_TickCount . ".toml"
 	; A multi-line array with NO closing ], followed by a later section + key.
-	content := '[metrics]`nmetrics_disabled_apps = [`n  "chrome.exe",`n[later_section]`nflag = true`n'
+	content := '[metrics]`ndisabled_apps = [`n  "chrome.exe",`n[later_section]`nflag = true`n'
 	try FileDelete(tmp)
 	FileAppend(content, tmp, "UTF-8")
 	Sections := ParseTomlFile(tmp)
@@ -34,7 +34,7 @@ _PTUA_AssertRecovers() {
 	Assert(Sections["later_section"].Has("flag"),
 		"the key under the section after an unterminated array must be parsed (toml-unterminated-array-recovery)")
 	AssertEqual(true, Sections["later_section"]["flag"])
-	AssertFalse(Sections["metrics"].Has("metrics_disabled_apps"),
+	AssertFalse(Sections["metrics"].Has("disabled_apps"),
 		"recovery must not publish a fabricated value for the incomplete array")
 }
 Test("toml: ParseTomlFile recovers sections after an unterminated multi-line array (toml-unterminated-array-recovery)", _PTUA_AssertRecovers)

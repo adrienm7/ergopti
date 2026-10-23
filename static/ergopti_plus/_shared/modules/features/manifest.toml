@@ -1642,9 +1642,12 @@ input_altering = false
 type = "boolean"
 description_key = "menu.metrics.metrics_wpm_menubar_colors"
 
+# Applications whose typing is never recorded. The element is that OS's own
+# application identity (executable name, bundle identifier), so only the key
+# and its meaning are shared.
 [[features.metrics]]
-id = "metrics_disabled_apps"
-platforms = ["ahk"]
+id = "disabled_apps"
+platforms = ["ahk", "hs"]
 default = []
 recommended = []
 input_altering = false
@@ -6903,15 +6906,6 @@ input_altering = true
 type = "boolean"
 description_key = "category.magic_key"
 platforms = ["ahk"]
-
-[[features.metrics]]
-id = "disabled_apps"
-default = []
-recommended = []
-input_altering = false
-type = "array"
-description_key = "menu.metrics.metrics_disabled_apps"
-platforms = ["hs"]
 
 [[features.metrics]]
 id = "menubar_wpm"
