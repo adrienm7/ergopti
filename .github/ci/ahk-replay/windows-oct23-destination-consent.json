@@ -1,0 +1,21 @@
+{
+	"expected_count": 15,
+	"filters": [
+		{
+			"contains": "switch-destination-privacy-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "layer-editor-navigation-pause-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "update-check-native-consent",
+			"expected_count": 3
+		},
+		{
+			"contains": "spotlight-upload-owner",
+			"expected_count": 3
+		}
+	]
+}
