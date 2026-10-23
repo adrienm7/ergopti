@@ -389,19 +389,27 @@ function M.on_key(detail)
 		Logger.error(LOG, "Script chord '%s' pressed before init() — the key goes to the application.", slot_id)
 		return false
 	end
-	local generation = _dispatch_generation
+	local generation, paused, runs = _dispatch_generation, _is_paused, M.slot_runs
 	local action = _assignments[slot_id]
+	local function current()
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation
+			or _is_paused ~= paused or M.slot_runs ~= runs then return false end
+		local admitted = runs(slot_id)
+		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation
+			and _is_paused == paused and M.slot_runs == runs
+	end
 	local queued = _defer(function()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
 		-- A pause that began after the press: the chord was taken, and only a
 		-- script-management action may still run.
-		if not M.slot_runs(slot_id) then
+		if not current() then
 			Logger.info(LOG, "Script chord '%s' no longer runs '%s' — nothing done.", slot_id, action)
 			return
 		end
 		local Gestures = action_catalogue()
 		if not Gestures then return end
 		Logger.debug(LOG, "Script chord '%s' fired → '%s'.", slot_id, action)
+		-- Admission and logging may synchronously revoke this queued source.
+		if not current() then return end
 		Gestures.execute_action(action, M.binding_id(slot_id))
 	end)
 	if queued ~= true then
