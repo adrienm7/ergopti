@@ -1,0 +1,17 @@
+{
+	"expected_count": 4,
+	"filters": [
+		{
+			"contains": "healthcheck-native64-uptime",
+			"expected_count": 2
+		},
+		{
+			"contains": "tickcount-wrap: healthcheck.ahk uptime division uses & 0xFFFFFFFF mask",
+			"expected_count": 1
+		},
+		{
+			"contains": "tickcount-wrap: crash_reporter.ahk uptime division uses & 0xFFFFFFFF mask",
+			"expected_count": 1
+		}
+	]
+}
