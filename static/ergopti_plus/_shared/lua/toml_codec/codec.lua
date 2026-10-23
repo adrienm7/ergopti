@@ -280,7 +280,15 @@ end
 -- =================================
 -- =================================
 
-local function trim(s) return (s:match("^%s*(.-)%s*$") or s) end
+--- Trims whitespace in linear time. The pattern form `^%s*(.-)%s*$` backtracks
+--- quadratically on a long value that ends in spaces.
+local function trim(s)
+	local first = s:find("%S")
+	if first == nil then return "" end
+	local last = #s
+	while s:find("^%s", last) do last = last - 1 end
+	return s:sub(first, last)
+end
 
 --- Split a dotted section path into its segments, honouring quoted segments
 --- that may contain dots themselves. e.g.
@@ -330,10 +338,27 @@ local PARSE_ERROR = {}
 --- @param source string Complete value or physical line.
 --- @return string uncommented
 local function strip_comments(source)
+	-- Every state copies its characters verbatim and only `#` removes any, so a
+	-- source without one is returned as it is.
+	if not source:find("#", 1, true) then return source end
 	local out = {}
 	local quote = nil
 	local index = 1
 	while index <= #source do
+		-- A run of characters no state reacts to is copied in one slice; the
+		-- stop sets are exactly the characters each branch below acts on.
+		local stop = nil
+		if quote == nil then stop = source:find("[\"'#]", index)
+		elseif quote == '"' then stop = source:find('[\\"]', index)
+		elseif quote == "'" then stop = source:find("'", index, true) end
+		if quote == nil or quote == '"' or quote == "'" then
+			local run_end = (stop or (#source + 1)) - 1
+			if run_end >= index then
+				out[#out + 1] = source:sub(index, run_end)
+				index = run_end + 1
+				if index > #source then break end
+			end
+		end
 		local char = source:sub(index, index)
 		local triple = source:sub(index, index + 2)
 		if quote == '"""' or quote == "'''" then
@@ -407,7 +432,29 @@ local function split_top_level_commas(body, with_spans)
 	local quote = nil
 	local depth = 0
 	local index = 1
+	local plain_stop = with_spans and "[\"'%[%]{},#]" or "[\"'%[%]{},]"
+	-- No delimiter, quote or comment at all: the body is the single fragment.
+	if not body:find(plain_stop) then
+		if #body > 0 then
+			fragments[1] = body
+			if spans then spans[1] = { first = 1, last = #body } end
+		end
+		return fragments, spans
+	end
 	while index <= #body do
+		-- Plain runs are appended in one slice (see strip_comments).
+		local stop = nil
+		if quote == nil then stop = body:find(plain_stop, index)
+		elseif quote == '"' then stop = body:find('[\\"]', index)
+		elseif quote == "'" then stop = body:find("'", index, true) end
+		if quote == nil or quote == '"' or quote == "'" then
+			local run_end = (stop or (#body + 1)) - 1
+			if run_end >= index then
+				current[#current + 1] = body:sub(index, run_end)
+				index = run_end + 1
+				if index > #body then break end
+			end
+		end
 		local char = body:sub(index, index)
 		local triple = body:sub(index, index + 2)
 		if quote == '"""' or quote == "'''" then
