@@ -18,7 +18,7 @@ _TSCOT_ChildSource() {
 	AssertTrue(ClipboardOwner != "" && SenderOwner != "" && EditorOwner != "",
 		"All three complete genuine adapter owners must resolve")
 	ClipboardSource := FileRead(ClipboardOwner, "UTF-8")
-	ClipboardSource := StrReplace(ClipboardSource, "CB_Write(Text) {", "_TSCO_ActualWrite(Text) {", &Writes)
+	ClipboardSource := StrReplace(ClipboardSource, "CB_Write(Text) {", "_TSCO_ActualWrite(Text) {", true, &Writes)
 	AssertEqual(1, Writes, "Only the genuine text publisher declaration may be decorated")
 	SenderSource := FileRead(SenderOwner, "UTF-8")
 	Masked := _DriverMaskNonCode(&SenderSource)
