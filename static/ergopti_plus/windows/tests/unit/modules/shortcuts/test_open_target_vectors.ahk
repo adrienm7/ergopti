@@ -153,3 +153,17 @@ _OTV_ReportKeysAreTranslated() {
 }
 Test("copy_selected_path: every report has its translated message (open-target-missing-path-reported)",
 	_OTV_ReportKeysAreTranslated)
+
+
+_OTV_EncodedNulNeverBecomesPathPrefix() {
+	for Url in ["file:///C:/safe.txt%00ignored",
+			"file://localhost/C:/safe.txt%00ignored",
+			"file://server/share/safe.txt%00ignored"] {
+		Candidate := _OpenTarget_FileUri(Url, (Name) => "")
+		Assert(Candidate is String && Candidate == "", "a decoded control must refuse the file-path branch")
+		Result := OpenTarget_Classify(Url, (Name) => "")
+		AssertEqual("url", Result["kind"], "the original URI stays intact for the scheme handler")
+		Assert(Result["target"] == Url, "the classifier must never silently open only the prefix before NUL")
+	}
+}
+Test("copy_selected_path: encoded NUL cannot truncate a file target (uri-decoded-nul)", _OTV_EncodedNulNeverBecomesPathPrefix)
