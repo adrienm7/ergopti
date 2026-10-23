@@ -772,6 +772,7 @@ enum ManagedHTTPWorker {
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() },
 		environment: [String: String] = ProcessInfo.processInfo.environment,
+		directFallback: Bool = true,
 		output: @escaping (Data) -> Bool) -> Int32 {
 		let certificates: [SecCertificate]
 		do { certificates = try ManagedCertificateAuthorities.load(environment: environment) }
@@ -782,12 +783,20 @@ enum ManagedHTTPWorker {
 		else {
 			let lookupRemaining = request.timeout.map { $0 - (ProcessInfo.processInfo.systemUptime - started) }
 			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .lookupDeadline, output: output) }
-			guard let selected = ManagedProxyLookup.routes(url: request.url,
+			if let selected = ManagedProxyLookup.routes(url: request.url,
 				budget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),
 				maximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,
-				discoveryMetadataProvider: discoveryMetadataProvider)
-			else { return refuse(reason: "unavailable", status: 78, stage: .proxyLookup, output: output) }
-			routes = selected
+				discoveryMetadataProvider: discoveryMetadataProvider) {
+				routes = selected
+			} else if directFallback {
+				// A PAC that cannot be fetched or evaluated names no route at all, which is
+				// not a proxy decision: go direct like a terminal does. A PAC that selects
+				// a proxy never reaches this branch, and the transfer stays https with a
+				// pinned digest (issue #101).
+				_ = fputs("# native_http_proxy_fallback route=direct reason=lookup_unusable
+", stderr)
+				routes = [[kCFProxyTypeKey as String: kCFProxyTypeNone as String]]
+			} else { return refuse(reason: "unavailable", status: 78, stage: .proxyLookup, output: output) }
 		}
 		for (index, route) in routes.enumerated() {
 			guard let proxy = ManagedProxyLookup.dictionary(route: route) else { return refuse(reason: "proxy", status: 78, stage: .proxyDictionary, output: output) }
