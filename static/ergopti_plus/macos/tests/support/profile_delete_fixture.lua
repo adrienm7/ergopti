@@ -187,6 +187,9 @@ local function make_hotkey_backend()
 			if result == true then handle.enabled = enabled == true end
 			return result
 		end,
+		-- This seam's refused deletes retain their native owner; it never
+		-- acknowledges deletion before returning its scripted false/nil result.
+		release_pending = function(_) return false end,
 		unbind = function(handle)
 			local result = seam_terminal("delete")
 			if result == true then
