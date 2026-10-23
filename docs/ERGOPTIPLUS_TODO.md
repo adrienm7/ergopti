@@ -110,14 +110,16 @@ a sealed Windows updater source, reseal with
       `docs/handovers/2026-10-12-dev-consolidation/` against the tree first.
       Measured on the maintainer's PC (Debug > Record keyboard hook order, 2026-10-24): before a
       SendInput the test hook is first; after it the AutoHotkey hook is first, so SendInput does
-      reinstall the AutoHotkey hook in front of any hook installed earlier. Consumers that rely on
-      their own hook staying ahead of AutoHotkey's (the native nav owner DLL, item 91) lose that
-      position at the first SendInput of the hot paths. Consumer audit:
+      reinstall the AutoHotkey hook in front of any hook installed earlier. SendEvent does not
+      (and hotstring chaining needs SendEvent, item 50), which is one more reason hotstring output
+      stays on SendEvent. Consumers that rely on their own hook staying ahead of AutoHotkey's (the
+      native nav owner DLL, item 91) lose that position at the first SendInput of the other paths.
+      Consumer audit:
       [windows-input-hooks-items-49-50.md](todo-agents/windows-input-hooks-items-49-50.md). Left:
-      decide per consumer whether to avoid SendInput (SendEvent does not rehook, at 2.7 to 3.4 times
-      the latency, item 50) or to make the consumer order-independent (single-hook/RawInput source,
-      needs an MSVC DLL and manifest); the terminal-capture hardware list; the `SetWindowsHookExW`
-      string in the exe for antivirus (the AV-surface gate allows it).
+      decide per remaining SendInput consumer (text sender, HSE dispatch) whether it can avoid
+      SendInput or make the consumer order-independent (single-hook/RawInput source, needs an MSVC
+      DLL and manifest); the terminal-capture hardware list; the `SetWindowsHookExW` string in the
+      exe for antivirus (the AV-surface gate allows it).
 - [ ] **91. Simultaneous and first-key hold arbitration.** [CODE] Integrate with the
       single-hook/RawInput source (needs a genuine MSVC DLL and manifest pair); [PHYS-W]
       held-alone-then-joined order, AltGr hook provenance.
@@ -126,11 +128,15 @@ a sealed Windows updater source, reseal with
       predictions (latency, lost or interleaved keys) before choosing.
       Measured on the maintainer's PC (8 repetitions per scenario, all exact, 0 lost, 0 interleaved in
       both modes): expansion median 50.6 ms (SendInput) vs 136.8 ms (SendEvent), prediction 56.1 vs
-      191.0 ms, paste 3.6 vs 3.8 ms, a concurrent key during the send 201 vs 282 ms. SendInput is 2.7
-      to 3.4 times faster and no less exact, so the hotstring send/dispatch, text sender and config I/O
-      keep SendInput on speed alone, but item 49 now shows that every SendInput moves the AutoHotkey hook
-      ahead of the others: the choice per consumer is open there (global `SendMode("Event")` exists
-      for that reason).
+      191.0 ms, paste 3.6 vs 3.8 ms, a concurrent key during the send 201 vs 282 ms. **Decision
+      (maintainer, 2026-10-24): the SendEvent behaviour for hotstring output must persist**: a
+      hotstring's output must be able to trigger another hotstring, itself triggering another
+      (`SendMode("Event")` in `ErgoptiPlus.ahk`, `#InputLevel 2` registration); SendInput hides the
+      script's own keys from its own hooks. The roughly 90 ms per expansion is the accepted price.
+      No hotstring emission moves to SendInput; the output of the TextSender stays at level 0
+      (invisible to the hotstring layer) as designed. Left: a regression test that a chain of three
+      hotstrings expands end to end through the real engine (Windows PC), and a note in the
+      windows-ahk memory.
 - [ ] **Per-layer layout composer.** [CODE] Decided 2026-10-22: the per-row number-row switches do
       not cover the October 13 request. Not started. Spec: split the layout into four layers (base,
       Shift, AltGr, Shift+AltGr), each with a dropdown that takes that layer from any layout (for
