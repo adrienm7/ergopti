@@ -156,3 +156,30 @@ _TestTextHeadWithinUnits() {
 	}
 }
 Test("text_utils provider-error-prefix: every unit budget keeps the longest whole-character prefix", _TestTextHeadWithinUnits)
+
+
+; A positive StrGet bound stops at NUL. Percent decoding must retain all bytes
+; so callers can reject controls instead of opening a different path prefix.
+_SU_DecodesNulWithoutTruncation() {
+	Decoded := UriDecode("safe%00suffix")
+	AssertEqual(11, StrLen(Decoded), "decoded NUL must not discard the suffix")
+	AssertEqual("safe", SubStr(Decoded, 1, 4))
+	AssertEqual(0, NumGet(StrPtr(Decoded), 8, "UShort"), "the decoded byte remains a real NUL")
+	AssertEqual("suffix", SubStr(Decoded, 6))
+	Assert(RegExMatch(Decoded, "[\x00-\x1F\x7F]") > 0, "callers must still observe the control")
+}
+Test("UriDecode: encoded NUL retains its suffix for rejection (uri-decoded-nul)", _SU_DecodesNulWithoutTruncation)
+
+_SU_DecodesNulAtEitherBoundary() {
+	Leading := UriDecode("%00x")
+	Trailing := UriDecode("x%00")
+	AssertEqual(2, StrLen(Leading), "a leading NUL does not erase the whole decoded value")
+	AssertEqual(2, StrLen(Trailing), "a trailing decoded NUL remains part of the value")
+	AssertEqual(0, NumGet(StrPtr(Leading), 0, "UShort"))
+	AssertEqual(0, NumGet(StrPtr(Trailing), 2, "UShort"))
+	AssertEqual("x", SubStr(Leading, 2))
+	AssertEqual("x", SubStr(Trailing, 1, 1))
+	AssertEqual("%00", UriDecode("%2500"), "only one decoding pass is permitted")
+	AssertEqual("", UriDecode(""), "an exact zero-byte decode remains empty")
+}
+Test("UriDecode: leading and trailing NUL remain explicit (uri-decoded-nul)", _SU_DecodesNulAtEitherBoundary)
