@@ -400,7 +400,7 @@ HotPath_StopStatistics() {
 
 /** Owns the bounded counter registry; static so early include-order callers are safe. */
 _PerfCountersOwner() {
-	static Owner := { Counts: Map(), Refused: 0, Limit: 64, WindowStartMs: 0 }
+	static Owner := { Counts: Map(), Refused: 0, Limit: 192, WindowStartMs: 0 }
 	return Owner
 }
 
@@ -438,6 +438,9 @@ PerfStage_End(Label, StartTicks, Count := -1) {
 	DllCall("QueryPerformanceCounter", "Int64*", &now)
 	ElapsedMs := (now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0
 	HotPath_RecordLatency(Label, ElapsedMs, _HOTPATH_SLOW_MS)
+	; Total microseconds per stage ride the interval counter record, so a stage's cost
+	; is visible even where the repeat collapser folds its debug lines.
+	PerfCount("us." . Label, Round(ElapsedMs * 1000))
 	if LoggerIsDebugEnabled()
 		try LoggerDebug("Perf", "Stage '{1}' took {2} ms (count={3}).", Label, Round(ElapsedMs, 3), Count)
 	return ElapsedMs

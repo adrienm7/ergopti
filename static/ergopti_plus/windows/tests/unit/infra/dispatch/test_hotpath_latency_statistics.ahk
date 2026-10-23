@@ -171,6 +171,7 @@ _PC_CountsAccumulateAndAreBounded() {
 		AssertTrue(PerfCount("a"))
 		AssertTrue(PerfCount("a", 4))
 		AssertEqual(5, Owner.Counts["a"])
+		SavedLimit := Owner.Limit
 		Owner.Limit := 2
 		try {
 			AssertTrue(PerfCount("b"))
@@ -178,7 +179,7 @@ _PC_CountsAccumulateAndAreBounded() {
 			AssertEqual(1, Owner.Refused)
 			AssertTrue(PerfCount("b", 2), "capacity never rejects an existing name")
 			AssertEqual(3, Owner.Counts["b"])
-		} finally Owner.Limit := 64
+		} finally Owner.Limit := SavedLimit
 	}
 	_PC_WithFreshRegistry(_Scenario)
 }

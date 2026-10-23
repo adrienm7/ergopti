@@ -246,6 +246,27 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 ; Reads and validates hotstring_category_keys from menu_manifest.json.
 ; The manifest is the sole behavioral definition: failure is explicit so a
 ; candidate state can never be partially gated by a stale fallback table.
+; Decodes the exact manifest text just read. The file is still read and
+; validated on EVERY call, so an invalid or changed manifest is judged afresh and
+; throws every time: only a decode of text equal to the last valid one is skipped.
+; The decoded root is read-only for the caller, which builds its own Map from it.
+; Boot and every tray rebuild decoded the unchanged 12.5 KB file several times
+; (about 40 ms each) through this loader.
+_MG_ParseManifestContent(Content) {
+		static LastContent := "", LastRoot := ""
+		if (LastRoot is Map && LastContent == Content) {
+				PerfCount("master_gates.manifest_decode_skipped")
+				return LastRoot
+		}
+		PerfCount("master_gates.manifest_decode")
+		Root := JsonParse(Content)
+		if (Root is Map) {
+				LastContent := Content
+				LastRoot := Root
+		}
+		return Root
+}
+
 _MG_LoadSubCategories(ManifestPath := "") {
 		global _SharedDir
 		; NOT memoized, deliberately. Caching the parsed manifest was tried and
@@ -268,7 +289,7 @@ _MG_LoadSubCategories(ManifestPath := "") {
 		if (Content == "") {
 				throw Error("Master gate manifest is empty: " . FilePath)
 		}
-		try Root := JsonParse(Content)
+		try Root := _MG_ParseManifestContent(Content)
 		catch as Err
 				throw Error("Master gate manifest is invalid JSON: " . Err.Message)
 		if !(Root is Map) or !Root.Has("hotstring_category_keys") {

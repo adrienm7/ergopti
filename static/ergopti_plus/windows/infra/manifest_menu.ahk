@@ -2968,6 +2968,14 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 	Admitted := false
 	Child := false, ChildHandle := 0, LeafCallbacks := [], Published := false, Population := false, Pending := false, PendingEntry := false
 	PrimaryError := false
+	; The deferred-leaf receipts of EARLIER menus hold every pending row built so far, and
+	; re-walking them cost about 32 ms per check, 32 checks per frame (1.0 s of a 14 s boot,
+	; repeated by every tray rebuild). Only code that is not a pure comparison can change
+	; them, so Foreign counts each call out to such code and the walk is repeated only after
+	; one, or when the staged child or its pending entry changed. The native readers
+	; (DestinationOwner) are the genuine owners that OwnersLive re-verifies on every
+	; check and only read native state, so they are not counted.
+	Guard := { Foreign: 0, PendingKey: "" }
 	RegistryOwners := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
 		_MenuDispatchLastFire, _MenuDispatchClickSequences]
 	DispatcherEpoch := _MenuDispatcherEpoch
@@ -3134,8 +3142,17 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 				NowPending := Object.Prototype.GetOwnPropDesc.Call(Population, "Pending")
 				if !NowPending.HasOwnProp("Value") || NowPending.Value != Pending
 					return false
-				if !PendingCurrentOwner.Call(PendingReceipt, Child, PendingEntry)
-					return false
+				PendingKey := Guard.Foreign . ":" . (Child is Menu ? ObjPtr(Child) : 0)
+					. ":" . (IsObject(PendingEntry) ? ObjPtr(PendingEntry) : 0)
+				if PendingKey != Guard.PendingKey {
+					PerfCount("menu.frame_pending_walk")
+					_perfWalk := PerfStage_Begin()
+					if !PendingCurrentOwner.Call(PendingReceipt, Child, PendingEntry)
+						return false
+					PerfStage_End("Menu.frame.pending_walk", _perfWalk, Pending.Count)
+					Guard.PendingKey := PendingKey
+				} else
+					PerfCount("menu.frame_pending_skip")
 			}
 			return OwnersLive()
 		}
@@ -3148,6 +3165,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 		if !DestinationLive()
 			return 0
 		Data := Provider.Call()
+		Guard.Foreign += 1
 		if !DestinationLive()
 			return 0
 		if Type(Data) == "Integer" && Data == 0 {
@@ -3160,6 +3178,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 		if !DataReceipt || !DestinationLive()
 			return 0
 		Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))
+		Guard.Foreign += 1
 		if !DestinationLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data)
 			|| !AdmissionOwner.Call(Rows, 1, Map()) || Rows.Length != Frame.Length
 			|| !Rows[Rows.Length].Has("items") || Rows[Rows.Length]["items"] != Data
@@ -3170,16 +3189,21 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 		for Leaf in Data
 			LeafCallbacks.Push(Leaf["action"])
 		Child := NativeConstructor.Call()
+		Guard.Foreign += 1
 		ChildHandle := Child.Handle
 		if !DestinationLive()
 			return 0
 		if Population is MenuPopulation {
 			FillOwner.Call(Population, Child, Data, FrameKey, 2)
+			Guard.Foreign += 1
 			PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle)
 		} else {
-			if RenderOwner.Call(Child, Data, FrameKey, 2, 0, true) != Data.Length
+			RenderedRows := RenderOwner.Call(Child, Data, FrameKey, 2, 0, true)
+			Guard.Foreign += 1
+			if RenderedRows != Data.Length
 				return 0
 			NormalizeOwner.Call(Child)
+			Guard.Foreign += 1
 		}
 		if !DestinationLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data)
 			|| !CurrentOwner.Call(RowsReceipt)
@@ -3201,6 +3225,8 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 			|| !LeafOwner.Call(Data) || !CurrentOwner.Call(RowsReceipt)
 			return 0
 		PublicationLive() {
+			; Called by the publication operation after real native effects.
+			Guard.Foreign += 1
 			if !SourceLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data)
 				|| !CurrentOwner.Call(RowsReceipt)
 				return false
@@ -3213,6 +3239,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 		; The actual operation helper receives the held native methods, never providers.
 		Added := PublishOwner.Call(TargetMenu, Child, Rows, Label, Destination, NativeMethods,
 			OldChild, OldParentFlags, PublicationLive)
+		Guard.Foreign += 1
 		Published := true, Admitted := true
 		return Added
 	} catch as Failure {

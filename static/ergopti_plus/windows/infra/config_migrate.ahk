@@ -1112,7 +1112,10 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 					&& Proof.shadow == Row.registry_shadow
 				return true
 			ConfigMigrateRegistryDeepCompares += 1
-			if !SameRegistry(CurrentRegistry, Row.registry_shadow)
+			CompareStarted := PerfStage_Begin()
+			Same := SameRegistry(CurrentRegistry, Row.registry_shadow)
+			PerfStage_End("ConfigMigrate.registry_deep_compare", CompareStarted)
+			if !Same
 				return false
 			if Proof.depth
 				Proof.registry := CurrentRegistry, Proof.shadow := Row.registry_shadow
@@ -1184,6 +1187,7 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned" || Request == "settle_owned"
 			|| Request == "capture_read" || Request == "capture_write" || Request == "capture_noop" || Request == "capture_reconcile_noop" || Request == "capture_transition" || Request == "capture_recovery" || Request == "known" || Request == "check_write" || Request == "consume_read_failure" || Request == "read_only_status")
 		throw ValueError("Unknown configuration journal request")
+	PerfCount("config_migrate.request." . Request)
 	if !(FilePath is String) || FilePath == "" || !NativeLive()
 		return false
 	if Request == "prepare_owned" && (!IsSet(OwnerBundle)

@@ -1484,6 +1484,8 @@ LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _Boot
 	BootProfile_StageSummary())
 ; The counted operations of the whole boot (parses, reads, rebuilds), published as
 ; their own window so the first minute's interval record starts from ready.
+PerfCount("config_migrate.registry_checks", ConfigMigrateRegistryChecks)
+PerfCount("config_migrate.registry_deep_compares", ConfigMigrateRegistryDeepCompares)
 PerfCounters_Flush()
 ; One environment summary with the same field names on every driver. A probe
 ; failure is reported and never allowed to turn a ready driver into a dead one.
