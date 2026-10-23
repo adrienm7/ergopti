@@ -176,3 +176,5 @@ Test("WebView profile: stale Edge termination retires only its own files (profil
 Test("WebView profile: late abandon preserves confirmed cleanup (profile-ownership)", _WPO_ConfirmedAbandon)
 
 #Include test_action_picker_startup_owner.ahk
+
+#Include test_paths_editor_startup_owner.ahk
