@@ -234,12 +234,20 @@ _LLM_ModelBrowser_RefreshRows(lv, filter := "") {
  * function — does not mutate the caller's array.
  */
 _LLM_ModelBrowser_Sort(names) {
+	Snapshot := []
+	for Name in names
+		Snapshot.Push(Name)
+	if (Snapshot.Length < 2)
+		return Snapshot
+	; Native Array has no Sort method. Sort unique indices instead of model
+	; text so delimiters and duplicate names cannot alter the copied entries.
+	Indices := ""
+	loop Snapshot.Length
+		Indices .= (A_Index = 1 ? "" : "`n") . A_Index
+	Ordered := Sort(Indices, "", (a, b, *) => _LLM_ModelBrowser_Compare(Snapshot[Integer(a)], Snapshot[Integer(b)]))
 	out := []
-	for n in names
-		out.Push(n)
-	; Two-key comparator: family ascending, then params_b ascending within
-	; each family. Missing params_b entries sort as 0 (unknown size first).
-	out.Sort((a, b) => _LLM_ModelBrowser_Compare(a, b))
+	for Index in StrSplit(Ordered, "`n")
+		out.Push(Snapshot[Integer(Index)])
 	return out
 }
 
