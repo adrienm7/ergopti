@@ -617,17 +617,21 @@ end
 --- of the word instead of the word.
 function M.select_word()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Word selection refused: no retained text destination."); return false end
 	record("select_word")
-	if not ComboEmitter.press("ctrl+Right") then return false end
-	return ComboEmitter.press("ctrl+shift+Left")
+	if not ComboEmitter.press("ctrl+Right", publication) then return false end
+	return ComboEmitter.press("ctrl+shift+Left", publication)
 end
 
 --- Selects the entire current line (Home, Shift+End).
 function M.select_line()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Line selection refused: no retained text destination."); return false end
 	record("select_line")
-	if not ComboEmitter.press("Home") then return false end
-	return ComboEmitter.press("shift+End")
+	if not ComboEmitter.press("Home", publication) then return false end
+	return ComboEmitter.press("shift+End", publication)
 end
 
 --- Wraps the current line in parentheses: Home, "(", End, ")", Home, the
@@ -635,14 +639,16 @@ end
 --- @return boolean True when every step was emitted.
 function M.surround_line_with_parens()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Line wrapping refused: no retained text destination."); return false end
 	record("surround_parens")
 	local function typed(text)
-		local result = Injector.inject(0, text, false)
+		local result = Injector.inject(0, text, false, nil, publication)
 		return type(result) == "table" and result.ok == true
 	end
-	return ComboEmitter.press("Home") and typed("(")
-		and ComboEmitter.press("End") and typed(")")
-		and ComboEmitter.press("Home")
+	return ComboEmitter.press("Home", publication) and typed("(")
+		and ComboEmitter.press("End", publication) and typed(")")
+		and ComboEmitter.press("Home", publication)
 end
 
 --- Pastes clipboard content as plain text (strips formatting).
