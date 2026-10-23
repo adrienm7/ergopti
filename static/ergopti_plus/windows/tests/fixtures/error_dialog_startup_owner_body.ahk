@@ -10,6 +10,32 @@
 
 #Requires AutoHotkey v2.0
 
+; These hoisted diagnostics run before includes execute and do not need logger state.
+_EDOS_Phase(Phase, Failure := 0, Mode := "") {
+	static Ordinal := 0, FirstException := 0, LastPhase := "", FirstExceptionPhase := ""
+	if IsObject(Failure) {
+		if IsObject(FirstException)
+			return
+		FirstException := Failure, FirstExceptionPhase := LastPhase
+	} else
+		LastPhase := Phase
+	Line := 'PHASE error-dialog-startup {"ordinal":' . ++Ordinal . ',"tick":' . A_TickCount
+		. ',"phase":' . JsonStringLiteral(Phase) . ',"critical":' . A_IsCritical
+		. ',"first_exception_phase":' . (IsObject(FirstException) ? JsonStringLiteral(FirstExceptionPhase) : "null")
+	if IsObject(Failure)
+		Line .= ',"exception_type":' . JsonStringLiteral(Type(FirstException))
+			. ',"message":' . JsonStringLiteral(FirstException.Message)
+			. ',"file":' . JsonStringLiteral(FirstException.File) . ',"line":' . FirstException.Line
+			. ',"mode":' . JsonStringLiteral(Mode)
+	FileAppend(Line . "}`n", "*", "UTF-8")
+}
+
+_EDOS_BootError(Failure, Mode) {
+	; Leave the original unhandled-error disposition in place after exporting it.
+	try _EDOS_Phase("first-exception", Failure, Mode)
+	return false
+}
+
 _EDOS_Require(Condition, Message) {
 	if !Condition
 		throw Error(Message)
@@ -22,6 +48,7 @@ _EDOS_Failure(Failure) {
 }
 
 _EDOS_OnError(Failure, Mode) {
+	try _EDOS_Phase("async-first-exception", Failure, Mode)
 	_EDOS_Failure(Failure)
 	try FileAppend("DIAG error-startup async type=" . Type(Failure) . " file=" . Failure.File
 		. " line=" . Failure.Line . " mode=" . Mode . "`n", "*", "UTF-8")
@@ -70,6 +97,7 @@ class _EDOS_Environment {
 
 _EDOS_EnvironmentFactory(Sdk, Options, UserData, Arguments, Loader) {
 	global _EDOS, WEBVIEW_SHARED_UDIR, _VendorDir
+	_EDOS_Phase("SDK environment factory entered")
 	_EDOS_Require(Sdk == WebView2 && Options == 0 && Arguments == ""
 		&& UserData == WEBVIEW_SHARED_UDIR && Loader == _VendorDir . "\64bit\WebView2Loader.dll",
 		"The real shared helper must call the existing four-argument SDK factory.")
@@ -101,6 +129,7 @@ _EDOS_Ready(Page) {
 }
 
 _EDOS_Create(Hwnd) {
+	_EDOS_Phase("SDK controller request entered")
 	global _EDOS, _ED_Gui, _ED_WindowEpoch, _ED_Session
 	_EDOS_Require(DllCall("User32\IsWindow", "Ptr", Hwnd, "Int"), "The SDK port must receive a real placeholder HWND.")
 	Parent := DllCall("User32\GetParent", "Ptr", Hwnd, "Ptr"), Window := GuiFromHwnd(Parent)
@@ -117,6 +146,7 @@ _EDOS_Create(Hwnd) {
 	_EDOS.Pending.promise.onSettled((*) => 0, (*) => 0)
 	SetTimer(_EDOS.Timeout, -3000)
 	SetTimer(_EDOS.Actor, -1)
+	_EDOS_Phase("SDK controller pending promise ready to return; await remains vendored")
 	return _EDOS.Pending.promise
 }
 
@@ -124,7 +154,9 @@ _EDOS_NativeClose(Page) {
 	global _ED_WindowEpoch
 	Before := _ED_WindowEpoch
 	_EDOS_Require(DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int"), "Native Close needs the exact live private HWND.")
+	_EDOS_Phase("before native WM_CLOSE")
 	DllCall("User32\SendMessageW", "Ptr", Page.Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+	_EDOS_Phase("after native WM_CLOSE send")
 	Started := A_TickCount
 	while (DllCall("User32\IsWindow", "Ptr", Page.Hwnd, "Int") || _ED_WindowEpoch <= Before)
 		&& TickElapsed64(Started) < 1000
@@ -165,6 +197,7 @@ _EDOS_Actor() {
 		else
 			_EDOS.Pending.resolve.Call(_EDOS.Pages[1].Controller)
 		_EDOS.ActorDone := true
+		_EDOS_Phase("actor settled old constructor promise")
 	} catch Any as Failure {
 		_EDOS_Failure(Failure)
 		_EDOS.Pending.reject.Call(Failure)
@@ -264,6 +297,7 @@ _EDOS_Cleanup() {
 }
 
 _EDOS_Main() {
+	_EDOS_Phase("fixture Main entered")
 	global _EDOS, _EDOS_Root, _DriverBootPhase, _DriverStartupSmokeDir, WEBVIEW_SHARED_UDIR, Features, _VendorDir
 	if A_Args.Length != 2 || A_Args[2] != _EDOS_Root
 		ExitApp(2)
@@ -282,21 +316,31 @@ _EDOS_Main() {
 		Features := ManifestBuildFeaturesMap()
 		WEBVIEW_SHARED_UDIR := _EDOS_Root . "\profile"
 		WebView2.DefineProp("CreateEnvironmentAsync", {Call: _EDOS_EnvironmentFactory})
+		_EDOS_Phase("before LoggerInit")
 		LoggerInit()
+		_EDOS_Phase("after LoggerInit")
 		LoggerSetTestSink(_EDOS_Log)
 		Cache := Map("script", Map("show_error_dialog", 1))
+		_EDOS_Phase("before ErrorDialog_Init")
 		_EDOS_Require(ErrorDialog_Init(Cache), "The true public initializer must admit the shipped policy.")
+		_EDOS_Phase("after ErrorDialog_Init")
+		_EDOS_Phase("before shared environment warm await")
 		Warm := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
+		_EDOS_Phase("after shared environment warm await")
 		_EDOS_Require(Warm == _EDOS.Environment, "Only the genuine shared helper may publish the passive environment.")
+		_EDOS_Phase("before LoggerError A")
 		LoggerError("EDStartupA", "Controlled source error A")
+		_EDOS_Phase("after LoggerError A")
 		Started := A_TickCount
 		; Main cannot resume from the presenter's interrupt until its Open stack
 		; has unwound. ActorDone alone, observed inside that actor, is not an ACK.
 		while _EDOS.Pages.Length == 0 && TickElapsed64(Started) < 5000
 			Sleep(10)
+		_EDOS_Phase("Main observation wait returned; before observation")
 		_EDOS_Observe(), Observed := true
 		_EDOS_Check()
 	} catch Any as Failure {
+		try _EDOS_Phase("Main caught first exception", Failure)
 		Primary := IsObject(_EDOS.Failure) ? _EDOS.Failure : Failure
 	} finally {
 		if !Observed {
@@ -314,6 +358,7 @@ _EDOS_Main() {
 		catch Any as Failure
 			_EDOS_Failure(Failure)
 		OnError(_EDOS_OnError, 0)
+		OnError(_EDOS_BootError, 0)
 		Suspend(PreviousSuspend), Critical(PreviousCritical)
 	}
 	if !IsObject(Primary) && IsObject(_EDOS.Failure)
