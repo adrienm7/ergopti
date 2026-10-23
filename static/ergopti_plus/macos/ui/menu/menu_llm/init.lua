@@ -29,6 +29,7 @@ local BackendPanel     = require("ui.menu.menu_llm.backend_panel")
 local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
 local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
+local ConfigGuard      = require("ui.menu.menu_llm.config_guard")
 local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
 local UnreachableOffer = require("ui.menu.menu_llm.unreachable_backend_offer")
 local OllamaEndpoint   = require("modules.llm.ollama_endpoint")
@@ -1015,6 +1016,31 @@ local function create_menu(deps)
 								return { items = rows, disabled = disabled }
 						end
 				end
+				-- The AI submenus that write config.toml name the same cause as the
+				-- manifest rows when the file refuses writes, and recheck it on a click.
+				local function config_reason()
+						return ConfigGuard.reason_key(require("ui.menu.menu_paths").get("ConfigTomlPath"),
+								require("config_migrate"))
+				end
+				local blocked_reason = config_reason()
+				--- Builds one native parent over a submenu that writes config.toml.
+				--- @param id string Manifest row id, for the renderer's warnings.
+				--- @param title string Parent caption.
+				--- @param menu table Native submenu, kept by identity.
+				--- @param disabled boolean|nil Greying unrelated to the file.
+				--- @return table|nil row
+				local function config_parent(id, title, menu, disabled)
+						ConfigGuard.protect(menu, config_reason)
+						if blocked_reason == nil then return { title = title, disabled = disabled, menu = menu } end
+						local native = ManifestMenu.render_rows({ {
+								label = title, disabled = true, disabled_reason_key = blocked_reason, submenu = menu,
+						} }, id)
+						if #native ~= 1 then
+								Logger.error(LOG, "Greyed AI parent '%s' handoff refused.", id)
+								return nil
+						end
+						return native[1]
+				end
 				local function row_for(id, row)
 						local bucket = rows_by_id[id]
 						if not bucket then
@@ -1050,11 +1076,18 @@ local function create_menu(deps)
 						end,
 				})
 
-				row_for("llm_backend", {
-						title    = backend_title,
-						disabled = MenuLayout.row_disabled("llm_backend", is_disabled, paused),
-						menu     = backend_menu
-				})
+				if type(backend_title) == "string" and type(backend_menu) == "table" then
+						local backend_row = config_parent("llm_backend", backend_title, backend_menu,
+								MenuLayout.row_disabled("llm_backend", is_disabled, paused))
+						if not backend_row then return {} end
+						row_for("llm_backend", backend_row)
+				else
+						row_for("llm_backend", {
+								title    = backend_title,
+								disabled = MenuLayout.row_disabled("llm_backend", is_disabled, paused),
+								menu     = backend_menu
+						})
+				end
 
 				-- API entries CRUD — delegates entirely to ApiPanel.
 				do
@@ -1070,11 +1103,9 @@ local function create_menu(deps)
 								-- Anchored to the backend row: it configures the backend the row
 								-- above selects, and the manifest declares no row of its own for
 								-- it because Windows has no API-entry CRUD to declare.
-								row_for("llm_backend", {
-										title    = api_title,
-										disabled = paused or nil,
-										menu     = api_menu,
-								})
+								local api_row = config_parent("llm_backend", api_title, api_menu, paused or nil)
+								if not api_row then return {} end
+								row_for("llm_backend", api_row)
 						end
 				end
 				local active_display_model = get_display_model_name(state.llm_model)
@@ -1258,9 +1289,11 @@ local function create_menu(deps)
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
 				-- The profile owner returns a DATA caption over completed native children.
 				-- Materialize only that parent; keep its existing child tree by identity.
+				ConfigGuard.protect(profiles_item.menu, config_reason)
 				local native_profile = ManifestMenu.render_rows({ {
 					label = profiles_item.label,
-					disabled = profiles_item.disabled,
+					disabled = profiles_item.disabled or blocked_reason ~= nil or nil,
+					disabled_reason_key = blocked_reason,
 					submenu = profiles_item.menu,
 				} }, "llm_profile")
 				if #native_profile ~= 1 or not rawequal(native_profile[1].menu, profiles_item.menu) then
