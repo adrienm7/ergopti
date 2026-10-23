@@ -223,12 +223,101 @@ _LLM_Menu_StateGetters() {
 		"config_newer_schema", () => ConfigNewerSchemaReadOnly())
 }
 
+/**
+ * Names why the AI submenus that write config.toml (servers, API entries,
+ * profiles) cannot be used: a configuration saved by a newer version, or any
+ * other refusal of the session writer. The switch and the restore row grey
+ * with the same causes through the manifest; these parents are native, so they
+ * name the cause here. A pause is not a cause: it greys the rows already.
+ * @returns {String} A locale key, or "" when the file accepts writes.
+ */
+_LLM_Menu_ConfigBlockReason() {
+	global ConfigurationFile
+	if !IsSet(ConfigurationFile) || !(ConfigurationFile is String) || ConfigurationFile == ""
+		return ""
+	if TOML_WriteRefusal(ConfigurationFile) == ""
+		return ""
+	return ConfigNewerSchemaReadOnly() ? "menu.read_only.newer_schema" : "menu.llm.save_unavailable"
+}
+
+/**
+ * Greys one finished parent row with the configuration cause. A parent greyed
+ * for another reason (category off, pause) keeps its plain greying.
+ * @param {Map} Parent Row data from the shared group renderer, edited in place.
+ * @param {Boolean} Disabled Whether the parent is already greyed for another reason.
+ */
+_LLM_Menu_GreyParentForConfig(Parent, Disabled) {
+	if Disabled
+		return
+	Reason := _LLM_Menu_ConfigBlockReason()
+	if Reason == ""
+		return
+	Parent["disabled"] := true
+	Parent["disabled_reason_key"] := Reason
+}
+
+/**
+ * Names the configuration cause on the parent an emitted AI row returned: the
+ * backend (servers), the model parent while it lists the API entries, and the
+ * profile parent. The emitters stay pinned to their declared frames; the cause
+ * is applied to what they hand back.
+ * @param {String} Id Row id from the manifest's llm_menu.
+ * @param {Array} Rows Row data the emitter returned.
+ * @param {Boolean} Disabled Whether the row is already greyed for another reason.
+ * @returns {Array} The same rows.
+ */
+_LLM_Menu_GreyConfigParents(Id, Rows, Disabled) {
+	global _LLM_Menu
+	if !(Rows is Array)
+		return Rows
+	if Id != "llm_backend" && Id != "llm_profile" && !(Id == "llm_model" && _LLM_Menu["backend"] == "api")
+		return Rows
+	for Row in Rows {
+		; Warnings, separators and info rows carry no submenu; the parent does.
+		if (Row is Map) && Row.Has("submenu")
+			_LLM_Menu_GreyParentForConfig(Row, Disabled)
+	}
+	return Rows
+}
+
+/**
+ * Wraps every action of a native row tree, in place, so a retained click asks
+ * the configuration cause again: a menu stays on screen while a reload can
+ * read a newer file, and the click must not write over it.
+ * @param {Array} Rows Row data (label, action, items).
+ * @returns {Array} The same rows.
+ */
+_LLM_Menu_GuardConfigRows(Rows, Depth := 1) {
+	if !(Rows is Array) || Depth > 8
+		return Rows
+	for Row in Rows {
+		if !(Row is Map)
+			continue
+		if Row.Has("action") && HasMethod(Row["action"], "Call")
+			Row["action"] := _LLM_Menu_GuardedAction.Bind(Row["action"])
+		if Row.Has("items")
+			_LLM_Menu_GuardConfigRows(Row["items"], Depth + 1)
+	}
+	return Rows
+}
+
+; The retained click: refused with a log line while config.toml refuses writes.
+_LLM_Menu_GuardedAction(Action, Params*) {
+	Reason := _LLM_Menu_ConfigBlockReason()
+	if Reason != "" {
+		try LoggerWarn("LLM", "AI settings click refused: {1}.", Reason)
+		return false
+	}
+	return Action.Call(Params*)
+}
+
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
 ; The rows go back to the renderer, which draws them at the declared entry.
 _LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
 	if !(Owner is Menu) || !(TargetMenu is Menu) || TargetMenu != Owner
 		throw Error("An LLM row cannot leave its detached native menu owner.")
-	return _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)
+	return _LLM_Menu_GreyConfigParents(Id, _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows),
+		Disabled)
 }
 
 ; Child builders retain genuine native Menu identities; the manifest owns the parents.

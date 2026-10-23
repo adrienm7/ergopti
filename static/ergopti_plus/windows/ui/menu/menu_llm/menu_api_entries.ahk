@@ -104,7 +104,7 @@ _LLM_Menu_ApiEntriesRows() {
 				Rows.Push(Row)
 		}
 	}
-	return Rows
+	return _LLM_Menu_GuardConfigRows(Rows)
 }
 
 /**
