@@ -337,3 +337,5 @@ Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)
 	_LAG_ToolsCacheLifetime.Bind(100))
 Test("LLM agent: tool cache expires across tick wrap (tools-cache-wrap)",
 	_LAG_ToolsCacheLifetime.Bind(0xFFFFFFF0))
+
+#Include test_llm_agent_tools_native64_ttl.ahk
