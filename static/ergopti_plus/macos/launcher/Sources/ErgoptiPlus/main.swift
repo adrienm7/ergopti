@@ -1281,6 +1281,10 @@ if ManagedHTTPWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(ManagedHTTPWorker.run(arguments: CommandLine.arguments))
 }
 
+if ManagedProxyRouteWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedProxyRouteWorker.run(arguments: CommandLine.arguments))
+}
+
 if OwnedAutomationQueryWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedAutomationQueryWorker.run(arguments: CommandLine.arguments))
 }

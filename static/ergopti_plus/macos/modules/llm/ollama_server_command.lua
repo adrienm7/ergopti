@@ -18,6 +18,7 @@ local M = {}
 local text_utils = require("infra.text_utils")
 local AppDirs    = require("app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
+local OllamaRegistry = require("llm.ollama_registry")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -26,6 +27,10 @@ local DAILY_LOG_SUFFIX = AppDirs.files.extension
 local STAMP_FORMAT = "+%Y-%m-%d %H:%M:%S"
 local OLLAMA_HOST = "127.0.0.1"
 local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
+
+-- The registry the daemon pulls from is the origin whose automatic route the
+-- launcher resolves (PAC, WPAD); the pull that asks the daemon uses the same.
+M.NETWORK_OPTIONS = { pac_probe_url = OllamaRegistry.URL }
 
 --- Resolves a POSIX parent directory from the Logger's current unified path.
 --- Only the directory is retained by the daemon; the dated filename is rebuilt
@@ -109,7 +114,10 @@ function M.build(ollama_bin, unified_log_file, port, source_kind, caller_nonce)
 		-- last successful write cannot turn a guarded refusal into exit zero.
 		return "exec " .. service, nil
 	end
-	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER")
+	-- The daemon reads only HTTPS_PROXY: under a company PAC the launcher names
+	-- the route for the registry it pulls from, and a lookup that fails leaves
+	-- the daemon to start anyway, for the models already on disk.
+	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER", M.NETWORK_OPTIONS)
 	if not network then return nil, network_err end
 
 	return table.concat({

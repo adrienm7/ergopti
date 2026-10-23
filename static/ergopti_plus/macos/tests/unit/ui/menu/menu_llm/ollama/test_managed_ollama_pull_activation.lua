@@ -80,7 +80,11 @@ local function with_activation(options, callback)
 	package.loaded[names[3]] = { get_port = function() return 12345 end }
 	options.binary_path = options.stock and "/fixture/stock-runtime" or options.owned_path or OWNED
 	options.network_env = {
-		opaque_prelude = function() calls.opaque = calls.opaque + 1; return "fixture opaque; " end,
+		opaque_prelude = function(_, prelude_options)
+			calls.opaque = calls.opaque + 1
+			calls.opaque_options = prelude_options
+			return "fixture opaque; "
+		end,
 		prelude = function() calls.static = calls.static + 1; return "fixture static; " end,
 	}
 	local ok, error_value = xpcall(function()
@@ -162,6 +166,9 @@ helpers.describe("Managed Ollama original pull activation", function()
 			helpers.assert_eq(f.calls.prepare, 0)
 			helpers.assert_eq(f.calls.bind, 0)
 			helpers.assert_eq(f.calls.opaque, 1, "a daemon of unknown origin keeps the fail-closed admission")
+			helpers.assert_eq(f.calls.opaque_options and f.calls.opaque_options.pac_probe_url,
+				"https://registry.ollama.ai",
+				"the pull names the registry whose automatic route the launcher resolves (ollama-pac-route)")
 			helpers.assert_eq(f.pulls[1].executable, "/bin/bash")
 			helpers.assert_eq(f.pulls[1].args[1], "-c")
 			helpers.assert_true(f.pulls[1].args[2]:find("fixture opaque; exec", 1, true) ~= nil)
