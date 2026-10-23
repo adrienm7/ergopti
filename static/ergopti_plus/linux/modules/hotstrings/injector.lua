@@ -866,6 +866,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
 
+	local owner = capture_replacement_owner()
 	if is_private then
 		Logger.trace(LOG, "inject(): bc=%d, private text (content withheld)…", backspace_count)
 	else
@@ -874,7 +875,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	if not retire_clipboard() then
 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
-	local checked, prepared = pcall(prepare_replacement, replacement_text, publication)
+	local checked, prepared = pcall(prepare_replacement, replacement_text, publication, owner)
 	if not checked then
 		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
 		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
