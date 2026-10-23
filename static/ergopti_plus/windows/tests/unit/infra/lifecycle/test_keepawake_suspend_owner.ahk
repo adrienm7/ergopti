@@ -55,7 +55,23 @@ _KASO_Source() {
 			Source .= "#Include " . Owner . "`n"
 		}
 	}
-	WinOwner := CanonicalRoot . "\modules\shortcuts\win.ahk"
+	WinOwners := []
+	; These global functions are declared inside a runtime feature block, so the
+	; top-level-only resolver intentionally cannot select their whole owner.
+	Loop Files, CanonicalRoot . "\*.ahk", "FR" {
+		Path := A_LoopFileFullPath
+		if !_DriverIsProductionSource(Path)
+			continue
+		Candidate := FileRead(Path, "UTF-8")
+		Definition := _DriverFindFunctionDefinition(&Candidate, "StopActivitySimulation")
+		if !IsObject(Definition)
+			continue
+		AssertFalse(IsObject(_DriverFindFunctionDefinition(&Candidate,
+			"StopActivitySimulation", Definition.OpenPos + 1)), "the shortcut owner cannot contain duplicate definitions")
+		WinOwners.Push(Path)
+	}
+	AssertEqual(1, WinOwners.Length, "the conditional shortcut function must have exactly one authored owner")
+	WinOwner := WinOwners[1]
 	AssertTrue(_DriverIsProductionSource(WinOwner), "the whole shortcut module must be authored production")
 	Text := FileRead(WinOwner, "UTF-8")
 	for Name in ["StopActivitySimulation", "AwakeStopCancellationHook", "AwakeCreateCancellationHook"]
