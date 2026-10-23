@@ -155,7 +155,7 @@ helpers.describe("action catalogue parity (Linux)", function()
 		helpers.assert_eq(#dead, 0, "listed but not runnable on Linux: " .. table.concat(dead, ", "))
 		helpers.assert_eq(#hidden, 0, "runnable on Linux but never listed: " .. table.concat(hidden, ", "))
 		for _, id in ipairs({ "tab", "select_line", "tab_new", "open_config", "screenshot_region_save",
-			"script_quit", "desktop_prev", "app_window_previous" }) do
+			"script_quit", "desktop_prev", "app_window_previous", "one_shot_shift" }) do
 			helpers.assert_true(listed_set[id] == true, id .. " must be offered on Linux")
 		end
 	end)

@@ -529,6 +529,14 @@ local SETTINGS_APPLICATIONS = {
 --- the binding that fired it, which parameterized actions read their value by.
 local BUILTIN_HANDLERS = {
 	["run_program"] = function(binding) return M.run_program(binding) end,
+	-- A tap-hold tap value: the tap-hold manager intercepts it on the key that
+	-- owns it (platform/remap/tap_hold_manager.lua) before any executor runs. A
+	-- slot with no such key cannot arm the one-shot Shift, so it says so
+	-- rather than doing nothing.
+	["one_shot_shift"] = function(binding)
+		Logger.error(LOG, "one_shot_shift cannot run from binding '%s': it is only a tap value of a tap-hold key.",
+			tostring(binding))
+	end,
 	["alt_tab_monitor"] = function(binding) return M.run_window_switch(binding) end,
 	["open_system_settings"] = function()
 		local Shell = require("adapters.shell_runner")
