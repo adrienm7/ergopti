@@ -176,6 +176,8 @@ local KEY_MAP = {
 	layout_pause_switch_enabled          = { sec = "layout", key = "pause_switch_enabled"    },
 	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
 	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
+	-- The Karabiner virtual keyboard type (auto / iso / ansi): platform/remap deploys it.
+	layout_virtual_keyboard              = { sec = "layout", key = "virtual_keyboard", enum = true },
 
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
@@ -1892,6 +1894,21 @@ local function script_parameter_admission()
 	end
 end
 
+-- A whole-snapshot save that holds the main thread this long delays event taps
+-- and the Karabiner lease heartbeat (issue #101: 300 operations, 1.7 s). The
+-- report names the phase because the batch size alone did not explain the hold.
+local SLOW_SAVE_REPORT_MS = 250
+local NANOSECONDS_PER_MILLISECOND = 1000000
+
+--- Reads the monotonic clock, or nil when the host has none (headless runs).
+--- @return number|nil nanoseconds
+local function save_clock()
+	local host_timer = type(hs) == "table" and hs.timer or nil
+	if type(host_timer) ~= "table" or type(host_timer.absoluteTime) ~= "function" then return nil end
+	local ok, value = pcall(host_timer.absoluteTime)
+	return ok and type(value) == "number" and value or nil
+end
+
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
 --- file on disk. The sections Preferences owns come from the state; every
@@ -1950,6 +1967,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 	-- its default, whose sparse delete must not erase it (see _load_outdated).
 	local outdated = _load_outdated[prefs_file] or {}
 	local replaced = {}
+	local save_started = save_clock()
 	local model_operation
 	local ok, updates = pcall(function()
 		local document, shapes
@@ -2021,6 +2039,7 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 		return false
 	end
 
+	local prepare_done = save_clock()
 	local write_ok, written, detail, encoded, native, candidate = pcall(
 		TomlWriter.batch_write,
 		prefs_file,
@@ -2040,6 +2059,15 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view, on_error,
 				tostring(prefs_file), tostring(write_ok and detail or written))
 		end
 		return false
+	end
+	local write_done = save_clock()
+	if save_started and prepare_done and write_done then
+		local total_ms = (write_done - save_started) / NANOSECONDS_PER_MILLISECOND
+		if total_ms >= SLOW_SAVE_REPORT_MS then
+			Logger.warn(LOG, "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d).",
+				math.floor(total_ms), math.floor((prepare_done - save_started) / NANOSECONDS_PER_MILLISECOND),
+				math.floor((write_done - prepare_done) / NANOSECONDS_PER_MILLISECOND), #updates)
+		end
 	end
 	if model_operation then RecordList.acknowledge(model_operation, encoded) end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
