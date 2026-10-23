@@ -146,3 +146,23 @@ helpers.describe("script lifecycle actions", function()
 	end)
 
 end)
+
+
+helpers.describe("pause transition acknowledgement", function()
+	for _, result in ipairs({ "nil", "true", "false", "throw" }) do
+		helpers.it("acknowledges a " .. result .. " listener result", function()
+			local calls = 0
+			local controller = require("modules.shortcuts.script_actions").new({ reset = function() end,
+				reload = function() end, quit = function() end,
+				on_pause_change = function()
+					calls = calls + 1
+					if result == "throw" then error("listener failed") end
+					if result == "false" then return false end
+					if result == "true" then return true end
+				end })
+			helpers.assert_eq(controller.toggle_pause(), result == "nil" or result == "true")
+			helpers.assert_true(controller.is_paused())
+			helpers.assert_eq(calls, 1, "acknowledgement does not apply a second transition")
+		end)
+	end
+end)
