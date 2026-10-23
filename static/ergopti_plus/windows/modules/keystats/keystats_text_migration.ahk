@@ -308,10 +308,41 @@ _KL_Mig_IndexOf(columns, name) {
 		return 0
 }
 
-; Strips the quotes off a SQL literal and unescapes its doubled quotes.
+; Decodes only the quoted segments and control-byte joins emitted by SQLite_Q.
+; Data resembling SQL stays inside its segment; arbitrary expressions are refused.
 _KL_Mig_Unquote(literal) {
-		inner := SubStr(literal, 2, StrLen(literal) - 2)
-		return StrReplace(inner, "''", "'")
+		if !(literal is String) || RegExMatch(literal, "[\x00\r]")
+				throw ValueError("Migration requires a canonical SQLite text literal.")
+		; Derive the two joins from their one production encoder. Each expression
+		; is two empty quoted segments around the exact control-byte join.
+		static nulExpression := SQLite_Q(Chr(0)), crExpression := SQLite_Q(Chr(13))
+		static nulJoin := SubStr(nulExpression, 3, StrLen(nulExpression) - 4)
+		static crJoin := SubStr(crExpression, 3, StrLen(crExpression) - 4)
+		position := 1, length := StrLen(literal), value := ""
+		loop {
+				if (SubStr(literal, position, 1) != "'")
+						throw ValueError("Migration requires a quoted SQLite text segment.")
+				start := position + 1
+				finish := InStr(literal, "'", true, start)
+				; A doubled quote belongs to this segment, not to a control join.
+				while finish && SubStr(literal, finish + 1, 1) = "'"
+						finish := InStr(literal, "'", true, finish + 2)
+				if !finish
+						throw ValueError("Migration cannot decode an unfinished SQLite text segment.")
+				value .= StrReplace(SubStr(literal, start, finish - start), "''", "'")
+				position := finish + 1
+				if position > length
+						return value
+				if (SubStr(literal, position, StrLen(nulJoin)) == nulJoin) {
+						value .= Chr(0)
+						position += StrLen(nulJoin)
+				} else if (SubStr(literal, position, StrLen(crJoin)) == crJoin) {
+						value .= Chr(13)
+						position += StrLen(crJoin)
+				} else {
+						throw ValueError("Migration cannot decode an unsupported SQLite text expression.")
+				}
+		}
 }
 
 
@@ -381,11 +412,17 @@ KL_Mig_ConvertStatement(sql, deviceIdLit, mode) {
 				if (!columnIndex)
 						continue
 				raw := Trim(fields[columnIndex])
-				; Only a quoted literal holds text. NULL and numerics are left alone.
-				if (StrLen(raw) < 2 || SubStr(raw, 1, 1) != "'" || SubStr(raw, -1) != "'")
+				; SQLite_Q carries NUL as a join, never inside the SQL statement.
+				if RegExMatch(raw, "\x00")
+						return failed
+				; NULL and numeric scalars carry no text to encrypt. Every other
+				; expression must decode exactly or the original ledger stays intact.
+				if (raw = "NULL" || IsNumber(raw))
 						continue
-				value := _KL_Mig_Unquote(raw)
-				if (value = "")
+				try value := _KL_Mig_Unquote(raw)
+				catch
+						return failed
+				if (StrLen(value) = 0)
 						continue
 
 				wrapped := KL_Enc_IsEncrypted(value)
@@ -397,7 +434,7 @@ KL_Mig_ConvertStatement(sql, deviceIdLit, mode) {
 						converted := KL_Enc_Encrypt(Keystats.device_id, rowId . spec[2], value)
 						; KL_Enc_Encrypt returns the plaintext untouched when the toggle is
 						; off, so only the envelope marker proves anything happened.
-						if (converted = "" || !KL_Enc_IsEncrypted(converted))
+						if (StrLen(converted) = 0 || !KL_Enc_IsEncrypted(converted))
 								return failed
 				} else {
 						if (!wrapped)
@@ -405,7 +442,7 @@ KL_Mig_ConvertStatement(sql, deviceIdLit, mode) {
 						converted := KL_Enc_Decrypt(value)
 						; An envelope never wraps an empty value, so an empty result means the
 						; decryption failed. Writing it would erase the row for good.
-						if (converted = "")
+						if (StrLen(converted) = 0)
 								return failed
 				}
 				fields[columnIndex] := KL_SqlStr(converted)
