@@ -330,13 +330,13 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 		end)
 	end)
 
-	helpers.it("HS-075 latches a duplicate Edit callback after the first transaction refuses", function()
+	helpers.it("HS-075 refuses a duplicate Edit callback inside a refusing transaction", function()
 		local original = {id = "custom", label = "Original"}
 		local updated = {id = "custom", label = "Updated"}
 		with_fixture({
 			initial_profiles = {original},
 			editor_update = updated,
-			editor_double_callback = true,
+			editor_reentrant_callback = true,
 		}, function(fixture)
 			fixture.plan_save({
 				{mode = "false"},
@@ -347,8 +347,13 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(edit_row.action(), true)
 			fixture.fire_timer()
 
+			helpers.assert_eq(#fixture.editor_reentrant_results, 1,
+				"the duplicate must arrive before the first preference refusal returns")
+			helpers.assert_eq(fixture.editor_reentrant_results[1], false)
 			helpers.assert_eq(fixture.state.llm_user_profiles[1], original,
-				"a duplicate editor delivery must not retry a refused edit")
+				"an in-flight duplicate must not escape the refused edit rollback")
+			helpers.assert_true(fixture.state.llm_user_profiles[1] == original,
+				"the refused edit must preserve the exact original profile identity")
 			helpers.assert_eq(fixture.notifications(), 0,
 				"a refused edit must not become a later duplicate success")
 			helpers.assert_eq(fixture.save_count(), 2,
