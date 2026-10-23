@@ -3,7 +3,7 @@
 # ErgoptiPlus continuation checklist
 
 Updated: 2026-10-23. Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
-(tag 950979d19c, 2026-10-23). **Next step: the keystats to `keystats` rename (Backlog).** Open work only: a finished item is removed, its lessons go to
+(tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
 questions are in [questions-for-maintainer.md](questions-for-maintainer.md); per-work handoff files
@@ -243,12 +243,10 @@ Added October 22 (from the agents' reports; details in their commits):
       a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
       they need a Mac day of typing with the `key_event_health` counters; handoff in
       [issue99-karabiner-input.md](todo-agents/issue99-karabiner-input.md).
-- [ ] **NEXT STEP: rename keystats to `keystats` and make renames cheap.** [CODE] 12 191 occurrences in
-      1 360 files (953 tests, 579 paths). Declare each persisted name once (database, config
-      namespace, log tag, data file names), make tests read names from that source instead of
-      pinning spellings, regenerate seals and generated files through their owners, keep the
-      maintainer's existing data readable, and end with a repository grep that finds no
-      `keystats` outside history.
+- [ ] **Keystats rename leftovers.** [CODE] The rename is done (180a53e4de, 1 283 files, 579 paths). Left:
+      the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
+      script: recompile on a Mac); declare each persisted name once and make tests read it instead
+      of pinning spellings, so the next rename is cheap.
 - [ ] **Issue #101: managed network follow-ups.** [PHYS-M] Root cause of the reporter's `native_proxy_lookup`
       failures: the launcher Info.plist had no App Transport Security key, so the URLSession PAC fetch
       refused their `http://` company PAC (fixed; confirm on the Mac with the next release). Left: (1) split
