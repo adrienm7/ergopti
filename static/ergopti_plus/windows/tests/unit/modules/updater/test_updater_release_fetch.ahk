@@ -674,3 +674,5 @@ _UpdaterTest_ListCacheSurvivesRestart() {
 	}
 }
 Test("Updater: the release list and its ETag survive a restart (#95)", _UpdaterTest_ListCacheSurvivesRestart)
+
+#Include test_updater_managed_json_utf8.ahk
