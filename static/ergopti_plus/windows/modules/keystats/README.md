@@ -4,7 +4,7 @@
 
 Windows port of the Hammerspoon keystats. Intercepts every keystroke via the AHK keyboard hook, persists events to an append-only `data.sql` file and a hot-path `today.log` JSONL file. Mirrors the on-disk schema from `_shared/data/KEYSTATS_SPEC.md` byte-for-byte so a Mac and a PC sharing a cloud folder accumulate data naturally.
 
-Rich aggregation (n-grams, bursts, ergonomic streaks) is not yet ported; the Mac-side Hammerspoon walker handles those tables for any synced Windows device.
+Rich aggregation (n-grams, bursts, ergonomic streaks) is ported: the walker (`keystats_walker*.ahk`), the n-gram reader (`keystats_reader_ngrams.ahk`) and the ergonomic collector (`keystats_ergonomics.ahk`) fill the same tables as the macOS walker.
 
 ## Ports used (`_shared/core/ports/`)
 

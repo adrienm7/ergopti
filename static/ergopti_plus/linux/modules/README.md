@@ -1,25 +1,23 @@
 # modules/
 
-One folder per feature. Measured contents (production `.lua` only):
+One folder per feature. Measured 2026-10-24 (production `.lua` only):
 
-| Folder                | Files | Lines | Role                                                                                                                                        |
-| --------------------- | ----: | ----: | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `diagnostics/`        |     1 |   163 | crash reporter — the counterpart of `lib/crash_reporter.*` on the other two drivers                                                         |
-| `dynamic_hotstrings/` |     1 |   249 | computed expansions (dates, personal info)                                                                                                  |
-| `gestures/`           |     1 |   850 | gesture slots + action dispatch. **The libinput reader is a stub**: `start_reading()` sets a flag and logs, nothing spawns a reader         |
-| `hotstrings/`         |     6 | 1 191 | the expansion engine (`engine.lua` delegates to `_shared/lua/hotstring_engine`), TOML loader, evdev reader, ydotool injector, device finder |
-| `keystats/`           |     4 | 1 870 | capture, SQLite writer/reader, metrics collector                                                                                            |
-| `llm/`                |     3 |   898 | Ollama backend, prediction engine, profiles                                                                                                 |
-| `menu/`               |     1 |   833 | the tray menu, hand-built. On Windows and macOS the equivalent lives in `ui/menu/`                                                          |
-| `shortcuts/`          |     1 |   385 | text utilities. **Registers no hotkey**: Linux has no global keyboard-grab API in userland                                                  |
-| `ui/`                 |    16 | 2 379 | WebKitGTK hosting + one bridge handler per shared webview app. On Windows and macOS the equivalent lives in `ui/<window>/`                  |
-| `updater/`            |     1 |   798 | GitHub release polling and install                                                                                                          |
+| Folder                | Files |  Lines | Role                                                                                                                                                                     |
+| --------------------- | ----: | -----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `diagnostics/`        |     1 |    226 | crash reporter, the counterpart of the crash reporters on the other two drivers                                                                                          |
+| `dynamic_hotstrings/` |     3 |  1 531 | computed expansions (dates, personal info), prefix rules and the user-code sandbox                                                                                       |
+| `gestures/`           |     8 |  4 267 | gesture slots and action dispatch, the multi-touch decoder and touchpad finder, system and workspace actions                                                             |
+| `hotstrings/`         |    14 |  7 650 | the expansion engine (`engine.lua` delegates to `_shared/lua/hotstring_engine`), TOML loader, device finder, evdev input reader, ydotool injector, magic and repeat keys |
+| `keymap/`             |     2 |  1 273 | layout registry and the composer check                                                                                                                                   |
+| `keystats/`           |    10 |  7 158 | capture, SQLite writer and reader, metrics collector, text cipher and migration                                                                                          |
+| `llm/`                |    35 | 12 394 | inference backends (Ollama, remote API), prediction engine, profiles, agents, model download and inventory                                                               |
+| `shortcuts/`          |    12 |  4 856 | keyboard shortcuts, key combinations, tap keys, script chords, wrap on type                                                                                              |
+| `updater/`            |     5 |  3 039 | release polling and install: `manager.lua`, `installer.lua`, `archive_transfer.lua`, `config_backup.lua`, `restarter.lua`                                                |
 
-Sibling trees: `adapters/` (22 files — the port implementations), `lib/` (6 files —
-cross-cutting infra), `ui/` (1 file — `webkit_host.lua`).
+Sibling trees: `adapters/` (43 files, the port implementations), `infra/` (78
+files, cross-cutting infrastructure) and `ui/` (53 files, the tray menu and one
+bridge per shared webview app).
 
-> Two divergences from the other drivers that this layout makes visible, and that
-> the driver-tree parity gate measures (`tools/test/test-driver-tree-parity.cjs`):
-> the tray menu and the webview hosts live under `modules/` here and under `ui/`
-> elsewhere, and `linux/` therefore has **two** `ui` namespaces (`ui.*` →
-> `linux/ui/`, `modules.ui.*` → `linux/modules/ui/`).
+> The tray menu and the webview hosts live under `ui/` here as on the other two
+> drivers. The driver-tree parity gate (`tools/test/test-driver-tree-parity.cjs`)
+> measures any divergence of this layout.

@@ -12,7 +12,7 @@ The Windows implementation of ErgoptiPlus.
 >
 > Two name collisions to know before navigating: `modules/keymap/` is the
 > **physical layout remap** here and the **hotstring expansion engine** on macOS;
-> `lib/registry.ahk` is a **Windows-registry** wrapper while
+> `infra/registry.ahk` is a **Windows-registry** wrapper while
 > `macos/modules/keymap/registry.lua` is the **hotstring registry**.
 
 ## Entry point
@@ -35,7 +35,7 @@ includes.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ErgoptiPlus.ahk`    | Thin entry: directives + include manifest + error net + boot.                                                                                                                                    |
 | `adapters/`          | OS-isolation layer — every `DllCall`, `Send*`, `WinGet*`, file/COM call lives here (one file per port of `_shared/core/ports/contracts.json`), so domain code stays OS-agnostic.                 |
-| `lib/`               | Infrastructure & domain helpers (no UI windows). Foldered submodules (`lib/hotstrings/`, `lib/updater/`, …) for the large ones.                                                                  |
+| `infra/`             | Infrastructure helpers (no UI windows): boot, configuration, logger, paths, registry. Foldered submodules (`infra/hotstrings/`, `infra/metrics/`, `infra/timings/`) for the large ones.          |
 | `modules/<feature>/` | One folder per feature (`gestures/`, `keystats/`, `keymap/`, `llm/`, `tap_holds/`, `shortcuts/`, …).                                                                                             |
 | `ui/<window>/`       | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `healthcheck/`, `changelog/`, `spotlight/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`), each with an `init.ahk` index. |
 | `build/`             | Untracked build output (compiled bundle).                                                                                                                                                        |

@@ -467,8 +467,8 @@ Test-runner integration:
   `test_vectors.json` via `JsonParse()` and asserts each expected line (with timestamp
   replaced).
 - **HS**: `macos/tests/unit/infra/logger/test_logger.lua` does the same via `require("lib.json")`.
-- **Linux**: no vector replay today. The shared core it runs is therefore unpinned by
-  this spec.
+- **Linux**: `linux/tests/unit/infra/logger/test_logger_contract.lua` replays the vectors through the
+  shared core, and `linux/tests/meta/corpus/test_corpus_logger_behaviour.lua` replays the behaviour corpus.
 
 ---
 
