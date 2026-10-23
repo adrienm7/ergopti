@@ -541,3 +541,5 @@ Test("TimerScheduler: native callback identity survives cancel and rearm (prefix
 	_TSTest_NativeCallbackKeepsIdentity)
 
 #Include test_timer_scheduler_lifetime.ahk
+
+#Include test_timer_scheduler_retirement_after.ahk
