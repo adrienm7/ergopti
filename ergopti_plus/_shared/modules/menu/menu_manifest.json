@@ -1570,17 +1570,10 @@
 			"unavailable": "hide"
 		},
 		{
-			"type": "group",
+			"type": "command",
 			"id": "tap_hold_key_delay",
 			"i18n": "menu.tapholds.key_tap_delay",
 			"caption_getter": "tap_hold_key_delay_caption"
-		}
-	],
-	"tap_hold_key_delay_rows": [
-		{
-			"type": "command",
-			"id": "tap_hold_key_delay_set",
-			"i18n": "menu.tapholds.key_tap_delay_set"
 		},
 		{
 			"type": "check",
@@ -3505,40 +3498,20 @@
 			"caption_getter": "tap_hold_key_tap_caption",
 			"platforms": [
 				"ahk",
+				"hs",
 				"linux"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
-			"type": "group",
-			"id": "tap_hold_key_tap_picker",
-			"i18n": "menu.tapholds.tap_arrow",
-			"caption_getter": "tap_hold_key_tap_caption",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "group",
-			"id": "tap_hold_key_hold",
+			"type": "command",
+			"id": "tap_hold_key_hold_action",
 			"i18n": "tap_hold.picker.hold",
 			"caption_getter": "tap_hold_key_hold_caption",
 			"platforms": [
 				"ahk",
+				"hs",
 				"linux"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "group",
-			"id": "tap_hold_key_hold_picker",
-			"i18n": "menu.tapholds.hold_arrow",
-			"caption_getter": "tap_hold_key_hold_caption",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"linux_hotstrings_absent_rows": [
@@ -5905,7 +5878,33 @@
 			"label_prefix": "    "
 		}
 	],
+	"keyboard_group_scope_controls": [
+		{
+			"type": "command",
+			"id": "scope_restore",
+			"i18n": "common.restore_recommended",
+			"disabled_when": [
+				"keyboard_group_ready"
+			]
+		},
+		{
+			"type": "command",
+			"id": "scope_clear",
+			"i18n": "common.clear_to_system",
+			"disabled_when": [
+				"keyboard_group_ready"
+			]
+		},
+		{
+			"type": "---"
+		}
+	],
 	"keyboard_group_frame": [
+		{
+			"type": "include",
+			"section": "keyboard_group_scope_controls",
+			"present_when": "keyboard_group_has_scope"
+		},
 		{
 			"type": "include",
 			"section": "keyboard_group_fixed_frame",
@@ -6031,38 +6030,6 @@
 			"disabled_when": [
 				"keyboard_group_ready"
 			],
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"tap_hold_action_picker_frame": [
-		{
-			"type": "list",
-			"id": "tap_hold_picker_special_rows",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		},
-		{
-			"type": "include",
-			"section": "tap_hold_action_picker_boundary",
-			"present_when": "tap_hold_picker_has_boundary"
-		},
-		{
-			"type": "list",
-			"id": "tap_hold_picker_grouped_rows",
-			"platforms": [
-				"hs"
-			],
-			"unavailable": "hide"
-		}
-	],
-	"tap_hold_action_picker_boundary": [
-		{
-			"type": "---",
 			"platforms": [
 				"hs"
 			],

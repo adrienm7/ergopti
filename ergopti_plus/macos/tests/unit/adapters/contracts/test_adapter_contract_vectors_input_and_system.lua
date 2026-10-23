@@ -254,11 +254,22 @@ end)
 -- =========================================
 
 helpers.describe("Adapter contract vectors: Crypto", function()
-	-- sha256() shells out to openssl via hs.execute; stub it with a fixed digest
-	-- in the real output format so the adapter's parse/clean path is exercised.
+	-- sha256() hashes through hs.hash; the double reports a fixed native digest
+	-- so the adapter's validation/normalisation path is exercised.
 	local CANONICAL = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+	local function native_hash(value)
+		return {
+			new = function()
+				local context = {}
+				function context:append() return self end
+				function context:finish() return self end
+				function context:value() return value end
+				return context
+			end,
+		}
+	end
 	local adapter = helpers.load_with_stubs("adapters.crypto", {
-		execute = function(_cmd) return "SHA2-256(stdin)= " .. CANONICAL .. "\n" end,
+		hash = native_hash(CANONICAL),
 	})
 
 	helpers.it("sha256 returns a string (sha256_returns_string)", function()
@@ -291,7 +302,7 @@ helpers.describe("Adapter contract vectors: Crypto", function()
 
 	helpers.it("sha256 returns '' when the digest cannot be parsed (error_behavior)", function()
 		local bad = helpers.load_with_stubs("adapters.crypto", {
-			execute = function(_cmd) return "garbage with no digest line" end,
+			hash = native_hash("garbage with no digest line"),
 		})
 		helpers.assert_eq("", bad.sha256("hello"),
 			"sha256() must return '' on unparseable crypto output")

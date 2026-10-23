@@ -514,7 +514,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth, PopulationOwner := unset, Requir
 		} else if (Row.Has("action") and (Row["action"] is Func
 				or Row["action"] is MenuStartupUiCommand
 				or Row["action"] is MenuStartupRepeatableToggleCommand) and !Greyed) {
-			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""))
+			Tracked := RegisterMenuItem(TargetMenu, Label, Row["action"], Row.Get("replay_id", ""), Row.Get("checked_fn", 0))
 			if RequireTracking && Tracked != 1
 				throw Error("Native leaf command registration was refused")
 		} else {
@@ -670,8 +670,11 @@ _MR_CommandRowData(Item, ManifestKey, Commands, StateGetters) {
 		"replay_id", _MR_ReplayIdentity(ManifestKey, Id))
 	if Disabled
 		Row["disabled"] := true
-	if ItemType == "check"
+	if ItemType == "check" {
 		Row["checked"] := MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters)
+		; The dispatcher reads the live checkmark when a late command runs.
+		Row["checked_fn"] := MenuRenderer_ResolveCheckedWhen.Bind(ManifestKey, Id, StateGetters)
+	}
 	return Row
 }
 
@@ -890,7 +893,7 @@ _MR_ReceiveDeclaredParent(ManifestKey, RowId, Root, Rows, Source, Owner, Child, 
  * Supplies one declared parent around a completed native Menu.
  * @param {String} ManifestKey Owning shared menu declaration.
  * @param {String} RowId Unique declared group identity.
- * @param {Menu} NativeChild Finished child retained by identity.
+ * @param {Menu|MenuTemplateChild} NativeChild Finished child retained by identity.
  * @param {Map} StateGetters Actual native state readers.
  * @returns {Map|false} Canonical parent row or refused declaration.
  */
@@ -899,6 +902,9 @@ MenuRenderer_GroupRow(ManifestKey, RowId, NativeChild, StateGetters := unset) {
 		try LoggerError("MenuRenderer", "Invalid declared parent identity — provider row refused.")
 		return false
 	}
+	; A template child is attached only while the renderer still publishes it.
+	if NativeChild is MenuTemplateChild
+		NativeChild := _MR_TemplateChildMenu(NativeChild)
 	Selected := false
 	Matches := 0
 	for Item in _MR_GetMenuDef(ManifestKey) {
@@ -1512,7 +1518,7 @@ MenuRenderer_PersonalFileCaptionPolicy() {
  * @param {Map} Receipt Previously admitted source and original callable cohort.
  * @param {String} Stem Completed original native concatenation receipt.
  * @param {String} Count Completed original formatted-count concatenation receipt.
- * @param {Menu} Child Exact finished native child retained by identity.
+ * @param {MenuTemplateChild} Child Filled child the renderer still publishes.
  * @returns {Map|false} Declared caption/child DATA or owner/source refusal.
  */
 MenuRenderer_PersonalFileParentRow(Receipt, Stem, Count, Child) {
@@ -1520,7 +1526,10 @@ MenuRenderer_PersonalFileParentRow(Receipt, Stem, Count, Child) {
 		return false
 	for Name in ObjOwnProps(Receipt)
 		return false
-	if Receipt.Count != 9 || Type(Stem) != "String" || Type(Count) != "String" || !(Child is Menu)
+	if Receipt.Count != 9 || Type(Stem) != "String" || Type(Count) != "String"
+		return false
+	ChildMenu := _MR_TemplateChildMenu(Child)
+	if !ChildMenu
 		return false
 	for Key in ["root", "policy", "source", "parent", "formatter", "root_reader", "loader", "current", "guard"]
 		if !Receipt.Has(Key)
@@ -1558,7 +1567,7 @@ MenuRenderer_PersonalFileParentRow(Receipt, Stem, Count, Child) {
 	if !Root.Has("hotstring_personal_file_caption") || Root["hotstring_personal_file_caption"] != Receipt["policy"]
 		|| !Receipt["current"].Call(Receipt["source"])
 		return false
-	return Map("label", Label, "submenu", Child)
+	return Map("label", Label, "submenu", ChildMenu)
 }
 
 /**
@@ -1598,7 +1607,7 @@ MenuRenderer_PersonalFolderCaptionPolicy() {
  * @param {Integer} Positive Original native total comparison, without a new numeric domain.
  * @param {String} FolderName Completed original outer native concatenation receipt.
  * @param {String} Count Completed positive native count coercion, empty on the skipped branch.
- * @param {Menu} Child Exact finished native child retained by identity.
+ * @param {MenuTemplateChild} Child Filled child the renderer still publishes.
  * @returns {Map|false} Declared caption/child DATA or owner/source refusal.
  */
 MenuRenderer_PersonalFolderParentRow(Receipt, Positive, FolderName, Count, Child) {
@@ -1607,7 +1616,10 @@ MenuRenderer_PersonalFolderParentRow(Receipt, Positive, FolderName, Count, Child
 	for Name in ObjOwnProps(Receipt)
 		return false
 	if Receipt.Count != 9 || Type(Positive) != "Integer" || (Positive != 0 && Positive != 1)
-		|| Type(FolderName) != "String" || Type(Count) != "String" || !(Child is Menu)
+		|| Type(FolderName) != "String" || Type(Count) != "String"
+		return false
+	ChildMenu := _MR_TemplateChildMenu(Child)
+	if !ChildMenu
 		return false
 	for Key in ["root", "policy", "source", "parent", "formatter", "root_reader", "loader", "current", "guard"]
 		if !Receipt.Has(Key)
@@ -1647,7 +1659,7 @@ MenuRenderer_PersonalFolderParentRow(Receipt, Positive, FolderName, Count, Child
 	if !Root.Has("hotstring_personal_folder_caption") || Root["hotstring_personal_folder_caption"] != Receipt["policy"]
 		|| !Receipt["current"].Call(Receipt["source"])
 		return false
-	return Map("label", Label, "submenu", Child)
+	return Map("label", Label, "submenu", ChildMenu)
 }
 
 ; Ordered getter vectors retain original translated formats and reject malformed native data.
@@ -1828,7 +1840,8 @@ _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 		"label",   t(I18nKey),
 		"action",  Commands[CmdId],
 		"replay_id", _MR_ReplayIdentity(ManifestKey, Id),
-		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
+		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters),
+		"checked_fn", MenuRenderer_ResolveCheckedWhen.Bind(ManifestKey, Id, StateGetters))
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 		if ReasonKey != "" && !_MR_DisabledReason(Item, ManifestKey, StateGetters, &ReasonKey)
@@ -1837,6 +1850,7 @@ _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 			Row["disabled_reason_key"] := ReasonKey
 			Row.Delete("action")
 			Row.Delete("replay_id")
+			Row.Delete("checked_fn")
 		}
 	}
 	return Row
@@ -2582,7 +2596,8 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 		return false
 	Active[Identity] := true
 	Fields := Map("label", true, "separator", true, "action", true, "items", true,
-		"submenu", true, "checked", true, "disabled", true, "disabled_reason_key", true, "icon", true, "replay_id", true, "replay_group", true)
+		"submenu", true, "checked", true, "disabled", true, "disabled_reason_key", true, "icon", true, "replay_id", true, "replay_group", true,
+		"checked_fn", true)
 	loop Rows.Length {
 		if !Rows.Has(A_Index)
 			return false
@@ -2606,6 +2621,9 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 		}
 		if (Row.Has("replay_id") && !Row.Has("action")) || (Row.Has("replay_group") && !Row.Has("items") && !Row.Has("submenu"))
 			return false
+		; A checkmark predicate belongs to a check row's command only.
+		if Row.Has("checked_fn") && (!Row.Has("action") || !Row.Has("checked") || !(Row["checked_fn"] is Func))
+			return false
 		if Row.Has("icon") && Type(Row["icon"]) != "String"
 			return false
 		if Row.Has("disabled_reason_key") && Type(Row["disabled_reason_key"]) != "String"
@@ -2628,6 +2646,141 @@ _MR_AppendTemplateRowsAdmitted(Rows, Depth, Active) {
 			return false
 	}
 	Active.Delete(Identity)
+	return true
+}
+
+/**
+ * A native child Menu whose rows only the renderer draws and repaints.
+ * Driver code keeps this handle for its repaint callbacks instead of the Menu:
+ * the renderer fills the child once, hands the Menu out only inside a declared
+ * parent row, and refuses every later use once the child no longer holds
+ * exactly the rows it drew. Its fields belong to the renderer.
+ */
+class MenuTemplateChild {
+	__New(NativeMenu) {
+		this._native := NativeMenu
+		this._handle := NativeMenu.Handle
+		this._key := ""
+		this._drawn := -1
+		this._checks := Map()
+	}
+}
+
+/**
+ * Reserves an empty renderer-owned child before its commands are built, so
+ * those commands can name the handle they will repaint.
+ * @param {Array} OwnedMenus The caller's release ledger, which receives the Menu.
+ * @returns {MenuTemplateChild} The reserved, still unpublished child.
+ */
+MenuRenderer_TemplateChild(OwnedMenus) {
+	if !(OwnedMenus is Array)
+		throw TypeError("A template child joins its caller's release ledger.")
+	NativeMenu := Menu()
+	OwnedMenus.Push(NativeMenu)
+	return MenuTemplateChild(NativeMenu)
+}
+
+/**
+ * Draws one complete shared template into a reserved child, once.
+ * The declaration and entire provider tree are admitted before drawing, as for
+ * MenuRenderer_AppendTemplate; the child is published only when the native
+ * menu then holds exactly one item per admitted row.
+ * @param {MenuTemplateChild} Child A reserved child that was never filled.
+ * @param {String} ManifestKey Whole canonical template identity.
+ * @param {Map} Commands Existing native commands.
+ * @param {Map} StateGetters Existing state and caption readers.
+ * @param {Map} Children Existing child rows or declared providers.
+ * @returns {Integer} Number of nonseparator rows drawn, zero on refusal.
+ */
+MenuRenderer_FillTemplateChild(Child, ManifestKey, Commands, StateGetters, Children, &Admitted := unset) {
+	Admitted := false
+	if !(Child is MenuTemplateChild) || Child._key != "" || Child._drawn != -1
+		|| Type(ManifestKey) != "String" || ManifestKey == ""
+		return 0
+	NativeMenu := Child._native
+	if !(NativeMenu is Menu) || NativeMenu.Handle != Child._handle || TrayMenuHandleItemCount(Child._handle) != 0
+		return 0
+	try {
+		Rows := MenuRenderer_TemplateRows(ManifestKey, Commands, StateGetters, Children)
+		if !_MR_AppendTemplateRowsAdmitted(Rows, 1, Map())
+			return 0
+	} catch as ErrorInfo {
+		try LoggerError("MenuRenderer", "Template child '{1}' refused during admission: {2}", ManifestKey, ErrorInfo.Message)
+		return 0
+	}
+	; One fill per reservation, even when the native result is refused below.
+	Child._key := ManifestKey
+	Admitted := true
+	Added := _MR_RenderRows(NativeMenu, Rows, ManifestKey, 1)
+	if TrayMenuHandleItemCount(Child._handle) != Rows.Length {
+		try LoggerError("MenuRenderer", "Template child '{1}' drew a different native row count — refused.", ManifestKey)
+		return 0
+	}
+	; The child was empty, so each admitted row sits at its own native position.
+	Checks := Map()
+	for Index, Row in Rows {
+		if Row.Has("checked")
+			Checks[Row["label"]] := Checks.Has(Row["label"]) ? 0 : Index
+	}
+	Child._checks := Checks
+	Child._drawn := Rows.Length
+	return Added
+}
+
+; The child's Menu while the renderer still publishes it, false otherwise.
+_MR_TemplateChildMenu(Child) {
+	if !(Child is MenuTemplateChild) || Child._drawn < 0 || !(Child._native is Menu)
+		return false
+	if TrayMenuHandleItemCount(Child._handle) != Child._drawn
+		return false
+	try Current := Child._native.Handle == Child._handle
+	catch
+		return false
+	return Current ? Child._native : false
+}
+
+/**
+ * Commits one state change and redraws a published child's ticks and parent caption.
+ * Refuses before the commit unless the renderer still publishes the child and
+ * ParentMenu attaches it at exactly one row.
+ * @param {MenuTemplateChild} Child A filled child.
+ * @param {Menu} ParentMenu Native menu holding the child's parent row.
+ * @param {Map} OldParent Declared parent row as currently drawn.
+ * @param {Map} NewParent Declared parent row to draw.
+ * @param {String} Checked Label of the one drawn check row to tick, "" for none.
+ * @param {Func} Commit State change made once the child is admitted.
+ * @returns {Boolean} True once committed and redrawn, false on refusal.
+ */
+MenuRenderer_RepaintTemplateChild(Child, ParentMenu, OldParent, NewParent, Checked, Commit) {
+	NativeMenu := _MR_TemplateChildMenu(Child)
+	if !NativeMenu || !(ParentMenu is Menu) || Type(Checked) != "String" || !HasMethod(Commit, "Call")
+		return false
+	for Parent in [OldParent, NewParent] {
+		if !(Parent is Map) || Type(Parent.Get("label", 0)) != "String" || Parent["label"] == ""
+			|| Parent.Get("submenu", 0) != NativeMenu
+			return false
+	}
+	if Checked != "" && !(Child._checks.Get(Checked, 0) > 0)
+		return false
+	ParentHandle := ParentMenu.Handle, Position := 0
+	loop TrayMenuHandleItemCount(ParentHandle) {
+		if TrayMenuSubmenuHandle(ParentHandle, A_Index - 1) == Child._handle {
+			if Position
+				return false
+			Position := A_Index
+		}
+	}
+	if !Position
+		return false
+	Commit.Call()
+	for _, CheckPosition in Child._checks {
+		if CheckPosition
+			NativeMenu.Uncheck(CheckPosition . "&")
+	}
+	if Checked != ""
+		NativeMenu.Check(Child._checks[Checked] . "&")
+	; Rows carry literal text; only the native menu syntax treats & as a mnemonic.
+	ParentMenu.Rename(Position . "&", StrReplace(NewParent["label"], "&", "&&"))
 	return true
 }
 
@@ -3113,7 +3266,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 _MR_FrameLeafAdmitted(Data) {
 	if !_MR_AppendTemplateRowsAdmitted(Data, 1, Map())
 		return false
-	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true, "replay_id", true)
+	Allowed := Map("label", true, "action", true, "checked", true, "disabled", true, "replay_id", true, "checked_fn", true)
 	for Row in Data {
 		for Name in Row
 			if !Allowed.Has(Name)

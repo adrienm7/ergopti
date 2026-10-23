@@ -13,6 +13,7 @@ local Logger = require("infra.logger")
 local Paths = require("infra.paths")
 local DeferredWork = require("infra.deferred_work")
 local JsonCodec = require("adapters.json_codec")
+local OwnWindow = require("adapters.own_window")
 local LOG = "console_window"
 
 --- Resolves the native console ratios from the shared geometry owner.
@@ -36,7 +37,7 @@ end
 --- Places the console after its native window becomes available.
 --- @param ratios table Validated shared ratios.
 local function place(ratios)
-	local window = assert(hs.console.hswindow(), "console window is unavailable")
+	local window = assert(OwnWindow.console(), "console window is unavailable")
 	local screen = assert(hs.screen.mainScreen(), "main screen is unavailable")
 	local bounds, current = screen:frame(), window:frame()
 	local width = math.max(current.w, math.floor(bounds.w * ratios.width_ratio + 0.5))

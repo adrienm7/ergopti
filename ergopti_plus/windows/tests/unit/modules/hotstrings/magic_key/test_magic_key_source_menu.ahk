@@ -420,3 +420,7 @@ _MKS_AssertDeclaredData(Expected, Actual) {
 		AssertEqual(Expected, Actual)
 	}
 }
+
+#Include ../../../ui/editors/test_magic_key_capture_settlement.ahk
+
+#Include ../../../ui/editors/test_magic_key_startup_close.ahk

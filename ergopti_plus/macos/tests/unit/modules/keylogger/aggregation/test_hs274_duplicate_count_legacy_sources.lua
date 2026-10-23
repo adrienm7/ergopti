@@ -303,7 +303,13 @@ helpers.describe("HS-274 held modifier source settlement (wp3)", function()
 			scenario.flags_changed(55, {})
 			helpers.assert_eq(scenario.state.modifier_suppressed_releases[55], nil)
 			paused = false
-			package.loaded["modules.keylogger.context_tracker"].resync_context = function() return true end
+			package.loaded["modules.keylogger.context_tracker"].resync_context = function()
+				-- The healthy tracker double acknowledges the accepted fixture identity.
+				scenario.state.active_app_name = "TestApp"
+				scenario.state.active_app_pid = 1
+				scenario.state.foreground_refresh_pending = false
+				return true
+			end
 			helpers.assert_eq(keylogger.resync_context(), true)
 			scenario.flags_changed(55, { cmd = true })
 			scenario.flags_changed(55, {})

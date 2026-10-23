@@ -42,6 +42,10 @@ local NGRAM_TYPE_TABLE = {
 -- for is the SQL that runs. `pairs` over the map above would do neither.
 local NGRAM_CODES = { "c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "w_bg" }
 
+-- Each projection selects free text as `json_quote(column) AS column_json`;
+-- read_rows decodes it back under the column name the projections read.
+local QUOTED_TEXT_COLUMNS = { app_json = "app", title_json = "title", layout_json = "layout", app_to_json = "app_to" }
+
 local function sql_quote(value)
 	return "'" .. SqliteCommand.escape_literal(tostring(value or "")) .. "'"
 end
@@ -98,6 +102,18 @@ local function read_rows(sqlite_path, sql, media_owned)
 	for _, row in ipairs(rows) do
 		for column, value in pairs(row) do
 			if Json.is_null(value) then row[column] = nil end
+		end
+		-- Free text is selected through json_quote, which escapes NUL before the
+		-- CLI can cut it: a shortened application id is another application.
+		for quoted, column in pairs(QUOTED_TEXT_COLUMNS) do
+			if row[quoted] ~= nil then
+				local decoded, text = pcall(Json.decode, row[quoted])
+				if not decoded or type(text) ~= "string" then
+					Logger.warn(LOG, "SQLite %s text is invalid; dashboard projection skipped.", column)
+					return {}, false
+				end
+				row[column] = text
+			end
 		end
 	end
 	return rows, true
@@ -213,7 +229,7 @@ function M.read_manifest(sqlite_path, start_date, end_date, apps)
 		return rows
 	end
 	local rows = query(string.format([[
-SELECT date, app, SUM(chars) AS chars, SUM(pauses) AS pauses,
+SELECT date, json_quote(app) AS app_json, SUM(chars) AS chars, SUM(pauses) AS pauses,
        SUM(time_ms) AS time_ms, SUM(think_time_ms) AS think_time_ms,
        SUM(hs_chars) AS hs_chars, SUM(llm_chars) AS llm_chars,
        SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,
@@ -253,7 +269,7 @@ FROM agg_app_day%s GROUP BY date, app;
 	local where = filters(start_date, end_date, apps)
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
+SELECT date, json_quote(app) AS app_json, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
        SUM(space) AS space, SUM(other) AS other,
        MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
 FROM agg_app_day_chars_class%s GROUP BY date, app;
@@ -272,7 +288,7 @@ FROM agg_app_day_chars_class%s GROUP BY date, app;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
+SELECT date, json_quote(app) AS app_json, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
        MAX(cascade_max_len) AS cascade_max_len,
        SUM(recovery_sum_ms) AS recovery_sum, SUM(recovery_count) AS recovery_count
 FROM agg_app_day_errors%s GROUP BY date, app;
@@ -286,7 +302,7 @@ FROM agg_app_day_errors%s GROUP BY date, app;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, MAX(same_finger_streak_max) AS f_max,
+SELECT date, json_quote(app) AS app_json, MAX(same_finger_streak_max) AS f_max,
        MAX(same_hand_streak_max) AS h_max, SUM(auto_repeat_count) AS ar_count,
        SUM(focus_to_first_key_sum_ms) AS focus_sum,
        SUM(focus_to_first_key_count) AS focus_count
@@ -303,14 +319,14 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, media_id, SUM(c) AS c
+SELECT date, json_quote(app) AS app_json, media_id, SUM(c) AS c
 FROM ngram_media_keys%s GROUP BY date, app, media_id;
 ]], where), true)) do
 		get_entry(manifest, row.date, row.app).media_keys[row.media_id] = MediaStore.project_press(row)
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, media_id, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
+SELECT date, json_quote(app) AS app_json, media_id, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
        MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count, SUM(hold_count) AS hold_count
 FROM agg_app_day_media_hold%s GROUP BY date, app, media_id;
 ]], where), true)) do
@@ -318,7 +334,7 @@ FROM agg_app_day_media_hold%s GROUP BY date, app, media_id;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
+SELECT date, json_quote(app) AS app_json, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
        MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count,
        SUM(hold_count) AS hold_count
 FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
@@ -334,7 +350,7 @@ FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, layout, SUM(count) AS count
+SELECT date, json_quote(app) AS app_json, json_quote(layout) AS layout_json, SUM(count) AS count
 FROM agg_app_day_layouts%s GROUP BY date, app, layout;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
@@ -343,7 +359,7 @@ FROM agg_app_day_layouts%s GROUP BY date, app, layout;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
+SELECT date, json_quote(app) AS app_json, json_quote(title) AS title_json, SUM(c) AS c, SUM(ms) AS ms
 FROM agg_app_day_titles%s GROUP BY date, app, title;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
@@ -352,7 +368,7 @@ FROM agg_app_day_titles%s GROUP BY date, app, title;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
+SELECT date, json_quote(app) AS app_json, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
        e_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 ]], where))) do
@@ -366,7 +382,7 @@ FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
+SELECT date, json_quote(app) AS app_json, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
        e_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 ]], where))) do
@@ -380,7 +396,7 @@ FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
+SELECT date, json_quote(app) AS app_json, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
        SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,
        SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c
 FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
@@ -399,7 +415,7 @@ FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
 	-- distinct blobs each come back as their own row and are merged below.
 	-- Count identical blobs too: grouping must not deduplicate their buckets.
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
+SELECT date, json_quote(app) AS app_json, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
        MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
        SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
        length_buckets_json, COUNT(*) AS source_rows
@@ -425,7 +441,7 @@ FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 	end
 
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
+SELECT date, json_quote(app) AS app_json, count_total, longest_ms, longest_chars, total_active_ms, durations_json
 FROM agg_app_day_session%s;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
@@ -455,7 +471,7 @@ FROM agg_app_day_session%s;
 	-- boundary so the same date/app filter policy covers this differently keyed
 	-- aggregate, including synchronized contributions from several devices.
 	for _, row in ipairs(query(string.format([[
-SELECT date, app, app_to, SUM(count) AS count
+SELECT date, json_quote(app) AS app_json, json_quote(app_to) AS app_to_json, SUM(count) AS count
 FROM (SELECT date, app_from AS app, app_to, count FROM agg_app_day_switches_to)%s
 GROUP BY date, app, app_to;
 ]], where))) do
@@ -573,7 +589,7 @@ end
 --- TOTAL uses floating accumulation like LuaJIT, avoiding SUM's integer overflow.
 local function grouped_ngram_sql(table_name, where, by_app)
 	local keys = by_app and "app, token" or "token"
-	local projection = by_app and "app, json_quote(token) AS token_json" or "json_quote(token) AS token_json"
+	local projection = by_app and "json_quote(app) AS app_json, json_quote(token) AS token_json" or "json_quote(token) AS token_json"
 	local numeric = "typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')"
 	local conjunction = where == "" and " WHERE " or " AND "
 	-- SQLite's numeric affinity permits malformed text. Keep those rare rows raw:
@@ -584,20 +600,30 @@ local function grouped_ngram_sql(table_name, where, by_app)
 		.. table_name .. where .. conjunction .. "NOT (" .. numeric .. ");"
 end
 
+--- Reads the n-grams of an inclusive range, every family summed across apps.
+--- @param sqlite_path string Database path.
+--- @param start_date string|nil Inclusive lower bound.
+--- @param end_date string|nil Inclusive upper bound.
+--- @param apps table|nil Selected application names.
+--- @return table ngrams Partial or complete n-gram dictionaries.
+--- @return boolean complete Whether every native query was accepted.
 function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	local out = empty_ngrams()
+	local complete = true
 	local where = filters(start_date, end_date, apps)
 	for _, code in ipairs(NGRAM_CODES) do
-		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
+		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
+		if not accepted then complete = false end
 		for _, row in ipairs(rows) do
 			merge_ngram(out[code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
-	local sc_rows = read_rows(sqlite_path, string.format(
+	local sc_rows, sc_accepted = read_rows(sqlite_path, string.format(
 		"SELECT scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY scancode;",
 		filters(start_date, end_date, apps)))
+	if not sc_accepted then complete = false end
 	for _, row in ipairs(sc_rows) do merge_ngram(out.sc_kb, tostring(row.scancode), row.c) end
-	return out
+	return out, complete
 end
 
 --- Resolves inclusive date bounds against one captured local calendar day.
@@ -631,29 +657,32 @@ end
 --- @param apps table|nil Selected application names.
 --- @param today string|nil Current day captured by the projection owner.
 --- @return table { historical, today }.
+--- @return boolean complete Whether every native query was accepted.
 function M.read_range_split_today(sqlite_path, start_date, end_date, apps, today)
 	local bounds = M.split_bounds(start_date, end_date, today)
 	today = bounds.today
 	local historical_end = bounds.historical_end
-	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
+	local historical, complete = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
-	if not bounds.includes_today then return { historical = historical, today = today_by_app } end
+	if not bounds.includes_today then return { historical = historical, today = today_by_app }, complete end
 	local today_where = filters(today, today, apps)
 	for _, code in ipairs(NGRAM_CODES) do
-		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
+		local rows, accepted = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
+		if not accepted then complete = false end
 		for _, row in ipairs(rows) do
 			today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
 			merge_ngram(today_by_app[row.app][code], decode_token(row), row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
-	local sc_rows = read_rows(sqlite_path, string.format(
-		"SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",
+	local sc_rows, sc_accepted = read_rows(sqlite_path, string.format(
+		"SELECT json_quote(app) AS app_json, scancode, SUM(c) AS c FROM ngram_scancodes%s GROUP BY app, scancode;",
 		filters(today, today, apps)))
+	if not sc_accepted then complete = false end
 	for _, row in ipairs(sc_rows) do
 		today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
 		merge_ngram(today_by_app[row.app].sc_kb, tostring(row.scancode), row.c)
 	end
-	return { historical = historical, today = today_by_app }
+	return { historical = historical, today = today_by_app }, complete
 end
 
 return M

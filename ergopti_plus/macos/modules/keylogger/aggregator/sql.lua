@@ -23,6 +23,7 @@ local LOG     = "keylogger.aggregator"
 local SqliteWriter = require("modules.keylogger.sqlite_writer")
 local Export       = require("modules.keylogger.export")
 local AggHelper    = require("keylogger.aggregator_helpers")
+local Literal      = require("sqlite.literal")
 
 local S = require("modules.keylogger.aggregator.state")
 local C = require("modules.keylogger.aggregator.core")
@@ -79,7 +80,7 @@ local function json_lit(tbl)
 	if type(tbl) ~= "table" then return "'{}'" end
 	local ok, s = pcall(json.encode, tbl)
 	if not ok then return "'{}'" end
-	return "'" .. (s:gsub("'", "''")) .. "'"
+	return "'" .. Literal.escape(s) .. "'"
 end
 
 local NUMBER_MAP_JSON_COLUMNS = {
@@ -111,7 +112,7 @@ local function number_map_merge_expr(column, delta)
 	for k in pairs(delta) do
 		-- The result is spliced into a string.format template, so "%" must be
 		-- doubled as well as the SQL quote escaped.
-		local path = "$." .. tostring(k):gsub("'", "''"):gsub("%%", "%%%%")
+		local path = Literal.escape("$." .. tostring(k)):gsub("%%", "%%%%")
 		parts[#parts + 1] = string.format(
 			",'%s',COALESCE(json_extract(%s,'%s'),0)+COALESCE(json_extract(excluded.%s,'%s'),0)",
 			path, column, path, column, path)
@@ -131,8 +132,9 @@ local function session_durations_merge_expr()
 		.. "LIMIT " .. AggHelper.SESSION_DURATIONS_CAP .. "))"
 end
 
+--- Quotes one SQL text literal through the shared C-string-safe encoder.
 local function sq(s)
-	return "'" .. tostring(s):gsub("'", "''") .. "'"
+	return "'" .. Literal.escape(tostring(s)) .. "'"
 end
 
 local function i(n)

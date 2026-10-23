@@ -26,6 +26,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local NativePath = require("native_path")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
 local ui_restore    = require("infra.ui_restore")
@@ -524,7 +525,7 @@ function M.start(ctx)
 	-- paths, so the root watcher sees every event its descendants did. The walk's
 	-- depth cap and `visited` cycle guard existed only to survive a symlink loop
 	-- that no longer has to be walked at all.
-	local personal_root = (personal_dir):gsub("[/\\]+$", "")
+	local personal_root = NativePath.without_trailing_separators(personal_dir)
 	local function personal_hotstrings_changed(paths)
 		if not lifecycle_active then return end
 		local hit = {}

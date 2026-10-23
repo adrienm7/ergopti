@@ -274,10 +274,22 @@ _WMPW_SharedWindowTitles() {
 		try AssertEqual(Expected, Window.Title, "the " . Key . " native factory owns the caption")
 		finally Window.Destroy()
 	}
+	; A host the manifest does not name refuses, rather than showing a bare brand.
 	Host := WebViewHost()
 	Host.Opts := Map()
+	Refused := false
+	try {
+		Window := Host._NewWindow("320x200")
+		Window.Destroy()
+	} catch ValueError
+		Refused := true
+	AssertTrue(Refused, "an unnamed WebView host refuses to invent its caption")
+	WebViewHost._LoadManifest()
+	Host.AppId := "config_cleanup"
+	Label := t(Source["apps"]["config_cleanup"]["title_key"])
 	Window := Host._NewWindow("320x200")
-	try AssertEqual(Policy["prefix"], Window.Title, "an unnamed WebView host never duplicates branding")
+	try AssertEqual(Policy["prefix"] . Policy["separator"] . Label, Window.Title,
+		"a declared WebView host takes its caption label from the manifest, branded once")
 	finally Window.Destroy()
 }
 Test("windows: layout and navigation windows use the shared caption policy (shared-window-titles)",
@@ -375,3 +387,98 @@ _WMPW_GeneratedTitlePoliciesExecuteNatively() {
 }
 Test("windows: generated title policies execute with empty, quoted and semicolon prefixes (shared-window-titles)",
 	_WMPW_GeneratedTitlePoliciesExecuteNatively)
+
+; Every manifest window, built through the real WebView host in every shipped
+; locale, names the product once: a caption that repeats the brand or a segment
+; fails, whichever layer added it.
+global _WVT_Captions := []
+
+; Records the caption of the real native parent, then ends the build before any
+; controller exists, as a close during creation would.
+_WVT_CaptureCaption(Host, Window, Options) {
+	global _WVT_Captions
+	_WVT_Captions.Push(Window.Title)
+	Host.CloseRequested := true
+}
+
+; Runs Check once per shipped locale with the real translator switched to it.
+_WVT_EachLocale(Check, Args*) {
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded, I18N_LOCALES
+	AssertEqual(21, I18N_LOCALES.Length, "every shipped locale participates")
+	Saved := {Locale: _I18nLocale, Cache: _I18nCache, Loaded: _I18nCacheLoaded}
+	try {
+		for Entry in I18N_LOCALES {
+			_I18nLocale := Entry.Code
+			_I18nCacheLoaded := false
+			Check.Call(Entry.Code, Args*)
+		}
+	} finally {
+		_I18nLocale := Saved.Locale
+		_I18nCache := Saved.Cache
+		_I18nCacheLoaded := Saved.Loaded
+	}
+}
+
+; Captures the captions Body builds while the native show step is replaced.
+_WVT_WithCapturedCaptions(Body) {
+	global _WVT_Captions
+	_WVT_Captions := []
+	PreviousShow := WebViewHost.Prototype.GetOwnPropDesc("_ShowWindow")
+	WebViewHost.Prototype.DefineProp("_ShowWindow", {Call: _WVT_CaptureCaption})
+	try Body.Call()
+	finally WebViewHost.Prototype.DefineProp("_ShowWindow", PreviousShow)
+	return _WVT_Captions
+}
+
+; The caption names the product once, then the window's translated name.
+_WVT_AssertCaption(Caption, TitleKey, Context) {
+	Label := t(TitleKey)
+	Assert(Label != TitleKey && Label != "", Context . " has a translated name")
+	Brand := WindowTitle()
+	Separator := SubStr(WindowTitle("|"), StrLen(Brand) + 1, -1)
+	StrReplace(Caption, Brand, , , &Count)
+	AssertEqual(1, Count, Context . " names the product exactly once: " . Caption)
+	Previous := ""
+	for Segment in StrSplit(Caption, Separator) {
+		Assert(Trim(Segment) != Trim(Previous), Context . " repeats a caption segment: " . Caption)
+		Previous := Segment
+	}
+	AssertEqual(Brand . Separator . Label, Caption, Context . " names its window after the brand")
+}
+
+_WVT_ManifestApps() {
+	WebViewHost._LoadManifest()
+	Apps := WebViewHost._ManifestCache
+	Assert(Apps is Map && Apps.Count > 0, "the shared UI manifest declares its windows")
+	Assert(Apps.Has("config_cleanup"), "the manifest declares the unused-settings window")
+	return Apps
+}
+
+_WVT_CheckManifestWindows(Code, Apps) {
+	for AppId, Entry in Apps {
+		Captions := _WVT_WithCapturedCaptions(ObjBindMethod(WebViewHost, "TryOpen", AppId, Map("AllowMultiple", true)))
+		AssertEqual(1, Captions.Length, Code . " " . AppId . " builds one native caption")
+		_WVT_AssertCaption(Captions[1], Entry["title_key"], Code . " " . AppId)
+	}
+}
+
+_WVT_EveryManifestWindow() {
+	_WVT_EachLocale(_WVT_CheckManifestWindows, _WVT_ManifestApps())
+}
+Test("webview titles: every manifest window names the product once in every locale (window-title-brand-once)",
+	_WVT_EveryManifestWindow)
+
+_WVT_CheckCleanupWindow(Code, TitleKey) {
+	Previous := ConfigCleanupWindow.Current
+	ConfigCleanupWindow.Current := 0
+	try Captions := _WVT_WithCapturedCaptions(ObjBindMethod(ConfigCleanupWindow, "Open", "unused-by-title-test.toml"))
+	finally ConfigCleanupWindow.Current := Previous
+	AssertEqual(1, Captions.Length, Code . " the cleanup window builds one native caption")
+	_WVT_AssertCaption(Captions[1], TitleKey, Code . " config_cleanup")
+}
+
+_WVT_CleanupWindowOpen() {
+	_WVT_EachLocale(_WVT_CheckCleanupWindow, _WVT_ManifestApps()["config_cleanup"]["title_key"])
+}
+Test("webview titles: the unused-settings window names the product once in every locale (window-title-brand-once)",
+	_WVT_CleanupWindowOpen)

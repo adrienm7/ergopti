@@ -24,8 +24,13 @@ helpers.describe("activation adapters: false native results remain failures", fu
 	helpers.it("WindowManager.activate propagates application false", function()
 		local adapter = helpers.load_with_stubs("adapters.window_manager", {
 			application = {
-				get = function()
-					return { activate = function() return false end }
+				applicationsForBundleID = function() return {} end,
+				runningApplications = function()
+					return { {
+						name = function() return "Safari" end,
+						kind = function() return 1 end,
+						activate = function() return false end,
+					} }
 				end,
 			},
 		})

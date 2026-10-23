@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
@@ -306,9 +307,10 @@ local function _driver_root()
 	-- the driver's UI was reorganised by feature to match macOS and Windows, and a
 	-- stale depth here resolves to a directory that exists but holds nothing —
 	-- which is how every other wrong-depth path in this driver failed.
-	return (src:match("^(.*)[/\\\\]ui[/\\\\]webview_manager%.lua$")
-		or src:match("^(.*)[/\\\\]ui$")
-		or "."):gsub("\\", "/")
+	-- A backslash is a Linux filename byte: it neither splits nor is rewritten.
+	if NativePath.basename(src) == "webview_manager.lua" then src = NativePath.dirname(src) or "" end
+	if NativePath.basename(src) ~= "ui" then return "." end
+	return NativePath.dirname(src) or "."
 end
 
 --- Where each shared-UI app's bridge lives, as an explicit table rather than a
@@ -916,6 +918,13 @@ local function _app_title(app_name)
 end
 M._app_title = _app_title
 
+--- Composes a manifest app's native caption: its translated name, branded once.
+--- @param app_name string The app directory name.
+--- @return string
+function M.app_caption(app_name)
+	return M.window_title(_app_title(app_name))
+end
+
 
 -- =========================================
 -- ======= 7/ GTK Window Operations ========
@@ -975,7 +984,7 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
 
 		-- Contextual content never changes this generic native app caption.
-		local caption = M.window_title(_app_title(app_name))
+		local caption = M.app_caption(app_name)
 		if not contextual_title_live(app_name, contextual_receipt) then return false, "page title admission refused" end
 
 		-- ── Create the GTK window ──

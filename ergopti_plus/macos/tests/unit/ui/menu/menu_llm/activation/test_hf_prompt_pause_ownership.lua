@@ -208,14 +208,15 @@ local function with_fixture(options, callback)
 		local hs_overrides = {
 			timer = timer_stub,
 			task = task_stub,
+			-- The prompt finds its own process by PID (adapters.running_application).
+			processInfo = { processID = 4242 },
 			application = {
-				get = function()
+				applicationForPID = function()
 					if options.boundary_throw == "application" then
 						error("HF application boundary failure")
 					end
 					return nil
 				end,
-				find = function() return nil end,
 			},
 			pasteboard = { getContents = function()
 				if options.boundary_throw == "pasteboard" then

@@ -7,9 +7,8 @@ _TDT_AssertDeadKeyTimeout() {
 	; framework helper instead of a pinned modules path
 	DeadKeyBody := _DriverFuncBody("DeadKey")
 	
-	TimeoutIdx := InStr(DeadKeyBody, '"L1 T2"')
-	if !TimeoutIdx
-		TimeoutIdx := InStr(DeadKeyBody, "'L1 T2'")
+	Assert(DeadKeyBody != "", "the real DeadKey implementation must exist")
+	TimeoutIdx := InStr(DeadKeyBody, 'InputHook("L2 E C T2", _SIHO_ScalarEndKeys() . NamedKeys)')
 	Assert(TimeoutIdx > 0, "DeadKey InputHook must have a timeout (e.g. T2) (deadkey-inputhook-blocks-thread)")
 	
 	FinallyIdx := InStr(DeadKeyBody, "finally {")

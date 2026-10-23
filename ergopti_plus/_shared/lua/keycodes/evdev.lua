@@ -25,6 +25,8 @@
 
 local M = {}
 
+local NativePath = require("native_path")
+
 --- Loads the evdev layout tables from the shared JSON file.
 --- @param json_decode function A JSON string → Lua value decoder.
 ---   On Linux this is typically require("json").decode; on macOS it is hs.json.decode.
@@ -59,9 +61,11 @@ function M.load(json_decode, read_file, shared_root)
 		local src = debug and debug.getinfo and debug.getinfo(1, "S") and debug.getinfo(1, "S").source
 		if src and type(src) == "string" then
 			if src:sub(1, 1) == "@" then src = src:sub(2) end
-			local dir = src:match("^(.*[/\\])") or ""
-			-- dir is .../_shared/lua/keycodes/ — two levels up gives _shared/
-			root = (dir:gsub("[\\\\/]$", ""):gsub("[/\\][^/\\]+[/\\][^/\\]+$", "") .. "/")
+			-- src is .../_shared/lua/keycodes/evdev.lua — three levels up gives _shared/
+			local shared = NativePath.dirname(src)
+			shared = shared and NativePath.dirname(shared)
+			shared = shared and NativePath.dirname(shared)
+			root = shared and (shared .. "/")
 		end
 	end
 	if not root then

@@ -36,7 +36,9 @@ local function controlled(w,action)
  end
  os.rename=function()w.renames=w.renames+1;w.live=w.stage;w.stage=nil;return true end
  os.remove=function()w.stage=nil;return true end
+ local release=helpers.route_source_through_stdio('/controlled/config.toml',true)
  local ok,a,b=pcall(action)
+ release()
  io.open,os.rename,os.remove=old_open,old_rename,old_remove
  if not ok then error(a,0)end
  return a,b

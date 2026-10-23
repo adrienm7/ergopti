@@ -107,3 +107,5 @@ for Full in [false, true] {
 			_MRO_Outcome.Bind(Full, "canceled", AtLimit, false))
 	}
 }
+
+#Include test_metrics_warm_terminal_claim_reentry.ahk

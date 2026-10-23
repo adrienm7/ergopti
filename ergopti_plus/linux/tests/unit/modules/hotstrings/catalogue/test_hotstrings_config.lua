@@ -523,6 +523,16 @@ helpers.describe("hotstrings_config", function()
         "reload runs on every config-file change; one that left the module mute would "
           .. "stop every expansion until the next restart")
     end)
+
+    helpers.it("(menu-reload-rebuilds-tray) reload asks the menu to rebuild", function()
+      local changes = 0
+      config.init(make_engine(), "/tmp", function() changes = changes + 1 end)
+      local before = changes
+      config.reload()
+      helpers.assert_eq(changes - before, 1,
+        "a reload that left the tray rows live let a click made against an old "
+          .. "checkmark toggle the reloaded state back")
+    end)
   end)
 
 end)

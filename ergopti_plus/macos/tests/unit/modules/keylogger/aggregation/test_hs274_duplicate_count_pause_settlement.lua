@@ -64,7 +64,13 @@ helpers.describe("HS-274 held modifier pause settlement (wp3)", function()
 					if timer.delay == 0 and timer.running then timer:fire() end
 				end
 				scenario.state.is_secure_field = false
-				package.loaded["modules.keylogger.context_tracker"].resync_context = function() return true end
+				package.loaded["modules.keylogger.context_tracker"].resync_context = function()
+					-- The healthy tracker double acknowledges the accepted fixture identity.
+					scenario.state.active_app_name = "TestApp"
+					scenario.state.active_app_pid = 1
+					scenario.state.foreground_refresh_pending = false
+					return true
+				end
 				local function pause() paused = true end
 				local function resume()
 					-- ScriptControl performs this refresh before its final pause-state commit.

@@ -14,10 +14,10 @@
 --- 1. The layer_active contract is unchanged: every manipulator fires only while
 ---    the layer variable is 1, whatever modifier is held, and the generator
 ---    scopes the variable to the lease like every other rule.
---- 2. Physical inputs keep the registry's ISO projection (KEYBOARD_FORM).
----    Virtual outputs use canonical HID positions: the selected virtual
----    keyboard convention performs its own Carbon swap. Sharing the input
----    override with output would swap the two keys twice.
+--- 2. Inputs and outputs both use the registry's ISO projection
+---    (KEYBOARD_FORM): the deployed ANSI virtual keyboard passes the ISO pair
+---    through unswapped (modules/keymap/layout.lua VIRTUAL_KEYBOARD_PRODUCT), so
+---    an output reaches the keycode the physical key itself produces (#99).
 --- 3. F1-F12 reach the function keys in either top-row mode: sent plain while
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
@@ -40,6 +40,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local Layout = require("modules.keymap.layout")
 
 local LOG = "karabiner.nav_layer"
@@ -139,13 +140,12 @@ local HS_MODIFIERS = { ctrl = "ctrl", alt = "alt", shift = "shift", meta = "cmd"
 --- The Karabiner event of one physical key on Ergopti's board, as a fresh table.
 --- @param code string A registry key code.
 --- @param registry table Decoded physical_keys.json.
---- @param physical_input boolean|nil True for a hardware input, not a virtual HID target.
 --- @return table event { key_code | consumer_key_code | pointing_button = name }
-local function karabiner_event(code, registry, physical_input)
+local function karabiner_event(code, registry)
 	local entry = registry.keys[code]
 	if type(entry) ~= "table" then error("nav_layer: " .. tostring(code) .. " is not in the physical-key registry", 3) end
 	local source = entry.karabiner
-	local override = physical_input == true and type(entry["macos_" .. KEYBOARD_FORM]) == "table"
+	local override = type(entry["macos_" .. KEYBOARD_FORM]) == "table"
 		and entry["macos_" .. KEYBOARD_FORM].karabiner
 	if type(override) == "table" then source = override end
 	-- json.lua decodes a JSON null to a sentinel table, so check for a real field.
@@ -235,7 +235,7 @@ M.CALL_HANDLERS = CALL_HANDLERS
 
 --- A manipulator firing on one key while the layer is held.
 local function base_manipulator(code, registry, description, extra_condition)
-	local from = karabiner_event(code, registry, true)
+	local from = karabiner_event(code, registry)
 	from.modifiers = { optional = { "any" } }
 	local conditions = { { type = "variable_if", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE } }
 	if extra_condition then conditions[#conditions + 1] = extra_condition end
@@ -560,8 +560,8 @@ function M.load(opts)
 	local layer = { bindings = bindings, registry = ctx.registry, wheel = wheel }
 	local observation
 	if eligible and source_ports_current() and #sources == 3
-		and sources[1].path == shared_root:gsub("[/\\]$", "") .. "/data/keycodes/physical_keys.json"
-		and sources[2].path == shared_root:gsub("[/\\]$", "") .. "/keymap/layer_actions.toml"
+		and sources[1].path == NativePath.without_trailing_separators(shared_root) .. "/data/keycodes/physical_keys.json"
+		and sources[2].path == NativePath.without_trailing_separators(shared_root) .. "/keymap/layer_actions.toml"
 		and sources[3].path == result.path then
 		local complete = sources[1].status == "ok" and sources[2].status == "ok"
 		for _, source in ipairs(sources) do

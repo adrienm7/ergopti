@@ -89,4 +89,42 @@ function M.open(path)
 	return stream, detail, open_errno
 end
 
+--- Reports whether this runtime has a descriptor API to pin a source with.
+--- @return boolean
+local function descriptor_api_available()
+	local ok_uv, uv = pcall(require, "luv")
+	if ok_uv and type(uv) == "table" and type(uv.fs_open) == "function"
+		and type(uv.fs_fstat) == "function" and type(uv.fs_close) == "function" then return true end
+	local ok_ffi, ffi = pcall(require, "ffi")
+	return ok_ffi and type(ffi) == "table" and ffi.os == "Linux"
+end
+
+--- Runs one POSIX test(1) probe on a literal path.
+--- @param flag string "-e" or "-f".
+--- @param path string Validated path.
+--- @return boolean
+local function path_test(flag, path)
+	local result = os.execute("test " .. flag .. " " .. require("text_utils").shell_quote(path) .. " 2>/dev/null")
+	return result == true or result == 0
+end
+
+--- Opens a configuration source, pinned whenever the runtime can pin one.
+--- Stock Lua without luv has no descriptor API: refusing there made every
+--- TOML read fail and the daemon unusable, so it classifies the path with
+--- test(1) before stdio opens it. Only a replacement racing that probe can
+--- still reach a FIFO on that runtime; LuaJIT always pins through FFI.
+--- @param path string
+--- @return file*|nil stream
+--- @return string|nil failure
+--- @return number|string|nil errno
+function M.open_source(path)
+	if type(path) ~= "string" or path == "" or path:find("\0", 1, true) then
+		return nil, "invalid native file path", EINVAL
+	end
+	if descriptor_api_available() then return M.open(path) end
+	if not path_test("-e", path) then return nil, "source is absent", ENOENT end
+	if not path_test("-f", path) then return nil, "source is not a regular file", EINVAL end
+	return io.open(path, "r")
+end
+
 return M

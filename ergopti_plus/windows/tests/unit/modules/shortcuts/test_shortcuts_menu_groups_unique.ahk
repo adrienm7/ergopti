@@ -42,6 +42,8 @@ _SMGU_KeyboardGroupsUniqueAndPopulated() {
 				"keyboard group '" . Row["label"] . "' must hold at least one row")
 			ItemSeen := Map()
 			for _, Item in Row["items"] {
+				if Item.Get("separator", false)
+					continue
 				Assert(Trim(Item["label"]) != "", "every row of '" . Row["label"] . "' must have a label")
 				AssertFalse(ItemSeen.Has(Item["label"]),
 					"duplicate row '" . Item["label"] . "' in keyboard group '" . Row["label"] . "'")
@@ -56,7 +58,8 @@ _SMGU_KeyboardGroupsUniqueAndPopulated() {
 				AssertEqual(1, Row["items"].Length, "the contextual declaration appears exactly once")
 				Placed += Row["items"].Length
 			} else {
-				Placed += Row["items"].Length - 1
+				; Restore, clear, their separator and the Add command are no slot.
+				Placed += Row["items"].Length - 4
 			}
 		}
 		Active := 0

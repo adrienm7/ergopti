@@ -135,7 +135,7 @@ _PNW_BackspaceRecoveryIsWired() {
 	Assert(CommitCall > 0 and FinishCall > CommitCall,
 		"the physical backspace path must commit both buffers before finishing the tooltip update")
 
-	EngineBackspace := InStr(Commit, "HSE_FeedBackspace(true)")
+	EngineBackspace := InStr(Commit, "HSE_FeedBackspace(true, true)")
 	EmptyPreviewGate := InStr(Commit, '_PrefixBuffer == ""', true, EngineBackspace)
 	Recovery := InStr(Commit, "_PrefixWordTailFromEngine()", true, EmptyPreviewGate)
 	Publish := InStr(Commit, "_PrefixSetBuffer(NextPrefixBuffer)", true, Recovery)

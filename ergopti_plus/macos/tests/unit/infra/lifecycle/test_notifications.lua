@@ -99,6 +99,7 @@ helpers.describe("notifications.notify", function()
 		local click_callback = nil
 		local activation_attempts = 0
 		local original_focus = _G.hs.focus
+		local original_lookup = _G.hs.application.applicationsForBundleID
 		local original_get = _G.hs.application.get
 		_G.hs.notify.new = function(callback)
 			click_callback = callback
@@ -107,9 +108,14 @@ helpers.describe("notifications.notify", function()
 			return native
 		end
 		_G.hs.focus = function() error("injected global focus failure", 0) end
-		_G.hs.application.get = function()
+		_G.hs.application.applicationsForBundleID = function()
 			activation_attempts = activation_attempts + 1
 			error("injected application activation failure", 0)
+		end
+		-- The click must never reach the name lookup that falls back to a scan
+		-- of every window (issue #99).
+		_G.hs.application.get = function()
+			error("hs.application.get searches every window when nothing matches", 0)
 		end
 		local lines = {}
 		local Logger = require("infra.logger")
@@ -121,6 +127,7 @@ helpers.describe("notifications.notify", function()
 		helpers.assert_type(click_callback, "function")
 		click_callback()
 		_G.hs.focus = original_focus
+		_G.hs.application.applicationsForBundleID = original_lookup
 		_G.hs.application.get = original_get
 		Logger.set_sink(nil)
 

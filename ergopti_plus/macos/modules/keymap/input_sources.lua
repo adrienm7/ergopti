@@ -23,6 +23,7 @@
 
 local hs      = hs
 local Logger  = require("infra.logger")
+local NativePath = require("native_path")
 local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
@@ -708,7 +709,7 @@ function build_kl_name_to_tis_id()
 	local sb      = sb_sys or sb_user
 	local sb_dir  = sb_sys and SYSTEM_LAYOUTS_DIR or (sb_user and USER_LAYOUTS_DIR) or nil
 	if not sb or not sb_dir then return nil end
-	local bundle_path = sb_dir:gsub("[/\\]$", "") .. "/" .. sb.name
+	local bundle_path = NativePath.without_trailing_separators(sb_dir) .. "/" .. sb.name
 	local map = {}
 	for _, variant in ipairs(install.bundle_variants(bundle_path)) do
 		map[variant.name] = variant.tis_id

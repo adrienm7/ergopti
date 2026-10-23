@@ -47,6 +47,7 @@
 local M = {}
 local hs         = hs
 local Logger     = require("infra.logger")
+local NativePath = require("native_path")
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
 local TomlCodec  = require("infra.toml.codec")
@@ -96,7 +97,7 @@ local LOGS_DIR_KEY   = AppDirs.override_key
 -- Driver root — derived at module-load time so standalone source-tree launches
 -- can read their adjacent paths.toml before M.init(). M.init() may override it.
 local _src      = debug.getinfo(1, "S").source:sub(2)
-local _base_dir = (_src:match("^(.*[/\\])") or "./"):gsub("infra[/\\]$", "")
+local _base_dir = NativePath.directory_prefix(NativePath.dirname(_src) or "") or "./"
 
 -- Computed at module load, not in init(), for the same reason: anything written
 -- under the config dir must land outside the source tree by construction, even
@@ -190,15 +191,10 @@ local function normalize_config_dir_override(value, key)
 	if type(value) ~= "string" then
 		return nil, key .. " must be a string or empty"
 	end
-	local is_absolute = value:sub(1, 1) == "/"
-	if package.config:sub(1, 1) == "\\" then
-		is_absolute = is_absolute or value:match("^%a:[/\\]") ~= nil
-	end
-	if not is_absolute then
+	if not NativePath.is_absolute(value) then
 		return nil, key .. " must be an absolute path"
 	end
-	if not value:match("[/\\]$") then value = value .. "/" end
-	return value
+	return NativePath.with_trailing_separator(value)
 end
 
 --- Validates one logs-folder override and makes it a folder the application
@@ -211,7 +207,7 @@ end
 local function normalize_logs_dir_override(value)
 	local normalized, err = normalize_config_dir_override(value, LOGS_DIR_KEY)
 	if normalized == nil or normalized == "" then return normalized, err end
-	local leaf = normalized:match("([^/\\]+)[/\\]$")
+	local leaf = NativePath.basename(NativePath.without_trailing_separators(normalized))
 	if leaf ~= AppDirs.folder_name then
 		normalized = normalized .. AppDirs.folder_name .. "/"
 	end
@@ -324,10 +320,8 @@ local function ensure_dir(path)
 	local made = false
 	if hs.fs and type(hs.fs.mkdir) == "function" then
 		made = true
-		local prefix = path:match("^[/\\]") and path:sub(1, 1) or ""
-		local rest   = path:sub(#prefix + 1)
-		local current = prefix
-		for segment in rest:gmatch("[^/\\]+") do
+		local current = NativePath.is_rooted(path) and path:sub(1, 1) or ""
+		for _, segment in ipairs(NativePath.components(path)) do
 			current = current .. segment .. "/"
 			local ok_attr, attr = pcall(hs.fs.attributes, current)
 			if not (ok_attr and attr) then
@@ -505,9 +499,7 @@ end
 --- @param filename string Bare filename (e.g. "personal_hotstrings.toml").
 --- @return string
 local function file_in_config(filename)
-	local d = config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	return d .. filename
+	return NativePath.with_trailing_separator(config_dir()) .. filename
 end
 
 --- Absolute path for a HS-specific file under the ``hammerspoon/`` subfolder of
@@ -517,9 +509,7 @@ end
 --- @param filename string Bare filename inside the hammerspoon/ folder.
 --- @return string
 local function file_in_driver_subdir(filename)
-	local d = config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	local sub = d .. "hammerspoon/"
+	local sub = NativePath.with_trailing_separator(config_dir()) .. "hammerspoon/"
 	ensure_dir(sub)
 	return sub .. filename
 end
@@ -528,9 +518,7 @@ end
 --- access so callers need not guard ENOENT.
 --- @return string Absolute path with trailing slash.
 local function personal_hotstrings_dir()
-	local d = config_dir()
-	if not d:match("[/\\]$") then d = d .. "/" end
-	local p = d .. "hotstrings/"
+	local p = NativePath.with_trailing_separator(config_dir()) .. "hotstrings/"
 	ensure_dir(p)
 	-- Bootstrap an empty personal_hotstrings.toml on first use so the user always
 	-- has a file to open rather than a confusing ENOENT.
@@ -578,7 +566,7 @@ function M.init(base_dir)
 	_base_dir = base_dir
 	ensure_dir(_base_dir)
 	if _managed_paths_file then
-		ensure_dir(paths_file():match("^(.*[/\\])") or "")
+		ensure_dir(NativePath.directory_prefix(paths_file()) or "")
 	end
 
 	-- Read paths.toml, migrating an adjacent legacy override when present, or
@@ -809,8 +797,7 @@ function M.metrics_dir(dir)
 	if type(dir) ~= "string" or dir == "" then
 		error("config_paths.metrics_dir: a configuration directory is required", 2)
 	end
-	if not dir:match("[/\\]$") then dir = dir .. "/" end
-	return dir .. "metrics"
+	return NativePath.with_trailing_separator(dir) .. "metrics"
 end
 
 --- Ensures a directory exists. Exposed because the path editor creates the

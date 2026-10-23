@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local TomlReader = require("infra.toml.reader")
+local NativePath = require("native_path")
 
 local D = {}
 
@@ -67,10 +68,10 @@ local function shared_defaults_path()
 	-- Fallback: walk up from this file.
 	-- macos/platform/remap/defaults.lua → … → ergopti_plus → /_shared.
 	local src = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir = src:match("^(.*)[/\\][^/\\]+$") or src   -- → macos/platform/remap
-	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir          -- → macos/modules
-	dir = dir:match("^(.*)[/\\][^/\\]+$") or dir          -- → macos
-	local ergopti_plus = dir:match("^(.*)[/\\][^/\\]+$") or dir  -- → ergopti_plus
+	local dir = NativePath.dirname(src) or src             -- → macos/platform/remap
+	dir = NativePath.dirname(dir) or dir                    -- → macos/platform
+	dir = NativePath.dirname(dir) or dir                    -- → macos
+	local ergopti_plus = NativePath.dirname(dir) or dir     -- → ergopti_plus
 	return ergopti_plus .. "/_shared/tap_hold/defaults.toml"
 end
 

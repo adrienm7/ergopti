@@ -190,9 +190,9 @@ _THHS_KeyChildren(KeyId) {
 
 _THHS_KeyHeadRows(KeyId) {
 	Rows := _THHS_KeyChildren(KeyId)
-	Assert(Rows.Length > 1 && Rows[Rows.Length]["items"] is Array
-		&& Rows[Rows.Length]["items"].Length == 1,
-		"the existing head must be followed by one genuine Windows custom-delay command")
+	Assert(Rows.Length > 1 && !Rows[Rows.Length].Has("items")
+		&& HasMethod(Rows[Rows.Length].Get("action", 0), "Call"),
+		"the existing head must be followed by the genuine Windows delay command row")
 	Head := []
 	for Index, Row in Rows {
 		if Index < Rows.Length
@@ -211,7 +211,9 @@ _THHS_KeyHeadOrder(TargetPath) {
 	AssertEqual(StrReplace(t("tap_hold.picker.hold"), "%s", TapHoldCurrentHoldLabel("caps_lock")),
 		Rows[4]["label"], "shared hold caption uses the selected native label")
 	Assert(Rows[3].Has("action") && !Rows[3].Has("items"), "tap remains the native picker command")
-	Assert(Rows[4]["items"] is Array && !Rows[4].Has("action"), "hold remains native child data")
+	; The hold opens the shared action picker, never a submenu (2026-10-22).
+	Assert(HasMethod(Rows[4].Get("action", 0), "Call") && !Rows[4].Has("items"),
+		"hold is the shared picker command")
 	Rendered := Menu()
 	try {
 		; The renderer receipt counts labelled rows; separators still occupy native positions.
@@ -232,7 +234,7 @@ Test("tap-holds: actual key provider follows complete declared head (tap-hold-ke
 _THHS_KeyHeadMutation(TargetPath) {
 	Definition := _MR_GetMenuDef("tap_hold_key_head")
 	Tap := Definition[3]
-	Hold := Definition[5]
+	Hold := Definition[4]
 	PreviousCaption := Tap["i18n"]
 	PreviousGetter := Tap["caption_getter"]
 	try {
@@ -243,14 +245,16 @@ _THHS_KeyHeadMutation(TargetPath) {
 			Rows[3]["label"], "actual provider reads both shared caption and getter metadata")
 		Assert(Rows[3].Has("action") && !Rows[3].Has("items"), "caption changes retain the picker owner")
 		Definition[3] := Hold
-		Definition[5] := Tap
+		Definition[4] := Tap
 		Rows := _THHS_KeyChildren("caps_lock")
-		Assert(Rows[3].Has("items") && Rows[4].Has("action"), "declaration determines hold-before-tap order")
+		AssertEqual(StrReplace(t("tap_hold.picker.hold"), "%s", TapHoldCurrentHoldLabel("caps_lock")),
+			Rows[3]["label"], "declaration determines hold-before-tap order")
+		Assert(Rows[3].Has("action") && Rows[4].Has("action"), "both rows remain picker commands")
 	} finally {
 		Tap["i18n"] := PreviousCaption
 		Tap["caption_getter"] := PreviousGetter
 		Definition[3] := Tap
-		Definition[5] := Hold
+		Definition[4] := Hold
 	}
 }
 Test("tap-holds: actual key provider reads shared order and caption getter mutations (tap-hold-key-head)",
@@ -264,20 +268,80 @@ _THHS_KeyHeadPlatform(TargetPath) {
 		Rows := _THHS_KeyHeadRows("caps_lock")
 		AssertEqual(3, Rows.Length, "only the unavailable tap row is hidden")
 		Assert(Rows[2]["separator"], "the shared separator retains its declared position")
-		Assert(Rows[3]["items"] is Array, "hold payload remains present")
+		Assert(HasMethod(Rows[3].Get("action", 0), "Call"), "the hold command remains present")
 	} finally Tap["platforms"] := Previous
 }
 Test("tap-holds: actual key provider honors declared platform hiding (tap-hold-key-head)",
 	() => _THHS_WithNativeFixture(_THHS_KeyHeadPlatform))
 
+; The maintainer's decision of 2026-10-22: a key's hold opens the shared action
+; picker on the hold options, as its tap does, never a submenu of them.
+_THHS_HoldOpensSharedPicker(TargetPath) {
+	Hold := _THHS_KeyChildren("caps_lock")[4]
+	Assert(!Hold.Has("items") && !Hold.Has("submenu"), "the hold row opens no submenu")
+	Assert(HasMethod(Hold.Get("action", 0), "Call"), "the hold row is a command")
+	Opened := [], Writes := [], Reloads := []
+	Capture(Title, Current, OnConfirm, ShowNative, BindingId, Slot) {
+		Opened.Push({ Title: Title, Current: Current, OnConfirm: OnConfirm, ShowNative: ShowNative, Slot: Slot })
+		return true
+	}
+	Accept(KeyId, HoldOpt, Dir) {
+		Writes.Push(KeyId . ":" . HoldOpt["kind"] . ":" . HoldOpt["id"])
+		return 1
+	}
+	Refuse(KeyId, HoldOpt, Dir) => false
+	Reload(Reason, KeyId) {
+		Reloads.Push(Reason . ":" . KeyId)
+		return 1
+	}
+	KeyLabel := t("tap_hold.group.caps_lock")
+	_TH_OpenHoldPicker("caps_lock", KeyLabel, Capture, Accept, Reload)
+	AssertEqual(1, Opened.Length, "the hold opens the shared picker once")
+	Picker := Opened[1]
+	AssertEqual(t("tap_hold.picker.hold_title_prefix") . KeyLabel, Picker.Title, "titled by the hold and the key")
+	AssertEqual(TapHoldCurrentHoldPickId("caps_lock"), Picker.Current, "the current hold is marked")
+	AssertFalse(Picker.ShowNative, "the picker's own none row clears the hold")
+	Items := Picker.Slot["items"]
+	AssertEqual(TapHoldHoldOptions().Length - 1, Items.Length, "every hold option but the none row the picker draws")
+	Labels := Map()
+	for Item in Items {
+		AssertEqual("action", Item.Type)
+		Labels[Item.Id] := Item.Label
+	}
+	AssertEqual(t("tap_hold.hold.nav_layer"), Labels.Get("nav", ""), "the navigation layer is a holdable entry")
+	AssertEqual(t("tap_hold.hold.ctrl") . " + " . t("tap_hold.hold.shift"), Labels.Get("ctrl+shift", ""),
+		"a modifier combination is a holdable entry")
+	AssertFalse(Labels.Has("copy"), "no tap action is offered for a hold")
+	AssertFalse(Picker.OnConfirm.Call("copy"), "an action the hold does not offer is refused")
+	AssertFalse(_ActionPickerSlotCommitted(Picker.OnConfirm, "copy"), "so the picker stays open")
+	AssertEqual(0, Writes.Length, "a refused pick writes nothing")
+	AssertEqual(1, Picker.OnConfirm.Call("nav"), "an offered hold is written")
+	AssertEqual("caps_lock:layer:nav", Writes[1], "through the hold owner")
+	AssertEqual(0, Reloads.Length, "the script reloads only once the picker has closed")
+	Picker.Slot["after_close"].Call("nav")
+	AssertEqual("hold_set:caps_lock", Reloads[1])
+	AssertEqual(1, Picker.OnConfirm.Call("none"), "the none row clears the hold")
+	AssertEqual("caps_lock:none:", Writes[2])
+	_TH_OpenHoldPicker("caps_lock", KeyLabel, Capture, Refuse, Reload)
+	AssertFalse(Opened[2].OnConfirm.Call("shift"), "a refused write keeps the picker open")
+	Raised := false
+	try ShowActionPicker("t", "none", (*) => 1, false, "", Map("items", []))
+	catch ValueError
+		Raised := true
+	AssertTrue(Raised, "a slot without its after_close step is refused before any window opens")
+}
+Test("tap-holds: a key's hold opens the shared action picker on the hold options (tap-hold-hold-action-picker)",
+	() => _THHS_WithNativeFixture(_THHS_HoldOpensSharedPicker))
+
 _THHS_KeyHeadRefusesBrokenData() {
 	Definition := _MR_GetMenuDef("tap_hold_key_head")
 	PreviousInclude := Definition[1]["section"]
 	PreviousGetter := Definition[3]["caption_getter"]
-	Commands := Map("tap_hold_key_native", () => true, "tap_hold_key_tap", () => true)
+	Commands := Map("tap_hold_key_native", () => true, "tap_hold_key_tap", () => true,
+		"tap_hold_key_hold_action", () => true)
 	Getters := Map("tap_hold_key_configured", () => true,
 		"tap_hold_key_tap_caption", () => "copy 100%", "tap_hold_key_hold_caption", () => "Ctrl / {}")
-	Children := Map("tap_hold_key_hold", [])
+	Children := Map()
 	try {
 		Definition[1]["section"] := "missing_child_template"
 		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
@@ -297,8 +361,11 @@ _THHS_KeyHeadRefusesBrokenData() {
 		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
 			"non-string caption cannot return a partial key head")
 		Getters["tap_hold_key_tap_caption"] := () => "copy 100%"
-		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Map()),
-			"missing picker children cannot return a partial key head")
+		Assert(MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children) is Array,
+			"the repaired declaration renders the complete key head")
+		Commands.Delete("tap_hold_key_hold_action")
+		AssertEqual(false, MenuRenderer_TemplateRows("tap_hold_key_head", Commands, Getters, Children),
+			"a missing hold picker command cannot return a partial key head")
 	} finally {
 		Definition[1]["section"] := PreviousInclude
 		Definition[3]["caption_getter"] := PreviousGetter
@@ -314,9 +381,9 @@ _THHS_KeyDelayVisible(TargetPath) {
 	AssertEqual(5, Rows.Length, "Windows exposes the complete head and genuine per-key delay")
 	AssertEqual(StrReplace(t("menu.tapholds.key_tap_delay"), "%s", "350 ms"),
 		Rows[5]["label"], "caption reads the authoritative inherited/effective per-key duration")
-	AssertEqual(1, Rows[5]["items"].Length, "Windows exposes custom delay without an invented global reset")
-	AssertEqual(t("menu.tapholds.key_tap_delay_set"), Rows[5]["items"][1]["label"])
-	Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"), "the actual custom command has a native callback")
+	; The delay row opens the prompt itself: the one-row submenu is retired (2026-10-22).
+	Assert(!Rows[5].Has("items") && !Rows[5].Has("submenu"), "the delay row is a command, not a submenu")
+	Assert(HasMethod(Rows[5]["action"], "Call"), "clicking the delay row runs the native prompt owner")
 	Rendered := Menu()
 	try {
 		AssertEqual(4, _MR_RenderRows(Rendered, Rows, "tap_hold_key_delay_test", 1),
@@ -334,18 +401,20 @@ Test("tap-holds: Windows exposes real per-key delay after the original head (tap
 
 ; Exercise the real per-key provider and retained command, not a synthetic wrapper call.
 _THHS_KeyDelayProviderContract(TargetPath) {
-	Definition := _MR_GetMenuDef("tap_hold_key_delay_rows")[1]
+	Definition := _MR_FindItemById("tap_hold_key_delay_tail", "tap_hold_key_delay")
+	Assert(Definition is Map && Definition["type"] == "command", "the declared delay row is a command")
 	PreviousCaption := Definition["i18n"]
 	PreviousCommand := Definition["id"]
 	try {
 		for Hand in ["left", "right"]
 			AssertEqual(TapHoldKeyDefsOfHand(Hand).Length, _TH_KeyRows(Hand).Length,
 				"the actual provider renders every declared physical key without a construction exception")
-		Definition["i18n"] := "menu.shortcuts.title"
+		Definition["i18n"] := "menu.tapholds.simultaneous_title"
 		Rows := _THHS_KeyChildren("caps_lock")
-		AssertEqual(t("menu.shortcuts.title"), Rows[5]["items"][1]["label"],
-			"the real delay child consumes its shared command caption")
-		Assert(HasMethod(Rows[5]["items"][1]["action"], "Call"),
+		Prefix := StrSplit(t("menu.tapholds.simultaneous_title"), "%s")[1]
+		AssertEqual(Prefix, SubStr(Rows[5]["label"], 1, StrLen(Prefix)),
+			"the real delay row consumes its shared command caption")
+		Assert(HasMethod(Rows[5]["action"], "Call"),
 			"caption mutation retains the actual native delay owner")
 		Definition["id"] := "unowned_delay_command"
 		AssertEqual(0, _TH_KeyRows("left").Length,
@@ -362,7 +431,7 @@ Test("tap-holds: actual delay provider constructs both hands and refuses unowned
 _THHS_KeyDelayRetainedOwnerRefusal(TargetPath) {
 	global TapHold
 	Rows := _THHS_KeyChildren("caps_lock")
-	DelayCommand := Rows[5]["items"][1]
+	DelayCommand := Rows[5]
 	Previous := TapHold
 	try {
 		TapHold := 0

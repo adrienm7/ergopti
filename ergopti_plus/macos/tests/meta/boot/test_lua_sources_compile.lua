@@ -44,11 +44,17 @@ local ENTRY_POINT = DRIVER_ROOT .. "init.lua"
 -- scratch dirs (tests/scratch_test_dir) and stubs are excluded on purpose — see
 -- the module header. The shared Lua tree is resolved through helpers.shared so
 -- the _shared/ folder name stays defined in exactly one place (SHARED_REL).
+-- platform/ and vendor/ were missing: platform/remap/init.lua sits at Lua's
+-- 200-local limit, and one more top-level local made it fail to compile
+-- ("too many local variables") while this test stayed green.
 local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "infra",
 	DRIVER_ROOT .. "modules",
 	DRIVER_ROOT .. "ui",
 	DRIVER_ROOT .. "adapters",
+	DRIVER_ROOT .. "platform",
+	DRIVER_ROOT .. "vendor",
+	DRIVER_ROOT .. "_generated",
 	helpers.shared("lua"),
 }
 
@@ -104,6 +110,14 @@ helpers.describe("meta: every Lua source compiles", function()
 		local chunk, err = loadfile(ENTRY_POINT)
 		helpers.assert_true(chunk ~= nil,
 			string.format("init.lua must parse (loadfile failed): %s", tostring(err)))
+	end)
+
+	-- The remap facade is the driver's largest chunk and sits at the 200-local
+	-- limit, so it is named on its own as well.
+	helpers.it("platform/remap/init.lua compiles within Lua's local-variable limit", function()
+		local chunk, err = loadfile(DRIVER_ROOT .. "platform/remap/init.lua")
+		helpers.assert_true(chunk ~= nil,
+			string.format("platform/remap/init.lua must compile (loadfile failed): %s", tostring(err)))
 	end)
 
 	-- Bulk scan of every production source root. loadfile compiles to a function

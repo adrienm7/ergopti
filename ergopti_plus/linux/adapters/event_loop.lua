@@ -57,31 +57,8 @@ end
 --- @return function sleep(seconds)
 local nap = (function()
 	local ok_ffi, ffi = pcall(require, "ffi")
-	if not ok_ffi or type(ffi) ~= "table" then
-		return command_nap
-	end
-	local ok_cdef, cdef_err = pcall(ffi.cdef, [[
-		struct timespec { long tv_sec; long tv_nsec; };
-		int nanosleep(const struct timespec *req, struct timespec *rem);
-	]])
-	if not ok_cdef and not tostring(cdef_err):find("redefin", 1, true) then
-		return command_nap
-	end
-	local req = ffi.new("struct timespec[1]")
-	local remaining = ffi.new("struct timespec[1]")
-	local EINTR = 4 -- Linux errno for a signal-interrupted wait.
-	return function(seconds)
-		req[0].tv_sec = math.floor(seconds)
-		req[0].tv_nsec = math.floor((seconds % 1) * 1e9)
-		-- A libuv child's SIGCHLD interrupts nanosleep even with SA_RESTART.
-		-- Resume its remaining duration; restarting the whole wait extends it.
-		while ffi.C.nanosleep(req, remaining) ~= 0 do
-			local code = ffi.errno()
-			if code ~= EINTR then error("nanosleep failed (errno " .. code .. ")", 0) end
-			req[0].tv_sec = remaining[0].tv_sec
-			req[0].tv_nsec = remaining[0].tv_nsec
-		end
-	end
+	-- The shared binding resumes the remainder after a libuv child's SIGCHLD.
+	return require("infra.native_sleep").bind(ok_ffi and ffi or nil) or command_nap
 end)()
 
 --- True when the luv library is available and the event loop is native.
@@ -91,7 +68,11 @@ M.HAS_LUV = (luv ~= nil)
 --- @param ms number Milliseconds to wait.
 --- @return boolean True when the wait completed.
 function M.sleep_ms(ms)
-	if type(ms) ~= "number" or ms < 0 then return false end
+	if not NumberPolicy.within_timer_ceiling(ms) then
+		Logger.error(LOG, "sleep_ms() delay must be finite and within the timer ceiling — got %s; refused.", tostring(ms))
+		return false
+	end
+	if ms < 0 then return false end
 	local ok = pcall(nap, ms / 1000)
 	return ok
 end
@@ -188,6 +169,19 @@ local function _cleanup_luv()
 	end
 end
 
+--- Admits a periodic duration in both units before either loop allocates.
+--- libuv bindings can turn nonfinite values into a dormant huge timer or an
+--- unintended 1 ms repeat; the pump would tick on every iteration or never.
+--- @param periodSec number Resolved duration in seconds.
+--- @return number milliseconds Finite, not yet clamped.
+local function _periodic_ms(periodSec)
+	local milliseconds = NumberPolicy.timer_delay_ms(periodSec)
+	if milliseconds == nil then
+		error("Event loop periodic duration must be finite and within the timer ceiling", 0)
+	end
+	return milliseconds
+end
+
 --- Starts a native luv event loop with idle + periodic callbacks.
 --- @param opts table { onIdle = function, onPeriodic = function, periodSec = number }
 local function _run_luv(opts)
@@ -195,18 +189,7 @@ local function _run_luv(opts)
 	local onPeriodic = opts.onPeriodic
 	local periodSec  = tonumber(opts.periodSec) or 0.25
 	local periodMs
-	if onPeriodic then
-		-- Admit both units before clamping: libuv bindings can turn nonfinite
-		-- values into a dormant huge timer or an unintended 1 ms repeat.
-		if not NumberPolicy.is_finite(periodSec) then
-			error("Event loop periodic duration must be finite", 0)
-		end
-		periodMs = periodSec * 1000
-		if not NumberPolicy.is_finite(periodMs) then
-			error("Event loop periodic milliseconds must be finite", 0)
-		end
-		periodMs = math.max(1, math.floor(periodMs))
-	end
+	if onPeriodic then periodMs = math.max(1, math.floor(_periodic_ms(periodSec))) end
 
 	-- Idle handle: fires whenever the event loop has nothing else to do.
 	-- This replaces the tight while loop for keyboard-hook + tray pumping.
@@ -268,17 +251,19 @@ local function _run_pump(opts)
 	local onPeriodic = opts.onPeriodic
 	local periodSec  = tonumber(opts.periodSec) or 0.25
 
-	local last_tick = os.clock()
+	-- The gate reads the wall clock. os.clock() is CPU time: an iteration whose
+	-- callbacks waited on I/O advanced it by almost nothing, so the periodic
+	-- tick slipped by as much as the callbacks blocked. Without luv the wall
+	-- clock counts whole seconds; its resolution is subtracted so a second
+	-- boundary crossed a millisecond after the last tick cannot fire early.
+	local period_ms = onPeriodic and _periodic_ms(periodSec) or 0
+	local last_tick = Monotonic.now_ms()
 	local iteration = 0
 
-	-- Iteration-based fallback for the periodic gate. When os.clock() returns
-	-- CPU-time (some Lua builds on CI) instead of wall-clock, the periodSec
-	-- condition never fires and onPeriodic is starved — the failing test
-	-- "onPeriodic exception is caught" relies on the callback being called at
-	-- least once. Derive from periodSec so a tiny test value (0.001 s) fires
-	-- on the very first idle tick while the default (0.25 s) fires every
-	-- ~250 ticks at ~1 ms each — proportional to the intended interval.
-	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(periodSec * 1000))
+	-- Iteration-based cadence for the coarse wall clock: a tiny test value
+	-- (0.001 s) fires on the very first idle tick while the default (0.25 s)
+	-- fires every ~250 ticks at ~1 ms each — proportional to the interval.
+	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(period_ms))
 
 	while _running do
 		_safe_idle(onIdle)
@@ -287,8 +272,9 @@ local function _run_pump(opts)
 		iteration = iteration + 1
 
 		-- Drive the periodic callback when enough wall-clock has elapsed.
-		local now = os.clock()
-		if onPeriodic and (now - last_tick >= periodSec or iteration >= PERIODIC_ITER_FALLBACK) then
+		local now = Monotonic.now_ms()
+		if onPeriodic and (now - last_tick - Monotonic.resolution_ms() >= period_ms
+			or iteration >= PERIODIC_ITER_FALLBACK) then
 			_safe_periodic(onPeriodic)
 			last_tick = now
 			iteration = 0
@@ -422,7 +408,8 @@ end
 --- For work that must not hold up what the current callback returns: a bridge
 --- answers a window with what it already has and refreshes it after the page
 --- has painted. Runs on the daemon's own loop, with or without luv, so it needs
---- no timer backend. Fail-fast: a non-function, non-finite or negative delay is refused.
+--- no timer backend. Fail-fast: a non-function, negative, non-finite or
+--- above-ceiling delay is refused.
 --- @param fn function Zero-arity callback.
 --- @param delay_ms number|nil Minimum delay in milliseconds (default 0).
 --- @return boolean True when the callback was queued.
@@ -432,8 +419,8 @@ function M.defer(fn, delay_ms)
 		return false
 	end
 	local delay = delay_ms == nil and 0 or delay_ms
-	if not NumberPolicy.is_finite(delay) or delay < 0 then
-		Logger.error(LOG, "defer() delay must be a finite non-negative number — got %s; ignoring.", tostring(delay_ms))
+	if not NumberPolicy.within_timer_ceiling(delay) or delay < 0 then
+		Logger.error(LOG, "defer() delay must be non-negative and within the timer ceiling — got %s; ignoring.", tostring(delay_ms))
 		return false
 	end
 	_deferred[#_deferred + 1] = { fn = fn, due_ms = Monotonic.now_ms() + delay }

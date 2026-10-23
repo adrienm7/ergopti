@@ -7,14 +7,12 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. build_section_header provides a uniform disabled separator label.
---- 2. build_action_picker groups a catalogue of actions under those headers.
 ---
---- BOTH RETURN PROVIDER ROWS — `label`, `action`, `checked` — never the
---- hs.menubar shape. Every caller feeds the result into an `items` array that
---- the shared renderer materialises, and they returned `title`/`fn` until
---- 2026-08-07: a row with no `label` is dropped, so the Karabiner tap and hold
---- pickers showed their two ungrouped « Spécial » entries and NOTHING else, and
---- the mod-combo list lost every category header. Both were silent.
+--- IT RETURNS A PROVIDER ROW — `label`, `disabled` — never the hs.menubar
+--- shape. Every caller feeds the result into an `items` array that the shared
+--- renderer materialises, and it returned `title` until 2026-08-07: a row with
+--- no `label` is dropped, so the mod-combo list lost every category header
+--- without a word.
 --- ==============================================================================
 
 local M = {}
@@ -26,32 +24,6 @@ local RowDialect = require("menu.row_dialect")
 --- @return table Single disabled provider row.
 function M.build_section_header(label)
 	return { label = i18n.decorate_section(label), disabled = true }
-end
-
---- Builds a filtered and grouped picker submenu for a list of named actions.
---- @param actions table List of { id, label, category, holdable?, tappable? }.
---- @param current_id string Currently selected action id.
---- @param on_select function Callback receiving the selected action id.
---- @param filter function|nil Optional predicate (action) -> bool to exclude items.
---- @return table List of provider rows with category headers and checkmarks.
-function M.build_action_picker(actions, current_id, on_select, filter)
-	local items = {}
-	local current_category = nil
-	for _, action in ipairs(actions) do
-		if filter and not filter(action) then goto continue end
-		if action.category ~= current_category then
-			current_category = action.category
-			items[#items + 1] = M.build_section_header(action.category)
-		end
-		local aid = action.id
-		items[#items + 1] = {
-			label   = action.label,
-			checked = (aid == current_id),
-			action  = function() return on_select(aid) end,
-		}
-		::continue::
-	end
-	return items
 end
 
 --- Turns an hs.menubar row into the shape a manifest `list` provider returns.

@@ -1,0 +1,93 @@
+{
+	"_description": "Cross-driver n-gram corpus for manual corrections. Every Backspace is a token of the typing chain on every driver: it ends a bigram and a trigram ('x[BS]', 'yx[BS]'), and what follows it continues from it ('[BS]x', 'y[BS]x', ...) up to the heptagrams. Each vector is replayed as one typing entry per flush, for the same application, through the Windows (KLW_WalkTypingEntry), macOS (aggregator walk_typing) and Linux (aggregate_walker.walk with a carried context) walkers. 'expected' lists, for each of the seven n-gram families, every token whose typed count c is above zero and that count; a family absent from the batch or with no such token is {}. The comparison is exact, so a token a walker adds or drops fails on that driver.",
+	"date": "2024-06-01",
+	"app": "CorrectionApp",
+	"timestamps": ["2024-06-01 10:00:00.000", "2024-06-01 10:00:01.000"],
+	"vectors": [
+		{
+			"id": "correction_continues_the_sequence",
+			"description": "The character typed after a correction pairs with it",
+			"flushes": [
+				[
+					{ "char": "a", "delay": 100 },
+					{ "char": "[BS]", "delay": 100 },
+					{ "char": "b", "delay": 100 },
+					{ "char": "c", "delay": 100 }
+				]
+			],
+			"expected": {
+				"ngram_chars": { "a": 1, "[BS]": 1, "b": 1, "c": 1 },
+				"ngram_bigrams": { "a[BS]": 1, "[BS]b": 1, "bc": 1 },
+				"ngram_trigrams": { "a[BS]b": 1, "[BS]bc": 1 },
+				"ngram_quadgrams": { "a[BS]bc": 1 },
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "cascade_then_resume",
+			"description": "Consecutive corrections chain with each other and with the next character",
+			"flushes": [
+				[
+					{ "char": "t", "delay": 100 },
+					{ "char": "h", "delay": 100 },
+					{ "char": "e", "delay": 100 },
+					{ "char": "[BS]", "delay": 90 },
+					{ "char": "[BS]", "delay": 80 },
+					{ "char": "y", "delay": 120 }
+				]
+			],
+			"expected": {
+				"ngram_chars": { "t": 1, "h": 1, "e": 1, "[BS]": 2, "y": 1 },
+				"ngram_bigrams": { "th": 1, "he": 1, "e[BS]": 1, "[BS][BS]": 1, "[BS]y": 1 },
+				"ngram_trigrams": { "the": 1, "he[BS]": 1, "e[BS][BS]": 1, "[BS][BS]y": 1 },
+				"ngram_quadgrams": { "e[BS][BS]y": 1 },
+				"ngram_pentagrams": { "he[BS][BS]y": 1 },
+				"ngram_hexagrams": { "the[BS][BS]y": 1 },
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "pause_after_correction_breaks_it",
+			"description": "A pause at the keystroke threshold before the next character breaks the sequence",
+			"flushes": [
+				[
+					{ "char": "a", "delay": 100 },
+					{ "char": "[BS]", "delay": 100 },
+					{ "char": "b", "delay": 5000 }
+				]
+			],
+			"expected": {
+				"ngram_chars": { "a": 1, "[BS]": 1, "b": 1 },
+				"ngram_bigrams": { "a[BS]": 1 },
+				"ngram_trigrams": {},
+				"ngram_quadgrams": {},
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			}
+		},
+		{
+			"id": "correction_sequence_crosses_a_flush",
+			"description": "A correction that ends one flush still chains with the first character of the next",
+			"flushes": [
+				[
+					{ "char": "a", "delay": 100 },
+					{ "char": "b", "delay": 100 },
+					{ "char": "[BS]", "delay": 100 }
+				],
+				[{ "char": "c", "delay": 100 }]
+			],
+			"expected": {
+				"ngram_chars": { "a": 1, "b": 1, "[BS]": 1, "c": 1 },
+				"ngram_bigrams": { "ab": 1, "b[BS]": 1, "[BS]c": 1 },
+				"ngram_trigrams": { "ab[BS]": 1, "b[BS]c": 1 },
+				"ngram_quadgrams": { "ab[BS]c": 1 },
+				"ngram_pentagrams": {},
+				"ngram_hexagrams": {},
+				"ngram_heptagrams": {}
+			}
+		}
+	]
+}

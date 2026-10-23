@@ -280,12 +280,18 @@ function M.get(name)
 	return shipped
 end
 
-local function persist_one(name, value)
+local function persist_one(name, value, admission)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then return false end
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then return false end
-	local persisted = Storage.set(PREF_PREFIX .. name, value)
+	local persisted
+	if admission ~= nil then
+		persisted = type(Storage.set_many) == "function"
+			and Storage.set_many({ [PREF_PREFIX .. name] = value }, nil, admission)
+	else
+		persisted = Storage.set(PREF_PREFIX .. name, value)
+	end
 	if persisted ~= true then return false end
 	_values[name] = value
 	return true
@@ -297,8 +303,10 @@ end
 --- @param name string
 --- @param value string|number|boolean
 --- @param current_model string|nil
+--- @param admission function|nil Retained menu admission checked by the writer.
 --- @return boolean
-function M.set(name, value, current_model)
+function M.set(name, value, current_model, admission)
+	if admission ~= nil and (type(admission) ~= "function" or admission() ~= true) then return false end
 	if not valid(name, value) or default_for(name) == nil then
 		Logger.error(LOG, "Refused invalid profile setting %s=%s.", tostring(name), tostring(value))
 		return false
@@ -310,14 +318,14 @@ function M.set(name, value, current_model)
 				or Storage.set_many({
 					[PREF_PREFIX .. "active"] = value,
 					[PREF_PREFIX .. "auto_profile_for_model"] = false,
-				}) ~= true then
+				}, nil, admission) ~= true then
 			Logger.error(LOG, "Manual profile selection could not be persisted atomically.")
 			return false
 		end
 		_values.active = value
 		_values.auto_profile_for_model = false
 	else
-		if not persist_one(name, value) then
+		if not persist_one(name, value, admission) then
 			Logger.error(LOG, "Profile setting '%s' could not be persisted; live state is unchanged.", name)
 			return false
 		end
@@ -417,8 +425,10 @@ function M.list_built_in()
 end
 
 --- Returns detached copies of every user-defined profile.
+--- @param refresh boolean|nil Reloads the registry for a new menu's source-bound draft.
 --- @return table
-function M.list_user()
+function M.list_user(refresh)
+	if refresh == true then forget_registry(false) end
 	local copy = {}
 	for index, profile in ipairs(load_user_profiles()) do copy[index] = copy_profile(profile) end
 	return copy
@@ -462,8 +472,10 @@ end
 --- @param candidate table
 --- @param activate boolean|nil
 --- @param expected_existing boolean|nil True for edit, false for create.
+--- @param admission function|nil Retained editor admission checked by the writer.
 --- @return boolean
-function M.save_user_profile(candidate, activate, expected_existing)
+function M.save_user_profile(candidate, activate, expected_existing, admission)
+	if admission ~= nil and (type(admission) ~= "function" or admission() ~= true) then return false end
 	local profile = normalize_user_profile(candidate)
 	if not profile or built_in_exists(profile.id) then
 		Logger.error(LOG, "Refused invalid user-profile candidate.")
@@ -496,7 +508,7 @@ function M.save_user_profile(candidate, activate, expected_existing)
 		writes[PREF_PREFIX .. "active"] = profile.id
 		writes[PREF_PREFIX .. "auto_profile_for_model"] = false
 	end
-	if Storage.set_many(writes, _registry_source) ~= true then
+	if Storage.set_many(writes, _registry_source, admission) ~= true then
 		forget_registry(true)
 		Logger.error(LOG, "User profile '%s' could not be persisted; live registry is unchanged.",
 			profile.id)
@@ -514,8 +526,10 @@ end
 
 --- Deletes one user profile and atomically falls back when it was active.
 --- @param profile_id string
+--- @param admission function|nil Retained menu admission checked by the writer.
 --- @return boolean
-function M.delete_user_profile(profile_id)
+function M.delete_user_profile(profile_id, admission)
+	if admission ~= nil and (type(admission) ~= "function" or admission() ~= true) then return false end
 	if type(profile_id) ~= "string" or profile_id == "" then return false end
 	local next_profiles = {}
 	local found = false
@@ -535,7 +549,7 @@ function M.delete_user_profile(profile_id)
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
 	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
 	if active == profile_id then writes[PREF_PREFIX .. "active"] = "basic" end
-	if Storage.set_many(writes, _registry_source) ~= true then
+	if Storage.set_many(writes, _registry_source, admission) ~= true then
 		forget_registry(true)
 		Logger.error(LOG, "User profile '%s' could not be deleted; live registry is unchanged.",
 			profile_id)

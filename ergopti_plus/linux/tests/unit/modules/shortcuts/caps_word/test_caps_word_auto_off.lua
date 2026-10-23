@@ -391,6 +391,25 @@ helpers.describe("caps word auto-off: the manager session", function()
 		end)
 	end)
 
+	helpers.it("(linux-caps-word-unlock-debt) retains the native output outcome through the manager emitter", function()
+		with_caps_word(nil, function(c)
+			local Emitter = require("modules.gestures.combo_emitter")
+			local original = Emitter.press_codes
+			local called, failure = pcall(function()
+				helpers.assert_true(c.manager.toggle_caps_word())
+				for _, kind in ipairs({ "refused", "unavailable", "native_failed", "custody_unresolved" }) do
+					local issued = { kind = kind }
+					Emitter.press_codes = function() return false, issued end
+					local emitted, outcome = c.hook.emit()
+					helpers.assert_eq(emitted, false)
+					helpers.assert_true(outcome == issued, "the hook needs the exact original native outcome: " .. kind)
+				end
+			end)
+			Emitter.press_codes = original
+			if not called then error(failure, 0) end
+		end)
+	end)
+
 	helpers.it("caps word auto-off, a shortcut configuration transaction ends the session and unlocks", function()
 		with_caps_word(nil, function(c)
 			helpers.assert_true(c.manager.toggle_caps_word())
@@ -556,7 +575,7 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		local hook = source("adapters/keyboard_hook.lua")
 		helpers.assert_contains(hook, '_call_callback("character callback", _on_char, char, ev.code)')
 		helpers.assert_contains(hook, '_call_callback("text-control callback", _on_char, text_char, ev.code)')
-		helpers.assert_contains(hook, "else _dispatch_event(emitted_event, emitted_source) end")
+		helpers.assert_contains(hook, "\t\t\t\t_dispatch_event(emitted_event, emitted_source)\n")
 		local daemon = source("ergopti_hotstrings.lua")
 		helpers.assert_contains(daemon, "onChar  = on_char,")
 		helpers.assert_contains(daemon, "injector.set_output_observer(function(text)")

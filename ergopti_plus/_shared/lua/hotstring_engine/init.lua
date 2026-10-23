@@ -449,6 +449,13 @@ function M.new()
 	-- a codepoint, because the buffer then starts in the middle of the user's text
 	-- and nothing here knows what preceded it.
 	local _start_is_boundary = true
+	-- Whether the buffer's start is also the start of an empty input line, so a
+	-- Backspace that finds the buffer empty deleted nothing and the word start
+	-- stands. Only a reset that names it sets it (a bare Enter in a terminal
+	-- submits the line, and the prompt after it is empty); it holds only with a
+	-- known boundary, and every other reset and the rolling-window eviction
+	-- clear it.
+	local _start_is_line_start = false
 
 	local engine = {}
 
@@ -707,6 +714,7 @@ function M.new()
 			table.remove(_buf_times, 1)
 			-- The start is no longer the start of anything the user typed.
 			_start_is_boundary = false
+			_start_is_line_start = false
 		end
 
 		-- The character is typed text and is never logged; the buffer length is
@@ -835,13 +843,29 @@ function M.new()
 	--- @param at_boundary boolean|nil false when the caret moved somewhere this
 	---        engine never saw (an arrow, Home, a click): the next text does not
 	---        necessarily start a word. Omitted means a genuine boundary.
-	function engine:reset(at_boundary)
+	--- @param at_line_start boolean|nil true when the caret is also at the start
+	---        of an empty input line (a terminal prompt after a bare Enter, a
+	---        field whose whole text is selected): a Backspace there deletes
+	---        nothing. Ignored without a boundary.
+	function engine:reset(at_boundary, at_line_start)
 		_buf_cps = {}
 		_buf_times = {}
 		-- A plain reset happens at a boundary — focus change, Escape, a
 		-- final_result expansion — so what follows genuinely starts a word.
 		_start_is_boundary = at_boundary ~= false
+		_start_is_line_start = _start_is_boundary and at_line_start == true
 		Logger.debug(LOG, "Buffer reset.")
+	end
+
+	--- Applies a pause long enough to start a new word (idle_resets_word): the
+	--- buffer is forgotten at a word start. A buffer that is already empty at a
+	--- word start has nothing to forget and keeps its line-start promise, since
+	--- a pause changes nothing on screen.
+	--- @return boolean reset Whether anything was forgotten.
+	function engine:reset_after_pause()
+		if #_buf_cps == 0 and _start_is_boundary then return false end
+		engine.reset(engine, true)
+		return true
 	end
 
 	--- Mirrors a Backspace: drops the last codepoint, as the application did.
@@ -851,13 +875,24 @@ function M.new()
 	--- reset declared a word boundary: "xy", Backspace, "adn " fired a word-only
 	--- trigger in the middle of "xadn". macOS removes one character, and on an
 	--- empty buffer notes that the text now continues something it never saw.
+	---
+	--- The Backspace that erases the last codepoint typed since the buffer
+	--- started puts the caret back where that typing began, so the next
+	--- character starts a word: "ab", Backspace, Backspace, "c★" expands even
+	--- after an unknown start. A correction that leaves codepoints keeps the
+	--- word open. On an empty buffer at the start of an empty line nothing was
+	--- deleted and the word start stands. Windows (HSE_FeedBackspace) and macOS
+	--- (keymap) apply the same rules.
 	function engine:backspace()
 		if #_buf_cps == 0 then
+			if _start_is_line_start and _start_is_boundary then return end
 			_start_is_boundary = false
+			_start_is_line_start = false
 			return
 		end
 		table.remove(_buf_cps)
 		table.remove(_buf_times)
+		if #_buf_cps == 0 then _start_is_boundary = true end
 	end
 
 	--- Rewrites the buffer to reflect an expansion the driver has just injected:
@@ -896,6 +931,7 @@ function M.new()
 			table.remove(_buf_cps, 1)
 			table.remove(_buf_times, 1)
 			_start_is_boundary = false
+			_start_is_line_start = false
 		end
 		Logger.debug(LOG, "Expansion applied: buffer %d codepoint(s).", #_buf_cps)
 	end

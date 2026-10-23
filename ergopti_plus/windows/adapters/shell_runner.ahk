@@ -249,6 +249,13 @@ ShellRunner_Exec(Cmd) {
 	if (Type(Cmd) != "String" or Cmd = "") {
 		return ""
 	}
+	; Run passes a NUL-terminated command line: the prefix would run without
+	; the capture redirection that follows it.
+	if _SR_HasNul(Cmd) {
+		_SR_LogError("exec() refused for '{1}': the command contains NUL, which a native command line cannot carry.",
+			_SR_ProgramName(Cmd))
+		return ""
+	}
 
 	CaptureDir := ""
 	try CaptureDir := _SR_AcquireCaptureDirectory()
@@ -339,11 +346,15 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	finally Critical(previous_critical)
 	; Index of the first Arg carrying a newline, or 0 when every Arg is single-line.
 	local bad_arg_index := 0
+	; Index of the first NUL-bearing value (0 = the executable), or -1 when none.
+	local nul_arg_index := _SR_HasNul(Executable) ? 0 : -1
 	for Arg in Args {
 		if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
 			bad_arg_index := A_Index
+		if (nul_arg_index < 0 and _SR_HasNul(Arg))
+			nul_arg_index := A_Index
 	}
-	local command_line := _SR_BuildDirectCommandLine(Executable, Args)
+	local command_line := nul_arg_index < 0 ? _SR_BuildDirectCommandLine(Executable, Args) : ""
 
 	local state := _SR_LegacyNewState(task_id, "",
 		IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0)
@@ -356,6 +367,12 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	; terminate() are defined as ordinary nested functions instead.
 	_SR_HandleStart(*) {
 		; Refuse before allocating a capture owner or spawning anything.
+		if nul_arg_index >= 0 {
+			_SR_LogError("spawn() refused for '{1}': {2} contains NUL, which a native command line cannot carry.",
+				_SR_ProgramName(nul_arg_index = 0 ? "" : Executable),
+				nul_arg_index = 0 ? "the executable path" : "argument " . nul_arg_index)
+			return false
+		}
 		if bad_arg_index {
 			_SR_LogError("spawn() refused for '{1}': argument {2} contains a newline. Native process arguments must be single-line; stage a multi-line payload to a file and pass the path instead.",
 				Executable, bad_arg_index)
@@ -1096,8 +1113,16 @@ _SR_LegacyCreateDirect(Executable, CommandLine, CapturePath, State, ResumeFn := 
 ; ====== 3.1) Native process-tree ownership ======
 ; ================================================
 
+; A command line is NUL-terminated and Loop Parse stops at the first NUL code
+; unit, so such a value would reach the child silently shortened.
+_SR_HasNul(Text) {
+	return RegExMatch(Text, "\x00") != 0
+}
+
 _SR_QuoteCreateProcessArgument(Value) {
 	Text := Value . ""
+	if _SR_HasNul(Text)
+		throw ValueError("A native process argument cannot contain NUL.")
 	Result := '"'
 	BackslashCount := 0
 	Loop Parse Text {
@@ -1190,6 +1215,8 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
 	local validation_error := ""
 	if Type(Executable) != "String" or Executable = "" {
 		validation_error := "Executable must be a non-empty string."
+	} else if _SR_HasNul(Executable) {
+		validation_error := "Executable must not contain NUL."
 	} else if !(Args is Array) {
 		validation_error := "Args must be an Array."
 	} else {
@@ -1197,6 +1224,11 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
 		for Arg in Args {
 			if Type(Arg) != "String" {
 				validation_error := "Argument " . A_Index . " must be a string."
+				break
+			}
+			; Only the index is reported: the refused bytes can carry user text.
+			if _SR_HasNul(Arg) {
+				validation_error := "Argument " . A_Index . " must not contain NUL."
 				break
 			}
 			if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
@@ -1275,7 +1307,9 @@ _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
 
 	; The argv entry quotes once; the trusted command entry keeps its exact
 	; caller-composed shell text. Both attach stdout/stderr natively below.
-	local cmd := NativeLaunch is Map ? NativeLaunch["command"] : _SR_BuildDirectCommandLine(Executable, Args)
+	; A refused vector is never quoted: start() reports its validation error.
+	local cmd := NativeLaunch is Map ? NativeLaunch["command"]
+		: validation_error == "" ? _SR_BuildDirectCommandLine(Executable, Args) : ""
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,

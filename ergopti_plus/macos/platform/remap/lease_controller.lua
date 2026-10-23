@@ -32,6 +32,9 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local LeaseHelper    = require("platform.remap.lease_helper")
+local TaskOutputTurn = require("adapters.task_output_turn")
+local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local KeyEventHealth = require("infra.key_event_health")
 
 local LOG = "karabiner.lease"
 
@@ -45,13 +48,22 @@ local LOG = "karabiner.lease"
 local WORKER_COMMAND_BUDGET_SEC = 2.5
 local WORKER_GUARDIAN_ARM_BUDGET_SEC = 3.0
 local ACK_LATENCY_MARGIN_SEC = 2.0
--- READY follows the guardian ARM handshake and then one ACTIVATE write. At
--- 4.0 s it was shorter than the worker's own 4.75 s worst case, and recoveries
--- that redeployed karabiner.json timed out waiting for READY (issue #95).
-local READY_ACK_TIMEOUT_SEC = WORKER_GUARDIAN_ARM_BUDGET_SEC + WORKER_COMMAND_BUDGET_SEC
-	+ ACK_LATENCY_MARGIN_SEC
+-- The worker's budgets start once it runs. Before READY it must also launch:
+-- the outer worker and then its suspended inner, two starts of the launcher
+-- executable, about 2 s each on the loaded Mac of issue #99 (its detached
+-- revokers and guardian probes ran 2.0 to 2.2 s).
+local WORKER_LAUNCH_ALLOWANCE_SEC = 4.0
+-- READY follows those launches, the guardian ARM handshake and one ACTIVATE
+-- write. At 4.0 s it was shorter than the worker's own 4.75 s worst case
+-- (issue #95); at 7.5 s it still left nothing for the launches, so on that
+-- Mac every lease slower than the 3.4 to 6.0 s that did activate failed, and
+-- each failure redeployed karabiner.json for one more lease (issue #99).
+local READY_ACK_TIMEOUT_SEC = WORKER_LAUNCH_ALLOWANCE_SEC + WORKER_GUARDIAN_ARM_BUDGET_SEC
+	+ WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local COMMAND_ACK_TIMEOUT_SEC = WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local STOP_ACK_TIMEOUT_SEC = 7.0
+-- READY slower than this is reported with its duration (it is usually 0.25 s).
+local SLOW_READY_REPORT_SEC = 1.0
 -- An ACK timeout that fires this much later than due was held by a parked run
 -- loop (a modal dialog, a busy main thread). The worker's answer may be waiting
 -- in the pipe behind it, so the deadline is extended once by ACK_GRACE_SEC of
@@ -59,6 +71,15 @@ local STOP_ACK_TIMEOUT_SEC = 7.0
 -- while a heartbeat was in flight saw "timeout waiting for PONG 159".
 local PARKED_RUN_LOOP_LATENESS_SEC = 0.5
 local ACK_GRACE_SEC = 1.0
+-- A deadline that fires on time proves nothing either: hs.task hands a child's
+-- output to Lua only in the default run loop mode, timers fire in every mode,
+-- and an open menubar menu runs the event tracking mode. Issue #100 failed
+-- seven healthy leases "0.00 s late" while the user browsed the Ergopti menu.
+-- Such a deadline first waits for adapters/task_output_turn.lua to prove that
+-- task output is read again, at most this long. Keepalive PINGs hold the
+-- worker's inner silence budget off meanwhile, so a menu left open costs
+-- nothing; the inner still fences on its own if Hammerspoon really went away.
+local OUTPUT_TURN_CEILING_SEC = 120.0
 local HEARTBEAT_INTERVAL_SEC = 5 -- Bounds Core Service reset recovery without a 1 Hz CLI loop.
 local HEARTBEAT_RETRY_SEC = 1.0
 local MAX_CONSECUTIVE_HEARTBEAT_FAILURES = 2
@@ -575,6 +596,20 @@ end
 local function cancel_ack_timer(generation)
 	retry_timer_cleanup()
 	release_generation_timer(generation, "ack_timer", "Lease ACK timer")
+	local probe = generation.output_turn_probe
+	if probe then
+		generation.output_turn_probe = nil
+		release_generation_timer(generation, "keepalive_timer", "Lease keepalive timer")
+		probe.cancel()
+		if not generation.failed and not generation.stop_requested then
+			-- The answer was waiting in the pipe: without this line nothing would
+			-- tell a held-back ACK from a timely one (issue #100).
+			Logger.info(LOG,
+				"Karabiner lease %s read %s %.2f s after its deadline; task output was not being read meanwhile (an open menu or a modal window).",
+				generation.token, tostring(generation.output_turn_expected),
+				TimerScheduler.awake_time() - (generation.output_turn_since or 0))
+		end
+	end
 end
 
 --- Cancels the sole recurring heartbeat owned by one exact generation.
@@ -751,10 +786,19 @@ local function fail_generation(generation, reason)
 	generation.failed = true
 	generation.failure_reason = reason
 	cancel_ack_timer(generation)
+	release_generation_timer(generation, "keepalive_timer", "Lease keepalive timer")
 	cancel_heartbeat_timer(generation)
 	set_phase(generation, "fencing")
 	Logger.error(LOG, "Karabiner lease %s failed; fencing before publishing failure: %s",
 		generation.token, tostring(reason))
+	-- The fence switches every Ergopti rule off under the user's fingers; a key
+	-- held across it loses its Karabiner manipulation (issue #99: swallowed keys
+	-- and no drop the driver itself could see).
+	if generation.ready then
+		KeystrokeIntegrity.note_exposure("a Karabiner lease fence that switched Ergopti's rules off")
+	end
+	-- The session totals the next issue report carries (infra/key_event_health.lua).
+	pcall(KeyEventHealth.note_lease_failure, reason)
 	if _state.current == generation then
 		_state.current = nil
 		_state.retiring[generation.token] = generation
@@ -797,18 +841,155 @@ local function reject_unlaunched_generation(generation, reason)
 		generation.token, tostring(reason))
 end
 
+local arm_ack_timer
+local send_keepalive
+
+--- Fails a generation whose deadline passed, naming the wait and the lateness.
+--- @param generation table Generation awaiting the ACK.
+--- @param expected string Expected protocol line.
+--- @param since number When the first deadline for this ACK was armed.
+--- @param lateness number How late the deciding timer fired, in seconds.
+local function fail_on_deadline(generation, expected, since, lateness)
+	-- The wait and the timer's own lateness tell a silent worker (on time,
+	-- nothing in the pipe) from a held Hammerspoon run loop (late), which the
+	-- bare reason could not: issue #99 logged six of them without either. The
+	-- reason itself stays exact: the diagnostics report parses it.
+	Logger.warn(LOG,
+		"Karabiner lease %s waited %.2f s for %s; the deadline timer fired %.2f s late.",
+		generation.token, TimerScheduler.awake_time() - since, expected, math.max(0, lateness))
+	fail_generation(generation, "timeout waiting for " .. expected)
+end
+
+--- Writes one keepalive PING while the worker's answers sit unread. The
+--- worker's inner fences itself after its silence budget (the heartbeat
+--- interval plus 12.5 s) without a private command, and the regular PING is
+--- sent only once the previous PONG was read: an Ergopti menu held open longer
+--- than that fenced a healthy lease although Hammerspoon kept running (exit
+--- 73). Writing stdin works in every run loop mode; only reading does not.
+--- Its PONG is consumed without a deadline: the pending output turn probe
+--- already owns the verdict about the worker.
+--- @param generation table Generation whose output is unread.
+--- @return boolean sent
+send_keepalive = function(generation)
+	if generation.failed or generation.stop_requested or not generation.handle then return false end
+	-- The outer serves one private command at a time and fails an overlapping
+	-- PING (exit 74); after its command budget it is idle or already gone.
+	local now = TimerScheduler.awake_time()
+	if generation.last_keepalive_at and now - generation.last_keepalive_at < WORKER_COMMAND_BUDGET_SEC then
+		return false
+	end
+	local previous = generation.last_ping_sequence or 0
+	local sequence = previous >= MAX_PING_SEQUENCE and 1 or previous + 1
+	generation.last_ping_sequence = sequence
+	generation.keepalive_sequences = generation.keepalive_sequences or {}
+	generation.keepalive_sequences[sequence] = true
+	local wire = "PING " .. tostring(sequence)
+	local write_ok, wrote = pcall(generation.handle.set_input, wire .. "\n")
+	if not write_ok or not wrote then
+		generation.keepalive_sequences[sequence] = nil
+		Logger.warn(LOG, "Karabiner lease %s could not write keepalive %s; the worker may fence itself while its output is unread.",
+			generation.token, wire)
+		return false
+	end
+	generation.last_keepalive_at = now
+	generation.keepalives_sent = (generation.keepalives_sent or 0) + 1
+	if generation.keepalives_sent == 1 then
+		Logger.info(LOG, "Karabiner lease %s: its answers are unread (an open menu or a modal window); %s keeps the worker's heartbeat alive meanwhile.",
+			generation.token, wire)
+	end
+	return true
+end
+
+--- Arms the keepalive cadence for an ACK no heartbeat timer covers yet (READY).
+--- Armed before the probe's ceiling, which stays the newest deadline.
+--- @param generation table Generation whose READY is unread.
+local function arm_ready_keepalive(generation)
+	if generation.keepalive_timer then return end
+	local timer
+	local armed = false
+	local fired_before_arm = false
+	local schedule_ok, timer_or_err, committed = pcall(
+		TimerScheduler.every, HEARTBEAT_INTERVAL_SEC, function()
+		if not armed then
+			fired_before_arm = true
+			return
+		end
+		if generation.keepalive_timer ~= timer or generation.failed
+			or generation.stop_requested or generation.output_turn_probe == nil then
+			return
+		end
+		send_keepalive(generation)
+	end)
+	if schedule_ok then timer = timer_or_err end
+	generation.keepalive_timer = timer
+	if committed ~= true or type(timer) ~= "table" or timer.fired == true or fired_before_arm then
+		generation.keepalive_timer = nil
+		rollback_uncommitted_timer(timer, "Lease keepalive timer")
+		Logger.warn(LOG, "Karabiner lease %s could not arm its keepalive timer: %s.",
+			generation.token, tostring(schedule_ok and "invalid handle" or timer_or_err))
+		return
+	end
+	armed = true
+end
+
+--- Defers an on-time deadline until task output is proven to be read again.
+--- @param generation table Generation awaiting the ACK.
+--- @param expected string Expected protocol line.
+--- @param since number When the first deadline for this ACK was armed.
+--- @return boolean deferred True when a probe now owns the verdict.
+local function defer_until_output_turn(generation, expected, since)
+	-- The deadline is at least the worker's own command budget past the last
+	-- write, so its outer is idle and accepts a PING (it refuses an overlap).
+	send_keepalive(generation)
+	if generation.failed then return true end
+	if expected == "READY" then arm_ready_keepalive(generation) end
+	-- The ceiling is armed first: arming cancels any older probe.
+	arm_ack_timer(generation, expected, "output_turn", since)
+	if generation.failed or generation.ack_timer == nil then return true end
+	generation.output_turn_expected = expected
+	generation.output_turn_since = TimerScheduler.awake_time()
+	local probe
+	local probe_err
+	probe, probe_err = TaskOutputTurn.request("Karabiner lease " .. generation.token,
+		function(delivered, reason)
+			if probe == nil or generation.output_turn_probe ~= probe or generation.failed
+				or generation.awaiting ~= expected then return end
+			generation.output_turn_probe = nil
+			if not delivered then
+				Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
+					generation.token, tostring(reason))
+			end
+			fail_on_deadline(generation, expected, since, 0)
+		end)
+	if not probe then
+		Logger.warn(LOG, "Karabiner lease %s could not prove that task output is read: %s.",
+			generation.token, tostring(probe_err))
+		fail_on_deadline(generation, expected, since, 0)
+		return true
+	end
+	generation.output_turn_probe = probe
+	Logger.debug(LOG,
+		"Karabiner lease %s: %s deadline passed on time; reading pending task output before judging the worker.",
+		generation.token, expected)
+	return true
+end
+
 --- Arms a bounded timeout for one expected protocol acknowledgement.
 --- @param generation table Generation awaiting the ACK.
 --- @param expected string Expected protocol line.
---- @param grace boolean|nil Whether this is the one extension after a parked run loop.
-local function arm_ack_timer(generation, expected, grace)
+--- @param stage string|nil nil for the first deadline, "grace" for the one
+---   extension after a parked run loop, "output_turn" for the ceiling of a probe.
+--- @param awaited_since number|nil When the first deadline for this ACK was armed.
+arm_ack_timer = function(generation, expected, stage, awaited_since)
 	cancel_ack_timer(generation)
 	generation.awaiting = expected
 	local timeout = COMMAND_ACK_TIMEOUT_SEC
 	if expected == "READY" then timeout = READY_ACK_TIMEOUT_SEC end
 	if expected == "STOPPED" then timeout = STOP_ACK_TIMEOUT_SEC end
-	if grace then timeout = ACK_GRACE_SEC end
+	if stage == "grace" then timeout = ACK_GRACE_SEC end
+	if stage == "output_turn" then timeout = OUTPUT_TURN_CEILING_SEC end
 	local armed_at = TimerScheduler.awake_time()
+	local since = awaited_since or armed_at
 	local timer = nil
 	local armed = false
 	local fired_before_arm = false
@@ -823,14 +1004,28 @@ local function arm_ack_timer(generation, expected, grace)
 		if generation.ack_timer ~= timer
 			or generation.awaiting ~= expected or generation.failed then return end
 		generation.ack_timer = nil
-		if not grace and TimerScheduler.awake_time() - armed_at - timeout > PARKED_RUN_LOOP_LATENESS_SEC then
+		local fired_at = TimerScheduler.awake_time()
+		local lateness = fired_at - armed_at - timeout
+		if stage == nil and lateness > PARKED_RUN_LOOP_LATENESS_SEC then
 			Logger.debug(LOG,
 				"Karabiner lease %s: %s timeout fired late after a parked run loop; reading the pipe first.",
 				generation.token, expected)
-			arm_ack_timer(generation, expected, true)
+			arm_ack_timer(generation, expected, "grace", since)
 			return
 		end
-		fail_generation(generation, "timeout waiting for " .. expected)
+		-- STOPPED keeps its direct verdict: a stop already retires the rules, and
+		-- its fallback revoker reaches the same safe state as a late STOPPED. A
+		-- grace that ran out proves no more than an on-time deadline: a modal
+		-- window parks the timers and then keeps task output unread.
+		if (stage == nil or stage == "grace") and expected ~= "STOPPED" then
+			defer_until_output_turn(generation, expected, since)
+			return
+		end
+		if stage == "output_turn" then
+			Logger.warn(LOG, "Karabiner lease %s: task output stayed unread for %.1f s after the %s deadline.",
+				generation.token, OUTPUT_TURN_CEILING_SEC, expected)
+		end
+		fail_on_deadline(generation, expected, since, lateness)
 	end)
 	if schedule_ok then timer = timer_or_err end
 	generation.ack_timer = timer
@@ -1098,6 +1293,15 @@ local function process_line(generation, line)
 		set_phase(generation, ready_phase)
 		Logger.info(LOG, "Karabiner lease %s activated %s by watchdog READY.",
 			generation.token, generation.initial_paused and "paused" or "active")
+		-- READY spans two launcher process launches, the guardian ARM and one
+		-- karabiner_cli write. Issue #99 saw it take 3.4 to 6.0 s where 0.25 s is
+		-- usual, then time out at the deadline with nothing to say which part.
+		local ready_after = type(generation.launched_at) == "number"
+			and TimerScheduler.awake_time() - generation.launched_at or nil
+		if ready_after and ready_after >= SLOW_READY_REPORT_SEC then
+			Logger.info(LOG, "Karabiner lease %s READY arrived %.2f s after launch (deadline %.1f s).",
+				generation.token, ready_after, READY_ACK_TIMEOUT_SEC)
+		end
 		settle_callbacks("lease.start", generation.start_callbacks, true, ready_reason)
 		generation.reconciling_command = nil
 		if queued and queued.kind == (ready_phase == "paused" and "pause" or "resume")
@@ -1111,6 +1315,14 @@ local function process_line(generation, line)
 	local ping_result, ping_sequence = parse_ping_result(line)
 	if ping_result then
 		if generation.stop_requested then return end
+		if generation.keepalive_sequences and generation.keepalive_sequences[ping_sequence] then
+			generation.keepalive_sequences[ping_sequence] = nil
+			if ping_result == "failed" then
+				Logger.warn(LOG, "Karabiner lease %s keepalive %d had no clean local CLI transport.",
+					generation.token, ping_sequence)
+			end
+			return
+		end
 		local expected = "PONG " .. tostring(ping_sequence)
 		if generation.ping_sequence ~= ping_sequence or generation.awaiting ~= expected then
 			fail_generation(generation, "unexpected or stale " .. line)
@@ -1193,7 +1405,19 @@ end
 --- @param generation table Generation emitting bytes.
 --- @param chunk string|nil New stdout bytes.
 local function consume_stdout(generation, chunk)
-	if generation.failed or type(chunk) ~= "string" or chunk == "" then return end
+	if type(chunk) ~= "string" or chunk == "" then return end
+	if generation.failed then
+		-- An answer read after the verdict was late, not missing: the one fact
+		-- that tells unread output from a silent worker afterwards (issue #100).
+		local answer = chunk:match("(READY)") or chunk:match("(PONG %d+)")
+			or chunk:match("(PAUSED)") or chunk:match("(RESUMED)")
+		if answer and not generation.late_answer_logged then
+			generation.late_answer_logged = true
+			Logger.info(LOG, "Karabiner lease %s answered %s after the driver had failed it: its output was read late, not missing.",
+				generation.token, answer)
+		end
+		return
+	end
 	if #generation.stdout_buffer + #chunk > MAX_PROTOCOL_BUFFER_BYTES then
 		generation.stdout_buffer = ""
 		fail_generation(generation, string.format(
@@ -1247,6 +1471,15 @@ end
 --- @return boolean True when sent or an existing write already renews liveness.
 send_ping = function(generation, origin)
 	if generation.failed or generation.stop_requested then return false end
+	-- While answers sit unread the heartbeat tick feeds the worker a keepalive.
+	if generation.output_turn_probe then
+		send_keepalive(generation)
+		return true
+	end
+	if generation.last_keepalive_at
+		and TimerScheduler.awake_time() - generation.last_keepalive_at < WORKER_COMMAND_BUDGET_SEC then
+		return true
+	end
 	if generation.heartbeat_retry_timer then return true end
 	if generation.command or generation.ping_sequence then return true end
 	if generation.phase ~= "active" and generation.phase ~= "paused"
@@ -1756,6 +1989,7 @@ local function start_generation(initial_paused, on_done)
 
 	Logger.start(LOG, "Starting Karabiner lease watchdog %s…", generation.token)
 	set_phase(generation, "starting")
+	generation.launched_at = TimerScheduler.awake_time()
 	local handle, helper_error = spawn_current_helper(
 		{
 			WORKER_FLAG,
@@ -1768,6 +2002,17 @@ local function start_generation(initial_paused, on_done)
 		},
 		function(exit_code, stdout, stderr)
 			generation.completed = true
+			if generation.failed and not generation.stop_requested then
+				-- fail_generation() already ran (an ACK deadline), so the line below
+				-- would be dropped. How the worker then ended tells a worker that was
+				-- alive and fenced on stdin EOF (exit 0) from one that had lost its
+				-- inner (73) or never answered at all.
+				local detail = type(stderr) == "string" and stderr:gsub("%s+$", "") or ""
+				Logger.info(LOG, "Karabiner lease %s worker exited (exit %s) after the driver had failed it%s",
+					generation.token, tostring(exit_code),
+					detail ~= "" and (": " .. detail) or ".")
+				return
+			end
 			if not generation.stop_requested then
 				-- Completion status is authoritative. A final buffered READY from a
 				-- process that exited non-zero must never settle activation true.

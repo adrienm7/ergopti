@@ -139,8 +139,10 @@ Test("menu command deferral: a write in progress is an owned path outside a term
 _MCD_DispatcherDefersBothPaths() {
 	Native := _DriverFuncBody("_TrackedDispatch")
 	Assert(Native != "", "native dispatch must exist")
-	Assert(InStr(Native, "MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0, TrackedObj)") > 0,
+	Assert(InStr(Native, "MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0,") > 0,
 		"a native menu dispatch must go through the deferral")
+	Assert(InStr(Native, "_MenuDispatchClickRegistration(TrackedObj.ItemId, TrackedObj.Token, Args)") > 0,
+		"with the registration and requested check state of the click")
 	Assert(!InStr(Native, "TrackedObj.Callback.Call("), "and must not call the command directly")
 	Bypass := _DriverFuncBody("_DispatchIfMissed")
 	Assert(Bypass != "", "fallback dispatch must exist")
@@ -480,3 +482,247 @@ Test("menu startup registration: real startup and writer timers refuse an item r
 	_MCDS_WriterRetry.Bind(true))
 Test("menu startup registration: real startup and writer timers execute the live native selection exactly once",
 	_MCDS_WriterRetry.Bind(false))
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 4/ Click during a terminal transition =======
+; =====================================================
+; =====================================================
+
+; On 2026-10-22 a scoped configuration commit (ConfigScopeCommitOperations)
+; held the terminal bundle across its durable I/O; the tray opened over it and
+; the private-browsing filter click ran on top of that thread. The deferral
+; treated a terminal bundle as « until exit » and ran the click at once, so it
+; was refused (« another configuration transaction is already in progress »)
+; with an error window (menu-click-during-scoped-transition).
+
+/** Records whether the click could take a configuration lease when it ran. */
+_MCDT_Command(ClickState, ClickPath, *) {
+	Owner := _ConfigWriteLeaseTryAcquire(ClickPath, "menu-click-test")
+	ClickState.Runs.Push(Owner is Object ? "persisted" : "refused")
+	if Owner is Object
+		_ConfigWriteLeaseRelease(Owner)
+	return "done"
+}
+
+_MCDT_InFlightTransitionDefersTheClick() {
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the fixture cannot adopt a terminal transition")
+	AssertFalse(ReloadTerminalHandoffActive(), "the fixture runs without a reload successor")
+	Base := A_Temp . "\ergopti_mcdt_" . A_ScriptHwnd
+	ClickState := {Runs: []}
+	ScheduleState := {Armed: []}
+	Bundle := _ConfigWriteTerminalTryAcquire([Base . "\config.toml"])
+	AssertTrue(Bundle is Object, "the actual terminal issuer must open the scoped transition")
+	Released := false
+	try {
+		MenuCommandRun(_MCDT_Command.Bind(ClickState, Base . "\click.toml"), ["Row", 1, 0], 0, 0,
+			_MCDR_Arm.Bind(ScheduleState))
+		AssertEqual(0, ClickState.Runs.Length,
+			"the click must not run on top of the transition it interrupted: it could only be refused")
+		AssertTrue(MenuCommandConfigBusy(), "a transition on its way to a reload or a release is worth waiting for")
+		AssertEqual(1, ScheduleState.Armed.Length, "one retry is scheduled")
+		_MCDR_Drain(ScheduleState)
+		AssertEqual(0, ClickState.Runs.Length, "a transition still open keeps the click waiting")
+		AssertEqual(1, ScheduleState.Armed.Length, "on one timer")
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		Released := true
+		_MCDR_Drain(ScheduleState)
+		AssertEqual(1, ClickState.Runs.Length, "the click runs once the transition released its barrier")
+		AssertEqual("persisted", ClickState.Runs[1], "and gets the configuration lease it needs")
+		AssertEqual(0, ScheduleState.Armed.Length)
+	} finally {
+		ScheduleState.Armed := []
+		if !Released
+			_ConfigWriteTerminalRelease(Bundle)
+	}
+}
+Test("menu command deferral: a click during a scoped transition waits for its release (menu-click-during-scoped-transition)",
+	_MCDT_InFlightTransitionDefersTheClick)
+
+; A barrier retained after a failed rollback lasts until the process exits.
+_MCDT_RetainedBarrierIsNotAwaited() {
+	global _ConfigTransitionRetainedBarrier
+	AssertFalse(_ConfigWriteTerminalIsActive(), "the fixture cannot adopt a terminal transition")
+	PriorRetained := _ConfigTransitionRetainedBarrier
+	Bundle := _ConfigWriteTerminalTryAcquire([A_Temp . "\ergopti_mcdt_retained_" . A_ScriptHwnd . "\config.toml"])
+	AssertTrue(Bundle is Object)
+	try {
+		_ConfigTransitionRetainedBarrier := Bundle
+		AssertFalse(MenuCommandConfigBusy(),
+			"a retained recovery barrier never ends before exit: waiting would only delay the refusal")
+	} finally {
+		_ConfigTransitionRetainedBarrier := PriorRetained
+		_ConfigWriteTerminalRelease(Bundle)
+	}
+	AssertFalse(MenuCommandConfigBusy(), "an idle table is not busy")
+}
+Test("menu command deferral: a retained recovery barrier is not awaited (menu-click-during-scoped-transition)",
+	_MCDT_RetainedBarrierIsNotAwaited)
+
+_MCDT_DispatcherUsesTheTransitionAwarePredicate() {
+	Body := _DriverFuncBody("MenuCommandRun")
+	Assert(InStr(Body, ": MenuCommandConfigBusy()") > 0,
+		"the dispatch deferral must wait for an in-flight terminal transition, not only an owned path")
+}
+Test("menu command deferral: the dispatcher waits for an in-flight transition (menu-click-during-scoped-transition)",
+	_MCDT_DispatcherUsesTheTransitionAwarePredicate)
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 5/ Late check-row commands =======
+; ==========================================
+; ==========================================
+
+; On 2026-10-22 the private-browsing filter was clicked during startup (the
+; click was retained), then clicked again while that first commit was still
+; writing, against the unchanged checkmark. The second click waited, ran in the
+; reload successor and toggled the filter back on: the row « did nothing » and
+; stayed checked (menu-toggle-replay-double-flip). A click now records the state
+; it asks for, and a late command that would only re-apply it is skipped.
+
+_MCDF_Toggle(ToggleState, *) {
+	ToggleState.Runs += 1
+	ToggleState.On := !ToggleState.On
+	return "done"
+}
+
+_MCDF_Checked(ToggleState) {
+	return ToggleState.On
+}
+
+_MCDF_TwoDeferredClicksBody(Fixture) {
+	global _MenuDispatchTokens, _MenuDispatchCallbacks
+	ToggleState := {On: true, Runs: 0}
+	ToggleMenu := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(ToggleMenu, "toggle", _MCDF_Toggle.Bind(ToggleState), "",
+			_MCDF_Checked.Bind(ToggleState)), "a check row registers its checkmark predicate")
+		ToggleMenu.Check("toggle")
+		ItemId := _MenuItemIdAtPosition(ToggleMenu, 0)
+		Token := _MenuDispatchTokens[ItemId]
+		Callback := _MenuDispatchCallbacks[ItemId]
+		Args := ["toggle", 1, ToggleMenu]
+		First := _MenuDispatchClickRegistration(ItemId, Token, Args)
+		AssertEqual(0, First.Desired, "a click on a checked row asks for it unchecked")
+		AssertEqual("", MenuCommandRun(Callback, Args, 0, 0, _MCDR_Arm.Bind(Fixture.Schedule), First))
+		; The checkmark has not changed yet: the first command is still waiting.
+		Second := _MenuDispatchClickRegistration(ItemId, Token, Args)
+		AssertEqual(0, Second.Desired, "the second click asks for the same state as the first")
+		AssertEqual("", MenuCommandRun(Callback, Args, 0, 0, _MCDR_Arm.Bind(Fixture.Schedule), Second))
+		AssertEqual(0, ToggleState.Runs, "both clicks wait for the write")
+		AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease))
+		_MCDR_Drain(Fixture.Schedule)
+		AssertEqual(1, ToggleState.Runs, "the second late command is skipped instead of toggling back")
+		AssertFalse(ToggleState.On, "the row ends in the state both clicks asked for")
+		ToggleMenu.Uncheck("toggle")
+		Third := _MenuDispatchClickRegistration(ItemId, Token, Args)
+		AssertEqual(1, Third.Desired, "a click on the refreshed unchecked row asks for it checked")
+		AssertEqual("done", MenuCommandRun(Callback, Args, 0, 0, _MCDR_Arm.Bind(Fixture.Schedule), Third))
+		AssertTrue(ToggleState.On, "a fresh click still toggles")
+		AssertEqual(2, ToggleState.Runs)
+	} finally {
+		ToggleMenu.Delete()
+		MenuDispatcher_PruneMenu(ToggleMenu)
+	}
+}
+Test("menu check rows: two deferred clicks against the same checkmark apply once (menu-toggle-replay-double-flip)",
+	(*) => _MCDR_Run(_MCDF_TwoDeferredClicksBody))
+
+_MCDF_ReplayCarriesTheRequestedState() {
+	global MENU_RELOAD_REPLAY_SCHEMA
+	Path :=["Metrics", "Private browsing"]
+	MenuReloadReplay_CarryDesired(Path, {ItemId: 1, Token: 1, Desired: 0})
+	Decoded := _MenuReloadReplayDecode(_MenuReloadReplayEncode([Path]))
+	AssertEqual(1, Decoded.Length)
+	AssertTrue(Decoded[1].HasOwnProp("ReplayDesired"), "the reload hand-off keeps the click's requested state")
+	AssertEqual(0, Decoded[1].ReplayDesired)
+	AssertEqual("Private browsing", Decoded[1][2])
+	Plain := ["Metrics", "Dashboard"]
+	MenuReloadReplay_CarryDesired(Plain, {ItemId: 2, Token: 2})
+	AssertFalse(_MenuReloadReplayDecode(_MenuReloadReplayEncode([Plain]))[1].HasOwnProp("ReplayDesired"),
+		"a plain row carries no requested state")
+	Schema := JsonStringLiteral(MENU_RELOAD_REPLAY_SCHEMA)
+	for Command in ['{"labels":["A"],"desired":2}', '{"labels":["A"],"desired":"0"}', '{"labels":["A"]}']
+		_MCDF_AssertReplayCommandRefused(Schema, Command)
+}
+
+; A helper so the closure reads a parameter: a closure over the for variable
+; would read it unset, and AssertThrows would pass on that UnsetError.
+_MCDF_AssertReplayCommandRefused(Schema, Command) {
+	Encoded := '{"schema":' . Schema . ',"commands":[' . Command . ']}'
+	AssertThrows(() => _MenuReloadReplayDecode(Encoded), "an invalid requested state is refused: " . Command)
+}
+Test("menu check rows: the reload hand-off carries the requested state (menu-toggle-replay-double-flip)",
+	_MCDF_ReplayCarriesTheRequestedState)
+
+; End to end on the real private-browsing row: its real command, its real
+; checked_when predicate and a real config file. Two clicks reach the bypass
+; dispatch while an interrupted writer holds the lease; once it ends, the value
+; is persisted, the checkmark reads unchecked and private windows are no
+; longer filtered.
+_MCDF_PrivateFilterBody(Fixture) {
+	global ConfigurationFile, _SaveFullConfigReady, _MenuDispatchLastFire, _MET_STATE_GETTERS
+	global MENU_COMMAND_DEFERRAL_RETRY_MS
+	SavedPath := ConfigurationFile
+	HadReady := IsSet(_SaveFullConfigReady)
+	SavedReady := HadReady ? _SaveFullConfigReady : false
+	SavedPrivate := MetricsFilters.private_browsing
+	Scope := 0, RowMenu := 0, Lease := 0
+	Effects := {Reloads: 0, Notices: 0}
+	Title := "New tab - Mozilla Firefox Private Browsing"
+	try {
+		AssertTrue(_ConfigWriteLeaseRelease(Fixture.Lease), "this case owns its own writer on the real config")
+		Scope := _ScopeOwnerFixture('[metrics]`nprivate_filter_enabled = true`n')
+		ConfigurationFile := Scope.path
+		_SaveFullConfigReady := true
+		MetricsFilters.private_browsing := true
+		AssertTrue(MF_ShouldFilterFor("firefox.exe", Title), "the filter starts on")
+		CheckedFn := MenuRenderer_ResolveCheckedWhen.Bind("metrics_menu", "filter_private", _MET_STATE_GETTERS)
+		AssertTrue(CheckedFn.Call(), "the row starts checked")
+		Command := (*) => _MetricsToggleFilterAndReload("private_browsing", 0,
+			(*) => (Effects.Notices += 1, 1), (*) => (Effects.Reloads += 1, 1))
+		RowMenu := Menu()
+		AssertEqual(1, RegisterMenuItem(RowMenu, "private", Command, "", CheckedFn))
+		ItemId := _MenuItemIdAtPosition(RowMenu, 0)
+		Lease := _ConfigWriteLeaseTryAcquire(Scope.path, "interrupted-writer")
+		AssertTrue(Lease is Object, "the interrupted writer owns the real config")
+		Loop 2
+			_DispatchIfMissed(ItemId, _MenuDispatchLastFire[ItemId])
+		AssertTrue(MetricsFilters.private_browsing, "neither click runs on top of the writer")
+		AssertTrue(_ConfigWriteLeaseRelease(Lease))
+		Lease := 0
+		; Both retries run from real one-shot timers; let the second one fire too.
+		Deadline := A_TickCount + 5000
+		while Effects.Reloads == 0 && Effects.Notices == 0 && A_TickCount < Deadline
+			Sleep(10)
+		Sleep(4 * MENU_COMMAND_DEFERRAL_RETRY_MS)
+		AssertEqual(0, Effects.Notices, "no click is refused")
+		AssertEqual(1, Effects.Reloads, "one commit, one reload")
+		AssertFalse(MetricsFilters.private_browsing, "the runtime value is the one the clicks asked for")
+		AssertFalse(CheckedFn.Call(), "the row's checkmark reads unchecked")
+		AssertFalse(MF_ShouldFilterFor("firefox.exe", Title), "private windows are no longer filtered")
+		AssertTrue(InStr(FSRead(Scope.path), "private_filter_enabled = false") > 0, "the value is persisted")
+	} finally {
+		if Lease is Object
+			_ConfigWriteLeaseRelease(Lease)
+		if RowMenu is Menu {
+			RowMenu.Delete()
+			MenuDispatcher_PruneMenu(RowMenu)
+		}
+		ConfigurationFile := SavedPath
+		_SaveFullConfigReady := HadReady ? SavedReady : unset
+		MetricsFilters.private_browsing := SavedPrivate
+		if Scope is Object
+			_ScopeOwnerCleanup(Scope)
+	}
+}
+Test("menu check rows: two late private-browsing clicks persist, uncheck and disable the filter once (menu-toggle-replay-double-flip)",
+	(*) => _MCDR_Run(_MCDF_PrivateFilterBody))

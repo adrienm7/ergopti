@@ -23,6 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local NativePath = require("native_path")
 local Manifest      = require("infra.manifest_reader")
 local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
@@ -394,7 +395,7 @@ function M.build(ctx)
 		installed_name = user_best.name
 	end
 	local bundle_full_path = (installed_dir and installed_name) and
-		(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
+		(NativePath.without_trailing_separators(installed_dir) .. "/" .. installed_name) or ""
 	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
 	local all_variants_active = #variants > 0
 	local active_variant_count = 0

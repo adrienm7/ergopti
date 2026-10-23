@@ -22,6 +22,8 @@
 ; EXIT CODES: 0 pass, 10 non-zero count in the boot window, 11 active hooks
 ; reported in the boot window, 12 the registry still did not exist after the
 ; module ran, 13 the initialised module disagreed with the boot-window answer.
+; Codes 14–17 also prove pure scalar-cache warming before registry creation
+; and preservation of that complete table after the late include executes.
 ; They start at 10 so no assertion can be confused with AutoHotkey's own exit 1
 ; (fail) or 2 (load or runtime error) — the pre-fix UnsetError is exactly a 2.
 ; ============================================================================
@@ -45,6 +47,13 @@ LoggerError(Component, Message, Args*) {
 }
 
 ; ---- The boot window: the registry does not exist yet. ----
+if IsSet(_SIHO_Owners) || IsSet(_SIHO_NextToken)
+	ExitApp(14)
+ScalarTable := _SIHO_ScalarEndKeys()
+if !(ScalarTable is String) || StrLen(ScalarTable) != 64515
+	ExitApp(15)
+if IsSet(_SIHO_Owners) || IsSet(_SIHO_NextToken)
+	ExitApp(16)
 if (SIHO_Count() != 0)
 	ExitApp(10)
 if SIHO_HasActive()
@@ -57,4 +66,6 @@ if !IsSet(_SIHO_Owners)
 	ExitApp(12)
 if (SIHO_Count() != 0 || SIHO_HasActive())
 	ExitApp(13)
+if _SIHO_NextToken != 0 || !(_SIHO_ScalarEndKeys() == ScalarTable)
+	ExitApp(17)
 ExitApp(0)

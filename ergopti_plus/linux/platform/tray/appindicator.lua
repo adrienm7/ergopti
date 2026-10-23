@@ -99,6 +99,9 @@ local _lib = nil
 -- The live indicator, its current menu, and every callback keeping GTK alive.
 local _indicator = nil
 local _menu = nil
+-- The status window, created on first show and kept (hidden on close) until
+-- destroy(), so a second show re-presents it instead of stacking copies.
+local _window = nil
 
 -- Menu actions by id, and the one C callback that dispatches to them.
 --
@@ -173,6 +176,19 @@ local function bind()
 		gboolean     gtk_init_check(int *argc, char ***argv);
 		gboolean     gtk_events_pending(void);
 		gboolean     gtk_main_iteration_do(gboolean blocking);
+		GtkWidget*   gtk_window_new(int type);
+		void         gtk_window_set_title(GtkWidget *window, const char *title);
+		void         gtk_window_set_position(GtkWidget *window, int position);
+		void         gtk_window_set_default_size(GtkWidget *window, int width, int height);
+		void         gtk_window_present(GtkWidget *window);
+		void         gtk_container_add(GtkWidget *container, GtkWidget *widget);
+		void         gtk_container_set_border_width(GtkWidget *container, unsigned int width);
+		GtkWidget*   gtk_label_new(const char *text);
+		void         gtk_label_set_line_wrap(GtkWidget *label, gboolean wrap);
+		void         gtk_label_set_max_width_chars(GtkWidget *label, int n_chars);
+		void         gtk_label_set_selectable(GtkWidget *label, gboolean selectable);
+		gboolean     gtk_widget_hide_on_delete(GtkWidget *widget);
+		void         gtk_widget_destroy(GtkWidget *widget);
 
 		gulong       g_signal_connect_data(gpointer instance, const char *detailed_signal,
 		                                   GCallback c_handler, gpointer data,
@@ -428,6 +444,10 @@ function M.destroy()
 	lib.gobject.g_object_unref(_indicator)
 	_indicator = nil
 	_menu = nil
+	if _window ~= nil then
+		lib.gtk.gtk_widget_destroy(_window)
+		_window = nil
+	end
 	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
 	_menu_actions = {}
 	Logger.info(LOG, "Tray icon removed.")
@@ -436,6 +456,52 @@ end
 --- @return boolean True when an icon is live.
 function M.is_live()
 	return _indicator ~= nil
+end
+
+-- GtkWindowType TOPLEVEL and GtkWindowPosition CENTER. Centred because,
+-- without a window manager, a window maps at 0,0, which is where an XEmbed
+-- tray such as stalonetray docks the icon: the window would cover it.
+local GTK_WINDOW_TOPLEVEL = 0
+local GTK_WIN_POS_CENTER = 1
+
+--- Shows a plain window carrying a message, or brings the existing one back.
+---
+--- The degraded no-keyboard state needs something a desktop launch can see
+--- without knowing where the tray is. The AppImage catalogue looks for a named
+--- window first and screenshots it; a tray menu, being an override-redirect
+--- popup, is never the active window it can capture. Closing the window only
+--- hides it: the tray menu can show it again.
+--- @param title string The window title.
+--- @param text string The message, wrapped.
+--- @return boolean shown
+function M.show_window(title, text)
+	local lib = bind()
+	if not lib then return false end
+	if _window == nil then
+		local window = lib.gtk.gtk_window_new(GTK_WINDOW_TOPLEVEL)
+		if window == nil then
+			Logger.error(LOG, "gtk_window_new returned nothing — no status window.")
+			return false
+		end
+		lib.gtk.gtk_window_set_title(window, tostring(title))
+		lib.gtk.gtk_window_set_position(window, GTK_WIN_POS_CENTER)
+		lib.gtk.gtk_window_set_default_size(window, 420, -1)
+		lib.gtk.gtk_container_set_border_width(window, 18)
+		local label = lib.gtk.gtk_label_new(tostring(text))
+		lib.gtk.gtk_label_set_line_wrap(label, 1)
+		lib.gtk.gtk_label_set_max_width_chars(label, 60)
+		lib.gtk.gtk_label_set_selectable(label, 1)
+		lib.gtk.gtk_container_add(window, label)
+		-- A C handler, not a Lua callback: hiding needs no Lua and spends no
+		-- FFI callback slot.
+		lib.gobject.g_signal_connect_data(window, "delete-event",
+			lib.ffi.cast("GCallback", lib.gtk.gtk_widget_hide_on_delete), nil, nil, 0)
+		_window = window
+	end
+	lib.gtk.gtk_widget_show_all(_window)
+	lib.gtk.gtk_window_present(_window)
+	Logger.info(LOG, "Status window shown (%s).", tostring(title))
+	return true
 end
 
 

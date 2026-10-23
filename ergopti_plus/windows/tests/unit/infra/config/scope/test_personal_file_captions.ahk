@@ -30,11 +30,24 @@ _HSCS_PersonalFileCaptionCheckUnits(Value, Units) {
 		AssertEqual(Unit, Ord(SubStr(Value, Index, 1)), "unit-by-unit original integer oracle " . Index)
 }
 
+; A real published template child: the parent rows take the renderer's handle.
+_HSCS_PublishedTemplateChild(Ledger) {
+	Child := MenuRenderer_TemplateChild(Ledger)
+	Getters := Map("hotstring_file_ready", (*) => true, "personal_file_open_present", (*) => true,
+		"personal_file_boundary", (*) => false)
+	Providers := Map("personal_file_controls", (*) => [], "personal_file_sections", (*) => [])
+	AssertEqual(1, MenuRenderer_FillTemplateChild(Child, "hotstring_personal_file_frame",
+		Map("hotstring_file_open", (*) => ""), Getters, Providers, &Admitted), "the fixture child holds its one open command")
+	AssertTrue(Admitted)
+	return Child
+}
+
 _HSCS_PersonalFileCaptionScalars() {
 	global _SharedDir
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\windows_personal_file_parent_caption_original.json", "UTF-8"))
 	Root := _MR_GetManifestRoot(), Key := "hotstring_personal_file_caption", Original := Root[Key]
-	Child := Menu(), Primary := false, CleanupFailures := []
+	Ledger := [], Child := _HSCS_PublishedTemplateChild(Ledger), ChildMenu := Ledger[1]
+	Primary := false, CleanupFailures := []
 	Attempt(Owner, Operation) {
 		try Operation.Call()
 		catch Any as Failure
@@ -49,7 +62,7 @@ _HSCS_PersonalFileCaptionScalars() {
 			Row := MenuRenderer_PersonalFileParentRow(Receipt, Stem, Vector["formatted_count"], Child)
 			AssertTrue(Row is Map, "original literal scalar domain survives " . Vector["name"])
 			AssertEqual(Expected, Row["label"], "frozen donor caption remains literal " . Vector["name"])
-			AssertTrue(Row["submenu"] == Child, "the exact finished native owner remains attached")
+			AssertTrue(Row["submenu"] == ChildMenu, "the exact finished native owner remains attached")
 		}
 		AssertThrows(() => _HSCS_PersonalFileCaptionCheckUnits("a" . Chr(0xFFFD) . "b", Corpus["receipts"][8]["stem_units"]),
 			"normalization cannot make both input and expected transport silently agree")
@@ -78,8 +91,8 @@ _HSCS_PersonalFileCaptionScalars() {
 		throw Failure
 	} finally {
 		Attempt("policy", (*) => Root[Key] := Original)
-		Attempt("owned_delete", (*) => Child.Delete())
-		Attempt("owned_prune", (*) => MenuDispatcher_PruneMenu(Child))
+		Attempt("owned_delete", (*) => ChildMenu.Delete())
+		Attempt("owned_prune", (*) => MenuDispatcher_PruneMenu(ChildMenu))
 		Attempt("cleanup_report", (*) => _TestPrint("# ERGOPTI_PERSONAL_CAPTION_SCALAR_CLEANUP primary_present=" . Primary . " secondary_count=" . CleanupFailures.Length))
 		if !Primary && CleanupFailures.Length
 			throw CleanupFailures[1]["failure"]
@@ -300,7 +313,8 @@ _HSCS_PersonalFolderCaptionScalars() {
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\windows_personal_folder_parent_caption_original.json", "UTF-8"))
 	Root := _MR_GetManifestRoot(), Key := "hotstring_personal_folder_caption", Original := Root[Key]
 	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
-	Child := Menu(), HadPrimary := false, CleanupFailures := [], CountReads := 0, PermitCount := false
+	Ledger := [], Child := _HSCS_PublishedTemplateChild(Ledger), ChildMenu := Ledger[1]
+	HadPrimary := false, CleanupFailures := [], CountReads := 0, PermitCount := false
 	Primary := Error("original positive folder count observer failure")
 	ReadCache(This, Number) {
 		CountReads += 1
@@ -335,7 +349,7 @@ _HSCS_PersonalFolderCaptionScalars() {
 			if Vector.Has("expected_units")
 				_HSCS_PersonalFileCaptionCheckUnits(Row["label"], Vector["expected_units"])
 			AssertEqual(PermitCount ? 1 : 0, CountReads, "only the original positive branch observes FmtCount")
-			AssertTrue(Row["submenu"] == Child, "the exact finished native child remains attached")
+			AssertTrue(Row["submenu"] == ChildMenu, "the exact finished native child remains attached")
 		}
 		AssertThrows(() => _HSCS_PersonalFileCaptionCheckUnits("a" . Chr(0xFFFD) . "b", Corpus["receipts"][14]["folder_units"]),
 			"a shared UTF-16 conversion mistake cannot satisfy the frozen integer oracle")
@@ -383,8 +397,8 @@ _HSCS_PersonalFolderCaptionScalars() {
 	} finally {
 		Attempt("policy", (*) => Root[Key] := Original)
 		Attempt("count_cache", RestoreCounts)
-		Attempt("owned_delete", (*) => Child.Delete())
-		Attempt("owned_prune", (*) => MenuDispatcher_PruneMenu(Child))
+		Attempt("owned_delete", (*) => ChildMenu.Delete())
+		Attempt("owned_prune", (*) => MenuDispatcher_PruneMenu(ChildMenu))
 		Attempt("cleanup_report", (*) => _TestPrint("# ERGOPTI_PERSONAL_FOLDER_SCALAR_CLEANUP primary_present=" . HadPrimary . " secondary_count=" . CleanupFailures.Length))
 		if !HadPrimary && CleanupFailures.Length
 			throw CleanupFailures[1]["failure"]
@@ -606,3 +620,115 @@ _HSCS_PersonalFolderRefusesParentMenu() {
 }
 Test("shared-personal-folder-caption: a folder level never appends into a native parent menu",
 	_HSCS_PersonalFolderRefusesParentMenu)
+
+
+; The three personal submenus are renderer-owned template children. A parent row
+; or a repaint accepts only a child the renderer filled and still publishes:
+; never a bare Menu, a reservation, a second fill, or a child released under it.
+_HSCS_TemplateChildPublication() {
+	global _PrevDefaultLabel, ConfigurationFile
+	Ledger := [], DefaultLedger := [], Parent := Menu()
+	try {
+		Reserved := MenuRenderer_TemplateChild(Ledger)
+		AssertEqual(1, Ledger.Length, "a reservation joins the caller's release ledger at once")
+		ChildMenu := Ledger[1]
+		FileReceipt := MenuRenderer_PersonalFileCaptionPolicy(), FolderReceipt := MenuRenderer_PersonalFolderCaptionPolicy()
+		AssertTrue(FileReceipt is Map && FolderReceipt is Map, "both caption policies are admitted")
+		Caption := Map("personal_default_label", (*) => "alpha")
+		AssertFalse(MenuRenderer_PersonalFileParentRow(FileReceipt, "file", "1", Reserved), "an unfilled reservation is not published")
+		AssertFalse(MenuRenderer_PersonalFileParentRow(FileReceipt, "file", "1", ChildMenu), "a bare native Menu is not a template child")
+		AssertFalse(MenuRenderer_PersonalFolderParentRow(FolderReceipt, 1, "folder", "1", ChildMenu), "a folder parent refuses a bare Menu")
+		AssertFalse(MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption", Reserved, Caption),
+			"a declared group refuses an unfilled reservation")
+		Getters := Map("hotstring_file_ready", (*) => true, "personal_file_open_present", (*) => true, "personal_file_boundary", (*) => false)
+		Providers := Map("personal_file_controls", (*) => [], "personal_file_sections", (*) => [])
+		Commands := Map("hotstring_file_open", (*) => "")
+		AssertEqual(1, MenuRenderer_FillTemplateChild(Reserved, "hotstring_personal_file_frame", Commands, Getters, Providers, &Admitted))
+		AssertTrue(Admitted, "the whole template tree was admitted")
+		AssertEqual(1, TrayMenuItemCount(ChildMenu), "the renderer drew the template into its own child")
+		AssertEqual(0, MenuRenderer_FillTemplateChild(Reserved, "hotstring_personal_file_frame", Commands, Getters, Providers, &Again),
+			"a published child is filled once")
+		AssertFalse(Again)
+		AssertEqual(1, TrayMenuItemCount(ChildMenu), "a refused second fill draws nothing")
+		FileRow := MenuRenderer_PersonalFileParentRow(FileReceipt, "file", "1", Reserved)
+		AssertTrue(FileRow is Map && FileRow["submenu"] == ChildMenu, "the file parent row carries the published child")
+		FolderRow := MenuRenderer_PersonalFolderParentRow(FolderReceipt, 1, "folder", "1", Reserved)
+		AssertTrue(FolderRow is Map && FolderRow["submenu"] == ChildMenu, "the folder parent row carries the published child")
+
+		; The default-section child: its repaint is the renderer's, and only on a child it still publishes.
+		Default := MenuRenderer_TemplateChild(DefaultLedger), DefaultMenu := DefaultLedger[1]
+		Choices := []
+		for Label in ["alpha", "R&D"] {
+			Choice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",
+				Map("personal_default_section", (*) => ""),
+				Map("personal_default_section_label", ((Value) => (*) => Value)(Label),
+					"personal_default_section_selected", ((Value) => (*) => Value)(Label == "alpha")))
+			AssertTrue(Choice is Map, "the declared default choice " . Label . " is admitted")
+			Choices.Push(Choice)
+		}
+		AssertEqual(3, MenuRenderer_FillTemplateChild(Default, "hotstring_personal_default_frame",
+			Map("personal_default_none", (*) => ""),
+			Map("personal_default_unset", (*) => false, "personal_default_boundary", (*) => true),
+			Map("personal_default_choices", (*) => Choices), &DefaultAdmitted))
+		AssertTrue(DefaultAdmitted)
+		AssertEqual(4, TrayMenuItemCount(DefaultMenu), "none, boundary and the two choices")
+		ParentRow(Value) => MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
+			Default, Map("personal_default_label", (*) => Value))
+		OldParent := ParentRow("alpha"), NewParent := ParentRow("R&D")
+		AssertTrue(OldParent is Map && NewParent is Map && OldParent["submenu"] == DefaultMenu, "the declared parent carries the child")
+		AssertEqual(1, MenuRenderer_AppendRows(Parent, "test", "template_child", [OldParent]))
+		Commits := 0
+		Commit(*) {
+			Commits += 1
+		}
+		IsChecked(Position) => (TrayMenuHandleItemState(DefaultMenu.Handle, Position - 1) & 0x8) != 0
+		AssertTrue(IsChecked(3) && !IsChecked(1) && !IsChecked(4), "the fill drew the current tick")
+		AssertFalse(MenuRenderer_RepaintTemplateChild(Default, Parent, OldParent, NewParent, "gamma", Commit),
+			"a label the renderer never drew is refused")
+		Foreign := Menu()
+		try AssertFalse(MenuRenderer_RepaintTemplateChild(Default, Foreign, OldParent, NewParent, "R&D", Commit),
+			"a parent that does not attach the child is refused")
+		finally MenuDispatcher_PruneMenu(Foreign)
+		AssertFalse(MenuRenderer_RepaintTemplateChild(Reserved, Parent, FileRow, FileRow, "", Commit),
+			"a parent row of another child is refused")
+		AssertFalse(MenuRenderer_RepaintTemplateChild(DefaultMenu, Parent, OldParent, NewParent, "R&D", Commit),
+			"a bare Menu cannot be repainted")
+		AssertEqual(0, Commits, "every refusal precedes the commit")
+		AssertTrue(MenuRenderer_RepaintTemplateChild(Default, Parent, OldParent, NewParent, "R&D", Commit))
+		AssertEqual(1, Commits, "the admitted repaint commits once")
+		AssertTrue(IsChecked(4) && !IsChecked(3) && !IsChecked(1), "the tick moves to the chosen row")
+		AssertEqual(StrReplace(NewParent["label"], "&", "&&"), TrayMenuHandleItemCaption(Parent.Handle, 0),
+			"the parent row is renamed at its position, with the literal ampersand kept")
+		AssertTrue(MenuRenderer_RepaintTemplateChild(Default, Parent, NewParent, OldParent, "", Commit))
+		AssertTrue(!IsChecked(1) && !IsChecked(3) && !IsChecked(4), "an empty choice clears every tick")
+
+		; A refused new caption performs no setter after the old one was admitted.
+		SavedLabel := IsSet(_PrevDefaultLabel) ? _PrevDefaultLabel : unset
+		SavedConfig := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+		Missing := A_Temp . "\ergopti-template-child-" . A_TickCount . ".toml"
+		try {
+			_PrevDefaultLabel := "alpha", ConfigurationFile := Missing
+			Toml := Map("sections_order", ["alpha", "R&D"], "sections", Map("alpha", Map(), "R&D", Map()))
+			AssertFalse(_SetPersonalDefaultSection("R&D", Parent, Toml, Default, Map("alpha", "alpha", "R&D", false)),
+				"a refused new caption receipt performs no setter after admitting the old one")
+			AssertFalse(FileExist(Missing), "the refused setter writes no preference file")
+			AssertTrue(!IsChecked(1) && !IsChecked(3) && !IsChecked(4), "the refused setter moves no tick")
+		} finally {
+			_PrevDefaultLabel := IsSet(SavedLabel) ? SavedLabel : unset
+			ConfigurationFile := IsSet(SavedConfig) ? SavedConfig : unset
+		}
+
+		; A child released under its parent is no longer published.
+		_HS_PersonalReleaseMenus(DefaultLedger)
+		AssertFalse(MenuRenderer_RepaintTemplateChild(Default, Parent, OldParent, NewParent, "alpha", Commit),
+			"a released child is never repainted")
+		AssertFalse(ParentRow("alpha"), "a released child gets no parent row")
+		AssertEqual(2, Commits, "the released child commits nothing")
+	} finally {
+		_HS_PersonalReleaseMenus([Parent])
+		_HS_PersonalReleaseMenus(DefaultLedger)
+		_HS_PersonalReleaseMenus(Ledger)
+	}
+}
+Test("template-child: only a filled child the renderer still publishes gets a parent row or a repaint",
+	_HSCS_TemplateChildPublication)

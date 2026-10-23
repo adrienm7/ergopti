@@ -58,7 +58,7 @@ _KSWS_EditorSlotRowsCount(Slot) {
 	Prefix := _FormatSlotLabel(Slot) . " : "
 	for Group in KeyboardSlotRows() {
 		for Row in Group["items"]
-			if InStr(Row["label"], Prefix) == 1
+			if InStr(Row.Get("label", ""), Prefix) == 1
 				Count += 1
 	}
 	return Count

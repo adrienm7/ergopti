@@ -306,10 +306,12 @@ _KLRManifest_Abandonment(Scenario, Consumer := "") {
 		AssertTrue(KLHook.app_entered_at > 0)
 		Sleep(20)
 		Sample := A_TickCount
-		AssertTrue(Sample > KLWatchConst.SESSION_TIMEOUT_MS + 100,
-			"the passive fixture needs legal positive past native ticks")
-		Accepted := (Consumer != "" && Scenario = "expired") || Scenario = "inactive-retained"
-			? Sample - KLWatchConst.SESSION_TIMEOUT_MS - 100 : Sample
+		AssertTrue(Sample > 100, "the passive fixture needs legal positive native ticks")
+		; Expiry is observed from a later clock, never from an origin placed
+		; before the sample: A_TickCount is host uptime, and a hosted runner
+		; younger than the session timeout has no such past tick.
+		Accepted := Sample
+		ExpiredNow := Sample + KLWatchConst.SESSION_TIMEOUT_MS + 100
 		if Scenario != "inactive" {
 			AssertTrue(KL_Watchers_OnKeystroke(_KLRManifest_AbandonmentStart, Accepted))
 			AssertTrue(KLWatch.is_session_active)
@@ -336,8 +338,12 @@ _KLRManifest_Abandonment(Scenario, Consumer := "") {
 				. SQLite_Q(Today) . ",'owned-synthetic-editor.exe'," . Carry . ");"))
 			Before := A_TickCount
 			Index := Map()
-			if Consumer = "encoded"
+			if Consumer = "encoded" && Scenario = "expired"
+				Manifest := JsonParse(KLR_BuildManifestJson(Db, Today, Today, &Index, ExpiredNow))
+			else if Consumer = "encoded"
 				Manifest := JsonParse(KLR_BuildManifestJson(Db, Today, Today, &Index))
+			else if Scenario = "expired"
+				Manifest := KLR_ReadManifest(Db, Today, Today, ExpiredNow)
 			else
 				Manifest := KLR_ReadManifest(Db, Today, Today)
 			After := A_TickCount
@@ -367,7 +373,7 @@ _KLRManifest_Abandonment(Scenario, Consumer := "") {
 				case "inactive":
 					Expected := true
 				case "inactive-retained":
-					Now := Sample
+					Now := ExpiredNow
 					AssertFalse(KLWatch.is_session_active)
 					Expected := true
 				case "physical-recent":

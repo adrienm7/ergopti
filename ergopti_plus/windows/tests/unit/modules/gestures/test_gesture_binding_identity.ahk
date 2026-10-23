@@ -169,8 +169,10 @@ _GSBP_PublicationIdentityBody() {
 	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"))
 	_ScriptShortcutBindingPublication := OriginalPublication
 	AssertEqual("retired", TomlConfigParameterBindingStatus("script__removed_script_slot"))
-	for Binding in ["keyboard__removed_key", "tap_key__removed_key", "tap_hold__removed_key", "combination__removed_pair", "Script__removed_script_slot"]
+	for Binding in ["tap_key__removed_key", "tap_hold__removed_key", "combination__removed_pair", "Script__removed_script_slot", "Keyboard__removed_key"]
 		AssertEqual("unjudged", TomlConfigParameterBindingStatus(Binding), Binding)
+	; The keyboard owner publishes its own complete slot domain (keyboard-slot-publication).
+	AssertEqual("retired", TomlConfigParameterBindingStatus("keyboard__removed_key"))
 }
 Test("Gestures: script publication is detached, pure and bound to the compiled declaration (script-binding-identity)",
 	TestGestures_ScriptPublicationIdentity)

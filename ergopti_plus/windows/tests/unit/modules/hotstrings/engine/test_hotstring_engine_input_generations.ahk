@@ -582,3 +582,5 @@ _HUE_Close(State, Token) {
 _HUE_Schedule(State, Callback) {
 	State.Scheduled := Callback
 }
+
+#Include test_hotstring_scalar_framing.ahk

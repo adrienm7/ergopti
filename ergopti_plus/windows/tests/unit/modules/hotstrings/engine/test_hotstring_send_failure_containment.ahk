@@ -61,9 +61,12 @@ _SCFC_Restore(State, Saved) {
 _SCFC_Context(State, Job) {
 	State["contexts"] += 1
 	_SCFC_Transition(State, State["context_action"])
+	; Elapsed and idle describe the physical idle clock the capture once judged
+	; by; the generation is what a newer physical key-down actually advances.
 	return Map("foreground", State["foreground"],
 		"elapsed", TickElapsed(Job["started"], State["now"]),
-		"idle", State["idle"])
+		"idle", State["idle"],
+		"physical_generation", Job["physical_generation"] + (State["later_key_down"] ? 1 : 0))
 }
 
 _SCFC_Deliver(State, Text) {
@@ -75,7 +78,8 @@ _SCFC_Deliver(State, Text) {
 
 _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 		ContextAction := "none", Foreground := 101, Started := 100,
-		Now := 200, Idle := 100, Deliver := true, Reason := "ready") {
+		Now := 200, Idle := 100, Deliver := true, Reason := "ready",
+		LaterKeyDown := false) {
 	global _SelectionCaptureJob, _SelectionCaptureNextId
 	AssertFalse(IsObject(_SelectionCaptureJob), "fixture requires no live capture")
 	AssertEqual(0, CBClipboardOwner.active.Count,
@@ -93,11 +97,13 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 		CBClipboardOwner.settle_hook := 0
 		State := Map("restore_action", RestoreAction, "context_action", ContextAction,
 			"foreground", Foreground, "now", Now, "idle", Idle,
+			"later_key_down", LaterKeyDown,
 			"restores", 0, "contexts", 0, "deliveries", 0, "delivered", "")
 		Token := CB_TryBeginOwnedTransaction("selection_capture")
 		AssertTrue(Token > 0)
 		Job := Map("id", ++_SelectionCaptureNextId,
 			"callback", _SCFC_Deliver.Bind(State), "started", Started,
+			"physical_generation", 7, "generation_fn", (*) => 7,
 			"foreground", 101, "clipboard", "owned snapshot", "clear_sequence", 100,
 			; Every ready/completed fixture has admitted the captured sequence.
 			; The physical-copy cancellation still owns only its earlier clear.
@@ -152,11 +158,12 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 
 for Vector in [
 	["normal", 1],
-	["input before grace", 1, "none", "none", 101, 100, 200, 81],
-	["input at grace", 1, "none", "none", 101, 100, 200, 80],
-	["input after grace", 0, "none", "none", 101, 100, 200, 79],
-	["input wrap at grace", 1, "none", "none", 101, 0xFFFFFFF0, 0x10, 12],
-	["input wrap after grace", 0, "none", "none", 101, 0xFFFFFFF0, 0x10, 11],
+	; Releasing S and then Win of Win+S moves A_TimeIdlePhysical 100 ms after
+	; the shortcut but is no new action: the selection must still be delivered
+	; (copy_selected_path did nothing while this cancelled the capture).
+	["chord released after the copy (selection-chord-release)", 1, "none", "none", 101, 100, 200, 0],
+	["chord released across the tick wrap (selection-chord-release)", 1, "none", "none", 101, 0xFFFFFFF0, 0x10, 0],
+	["new physical key-down after the shortcut", 0, "none", "none", 101, 100, 200, 0, true, "ready", true],
 	["foreground replaced", 0, "none", "none", 202],
 	["foreground unavailable", 0, "none", "none", 0],
 	["cancel during restoration", 0, "cancel"],
@@ -257,7 +264,7 @@ _SCSC_Startup(Boundary, Action) {
 			AssertEqual(1, CBClipboardOwner.active.Count)
 			_SelectionCaptureFinish(_SelectionCaptureJob, "captured selection", true, "ready",
 				Ports["restore"], Ports["sequence"],
-				(*) => Map("foreground", 101, "elapsed", 0, "idle", 0))
+				(J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
 		} else {
 			AssertFalse(Accepted, "a revoked startup cannot report accepted")
 			AssertTrue(State["revoked"], "the requested boundary must be reached")
@@ -357,7 +364,7 @@ _SCL_TimerLifetime(Reason) {
 		} else {
 			_SelectionCaptureFinish(Job, "captured selection", true, "ready",
 				Ports["restore"], Ports["sequence"],
-				(*) => Map("foreground", 101, "elapsed", 0, "idle", 0))
+				(J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
 		}
 		AssertFalse(IsObject(_SelectionCaptureJob))
 		AssertEqual(0, Job["timer"], "retirement must detach the exact bound callback")
@@ -482,6 +489,151 @@ Test("hotstrings: startup rollback yields to a newer clipboard (selection-startu
 	_SCO_StartupSettlement.Bind(true))
 Test("hotstrings: startup rollback preserves its settlement successor (selection-startup-owner-settlement)",
 	_SCO_StartupSettlement.Bind(false))
+
+; The real capture, poll and physical-input generation owner, as Win+S drives
+; them: the dispatcher counts the S key-down before the hotkey thread starts the
+; capture, then the user releases S and Win while the application copies.
+; A_TimeIdlePhysical moves for those releases; the old poll took them for a new
+; action and cancelled the capture, so copy_selected_path opened nothing. The
+; poll is driven by hand and stopped at the foreground check, before its real
+; clipboard probe. Its production restore is fenced by the job's fake clear
+; sequence, so the real clipboard is never written; whether that restore
+; settles at once depends on the runner's clipboard and is not asserted.
+_SCCR_PollReason(Mode) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live capture")
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	AssertFalse(CBClipboardOwner.restore_debt)
+	PreviousId := _SelectionCaptureNextId
+	PreviousGeneration := CBClipboardOwner.generation
+	PreviousSuspended := A_IsSuspended
+	PreviousSettle := CBClipboardOwner.settle_hook
+	State := Map("boundary", "none", "action", "none", "revoked", false,
+		"saves", 0, "clears", 0, "sequences", 0, "sends", 0, "restores", 0, "deliveries", 0)
+	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
+		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
+		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => -1)
+	Job := 0
+	try {
+		CBClipboardOwner.settle_hook := 0
+		Suspend(false)
+		KS_RecordPhysicalKeyDown(0x53, 0x24, "dispatcher")
+		; Critical keeps the armed poll timer from firing before it is stopped.
+		PreviousCritical := Critical("On")
+		try {
+			AssertTrue(GetSelectionAsync((Text) => State["deliveries"] += 1, Ports))
+			Job := _SelectionCaptureJob
+			SetTimer(Job["timer"], 0)
+		} finally Critical(PreviousCritical)
+		; The chord was released long after the shortcut by the idle clock.
+		Job["started"] := A_TickCount - 500
+		SendInput("{VKFF}")
+		if Mode == "new key-down"
+			KS_RecordPhysicalKeyDown(0x41, 0x1E, "dispatcher")
+		_SelectionCapturePoll(Job)
+		AssertFalse(IsObject(_SelectionCaptureJob), "the poll must end this capture")
+		AssertEqual(0, State["deliveries"])
+		AssertEqual(Mode == "new key-down" ? "superseded by input" : "foreground changed",
+			Job["end_reason"],
+			Mode == "new key-down" ? "a newer physical key-down must cancel the capture"
+			: "releasing the initiating chord must not cancel the capture")
+		; The production restore may still be retrying when the runner cannot
+		; open the clipboard (CI): only its debt may remain, never a live owner.
+		AssertTrue(CBClipboardOwner.restore_debt is Map
+			? CBClipboardOwner.restore_debt["owner_token"] == Job["owner_token"]
+			: CBClipboardOwner.active.Count == 0,
+			"the capture must release its owner or leave exactly its restore debt")
+	} finally {
+		SetTimer(CB_RetryRestoreDebt, 0)
+		if CBClipboardOwner.restore_debt is Map {
+			CB_EndOwnedTransaction(CBClipboardOwner.restore_debt["owner_token"])
+			CBClipboardOwner.restore_debt := 0
+		}
+		if IsObject(Job) {
+			if IsObject(Job["timer"])
+				SetTimer(Job["timer"], 0)
+			Job["timer"] := 0
+			Job["callback"] := 0
+			if CBClipboardOwner.active.Has(Job["owner_token"])
+				CB_EndOwnedTransaction(Job["owner_token"])
+		}
+		CBClipboardOwner.settle_hook := PreviousSettle
+		CBClipboardOwner.generation := PreviousGeneration
+		_SelectionCaptureJob := false
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+	}
+}
+
+Test("hotstrings: releasing the Win+S chord keeps the selection capture (selection-chord-release)",
+	_SCCR_PollReason.Bind("release"))
+Test("hotstrings: a newer physical key-down cancels the selection capture (selection-chord-release)",
+	_SCCR_PollReason.Bind("new key-down"))
+
+; The copy chord is driver output: sent from the #InputLevel 2 Win broker at the
+; thread's own level, the driver's "I1" InputHooks took it for typing (a "Win+C"
+; in the keylogger) and it advanced the physical generation the capture is
+; judged by. GetSelectionAsync's default copy must go out at level 0.
+_SCSL_CopyLevel() {
+	Seg := _DriverFuncBody("GetSelectionAsync")
+	Assert(Seg != "", "GetSelectionAsync must exist")
+	Assert(InStr(Seg, 'Ports.Get("send", _SelectionSendCopy)') > 0,
+		"the default copy port must be _SelectionSendCopy, not a bare SendEvent")
+	PreviousLevel := A_SendLevel
+	Seen := Map("level", -1)
+	try {
+		SendLevel(2)
+		_SelectionSendCopy(() => Seen["level"] := A_SendLevel)
+		AssertEqual(TEXT_SENDER_SEND_LEVEL, Seen["level"], "the copy chord must be sent at TEXT_SENDER_SEND_LEVEL")
+		AssertEqual(2, A_SendLevel, "the hotkey thread keeps its own level afterwards")
+	} finally SendLevel(PreviousLevel)
+}
+Test("hotstrings: the selection copy chord is sent at level 0 (selection-copy-send-level)", _SCSL_CopyLevel)
+
+; A clipboard another program holds past ClipboardAll's one-second wait is
+; reported to the user with its holder; it used to raise an ERROR that opened
+; the generic error window.
+_SCBusy_Run() {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live capture")
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	PreviousId := _SelectionCaptureNextId
+	State := Map("busy", 0, "clears", 0, "sends", 0, "restores", 0)
+	Ports := Map("save", (*) => "__CB_SAVE_ERROR__",
+		"clear", (*) => (State["clears"] += 1, true),
+		"send", (*) => State["sends"] += 1,
+		"restore", (Saved) => (State["restores"] += 1, true),
+		"sequence", (*) => 42, "foreground", (*) => 101,
+		"report_busy", (*) => State["busy"] += 1)
+	try {
+		AssertFalse(GetSelectionAsync((*) => 0, Ports), "a busy clipboard cannot start a capture")
+		AssertEqual(1, State["busy"], "the busy clipboard must be reported once, naming its holder")
+		AssertEqual(0, State["clears"], "nothing may be cleared without a snapshot")
+		AssertEqual(0, State["sends"], "no Ctrl+C may be sent without a snapshot")
+		AssertEqual(0, State["restores"])
+		AssertFalse(IsObject(_SelectionCaptureJob))
+		AssertEqual(0, CBClipboardOwner.active.Count, "the transaction owner must be released")
+	} finally {
+		_SelectionCaptureJob := false
+		_SelectionCaptureNextId := PreviousId
+	}
+}
+Test("hotstrings: a held clipboard is reported instead of raising an error (selection-clipboard-busy)", _SCBusy_Run)
+
+; GetOpenClipboardWindow names the lock holder: the test process holds the real
+; lock itself, so the description must name this process and flag it as ours.
+_SCHolder_Run() {
+	AssertTrue(CB_OpenClipboardWithin(A_ScriptHwnd), "the test must hold the real clipboard lock")
+	try Holder := CB_DescribeClipboardHolder()
+	finally DllCall("User32\CloseClipboard", "Int")
+	SplitPath(A_AhkPath, &ExeName)
+	AssertEqual(A_ScriptHwnd, Holder["hwnd"])
+	AssertEqual(DllCall("Kernel32\GetCurrentProcessId", "UInt"), Holder["pid"])
+	AssertEqual(StrLower(ExeName), StrLower(Holder["process"]))
+	AssertTrue(Holder["own"], "the holder must be flagged as this process")
+	Assert(InStr(Holder["summary"], "own_process=yes") > 0, "the log summary must say the holder is ours")
+}
+Test("clipboard: the busy-clipboard evidence names the holding process (clipboard-holder-evidence)", _SCHolder_Run)
 
 
 #Include test_selection_admitted_clipboard_sequence.ahk

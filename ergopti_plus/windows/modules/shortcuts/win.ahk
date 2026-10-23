@@ -356,8 +356,12 @@ if Features["shortcuts"]["search"]["enabled"] {
 
 		_SearchSelectionReady(Text, SearchInExplorer) {
 				SelectedText := Trim(Text)
-				if (SelectedText = "")
+				; As on Linux, an empty selection opens nothing; the log says so,
+				; so the shortcut never ends without a trace.
+				if (SelectedText = "") {
+						LoggerInfo("Search", "copy_selected_path: the selection is empty; nothing opened.")
 						return
+				}
 				if SearchInExplorer {
 						GetPath(SelectedText)
 						return
@@ -365,75 +369,85 @@ if Features["shortcuts"]["search"]["enabled"] {
 				SearchPath(SelectedText)
 		}
 
-		SearchPath(SelectedText, LaunchFn := Run) {
-				; The result of each of those regexes is a boolean
-
-				; Detects Windows file paths like C:/ or D:\ (supports forward and backward slashes)
-				; Invalid Windows path characters are excluded: <>:"|?*
-				FilePath := RegExMatch(
-						SelectedText,
-						"^[A-Za-z]:[\\/](?:[^<>:" . '"' . "|?*\r\n]+[\\/]?)*$"
-				)
-
-				; Detects Windows Registry paths (optional Computer\ or Ordinateur\ prefix)
-				; Matches both full names (HKEY_CLASSES_ROOT...) and abbreviations (HKCR, HKCU, etc.)
-				RegeditPath := RegExMatch(
-						SelectedText,
-						"i)^(?:Computer\\|Ordinateur\\)?(?:HKEY_(?:CLASSES_ROOT|CURRENT_USER|LOCAL_MACHINE|USERS|CURRENT_CONFIG)|HK(?:CR|CU|LM|U|CC))(?:\\[^\r\n]*)?$"
-				)
-
-				; Detects full URLs with protocol (http, https, ftp, file, etc.)
-				; Protocol must start with a letter and be 2-9 characters long
-				URLPath := RegExMatch(
-						SelectedText,
-						"i)^[a-z][a-z0-9+\-.]{1,8}://[^\s]+$"
-				)
-
-				; Detects domain names (supports up to 4 subdomain levels, TLD up to 63 chars)
-				; Optionally followed by a path (no spaces allowed)
-				WebsitePath := RegExMatch(
-						SelectedText,
-						"i)^(?:[\w-]{1,63}\.){1,4}[a-z]{2,63}(?:/[^\s]*)?$"
-				)
-
-				; AHK-18: FilePath regex matches SHAPE only — verify existence before Run so a
-				; selected-but-non-existent path string falls through to the web-search branch
-				; instead of throwing an OSError that escalates to the crash-report error net.
-				if (FilePath and FileExist(SelectedText)) {
-						try LaunchFn.Call(SelectedText, , "Max")
+		; Opens what the selection names, classified by infra/open_target.ahk
+		; (the rule the macOS and Linux drivers share): a URL, an IP address, a
+		; file or folder, a registry key, ms-settings: or shell:. Plain text is
+		; searched. A target that is recognised but cannot be opened (a path that
+		; does not exist, a bare file name) is reported, never searched instead:
+		; the user asked to open that thing.
+		SearchPath(SelectedText, LaunchFn := Run, ReportFn := _SearchReportUnopened) {
+				Target := OpenTarget_Classify(SelectedText)
+				Kind := Target["kind"]
+				Value := Target["target"]
+				if (Kind == "empty") {
+						try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine"])
 						catch as SearchError {
-								LoggerWarn("Search", "Could not open path '{1}': {2}.", SelectedText, SearchError.Message)
+								LoggerWarn("Search", "Could not open search engine: {1}.", SearchError.Message)
 						}
-				} else if RegeditPath {
-						try RegJump(SelectedText)
+						return false
+				}
+				if (Kind == "search") {
+						; Preserve the existing CRLF-to-space selection policy, then encode one component.
+						Query := UriEncode(StrReplace(Value, "`r`n", " "))
+						try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine_url_query"] . Query)
 						catch as SearchError {
-								LoggerWarn("Search", "Could not jump to registry path '{1}': {2}.", SelectedText, SearchError.Message)
+								LoggerWarn("Search", "Could not open search URL: {1}.", SearchError.Message)
 						}
+						return false
+				}
+				LoggerStart("Search", "Opening the selected {1} '{2}'…", Kind, Value)
+				if (Kind == "path") {
+						if !FileExist(Value) {
+								ReportFn.Call("open_target.missing_path", Value, "no file or folder exists at that path")
+								return false
+						}
+						; Quoted, the whole path is one file for the shell: no part of a
+						; selected path can become a program's arguments.
+						try LaunchFn.Call('"' . Value . '"', , "Max")
+						catch as SearchError {
+								ReportFn.Call("open_target.open_failed", Value, SearchError.Message)
+								return false
+						}
+				} else if (Kind == "registry") {
+						try Jumped := RegJump(Value)
+						catch as SearchError {
+								ReportFn.Call("open_target.open_failed", Value, SearchError.Message)
+								return false
+						}
+						if !Jumped {
+								LoggerWarn("Search", "Registry navigation to '{1}' did not launch Regedit.", Value)
+								return false
+						}
+				} else if (Kind == "url") {
+						; The classifier admits no whitespace in a URL, so the shell
+						; receives one target and no arguments.
+						try LaunchFn.Call(Value)
+						catch as SearchError {
+								ReportFn.Call("open_target.open_failed", Value, SearchError.Message)
+								return false
+						}
+				} else if (Kind == "file_name") {
+						; Outside Explorer the selection carries no folder, and guessing
+						; one would open a different file of the same name.
+						ReportFn.Call("open_target.bare_file_name", Value, "a file name without its folder cannot be located")
+						return false
 				} else {
-						; Complete URIs retain their delimiters and existing escapes.
-						if URLPath {
-								try LaunchFn.Call(SelectedText)
-								catch as SearchError {
-										LoggerWarn("Search", "Could not open URL '{1}': {2}.", SelectedText, SearchError.Message)
-								}
-						} else if (WebsitePath) {
-								try LaunchFn.Call("https://" . SelectedText)
-								catch as SearchError {
-										LoggerWarn("Search", "Could not open website '{1}': {2}.", SelectedText, SearchError.Message)
-								}
-						} else if (SelectedText == "") { ; If nothing was copied
-								try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine"])
-								catch as SearchError {
-										LoggerWarn("Search", "Could not open search engine: {1}.", SearchError.Message)
-								}
-						} else {
-								; Preserve the existing CRLF-to-space selection policy, then encode one component.
-								Query := UriEncode(StrReplace(SelectedText, "`r`n", " "))
-								try LaunchFn.Call(Features["shortcuts"]["search"]["search_engine_url_query"] . Query)
-								catch as SearchError {
-										LoggerWarn("Search", "Could not open search URL: {1}.", SearchError.Message)
-								}
-						}
+						ReportFn.Call("open_target.open_failed", Value, "unexpected target kind " . Kind)
+						return false
+				}
+				LoggerSuccess("Search", "Handed the selected {1} '{2}' to the shell.", Kind, Value)
+				return true
+		}
+
+		; Logs a recognised target that could not be opened and tells the user why.
+		; @param {String} MessageKey The locale key, whose %s receives the target.
+		; @param {String} Target The classified target.
+		; @param {String} Reason English detail for the log.
+		_SearchReportUnopened(MessageKey, Target, Reason) {
+				LoggerError("Search", "Could not open '{1}': {2}.", Target, Reason)
+				try TrayTip(StrReplace(t(MessageKey), "%s", Target), "ErgoptiPlus", "Iconx Mute")
+				catch as Err {
+						LoggerError("Search", "The notice for '{1}' could not be shown: {2}.", Target, Err.Message)
 				}
 		}
 

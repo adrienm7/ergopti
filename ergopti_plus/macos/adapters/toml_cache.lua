@@ -33,6 +33,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local LOG    = "adapters.toml_cache"
 
 
@@ -234,7 +235,7 @@ end
 --- @param path string Absolute source path.
 --- @return string Absolute snapshot path.
 local function snapshot_path(path)
-	local base = path:match("([^/\\]+)$") or "toml"
+	local base = NativePath.basename(path) or "toml"
 	base = base:gsub("[^%w%.%-_]", "_")
 	return _cache_dir .. "/" .. base .. "_" .. string.format("%d", djb2(path)) .. ".lua"
 end
@@ -246,7 +247,7 @@ local function ensure_dir(dir)
 	if type(dir) ~= "string" or dir == "" then return false end
 	local ok = pcall(function()
 		local accum = dir:sub(1, 1) == "/" and "" or "."
-		for seg in dir:gmatch("[^/\\]+") do
+		for _, seg in ipairs(NativePath.components(dir)) do
 			accum = accum .. "/" .. seg
 			if not hs.fs.attributes(accum) then hs.fs.mkdir(accum) end
 		end

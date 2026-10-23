@@ -42,12 +42,11 @@ M.REASONS = {
 ---   where release is the JSON object of the offered or latest release.
 function M.classify(body, opts)
 	local registry = opts.registry
-	local chunks = Parser.split_releases_array(body)
-	local tags, releases = {}, {}
-	for index, chunk in ipairs(chunks) do
-		tags[index] = Parser.parse_tag(chunk)
-		releases[index] = { tag = tags[index], published_at = Parser.parse_published_at(chunk) }
-	end
+	-- One decode of the list gives every release's tag and date: the list is
+	-- about 6 MB and each span used to be decoded twice more.
+	local chunks, releases = Parser.index_releases(body)
+	local tags = {}
+	for index, release in ipairs(releases) do tags[index] = release.tag end
 	local result = {
 		channel = opts.channel,
 		current = opts.current,

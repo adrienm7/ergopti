@@ -82,6 +82,25 @@ helpers.describe("tray_menu: with a backend", function()
 				.. "would be a second menu vocabulary to keep in sync")
 	end)
 
+	helpers.it("builds both fallback menus with one builder (appimage-catalogue-tray-screenshot)", function()
+		local tray, log = with_indicator(true)
+		local quit, details, logs = function() end, function() end, function() end
+		tray.setFallbackMenu("Ergopti qwerty", "Quit", quit)
+		local plain = log.menus[#log.menus]
+		helpers.assert_eq(#plain, 2, "a name and a way out, no separator")
+		helpers.assert_eq(plain[1].disabled, true)
+		helpers.assert_eq(plain[2].fn, quit)
+		tray.setFallbackMenu("No keyboard", "Quit", quit,
+			{ { { label = "Details", fn = details } }, { { label = "Logs", fn = logs } } })
+		local grouped = log.menus[#log.menus]
+		local shape = {}
+		for _, row in ipairs(grouped) do shape[#shape + 1] = row.separator and "-" or row.title end
+		helpers.assert_eq(table.concat(shape, "|"), "No keyboard|Details|-|Logs|-|Quit")
+		helpers.assert_eq(grouped[2].fn, details)
+		helpers.assert_eq(grouped[4].fn, logs)
+		helpers.assert_eq(grouped[6].fn, quit)
+	end)
+
 	helpers.it("rebuilds on every setMenu, because a toggle changes the tree", function()
 		local tray, log = with_indicator(true)
 		tray.setMenu({ { title = "A" } })

@@ -29,6 +29,15 @@
 ---    `idle_resets_word`, which the other two drivers apply too.
 --- 5. Setters publish a sparse canonical write before changing runtime state,
 ---    and the Hotstrings scope adopts and restores every leaf with the others.
+--- 6. Ctrl+Backspace deletes the previous word: the caret then sits where that
+---    word began, so the next key starts a word whatever the settings say.
+---    Alt+Backspace (undo in many editors) and Super+Backspace keep their
+---    reset to an unknown start.
+--- 7. A field left empty: a bare Enter in a terminal submits the line, and
+---    Ctrl+A (outside a terminal) or Ctrl+L in a browser selects the whole
+---    text. A Backspace that finds the buffer empty there deleted nothing, so
+---    the engine keeps the word start (its line-start reset). Windows and
+---    macOS apply the same rules.
 --- ==============================================================================
 
 local M = {}
@@ -61,6 +70,30 @@ local ARROWS = { up = true, down = true, left = true, right = true }
 -- daemon's focus boundary. None of them is governed by an option.
 local UNGOVERNED_CHORDS = { backspace = true, delete = true, home = true, ["end"] = true,
 	pageup = true, pagedown = true, insert = true, tab = true }
+
+-- Terminal emulators, by the last dot-separated part of their lowercase
+-- application id or WM_CLASS ("org.gnome.Terminal" -> "terminal"). Their line
+-- editor submits on Enter and ignores a Backspace at the start of the prompt.
+local TERMINAL_APPS = {
+	terminal = true, ["gnome-terminal"] = true, ["gnome-terminal-server"] = true,
+	console = true, kgx = true, ptyxis = true, konsole = true, yakuake = true,
+	kitty = true, alacritty = true, foot = true, footclient = true, wezterm = true,
+	["wezterm-gui"] = true, ghostty = true, tilix = true, terminator = true,
+	["xfce4-terminal"] = true, ["mate-terminal"] = true, lxterminal = true,
+	qterminal = true, xterm = true, uxterm = true, urxvt = true, rxvt = true,
+	st = true, ["st-256color"] = true, sakura = true, terminology = true,
+	guake = true, tilda = true, blackbox = true, contour = true, tabby = true,
+	hyper = true, warp = true, ["deepin-terminal"] = true, ["cool-retro-term"] = true,
+}
+
+-- Browsers, whose Ctrl+L selects the whole address of the address bar.
+local BROWSER_APPS = {
+	firefox = true, ["firefox-esr"] = true, librewolf = true, waterfox = true,
+	chromium = true, ["chromium-browser"] = true, ["google-chrome"] = true,
+	chrome = true, brave = true, ["brave-browser"] = true, vivaldi = true,
+	["vivaldi-stable"] = true, opera = true, ["microsoft-edge"] = true,
+	epiphany = true, falkon = true, floorp = true, zen = true,
+}
 
 -- Populated once; no preference IO on each keystroke.
 local _settings = nil
@@ -367,6 +400,57 @@ function M.forget_last_key()
 	_last_key_ms = nil
 end
 
+--- The last dot-separated part of an application id, lowercase.
+--- @param app_id string|nil Focused application id or WM_CLASS.
+--- @return string|nil
+local function app_key(app_id)
+	if type(app_id) ~= "string" or app_id == "" then return nil end
+	return app_id:lower():match("([^%.]+)$")
+end
+
+--- Whether the focused application is a terminal emulator.
+--- @param app_id string|nil Focused application id or WM_CLASS.
+--- @return boolean
+function M.is_terminal_app(app_id)
+	return TERMINAL_APPS[app_key(app_id)] == true
+end
+
+--- Whether a Backspace event is the delete-previous-word chord: Ctrl held,
+--- Shift allowed, no Alt, AltGr or Super.
+--- @param detail table|nil `{ mods }` as the hook reports it.
+--- @return boolean
+function M.deletes_previous_word(detail)
+	local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+	return mods.ctrl == true and mods.alt ~= true and mods.altgr ~= true and mods.meta ~= true
+end
+
+--- Whether a shortcut selects the whole text of the focused field: Ctrl+A
+--- outside a terminal, Ctrl+L in a browser (its address bar).
+--- @param detail table|nil `{ key, mods }` as the hook reports it.
+--- @param app_id string|nil Focused application id.
+--- @return boolean
+local function selects_whole_field(detail, app_id)
+	if type(detail) ~= "table" or type(detail.key) ~= "string" or not M.deletes_previous_word(detail) then
+		return false
+	end
+	local key = detail.key:lower()
+	if key == "a" then return not M.is_terminal_app(app_id) end
+	return key == "l" and BROWSER_APPS[app_key(app_id)] == true
+end
+
+--- Applies a typed character that may leave an empty line: a bare Enter in a
+--- terminal submits the line and the prompt after it is empty, so the engine
+--- restarts at a word start and at the start of that line.
+--- @param engine table Hotstring engine (`reset(at_word_start, at_line_start)`).
+--- @param ch string The character just typed.
+--- @param app_id string|nil Focused application id.
+--- @return boolean applied
+function M.apply_typed_newline(engine, ch, app_id)
+	if ch ~= "\n" or not M.is_terminal_app(app_id) then return false end
+	engine:reset(true, true)
+	return true
+end
+
 --- Names the option that governs a control-key event, if any.
 ---
 --- An arrow is an arrow whatever is held with it and wherever it came from (a
@@ -397,15 +481,22 @@ end
 --- the buffer and its start exactly as they were when it is off. Every other
 --- control key keeps its unconditional reset: Escape leaves the caret where it
 --- was (word start), the others move it by an unknown amount.
---- @param engine table Hotstring engine (`reset(at_word_start)`).
+--- Ctrl+Backspace is no option's: it always starts a word. A shortcut that
+--- selects the whole field also tells the engine the line is empty.
+--- @param engine table Hotstring engine (`reset(at_word_start, at_line_start)`).
 --- @param key_name string The hook's control-key name, or "shortcut".
 --- @param detail table|nil As for control_owner().
+--- @param app_id string|nil Focused application id.
 --- @return string effect "word_start", "unknown" or "kept".
-function M.apply_control(engine, key_name, detail)
+function M.apply_control(engine, key_name, detail, app_id)
+	if key_name == "backspace" and M.deletes_previous_word(detail) then
+		engine:reset(true)
+		return "word_start"
+	end
 	local owner = M.control_owner(key_name, detail)
 	if owner ~= nil and not M.current()[owner .. "_resets_word"] then return "kept" end
 	local at_word_start = owner ~= nil or key_name == "escape"
-	engine:reset(at_word_start)
+	engine:reset(at_word_start, owner ~= nil and key_name == "shortcut" and selects_whole_field(detail, app_id))
 	return at_word_start and "word_start" or "unknown"
 end
 

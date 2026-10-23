@@ -34,6 +34,8 @@
 ;                ``selected_array`` is an Array of lowercase process names.
 ;                ``receipt`` must be claimed inside the durable candidate build.
 ;     ok_label : optional override for the OK button caption
+;     on_open  : optional callable(gui, receipt), strict true admits Show.
+;                Allows a caller to retain and retire this exact native window.
 ;
 ; The Gui is deliberately nonmodal: more than one window can exist, so every
 ; callback is fenced by the logical-owner receipt described below.
@@ -197,6 +199,7 @@ AppPicker_InvokeSave(OnSave, Selected, Receipt) {
 ; ===============================
 
 AppPicker_Show(opts) {
+		global _AppPickerActiveReceipts, _AppPickerOwnerEpochs
 		if !(opts is Map) {
 				; Defensive — mis-call must not crash the caller.
 				return
@@ -255,6 +258,19 @@ AppPicker_Show(opts) {
 				btn_cancel.OnEvent("Click", (*) => AppPicker_OnCancel(g, receipt))
 				g.OnEvent("Close", (*) => AppPicker_OnCancel(g, receipt))
 				g.OnEvent("Escape", (*) => AppPicker_OnCancel(g, receipt))
+				if opts.Has("on_open") {
+						if !HasMethod(opts["on_open"], "Call")
+								throw TypeError("App picker open admission must be callable.")
+						Opened := opts["on_open"].Call(g, receipt)
+						if !(Opened is Integer) || Opened != 1
+								|| _AppPickerActiveReceipts.Get(owner, 0) != receipt
+								|| _AppPickerOwnerEpochs.Get(owner, 0) != receipt["epoch"]
+								|| receipt.Get("state", "") != "open" {
+								AppPicker_RetireReceipt(receipt)
+								g.Destroy()
+								return false
+						}
+				}
 				g.Show()
 				return receipt
 		} catch {

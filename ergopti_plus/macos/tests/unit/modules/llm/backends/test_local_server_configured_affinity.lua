@@ -101,7 +101,7 @@ helpers.describe("Configured endpoint refusal and ownership (local-configured-af
 			held[1].callback(true, "inert-owned-key")
 			helpers.assert_eq(probes.configured.url, "http://localhost:8000/foreign/v1/models")
 			helpers.assert_eq(probes.configured.headers.Authorization, "Bearer inert-owned-key")
-			helpers.assert_eq(probes.omlx.url, "http://localhost:8000/v1/models")
+			helpers.assert_eq(probes.omlx.url, "http://127.0.0.1:8000/v1/models")
 			helpers.assert_eq(probes.omlx.headers.Authorization, nil, "the catalogue endpoint never receives another path's credential")
 		end)
 		isolated(function(api, _, probes, crypto)

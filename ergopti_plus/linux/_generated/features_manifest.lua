@@ -425,7 +425,7 @@ M.features = {
 		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" }, recommended = true, input_altering = false,
+		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" }, recommended = false, input_altering = false,
 	},
 	{
 		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "linux" }, recommended = false, input_altering = false,
@@ -452,7 +452,7 @@ M.features = {
 		path = "shortcuts.key_combination_taps.alt_gr_then_caps_lock", id = "alt_gr_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "ctrl_delete", input_altering = true,
 	},
 	{
-		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", id = "left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "none", input_altering = true,
+		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", id = "left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "caps_word", input_altering = true,
 	},
 	{
 		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "linux" }, recommended = 100, input_altering = false,
@@ -521,34 +521,34 @@ M.features = {
 		path = "gestures.enabled", id = "enabled", section = "gestures", default = false, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" }, recommended = "tab_close", input_altering = true,
 	},
 	{
-		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" }, recommended = "tab_prev", input_altering = true,
 	},
 	{
-		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" }, recommended = "tab_next", input_altering = true,
 	},
 	{
-		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" }, recommended = "tab_new", input_altering = true,
 	},
 	{
 		path = "gestures.swipe_4_down", id = "swipe_4_down", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_down", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
-		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.swipe_4_left", id = "swipe_4_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_left", platforms = { "ahk", "hs", "linux" }, recommended = "desktop_prev", input_altering = true,
 	},
 	{
-		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.swipe_4_right", id = "swipe_4_right", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_right", platforms = { "ahk", "hs", "linux" }, recommended = "desktop_next", input_altering = true,
 	},
 	{
 		path = "gestures.swipe_4_up", id = "swipe_4_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_4_up", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
-		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.tap_3", id = "tap_3", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_3", platforms = { "ahk", "hs", "linux" }, recommended = "left_click_toggle", input_altering = true,
 	},
 	{
-		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "none", input_altering = true,
+		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "alt_tab_monitor", input_altering = true,
 	},
 	{
 		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "none", input_altering = true,

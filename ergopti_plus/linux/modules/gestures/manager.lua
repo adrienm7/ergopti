@@ -565,6 +565,11 @@ local BUILTIN_HANDLERS = {
 		-- argument but only the option boundary makes it an application operand.
 		run_background("gtk-launch -- " .. shell_quote(app))
 	end,
+	-- The selected files' paths in a file manager, otherwise what the primary
+	-- selection names: modules/shortcuts/open_selection.
+	["copy_selected_path"] = function()
+		return require("modules.shortcuts.open_selection").copy_selected_path(primary_selection)
+	end,
 	["search_web"] = function(binding)
 		local template = M.get_action_parameter(binding, "search_web")
 		if not M.validate_action_parameter("search_web", template) then return end

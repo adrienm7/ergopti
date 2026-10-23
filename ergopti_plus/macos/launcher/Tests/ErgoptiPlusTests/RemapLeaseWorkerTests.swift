@@ -4571,6 +4571,108 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		XCTAssertGreaterThanOrEqual(clockReads, acknowledgementBoundaryRead)
 	}
 
+	/// Runs one real outer over a scripted inner and a scripted Hammerspoon pipe.
+	/// - Parameters:
+	///   - parentInput: Bytes Hammerspoon wrote before the run.
+	///   - closeParentInput: Whether Hammerspoon's write end is closed first.
+	///   - diagnosticTimes: Successive diagnostic-clock readings; the last repeats.
+	/// - Returns: Exit code and every diagnostic the outer reported.
+	private func runOuterOverScriptedInner(
+		parentInput: String,
+		closeParentInput: Bool,
+		diagnosticTimes: [TimeInterval] = [0]
+	) throws -> (exitCode: Int32, diagnostics: [String]) {
+		let fixture = try makeExecutableFixture(
+			body: "IFS= read -r command <&3 || exit 40\n"
+				+ "[ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
+				+ "printf 'READY 1\\n' >&3\n"
+				+ "IFS= read -r command <&3 || exit 42\n"
+				+ "[ \"$command\" = STOP ] || exit 43\n"
+				+ "printf 'FENCED\\n' >&3\n"
+		)
+		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
+		var parentPipe = [Int32](repeating: -1, count: 2)
+		let pipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
+			Darwin.pipe(buffer.baseAddress!)
+		}
+		XCTAssertEqual(pipeStatus, 0)
+		let nullDescriptor = Darwin.open("/dev/null", O_WRONLY)
+		XCTAssertGreaterThanOrEqual(nullDescriptor, 0)
+		defer {
+			for descriptor in parentPipe where descriptor >= 0 { _ = Darwin.close(descriptor) }
+			if nullDescriptor >= 0 { _ = Darwin.close(nullDescriptor) }
+		}
+		if !parentInput.isEmpty {
+			XCTAssertTrue(writeLeaseLine(
+				String(parentInput.dropLast()),
+				to: parentPipe[1]
+			))
+		}
+		if closeParentInput {
+			_ = Darwin.close(parentPipe[1])
+			parentPipe[1] = -1
+		}
+		let guardianRegistration = ScriptedLeaseGuardianRegistration(armResult: true)
+		if parentPipe[1] >= 0 { guardianRegistration.childCloseDescriptors = [parentPipe[1]] }
+		let identity = LeaseIdentity(
+			cliPath: "/unused/karabiner_cli",
+			token: token,
+			modeName: "unused",
+			revokedName: "unused",
+			initialMode: kLeaseModeActive,
+			heartbeatSeconds: 5
+		)
+		var diagnostics: [String] = []
+		var diagnosticReads = 0
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: identity,
+			detached: false,
+			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
+			guardianRegistration: guardianRegistration,
+			parentInputDescriptor: parentPipe[0],
+			parentOutputDescriptor: nullDescriptor,
+			diagnostic: { diagnostics.append($0) },
+			diagnosticClock: {
+				let reading = diagnosticTimes[min(diagnosticReads, diagnosticTimes.count - 1)]
+				diagnosticReads += 1
+				return reading
+			}
+		)
+		return (runtime.run(), diagnostics)
+	}
+
+	/// Proves an input closed without STOP names the last private command (issue #99).
+	func testParentEOFWithoutStopNamesTheLastPrivateCommand() throws {
+		let result = try runOuterOverScriptedInner(parentInput: "", closeParentInput: true)
+
+		XCTAssertEqual(result.exitCode, LeaseWorkerExit.success.rawValue,
+			"Hammerspoon EOF is a revocation, never a lease failure")
+		let closures = result.diagnostics.filter {
+			$0.hasPrefix("Hammerspoon closed its input without STOP")
+		}
+		XCTAssertEqual(closures.count, 1, "the closed input is reported exactly once: \(result.diagnostics)")
+		XCTAssertTrue(closures.first?.contains("last private command ACTIVATE 1") == true,
+			"the report must name the command in flight: \(result.diagnostics)")
+		XCTAssertFalse(result.diagnostics.contains { $0.hasPrefix("lease lost") },
+			"an EOF is not a lease loss: \(result.diagnostics)")
+	}
+
+	/// Proves an explicit STOP stays silent, and that a slow preparation is reported.
+	func testStopIsSilentAndSlowActivationPreparationIsReported() throws {
+		let result = try runOuterOverScriptedInner(
+			parentInput: "STOP\n",
+			closeParentInput: false,
+			diagnosticTimes: [0, 1.5, 1.75]
+		)
+
+		XCTAssertEqual(result.exitCode, LeaseWorkerExit.success.rawValue)
+		XCTAssertFalse(result.diagnostics.contains { $0.hasPrefix("Hammerspoon closed its input") },
+			"a requested STOP is not an unexplained closure: \(result.diagnostics)")
+		XCTAssertTrue(result.diagnostics.contains(
+			"activation preparation took 1.75 s (guardian ARM 1.50 s, inner spawn 0.25 s)."
+		), "READY's slow part must be named: \(result.diagnostics)")
+	}
+
 	/// Proves EOF preempts an in-flight pause before any PAUSED acknowledgement.
 	func testEOFDuringPauseFencesWithoutFalsePausedAck() {
 		let result = runInner(

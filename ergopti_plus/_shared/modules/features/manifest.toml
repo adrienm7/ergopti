@@ -471,6 +471,14 @@ description_key = "menu.hotstrings.repeat_key_enabled"
 # buffer is kept forever, the behaviour before 2026-10). The menu offers the
 # `preset_values` plus a free entry for any other non-negative value.
 # A pure parameter of the matcher: it types nothing by itself.
+# Fixed Backspace rules, the same on every driver and without a setting: the
+# Backspace that erases the last character typed since the word started puts
+# the caret back at a word start (« ab », Backspace, Backspace, « c★ »
+# expands), a correction that leaves letters keeps the word, and a Backspace
+# right after the pause still edits the word typed before it. A Backspace
+# past the buffer's start makes the start unknown, except on an empty line: a
+# terminal prompt after a bare Enter, a field whose whole text Ctrl+A (Cmd+A)
+# or a browser's Ctrl+L (Cmd+L) selected, where it deletes nothing.
 [[features.hotstrings]]
 id = "idle_reset_seconds"
 default = 3
@@ -508,8 +516,10 @@ description_key = "menu.hotstrings.arrow_resets_word"
 # Whether a shortcut starts a new word: a key struck with Ctrl, Alt or Win held
 # (Cmd or Ctrl on macOS, where Option types characters), Shift added or not.
 # AltGr and Shift alone are typing. Off, Ctrl+V or Ctrl+Z leave the word in
-# progress open. Ctrl+Backspace and its siblings delete text by an unknown
-# amount and forget the word either way.
+# progress open. Ctrl+Backspace (Option+Backspace on macOS) deletes the
+# previous word and always starts a new one; its siblings (Alt+Backspace,
+# Cmd+Backspace) delete text by an unknown amount and forget the word either
+# way.
 [[features.hotstrings]]
 id = "shortcut_resets_word"
 default = true
@@ -1683,14 +1693,11 @@ description_key = "menu.metrics.wpm_widget_y"
 [[features.metrics]]
 id = "wpm_widget_colors"
 platforms = ["ahk", "linux"]
-# The two drivers disagree, and the disagreement is recorded here rather than
-# resolved. Windows ships the pill neutral; Linux has shipped it coloured by
-# keystroke origin since its widget existed. Picking one is a product decision
-# about what a fresh install looks like, not something to settle inside a
-# refactor — and silently flipping Linux would change what every existing user
-# sees on their next start, for no reason they could find.
-default_per_platform = { ahk = false, linux = true }
-recommended_per_platform = { ahk = false, linux = true }
+# Linux used to colour the pill by keystroke origin while Windows ships it
+# neutral. The maintainer decided on 2026-10-22 that Linux recommends what
+# Windows recommends, and a pure parameter's default is its recommendation.
+default = false
+recommended = false
 input_altering = false
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_colors"
@@ -2039,7 +2046,7 @@ description_key = "menu.shortcuts.key_combinations"
 id = "left_alt_then_caps_lock"
 platforms = ["ahk", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "caps_word", linux = "none" }
+recommended = "caps_word"
 input_altering = true
 type = "action"
 description_key = "menu.shortcuts.key_combinations"
@@ -2553,6 +2560,10 @@ description_key = "menu.caps_word.pointer.other_buttons"
 # Windows (GESTURE_FACTORY_DEFAULTS) build what « Restaurer les valeurs
 # conseillées » writes from them rather than from a copy of their own;
 # test-gesture-defaults-single-source.cjs holds both drivers to this list.
+# Linux recommends the Windows binding of every slot both drivers have
+# (maintainer decision, 2026-10-22), except the four-finger vertical swipes:
+# their Windows actions, win_app_prev and win_app_next, do not exist in the
+# Linux catalogue, so those two stay unassigned there.
 [[features.gestures]]
 id = "enabled"
 platforms = ["ahk", "hs", "linux"]
@@ -2566,7 +2577,7 @@ description_key = "menu.gestures.enabled"
 id = "swipe_3_down"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "none" }
+recommended_per_platform = { ahk = "tab_close", hs = "tab_next", linux = "tab_close" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_down"
@@ -2575,7 +2586,7 @@ description_key = "menu.gestures.swipe_3_down"
 id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
+recommended_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "tab_prev" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
@@ -2584,7 +2595,7 @@ description_key = "menu.gestures.swipe_3_left"
 id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
+recommended_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "tab_next" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
@@ -2593,7 +2604,7 @@ description_key = "menu.gestures.swipe_3_right"
 id = "swipe_3_up"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "none" }
+recommended_per_platform = { ahk = "tab_new", hs = "tab_prev", linux = "tab_new" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_3_up"
@@ -2611,7 +2622,7 @@ description_key = "menu.gestures.swipe_4_down"
 id = "swipe_4_left"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "desktop_prev", hs = "none", linux = "desktop_prev" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_left"
@@ -2620,7 +2631,7 @@ description_key = "menu.gestures.swipe_4_left"
 id = "swipe_4_right"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "none" }
+recommended_per_platform = { ahk = "desktop_next", hs = "none", linux = "desktop_next" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_4_right"
@@ -2638,7 +2649,7 @@ description_key = "menu.gestures.swipe_4_up"
 id = "tap_3"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "left_click_toggle", hs = "left_click_toggle", linux = "none" }
+recommended = "left_click_toggle"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_3"
@@ -2647,7 +2658,7 @@ description_key = "menu.gestures.tap_3"
 id = "tap_4"
 platforms = ["ahk", "hs", "linux"]
 default = "none"
-recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "none" }
+recommended_per_platform = { ahk = "alt_tab_monitor", hs = "win_app_next", linux = "alt_tab_monitor" }
 input_altering = true
 type = "action"
 description_key = "menu.gestures.tap_4"
@@ -3665,6 +3676,8 @@ type = "boolean"
 description_key = "menu.layout.ergopti_base"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
+# Linux and macOS only report the layout's own number row (number_row_policy
+# native_rows); no writer reorders it there, so they cannot recommend digits.
 [[features.layout]]
 id = "direct_access_digits"
 platforms = ["ahk", "hs", "linux"]
@@ -5223,18 +5236,16 @@ type = "---"
 platforms = ["hs"]
 unavailable = "hide"
 
+# The row naming the key's delay opens the driver's delay prompt itself: the
+# maintainer retired the submenu whose only row did that (2026-10-22), since
+# a row that opens a submenu is never clicked.
 [[menu.tap_hold_key_delay_tail]]
-type = "group"
+type = "command"
 id = "tap_hold_key_delay"
 i18n = "menu.tapholds.key_tap_delay"
 caption_getter = "tap_hold_key_delay_caption"
 
-[[menu.tap_hold_key_delay_rows]]
-type = "command"
-id = "tap_hold_key_delay_set"
-i18n = "menu.tapholds.key_tap_delay_set"
-
-[[menu.tap_hold_key_delay_rows]]
+[[menu.tap_hold_key_delay_tail]]
 type = "check"
 id = "tap_hold_key_delay_use_global"
 i18n = "menu.tapholds.key_tap_delay_use_global"
@@ -7423,32 +7434,19 @@ type = "command"
 id = "tap_hold_key_tap"
 i18n = "tap_hold.picker.tap"
 caption_getter = "tap_hold_key_tap_caption"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
+platforms = ["ahk", "hs", "linux"]
 
+# The hold opens the shared action picker like the tap, listing only what a
+# hold can be: on macOS the holdable actions of its remap catalogue
+# (modifiers, chords, sticky keys, the layer), on Windows and Linux the
+# options of [tap_hold.hold_picker] (the modifiers, their combinations and
+# the navigation layer). The maintainer's decision of 2026-10-22.
 [[menu.tap_hold_key_head]]
-type = "group"
-id = "tap_hold_key_tap_picker"
-i18n = "menu.tapholds.tap_arrow"
-caption_getter = "tap_hold_key_tap_caption"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.tap_hold_key_head]]
-type = "group"
-id = "tap_hold_key_hold"
+type = "command"
+id = "tap_hold_key_hold_action"
 i18n = "tap_hold.picker.hold"
 caption_getter = "tap_hold_key_hold_caption"
-platforms = ["ahk", "linux"]
-unavailable = "hide"
-
-[[menu.tap_hold_key_head]]
-type = "group"
-id = "tap_hold_key_hold_picker"
-i18n = "menu.tapholds.hold_arrow"
-caption_getter = "tap_hold_key_hold_caption"
-platforms = ["hs"]
-unavailable = "hide"
+platforms = ["ahk", "hs", "linux"]
 
 # Native absent-module branches retain disabled status without acquiring an action.
 [[menu.linux_hotstrings_absent_rows]]
@@ -9134,7 +9132,35 @@ platforms = ["linux"]
 unavailable = "hide"
 label_prefix = "    "
 
+# The first rows of every modifier group of the keyboard slots (Alt, Ctrl,
+# Ctrl+Shift, Win on Windows; Option, Ctrl, Ctrl+Shift, Cmd, Cmd+Shift on
+# macOS; Ctrl, Ctrl+Shift, Alt, Super on Linux), on the three drivers: the
+# Shortcuts scope narrowed to that group's slots and their action parameters.
+# The restore puts each shipped slot of the group back to its recommended
+# action and removes the slots the user added; the clear empties every slot of
+# the group. Both apply at once, without a question, like every scope row (the
+# maintainer's decision of 2026-09-30); the owner backs up first.
+[[menu.keyboard_group_scope_controls]]
+type = "command"
+id = "scope_restore"
+i18n = "common.restore_recommended"
+disabled_when = ["keyboard_group_ready"]
+
+[[menu.keyboard_group_scope_controls]]
+type = "command"
+id = "scope_clear"
+i18n = "common.clear_to_system"
+disabled_when = ["keyboard_group_ready"]
+
+[[menu.keyboard_group_scope_controls]]
+type = "---"
+
 # Complete native keyboard-group content; only the genuine binding callbacks stay native.
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_scope_controls"
+present_when = "keyboard_group_has_scope"
+
 [[menu.keyboard_group_frame]]
 type = "include"
 section = "keyboard_group_fixed_frame"
@@ -9224,29 +9250,6 @@ id = "keyboard_group_add_cmd_shift"
 command = "keyboard_group_add"
 i18n = "menu.shortcuts.cmd_shift_add"
 disabled_when = ["keyboard_group_ready"]
-platforms = ["hs"]
-unavailable = "hide"
-
-# Action-picker composition retains the actual native catalogue and selection owners.
-[[menu.tap_hold_action_picker_frame]]
-type = "list"
-id = "tap_hold_picker_special_rows"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.tap_hold_action_picker_frame]]
-type = "include"
-section = "tap_hold_action_picker_boundary"
-present_when = "tap_hold_picker_has_boundary"
-
-[[menu.tap_hold_action_picker_frame]]
-type = "list"
-id = "tap_hold_picker_grouped_rows"
-platforms = ["hs"]
-unavailable = "hide"
-
-[[menu.tap_hold_action_picker_boundary]]
-type = "---"
 platforms = ["hs"]
 unavailable = "hide"
 

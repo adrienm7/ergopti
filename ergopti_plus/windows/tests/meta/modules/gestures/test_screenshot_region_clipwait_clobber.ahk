@@ -41,7 +41,7 @@ _TSC_Check() {
 	Assert(InStr(PollSrc, 'State["clipboard_sequence"] := CB_GetSequenceNumber()') > 0,
 		"the accepted Snipping Tool image must publish the clipboard sequence owned by this transaction")
 	Assert(InStr(SaveStartSrc, '_GestureScreenshotCreateWorker("region_save"') > 0,
-		"region save must retain the PowerShell process in the shared worker registry")
+		"region save must retain its capture worker in the shared worker registry")
 	Assert(InStr(SaveDoneSrc, "_GestureScreenshotPublishFile") > 0,
 		"region save may publish the final path only from its current worker completion")
 	Assert(InStr(FinishSrc, "CB_RestoreOwnedAllEventually") > 0

@@ -133,3 +133,26 @@ _TestTextPenultimateCodepoint() {
 	AssertTrue(Caught is TypeError, "invalid text is refused explicitly")
 }
 Test("text_utils unicode-time-gate: prior scalar lookup covers short and supplementary spans", _TestTextPenultimateCodepoint)
+
+_TestTextHeadWithinUnits() {
+	Text := "ab" . Chr(0x1F600) . "c"
+	Expected := ["", "a", "ab", "ab", "ab" . Chr(0x1F600), Text, Text]
+	for Value in Expected {
+		Capacity := A_Index - 1
+		Actual := TextHeadWithinUnits(Text, Capacity)
+		AssertEqual(Value, Actual, "whole-character prefix for budget " . Capacity)
+		Assert(StrLen(Actual) <= Capacity, "the prefix never exceeds the unit budget")
+	}
+	AssertEqual("", TextHeadWithinUnits(Chr(0x1F600) . "a", 1), "a leading pair that does not fit is dropped whole")
+	AssertEqual("a" . Chr(0xD800), TextHeadWithinUnits("a" . Chr(0xD800) . "b", 2),
+		"an isolated legacy unit keeps its original representation")
+	AssertEqual(Chr(0xDC00), TextHeadWithinUnits(Chr(0xDC00) . "b", 1))
+	for Invalid in [[42, 1], ["a", -1], ["a", 1.5]] {
+		Caught := 0
+		try TextHeadWithinUnits(Invalid*)
+		catch as Err
+			Caught := Err
+		AssertTrue(Caught is TypeError, "invalid prefix arguments are refused explicitly")
+	}
+}
+Test("text_utils provider-error-prefix: every unit budget keeps the longest whole-character prefix", _TestTextHeadWithinUnits)

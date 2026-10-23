@@ -174,6 +174,8 @@ end
 --- @return table|nil metadata Owned-event metadata.
 --- @return string status Classification status.
 --- @return table|nil fence Physical-ordering adoption/cancellation record.
+--- @return boolean replay True for a delayed copy of a physical event whose
+---         original this consumer already saw arrive.
 function M.classify_with_fence(event, consumer_id)
 	assert(type(consumer_id) == "string" and consumer_id ~= "",
 		"adapters.event_provenance.classify_with_fence: consumer_id must be a non-empty string")
@@ -189,9 +191,9 @@ function M.classify_with_fence(event, consumer_id)
 		-- second fence. Every consumer must otherwise process it exactly like the
 		-- original human event, including keylogger and shortcut taps.
 		if metadata.physical_replay == true then
-			return nil, M.STATUS_FOREIGN, nil
+			return nil, M.STATUS_FOREIGN, nil, true
 		end
-		return metadata, status, nil
+		return metadata, status, nil, false
 	end
 	local fence_ok, fence_or_err = xpcall(
 		SyntheticInput.claim_physical_fence, debug.traceback, event)
@@ -200,9 +202,9 @@ function M.classify_with_fence(event, consumer_id)
 		-- A foreign event is only authoritative after every older payload was
 		-- claimed. If that ordering operation fails, downgrade the event so no
 		-- consumer accepts, reloads, wraps, or otherwise mutates stale state.
-		return nil, M.STATUS_UNREADABLE, nil
+		return nil, M.STATUS_UNREADABLE, nil, false
 	end
-	return nil, status, fence_or_err
+	return nil, status, fence_or_err, false
 end
 
 return M

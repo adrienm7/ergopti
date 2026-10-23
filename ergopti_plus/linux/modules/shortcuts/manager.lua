@@ -408,8 +408,9 @@ end
 --- Presses and releases CapsLock on the daemon's device: the key a CapsWord
 --- session locks and unlocks the desktop's Caps Lock with.
 --- @return boolean True when the press and the release were written.
+--- @return table Typed outcome; only a pre-output refusal permits another tap.
 local function press_caps_lock()
-	return (ComboEmitter.press_codes({}, { EvdevCodes.KEY_CAPSLOCK }, "CapsWord CapsLock")) == true
+	return ComboEmitter.press_codes({}, { EvdevCodes.KEY_CAPSLOCK }, "CapsWord CapsLock")
 end
 
 --- Clears the session state, naming why once.

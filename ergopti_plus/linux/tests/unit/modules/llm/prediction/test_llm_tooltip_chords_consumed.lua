@@ -701,7 +701,9 @@ helpers.describe("Configured prediction shortcut collision reservations", functi
 					return { read = function(_, ...) return file:read(...) end,
 						close = function() assert(file:close() == true); return ack.value end }
 				end
+				local release_source = helpers.route_source_through_stdio(observed.path)
 				local captured, frame = pcall(engine.capture_collision_inventory)
+				release_source()
 				io.open = open
 				helpers.assert_eq(captured, true); helpers.assert_eq(frame, nil)
 			end)

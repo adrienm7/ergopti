@@ -11,7 +11,10 @@
 ;
 ; The AHK driver cannot require Lua modules, so its parser functions in
 ; modules/updater/core.ahk are hand-maintained. This test pins them against the
-; same golden vectors as the macOS Lua test so any divergence is caught.
+; same golden vectors as the macOS and Linux Lua tests so any divergence is
+; caught. The contract_* vectors carry the shared Lua metadata contract: each
+; field is the selected release object's own, decoded once by the strict JSON
+; owner, and a release list splits into exact raw spans of root objects only.
 ;
 ; parse_asset_url is NOT tested here because the AHK _Updater_FindAsset
 ; uses a structurally different algorithm (finds the "assets" array first,
@@ -57,104 +60,49 @@ _URPC_Integrity() {
 }
 Test("corpus:up-rp: corpus file is readable and every vector has required fields", _URPC_Integrity)
 
-; ── parse_tag vectors ────────────────────────────────────────────────────────
-
-_URPC_ParseTag() {
-	Raw := _URPC_LoadCorpus()
-	Data := _URPC_ParseJson(Raw)
+; Replays every vector of one category before failing, so a red run names
+; each divergent vector instead of only the first.
+_URPC_Replay(Category, Parse) {
+	Data := _URPC_ParseJson(_URPC_LoadCorpus())
+	AssertTrue(Data is Map, "corpus JSON must be parseable")
+	Failures := [], Count := 0
 	for _, V in Data["vectors"] {
-		if V["category"] != "parse_tag"
+		if V["category"] != Category
 			continue
-		Body := V["input"]["body"]
-		if !(Body is String)
-			Body := ""
-		Result := Updater_ParseTagName(Body)
-		AssertEqual(V["expected"], Result, V["id"] . ": parse_tag mismatch")
+		Count += 1
+		Input := V["input"].Has("json") ? V["input"]["json"] : V["input"]["body"]
+		if !(Input is String)
+			Input := ""
+		try _URPC_CheckVector(Category, V, Parse.Call(Input))
+		catch as Err
+			Failures.Push(Err.Message)
+	}
+	AssertTrue(Count > 0, Category . ": the corpus must hold vectors of this category")
+	Report := ""
+	for Message in Failures
+		Report .= (Report == "" ? "" : " | ") . Message
+	AssertEqual(0, Failures.Length, Failures.Length . " of " . Count . " " . Category . " vectors diverge: " . Report)
+}
+
+_URPC_CheckVector(Category, V, Result) {
+	if Category != "split_releases_array" {
+		AssertEqual(V["expected"], Result, V["id"] . ": " . Category . " mismatch")
+		return
+	}
+	AssertEqual(V["expected_count"], Result.Length, V["id"] . ": split count mismatch")
+	; Exact raw spans and publication order, where the vector pins them.
+	if V.Has("expected_spans") {
+		for Index, Span in V["expected_spans"]
+			AssertEqual(Span, Result[Index], V["id"] . ": split span " . Index . " must keep its exact raw bytes")
 	}
 }
-Test("corpus:up-rp: parse_tag vectors match golden values", _URPC_ParseTag)
 
-; ── parse_notes vectors ──────────────────────────────────────────────────────
-
-_URPC_ParseNotes() {
-	Raw := _URPC_LoadCorpus()
-	Data := _URPC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "parse_notes"
-			continue
-		Body := V["input"]["body"]
-		if !(Body is String)
-			Body := ""
-		Result := Updater_ParseBody(Body)
-		AssertEqual(V["expected"], Result, V["id"] . ": parse_notes mismatch")
-	}
-}
-Test("corpus:up-rp: parse_notes vectors match golden values", _URPC_ParseNotes)
-
-; ── parse_prerelease_flag vectors ────────────────────────────────────────────
-
-_URPC_ParsePrerelease() {
-	Raw := _URPC_LoadCorpus()
-	Data := _URPC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "parse_prerelease_flag"
-			continue
-		Body := V["input"]["body"]
-		if !(Body is String)
-			Body := ""
-		Result := _Updater_ParsePrerelease(Body)
-		AssertEqual(V["expected"], Result, V["id"] . ": parse_prerelease_flag mismatch")
-	}
-}
-Test("corpus:up-rp: parse_prerelease_flag vectors match golden values", _URPC_ParsePrerelease)
-
-; ── split_releases_array vectors ─────────────────────────────────────────────
-
-_URPC_SplitReleases() {
-	Raw := _URPC_LoadCorpus()
-	Data := _URPC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "split_releases_array"
-			continue
-		Json := V["input"]["json"]
-		if !(Json is String)
-			Json := ""
-		Chunks := _Updater_SplitReleasesArray(Json)
-		AssertEqual(V["expected_count"], Chunks.Length, V["id"] . ": split count mismatch")
-	}
-}
-Test("corpus:up-rp: split_releases_array vectors match golden values", _URPC_SplitReleases)
-
-; ── parse_html_url vectors ───────────────────────────────────────────────────
-
-_URPC_ParseHtmlUrl() {
-	Raw := _URPC_LoadCorpus()
-	Data := _URPC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "parse_html_url"
-			continue
-		Body := V["input"]["body"]
-		if !(Body is String)
-			Body := ""
-		Result := _Updater_ParseHtmlUrl(Body)
-		AssertEqual(V["expected"], Result, V["id"] . ": parse_html_url mismatch")
-	}
-}
-Test("corpus:up-rp: parse_html_url vectors match golden values", _URPC_ParseHtmlUrl)
-
-; ── parse_published_at vectors ───────────────────────────────────────────────
-
-_URPC_ParsePublishedAt() {
-	Raw := _URPC_LoadCorpus()
-	Data := _URPC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "parse_published_at"
-			continue
-		Body := V["input"]["body"]
-		if !(Body is String)
-			Body := ""
-		Result := _Updater_ParsePublishedAt(Body)
-		AssertEqual(V["expected"], Result, V["id"] . ": parse_published_at mismatch")
-	}
-}
-Test("corpus:up-rp: parse_published_at vectors match golden values", _URPC_ParsePublishedAt)
+Test("corpus:up-rp: parse_tag vectors match golden values", _URPC_Replay.Bind("parse_tag", Updater_ParseTagName))
+Test("corpus:up-rp: parse_notes vectors match golden values", _URPC_Replay.Bind("parse_notes", Updater_ParseBody))
+Test("corpus:up-rp: parse_prerelease_flag vectors match golden values",
+	_URPC_Replay.Bind("parse_prerelease_flag", _Updater_ParsePrerelease))
+Test("corpus:up-rp: split_releases_array vectors match golden values",
+	_URPC_Replay.Bind("split_releases_array", _Updater_SplitReleasesArray))
+Test("corpus:up-rp: parse_html_url vectors match golden values", _URPC_Replay.Bind("parse_html_url", _Updater_ParseHtmlUrl))
+Test("corpus:up-rp: parse_published_at vectors match golden values",
+	_URPC_Replay.Bind("parse_published_at", _Updater_ParsePublishedAt))

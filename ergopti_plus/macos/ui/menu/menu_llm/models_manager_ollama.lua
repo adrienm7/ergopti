@@ -18,6 +18,7 @@ local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
+local RuntimeChoice = require("core.llm.ollama_runtime_choice")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local NetworkEnv = require("modules.llm.network_env")
 local ManagedPullReceipt = require("adapters.managed_ollama_pull")
@@ -1074,12 +1075,20 @@ function M.new(deps, presets, ram_getter)
 		end
 	end
 
+	--- Whether the user switched the AI on. With it off nothing of Ollama runs:
+	--- a menu build used to start `ollama list` on every Mac (ai-off-inert-macos).
+	--- @return boolean
+	local function ai_enabled()
+		return type(deps.state) == "table" and deps.state.llm_enabled == true
+	end
+
 	function obj.get_installed_models()
 		local now = hs.timer.secondsSinceEpoch()
 		-- Return cached result if still valid
 		if _installed_cache and (now - _installed_cache_time) < INSTALLED_CACHE_TTL then
 			return _installed_cache
 		end
+		if not ai_enabled() then return _installed_cache or {} end
 		-- Trigger async refresh for next menu open; return stale cache or empty table now
 		refresh_installed_async()
 		return _installed_cache or {}
@@ -1209,7 +1218,8 @@ function M.new(deps, presets, ram_getter)
 		return true
 	end
 
-	schedule_initial_refresh()
+	-- With the AI off the first read after the switch-on refreshes the cache
+	if ai_enabled() then schedule_initial_refresh() end
 
 	local function check_model_loadable(target_model, on_success, on_fail, opts)
 		local origin = OllamaEndpoint.get_base_url()
@@ -1406,7 +1416,17 @@ function M.new(deps, presets, ram_getter)
 		local managed_handle
 		local pull_executable, pull_arguments, pull_command
 		if managed ~= true then
-			local network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+			-- `ollama pull` only asks the daemon to fetch. A daemon Ergopti did not
+			-- start (Ollama.app, Homebrew, PATH) downloads with its own network
+			-- settings, so refusing a PAC or WPAD route here only guaranteed that the
+			-- model never came (issue #100); its own failure is reported instead.
+			local foreign_daemon = RuntimeChoice.classify(bin_source) == "foreign"
+			local network, network_err
+			if foreign_daemon then
+				network, network_err = NetworkEnv.prelude("OLLAMA-PULL")
+			else
+				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+			end
 			if not network then
 				Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))
 				settle_cancel("network_policy_missing")

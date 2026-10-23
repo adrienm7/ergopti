@@ -117,6 +117,7 @@ helpers.describe("HS-012 MLX port requirement replay ownership", function()
 						get_startup_silence = function() return false end,
 						set_startup_silence = function() return true end,
 						get_profile_hks = function() return {} end,
+						disarm_shortcuts = function() return true end,
 						prediction_locks = build_prediction_locks(),
 					})
 

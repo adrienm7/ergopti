@@ -1364,9 +1364,13 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 end
 M.__build_payload_for_test = build_payload
 
+-- Byte ceiling of the provider message shown in notifications and logs (Linux: 200).
+local MAX_SERVER_MESSAGE = 200
+
 --- Extracts the provider's own error text (error.message, else a top-level
 --- message as in the Cerebras error shape) without promoting content
---- decoys. Trimmed for notifications; nil when there is nothing to show.
+--- decoys. Bounded for notifications to MAX_SERVER_MESSAGE bytes without ever
+--- splitting a UTF-8 scalar; nil when there is nothing to show.
 --- @param body any Response body.
 --- @return string|nil Message or nil.
 local function extract_server_message(body)
@@ -1375,10 +1379,10 @@ local function extract_server_message(body)
 	if not ok or type(root) ~= "table" then return nil end
 	local err = root.error
 	if type(err) == "table" and type(err.message) == "string" and err.message ~= "" then
-		return err.message:sub(1, 200)
+		return text_utils.utf8_byte_prefix(err.message, MAX_SERVER_MESSAGE)
 	end
 	if type(root.message) == "string" and root.message ~= "" then
-		return root.message:sub(1, 200)
+		return text_utils.utf8_byte_prefix(root.message, MAX_SERVER_MESSAGE)
 	end
 	return nil
 end
@@ -3030,7 +3034,17 @@ function M.detect_local_servers(on_done)
 				if not target_is_current() then settle(nil); return end
 				local returned, delivered, buffered = false, false, nil
 				local function deliver(response)
-					if not target_is_current() then settle(nil); return end
+					if not target_is_current() then
+						Logger.debug(LOG, "Local server '%s' probe answer dropped: its settings changed meanwhile.", target.id)
+						settle(nil)
+						return
+					end
+					-- The sweep publishes one line for every server; this one says why
+					-- a server is not listed (#99: "none answers" alone named no cause)
+					local status = type(response) == "table" and tonumber(response.status) or 0
+					Logger.debug(LOG, "Local server '%s' probe answered %s.", target.id,
+						status ~= 0 and ("HTTP " .. tostring(status))
+							or ("nothing (" .. tostring(type(response) == "table" and response.error or "no response") .. ")"))
 					if type(response) == "table" and response.ok == false and response.status == 0
 						and response.error_kind == "native_dispatch" then
 						settle({ ok = false, status = 0, body = "", probe_error = true })

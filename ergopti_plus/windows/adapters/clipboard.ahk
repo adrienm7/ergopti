@@ -65,6 +65,11 @@ class CBClipboardOwner {
 	static settle_hook := 0
 }
 global CB_RESTORE_RETRY_MS := 50
+; Readers such as the Windows clipboard history open the clipboard right after
+; each change. AutoHotkey's own clipboard calls wait for them up to their default
+; ClipboardTimeout of one second; raw native locks wait for the same bound.
+global CB_NATIVE_OPEN_TIMEOUT_MS := 1000
+global CB_NATIVE_OPEN_RETRY_MS := 10
 
 ; Claims the one process-wide temporary paste slot before its caller performs
 ; any blocking clipboard snapshot. The returned token is also the regular
@@ -237,20 +242,50 @@ CB_RetryRestoreDebt(*) {
 	}
 
 	Settled := false
+	; Critical excludes another script thread using the same native HWND. The
+	; native lease excludes other processes until ClipboardAll closes its setter.
+	RestoreLock := {Opened: false, Released: false, PreviousCritical: Critical("On")}
 	try {
+		; A same-HWND reopen is accepted by Windows, but a skipped attempt must
+		; not close a lease borrowed from its caller. Only that caller may release it.
+		if DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+			return false
+		try RestoreLock.Opened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		catch as Err {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
+			try LoggerWarn("Clipboard", "Restore debt from {1} could not acquire its native lock: {2}.",
+				Debt["source"], Err.Message)
+			return false
+		}
+		if !RestoreLock.Opened {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
+			if (Debt["attempts"] == 1 or Mod(Debt["attempts"], 20) == 0)
+				try LoggerWarn("Clipboard",
+					"Restore debt from {1} is still blocked after attempt {2}; retrying.",
+					Debt["source"], Debt["attempts"])
+			return false
+		}
 		try CurrentSequence := Debt["sequence_fn"].Call()
 		catch as Err {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerWarn("Clipboard",
 				"Restore debt from {1} could not read clipboard ownership: {2}.",
 				Debt["source"], Err.Message)
 			return false
 		}
+		if CBClipboardOwner.restore_debt != Debt
+			return false
 		; Without a recorded sequence, even the first rollback cannot prove that
 		; observable clipboard content still belongs to this producer. A positive
 		; sequence therefore wins before any restore attempt. The existing forced
 		; zero-sequence path remains unfenced and provides no ownership guarantee.
 		if (!Debt["expected_sequence"] and Debt["force"]
 				and CurrentSequence) {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerWarn("Clipboard",
 				"Unfenced restore debt from {1} yielded to observable clipboard content.",
 				Debt["source"])
@@ -259,6 +294,8 @@ CB_RetryRestoreDebt(*) {
 		}
 		if (Debt["expected_sequence"] and CurrentSequence
 				and CurrentSequence != Debt["expected_sequence"]) {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerDebug("Clipboard",
 				"Restore debt from {1} retired because a newer clipboard sequence won.",
 				Debt["source"])
@@ -268,15 +305,23 @@ CB_RetryRestoreDebt(*) {
 		if (Debt["expected_sequence"] and !CurrentSequence)
 			return false
 		if (!Debt["expected_sequence"] and !Debt["force"]) {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			Settled := _CB_SettleRestoreDebt(Debt)
 			return Settled
 		}
 		RestoreOk := false
 		try RestoreOk := Debt["restore_fn"].Call(Debt["saved"])
 		catch as Err {
+			if !_CB_ReleaseRestoreLock(RestoreLock)
+				return false
 			try LoggerWarn("Clipboard", "Restore debt from {1} threw: {2}.",
 				Debt["source"], Err.Message)
 		}
+		if !_CB_ReleaseRestoreLock(RestoreLock)
+			return false
+		; Do not sample a post-setter sequence as ownership. Its internal close
+		; admits later user copies, which must survive this exact debt's retirement.
 		if RestoreOk {
 			Settled := _CB_SettleRestoreDebt(Debt)
 			return Settled
@@ -287,6 +332,7 @@ CB_RetryRestoreDebt(*) {
 				Debt["source"], Debt["attempts"])
 		return false
 	} finally {
+		_CB_ReleaseRestoreLock(RestoreLock)
 		if !Settled {
 			PreviousCritical := Critical("On")
 			try {
@@ -300,6 +346,24 @@ CB_RetryRestoreDebt(*) {
 			}
 		}
 	}
+}
+
+; The real ClipboardAll setter closes its internal open before returning.
+; Never close a later foreign process's lease, or log while our lease remains.
+_CB_ReleaseRestoreLock(Lock) {
+	if Lock.Released
+		return true
+	Critical("On")
+	try {
+		if Lock.Opened && DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+			if !DllCall("User32\CloseClipboard", "Int")
+				return false
+		Lock.Opened := false
+		Lock.Released := true
+		return true
+	} catch {
+		return false
+	} finally Critical(Lock.PreviousCritical)
 }
 
 ; Mutators call this before taking a new snapshot or publishing content. It
@@ -516,9 +580,50 @@ CB_SaveAll() {
 	try {
 		return ClipboardAll()
 	} catch as Err {
-		try LoggerWarn("Clipboard", "CB_SaveAll failed: {1}.", Err.Message)
+		try LoggerWarn("Clipboard", "CB_SaveAll failed: {1} (holder: {2}).",
+			RTrim(Err.Message, "."), CB_DescribeClipboardHolder()["summary"])
 		return "__CB_SAVE_ERROR__"
 	}
+}
+
+; Identifies who holds the native clipboard lock, for failure logs and notices.
+; GetOpenClipboardWindow is 0 both when the lock is free again and when it was
+; opened without a window (OpenClipboard(NULL)), which names no process; the
+; summary says so instead of guessing. GetClipboardOwner is the window whose
+; data the clipboard currently holds, which may differ from the lock holder.
+; Windows-local diagnostics: not part of the cross-driver Clipboard port.
+; @return {Map} hwnd, pid, process ("" when unknown), own, owner_process, summary.
+CB_DescribeClipboardHolder() {
+	Hwnd := DllCall("User32\GetOpenClipboardWindow", "Ptr")
+	Holder := _CB_DescribeClipboardWindow(Hwnd)
+	Owner := _CB_DescribeClipboardWindow(DllCall("User32\GetClipboardOwner", "Ptr"))
+	if !Hwnd
+		Summary := "no window holds the lock (released since, or opened without a window)"
+	else
+		Summary := Format("hwnd=0x{:X} pid={} process={} own_process={}", Hwnd,
+			Holder["pid"], Holder["label"], Holder["own"] ? "yes" : "no")
+	Summary .= "; data owner " . Owner["label"]
+	return Map("hwnd", Hwnd, "pid", Holder["pid"], "process", Holder["process"],
+		"own", Holder["own"], "owner_process", Owner["process"], "summary", Summary)
+}
+
+_CB_DescribeClipboardWindow(Hwnd) {
+	Pid := 0, ProcName := "", Label := "none"
+	if Hwnd {
+		DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd, "UInt*", &Pid)
+		if Pid {
+			try {
+				ProcName := ProcessGetName(Pid)
+				Label := ProcName
+			} catch as Err {
+				Label := "pid " . Pid . " (name unavailable: " . RTrim(Err.Message, ".") . ")"
+			}
+		} else {
+			Label := "unknown (window gone)"
+		}
+	}
+	return Map("pid", Pid, "process", ProcName, "label", Label,
+		"own", Pid != 0 && Pid == DllCall("Kernel32\GetCurrentProcessId", "UInt"))
 }
 
 ; Restores a previously saved all-formats clipboard snapshot.
@@ -567,59 +672,70 @@ CB_HasImage() {
 ; CloseClipboard materializes synthesized DIB formats, so the optional receipt
 ; authenticates the exact publication under a new read lock after that close.
 ; A sequence sampled after return cannot establish ownership.
-CB_WriteBitmapFile(Path, &MutationSequence := 0) {
+CB_WriteBitmapFile(Path, &MutationSequence := 0, AdmissionFn := 0) {
 	MutationSequence := 0
 	if !_CB_ResolveRestoreDebtBeforeMutation()
 		return false
-	static IMAGE_BITMAP := 0
-	static CF_BITMAP := 2
-	static LR_LOADFROMFILE := 0x10
-	MutationId := 0
 	BitmapHandle := 0
-	TransferredBitmap := 0
-	ClipboardOpened := false
-	ClipboardMutated := false
 	try {
-		; CF_BITMAP needs a DDB: a process-local DIB section cannot be pasted by another process.
+		if !(AdmissionFn is Integer && AdmissionFn == 0) && !HasMethod(AdmissionFn, "Call")
+			throw TypeError("Bitmap admission must be a callable or Integer0.")
+		; Load before final admission and keep file I/O outside the short claim.
+		; CF_BITMAP needs a DDB usable by another process, without LR_CREATEDIBSECTION.
 		BitmapHandle := DllCall("User32\LoadImageW", "Ptr", 0, "Str", Path,
-			"UInt", IMAGE_BITMAP, "Int", 0, "Int", 0,
-			"UInt", LR_LOADFROMFILE, "Ptr")
+			"UInt", 0, "Int", 0, "Int", 0, "UInt", 0x10, "Ptr")
 		if !BitmapHandle
 			throw Error("LoadImageW could not load the staged bitmap")
-		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		return _CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn)
+	} catch as Err {
+		if BitmapHandle {
+			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+			BitmapHandle := 0
+		}
+		; The native helper has closed its lock and restored Critical before logging.
+		try LoggerError("Clipboard", "CB_WriteBitmapFile failed for '{1}': {2}.", Path, Err.Message)
+		return false
+	} finally {
+		if BitmapHandle
+			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+	}
+}
+
+; Admission is a pure, zero-argument predicate. Only Integer1 authorizes the
+; mutation; its callback cannot yield to UI or perform clipboard/file I/O.
+; The caller still owns the loaded bitmap until SetClipboardData transfers it.
+_CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn) {
+	PreviousCritical := Critical("On")
+	ClipboardOpened := false, ClipboardMutated := false
+	MutationId := 0, TransferredBitmap := 0
+	try {
+		ClipboardOpened := CB_OpenClipboardWithin(A_ScriptHwnd)
 		if !ClipboardOpened
 			throw Error("OpenClipboard failed")
-		; No clipboard notification can be ours until the file is loaded and the
-		; clipboard lock is held. Reserving earlier could consume an unrelated user
-		; copy while LoadImageW or OpenClipboard was still in progress.
+		if HasMethod(AdmissionFn, "Call") {
+			Admitted := AdmissionFn.Call()
+			if !(Admitted is Integer && Admitted == 1)
+				return false
+		}
+		; Reserve only after the loaded bitmap, native lock and caller admission
+		; are current. Refusal must never consume a foreign clipboard notification.
 		MutationId := _CB_BeginOwnedMutation()
 		if !DllCall("User32\EmptyClipboard", "Int")
 			throw Error("EmptyClipboard failed")
 		ClipboardMutated := true
-		TransferredBitmap := DllCall("User32\SetClipboardData", "UInt", CF_BITMAP, "Ptr", BitmapHandle, "Ptr")
+		TransferredBitmap := DllCall("User32\SetClipboardData", "UInt", 2, "Ptr", BitmapHandle, "Ptr")
 		if !TransferredBitmap
 			throw Error("SetClipboardData(CF_BITMAP) failed")
 		BitmapHandle := 0
 		return true
 	} catch as Err {
-		; EmptyClipboard itself emits the owned notification. Cancel the reservation
-		; only when the clipboard never changed, otherwise the observer must consume it.
 		if MutationId && !ClipboardMutated
 			_CB_CancelOwnedMutation(MutationId)
-		; Release the global clipboard lock before file-backed logging can yield.
-		if ClipboardOpened
-			MutationSequence := _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap)
-		if BitmapHandle {
-			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
-			BitmapHandle := 0
-		}
-		try LoggerError("Clipboard", "CB_WriteBitmapFile failed for '{1}': {2}.", Path, Err.Message)
-		return false
+		throw Err
 	} finally {
 		if ClipboardOpened
 			MutationSequence := _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap)
-		if BitmapHandle
-			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+		Critical(PreviousCritical)
 	}
 }
 
@@ -635,7 +751,9 @@ _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap
 		ClipboardOpened := false
 		if !ClipboardMutated
 			return 0
-		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
+		; Readers notified by the close race this reopen; the owner check below
+		; still refuses a receipt if another process replaced the content meanwhile.
+		ClipboardOpened := CB_OpenClipboardWithin(A_ScriptHwnd)
 		if !ClipboardOpened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
 			return 0
 		if TransferredBitmap {
@@ -684,6 +802,30 @@ CB_IsBusy() {
 		return true
 	try DllCall("User32\CloseClipboard")
 	return false
+}
+
+; Opens the native clipboard lock for Hwnd, waiting up to CB_NATIVE_OPEN_TIMEOUT_MS
+; while another process holds it. A single attempt loses to the readers that open
+; the clipboard just after every change, which is exactly when callers need it.
+; @param {Integer} Hwnd The window that will own the lock.
+; @param {Func} OnRefused Optional; called once, at the first refused attempt.
+; @returns {Boolean} True once the lock is held; false when the bound expired.
+CB_OpenClipboardWithin(Hwnd, OnRefused := 0) {
+	global CB_NATIVE_OPEN_TIMEOUT_MS, CB_NATIVE_OPEN_RETRY_MS
+	Started := A_TickCount
+	Refused := false
+	Loop {
+		if DllCall("User32\OpenClipboard", "Ptr", Hwnd, "Int")
+			return true
+		if !Refused {
+			Refused := true
+			if HasMethod(OnRefused, "Call")
+				OnRefused.Call()
+		}
+		if TickElapsed(Started) >= CB_NATIVE_OPEN_TIMEOUT_MS
+			return false
+		Sleep(CB_NATIVE_OPEN_RETRY_MS)
+	}
 }
 
 

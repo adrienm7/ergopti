@@ -21,10 +21,16 @@
 --- 4. Filter requests: the JS frontend pushes `(start_date, end_date, apps)`
 ---    via `window._lua_request`; the poll timer reads it, queues the paced
 ---    projection (latest request wins), and pushes back the result.
+--- 5. Incomplete reads are shown, never cached. When a SQLite query fails the
+---    page still gets the counts that were read, flagged so it says the
+---    history is incomplete; the snapshot is not saved and the projection
+---    cache is left as it was, so the next open retries a full read.
 --- ==============================================================================
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local RunningApplication = require("adapters.running_application")
+local OwnWindow = require("adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -102,6 +108,8 @@ M._job = nil
 local _pending_work = { full = false, live = false, range = nil }
 --- Snapshot timestamp painted in this window, shown again if the refresh fails.
 local _painted_snapshot_at = nil
+--- True while the last delivered read was incomplete; pairs the recovery log.
+local _incomplete_read_reported = false
 
 local function delivery_is_current(generation, webview)
 	return generation == _generation and M._wv == webview
@@ -408,7 +416,9 @@ local MAX_ICON_LOOKUPS_PER_OPEN = 24
 local EXCLUDED_APPS = { Unknown = true, _sys = true, _system = true }
 
 local function get_app_icon(app_name)
-	local app = hs.application.find(app_name)
+	-- Never hs.application.find: for an app that is not running it searches every
+	-- window of every application, once per icon, on the main thread.
+	local app = RunningApplication.by_name(app_name)
 	if app and type(app.bundleID) == "function" then
 		local ok, img = pcall(hs.image.imageFromAppBundle, app:bundleID())
 		if ok and img then
@@ -437,19 +447,21 @@ local function readable_sqlite_path()
 	return sqlite_path
 end
 
---- Computes the complete first-paint publication: manifest, app icons, the
---- all-time n-gram prefetch, and the keycode layout.
+--- Computes the first-paint publication: manifest, app icons, the all-time
+--- n-gram prefetch, and the keycode layout.
 --- @param pacer table Pacer from `infra.paced_job`.
---- @return table result { payload = string, generated_at = epoch seconds }.
+--- @return table result { payload = string, generated_at = epoch seconds,
+---     complete = boolean }; an incomplete result is shown but never saved.
 local function compute_full(pacer)
 	local generated_at = os.time()
 	local today = os.date("%Y-%m-%d")
 	local manifest, manifest_json = {}, "{}"
+	local manifest_complete, range_complete = true, true
 	local session = nil
 	local sqlite_path = readable_sqlite_path()
 	if sqlite_path then
 		session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path, today, pacer)
-		manifest, manifest_json = session.manifest()
+		manifest, manifest_json, manifest_complete = session.manifest()
 	end
 
 	-- App icons + apps list + first_date computed from manifest. The apps list
@@ -496,41 +508,63 @@ local function compute_full(pacer)
 	-- Initial range pre-fetch (first_date → today).
 	local initial_data_json = "null"
 	if session and first_date then
-		initial_data_json = session.range(first_date, today, all_apps_list)
+		initial_data_json, range_complete = session.range(first_date, today, all_apps_list)
 	end
 
 	return {
 		generated_at = generated_at,
-		payload = string.format('{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
-			manifest_json, PacedJson.encode(app_icons, pacer), initial_data_json,
-			PacedJson.encode(kc_layout, pacer)),
+		complete = manifest_complete == true and range_complete == true,
+		payload = string.format('{"manifest":%s,%s"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+			manifest_json, manifest_complete == true and "" or '"manifest_incomplete":true,',
+			PacedJson.encode(app_icons, pacer), initial_data_json, PacedJson.encode(kc_layout, pacer)),
 	}
 end
 
 --- Computes the manifest alone after an ingest; the frontend then replays its
 --- active range request.
 --- @param pacer table Pacer from `infra.paced_job`.
---- @return string payload Publication object text.
+--- @return table result { payload = publication object text, complete = boolean }.
 local function compute_live(pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return '{"manifest":{}}' end
+	if not sqlite_path then return { payload = '{"manifest":{}}', complete = true } end
 	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	local _, manifest_json = session.manifest()
-	return '{"manifest":' .. manifest_json .. "}"
+	local _, manifest_json, manifest_complete = session.manifest()
+	return {
+		payload = '{"manifest":' .. manifest_json
+			.. (manifest_complete == true and "" or ',"manifest_incomplete":true') .. "}",
+		complete = manifest_complete == true,
+	}
 end
 
 --- Computes one range request's { historical, today } payload.
 --- @param query table Decoded frontend request.
 --- @param pacer table Pacer from `infra.paced_job`.
---- @return string payload Encoded range data.
+--- @return table result { payload = encoded range data, complete = boolean }.
 local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
-	if not sqlite_path then return '{"historical":[],"today":[]}' end
+	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
 	local apps = type(query.apps) == "table" and query.apps or nil
 	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
-	return session.range(query.start_date, query.end_date, apps)
+	local payload, range_complete = session.range(query.start_date, query.end_date, apps)
+	return { payload = payload, complete = range_complete == true }
+end
+
+--- Logs an incomplete read once and its recovery once, so the pair brackets
+--- the time the page showed partial counts.
+--- @param site string Delivered projection kind.
+--- @param complete boolean Whether every SQLite read of that projection succeeded.
+local function note_read_completion(site, complete)
+	if not complete then
+		if not _incomplete_read_reported then
+			_incomplete_read_reported = true
+			Logger.warn(LOG, "Typing metrics %s read incomplete; partial counts shown with a notice, not cached.", site)
+		end
+	elseif _incomplete_read_reported then
+		_incomplete_read_reported = false
+		Logger.info(LOG, "Typing metrics %s read complete again; caching resumed.", site)
+	end
 end
 
 
@@ -658,16 +692,20 @@ local function deliver_work(generation, webview, work, ok, result)
 				_publication_revision)
 			return
 		end
-		Snapshot.save(result.payload, result.generated_at)
+		note_read_completion("history", result.complete)
+		-- Only a complete read may become the snapshot the next open paints
+		if result.complete then Snapshot.save(result.payload, result.generated_at) end
 		publish_data(generation, webview, "manifest", result.payload, _publication_revision, true,
 			freshness_json("fresh"))
 	elseif work.kind == "live" then
 		if not ok then return end
+		note_read_completion("live manifest", result.complete)
 		_publication_revision = _publication_revision + 1
-		publish_data(generation, webview, "live manifest", result, _publication_revision, false)
+		publish_data(generation, webview, "live manifest", result.payload, _publication_revision, false)
 	else
 		local request_id = work.request_id
-		local encoded = ok and result or "null"
+		if ok then note_read_completion("range", result.complete) end
+		local encoded = ok and result.payload or "null"
 		local js_cmd
 		if request_id then
 			js_cmd = string.format("window.receive_range_data(%s,%d)", encoded, request_id)
@@ -793,14 +831,9 @@ function M.show()
 	end
 	if M._wv then
 		local generation, webview = _generation, M._wv
-		local already_focused = false
-		pcall(function()
-			local win     = webview:hswindow()
-			if win then
-				local focused   = hs.window.focusedWindow()
-				already_focused = focused and focused:id() == win:id()
-			end
-		end)
+		-- A failed lookup reads as not focused, so the dashboard is presented.
+		local ok_focused, focused = pcall(OwnWindow.is_webview_focused, webview)
+		local already_focused = ok_focused and focused == true
 		if not delivery_is_current(generation, webview) then return false end
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")

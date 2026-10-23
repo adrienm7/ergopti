@@ -37,17 +37,19 @@ MagicKeyEditor(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
-		GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
-		GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
-		GuiToShow.Show("Center")
-		IH := InputHook("L1 I", "{Escape}")
-		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
+		; Prepare the cached scalar membership before any dialog is visible.
+		; I keeps its existing MinSendLevel=1 admission for non-AHK input.
+		ScalarEndKeys := _SIHO_ScalarEndKeys() . "{Escape}"
 		_InheritedCritical := A_IsCritical
+		GuiToShow := 0, IH := 0
 		try {
-				; Publish + Start is one lifecycle transaction. If suspend lands before
-				; publication this gate refuses Start; if it lands afterwards, suspend
-				; owns this exact live hook and stops it synchronously.
+				GuiToShow := Gui_Create("", t("dialog.magic_key.title"))
+				GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
+				GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
+				; Construct while hidden: native Close otherwise hides an unowned Gui
+				; before the later factory returns and starts an invisible capture.
+				IH := InputHook("L2 E C I", ScalarEndKeys)
+				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
@@ -56,26 +58,44 @@ MagicKeyEditor(*) {
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
+						; Show pumps messages. Its Close handler must already own the
+						; started hook, with no later Start able to revive that capture.
+						GuiToShow.Show("Center")
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
 				} finally {
-						; Wait() pumps messages and may block indefinitely. It must never
-						; inherit a Critical menu caller after publication is complete.
+						; Wait must never inherit a Critical menu caller.
 						Critical("Off")
 				}
 				IH.Wait()
 		} finally {
-				_MagicKeyEditorStopOwned(IH)
-				if (_MagicKeyEditorGui == GuiToShow)
-						_MagicKeyEditorGui := ""
-				; The Close event may already have destroyed the native window.
-				try GuiToShow.Destroy()
-				Critical(_InheritedCritical)
+				CaptureSettled := false
+				try {
+						if IsObject(IH)
+								CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
+				} finally {
+						if IsObject(GuiToShow) {
+								if (_MagicKeyEditorGui == GuiToShow)
+										_MagicKeyEditorGui := ""
+								; Close or a constructor failure may already retire this Gui.
+								try GuiToShow.Destroy()
+						}
+						Critical(_InheritedCritical)
+				}
 		}
-		; InputHook.Wait pumps messages and native Suspend does not stop hooks by
-		; itself. Discard a capture whose wait crossed the pause boundary.
-		if A_IsSuspended
+
+		; Close or a complete pause/resume may retire this exact owner while a
+		; completed native hook still retains its reason and captured units. Only the
+		; terminal path which actually retires that owner may persist its result.
+		if !CaptureSettled || A_IsSuspended
 				return
-		if (IH.EndReason = "Max" && IH.Input != "")
-				ModifyMagicKey(0, IH.Input)
+		Capture := _SIHO_ReadScalar(IH, "{Escape}")
+		if Capture.Reason != ""
+				LoggerWarn("Editors", "Discarded invalid Magic Key scalar capture ({1}).", Capture.Reason)
+		if Capture.Kind == "text"
+				ModifyMagicKey(0, Capture.Text)
 }
 
 _MagicKeyEditorClose(IH, GuiToClose, *) {
@@ -85,17 +105,19 @@ _MagicKeyEditorClose(IH, GuiToClose, *) {
 		return !_MagicKeyEditorStopOwned(IH)
 }
 
-_MagicKeyEditorStopOwned(IH) {
+; Cleanup is idempotent for Close/lifecycle callers. Terminal capture delivery
+; instead requires this call to retire the exact owner after native Stop.
+_MagicKeyEditorStopOwned(IH, SettleCapture := false) {
 		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
 		PreviousCritical := Critical("On")
 		try {
 				if !IsObject(_MagicKeyEditorInputHook) {
 						_MagicKeyEditorStopDebt := false
-						return true
+						return !SettleCapture
 				}
 				; A stale Close/finally must never stop or clear a successor editor.
 				if _MagicKeyEditorInputHook != IH
-						return true
+						return !SettleCapture
 		} finally Critical(PreviousCritical)
 
 		try IH.Stop()
@@ -111,7 +133,7 @@ _MagicKeyEditorStopOwned(IH) {
 				} finally Critical(PreviousCritical)
 				; Stop may have pumped an OnEnd/finally that settled this owner first.
 				if !OwnerRetained
-						return true
+						return !SettleCapture
 				LoggerError("Editors", "Could not stop the Magic Key capture; cleanup ownership was retained: {1}.", Err.Message)
 				return false
 		}
@@ -122,9 +144,12 @@ _MagicKeyEditorStopOwned(IH) {
 				and _MagicKeyEditorInputHook == IH {
 						_MagicKeyEditorInputHook := ""
 						_MagicKeyEditorStopDebt := false
+						return true
 				}
 		} finally Critical(PreviousCritical)
-		return true
+		; Cleanup remains idempotent for Close/lifecycle callers. A capture
+		; receipt additionally proves that no reentrant Stop already revoked it.
+		return !SettleCapture
 }
 
 _EditorWriteToml(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
@@ -250,20 +275,19 @@ MagicKeySourceCapture(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
-		GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
-		GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
-		GuiToShow.Show("Center")
-		State := _MagicKeySourceCaptureState()
-		; L0: no text is collected, every key is reported to OnKeyDown (N) and
-		; kept from the application (S); T ends the wait on the shared timeout.
-		IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
-		IH.KeyOpt("{All}", "NS")
-		IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
-		MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
-		GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 		_InheritedCritical := A_IsCritical
+		GuiToShow := 0, IH := 0, MagicKeyCapturePoll := 0
 		try {
-				; Publish + Start is one lifecycle transaction, as in MagicKeyEditor.
+				GuiToShow := Gui_Create("", t("dialog.magic_key_source.title"))
+				GuiToShow.Add("Text", "w300", t("dialog.magic_key_source.prompt"))
+				State := _MagicKeySourceCaptureState()
+				; Prepare the whole capture before showing an actionable dialog.
+				; L0 collects no text. NS reports and suppresses every physical key.
+				IH := InputHook("L0 I T" . TimingsGetSec("ui", "magic_key_capture_timeout_ms"))
+				IH.KeyOpt("{All}", "NS")
+				IH.OnKeyDown := _MagicKeySourceCaptureKeyDown.Bind(State)
+				MagicKeyCapturePoll := _MagicKeySourceCapturePoll.Bind(State, IH)
+				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
@@ -272,21 +296,39 @@ MagicKeySourceCapture(*) {
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
+						GuiToShow.Show("Center")
+						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+								return
 				} finally {
 						Critical("Off")
 				}
 				SetTimer(MagicKeyCapturePoll, TimingsGet("ui", "magic_key_capture_poll_ms"))
 				IH.Wait()
 		} finally {
-				SetTimer(MagicKeyCapturePoll, 0)
-				_MagicKeyEditorStopOwned(IH)
-				if (_MagicKeyEditorGui == GuiToShow)
-						_MagicKeyEditorGui := ""
-				try GuiToShow.Destroy()
-				Critical(_InheritedCritical)
+				try {
+						if HasMethod(MagicKeyCapturePoll, "Call")
+								SetTimer(MagicKeyCapturePoll, 0)
+				} finally {
+						CaptureSettled := false
+						try {
+								if IsObject(IH)
+										CaptureSettled := _MagicKeyEditorStopOwned(IH, true)
+						} finally {
+								if IsObject(GuiToShow) {
+										if (_MagicKeyEditorGui == GuiToShow)
+												_MagicKeyEditorGui := ""
+										try GuiToShow.Destroy()
+								}
+								Critical(_InheritedCritical)
+						}
+				}
 		}
-		; A capture whose wait crossed the pause boundary is discarded.
-		if A_IsSuspended
+
+		; A completed candidate can outlive external Close or pause/resume. Its
+		; retained Scan/Stopped result is valid only for the terminal owner.
+		if !CaptureSettled || A_IsSuspended
 				return
 		; Escape, Close and the timeout all end without an answer.
 		if (IH.EndReason != "Stopped")
@@ -734,16 +776,25 @@ _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 }
 
 PersonalInformationEditor(*) {
+		global PersonalInformation, PersonalInformationLetters
 		; Prefer the shared WebView2 editor (identical UI to macOS); the native
 		; multi-field dialog below remains as an automatic fallback.
 		if _PiEdWeb_TryOpen()
 				return
+		Path := PersonalInfoTomlPath()
+		ConfiguredKey := _ConfigWriteLeaseKey(Path)
+		ReadPersonalInfoToml(Path)
+		EditorSource := _PersonalInfoCaptureEditorSource(Path, true, ConfiguredKey)
+		if !_PersonalInfoEditorPathCurrent(EditorSource)
+			return
 		GuiToShow := Gui_Create(, t("dialog.personal_info.title"))
+		GuiToShow.OnEvent("Close", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
+		GuiToShow.OnEvent("Escape", _PersonalInfoCloseEditor.Bind(GuiToShow, EditorSource))
 		UpdatedPersonalInformation := Map()
 		ReverseLetters := Map()
-		for k, v in PersonalInformationLetters
+		for k, v in EditorSource["letters"]
 				ReverseLetters[v] := k
-		for PersonalInformationKey, OldValue in PersonalInformation {
+		for PersonalInformationKey, OldValue in EditorSource["information"] {
 				TextToAdd := ""
 				if ReverseLetters.Has(PersonalInformationKey)
 						TextToAdd := " (@" . ReverseLetters[PersonalInformationKey] . ScriptInformation["MagicKey"] . ")"
@@ -753,12 +804,18 @@ PersonalInformationEditor(*) {
 				NewValue := GuiToShow.Add("Edit", "w300", OldValue)
 				UpdatedPersonalInformation[PersonalInformationKey] := NewValue
 		}
-		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation))
+		GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click",
+			(*) => ProcessUserInput(GuiToShow, UpdatedPersonalInformation, 0, 0, 0, 0, 0, 0, 0, EditorSource))
 		GuiToShow.Show("Center")
 }
 
+_PersonalInfoCloseEditor(Window, EditorSource, *) {
+	EditorSource["active"] := false
+	Window.Destroy()
+}
+
 ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
-		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0) {
+		AuthorizeFn := 0, NotifyFn := 0, ReloadFn := 0, ConfirmFn := 0, EditorSource := unset) {
 	global PersonalInformation, ScriptInformation
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -766,7 +823,7 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		; may be Critical, but this complete user action must remain interruptible.
 		Critical("Off")
 		try return ProcessUserInput(gui, edits, WriterFn, ReplaceFn, DeleteFn,
-			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn)
+			AuthorizeFn, NotifyFn, ReloadFn, ConfirmFn, EditorSource?)
 		finally Critical(InheritedCritical)
 	}
 	if !(edits is Map) {
@@ -794,8 +851,16 @@ ProcessUserInput(gui, edits, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 			Changed[Key] := true
 	}
 
-	if !PersonalInfoCommitValues(ScriptInformation["PersonalInfoTomlPath"],
-			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn) {
+	Path := ScriptInformation["PersonalInfoTomlPath"]
+	if !IsSet(EditorSource) {
+		AdapterSource := _PersonalInfoEditorAdapterSource(Path)
+		if AdapterSource is Map
+			EditorSource := AdapterSource
+	}
+	if IsSet(EditorSource) && EditorSource is Map && EditorSource.Get("path", 0) is String
+		Path := EditorSource["path"]
+	if !PersonalInfoCommitValues(Path,
+			Values, WriterFn, ReplaceFn, DeleteFn, AuthorizeFn, EditorSource?) {
 		try LoggerError("PersonalInfo",
 			"Personal information NOT saved — keeping the native editor open so the values are not lost.")
 		return _PersonalInfoReportSaveFailure(NotifyFn)

@@ -21,6 +21,7 @@
 local M = {}
 
 local hs = hs
+local NativePath = require("native_path")
 local HELPER_ENV = "ERGOPTI_LAUNCHER_EXECUTABLE"
 local HELPER_DEVICE_ENV = "ERGOPTI_LAUNCHER_DEVICE"
 local HELPER_INODE_ENV = "ERGOPTI_LAUNCHER_INODE"
@@ -30,13 +31,15 @@ local MAX_EXACT_FLOAT_INTEGER = 9007199254740991
 
 local function source_driver_root()
 	local source = ((debug.getinfo(1, "S") or {}).source or ""):gsub("^@", "")
-	return source:match("^(.*)[/\\]platform[/\\]remap[/\\][^/\\]+$")
+	local remap = NativePath.dirname(source)
+	local platform = remap and NativePath.basename(remap) == "remap" and NativePath.dirname(remap) or nil
+	if not platform or NativePath.basename(platform) ~= "platform" then return nil end
+	return NativePath.dirname(platform)
 end
 
 local function basename(path)
 	if type(path) ~= "string" then return nil end
-	local trimmed = path:gsub("[/\\]+$", "")
-	return trimmed:match("([^/\\]+)$")
+	return NativePath.basename(NativePath.without_trailing_separators(path))
 end
 
 --- Canonicalizes one non-negative integer filesystem identity component.

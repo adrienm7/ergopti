@@ -201,6 +201,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/text_utils.ahk
 #Include ../infra/text_case.ahk
 #Include ../infra/wrap_pair.ahk
+#Include ../infra/open_target.ahk
 #Include ../infra/send_input_parameter.ahk
 #Include ../infra/tap_keys.ahk
 #Include ../infra/key_combinations.ahk
@@ -607,6 +608,7 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_check_schedule.ahk
 #Include unit/modules/updater/test_updater_balloon_click_ownership.ahk
 #Include unit/modules/updater/test_updater_channel_selection.ahk
+#Include unit/modules/updater/test_updater_release_list_budget.ahk
 ; The About row actions; menu_init.ahk is included with the tray root below.
 #Include ../ui/menu/menu_actions.ahk
 #Include unit/modules/updater/test_about_menu_channel_rows.ahk
@@ -628,6 +630,7 @@ InstallSendNoOps()
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
 ; include paths are resolved relative to the tests/ directory.
 #Include unit/modules/shortcuts/test_shortcuts.ahk
+#Include unit/modules/shortcuts/test_open_target_vectors.ahk
 #Include unit/modules/shortcuts/test_keepawake_visible_cancellation.ahk
 #Include unit/suite/test_runner_shard.ahk
 
@@ -674,6 +677,8 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/local_servers.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_streaming.ahk
+#Include unit/modules/llm/api/test_llm_api_ollama_curl_personal_config.ahk
+#Include unit/modules/llm/api/test_llm_provider_error_prefix.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_local_presence.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama_warmup.ahk
 #Include unit/modules/llm/prediction/test_llm_engine_read_guarded_in_timer.ahk
@@ -683,6 +688,8 @@ _LLM_Deps_State := "ready"
 #Include unit/platform/network/test_curl_proxy_auth_integration.ahk
 #Include unit/platform/network/test_curl_proxy_discovery.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
+#Include unit/platform/network/test_managed_curl_empty_header.ahk
+#Include unit/platform/network/test_http_post_replacement_validation.ahk
 #Include unit/platform/network/test_managed_curl_callers.ahk
 #Include unit/platform/network/test_curl_proxy_auth_policy.ahk
 #Include unit/modules/llm/servers/test_local_server_auth.ahk
@@ -695,6 +702,8 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/servers/test_llm_crash_orphan_cleanup.ahk
 #Include unit/modules/llm/servers/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/adapters/test_filesystem_native_write.ahk
+#Include unit/adapters/test_filesystem_nul_paths.ahk
+#Include unit/adapters/test_process_lifecycle_app_events.ahk
 #Include unit/infra/logger/test_logger_native_write.ahk
 #Include unit/modules/keylogger/test_keylogger_sql_native_write.ahk
 #Include unit/modules/keylogger/test_keylogger_sql_write_compensation.ahk
@@ -748,6 +757,7 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/hotstrings/prefix/test_prefix_char_admission.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_idle_click_reset.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_event_word_reset.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_backspace_word_start.ahk
 #Include unit/modules/llm/prediction/test_llm_bridge_buffer_cap.ahk
 #Include unit/modules/llm/navigation/test_llm_pointer_watch_transaction.ahk
 #Include unit/modules/llm/navigation/test_llm_tab_accept_policy.ahk
@@ -1122,6 +1132,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keylogger/ergonomics/test_walker_json_flush_merge.ahk
 #Include unit/modules/keylogger/ergonomics/test_walker_histogram_partitions.ahk
 #Include unit/modules/keylogger/test_keylogger_sql.ahk
+#Include unit/modules/keylogger/test_keylogger_sql_literal_controls.ahk
 #Include unit/modules/keylogger/test_keylogger_text_cipher.ahk
 #Include unit/modules/keylogger/test_keylogger_text_migration.ahk
 #Include unit/infra/config/migration/test_migration_native_write.ahk
@@ -1132,6 +1143,7 @@ global _AhkSubDir := ""
 #Include unit/modules/keylogger/test_keylogger_app_categories.ahk
 #Include unit/modules/keylogger/reader/test_keylogger_reader.ahk
 #Include unit/modules/keylogger/reader/test_keylogger_reader_manifest_contract.ahk
+#Include unit/modules/keylogger/reader/test_klr_manifest_switches_to.ahk
 #Include unit/modules/keylogger/test_keylogger_llm_accepted_metrics.ahk
 #Include unit/modules/keylogger/metrics/test_metrics_sqlite_fixture_cleanup.ahk
 #Include unit/modules/keylogger/test_keylogger_shortcut_projection.ahk
@@ -1261,6 +1273,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/modules/updater/test_updater_curl_capture.ahk
 #Include unit/modules/updater/test_updater_curl_capture_namespace.ahk
 #Include unit/modules/updater/test_updater_curl_capture_move_graph.ahk
+#Include fixtures/host_curl_capability.ahk
+#Include unit/platform/network/test_host_curl_capability.ahk
 #Include unit/platform/network/test_managed_remote_sspi.ahk
 #Include meta/modules/llm/servers/test_remote_connect_timeout_bounded.ahk
 #Include meta/modules/keylogger/test_keylogger_json_64bit_decode.ahk
@@ -1473,6 +1487,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/modules/shortcuts/test_shortcuts_personal_data_native_port.ahk
 #Include unit/modules/shortcuts/test_shortcuts_extension_results.ahk
 #Include unit/modules/shortcuts/test_shortcuts_menu_groups_unique.ahk
+#Include unit/modules/shortcuts/test_keyboard_slot_group_scope.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/ui/menu/test_list_providers_touch_no_menu.ahk
 #Include meta/modules/keylogger/metrics/test_menu_metrics_disabled_when.ahk
@@ -1702,6 +1717,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/infra/toml/test_json_number_misleading_error.ahk
 #Include unit/infra/toml/test_json_string_fast_path.ahk
 #Include unit/infra/toml/test_json_object_key_nul.ahk
+#Include unit/infra/toml/test_json_native_string_scan.ahk
 #Include unit/modules/llm/servers/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
@@ -1966,6 +1982,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/platform/remap/key_combinations/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/modules/updater/test_changelog_fetch_async.ahk
 #Include meta/platform/network/test_curl_response_size_bound.ahk
+#Include meta/platform/network/test_curl_personal_config_disabled.ahk
 #Include meta/modules/updater/test_curl_staging_failure_cleanup.ahk
 #Include meta/modules/updater/test_changelog_webview_bridge.ahk
 #Include meta/modules/llm/menu/test_model_browser_webview_bridge.ahk
@@ -2198,6 +2215,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/modules/shortcuts/test_program_providers.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_launch_cleanup.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_argv.ahk
+#Include unit/adapters/shell_runner/test_shell_runner_nul_arguments.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_exit_code.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_exit_query_failure.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_ownership.ahk

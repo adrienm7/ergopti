@@ -17,8 +17,9 @@
 --- THE THREE RULES THAT MAKE THE COUNTS MEAN SOMETHING:
 --- A long pause breaks the run — two characters either side of a coffee break
 --- are not a bigram, and counting them as one puts a pair into the same-finger
---- analysis that no hand ever typed. A backspace breaks it — what follows
---- continues from a different character than it appears to. And synthetic output
+--- analysis that no hand ever typed. A backspace is a token of the run, as on
+--- Windows and macOS: "a[BS]b" is a sequence the hands made, "ab" is not. And
+--- synthetic output
 --- never chains: a hotstring's expansion is text the user did not type, and
 --- folding it into the bigram counts would make the layout look better the more
 --- expansions they use, which is backwards for a tool that measures effort.
@@ -216,7 +217,7 @@ end)
 
 
 -- ============================================================================
--- Canonical backspace unigrams without extending correction sequences
+-- Canonical backspace unigrams
 -- ============================================================================
 
 helpers.describe("aggregate walker: backspace unigram retention", function()
@@ -267,11 +268,12 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 		helpers.assert_eq(errors.cascade_max_len, 3)
 		helpers.assert_eq(errors.recovery_sum_ms, 140)
 		helpers.assert_eq(errors.recovery_count, 1)
-		-- The sequences ending in a correction are counted (linux-backspace-sequences);
-		-- nothing is chained after one.
+		-- The sequences ending in a correction and the ones that follow it are
+		-- counted, as on Windows and macOS (linux-backspace-sequences).
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 1)
-		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
-		helpers.assert_eq(count_of(batch, "ngram_trigrams", "a[BS]b"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "[BS][BS]b"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "a[BS]b"), 0, "three corrections stand between a and b")
 	end)
 	it("linux-backspace-unigrams: literal software spelling stays four codepoints", function()
 		local batch = Walker.walk({ key("[", 0, "other"), key("B", 0, "other"),
@@ -294,8 +296,9 @@ end)
 -- ============================================================================
 
 -- Windows and macOS push "x[BS]" and "yx[BS]" for every Backspace, so the
--- dashboard can show which sequences the user goes back over; this walker
--- counted the unigram only and left both tables without a single correction.
+-- dashboard can show which sequences the user goes back over, and the marker
+-- stays in the chain, so "[BS]x" and "y[BS]x" count what the user typed next.
+-- This walker first counted the unigram only, then broke the chain after it.
 helpers.describe("aggregate walker: backspace sequences", function()
 	local PAUSE_MS = Fixture.PAUSE_MS
 	local function item(batch, family, token)
@@ -327,14 +330,25 @@ helpers.describe("aggregate walker: backspace sequences", function()
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "[BS][BS][BS]"), 1)
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 3, "the error counts are unchanged")
 	end)
-	it("linux-backspace-sequences: nothing chains after a correction", function()
+	it("linux-backspace-sequences: the characters after a correction chain with it", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("b", 100), key("c", 100),
 			key("[BS]", 100) }, "2026-08-06", "app")
-		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
-		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 1, "the run restarts at the next character")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 1)
+		helpers.assert_eq(item(batch, "ngram_bigrams", "[BS]b").td, 100, "the next keystroke times the pair")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "bc"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "c[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "a[BS]b"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_trigrams", "[BS]bc"), 1)
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "bc[BS]"), 1)
-		helpers.assert_eq(count_of(batch, "ngram_trigrams", "[BS]bc"), 0)
+		helpers.assert_eq(count_of(batch, "ngram_quadgrams", "a[BS]bc"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_quadgrams", "[BS]bc[BS]"), 0,
+			"a correction still ends no sequence longer than a trigram")
+	end)
+	it("linux-backspace-sequences: a pause after the correction breaks the sequence", function()
+		local batch = Walker.walk({ key("a", 100), key("[BS]", 100), key("b", PAUSE_MS) },
+			"2026-08-06", "app")
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "a[BS]"), 1)
+		helpers.assert_eq(count_of(batch, "ngram_bigrams", "[BS]b"), 0)
 	end)
 	it("linux-backspace-sequences: a pause before the correction breaks the sequence", function()
 		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", PAUSE_MS) },
@@ -463,3 +477,47 @@ helpers.describe("aggregate walker: cross-flush context", function()
 	end)
 end)
 
+
+
+
+
+-- ============================================================================
+-- The shared correction sequence corpus
+-- ============================================================================
+
+-- _shared/tests/corpus/keylogger/correction_sequence_vectors.json is replayed by
+-- the Windows and macOS walkers too, so the three drivers keep one definition of
+-- the n-grams around a correction. Each flush is one walk over a carried context.
+helpers.describe("aggregate walker: shared correction sequence corpus", function()
+	local Json = require("json")
+	local file = assert(io.open(assert(require("infra.paths").shared(
+		"tests/corpus/keylogger/correction_sequence_vectors.json")), "rb"))
+	local data = Json.decode(assert(file:read("*a")))
+	assert(file:close())
+	it("corpus-correction-sequences: the corpus carries vectors", function()
+		helpers.assert_true(type(data.vectors) == "table" and #data.vectors > 0)
+	end)
+	for _, vec in ipairs(data.vectors) do
+		it("corpus-correction-sequences: " .. vec.id, function()
+			local batch, ctx = nil, {}
+			for _, flush in ipairs(vec.flushes) do
+				local events = {}
+				for _, ev in ipairs(flush) do events[#events + 1] = key(ev.char, ev.delay) end
+				batch = Walker.walk(events, data.date, data.app, batch, nil, ctx)
+			end
+			local prefix = data.date .. "\1" .. data.app .. "\1"
+			for family, expected in pairs(vec.expected) do
+				local actual = {}
+				for row_key, row in pairs(batch.ngram[family] or {}) do
+					if row_key:sub(1, #prefix) == prefix and row.c > 0 then actual[row_key:sub(#prefix + 1)] = row.c end
+				end
+				for token, count in pairs(expected) do
+					helpers.assert_eq(actual[token], count, vec.id .. ": " .. family .. " " .. token)
+				end
+				for token in pairs(actual) do
+					helpers.assert_true(expected[token] ~= nil, vec.id .. ": " .. family .. " counts an unexpected " .. token)
+				end
+			end
+		end)
+	end
+end)

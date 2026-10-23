@@ -224,8 +224,21 @@ TomlConfigTapSlotCatalogue() {
 	return Map("prefix", "tap_key__", "slots", Captured["slots"].Clone())
 }
 
+; Returns the keyboard input owner's complete published slot domain, or false
+; while it is unavailable (an unloaded manifest cannot prove retirement).
+TomlConfigKeyboardSlotCatalogue() {
+	Ids := KeyboardSlotCatalogueIds()
+	if !(Ids is Array)
+		return false
+	return ConfigBindingIdentityKeyboardCatalogue(Ids)
+}
+
 ; Judges native bindings only against their actual acknowledged publication.
 TomlConfigParameterBindingStatus(BindingId, Catalogue?) {
+	if Type(BindingId) == "String" && SubStr(BindingId, 1, 10) == "keyboard__" {
+		KeyboardCatalogue := TomlConfigKeyboardSlotCatalogue()
+		return KeyboardCatalogue is Map ? ConfigBindingIdentityKeyboardStatus(BindingId, KeyboardCatalogue) : "unjudged"
+	}
 	if Type(BindingId) == "String" && SubStr(BindingId, 1, 9) == "tap_key__" {
 		TapCatalogue := TomlConfigTapSlotCatalogue()
 		return TapCatalogue is Map ? ConfigBindingIdentityTapStatus(BindingId, TapCatalogue) : "unjudged"
@@ -279,6 +292,7 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 	} finally Critical(PreviousCritical)
 	Reason := SubStr(Key, 1, 8) == "script__" ? ConfigBindingIdentityScriptRetiredReason()
 		: SubStr(Key, 1, 9) == "tap_key__" ? ConfigBindingIdentityTapRetiredReason()
+		: SubStr(Key, 1, 10) == "keyboard__" ? ConfigBindingIdentityKeyboardRetiredReason()
 		: "no gesture slot of this build has this name"
 	try LoggerWarn("TomlConfigLoader", "Outdated configuration entry '[action_parameters].{1}' in '{2}' ignored "
 		. "({3}); it is offered for explicit cleanup.", TOML_RenderKey(Key), FilePath, Reason)
@@ -287,12 +301,20 @@ TomlConfigReportRetiredGestureParameter(FilePath, Key) {
 
 ; Action parameters use the binding grammar written by the gesture, shortcut
 ; and tap-hold owners. Only actions declaring a parameter can consume a value.
+; A binding its owner publishes is owned by that publication, not by spelling:
+; a physical keyboard slot keeps its scan-code case (win_SC03A), which the
+; lowercase grammar alone would offer for deletion. An unpublished domain keeps
+; the lowercase grammar.
 TomlConfigActionParameterIsOwned(Key) {
 	static Actions := GestureActionCatalogueData().Actions
-	if !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
+	if Type(Key) != "String" || !RegExMatch(Key, "^(?:combination|gesture|keyboard|script|tap_hold|tap_key)__([A-Za-z0-9]+(?:_[A-Za-z0-9]+)*)__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
 		return false
-	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
-		&& TomlConfigActionParameterBindingStatus(Key) != "retired"
+	if !Actions.Has(Match[2]) || Actions[Match[2]].Parameter == ""
+		return false
+	Status := TomlConfigActionParameterBindingStatus(Key)
+	if Status == "current"
+		return true
+	return Status != "retired" && RegExMatch(Match[1], "^[a-z0-9_]+$")
 }
 
 TomlConfigForeignOwner(SectionPath, Key) {
@@ -306,11 +328,10 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	if SectionPath == "action_parameters" && TomlConfigActionParameterIsOwned(Key)
 		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
-	; Admit exactly the prefixes and keys that ShowKeyboardSlotPicker can create;
-	; a broad section exemption would hide misspellings such as win_cc forever.
-	if (SectionPath == "shortcuts.keyboard"
-			&& RegExMatch(Key,
-				"^(?:alt|ctrl|ctrl_shift|win)_(?:[a-z0-9]|space|enter|period|comma|sc029)$"))
+	; Admit exactly the slots the keyboard input owner binds (its published
+	; domain); a broad section exemption would hide misspellings such as win_cc
+	; forever, and a narrower rule would offer a live physical slot for removal.
+	if (SectionPath == "shortcuts.keyboard" && KeyboardSlotIsCatalogued(Key))
 		return "ConfigIO"
 	; The key-combination slots are keyed by an ordered pair of tap-hold keys,
 	; « first_then_second » (infra/key_combinations.ahk); the manifest declares
@@ -359,7 +380,8 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	if TomlSectionIsDynamicPersonalNamespace(SectionPath)
 		return ""
 	Node := Features
-	Parts := TomlConfigSectionParts(SectionPath)
+	; A bare root key sits in the tree root itself, so it is a leaf there.
+	Parts := SectionPath == "" ? [] : TomlConfigSectionParts(SectionPath)
 	if !(Parts is Array)
 		return "section"
 	for _, Part in Parts {
@@ -385,6 +407,25 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 	; Dynamic keyboard slots belong to ConfigIO only outside the manifest tree.
 	ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
 	return ForeignOwner != "" ? "" : "leaf"
+}
+
+; Judges one outermost ``[[x]]`` table array (a snapshot ArrayRows entry). No
+; manifest setting is a table array, so the loader never applies one. Returns
+; "skip" inside a reserved or obsolete namespace (its own reader or the retired
+; cleanup owns it), "" for a registered foreign or dynamic personal owner, the
+; TomlConfigUnknownKind result for an unknown path, and "outdated" for a path
+; this build knows under another shape. The boot loader and the unused-key
+; cleanup both call this, so the arrays boot names are the ones cleanup offers.
+TomlConfigTableArrayKind(Features, Section, Key) {
+	Path := _TOML_ConfigPathName(_TOML_ConfigPath(Section, Key))
+	if TomlConfigSectionSkipKind(Section) != "" || TomlConfigSectionSkipKind(Path) != ""
+		return "skip"
+	if TomlSectionIsDynamicPersonalNamespace(Path)
+		return ""
+	Kind := TomlConfigUnknownKind(Features, Section, Key, &ForeignOwner)
+	if Kind != "" || ForeignOwner != "" || TomlSectionIsDynamicPersonalNamespace(Section)
+		return Kind
+	return "outdated"
 }
 
 ; Why the loader leaves a manifest-known ``[Section].Key`` value unapplied as
@@ -859,6 +900,19 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			RejectedOverrides += 1
 			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)
+		}
+	}
+
+	; Table-array generations never apply (their records are counted above as
+	; skipped); an unknown or outdated one is named like any other unused row.
+	for Row in Snapshot.ArrayRows {
+		ArrayKind := TomlConfigTableArrayKind(Features, Row.Section, Row.Key)
+		if ArrayKind == "outdated" {
+			OutdatedEntries[Row.Section . "`n" . Row.Key] := "this build reads no table array at this path"
+			OutdatedNames .= (OutdatedNames == "" ? "" : ", ") . "[" . Row.Section . "]." . Row.Key
+		} else if ArrayKind == "section" || ArrayKind == "leaf" {
+			UnknownKeys += 1
+			UnknownNames .= (UnknownNames == "" ? "" : ", ") . "[" . Row.Section . "]." . Row.Key
 		}
 	}
 

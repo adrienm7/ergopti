@@ -333,7 +333,9 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 				if (A_IsSuspended or entry["cancelled"] or !_LLM_Ollama_PresenceStillCurrent(entry)) {
 					launch_blocked := true
 				} else {
-					cmdLine := '"' . curl_exe . '" -s -S -m '
+					; --disable must come first: it alone stops curl from reading
+					; the user's personal .curlrc (headers, output, TLS options).
+					cmdLine := '"' . curl_exe . '" --disable -s -S -m '
 						. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
 						. _LLM_CurlMaxFileSizeArg() . '-X POST '
 						. '-H "Content-Type: application/json" '
@@ -814,7 +816,9 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; Launch curl.exe directly (not cmd /c): hidden cmd often lacks curl on PATH and
 	; shell redirects (> file) silently produce empty/missing stdout — logs showed
 	; "Streaming finished with empty response. No stdout file."
-	cmdLine := '"' . curl_exe . '" -N -s -S -m '
+	; --disable must come first: it alone stops curl from reading the user's
+	; personal .curlrc (headers, output, TLS options).
+	cmdLine := '"' . curl_exe . '" --disable -N -s -S -m '
 		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
 		. _LLM_CurlMaxFileSizeArg() . '-X POST '
 		. '-H "Content-Type: application/json" '
@@ -1138,7 +1142,7 @@ _LLM_Ollama_StreamFailHint(stdout_path) {
 		if (raw == "")
 			return "Stdout empty."
 		if InStr(raw, '"error"')
-			return "Ollama error: " . SubStr(raw, 1, 200)
+			return "Ollama error: " . TextHeadWithinUnits(raw, 200)
 		if InStr(raw, '"thinking"') and !InStr(raw, '"response":"') 
 			return "Model returned thinking-only tokens (enable think:false)."
 		return "Stdout snippet: " . SubStr(raw, 1, 120)

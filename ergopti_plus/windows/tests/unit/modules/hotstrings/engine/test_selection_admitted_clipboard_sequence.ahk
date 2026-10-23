@@ -216,7 +216,7 @@ _SCAS_Ready(Mode, State, Ports) {
 	if Mode != "ordinary"
 		State["read_action"] := _SCAS_ChangeDuringRead.Bind(State, Mode)
 	AssertTrue(_SelectionCaptureReadReady(Job, _SCAS_Read.Bind(State), Ports["sequence"],
-		Ports["restore"], (*) => Map("foreground", 101, "elapsed", 0, "idle", 0)))
+		Ports["restore"], (J) => Map("foreground", 101, "physical_generation", J["physical_generation"])))
 	AssertEqual(Mode == "admission-zero" ? 0 : 1, State["reads"], "unavailable initial ownership must refuse the clipboard read")
 	AssertEqual(Expected, Job["owned_sequence"], "a positive copy is admitted before reading, while zero retains proven clear ownership")
 	AssertEqual(Mode == "ordinary" ? 1 : 0, State["delivered"].Length,
@@ -279,7 +279,7 @@ _SCAS_ReentrantRead(Boundary, Action, State, Ports) {
 	else
 		State[Boundary . "_action"] := Reenter
 	AssertFalse(_SelectionCaptureReadReady(Job, _SCAS_Read.Bind(State), Ports["sequence"],
-		Ports["restore"], (*) => Map("foreground", 101, "elapsed", 0, "idle", 0)),
+		Ports["restore"], (J) => Map("foreground", 101, "physical_generation", J["physical_generation"])),
 		"revocation at either native boundary must stop the old completion")
 	AssertEqual(Boundary == "sequence" ? 0 : 1, State["reads"], "a revoked probe cannot proceed to a clipboard read")
 	AssertEqual(Boundary == "sequence" ? 42 : 43, Job["owned_sequence"], "only a current sequence probe can admit ownership")
@@ -322,7 +322,7 @@ _SCAS_ReadFailure(Action, State, Ports) {
 	else if Action != "none"
 		State["read_action"] := _SCAS_Reenter.Bind(State, Ports, Action)
 	Completed := _SelectionCaptureReadReady(Job, _SCAS_Read.Bind(State), Ports["sequence"],
-		Ports["restore"], (*) => Map("foreground", 101, "elapsed", 0, "idle", 0))
+		Ports["restore"], (J) => Map("foreground", 101, "physical_generation", J["physical_generation"]))
 	AssertEqual(1, State["reads"], "the failing getter must actually run")
 	AssertEqual(0, State["delivered"].Length, "a failed getter never delivers partial or foreign text")
 	AssertEqual(43, Job["owned_sequence"], "error cleanup retains the sequence admitted before the getter")

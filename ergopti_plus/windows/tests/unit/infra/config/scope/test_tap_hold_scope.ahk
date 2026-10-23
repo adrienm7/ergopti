@@ -279,13 +279,14 @@ Test("tap-hold-scope: picking the layer as a hold brings the recommended layer a
 ; The tray's hold picker is the caller: it hands the configuration folder to
 ; the owner above, never to the bare key writer.
 _TapHoldPickerCallsLayerOwner() {
-	Body := _DriverFuncBody("_TH_ApplyHold")
+	Body := _DriverFuncBody("_TH_CommitHoldPick")
+	Assert(Body != "", "_TH_CommitHoldPick must be present in the driver source")
 	Assert(RegExMatch(Body, "TapHoldSetHold\(KeyId,\s*HoldOpt,\s*_ConfigDir\)"),
 		"the hold picker must write through TapHoldSetHold with the configuration folder")
 	Assert(!RegExMatch(Body, "[^A-Za-z_]WriteTapHoldHold\("),
 		"the hold picker must not call the bare key writer, which brings no layer")
-	Assert(InStr(_DriverSourceNoComments(), "return _TH_ApplyHold(this.KeyId, this.HoldOpt)"),
-		"the picker row's callback must reach _TH_ApplyHold")
+	Assert(InStr(_DriverFuncBody("_TH_OpenHoldPicker"), "_TH_CommitHoldPick.Bind(KeyId, SetHoldFn)"),
+		"the hold picker's pick must reach _TH_CommitHoldPick")
 }
 Test("tap-hold-scope: the hold picker writes through the layer owner (hold-picker-brings-the-layer-2026-10-01)",
 	_TapHoldPickerCallsLayerOwner)

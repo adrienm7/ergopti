@@ -167,6 +167,7 @@ local function load_real_startup_owner(initial_stop_mode, options)
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() return true end,
 		get_profile_hks = function() return {} end,
+		disarm_shortcuts = function() return true end,
 	})
 	local startup_result = check_startup()
 	helpers.assert_not_nil(registered_owner)

@@ -39,6 +39,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local i18n   = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local KePaths = require("platform.remap.ke_paths")
@@ -70,7 +71,7 @@ local schedule_install_cleanup_retry
 
 -- Resolve our own directory at load time so the manifest lookup works whether
 -- this file is symlinked, run from the project tree, or deployed elsewhere.
-local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
+local _SELF_DIR = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
 
 -- Path to the version-pinning manifest, relative to this module's location.
 local MANIFEST_PATH = _SELF_DIR .. "../../vendor/karabiner-elements/manifest.lua"

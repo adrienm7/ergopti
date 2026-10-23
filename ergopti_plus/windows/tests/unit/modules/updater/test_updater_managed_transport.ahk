@@ -47,17 +47,56 @@ _UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
 _UpdaterNativeObservedStagingScript(OriginalScript) {
 	global _DriverDir
 	Helper := FileRead(_DriverDir . "\tests\fixtures\updater_staging_diagnostic.ps1", "UTF-8")
-	HeaderEnd := InStr(OriginalScript, "`n")
-	if !HeaderEnd
+	; The wrapper declares the worker's exact one-line parameter block so that
+	; @PSBoundParameters forwards the transport prefix and fixture readers.
+	if !RegExMatch(OriginalScript, "m)^param\(.*\)$", &Header)
 		throw Error("The actual staging parameter declaration is unavailable.")
-	; A literal here-string avoids redundant Base64 expansion of trusted source.
+	; A literal here-string carries the trusted source unchanged.
 	; A closing delimiter cannot escape into the surrounding fixture worker.
 	if RegExMatch(OriginalScript, "(?:\A|[\r\n])'@")
 		throw Error("The staging fixture source contains a literal delimiter.")
-	return SubStr(OriginalScript, 1, HeaderEnd) . Helper . "`n"
+	return Header[0] . "`n" . Helper . "`n"
 		. "$StagingSource=@'`n" . OriginalScript . "`n'@`n"
 		. '$StagingObserved=New-ErgoptiObservedStagingScript $StagingSource ""' . "`n"
 		. '& ([scriptblock]::Create($StagingObserved.Source)) @PSBoundParameters'
+}
+
+; Writes the observed bundled staging worker and a fixture bootstrap into the
+; run's owned directory and returns the -File argv that starts them. The
+; bootstrap passes the real transport prefix plus the declared fixture readers,
+; which a production -File launch cannot carry. Admission must define $reader
+; and $environment.
+; Encodes a fixture-only one-line PowerShell command for -EncodedCommand
+; (UTF-16LE, then Base64). The driver never launches encoded commands; only
+; test processes that stand in for a native writer use this.
+_UpdaterTestEncodedCommand(Command) {
+	if Type(Command) != "String" || Command == ""
+		throw TypeError("The fixture command must be a non-empty String")
+	Bytes := Buffer(StrLen(Command) * 2, 0)
+	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", StrPtr(Command), "UPtr", Bytes.Size)
+	return CryptoBase64Encode(Bytes)
+}
+
+_UpdaterNativeStagingWorkerPath(Run) {
+	Run.StagingWorkerPath := Run.Directory . "observed-staging.ps1"
+	return Run.StagingWorkerPath
+}
+
+_UpdaterNativeStagingLaunchArgs(Run, Admission) {
+	if Run.Transport.WorkerPath != Run.StagingWorkerPath
+		throw Error("The fixture transport must name the observed staging worker.")
+	Run.StagingBootstrapPath := Run.Directory . "staging-bootstrap.ps1"
+	FileAppend(_UpdaterNativeObservedStagingScript(FileRead(_Updater_StagingWorkerPath(), "UTF-8")),
+		Run.StagingWorkerPath, "UTF-8")
+	return _UpdaterNativeStagingBootstrapArgs(Run.Transport, Run.StagingBootstrapPath, Admission)
+}
+
+_UpdaterNativeStagingBootstrapArgs(Transport, BootstrapPath, Admission) {
+	FileAppend('$ErrorActionPreference="Stop"' . "`n" . Admission . "`n"
+		. "& '" . StrReplace(Transport.WorkerPath, "'", "''") . "' -TransportPrefix '"
+		. Transport.Prefix . "' -ReadConfig $reader -ReadEnvironment $environment`n"
+		. 'exit $LASTEXITCODE' . "`n", BootstrapPath, "UTF-8")
+	return ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", BootstrapPath]
 }
 
 _UpdaterNativeStagingScalarFact(Scalar) {
@@ -294,8 +333,8 @@ class _UpdaterNativeDownloadRun {
 		this.Closed := false
 		this.Transport := 0
 		this.OldBytes := "Independent existing-app bytes " . Owner.Identity
-		; Receive the full production swap worker as UTF-8 data; never execute it.
-		this.SwapBytes := _Updater_BuildSwapWorkerScript()
+		; The staging worker copies the bundled swap worker; it is never executed here.
+		this.SwapBytes := FileRead(_Updater_SwapWorkerPath(), "UTF-8")
 		this.Digest := "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
 		this.RefusalDiagnosticPrinter := _TestPrint
 		this.RefusalDiagnosticStatus := "not_requested"
@@ -323,14 +362,13 @@ class _UpdaterNativeDownloadRun {
 		Url := "https://" . Host . ":" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
 		this.Transport := _Updater_BuildStagingTransport(
-			_UpdaterNativeObservedStagingScript(_Updater_BuildStagingWorkerScript()), this.SwapBytes, Url, this.Digest,
+			_UpdaterNativeStagingWorkerPath(this), _Updater_SwapWorkerPath(), Url, this.Digest,
 			this.NewExe, this.SwapPath, this.CurrentExe, UPDATER_MIN_EXE_SIZE_BYTES, 5000,
 			_VendorDir . "\ergopti_updater_download.ps1", this.DeadlineMs, this.StartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json")
 		try {
-			ScriptName := this.Transport.Environment[1].Name
-			Prefix := SubStr(ScriptName, 1, StrLen(ScriptName) - StrLen("_SCRIPT"))
+			Prefix := this.Transport.Prefix
 			Pair := {Name: Prefix . "_TEST_PAC", Value: "http://127.0.0.1:" . this.Owner.State["http_port"] . "/updater.pac"}
 			this.Transport.Environment.Push(Pair)
 			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
@@ -345,9 +383,7 @@ class _UpdaterNativeDownloadRun {
 			Admission := '$env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE=$env:' . RouteShapePair.Name . ';$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';$ownedPac=$env:' . Pair.Name . ';'
 				. '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl=$ownedPac;Proxy="";Bypass="";NativeError=0;FailureOrigin=""}}.GetNewClosure();'
 				. '$environment={param($Name)return ""};'
-			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
-			Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand",
-				_Updater_EncodePowerShellCommand(Bootstrap)]
+			Args := _UpdaterNativeStagingLaunchArgs(this, Admission)
 			this.Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(), Args,
 				ObjBindMethod(this, "OnDone"), , ObjBindMethod(this, "OnNativeAdopt"), 8192)
 			AssertTrue(this.Handle.start(), "actual staging private Job must start")
@@ -478,7 +514,7 @@ class _UpdaterNativeDownloadRun {
 				return false
 		}
 		if this.Directory != "" {
-			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath", "StagingSetupDiagnosticPath", "RouteShapeDiagnosticPath"] {
+			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath", "StagingSetupDiagnosticPath", "RouteShapeDiagnosticPath", "StagingWorkerPath", "StagingBootstrapPath"] {
 				if !this.HasOwnProp(Name)
 					continue
 				Path := this.%Name%

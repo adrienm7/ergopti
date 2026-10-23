@@ -497,3 +497,74 @@ _KlgAggCorpus_FallbackTimeUsesOneInstant() {
 }
 Test("keylogger walker: fallback buckets sample one instant (walker-timestamp-fallback)",
 	_KlgAggCorpus_FallbackTimeUsesOneInstant)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 5/ Correction Sequence Corpus =============
+; ===================================================
+; ===================================================
+
+; Replays _shared/tests/corpus/keylogger/correction_sequence_vectors.json, which
+; the macOS and Linux walkers replay too: every Backspace ends a bigram and a
+; trigram and starts the sequences that follow it, so the three drivers keep
+; one definition of the n-grams around a correction.
+_KlgAggCorpus_LoadCorrectionCorpus() {
+	CorpusPath := A_ScriptDir . "\..\..\_shared\tests\corpus\keylogger\correction_sequence_vectors.json"
+	AssertTrue(FileExist(CorpusPath) != "", "the correction sequence corpus must exist at " . CorpusPath)
+	return JsonParse(FileRead(CorpusPath, "UTF-8"))
+}
+
+; Collects the tokens of one family typed at least once for the corpus app-day.
+_KlgAggCorpus_TypedTokens(Family, Prefix) {
+	Out := Map()
+	if !KLW.batch["ngram"].Has(Family)
+		return Out
+	for Key, Item in KLW.batch["ngram"][Family] {
+		if (SubStr(Key, 1, StrLen(Prefix)) = Prefix && Item["c"] > 0)
+			Out[SubStr(Key, StrLen(Prefix) + 1)] := Item["c"]
+	}
+	return Out
+}
+
+_KlgAggCorpus_RunCorrectionVector(Data, Vec) {
+	SavedBatch := KLW.batch
+	SavedCtx := KLW.ctx
+	try {
+		KLW_ResetBatch()
+		KLW.ctx := Map()
+		for Index, Flush in Vec["flushes"] {
+			Events := []
+			for Ev in Flush
+				Events.Push([Ev["char"], Ev["delay"], Map()])
+			KLW_WalkTypingEntry(Map("app", Data["app"],
+				"timestamp", Data["timestamps"][Index], "events", Events))
+		}
+		Prefix := Data["date"] . Chr(1) . Data["app"] . Chr(1)
+		for Family, Expected in Vec["expected"] {
+			Actual := _KlgAggCorpus_TypedTokens(Family, Prefix)
+			for Token, Count in Expected {
+				AssertTrue(Actual.Has(Token), Vec["id"] . ": " . Family . " must count " . Chr(34) . Token . Chr(34))
+				AssertEqual(Count, Actual[Token], Vec["id"] . ": " . Family . " " . Chr(34) . Token . Chr(34))
+			}
+			for Token in Actual
+				AssertTrue(Expected.Has(Token), Vec["id"] . ": " . Family . " counts an unexpected "
+					. Chr(34) . Token . Chr(34))
+		}
+	} finally {
+		KLW.batch := SavedBatch
+		KLW.ctx := SavedCtx
+	}
+}
+
+_KlgAggCorpus_RegisterCorrectionVectors() {
+	Data := _KlgAggCorpus_LoadCorrectionCorpus()
+	AssertTrue(Data["vectors"].Length > 0, "the correction sequence corpus must carry vectors")
+	for Vec in Data["vectors"]
+		Test("[corpus:kl-correction:" . Vec["id"] . "] " . Vec["description"]
+			. " (corpus-correction-sequences)", _KlgAggCorpus_RunCorrectionVector.Bind(Data, Vec))
+}
+_KlgAggCorpus_RegisterCorrectionVectors()

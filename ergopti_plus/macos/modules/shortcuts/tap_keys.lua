@@ -11,9 +11,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Key identity is shared data (_shared/modules/actions/tap_keys.json). The
 ---    key left of 1 has two macOS keycodes: kVK_ANSI_Grave (50) on an ANSI
----    keyboard and behind Karabiner's ANSI virtual keyboard, kVK_ISO_Section
----    (10) on an ISO one and behind its ISO virtual keyboard. The deployed
----    virtual form, else each event's keyboard model, chooses one code
+---    keyboard, kVK_ISO_Section (10) on an ISO one, also behind the ANSI virtual
+---    keyboard Ergopti deploys, which passes the pair through. The layout's
+---    keycode convention while Karabiner runs, else each event's keyboard
+---    model, chooses one code
 ---    (adapters/keyboard_geometry.lua), so the extra ISO key is never mistaken
 ---    for the key left of 1.
 --- 2. Assignments live in canonical config.toml, beside the
@@ -78,9 +79,12 @@ function M.keys()
 	if _keys then return _keys end
 	local path = Paths.shared(KEYS_REL_PATH)
 	local raw = FileSystem.read(path)
-	local decoded = raw and JsonCodec.decode(raw) or nil
+	-- A failed read and malformed content are distinct diagnoses: the first is
+	-- the file system, the second is the shared file itself.
+	if type(raw) ~= "string" then error("tap_keys: cannot complete read of " .. tostring(path)) end
+	local decoded = JsonCodec.decode(raw)
 	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" or #decoded.keys == 0 then
-		error("tap_keys: " .. tostring(path) .. " is unreadable or malformed")
+		error("tap_keys: " .. tostring(path) .. " is malformed")
 	end
 	for _, entry in ipairs(decoded.keys) do
 		if type(entry.id) ~= "string" or type(entry.hs) ~= "table" or #entry.hs == 0 then

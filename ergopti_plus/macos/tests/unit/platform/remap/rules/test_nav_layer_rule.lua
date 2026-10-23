@@ -44,6 +44,10 @@ local FKEYS_VAR = "system.use_fkeys_as_standard_function_keys"
 -- What the recommended layer changes on macOS against the hand-written layer,
 -- keyed like normalise() keys its entries; false means the entry is gone.
 local CANONICAL_CHANGES = {
+	-- Command + the key left of 1 is named for the deployed ANSI virtual keyboard
+	-- (issue #99): non_us_backslash reaches keycode 10 there, as
+	-- grave_accent_and_tilde did through the ISO product the frozen layer assumed.
+	["tab"] = "to=non_us_backslash[command]",
 	-- CapsLock is Backspace and the right Alt (Option) key Escape, as on Windows.
 	["caps_lock"] = "to=delete_or_backspace",
 	["right_option"] = "to=escape",
@@ -56,8 +60,6 @@ local CANONICAL_CHANGES = {
 	["g|standard"] = "to=f12",
 	-- Maximize is a keystroke like every other: sent on key down.
 	["n"] = "to=y[command,control,fn]",
-	-- Virtual ISO itself maps the canonical HID Backquote target to Carbon 10.
-	["tab"] = "to=grave_accent_and_tilde[command]",
 }
 -- Floor: the hand-written layer had 59 manipulators on 47 keys.
 local MIN_ENTRIES = 50
@@ -409,15 +411,17 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 end)
 
 helpers.describe("navigation physical inputs and virtual outputs (iso-typing-convention)", function()
-	helpers.it("keeps the physical ISO input domain but sends each target's canonical HID position", function()
+	helpers.it("names inputs and outputs in the one physical ISO domain the ANSI product passes through (iso-key-99)", function()
 		local bindings = bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n'
 			.. '"IntlBackslash" = "keystroke:Backquote"\n"Backquote" = "keystroke:IntlBackslash"\n')
 		local rule = NavLayer.build_rule(bindings, ctx.registry)
 		local actual = normalise(rule)
-		helpers.assert_eq(actual.grave_accent_and_tilde, "to=grave_accent_and_tilde",
-			"the ISO extra source sends the target left of 1 through the ISO virtual keyboard")
-		helpers.assert_eq(actual.non_us_backslash, "to=non_us_backslash",
-			"the source left of 1 sends the ISO extra target through the ISO virtual keyboard")
+		-- The ISO extra key reports 0x35 and the key left of 1 reports 0x64; the
+		-- ANSI product sends 0x64 as keycode 10 (left of 1) and 0x35 as 50.
+		helpers.assert_eq(actual.grave_accent_and_tilde, "to=non_us_backslash",
+			"the ISO extra source sends the key left of 1")
+		helpers.assert_eq(actual.non_us_backslash, "to=grave_accent_and_tilde",
+			"the source left of 1 sends the ISO extra key")
 	end)
 
 	helpers.it("wheel Quartz strokes use the captured layout convention, without changing ordinary keys", function()

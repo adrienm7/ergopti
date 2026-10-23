@@ -679,3 +679,62 @@ helpers.describe("keylogger corpus - pure text primitives", function()
 		end
 	end)
 end)
+
+
+
+
+-- ============================================================================
+-- Correction sequence corpus
+-- ============================================================================
+
+-- _shared/tests/corpus/keylogger/correction_sequence_vectors.json is replayed by
+-- the Windows and Linux walkers too: every Backspace ends a bigram and a trigram
+-- and starts the sequences that follow it, so the three drivers keep one
+-- definition of the n-grams around a correction.
+helpers.describe("keylogger correction sequence corpus", function()
+	local fh = io.open(helpers.shared("tests/corpus/keylogger/correction_sequence_vectors.json"), "r")
+	local data = fh and require("hs").json.decode(fh:read("*a"))
+	if fh then fh:close() end
+
+	--- Collects the tokens of one family typed at least once for the corpus app-day.
+	--- @param family string
+	--- @param prefix string "date\1app\1".
+	--- @return table token -> count
+	local function typed_tokens(family, prefix)
+		local out, batch = {}, get_batch()
+		local rows = batch and batch.ngram and batch.ngram[family] or {}
+		for key, item in pairs(rows) do
+			if key:sub(1, #prefix) == prefix and (item.c or 0) > 0 then out[key:sub(#prefix + 1)] = item.c end
+		end
+		return out
+	end
+
+	helpers.it("corpus-correction-sequences: the corpus is readable and carries vectors", function()
+		helpers.assert_true(type(data) == "table" and type(data.vectors) == "table" and #data.vectors > 0)
+	end)
+	for _, vec in ipairs(data and data.vectors or {}) do
+		helpers.it("corpus-correction-sequences: " .. vec.id, function()
+			local entries = {}
+			for index, flush in ipairs(vec.flushes) do
+				local events = {}
+				for _, ev in ipairs(flush) do events[#events + 1] = { char = ev.char, delay = ev.delay } end
+				entries[#entries + 1] = { type = "typing", app = data.app, timestamp = data.timestamps[index],
+					events = events }
+			end
+			setup_and_replay({ events = entries })
+			local prefix = data.date .. "\1" .. data.app .. "\1"
+			for family, expected in pairs(vec.expected) do
+				local actual = typed_tokens(family, prefix)
+				for token, count in pairs(expected) do
+					helpers.assert_eq(actual[token], count, vec.id .. ": " .. family .. " " .. token)
+				end
+				for token in pairs(actual) do
+					helpers.assert_true(expected[token] ~= nil,
+						vec.id .. ": " .. family .. " counts an unexpected " .. token)
+				end
+			end
+			local S = require("modules.keylogger.aggregator.state")
+			S.initialized, S.agg_batch, S.ngram_ctx, S.device_id = false, nil, nil, nil
+		end)
+	end
+end)

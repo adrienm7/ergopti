@@ -20,7 +20,7 @@ local function with_activation(options, callback)
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local handle, bound, attempted, removed, fixture = nil, nil, false, false, nil
-	local calls = { prepare = 0, bind = 0, mark = 0, rollback = 0, retire = {}, opaque = 0 }
+	local calls = { prepare = 0, bind = 0, mark = 0, rollback = 0, retire = {}, opaque = 0, static = 0 }
 	local rollback_ready = options.rollback_ready ~= false
 	local rollback_hook
 	local adapter = {
@@ -79,7 +79,10 @@ local function with_activation(options, callback)
 	package.loaded[names[2]] = { resolve = function() if options.python_missing then return nil end; return PYTHON end }
 	package.loaded[names[3]] = { get_port = function() return 12345 end }
 	options.binary_path = options.stock and "/fixture/stock-runtime" or options.owned_path or OWNED
-	options.network_env = { opaque_prelude = function() calls.opaque = calls.opaque + 1; return "fixture opaque; " end }
+	options.network_env = {
+		opaque_prelude = function() calls.opaque = calls.opaque + 1; return "fixture opaque; " end,
+		prelude = function() calls.static = calls.static + 1; return "fixture static; " end,
+	}
 	local ok, error_value = xpcall(function()
 		with_fixture(options, function(f)
 			local binary = package.loaded["modules.llm.ollama_binary"]
@@ -154,15 +157,25 @@ helpers.describe("Managed Ollama original pull activation", function()
 	end)
 
 	helpers.it("preserves the stock opaque shell pull without managed preparation", function()
-		with_activation({ stock = true }, function(f)
+		with_activation({ stock = true, binary_source = "unrecognised" }, function(f)
 			helpers.assert_true(f.start())
 			helpers.assert_eq(f.calls.prepare, 0)
 			helpers.assert_eq(f.calls.bind, 0)
-			helpers.assert_eq(f.calls.opaque, 1)
+			helpers.assert_eq(f.calls.opaque, 1, "a daemon of unknown origin keeps the fail-closed admission")
 			helpers.assert_eq(f.pulls[1].executable, "/bin/bash")
 			helpers.assert_eq(f.pulls[1].args[1], "-c")
 			helpers.assert_true(f.pulls[1].args[2]:find("fixture opaque; exec", 1, true) ~= nil)
 			helpers.assert_true(f.pulls[1].args[2]:find("registry/model:tiny", 1, true) ~= nil)
+		end)
+	end)
+
+	helpers.it("(ollama-foreign-daemon-pull) asks a stock PATH daemon through the static settings", function()
+		with_activation({ stock = true }, function(f)
+			helpers.assert_true(f.start())
+			helpers.assert_eq(f.calls.prepare, 0)
+			helpers.assert_eq(f.calls.opaque, 0, "the user's own daemon fetches with its own network settings")
+			helpers.assert_eq(f.calls.static, 1)
+			helpers.assert_true(f.pulls[1].args[2]:find("fixture static; exec", 1, true) ~= nil)
 		end)
 	end)
 
@@ -295,7 +308,8 @@ helpers.describe("Managed Ollama original pull activation", function()
 			helpers.assert_true(f.start())
 			helpers.assert_eq(f.calls.prepare, 0)
 			helpers.assert_eq(f.calls.bind, 0)
-			helpers.assert_eq(f.calls.opaque, 1)
+			helpers.assert_eq(f.calls.opaque, 0, "a PATH source is a daemon Ergopti never starts")
+			helpers.assert_eq(f.calls.static, 1)
 			helpers.assert_eq(f.pulls[1].executable, "/bin/bash")
 			helpers.assert_eq(f.pulls[1].args[1], "-c")
 			helpers.assert_true(f.pulls[1].args[2]:find(canonical, 1, true) ~= nil)

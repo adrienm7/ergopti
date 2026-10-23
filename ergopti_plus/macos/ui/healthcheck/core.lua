@@ -385,6 +385,18 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.running_application",
+		contract = { "by_name", "by_bundle_id", "current" },
+		-- Every application lookup goes through it; none scans windows.
+		wired    = true,
+	},
+	{
+		id       = "adapters.own_window",
+		contract = { "webview_window_number", "for_webview", "console", "is_webview_focused" },
+		-- Every webview and console window lookup; none scans other applications.
+		wired    = true,
+	},
+	{
 		id       = "adapters.boot_fatal",
 		contract = { "report" },
 		wired    = true,
@@ -407,6 +419,12 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.event_provenance",
 		contract = { "classify", "classify_with_fence", "is_owned" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.event_clock",
+		contract = { "lateness_ms", "duration_ms" },
+		-- The keymap taps and the physical fence read every key event's lateness.
 		wired    = true,
 	},
 	{
@@ -555,6 +573,12 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.task_lifecycle",
 		contract = { "guard_callback", "create", "native", "start" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.task_output_turn",
+		contract = { "request" },
+		-- The Karabiner lease ACK deadlines prove a task output turn before failing.
 		wired    = true,
 	},
 	{

@@ -526,19 +526,21 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	if not snapshot_ok then return false, "", snapshot_error or "clipboard_snapshot_failed" end
 	-- A text sentinel first, as copy_selection does: files copied earlier
 	-- would otherwise still answer the uri-list read when nothing is selected.
-	if not write_backend_checked(b, "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__") then
+	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
+	if not write_backend_checked(b, sentinel) then
 		if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 		return false, "", "clipboard_probe_write_failed"
 	end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
 	local settled = copy_ok and copied == true and wait_checked(sleep_ms, COPY_SETTLE_MS)
-	-- Nothing copied leaves the sentinel, which offers no uri-list target: the
-	-- read then fails, which is "no file selected".
+	-- Nothing copied leaves the sentinel. wl-copy offers it under text types
+	-- only, so the uri-list read fails; xclip answers every target with its
+	-- text, so the read returns the sentinel itself. Both are "no file selected".
 	local read_ok, uri_list = false, ""
 	if settled then read_ok, uri_list = Shell.exec_checked(b.read_uri_list) end
 	if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 	if not settled then return false, "", "copy_chord_failed" end
-	if not read_ok or uri_list == "" then return false, "", "no_file_selection" end
+	if not read_ok or uri_list == "" or uri_list == sentinel then return false, "", "no_file_selection" end
 	Logger.debug(LOG, "Read a %d-byte uri-list selection via %s.", #uri_list, b.name)
 	return true, uri_list, nil
 end

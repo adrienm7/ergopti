@@ -683,3 +683,74 @@ helpers.describe("event loop: stop cancels queued dispatch", function()
 		helpers.assert_eq(calls, 2, "manual pumping remains an explicit supported owner after run returns")
 	end)
 end)
+
+--- Loads the polling loop over a controlled wall clock.
+--- @param resolution number Milliseconds the clock can overstate a gap by.
+--- @return table loop, table clock { now }
+local function pump_on_clock(resolution)
+	local clock = { now = 0 }
+	local previous = package.loaded["infra.monotonic"]
+	package.loaded["infra.monotonic"] = {
+		now_ms = function() return clock.now end,
+		resolution_ms = function() return resolution end,
+	}
+	local ok, loop = pcall(load_pump_loop)
+	package.loaded["infra.monotonic"] = previous
+	if not ok then error(loop, 0) end
+	return loop, clock
+end
+
+helpers.describe("linux-pump-periodic-wall-clock", function()
+	helpers.it("linux-pump-periodic-wall-clock: callbacks that wait without CPU keep the periodic cadence", function()
+		local loop, clock = pump_on_clock(0)
+		local iterations, ticks = 0, {}
+		loop.run({ periodSec = 0.25,
+			onIdle = function()
+				iterations = iterations + 1
+				clock.now = clock.now + 400 -- Blocked on I/O: wall time passes, CPU time does not.
+				if iterations >= 6 then loop.stop() end
+			end,
+			onPeriodic = function() ticks[#ticks + 1] = clock.now end })
+		helpers.assert_eq(ticks, { 400, 800, 1200, 1600, 2000 },
+			"every 400 ms iteration exceeds the 250 ms period, whatever the CPU clock says")
+	end)
+
+	helpers.it("linux-pump-periodic-wall-clock: a coarse second boundary cannot fire the tick early", function()
+		local loop, clock = pump_on_clock(1000)
+		local iterations, ticks = 0, 0
+		loop.run({ periodSec = 0.25,
+			onIdle = function()
+				iterations = iterations + 1
+				if iterations == 1 then clock.now = 1000 end -- A boundary crossed after about 1 ms.
+				if iterations >= 3 then loop.stop() end
+			end,
+			onPeriodic = function() ticks = ticks + 1 end })
+		helpers.assert_eq(ticks, 0)
+	end)
+end)
+
+helpers.describe("linux-pump-periodic-finite-admission", function()
+	for _, value in ipairs({ 0 / 0, math.huge, -math.huge, 1e308 }) do
+		helpers.it("linux-pump-periodic-finite-admission: refuses " .. tostring(value) .. " before pumping", function()
+			local loop = load_pump_loop()
+			local idles, ticks = 0, 0
+			local ok, err = pcall(loop.run, { periodSec = value,
+				onIdle = function() idles = idles + 1; if idles > 3 then loop.stop() end end,
+				onPeriodic = function() ticks = ticks + 1 end })
+			helpers.assert_eq(ok, false, "a nonfinite period must not tick every iteration or never")
+			helpers.assert_contains(tostring(err), "must be finite")
+			helpers.assert_eq(idles, 0)
+			helpers.assert_eq(ticks, 0)
+			helpers.assert_eq(loop.isRunning(), false)
+			local healthy = 0
+			loop.run({ periodSec = 0.001, onPeriodic = function() healthy = healthy + 1; loop.stop() end })
+			helpers.assert_eq(healthy, 1, "a refused period leaves the loop reusable")
+		end)
+	end
+	helpers.it("linux-pump-periodic-finite-admission: an idle-only loop ignores an unused period", function()
+		local loop = load_pump_loop()
+		local idles = 0
+		loop.run({ periodSec = 0 / 0, onIdle = function() idles = idles + 1; loop.stop() end })
+		helpers.assert_eq(idles, 1)
+	end)
+end)

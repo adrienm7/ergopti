@@ -202,7 +202,11 @@ public static class ErgoptiBoundedCurlPipe {
             }
             if ($SendHeaders) {
                 foreach ($Header in $InputValue.headers) {
-                    $Lines += 'header = ' + (ConvertTo-CurlLiteral ($Header.name + ': ' + $Header.value))
+                    # curl removes a header written "Name:" with nothing after the
+                    # colon; its "Name;" form sends the field with an empty value.
+                    $Field = $Header.name + ': ' + $Header.value
+                    if ($Header.value -cmatch '^[ ]*$') { $Field = $Header.name + ';' }
+                    $Lines += 'header = ' + (ConvertTo-CurlLiteral $Field)
                 }
             }
             if ($SendBody -and $InputValue.body -ne '') {

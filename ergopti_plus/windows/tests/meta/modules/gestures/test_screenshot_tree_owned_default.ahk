@@ -1,11 +1,14 @@
 ﻿; tests/meta/modules/gestures/test_screenshot_tree_owned_default.ahk
 
 ; ==============================================================================
-; MODULE: Screenshot Tree-owned Spawn Default
+; MODULE: Screenshot In-process Capture Default
 ; DESCRIPTION:
-; Structural link guard between screenshot production and the behavioural Job
-; Object contract. The injected spawn_fn seam remains available to deterministic
-; unit tests, but the no-injection branch must select the native tree owner.
+; Structural link guard between screenshot production and its in-process
+; capture. The injected spawn_fn seam remains available to deterministic unit
+; tests, but the no-injection branch must select the native GDI capture task,
+; and the screenshot module must never launch a script host again: v1.0.4 was
+; flagged by a corporate antivirus for a hidden PowerShell clipboard stage.
+; The shell_runner guards below keep the tree owner's own contract pinned.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -20,7 +23,7 @@
 ; ==============================================
 ; ==============================================
 
-_GSTOD_ScreenshotDefaultOwnsTheProcessTree() {
+_GSTOD_ScreenshotDefaultIsInProcess() {
 	local body := _StripFullLineComments(
 		_DriverFuncBody("_GestureScreenshotCreateWorker"))
 	Assert(body != "",
@@ -34,14 +37,33 @@ _GSTOD_ScreenshotDefaultOwnsTheProcessTree() {
 		"the injected GestureScreenshotWorkerState.spawn_fn seam must remain reachable")
 
 	Assert(RegExMatch(body,
-		"s)\?\s*GestureScreenshotWorkerState\.spawn_fn\s*:\s*ShellRunner_SpawnTreeOwned\b"),
-		"the no-injection screenshot branch must use ShellRunner_SpawnTreeOwned so cancellation owns every cmd.exe descendant")
-	Assert(!RegExMatch(body, "m):\s*ShellRunner_Spawn\s*$"),
-		"the production screenshot fallback must never regress to PID-only ShellRunner_Spawn")
+		"s)\?\s*GestureScreenshotWorkerState\.spawn_fn\s*:\s*_GestureScreenshotSpawnNative\b"),
+		"the no-injection screenshot branch must use the in-process capture task")
+	Assert(!RegExMatch(body, "ShellRunner_Spawn"),
+		"the production screenshot fallback must never regress to a child process")
 }
 
-Test("screenshot: production spawn fallback is the native tree owner",
-	_GSTOD_ScreenshotDefaultOwnsTheProcessTree)
+Test("screenshot: production spawn fallback is the in-process capture",
+	_GSTOD_ScreenshotDefaultIsInProcess)
+
+; Scans the whole screenshot module (full-line comments removed, string
+; literals kept) so a launcher hidden in any helper or literal still fails.
+_GSTOD_ScreenshotModuleLaunchesNoScriptHost() {
+	local path := _DriverProductionFileForSymbol("GestureCaptureRegion")
+	local code := _StripFullLineComments(FileRead(path, "UTF-8"))
+	Assert(InStr(code, "_GestureScreenshotSpawnNative(Capture, Done)") > 0,
+		"the screenshot module scan must read the module that owns the capture")
+	for needle in ["powershell", "pwsh", "-EncodedCommand", "-WindowStyle", "-ExecutionPolicy",
+			"Add-Type", "DllImport", "TypeDefinition", "System.Drawing", "System.Windows.Forms",
+			"ShellRunner_Spawn", "ShellRun", "WScript.Shell", "ComObject("]
+		Assert(!InStr(code, needle),
+			"the screenshot module must capture in process, never through a script host: found '" . needle . "'")
+	Assert(!RegExMatch(code, "\bRun(Wait)?\s*\("),
+		"the screenshot module must not launch any process")
+}
+
+Test("screenshot: the capture module never launches a hidden script host",
+	_GSTOD_ScreenshotModuleLaunchesNoScriptHost)
 
 _GSTOD_TreeOwnerPollsTheExactProcessHandle() {
 	local body := _DriverFuncBody("_SR_TreePoll")

@@ -32,6 +32,7 @@
 local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
+local NativePath = require("native_path")
 local TomlWriter = require("toml_codec.writer")
 -- Use the constructor's captured checker, never a replaceable public getter.
 -- This is the same trusted normal-loader boundary as the shared writer; it
@@ -602,7 +603,7 @@ end
 function M.get_group_name(file)
 	if type(file) ~= "string" then return "" end
 	-- Strip directory path if present
-	local name = file:match("([^/\\]+)$") or file
+	local name = NativePath.basename(file) or file
 	-- Strip extension
 	return name:match("^(.*)%.lua$") or name:match("^(.*)%.toml$") or name
 end

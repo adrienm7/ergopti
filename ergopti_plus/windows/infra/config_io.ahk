@@ -2278,6 +2278,99 @@ _KeyboardSlotChord(SlotId) {
 }
 
 /**
+ * The keyboard slot domain of this build's input owner: the chord groups the
+ * tray offers (KEYBOARD_SLOT_GROUPS), the keys each group binds and the
+ * shipped manifest slots. A function, not a global, because the boot loader
+ * judges slots before this file's include position has run.
+ * @returns {Map} "groups" (slot prefixes) and "keys" (slot suffixes), in order.
+ */
+KeyboardSlotDeclaration() {
+		static Declaration := _KeyboardSlotBuildDeclaration()
+		return Declaration
+}
+
+_KeyboardSlotBuildDeclaration() {
+		Keys := []
+		loop Parse "abcdefghijklmnopqrstuvwxyz0123456789"
+				Keys.Push(A_LoopField)
+		for Special in ["space", "enter", "period", "comma", "sc029"]
+				Keys.Push(Special)
+		return Map("groups", ["alt_", "ctrl_", "ctrl_shift_", "win_"], "keys", Keys)
+}
+
+/**
+ * Resolves a physical Win slot (win_SC03A, any letter case) to its canonical
+ * scan when the shipped physical key registry has that key.
+ * @param {String} Slot Persisted slot id.
+ * @returns {String} Canonical "SCnnn", or "" when Slot is no physical slot.
+ */
+KeyboardSlotPhysicalScan(Slot) {
+		if !(Slot is String) || !RegExMatch(Slot, "i)^win_(SC[0-9a-f]{3})$", &Match)
+				return ""
+		Scan := StrUpper(Match[1])
+		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+				if StrUpper(Key["ahk"]) == Scan
+						return Scan
+		}
+		return ""
+}
+
+; The exact ordinary slot ids, or 0 while the manifest is unavailable: without
+; its slots the set is incomplete and must judge nothing.
+_KeyboardSlotOrdinarySet() {
+		Manifest := ManifestFeaturesForSection("shortcuts.keyboard")
+		if !(Manifest is Array) || Manifest.Length == 0
+				return 0
+		Slots := Map()
+		Slots.CaseSense := "On"
+		for Entry in Manifest
+				Slots[Entry["id"]] := true
+		Declaration := KeyboardSlotDeclaration()
+		for Prefix in Declaration["groups"] {
+				for Key in Declaration["keys"]
+						Slots[Prefix . Key] := true
+		}
+		return Slots
+}
+
+/**
+ * Whether the keyboard input owner binds this persisted slot. The boot loader,
+ * the unused-key cleanup and ReadKeyboardShortcutsConfig all ask this one
+ * rule, so a slot is either live and owned or unused and offered for cleanup.
+ * @param {String} Slot Persisted slot id (case-exact, physical slots aside).
+ * @returns {Boolean}
+ */
+KeyboardSlotIsCatalogued(Slot) {
+		if !(Slot is String) || Slot == ""
+				return false
+		if KeyboardSlotPhysicalScan(Slot) != ""
+				return true
+		Slots := _KeyboardSlotOrdinarySet()
+		return (Slots is Map) && Slots.Has(Slot)
+}
+
+/**
+ * The complete published slot inventory for parameter-binding judgment: the
+ * ordinary slots plus the canonical and lowercase spelling of every physical
+ * Win slot. Returns 0 while the manifest is unavailable (nothing is judged).
+ * @returns {Array|Integer}
+ */
+KeyboardSlotCatalogueIds() {
+		Slots := _KeyboardSlotOrdinarySet()
+		if !(Slots is Map)
+				return 0
+		for Key in MagicEditorPhysicalCatalogue()["keys"] {
+				Scan := StrUpper(Key["ahk"])
+				Slots["win_" . Scan] := true
+				Slots["win_" . StrLower(Scan)] := true
+		}
+		Ids := []
+		for Slot in Slots
+				Ids.Push(Slot)
+		return Ids
+}
+
+/**
  * Collects keyboard settings without materializing implicit neutral defaults.
  * @param {Array} Updates Existing acknowledged writer's speculative rows.
  * @param {Map} Assignments Resolved runtime assignments.
@@ -2315,6 +2408,14 @@ ReadKeyboardShortcutsConfig() {
 		}
 
 		for Slot, _ in SlotsToRead {
+				; A slot this build's owner does not bind (a hand-written ctrl_f1, a
+				; case variant, an unknown physical key) is the unused key the boot
+				; loader already warned about: it stays on disk for the cleanup and
+				; must never become a live hotkey.
+				if !KEYBOARD_SHORTCUT_DEFAULTS.Has(Slot) && !KeyboardSlotIsCatalogued(Slot) {
+						try LoggerInfo("Shortcuts", "Keyboard slot '{1}' is not a slot of this build; it is left for the configuration cleanup.", Slot)
+						continue
+				}
 				Value := IniCacheGet(_IniCache, "shortcuts.keyboard", Slot)
 				if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
 						KeyboardShortcutAssignments[Slot] := Value
@@ -2401,25 +2502,20 @@ KeyboardSlotRows() {
 		Rows := []
 		for GroupInfo in KEYBOARD_SLOT_GROUPS {
 				Prefix := GroupInfo["prefix"]
-				Items := []
 				if Prefix == "magic_" {
 						Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", MagicEditorSlotRows()))
 						continue
 				}
+				; The group opens with its restore and clear, declared by
+				; keyboard_group_scope_controls like on the two other drivers.
+				Items := MenuRenderer_TemplateRows("keyboard_group_scope_controls", Map(
+						"scope_restore", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "recommended"),
+						"scope_clear", _KeyboardSlotGroupScopeCommand.Bind(Prefix, "clear")),
+						Map("keyboard_group_ready", (*) => true), Map())
+				if !(Items is Array) || Items.Length != 3
+						throw Error("The keyboard group scope rows are not declared.")
 				for Slot, Action in KeyboardShortcutAssignments {
-						if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
-								continue
-						; A slot only belongs to the LONGEST prefix that matches it, or
-						; "ctrl_shift_v" would appear in the Ctrl group as well
-						IsExactPrefix := true
-						for OtherGroup in KEYBOARD_SLOT_GROUPS {
-								OtherPrefix := OtherGroup["prefix"]
-								if (OtherPrefix != Prefix and StrLen(OtherPrefix) > StrLen(Prefix) and SubStr(Slot, 1, StrLen(OtherPrefix)) == OtherPrefix) {
-										IsExactPrefix := false
-										break
-								}
-						}
-						if !IsExactPrefix or (Action == "none")
+						if KeyboardSlotGroupOf(Slot) != Prefix or (Action == "none")
 								continue
 						ActionLabel := GESTURE_ACTIONS.Has(Action) ? GestureActionDisplayLabel(Action, GestureBindingId("keyboard", Slot)) : Action
 						Items.Push(Map(
@@ -2434,6 +2530,86 @@ KeyboardSlotRows() {
 				Rows.Push(Map("label", t(GroupInfo["group_key"]), "items", Items))
 		}
 		return Rows
+}
+
+/**
+ * The keyboard-slot group a slot is listed in: the LONGEST group prefix that
+ * matches it, or "ctrl_shift_v" would also belong to the Ctrl group. The tray
+ * and the group's restore and clear ask this one rule.
+ * @param {String} Slot Persisted slot id.
+ * @returns {String} The group prefix, or "" when no group lists the slot.
+ */
+KeyboardSlotGroupOf(Slot) {
+		global KEYBOARD_SLOT_GROUPS
+		Found := ""
+		for GroupInfo in KEYBOARD_SLOT_GROUPS {
+				Prefix := GroupInfo["prefix"]
+				if SubStr(Slot, 1, StrLen(Prefix)) == Prefix && StrLen(Prefix) > StrLen(Found)
+						Found := Prefix
+		}
+		return Found
+}
+
+; Whether one configuration row belongs to a modifier group: its slot, or an
+; action parameter of the binding that slot dispatches under.
+_KeyboardSlotGroupOwnsRow(Prefix, Row) {
+		if Row.Section == "shortcuts.keyboard"
+				return KeyboardSlotGroupOf(Row.Key) == Prefix
+		BindingPrefix := GestureBindingId("keyboard", "")
+		if Row.Section != "action_parameters" || SubStr(Row.Key, 1, StrLen(BindingPrefix)) != BindingPrefix
+				return false
+		Rest := SubStr(Row.Key, StrLen(BindingPrefix) + 1)
+		Separator := InStr(Rest, "__")
+		return Separator > 1 && KeyboardSlotGroupOf(SubStr(Rest, 1, Separator - 1)) == Prefix
+}
+
+/**
+ * The rows that put one modifier group of the keyboard slots back to its
+ * preset ("recommended": each shipped slot of the group takes its recommended
+ * action and the slots the user added are removed) or empty it ("clear").
+ * They are the Shortcuts scope's own rows narrowed to the group, so the group
+ * restores exactly what the whole Shortcuts restore would.
+ * @param {String} Prefix A bindable group prefix of KEYBOARD_SLOT_GROUPS.
+ * @param {String} Mode "recommended" or "clear".
+ * @returns {Array} Sparse configuration rows.
+ */
+KeyboardSlotGroupScopeRows(Prefix, Mode) {
+		global KEYBOARD_SLOT_GROUPS
+		if !(Mode == "recommended" or Mode == "clear")
+				throw ValueError("Unknown keyboard group scope mode.", -1, Mode)
+		Bindable := false
+		for GroupInfo in KEYBOARD_SLOT_GROUPS
+				Bindable := Bindable || (GroupInfo["prefix"] == Prefix && Prefix != "magic_")
+		if !Bindable
+				throw ValueError("Unknown keyboard slot group.", -1, Prefix)
+		Owners := Map("action_parameter_domain", ConfigScopeActionParameterDomain)
+		Inventory := ManifestScopeInventory("shortcuts", Map("parameters", ConfigScopeActionParameterPaths), Owners)
+		Rows := []
+		for Row in ManifestScopePlan("shortcuts", Mode, Inventory, Owners).operations {
+				if _KeyboardSlotGroupOwnsRow(Prefix, Row)
+						Rows.Push(Row)
+		}
+		for Row in ConfigIOShortcutScopeOperations("shortcuts", Mode) {
+				if _KeyboardSlotGroupOwnsRow(Prefix, Row)
+						Rows.Push(Row)
+		}
+		return Rows
+}
+
+; Restores or clears one modifier group the way every scope row does: a
+; backup, one conditional write, then the reload that reads it (no question).
+; @param Prefix {String} The group prefix.
+; @param Mode {String} "recommended" or "clear".
+; @param Options {Map} Scope ports (path, reload...) for tests.
+; @return {Map} The scope receipt.
+KeyboardSlotGroupApplyScope(Prefix, Mode, Options := unset) {
+		return ConfigScopeCommitOperations("shortcuts", Mode, KeyboardSlotGroupScopeRows.Bind(Prefix, Mode),
+				IsSet(Options) ? Options : Map())
+}
+
+; Menu callback: the native menu arguments never reach the scope options.
+_KeyboardSlotGroupScopeCommand(Prefix, Mode, *) {
+		return KeyboardSlotGroupApplyScope(Prefix, Mode)
 }
 
 /**

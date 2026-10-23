@@ -290,3 +290,118 @@ helpers.describe("owned SQLite collector flush", function()
 		end)
 	end)
 end)
+
+helpers.describe("linux-open-session-crash-recovery", function()
+	--- A keystroke stamp just before now on the monotonic clock the flush settles
+	--- with. A fixed small stamp read as typed long ago once the host had been up
+	--- longer than the session gap, so the session closed at the first flush.
+	local function recent_stamp(index)
+		return math.floor(require("infra.monotonic").now_ms()) - 1000 + 100 * index
+	end
+	--- Starts one collector process against a shared logical database.
+	local function process(writer, body)
+		local writer_name, keylogger_name = "modules.keylogger.sqlite_writer", "modules.keylogger.keylogger"
+		local old_writer, old_keylogger = package.loaded[writer_name], package.loaded[keylogger_name]
+		package.loaded[writer_name], package.loaded[keylogger_name] = writer, nil
+		local ok, err = xpcall(function()
+			local collector = require(keylogger_name)
+			collector.init({ sqlite_path = "/tmp/open-walk-logical.sqlite" })
+			require("tests.support.metrics_consent_fixture").enable(collector)
+			body(collector)
+		end, debug.traceback)
+		package.loaded[writer_name], package.loaded[keylogger_name] = old_writer, old_keylogger
+		if not ok then error(err, 0) end
+	end
+	local function record(writer)
+		for key, value in pairs(writer.meta) do
+			if key:find("^open_walk:") then return value end
+		end
+	end
+	local function sessions_for(writer, app)
+		local rows = {}
+		for _, entry in ipairs(writer.sessions) do
+			if entry.row.app == app then rows[#rows + 1] = entry.row end
+		end
+		return rows
+	end
+
+	it("linux-open-session-crash-recovery: the session still open at a COMMIT is recorded with it", function()
+		local writer = Fakes.sqlite_writer()
+		process(writer, function(k)
+			for index, char in ipairs({ "a", "b", "c" }) do k.on_keydown(char, recent_stamp(index), "owned") end
+			helpers.assert_true(k.flush())
+		end)
+		local text = record(writer)
+		helpers.assert_true(type(text) == "string", "an open session must be recorded beside the rows it was cut from")
+		helpers.assert_contains(text, '"app":"owned"')
+		helpers.assert_eq(#sessions_for(writer, "owned"), 0, "the session is still open, not credited")
+	end)
+
+	it("linux-open-session-crash-recovery: a process after a crash credits the open session once", function()
+		local writer = Fakes.sqlite_writer()
+		process(writer, function(k)
+			for index, char in ipairs({ "a", "b", "c" }) do k.on_keydown(char, recent_stamp(index), "owned") end
+			helpers.assert_true(k.flush())
+			-- No stop(): the process dies here, before its final flush.
+		end)
+		process(writer, function(k)
+			helpers.assert_true(k.flush())
+			local credited = sessions_for(writer, "owned")
+			helpers.assert_eq(#credited, 1, "the crashed session must be credited by the next process")
+			helpers.assert_eq(credited[1].count_total, 1)
+			helpers.assert_eq(credited[1].longest_chars, 3)
+			helpers.assert_eq(record(writer), "[]", "the credited session leaves the record")
+			helpers.assert_true(k.flush())
+			helpers.assert_eq(#sessions_for(writer, "owned"), 1, "a recovered session is credited exactly once")
+		end)
+	end)
+
+	it("linux-open-session-crash-recovery: a clean stop leaves nothing to recover", function()
+		local writer = Fakes.sqlite_writer()
+		process(writer, function(k)
+			for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, recent_stamp(index), "owned") end
+			helpers.assert_true(k.flush())
+			k.stop()
+			helpers.assert_eq(#sessions_for(writer, "owned"), 1)
+			helpers.assert_eq(record(writer), "[]")
+		end)
+		process(writer, function(k)
+			k.flush()
+			helpers.assert_eq(#sessions_for(writer, "owned"), 1, "a stopped process's session is not credited twice")
+		end)
+	end)
+
+	it("linux-open-session-crash-recovery: an unchanged open state is not rewritten", function()
+		local writer = Fakes.sqlite_writer()
+		local writes = 0
+		local start = writer.start_flush
+		writer.start_flush = function(device, payload)
+			for _, entry in ipairs(payload.upserts) do
+				if entry.kind == "open_walk" then writes = writes + 1 end
+			end
+			return start(device, payload)
+		end
+		process(writer, function(k)
+			helpers.assert_true(k.flush())
+			helpers.assert_eq(writes, 0, "nothing open and nothing recorded: no write")
+			k.on_keydown("a", recent_stamp(1), "owned")
+			helpers.assert_true(k.flush())
+			helpers.assert_eq(writes, 1)
+			helpers.assert_true(k.flush())
+			helpers.assert_eq(writes, 1, "an unchanged open session is not written again")
+		end)
+	end)
+
+	it("linux-open-session-crash-recovery: a malformed record credits nothing and is replaced", function()
+		for _, text in ipairs({ "not json", '[{"date":"2026-10-21","app":"owned","session":[1]}]', '{"app":"x"}' }) do
+			local writer = Fakes.sqlite_writer()
+			writer.meta["open_walk:" .. "linux-" .. (io.popen("hostname"):read("*l") or "linux"):gsub("%s+", "")] = text
+			process(writer, function(k)
+				for index, char in ipairs({ "a", "b" }) do k.on_keydown(char, recent_stamp(index), "fresh") end
+				helpers.assert_true(k.flush())
+			end)
+			helpers.assert_eq(#writer.sessions, 0, text)
+			helpers.assert_contains(record(writer), '"app":"fresh"')
+		end
+	end)
+end)

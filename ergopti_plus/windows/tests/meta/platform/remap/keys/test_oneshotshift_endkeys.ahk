@@ -13,22 +13,17 @@ _OSEK_OneShotShiftResendsEndKeys() {
     Body := _DriverFuncBody("OneShotShift")
     Assert(Body != "", "OneShotShift() must exist in platform/remap/one_shot_shift.ahk")
 
-    Assert(InStr(Body, 'KeyOpt("{BackSpace}{Enter}{Delete}", "E")') > 0,
-        "OneShotShift must explicitly classify Backspace, Enter, and Delete as InputHook end keys")
-
-    EndReasonPos := InStr(Body, 'ihvText.EndReason == "EndKey"')
-    SendPos := InStr(Body, 'SendNewResult("{" . ihvText.EndKey . "}", False, False)')
-    Assert(EndReasonPos > 0 && SendPos > EndReasonPos,
-        "OneShotShift must re-send a captured control EndKey as one non-text control sequence after the InputHook returns")
-
-    ; The raw re-emit branch must be RESTRICTED to the three KeyOpt("E") control
-    ; keys. The punctuation/magic end keys (= % $ . , ' space + magic key) are ALSO
-    ; EndKey terminations; if this branch catches them, every SpecialCharacter
-    ; mapping (. -> ' :', = -> masculine ordinal, etc.) becomes dead code. That is
-    ; exactly what commit 866341cb4 did until this restriction was added.
-    Segment := SubStr(Body, EndReasonPos, SendPos - EndReasonPos)
-    Assert(InStr(Segment, "BackSpace") > 0 && InStr(Segment, "Enter") > 0 && InStr(Segment, "Delete") > 0,
-        "the EndKey re-emit branch must be restricted to BackSpace/Enter/Delete so punctuation end keys fall through to the SpecialCharacter dispatch")
+    Assert(InStr(Body, 'NamedKeys := "{BackSpace}{Enter}{Delete}"') > 0
+        && InStr(Body, 'KeyOpt(NamedKeys, "E")') > 0,
+        "the same explicit control list must classify native completion and decoder admission")
+    ReadPos := InStr(Body, 'Capture := _SIHO_ReadScalar(ihvText, NamedKeys)')
+    GuardPos := InStr(Body, 'if Capture.Kind == "control"')
+    SendPos := InStr(Body, 'SendNewResult("{" . Capture.Name . "}", False, False)')
+    SpecialPos := InStr(Body, 'SpecialCharacter := TapHoldOneShotResult(Scalar, MagicKey)')
+    Assert(ReadPos > 0 && GuardPos > ReadPos && SendPos > GuardPos && SpecialPos > SendPos,
+        "only named controls may replay as keys, while complete scalar punctuation/magic remains reachable")
+    Assert(InStr(Body, 'Scalar := Capture.Text') > 0,
+        "one-shot results must use the complete scalar, not an isolated low EndKey or empty Input")
 
     Assert(InStr(Body, 'SpecialCharacter != ""') > 0,
         "OneShotShift must retain the SpecialCharacter dispatch reachable for punctuation/magic end keys")

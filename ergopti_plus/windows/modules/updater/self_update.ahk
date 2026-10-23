@@ -801,11 +801,8 @@ global _UpdaterDownloadRequest := 0
 global _UpdaterDownloadArtifacts := 0
 global _UpdaterDownloadStartedTick := 0
 global _UpdaterStagingTransportCounter := 0
+; Bound of one inherited staging value (a URL or a path) passed through cmd.exe.
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
-; Application source-publication budget, not a Windows environment-block limit.
-; Eight individually bounded fragments admit the production worker with room
-; for growth while refusing an unbounded encoded source before any EnvSet.
-global UPDATER_STAGING_MAX_SCRIPT_CHUNKS := 8
 global _UpdaterSwapOwner := 0
 ; Boot installs an admitted recovery claim before loading this module. Other
 ; ordinary module consumers own an absent target; never overwrite a boot claim.
@@ -2132,60 +2129,48 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 ; Starts an isolated PowerShell transaction. ShellRunner owns process polling,
 ; preventing a slow CDN, antivirus scan or file flush from entering AHK's hook
 ; dispatch loop.
-; PowerShell -EncodedCommand requires UTF-16LE before Base64. The shared crypto
-; adapter emits Base64 without CR/LF, so both the worker payload and bootstrap
-; satisfy ShellRunner's single-line cmd.exe transport.
-_Updater_EncodePowerShellCommand(Command) {
-	if Type(Command) != "String"
-		throw TypeError("PowerShell command must be a String")
-	ByteCount := StrLen(Command) * 2
-	if ByteCount <= 0
-		return ""
-	Bytes := Buffer(ByteCount, 0)
-	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", StrPtr(Command),
-		"UPtr", ByteCount)
-	return CryptoBase64Encode(Bytes)
-}
-
 _Updater_PowerShellPath() {
 	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
 }
 
-; The persisted swap script is transported as UTF-8 data, not as an encoded
-; PowerShell command. UTF-8 keeps the independent environment payload below the
-; inherited-value budget while the staging worker writes the exact bytes that
-; Windows PowerShell later reads from the .ps1 file.
-_Updater_EncodeUtf8Payload(Text) {
-	if Type(Text) != "String"
-		throw TypeError("UTF-8 payload must be a String")
-	return CryptoBase64EncodeUtf8(Text)
+; Both workers are readable bundled scripts run with -File. Antivirus sandboxes
+; score an encoded command, or code decoded from the environment and compiled
+; into a script block, as a malware stage; a plain script file is not.
+_Updater_StagingWorkerPath() {
+	global _VendorDir
+	return _VendorDir . "\ergopti_updater_staging.ps1"
 }
 
-; Publish the large multi-line worker and its argv under unique inherited
-; environment names, then pass only a small single-line bootstrap to cmd.exe.
-; This avoids synchronous script-file I/O on the menu thread and preserves
-; release metadata as data rather than interpolating it into PowerShell syntax.
-_Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
+_Updater_SwapWorkerPath() {
+	global _VendorDir
+	return _VendorDir . "\ergopti_updater_swap.ps1"
+}
+
+; Publish the release data under unique inherited environment names and pass
+; only that name prefix to the -File worker. Environment values are data, never
+; PowerShell source, and unlike cmd.exe arguments they are not subject to the
+; wrapper's %VAR% expansion. No script file is written on the menu thread.
+; Bundled -File scripts still need -ExecutionPolicy Bypass: it applies to this
+; process only, and the default Windows client policy (Restricted) refuses
+; every script file without it.
+_Updater_BuildStagingTransport(WorkerPath, SwapSourcePath, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
 	ProxyPolicyPath := "", UpdaterDefaultsPath := "", AuthenticatedSize := 0) {
-	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
+	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
+	if (Type(WorkerPath) != "String" or WorkerPath == "")
+		throw TypeError("Staging worker path must be a non-empty String")
+	if (Type(SwapSourcePath) != "String" or SwapSourcePath == "")
+		throw TypeError("Swap worker path must be a non-empty String")
 	_UpdaterStagingTransportCounter += 1
 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . A_TickCount . "_" . _UpdaterStagingTransportCounter
-	ScriptPayload := _Updater_EncodePowerShellCommand(Script)
-	SwapScriptPayload := _Updater_EncodeUtf8Payload(SwapScript)
-	ScriptChunkCount := Ceil(StrLen(ScriptPayload) / UPDATER_STAGING_ENV_MAX_CHARS)
-	if (ScriptPayload == "" or ScriptChunkCount > UPDATER_STAGING_MAX_SCRIPT_CHUNKS)
-		throw ValueError("Encoded staging worker exceeds the bounded chunk transport budget")
-	if (SwapScriptPayload == "")
-		throw ValueError("Encoded swap worker is empty")
 	Environment := [
-		{ Name: Prefix . "_SCRIPT", Value: SubStr(ScriptPayload, 1, UPDATER_STAGING_ENV_MAX_CHARS) },
 		{ Name: Prefix . "_URL", Value: AssetUrl },
 		{ Name: Prefix . "_DIGEST", Value: ExpectedSha256 },
 		{ Name: Prefix . "_NEW_EXE", Value: NewExe },
 		{ Name: Prefix . "_SWAP_PATH", Value: SwapScriptPath },
+		{ Name: Prefix . "_SWAP_SOURCE", Value: SwapSourcePath },
 		{ Name: Prefix . "_CURRENT", Value: CurrentExe },
 		{ Name: Prefix . "_MINIMUM", Value: MinimumSize },
 		{ Name: Prefix . "_TIMEOUT", Value: TimeoutMs },
@@ -2196,52 +2181,15 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath },
 		{ Name: Prefix . "_AUTHENTICATED_SIZE", Value: AuthenticatedSize }
 	]
-	Environment.Push({ Name: Prefix . "_SCRIPT_COUNT", Value: ScriptChunkCount })
-	Loop ScriptChunkCount - 1 {
-		ChunkNumber := A_Index + 1
-		Environment.Push({
-			Name: Prefix . "_SCRIPT_" . ChunkNumber,
-			Value: SubStr(ScriptPayload, ((ChunkNumber - 1) * UPDATER_STAGING_ENV_MAX_CHARS) + 1,
-				UPDATER_STAGING_ENV_MAX_CHARS)
-		})
-	}
-	SwapChunkCount := Ceil(StrLen(SwapScriptPayload)
-		/ UPDATER_STAGING_ENV_MAX_CHARS)
-	Environment.Push({ Name: Prefix . "_SWAP_COUNT", Value: SwapChunkCount })
-	Loop SwapChunkCount {
-		ChunkOffset := ((A_Index - 1) * UPDATER_STAGING_ENV_MAX_CHARS) + 1
-		Environment.Push({
-			Name: Prefix . "_SWAP_" . A_Index,
-			Value: SubStr(SwapScriptPayload, ChunkOffset,
-				UPDATER_STAGING_ENV_MAX_CHARS)
-		})
-	}
 	for Pair in Environment {
 		if StrLen(Pair.Value) > UPDATER_STAGING_ENV_MAX_CHARS
 			throw ValueError("Staging environment value exceeds the cmd.exe inheritance budget")
 	}
-	; Consumed payloads must not overflow the Framework compiler's inherited ANSI environment.
-	Bootstrap := '$ErrorActionPreference=' . Chr(39) . 'Stop' . Chr(39) . ';'
-		. '$ProgressPreference=' . Chr(39) . 'SilentlyContinue' . Chr(39) . ';'
-		. 'if($env:' . Prefix . '_SCRIPT_COUNT -cne ' . Chr(39) . ScriptChunkCount . Chr(39) . ' -or $env:' . Prefix . '_SWAP_COUNT -cne ' . Chr(39) . SwapChunkCount . Chr(39) . '){throw "Staging fragment counts were refused"};'
-		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;if([string]::IsNullOrEmpty($scriptPayload)){throw "Staging source fragment was refused"};'
-		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging source fragment was refused"};$scriptPayload+=$chunk};'
-		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($scriptPayload));'
-		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging swap fragment was refused"};$swapPayload+=$chunk};'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunkName=if($i -eq 1){' . Chr(39) . Prefix . '_SCRIPT' . Chr(39) . '}else{' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i};[Environment]::SetEnvironmentVariable($chunkName,[NullString]::Value)};'
-		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_COUNT' . Chr(39) . ',[NullString]::Value);'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i,[NullString]::Value)};'
-		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_COUNT' . Chr(39) . ',[NullString]::Value);'
-		. '$worker=[ScriptBlock]::Create($source);'
-		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
-		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
-		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS -AuthenticatedSize ([int64]$env:' . Prefix . '_AUTHENTICATED_SIZE)'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)]
+		"-File", WorkerPath, "-TransportPrefix", Prefix]
 	for Arg in Args {
 		if (InStr(Arg, "`n") or InStr(Arg, "`r"))
-			throw ValueError("Encoded staging transport unexpectedly contains a newline")
+			throw ValueError("Staging worker arguments unexpectedly contain a newline")
 	}
 	Published := []
 	try {
@@ -2257,11 +2205,8 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	return {
 		Args: Args,
 		Environment: Environment,
-		ScriptPayload: ScriptPayload,
-		ScriptChunkCount: ScriptChunkCount,
-		SwapScriptPayload: SwapScriptPayload,
-		SwapChunkCount: SwapChunkCount,
-		Bootstrap: Bootstrap
+		Prefix: Prefix,
+		WorkerPath: WorkerPath
 	}
 }
 
@@ -2271,22 +2216,20 @@ _Updater_BindCurlCaptureTransport(Transport, Capture) {
 	if !(Capture is _UpdaterCurlCaptureLedger) || Capture.Retired || Capture.Acquiring
 		|| Type(Transport) != "Object" || !Transport.HasOwnProp("Environment")
 		|| !(Transport.Environment is Array) || Transport.Environment.Length == 0
+		|| !Transport.HasOwnProp("Prefix")
 		|| !Capture.ValidatePaths()
 		throw Error("Parent-owned curl capture transport was refused.")
 	if StrLen(Capture.Path) > UPDATER_STAGING_ENV_MAX_CHARS
 		throw ValueError("Curl capture exceeds the private inheritance budget.")
-	First := Transport.Environment[1].Name
-	if !RegExMatch(First, "\A(ERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+)_SCRIPT\z", &Prefix)
+	if !RegExMatch(Transport.Prefix, "\AERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+\z")
+		|| Transport.Environment[1].Name != Transport.Prefix . "_URL"
 		throw Error("Curl capture requires the original staging environment owner.")
-	Name := Prefix[1] . "_CURL_CAPTURE"
+	Name := Transport.Prefix . "_CURL_CAPTURE"
 	for Pair in Transport.Environment
 		if Pair.Name == Name
 			throw Error("Curl capture transport has already been initialized.")
 	Transport.Environment.Push({Name: Name, Value: Capture.Path})
 	EnvSet(Name, Capture.Path)
-	Transport.Bootstrap .= ' -OwnedCaptureDirectory $env:' . Name
-	Transport.Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-EncodedCommand", _Updater_EncodePowerShellCommand(Transport.Bootstrap)]
 }
 
 
@@ -2301,8 +2244,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
-	StagingScript := _Updater_BuildStagingWorkerScript()
-	SwapScript := _Updater_BuildSwapWorkerScript()
+	StagingWorker := _Updater_StagingWorkerPath()
+	SwapWorker := _Updater_SwapWorkerPath()
 	FailureOwner := IsSet(InstallObserver)
 		? _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
 			ExpectedSha256, StagingEpoch, InstallObserver)
@@ -2331,8 +2274,11 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 				throw Error("Curl capture allocation crossed transaction retirement.")
 		}
+		for WorkerPath in [StagingWorker, SwapWorker]
+			if !FileExist(WorkerPath)
+				throw Error("Bundled updater worker is missing: " . WorkerPath)
 		Transport := _Updater_BuildStagingTransport(
-			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
+			StagingWorker, SwapWorker, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
 			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
 			_UpdaterDownloadStartedTick,
@@ -2604,87 +2550,6 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	}
 	_Updater_NotifyInstallPhase("restarting")
 	global UPDATER_LAST_NOTIFIED_TAG := ""
-}
-
-; Returns the compact staging orchestrator. Trusted helper paths and release
-; data use the private inherited environment, never PowerShell interpolation.
-_Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null, [int64]$AuthenticatedSize=0, [string]$OwnedCaptureDirectory="")' . "`n"
-		. '$ErrorActionPreference = "Stop"' . "`n"
-		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()};if ($OwnedCaptureDirectory -ne "") {$State.OwnedCaptureDirectory=$OwnedCaptureDirectory}' . "`n"
-		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
-		. 'try {' . "`n"
-		. '  . $DownloadModulePath' . "`n"
-		. '  . (Join-Path (Split-Path -Parent $DownloadModulePath) "ergopti_network_routes.ps1")' . "`n"
-		. '  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}' . "`n"
-		. '  $Request=[System.Net.HttpWebRequest]::Create($Url)' . "`n"
-		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
-		. '  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}' . "`n"
-		. '  $State.Stage="file_read"' . "`n"
-		. '  $ActualSize=(Get-Item -LiteralPath $NewExe).Length' . "`n"
-		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
-		. '  if ($ActualSize -lt $MinimumSize) { $State.Reason="verify";throw "Downloaded file is too small" }' . "`n"
-		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { $State.Reason="verify";throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
-		. '  $ActualDigest=& { $HashStream=$null; $Hasher=[Security.Cryptography.SHA256]::Create(); try { $HashStream=[IO.File]::Open($NewExe,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read); [BitConverter]::ToString($Hasher.ComputeHash($HashStream)).Replace("-","").ToLowerInvariant() } finally { try { if ($null -ne $HashStream) { $HashStream.Dispose() } } finally { $Hasher.Dispose() } } }' . "`n"
-		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
-		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
-		. '  if ($AuthenticatedSize -le 0) {$State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)}' . "`n"
-		. '  $State.Stage="file_write"' . "`n"
-		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  if ($AuthenticatedSize -le 0) {[IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))} else {$SwapOutput=$null;try{$State.Stage="file_create";$SwapOutput=[IO.File]::Open($SwapScriptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None);$State.SwapWorkerOwned=$true;$State.Stage="file_write";$SwapBytes=[Text.Encoding]::UTF8.GetBytes($SwapSource);$SwapOutput.Write($SwapBytes,0,$SwapBytes.Length);$SwapOutput.Flush($true)}finally{Close-ErgoptiUpdaterResource $SwapOutput "swap_worker" "file_write" $State}}' . "`n"
-		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  if ($State.NativeCleanupDebt -or $State.CleanupDebt.Count -ne 0) {throw "Staging resources have unacknowledged retirement"}' . "`n"
-		. '  Write-Output "READY"' . "`n"
-		. '  exit 0' . "`n"
-		. '} catch {' . "`n"
-		. '  $Receipt=@{}' . "`n"
-		. '  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }' . "`n"
-		. '  if ($AuthenticatedSize -le 0 -or $State.StagedExecutableOwned) {CleanWorker $NewExe "staged_executable"}' . "`n"
-		. '  if ($AuthenticatedSize -le 0 -or $State.SwapWorkerOwned) {CleanWorker $SwapScriptPath "swap_worker"}' . "`n"
-		. '  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress' . "`n"
-		. '  exit 1' . "`n"
-		. '}'
-}
-
-; The swapper is a separate PowerShell process because it must survive the AHK
-; process whose executable it replaces. Its four-event protocol prevents any
-; production-file mutation until AHK has passed every shutdown refusal gate and
-; the inherited exact parent HANDLE proves that process has really exited.
-_Updater_BuildSwapWorkerScript() {
-	return 'param([string]$ReadyName,[string]$CommitName,[string]$AckName,[string]$FinalExitName,[int64]$ParentHandle,[string]$NewExe,[string]$CurrentExe,[int]$ProbationMs,[int]$BootReadyTimeoutMs,[int]$RestoreAttempts,[int]$RestoreRetryMs,[string]$DiagnosticPath)' . "`n"
-		. '$ErrorActionPreference="Stop";$R=$null;$C=$null;$A=$null;$F=$null;$P=$null' . "`n"
-		. 'function Diag($M){try{[IO.File]::AppendAllText($DiagnosticPath,$M+[Environment]::NewLine)}catch{}}' . "`n"
-		. 'function RemoveBest($Path,$Label){try{if($Path -and [IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}catch{Diag($Label+":"+$_.Exception.Message)}}' . "`n"
-		. 'function WriteTerminal($Path,$Message){$Temp=$Path+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "terminal-temp";RemoveBest $Path "terminal-stale";$Clean=($Message -replace "[\r\n]+"," ");if($Clean.Length -gt 2000){$Clean=$Clean.Substring(0,2000)};[IO.File]::WriteAllText($Temp,$Clean,$Utf8);[IO.File]::Move($Temp,$Path)}finally{RemoveBest $Temp "terminal-temp-cleanup"}}' . "`n"
-		. 'function PublishCopy($Source,$Destination){$Temp=$Destination+".tmp";try{RemoveBest $Temp "precopy-temp";if([IO.File]::Exists($Destination)){throw "Unique publish destination already exists"};[IO.File]::Copy($Source,$Temp,$false);$Expected=[IO.FileInfo]::new($Source).Length;if($Expected -le 0 -or [IO.FileInfo]::new($Temp).Length -ne $Expected){throw "Pre-copy size mismatch"};[IO.File]::Move($Temp,$Destination);if([IO.FileInfo]::new($Destination).Length -ne $Expected){throw "Published copy size mismatch"};return $Destination}finally{RemoveBest $Temp "precopy-temp-cleanup"}}' . "`n"
-		. 'function WriteClaim($Claim,$Target,$Stage){$Temp=$Claim+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "claim-temp";RemoveBest $Claim "claim-stale";[IO.File]::WriteAllText($Temp,$Target+[Environment]::NewLine+$Stage,$Utf8);[IO.File]::Move($Temp,$Claim)}finally{RemoveBest $Temp "claim-temp-cleanup"}}' . "`n"
-		. 'function StopExact($Process){if($null -eq $Process){return $true};try{$Exact=$Process.Handle;$Process.Refresh();if(!$Process.HasExited){$Process.Kill()};if(!$Process.WaitForExit(5000)){Diag("exact-stop-timeout");return $false};return $true}catch{Diag("exact-stop:"+$_.Exception.Message);return $false}}' . "`n"
-		. 'function StartReady($Path,$TimeoutMs,$Probation,$AllowLauncherExit){$Event=$null;$Process=$null;$ProcessWait=$null;$OldReady=[Environment]::GetEnvironmentVariable("ERGOPTI_UPDATER_BOOT_READY");try{$EventName="Local\ErgoptiPlus.Updater.BootReady."+[Guid]::NewGuid().ToString("N");$Event=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset,$EventName);[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_BOOT_READY",$EventName);$Process=Start-Process -FilePath $Path -PassThru -WindowStyle Hidden;$Exact=$Process.Handle;if($AllowLauncherExit){if(!$Event.WaitOne($TimeoutMs)){throw "Canonical driver did not acknowledge recovery handoff"};return $Process};$ProcessWait=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset);$OldSafe=$ProcessWait.SafeWaitHandle;$ProcessWait.SafeWaitHandle=[Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$Exact,$false);$OldSafe.Dispose();$Wait=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($Event,$ProcessWait),$TimeoutMs);if($Wait -eq 1){throw "Driver exited before boot-ready"};if($Wait -ne 0){throw "Driver boot-ready timeout"};Start-Sleep -Milliseconds $Probation;$Process.Refresh();if($Process.HasExited){throw "Driver exited during post-ready probation"};return $Process}catch{$Failure=$_;if($null -ne $Process -and !(StopExact $Process)){throw "UNSAFE_CHILD:"+$Failure.Exception.Message};throw $Failure}finally{[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_BOOT_READY",$OldReady);if($null -ne $ProcessWait){$ProcessWait.Dispose()};if($null -ne $Event){$Event.Dispose()}}}' . "`n"
-		. 'try {' . "`n"
-		. '  $R=[Threading.EventWaitHandle]::OpenExisting($ReadyName);$C=[Threading.EventWaitHandle]::OpenExisting($CommitName);$A=[Threading.EventWaitHandle]::OpenExisting($AckName);$F=[Threading.EventWaitHandle]::OpenExisting($FinalExitName)' . "`n"
-		. '  $P=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset);$H=$P.SafeWaitHandle;$P.SafeWaitHandle=[Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$ParentHandle,$true);$H.Dispose()' . "`n"
-		. '  if(!$R.Set()){throw "Ready signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($C,$P));if($G -eq 1){exit 20};if($G -ne 0){throw "Commit wait failed"}' . "`n"
-		. '  if(!$A.Set()){throw "Ack signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($F,$P));if($G -eq 1){exit 21};if($G -ne 0){throw "FinalExit wait failed"};$P.WaitOne()|Out-Null' . "`n"
-		. '  $B=$CurrentExe+".bak";$Had=[IO.File]::Exists($CurrentExe);$Retired=(!$Had -and [IO.File]::Exists($B));$Installed=$false;$Token=[Guid]::NewGuid().ToString("N");$Candidate=$CurrentExe+"."+$Token+".candidate.exe";$RecoveryPath=$CurrentExe+"."+$Token+".recovery.exe";$RecoveryStage=$CurrentExe+"."+$Token+".republish.exe";$RecoveryClaim=$RecoveryPath+".claim";$Recovery=$null;$TerminalPath=$DiagnosticPath+".terminal";RemoveBest $TerminalPath "terminal-stale"' . "`n"
-		. '  try {' . "`n"
-		. '    PublishCopy $NewExe $Candidate|Out-Null;$OldSource=if($Had){$CurrentExe}elseif($Retired){$B}else{$null}' . "`n"
-		. '    if($null -ne $OldSource){PublishCopy $OldSource $RecoveryPath|Out-Null;PublishCopy $OldSource $RecoveryStage|Out-Null;WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$Recovery=$RecoveryPath}' . "`n"
-		. '    if($Had){RemoveBest $B "stale-bak";[IO.File]::Replace($Candidate,$CurrentExe,$B,$true);$Retired=$true}else{[IO.File]::Move($Candidate,$CurrentExe)};$Installed=$true;RemoveBest $NewExe "new-cleanup"' . "`n"
-		. '    $Child=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false' . "`n"
-		. '    RemoveBest $RecoveryClaim "success-claim-cleanup";RemoveBest $B "success-bak-cleanup";RemoveBest $RecoveryStage "success-stage-cleanup";RemoveBest $Recovery "success-recovery-cleanup";exit 0' . "`n"
-		. '  } catch {' . "`n"
-		. '    $Failure=$_;if($Failure.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw $Failure};$TerminalMessage="SWAP_ERROR:"+$Failure.Exception.Message;try{WriteTerminal $TerminalPath $TerminalMessage}catch{Diag("terminal-write:"+$_.Exception.Message)};RemoveBest $Candidate "rollback-candidate-cleanup";$Restored=(!$Installed -and $Had -and [IO.File]::Exists($CurrentExe))' . "`n"
-		. '    for($I=0;$I -lt $RestoreAttempts -and !$Restored;$I++){' . "`n"
-		. '      try{$Source=if([IO.File]::Exists($RecoveryStage)){$RecoveryStage}elseif([IO.File]::Exists($B)){$B}else{$null};if($null -eq $Source){break};if([IO.File]::Exists($CurrentExe)){$Bad=$CurrentExe+"."+$Token+".failed.exe";RemoveBest $Bad "rollback-failed-stale";[IO.File]::Replace($Source,$CurrentExe,$Bad,$true);RemoveBest $Bad "rollback-failed-cleanup"}else{[IO.File]::Move($Source,$CurrentExe)};$Restored=$true}' . "`n"
-		. '      catch{Diag("rollback-restore-"+$I+":"+$_.Exception.Message);if(($I+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}' . "`n"
-		. '    }' . "`n"
-		. '    $OldTerminal=[Environment]::GetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL");[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$TerminalPath);try{$DriverReady=$false;if($Restored){try{$RestoredChild=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false;$DriverReady=$true;RemoveBest $RecoveryClaim "rollback-claim-cleanup";RemoveBest $B "rollback-bak-cleanup";RemoveBest $RecoveryStage "rollback-stage-cleanup";RemoveBest $Recovery "rollback-recovery-cleanup"}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-relaunch:"+$_.Exception.Message)}}' . "`n"
-		. '    for($RecoveryAttempt=0;$RecoveryAttempt -lt $RestoreAttempts -and !$DriverReady -and $null -ne $Recovery -and [IO.File]::Exists($Recovery);$RecoveryAttempt++){try{if(![IO.File]::Exists($RecoveryStage)){PublishCopy $Recovery $RecoveryStage|Out-Null};WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$RecoveryChild=StartReady $Recovery $BootReadyTimeoutMs $ProbationMs $true;$DriverReady=$true;Diag("rollback-recovery:"+$Recovery)}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-recovery-"+$RecoveryAttempt+":"+$_.Exception.Message);if(($RecoveryAttempt+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}}' . "`n"
-		. '    if(!$DriverReady){throw "Rollback could not start either canonical or recovery driver"}}finally{[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$OldTerminal)};throw $Failure' . "`n"
-		. '  }' . "`n"
-		. '} catch {$M="SWAP_ERROR:"+$_.Exception.Message;Diag($M);[Console]::Error.WriteLine($M);exit 1}' . "`n"
-		. 'finally{foreach($W in @($R,$C,$A,$F,$P)){if($null -ne $W){$W.Dispose()}}}'
 }
 
 _Updater_QuoteCreateProcessArg(Value) {

@@ -37,6 +37,7 @@ local function with_editor(body, options)
 		end
 		s.bind()
 		package.loaded[MODULES[4]] = { open = function(opts, confirm)
+			if opts.presentation_id == "tap_hold_hold_action" then s.hold_opts, s.hold_confirm = opts, confirm; return true end
 			assert(opts.presentation_id == "tap_hold_action"); s.confirm = confirm; return true
 		end }
 		os.execute = function(command)
@@ -58,14 +59,16 @@ local function with_editor(body, options)
 		locate(rows); assert(caps, "actual CapsLock menu")
 		local caption = I18n.get("tap_hold.picker.tap"); local prefix = caption:match("^(.-)%%s") or caption
 		for _, row in ipairs(caps.menu) do if row.fn and row.title:sub(1, #prefix) == prefix then s.tap = row.fn end end
-		local declaration = require("infra.manifest_menu").get_array("tap_hold_key_delay_rows")[1]
-		local function delay(items)
-			for _, row in ipairs(items) do
-				if row.fn and row.title == I18n.get(declaration.i18n) then s.delay = row.fn end
-				if row.menu then delay(row.menu) end
-			end
+		local hold_caption = I18n.get("tap_hold.picker.hold"); local hold_prefix = hold_caption:match("^(.-)%%s") or hold_caption
+		for _, row in ipairs(caps.menu) do if row.fn and row.title:sub(1, #hold_prefix) == hold_prefix then s.hold = row.fn end end
+		assert(s.hold, "actual hold callback")
+		local declaration = require("infra.manifest_menu").get_array("tap_hold_key_delay_tail")[2]
+		assert(declaration.id == "tap_hold_key_delay", "the declared delay row")
+		local delay_caption = I18n.get(declaration.i18n); local delay_prefix = delay_caption:match("^(.-)%%s") or delay_caption
+		for _, row in ipairs(caps.menu) do
+			if row.fn and row.title:sub(1, #delay_prefix) == delay_prefix then s.delay = row.fn end
 		end
-		delay(caps.menu); assert(s.tap and s.delay, "actual tap and delay callbacks")
+		assert(s.tap and s.delay, "actual tap and delay callbacks")
 		s.pause = function(value) s.paused = value; assert(manager.set_paused(value)) end
 		s.prompt = function(callback) Prompt.ask = function() callback(); return "450" end end
 		s.stage = function(callback)
@@ -188,6 +191,31 @@ helpers.describe("TapHold deferred configuration owner", function()
 			end)
 		end)
 	end
+	-- The hold row opens the shared action picker (2026-10-22); its pick goes
+	-- through the real set_hold, source and engine.
+	helpers.it("commits a hold picked in the shared picker to real source and engine (tap-hold-hold-action-picker)", function()
+		with_editor(function(s)
+			helpers.assert_eq(s.hold(), true, "the hold row opens the picker")
+			helpers.assert_eq(s.hold_opts.current, "none", "CapsLock holds nothing in this file")
+			helpers.assert_eq(s.hold_confirm("ctrl+shift"), true); helpers.assert_eq(s.notices, 0)
+			helpers.assert_eq(s.manager.keys().caps_lock.hold_modifier, "ctrl+shift")
+			helpers.assert_true(read(s.path):find('hold_modifier = "ctrl+shift"', 1, true) ~= nil)
+			helpers.assert_eq(s.hold_confirm("none"), true, "the none row clears the hold")
+			helpers.assert_eq(s.manager.keys().caps_lock.hold_modifier, "")
+		end)
+	end)
+	helpers.it("keeps the hold picker open on an unoffered or refused pick (tap-hold-hold-action-picker)", function()
+		with_editor(function(s)
+			s.hold(); local before = read(s.path)
+			helpers.assert_eq(s.hold_confirm("backspace"), false, "a tap action is not a hold")
+			helpers.assert_eq(read(s.path), before, "an unoffered pick writes nothing")
+			helpers.assert_eq(s.notices, 0)
+			s.reload_refused = true
+			helpers.assert_eq(s.hold_confirm("shift"), false, "a refused reload is a refused pick")
+			helpers.assert_eq(s.manager.keys().caps_lock.hold_modifier, nil, "the engine kept its hold")
+			helpers.assert_eq(s.notices, 1, "refusal is visible")
+		end)
+	end)
 	helpers.it("reports accepted rename honestly when reload refuses", function()
 		with_editor(function(s)
 			s.reload_refused = true; s.tap(); local before = read(s.path)

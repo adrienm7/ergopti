@@ -96,6 +96,7 @@ return function(run, dependencies)
 				save = 0,
 				saved_enabled = {},
 				saved_payloads = {},
+				saved_intents = {},
 				save_results = {},
 				save_result_index = 0,
 				lease_bound_starts = 0,
@@ -175,10 +176,11 @@ return function(run, dependencies)
 						combo_symmetric = false,
 					}
 				end,
-				save_user_config = function(state, path)
+				save_user_config = function(state, path, overwrite_corrupt, expected_source, intent)
 					calls.save = calls.save + 1
 					calls.saved_enabled[#calls.saved_enabled + 1] = state.enabled == true
 					calls.saved_payloads[#calls.saved_payloads + 1] = clone_payload(state)
+					calls.saved_intents[#calls.saved_intents + 1] = intent or false
 					calls.save_result_index = calls.save_result_index + 1
 					local configured = calls.save_results[calls.save_result_index]
 					if configured == "throw" then
@@ -187,7 +189,11 @@ return function(run, dependencies)
 					if configured == "nil" then return nil end
 					if configured == "false" then return false end
 					if configured == "true" then return true end
-					if options.real_user_config_writes == true then return RealConfig.save_user_config(state, path) end
+					if options.real_user_config_writes == true then
+						-- Only the setter intent is forwarded: the reset and scope arguments
+						-- keep the earlier two-argument real-write contract of these fixtures.
+						return RealConfig.save_user_config(state, path, nil, nil, intent)
+					end
 					return calls.save_succeeds
 				end,
 				build_default_state = function()
@@ -545,6 +551,7 @@ return function(run, dependencies)
 			calls.build, calls.deploy, calls.execute, calls.save = 0, 0, 0, 0
 			calls.saved_enabled = {}
 			calls.saved_payloads = {}
+			calls.saved_intents = {}
 			calls.lease_bound_starts = 0
 			calls.hotkey_attempts = 0
 			calls.lifecycle_stop_attempts = 0

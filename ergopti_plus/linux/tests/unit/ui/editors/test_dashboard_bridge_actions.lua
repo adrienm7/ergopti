@@ -249,6 +249,33 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 		Bridge._reset()
 	end)
 
+	helpers.it("(incomplete-history-partial) an incomplete read is shown but never kept", function()
+		local Bridge, deferred = bridge_with_seams()
+		local reads, incomplete = 0, true
+		local keylogger = require("tests.fakes.metrics_keylogger").synchronous({
+			get_dashboard_payload = function()
+				reads = reads + 1
+				return { metrics_manifest = {}, metrics_manifest_incomplete = incomplete or nil,
+					_prefetch_data = { read = reads, incomplete = incomplete or nil } }
+			end,
+			clear_cache = function() return true end,
+		})
+		local state = { keylogger = keylogger }
+		local partial = Bridge.on_message("ready", state)
+		helpers.assert_true(partial._prefetch_data.incomplete == true and partial.metrics_manifest_incomplete == true,
+			"the partial counts reach the page with their incomplete flags")
+		local retried = Bridge.on_message("ready", state)
+		helpers.assert_eq(reads, 2, "reopening after an incomplete read retries the whole read")
+		helpers.assert_true(retried ~= partial, "an incomplete payload was kept as the cached answer")
+		helpers.assert_eq(#deferred, 0, "nothing cached means no cached answer to refresh")
+		incomplete = false
+		local complete = Bridge.on_message("ready", state)
+		helpers.assert_eq(complete._prefetch_data.incomplete, nil)
+		helpers.assert_true(Bridge.on_message("ready", state) == complete, "a complete read is cached again")
+		helpers.assert_eq(reads, 3)
+		Bridge._reset()
+	end)
+
 	helpers.it("the event loop runs a deferred callback only once it is due", function()
 		local EventLoop = helpers.load_module("adapters.event_loop")
 		local ran = 0

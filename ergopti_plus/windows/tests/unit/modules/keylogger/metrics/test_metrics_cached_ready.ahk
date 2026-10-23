@@ -79,3 +79,13 @@ _MCR_CachedReady(Outcome) {
 }
 for Outcome in ["delivered", "refused", "replaced", "inflight"]
 	Test("metrics cached ready: " . Outcome . " (metrics-cached-ready)", _MCR_CachedReady.Bind(Outcome))
+
+#Include test_metrics_apps_editor.ahk
+
+#Include test_metrics_apps_refresh_retry.ahk
+
+#Include test_metrics_apps_owned_gui.ahk
+
+#Include test_metrics_native_sender_identity.ahk
+
+#Include test_metrics_apps_dom_native.ahk

@@ -88,7 +88,7 @@ function M.with_world(options, scenario)
 			local scheduler = require("adapters.timer_scheduler")
 			local state = { buffer = "abcdefghijkl", magic_key = "star" }
 			helpers.assert_true(expander.init(state, {}, { get_llm_enabled = function() return false end }))
-			function w.start(replacement)
+			function w.attempt(replacement)
 				f.callback_active = true
 				synthetic.enter_callback()
 				local accepted, tx = expander.perform_text_replacement(options.deletes or 12, function()
@@ -96,9 +96,13 @@ function M.with_world(options, scenario)
 				end, function() state.buffer = replacement end, false, true, "hotstring", "unit.multi-paste")
 				local consume, returned = synthetic.leave_callback(accepted)
 				f.callback_active = false
-				helpers.assert_true(accepted and consume)
 				for _, event in ipairs(returned or {}) do observe(event) end
 				w.tx = tx
+				return accepted, tx, consume, returned
+			end
+			function w.start(replacement)
+				local accepted, tx, consume = w.attempt(replacement)
+				helpers.assert_true(accepted and consume)
 				return tx
 			end
 			function w.standalone(replacement)

@@ -69,7 +69,7 @@ _CurlCaptureNativeBodyControls() {
 			. "try{$b=[byte[]](5,6,7,8);$f.Write($b,0,4);$f.Flush($true)}finally{$f.Dispose()};"
 			. "Start-Sleep -Milliseconds 30000"
 		Worker := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-			["-NoProfile", "-NonInteractive", "-EncodedCommand", _Updater_EncodePowerShellCommand(Script)],
+			["-NoProfile", "-NonInteractive", "-EncodedCommand", _UpdaterTestEncodedCommand(Script)],
 			, , ObjBindMethod(Capture, "OnNativeAdopt"))
 		Capture.Attach(Worker)
 		AssertEqual(0, Capture.ObserveBody(Worker, 16), "a not-started process cannot authorize a body")
@@ -129,7 +129,7 @@ class _CurlCaptureNativeDownloadRun extends _UpdaterNativeDownloadRun {
 		this.Capture.Acquire(this.Directory)
 		Url := "https://managed-fixture.invalid:" . this.Owner.State["tls_port"] . this.Path
 		this.StartedTick := A_TickCount
-		this.Transport := _Updater_BuildStagingTransport(_Updater_BuildStagingWorkerScript(), this.SwapBytes,
+		this.Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(),
 			Url, this.Digest, this.NewExe, this.SwapPath, this.CurrentExe, UPDATER_MIN_EXE_SIZE_BYTES, 5000,
 			_VendorDir . "\ergopti_updater_download.ps1", this.DeadlineMs, this.StartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json", _SharedDir . "\modules\updater\defaults.json", 524288)
@@ -137,9 +137,9 @@ class _CurlCaptureNativeDownloadRun extends _UpdaterNativeDownloadRun {
 			_Updater_BindCurlCaptureTransport(this.Transport, this.Capture)
 			Proxy := "127.0.0.1:" . this.Owner.State["proxy_port"]
 			Admission := '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl="";Proxy="' . Proxy . '";Bypass="";NativeError=0;FailureOrigin=""}};$environment={param($Name)return ""};'
-			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
+			this.StagingBootstrapPath := this.Directory . "staging-bootstrap.ps1"
 			this.Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-				["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)],
+				_UpdaterNativeStagingBootstrapArgs(this.Transport, this.StagingBootstrapPath, Admission),
 				ObjBindMethod(this, "OnDone"), , ObjBindMethod(this, "OnNativeAdopt"), 8192)
 			this.Capture.Attach(this.Handle)
 			AssertTrue(this.Handle.start(), "the actual authenticated curl Job starts with its parent-owned capture")
@@ -586,7 +586,7 @@ _CurlCaptureProductionJoinControls() {
 	Moved := ""
 	try {
 		Capture.Acquire(Parent)
-		Transport := _Updater_BuildStagingTransport(_Updater_BuildStagingWorkerScript(), "exit 0",
+		Transport := _Updater_BuildStagingTransport(_Updater_StagingWorkerPath(), _Updater_SwapWorkerPath(),
 			"https://github.com/adrienm7/ergopti/releases/download/v9.8.7/ErgoptiPlus.exe",
 			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			Parent . "\staged.exe", Parent . "\swap.ps1", Parent . "\existing.exe", UPDATER_MIN_EXE_SIZE_BYTES,
@@ -602,8 +602,13 @@ _CurlCaptureProductionJoinControls() {
 			}
 		}
 		AssertEqual(1, Found, "the source binder transfers one original capture")
-		AssertContains(Transport.Bootstrap, " -OwnedCaptureDirectory $env:")
-		AssertFalse(InStr(Transport.Bootstrap, Capture.Path), "capture paths never become script interpolation")
+		AssertEqual(Transport.Prefix . "_CURL_CAPTURE", Transport.Environment[Transport.Environment.Length].Name,
+			"the capture is published under the prefix the -File worker receives")
+		for Arg in Transport.Args
+			AssertFalse(InStr(Arg, Capture.Path), "capture paths never become worker arguments")
+		AssertContains(FileRead(_Updater_StagingWorkerPath(), "UTF-8"),
+			'$OwnedCaptureDirectory = Read-ErgoptiStagingInput "CURL_CAPTURE" $false',
+			"the bundled worker reads the capture as private data")
 		AssertThrows(() => _Updater_BindCurlCaptureTransport(Transport, Capture),
 			"duplicate ownership transfer is refused")
 	} catch Any as Failure {

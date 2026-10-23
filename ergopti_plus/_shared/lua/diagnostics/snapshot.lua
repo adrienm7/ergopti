@@ -24,6 +24,7 @@
 local M = {}
 
 local reload_gate = require("reload_gate")
+local NativePath = require("native_path")
 
 
 
@@ -118,10 +119,10 @@ end
 function M.redact_home(path, home)
 	if type(path) ~= "string" or path == "" then return nil end
 	if type(home) ~= "string" or home == "" then return path end
-	local trimmed = home:gsub("[/\\]+$", "")
+	local trimmed = NativePath.without_trailing_separators(home)
 	if trimmed ~= "" and path:sub(1, #trimmed) == trimmed then
 		local rest = path:sub(#trimmed + 1)
-		if rest == "" or rest:match("^[/\\]") then return "~" .. rest end
+		if rest == "" or NativePath.is_rooted(rest) then return "~" .. rest end
 	end
 	return path
 end
@@ -250,7 +251,7 @@ end
 function M.build_commit(fs, shared_root)
 	if type(fs) ~= "table" or type(fs.read) ~= "function" then return nil, "no file reader" end
 	if type(shared_root) ~= "string" or shared_root == "" then return nil end
-	local text = fs.read(shared_root:gsub("[/\\]+$", "") .. "/" .. M.BUILD_STAMP_FILE)
+	local text = fs.read(NativePath.without_trailing_separators(shared_root) .. "/" .. M.BUILD_STAMP_FILE)
 	if text == nil then return nil end
 	return M.parse_build_stamp(text)
 end
@@ -308,7 +309,7 @@ end
 function M.build_version(fs, shared_root)
 	if type(fs) ~= "table" or type(fs.read) ~= "function" then return nil, "no file reader", false end
 	if type(shared_root) ~= "string" or shared_root == "" then return nil, nil, false end
-	local text = fs.read(shared_root:gsub("[/\\]+$", "") .. "/" .. M.BUILD_STAMP_FILE)
+	local text = fs.read(NativePath.without_trailing_separators(shared_root) .. "/" .. M.BUILD_STAMP_FILE)
 	if text == nil then return nil, nil, false end
 	local version, reason = M.parse_build_version(text)
 	if version then return version, nil, true end

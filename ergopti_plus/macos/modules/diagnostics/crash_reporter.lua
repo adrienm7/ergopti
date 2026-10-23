@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local i18n   = require("infra.i18n")
 
 local LOG = "crash_reporter"
@@ -329,11 +330,8 @@ function M.save(report)
 	-- The single 2-level approach (parent + dir) fails when two or more ancestors
 	-- are absent simultaneously (lib-update-05).
 	pcall(function()
-		local path = dir:gsub("[/\\]$", "")
-		local segments = {}
-		for seg in path:gmatch("[^/\\]+") do
-			segments[#segments + 1] = seg
-		end
+		local path = NativePath.without_trailing_separators(dir)
+		local segments = NativePath.components(path)
 		local built = path:sub(1, 1) == "/" and "/" or ""
 		for _, seg in ipairs(segments) do
 			built = built .. seg .. "/"

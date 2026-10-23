@@ -1081,6 +1081,23 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 
 global _ReadPersonalInfoTomlCache := false
 
+; Match FileRead(Path, "UTF-8") on the exact captured bytes, including native
+; BOM and malformed-input behavior. Negative StrGet lengths preserve NULs.
+_PersonalInfoDecodeSourceBytes(Bytes) {
+	if !(Bytes is Buffer)
+		throw TypeError("A personal-information source must be raw bytes.")
+	if Bytes.Size == 0
+		return ""
+	if Bytes.Size >= 2 && NumGet(Bytes, 0, "UChar") == 0xFF && NumGet(Bytes, 1, "UChar") == 0xFE {
+		Units := (Bytes.Size - 2) // 2
+		return Units ? StrGet(Bytes.Ptr + 2, -Units, "UTF-16") : ""
+	}
+	Offset := Bytes.Size >= 3 && NumGet(Bytes, 0, "UChar") == 0xEF
+		&& NumGet(Bytes, 1, "UChar") == 0xBB && NumGet(Bytes, 2, "UChar") == 0xBF ? 3 : 0
+	Length := Bytes.Size - Offset
+	return Length ? StrGet(Bytes.Ptr + Offset, -Length, "UTF-8") : ""
+}
+
 ; Read personal_info.toml and atomically populate personal-info Maps.
 ; Format:
 ;   [info]
@@ -1092,19 +1109,29 @@ global _ReadPersonalInfoTomlCache := false
 ; Missing file is silently skipped (defaults remain).
 ReadPersonalInfoToml(FilePath) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
-	if (_ReadPersonalInfoTomlCache != false) {
-		PersonalInformation := _ReadPersonalInfoTomlCache["info"].Clone()
-		PersonalInformationLetters := _ReadPersonalInfoTomlCache["letters"].Clone()
-		return
-	}
-
-	if !FileExist(FilePath) {
-		return
+	PreviousCritical := Critical("On")
+	try {
+		Cache := _ReadPersonalInfoTomlCache
+		if Cache is Map && (!Cache.Has("source")
+			|| (Cache["source"] is Map && Cache["source"].Get("path", 0) == FilePath)) {
+			PersonalInformation := Cache["info"].Clone()
+			PersonalInformationLetters := Cache["letters"].Clone()
+			return
+		}
+	} finally Critical(PreviousCritical)
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ReadPersonalInfoToml(FilePath)
+		finally Critical(InheritedCritical)
 	}
 
 	global _TomlUnreadableFiles
 	try {
-		FileContent := FileRead(FilePath, "UTF-8")
+		if !FSStrictExists(FilePath)
+			return
+		Bytes := FSReadBytesStrict(FilePath)
+		FileContent := _PersonalInfoDecodeSourceBytes(Bytes)
 	} catch as e {
 		; Latch the failure the way the personal_hotstrings.toml sibling above
 		; already does. The placeholder identity left in PersonalInformation
@@ -1168,13 +1195,15 @@ ReadPersonalInfoToml(FilePath) {
 			}
 		}
 	}
-	PersonalInformation := NextInformation
-	if SawLetters
-		PersonalInformationLetters := NextLetters
-	_ReadPersonalInfoTomlCache := Map(
-		"info", PersonalInformation.Clone(),
-		"letters", PersonalInformationLetters.Clone()
-	)
+	PreviousCritical := Critical("On")
+	try {
+		PersonalInformation := NextInformation
+		if SawLetters
+			PersonalInformationLetters := NextLetters
+		_ReadPersonalInfoTomlCache := Map("info", PersonalInformation.Clone(),
+			"letters", PersonalInformationLetters.Clone(),
+			"source", Map("admitted", true, "present", true, "bytes", Bytes, "path", FilePath))
+	} finally Critical(PreviousCritical)
 }
 
 _PersonalInfoSerializeCandidate(Information, Letters) {
@@ -1238,13 +1267,13 @@ _PersonalInfoPublishCandidate(Information, Letters) {
 ; lease is acquired before cloning live state, so neither a sibling writer nor
 ; a terminal path/reload transition can interleave with the transaction.
 PersonalInfoCommitValues(FilePath, Values, WriterFn := 0, ReplaceFn := 0,
-		DeleteFn := 0, AuthorizeFn := 0) {
+		DeleteFn := 0, AuthorizeFn := 0, EditorSource := unset) {
 	global PersonalInformation, PersonalInformationLetters
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
 		try return PersonalInfoCommitValues(FilePath, Values, WriterFn,
-			ReplaceFn, DeleteFn, AuthorizeFn)
+			ReplaceFn, DeleteFn, AuthorizeFn, EditorSource?)
 		finally Critical(InheritedCritical)
 	}
 	if !(FilePath is String) || FilePath == "" {
@@ -1278,8 +1307,13 @@ PersonalInfoCommitValues(FilePath, Values, WriterFn := 0, ReplaceFn := 0,
 			try LoggerError("PersonalToml", "Refusing a personal-information save before its state is initialized.")
 			return false
 		}
-		CandidateInformation := PersonalInformation.Clone()
-		CandidateLetters := PersonalInformationLetters.Clone()
+		PreviousCritical := Critical("On")
+		try {
+			if IsSet(EditorSource) && !_PersonalInfoEditorSourceCurrent(EditorSource, FilePath)
+				return false
+			CandidateInformation := PersonalInformation.Clone()
+			CandidateLetters := PersonalInformationLetters.Clone()
+		} finally Critical(PreviousCritical)
 		for Key, Val in Values {
 			if !(Key is String) || !CandidateInformation.Has(Key) {
 				try LoggerError("PersonalToml", "Refusing a personal-information save containing an unknown field.")
@@ -1297,7 +1331,7 @@ PersonalInfoCommitValues(FilePath, Values, WriterFn := 0, ReplaceFn := 0,
 			CandidateLetters, WriterFn, ReplaceFn, DeleteFn,
 			_PersonalInfoAuthorizeCommit.Bind(AuthorizeFn), OwnerToken,
 			_PersonalInfoPublishCandidate.Bind(
-				CandidateInformation, CandidateLetters))
+				CandidateInformation, CandidateLetters), EditorSource?)
 		if Committed {
 			; The publisher above runs in the atomic memory span. Notify tooltip and
 			; watcher consumers only after the durable writer has restored Critical.
@@ -1309,12 +1343,206 @@ PersonalInfoCommitValues(FilePath, Values, WriterFn := 0, ReplaceFn := 0,
 	}
 }
 
+; A raw witness retains the existing reader's native BOM contract. An unknown
+; probe/read is never an absent or empty identity, and no decoded replacement
+; character can conceal an external byte change.
+_PersonalInfoReadWriteSource(FilePath) {
+	Source := Map("admitted", false, "present", false, "bytes", Buffer(0),
+		"target_key", "", "configured_key", "")
+	if !(FilePath is String) || FilePath == ""
+		return Source
+	try {
+		ConfiguredPath := PersonalInfoTomlPath()
+		if !(ConfiguredPath is String) || ConfiguredPath == ""
+			return Source
+		Source["target_key"] := _ConfigWriteLeaseKey(FilePath)
+		Source["configured_key"] := _ConfigWriteLeaseKey(ConfiguredPath)
+		if FSStrictExists(FilePath) {
+			Source["bytes"] := FSReadBytesStrict(FilePath)
+			if !(Source["bytes"] is Buffer)
+				return Source
+			Source["present"] := true
+		}
+		Source["admitted"] := true
+	} catch {
+		return Source
+	}
+	return Source
+}
+
+_PersonalInfoSourceBytesEqual(Expected, Observed) {
+	if !(Expected is Buffer) || !(Observed is Buffer) || Expected.Size != Observed.Size
+		return false
+	Offset := 0
+	while Offset + 4 <= Expected.Size {
+		if NumGet(Expected, Offset, "UInt") != NumGet(Observed, Offset, "UInt")
+			return false
+		Offset += 4
+	}
+	while Offset < Expected.Size {
+		if NumGet(Expected, Offset, "UChar") != NumGet(Observed, Offset, "UChar")
+			return false
+		Offset += 1
+	}
+	return true
+}
+
+_PersonalInfoMapsEqual(Left, Right) {
+	if !(Left is Map) || !(Right is Map) || Left.Count != Right.Count
+		return false
+	for Key, Value in Left
+		if !(Key is String) || !(Value is String) || !Right.Has(Key)
+			|| !(Right[Key] is String) || !(Value == Right[Key])
+			return false
+	return true
+}
+
+; Capture the displayed model and its original loader receipt together. Actual
+; forms always pass this record explicitly, even when its source is unknown.
+_PersonalInfoCaptureEditorSource(FilePath, AllowAbsent := false, ConfiguredKey := unset) {
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	global HSE_RuntimeDecisionGeneration
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _PersonalInfoCaptureEditorSource(FilePath, AllowAbsent, ConfiguredKey?)
+		finally Critical(InheritedCritical)
+	}
+	if !IsSet(ConfiguredKey)
+		ConfiguredKey := _ConfigWriteLeaseKey(PersonalInfoTomlPath())
+	PreviousCritical := Critical("On")
+	try {
+		Owner := Map("kind", "personal-info-editor", "active", true, "path", FilePath,
+			"information", PersonalInformation.Clone(), "letters", PersonalInformationLetters.Clone(),
+			"resident_info", PersonalInformation, "resident_letters", PersonalInformationLetters,
+			"generation", HSE_RuntimeDecisionGeneration, "source", 0, "web_epoch", 0,
+			"configured_key", ConfiguredKey)
+		Cache := _ReadPersonalInfoTomlCache
+		if Cache is Map && Cache.Has("source") && Cache["source"] is Map
+			&& _PersonalInfoMapsEqual(Owner["information"], Cache.Get("info", 0))
+			&& _PersonalInfoMapsEqual(Owner["letters"], Cache.Get("letters", 0)) {
+			Source := Cache["source"].Clone()
+			if Source.Get("path", "") is String && Source["path"] != ""
+				&& _ConfigWriteLeaseKey(Source["path"]) == _ConfigWriteLeaseKey(FilePath) {
+				Source["target_key"] := _ConfigWriteLeaseKey(FilePath)
+				Source["configured_key"] := ConfiguredKey
+				Owner["source"] := Source
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if AllowAbsent && !(Owner["source"] is Map) {
+		; An absent file may display defaults, but a newly observed present B can
+		; never certify an older in-memory A. No decoded second path read occurs.
+		Observed := _PersonalInfoReadWriteSource(FilePath)
+		if Observed["admitted"] && !Observed["present"]
+			Owner["source"] := Observed
+	}
+	return Owner
+}
+
+; Direct historical save adapters may omit opening consent. A genuine loaded
+; cache still supplies its own receipt; malformed provenance never falls back.
+_PersonalInfoEditorAdapterSource(FilePath) {
+	global _ReadPersonalInfoTomlCache
+	if _ReadPersonalInfoTomlCache is Map && _ReadPersonalInfoTomlCache.Has("source")
+		return _PersonalInfoCaptureEditorSource(FilePath)
+	return 0
+}
+
+_PersonalInfoEditorPathCurrent(Owner) {
+	ConfiguredPath := PersonalInfoTomlPath()
+	return Owner is Map && Owner.Get("configured_key", 0) is String
+		&& Owner["configured_key"] != "" && ConfiguredPath is String && ConfiguredPath != ""
+		&& Owner["configured_key"] == _ConfigWriteLeaseKey(ConfiguredPath)
+}
+
+_PersonalInfoEditorReceiptValid(Source) {
+	return Source is Map && Source.Get("admitted", 0) is Integer && Source["admitted"] == 1
+		&& Source.Get("present", -1) is Integer && (Source["present"] == 0 || Source["present"] == 1)
+		&& Source.Get("bytes", 0) is Buffer && (Source["present"] || Source["bytes"].Size == 0)
+		&& Source.Get("target_key", 0) is String && Source["target_key"] != ""
+		&& Source.Get("configured_key", 0) is String && Source["configured_key"] != ""
+}
+
+_PersonalInfoEditorSourceCurrent(Owner, FilePath) {
+	global PersonalInformation, PersonalInformationLetters, HSE_RuntimeDecisionGeneration
+	if !(Owner is Map)
+		return false
+	for Field in ["kind", "active", "path", "information", "letters", "resident_info",
+		"resident_letters", "generation", "source", "web_epoch", "configured_key"]
+		if !Owner.Has(Field)
+			return false
+	if Owner["kind"] != "personal-info-editor" || !(Owner["active"] is Integer)
+		|| Owner["active"] != 1 || !(Owner["path"] is String) || !(FilePath is String)
+		|| Owner["path"] == "" || FilePath == "" || A_IsSuspended
+		|| !_PersonalInfoEditorReceiptValid(Owner["source"])
+		|| !_PersonalInfoEditorPathCurrent(Owner)
+		|| !(Owner["generation"] is Integer) || Owner["generation"] != HSE_RuntimeDecisionGeneration
+		|| PersonalInformation != Owner["resident_info"] || PersonalInformationLetters != Owner["resident_letters"]
+		|| !_PersonalInfoMapsEqual(PersonalInformation, Owner["information"])
+		|| !_PersonalInfoMapsEqual(PersonalInformationLetters, Owner["letters"])
+		return false
+	Source := Owner["source"]
+	if _ConfigWriteLeaseKey(Owner["path"]) != _ConfigWriteLeaseKey(FilePath)
+		|| Source.Get("target_key", "") != _ConfigWriteLeaseKey(FilePath)
+		|| Source.Get("configured_key", "") != Owner["configured_key"]
+		return false
+	if !(Owner["web_epoch"] is Integer)
+		return false
+	if Owner["web_epoch"] == 0
+		return true
+	; The only web guard is the known pure session owner. No caller-supplied
+	; function can execute inside the transaction's final RAM-only fence.
+	return _PiEdWeb_EditorSourceCurrent(Owner["web_epoch"], Owner)
+}
+
+_PersonalInfoEditorSourcesEqual(Expected, Observed) {
+	return _PersonalInfoEditorReceiptValid(Expected) && _PersonalInfoEditorReceiptValid(Observed)
+		&& Expected["present"] == Observed["present"]
+		&& Expected.Get("target_key", "") == Observed["target_key"]
+		&& Expected.Get("configured_key", "") == Observed["configured_key"]
+		&& _PersonalInfoSourceBytesEqual(Expected.Get("bytes", 0), Observed["bytes"])
+}
+
+; Memory-only admission after a source read. The explicit-path writer remains
+; usable without making its target the configured path, while a relocation of
+; the configured identity invalidates the attempt that started before it.
+_PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
+	if !Source["admitted"] || A_IsSuspended
+			|| !_PersonalTomlWriteLeaseOwns(OwnerToken, FilePath)
+		return false
+	if Source.Has("editor_owner") && !_PersonalInfoEditorSourceCurrent(Source["editor_owner"], FilePath)
+		return false
+	ConfiguredPath := PersonalInfoTomlPath()
+	return ConfiguredPath is String && ConfiguredPath != ""
+		&& _ConfigWriteLeaseKey(FilePath) == Source["target_key"]
+		&& _ConfigWriteLeaseKey(ConfiguredPath) == Source["configured_key"]
+}
+
+_PersonalInfoReplaceUnchanged(Source, OwnerToken, ReplaceFn, StagePath, FilePath) {
+	Replacement := HasMethod(ReplaceFn, "Call") ? ReplaceFn : FSAtomicMoveReplace
+	; Atomic dispatches this boundary after staging and authorization, outside
+	; Critical. Reading here must not be moved into its authorization callback.
+	Observed := _PersonalInfoReadWriteSource(FilePath)
+	if !Observed["admitted"] || Source["present"] != Observed["present"]
+			|| !_PersonalInfoSourceBytesEqual(Source["bytes"], Observed["bytes"])
+		return false
+	PreviousCritical := Critical("On")
+	try Current := _PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath)
+	finally Critical(PreviousCritical)
+	if !Current
+		return false
+	; This is a witness check, not an OS-atomic external compare-and-swap.
+	; Preserve the original port's receipt for the canonical strict status check.
+	return Replacement.Call(StagePath, FilePath)
+}
+
 ; Serialise one detached personal-information snapshot and atomically replace
 ; personal_info.toml. A one-argument compatibility call snapshots the current
 ; globals only after it owns the path (used by first-boot materialisation).
 WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 		WriterFn := 0, ReplaceFn := 0, DeleteFn := 0, AuthorizeFn := 0,
-		ExistingOwner := 0, PublishFn := 0) {
+		ExistingOwner := 0, PublishFn := 0, EditorSource := unset) {
 	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -1324,18 +1552,18 @@ WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 				if IsSet(Letters)
 					return WritePersonalInfoToml(FilePath, Information, Letters,
 						WriterFn, ReplaceFn, DeleteFn, AuthorizeFn,
-						ExistingOwner, PublishFn)
+						ExistingOwner, PublishFn, EditorSource?)
 				return WritePersonalInfoToml(FilePath, Information, unset,
 					WriterFn, ReplaceFn, DeleteFn, AuthorizeFn,
-					ExistingOwner, PublishFn)
+					ExistingOwner, PublishFn, EditorSource?)
 			}
 			if IsSet(Letters)
 				return WritePersonalInfoToml(FilePath, unset, Letters,
 					WriterFn, ReplaceFn, DeleteFn, AuthorizeFn,
-					ExistingOwner, PublishFn)
+					ExistingOwner, PublishFn, EditorSource?)
 			return WritePersonalInfoToml(FilePath, unset, unset,
 				WriterFn, ReplaceFn, DeleteFn, AuthorizeFn,
-				ExistingOwner, PublishFn)
+				ExistingOwner, PublishFn, EditorSource?)
 		} finally Critical(InheritedCritical)
 	}
 	BorrowedOwner := ExistingOwner is Object
@@ -1365,6 +1593,18 @@ WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 			try LoggerError("PersonalToml", "Refusing to write '{1}': it could not be read, so the identity in memory is the shipped placeholder rather than the user's. Reopen the editor once the file is readable.", FilePath)
 			return false
 		}
+		Source := _PersonalInfoReadWriteSource(FilePath)
+		if IsSet(EditorSource) {
+			if !_PersonalInfoEditorSourceCurrent(EditorSource, FilePath)
+				|| !_PersonalInfoEditorSourcesEqual(EditorSource["source"], Source)
+				return false
+			Source["editor_owner"] := EditorSource
+		}
+		if !Source["admitted"] || !_PersonalInfoWriteSourceCurrent(Source, OwnerToken, FilePath) {
+			try LoggerError("PersonalToml",
+				"Refusing to write '{1}': its current identity source could not be retained.", FilePath)
+			return false
+		}
 		if !IsSet(Information)
 			Information := PersonalInformation.Clone()
 		if !IsSet(Letters)
@@ -1378,7 +1618,7 @@ WritePersonalInfoToml(FilePath, Information := unset, Letters := unset,
 		}
 
 		Written := _PersonalTomlWriteAtomic(FilePath, Content,
-			WriterFn, ReplaceFn, DeleteFn,
+			WriterFn, _PersonalInfoReplaceUnchanged.Bind(Source, OwnerToken, ReplaceFn), DeleteFn,
 			_PersonalTomlAuthorizeOwnedWrite.Bind(
 				OwnerToken, FilePath, AuthorizeFn), PublishFn)
 		if !((Written is Integer) && Written == 1)

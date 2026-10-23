@@ -10,9 +10,9 @@
 --- encrypted, readable only by the machine that wrote them.
 ---
 --- WHAT THIS ENCODES:
---- 1. The conversion is BYTE-EXACT. The cipher shells out through a heredoc, and
----    a heredoc always appends a newline to its body, so the naive framing stored
----    the ciphertext of a value the user never typed. Rewriting stored rows with
+--- 1. The conversion is BYTE-EXACT. The cipher shells out, and a heredoc framing
+---    always appended a newline to its body, so the naive framing stored the
+---    ciphertext of a value the user never typed. Rewriting stored rows with
 ---    that framing would corrupt them permanently, so the round trip is asserted
 ---    on the bytes — multi-byte UTF-8 and trailing newlines included.
 --- 2. It is idempotent, therefore restart-safe: a pass interrupted halfway and
@@ -33,9 +33,7 @@ local helpers = require("tests.helpers")
 local Plan       = require("keylogger.text_migration")
 local TextCrypto = require("keylogger.text_crypto")
 
---- A syntactically valid AES-256 key and IV, for the fake derivation.
-local KEY = string.rep("ab", 32)
-local IV  = string.rep("cd", 16)
+local CipherDouble = require("tests.support.keylogger.cipher_shell_double")
 
 local DEVICE = "mac-testhost"
 
@@ -49,88 +47,37 @@ local DEVICE = "mac-testhost"
 -- =========================================
 -- =========================================
 
-local function to_hex(s)
-	return (s:gsub(".", function(c) return string.format("%02X", c:byte()) end))
-end
-
-local function from_hex(h)
-	if h:match("^%x*$") == nil or #h % 2 ~= 0 then return "" end
-	return (h:gsub("%x%x", function(b) return string.char(tonumber(b, 16)) end))
-end
-
 --- Returns the first line of a composed command — the part the shell parses.
 --- Every decision below is taken on this and never on the whole string: the
---- heredoc body is the user's own text and could contain any flag we look for.
+--- stdin operand is the user's own text and could contain any flag we look for.
 local function command_line(cmd)
 	return cmd:match("^([^\n]*)") or ""
 end
 
---- Reproduces the bytes the SHELL would hand the command's standard input: the
---- heredoc body plus the newline the shell always appends, truncated by whatever
---- `head -c` filter sits in front. A framing that mangles the payload therefore
---- fails here exactly as it would on a real Mac, rather than being hidden behind
---- a canned answer.
---- @param cmd string
---- @return string|nil
-local function delivered_stdin(cmd)
-	local token = command_line(cmd):match("<<'([%w_]+)'")
-	if not token then return nil end
-	local body = cmd:match("\n(.-)\n" .. token .. "\n$")
-	if body == nil then return nil end
-	local delivered = body .. "\n"
-	local limit = tonumber(command_line(cmd):match("^head %-c (%d+) "))
-	if limit then delivered = delivered:sub(1, limit) end
-	return delivered
-end
-
---- Points every route to the shell at a double answering the commands the cipher
---- issues. TWO routes have to be covered: the cipher goes through the shell
---- adapter, but adapters/crypto calls hs.execute directly, and the stub answers
---- "" to everything — which yields an empty digest, hence no IV, hence an
---- encryption that fails for a reason that has nothing to do with the migration.
---- @param opts table|nil { fail_crypto = boolean }.
+--- Points the cipher's native boundaries at faithful doubles: hs.execute
+--- reproduces the bytes /bin/sh would hand openssl (C-string cut, printf %b
+--- expansion, pipeline exit status) and hs.hash supplies the per-row IV digest.
+--- A framing that mangles the payload therefore fails here as it would on a Mac.
 --- @return table The recorded commands.
-local _real_exec = nil
 local _real_hs_execute = nil
-local function install_shell(opts)
-	opts = opts or {}
-	local Shell = require("adapters.shell_runner")
-	if _real_exec == nil then _real_exec = Shell.exec end
+local _real_hs_hash = nil
+local _private_stdin_native = nil
+local function install_shell()
 	if _real_hs_execute == nil then _real_hs_execute = hs.execute end
-
-	local seen = {}
-	local function answer(cmd)
-		seen[#seen + 1] = cmd
-		local head = command_line(cmd)
-		-- The hardware-UUID probe, which runs before any crypto.
-		if head:find("ioreg", 1, true) then return "0123456789ABCDEF\n" end
-		-- The one key derivation, recognised by -pbkdf2: no per-value command
-		-- carries it, because re-deriving costs half a second each time.
-		if head:find("pbkdf2", 1, true) then
-			return "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n"
-		end
-		-- The per-row IV. The digest must vary with the command, or two rows share
-		-- an IV exactly as they would with a broken derivation on a real machine.
-		if head:find("dgst", 1, true) then
-			local h = 0
-			for i = 1, #cmd do h = (h * 33 + cmd:byte(i)) % 0xFFFFFFF end
-			return "(stdin)= " .. (string.format("%07x", h):rep(10)):sub(1, 64)
-		end
-		if opts.fail_crypto then return "" end
-		local payload = delivered_stdin(cmd)
-		if payload == nil then return "" end
-		if head:find("enc %-d ") then return from_hex(payload) end
-		return to_hex(payload)
-	end
-
-	Shell.exec = answer
-	hs.execute = function(cmd) return answer(cmd), true, "exit", 0 end
+	if _real_hs_hash == nil then _real_hs_hash = hs.hash end
+	local execute, seen, native = CipherDouble.new()
+	_private_stdin_native = native
+	hs.execute = execute
+	hs.hash = CipherDouble.native_hash()
 	return seen
 end
 
 local function restore_shell()
-	if _real_exec ~= nil then require("adapters.shell_runner").exec = _real_exec end
 	if _real_hs_execute ~= nil then hs.execute = _real_hs_execute end
+	hs.hash = _real_hs_hash
+	_private_stdin_native = nil
+	local runner = package.loaded["adapters.shell_runner"]
+	if type(runner) == "table" and runner._set_private_stdin_native then runner._set_private_stdin_native(nil) end
 end
 
 --- Builds an in-memory stand-in for events_typing.
@@ -185,9 +132,13 @@ end
 --- @param store table
 --- @return table cipher, table migration.
 local function load_runner(store)
+	-- Both adapters capture the global hs at load: reload them under the doubles.
 	package.loaded["adapters.crypto"] = nil
+	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["modules.keylogger.text_cipher"] = nil
 	package.loaded["modules.keylogger.text_migration"] = nil
+	-- Secret input is written to a popen(3) pipe, never to hs.execute.
+	require("adapters.shell_runner")._set_private_stdin_native(_private_stdin_native)
 	local cipher = require("modules.keylogger.text_cipher")
 	cipher._set_machine_id_command("echo ioreg-stub")
 	local migration = require("modules.keylogger.text_migration")

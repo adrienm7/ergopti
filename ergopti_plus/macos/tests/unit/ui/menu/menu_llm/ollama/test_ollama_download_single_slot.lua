@@ -301,6 +301,33 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 		end)
 	end)
 
+	-- Issue #100: a Mac with a PAC proxy setting never got its model, because the
+	-- admission refused the pull before asking the user's own Ollama.app to
+	-- fetch. That daemon is not Ergopti's child: it downloads with its own
+	-- network settings, which the CLI's environment cannot change
+	-- (ollama-foreign-daemon-pull).
+	for _, source in ipairs({ "app", "user_app", "homebrew", "managed", "path" }) do
+		helpers.it("(ollama-foreign-daemon-pull) asks a " .. source .. " Ollama daemon without the opaque admission", function()
+			local admissions, preludes = 0, 0
+			with_fixture({ binary_source = source, network_env = {
+				opaque_prelude = function()
+					admissions = admissions + 1
+					return "refused_admission; "
+				end,
+				prelude = function(tag)
+					helpers.assert_eq(tag, "OLLAMA-PULL")
+					preludes = preludes + 1
+					return "local_settings; "
+				end,
+			} }, function(f)
+				helpers.assert_true(start_pull(f))
+				helpers.assert_eq(admissions, 0, "the user's own daemon does the fetch, not this child")
+				helpers.assert_eq(preludes, 1, "the CLI still gets the loopback settings")
+				helpers.assert_eq(f.pulls[1].args[2], "local_settings; exec '/fixture/ollama' pull 'model-A'")
+			end)
+		end)
+	end
+
 end)
 
 return true

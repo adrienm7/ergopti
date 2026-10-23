@@ -145,7 +145,8 @@ helpers.describe("clipboard selection transaction", function()
 end)
 
 --- Makes the simulated session answer a text/uri-list read only when the
---- clipboard holds one, as xclip and wl-paste refuse a target nobody offers.
+--- clipboard holds one, as wl-paste refuses a target nobody offers. xclip does
+--- not: it answers every target with its text (the next describe's last case).
 --- @param shell table The simulated shell of with_session.
 local function offer_uri_list_only_for_files(shell)
 	local read = shell.exec_checked
@@ -186,6 +187,19 @@ helpers.describe("clipboard file-selection probe (text/uri-list)", function()
 			local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
 
 			helpers.assert_true(not ok, "nothing was copied")
+			helpers.assert_eq(uri_list, "")
+			helpers.assert_eq(reason, "no_file_selection")
+			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the sentinel never remains")
+		end)
+	end)
+
+	-- Measured on xclip 0.13 under X11: `xclip -t text/uri-list -o` against
+	-- the sentinel xclip -in owns returns the sentinel, with status 0.
+	helpers.it("(linux-uri-list-xclip-sentinel) reads the sentinel back as no file selection", function()
+		with_session("x11", nil, function(clipboard, shell, _, _, emit, sleep_ms)
+			local ok, uri_list, reason = clipboard.read_selection_uri_list(emit, sleep_ms)
+
+			helpers.assert_true(not ok, "the sentinel is not a file selection: " .. tostring(uri_list))
 			helpers.assert_eq(uri_list, "")
 			helpers.assert_eq(reason, "no_file_selection")
 			helpers.assert_eq(shell.writes[#shell.writes].text, "saved", "the sentinel never remains")

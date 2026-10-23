@@ -235,7 +235,7 @@ _LPP_RewriteEndToEnd() {
 	_LPP_Run(_LPP_Menu(), LPP_BUFFER, _Body)
 	_Body(Calls, Lines) {
 		global GestureActionParameters, _LLM_Menu, _LLM_Engine, _LLM_Bridge_Buffer, LPP_SENTENCE
-		Binding := "keyboard__rewrite_test"
+		Binding := "keyboard__ctrl_shift_r"
 		GestureActionParameters[GestureActionParameterKey(Binding, "llm_prompt_prediction")] := "rewrite|2"
 		AssertTrue(GestureInvokeAction("llm_prompt_prediction", Binding),
 			"the bound action must request a prediction")

@@ -84,6 +84,7 @@ local function make_ctx(keymap, models_mgr, captured_timers)
 		get_startup_silence = function() return false end,
 		set_startup_silence = function() end,
 		get_profile_hks = function() return {} end,
+		disarm_shortcuts = function() return true end,
 	}
 end
 
@@ -351,4 +352,87 @@ helpers.describe("startup_controller: a missing AI runtime skips the requirement
 		helpers.assert_eq(#captured_checks, 2)
 		helpers.assert_eq(ctx.state.llm_enabled, true)
 	end)
+end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= A declined model download is no error =======
+-- =====================================================
+-- =====================================================
+
+--- Issue #99: Ollama ran without the configured model, the user closed the
+--- download prompt, and the startup check logged two ERROR lines, so the error
+--- window opened over the dialog the user had just answered: "Disabling LLM
+--- (requirements check failed)" for the decline itself, and "Startup-cycle
+--- settlement remains unsettled" because the decline arrives from inside the
+--- requirement task, whose retirement the armed observer then awaited.
+helpers.describe("startup_controller: a declined model download turns the AI off without an error (startup-declined-download-99)", function()
+	for _, reason in ipairs({ "download_declined", "disk_insufficient" }) do
+		helpers.it("warns, defers the settlement and saves the off state after " .. reason, function()
+			local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
+			local declared = reason == "download_declined" and RequirementRegistry.CANCEL_DOWNLOAD_DECLINED
+				or RequirementRegistry.CANCEL_DISK_INSUFFICIENT
+			helpers.assert_eq(declared, reason, "the reason the system check sends is the registry's")
+			local logged = { error = {}, warn = {} }
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, fmt, ...) logged.error[#logged.error + 1] = string.format(fmt, ...) end
+			logger.warn = function(_, fmt, ...) logged.warn[#logged.warn + 1] = string.format(fmt, ...) end
+			local previous_logger = package.loaded["infra.logger"]
+			package.loaded["infra.logger"] = logger
+			local ok, err = pcall(function()
+				local StartupCtrl, captured_timers = load_fresh_startup_controller()
+				local keymap = make_keymap_stub()
+				local in_task, retired, check = true, nil, nil
+				local models_mgr = {
+					get_installed_models = function() return { other_model = true } end,
+					create_requirement_owner = function() return {} end,
+					-- The decline is delivered while its requirement task still runs
+					pause_requirements = function() return not in_task end,
+					when_requirements_settled = function(_, callback)
+						retired = callback
+						return { cancel = function() return true end }, true
+					end,
+					check_requirements = function(_, on_ok, on_fail)
+						check = { on_ok = on_ok, on_fail = on_fail }
+						return true
+					end,
+				}
+				local ctx = make_ctx(keymap, models_mgr, captured_timers)
+				ctx.state.llm_backend = "ollama"
+				ctx.deps.script_control = {
+					get_pause_epoch = function() return 0 end,
+					is_paused = function() return false end,
+					register_pause_owner = function() return true end,
+				}
+				local saves = 0
+				ctx.save_prefs = function() saves = saves + 1; return true end
+
+				local check_startup = StartupCtrl.new(ctx)
+				helpers.assert_true(check_startup())
+				fire_all_timers(captured_timers)
+				helpers.assert_true(check ~= nil, "the Ollama requirement check must have been dispatched")
+
+				check.on_fail(declared)
+				helpers.assert_eq(ctx.state.llm_enabled, false, "the AI is off: it has no model")
+				helpers.assert_eq(logged.error, {}, "a declined download is no error")
+				helpers.assert_true(#logged.warn >= 1 and logged.warn[1]:find("Disabling LLM", 1, true) ~= nil,
+					"the decline is a warning naming why the AI is off")
+				helpers.assert_eq(saves, 0, "the settlement waits for the requirement task")
+
+				in_task = false
+				helpers.assert_true(type(retired) == "function", "an observer must await the task's retirement")
+				local before = #captured_timers
+				retired()
+				for index = before + 1, #captured_timers do captured_timers[index]:fire() end
+				helpers.assert_eq(logged.error, {}, "the deferred settlement completes without an error")
+				helpers.assert_true(saves >= 1, "the off state is saved once the task retired")
+			end)
+			package.loaded["infra.logger"] = previous_logger
+			if not ok then error(err, 0) end
+		end)
+	end
 end)

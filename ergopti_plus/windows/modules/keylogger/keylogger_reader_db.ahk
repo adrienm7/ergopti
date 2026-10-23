@@ -128,6 +128,12 @@ class KLRCache {
 		; Wall clock stamped into the image the last time it was published, so a
 		; refresh can persist on a cadence instead of copying every page per tick.
 		static saved_at := ""
+		; A projection worker persists its image only once its dashboard read has
+		; completed: an image that a read could not fully answer must not become
+		; the next worker's starting point, which would only repeat that read.
+		static defer_saves := false
+		; The save requested while deferred: Map(md, log, checkpoint), or 0.
+		static deferred_save := 0
 }
 
 KLR_ResetCache() {
@@ -143,6 +149,8 @@ KLR_ResetCache() {
 		KLRCache.disposable := false
 		KLRCache.readonly := false
 		KLRCache.saved_at := ""
+		KLRCache.defer_saves := false
+		KLRCache.deferred_save := 0
 }
 
 ; Opens the private database a projection builds or refreshes before it
@@ -234,8 +242,7 @@ KLR_BuildDatabase(metrics_dir) {
 										; The previous disk image no longer describes the source. Its
 										; save age cannot defer handing this recovery to the next worker.
 										KLRCache.saved_at := ""
-										if KLR_CacheSaveIfOwned(md, logPath) && cold.Has("checkpoint")
-												KLR_RebuildDiscardCheckpoint(md)
+										KLR_CacheSaveIfOwned(md, logPath, cold.Has("checkpoint"))
 										return KLRCache.db
 								}
 						}
@@ -366,8 +373,7 @@ KLR_BuildDatabase(metrics_dir) {
 		KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
 		; Hand the finished image to the next worker. Everything above cost
 		; minutes and none of it has to be paid twice for the same bytes.
-		if KLR_CacheSaveIfOwned(md, logPath) && cold.Has("checkpoint")
-				KLR_RebuildDiscardCheckpoint(md)
+		KLR_CacheSaveIfOwned(md, logPath, cold.Has("checkpoint"))
 		return KLRCache.db
 }
 
@@ -449,10 +455,43 @@ KLR_ReleaseCandidate(candidate) {
 ; owns it. The driver's in-process handle carries live-walker deltas that are
 ; not reproducible from data.sql alone, so it must never become the image a
 ; later cold-start trusts.
-KLR_CacheSaveIfOwned(md, logPath) {
-		global KLR_CACHE_MIN_SAVE_INTERVAL_S
+; A rebuild checkpoint is discarded only once the image that supersedes it is
+; saved; a deferred save keeps it until KLR_CacheCommitDeferredSave.
+; @param DiscardCheckpoint {Boolean} True after a cold rebuild with a checkpoint.
+; @returns {Boolean} True when the image was saved now.
+KLR_CacheSaveIfOwned(md, logPath, DiscardCheckpoint := false) {
 		if !KLRCache.disposable || !KLRCache.db || KLRCache.readonly
 				return false
+		if KLRCache.defer_saves {
+				Pending := KLRCache.deferred_save
+				KLRCache.deferred_save := Map("md", md, "log", logPath, "checkpoint",
+						DiscardCheckpoint || ((Pending is Map) && Pending["checkpoint"]))
+				return false
+		}
+		return _KLR_CacheSaveNow(md, logPath, DiscardCheckpoint)
+}
+
+; Persists the save a deferring worker requested, once its read completed.
+; @returns {Boolean} True when an image was saved.
+KLR_CacheCommitDeferredSave() {
+		Pending := KLRCache.deferred_save
+		KLRCache.deferred_save := 0
+		if !(Pending is Map) || !KLRCache.disposable || !KLRCache.db || KLRCache.readonly
+				return false
+		return _KLR_CacheSaveNow(Pending["md"], Pending["log"], Pending["checkpoint"])
+}
+
+; Forgets the save a deferring worker requested after an incomplete read. The
+; cache on disk stays the last image whose read completed.
+; @returns {Boolean} True when a requested save was dropped.
+KLR_CacheDropDeferredSave() {
+		Dropped := KLRCache.deferred_save is Map
+		KLRCache.deferred_save := 0
+		return Dropped
+}
+
+_KLR_CacheSaveNow(md, logPath, DiscardCheckpoint) {
+		global KLR_CACHE_MIN_SAVE_INTERVAL_S
 		; Publishing copies every page of a multi-hundred-megabyte image, and an
 		; open dashboard refreshes every few seconds. Persist on a cadence instead:
 		; a skipped save only costs the next worker the tail it was going to read
@@ -467,6 +506,8 @@ KLR_CacheSaveIfOwned(md, logPath) {
 		if (KLR_CacheSave(KLRCache.db, KLRCache.last_sizes, md, logPath, KLRCache.ledger_snapshots) != 1)
 				return false
 		KLRCache.saved_at := A_Now
+		if DiscardCheckpoint
+				KLR_RebuildDiscardCheckpoint(md)
 		return true
 }
 

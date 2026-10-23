@@ -315,11 +315,22 @@ end
 function H.configuration_context(schema, overrides)
 	overrides = overrides or {}
 	local names = schema.configuration.file_names
+	--- Where one configuration file lives on macOS: config.toml under the
+	--- driver's hammerspoon/ folder, the shared files (layers.toml) at the root
+	--- of the configuration folder. macOS config_paths has no config(rel) like
+	--- Linux; calling it made every configuration probe answer "error" (#99).
+	--- @param id string Schema file id.
+	--- @return string path
+	local function path_of(id)
+		local ConfigPaths = require("infra.config_paths")
+		if id == "config" then return ConfigPaths.get("ConfigTomlPath") end
+		return ConfigPaths.get_config_dir() .. names[id]
+	end
 	return {
 		schema   = schema,
 		driver   = "macos",
 		features = overrides.features or function() return require("infra.manifest_reader").features() end,
-		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
+		path_of  = overrides.path_of or path_of,
 		decode   = require("toml_codec").decode,
 		open_fn  = overrides.open_fn,
 		clock    = overrides.clock or function() return hs.timer.absoluteTime() / 1e6 end,

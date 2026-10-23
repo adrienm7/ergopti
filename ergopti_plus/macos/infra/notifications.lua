@@ -11,7 +11,9 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local TimerScheduler = require("adapters.timer_scheduler")
+local RunningApplication = require("adapters.running_application")
 
 local LOG = "notifications"
 
@@ -41,7 +43,7 @@ local _next_notification_id = 0
 -- Safely resolve the absolute path to the favicon based on this file’s location
 pcall(function()
 	local _src  = debug.getinfo(1, "S").source
-	local _base = (_src:sub(1,1) == "@" and _src:sub(2) or _src):match("^(.*[/\\])") or "./"
+	local _base = NativePath.directory_prefix(_src:sub(1,1) == "@" and _src:sub(2) or _src) or "./"
 	_logo_path  = _base .. "../../../img/logo/logo_simple.png"
 end)
 
@@ -153,16 +155,17 @@ function M.notify(title_or_msg, body, kind, on_click)
 			if type(hs.focus) == "function" then
 				run_click_step("global focus", hs.focus)
 			end
-			if hs.application and type(hs.application.get) == "function" then
-				run_click_step("application activation", function()
-					local app = hs.application.get("com.ergoptiplus.app")
-						or hs.application.get("Hammerspoon")
-					if app and type(app.activate) == "function" then
-						return app:activate(true)
-					end
-					return true
-				end)
-			end
+			-- The launcher by bundle identifier, else this Hammerspoon process:
+			-- hs.application.get would search every window of every application
+			-- whenever the launcher is not running.
+			run_click_step("application activation", function()
+				local app = RunningApplication.by_bundle_id("com.ergoptiplus.app")
+					or RunningApplication.current()
+				if app and type(app.activate) == "function" then
+					return app:activate(true)
+				end
+				return true
+			end)
 		end, {
 			title           = title_text,
 			informativeText = info_text,

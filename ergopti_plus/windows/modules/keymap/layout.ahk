@@ -55,7 +55,7 @@ DeadKey(Mapping) {
 		; SerializeSymbols path, AltGrShiftDispatch's unconditional wrap) so their
 		; own SendEvent-based emits serialize against neighbouring remapped keys.
 		; ih.Wait() below is a blocking, message-pumping wait with up to a 2s
-		; timeout ("L1 T2") -- running THAT under Critical stalls the ENTIRE AHK
+		; timeout ("L2 E C T2") -- running THAT under Critical stalls the ENTIRE AHK
 		; message pump (every hotkey/timer in the process) for up to 2 seconds on
 		; every CapsLock dead-key press, not just this key
 		; (deadkey-wait-under-critical-stalls-pump). Release Critical for the wait
@@ -63,10 +63,8 @@ DeadKey(Mapping) {
 		; below still serializes exactly as the caller intended.
 		_AtCrit := Critical("Off")
 		try {
-			ih := InputHook(
-				"L1 T2",
-				"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
-			)
+			NamedKeys := "{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Insert}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
+			ih := InputHook("L2 E C T2", _SIHO_ScalarEndKeys() . NamedKeys)
 			OwnerToken := SIHO_StartOwned(ih, "dead-key", true)
 			if !OwnerToken
 				return
@@ -84,12 +82,17 @@ DeadKey(Mapping) {
 		; also rejects a pause which resumed before this older Wait unwound.
 		if !CaptureSettled || A_IsSuspended
 			return
-		if (ih.EndReason = "Timeout") {
+		Capture := _SIHO_ReadScalar(ih, NamedKeys)
+		if Capture.Reason != ""
+			LoggerWarn("DeadKey", "Discarded invalid scalar capture ({1}).", Capture.Reason)
+		if Capture.Kind == "invalid"
+			return
+		if Capture.Kind == "timeout" {
 			if Mapping.Has(" ")
 				SendNewResult(Mapping[" "])
 			return
 		}
-		PressedKey := ih.Input
+		PressedKey := Capture.Text
 		if Mapping.Has(PressedKey) {
 			SendNewResult(Mapping[PressedKey])
 		} else {
@@ -102,8 +105,8 @@ DeadKey(Mapping) {
 		; Re-send EndKeys (Enter, BackSpace, Delete) consumed by the InputHook.
 		; Without the "V" option the hook swallows them; the user's newline,
 		; delete or erase would disappear silently after a dead-key sequence.
-		if (ih.EndReason = "EndKey")
-			Send("{" . ih.EndKey . "}")
+		if Capture.Kind == "control"
+			Send("{" . Capture.Name . "}")
 	} finally {
 		InDeadKeySequence := false
 	}

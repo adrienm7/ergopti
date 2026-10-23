@@ -132,8 +132,8 @@ class ConfigCleanupWindow extends WebViewHost {
 		Host := ConfigCleanupWindow()
 		Host.AppId := "config_cleanup"
 		Host.Session := ConfigCleanupSession(Path)
-		Host.Opts := Map("Title", "ErgoptiPlus — " . t("dialog.unused_keys.title"),
-			"NoActivate", true, "OnReady", (ReadyHost) => ReadyHost.Deliver("ready"),
+		; The host names the window from the manifest and adds the product name.
+		Host.Opts := Map("NoActivate", true, "OnReady", (ReadyHost) => ReadyHost.Deliver("ready"),
 			"OnMessage", (MessageHost, Message) => MessageHost.Deliver(Message))
 		ConfigCleanupWindow.Current := Host
 		try Built := Host._Build()

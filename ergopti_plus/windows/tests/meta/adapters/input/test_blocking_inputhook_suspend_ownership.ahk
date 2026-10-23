@@ -78,9 +78,13 @@ _BIHS_AllBlockingInputHooksAreSuspendOwned() {
 			Assert(PublishPos > HookPos and StartPos > PublishPos,
 				FunctionName . " must publish " . OwnerName . " before Start()")
 			FinallyPos := InStr(Body, "finally", true, WaitPos)
-			ClearPos := InStr(Body, "_MagicKeyEditorStopOwned(IH)", true, WaitPos)
+			ClearPos := InStr(Body, "CaptureSettled := _MagicKeyEditorStopOwned(IH, true)", true, WaitPos)
 			Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
-				FunctionName . " must settle " . OwnerName . " transactionally in finally after Wait()")
+				FunctionName . " must retain its exact terminal settlement receipt in finally after Wait()")
+			DeliveryGuardPos := InStr(Body, "if !CaptureSettled || A_IsSuspended", true, ClearPos)
+			DeliveryPos := InStr(Body, FunctionName == "MagicKeyEditor" ? "ModifyMagicKey(" : "ModifyMagicKeySource(", true, ClearPos)
+			Assert(DeliveryGuardPos > ClearPos && DeliveryPos > DeliveryGuardPos,
+				FunctionName . " must reject a retired capture even after pause has resumed")
 			Assert(InStr(Lifecycle, "_MagicKeyEditorStopOwned(" . OwnerName, true) > 0,
 				"suspend entry must stop " . OwnerName . " synchronously")
 		}

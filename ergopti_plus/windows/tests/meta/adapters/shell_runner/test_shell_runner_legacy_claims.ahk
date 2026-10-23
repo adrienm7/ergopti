@@ -476,7 +476,10 @@ _SRLC_PublicHandleUsesOneStateMap() {
 	local handler_routes := Map(
 		"_SR_HandleStart", Map(
 			"_SR_LegacyDrainReleases", 1,
-			"_SR_LogError", 2,
+			; The NUL and newline refusals, then the start failure.
+			"_SR_LogError", 3,
+			; Names the program in the NUL refusal without its argument bytes.
+			"_SR_ProgramName", 1,
 			"_SR_LegacyBeginStart", 1,
 			"_SR_AcquireCaptureDirectory", 1,
 			"_SR_LegacyCreateDirect", 1,

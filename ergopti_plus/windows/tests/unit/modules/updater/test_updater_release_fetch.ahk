@@ -496,13 +496,14 @@ _UpdaterTest_DownloadHasTimeout() {
 Test("Updater: DownloadAndInstall has timeout guard (regression: unbounded binary download)", _UpdaterTest_DownloadHasTimeout)
 
 
-; The worker script is constructed at runtime, so a source-only scan cannot
-; catch an accidental AHK string-concatenation regression that drops its argv
-; contract or integrity checks before PowerShell is even launched.
+; The worker is the bundled script the driver launches, read through the same
+; path function, so a regression that drops its input contract or integrity
+; checks fails here before PowerShell is even launched.
 _UpdaterTest_StagingWorkerScriptContract() {
-	Script := _Updater_BuildStagingWorkerScript()
-	AssertEqual(true, InStr(Script, "param([string]$Url") > 0,
-		"Updater staging worker script must keep its URL argv contract")
+	Script := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
+	AssertEqual(true, InStr(Script, "param([string]$TransportPrefix") > 0
+		&& InStr(Script, '$Url = Read-ErgoptiStagingInput "URL" $true') > 0,
+		"Updater staging worker script must keep its URL input contract")
 	AssertEqual(true, InStr(Script, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,
 		"Updater staging worker script must apply a streaming timeout")
 	AssertEqual(true, InStr(Script, "$ActualSize -ne $ExpectedSize") > 0,

@@ -9,11 +9,11 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Behind Karabiner every grabbed keyboard reaches Quartz through its virtual
----    keyboard, whose ISO or ANSI product decides the 0x35/0x64 exchange in
----    IOHIDFamily. The event's keyboard model then describes neither the
----    physical keyboard nor, reliably, that exchange: issue #95 saw the key
----    left of 1 resolve to the extra ISO key behind the ISO virtual keyboard.
----    While the integration deploys a virtual form, that form decides.
+---    keyboard, so the event's keyboard model describes the virtual product,
+---    never the physical keyboard. Ergopti deploys the ANSI product, which
+---    passes the ISO pair through unswapped (issue #99), so a key arrives with
+---    the keycode of the layout's keycode convention. While the integration is
+---    on, that convention (the registered source's "virtual form") decides.
 --- ==============================================================================
 
 local M = {}

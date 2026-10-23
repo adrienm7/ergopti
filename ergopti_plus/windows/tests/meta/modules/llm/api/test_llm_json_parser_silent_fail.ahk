@@ -22,11 +22,13 @@ _TLJ_Check() {
 	Body := _DriverFuncBody("LLM_ParseOllamaChatResponse")
 	Assert(Body != "", "LLM_ParseOllamaChatResponse must exist in the Ollama API module")
 	Assert(InStr(Body, 'Map("error", true') > 0, "LLM_ParseOllamaChatResponse must return a structured error map on parse failure")
-	Assert(InStr(Body, "SubStr(") > 0, "LLM_ParseOllamaChatResponse must log the raw response payload")
+	; The logged raw payload is a bounded prefix that keeps whole characters
+	; (provider-error-prefix): a cut surrogate pair would corrupt the log line.
+	Assert(InStr(Body, "TextHeadWithinUnits(raw, 200)") > 0, "LLM_ParseOllamaChatResponse must log the raw response payload")
 
 	Src2 := _TLJ_ReadSource("modules/llm/models.ahk")
 	Assert(Src2 != "", "Source file models.ahk must exist")
-	Assert(InStr(Src2, "SubStr(") > 0, "models.ahk must log the raw response payload")
+	Assert(InStr(Src2, "TextHeadWithinUnits(raw, 200)") > 0, "models.ahk must log the raw response payload")
 }
 
 Test("LLM JSON parsers: log raw payload and return structured error", _TLJ_Check)

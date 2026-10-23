@@ -11,9 +11,10 @@
 --- 1. File-Manager Agnosticism: Tries popular third-party managers (QSpace,
 ---    ForkLift, etc.) before falling back to stock Finder, so the shortcuts work
 ---    regardless of the user's setup.
---- 2. Smart Copy/Search: Detects whether the frontmost app is a file manager to
----    decide between copying the current path vs. opening the selection in a
----    browser or running a Google search.
+--- 2. Smart Copy/Open: Detects whether the frontmost app is a file manager to
+---    decide between copying the current path vs. opening what the selection
+---    names (_shared/lua/open_target: a URL, an IP address, a file, a folder)
+---    or searching the web for plain text.
 --- 3. Parent-scoped lifecycle: the fixed shortcuts run under the
 ---    "shortcut_bindings" parent and the gesture actions under "gestures", each
 ---    with its own admission generation, so pausing one feature never fences or
@@ -37,6 +38,8 @@ local WindowManager = require("adapters.window_manager")
 local ShellRunner   = require("adapters.shell_runner")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local FileSystem    = require("adapters.file_system")
+local OpenTarget    = require("open_target")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -64,9 +67,6 @@ local FILE_MANAGERS = {
 	"qspace", "path finder", "forklift", "commander one",
 	"totalfinder", "xtrafinder", "finder",
 }
-
--- Google search base URL used when the selection is not a URL
-local GOOGLE_SEARCH_URL = "https://www.google.com/search?q="
 
 -- Wait after Cmd+Opt+C for Finder to populate the clipboard with the path
 local FINDER_PATH_SETTLE_SEC = 0.15
@@ -415,14 +415,6 @@ local function start_owned_applescript(scope, script, label, on_done)
 end
 -- ===================================
 
---- Trims leading and trailing whitespace from a string.
---- @param s string The input string.
---- @return string The trimmed string.
-local function trim(s)
-	if type(s) ~= "string" then return "" end
-	return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
 local function begin_copy_capture(scope)
 	if not apps_admission_open(scope) or _copy_capture_in_flight then
 		Logger.debug(LOG, "copy_or_open_path ignored while another capture owns the clipboard.")
@@ -629,18 +621,6 @@ local function start_copy_dispatch(prior, generation, scope, apps_generation, mo
 	return accepted == true
 end
 
---- Heuristically checks whether a string looks like a URL and normalises it.
---- @param s string The candidate string.
---- @return string|nil Normalised URL, or nil if not a URL.
-local function is_probable_url(s)
-	local x = trim(s)
-	if x:match("^https?://") then return x end
-	if x:match("^www%.") or (x:match("%.%a%a") and not x:match("%s")) then
-		return "http://" .. x
-	end
-	return nil
-end
-
 --- Returns true when the given app name matches a known file manager.
 --- @param appname string Application name to test.
 --- @return boolean True if it is a file manager.
@@ -718,17 +698,76 @@ local function center_frontmost_after(scope, delay)
 	return committed == true
 end
 
---- Opens a URL directly, or falls back to a Google search for plain text.
---- @param text string The selected text or path to act on.
-local function open_or_search(text)
-	local trimmed = trim(text)
-	local url     = is_probable_url(trimmed)
-	if url then
-		pcall(urlevent.openURL, url)
-	else
-		local q = http.encodeForQuery(trimmed)
-		pcall(urlevent.openURL, GOOGLE_SEARCH_URL .. q)
+--- Logs a recognised target that stays closed and tells the user why.
+--- @param key string Locale key whose %s receives the target.
+--- @param target string The classified target.
+--- @param detail string English detail for the log.
+local function report_unopened(key, target, detail)
+	Logger.error(LOG, "Could not open '%s': %s.", target, detail)
+	local message = (tostring(i18n.get(key)):gsub("%%s", function() return target end))
+	local shown, refusal = notifications.notify(message, nil, "error")
+	if shown ~= true then
+		Logger.warn(LOG, "The notice for '%s' was not shown — %s.", target, tostring(refusal))
 	end
+end
+
+--- Hands a URL to the default handler, logging the lifecycle.
+--- @param kind string Classification kind, for the log.
+--- @param url string
+--- @return boolean
+local function open_url_target(kind, url)
+	Logger.start(LOG, "Opening the selected %s '%s'…", kind, url)
+	local ok, opened = pcall(urlevent.openURL, url)
+	if not ok or opened == false then
+		report_unopened("open_target.open_failed", url, "the URL handler refused it (" .. tostring(opened) .. ")")
+		return false
+	end
+	Logger.success(LOG, "Handed the selected %s '%s' to its handler.", kind, url)
+	return true
+end
+
+--- Opens what a selected text names (_shared/lua/open_target: a URL, an IP
+--- address, localhost, a mail address, a file or a folder), or searches the
+--- web for plain text. A recognised target that cannot be opened here (a
+--- missing path, a bare file name, a registry key or a Windows path) is
+--- notified, never searched instead: the user asked to open that thing.
+--- @param scope table Parent scope that owns the open(1) process.
+--- @param text string The selected text.
+--- @return boolean True when a target was handed to its opener.
+local function open_or_search(scope, text)
+	local found = OpenTarget.classify(text, os.getenv)
+	local kind, target = found.kind, found.target
+	if kind == "empty" then return false end
+	if kind == "search" then
+		return open_url_target(kind, OpenTarget.DEFAULT_SEARCH_URL .. http.encodeForQuery(target))
+	end
+	if kind == "url" then return open_url_target(kind, target) end
+	if kind == "file_name" then
+		report_unopened("open_target.bare_file_name", target, "a file name without its folder cannot be located")
+		return false
+	end
+	if kind == "unsupported" then
+		report_unopened("open_target.windows_only", target, "only Windows can open it")
+		return false
+	end
+	if kind ~= "path" then
+		report_unopened("open_target.open_failed", target, "unexpected target kind " .. tostring(kind))
+		return false
+	end
+	if not FileSystem.exists(target) then
+		report_unopened("open_target.missing_path", target, "no file or folder exists at that path")
+		return false
+	end
+	-- open(1) receives the path as one argument: a file opens in its default
+	-- application, a folder in Finder.
+	Logger.start(LOG, "Opening the selected path '%s'…", target)
+	return start_owned_open(scope, target, "open selected path", function(opened)
+		if opened then
+			Logger.success(LOG, "Opened the selected path '%s'.", target)
+		else
+			report_unopened("open_target.open_failed", target, "open(1) failed")
+		end
+	end)
 end
 
 
@@ -846,7 +885,8 @@ function M.open_settings(parent)
 end
 
 --- In a file manager: copies the current path (Cmd+Opt+C).
---- Elsewhere: copies the text selection and opens it as a URL or Google search.
+--- Elsewhere: copies the text selection and opens what it names, or searches
+--- the web for plain text (open_or_search).
 --- @param parent string|nil Stable action parent.
 function M.copy_or_open_path(parent)
 	local scope = apps_scope(parent)
@@ -914,7 +954,7 @@ function M.copy_or_open_path(parent)
 					Logger.error(LOG, "copy_or_open_path selection read failed — %s.", tostring(sel))
 					return
 				end
-				if sel and sel ~= "" then open_or_search(sel) end
+				if sel and sel ~= "" then open_or_search(scope, sel) end
 			end
 			start_copy_dispatch(prior, capture_generation, scope, capture_apps_generation,
 				{ "cmd" }, COPY_SETTLE_SEC, "fallback selection", read_fallback_selection)
@@ -957,7 +997,7 @@ function M.copy_or_open_path(parent)
 			Logger.error(LOG, "copy_or_open_path selection read failed — %s.", tostring(sel))
 			return
 		end
-		if sel and sel ~= "" then open_or_search(sel) end
+		if sel and sel ~= "" then open_or_search(scope, sel) end
 	end
 	if not start_copy_dispatch(prior, capture_generation, scope, capture_apps_generation,
 		{ "cmd" }, COPY_SETTLE_SEC, "selection", read_selection) then
@@ -1059,6 +1099,14 @@ end
 --- @return boolean pending
 function M.has_pending_apps_action(parent)
 	return apps_owner_pending(apps_scope(parent))
+end
+
+--- Test seam: what copy_or_open_path does with the copied selection.
+--- @param text string The selected text.
+--- @param parent string|nil Stable action parent.
+--- @return boolean
+function M._open_or_search(text, parent)
+	return open_or_search(apps_scope(parent), text)
 end
 
 return M

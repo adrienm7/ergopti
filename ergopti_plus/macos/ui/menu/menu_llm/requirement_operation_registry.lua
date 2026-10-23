@@ -12,6 +12,12 @@ local M = {}
 local Logger = require("infra.logger")
 
 local LOG = "menu_llm.requirements"
+
+-- Why a requirement ended without a failure: the user declined the model
+-- download, or the disk cannot hold it. A caller turns the AI off with a
+-- warning for these, since the dialog already told the user (#99).
+M.CANCEL_DOWNLOAD_DECLINED = "download_declined"
+M.CANCEL_DISK_INSUFFICIENT = "disk_insufficient"
 -- Observation only: each entry is the same original operation, released only
 -- by its existing terminal-plus-physical-child join. No registry GC can erase
 -- a live requirement's migration fence.

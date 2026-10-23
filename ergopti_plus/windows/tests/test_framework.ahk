@@ -50,6 +50,12 @@ global TEST_REGISTRY := []
 ; Counters updated by RunTests.
 global TEST_PASS_COUNT := 0
 global TEST_FAIL_COUNT := 0
+; Cases that could not run on this host. Never part of the pass count.
+global TEST_NOT_EXECUTED_COUNT := 0
+
+; The marker of a not-executed TAP result. validate-ahk-suite-manifest.cjs and
+; report.cjs parse the same spelling.
+global TEST_NOT_EXECUTED_MARKER := " # SKIP NOT EXECUTED: "
 
 ; Including assertion helpers does not acquire or reset a runner receipt.
 
@@ -102,6 +108,21 @@ Assert(Condition, Message := "assertion failed") {
 	if !Condition {
 		throw Error(Message)
 	}
+}
+
+; Raised by TestNotExecuted. RunTests reports the case as NOT EXECUTED: it is
+; neither a pass nor a failure, and the summary lists it with its reason.
+class TestNotExecutedSignal extends Error {
+}
+
+; Ends the current case before it exercises anything because this host cannot
+; run it. Call it only from a capability check that has positively observed the
+; missing capability; an unknown capability must let the case run.
+; @param Reason {String} One line naming the missing capability and its remedy.
+TestNotExecuted(Reason) {
+	if !(Reason is String) || Trim(Reason) == "" || RegExMatch(Reason, "[\x00-\x1F]")
+		throw ValueError("A not-executed reason must be one nonempty line.")
+	throw TestNotExecutedSignal(Reason)
 }
 
 ; Append a line to the results file (for CI tailing) and also to stdout when possible.
@@ -909,6 +930,7 @@ _TestPrint(Line) {
 ; printing the plan line so the CI warning-check step stays fast.
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
+	global TEST_NOT_EXECUTED_COUNT, TEST_NOT_EXECUTED_MARKER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
 	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
     if (A_IsCritical != 0) {
@@ -962,6 +984,7 @@ RunTests() {
 		ExitApp(1)
 	}
 	Index := 0
+	NotExecuted := []
 	for TestEntry in ActiveTests {
 		Index += 1
 		_TestPrint("RUNNING " . Index . "/" . ActiveTests.Length . " - " . TestEntry.name)
@@ -981,23 +1004,33 @@ RunTests() {
 			if LeakedCritical
 				throw Error("Test LEAKED Critical: " . TestEntry.name)
 		} catch as e {
-			Status := "not ok"
-			; Point [file:line] at the test's own call site, not the assert helper
-			; in test_framework.ahk where the throw physically happened.
-			Site := ""
-			try Site := _TestCallSite(e.Stack)
-			if (Site == "") {
-				SplitPath(e.File, &EFileName)
-				Site := EFileName . ":" . e.Line
+			if e is TestNotExecutedSignal {
+				Status := "not executed"
+				Detail := TEST_NOT_EXECUTED_MARKER . e.Message
+			} else {
+				Status := "not ok"
+				; Point [file:line] at the test's own call site, not the assert helper
+				; in test_framework.ahk where the throw physically happened.
+				Site := ""
+				try Site := _TestCallSite(e.Stack)
+				if (Site == "") {
+					SplitPath(e.File, &EFileName)
+					Site := EFileName . ":" . e.Line
+				}
+				Detail := " — " . e.Message . " [" . Site . "]"
 			}
-			Detail := " — " . e.Message . " [" . Site . "]"
 		}
 		if (Status == "ok") {
 			TEST_PASS_COUNT += 1
+		} else if (Status == "not executed") {
+			TEST_NOT_EXECUTED_COUNT += 1
+			NotExecuted.Push(TestEntry.name . Detail)
 		} else {
 			TEST_FAIL_COUNT += 1
 		}
-		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
+		; TAP spells a case that did not run as an ok line with a SKIP directive;
+		; the marker keeps it out of every pass count.
+		_TestPrint((Status == "not executed" ? "ok" : Status) . " " . Index . " - " . TestEntry.name . Detail)
 		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
 		; Print the exact one-test replay command so a red test is reproducible
 		; without re-running the whole suite (the JS runner sets this bar).
@@ -1006,7 +1039,13 @@ RunTests() {
 				. (TestEntry.interactive ? " --interactive" : "") . " --only "
 				. Chr(34) . TestEntry.name . Chr(34))
 	}
-	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
+	if NotExecuted.Length {
+		_TestPrint("# NOT EXECUTED on this host: " . NotExecuted.Length . " case(s), none counted as passed:")
+		for Line in NotExecuted
+			_TestPrint("#   " . Line)
+	}
+	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed"
+		. (TEST_NOT_EXECUTED_COUNT ? ", " . TEST_NOT_EXECUTED_COUNT . " not executed" : "") . ".")
 	_CopyTestResultsForCi()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
 }

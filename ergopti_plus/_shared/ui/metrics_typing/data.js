@@ -195,6 +195,7 @@ window.publishTypingMetricsData = function (payload, metadata) {
 		window._prefetch_data = payload.initial_data === undefined ? null : payload.initial_data;
 		appliedTypingManifestRevision = metadata.manifest_revision;
 		manifestChanged = true;
+		mark_incomplete_read('manifest', payload.manifest_incomplete === true);
 	}
 	if (
 		metadata.assets_revision !== undefined &&
@@ -3629,9 +3630,19 @@ function can_receive_range_data(request_id = null) {
 }
 
 /**
+ * Labels the dashboard while the data shown came from an incomplete host read.
+ * @param {string} part - "manifest" or "range".
+ * @param {boolean} incomplete - Whether that part's host read missed rows.
+ */
+function mark_incomplete_read(part, incomplete) {
+	if (window.metrics_freshness) window.metrics_freshness.mark_incomplete(part, incomplete);
+}
+
+/**
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
- * @param {Object} payload - Contains { historical, today } n-gram dictionaries.
+ * @param {Object} payload - Contains { historical, today } n-gram dictionaries,
+ *     plus `incomplete: true` when the host read missed rows.
  * @param {number|null} [request_id=null] - Native request ownership token.
  * @returns {boolean} Whether the payload was current and rendered.
  */
@@ -3644,6 +3655,7 @@ function receive_range_data(payload, request_id = null) {
 	invalidate_typing_projection_cache();
 	app_state.historical_cache = payload.historical;
 	app_state.today_live_data = payload.today;
+	mark_incomplete_read('range', payload.incomplete === true);
 	apply_local_filters();
 	return true;
 }

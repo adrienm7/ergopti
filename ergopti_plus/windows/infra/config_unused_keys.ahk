@@ -41,7 +41,10 @@ global CONFIG_UNUSED_KEYS_DISPLAY_LIMIT := 30
 ; ============================
 
 ; Retired ownership is a semantic segment, never a case-folded textual prefix.
+; The root (section "") holds bare keys and is never retired itself.
 _ConfigUnusedKeysRetiredSection(Section) {
+	if Section == ""
+		return false
 	Parts := TOML_ParseKeyPath(Section, true)
 	return Parts.Length > 0 && Parts[1] == "ahk"
 }
@@ -168,21 +171,107 @@ ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 				continue
 			}
 		}
-		for Key, Value in Entries {
-			Kind := Retired ? "section"
-				: TomlConfigUnknownKind(Tree, SectionPath, Key, &ForeignOwner)
-			if (Kind == "") {
-				Native := Value is TOML_Bool ? Value.Value : Value
-				if (TomlConfigOutdatedReason(Tree, SectionPath, Key, Native,
-						TOML_RenderValue(Value), ForeignOwner) == "")
-					continue
-				Kind := "leaf"
-			}
-			Keys.Push(Map("section", SectionPath, "key", Key, "kind", Kind,
+		if !Retired
+			continue
+		for Key, Value in Entries
+			Keys.Push(Map("section", SectionPath, "key", Key, "kind", "section",
 				"value", TOML_RenderValue(Value)))
-		}
+	}
+	; Every other row comes from the semantic projection boot applies, so a root
+	; dotted key, an inline member or a section-relative dotted key is offered
+	; under the exact section/key pair the loader warned about and the writer
+	; resolves to the same semantic path.
+	try Snapshot := ConfigTomlDecodeSnapshot(Source)
+	catch as Err {
+		try LoggerWarn("ConfigUnusedKeys", "Cleanup cannot project '{1}': {2}.", FilePath, Err.Message)
+		return Map("status", "malformed", "keys", [])
+	}
+	; A bare root key (section "") is offered too: the writer addresses it by the
+	; same semantic path as any other row.
+	for Row in Snapshot.Rows {
+		Parts := _TOML_ConfigPath(Row.Section, Row.Key)
+		if _ConfigUnusedKeysRetiredSection(TOML_RenderKey(Parts[1]))
+			continue
+		if TomlConfigSectionSkipKind(Row.Section == "" ? TOML_RenderKey(Row.Key) : Row.Section) != ""
+			continue
+		_ConfigUnusedKeysClassify(Tree, Row.Section, Row.Key, Row.Value,
+			TOML_StripInlineComment(Row.Raw), Row.Typed, Row.ChildRaw, Keys)
+	}
+	; Each outermost table array is one row, judged by the loader's rule and
+	; removed whole with every generation beneath it.
+	for Row in Snapshot.ArrayRows {
+		if _ConfigUnusedKeysRetiredSection(TOML_RenderKey(_TOML_ConfigPath(Row.Section, Row.Key)[1]))
+			continue
+		Kind := TomlConfigTableArrayKind(Tree, Row.Section, Row.Key)
+		if Kind == "outdated"
+			Kind := "leaf"
+		if Kind == "section" || Kind == "leaf"
+			Keys.Push(Map("section", Row.Section, "key", Row.Key, "kind", Kind, "value", Row.Raw))
 	}
 	return Map("status", "ok", "keys", Keys)
+}
+
+; Applies the loader's unknown-key and outdated-value rules to one semantic
+; row. A manifest feature record is merged child by child at boot
+; (TomlConfigMergeFeatureRecord), so its ignored children are judged the same
+; way and offered under the record's own section.
+_ConfigUnusedKeysClassify(Tree, Section, Key, Value, Raw, Typed, ChildRaw, Keys) {
+	Kind := TomlConfigUnknownKind(Tree, Section, Key, &ForeignOwner)
+	if Kind == "" {
+		if TomlConfigOutdatedReason(Tree, Section, Key, Value, Raw, ForeignOwner) != ""
+			Kind := "leaf"
+		else if ForeignOwner == "" && Typed is Map && ChildRaw is Map
+				&& TomlConfigExpectedType(Section, Key, &Entry) == "feature" {
+			_ConfigUnusedKeysClassifyRecord(Tree, _ConfigUnusedKeysChildSection(Section, Key),
+				_ConfigUnusedKeysTreeNode(Tree, _TOML_ConfigPath(Section, Key)), Typed, ChildRaw, Keys)
+		}
+	}
+	if Kind != ""
+		Keys.Push(Map("section", Section, "key", Key, "kind", Kind,
+			"value", TOML_RenderValue(Typed)))
+}
+
+; Mirrors TomlConfigMergeFeatureRecord's decision order for each child.
+_ConfigUnusedKeysClassifyRecord(Tree, Section, Seed, Typed, ChildRaw, Keys) {
+	for Key, Child in Typed {
+		Raw := ChildRaw[Key] is Map ? TOML_RenderValue(Child) : TOML_StripInlineComment(ChildRaw[Key])
+		Value := _ConfigTomlNativeValue(Child)
+		if TomlConfigOutdatedReason(Tree, Section, Key, Value, Raw) != "" {
+			Keys.Push(Map("section", Section, "key", Key, "kind", "leaf",
+				"value", TOML_RenderValue(Child)))
+			continue
+		}
+		Kind := TomlConfigUnknownKind(Tree, Section, Key, &ForeignOwner)
+		if Kind != "" {
+			Keys.Push(Map("section", Section, "key", Key, "kind", Kind,
+				"value", TOML_RenderValue(Child)))
+			continue
+		}
+		if ForeignOwner != ""
+			continue
+		if Child is Map && ChildRaw[Key] is Map && Seed is Map && Seed.Has(Key) && Seed[Key] is Map
+			_ConfigUnusedKeysClassifyRecord(Tree, _ConfigUnusedKeysChildSection(Section, Key),
+				Seed[Key], Child, ChildRaw[Key], Keys)
+	}
+}
+
+; The rendered section of the table that holds Section's Key, segment-exact.
+_ConfigUnusedKeysChildSection(Section, Key) {
+	Parts := _TOML_ConfigPath(Section, Key)
+	Parts.Push("_")
+	return _ConfigTomlSection(Parts)
+}
+
+; Resolves a semantic path in the manifest-built tree, or 0 when it is absent.
+_ConfigUnusedKeysTreeNode(Tree, Parts) {
+	Node := Tree
+	for Part in Parts {
+		if Node is Map && Node.Has(Part)
+			Node := Node[Part]
+		else
+			return 0
+	}
+	return Node
 }
 
 ; One "[section] key = value" line per key, capped at
@@ -196,7 +285,7 @@ ConfigUnusedKeysDescribe(Keys) {
 				Keys.Length - CONFIG_UNUSED_KEYS_DISPLAY_LIMIT)
 			break
 		}
-		Lines .= (Index > 1 ? "`n" : "") . "[" . Entry["section"] . "] "
+		Lines .= (Index > 1 ? "`n" : "") . (Entry["section"] == "" ? "" : "[" . Entry["section"] . "] ")
 			. TOML_RenderKey(Entry["key"]) . " = " . Entry["value"]
 	}
 	return Lines
@@ -230,16 +319,31 @@ _ConfigUnusedKeysSectionOnly(Entry) {
 	return true
 }
 
-; Mirrors the semantic writer's exact segment and case identity.
+; Mirrors the semantic writer's exact segment and case identity. A bare root
+; row (section "") lies under no dropped section.
 _ConfigUnusedKeysUnderSection(Name, Section) {
+	if Name == ""
+		return false
 	return _TOML_ConfigPathUnder(TOML_ParseKeyPath(Name, true),
 		TOML_ParseKeyPath(Section, true))
 }
 
+; A listed value owns every record and header beneath its exact path: deleting
+; it removes them all (a table array and each of its generations).
+_ConfigUnusedKeysListedOwner(Listed, Parts) {
+	Prefix := []
+	for Part in Parts {
+		Prefix.Push(Part)
+		if Listed.Has(_TOML_ConfigPathName(Prefix))
+			return true
+	}
+	return false
+}
+
 ; A whole section is removable only when every actual semantic source record
-; beneath it was offered. An added child or case/literal twin cannot borrow
-; another preview entry's ownership. Table-array flat projections still refuse;
-; only an exact private retired-root receipt can own their complete namespace.
+; beneath it was offered. An added child, table-array generation or case/literal
+; twin cannot borrow another preview entry's ownership. Only an exact private
+; retired-root receipt can own a complete retired namespace.
 _ConfigUnusedKeysEmptiedSections(FilePath, Keys, Source := unset) {
 	if !IsSet(Source)
 		Source := FSReadUtf8Exact(FilePath)
@@ -284,9 +388,7 @@ _ConfigUnusedKeysEmptiedSections(FilePath, Keys, Source := unset) {
 		for Record in Records {
 			if !_TOML_ConfigPathUnder(Record.Path, Parts)
 				continue
-			if _ConfigTomlArrayMember(Document, Record.Path)
-				throw Error("the cleanup preview cannot own table-array generations")
-			if !Listed.Has(_TOML_ConfigPathName(Record.Path)) {
+			if !_ConfigUnusedKeysListedOwner(Listed, Record.Path) {
 				Covered := false
 				break
 			}
@@ -299,7 +401,8 @@ _ConfigUnusedKeysEmptiedSections(FilePath, Keys, Source := unset) {
 					continue
 				HeaderParts := TOML_ParseKeyPath(Record.Section, true)
 				if _TOML_ConfigPathUnder(HeaderParts, Parts)
-						&& !ListedHeaders.Has(_TOML_ConfigPathName(HeaderParts)) {
+						&& !ListedHeaders.Has(_TOML_ConfigPathName(HeaderParts))
+						&& !_ConfigUnusedKeysListedOwner(Listed, HeaderParts) {
 					Covered := false
 					break
 				}
@@ -309,6 +412,16 @@ _ConfigUnusedKeysEmptiedSections(FilePath, Keys, Source := unset) {
 			Emptied.Push(Section)
 	}
 	return Emptied
+}
+
+; Every individual deletion must name a value the exact source holds.
+_ConfigUnusedKeysUpdatesExist(Source, Updates) {
+	Document := TOML_ParseDocument(Source)
+	for Update in Updates {
+		if !_TOML_DocumentLookup(Document, _TOML_ConfigPath(Update.Section, Update.Key))["found"]
+			return false
+	}
+	return true
 }
 
 ; Removes Keys (as returned by ConfigUnusedKeysFind) from FilePath. Returns a
@@ -398,13 +511,6 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 				return { noop: true }
 			}
 		}
-		Written := WriteBackup.Call(BackupPath, Source)
-		if !((Written is Integer) && Written == 1)
-				|| !FSUtf8ExactMatches(BackupPath, Source) {
-			Outcome := "backup_failed"
-			throw Error("the backup '" . BackupPath . "' could not be written and verified")
-		}
-		ValidateRootReceipts(Source)
 		; A key inside a dropped section needs no deletion of its own, and the
 		; writer would recreate the section as an empty header to delete it.
 		Updates := []
@@ -419,6 +525,20 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 			if !Dropped
 				Updates.Push({ Section: Entry["section"], Key: Entry["key"], Delete: 1 })
 		}
+		; Deleting an absent path is a writer no-op that still acknowledges, so
+		; a row naming no record of this source would be reported removed while
+		; the file kept it. Such a preview no longer describes the file.
+		if !_ConfigUnusedKeysUpdatesExist(Source, Updates) {
+			Outcome := "changed"
+			return { noop: true }
+		}
+		Written := WriteBackup.Call(BackupPath, Source)
+		if !((Written is Integer) && Written == 1)
+				|| !FSUtf8ExactMatches(BackupPath, Source) {
+			Outcome := "backup_failed"
+			throw Error("the backup '" . BackupPath . "' could not be written and verified")
+		}
+		ValidateRootReceipts(Source)
 		Outcome := "write_failed"
 		return { updates: Updates }
 	}

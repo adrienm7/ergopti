@@ -40,7 +40,10 @@ elseif kind == "nul" then body = "before\0after"
 elseif kind == "escaped" then body = '{"text":"' .. string.rep('\\"', size) .. '"}'
 else body = '{"text":"' .. string.rep("x", size) .. '"}' end
 local result, callbacks, chunks = nil, 0, ""
-local options = { owner = owner, timeout_ms = kind == "timeout" and 1 or 5000 }
+-- The server never reads a timeout body, so the deadline expires while the
+-- writer is backpressured. A 1 ms budget could expire before dispatch returned,
+-- which production rightly reports as an undispatched timeout.
+local options = { owner = owner, timeout_ms = kind == "timeout" and 300 or 5000 }
 local function complete(value) result, callbacks = value, callbacks + 1 end
 local url = origin .. "/body?literal=%2F%00&filter[name]=one"
 local dispatched
@@ -122,6 +125,7 @@ def main():
             json.loads(expected)  # Independently validate all admitted JSON controls.
             expected_hash = hashlib.sha256(expected).hexdigest()
             receipts, server_errors = [], []
+            release = threading.Event()
 
             class Handler(http.server.BaseHTTPRequestHandler):
                 protocol_version = "HTTP/1.1"
@@ -143,6 +147,11 @@ def main():
                     self.respond(200, b"abc")
 
                 def do_POST(self):
+                    if kind == "timeout":
+                        # Stall without reading: only the client deadline ends this.
+                        release.wait(10)
+                        self.close_connection = True
+                        return
                     received = self.rfile.read(int(self.headers["Content-Length"]))
                     identity = hashlib.sha256(received).hexdigest()
                     receipts.append((len(received), identity, self.path))
@@ -201,6 +210,7 @@ def main():
                     )
                     print(result.stdout + result.stderr, flush=True)
             finally:
+                release.set()
                 server.shutdown()
                 server.server_close()
                 thread.join(timeout=2)
