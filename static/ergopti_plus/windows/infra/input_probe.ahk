@@ -726,11 +726,14 @@ _IP_HoldClipboard(Spec) {
 		CB_EndOwnedTransaction(Token)
 		return "skipped"
 	}
-	if !CB_Write(Spec["clipboard"]) {
-		CB_RestoreOwnedAllEventually(Saved, 0, Token, "input_probe", true, true)
+	Published := CB_WriteTextWithReceipt(Spec["clipboard"], &OwnedSequence)
+	if !Published || !OwnedSequence {
+		; Neither a failed setter nor an unauthenticated publication authorizes
+		; restoring over a clipboard which may now belong to another process.
+		CB_EndOwnedTransaction(Token)
 		return "skipped"
 	}
-	return Map("token", Token, "saved", Saved, "sequence", CB_GetSequenceNumber())
+	return Map("token", Token, "saved", Saved, "sequence", OwnedSequence)
 }
 
 ; Gives the clipboard back to the user.
