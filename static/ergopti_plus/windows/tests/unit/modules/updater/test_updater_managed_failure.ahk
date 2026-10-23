@@ -271,6 +271,8 @@ _UMF_LateReadyCannotBeatMonitor() {
 	global _UpdaterDownloadWorker, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterInstallObserver, _UpdaterManagedFailureOwner, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	global _UpdaterInstallObserverEpoch
+	SavedObserverEpoch := _UpdaterInstallObserverEpoch
 	Saved := [_UpdaterDownloadInProgress, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch,
 		_UpdaterDownloadWorker, _UpdaterDownloadRequest, _UpdaterDownloadArtifacts,
 		_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
@@ -291,6 +293,9 @@ _UMF_LateReadyCannotBeatMonitor() {
 		_UpdaterExitInvocation := 0
 		_UpdaterManagedFailureOwner := 0
 		_UpdaterInstallObserver := (Phase, Reason) => Phases.Push(Phase)
+		; This retained worker represents a transaction already reserved and registered.
+		_UpdaterDownloadArtifacts := {InstallObservation: {
+			Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}}
 		_Updater_PollDownloadAsync(0, "READY", "", "", "", "", "v1.0.0", 8123,
 			0, 100 + UPDATER_HTTP_DOWNLOAD_DEADLINE_MS + 1,
 			_UpdaterTest_RecordDeadlineFailure.Bind(State))
@@ -312,6 +317,7 @@ _UMF_LateReadyCannotBeatMonitor() {
 		_UpdaterExitIntent := Saved[8]
 		_UpdaterExitInvocation := Saved[9]
 		_UpdaterInstallObserver := Saved[10]
+		_UpdaterInstallObserverEpoch := SavedObserverEpoch
 		_UpdaterManagedFailureOwner := Saved[11]
 	}
 }
