@@ -14,7 +14,7 @@
 #        AppDir/usr/bin/luajit                          required bundled runtime
 #        AppDir/usr/lib/ergopti/                        driver tree, flat
 #        AppDir/usr/lib/ergopti/_shared/                shared tree, as a child
-#   2. build/linux/Ergopti-<version>-x86_64.AppImage  — only when appimagetool is
+#   2. build/linux/ErgoptiPlus-x86_64.AppImage and its .zsync — only when appimagetool is
 #      on PATH. Without it the AppDir is left staged and the manual packaging
 #      command is printed. Actual native staging requires Linux x86_64.
 #
@@ -61,7 +61,12 @@ PACKAGE_NAME="ergopti"
 # Extract version from package.json (e.g. "3.0.0") or fall back to "0.1.0"
 VERSION=$(node -e "try { process.stdout.write(require('$PROJECT_ROOT/package.json').version) } catch(e) { process.stdout.write('0.1.0') }" 2>/dev/null || echo "0.1.0")
 ARCH="x86_64"
-APPIMAGE_FILE="$BUILD_DIR/Ergopti-${VERSION}-${ARCH}.AppImage"
+# Built under the name the release publishes: the .zsync names the file it was made
+# from, and AppImageUpdate fetches that exact asset.
+APPIMAGE_CHECK="$SCRIPT_DIR/check-appimage-update.cjs"
+APPIMAGE_ASSET="$(node "$APPIMAGE_CHECK" --print-appimage-asset)"
+UPDATE_INFORMATION="$(node "$APPIMAGE_CHECK" --print-update-information)"
+APPIMAGE_FILE="$BUILD_DIR/$APPIMAGE_ASSET"
 
 echo "=== ergopti AppImage packager ==="
 echo "Package: $PACKAGE_NAME $VERSION ($ARCH)"
@@ -251,7 +256,16 @@ fi
 
 echo ""
 echo "Building AppImage..."
-ARCH="$ARCH" appimagetool "$APPDIR" "$APPIMAGE_FILE"
+# -u embeds the update information; appimagetool then writes the .zsync into its
+# working directory, so it runs in the build directory with a relative output.
+(cd "$BUILD_DIR" && ARCH="$ARCH" appimagetool -u "$UPDATE_INFORMATION" "$APPDIR" "$APPIMAGE_ASSET")
+
+# A missing or mismatched .zsync would ship an AppImage that never updates.
+if [ ! -s "$APPIMAGE_FILE.zsync" ]; then
+  echo "[ERR] appimagetool produced no $APPIMAGE_ASSET.zsync."
+  exit 1
+fi
+node "$APPIMAGE_CHECK" "$APPIMAGE_FILE" "$APPIMAGE_FILE.zsync"
 
 if [ -f "$APPIMAGE_FILE" ]; then
   appimage_size=$(du -h "$APPIMAGE_FILE" | cut -f1)

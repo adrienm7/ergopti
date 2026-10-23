@@ -16,7 +16,7 @@
 # Usage:
 #   bash tools/build/appimage-oldest-lts.sh build
 #     Needs Docker and the bundle from build-linux-driver.sh. Leaves
-#     build/linux/Ergopti-<version>-x86_64.AppImage, owned by the caller.
+#     build/linux/ErgoptiPlus-x86_64.AppImage and its .zsync, owned by the caller.
 #
 #   bash tools/build/appimage-oldest-lts.sh smoke <AppImage>
 #     Launches it in the conditions the catalogue sets with firejail: no
