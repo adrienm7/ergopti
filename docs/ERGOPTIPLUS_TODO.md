@@ -31,17 +31,15 @@ a sealed Windows updater source, reseal with
 
 ## Big item 1: Windows corporate networks and trust (items 62, 132)
 
-- [ ] **62. WinHTTP transport for the managed remote downloads (decision of October 21).** [CODE]
-      Microsoft's `System32\curl.exe` 8.21.0 (Windows image 20261018) no longer lists NTLM, so the
-      managed transport refuses an NTLM-only company proxy on an up-to-date Windows
-      ([memory](memory/windows-ahk.md#project-windows-system32-curl-has-no-ntlm)). Decided: use the
-      Windows system HTTP stack (WinHTTP, through `WinHttp.WinHttpRequest.5.1` or equivalent), which
-      follows the system proxy/PAC and does NTLM/Negotiate with the user's session, instead of
-      shipping an extra binary (no new hash for scanners to flag). Replace the System32-curl
-      dependency of the managed remote transport; until then the three NTLM cases stay NOT EXECUTED
-      on images whose curl has no NTLM (f2cad38252, 90c42fbaa9). Also open: the WinHTTP route
-      vector shape, the updater route/trust classification, the Job/child cleanup ack, and the
-      PowerShell 5 fetch (`Source44`) exception with no known cause.
+- [ ] **62. WinHTTP transport for the managed remote downloads.** [CODE] Done (1d15b51e66, 7c001b2456
+      and the following commits): managed requests, updater artifact download and Ollama archive
+      download use WinHTTP (`vendor/ergopti_winhttp_transport.ps1`, worker
+      `ergopti_managed_http_worker.ps1`); `curl.exe` stays only for loopback Ollama. Proven on this PC
+      against owned loopback services with real SSPI NTLM and Negotiate proxies, CONNECT, untrusted
+      TLS, bounds, deadlines and PAC failover. Left: the native CA cases (a click on the Windows
+      security warning or an elevated LocalMachine scope), enterprise acceptance behind a real
+      proxy/PAC (Kerberos, TLS inspection, revocation) through Debug > diagnostics (`github_api`,
+      `proxy_pac`), and item 36 (external trusted binding).
 - [ ] **132. SignPath Foundation signing.** [CODE] Apply, integrate Windows signing, then delete
       `.github/ci/stable_windows_signing_exception.json`. Before applying, check the current
       conditions on signpath.org/foundation (open-source license, public repository, build and
@@ -53,18 +51,15 @@ a sealed Windows updater source, reseal with
       form answers and switch-on steps in the
       [handoff](todo-agents/signpath-foundation-application.md).
 - [ ] **`ErgoptiPlus.exe` flagged by a corporate proxy (Netskope, Airbus tester).** [CODE] [PHYS-W]
-      'ERR00: "ErgoptiPlus.exe" a peut-etre ete infecte par un virus' on v1.0.4; v1.0.0 and v1.0.3
-      pass, so it is a threat-engine verdict on the new bytes or hash. Done: no hidden PowerShell
-      clipboard stage (6d9eae1f94), own version resource (1965c2ffac), English metadata
-      (965ff7569b), all in v1.0.5. v1.0.5 then passed once and was blocked two hours later: its
-      content holds nothing v1.0.2 lacks, so the verdict is a sandbox and reputation one on a new
-      unsigned hash. Done on dev: first launch extracts with tar.exe, no hidden PowerShell
-      (3d2c78d7b7); build gate over the compiled exe (745f07fa51). Left: signing (132), the
-      Microsoft false-positive submission (text and hashes in the handoff), the tester's retry,
-      and the "keystats" naming (about 1 070 shipped strings) as a cross-driver rename to
-      `keystats` (maintainer, October 22; one word, code, config keys and logs; queued until the
-      parallel agents finish). Analysis,
-      playbook and download matrix: [handoff](todo-agents/windows-exe-flagged-by-proxy.md).
+      Done: no hidden PowerShell clipboard stage, own version resource, English metadata, tar.exe
+      extraction, the keylogger naming gone (keystats rename; the gate forbids `keylog` in the script
+      and the bundle), string-surface ceilings and a per-build record with the exe SHA-256 in CI
+      (e2c9dfb79d), the submission pack
+      [windows-exe-false-positive-submission-pack.md](todo-agents/windows-exe-false-positive-submission-pack.md).
+      Left (maintainer): signing (132), VirusTotal lookup, Microsoft and vendor submissions, the
+      tester's block page and retry (T1-T4); decide whether the `WH_KEYBOARD_LL` probe in
+      `input_probe.ahk` stays in the release exe. Playbook:
+      [handoff](todo-agents/windows-exe-flagged-by-proxy.md).
 
 ## Big item 2: macOS Karabiner input reliability (items 31, 117, 140)
 
@@ -142,31 +137,14 @@ a sealed Windows updater source, reseal with
       an edit and resets both buffers, so an end-character trigger cannot complete from the Space
       tap-hold; check on the PC with the Space tap-hold on. Left: wire
       `test_hotstring_output_is_final.ahk` into `run_all.ahk`.
-- [ ] **Per-layer layout composer.** [CODE] Decided 2026-10-22: the per-row number-row switches do
-      not cover the October 13 request. Not started. Spec: split the layout into four layers (base,
-      Shift, AltGr, Shift+AltGr), each with a dropdown that takes that layer from any layout (for
-      example base QWERTY, Shift AZERTY, AltGr Ergopti, Shift+AltGr Ergo-L); add a shortcuts layer
-      where the user says what a key gives under each held modifier (Ctrl+A when Ctrl is held,
-      Win+A with Win, and so on); let the user tune each layer key by key, up to their own complete
-      keylayout. Windows, macOS and Linux, from one shared declaration (the layout registry is
-      `.keylayout`).
+- [ ] **Per-layer layout composer.** [CODE] Done on the three OS (docs/layout-composer.md): shared
+      model, page, 21 locales, Windows host, macOS and Linux install paths, tests, one-click Debug
+      "Test the composed layout". Left: typing the composed layout on a real keyboard on each OS.
 
 ## Wave 2: mid-size work
 
 In progress (agent), October 22:
 
-- [ ] **Linux `[BS]x` pairs and correction n-grams (decision of October 21).** Align Linux on
-      Windows and macOS, which push `x[BS]` and `yx[BS]` for every Backspace; update the test that
-      pins the opposite and the shared corpus. Also L124 (a NUL histogram key merged by
-      `json_group_object`), never checked on Windows. **In progress (agent).**
-- [ ] **One path-separator owner, shared Lua and Linux.** [CODE] macOS is converted and guarded
-      (b4711585e0, `test_posix_path_separator_owner.lua`). Left: about 25 shared and 8 Linux
-      `[/\\]` sites
-      (`rg -n '\[\^?(/\\\\|\\\\/)' static/ergopti_plus/_shared/lua static/ergopti_plus/linux --glob '!**/tests/**'`);
-      keep the genuine Windows-path parsers (`program_parameter.lua`, `diagnostics/redact.lua`) and
-      Linux `normalize_native_separators` (it runs before the shared root is known). With it, L105:
-      the Linux injector's no-FFI `luv.sleep` and `os.execute sleep` fallbacks do not check the 2^53
-      ms ceiling (d5c520ce94). **In progress (agent).**
 - [ ] **Windows config policy (items 33, 42) and the TOML parse cost.** [CODE] Per sub-item in
       [config-policy-33-42.md](todo-agents/config-policy-33-42.md); 33: Windows keyboard binding
       publication from its real input owner, macOS Hotstrings category authority, Linux retired
@@ -175,36 +153,16 @@ In progress (agent), October 22:
       preservation. Parse cost: every document-mode write parses source, expected model and final
       candidate, and every start pays two builds after ready; reuse one parse per transaction
       before adding any cache. **In progress (agent).**
-- [ ] **macOS Hammerspoon coexistence (decision 10).** Never kill the user's Hammerspoon; the
-      launcher-owned instance gets its own config dir and single-instance guard; a second Ergopti
-      instance is refused or recovered cleanly and its timers stop before its fatal dialog (the
-      2026-10-21 log shows one aborting while its KC poll kept writing the shared log); a stale
-      Ergopti-owned instance is replaced. With it: the at-rest cipher puts its plaintext in the
-      `sh -c` argv. **In progress (agent).**
-- [ ] **HS-274 orphan tools (decision 9).** `tools/diagnostics/hs274_*_test.py`,
-      `hs274-native.swift`, `karabiner_candidate_install.py` lost their workflows: delete them if
-      useless, or run them in a CI lane. **In progress (agent).**
-- [ ] **macOS typing dashboard with a partial SQLite history (decided 2026-10-22).** [CODE] Show
-      the partial counts, never cached, with an "incomplete history" mention (dev's choice before
-      the Codex integration f0fb919379, which refuses the history instead); check that Windows and
-      Linux behave the same. **In progress (agent).**
-- [ ] **Versions window with a feed-only list (macOS, decided 2026-10-22).** [CODE] When the API
-      gives no list, a click on the channel's newest release is handed to Sparkle (a page phase and
-      21 locale strings); older releases stay refused with the warning. **In progress (agent).**
-- [ ] **Tap-hold hold rows open the shared picker on Windows and Linux (decided 2026-10-22).**
-      [CODE] Replace the seven-option « Hold → … » submenu (and a pair's hold: submenu on Windows,
-      list dialog on Linux) with the shared action picker listing holdable actions only, as on
-      macOS ([handoff](todo-agents/macos-tap-hold-action-picker.md)). **In progress (agent).**
 
 Not started:
 
-- [ ] **Ollama redirect policy and Go compile (decision 5).** [CODE] [CI] When a proxy or the
-      native worker carries the request, an unresolved download host is left to it; literal
-      private, loopback, link-local and CGNAT addresses stay refused, as do names that resolve
-      locally to them. Patch the upstream `ValidateRedirectTarget` call in the macOS build recipe
-      and reverse the assertion in `address_policy_test.go`. Every driver pins Ollama 0.40.4
-      (662ed3714b, `OLLAMA_NO_CLOUD=1` b06c421923), but its Go side was never compiled: validate in
-      the macOS Managed Ollama CI cells on a `tmp/*` branch.
+- [ ] **Ollama redirect policy and Go compile (decision 5).** [CODE] [CI] Code done (cda1e10c5e): an
+      unresolved download host is left to the proxy or the native worker; private, loopback,
+      link-local and CGNAT addresses and names resolving to them stay refused; the build recipe
+      patches upstream `ValidateRedirectTarget`. The hosted Go cell (`go vet`, `go test` through
+      `build-macos-managed-ollama.py`) passed on a throwaway branch (run 40021624397, see
+      [ci-validation-2026-10-24.md](ci-validation-2026-10-24.md)). Left: the same cell on the final
+      source before a release.
 - [x] **54/81. Last three native Windows menu rows.** Done in 02b63912f1 (local): census Windows
       0, macOS 0, Linux 0. The default-section, file and folder submenus are renderer template
       children (`MenuRenderer_TemplateChild` reserves, `MenuRenderer_FillTemplateChild` fills,
@@ -212,40 +170,24 @@ Not started:
       kept callback after a rebuild is now refused before any write. Left: manual check 17
       (installed menus, default choice after restart); the shared-tree census is red on Linux only
       while `linux/ui/menu/rebuild_owner.lua:39` (another agent's uncommitted edit) is in flight.
-- [ ] **Ergopti-started Ollama behind a PAC proxy.** [CODE] Resolve the PAC through the system for
-      the model registry host (macOS CFNetwork `CFNetworkExecuteProxyAutoConfigurationURL` /
-      SystemConfiguration; Windows WinHTTP auto-proxy; the Linux equivalent) and pass the resulting
-      `HTTPS_PROXY` to the managed Ollama, instead of refusing the pull. A user-started daemon
-      (Ollama.app, Homebrew, PATH) is covered by 2353a72eed. The maintainer's Mac uses a corporate
-      PAC URL with Auto Proxy Discovery off and every static proxy (HTTP, HTTPS, SOCKS) off, so the
-      PAC is the only proxy source: there is no static fallback to use.
-- [x] **Menu clicks during a reload on macOS and Linux.** Done (b0fb0f585b, c280aa4eaf,
-      8c4314524a, local): macOS holds a click during a reload, hands it to the new instance and
-      replays it with the intended state; a stale menu resolves on a fresh tree. Linux replays a
-      click on a retired row on the republished menu, and a hotstring reload rebuilds the tray.
-      Shared intent rule `_shared/lua/menu/click_intent.lua`. Left:
-  - [ ] Linux `perform_reload` logs "Hotstrings reloaded" and the local command answers
-        `completed` although `load_all` refused (second value false, e.g.
-        `personal-source-pending`).
-  - [ ] [DECISION] A click on Reload during a reload is replayed in the new instance, so a second
-        reload runs (Windows probably too, unchecked): should that row join the reload in flight?
-  - [ ] Linux `actual Linux ordered-pair translations` (`test_key_combinations_menu.lua`) stops
-        the runner without a result, already on HEAD.
-- [ ] **AppImage self-contained, with update information.** [CODE] Build with
-      `appimagetool -u gh-releases-zsync|adrienm7|ergopti|latest|ErgoptiPlus-*x86_64.AppImage.zsync`
-      and publish the `.zsync` through the release assembly, receipts and verifier; bundle the C
-      library and loader (or build on an older base) and prove it on the distro matrix (musl cannot
-      run glibc binaries: say so), keeping the tray closure. Polish: with no keyboard device the
-      notice still names input groups.
-- [x] **Linux `copy_selected_path` in a file manager.** Done (8edb31edba, xclip sentinel
-      d2a7bc9c5b, local): in a known file manager the action copies the selected paths. Left:
-  - [ ] GNOME and KDE on Wayland do not name the foreground application, so the action there
-        always opens the PRIMARY selection; identify the app through the AT-SPI active frame.
-        Known limits elsewhere: Unicode IDNs and a zoned IPv6 are searched, not opened.
-- [ ] **Linux X11 window list not proven on a real WM.** [CODE] `getAll()` (one `wmctrl -lp` plus
-      `/proc/<pid>/comm`, fcb0168fb5) is covered by unit tests only (the WSLg WM publishes no
-      `_NET_CLIENT_LIST`): add it to the Openbox e2e, and add wmctrl to the RPM and Flatpak
-      dependencies.
+- [ ] **Ergopti-started Ollama behind a PAC proxy.** [CODE] Linux done (89d22d782c, fake-lookup
+      tests). macOS in code (launcher role `--managed-proxy-route`, 06addb2e3f; per-origin route
+      plan 1fd254d92e and 749e00c4c8); Swift compiled and tested on the hosted macOS cell. Windows
+      is covered by the WinHTTP transport (62). Left: a real-PAC pull on the maintainer's Mac (Debug >
+      Test network), the Ollama blob host inventory check, a `route_plan` step in the network check.
+- [x] **Menu clicks during a reload.** Done (b0fb0f585b, c280aa4eaf, 8c4314524a, d8f6fbf1d2): a click
+      is held during a reload and replayed with its intended state; a Reload click during a reload
+      JOINS it (Linux and macOS; Windows in the standing-checks agent's work, see PAR entries); Linux
+      reports a refused `load_all` truthfully; the ordered-pair test runs in 8 s.
+- [ ] **AppImage self-contained.** [CODE] `.zsync` and update information are done (10c016e51f,
+      6fb83014e3). Left: validate on hosted CI; bundle the C library and loader (or build on an older
+      base) and prove it on the distro matrix (musl cannot run glibc binaries: say so), keeping the
+      tray closure.
+- [x] **Linux `copy_selected_path` in a file manager.** Done (8edb31edba, d2a7bc9c5b, 3027faffd3: the
+      AT-SPI active frame names the application under Wayland). Left: confirm the AT-SPI query on a
+      real GNOME or KDE Wayland desktop. Unicode IDNs and a zoned IPv6 are searched, not opened.
+- [ ] **Linux X11 window list.** [CODE] `getAll()` is covered by the Openbox receipts (962a25a973);
+      confirm in the first hosted run. Flatpak: wmctrl is only a documented host program.
 
 ## Cross-OS parity, centralisation and constants (audit of 2026-10-24)
 
@@ -578,43 +520,36 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
       inverse oracle of `macos_native_http_receiving_facts_test` (red since 719c7fcd76), compile the
       Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
       is skipped (HEAD only).
-- [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through in tap*keys,
-      script_control and modifier_injector (ed2d9fe65c); AXValue read once per typing burst
-      (34765cde7c); no error window for a lease failure that recovered within 60 s (fcf4af85dc);
-      `key*\*` counters in the Markdown diagnostics (6f2daed2e5). Left: reuse the lease token on
-      recovery so the 743 KB karabiner.json is not rewritten each time (needs the token ledger
-      redesigned and checked on a Mac).
+- [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through (ed2d9fe65c),
+      AXValue read once per burst (34765cde7c), no error window for a lease failure that recovered
+      within 60 s (fcf4af85dc), `key_*` counters in the diagnostics (6f2daed2e5). Lease token reuse
+      was analysed and refused (ADR 012): a reused token could never reach READY because the
+      revocation tombstone is monotone; reuse needs a native acknowledged rearm, decided NOT to
+      build for now. The next Mac log carries `Lease token decision=` and `written in N ms`: if the
+      write is short, keep it; if long, shrink the 743 KB file instead.
 - [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
       n-grams get `e`, synthetic output chains. Left: erased and synthetic vectors in the shared corpus
       (needs the AHK and macOS replayers); Windows word separators are wider than Linux's three.
-- [ ] **Windows typing dashboard partial history remainders.** [CODE] Done for Typing (0010418934,
-      reader NUL keys a6a4274a8d); left: the mention on the Apps dashboard and the Edge fallback
-      (no WebView2), which does not open on an incomplete read.
 - [ ] **Windows updater -File workers: real update check.** [PHYS] Install a build with 5d6beccf83
       by hand, then update from it to the next release: the exe is replaced and restarts, the
       three scripts are in `%LOCALAPPDATA%\Ergopti\vendor\`, the PowerShell command line shows
       `-File ...ergopti_updater_staging.ps1` and no `-EncodedCommand`.
-- [ ] **Config policy remainders (33, 42).** [CODE] 33: macOS Hotstrings category authority and
-      Windows `api_entries` per-row validation; 42: the `--config FILE.toml` watcher (needs a
-      Linux host). Parse cost: the schema journal still parses the candidate on its own; profile
-      the tokenizer.
-- [ ] **Linux AI off remainders.** [CODE] The menu switch-off does not stop an app-started
-      `ollama serve` nor a running model download, as pause does (the agent auto mode and bound
-      `llm_*` chords are a maintainer question).
-- [ ] **HS-274 vendor-header C++ tests.** [CI] stream-protocol, -inventory, -source, -clock,
-      key-state, baseline-v2 and accept-test need the Karabiner-Elements 9312593e vendor headers:
-      run them in the future `remap-runtime-build.yml`. The portable tests run in js-0453
-      (17d2f1a7fd). The `hs274_persistence_test.py` cases are dead (their fixture moved into
-      `test_physical_history_persistence.lua`): repair or retire them.
-- [ ] **Linux CI installs packages inside short test steps.** [CI] 25 Linux steps still run apt
-      inside a test step with a short timeout (a649f2930a moved the network-ai one out; f1b5c7f684
-      fails a stalled mirror within 30 s; 409d0faac7 moved the window-switch one); move the
-      installs to their own steps (about twenty left).
-- [ ] **CI partial rerun refused by the site verdict.** [CI] `gh run rerun --failed` makes the site
-      verdict fail with "Build receipt differs from selected writer attempt", so only full runs
-      can be retried today; admit a rerun attempt of the writer.
-- [ ] **macOS "Quit did not end both processes within 10 s".** [CI] Seen once in the October 23
-      CI, passed on rerun; find the cause (green run 39889203911 at e0dd6629e4).
+- [ ] **Config policy remainders (33, 42).** [CODE] Done: macOS category authority (80c18d9cc2),
+      explicit `--config` watcher topology (3dd420292d), `api_entries` retired rows (c03762d27b),
+      parse cost (e525cd6615). Left: the physical keyboard slot parameters
+      (`keyboard__win_SC03A__x`), the Windows `api_entries.json` per-row warning, the bare-root and
+      unknown-`[[x]]` cleanup offers, a reseal of the updater original source after e525cd6615
+      once `run_all.ahk` is clean, and the Linux reload as a daemon restart (the control protocol
+      needs a pending record that can name an unknowable successor pid; recommended: a TTL-bound
+      pending record completed by the successor).
+- [ ] **Linux CI installs packages inside short test steps.** [CI] 18 steps moved and skipped when the
+      suite is deferred (c52cb916a7, 285d3363a1). Left: `Qualify three actual XI2 property cookies`
+      and `The whole daemon, live` (their text is pinned), the 35-minute and 18-minute steps, the
+      other jobs, and hosted validation.
+- [ ] **macOS "Quit did not end both processes within 10 s".** [CI] Cause found: the Quit AppleEvent
+      timed out while the launcher log had been silent since startup (run 39850037912); the gate now
+      names the surviving process and keeps the failing attempt's evidence for 7 days
+      (b2b5bb149b, bf05488dfb). Read `launch-gate-failed-*` if it recurs.
 - [ ] **History hygiene of October 22.** Commits with another agent's message, already on dev:
       c6db589c76 (macOS cipher argv fix under a README subject), 90da28c725 (config snapshot test
       under a CI subject), 18ca214ead (also deletes ten handoff files), 6d9c659 ("applied for now"
@@ -626,56 +561,52 @@ tick`, `Slow preferences save` and `Field check result:` to name the dominant ma
 
 - [ ] **36. Windows updater production coupling.** [CODE] The "original23" collector stays inactive
       (`docs/handovers/2026-10-12-group6-ci/INACTIVE-ORIGINAL23-SOURCE.md`) until enrolled.
-- [ ] **62 (macOS and Linux).** [CODE] macOS full request-URL PAC/WPAD, fallback and redirects for
-      uv, HTTPX/HF/Xet and outgoing Ollama Go; `-1202`/SSL-9813 after a trust add and the 15 s
-      trust-removal timeout; forward the Ollama daemon log directory (output goes to `/dev/null`).
-- [ ] **115. Portable JS suite on the Windows host.** Install the pinned Node 22.22.2 and `pwsh`,
-      rerun, fix only a red that survives.
-- [ ] **CI duration** ([target](memory/workflow-and-verification.md)). Validate the parallel
-      `package-flatpak` job (6310b316bf: green, install cells start after Build, release-like run
-      lists the `.flatpak`), then build the Linux packages per format in parallel. Windows
-      Integration adds 4-5 min on the critical path (three lots); the macOS lane (about 58 min) must
-      stay within the five-runner budget.
-- [ ] **CI structure.** [CODE] Elapsed time per step, suite and test with a slowest-test summary;
-      live Windows unit-log progress.
-- [ ] **Test parity across the drivers.** [CODE] Continue the
-      [parity audit](audits/2026-10-18-test-parity-audit.md): Windows dynamic hotstrings, verbatim
-      duplicate Lua test files, absence ratchets, one tidy `tests/` tree.
-- [ ] **Neutral installation.** [CODE] Check that the shipped defaults enable no layout emulation,
-      system layout change or number-row inversion on the three drivers.
+- [ ] **62 (macOS and Linux).** [CODE] Packaged paths resolve every request and redirect natively;
+      the environment fallback now resolves each origin of the client inventory and refuses two
+      different relays (1fd254d92e, 749e00c4c8). Left: confirm the Ollama blob host on the Mac,
+      the Go twin `_shared/go/route_plan` in a CI cell, a Linux wrapper test.
+- [ ] **CI duration** ([target](memory/workflow-and-verification.md)). Flatpak runtime cache and a
+      bounded retry are in (07a601c97e plus the retry commit); confirm on a hosted run (target under
+      5 min). Windows Integration still adds 4-5 min on the critical path; the macOS lane (about 58
+      min) must stay within the five-runner budget.
+- [ ] **CI structure.** [CODE] Slowest-test summary and `tools/ci/run-timing.cjs` shipped
+      (e1aa4a5f48, cab1170446). Left: a per-step elapsed summary inside the CI run itself.
+- [ ] **Test parity across the drivers.** [CODE] Done: Windows CapsWord behaviour tests, dynamic
+      hotstrings, macOS audit-named tests renamed, neutral-installation gate. Left: Windows replay of
+      the shared HTTP-redirect, timer-ceiling and key-chord corpora (needs a decision to build those
+      policies on Windows), conversion of Windows source assertions to behaviour (audit item 14).
 - [ ] **5.** [CODE] Linux layout and number-row scope participants composed with the real runtime
       producers; Linux/macOS numeric-owned Script aliases need an explicit snapshot contract.
-- [ ] **102.** [CODE] A refused personal file's row caption shows its raw entry count as if active.
-- [ ] **116. Guided third-party validation report.** [CODE] Isolated timer/Karabiner/Shortcuts/Brew
-      checks and package provenance.
-- [ ] **131.** [CODE] macOS `SMAppService` cannot expose the registered bundle URL; legacy
-      ownership unqualified.
-- [ ] **138.** [CODE] Three native daily-log collectors (a 64 KiB / 50-entry tail is not a day);
-      GitHub field editability.
-- [ ] **139. Personal identities in logs.** [CODE] Free-form text not proven safe; historical logs
-      unchanged; attachment URL revocation unestablished.
-- [ ] **141.** [CODE] AI submenus (servers, API entries, profiles) under a newer configuration get
-      the same greyed cause as the other rows; recheck the retained callbacks.
-- [ ] **142 gaps.** [CODE] Windows refuses "busy" during a pending reload instead of queueing;
-      Linux reloads hotstrings in process; the Windows client does not hash-check the driver.
+- [ ] **116. Guided third-party validation report.** [PHYS-M] macOS `field_check_toolchain` landed
+      (timer, Shortcuts, Homebrew, Karabiner signature); needs a run on a real Mac. Package
+      provenance beyond the signature check is open.
+- [ ] **139. Personal identities in logs.** [CODE] Done: email, URL-credential, foreign-profile
+      rules (5ef12e8a2a) and config-directory name masking (20e845692b); opt-in redacted day log
+      attachment (1c6f891ed3, item 138). Left: emitter-side pack labels (the TomlLoader SUCCESS line
+      prints the pack label; check the macOS and Linux loaders), write-time masking in the three
+      loggers, historical logs on disk stay unmasked (the collector masks at export), GitHub field
+      editability after a form reload needs a real draft.
+- [ ] **142 gaps.** [CODE] Windows: a Reload click during a pending reload now follows the join rule
+      (standing-checks agent); no hash-check requirement identified for the Windows client. Linux:
+      the reload is in process; see "Config policy remainders" for the protocol decision.
 - [ ] **13/35.** [CODE] Enrol the complete guardian acceptance collector in main CI.
-- [ ] **93. Linux ordered pairs.** [CODE] Saved Xi runtime/staging packet, `libxi-dev`, XKB/XI2
-      server state join.
-- [ ] **97/98.** [CODE] Native physical-position capture, all-owner collision admission, star
-      setting migration; Linux identity needs the MediaStore device contract.
-- [ ] **106.** [CODE] Genuine Apple Shortcuts invocation with bounded cancellation.
+- [ ] **93. Linux ordered pairs.** [CODE] XI2 property cookies proven on Xvfb in WSL; the saved Xi
+      packet is retired (libXi as a package dependency declined by the maintainer). Physical input
+      and the XKB/XI2 server-state join need a real kernel and desktop.
+- [ ] **97/98.** [CODE] Native physical-position capture and all-owner collision admission; Linux
+      identity needs the MediaStore device contract. The star setting migration is dropped (no
+      users, no legacy migration).
+- [ ] **106.** [PHYS-M] Genuine Apple Shortcuts invocation with bounded cancellation; only the
+      refusal-in-time probe exists (in 116).
 - [ ] **107.** [CODE] macOS forced output, Linux input+XI2+writer join.
 - [ ] **108.** [CODE] Item 97's collision/source/modifier/output joins.
 - [ ] **109. Branded debug GUI.** Blocked: AHK 2.0.26 has no supported invisible
       Variables/KeyHistory snapshot.
-- [ ] **113.** [CODE] Sales-page placeholder rows; regenerate GIFs
-      (`npm run gifs -- personal-hotstrings screen-time ai-predictions`).
-- [ ] **46/47/48.** [CODE] Windows managed AI private UI assembly not adopted (rejects the default
-      `localhost` URL); 17 baseline FFI failures in the Lua 5.4 authenticated private-file fixture;
-      broad Ollama process termination on macOS (120) stays debt.
-- [ ] **macOS `ui/changelog` `asyncGet` follows redirects.** [CODE]
-- [ ] **L115.** [CODE] Provider error envelope guard: the fixture prints the swallowed traceback
-      (1f103733aa); cause unknown.
+- [ ] **120 (formerly 46/47/48).** [CODE] Broad Ollama process termination on macOS stays debt (the
+      other clauses of 46/47/48 were stale or by design; their context was lost and the maintainer
+      retired them).
+- [ ] **L115.** [CODE] Provider error envelope guard: not reproducible under WSL LuaJIT (6 of 6
+      runs pass); leave it or close it.
 - Optional, not planned: XKB angle-name gaps and raw-input grammar (L118-L120); concurrent JSON
   backup replacement (L52, L60); ALSA fallback (L63); multi-group XKB recovery (L100); a real
   `Comments` exe field through a version `.res` resource.
