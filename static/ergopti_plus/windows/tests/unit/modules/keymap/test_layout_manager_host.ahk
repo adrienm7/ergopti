@@ -522,3 +522,5 @@ _LMH_SelectionCommittedCase() {
 }
 Test("layout selection: genuine scope completion commits the selected Ergopti+ source (todo96-picker-handoff)",
 	_LMH_SelectionCommittedCase)
+
+#Include test_layout_refresh_completion.ahk
