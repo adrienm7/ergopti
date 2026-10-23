@@ -1,0 +1,9 @@
+{
+	"_comment": "The opt-in attachment of the diagnostics report: today's complete log, redacted line by line by redaction.json, saved next to the report for the user to attach by hand (nothing is uploaded by the product). max_bytes is the refusal cap, applied to the log file and again to the redacted text; over it nothing is attached. The preview the page shows is the first preview_head_lines and the last preview_tail_lines redacted lines, each cut to preview_line_max_chars characters. Implemented by _shared/lua/diagnostics/day_log.lua and windows/infra/day_log.ahk, both replaying _shared/tests/corpus/diagnostics/day_log_vectors.json.",
+	"max_bytes": 4194304,
+	"preview_head_lines": 12,
+	"preview_tail_lines": 12,
+	"preview_line_max_chars": 200,
+	"name_prefix": "ergopti-day-log-",
+	"name_suffix": ".log"
+}

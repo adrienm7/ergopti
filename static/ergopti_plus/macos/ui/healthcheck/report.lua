@@ -300,6 +300,12 @@ function M.perform(action, paths, documents, context, overrides, snapshot, owner
 	end
 	local function save_then(next_step)
 		if type(paths.diagnostics_dir) ~= "string" then error("the diagnostics folder is unknown") end
+		-- The opt-in day log first, so the report is the file revealed last
+		if action.day_log_file then
+			local log_path, log_detail = effects.save(paths.diagnostics_dir, action.day_log_file.name, action.day_log_file.text)
+			if not current() then return end
+			if not log_path then error("the day log could not be saved: " .. tostring(log_detail)) end
+		end
 		local path, detail = effects.save(paths.diagnostics_dir, action.name, action.text)
 		if not current() then return end
 		if not path then error("the report could not be saved: " .. tostring(detail)) end
@@ -319,10 +325,15 @@ function M.perform(action, paths, documents, context, overrides, snapshot, owner
 		Logger.start(LOG, "Diagnostics action '%s'…", action.action)
 		if not current() then return end
 		if action.action == "copy" or action.action == "save" or action.action == "report" then
+			-- The opt-in day log is written by save and report only, and only from
+			-- the collection prepared for this very snapshot
+			local with_log = action.day_log == true
+			if with_log and action.action == "copy" then error("the day log is saved with the report, never copied") end
 			local document = Share.document(snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key))
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), with_log)
 			assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
-			action = { action = action.action, text = document.text, fields = document.fields, name = document.name }
+			action = { action = action.action, text = document.text, fields = document.fields, name = document.name,
+				day_log_file = with_log and require("healthcheck.day_log").file(snapshot, documents, document.snapshot) or nil }
 		end
 		if not current() then return end
 		if action.action == "copy" or action.action == "report" then

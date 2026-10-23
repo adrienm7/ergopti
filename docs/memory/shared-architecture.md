@@ -734,3 +734,24 @@ a refusal callback, so it is refused as `busy` instead of joining a pending or
 deferred reload. Action: never report a launch or an exit as completion, and
 change the folders or file names only in the declaration, then in the POSIX
 tool, which the Linux suite checks against it.
+
+### project-diagnostics-day-log-attachment
+
+The diagnostics window can save a redacted copy of today's complete log beside
+the report, only when the user ticks "Also save a redacted copy of today's
+complete log" (unticked at every snapshot; Copy and the Debug menu's Report a
+bug never carry it). The collector is `_shared/lua/diagnostics/day_log.lua`
+with its AHK port `windows/ui/healthcheck/day_log.ahk`, both replaying
+`day_log_vectors.json`; limits (the refusal cap, the preview size, the file
+name) live in `_shared/modules/diagnostics/day_log.json`. The host keeps the
+redacted text per snapshot (`healthcheck/day_log.lua` on macOS and Linux); the
+page only ever receives the first and last redacted lines and the closed record
+`day_log_attachment` (included, bytes, lines) of `share_policy`, which a report
+contains only when its save or report action asked for the log. Redaction masks
+the configuration directory's folder and file names (`config_dir` in the
+context, `config_known_names` stay readable) and whole profile folders with
+spaces. Nothing is uploaded: the user attaches the file by hand, after which it
+is on GitHub (public repositories serve uploads to anyone with the link, and
+GitHub's attachment documentation describes no revocation). Action: change the
+cap or preview in `day_log.json` only; add a log rule to `redaction.json` and
+its vectors, never a driver-local filter; keep any new page action out of Copy.

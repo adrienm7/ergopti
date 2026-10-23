@@ -28,6 +28,9 @@
 
 #Requires AutoHotkey v2.0
 
+; The opt-in redacted copy of today's log the report actions may save
+#Include day_log.ahk
+
 /**
  * Projects one configuration row {setting, type, value}. A value outside the
  * grammar of its type drops the whole row: an enum is a bare identifier, a text
@@ -172,8 +175,12 @@ HealthCheck_RecentErrorFacts(Entries, Source, Schema) {
 		"qualification", "log_observation_only", "examined_entries", Count, "excluded_entries", Count - Events.Length, "events", Events)
 }
 
-/** Returns a detached technical projection; unknown fields cannot be shared. */
-HealthCheck_ShareSnapshot(Snapshot, Schema) {
+/**
+ * Returns a detached technical projection; unknown fields cannot be shared.
+ * The day log record (included, bytes, lines) is part of it only when the
+ * action that saves the attachment asks for it.
+ */
+HealthCheck_ShareSnapshot(Snapshot, Schema, WithDayLog := false) {
 	Policy := Schema.Get("share_policy", 0)
 	if !(Policy is Map) || Policy.Get("version", 0) != 1 || !(Snapshot is Map)
 		throw Error("The diagnostic sharing policy is unavailable.")
@@ -181,6 +188,10 @@ HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	if !(Driver == "windows" || Driver == "macos" || Driver == "linux")
 		throw Error("The diagnostic sharing identity is unavailable.")
 	Safe := _HCShare_Project(Snapshot, Policy["projection"], &Present)
+	if !WithDayLog && Safe.Has("day_log_attachment")
+		Safe.Delete("day_log_attachment")
+	if WithDayLog && !Safe.Has("day_log_attachment")
+		throw Error("The day log was asked for but the snapshot holds no record of it.")
 	Sections := Snapshot.Get("sections", 0)
 	Issues := Sections is Map ? Sections.Get("issues", 0) : 0
 	if Issues is Map
@@ -319,8 +330,8 @@ _HCShare_English(Schema, Key) {
 }
 
 /** Builds file and issue-form content only from the host-retained snapshot. */
-HealthCheck_ShareDocument(Snapshot, Schema) {
-	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema)
+HealthCheck_ShareDocument(Snapshot, Schema, WithDayLog := false) {
+	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema, WithDayLog)
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
 	Text := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
@@ -454,9 +465,12 @@ HealthCheck_RedactionContext(Overrides := 0) {
 
 ; Saves the report under the diagnostics folder and selects it in Explorer.
 ; @returns {String} The saved file's path.
-_HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
+_HCReport_SaveAndReveal(Effects, Paths, Name, Text, LogFile := 0) {
 	if !Paths.Has("diagnostics_dir")
 		throw Error("The diagnostics folder is unknown.")
+	; The opt-in day log first, so the report is the file Explorer selects last
+	if (LogFile is Map)
+		Effects["save"].Call(Paths["diagnostics_dir"], LogFile["name"], LogFile["text"])
 	Path := Effects["save"].Call(Paths["diagnostics_dir"], Name, Text)
 	if !Effects["reveal"].Call(Path)
 		LoggerWarn("HealthCheckReport", "The saved report could not be selected in Explorer.")
@@ -475,7 +489,7 @@ _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
 	; The complete approved document stays in a local attachment, never the URL.
-	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
+	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text, Action.Get("day_log_file", 0))
 	Fields := Map()
 	; Only the host-derived technical identity is stable enough to prefill.
 	for Id in ["version", "os", "driver"]
@@ -507,10 +521,22 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 		Context := HealthCheck_RedactionContext(Overrides)
 		Rules := Config["redaction"]
 		if Name == "copy" || Name == "save" || Name == "report" {
-			Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+			; The opt-in day log is written by save and report only, and only
+			; from the collection prepared for this very snapshot
+			WithLog := Action.Get("day_log", false) ? true : false
+			if WithLog && Name == "copy"
+				throw Error("The day log is saved with the report, never copied.")
+			Document := HealthCheck_ShareDocument(Snapshot, Config["schema"], WithLog)
 			if !Action.Has("text") || !(Action["text"] == Document["text"])
 				throw Error("The diagnostic sharing preview is stale or invalid.")
 			Action := Action.Clone()
+			if WithLog {
+				Retained := HealthCheck_DayLogRetained(Snapshot)
+				if !(Retained is Map)
+					throw Error("The day log was not prepared for this report.")
+				Action["day_log_file"] := Map("name", HealthCheck_DayLogName(Config, Document["snapshot"]),
+					"text", Retained["text"])
+			}
 			Action["text"] := Document["text"]
 			Action["fields"] := Document["fields"]
 			Action["name"] := Document["name"]
@@ -522,7 +548,7 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0, Snapshot := 0) 
 					throw Error("The clipboard refused the report.")
 			case "save":
 				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"],
-					Action["text"])
+					Action["text"], Action.Get("day_log_file", 0))
 			case "report":
 				Outcome["path"] := _HCReport_Report(Effects, Config, Action, Rules, Context, Paths)
 			case "open_path":

@@ -254,3 +254,22 @@ helpers.describe("diagnostics corpus (linux): error report (error-report-corpus)
 		end)
 	end
 end)
+
+helpers.describe("diagnostics corpus: day log attachment (day-log-corpus)", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/day_log_vectors.json")
+	local rules = read_corpus("modules/diagnostics/redaction.json")
+	local DayLog = require("diagnostics.day_log")
+
+	helpers.it("has vectors (day-log-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 8,
+			"the day log corpus must hold its vectors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("collect: " .. vector.id .. " (day-log-corpus)", function()
+			local got = DayLog.collect(vector.raw, vector.file_size, rules, corpus.context, vector.limits or corpus.limits)
+			-- An empty list decodes as an empty table in both directions
+			helpers.assert_eq(require("json").encode(got), require("json").encode(vector.expected), vector.id)
+		end)
+	end
+end)

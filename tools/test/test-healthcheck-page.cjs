@@ -987,6 +987,138 @@ for (const driver of ['linux', 'macos', 'windows']) {
 		fail('a failed worker with native cleanup pending enabled a replacement collection');
 }
 
+// The opt-in day log: unticked at every snapshot, previewed from the host's
+// answer, carried back by Save and Report only, never by Copy.
+{
+	const page = loadPage();
+	const box = page.elements['chk-day-log'];
+	if (!box || box.checked || !box.disabled)
+		fail('the day log box must exist, unticked and disabled before the host answered');
+	init(page, false);
+	if (box.disabled || box.checked) fail('the day log box must be enabled and unticked after init');
+	const exportAs = (button, withLog) => {
+		page.elements[button].dispatch('click');
+		const request = page.posted.at(-1);
+		if (request.action !== 'export_snapshot') {
+			fail(`${button} did not ask for an export`);
+			return null;
+		}
+		if ((request.day_log === true) !== withLog)
+			fail(`${button} asked for an export with day_log=${request.day_log}, expected ${withLog}`);
+		const host = hostSnapshot(snapshot(false), request, page);
+		page.sandbox.receiveDiagnostics({
+			type: 'action',
+			action: 'export_snapshot',
+			ok: true,
+			export_sequence: request.export_sequence,
+			snapshot: host,
+			share_text: 'host text for ' + button
+		});
+		return page.posted.at(-1);
+	};
+
+	box.checked = true;
+	box.dispatch('change');
+	let ask = page.posted.at(-1);
+	if (ask.action !== 'day_log' || ask.enabled !== true || Object.keys(ask).length !== 2)
+		fail('ticking the box must post exactly {action: day_log, enabled: true}');
+	// Before the host answered, nothing is attached
+	if (exportAs('btn-save', false) === null) fail('the export before the answer failed');
+
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'day_log',
+		ok: true,
+		state: 'ready',
+		bytes: 2048,
+		lines: 40,
+		cap_bytes: 4194304,
+		first_time: '2026-09-24 00:00:01',
+		last_time: '2026-09-24 10:00:00',
+		head: ['first line'],
+		tail: ['last line']
+	});
+	const status = page.elements['day-log-status'].textContent;
+	if (!status.includes('40') || !status.includes('2.0 KiB') || !status.includes('4.0 MiB'))
+		fail(`the day log summary lacks the lines, size or limit: ${status}`);
+	const shown = page.elements['day-log-preview-text'].textContent;
+	if (
+		page.elements['day-log-preview'].hidden ||
+		shown.split('\n')[0] !== 'first line' ||
+		shown.split('\n').at(-1) !== 'last line' ||
+		shown.split('\n').length !== 3
+	)
+		fail(`the day log preview is not head, a gap line and tail: ${JSON.stringify(shown)}`);
+
+	const copyAction = exportAs('btn-copy', false);
+	if (!copyAction || copyAction.action !== 'copy' || 'day_log' in copyAction)
+		fail('Copy must never carry the day log');
+	const saved = exportAs('btn-save', true);
+	if (
+		!saved ||
+		saved.action !== 'save' ||
+		saved.day_log !== true ||
+		saved.text !== 'host text for btn-save'
+	)
+		fail('Save must carry day_log=true and the host text');
+	page.sandbox.receiveDiagnostics({ type: 'action', action: 'save', ok: true, path: '/x/y.md' });
+	if (!page.elements.status.textContent.includes('redacted log'))
+		fail('the status after a save with the log must say the log was saved');
+	const reported = exportAs('btn-report', true);
+	if (!reported || reported.action !== 'report' || reported.day_log !== true)
+		fail('Report must carry day_log=true');
+
+	box.checked = false;
+	box.dispatch('change');
+	ask = page.posted.at(-1);
+	if (ask.action !== 'day_log' || ask.enabled !== false) fail('unticking must post enabled=false');
+	if (!page.elements['day-log-preview'].hidden) fail('unticking must hide the preview');
+	if (exportAs('btn-save', false) === null) fail('the export after unticking failed');
+	// A late answer for a box the user has unticked is dropped
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'day_log',
+		ok: true,
+		state: 'ready',
+		bytes: 1,
+		lines: 1,
+		cap_bytes: 2,
+		head: ['late'],
+		tail: []
+	});
+	if (
+		!page.elements['day-log-preview'].hidden ||
+		page.elements['day-log-status'].textContent !== ''
+	)
+		fail('a late day log answer revived an unticked box');
+
+	// A refusal over the cap says so and attaches nothing
+	box.checked = true;
+	box.dispatch('change');
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'day_log',
+		ok: true,
+		state: 'too_large',
+		bytes: 8388608,
+		cap_bytes: 4194304
+	});
+	if (!page.elements['day-log-status'].textContent.includes('8.0 MiB'))
+		fail('the over-the-cap refusal does not name the size');
+	if (!page.elements['day-log-preview'].hidden) fail('a refused log must show no preview');
+	if (exportAs('btn-save', false) === null) fail('the export after a refusal failed');
+
+	// Every new snapshot starts unticked
+	page.sandbox.receiveDiagnostics({ type: 'snapshot', snapshot: snapshot(false) });
+	if (box.checked || page.elements['day-log-status'].textContent !== '')
+		fail('a new snapshot must reset the day log box');
+
+	// The notice must say what the product can and cannot do about the upload
+	const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+	if (!/Ergopti cannot remove it/.test(en['healthcheck.day_log.upload_notice']))
+		fail('the upload notice must say Ergopti cannot remove the attachment');
+}
+
 // The deep-test output sits in the fixed toolbar: it must scroll in a bounded box
 // or it pushes the report tables out of view (issue #101).
 const pageCss = fs.readFileSync(path.join(PAGE, 'style.css'), 'utf8');

@@ -306,6 +306,7 @@ HealthCheck_Config() {
 		"redaction",     JsonParse(RawRedaction),
 		"raw_redaction", RawRedaction,
 		"templates",     JsonParse(FileRead(_SharedDir . "\modules\diagnostics\issue_templates.json", "UTF-8")),
+		"day_log",       DayLog_CheckLimits(JsonParse(FileRead(_SharedDir . "\modules\diagnostics\day_log.json", "UTF-8"))),
 		"repository",    JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"])
 	return _HC_Config
 }
@@ -1117,6 +1118,7 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 				}
 			}
 		case "close":
+			HealthCheck_DayLogDiscard(Snapshot)
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
 		case "export_snapshot":
@@ -1127,7 +1129,17 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			}
 			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
 				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", Snapshot,
-				"share_text", HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"])))
+				"share_text", HealthCheck_ShareDocument(Snapshot, Config["schema"], Action.Get("day_log", false))["text"])))
+		case "day_log":
+			; Opt-in: ticking collects and redacts today's log; unticking drops it
+			if Action["enabled"] {
+				Reply := HealthCheck_DayLogPrepare(Snapshot, Config, HealthCheck_RedactionContext())
+			} else {
+				HealthCheck_DayLogDiscard(Snapshot)
+				Reply := Map("type", "action", "action", "day_log", "ok", true, "state", "off")
+			}
+			if _HC_SessionCurrent(WindowEpoch, Session)
+				_HC_Send(WindowEpoch, _HC_ValueToJson(Reply))
 		case "cancel":
 			HealthCheck_CancelProbes(_HC_SessionCurrent.Bind(WindowEpoch, Session))
 			if !_HC_SessionCurrent(WindowEpoch, Session)
@@ -1145,6 +1157,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			_HC_ArchiveCleanupMetadata(Session)
 			if !_HC_SessionCurrent(WindowEpoch, Session)
 				return
+			; A refreshed snapshot starts without the optional day log
+			HealthCheck_DayLogDiscard(Snapshot)
 			Revision := Snapshot.Get("export_revision", 1) + 1
 			Fresh := HealthCheck_Run(Action["detailed"], Action["extensive"])
 			Fresh["export_revision"] := Revision

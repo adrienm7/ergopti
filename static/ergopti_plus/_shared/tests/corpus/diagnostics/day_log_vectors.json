@@ -1,0 +1,129 @@
+{
+	"description": "Golden vectors for the day log attachment (_shared/lua/diagnostics/day_log.lua) with the rules of _shared/modules/diagnostics/redaction.json. `file_size` is what the driver measured on disk; `raw` is absent when the file is over the cap. Replayed by the macOS and Linux Lua suites and the AHK suite.",
+	"limits": {
+		"max_bytes": 400,
+		"preview_head_lines": 2,
+		"preview_tail_lines": 2,
+		"preview_line_max_chars": 40
+	},
+	"context": {
+		"home": "/Users/jdoe",
+		"user": "jdoe",
+		"config_dir": "/Users/jdoe/.config/ergopti_plus",
+		"case_insensitive": false
+	},
+	"vectors": [
+		{
+			"id": "bom_and_crlf_are_normalized_and_every_line_is_redacted",
+			"raw": "﻿2026-10-23 10:00:00:001 [INFO] [A] opened /Users/jdoe/x\r\n2026-10-23 10:00:01:002 [INFO] [B] token=abcdefghijkl\r\n",
+			"file_size": 100,
+			"expected": {
+				"ok": true,
+				"text": "2026-10-23 10:00:00:001 [INFO] [A] opened ~/x\n2026-10-23 10:00:01:002 [INFO] [B] token=<secret>\n",
+				"bytes": 96,
+				"lines": 2,
+				"first_time": "2026-10-23 10:00:00",
+				"last_time": "2026-10-23 10:00:01",
+				"head": [
+					"2026-10-23 10:00:00:001 [INFO] [A] opene…",
+					"2026-10-23 10:00:01:002 [INFO] [B] token…"
+				],
+				"tail": [],
+				"cap_bytes": 400
+			}
+		},
+		{
+			"id": "an_empty_file_attaches_nothing",
+			"raw": "",
+			"file_size": 0,
+			"expected": { "ok": false, "reason": "empty", "bytes": 0, "cap_bytes": 400 }
+		},
+		{
+			"id": "a_file_of_only_a_byte_order_mark_attaches_nothing",
+			"raw": "﻿",
+			"file_size": 3,
+			"expected": { "ok": false, "reason": "empty", "bytes": 0, "cap_bytes": 400 }
+		},
+		{
+			"id": "a_file_over_the_cap_is_refused_unread",
+			"file_size": 401,
+			"expected": { "ok": false, "reason": "too_large", "bytes": 401, "cap_bytes": 400 }
+		},
+		{
+			"id": "redaction_that_grows_the_text_past_the_cap_is_refused",
+			"limits": {
+				"max_bytes": 38,
+				"preview_head_lines": 2,
+				"preview_tail_lines": 2,
+				"preview_line_max_chars": 40
+			},
+			"raw": "a@b.cc\na@b.cc\na@b.cc\na@b.cc\na@b.cc\n",
+			"file_size": 35,
+			"expected": { "ok": false, "reason": "too_large", "bytes": 40, "cap_bytes": 38 }
+		},
+		{
+			"id": "the_preview_is_the_first_and_last_lines",
+			"raw": "l1\nl2\nl3\nl4\nl5\nl6\n",
+			"file_size": 18,
+			"expected": {
+				"ok": true,
+				"text": "l1\nl2\nl3\nl4\nl5\nl6\n",
+				"bytes": 18,
+				"lines": 6,
+				"first_time": "",
+				"last_time": "",
+				"head": ["l1", "l2"],
+				"tail": ["l5", "l6"],
+				"cap_bytes": 400
+			}
+		},
+		{
+			"id": "a_short_log_is_all_head_and_no_tail",
+			"raw": "l1\nl2\nl3\nl4",
+			"file_size": 11,
+			"expected": {
+				"ok": true,
+				"text": "l1\nl2\nl3\nl4\n",
+				"bytes": 12,
+				"lines": 4,
+				"first_time": "",
+				"last_time": "",
+				"head": ["l1", "l2", "l3", "l4"],
+				"tail": [],
+				"cap_bytes": 400
+			}
+		},
+		{
+			"id": "a_long_line_is_cut_in_the_preview_only",
+			"raw": "2026-10-23 10:00:00:001 [INFO] [A] xxxxxxxxxxxxxxxxxxxx\n",
+			"file_size": 56,
+			"expected": {
+				"ok": true,
+				"text": "2026-10-23 10:00:00:001 [INFO] [A] xxxxxxxxxxxxxxxxxxxx\n",
+				"bytes": 56,
+				"lines": 1,
+				"first_time": "2026-10-23 10:00:00",
+				"last_time": "2026-10-23 10:00:00",
+				"head": ["2026-10-23 10:00:00:001 [INFO] [A] xxxxx…"],
+				"tail": [],
+				"cap_bytes": 400
+			}
+		},
+		{
+			"id": "pack_names_under_the_configuration_directory_never_reach_the_attachment",
+			"raw": "2026-10-23 09:59:59:999 [INFO] [A] read '/Users/jdoe/.config/ergopti_plus/hotstrings/my_pack/a.toml'\nno stamp here",
+			"file_size": 100,
+			"expected": {
+				"ok": true,
+				"text": "2026-10-23 09:59:59:999 [INFO] [A] read '<config>/hotstrings/<name>/<name>'\nno stamp here\n",
+				"bytes": 90,
+				"lines": 2,
+				"first_time": "2026-10-23 09:59:59",
+				"last_time": "2026-10-23 09:59:59",
+				"head": ["2026-10-23 09:59:59:999 [INFO] [A] read …", "no stamp here"],
+				"tail": [],
+				"cap_bytes": 400
+			}
+		}
+	]
+}

@@ -15,7 +15,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Describe the problem in your own words. Debug > Report a bug copies the approved diagnostic report, technical facts only, to the clipboard and saves it as a file you can attach here; the app never uploads it automatically.
+        Describe the problem in your own words. Debug > Report a bug copies the approved diagnostic report, technical facts only, to the clipboard and saves it as a file you can attach here. The diagnostics window can also save a redacted copy of today's complete log beside it, only if you tick that box. The app never uploads either file: once you attach one here it is on GitHub, and the app cannot remove it.
   - type: textarea
     id: what_happened
     attributes:

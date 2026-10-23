@@ -466,3 +466,85 @@ _THPA_ConfigDirContext() {
 		"a hotstring pack name under the configuration directory never reaches a report")
 }
 Test("Diagnostics export: the redaction context masks the configuration directory (config-dir-masking)", _THPA_ConfigDirContext)
+
+
+; The reader a day log test hands the collector instead of the real file.
+_THPA_DayLogReader(Text) {
+	return (Cap) => Map("found", true, "size", StrPut(Text, "UTF-8") - 1, "text", Text)
+}
+
+; A minimal host snapshot of the fixture.
+_THPA_DayLogSnapshot() {
+	return Map("schema_version", 2, "driver", "windows", "generated_at", "2026-09-24T10:00:00Z",
+		"sections", Map("versions", Map("ergopti_version", "2.4.0")), "probes", Map())
+}
+
+_THPA_DayLog() {
+	Config := HealthCheck_Config()
+	Raw := "2026-09-24 09:00:00:001 [INFO] [A] opened C:\Users\JDoe\x`n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl`n"
+	Redacted := "2026-09-24 09:00:00:001 [INFO] [A] opened ~\x`n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>`n"
+	Snapshot := _THPA_DayLogSnapshot()
+	Context := HealthCheck_RedactionContext(_THPA_Effects([]))
+
+	; Collecting redacts the log and records only the closed record
+	Reply := HealthCheck_DayLogPrepare(Snapshot, Config, Context, _THPA_DayLogReader(Raw))
+	AssertEqual("ready", Reply["state"])
+	AssertEqual(2, Reply["lines"])
+	AssertEqual(StrPut(Redacted, "UTF-8") - 1, Reply["bytes"])
+	AssertFalse(InStr(_HC_ValueToJson(Snapshot), "abcdefghijkl"), "the snapshot never holds the log")
+	With := HealthCheck_ShareDocument(Snapshot, Config["schema"], true)
+	AssertContains(With["text"], "day_log_attachment.included | true")
+	AssertFalse(InStr(HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"], "day_log_attachment"),
+		"a report that does not save the log does not record it")
+
+	; Save writes the log first, then the report
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "save", "text", With["text"], "name", With["name"], "day_log", true),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertTrue(Outcome["ok"])
+	Saves := []
+	for Call in Calls
+		if (SubStr(Call, 1, 5) == "save:")
+			Saves.Push(Call)
+	AssertEqual(2, Saves.Length)
+	AssertEqual("save:C:\Users\JDoe\AppData\Local\ergopti_plus\logs\diagnostics\ergopti-day-log-windows-2026-09-24T10_00_00Z.log:" . Redacted, Saves[1])
+	AssertContains(Saves[2], With["name"])
+
+	; Copy never carries the log
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", With["text"], "day_log", true),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertFalse(Outcome["ok"])
+	AssertEqual(0, Calls.Length, "a refused copy touches nothing")
+
+	; Without the flag nothing about the log is saved or recorded
+	Plain := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "save", "text", Plain["text"], "name", Plain["name"]),
+		_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertTrue(Outcome["ok"])
+	Saves := []
+	for Call in Calls
+		if (SubStr(Call, 1, 5) == "save:")
+			Saves.Push(Call)
+	AssertEqual(1, Saves.Length)
+
+	; An unprepared log is refused before any file is written
+	HealthCheck_DayLogDiscard(Snapshot)
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", With["text"], "name", With["name"],
+		"fields", Map(), "day_log", true), _THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+	AssertFalse(Outcome["ok"])
+	AssertEqual(0, Calls.Length, "nothing is copied or saved for an unprepared log")
+
+	; Over the cap, empty and missing are refused with their reason
+	Limits := Config["day_log"]
+	AssertEqual("too_large", HealthCheck_DayLogPrepare(Snapshot, Config, Context,
+		(Cap) => Map("found", true, "size", Limits["max_bytes"] + 1, "text", ""))["state"])
+	AssertFalse(Snapshot.Has("day_log_attachment"))
+	AssertEqual("empty", HealthCheck_DayLogPrepare(Snapshot, Config, Context, _THPA_DayLogReader(""))["state"])
+	AssertEqual("missing", HealthCheck_DayLogPrepare(Snapshot, Config, Context,
+		(Cap) => Map("found", false, "size", 0, "text", ""))["state"])
+	HealthCheck_DayLogDiscard(Snapshot)
+}
+Test("Diagnostics export: the opt-in day log is redacted, saved with the report and never copied (day-log-host)", _THPA_DayLog)

@@ -697,7 +697,25 @@ local function perform(session, action, state, context)
 		return { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text }
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
+	end
+	if action.action == "day_log" then
+		-- Opt-in: ticking collects and redacts today's log; unticking drops it
+		local DayLogHost = require("healthcheck.day_log")
+		if not action.enabled then
+			DayLogHost.discard(session.snapshot)
+			return { type = "action", action = "day_log", ok = true, state = "off" }
+		end
+		Logger.start(LOG, "Collecting today's log for the report…")
+		local reply = DayLogHost.prepare(session.snapshot, documents, Report.redaction_context(), function(cap)
+			return DayLogHost.read_file(LoggerSink.main_log_path(), cap)
+		end)
+		if reply.state == "ready" then
+			Logger.success(LOG, "Today's log is ready: %d lines, %d bytes.", reply.lines, reply.bytes)
+		else
+			Logger.warn(LOG, "Today's log is not attachable: %s.", tostring(reply.state))
+		end
+		return reply
 	end
 	if action.action == "cancel" then
 		local revision = cancel_action(session)
