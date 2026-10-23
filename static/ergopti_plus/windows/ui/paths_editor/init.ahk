@@ -88,10 +88,16 @@ _PathsEdWeb_TryOpen() {
 	g.OnEvent("Close", _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnClose))
 	g.OnEvent("Size",  _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnResize))
 
+	; Publish the native owner before Show can dispatch Close. Its existing
+	; handler must be able to destroy this exact window during the Show pump.
+	_PathsEdWeb_Gui := g
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
 	g.Show("w720 h440 Center")
-	_PathsEdWeb_Gui := g
+	if !_PathsEdWeb_StartupCurrent(SessionEpoch, g) {
+		try g.Destroy()
+		return true
+	}
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	Installed := false
