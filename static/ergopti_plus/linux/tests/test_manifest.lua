@@ -352,6 +352,7 @@ return {
 	"tests.unit.modules.hotstrings.injector.test_injector_race",
 	"tests.unit.modules.hotstrings.injector.test_injector_terminator_contract",
 	"tests.unit.modules.hotstrings.injector.test_injector_output_observer",
+	"tests.unit.modules.hotstrings.injector.test_injection_diagnostic_output_owner",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_modifier_key",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_engine_under_modifier_layer",
 	"tests.unit.platform.remap.tap_hold.test_tap_hold_loader",
