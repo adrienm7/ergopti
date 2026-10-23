@@ -34,12 +34,32 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
+# Desktops differ in the dialog tool they ship: GNOME has zenity, KDE has
+# kdialog. When neither works the failure must still reach the user, so the
+# last resort is stderr plus a desktop notification when one is available.
+show_failure_dialog() {
+	if command -v zenity >/dev/null 2>&1; then
+		if zenity --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
+			return 0
+		fi
+	fi
+	if command -v kdialog >/dev/null 2>&1; then
+		if kdialog --title "$GUI_TITLE" --error "$GUI_ERROR"; then
+			return 0
+		fi
+	fi
+	echo "$GUI_TITLE: $GUI_ERROR" >&2
+	if command -v notify-send >/dev/null 2>&1; then
+		notify-send --urgency=critical -- "$GUI_TITLE" "$GUI_ERROR" || echo 'The uninstall failure notification could not be displayed.' >&2
+	else
+		echo 'No dialog tool (zenity, kdialog) or notify-send is available.' >&2
+	fi
+}
+
 report_exit() {
 	local status=$?
 	if [ "$status" -ne 0 ] && [ -n "$GUI_TITLE" ]; then
-		if ! zenity --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
-			echo 'The uninstall failure dialog could not be displayed.' >&2
-		fi
+		show_failure_dialog
 	fi
 }
 trap report_exit EXIT

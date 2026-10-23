@@ -60,6 +60,35 @@ try {
 		});
 	assert.notEqual(run('--yes').status, 0, 'an unrelated wrapper must prevent removal');
 	assert.ok(fs.existsSync(library), 'refusal preserves the installation');
+	// The failure dialog falls back from zenity to kdialog, then to stderr and
+	// notify-send, so a KDE host without zenity still reports the failure.
+	const kdialogLog = path.join(sandbox, 'kdialog.log');
+	const notifyLog = path.join(sandbox, 'notify.log');
+	fs.writeFileSync(
+		path.join(stubs, 'kdialog'),
+		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(kdialogLog)}"\n`,
+		{ mode: 0o755 }
+	);
+	assert.notEqual(run('--yes', '--gui', 'Title', 'Body').status, 0);
+	assert.match(
+		fs.readFileSync(kdialogLog, 'utf8'),
+		/--error\|Body\|/,
+		'kdialog must show the failure'
+	);
+	fs.unlinkSync(path.join(stubs, 'kdialog'));
+	fs.writeFileSync(
+		path.join(stubs, 'notify-send'),
+		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(notifyLog)}"\n`,
+		{ mode: 0o755 }
+	);
+	const bareRun = run('--yes', '--gui', 'Title', 'Body');
+	assert.match(bareRun.stderr, /Title: Body/, 'stderr must carry the failure text');
+	assert.match(
+		fs.readFileSync(notifyLog, 'utf8'),
+		/Title\|Body\|/,
+		'notify-send is the last resort'
+	);
+	fs.unlinkSync(path.join(stubs, 'notify-send'));
 	fs.writeFileSync(
 		wrapper,
 		`#!/bin/bash\nDRIVER_ROOT="${bashPath(library)}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
