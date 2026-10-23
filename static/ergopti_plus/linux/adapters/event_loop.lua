@@ -4,9 +4,9 @@
 --- MODULE: EventLoop Adapter (Linux)
 --- DESCRIPTION:
 --- Abstraction over the daemon event loop. When luv (libuv Lua binding) is
---- available, runs a full async event loop via luv.run() with idle callbacks
---- for keyboard-hook/tray pumping and a repeating timer for process-lifecycle
---- tick. When luv is absent, falls back to a pump-based loop with a 1 ms sleep
+--- available, runs a full async event loop via luv.run() with a 1 ms wake timer
+--- and a prepare callback for keyboard-hook/tray pumping. A separate repeating
+--- timer schedules the process-lifecycle tick. When luv is absent, falls back to a pump-based loop with a 1 ms sleep
 --- between iterations to avoid 100 % CPU busy-wait.
 ---
 --- This adapter is the runtime counterpart to the TimerScheduler adapter — the
@@ -30,6 +30,7 @@ local NativeTimer = require("infra.native_timer")
 local NumberPolicy = require("number_policy")
 local ErrorDescription = require("error_description")
 local LOG = "adapters.event_loop"
+local PUMP_INTERVAL_MS = 1
 
 
 -- =========================================
@@ -87,8 +88,9 @@ end
 local _running    = false   -- Set by run(), cleared by stop() or on exit.
 local _run_active = false   -- Retained until run() retires its owned handles.
 local _stop_generation = 0  -- Revokes detached callback batches at stop().
-local _idle_handle = nil    -- luv idle handle (only with luv).
+local _pump_handle = nil    -- luv pump timer (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
+local _prepare_handle = nil -- luv in-iteration dispatch handle (only with luv).
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
 local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
 
@@ -157,10 +159,15 @@ end
 
 --- Retires only the handles owned by this loop, including partial startup.
 local function _cleanup_luv()
-	if _idle_handle then
-		pcall(luv.idle_stop, _idle_handle)
-		pcall(luv.close, _idle_handle)
-		_idle_handle = nil
+	if _prepare_handle then
+		pcall(luv.prepare_stop, _prepare_handle)
+		pcall(luv.close, _prepare_handle)
+		_prepare_handle = nil
+	end
+	if _pump_handle then
+		pcall(luv.timer_stop, _pump_handle)
+		pcall(luv.close, _pump_handle)
+		_pump_handle = nil
 	end
 	if _timer_handle then
 		pcall(luv.timer_stop, _timer_handle)
@@ -182,7 +189,7 @@ local function _periodic_ms(periodSec)
 	return milliseconds
 end
 
---- Starts a native luv event loop with idle + periodic callbacks.
+--- Starts a native luv event loop with bounded pump and periodic callbacks.
 --- @param opts table { onIdle = function, onPeriodic = function, periodSec = number }
 local function _run_luv(opts)
 	local onIdle     = opts.onIdle
@@ -191,44 +198,48 @@ local function _run_luv(opts)
 	local periodMs
 	if onPeriodic then periodMs = math.max(1, math.floor(_periodic_ms(periodSec))) end
 
-	-- Idle handle: fires whenever the event loop has nothing else to do.
-	-- This replaces the tight while loop for keyboard-hook + tray pumping.
-	_idle_handle = luv.new_idle()
-	if not _idle_handle then error("Unable to allocate event loop idle handle", 0) end
-	local idle_started, idle_error = luv.idle_start(_idle_handle, function()
-		if not _running then
-			if _idle_handle then
-				luv.idle_stop(_idle_handle)
-				luv.close(_idle_handle)
-				_idle_handle = nil
-			end
-			return
-		end
-		_safe_idle(onIdle)
-		_run_idle_handlers()
+	-- Active idle handles force zero-timeout polling. Timers only mark work due;
+	-- prepare dispatches it inside an iteration so stop() still reaches closing
+	-- callbacks, even when an immediate timer fired in libuv's run preamble.
+	local pump_due, periodic_due = false, false
+	_pump_handle = luv.new_timer()
+	if not _pump_handle then error("Unable to allocate event loop pump timer", 0) end
+	local pump_started, pump_error = NativeTimer.start(luv, _pump_handle, 0, PUMP_INTERVAL_MS, function()
+		if _running then pump_due = true end
 	end)
-	if idle_started == nil or idle_started == false then
-		error("Unable to start event loop idle handle: " .. tostring(idle_error), 0)
+	if pump_started == nil or pump_started == false then
+		error("Unable to start event loop pump timer: " .. tostring(pump_error), 0)
 	end
 
-	-- Periodic timer: drives process_lifecycle.tick() at a fixed interval.
+	-- Keep the lifecycle deadline separate, including its first real tick.
 	if onPeriodic then
 		_timer_handle = luv.new_timer()
 		if not _timer_handle then error("Unable to allocate event loop timer handle", 0) end
 		local timer_started, timer_error = NativeTimer.start(luv, _timer_handle, periodMs, periodMs, function()
-			if not _running then
-				if _timer_handle then
-					luv.timer_stop(_timer_handle)
-					luv.close(_timer_handle)
-					_timer_handle = nil
-				end
-				return
-			end
-			_safe_periodic(onPeriodic)
+			if _running then periodic_due = true end
 		end)
 		if timer_started == nil or timer_started == false then
 			error("Unable to start event loop timer handle: " .. tostring(timer_error), 0)
 		end
+	end
+
+	_prepare_handle = luv.new_prepare()
+	if not _prepare_handle then error("Unable to allocate event loop prepare handle", 0) end
+	local prepare_started, prepare_error = luv.prepare_start(_prepare_handle, function()
+		if not _running then return end
+		-- Coalesce due marks; callbacks may queue work for the next pump batch.
+		if pump_due then
+			pump_due = false
+			_safe_idle(onIdle)
+			_run_idle_handlers()
+		end
+		if _running and periodic_due then
+			periodic_due = false
+			_safe_periodic(onPeriodic)
+		end
+	end)
+	if prepare_started == nil or prepare_started == false then
+		error("Unable to start event loop prepare handle: " .. tostring(prepare_error), 0)
 	end
 
 	-- stop() returns control even if another component still owns active handles.
@@ -263,7 +274,7 @@ local function _run_pump(opts)
 	-- Iteration-based cadence for the coarse wall clock: a tiny test value
 	-- (0.001 s) fires on the very first idle tick while the default (0.25 s)
 	-- fires every ~250 ticks at ~1 ms each — proportional to the interval.
-	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(period_ms))
+	local PERIODIC_ITER_FALLBACK = math.max(1, math.ceil(period_ms / PUMP_INTERVAL_MS))
 
 	while _running do
 		_safe_idle(onIdle)
@@ -282,15 +293,8 @@ local function _run_pump(opts)
 
 		if not _running then break end
 
-		-- Yield the CPU for ~1 ms.  This drops usage from 100 % to < 1 %
-		-- on any modern kernel while keeping latency low enough for real-time
-		-- keyboard input.  GNU coreutils sleep accepts fractional seconds.
-		--
-		-- Note: keyboard_hook.pump() already blocks on pipe:read("*l") when
-		-- there is no input, so this sleep only costs cycles during burst
-		-- periods (rare).  The pcall guard means a missing sleep binary is
-		-- silently tolerated — the loop becomes a controlled busy-wait,
-		-- which is still correct (the pipe read provides natural backpressure).
+		-- Keep the non-native pump on the same cadence as the native timer.
+		-- The protected wait retains the fallback's existing error isolation.
 		pcall(function()
 			-- nanosleep through FFI, not a fork. This ran once per loop
 			-- iteration — a thousand times a second on an idle daemon — and
@@ -298,7 +302,7 @@ local function _run_pump(opts)
 			-- spent doing nothing. LuaJIT FFI is already a hard requirement of
 			-- this driver (uinput, evdev), so this is not a new dependency; luv
 			-- remains the preferred path and this is what runs without it.
-			nap(0.001)
+			nap(PUMP_INTERVAL_MS / 1000)
 		end)
 	end
 end
@@ -343,13 +347,13 @@ function M.run(opts)
 	local ran, run_error
 
 	if luv then
-		Logger.debug(LOG, "Starting luv native event loop (idle + periodic @ %.2fs).",
-			tonumber(options.periodSec) or 0.25)
+		Logger.debug(LOG, "Starting luv native event loop (%d ms pump + periodic @ %.2fs).",
+			PUMP_INTERVAL_MS, tonumber(options.periodSec) or 0.25)
 		ran, run_error = pcall(_run_luv, options)
 		_cleanup_luv()
 	else
-		Logger.debug(LOG, "Starting pump fallback loop (1 ms sleep, periodic @ %.2fs).",
-			tonumber(options.periodSec) or 0.25)
+		Logger.debug(LOG, "Starting pump fallback loop (%d ms sleep, periodic @ %.2fs).",
+			PUMP_INTERVAL_MS, tonumber(options.periodSec) or 0.25)
 		ran, run_error = pcall(_run_pump, options)
 	end
 
@@ -370,8 +374,11 @@ function M.stop()
 
 	-- Retire our callbacks, then request return without closing foreign handles.
 	if luv then
-		if _idle_handle then
-			pcall(function() luv.idle_stop(_idle_handle) end)
+		if _prepare_handle then
+			pcall(function() luv.prepare_stop(_prepare_handle) end)
+		end
+		if _pump_handle then
+			pcall(function() luv.timer_stop(_pump_handle) end)
 		end
 		if _timer_handle then
 			pcall(function() luv.timer_stop(_timer_handle) end)

@@ -18,6 +18,253 @@ local function load_pump_loop()
 end
 local el = load_pump_loop()
 
+--- Models actual idle readiness and timer deadlines with an independent clock.
+--- @param refusal table|nil Optional role/kind of one refused native admission.
+--- @return table loop, table state, table backend
+local function bounded_native_fixture(refusal)
+	local state = { handles = {}, starts = {}, clock = 0, stops = 0, idle_starts = 0, updates = 0, phase = "outside" }
+	local backend = {}
+	local function refused(role, kind)
+		if not refusal or refusal.role ~= role or refusal.kind ~= kind then return false end
+		if refusal.receipt == "throw" then error("controlled " .. role .. " " .. kind .. " refusal") end
+		return true
+	end
+	local function create(kind)
+		local role = kind == "prepare" and "prepare" or "pump"
+		if kind == "timer" then
+			for _, handle in ipairs(state.handles) do
+				if not handle.closed and handle.role == "pump" then role = "periodic" end
+			end
+		end
+		if refused(role, "allocation") then
+			if refusal.receipt == "false" then return false end
+			return nil
+		end
+		local handle = { kind = kind, role = role }
+		state.handles[#state.handles + 1] = handle
+		return handle
+	end
+	function backend.new_idle() return create("idle") end
+	function backend.new_timer() return create("timer") end
+	function backend.new_prepare() return create("prepare") end
+	function backend.update_time() state.updates = state.updates + 1 end
+	local function start(handle, callback)
+		if refused(handle.role, "start") then
+			if refusal.receipt == "false" then return false, "controlled start refusal" end
+			return nil, "controlled start refusal"
+		end
+		handle.active, handle.callback = true, callback
+		return 0
+	end
+	function backend.idle_start(handle, callback)
+		state.idle_starts = state.idle_starts + 1
+		return start(handle, callback)
+	end
+	function backend.prepare_start(handle, callback) return start(handle, callback) end
+	function backend.timer_start(handle, delay, interval, callback)
+		handle.role = delay == 0 and interval == 1 and "pump" or "periodic"
+		state.starts[#state.starts + 1] = { role = handle.role, delay = delay, interval = interval, updates = state.updates }
+		handle.due, handle.interval = state.clock + delay, interval
+		return start(handle, callback)
+	end
+	function backend.idle_stop(handle) assert(handle.kind == "idle"); handle.active = false; handle.stopped_by = "idle"; return 0 end
+	function backend.timer_stop(handle) assert(handle.kind == "timer"); handle.active = false; handle.stopped_by = "timer"; return 0 end
+	function backend.prepare_stop(handle) assert(handle.kind == "prepare"); handle.active = false; handle.stopped_by = "prepare"; return 0 end
+	function backend.close(handle, callback) handle.closed, handle.active, handle.close_callback = true, false, callback end
+	function backend.stop() state.stops = state.stops + 1 end
+	local function timers()
+		local ready = {}
+		for _, handle in ipairs(state.handles) do
+			if handle.active and not handle.closed and handle.kind == "timer" and handle.due <= state.clock then ready[#ready + 1] = handle end
+		end
+		for _, handle in ipairs(ready) do
+			if handle.active then
+				if handle.interval > 0 then handle.due = state.clock + handle.interval else handle.active = false end
+				handle.callback()
+			end
+		end
+	end
+	function backend.run()
+		local previous = state.stops
+		state.phase = "preamble"
+		timers()
+		if previous ~= state.stops then return end
+		for _ = 1, 50 do
+			local spinning, next_due = false, nil
+			state.phase = "idle"
+			for _, handle in ipairs(state.handles) do
+				if handle.active and handle.kind == "idle" then spinning = true; handle.callback() end
+			end
+			state.phase = "prepare"
+			if state.before_prepare then state.before_prepare() end
+			for _, handle in ipairs(state.handles) do
+				if handle.active and handle.kind == "prepare" then handle.callback() end
+			end
+			state.phase = "poll"
+			if previous == state.stops and not spinning then
+				for _, handle in ipairs(state.handles) do
+					if handle.active and handle.kind == "timer" and (not next_due or handle.due < next_due) then next_due = handle.due end
+				end
+				if next_due then state.clock = next_due end
+			end
+			state.phase = "closing"
+			for _, handle in ipairs(state.handles) do
+				if handle.close_callback then local callback = handle.close_callback; handle.close_callback = nil; callback() end
+			end
+			if previous ~= state.stops then return end
+			state.phase = "timers"
+			timers()
+		end
+		error("the controlled native loop must reach its own stop", 0)
+	end
+	local loop = helpers.load_module_with_dependency("adapters.event_loop", "luv", backend)
+	return loop, state, backend
+end
+
+helpers.describe("native event-loop bounded pumping", function()
+	helpers.it("native-pump-owner uses an acknowledged immediate one-millisecond timer", function()
+		local loop, state = bounded_native_fixture()
+		local calls = 0
+		loop.run({ onIdle = function() calls = calls + 1; if calls == 3 then loop.stop() end end })
+		helpers.assert_eq(calls, 3)
+		helpers.assert_eq(state.idle_starts, 0, "a native idle source makes every poll immediately runnable")
+		helpers.assert_eq(#state.starts, 1)
+		helpers.assert_eq({ state.starts[1].role, state.starts[1].delay, state.starts[1].interval }, { "pump", 0, 1 })
+		helpers.assert_true(state.starts[1].updates > 0, "arming must refresh native time")
+		helpers.assert_eq(state.handles[1].stopped_by, "timer")
+		helpers.assert_true(state.handles[1].closed)
+	end)
+
+	helpers.it("native-pump-owner lets poll advance between quiet callbacks", function()
+		local loop, state = bounded_native_fixture()
+		local times = {}
+		loop.run({ onIdle = function() times[#times + 1] = state.clock; if #times == 3 then loop.stop() end end })
+		helpers.assert_eq(times, { 0, 1, 2 }, "the next quiet pump must wait for the next independent timer deadline")
+	end)
+
+	helpers.it("native-pump-owner separates periodic work when the primary callback is absent", function()
+		local loop, state = bounded_native_fixture()
+		local handlers, periodic = 0, 0
+		loop.add_idle_handler(function() handlers = handlers + 1; if handlers == 5 then loop.stop() end end)
+		loop.run({ periodSec = .001, onPeriodic = function() periodic = periodic + 1; loop.stop() end })
+		helpers.assert_eq(periodic, 1, "quiet pumping must not keep native time from reaching periodic work")
+		helpers.assert_true(handlers > 0)
+		helpers.assert_eq({ state.starts[1].delay, state.starts[2].delay }, { 0, 1 })
+		helpers.assert_eq({ state.starts[1].role, state.starts[2].role }, { "pump", "periodic" })
+	end)
+
+	helpers.it("native-pump-owner preserves handler and recursive-deferred ordering", function()
+		local loop = bounded_native_fixture()
+		local seen, ticks = {}, 0
+		loop.add_idle_handler(function() seen[#seen + 1] = "handler" end)
+		loop.defer(function()
+			seen[#seen + 1] = "deferred1"
+			loop.defer(function() seen[#seen + 1] = "deferred2"; loop.stop() end)
+		end)
+		loop.run({ onIdle = function() ticks = ticks + 1; seen[#seen + 1] = "primary" .. ticks end })
+		helpers.assert_eq(seen, { "primary1", "handler", "deferred1", "primary2", "handler", "deferred2" })
+	end)
+
+	helpers.it("native-pump-owner stops secondary handlers and deferred work after a stop", function()
+		local loop = bounded_native_fixture()
+		local seen = {}
+		loop.add_idle_handler(function() seen[#seen + 1] = "first"; loop.stop() end)
+		loop.add_idle_handler(function() seen[#seen + 1] = "late" end)
+		loop.defer(function() seen[#seen + 1] = "deferred" end)
+		loop.run({ onIdle = function() seen[#seen + 1] = "primary" end })
+		helpers.assert_eq(seen, { "primary", "first" })
+	end)
+
+	helpers.it("native-pump-owner stops inside an iteration and acknowledges its queued close", function()
+		local loop, state, backend = bounded_native_fixture()
+		local closed, calls = false, 0
+		loop.run({ onIdle = function()
+			calls = calls + 1
+			-- The fixture owns this synthetic closing handle, independently of the adapter.
+			state.handles[#state.handles + 1] = { close_callback = function() closed = true end }
+			loop.stop()
+		end })
+		helpers.assert_eq(calls, 1)
+		helpers.assert_true(closed, "stop from a preamble timer skips the closing phase")
+	end)
+
+	helpers.it("native-pump-owner dispatches due work only from prepare and coalesces repeated marks", function()
+		local loop, state = bounded_native_fixture()
+		local calls, phases = 0, {}
+		state.before_prepare = function()
+			for _, handle in ipairs(state.handles) do
+				if handle.active and handle.role == "pump" and handle.kind == "timer" then handle.callback(); handle.callback() end
+			end
+		end
+		loop.run({ onIdle = function()
+			calls = calls + 1; phases[#phases + 1] = state.phase
+			if calls == 2 then loop.stop() end
+		end })
+		helpers.assert_eq(phases, { "prepare", "prepare" })
+		helpers.assert_eq(state.clock, 1, "repeated due marks must coalesce until the next iteration")
+	end)
+
+	helpers.it("native-pump-owner keeps periodic work in the iteration after pump handlers", function()
+		local loop, state = bounded_native_fixture()
+		local seen, ticks = {}, 0
+		loop.add_idle_handler(function() if state.clock == 1 then seen[#seen + 1] = "handler" end end)
+		loop.run({ onIdle = function()
+			ticks = ticks + 1; if ticks == 5 then loop.stop() end
+			if state.clock == 1 then seen[#seen + 1] = "pump" end
+		end,
+			periodSec = .001, onPeriodic = function() seen[#seen + 1] = state.phase; loop.stop() end })
+		helpers.assert_eq(seen, { "pump", "handler", "prepare" })
+	end)
+
+	helpers.it("native-pump-owner suppresses due periodic work after a pump stop without dispatching future foreign work", function()
+		local loop, state, backend = bounded_native_fixture()
+		local periodic, foreign, ticks = 0, 0, 0
+		local handle = { kind = "timer", role = "foreign", active = true, due = 10, interval = 10,
+			callback = function() foreign = foreign + 1 end }
+		state.handles[#state.handles + 1] = handle
+		loop.run({ onIdle = function() ticks = ticks + 1; if state.clock == 1 or ticks == 5 then loop.stop() end end,
+			periodSec = .001, onPeriodic = function() periodic = periodic + 1 end })
+		helpers.assert_eq({ periodic, foreign }, { 0, 0 })
+		helpers.assert_true(handle.active and not handle.closed, "foreign ownership must remain untouched")
+		backend.close(handle)
+	end)
+
+	for _, kind in ipairs({ "allocation", "start" }) do
+		for _, receipt in ipairs({ "nil", "false", "throw" }) do
+			helpers.it("native-pump-owner unwinds prepare " .. kind .. " " .. receipt .. " and retries", function()
+				local refusal = { role = "prepare", kind = kind, receipt = receipt }
+				local loop, state = bounded_native_fixture(refusal)
+				local ran = pcall(loop.run, { onIdle = function() loop.stop() end, onPeriodic = function() end })
+				helpers.assert_eq(ran, false)
+				helpers.assert_eq(loop.isRunning(), false)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+				refusal.role = nil
+				local calls = 0
+				loop.run({ onIdle = function() calls = calls + 1; loop.stop() end })
+				helpers.assert_eq(calls, 1)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+			end)
+		end
+	end
+
+	for _, role in ipairs({ "pump", "periodic" }) do
+		for _, kind in ipairs({ "allocation", "start" }) do
+			helpers.it("native-pump-owner unwinds " .. role .. " " .. kind .. " refusal and retries", function()
+				local refusal = { role = role, kind = kind }
+				local loop, state = bounded_native_fixture(refusal)
+				local ran = pcall(loop.run, { onIdle = function() loop.stop() end, onPeriodic = function() end })
+				helpers.assert_eq(ran, false); helpers.assert_eq(loop.isRunning(), false)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+				refusal.role = nil
+				local calls = 0
+				loop.run({ onIdle = function() calls = calls + 1; loop.stop() end })
+				helpers.assert_eq(calls, 1)
+				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
+			end)
+		end
+	end
+end)
+
 --- Models libuv stop admission while an independently owned handle stays live.
 local function stop_fixture(source)
 	local state = { handles = {}, stops = 0, waited = false }
@@ -27,11 +274,17 @@ local function stop_fixture(source)
 		state.handles[#state.handles + 1] = handle
 		return handle
 	end
-	function backend.new_idle() return new_handle("idle") end
+	function backend.new_idle() local handle = new_handle("idle"); handle.role = "pump"; return handle end
 	function backend.update_time() end -- native void-style clock refresh
 	function backend.new_timer() return new_handle("timer") end
+	function backend.new_prepare() state.prepare_allocations = (state.prepare_allocations or 0) + 1; return new_handle("prepare") end
+	function backend.prepare_start(handle, callback) handle.active, handle.callback = true, callback; return 0 end
+	function backend.prepare_stop(handle) handle.active = false; return 0 end
 	function backend.idle_start(handle, callback) handle.active, handle.callback = true, callback; return 0 end
-	function backend.timer_start(handle, _, _, callback) handle.active, handle.callback = true, callback; return 0 end
+	function backend.timer_start(handle, delay, interval, callback)
+		handle.role = delay == 0 and interval == 1 and "pump" or "periodic"
+		handle.active, handle.callback = true, callback; return 0
+	end
 	function backend.idle_stop(handle) handle.active = false; return 0 end
 	function backend.timer_stop(handle) handle.active = false; return 0 end
 	function backend.close(handle) handle.closed = true end
@@ -39,10 +292,13 @@ local function stop_fixture(source)
 	function backend.run()
 		local stops_before = state.stops
 		for _, handle in ipairs(state.handles) do
-			if not handle.closed and handle.kind == (source == "periodic" and "timer" or "idle") then
+			if not handle.closed and handle.role == (source == "periodic" and "periodic" or "pump") then
 				handle.callback()
 				break
 			end
+		end
+		for _, handle in ipairs(state.handles) do
+			if handle.kind == "prepare" and handle.active then handle.callback() end
 		end
 		-- Stopping the adapter's own idle/timer cannot retire a foreign owner.
 		state.waited = state.stops == stops_before
@@ -391,7 +647,7 @@ helpers.describe("linux-periodic-finite-admission", function()
 			helpers.assert_eq(calls, 1)
 			helpers.assert_eq(first, case.milliseconds)
 			helpers.assert_eq(repeat_ms, case.milliseconds)
-			helpers.assert_eq(#state.handles, 2)
+			helpers.assert_eq(#state.handles, 2 + (state.prepare_allocations or 0))
 			for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
 		end)
 	end
@@ -399,7 +655,7 @@ helpers.describe("linux-periodic-finite-admission", function()
 		helpers.it("linux-periodic-finite-admission: idle-only ignores unused duration " .. tostring(value), function()
 			local loop, state = stop_fixture("idle")
 			loop.run({ periodSec = value, onIdle = function() loop.stop() end })
-			helpers.assert_eq(#state.handles, 1)
+			helpers.assert_eq(#state.handles, 1 + (state.prepare_allocations or 0))
 			helpers.assert_true(state.handles[1].closed)
 		end)
 	end
@@ -534,7 +790,7 @@ helpers.describe("linux-event-reentry", function()
 				loop.run(options)
 				helpers.assert_eq(outer, 1)
 				helpers.assert_eq(nested, 0, "an unreturned run still owns its native handles")
-				helpers.assert_eq(#state.handles, source == "periodic" and 2 or 1,
+				helpers.assert_eq(#state.handles, (source == "periodic" and 2 or 1) + (state.prepare_allocations or 0),
 					"callback reentry must not acquire another native loop")
 				for _, handle in ipairs(state.handles) do helpers.assert_true(handle.closed) end
 				helpers.assert_true(not loop.isRunning())

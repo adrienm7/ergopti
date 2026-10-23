@@ -100,12 +100,19 @@ end)
 
 check("simulated start receipt refusal after native activation permits retry", function(loop)
 	local native_start = uv.idle_start
+	local native_timer_start = uv.timer_start
 	uv.idle_start = function(handle, callback)
 		assert(native_start(handle, callback) == 0)
 		return nil, "simulated start receipt refusal"
 	end
+	uv.timer_start = function(handle, delay, interval, callback)
+		assert(delay == 0 and interval == 1, "the refused timer must be the actual pump")
+		assert(native_timer_start(handle, delay, interval, callback) == 0)
+		return nil, "simulated start receipt refusal"
+	end
 	local ok, err = pcall(loop.run, { onIdle = function() loop.stop() end })
 	uv.idle_start = native_start
+	uv.timer_start = native_timer_start
 	assert(not ok and tostring(err):find("simulated start receipt refusal", 1, true), "refusal did not propagate")
 	drain()
 	assert(handle_count() == 1 and not loop.isRunning(), "refused activation retained run ownership")

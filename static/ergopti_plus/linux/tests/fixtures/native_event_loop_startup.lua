@@ -14,44 +14,69 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/lua/?.lua;" .. package.path
 local uv = require("luv")
 local failures = 0
-local cases = { "idle nil", "idle raised", "idle start raised", "timer nil", "timer raised", "timer start raised", "timer invalidated" }
+local cases = { "pump nil", "pump raised", "pump start raised", "timer nil", "timer raised", "timer start raised", "timer invalidated",
+	"prepare nil", "prepare false", "prepare raised", "prepare start nil", "prepare start false", "prepare start raised" }
 
 for _, refusal in ipairs(cases) do
 	package.loaded["adapters.event_loop"] = nil
 	local loop = require("adapters.event_loop")
 	local new_idle, new_timer, idle_start, timer_start = uv.new_idle, uv.new_timer, uv.idle_start, uv.timer_start
 	local owned, receipt = {}, nil
+	local roles = {}
+	local new_prepare, prepare_start = uv.new_prepare, uv.prepare_start
 	local foreign = new_timer()
 	timer_start(foreign, 10000, 10000, function() end)
 	uv.unref(foreign)
+	uv.new_prepare = function()
+		if refusal == "prepare nil" then return nil end
+		if refusal == "prepare false" then return false end
+		if refusal == "prepare raised" then error("simulated prepare allocation refusal") end
+		local handle = new_prepare()
+		owned[#owned + 1] = handle
+		roles[handle] = "prepare"
+		return handle
+	end
+	uv.prepare_start = function(handle, callback)
+		assert(roles[handle] == "prepare", "prepare start must target the real prepare handle")
+		local result = prepare_start(handle, callback)
+		if refusal == "prepare start raised" then error("simulated prepare start refusal") end
+		if refusal == "prepare start nil" then return nil, "simulated prepare start refusal" end
+		if refusal == "prepare start false" then return false, "simulated prepare start refusal" end
+		return result
+	end
 	uv.new_idle = function()
-		if refusal == "idle nil" then return nil end
-		if refusal == "idle raised" then error("simulated idle allocation refusal") end
+		if refusal == "pump nil" then return nil end
+		if refusal == "pump raised" then error("simulated pump allocation refusal") end
 		local handle = new_idle()
 		owned[#owned + 1] = handle
+		roles[handle] = "pump"
 		return handle
 	end
 	uv.new_timer = function()
-		if refusal == "timer nil" then return nil end
-		if refusal == "timer raised" then error("simulated timer allocation refusal") end
+		local role = #owned == 0 and "pump" or "timer"
+		if refusal == role .. " nil" then return nil end
+		if refusal == role .. " raised" then error("simulated " .. role .. " allocation refusal") end
 		local handle = new_timer()
 		owned[#owned + 1] = handle
+		roles[handle] = role
 		return handle
 	end
 	uv.idle_start = function(handle, callback)
 		local result = idle_start(handle, callback)
-		if refusal == "idle start raised" then error("simulated idle start refusal") end
+		if refusal == "pump start raised" then error("simulated pump start refusal") end
 		return result
 	end
-	uv.timer_start = function(handle, ...)
-		if refusal == "timer invalidated" then
+	uv.timer_start = function(handle, delay, interval, callback)
+		local role = delay == 0 and interval == 1 and "pump" or "timer"
+		assert(roles[handle] == role, "native timer allocation and start roles must agree")
+		if refusal == "timer invalidated" and role == "timer" then
 			uv.close(handle) -- Simulated invalidation, native timer and receipt.
-			local result, message, code = timer_start(handle, ...)
+			local result, message, code = timer_start(handle, delay, interval, callback)
 			receipt = { result, message, code }
 			return result, message, code
 		end
-		local result = timer_start(handle, ...)
-		if refusal == "timer start raised" then error("simulated timer start refusal") end
+		local result = timer_start(handle, delay, interval, callback)
+		if refusal == role .. " start raised" then error("simulated " .. role .. " start refusal") end
 		return result
 	end
 	local ok, err = xpcall(function()
@@ -63,11 +88,13 @@ for _, refusal in ipairs(cases) do
 		assert(not uv.is_closing(foreign) and uv.is_active(foreign), "startup rollback retired another owner's timer")
 		if receipt then assert(receipt[1] == nil and receipt[3] == "EINVAL", "fixture did not reach native timer refusal") end
 		uv.new_idle, uv.new_timer, uv.idle_start, uv.timer_start = new_idle, new_timer, idle_start, timer_start
+		uv.new_prepare, uv.prepare_start = new_prepare, prepare_start
 		local callbacks = 0
 		loop.run({ onIdle = function() callbacks = callbacks + 1; loop.stop() end })
 		assert(callbacks == 1 and not loop.isRunning(), "failed startup made the next run unusable")
 	end, debug.traceback)
 	uv.new_idle, uv.new_timer, uv.idle_start, uv.timer_start = new_idle, new_timer, idle_start, timer_start
+	uv.new_prepare, uv.prepare_start = new_prepare, prepare_start
 	-- Cleanup cannot hide the assertions above, and owns only this fixture's handles.
 	loop.stop()
 	for _, handle in ipairs(owned) do if not uv.is_closing(handle) then uv.close(handle) end end
