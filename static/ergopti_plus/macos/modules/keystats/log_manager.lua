@@ -970,13 +970,29 @@ local function _last_complete_ledger_offset(ledger)
 	return Export._last_complete_batch_offset(ledger)
 end
 
+--- Recognize only standalone producer markers after the last complete batch.
+--- User text inside SQL and torn batches cannot authorize a context reset.
+---@param trailing string
+---@return boolean
+local function _has_trailing_rollover(trailing)
+	local found = false
+	for line in trailing:gmatch("[^\n]+") do
+		if not line:match("^%s*$") then
+			local previous, date = line:match("^%-%- === day rollover (.-) %-%> (%d%d%d%d%-%d%d%-%d%d) ===$")
+			if not date or (previous ~= "" and not previous:match("^%d%d%d%d%-%d%d%-%d%d$")) then return false end
+			found = true
+		end
+	end
+	return found
+end
+
 --- Derive the current today.log cursor from durable local ledger comments.
 --- data.sql records byte offsets for every successful ingest batch. Reusing the
 --- most recent offset after a tmp-cache loss prevents already-ledgered JSONL
 --- lines from being assigned fresh ids and counted a second time at next boot.
 ---@param ledger string
 ---@param complete_offset integer
----@return table { offset: integer, date: string|nil }
+---@return table { offset: integer, date: string|nil, trailing_rollover: boolean }
 local function _local_ledger_replay_cursor(ledger, complete_offset)
 	local full_ledger = ledger or ""
 	local safe_ledger = full_ledger:sub(1, complete_offset or 0)
@@ -985,8 +1001,10 @@ local function _local_ledger_replay_cursor(ledger, complete_offset)
 	-- marker so a newly-created today.log resumes at byte 0; reject any suffix
 	-- containing a partial BEGIN/INSERT batch, which is not yet durable.
 	local trailing = full_ledger:sub((complete_offset or 0) + 1)
+	local trailing_rollover = false
 	if trailing:match("^%s*%-%- === day rollover .- %-%> %d%d%d%d%-%d%d%-%d%d ===%s*$") then
 		safe_ledger = safe_ledger .. trailing
+		trailing_rollover = _has_trailing_rollover(trailing)
 	end
 	local offset, date, segment_start = 0, nil, 1
 	local pos = 1
@@ -1008,7 +1026,7 @@ local function _local_ledger_replay_cursor(ledger, complete_offset)
 		if not date then date = batch_ts:match("(%d%d%d%d%-%d%d%-%d%d)") end
 		pos = e + 1
 	end
-	return { offset = offset, date = date }
+	return { offset = offset, date = date, trailing_rollover = trailing_rollover }
 end
 
 -- Test seam for the restart/deduplication invariant above.
@@ -1868,7 +1886,12 @@ local function _init(core_state)
 			-- TMPDIR purge and older caches gain the missing foreign aggregates.
 			_sync_foreign_data_sql()
 			if _rebuild_aggregates_from_raw(db) then
-				if recovery_cursor then _persist_recovery_state(db, recovery_cursor) end
+				if recovery_cursor then
+					-- Replaying old raw rows must not revive context retired by rollover.
+					if recovery_cursor.trailing_rollover == true and recovery_cursor.offset == 0
+						and recovery_cursor.date ~= nil then Aggregator.reset_ngram_ctx() end
+					_persist_recovery_state(db, recovery_cursor)
+				end
 				if _mark_aggregate_cache_rebuilt(db) then
 					Logger.success(LOG, "Rebuilt aggregate cache from durable raw ledgers.")
 				else
