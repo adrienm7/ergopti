@@ -159,6 +159,7 @@ end
 --- @return string|nil detail
 --- @return number|string|nil errno
 --- @return function|nil cleanup Native creation's identity-checked removal.
+--- @return function|nil current_image Native staging's regular-path byte proof.
 local function open_staging(tmp_path)
 	if has_native_writer then return require(NATIVE_WRITER).open(tmp_path, "wx") end
 	return io.open(tmp_path, "w")
@@ -186,7 +187,7 @@ local function publish(path, content, expected_source, admission)
 		return true
 	end
 	local tmp_path = path .. ".tmp"
-	local open_ok, fh, open_err, _, remove_owned = pcall(open_staging, tmp_path)
+	local open_ok, fh, open_err, _, remove_owned, current_image = pcall(open_staging, tmp_path)
 	if not open_ok or not fh then
 		return false, "cannot open staging file: " .. tostring(open_ok and open_err or fh)
 	end
@@ -219,6 +220,11 @@ local function publish(path, content, expected_source, admission)
 	if not publication_admitted(admission) then
 		pcall(discard_staging)
 		return false, "publication admission refused"
+	end
+	if has_native_writer then
+		local checked, current = pcall(current_image, content)
+		-- A refusal cannot prove the staging still belongs to this attempt.
+		if not checked or current ~= true then return false, "staging image verification refused" end
 	end
 	local rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
 	-- POSIX replaces an existing destination atomically. Windows' C runtime does

@@ -30,12 +30,14 @@ local function native_open(path, mode)
 		if mode == "wx" and (type(uv.fs_lstat) ~= "function" or type(uv.fs_unlink) ~= "function") then
 			return nil, "exclusive file cleanup unavailable", EIO
 		end
+		local lstat = uv.fs_lstat
 		local fd, detail, code = uv.fs_open(path, flags, 438) -- 0666, subject to the process umask.
 		if not fd then return nil, detail, code end
 		local identity
 		return fd, {
 			regular = function() identity = uv.fs_fstat(fd); return identity and identity.type == "file" end,
 			close = function() return uv.fs_close(fd) end,
+			regular_path = function() local current = lstat(path); return current and current.type == "file" end,
 			remove_owned = function()
 				local current = uv.fs_lstat(path)
 				-- Native IDs must be nonnegative exact integers, including LuaJIT doubles.
@@ -86,6 +88,12 @@ local function native_open(path, mode)
 			return mode_bits - mode_bits % 4096 == S_IFREG
 		end,
 		close = function() return ffi.C.close(fd) == 0 end,
+		regular_path = function()
+			local record = ffi.new("struct ergopti_write_statx")
+			if statx(AT_FDCWD, path, AT_SYMLINK_NOFOLLOW, STATX_TYPE, record) ~= 0 or tonumber(record.mask) % 2 ~= 1 then return false end
+			local mode_bits = tonumber(record.mode)
+			return mode_bits - mode_bits % 4096 == S_IFREG
+		end,
 		remove_owned = function()
 			local current = ffi.new("struct ergopti_write_statx")
 			if not identity or math.floor(tonumber(identity.mask) / STATX_INO) % 2 ~= 1
@@ -106,9 +114,15 @@ end
 --- @return string|nil failure
 --- @return number|string|nil errno
 --- @return function|nil remove_owned Exclusive creation's identity-checked cleanup.
+--- @return function|nil current_image Exclusive staging's regular-path byte proof.
 function M.open(path, mode)
 	if type(path) ~= "string" or path == "" or path:find("\0", 1, true) or (mode ~= "w" and mode ~= "a" and mode ~= "wx") then
 		return nil, "invalid native write path or mode", EINVAL
+	end
+	local open_image
+	if mode == "wx" then
+		open_image = require("infra.regular_file_reader").open
+		if type(open_image) ~= "function" then return nil, "native staging image reader unavailable", EIO end
 	end
 	local fd, operations, errno = native_open(path, mode)
 	if not fd then return nil, operations, errno end
@@ -135,7 +149,20 @@ function M.open(path, mode)
 	if not inspected then return nil, "native file classification failed", EIO end
 	if not opened then return nil, "native stream open raised", EIO end
 	if mode == "wx" and not stream then return nil, detail, open_errno end
-	if mode == "wx" then return stream, detail, open_errno, remove_owned end
+	if mode == "wx" then
+		local function current_image(expected_bytes)
+			if type(expected_bytes) ~= "string" then return false end
+			local inspected_path, regular_path = pcall(operations.regular_path)
+			if not inspected_path or regular_path ~= true then return false end
+			local acquired, image = pcall(open_image, path)
+			if not acquired or not image then return false end
+			local read_ok, bytes = pcall(image.read, image, "*a")
+			local closed_ok, image_closed = pcall(image.close, image)
+			-- Equal bytes in a replacement regular file are allowed; this is not an external CAS.
+			return read_ok and bytes == expected_bytes and closed_ok and image_closed == true
+		end
+		return stream, detail, open_errno, remove_owned, current_image
+	end
 	return stream, detail, open_errno
 end
 

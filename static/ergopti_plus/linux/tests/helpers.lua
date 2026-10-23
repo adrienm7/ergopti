@@ -145,6 +145,7 @@ end
 --- stream of an admitted regular file is reopened by name for the double.
 --- A virtual path and its staging exist only inside the double, so both skip
 --- native admission while keeping the double's own write/close/remove receipts.
+--- Physical staging image checks belong to the native file integration tests.
 --- @param path string Exact source path the test's io.open double recognises.
 --- @param virtual boolean|nil True when no file exists on disk at that path.
 --- @return function restore Reinstates the native admission.
@@ -157,7 +158,7 @@ function M.route_source_through_stdio(path, virtual)
 		Writer.open = function(candidate, mode)
 			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
 			local stream, detail, errno = io.open(candidate, "w")
-			return stream, detail, errno, function() return os.remove(candidate) end
+			return stream, detail, errno, function() return os.remove(candidate) end, function() return true end
 		end
 	end
 	Reader.open = function(candidate)
