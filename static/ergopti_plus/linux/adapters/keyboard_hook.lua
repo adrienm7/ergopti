@@ -4122,8 +4122,8 @@ function M.while_released(fn, opts)
 
 	local results = { n = 0 }
 	local function keep(...) results = { n = select("#", ...), ... } end
+	-- An error may itself be false or nil; only pcall's status owns success.
 	local ok, err = pcall(function() keep(fn()) end)
-	if ok then err = nil end
 
 	-- Restoration can acquire one source before a later native operation raises.
 	-- Keep the entire cohort under one cleanup boundary so no grab escapes it.
@@ -4155,18 +4155,19 @@ function M.while_released(fn, opts)
 		restore_reason = restored_call and restore_reason or "restoration_failed"
 		stop_modal("could not restore keyboard capture after a dialog: " .. tostring(restore_reason))
 		observe("refused", { ok = false, reason = restore_reason })
-		if err then error(err, 0) end
+		if not ok then error(err, 0) end
 		return (table.unpack or unpack)(results, 1, results.n)
 	end
 	if not observe("before", { ok = true }) then
 		observe("refused", { ok = false, reason = "observer_failed" })
+		if not ok then error(err, 0) end
 		return (table.unpack or unpack)(results, 1, results.n)
 	end
 	local desynced = not _on_desync or _call_callback("input-desync callback", _on_desync)
-	observe("after", { ok = desynced and _running and err == nil })
-	if desynced and _running and err == nil then _number_row.construct() end
+	observe("after", { ok = desynced and _running and ok })
+	if desynced and _running and ok then _number_row.construct() end
 	Logger.debug(LOG, "Keyboard taken back after a dialog.")
-	if err then error(err, 0) end
+	if not ok then error(err, 0) end
 	return (table.unpack or unpack)(results, 1, results.n)
 end
 
