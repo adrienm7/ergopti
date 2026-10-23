@@ -439,12 +439,14 @@ end
 
 --- Formats a log line per spec § 3, suppresses it per spec § 4.1 and § 4.2,
 --- and delivers it.
+--- @param exempt boolean  True for an evidence record (spec § 4.3): it skips both
+---   suppression layers, whatever its text and however recently it was written.
 --- @param variant string  One of: debug/trace/done/info/start/success/warn/error
 --- @param module_name string  Caller-supplied tag (e.g. "menu_llm")
 --- @param msg string  Format string (Lua string.format syntax)
 --- @param ... any  Variadic arguments for msg
 --- @return string|nil  The formatted line, or nil when filtered or suppressed
-local function emit(variant, module_name, msg, ...)
+local function emit_record(exempt, variant, module_name, msg, ...)
 	local level = LEVELS[variant]
 	if not level or level < _min_level then return nil end
 
@@ -473,16 +475,22 @@ local function emit(variant, module_name, msg, ...)
 	-- stopped, and puts each summary before the line that found it due.
 	if _repeat.enabled then expire_repeat_streaks(now, ts) end
 
-	if body_key == _dedup.line and (now - _dedup.time) < DEDUP_WINDOW_SEC then
-		_dedup.count   = _dedup.count + 1
-		_dedup.variant = variant
-		return nil
-	end
+	-- An evidence record (spec § 4.3) is the data a person was asked to send back:
+	-- eight records sharing one template, or the same check run twice, are all
+	-- news. It is accepted like any line (it ends an open dedup streak below) but
+	-- is never itself withheld.
+	if not exempt then
+		if body_key == _dedup.line and (now - _dedup.time) < DEDUP_WINDOW_SEC then
+			_dedup.count   = _dedup.count + 1
+			_dedup.variant = variant
+			return nil
+		end
 
-	-- The repeat layer only sees what the consecutive dedup let through, so a
-	-- burst is reported once, promptly, by the dedup summary and never twice.
-	if _repeat.enabled and withhold_repeat(variant, module_text, msg, body, ts, now) then
-		return nil
+		-- The repeat layer only sees what the consecutive dedup let through, so a
+		-- burst is reported once, promptly, by the dedup summary and never twice.
+		if _repeat.enabled and withhold_repeat(variant, module_text, msg, body, ts, now) then
+			return nil
+		end
 	end
 
 	flush_dedup_summary()
@@ -507,6 +515,11 @@ local function emit(variant, module_name, msg, ...)
 		if not ok then end
 	end
 	return line
+end
+
+--- Emits one ordinary line, subject to both suppression layers.
+local function emit(variant, module_name, msg, ...)
+	return emit_record(false, variant, module_name, msg, ...)
 end
 
 
@@ -556,6 +569,14 @@ function M.warn(module_name, msg, ...)    return emit("warn",    module_name, ms
 --- ERROR — unrecoverable failure; execution should stop or degrade gracefully.
 --- @param module_name string  @param msg string  @param ... any
 function M.error(module_name, msg, ...)   return emit("error",   module_name, msg, ...) end
+
+--- Evidence record (spec § 4.3): an INFO line, rendered `[INFO]`, that neither
+--- suppression layer ever withholds. For the result lines of a field check or a
+--- diagnostics probe, where records share one template and differ by arguments
+--- and the same check may run again minutes later. It is not a lifecycle half and
+--- not a substitute for M.info: use it only for data a person is asked to send back.
+--- @param module_name string  @param msg string  @param ... any
+function M.evidence(module_name, msg, ...) return emit_record(true, "info", module_name, msg, ...) end
 
 
 

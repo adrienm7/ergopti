@@ -474,13 +474,13 @@ InputProbe_RunSendComparison(Reps := 0) {
 		}
 		Frequency := 0
 		DllCall("QueryPerformanceFrequency", "Int64*", &Frequency)
-		try LoggerInfo(INPUT_PROBE_TAG, "send_compare context ahk={1} os={2} key_delay={3} send_level={4} reps={5}",
+		try LoggerEvidence(INPUT_PROBE_TAG, "send_compare context ahk={1} os={2} key_delay={3} send_level={4} reps={5}",
 			A_AhkVersion, A_OSVersion, A_KeyDelay, A_SendLevel, Reps)
 		for Scenario in _IP_Scenarios() {
 			Spec := Scenario["spec"]
 			Held := _IP_HoldClipboard(Spec)
 			if (Held is String && Held == "skipped") {
-				try LoggerInfo(INPUT_PROBE_TAG, "send_compare scenario={1} skipped=clipboard_busy", Scenario["id"])
+				try LoggerEvidence(INPUT_PROBE_TAG, "send_compare scenario={1} skipped=clipboard_busy", Scenario["id"])
 				continue
 			}
 			try {
@@ -500,7 +500,7 @@ InputProbe_RunSendComparison(Reps := 0) {
 					}
 					Row := InputProbe_SummarizeRow(Scenario["id"], Mode, Collected)
 					Result["rows"].Push(Row)
-					try LoggerInfo(INPUT_PROBE_TAG, "{1}", InputProbe_RowRecord(Row))
+					try LoggerEvidence(INPUT_PROBE_TAG, "{1}", InputProbe_RowRecord(Row))
 				}
 			} finally
 				_IP_ReleaseClipboard(Held)
@@ -660,7 +660,7 @@ InputProbe_RunHookOrder() {
 		Verdict := InputProbe_HookVerdict(Before, During, After, Control)
 		Result["verdict"] := Verdict
 		Result["record"] := InputProbe_HookRecord(Before, During, After, Control, Verdict)
-		try LoggerInfo(INPUT_PROBE_TAG, "{1}", Result["record"])
+		try LoggerEvidence(INPUT_PROBE_TAG, "{1}", Result["record"])
 		Result["state"] := "done"
 		Result["pass"] := Verdict["conclusive"]
 		try LoggerSuccess(INPUT_PROBE_TAG, "Hook order check finished (conclusive={1}).", Verdict["conclusive"] ? 1 : 0)

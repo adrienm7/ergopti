@@ -1526,6 +1526,18 @@ function M.start(module_name, msg, ...) _log("START", module_name, msg, ...) end
 --- @param ... any Optional format arguments.
 function M.success(module_name, msg, ...) _log("SUCCESS", module_name, msg, ...) end
 
+--- Logs an evidence record (spec § 4.3): an INFO line that neither the
+--- consecutive dedup nor the repeat collapser ever withholds. For the result
+--- lines of a field check or a diagnostics probe a person is asked to send back.
+--- Subject to the same level threshold as INFO.
+--- @param module_name string Short module identifier.
+--- @param msg string Message or format string.
+--- @param ... any Optional format arguments.
+function M.evidence(module_name, msg, ...)
+	if VARIANTS.INFO.level < M.current_level then return false end
+	return Core.evidence(module_name, msg, ...) ~= nil
+end
+
 --- Logs a WARNING message — unexpected condition; execution continues but must be investigated.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.

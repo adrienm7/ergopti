@@ -165,7 +165,7 @@ _IPT_LogCallsCarryNoContent() {
 		Body := _DriverFuncBody(Name)
 		Pos := 1
 		Calls := 0
-		while RegExMatch(Body, "i)Logger(?:Debug|Info|Start|Success|Warn|Error)\(([^\r\n]*)", &Match, Pos) {
+		while RegExMatch(Body, "i)Logger(?:Debug|Info|Evidence|Start|Success|Warn|Error)\(([^\r\n]*)", &Match, Pos) {
 			Calls += 1
 			Pos := Match.Pos + Match.Len
 			Assert(!RegExMatch(Match[1], "i)\.Value|Expected|Actual|Replacement|Prediction|Pasted|Payload"),

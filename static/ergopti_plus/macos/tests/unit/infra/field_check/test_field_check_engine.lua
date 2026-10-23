@@ -19,9 +19,13 @@ local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks
 --- @param body function(Engine, world)
 local function with_engine(body)
 	helpers.with_stub_scope(MODULES, function()
-		local world = { lines = {} }
+		local world = { lines = {}, info_lines = {} }
 		local logger = helpers.make_logger_stub()
-		logger.info = function(_, message, ...) world.lines[#world.lines + 1] = string.format(message, ...) end
+		-- The result record is evidence (spec 4.3): the logger must never fold it.
+		logger.evidence = function(_, message, ...) world.lines[#world.lines + 1] = string.format(message, ...) end
+		logger.info = function(_, message, ...)
+			world.info_lines[#world.info_lines + 1] = string.format(message, ...)
+		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.field_check_checks"] = { checks = {} }
 		package.loaded["infra.field_check"] = nil
@@ -115,6 +119,10 @@ helpers.describe("field check run", function()
 			helpers.assert_true(delivered[1].passed)
 			helpers.assert_eq(Engine.is_running(), false)
 			helpers.assert_eq(world.lines[1], "Field check result: check=demo verdict=pass steps=1 a=pass:1")
+			for _, line in ipairs(world.info_lines) do
+				helpers.assert_eq(line:find("Field check result", 1, true), nil,
+					"the result record must not go through the collapsible info variant")
+			end
 		end)
 	end)
 

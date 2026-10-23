@@ -27,8 +27,8 @@
 ; ===================================================
 
 _LFOE_CheckErrorThreshold() {
-	Body := _DriverFuncBody("_LoggerEmit")
-	Assert(Body != "", "_LoggerEmit must exist in infra/logger.ahk")
+	Body := _DriverFuncBody("_LoggerEmitBody")
+	Assert(Body != "", "_LoggerEmitBody must exist in infra/logger.ahk")
 
 	; [^}]* between the guard's "{" and "_LoggerFlush(true)" requires the flush
 	; call to be inside THIS specific if-block with no intervening "}" — so the
