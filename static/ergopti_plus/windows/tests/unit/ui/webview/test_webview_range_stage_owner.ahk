@@ -108,3 +108,5 @@ for Mode in ["consume", "stale-ack", "stale-native", "invalid", "wrong-sender", 
 
 #Include test_layer_editor_ready_delivery.ahk
 #Include test_layer_editor_navigation_pause.ahk
+
+#Include test_layout_manager_command_owner.ahk
