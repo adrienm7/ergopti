@@ -1428,7 +1428,7 @@ function M.new(deps, presets, ram_getter)
 				-- The daemon Ergopti started reads only HTTPS_PROXY: a company PAC is
 				-- resolved for the registry by the launcher instead of refusing the pull.
 				network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL",
-					{ pac_probe_url = require("llm.ollama_registry").URL })
+					{ pac_probe_client = "ollama" })
 			end
 			if not network then
 				Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))

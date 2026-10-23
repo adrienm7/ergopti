@@ -403,9 +403,11 @@ function receivingNetworkSource(fixturePolicy) {
 		'utf8'
 	);
 	return [
+		// The shared origin inventory is read by its suffix: the copied driver root has no _shared sibling.
 		// This exact existence port also keeps Git Bash paths independent of
 		// the host Lua file-name convention. No NetworkEnv method is replaced.
-		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end }`,
+		`package.loaded["adapters.file_system"] = { exists = function(p) return p == ${luaString(shellPath(managedReceiver))} end,
+			read_with_status = function(p) if p:match("/modules/network/route_origins%.json$") then return ${luaString(fs.readFileSync(path.join(root, 'static/ergopti_plus/_shared/modules/network/route_origins.json'), 'utf8'))}, "ok" end return nil, "missing" end }`,
 		`local Network = assert(load(${luaString(networkSource)}, ${luaString('@' + shellPath(managedRoot) + '/modules/llm/network_env.lua')}))()`,
 		`Network.policy_path = function() return ${luaString(shellPath(fixturePolicy))} end`,
 		`local receiver = { path = ${luaString(shellPath(managedReceiver))}, source = ${luaString(fs.readFileSync(managedReceiver, 'utf8'))} }`
@@ -1119,7 +1121,8 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'utf8'
 	);
 	assert.ok(
-		localServer.includes('NetworkEnv.prelude("OLLAMA-SERVER")'),
+		localServer.includes('NetworkEnv.prelude("OLLAMA-SERVER", M.NETWORK_OPTIONS)') &&
+			!localServer.includes('opaque_prelude'),
 		'local serving retains default static policy'
 	);
 	const hfPull = fs.readFileSync(
@@ -1135,7 +1138,9 @@ apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf 
 		'utf8'
 	);
 	assert.ok(
-		ollamaPull.includes('NetworkEnv.opaque_prelude("OLLAMA-PULL")'),
+		/NetworkEnv\.opaque_prelude\("OLLAMA-PULL",\s*\{ pac_probe_client = "ollama" \}\)/.test(
+			ollamaPull
+		),
 		'actual Ollama pull owns opaque admission'
 	);
 	assert.ok(

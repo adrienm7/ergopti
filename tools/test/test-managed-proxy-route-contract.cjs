@@ -322,6 +322,215 @@ try {
 		assert.equal(run.calls, '');
 		assert.equal(run.result[2], 'unset');
 	});
+	// ===========================================================
+	// ===== 3/ The per-origin route plan, shell twin ============
+	// ===========================================================
+
+	const shared = path.join(root, 'static', 'ergopti_plus', '_shared');
+	const sharedJson = (...parts) => JSON.parse(read(path.join(shared, ...parts)));
+	const origins = sharedJson('modules', 'network', 'route_origins.json');
+	const vectors = sharedJson('tests', 'corpus', 'network', 'route_plan_vectors.json');
+	const policyFile = posix(path.join(driver, 'modules', 'llm', 'network-retry.sh'));
+	const cleanEnvironment = () => {
+		const environment = { ...process.env };
+		for (const name of [
+			'http_proxy',
+			'HTTP_PROXY',
+			'https_proxy',
+			'HTTPS_PROXY',
+			'all_proxy',
+			'ALL_PROXY',
+			'no_proxy',
+			'NO_PROXY'
+		]) {
+			delete environment[name];
+		}
+		return environment;
+	};
+	const sourced = (body, environment = cleanEnvironment()) => {
+		const result = spawnSync(
+			bash,
+			['-c', `. '${policyFile}'\nlog_info() { printf '[T] %s\\n' "$1" >&2; }\n${body}`],
+			{ env: environment, encoding: 'utf8' }
+		);
+		assert.equal(result.error, undefined, String(result.error));
+		return result;
+	};
+	const tab = '\t';
+
+	check('the shell budget is the shared per-origin lookup budget', () => {
+		assert.equal(
+			Number(/^PAC_ROUTE_BUDGET_SEC=(\d+)$/m.exec(policyText)[1]),
+			origins.route_lookup_budget_seconds
+		);
+	});
+
+	check('the shell twin answers every shared route plan vector', () => {
+		vectors.plans.forEach((plan, index) => {
+			const body = plan.entries.map((entry) => `${entry.origin}${tab}${entry.route}`).join('\n');
+			const run = sourced(
+				plan.entries.length === 0
+					? 'printf "" | route_plan_from_entries'
+					: `printf '%s\\n' '${body.replace(/'/g, "'\\''")}' | route_plan_from_entries`
+			);
+			const expected = plan.expect.reason
+				? `REFUSED|${plan.expect.reason}`
+				: `PLAN|${plan.expect.proxy}|${plan.expect.no_proxy}`;
+			assert.equal(run.stdout.trim(), expected, `${plan.name} (#${index})`);
+		});
+	});
+
+	check('route_origins_for_client lists exactly the shared inventory', () => {
+		for (const [client, list] of Object.entries(origins.clients)) {
+			const run = sourced(
+				`route_origins_for_client '${client}' '${posix(path.join(shared, 'modules', 'network', 'route_origins.json'))}'`
+			);
+			assert.equal(run.status, 0, client);
+			assert.deepEqual(run.stdout.trim().split('\n'), list, client);
+		}
+		const unknown = sourced(
+			`route_origins_for_client nobody '${posix(path.join(shared, 'modules', 'network', 'route_origins.json'))}'`
+		);
+		assert.notEqual(unknown.status, 0, 'an unknown client is refused');
+	});
+
+	check('the Ollama inventory names the registry the daemon pulls from', () => {
+		const registry = /M\.URL = "([^"]+)"/.exec(
+			read(path.join(shared, 'lua', 'llm', 'ollama_registry.lua'))
+		)[1];
+		assert.ok(origins.clients.ollama.includes(registry));
+	});
+
+	check('uv names its origins before each opaque admission, never before the native ones', () => {
+		const bootstrap = read(path.join(driver, 'modules', 'llm', 'ensure-mlx-deps.sh'));
+		const guarded =
+			/if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque \|\| exit \$\?; fi/g;
+		assert.equal((bootstrap.match(guarded) || []).length, 3);
+		assert.equal((bootstrap.match(/apply_system_network opaque/g) || []).length, 3);
+		assert.ok(bootstrap.includes('\napply_system_network\n'), 'the plain admission stays');
+		assert.ok(
+			bootstrap.indexOf('use_uv_route_origins()') < bootstrap.indexOf('use_uv_route_origins;'),
+			'defined before its first use'
+		);
+	});
+
+	check('the uv inventory covers the hosts the pinned downloads come from', () => {
+		const host = (url) => new URL(url).origin;
+		const release = read(path.join(driver, 'modules', 'llm', 'uv-release.sh'));
+		const wheels = [...release.matchAll(/_URL="(https:[^"]+)"/g)].map((match) => host(match[1]));
+		assert.ok(wheels.length >= 2);
+		const python = Object.values(
+			JSON.parse(read(path.join(driver, 'modules', 'llm', 'managed-python-downloads.json')))
+		).map((entry) => host(entry.url));
+		for (const origin of [...wheels, ...python, 'https://pypi.org']) {
+			assert.ok(origins.clients.uv.includes(origin), origin);
+		}
+	});
+
+	const routeTable = path.join(scratch, 'route-table.sh');
+	fs.writeFileSync(
+		routeTable,
+		[
+			'#!/bin/sh',
+			'printf "%s\\n" "$*" >> "$FAKE_ARGUMENTS_LOG"',
+			'for pair in $FAKE_ROUTE_TABLE; do',
+			'  case "$pair" in "$2="*) printf "ROUTE %s\\n" "${pair#*=}"; exit 0 ;; esac',
+			'done',
+			'printf "STAGE native_pac_download\\n" >&2',
+			'exit 78',
+			''
+		].join('\n'),
+		{ mode: 0o755 }
+	);
+	/**
+	 * Runs the resolver over several origins against a per-origin fake launcher.
+	 * @param {Record<string, string|null>} table Origin to route the fake names (null: no answer).
+	 * @returns {{ code: number, stderr: string, result: string[], calls: string[] }}
+	 */
+	const multiOrigin = (table) => {
+		fs.rmSync(argumentsLog, { force: true });
+		const environment = cleanEnvironment();
+		environment.FAKE_ARGUMENTS_LOG = posix(argumentsLog);
+		environment.FAKE_ROUTE_TABLE = Object.entries(table)
+			.filter(([, route]) => route !== null)
+			.map(([origin, route]) => `${origin}=${route}`)
+			.join(' ');
+		const result = sourced(
+			[
+				`managed_bootstrap_launcher_available() { return 0; }`,
+				`ERGOPTI_LAUNCHER_EXECUTABLE='${posix(routeTable)}'`,
+				`OPAQUE_NETWORK_PAC_PROBE_URLS='${Object.keys(table).join('\n')}'`,
+				'resolve_system_route_for_probe',
+				'status=$?',
+				'printf "RESULT|%s|%s|%s|%s\\n" "$status" "${HTTPS_PROXY-unset}" "${NO_PROXY-unset}" "${no_proxy-unset}"'
+			].join('\n'),
+			environment
+		);
+		const match = /RESULT\|(\d+)\|([^|]*)\|([^|]*)\|(.*)/.exec(result.stdout);
+		return {
+			code: Number(match[1]),
+			stderr: result.stderr,
+			result: match.slice(2),
+			calls: fs.readFileSync(argumentsLog, 'utf8').trim().split('\n')
+		};
+	};
+
+	check('every origin of a client is looked up and the relay excludes the direct ones', () => {
+		const run = multiOrigin({
+			'https://registry.example': 'http://relay.corp:3128',
+			'https://blobs.example': 'direct'
+		});
+		assert.equal(run.code, 0, run.stderr);
+		assert.deepEqual(run.result, ['http://relay.corp:3128', 'blobs.example', 'blobs.example']);
+		assert.deepEqual(run.calls, [
+			'--managed-proxy-route https://registry.example 20',
+			'--managed-proxy-route https://blobs.example 20'
+		]);
+		assert.ok(!run.stderr.includes('relay.corp'), 'the route is never logged');
+		assert.ok(!run.stderr.includes('blobs.example'), 'an origin is never logged');
+	});
+
+	check('two different relays are refused by their closed reason, nothing exported', () => {
+		const run = multiOrigin({
+			'https://a.example': 'http://relay-a.corp:3128',
+			'https://b.example': 'http://relay-b.corp:3128'
+		});
+		assert.equal(run.code, 1);
+		assert.deepEqual(run.result, ['unset', 'unset', 'unset']);
+		assert.ok(run.stderr.includes('route-plan-conflict'), run.stderr);
+		assert.ok(!/relay-[ab]|a\.example|b\.example/.test(run.stderr), run.stderr);
+		assert.ok(!/proxy/i.test(run.stderr), 'no word the failure classifier matches');
+	});
+
+	check('one failed lookup among several keeps the refusal and names only its stage', () => {
+		const run = multiOrigin({
+			'https://a.example': 'http://relay.corp:3128',
+			'https://missing.example': null
+		});
+		assert.equal(run.code, 1);
+		assert.deepEqual(run.result, ['unset', 'unset', 'unset']);
+		assert.ok(run.stderr.includes('native_pac_download'), run.stderr);
+	});
+
+	check('a caller NO_PROXY is kept ahead of the direct origins', () => {
+		fs.rmSync(argumentsLog, { force: true });
+		const environment = cleanEnvironment();
+		environment.NO_PROXY = 'internal.corp';
+		environment.FAKE_ARGUMENTS_LOG = posix(argumentsLog);
+		environment.FAKE_ROUTE_TABLE =
+			'https://a.example=http://relay.corp:3128 https://b.example=direct';
+		const run = sourced(
+			[
+				`managed_bootstrap_launcher_available() { return 0; }`,
+				`ERGOPTI_LAUNCHER_EXECUTABLE='${posix(routeTable)}'`,
+				`OPAQUE_NETWORK_PAC_PROBE_URLS='https://a.example https://b.example'`,
+				'resolve_system_route_for_probe',
+				'printf "%s" "$NO_PROXY"'
+			].join('\n'),
+			environment
+		);
+		assert.equal(run.stdout, 'internal.corp,b.example');
+	});
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }

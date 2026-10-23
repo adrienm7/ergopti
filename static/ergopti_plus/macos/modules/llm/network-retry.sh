@@ -136,36 +136,130 @@ managed_bootstrap_launcher_available() {
 # download and its evaluation included).
 PAC_ROUTE_BUDGET_SEC=20
 
-# A client that reads only HTTPS_PROXY (the Ollama daemon) cannot evaluate a
-# PAC. When the caller names the origin it downloads from in
-# OPAQUE_NETWORK_PAC_PROBE_URL, the launcher resolves that origin through the
-# system (PAC, WPAD) and the first route it names becomes HTTPS_PROXY, or no
-# proxy at all when the PAC answers DIRECT. Neither the route nor the PAC is
-# ever logged: only the step that gave up, by its closed stage code.
+# The shared origin inventory, beside this file in the bundle and the checkout
+# (macos/modules/llm -> _shared/modules/network). A caller may override it.
+ROUTE_ORIGINS_FILE="${ROUTE_ORIGINS_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../_shared/modules/network" 2>/dev/null && pwd)/route_origins.json}"
+
+# The origins one download client contacts, redirect targets included, as the
+# shared inventory (_shared/modules/network/route_origins.json) lists them.
+# Prints one origin per line; fails for an unknown client or a missing file.
+route_origins_for_client() {
+	local client="$1" file="${2:-${ROUTE_ORIGINS_FILE:-}}"
+	[ -n "$client" ] && [ -f "$file" ] || return 1
+	awk -v client="$client" '
+		$0 ~ "\"" client "\"[ \t]*:[ \t]*\\[" { active = 1 }
+		active {
+			line = $0
+			while (match(line, /"https:\/\/[^"]+"/)) {
+				print substr(line, RSTART + 1, RLENGTH - 2)
+				line = substr(line, RSTART + RLENGTH)
+				found = 1
+			}
+			if (line ~ /\]/) exit
+		}
+		END { exit found ? 0 : 1 }
+	' "$file"
+}
+
+# Twin of _shared/lua/network/route_plan.lua and _shared/go/route_plan: both
+# answer _shared/tests/corpus/network/route_plan_vectors.json. Reads
+# "<https origin><TAB><route>" lines on stdin, one per looked-up origin, where a
+# route is "direct" or an http / socks5 relay with a port. Prints
+# "PLAN|<relay or direct>|<comma list of origins the lookup sent direct>" or
+# "REFUSED|<closed reason>". A client holding one environment relay cannot serve
+# two different relays, so that is refused rather than guessed.
+route_plan_from_entries() {
+	awk -F '\t' '
+		function refuse(reason) { print "REFUSED|" reason; refused = 1; exit 0 }
+		{ count++; origin[count] = $1; route[count] = $2; fields[count] = NF }
+		END {
+			if (count == 0) refuse("route-plan-empty")
+			for (i = 1; i <= count; i++) {
+				host = tolower(origin[i])
+				if (fields[i] != 2 || host !~ /^https:\/\/[A-Za-z0-9.-]+$/) refuse("route-plan-invalid")
+				sub(/^https:\/\//, "", host)
+				sub(/\.$/, "", host)
+				if (host == "" || length(host) > 253 || index(host, "..") > 0) refuse("route-plan-invalid")
+				hostname[i] = host
+				if (route[i] != "direct") {
+					if (route[i] !~ /^(http|socks5):\/\/(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+):[0-9]+$/) refuse("route-plan-invalid")
+					parts = split(route[i], pieces, ":")
+					if (length(pieces[parts]) > 5 || pieces[parts] + 0 < 1 || pieces[parts] + 0 > 65535) refuse("route-plan-invalid")
+				}
+			}
+			relay = ""
+			for (i = 1; i <= count; i++) {
+				if (hostname[i] in known) {
+					if (known[hostname[i]] != route[i]) refuse("route-plan-conflict")
+					continue
+				}
+				known[hostname[i]] = route[i]
+				if (route[i] == "direct") {
+					direct = direct (direct == "" ? "" : ",") hostname[i]
+				} else if (relay != "" && relay != route[i]) {
+					refuse("route-plan-conflict")
+				} else {
+					relay = route[i]
+				}
+			}
+			print "PLAN|" (relay == "" ? "direct" : relay) "|" (relay == "" ? "" : direct)
+		}
+	'
+}
+
+# Seconds are bounded by PAC_ROUTE_BUDGET_SEC per origin; the origins are looked
+# up one after the other, so a download with N origins waits at most N times it.
+# A client that reads only environment relay variables (the Ollama daemon, uv)
+# cannot evaluate a PAC. When the caller names the origins it downloads from,
+# redirect targets included, in OPAQUE_NETWORK_PAC_PROBE_URLS (or the single
+# OPAQUE_NETWORK_PAC_PROBE_URL), the launcher resolves each one through the
+# system (PAC, WPAD) and the plan above turns the answers into HTTPS_PROXY plus
+# a NO_PROXY entry for each origin the PAC sends direct, or no relay at all when
+# every answer is DIRECT. A host the lookups did not name still follows
+# HTTPS_PROXY: the plan cannot see a redirect that leaves the inventory.
+# Neither a route nor a PAC is ever logged: only the step that gave up by its
+# closed stage code, or the closed reason of a refused plan.
 # Returns 0 when a route was settled, 1 otherwise (nothing is exported then).
 resolve_system_route_for_probe() {
-	local probe="${OPAQUE_NETWORK_PAC_PROBE_URL:-}" output status stage route
-	[ -n "$probe" ] || return 1
+	local origins="${OPAQUE_NETWORK_PAC_PROBE_URLS:-${OPAQUE_NETWORK_PAC_PROBE_URL:-}}"
+	local origin output status stage route entries="" plan kind first second existing
+	local tab=$'\t' newline=$'\n'
+	[ -n "$origins" ] || return 1
 	managed_bootstrap_launcher_available || return 1
-	output="$("$ERGOPTI_LAUNCHER_EXECUTABLE" --managed-proxy-route "$probe" "$PAC_ROUTE_BUDGET_SEC" 2>&1 </dev/null)"
-	status=$?
-	if [ "$status" -ne 0 ]; then
-		stage="$(printf '%s\n' "$output" | sed -n 's/^STAGE \(native_[a-z_]*\)$/\1/p' | head -n 1)"
-		log_info "The automatic network settings named no route (${stage:-unknown step})."
-		return 1
-	fi
-	route="$(printf '%s\n' "$output" | sed -n 's/^ROUTE \(.*\)$/\1/p' | head -n 1)"
-	case "$route" in
-		direct)
-			log_info "The automatic network settings send model downloads directly."
-			;;
-		http://*|socks5://*)
-			case "$route" in *[[:space:]]*) return 1 ;; esac
-			export HTTPS_PROXY="$route" https_proxy="$route"
-			log_info "Model downloads use the relay the automatic network settings name."
+	for origin in $origins; do
+		case "$origin" in https://*) ;; *) return 1 ;; esac
+		output="$("$ERGOPTI_LAUNCHER_EXECUTABLE" --managed-proxy-route "$origin" "$PAC_ROUTE_BUDGET_SEC" 2>&1 </dev/null)"
+		status=$?
+		if [ "$status" -ne 0 ]; then
+			stage="$(printf '%s\n' "$output" | sed -n 's/^STAGE \(native_[a-z_]*\)$/\1/p' | head -n 1)"
+			log_info "The automatic network settings named no route (${stage:-unknown step})."
+			return 1
+		fi
+		route="$(printf '%s\n' "$output" | sed -n 's/^ROUTE \(.*\)$/\1/p' | head -n 1)"
+		entries="${entries}${origin}${tab}${route}${newline}"
+	done
+	plan="$(printf '%s' "$entries" | route_plan_from_entries)"
+	IFS='|' read -r kind first second <<EOF_ROUTE_PLAN
+$plan
+EOF_ROUTE_PLAN
+	case "$kind" in
+		PLAN) ;;
+		REFUSED)
+			log_info "The automatic network settings cannot be applied to every host of this download (${first})."
+			return 1
 			;;
 		*) return 1 ;;
 	esac
+	if [ "$first" = direct ]; then
+		log_info "The automatic network settings send model downloads directly."
+		return 0
+	fi
+	export HTTPS_PROXY="$first" https_proxy="$first"
+	if [ -n "$second" ]; then
+		existing="${NO_PROXY:-${no_proxy:-}}"
+		export NO_PROXY="${existing:+$existing,}$second" no_proxy="${existing:+$existing,}$second"
+	fi
+	log_info "Model downloads use the relay the automatic network settings name."
 	return 0
 }
 

@@ -18,7 +18,6 @@ local M = {}
 local text_utils = require("infra.text_utils")
 local AppDirs    = require("app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
-local OllamaRegistry = require("llm.ollama_registry")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -28,9 +27,9 @@ local STAMP_FORMAT = "+%Y-%m-%d %H:%M:%S"
 local OLLAMA_HOST = "127.0.0.1"
 local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
 
--- The registry the daemon pulls from is the origin whose automatic route the
+-- The registry and its blob redirect hosts are the origins whose automatic route the
 -- launcher resolves (PAC, WPAD); the pull that asks the daemon uses the same.
-M.NETWORK_OPTIONS = { pac_probe_url = OllamaRegistry.URL }
+M.NETWORK_OPTIONS = { pac_probe_client = "ollama" }
 
 --- Resolves a POSIX parent directory from the Logger's current unified path.
 --- Only the directory is retained by the daemon; the dated filename is rebuilt

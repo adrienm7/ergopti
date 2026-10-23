@@ -24,6 +24,7 @@ local M = {}
 
 local text_utils = require("infra.text_utils")
 local FileSystem = require("adapters.file_system")
+local Json = require("json")
 local Admission = require("modules.llm.opaque_network_admission")
 
 -- The shared policy, relative to the driver root.
@@ -33,7 +34,7 @@ local POLICY_RELATIVE = "modules/llm/network-retry.sh"
 --- @return string|nil root
 local function driver_root()
 	local source = debug.getinfo(1, "S").source or ""
-	source = source:sub(1, 1) == "@" and source:sub(2) or source
+	source = (source:sub(1, 1) == "@" and source:sub(2) or source):gsub("\\", "/")
 	return source:match("^(.*)/modules/llm/network_env%.lua$")
 end
 
@@ -47,6 +48,9 @@ local function locate_policy()
 	return path
 end
 
+-- The shared inventory of the origins each download client contacts.
+local ORIGINS_RELATIVE = "/../_shared/modules/network/route_origins.json"
+
 -- Located once, when the module loads: the file ships beside it in the bundle.
 local _policy_path = locate_policy()
 
@@ -56,17 +60,50 @@ function M.policy_path()
 	return _policy_path
 end
 
+--- The origins one download client contacts, redirect targets included.
+--- @param client string Key of route_origins.json "clients".
+--- @return table|nil origins Ordered https origins.
+--- @return string|nil err Why the inventory cannot be used.
+function M.route_origins(client)
+	local root = driver_root()
+	if not root then return nil, "the bundled route inventory owner is missing" end
+	local ok, bytes, status = pcall(FileSystem.read_with_status, root .. ORIGINS_RELATIVE, function() end)
+	if not ok or status ~= "ok" or type(bytes) ~= "string" then
+		return nil, "the shared route inventory is unreadable"
+	end
+	local decoded, inventory = pcall(Json.decode, bytes)
+	local origins = decoded and type(inventory) == "table" and type(inventory.clients) == "table"
+		and inventory.clients[client] or nil
+	if type(origins) ~= "table" or #origins == 0 then
+		return nil, "the route inventory names no origin for " .. tostring(client)
+	end
+	return origins, nil
+end
+
 --- The shell lines, ending in "; ", that export the system network settings
 --- for the command that follows them.
 --- @param tag string Log prefix of the child, e.g. "MLX".
 --- @param opaque boolean Whether the client is admitted for an outgoing fetch.
---- @param options table|nil { pac_probe_url = https origin the client downloads from }.
+--- @param options table|nil { pac_probe_url = https origin the client downloads from,
+---   pac_probe_client = key of every origin a client contacts in route_origins.json }.
 --- @return string|nil prelude
 --- @return string|nil err Why it cannot be built.
 local function build_prelude(tag, opaque, options)
 	local probe = options and options.pac_probe_url
 	if probe ~= nil and (type(probe) ~= "string" or not probe:match("^https://[%w%.%-]+/?$")) then
 		return nil, "the automatic-route origin is not a plain https origin"
+	end
+	local probes
+	if options and options.pac_probe_client ~= nil then
+		if probe ~= nil then return nil, "the automatic-route origin is named twice" end
+		local origins, origins_error = M.route_origins(options.pac_probe_client)
+		if not origins then return nil, origins_error end
+		for _, origin in ipairs(origins) do
+			if type(origin) ~= "string" or not origin:match("^https://[%w%.%-]+$") then
+				return nil, "an automatic-route origin is not a plain https origin"
+			end
+		end
+		probes = table.concat(origins, " ")
 	end
 	local policy = M.policy_path()
 	if not policy then return nil, "the shared network policy " .. POLICY_RELATIVE .. " is missing" end
@@ -86,6 +123,7 @@ local function build_prelude(tag, opaque, options)
 	return "log_info() { printf " .. label .. " \"$1\" >&2; }; "
 		.. "log_error() { printf " .. label .. " \"$1\" >&2; }; "
 		.. (probe and ("OPAQUE_NETWORK_PAC_PROBE_URL=" .. text_utils.shell_quote(probe) .. "; ") or "")
+		.. (probes and ("OPAQUE_NETWORK_PAC_PROBE_URLS=" .. text_utils.shell_quote(probes) .. "; ") or "")
 		.. ". " .. text_utils.shell_quote(policy) .. " && " .. activation .. "; "
 		.. status, nil
 end
