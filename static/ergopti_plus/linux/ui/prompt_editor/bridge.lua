@@ -62,7 +62,8 @@ local function close_session(session, state, context)
 		Logger.error(LOG, "Prompt editor close refused; session %d retained.", session.epoch)
 		return false
 	end
-	_active_session = nil
+	-- Native close may have synchronously opened the next editor.
+	if _active_session == session then _active_session = nil end
 	Logger.info(LOG, "Prompt editor session %d closed.", session.epoch)
 	return true
 end
@@ -169,24 +170,31 @@ function M.open(existing, on_save, opts)
 	end
 
 	if _active_session then
+		local previous = _active_session
 		local visible = type(manager.is_visible) == "function"
 			and manager.is_visible(APP_NAME) == true
+		if _active_session ~= previous then return false end
 		if visible and manager.hide(APP_NAME) ~= true then
 			Logger.error(LOG, "Prompt editor replacement refused; prior session retained.")
 			return false
 		end
+		if _active_session ~= previous then return false end
 		_active_session = nil
 	end
 
 	local session = new_session(existing, on_save, opts)
 	_active_session = session
-	if manager.show(APP_NAME) ~= true then
+	local shown = manager.show(APP_NAME)
+	if _active_session ~= session then return false end
+	if shown ~= true then
 		_active_session = nil
 		Logger.error(LOG, "Prompt editor native window could not be opened.")
 		return false
 	end
-	session.window_epoch = type(manager.current_epoch) == "function"
+	local window_epoch = type(manager.current_epoch) == "function"
 		and manager.current_epoch(APP_NAME) or nil
+	if _active_session ~= session then return false end
+	session.window_epoch = window_epoch
 	Logger.info(LOG, "Prompt editor session %d opened for '%s'.",
 		session.epoch, session.profile_id)
 	return true
