@@ -37,11 +37,17 @@ DriverKit VirtualHID process.
 
 These rules describe the shared Karabiner mode shipped today. The owned mode
 decided in [ADR 011](../../docs/adr/011-owned-karabiner-runtime.md) will add
-Ergopti's own headless runtime, whose console user server is started with the
-owner's PID so that the daemon stops grabbing, and the keyboard returns to
-native input, when that owner disappears. Stock Karabiner processes stay out of
-reach in both modes, except for the explicit, default-on « close other
-Karabiner instances » option of the owned mode.
+Ergopti's own headless runtime. This launcher owns that runtime's console
+user server: the `--installed-physical-source` role starts it with the capture
+stream and ends it with the stream, so the daemon stops grabbing, and the
+keyboard returns to native input, when Hammerspoon's stdin closes. The lease
+worker and the guardian accept the owned `ergoptiplus_remap_cli` next to the
+shared `karabiner_cli`, and the guardian record names the runtime it revokes
+through. The confirmed uninstall retires the owned runtime under one
+administrator prompt. Stock Karabiner processes stay out of reach in both modes,
+except for the explicit, default-on « close other Karabiner instances » option
+of the owned mode, which the Lua driver performs through Karabiner's own quit
+steps.
 
 The Lua suite simulates the missing-parent and native-termination paths. A
 physical Activity Monitor Force Quit and observable keyboard-release check still

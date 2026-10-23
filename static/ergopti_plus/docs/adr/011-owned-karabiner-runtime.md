@@ -65,6 +65,31 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 7. **Keys and hardware (question 5).** Everything is counted, the fn/globe key
    and the media (consumer) keys included. Real-Mac acceptance uses the
    internal Mac keyboard, with fn/globe, only.
+8. **One Console owner (2026-10-23).** The user-side Console is started, watched
+   and retired only by the signed launcher's installed-source role
+   (`InstalledPhysicalSourceBridge`, role `--installed-physical-source`), which
+   authenticates the installed runtime by designated requirement, pins the
+   Console image and its configuration root, and ends the Console with the
+   capture stream. The Lua runtime owner (`runtime_owner.lua`) spawns no process:
+   it requests the capture through a port (`adapters/runtime_capture_port.lua`
+   over the native module `ergopti_installed_source_native`) and is READY only
+   when that capture admits its first stream, which proves the Console, the Core
+   and the stream are up. Rejected: a second, Lua-spawned Console with
+   `--owner-pid` (two Consoles would fight for the owned sockets, and the
+   launcher already ties the Console's life to the stream and to Hammerspoon's
+   stdin). Consequence: the owned runtime has no mode without the capture, and a
+   managed capture session is single-use in one Lua VM, so a restart takes a
+   reload.
+9. **Closing another Karabiner, and uninstalling.** The default-on option runs
+   Karabiner's own « Quit » steps through its Non-Privileged Agents helper
+   (`unregister-core-agents` and the optional agent steps), never a kill or a
+   `launchctl` call, and only when `[karabiner] close_other_instances` (hidden,
+   default `true`) holds the user's consent; every refusal has a stable reason.
+   The user-side process is what is counted as « active » (an installed but idle
+   Karabiner does not block). The application uninstall retires the owned
+   runtime (two launchd jobs, root-owned directory) under one administrator
+   prompt before the bundle is trashed, and refuses by name when the prompt is
+   declined; the DriverKit extension is shared and stays.
 
 ## Consequences
 
@@ -130,8 +155,16 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 - The dual-mode description: `static/ergopti_plus/macos/platform/remap/README.md`
   and `static/ergopti_plus/macos/launcher/README.md`.
 - R3 stays enforced for stock processes by
-  `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
-  until the owned runtime lands together with the exact code it must allow.
+  `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`.
+  The one exception, the consented closer, is `adapters/karabiner_coexistence.lua`,
+  which uses Karabiner's own helper and is pinned by its own unit test; the
+  isolation test needed no rewrite because no Ergopti-labelled launchd call was
+  added to the driver (the uninstall's launchd calls run in the launcher, on
+  Ergopti labels only, and `test_owned_runtime_uninstall_scope.lua` pins them).
+- The artifact pin is `static/ergopti_plus/macos/vendor/remap-runtime/manifest.json`,
+  judged by `platform/remap/runtime_manifest.lua` and gated by
+  `tools/test/test-remap-runtime-manifest.cjs` (`--require-pinned` refuses the
+  unbuilt runtime fields until the hosted build fills them).
 - The HS-274 tooling in `tools/diagnostics/hs274*` is an input of the owned
   runtime, not a closed study: `tools/build/remap_runtime_source.py` pins the
   producer patch set (`hs274_raw_patch.py`, `hs274_stream_patch.py`) and the
