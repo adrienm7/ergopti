@@ -67,6 +67,11 @@ if Features["shortcuts"]["paste_without_formatting"] {
 								return
 						}
 						PlainText := CB_Read()
+						; Saving all formats can yield to a new non-text copy. Paste it intact.
+						if PlainText == "" {
+								SendFinalResult("^v")
+								return
+						}
 						OwnedSequence := 0
 						try {
 								if !CB_WriteTextWithReceipt(PlainText, &OwnedSequence)
