@@ -934,6 +934,75 @@ function assertCompleteAhkWatchdogBudget() {
 
 assertCompleteAhkWatchdogBudget();
 
+/** Checks the actual manual replay choice reaches the existing bounded CLI. */
+function assertReplayChildTimeoutWiring() {
+	const yaml = require('yaml');
+	const workflow = fs.readFileSync(
+		path.resolve(__dirname, '../../.github/workflows/windows-test-replay.yml'),
+		'utf8'
+	);
+	function check(source) {
+		const parsed = yaml.parse(source, { uniqueKeys: true });
+		const choice = parsed.on.workflow_dispatch.inputs.child_timeout_ms;
+		assert.ok(choice, 'manual replay must expose the child budget');
+		assert.equal(choice.type, 'choice');
+		assert.equal(choice.required, false);
+		assert.equal(choice.default, '120000', 'automatic replay keeps its original child budget');
+		assert.deepEqual(choice.options, ['120000', '300000']);
+		assert.equal(parsed.jobs.replay['timeout-minutes'], 35);
+		const steps = parsed.jobs.replay.steps.filter(
+			(step) => step.name === 'Replay every case alone and the selection in reverse'
+		);
+		assert.equal(steps.length, 1, 'one actual native replay consumer');
+		assert.equal(steps[0].shell, 'pwsh');
+		assert.equal(
+			steps[0].env.ERGOPTI_REPLAY_CHILD_TIMEOUT_MS,
+			"${{ inputs.child_timeout_ms || '120000' }}"
+		);
+		assert.ok(
+			steps[0].run.includes(
+				'Write-Host "Replay child timeout (ms): $env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"'
+			)
+		);
+		const launches = steps[0].run.split('\n').filter((line) => /^\s*node /.test(line));
+		assert.deepEqual(launches, [
+			'node tools/ci/windows-test-replay.cjs --ahk "$env:ERGOPTI_REPLAY_AHK" --selection "$env:ERGOPTI_REPLAY_SELECTION" --timeout-ms "$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS" --output "$output"'
+		]);
+	}
+	check(workflow);
+	for (const mutate of [
+		(doc) => delete doc.on.workflow_dispatch.inputs.child_timeout_ms,
+		(doc) => (doc.on.workflow_dispatch.inputs.child_timeout_ms.type = 'string'),
+		(doc) => (doc.on.workflow_dispatch.inputs.child_timeout_ms.default = '300000'),
+		(doc) => doc.on.workflow_dispatch.inputs.child_timeout_ms.options.push('600000'),
+		(doc) => (doc.jobs.replay['timeout-minutes'] = 40),
+		(doc) => {
+			const step = doc.jobs.replay.steps.find((item) => item.env?.ERGOPTI_REPLAY_SELECTION);
+			step.env.ERGOPTI_REPLAY_CHILD_TIMEOUT_MS = '120000';
+		},
+		(doc) => {
+			const step = doc.jobs.replay.steps.find((item) => item.env?.ERGOPTI_REPLAY_SELECTION);
+			step.run = step.run.replace(' --timeout-ms "$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"', '');
+		},
+		(doc) => {
+			const step = doc.jobs.replay.steps.find((item) => item.env?.ERGOPTI_REPLAY_SELECTION);
+			step.run = step.run.replace(
+				'"$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS"',
+				'$env:ERGOPTI_REPLAY_CHILD_TIMEOUT_MS'
+			);
+		}
+	]) {
+		const changed = yaml.parse(workflow, { uniqueKeys: true });
+		mutate(changed);
+		assert.throws(() => check(yaml.stringify(changed)));
+	}
+	console.log(
+		'PASS: replay child budget choice, automatic default and eight wiring refusal controls.'
+	);
+}
+
+assertReplayChildTimeoutWiring();
+
 // This supplemental route follows every original contract assertion. It loads
 // the authentic whole runner; the fixed data-only selection never grants a
 // production route, action emission or full-suite qualification.
