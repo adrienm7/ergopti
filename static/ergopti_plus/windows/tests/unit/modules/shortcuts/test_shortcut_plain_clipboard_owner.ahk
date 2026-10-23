@@ -17,9 +17,18 @@ _SPCOT_ChildSource() {
 	ClipboardSource := FileRead(ClipboardOwner, "UTF-8")
 	ClipboardSource := StrReplace(ClipboardSource, "CB_Write(Text) {", "_PPCO_ActualWrite(Text) {", true, &Writes)
 	AssertEqual(1, Writes, "Only the genuine publisher declaration may be decorated")
+	; Choose the observed boundary from executable source presence, never the result.
+	MaskedClipboard := _DriverMaskNonCode(&ClipboardSource)
+	NativePublisher := RegExMatch(MaskedClipboard, "m)^_CB_PlainNativeMutationCAS\(Record, Text\) \{") > 0
+	if NativePublisher {
+		ClipboardSource := StrReplace(ClipboardSource, "_CB_PlainNativeMutationCAS(Record, Text) {",
+			"_PPCO_ActualNativeMutationCAS(Record, Text) {", true, &Publishers)
+		AssertEqual(1, Publishers, "The genuine native CAS declaration must be decorated exactly once")
+	}
 	Code := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
 	Code .= "LoggerWarn(*) => 0`nLoggerError(*) => 0`nLoggerDebug(*) => 0`nLoggerInfo(*) => 0`n"
 	Code .= "global _SendHook := 0`nglobal SEND_INSTANT_PASTE_DELAY_MS := Integer(A_Args[4])`n"
+	Code .= "global _PPCO_UsesNativeMutation := " . (NativePublisher ? "true" : "false") . "`n"
 	for Name in ["TickElapsed", "TickElapsed64", "_TextSenderNativeFocus", "_SendVerdictSucceeded",
 			"SendFinalResult", "_PasteWithoutFormattingRestore", "PasteWithoutFormatting"] {
 		Body := _DriverFuncBody(Name)
