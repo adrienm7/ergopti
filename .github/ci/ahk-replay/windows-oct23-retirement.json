@@ -1,0 +1,25 @@
+{
+	"expected_count": 14,
+	"filters": [
+		{
+			"contains": "system-event-publication-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "system-event-committed-retirement",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout-registry-retirement",
+			"expected_count": 4
+		},
+		{
+			"contains": "personal-toml-startup-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "prompt-startup-owner",
+			"expected_count": 3
+		}
+	]
+}
