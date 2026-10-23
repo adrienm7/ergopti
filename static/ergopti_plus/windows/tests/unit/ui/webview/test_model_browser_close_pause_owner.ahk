@@ -51,7 +51,8 @@ _MBPT_ChildSource() {
 		AssertEqual(1, Count, "Only this private boot declaration may change: " . Name)
 	}
 	SplitPath(Support, , &SupportDir)
-	Code := ""
+	; The real registry reader must never consult another process's parse cache.
+	Code := 'EnvSet("LOCALAPPDATA", A_Args[2] . "\local-app-data")' . "`n"
 	for Line in StrSplit(Prefix, "`n") {
 		if RegExMatch(Line, "^#Include\s+(.+)$", &Include)
 			Line := "#Include " . SupportDir . "\" . Include[1]
@@ -85,9 +86,20 @@ _MBPT_ChildSource() {
 ; These are byte-verified copies of the shipped data, never synthetic defaults.
 _MBPT_StageAssets(Directory) {
 	global _SharedDir
-	for Relative in ["shared", "shared\modules", "shared\modules\llm", "shared\data", "shared\data\locales"]
+	for Relative in ["shared", "shared\modules", "shared\modules\llm", "shared\modules\menu",
+		"shared\modules\diagnostics", "shared\data", "shared\data\locales", "shared\core",
+		"shared\core\config_schema", "shared\core\config_schema\examples", "local-app-data"]
 		FSCreateDirectoryExclusiveStrict(Directory . "\" . Relative)
-	for Relative in ["modules\llm\defaults.json", "modules\llm\models.json", "data\locales\fr.json", "data\locales\en.json"] {
+	; Stage the complete shipped schema pack for the genuine boot owner, plus
+	; canonical presentation/privacy policies for diagnostics. The component
+	; does not claim every reserved policy is read on its successful cold path.
+	for Relative in ["modules\llm\defaults.json", "modules\llm\models.json", "data\locales\fr.json", "data\locales\en.json",
+		"modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json",
+		"core\config_schema\migrations.toml", "core\config_schema\config.schema.json",
+		"core\config_schema\tap_hold.schema.json", "core\config_schema\SCHEMA.md",
+		"core\config_schema\examples\hs_tap_hold.example.toml", "core\config_schema\examples\personal_info.example.toml",
+		"core\config_schema\examples\hs_config.example.toml", "core\config_schema\examples\ahk_config.example.toml",
+		"core\config_schema\examples\hotstrings_config.example.toml", "core\config_schema\examples\ahk_tap_hold.example.toml"] {
 		Source := _SharedDir . "\" . Relative, Target := Directory . "\shared\" . Relative
 		Before := FSReadBytesStrict(Source), Expected := CryptoSha256Bytes(Before)
 		AssertTrue(Expected != "" && !FileExist(Target), "Only an exclusive private target may receive authentic data")
