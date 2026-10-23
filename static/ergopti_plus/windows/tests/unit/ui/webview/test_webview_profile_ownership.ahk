@@ -174,3 +174,5 @@ Test("WebView profile: native refusal retains only valid exit receipts (profile-
 Test("WebView profile: unknown initialization failure preserves files (profile-ownership)", _WPO_AbandonUnknown)
 Test("WebView profile: stale Edge termination retires only its own files (profile-ownership)", _WPO_StaleEdgeTerminal)
 Test("WebView profile: late abandon preserves confirmed cleanup (profile-ownership)", _WPO_ConfirmedAbandon)
+
+#Include test_action_picker_startup_owner.ahk
