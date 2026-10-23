@@ -4,7 +4,7 @@
 ; MODULE: WPM Tick Rollover Tests
 ; DESCRIPTION:
 ; A private child drives the genuine producer and calculator. Only each body's
-; single native DWORD clock expression is replaced, never the math or the ring.
+; single native-width clock expression is replaced, never the math or the ring.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -158,5 +158,5 @@ _WPMR_Case(Mode) {
 		throw ExportFailure
 }
 
-for _WPMR_Mode in ["translated-current", "dword-rollover", "expired-and-minimum"]
+for _WPMR_Mode in ["full64-expired-after-dword-period", "full64-across-dword-boundary", "expired-and-minimum"]
 	Test("WPM clock: " . _WPMR_Mode . " respects admitted event ages (wpm-tick-rollover-owner)", _WPMR_Case.Bind(_WPMR_Mode))
