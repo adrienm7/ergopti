@@ -946,7 +946,7 @@ end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
 local REPLAY_FLUSH_EVENT_COUNT = 500
-local AGGREGATE_CACHE_REVISION = "1"
+local AGGREGATE_CACHE_REVISION = "2"
 -- Every table written by aggregator/sql.lua.  Replaying a device's canonical
 -- raw rows is additive, so its old derived partition must be cleared first.
 local DERIVED_DEVICE_TABLES = {
@@ -1106,6 +1106,63 @@ local function _clear_derived_device_rows(db, device_id)
 	return true
 end
 
+--- Return the local-only ledger batch waiting to reach data.sql.
+--- This value must never be appended to data.sql itself: it is a cursor-local
+--- recovery record, not data to replay into a different device cache.
+local function _get_local_outbox(db)
+	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY)) do
+		return type(row.value) == "string" and row.value or ""
+	end
+	return ""
+end
+
+--- Validate a missing/lagging canonical prefix against the committed local outbox.
+--- Membership, not min/max, matters because global event ids may be sparse.
+local function _outbox_covers_typing(db, device_id, after_id)
+	if device_id ~= _device_id then return false end
+	local outbox = _get_local_outbox(db)
+	local complete = _last_complete_ledger_offset(outbox)
+	if complete == 0 or not outbox:sub(complete + 1):match("^%s*$") then return false end
+	local facts = Export._typing_rollover_boundaries(outbox, _sq(device_id), true, _has_trailing_rollover)
+	if not facts or facts.unreadable or facts.has_markers then return false end
+	local condition = after_id ~= nil and (" AND id>" .. tostring(after_id)) or ""
+	for row in db:nrows("SELECT id FROM events_typing WHERE device_id=" .. _sq(device_id) .. condition) do
+		if not facts.ids[tonumber(row.id)] then return false end
+	end
+	return true
+end
+
+--- Read boundaries before any derived DELETE; cache-only rows need exact authority.
+local function _typing_replay_cutoffs(db, device_id)
+	local raw_max = nil
+	for row in db:nrows("SELECT MAX(id) AS max_id FROM events_typing WHERE device_id=" .. _sq(device_id)) do
+		raw_max = tonumber(row.max_id)
+	end
+	if raw_max == nil then return {} end
+	if device_id == "." or device_id == ".." or device_id:find("/", 1, true)
+		or device_id:find("\\", 1, true) or device_id:find("\0", 1, true) then
+		return nil, "raw device has no canonical folder identity"
+	end
+	local path = device_id == _device_id and _paths.data_sql_path
+		or (_paths.metrics_dir .. "by_device/" .. device_id .. "/data.sql")
+	local attrs = fs.attributes(path)
+	if not attrs or (attrs.size or 0) == 0 then
+		if _outbox_covers_typing(db, device_id) then return {} end
+		return nil, "retained typing has no canonical ledger or complete local outbox"
+	end
+	local ledger = FileSystem.read(path)
+	if type(ledger) ~= "string" or #ledger ~= attrs.size then
+		return nil, "canonical typing ledger could not be read completely"
+	end
+	local facts, detail = Export._typing_rollover_boundaries(ledger, _sq(device_id), false, _has_trailing_rollover)
+	if not facts then return nil, detail end
+	if facts.has_markers and raw_max > (facts.max_id or -1)
+		and not _outbox_covers_typing(db, device_id, facts.max_id or -1) then
+		return nil, "typing ahead of canonical rollover facts is not owned by the local outbox"
+	end
+	return facts.cutoffs
+end
+
 --- Rebuild UI aggregate tables from canonical raw rows.  Passing device ids
 --- rebuilds only those partitions after a foreign ledger import; omitting it
 --- repairs the entire cache (first start or an aggregate-version migration).
@@ -1153,6 +1210,17 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 	end
 	if #device_ids == 0 then return true end
 
+	-- Validate every partition first; a later source refusal must not erase an earlier one.
+	local boundary_maps = {}
+	for _, replay_device_id in ipairs(device_ids) do
+		local read_ok, cutoffs, detail = pcall(_typing_replay_cutoffs, db, replay_device_id)
+		if not read_ok or not cutoffs then
+			Logger.error(LOG, "Cannot read typing rollover facts: %s.", tostring(read_ok and detail or cutoffs))
+			return false
+		end
+		boundary_maps[replay_device_id] = cutoffs
+	end
+
 	-- Foreign-only recovery must not inject the other device's n-gram continuity
 	-- into the next local typing event.
 	local saved_local_ctx = nil
@@ -1179,11 +1247,24 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 		end
 		local quoted_device = _sq(replay_device_id)
 		local ok, replay_err = pcall(function()
-			for row in db:nrows("SELECT ts, app, title, layout, events_json FROM events_typing WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
-				local decoded_ok, events = pcall(json.decode, row.events_json or "[]")
-				if decoded_ok and type(events) == "table" then
-					Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
-					if not walked() then error("typing aggregate flush failed") end
+			local previous = nil
+			local cutoffs = boundary_maps[replay_device_id]
+			for segment = 1, #cutoffs + 1 do
+				local upper = cutoffs[segment]
+				local range = previous ~= nil and (" AND id>" .. tostring(previous)) or ""
+				if upper ~= nil then range = range .. " AND id<=" .. tostring(upper) end
+				for row in db:nrows("SELECT ts, app, title, layout, events_json FROM events_typing WHERE device_id="
+					.. quoted_device .. range .. " ORDER BY ts, id") do
+					local decoded_ok, events = pcall(json.decode, row.events_json or "[]")
+					if decoded_ok and type(events) == "table" then
+						Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
+						if not walked() then error("typing aggregate flush failed") end
+					end
+				end
+				if upper ~= nil then
+					-- Discard the retired generation, then retain any cache-only outbox rows above it.
+					Aggregator.reset_ngram_ctx()
+					previous = upper
 				end
 			end
 			for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms FROM events_app_switch WHERE device_id=" .. quoted_device .. " ORDER BY ts, id") do
@@ -1266,14 +1347,22 @@ end
 
 --- Mark a fully rebuilt derived cache and make every dashboard snapshot stale.
 ---@param db userdata
+---@param partition_only boolean|nil A partial refresh cannot certify an older global cache.
 ---@return boolean
-local function _mark_aggregate_cache_rebuilt(db)
+local function _mark_aggregate_cache_rebuilt(db, partition_only)
 	local begin_rc = db:exec("BEGIN TRANSACTION;")
 	if begin_rc ~= sqlite3.OK then return false end
 	local ok, err = pcall(function()
-		local version_rc = db:exec("UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION)
-			.. " WHERE key='aggregate_cache_revision';")
-		if version_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update aggregate cache revision") end
+		-- A foreign-only refresh has no authority over an unfinished global migration.
+		if partition_only ~= true or _aggregate_cache_revision(db) == AGGREGATE_CACHE_REVISION then
+			local context_json = json.encode(Aggregator.get_ngram_ctx() or {})
+			if type(context_json) ~= "string" then error("cannot encode rebuilt typing context") end
+			_exec_sqlite_or_error(db, "UPDATE meta SET value=" .. _sq(context_json)
+				.. " WHERE key='ngram_ctx_json';", "cannot persist rebuilt typing context")
+			local version_rc = db:exec("UPDATE meta SET value=" .. _sq(AGGREGATE_CACHE_REVISION)
+				.. " WHERE key='aggregate_cache_revision';")
+			if version_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update aggregate cache revision") end
+		end
 		local rev_rc = db:exec("UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';")
 		if rev_rc ~= sqlite3.OK then error(db:errmsg() or "cannot update metrics revision") end
 		local commit_rc = db:exec("COMMIT;")
@@ -1285,16 +1374,6 @@ local function _mark_aggregate_cache_rebuilt(db)
 		return false
 	end
 	return true
-end
-
---- Return the local-only ledger batch waiting to reach data.sql.
---- This value must never be appended to data.sql itself: it is a cursor-local
---- recovery record, not data to replay into a different device cache.
-local function _get_local_outbox(db)
-	for row in db:nrows("SELECT value FROM meta WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY)) do
-		return type(row.value) == "string" and row.value or ""
-	end
-	return ""
 end
 
 --- Clear the outbox only after its full batch has reached the append-only ledger.
@@ -1406,7 +1485,7 @@ function M.ingest_once()
 
 	local foreign_devices = _sync_foreign_data_sql(function(device_id)
 		if not _rebuild_aggregates_from_raw(db, { device_id }) then return false end
-		return _mark_aggregate_cache_rebuilt(db)
+		return _mark_aggregate_cache_rebuilt(db, true)
 	end)
 	trace.mark("foreign")
 	-- A previous cache transaction may have committed while data.sql was locked.
@@ -1887,9 +1966,6 @@ local function _init(core_state)
 			_sync_foreign_data_sql()
 			if _rebuild_aggregates_from_raw(db) then
 				if recovery_cursor then
-					-- Replaying old raw rows must not revive context retired by rollover.
-					if recovery_cursor.trailing_rollover == true and recovery_cursor.offset == 0
-						and recovery_cursor.date ~= nil then Aggregator.reset_ngram_ctx() end
 					_persist_recovery_state(db, recovery_cursor)
 				end
 				if _mark_aggregate_cache_rebuilt(db) then
