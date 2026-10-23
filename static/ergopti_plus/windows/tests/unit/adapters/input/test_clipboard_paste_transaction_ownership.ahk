@@ -574,7 +574,16 @@ _PPH_Script(Entry, Mode) {
 	Source := FileRead(_DriverDir . "\adapters\clipboard.ahk", "UTF-8")
 	Boundary := _DriverFindFunctionDefinition(&Source, "CB_Read")
 	AssertTrue(IsObject(Boundary), "the real clipboard registry must precede its OS read adapter")
-	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`nOnError(_PPH_Error)`n" . SubStr(Source, 1, Boundary.Idx - 1)
+	Registry := SubStr(Source, 1, Boundary.Idx - 1)
+	; This old logical-contents fixture keeps the real registry and debt coordinator.
+	; Native snapshot binding/publication is covered by the separate real-CB cases.
+	for Declaration in ["CB_SavePlainSnapshot(OwnerToken, &Capture) {",
+		"CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {",
+		"CB_RestorePlainSnapshotEventually(Saved, ExpectedSequence, OwnerToken, Source) {"] {
+		Registry := StrReplace(Registry, Declaration, "_PPH_Unused_" . Declaration, true, &Changed)
+		AssertEqual(1, Changed, "Every non-exercised native API must have one genuine declaration")
+	}
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`nOnError(_PPH_Error)`n" . Registry
 	Code .= '_PPH_Error(Err, *) {`nFileAppend(Err.Message, "**")`nExitApp(1)`n}`n'
 	for Name in ["GesturePastePlain", "_GesturePastePlainRestore", "PasteWithoutFormatting", "_PasteWithoutFormattingRestore"]
 		Code .= _DriverFuncBody(Name) . "`n"
@@ -586,6 +595,9 @@ _PPH_Script(Entry, Mode) {
 	; This existing logical clipboard models one synchronous owned publication.
 	; Native owner/UTF-16 authentication is exercised by the separate real-CB tests.
 	Code .= 'CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {`nglobal S`nOwnedSequence := 0`nif !CB_Write(Text)`nreturn false`nOwnedSequence := S["seq"]`nreturn true`n}`n'
+	Code .= 'CB_SavePlainSnapshot(OwnerToken, &Capture) {`nCapture := 0`nSaved := CB_SaveAll()`nif Saved is String && Saved == "__CB_SAVE_ERROR__"`nreturn false`nCapture := Map("saved", Saved)`nreturn true`n}`n'
+	Code .= 'CB_WritePlainSnapshot(Capture, Text, &OwnedSequence) {`nreturn CB_WriteTextWithReceipt(Text, &OwnedSequence)`n}`n'
+	Code .= 'CB_RestorePlainSnapshotEventually(Saved, ExpectedSequence, OwnerToken, Source) {`nreturn CB_RestoreOwnedAllEventually(Saved, ExpectedSequence, OwnerToken, Source)`n}`n'
 	Code .= 'CB_RestoreAll(Saved) {`nglobal S`nS["restores"] += 1`nS["text"] := Saved["text"]`nS["rich"] := Saved["rich"]`nS["seq"] += 1`nreturn true`n}`n'
 	Code .= 'CB_GetSequenceNumber() {`nglobal S`nreturn S["seq"]`n}`n'
 	Code .= 'WinActive(*) {`nglobal S`nreturn S["excel"]`n}`n'
