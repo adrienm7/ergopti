@@ -41,6 +41,7 @@ local TomlCodec = require("toml_codec")
 local KeyPath = require("toml_codec.key_path")
 local Languages = require("hotstrings.languages")
 local BulkScope = require("hotstrings.bulk_scope")
+local ChoiceCatalogue = require("hotstrings.choice_catalogue")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local ManifestReader = require("infra.manifest_reader")
@@ -211,11 +212,11 @@ end
 --- @param section string|nil Section name, for a section choice.
 --- @return boolean retired
 local function choice_is_retired(id, section)
-	if not _published then return false end
-	local category = _categories[id]
-	if category == nil then return true end
-	if section == nil or not sections_are_the_builds(category) then return false end
-	return not (category.sections or {})[section]
+	return ChoiceCatalogue.is_retired(_published == true, function(category_id)
+		local category = _categories[category_id]
+		if category == nil then return nil end
+		return { sections = sections_are_the_builds(category) and (category.sections or {}) or nil }
+	end, id, section)
 end
 
 --- Reports the choices naming a category or section this build no longer
