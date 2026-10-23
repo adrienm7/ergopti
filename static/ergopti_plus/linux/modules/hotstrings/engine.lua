@@ -10,7 +10,8 @@
 ---
 --- All matching logic, tail-char bucketing, longest-match-first sorting, word
 --- boundary enforcement, and the Logger shim live in the shared module. This
---- file is intentionally minimal — it only adjusts the Lua search path and
+--- file is intentionally minimal — it adjusts the Lua search path, counts and
+--- times each on_char call (infra/perf_counters), and
 --- delegates to the canonical implementation.
 --- ==============================================================================
 
@@ -42,5 +43,27 @@ if _shared_lua then
 	end
 end
 
--- Delegate entirely to the shared implementation.
-return require("hotstring_engine")
+-- Delegate to the shared implementation; the only addition is the permanent
+-- match counter and (at DEBUG) timing span, kept here so the shared engine,
+-- which the other drivers load, carries no Linux-only instrumentation.
+local Shared = require("hotstring_engine")
+local Perf = require("infra.perf_counters")
+
+local M = setmetatable({}, { __index = Shared })
+
+--- Creates a shared engine whose on_char is counted and timed.
+--- @return table engine
+function M.new(...)
+	local engine = Shared.new(...)
+	local shared_on_char = engine.on_char
+	function engine:on_char(ch, opts)
+		local started = Perf.clock()
+		local result = shared_on_char(self, ch, opts)
+		Perf.span("hotstring.match", started)
+		if result then Perf.count("hotstring.matches") end
+		return result
+	end
+	return engine
+end
+
+return M

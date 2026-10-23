@@ -183,6 +183,30 @@ predicate, and describe foreign error objects with `ErrorDescription`, never
 separately; a signal is a failure (SIGTERM is status 143), and ESRCH on a
 process group means already gone.
 
+### project-linux-idle-loop-costs
+
+An active libuv idle handle makes the loop poll with a zero timeout, so the
+daemon's idle tick used to spin one whole core (measured 99.997 % of a core,
+180 000 ticks a second, nothing to do). The tick now ends in
+`EvdevReader.wait_any_readable` (one `poll(2)` over every open keyboard,
+pointer and touchpad descriptor, at most 8 ms) supplied as `idleWait` by the
+daemon, and a fixed 1 ms `nanosleep` when the wait declines (nil). The wait
+answers nil, never false, when it cannot sleep, and a hook with an event read
+but not yet dispatched answers true at once. A source that is open but never
+drained would turn the wait into a spin: open a descriptor only for a consumer
+that drains it. On X11 the focus poll (four times a second) reads the root's
+`_NET_ACTIVE_WINDOW`, the title and the owner through libxcb in this process
+(`adapters/x11_focus`); the xdotool route forked twice per poll and blocked the
+loop for tens of milliseconds. Never use Xlib for it: a dead server makes Xlib
+`exit()`. TOML decoding of the shared codec is linear in the number of
+structural characters: its scanners copy runs of plain characters with one
+`string.find` stop set per lexical state, the pattern `^%s*(.-)%s*$` is
+quadratic on a long value, and `unescape_body` returns a body that needs no
+decoding as it is. Any new scanner there is proven against the previous one
+with a differential fuzz over every repository TOML file before it ships.
+`infra/perf_counters` holds the permanent closed-enum counters and spans, one
+evidence line per minute; measure with `tools/bench/linux-hot-path.lua`.
+
 ### project-linux-sqlite-cli-invocation
 
 The Linux SQLite CLI runs with `-init /dev/null` and `-bail`, `-readonly` for

@@ -35,6 +35,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("logger.shim")
+local Perf = require("infra.perf_counters")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view
@@ -610,6 +611,8 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
+	Perf.count("hotstring.expansions")
+	local transaction_started = Perf.clock()
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
@@ -621,7 +624,11 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 			end
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
 			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
-			return native_tx.emit(code, value, phase)
+			Perf.count("output.uinput_events")
+			local write_started = Perf.clock()
+			local accepted = native_tx.emit(code, value, phase)
+			Perf.span("output.uinput_write", write_started)
+			return accepted
 		end,
 	}, { __index = native_tx })
 	tx.channel = function()
@@ -656,6 +663,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt)
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
+	Perf.span("hotstring.expand", transaction_started)
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
 		and result.error == "programmable publication is no longer current") then stop_after_failure(result, label) end
 	return result

@@ -398,6 +398,8 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			if name == "logger.shim" then return { debug = function() end, warn = function() end } end
 			if name == "tray.protocol" then return { resolve_tray_icon = function() return "input-keyboard" end } end
 			if name == "infra.paths" then return { shared_root = function() return "/synthetic" end } end
+			-- Counters only: the tray counts and times each menu replacement.
+			if name == "infra.perf_counters" then return require(name) end
 			error("unexpected tray dependency: " .. name)
 		end }, { __index = _G })
 		local file = assert(io.open(helpers.driver_root() .. "/adapters/tray_menu.lua", "rb"))

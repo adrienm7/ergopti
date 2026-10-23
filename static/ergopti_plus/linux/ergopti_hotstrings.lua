@@ -2892,6 +2892,8 @@ local function main()
 		end,
 		onPeriodic = on_periodic,
 		periodSec = 0.25,
+		-- Sleep on the input descriptors between ticks instead of spinning a core.
+		idleWait = keyboard_hook.idle_wait,
 	})
 
 	-- 8.14) Clean exit.

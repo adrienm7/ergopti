@@ -28,6 +28,7 @@ local M = {}
 
 local Logger   = require("logger.shim")
 local Monotonic = require("infra.monotonic")
+local Perf = require("infra.perf_counters")
 local Timings   = require("infra.timings")
 local EvdevCodes = require("infra.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
@@ -426,7 +427,9 @@ function M.init(opts)
 
 	-- Derive device ID from hostname.
 	local hostname = "linux"
-	local fh_host = io.popen("hostname 2>/dev/null", "r")
+	-- The kernel's nodename, read in this process (what `hostname` prints, without
+	-- a fork on every start).
+	local fh_host = io.open("/proc/sys/kernel/hostname", "rb")
 	if fh_host then
 		hostname = fh_host:read("*l") or "linux"
 		fh_host:close()
@@ -523,7 +526,7 @@ end
 --- @param timestamp_ms number  Wall-clock timestamp in ms.
 --- @param app_id       string|nil  The focused app identifier (from window_info).
 --- @param scancode     number|nil  Physical evdev code captured at keydown.
-function M.on_keydown(ch, timestamp_ms, app_id, scancode)
+local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if not may_record() then return end
 
 	-- A correction is an input event but types nothing, so neither speed readout
@@ -573,6 +576,15 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 		-- the delays are capped, so summing them drifts across every real pause.
 		pending.times[#pending.events] = timestamp_ms
 	end
+end
+
+--- Records one typed character (or the Backspace marker) for the metrics.
+--- Counted and, at DEBUG, timed: this runs once per keystroke.
+function M.on_keydown(ch, timestamp_ms, app_id, scancode)
+	local started = Perf.clock()
+	Perf.count("keystats.ingests")
+	ingest_keydown(ch, timestamp_ms, app_id, scancode)
+	Perf.span("keystats.ingest", started)
 end
 
 --- Records one physical Backspace press as a manual correction.
@@ -2081,10 +2093,9 @@ local function flush_json()
 	return true
 end
 
---- Dispatches or retries one immutable flush snapshot; false never means saved.
---- @return boolean True only after durable COMMIT and native cleanup ACK.
-function M.flush()
-	if _flush_stopping then return false end
+--- The flush body: retries a retained snapshot, else dispatches a new one.
+--- @return boolean
+local function flush_dispatch()
 	if _flush_state then
 		local operation = _flush_state.operation
 		if operation and operation:is_retryable() then
@@ -2095,6 +2106,18 @@ function M.flush()
 	end
 	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush() end
 	return flush_json()
+end
+
+--- Dispatches or retries one immutable flush snapshot; false never means saved.
+--- Counted and, at DEBUG, timed.
+--- @return boolean True only after durable COMMIT and native cleanup ACK.
+function M.flush()
+	if _flush_stopping then return false end
+	local started = Perf.clock()
+	Perf.count("keystats.flushes")
+	local result = flush_dispatch()
+	Perf.span("keystats.flush", started)
+	return result
 end
 
 --- Quiesces producers and waits for exact native retirement, independently of

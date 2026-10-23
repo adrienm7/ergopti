@@ -44,6 +44,7 @@ local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
+local Perf = require("infra.perf_counters")
 local NumberPolicy = require("number_policy")
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
@@ -74,7 +75,14 @@ local _test_runner = nil
 -- Every real exit is reported through one throttled recorder: the program name,
 -- the status and the duration, never the command line, which can carry user
 -- text in a heredoc. A child that hung or failed used to leave no trace at all.
-local _record_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
+local _log_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
+
+--- Counts the child (the forks per key and per startup are the figure that
+--- matters), then reports its exit as above.
+local function _record_exit(name, status, duration_ms)
+	Perf.count("shell.spawns")
+	return _log_exit(name, status, duration_ms)
+end
 
 
 
