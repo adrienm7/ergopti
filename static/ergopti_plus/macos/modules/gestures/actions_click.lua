@@ -27,6 +27,7 @@ local Logger          = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput  = require("adapters.synthetic_input")
 local Timings         = require("infra.timings")
+local TimerScheduler  = require("adapters.timer_scheduler")
 local LOG             = "gestures.click"
 
 -- Delay to ignore the spurious mouseUp from the gesture’s own finger-lift
@@ -545,7 +546,7 @@ end
 --- Constructs one generation-fenced drag/release tap without starting it.
 --- @param side string Either "left" or "right".
 --- @param generation integer Prospective side generation.
---- @param started_at number Hold-start timestamp for the finger-lift cooldown.
+--- @param started_at number Monotonic hold-start time for the finger-lift cooldown.
 --- @return table|userdata|nil candidate Exact constructed drag tap.
 --- @return string|nil detail Constructor refusal detail.
 local function construct_side_tap(side, generation, started_at)
@@ -563,7 +564,7 @@ local function construct_side_tap(side, generation, started_at)
 
 		local event_type = e:getType()
 		if event_type == mouse_up_type then
-			if hs.timer.secondsSinceEpoch() - started_at < CLICK_COOLDOWN_SEC then return true end
+			if TimerScheduler.awake_time() - started_at < CLICK_COOLDOWN_SEC then return true end
 			-- The physical mouseUp is the only crash-proof release capability: fence
 			-- internal ownership synchronously, then let that exact event reach Quartz
 			local owner_parent = side_parent(side)
@@ -795,7 +796,7 @@ local function acquire_hold(side, parent)
 	end
 
 	local tap_generation = side_generation(side) + 1
-	local started_at = hs.timer.secondsSinceEpoch()
+	local started_at = TimerScheduler.awake_time()
 	local drag_candidate, drag_error = construct_side_tap(side, tap_generation, started_at)
 	if not drag_candidate then
 		return reject_hold_acquisition(side,
