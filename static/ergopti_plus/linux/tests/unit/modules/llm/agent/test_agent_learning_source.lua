@@ -101,16 +101,17 @@ helpers.describe("agent learning quarantine ownership", function()
 				local source = PREFIX .. "7" .. SUFFIX
 				with_source(source, function(Learning, path, config)
 					local open, fault, handles, opened, closed = io.open, true, {}, 0, 0
+					local Reader = require("infra.regular_file_reader")
+					local open_source, wrapped = Reader.open_source, {}
 					local function refused()
 						if refusal == "throw" then error("controlled stream refusal", 0) end
 						if refusal == "false" then return false end
 						return nil
 					end
-					io.open = function(candidate, mode)
-						local file, detail, errno = open(candidate, mode)
-						if not file or not fault or candidate ~= path or mode ~= "r" then return file, detail, errno end
+					local function wrap(file, detail, errno)
+						if not file or not fault or wrapped[file] then return file, detail, errno end
 						handles[#handles + 1] = file; opened = opened + 1
-						return {
+						local stream = {
 							read = function(_, ...)
 								if boundary == "read" then return refused() end
 								return file:read(...)
@@ -121,6 +122,18 @@ helpers.describe("agent learning quarantine ownership", function()
 								return true
 							end,
 						}
+						wrapped[stream] = true
+						return stream
+					end
+					-- Both legacy stdio and descriptor-admitted sources own the same
+					-- stream receipts; never depend on a /proc/self/fd alias spelling.
+					io.open = function(candidate, mode)
+						if candidate == path and mode == "r" then return wrap(open(candidate, mode)) end
+						return open(candidate, mode)
+					end
+					Reader.open_source = function(candidate)
+						if candidate == path then return wrap(open_source(candidate)) end
+						return open_source(candidate)
 					end
 					local okay, detail = xpcall(function()
 						local called, threshold = pcall(Learning.threshold, config, "Mail", "calendar")
@@ -140,7 +153,7 @@ helpers.describe("agent learning quarantine ownership", function()
 						helpers.assert_eq(saved.apps.Mail.used, 8)
 						helpers.assert_eq(saved.apps.Mail.thresholds.calendar, accepted)
 					end, debug.traceback)
-					io.open = open
+					io.open, Reader.open_source = open, open_source
 					for _, handle in ipairs(handles) do pcall(handle.close, handle) end
 					if not okay then error(detail, 0) end
 				end)
@@ -152,9 +165,15 @@ helpers.describe("agent learning quarantine ownership", function()
 		local source = PREFIX .. "7" .. SUFFIX
 		with_source(source, function(Learning, path, config)
 			local open, fault = io.open, true
+			local Reader = require("infra.regular_file_reader")
+			local open_source = Reader.open_source
 			io.open = function(candidate, mode)
 				if fault and candidate == path and mode == "r" then return nil, "controlled read refusal", 13 end
 				return open(candidate, mode)
+			end
+			Reader.open_source = function(candidate)
+				if fault and candidate == path then return nil, "controlled read refusal", 13 end
+				return open_source(candidate)
 			end
 			local okay, detail = xpcall(function()
 				helpers.assert_eq(Learning.threshold(config, "Mail", "calendar"), config.system1.threshold)
@@ -172,7 +191,7 @@ helpers.describe("agent learning quarantine ownership", function()
 				helpers.assert_eq(saved.apps.Mail.used, 8)
 				helpers.assert_eq(saved.apps.Mail.thresholds.calendar, learned)
 			end, debug.traceback)
-			io.open = open
+			io.open, Reader.open_source = open, open_source
 			if not okay then error(detail, 0) end
 		end)
 	end)
@@ -236,6 +255,40 @@ helpers.describe("agent learning quarantine ownership", function()
 				os.rename, Move.move = rename, move
 				if not okay then error(detail, 0) end
 			end)
+		end)
+	end
+end)
+
+helpers.describe("agent learning native source admission", function()
+	for _, candidate in ipairs({
+		{ kind = "fifo", mode = "threshold" },
+		{ kind = "fifo", mode = "record" },
+		{ kind = "fifo-symlink", mode = "threshold" },
+		{ kind = "directory", mode = "threshold" },
+		{ kind = "regular-symlink", mode = "threshold" },
+		{ kind = "regular", mode = "threshold" },
+	}) do
+		helpers.it("(agent-learning-native-source) bounds " .. candidate.kind .. " " .. candidate.mode, function()
+			local Shell = require("adapters.shell_runner")
+			local folder = os.tmpname()
+			assert(os.remove(folder))
+			assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
+			local okay, detail = xpcall(function()
+				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+				local fixture = helpers.driver_root() .. "/tests/fixtures/native_agent_learning_source.lua"
+				-- A regression waits in open(2). timeout owns and reaps this worker;
+				-- the caller owns its directory even when that deadline expires.
+				local completed = Shell.run("timeout --kill-after=2 5 " .. Shell.quote(executable)
+					.. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder)
+					.. " " .. Shell.quote(candidate.kind) .. " " .. Shell.quote(candidate.mode))
+				helpers.assert_true(completed, "native source worker must return without waiting for a FIFO peer")
+				helpers.assert_eq(read(folder .. "/complete"), "complete", "the worker acknowledged every source assertion")
+			end, debug.traceback)
+			for _, leaf in ipairs({ "source", "target", "source.corrupt", "source.corrupt.1", "source.tmp", "complete" }) do
+				os.remove(folder .. "/" .. leaf)
+			end
+			assert(os.remove(folder), "every owned native fixture entry must be removed")
+			if not okay then error(detail, 0) end
 		end)
 	end
 end)
