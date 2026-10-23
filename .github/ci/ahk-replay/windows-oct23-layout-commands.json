@@ -1,0 +1,9 @@
+{
+	"expected_count": 3,
+	"filters": [
+		{
+			"contains": "layout-manager-paused-command-owner",
+			"expected_count": 3
+		}
+	]
+}
