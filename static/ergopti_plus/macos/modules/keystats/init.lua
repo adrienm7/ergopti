@@ -1875,7 +1875,7 @@ function M.show_metrics()
 		Logger.info(LOG, "Metrics UI opened.")
 	else
 		Logger.error(LOG, "Failed to load metrics UI — ui.metrics_typing not found.")
-		dialog.alert(i18n.get("keystats.error_title"),
+		dialog.block_alert(i18n.get("keystats.error_title"),
 			i18n.get("keystats.error_body"),
 			i18n.get("button.ok"))
 	end

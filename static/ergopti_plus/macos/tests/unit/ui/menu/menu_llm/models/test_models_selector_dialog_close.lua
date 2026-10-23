@@ -9,12 +9,27 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local WarningContract = require("tests.support.dialog_warning_contract")
 
 local function with_fixture(callback, initial_state)
-	helpers.with_fresh_modules({
+	helpers.with_stub_scope({
 		"ui.menu.menu_llm.models_selector", "infra.i18n", "infra.logger",
 		"infra.dialog_util", "infra.deferred_work", "ui.ui_builder",
 		"hs", "tests.stubs.hs",
+		"ui.menu.menu_llm.backend_labels",
+		"infra.manifest_menu",
+		"adapters.json_codec",
+		"infra.paths",
+		"menu.renderer",
+		"compat.utf8",
+		"logger.shim",
+		"toml_codec.leaf_rows",
+		"toml_codec.codec",
+		"toml_codec.key_path",
+		"toml_codec.record_scanner",
+		"toml_codec.bom",
+		"toml_codec.basic_string",
+		"native_path",
 	}, function()
 		local controls = {delete_throws = false, disable_mode = "success", save_mode = "success"}
 		local context = {
@@ -54,6 +69,14 @@ local function with_fixture(callback, initial_state)
 				return "button.remove"
 			end,
 		}
+		local dialogs = package.loaded["infra.dialog_util"]
+		local confirm_removal = dialogs.block_alert
+		context.warnings = WarningContract.attach(dialogs)
+		local present_warning = dialogs.block_alert
+		dialogs.block_alert = function(title, message, button, ...)
+			if message == "menu.llm.empty_model_id" then return present_warning(title, message, button) end
+			return confirm_removal(title, message, button, ...)
+		end
 		package.loaded["infra.deferred_work"] = {
 			after = function(_delay, deferred_callback) deferred_callback(); return true end,
 		}
@@ -284,4 +307,23 @@ helpers.describe("shared user-model child preserves native removal acknowledgeme
 			end, state)
 		end)
 	end
+end)
+
+helpers.describe("custom model warning native signature", function()
+	helpers.it("presents the empty model warning after closing the owned form", function()
+		with_fixture(function(fixture)
+			fixture.action()
+			local bridge = fixture.context.bridges[1]
+			helpers.assert_eq(bridge.callback({ body = { action = "add", value = "  " } }), true)
+			helpers.assert_eq(fixture.context.warnings.shown, {
+				{ "menu.llm.custom_model_title", "menu.llm.empty_model_id", "OK" },
+			}, "The empty custom-model warning must remain visible after the form closes")
+			helpers.assert_eq(fixture.context.warnings.refused, 0)
+			helpers.assert_eq(fixture.context.deletes, 1)
+			helpers.assert_eq(bridge.callback, nil)
+			helpers.assert_eq(#fixture.state.llm_user_models, 0)
+			helpers.assert_eq(fixture.context.saves, 0)
+			helpers.assert_eq(#fixture.context.switches, 0)
+		end)
+	end)
 end)

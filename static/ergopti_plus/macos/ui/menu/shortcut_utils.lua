@@ -266,7 +266,7 @@ function M.prompt_shortcut(opts)
 		return apply_prompt_update(opts.on_apply, parsed.mods, parsed.key)
 	end
 
-	pcall(dialog.alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"))
+	pcall(dialog.block_alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"), i18n.get("button.ok"))
 	return false
 end
 
