@@ -42,6 +42,8 @@ const LABELS = Object.freeze({ arm64: 'Apple silicon', amd64: 'Intel' });
 // The visible cell names, macOS version included, come from the stage plan owner.
 const { roleLot } = require('./macos-stage-roles.cjs');
 const POLL_MILLISECONDS = 15000;
+// Readings of one listing before a listing that keeps shifting is an error.
+const LISTING_ATTEMPTS = 5;
 
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -395,14 +397,28 @@ async function api(route) {
  * @returns {Promise<object[]>}
  */
 async function listAll(route, key, read = api) {
-	const rows = [];
-	for (let page = 1; ; page++) {
-		const body = await read(
-			route + (route.includes('?') ? '&' : '?') + 'per_page=' + API_PAGE_SIZE + '&page=' + page
-		);
-		rows.push(...body[key]);
-		if (body[key].length < API_PAGE_SIZE) return rows;
+	// A record created while the pages are read pushes the older ones down a
+	// page, so one record comes back twice (run 39878950422 refused its own
+	// managed Ollama inputs as a duplicate). Such a torn listing is read again
+	// from its first page; two records with distinct ids still reach the caller.
+	for (let attempt = 1; attempt <= LISTING_ATTEMPTS; attempt++) {
+		const rows = [];
+		const ids = new Set();
+		let torn = false;
+		for (let page = 1; ; page++) {
+			const body = await read(
+				route + (route.includes('?') ? '&' : '?') + 'per_page=' + API_PAGE_SIZE + '&page=' + page
+			);
+			for (const row of body[key]) {
+				if (ids.has(row.id)) torn = true;
+				ids.add(row.id);
+				rows.push(row);
+			}
+			if (body[key].length < API_PAGE_SIZE) break;
+		}
+		if (!torn) return rows;
 	}
+	throw new Error('The ' + key + ' listing kept shifting while it was read');
 }
 
 async function awaitArtifact(context, deadlineMinutes, choose = select, what = 'build handoff') {

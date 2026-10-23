@@ -634,6 +634,28 @@ const paging = (async () => {
 		[1, 2, 3].map((page) => '/runs/1/jobs?filter=latest&per_page=50&page=' + page)
 	);
 	controls++;
+	// A record created between two page reads pushes the last record of page 1
+	// onto page 2: that torn listing is read again, never handed on with a copy.
+	const artifacts = Array.from({ length: API_PAGE_SIZE + 1 }, (_, id) => ({ id }));
+	let shifted = 0;
+	const tornRead = async (route) => {
+		const page = Number(/&page=(\d+)$/.exec(route)[1]);
+		if (page === 2 && shifted++ === 0)
+			return { artifacts: [artifacts[API_PAGE_SIZE - 1], artifacts[API_PAGE_SIZE]] };
+		return { artifacts: artifacts.slice((page - 1) * API_PAGE_SIZE, page * API_PAGE_SIZE) };
+	};
+	assert.deepEqual(await Handoff.listAll('/runs/1/artifacts', 'artifacts', tornRead), artifacts);
+	assert.equal(shifted, 2, 'the torn listing is read once more from its first page');
+	controls++;
+	const alwaysTorn = async (route) =>
+		Number(/&page=(\d+)$/.exec(route)[1]) === 1
+			? { artifacts: artifacts.slice(0, API_PAGE_SIZE) }
+			: { artifacts: [artifacts[0]] };
+	await assert.rejects(
+		Handoff.listAll('/runs/1/artifacts', 'artifacts', alwaysTorn),
+		/kept shifting/
+	);
+	controls++;
 })();
 
 paging.then(
