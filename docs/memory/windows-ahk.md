@@ -1166,22 +1166,39 @@ keyboard defaults) exactly. The suite watchdog is `_SUITE_MAX_TIMEOUT_MS` (120
 min, pinned by `test-ahk-suite-manifest.cjs`): shard the suite rather than
 raising it.
 
-### project-windows-system32-curl-has-no-ntlm
+### project-windows-managed-transport-is-winhttp
 
-Microsoft's System32 `curl.exe` dropped NTLM: curl 8.21.0, shipped with
-hosted image windows-2025-vs2026 20261018 (OS build 26100.33650), lists no
-`NTLM` in its `curl -V` Features. The managed transport launches that binary
-and, when its capability receipt has no NTLM, refuses a proxy that offers NTLM
-alone (`ergopti_curl_attempt.ps1`, "The observed proxy authentication feature
-is unavailable"). A user behind an NTLM-only company proxy therefore gets no
-managed request on an up-to-date Windows; Negotiate proxies are unaffected.
-Every case whose proxy offers NTLM alone (the two `test_managed_remote_sspi.ahk`
-cases and the artifact staging case of `test_updater_curl_artifact.ahk`)
-reports NOT EXECUTED through `TestRequireHostCurlNtlm` on such a host and
-still runs, and fails, on a curl that lists NTLM or whose features are
-unknown. Hosted jobs land on either image for a while, so compare the
-`Runner Image` version of a passing and a failing job before blaming code. Action: ship an owned
-SSPI-capable curl (TODO item 62), then confirm both cases execute again.
+The managed remote requests (`CurlAsyncRequest`, `vendor/ergopti_managed_http_worker.ps1`,
+the updater artifact download and the Ollama archive download) use the Windows
+system HTTP stack through `vendor/ergopti_winhttp_transport.ps1`, not
+`System32\curl.exe`: Microsoft's curl 8.21.0 (hosted image 20261018) lists no
+`NTLM`, so a curl transport refused an NTLM-only company proxy. WinHTTP answers
+Negotiate and NTLM proxies with the signed-in session and trusts the Windows
+store. curl.exe remains only for the loopback Ollama requests. Facts that cost
+time and are not obvious from the code:
+
+- WinHTTP never sends a loopback destination through a named proxy, so a
+  fixture that must exercise CONNECT or a proxied request names a host (the
+  owned proxy tunnels every CONNECT to its TLS service).
+- `WINHTTP_OPTION_AUTOLOGON_POLICY` HIGH blocks the proxy logon too, and
+  `WinHttpSetCredentials(NULL, NULL)` does not restore it; the origin server is
+  protected instead by `WINHTTP_DISABLE_AUTHENTICATION` on DIRECT requests and
+  by the default policy on proxied ones (an origin behind a proxy does not
+  bypass it, so it gets no logon). `winhttp_transport_controls.ps1` proves both
+  with an SSPI origin and proxy.
+- `WinHttpAddRequestHeaders` with REPLACE and an empty value means "remove" and
+  fails with 12150 on a fresh request; an empty header is added without REPLACE.
+- An untrusted chain wins over a name or date flag when one status must be
+  chosen (`untrusted_certificate`), and best-effort revocation retries only
+  when the single flag is "revocation check failed".
+- The native CA cases (`managed remote native`, `updater native`, the two
+  `test_managed_remote_sspi.ahk` cases, the artifact staging case) install
+  their root in CurrentUser, which raises the Windows security warning that
+  needs a click. Headless they fail at `Machine root-store scope requires...`
+  when `ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE=LocalMachine` is set without
+  elevation; run them from an elevated shell or accept the prompt by hand.
+- `run_all.ahk` replaces a running copy of itself: launch a private,
+  uniquely named copy, or two agents kill each other's runs with exit code 0.
 
 ### project-windows-tls-fixture-git-prefix
 
