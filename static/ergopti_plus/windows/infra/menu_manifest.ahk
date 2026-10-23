@@ -273,6 +273,8 @@ _MM_DebugFallback() {
 		Map("id", "open_error_log"),
 		Map("id", "---"),
 		Map("id", "healthcheck"),
+		Map("id", "send_probe"),
+		Map("id", "hook_probe"),
 		Map("id", "report_bug"),
 		Map("id", "suggest_feature"),
 	]

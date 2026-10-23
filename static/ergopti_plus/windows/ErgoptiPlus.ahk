@@ -497,6 +497,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
+#Include infra/input_probe.ahk
 #Include infra/driver_control.ahk
 #Include ui/error_dialog/init.ahk
 #Include ui/update_check/init.ahk
