@@ -574,3 +574,5 @@ _UMF_ActualCompletionAdmissionRestoresCriticalAndCurrentOwner() {
 
 Test("Updater managed failure: actual completion admission preserves current worker and Critical boundaries",
 	_UMF_ActualCompletionAdmissionRestoresCriticalAndCurrentOwner)
+
+#Include test_updater_install_phase_owner.ahk
