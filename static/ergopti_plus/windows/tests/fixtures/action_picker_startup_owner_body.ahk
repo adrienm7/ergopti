@@ -89,6 +89,10 @@ _APSO_Create(Hwnd) {
 	if _APSO.Controllers.Length > 1 || _APSO.Mode == "current"
 		return Controller
 	_APSO.Pending := Promise.withResolvers()
+	; The timer port has an independent settlement consumer so Promise.task does
+	; not report an unobserved rejection before the suspended await resumes.
+	; These callbacks never change its state or replace the rejecting await.
+	_APSO.Pending.promise.onSettled((*) => 0, (*) => 0)
 	_APSO.Boundary := _APSO_CloseDuringCreate
 	SetTimer(_APSO.Boundary, -1)
 	return _APSO.Pending.promise.await(3000)
