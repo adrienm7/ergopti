@@ -108,12 +108,16 @@ a sealed Windows updater source, reseal with
       authenticated event stream, non-hook handler conversion, chained/repeat semantics). Regenerate
       the DLL and manifest only through the official MSVC generator; check the patches in
       `docs/handovers/2026-10-12-dev-consolidation/` against the tree first.
-      Status 2026-10-24: Debug > Record keyboard hook order (`windows/infra/input_probe.ahk`) and the
-      terminal-capture consumer audit in
-      [windows-input-hooks-items-49-50.md](todo-agents/windows-input-hooks-items-49-50.md) are in;
-      left: the maintainer's run (`rehook=yes` needs the driver as the only AutoHotkey hook), the
-      terminal-capture hardware list, and the MSVC-dependent native work. Decide whether the
-      `SetWindowsHookExW` string in the exe is acceptable for antivirus (the AV-surface gate allows it).
+      Measured on the maintainer's PC (Debug > Record keyboard hook order, 2026-10-24): before a
+      SendInput the test hook is first; after it the AutoHotkey hook is first, so SendInput does
+      reinstall the AutoHotkey hook in front of any hook installed earlier. Consumers that rely on
+      their own hook staying ahead of AutoHotkey's (the native nav owner DLL, item 91) lose that
+      position at the first SendInput of the hot paths. Consumer audit:
+      [windows-input-hooks-items-49-50.md](todo-agents/windows-input-hooks-items-49-50.md). Left:
+      decide per consumer whether to avoid SendInput (SendEvent does not rehook, at 2.7 to 3.4 times
+      the latency, item 50) or to make the consumer order-independent (single-hook/RawInput source,
+      needs an MSVC DLL and manifest); the terminal-capture hardware list; the `SetWindowsHookExW`
+      string in the exe for antivirus (the AV-surface gate allows it).
 - [ ] **91. Simultaneous and first-key hold arbitration.** [CODE] Integrate with the
       single-hook/RawInput source (needs a genuine MSVC DLL and manifest pair); [PHYS-W]
       held-alone-then-joined order, AltGr hook provenance.
@@ -124,9 +128,9 @@ a sealed Windows updater source, reseal with
       both modes): expansion median 50.6 ms (SendInput) vs 136.8 ms (SendEvent), prediction 56.1 vs
       191.0 ms, paste 3.6 vs 3.8 ms, a concurrent key during the send 201 vs 282 ms. SendInput is 2.7
       to 3.4 times faster and no less exact, so the hotstring send/dispatch, text sender and config I/O
-      keep SendInput; the global `SendMode("Event")` stays only where a consumer needs the hook-order
-      semantics of item 49. Left: drop or justify that global once the hook-order check (item 49) has
-      run on the PC.
+      keep SendInput on speed alone, but item 49 now shows that every SendInput moves the AutoHotkey hook
+      ahead of the others: the choice per consumer is open there (global `SendMode("Event")` exists
+      for that reason).
 - [ ] **Per-layer layout composer.** [CODE] Decided 2026-10-22: the per-row number-row switches do
       not cover the October 13 request. Not started. Spec: split the layout into four layers (base,
       Shift, AltGr, Shift+AltGr), each with a dropdown that takes that layer from any layout (for
@@ -251,7 +255,7 @@ Added October 22 (from the agents' reports; details in their commits):
       line cap judged per line (5deb892d58); Ollama 412 upgrade request shown (08aaeaf3c2);
       diagnostics PAC probe on the three OS (f798aae1f9); one-click Debug checks (lease, owned
       runtime, network, 30 s key accounting). Left: (1) read the Mac's next log lines `Slow ingest
-  tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
+tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
       phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
       Jan) all answer "Network request failed"; (4) `keymap/utils.lua` ignored-window TTL probe
       (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
