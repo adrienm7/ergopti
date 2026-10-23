@@ -30,6 +30,7 @@ _SOW_CreateZero(Opts) {
 _SOW_DrawOk(Hwnd, PaintFn) {
 	global _SOW_Events
 	_SOW_Events.Push("draw:" . Hwnd)
+	return true
 }
 
 _SOW_DrawFails(Hwnd, PaintFn) {
