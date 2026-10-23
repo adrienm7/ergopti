@@ -1646,6 +1646,14 @@ local function main()
 		-- daemon happens to own would make the dashboard a picture of the driver's
 		-- configuration rather than of the user's habits.
 		if key_name == "shortcut" and type(detail) == "table" then
+			local mods = type(detail.mods) == "table" and detail.mods or {}
+			local key = keyboard_shortcuts.collision_identity(detail.key)
+			-- These standard edits change text or selection without on_char input.
+			-- Withdraw before dispatch so a bound action can start its own request.
+			if prediction_engine and mods.ctrl and not (mods.alt or mods.meta or mods.altgr)
+				and (key == "v" or key == "z" or (not mods.shift and (key == "x" or key == "y" or key == "a"))) then
+				pcall(function() prediction_engine.withdraw() end)
+			end
 			secure_focus_guard.blocks_text()
 			local chord = keyboard_shortcuts.chord_name(detail)
 			if chord then
