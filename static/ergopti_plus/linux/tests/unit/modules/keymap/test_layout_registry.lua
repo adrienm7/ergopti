@@ -682,3 +682,46 @@ require("test.layout_composer_contract")(helpers, Json, {
 		return count
 	end,
 })
+
+require("test.composer_check_contract")(helpers, Json, {
+	name = "Linux",
+	manager = manager,
+	files = shipped_files,
+	config_dir = "/cfg/",
+	local_dir = LOCAL_DIR,
+	installed_copy = LOCAL_DIR .. "composed.keylayout",
+	-- The Python children are controlled: every one succeeds and is recorded.
+	prepare = function(deps, state)
+		deps.run = function(program, args, run_options, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
+			callback(INSTALLED_RUN)
+			return true
+		end
+	end,
+	env = function(overrides)
+		return helpers.load_module("modules.keymap.composer_check").env(overrides)
+	end,
+	selections = function(state)
+		local count = 0
+		for _, item in ipairs(state.runs) do
+			for _, value in ipairs(item.args) do
+				if value == "activate" then count = count + 1 end
+			end
+		end
+		return count
+	end,
+	ready_step = "composer_ready=pass:verified",
+	-- The installer is not run again for a composition that already exists.
+	existing_ready_step = "composer_ready=info:not_reprobed",
+	-- The installer installs the layout but could not verify it.
+	readiness_failure = function(fresh)
+		local registry, deps, state = fresh()
+		deps.run = function(program, args, run_options, callback)
+			state.runs[#state.runs + 1] = { program = program, args = args, timeout_ms = run_options.timeout_ms }
+			callback({ exit_code = 0, stdout = '{"ok": true, "verified": false, "detail": "installed"}\n', stderr = "" })
+			return true
+		end
+		return registry, deps, state
+	end,
+	readiness_failure_step = "composer_ready=fail:unverified",
+})

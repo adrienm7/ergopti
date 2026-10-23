@@ -509,6 +509,7 @@ return {
 	"tests.unit.modules.keymap.test_layout_catalogue",
 	"tests.unit.modules.keymap.test_layout_registry",
 	"tests.unit.modules.keymap.test_layout_selection_owner",
+	"tests.unit.ui.composer_check.test_composer_check_window",
 	"tests.unit.modules.keymap.test_layout_registry_channel",
 	"tests.unit.modules.llm.settings.test_llm_settings",
 	"tests.unit.modules.llm.prediction.test_prediction_messages",

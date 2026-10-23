@@ -2247,6 +2247,9 @@ local function main()
 			end,
 			-- The bridge opens its window: it replaces an open one and resets its mode
 			on_healthcheck = function() require("ui.healthcheck.bridge").open() end,
+			-- The composer check installs the shipped check composition, verifies it and
+			-- removes it again; it reports in a dialog and in one evidence record
+			on_composer_check = function() require("ui.composer_check").run() end,
 			on_show_setup_wizard = function()
 				if webview_manager then
 					webview_manager.show("onboarding")
