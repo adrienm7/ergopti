@@ -61,7 +61,7 @@ class _LCPC_Handle {
 _LCPC_Spawn(World, Executable, Args, Done) {
 	_LCPC_Require(Executable == A_AhkPath && Args is Array && Args.Length == (World.Client == "range:typing" ? 18 : 15),
 		"the actual request must provide its process ABI")
-	_LCPC_Require(Args[4] == "--keylogger-prefetch-worker" && Args[5] == (World.Client == "apps" ? "apps" : "typing")
+	_LCPC_Require(Args[4] == "--keystats-prefetch-worker" && Args[5] == (World.Client == "apps" ? "apps" : "typing")
 		&& Args[6] == World.Directory && Args[7] == (World.Client == "range:typing" ? "range" : "full"),
 		"the actual client and mode must own the request")
 	for Arg in Args
@@ -131,7 +131,7 @@ _LCPC_Main() {
 	_LCPC_World := World
 	_ConfigDir := Directory
 	TimingsLoadShared(A_Args[4])
-	KeyloggerWalkerLoadTimings()
+	KeystatsWalkerLoadTimings()
 	LoggerSetTestSink(_LCPC_Log.Bind(World))
 	_LCPC_Require(!A_IsSuspended && KLPFWorker.jobs.Count == 0 && _KLPF_CLEANUP_DEBTS.Count == 0
 		&& !IsObject(_KLPF_CLEANUP_TIMER), "the child may not borrow a worker or cleanup timer")
@@ -163,7 +163,7 @@ _LCPC_Main() {
 		}
 		Result := Ergopti_OnSuspendEnter()
 		Debt := LifecycleTransitionDebtSnapshot("suspend")
-		ExpectedOwner := Client == "range:typing" ? "keylogger-prefetch-range" : "keylogger-prefetch-" . Client
+		ExpectedOwner := Client == "range:typing" ? "keystats-prefetch-range" : "keystats-prefetch-" . Client
 		Retained := IsObject(Job) && KLPFWorker.jobs.Has(Client) && KLPFWorker.jobs[Client] == Job
 		FileAppend("RECEIPT suspend-prefetch " . Client . " " . Mode
 			. " result=" . Result . " native_suspended=" . A_IsSuspended . " retained=" . Retained
