@@ -40,6 +40,15 @@ _EDOT_Source(Root) {
 		. "global _LogsDir := " . _EDOT_Quote(Root . "\logs\") . "`n"
 		. "global ConfigurationFile := " . _EDOT_Quote(Root . "\config\absent.toml") . "`n"
 		. 'global _AhkSubDir := "autohotkey\", _ALTGR_KANA_FIXUP := false' . "`n"
+	; This metadata normalizer is needed by feature_state's top-level defaults.
+	CategoryOwner := _DriverProductionFileForSymbol("_CategoryEnabledKey", _DriverDir)
+	CategoryText := FSReadStrict(CategoryOwner)
+	CategoryFunction := _DriverExtractFunctionBody(&CategoryText, "_CategoryEnabledKey")
+	AssertTrue(CategoryFunction != "", "The category normalizer must retain its real production definition.")
+	CategoryCode := _DriverMaskNonCode(&CategoryFunction)
+	AssertEqual(1, _DriverTopLevelDefinitionCount(&CategoryCode, "_CategoryEnabledKey"),
+		"The child must receive exactly one canonical category normalizer.")
+	Source .= CategoryFunction . "`n"
 	for Vendor in ["Promise.ahk", "ComVar.ahk", "WebView2.ahk"] {
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
 		Source .= "_EDOS_Phase(" . _EDOT_Quote("included vendor " . Vendor) . ")`n"
