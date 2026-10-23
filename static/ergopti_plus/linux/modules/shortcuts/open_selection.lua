@@ -23,7 +23,9 @@
 ---    Ctrl+C is sent only to a known file manager: in a terminal it would
 ---    interrupt the running program. A compositor that names no focused
 ---    application (GNOME and KDE under Wayland) therefore keeps the opening
----    behaviour.
+---    behaviour unless the AT-SPI active frame names the application: the window
+---    manager's ACTIVE frame is the one window the user is in, and its process
+---    name is the identity the X11 path reports.
 --- ==============================================================================
 
 local M = {}
@@ -59,6 +61,11 @@ local DEFAULT_DEPS = {
 	message = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,
 	focused_app = function() return require("adapters.window_info").getFocused().appId end,
+	-- Bounded helper process with a hard deadline; needs a desktop session.
+	active_frame_app = function()
+		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
+		return snapshot and snapshot.app_id or nil
+	end,
 	read_uri_list = function()
 		return require("adapters.clipboard").read_selection_uri_list(
 			require("modules.gestures.combo_emitter").press, require("adapters.event_loop").sleep_ms)
@@ -212,6 +219,13 @@ end
 --- @return boolean True when paths were copied or a target was opened.
 function M.copy_selected_path(read_primary)
 	local app = deps.focused_app()
+	if type(app) ~= "string" or app == "" then
+		-- GNOME and KDE on Wayland name no foreground application.
+		app = deps.active_frame_app()
+		if app ~= nil then
+			Logger.info(LOG, "copy_selected_path: the AT-SPI active frame names the application '%s'.", tostring(app))
+		end
+	end
 	if is_file_manager(app) then
 		local copied = copy_file_selection()
 		if copied ~= nil then return copied end
