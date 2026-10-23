@@ -101,11 +101,14 @@ end
 helpers.describe("the remap bridge reaches the owned runtime only after an opt-in", function()
 	helpers.it("never requires the owner or its ports at load time", function()
 		local source = init_source()
+		local requires = 0
 		for line in source:gmatch("[^\n]+") do
 			if line:find("runtime_owner", 1, true) and line:find("require", 1, true) then
+				requires = requires + 1
 				helpers.assert_true(line:match("^%s") ~= nil, "a top-level require would load the owner at boot: " .. line)
 			end
 		end
+		helpers.assert_true(requires > 0, "the scan must find the owner require it guards")
 		helpers.assert_true(source:find('require("platform.remap.runtime_owner")', 1, true) ~= nil)
 	end)
 
