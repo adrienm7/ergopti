@@ -643,3 +643,5 @@ _LPP_EraseRequiresAtomicOutput() {
 }
 Test("LLM prompt prediction: only an atomic output may erase before its text",
 	_LPP_EraseRequiresAtomicOutput)
+
+#Include test_llm_failed_prediction_owner.ahk
