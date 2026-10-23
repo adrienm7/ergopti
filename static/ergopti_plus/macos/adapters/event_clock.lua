@@ -41,6 +41,12 @@ local NS_PER_MS = 1e6
 -- Recent ages whose minimum is the floor lateness is measured from.
 M.FLOOR_WINDOW = 32
 
+-- A physical event this much later than the freshest recent events waited
+-- behind the main thread: it is never consumed, replayed or answered with
+-- output, which macOS may already have overtaken. Every physical-input tap
+-- (keymap, tap keys, script control, modifier injector) shares this bound.
+M.STALE_PHYSICAL_EVENT_MS = 500
+
 -- The scale the last plausible age was read with, reused for durations.
 local _scale = nil
 local _ages = {}
@@ -96,6 +102,20 @@ function M.lateness_ms(event)
 		if age < floor then floor = age end
 	end
 	return best_age - floor, stamp
+end
+
+--- Whether an event reached the tap that reads it so late that macOS may
+--- already have delivered it without that tap (kCGEventTapDisabledByTimeout):
+--- consuming, replaying or answering it would act on a key the application
+--- already has. A late event passes untouched. An event whose age cannot be
+--- proven is never judged late.
+--- @param event userdata|table hs.eventtap event.
+--- @return boolean stale
+--- @return number|nil lateness_ms The measured lateness, or nil when unproven.
+--- @return integer|nil stamp The event's raw stamp, for duration_ms().
+function M.is_stale(event)
+	local lateness, stamp = M.lateness_ms(event)
+	return lateness ~= nil and lateness >= M.STALE_PHYSICAL_EVENT_MS, lateness, stamp
 end
 
 --- Returns the time between two raw stamps read by lateness_ms().

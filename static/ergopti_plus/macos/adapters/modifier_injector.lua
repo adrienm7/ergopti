@@ -28,6 +28,7 @@ local hs            = hs
 local Logger        = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
+local KeyEventHealth = require("infra.key_event_health")
 
 local LOG = "adapters.modifier_injector"
 
@@ -158,6 +159,10 @@ function M.arm(flags, on_applied)
 		if provenance or status == EventProvenance.STATUS_UNREADABLE then
 			return false, fence_events
 		end
+		-- A key that waited behind the main thread may already be in the
+		-- application: mutating it is useless and would spend the one-shot
+		-- modifier. It passes untouched and the arm stays for the next key.
+		if KeyEventHealth.passes_late_event(event) then return false, fence_events end
 		local applied = _on_applied
 		local committed = false
 		if applied then

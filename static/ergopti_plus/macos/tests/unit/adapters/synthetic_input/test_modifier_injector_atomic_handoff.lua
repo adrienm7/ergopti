@@ -166,4 +166,38 @@ helpers.describe("modifier injector: atomic post-eventtap policy handoff", funct
 		helpers.assert_eq(applied, 1,
 			"the committed policy callback must run exactly once")
 	end)
+
+	-- A key that waited behind the main thread may already be in the application
+	-- (stale-physical-event): the one-shot modifier must wait for the next key.
+	helpers.it("leaves a key that waited behind the main thread untouched and the arm live (stale-physical-event)", function()
+		local fixture = make_fixture(true)
+		local EventClock = require("adapters.event_clock")
+		EventClock.reset()
+		local host_ns = 3600 * 1e9
+		local saved = hs.timer.absoluteTime
+		hs.timer.absoluteTime = function() return host_ns end
+		local ok, err = pcall(function()
+			local applied = 0
+			helpers.assert_true(fixture.injector.arm({ cmd = true }, function()
+				applied = applied + 1
+			end))
+			local function stamped(ms_ago)
+				local event, observed = physical_key(false)
+				local stamp = math.floor(host_ns - ms_ago * 1e6)
+				event.timestamp = function() return stamp end
+				return event, observed
+			end
+			local fresh_floor = stamped(1)
+			EventClock.lateness_ms(fresh_floor)
+			local late, late_observed = stamped(1200)
+			helpers.assert_true(fixture.fire(late) == false, "the late key passes through")
+			helpers.assert_eq(late_observed.set_calls, 0, "no flag lands on a key the application may have")
+			helpers.assert_true(fixture.injector.is_armed(), "the modifier waits for the next key")
+			local fresh, fresh_observed = stamped(1)
+			fixture.fire(fresh)
+			helpers.assert_true(fresh_observed.flags.cmd == true, "the next fresh key carries it")
+		end)
+		hs.timer.absoluteTime = saved
+		if not ok then error(err, 0) end
+	end)
 end)

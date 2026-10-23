@@ -80,6 +80,43 @@ helpers.describe("shortcuts.actions.system: the tap-key tap (tap-keys)", functio
 		end)
 	end)
 
+	-- A press that waited behind the main thread may already be in the
+	-- application (stale-physical-event): consuming it and running the action
+	-- would type the key and run the action.
+	helpers.it("lets a press that waited behind the main thread pass untouched (stale-physical-event)", function()
+		with_fixture(function()
+			local sys, spy = make_sys_screenshot_spies()
+			local ran = 0
+			sys.bind_tap_keys(nil, function()
+				return function() ran = ran + 1 return true end
+			end)
+			local properties = spy.hs.eventtap.event.properties
+			local EventClock = require("adapters.event_clock")
+			local Health = require("infra.key_event_health")
+			EventClock.reset()
+			Health.reset()
+			local host_ns = 3600 * 1e9
+			local saved = hs.timer.absoluteTime
+			hs.timer.absoluteTime = function() return host_ns end
+			local ok, err = pcall(function()
+				local function stamped(ms_ago)
+					local event = key_down(27, {}, false, properties)
+					local stamp = math.floor(host_ns - ms_ago * 1e6)
+					event.timestamp = function() return stamp end
+					return event
+				end
+				helpers.assert_eq(spy.captured_cb(stamped(1)), true, "a fresh press is consumed")
+				helpers.assert_eq(spy.captured_cb(stamped(1200)), false,
+					"a press the tap saw 1.2 s late reaches the application as typed")
+				run_screenshot_deferred(spy)
+				helpers.assert_eq(ran, 1, "only the fresh press ran the action")
+				helpers.assert_eq(Health.counts().stale_passed, 1)
+			end)
+			hs.timer.absoluteTime = saved
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("refuses a tap without a decision function", function()
 		with_fixture(function()
 			local sys = make_sys_screenshot_spies()
