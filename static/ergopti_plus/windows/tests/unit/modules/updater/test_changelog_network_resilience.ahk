@@ -929,3 +929,5 @@ _CNR_ControlledNativePacPaths() {
 	}
 }
 Test("system proxy native: actual unresolved fixture paths retain shared defaults (native-pac-unresolved-root)", _CNR_ControlledNativePacPaths)
+
+#Include test_changelog_managed_json_utf8.ahk
