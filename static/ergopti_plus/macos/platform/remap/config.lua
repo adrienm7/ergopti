@@ -38,6 +38,7 @@ local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
 local Outdated = require("config_outdated")
+local KePaths = require("platform.remap.ke_paths")
 
 local LOG = "karabiner"
 
@@ -101,6 +102,16 @@ end
 M.INTEGRATION_ENABLED_DEFAULT = true
 local INTEGRATION_SECTION = "karabiner"
 local INTEGRATION_KEY = "integration_enabled"
+--- Hidden `[karabiner] runtime`: which Karabiner runtime the generated rules
+--- target (ADR 011). `shared` (the absent default) is the official application
+--- and the user's karabiner.json; `owned` is the Ergopti background runtime and
+--- its own complete configuration. It is deliberately not a menu row and not in
+--- the shared manifest: the owned runtime is not shipped, so only a user who
+--- edits config_karabiner.toml by hand opts in. A value that is not one of the
+--- two names refuses the whole file, like a corrupt one, because a typo must not
+--- silently select the other runtime.
+M.RUNTIME_DEFAULT = KePaths.RUNTIME_SHARED
+local RUNTIME_KEY = "runtime"
 -- Builds before 2026-09-22 defaulted to off and wrote `[karabiner] enabled =
 -- false` on first launch; later builds ignored it. It is not the user's
 -- answer to the switch, so it is ignored and retained until explicit cleanup.
@@ -547,6 +558,17 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 		integration_enabled = integration[INTEGRATION_KEY]
 	end
+	local runtime = M.RUNTIME_DEFAULT
+	if integration ~= nil and integration[RUNTIME_KEY] ~= nil then
+		local value = integration[RUNTIME_KEY]
+		if value ~= KePaths.RUNTIME_SHARED and value ~= KePaths.RUNTIME_OWNED then
+			Logger.error(LOG, "[%s] %s in '%s' must be \"%s\" or \"%s\", got %s — refusing the unsafe user config.",
+				INTEGRATION_SECTION, RUNTIME_KEY, user_config_path, KePaths.RUNTIME_SHARED,
+				KePaths.RUNTIME_OWNED, tostring(value))
+			return nil, "error"
+		end
+		runtime = value
+	end
 	report_retired_integration(integration, user_config_path)
 
 	-- Saves are sparse against the neutral state: an absent table, key, slot or
@@ -657,6 +679,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
 	return {
 		enabled                   = integration_enabled,
+		runtime                   = runtime,
 		tap_holds_enabled         = tap_holds_enabled,
 		mod_combos_enabled        = mod_combos_enabled,
 		tap_hold_config           = tap_hold_config,
