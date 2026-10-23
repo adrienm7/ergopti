@@ -359,3 +359,5 @@ Test("_LLM_Ollama_NextStreamUid: returns non-empty string", _OllamaStreamUid_IsN
 #Include %A_LineFile%/../test_llm_api_ollama_final_flush.ahk
 
 #Include %A_LineFile%/../test_llm_api_ollama_stream_utf8.ahk
+
+#Include %A_LineFile%/../test_llm_api_ollama_stream_nul.ahk
