@@ -600,11 +600,17 @@ _ActPickWeb_Close() {
 	global _ActPickWeb_Gui
 	saved := (_ActPickWeb_Gui != 0) ? _ActPickWeb_Gui : 0
 	_ActPickWeb_Reset()
+	; Native Destroy can dispatch a successor. Detach only this retained window
+	; before that callout, and never clear a replacement published during Reset.
+	PreviousCritical := Critical("On")
+	try {
+		if _ActPickWeb_Gui == saved
+			_ActPickWeb_Gui := 0
+	} finally Critical(PreviousCritical)
 	try {
 		if saved
 			saved.Destroy()
 	}
-	_ActPickWeb_Gui := 0
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
