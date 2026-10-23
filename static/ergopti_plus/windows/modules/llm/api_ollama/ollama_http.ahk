@@ -387,14 +387,17 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 		if Terminate {
 			TerminateFn := _LLM_CurlArtifactPortFn(Port,
 				"terminate_process", _LLM_CurlTerminateProcessExact)
-			Terminated := false
-			try Terminated := TerminateFn.Call(Handle) == true
-			if !Terminated {
-				WaitFn := _LLM_CurlArtifactPortFn(Port,
-					"wait_process", _LLM_CurlWaitProcessExact)
-				try Terminated := WaitFn.Call(Handle) = 0
+			; Termination acceptance is only a request. Keep the exact capability
+			; and its process debt until a separate zero-time wait proves exit.
+			try TerminateFn.Call(Handle)
+			WaitFn := _LLM_CurlArtifactPortFn(Port,
+				"wait_process", _LLM_CurlWaitProcessExact)
+			Exited := false
+			try {
+				ExitReceipt := WaitFn.Call(Handle)
+				Exited := ExitReceipt is Integer && ExitReceipt == 0
 			}
-			if !Terminated
+			if !Exited
 				return false
 		}
 		CloseFn := _LLM_CurlArtifactPortFn(Port,
