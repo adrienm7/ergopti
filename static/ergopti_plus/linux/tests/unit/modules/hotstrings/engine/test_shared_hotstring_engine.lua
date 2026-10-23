@@ -457,6 +457,27 @@ helpers.describe("shared hotstring engine — final_result governs chaining", fu
 		helpers.assert_eq("xaby", e:current_buffer(),
 			"one expansion only — a self-containing replacement must not recurse")
 	end)
+
+	helpers.it("at, att and attention chain through three magic keys", function()
+		local star = "\u{2605}"
+		local sign = "\u{26A0}\u{FE0F}"
+		local e = engine_mod.new()
+		e:load_mappings({
+			{ trigger = "at" .. star, replacement = "att", auto_expand = true, final_result = false },
+			{ trigger = "att" .. star, replacement = "attention", auto_expand = true, final_result = false },
+			{ trigger = "attention" .. star, replacement = sign, auto_expand = true, final_result = false },
+		})
+		local fired = 0
+		for ch in ("at" .. star .. star .. star):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			local r = e:on_char(ch, {})
+			if r then
+				fired = fired + 1
+				e:apply_expansion(r)
+			end
+		end
+		helpers.assert_eq(3, fired, "each of the three magic keys must complete the next trigger")
+		helpers.assert_eq(sign, e:current_buffer(), "the chain must end on the sign")
+	end)
 end)
 
 
