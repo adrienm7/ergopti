@@ -1064,8 +1064,28 @@ jobs:
       - name: Check the ErgoptiPlus.exe antivirus surface
         shell: pwsh
         run: |
-          node tools/ci/windows-exe-av-surface.cjs "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
-          if ($LASTEXITCODE -ne 0) { throw "ErgoptiPlus.exe exceeds its antivirus surface policy." }
+          # The record (exe hash, size and the count of every pattern family) is
+          # written even when a ceiling fails, then kept with the build and
+          # printed in the job summary: the hash is what a false-positive
+          # submission and a VirusTotal lookup need.
+          $record = Join-Path $env:RUNNER_TEMP "ergoptiplus-av-surface.json"
+          node tools/ci/windows-exe-av-surface.cjs --breakdown --sources "${{ github.workspace }}\static\ergopti_plus\windows" --record $record "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $gateExit = $LASTEXITCODE
+          if (Test-Path -LiteralPath $record) {
+              $counts = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
+              "### ErgoptiPlus.exe antivirus surface`nSHA-256 ``$($counts.sha256)`` ($($counts.bytes) bytes), Authenticode signed: $($counts.authenticode)`n" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+              Copy-Item -LiteralPath $record -Destination "${{ github.workspace }}\ergoptiplus-av-surface.json"
+          }
+          if ($gateExit -ne 0) { throw "ErgoptiPlus.exe exceeds its antivirus surface policy." }
+
+      - name: Keep the ErgoptiPlus.exe antivirus surface record
+        if: ${{ always() && hashFiles('ergoptiplus-av-surface.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ergoptiplus-av-surface-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ergoptiplus-av-surface.json
+          retention-days: 30
+          if-no-files-found: error
 
       # SignPath (Foundation open-source signing) is switched on by the
       # repository variable SIGNPATH_PROJECT_SLUG, together with

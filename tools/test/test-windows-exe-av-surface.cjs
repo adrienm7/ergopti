@@ -8,12 +8,18 @@
 // independent of a compiler; CI runs the same gate on the real build.
 'use strict';
 const assert = require('node:assert/strict');
+const childProcess = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const {
 	parsePe,
 	readZip,
+	countSection,
+	breakdownFiles,
+	readSourceFiles,
 	validatePolicy,
 	scanExecutable,
 	POLICY_PATH
@@ -232,19 +238,140 @@ assert.equal(
 	'binary bundle members are not scanned as text'
 );
 
-// 7. The keylog wording is measured on every build without gating it.
-assert.ok(
-	scanExecutable(exe(CLEAN_SCRIPT + 'KeylogInit()\n'), policy).notes.includes(
-		'script: keylog_wording = 1 (reported only)'
-	)
+// 7. The naming left over from the keystats rename and the API families that
+// engines weigh are gated: the wording is forbidden in the script and the
+// bundle, a family with a legitimate use is held at its measured count.
+for (const [label, entries, script] of [
+	['script', undefined, CLEAN_SCRIPT + 'KeylogInit()\n'],
+	['bundle', [['vendor/a.ps1', 'function Start-Keylogger {}']], CLEAN_SCRIPT]
+])
+	assert.match(
+		scanExecutable(exe(script, entries), policy).errors.join('\n'),
+		new RegExp(`${label}: forbidden keylog_wording`),
+		`the keylog wording must be forbidden in the ${label}`
+	);
+assert.deepEqual(
+	scanExecutable(exe(CLEAN_SCRIPT + 'DllCall("user32\\SetWindowsHookExW")\n'), policy).errors,
+	[],
+	'a documented hook import stays inside its ceiling'
 );
+const hookMax = policy.script.ceilings.keyboard_hook_api.max;
+assert.match(
+	scanExecutable(
+		exe(CLEAN_SCRIPT + 'DllCall("user32\\SetWindowsHookExW")\n'.repeat(hookMax + 1)),
+		policy
+	).errors.join('\n'),
+	new RegExp(`keyboard_hook_api .* occurs ${hookMax + 1} times, ceiling ${hookMax}`),
+	'the keyboard hook import count is capped'
+);
+for (const [id, sample] of [
+	['key_state_polling', 'GetAsyncKeyState'],
+	['injection_wording', 'LoadLibraryW'],
+	['elevation_wording', 'requireAdministrator'],
+	['registry_run_key', 'CurrentVersion\\Run'],
+	['clipboard_listener', 'AddClipboardFormatListener'],
+	['screen_capture_api', 'BitBlt']
+])
+	assert.match(
+		scanExecutable(exe(CLEAN_SCRIPT, [['vendor/a.ps1', sample]]), policy).errors.join('\n'),
+		new RegExp(`bundle: forbidden ${id}`),
+		`${id} must be forbidden in the bundle`
+	);
+assert.match(
+	scanExecutable(exe(CLEAN_SCRIPT + 'URLDownloadToFile(a, b)\n'), policy).errors.join('\n'),
+	/script: forbidden download_api/,
+	'a download API call must not appear in the compiled script'
+);
+
+// 8. Counts of every family are returned for the per-build record, and the
+// breakdown names the files that hold them, largest first.
+const surface = scanExecutable(
+	exe(CLEAN_SCRIPT + 'SendInput\nSendInput\n', [
+		['vendor/a.ps1', 'powershell powershell'],
+		['vendor/b.ps1', 'powershell']
+	]),
+	policy
+);
+assert.equal(surface.counts.script.send_input_api, 2);
+assert.equal(surface.counts.bundle.powershell_mentions, 3);
+assert.deepEqual(surface.bundleBreakdown.powershell_mentions, [
+	['vendor/a.ps1', 2],
+	['vendor/b.ps1', 1]
+]);
+assert.deepEqual(countSection('a SendInput', { reported: { x: 'SendInput', y: 'zzz' } }), {
+	x: 1,
+	y: 0
+});
+assert.deepEqual(
+	breakdownFiles(
+		[
+			{ name: 'low.ahk', text: 'x' },
+			{ name: 'b.ahk', text: 'xx' },
+			{ name: 'a.ahk', text: 'xx' }
+		],
+		{ reported: { x: 'x' } },
+		2
+	),
+	{
+		x: [
+			['a.ahk', 2],
+			['b.ahk', 2]
+		]
+	}
+);
+assert.equal(surface.signed, false);
+
+// 9. The source breakdown reads the driver folder without its tests.
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'av-surface-'));
+try {
+	fs.mkdirSync(path.join(scratch, 'tests'));
+	fs.mkdirSync(path.join(scratch, 'adapters'));
+	fs.writeFileSync(path.join(scratch, 'tests', 't.ahk'), 'SendInput');
+	fs.writeFileSync(path.join(scratch, 'adapters', 'a.ahk'), 'SendInput');
+	fs.writeFileSync(path.join(scratch, 'adapters', 'note.txt'), 'SendInput');
+	assert.deepEqual(readSourceFiles(scratch), [{ name: 'adapters/a.ahk', text: 'SendInput' }]);
+} finally {
+	fs.rmSync(scratch, { recursive: true, force: true });
+}
+
+// 10. The command line records the counts with the exe hash.
+const recordDir = fs.mkdtempSync(path.join(os.tmpdir(), 'av-surface-'));
+try {
+	const image = exe(CLEAN_SCRIPT + 'SendInput\n');
+	const exePath = path.join(recordDir, 'ErgoptiPlus.exe');
+	const recordPath = path.join(recordDir, 'counts.json');
+	fs.writeFileSync(exePath, image);
+	const run = childProcess.spawnSync(
+		process.execPath,
+		[path.join(root, 'tools/ci/windows-exe-av-surface.cjs'), '--record', recordPath, exePath],
+		{ encoding: 'utf8' }
+	);
+	assert.equal(run.status, 0, run.stderr);
+	const record = JSON.parse(fs.readFileSync(recordPath, 'utf8'));
+	assert.equal(record.sha256, crypto.createHash('sha256').update(image).digest('hex'));
+	assert.equal(record.bytes, image.length);
+	assert.equal(record.authenticode, false);
+	assert.equal(record.script.send_input_api, 1);
+	assert.equal(record.bundle.powershell_mentions, 0);
+	assert.equal(
+		childProcess.spawnSync(process.execPath, [
+			path.join(root, 'tools/ci/windows-exe-av-surface.cjs'),
+			'--record'
+		]).status,
+		1,
+		'--record without a value must fail loudly'
+	);
+} finally {
+	fs.rmSync(recordDir, { recursive: true, force: true });
+}
+
 assert.throws(
 	() => validatePolicy({ ...policy, schema: 2 }),
 	/schema 1/,
 	'an unknown policy schema must be refused'
 );
 
-// 8. The build stage runs the gate on the compiled exe between compile and sign.
+// 11. The build stage runs the gate on the compiled exe between compile and sign.
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci-windows.yml'), 'utf8');
 const compile = workflow.indexOf('- name: Compile ErgoptiPlus.ahk');
 const gate = workflow.indexOf('- name: Check the ErgoptiPlus.exe antivirus surface');
@@ -256,6 +383,19 @@ assert.ok(
 	'the gate step scans the compiled exe'
 );
 assert.ok(!/continue-on-error/.test(step), 'the gate step must be able to fail the build');
+assert.ok(
+	step.includes('--record') && step.includes('GITHUB_STEP_SUMMARY'),
+	'the gate step records the counts and prints the hash in the job summary'
+);
+assert.ok(
+	step.indexOf('--record') < step.indexOf('throw "ErgoptiPlus.exe exceeds'),
+	'the record is written before a failing gate throws'
+);
+const keep = workflow.indexOf('- name: Keep the ErgoptiPlus.exe antivirus surface record');
+assert.ok(
+	keep > gate && keep < sign && workflow.slice(keep, sign).includes('actions/upload-artifact@'),
+	'the record is uploaded with the build, before signing'
+);
 
 console.log(
 	'[OK] ErgoptiPlus.exe antivirus surface: resources read, stages forbidden, ceilings held.'

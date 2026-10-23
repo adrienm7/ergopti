@@ -1,5 +1,5 @@
 {
-	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur in the compiled script; a ceiling may not be exceeded (lower it when a launcher is removed). Patterns are case-insensitive JavaScript regular expressions. PowerShell stages are bundled scripts run with -File, never encoded commands or code compiled from transported text. See docs/todo-agents/windows-exe-flagged-by-proxy.md.",
+	"$comment": "Antivirus-facing surface of ErgoptiPlus.exe, checked by tools/ci/windows-exe-av-surface.cjs on every Windows build. forbidden patterns must not occur; a ceiling may not be exceeded and is lowered when a count drops, so it is the string surface of the last measured build (node tools/ci/windows-exe-av-surface.cjs --breakdown --sources static/ergopti_plus/windows <exe> prints the per-file origin of every count). Patterns are case-insensitive JavaScript regular expressions. PowerShell stages are bundled scripts run with -File, never encoded commands or code compiled from transported text. See docs/todo-agents/windows-exe-flagged-by-proxy.md.",
 	"schema": 1,
 	"script": {
 		"forbidden": {
@@ -14,32 +14,63 @@
 			"remote_thread_injection": "CreateRemoteThread|WriteProcessMemory|VirtualAllocEx",
 			"powershell_encoded_command": "-EncodedCommand",
 			"scriptblock_create": "\\[ScriptBlock\\]::Create",
-			"base64_decode": "FromBase64String"
+			"base64_decode": "FromBase64String",
+			"keylog_wording": "keylog",
+			"download_api": "URLDownloadToFile|DownloadFile|Invoke-WebRequest|Invoke-RestMethod"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 17 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 16 },
 			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
-			"elevated_run": { "pattern": "\\*RunAs", "max": 3 }
-		},
-		"reported": {
-			"keylog_wording": "keylog",
-			"powershell_mentions": "powershell"
+			"elevated_run": { "pattern": "\\*RunAs", "max": 3 },
+			"powershell_mentions": { "pattern": "powershell", "max": 52 },
+			"keyboard_hook_api": { "pattern": "SetWindowsHookEx", "max": 2 },
+			"key_state_polling": {
+				"pattern": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
+				"max": 62
+			},
+			"clipboard_listener": {
+				"pattern": "AddClipboardFormatListener|SetClipboardViewer|OnClipboardChange",
+				"max": 3
+			},
+			"send_input_api": { "pattern": "SendInput", "max": 124 },
+			"script_host": { "pattern": "WScript|cscript|mshta", "max": 2 },
+			"elevation_wording": {
+				"pattern": "RunAs|requireAdministrator|highestAvailable|\\bUAC\\b",
+				"max": 3
+			},
+			"injection_wording": {
+				"pattern": "CreateRemoteThread|WriteProcessMemory|VirtualAllocEx|SetThreadContext|QueueUserAPC|NtCreateThreadEx|LoadLibrary",
+				"max": 11
+			},
+			"screen_capture_api": { "pattern": "BitBlt|CopyFromScreen|PrintWindow", "max": 1 }
 		}
 	},
 	"bundle": {
 		"forbidden": {
-			"powershell_encoded_command": "-EncodedCommand"
+			"powershell_encoded_command": "-EncodedCommand",
+			"keylog_wording": "keylog",
+			"keyboard_hook_api": "SetWindowsHookEx",
+			"key_state_polling": "GetAsyncKeyState|GetKeyState|GetKeyboardState",
+			"clipboard_listener": "AddClipboardFormatListener|SetClipboardViewer|OnClipboardChange",
+			"registry_run_key": "CurrentVersion\\\\Run",
+			"elevation_wording": "RunAs|requireAdministrator|highestAvailable|\\bUAC\\b",
+			"injection_wording": "CreateRemoteThread|WriteProcessMemory|VirtualAllocEx|SetThreadContext|QueueUserAPC|NtCreateThreadEx|LoadLibrary",
+			"screen_capture_api": "BitBlt|CopyFromScreen|PrintWindow"
 		},
 		"ceilings": {
-			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 2 },
+			"powershell_policy_bypass": { "pattern": "ExecutionPolicy[\"',\\s]+Bypass", "max": 1 },
 			"hidden_window_style": { "pattern": "WindowStyle[\"',\\s]+Hidden", "max": 3 },
 			"scriptblock_create": { "pattern": "\\[ScriptBlock\\]::Create", "max": 1 },
-			"inline_csharp_compile": { "pattern": "Add-Type", "max": 19 },
-			"pinvoke_declaration": { "pattern": "DllImport", "max": 33 },
-			"base64_decode": { "pattern": "FromBase64String", "max": 1 }
-		},
-		"reported": {
-			"keylog_wording": "keylog"
+			"inline_csharp_compile": { "pattern": "Add-Type", "max": 18 },
+			"pinvoke_declaration": { "pattern": "DllImport", "max": 52 },
+			"base64_decode": { "pattern": "FromBase64String", "max": 1 },
+			"powershell_mentions": { "pattern": "powershell", "max": 9 },
+			"send_input_api": { "pattern": "SendInput", "max": 127 },
+			"download_api": {
+				"pattern": "URLDownloadToFile|DownloadFile|Invoke-WebRequest|Invoke-RestMethod",
+				"max": 3
+			},
+			"script_host": { "pattern": "WScript|cscript|mshta", "max": 1 }
 		}
 	}
 }
