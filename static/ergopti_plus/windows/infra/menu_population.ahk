@@ -115,6 +115,8 @@ class MenuPopulation {
 			else
 				_MR_RenderRows(Entry.MenuObj, Batch, Entry.ListId, Entry.Depth, 0, true)
 			Appended := Batch.Length
+			PerfCount(Reason == "background" ? "menu.leaf_background" : "menu.leaf_foreground")
+			PerfCount("menu.leaf_rows", Appended)
 			Entry.NextRow := LastRow + 1
 			Remaining := Entry.Rows.Length - LastRow
 			if Remaining == 0 {
@@ -211,6 +213,7 @@ MenuPopulation_OnInitPopup(Handle, *) {
 	; Native configuration navigation remains available while paused. This only
 	; prepares rows: feature commands remain fenced by root pause greying.
 	global _MenuPopulationPublished
+	PerfCount("menu.initpopup")
 	if IsSet(_MenuPopulationPublished) && _MenuPopulationPublished is MenuPopulation {
 		try _MenuPopulationPublished.Complete(Handle)
 		catch as Err {

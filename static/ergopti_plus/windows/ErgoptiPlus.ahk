@@ -1476,6 +1476,9 @@ _BootOpenStages := BootProfile_OpenStageNames()
 if (_BootOpenStages != "")
 	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
 LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
+LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
+	BootProfile_StageSummary())
 ; One environment summary with the same field names on every driver. A probe
 ; failure is reported and never allowed to turn a ready driver into a dead one.
 try DiagSnapshot_Emit(_BootTotalMs)

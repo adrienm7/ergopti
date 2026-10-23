@@ -96,8 +96,10 @@ _ParseEntryPriority(Line, Fallback) {
 ReadTomlFile(FilePath) {
 		global _TomlFileCache, _TomlUnreadableFiles
 		if _TomlFileCache.Has(FilePath) {
+				PerfCount("toml.file_cache_hit")
 				return _TomlFileCache[FilePath]
 		}
+		PerfCount("toml.file_read")
 		Content := ""
 		try {
 				Content := FileRead(FilePath, "UTF-8")
@@ -676,8 +678,10 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 		LowerCat := StrLower(CategoryName)
 		CacheKey := (FilePath != "") ? FilePath : LowerCat
 		if HotstringGroupConfig.Has(CacheKey) {
+				PerfCount("toml.group_config_hit")
 				return HotstringGroupConfig[CacheKey]
 		}
+		PerfCount("toml.group_config_parse")
 
 		; Resolved through the shared helper so _ParseTomlGroupConfig_InvalidatePath
 		; recognises exactly the same file for a bare-category key as for a path one.
