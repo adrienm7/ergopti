@@ -54,22 +54,29 @@ func publicAddress(address net.IP) bool {
 type destinationPolicy struct {
 	exemptHost   string
 	allowPrivate bool
+	policy       *Policy
 }
 
 // newDestinationPolicy exempts only the registry host the caller named, as
-// upstream checkedClient does; redirect clients pass an empty base URL.
-func newDestinationPolicy(baseURL string, allowPrivate bool) destinationPolicy {
-	policy := destinationPolicy{allowPrivate: allowPrivate}
+// upstream checkedClient does; redirect clients pass an empty base URL. The
+// network policy, when known, names the loopback hosts that never need DNS.
+func newDestinationPolicy(baseURL string, allowPrivate bool, policy *Policy) destinationPolicy {
+	result := destinationPolicy{allowPrivate: allowPrivate, policy: policy}
 	if base, err := url.Parse(baseURL); baseURL != "" && err == nil {
-		policy.exemptHost = base.Hostname()
+		result.exemptHost = base.Hostname()
 	}
-	return policy
+	return result
 }
 
 func refuseDestination(cause error) error {
 	return &Error{Reason: "connect", cause: errors.Join(errDestinationNotPublic, cause)}
 }
 
+// check decides a destination that a proxy or the native worker will carry.
+// Both resolve the name on their own side, which a PAC-only network keeps out
+// of reach of local DNS, so a name this machine cannot resolve is left to the
+// carrier. A literal address, a loopback name and a name that resolves locally
+// to any non-public address stay refused.
 func (p destinationPolicy) check(ctx context.Context, target *url.URL) error {
 	if p.allowPrivate {
 		return nil
@@ -84,15 +91,15 @@ func (p destinationPolicy) check(ctx context.Context, target *url.URL) error {
 		}
 		return nil
 	}
-	addresses, err := lookupAddresses(ctx, host)
-	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return refuseDestination(err)
-	}
-	if len(addresses) == 0 {
+	if p.policy != nil && p.policy.loopbackName(strings.TrimSuffix(strings.ToLower(host), ".")) {
 		return refuseDestination(nil)
+	}
+	addresses, err := lookupAddresses(ctx, host)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if err != nil {
+		return nil
 	}
 	for _, address := range addresses {
 		if !publicAddress(address) {
@@ -100,6 +107,47 @@ func (p destinationPolicy) check(ctx context.Context, target *url.URL) error {
 		}
 	}
 	return nil
+}
+
+var errRedirectNotAllowed = errors.New("redirect target not allowed")
+
+// ValidateRedirectTarget replaces upstream transfer.ValidateRedirectTarget on
+// the blob download path. Upstream refuses a redirect whose host fails a local
+// lookup, which rejected every pull on a network where only the proxy resolves
+// the download host. The scheme rules and the refusal of non-public addresses
+// are upstream's; the request itself is checked again by WrapChecked.
+func ValidateRedirectTarget(ctx context.Context, location *url.URL, baseURL string, allowPrivate bool) error {
+	if location == nil {
+		return errors.Join(errRedirectNotAllowed, errors.New("missing Location"))
+	}
+	if allowPrivate {
+		return nil
+	}
+	if location.Scheme != "https" && location.Scheme != "http" {
+		return errors.Join(errRedirectNotAllowed, errors.New("unsupported scheme"))
+	}
+	// http is acceptable only when the registry itself was reached over http.
+	if base, err := url.Parse(baseURL); location.Scheme == "http" && err == nil && base.Scheme == "https" {
+		return errors.Join(errRedirectNotAllowed, errors.New("https registry redirecting to http"))
+	}
+	if err := newDestinationPolicy("", false, nil).check(ctx, location); err != nil {
+		return errors.Join(errRedirectNotAllowed, err)
+	}
+	return nil
+}
+
+// maxRedirects is upstream NewRedirectClient's hop limit.
+const maxRedirects = 10
+
+// RedirectPolicy is the CheckRedirect of upstream NewRedirectClient with the
+// target validation above.
+func RedirectPolicy(baseURL string, allowPrivate bool) func(*http.Request, []*http.Request) error {
+	return func(request *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects {
+			return errors.New("stopped after 10 redirects")
+		}
+		return ValidateRedirectTarget(request.Context(), request.URL, baseURL, allowPrivate)
+	}
 }
 
 // WrapChecked wraps a transport whose upstream dialer refuses non-public
@@ -111,6 +159,6 @@ func WrapChecked(original http.RoundTripper, baseURL string, allowPrivate bool) 
 	if !ok {
 		return wrapped
 	}
-	transport.Destination = newDestinationPolicy(baseURL, allowPrivate).check
+	transport.Destination = newDestinationPolicy(baseURL, allowPrivate, transport.Policy).check
 	return transport
 }

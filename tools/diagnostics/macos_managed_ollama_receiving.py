@@ -40,11 +40,12 @@ INFERENCE_TOKENS = 2
 # (manifest/paths.go and writeManifestData in manifest/manifest.go).
 MANIFEST_STORE = "manifests-v2"
 # Ollama 0.40.4 validates each blob redirect target (transfer.ValidateRedirectTarget
-# in server/download.go) and the port repeats it (address_policy.go): an IP
-# literal must pass isPublicIP, a name must resolve locally to public addresses.
-# The fixture's .test name resolves nowhere, so the registry is this TEST-NET-3
-# literal instead: the real check runs and accepts it (it is an upstream public
-# vector in address_policy_test.go), no DNS is involved, and the address is never
+# in server/download.go); the port replaces it (address_policy.go): an IP literal
+# must pass isPublicIP, a name that resolves locally must resolve to public
+# addresses, and a name this machine cannot resolve is left to the proxy or the
+# native worker. The registry is this TEST-NET-3 literal rather than the
+# fixture's .test name so the real check runs and accepts it (it is an upstream
+# public vector in address_policy_test.go), no DNS is involved, and the address is never
 # routed, so any request that bypassed the fixture proxies fails rather than
 # reaching a real host.
 REGISTRY_ADDRESS = "203.0.113.10"

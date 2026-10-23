@@ -150,7 +150,14 @@ that refuses non-public addresses. The native worker and an explicit relay
 never reach that dialer, so both transfer seams use
 `nativehttp.WrapChecked`, which repeats the decision in `address_policy.go`;
 `transfer/redirect.go` is a preimage so an upstream policy change stops the
-build. For a bump, extract the tag tarball (`gh api
+build. Upstream's own `ValidateRedirectTarget` also refuses any redirect host
+this machine cannot resolve, which broke every pull where only the proxy (a
+PAC) resolves the download host, so the recipe replaces it and the redirect
+`CheckRedirect` with `nativehttp.ValidateRedirectTarget`/`RedirectPolicy`: an
+unresolved name is left to the carrier, literal and locally resolved
+non-public addresses and loopback names stay refused. The Go side has never
+been compiled on the Windows host (no Go): `go vet` and `go test` run only in
+the macOS Managed Ollama cells. For a bump, extract the tag tarball (`gh api
 repos/ollama/ollama/tarball/vX`) into an empty scratch folder, recompute the
 preimages, and run `python tools/test/macos_managed_ollama_source_test.py
 --source <folder>`, which applies the real hooks without Go

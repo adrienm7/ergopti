@@ -78,6 +78,8 @@ ADDRESS_POLICY_IDENTITIES = [
     "TestDestinationPolicyIndependentUpstreamVectors",
     "TestDestinationPolicyRefusesNonPublicBeforeNativeWorker",
     "TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer",
+    "TestValidateRedirectTargetLeavesUnresolvedHostToTheCarrier",
+    "TestRedirectPolicyStopsAfterTenHops",
     "TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
 ]
 # Literal identities of the shared serve environment (OLLAMA_NO_CLOUD) the
@@ -150,7 +152,7 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (80, 45, 35)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (82, 47, 35)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
         for name in added + ADDED_IDENTITIES:
