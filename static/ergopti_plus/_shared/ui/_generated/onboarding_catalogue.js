@@ -2805,7 +2805,7 @@
 						"consent": true,
 						"groups": [],
 						"master": {
-							"path": "metrics.metrics_enabled",
+							"path": "metrics.enabled",
 							"default": false
 						}
 					}

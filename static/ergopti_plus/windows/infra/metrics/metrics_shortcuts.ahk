@@ -58,7 +58,7 @@ MS_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MS_PreferenceConfigKey(Prop) {
 		static Keys := Map(
-				"enabled", "metrics_enabled",
+				"enabled", "enabled",
 				"wpm_menubar_colors", "metrics_wpm_menubar_colors"
 		)
 		return Keys.Get(Prop, "")

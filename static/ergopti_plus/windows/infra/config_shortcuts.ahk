@@ -11,7 +11,7 @@
 ; SECTION LAYOUT inside autohotkey/config.toml:
 ;
 ;   [metrics]
-;   metrics_enabled            = true
+;   enabled                    = true
 ;   private_filter_enabled     = true
 ;   system_auth_filter_enabled = true
 ;   metrics_disabled_apps      = ["chrome.exe", "firefox.exe"]
@@ -103,7 +103,7 @@ CS_Read() {
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an
-; inline TOML comment (metrics_enabled = false # off) does not become part of the
+; inline TOML comment (enabled = false # off) does not become part of the
 ; value. Quote/escape state is tracked from the raw character stream (same
 ; discipline as the array tokenizer below), so a '#' inside a quoted value or an
 ; escaped quote is preserved. Without this, "false # x" fell through to the bare-
@@ -208,7 +208,7 @@ _CS_RequireDisabledApps(Value) {
 
 _CS_ValidateMetricsSection(Section) {
 		Validated := Map()
-		for Key in ["metrics_enabled", "metrics_wpm_menubar_colors",
+		for Key in ["enabled", "metrics_wpm_menubar_colors",
 				"private_filter_enabled", "secure_filter_enabled",
 				"system_auth_filter_enabled", "encrypt"] {
 				if Section.Has(Key)
@@ -239,8 +239,8 @@ CS_Load() {
 		if Validated.Has("encrypt")
 				KL_Enc_SetEnabled(Validated["encrypt"])
 
-		if Validated.Has("metrics_enabled")
-				MetricsShortcuts.enabled := Validated["metrics_enabled"]
+		if Validated.Has("enabled")
+				MetricsShortcuts.enabled := Validated["enabled"]
 
 		if Validated.Has("metrics_wpm_menubar_colors")
 				MetricsShortcuts.wpm_menubar_colors := Validated["metrics_wpm_menubar_colors"]

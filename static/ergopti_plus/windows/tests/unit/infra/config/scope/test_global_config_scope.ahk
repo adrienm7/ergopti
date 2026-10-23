@@ -15,7 +15,7 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 	; Real line feeds: escaped backticks once left both switches out of the file,
 	; so the clear's assertion on the Tap-Holds switch could not fail.
 	Assert(InStr(Fixture.source, "[category_enabled]`n"), "the fixture declares the category switches")
-	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__win_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
+	ConfigSource := StrReplace(Fixture.source, "[category_enabled]`n", "[category_enabled]`nshortcuts = true`ntap_holds = true`n") . '[layout]`nergopti_base = true`n[shortcuts.personal]`n"registered tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "unknown"`n[gestures]`ntap_4 = "open_url"`n[llm]`nenabled = true`nollama_port = 12345`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[action_parameters]`ngesture__tap_4__open_url = "gesture"`nkeyboard__win_b__open_url = "keyboard"`ntap_hold__space__open_url = "hold"`nunknown_user = "keep"`n'
 	if Scenario == "absent"
 		ConfigSource := StrReplace(ConfigSource, '`nenabled = true`n', '`n')
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))

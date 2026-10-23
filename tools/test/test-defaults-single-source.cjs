@@ -83,6 +83,22 @@ async function main() {
 		)
 	);
 	assert(manifest.entries.length > 200, 'the real feature registry must be loaded');
+	// PAR-3: the metrics master switch is ONE key, `metrics.enabled`, read by
+	// all three drivers. A second spelling (`metrics.metrics_enabled` on
+	// Windows) left the declared key unread there, and a section-prefixed id
+	// is how such a second spelling comes back.
+	assert.deepEqual(
+		manifest.onboarding.pages.metrics.master,
+		{ ahk: 'metrics.enabled', hs: 'metrics.enabled', linux: 'metrics.enabled' },
+		'the metrics consent page must name one master key on every platform'
+	);
+	assert.deepEqual(
+		manifest.entries
+			.filter((entry) => entry.section === 'metrics' && entry.id === 'metrics_enabled')
+			.map((entry) => entry.id),
+		[],
+		'no metrics key repeats its section name: one spelling per setting'
+	);
 	assert.deepEqual(
 		Object.keys(manifest.scopes || {}),
 		[
@@ -299,10 +315,7 @@ async function main() {
 		'the parity gate must reject the former Linux LAlt then CapsLock recommendation'
 	);
 	assert.deepEqual(manifest.scopes.llm.restore_exclude, ['llm.enabled']);
-	assert.deepEqual(manifest.scopes.metrics.restore_exclude, [
-		'metrics.enabled',
-		'metrics.metrics_enabled'
-	]);
+	assert.deepEqual(manifest.scopes.metrics.restore_exclude, ['metrics.enabled']);
 	assert(
 		manifest.scopes.global.prefixes.includes('script'),
 		'global scope must include script preferences'

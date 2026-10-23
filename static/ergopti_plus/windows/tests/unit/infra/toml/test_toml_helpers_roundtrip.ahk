@@ -226,8 +226,8 @@ _TTHRT_QuotedKeysReadBack() {
 		AssertEqual("kept-" . KeyIndex, KeyData[OriginalKey])
 	}
 	LiteralData := _ParseTomlFileImpl("literal-key-fixture", false, false,
-		"[metrics]`n'metrics_enabled' = false`n'editor#1=work' = 'kept' # trailing comment`n")
-	AssertEqual(false, LiteralData["metrics"]["metrics_enabled"])
+		"[metrics]`n'enabled' = false`n'editor#1=work' = 'kept' # trailing comment`n")
+	AssertEqual(false, LiteralData["metrics"]["enabled"])
 	AssertEqual("kept", LiteralData["metrics"]["editor#1=work"])
 }
 Test("toml keys: rendered and literal spellings decode exactly (toml-quoted-key-identity)",
@@ -243,9 +243,9 @@ _TTHRT_QuotedKeysSurviveRepeatedWrites() {
 		Assert(FSWriteCreateDurable(KeyPath, KeyImage) == 1)
 		loop 2 {
 			Assert(TOML_BatchWrite(KeyPath,
-				[{ Section: "metrics", Key: "metrics_enabled", Value: TOML_Bool(false) }]))
+				[{ Section: "metrics", Key: "enabled", Value: TOML_Bool(false) }]))
 			KeyData := TOML_ParseFreshFile(KeyPath)
-			AssertEqual(false, KeyData["metrics"]["metrics_enabled"])
+			AssertEqual(false, KeyData["metrics"]["enabled"])
 			AssertEqual(KeyCases.Length, KeyData["future"].Count,
 				"an unrelated metrics save must neither add nor lose future settings")
 			for KeyIndex, OriginalKey in KeyCases {

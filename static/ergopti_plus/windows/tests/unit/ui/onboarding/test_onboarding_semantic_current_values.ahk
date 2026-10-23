@@ -14,16 +14,16 @@ _TOASC_Source(Shape, Enabled) {
 	Gestures := Enabled ? "false" : "true"
 	switch Shape {
 		case "table":
-			return '[metrics]`nmetrics_enabled = ' . Metrics . '`n[gestures]`nenabled = ' . Gestures
+			return '[metrics]`nenabled = ' . Metrics . '`n[gestures]`nenabled = ' . Gestures
 				. '`n[hotstrings]`ntrigger_char = "0"`n[unrelated]`nenabled = true`n'
 		case "dotted":
-			return 'metrics.metrics_enabled = ' . Metrics . '`ngestures.enabled = ' . Gestures
+			return 'metrics.enabled = ' . Metrics . '`ngestures.enabled = ' . Gestures
 				. '`nhotstrings.trigger_char = "0"`nunrelated.enabled = true`n'
 		case "inline":
-			return 'metrics = { metrics_enabled = ' . Metrics . ' }`ngestures = { enabled = ' . Gestures
+			return 'metrics = { enabled = ' . Metrics . ' }`ngestures = { enabled = ' . Gestures
 				. ' }`nhotstrings = { trigger_char = "0" }`nunrelated = { enabled = true }`n'
 		case "quoted":
-			return '["metrics"]`n"metrics_enabled" = ' . Metrics . '`n["gestures"]`n"enabled" = ' . Gestures
+			return '["metrics"]`n"enabled" = ' . Metrics . '`n["gestures"]`n"enabled" = ' . Gestures
 				. '`n["hotstrings"]`n"trigger_char" = "0"`n["unrelated"]`n"enabled" = true`n'
 		default: throw ValueError("Unknown onboarding current-value source shape.")
 	}
@@ -36,21 +36,21 @@ _TOASC_ReadCurrent(Shape, Enabled) {
 	try {
 		AssertTrue(FSWrite(Path, Source))
 		Admitted := ConfigTomlDecodeSnapshot(Source)
-		AssertEqual(Enabled, Admitted.Cache["metrics"]["metrics_enabled"],
+		AssertEqual(Enabled, Admitted.Cache["metrics"]["enabled"],
 			"the canonical runtime projection must admit this exact metrics setting")
 		AssertEqual(!Enabled, Admitted.Cache["gestures"]["enabled"])
 		Values := OnboardingReadCurrentValues(OnboardingCatalogue(), Path)
 		AssertTrue(Values is Map, "a valid semantic configuration must remain readable")
 		AssertEqual(3, Values.Count, "only actual wizard paths are projected")
-		AssertTrue(Values["metrics.metrics_enabled"] is TOML_Bool,
+		AssertTrue(Values["metrics.enabled"] is TOML_Bool,
 			"preview JSON must carry a Boolean instead of the native cache's numeric flag")
 		AssertTrue(Values["gestures.enabled"] is TOML_Bool)
-		AssertEqual(Enabled, Values["metrics.metrics_enabled"].Value)
+		AssertEqual(Enabled, Values["metrics.enabled"].Value)
 		AssertEqual(!Enabled, Values["gestures.enabled"].Value)
 		AssertTrue(Values["hotstrings.trigger_char"] is String)
 		AssertEqual("0", Values["hotstrings.trigger_char"])
 		Json := OnboardingValuesJson(Values)
-		AssertContains(Json, '"metrics.metrics_enabled":' . (Enabled ? "true" : "false"))
+		AssertContains(Json, '"metrics.enabled":' . (Enabled ? "true" : "false"))
 		AssertContains(Json, '"gestures.enabled":' . (Enabled ? "false" : "true"))
 		AssertContains(Json, '"hotstrings.trigger_char":"0"')
 		AssertEqual(Source, FSReadUtf8Exact(Path), "preview must leave authored source bytes untouched")
@@ -64,7 +64,7 @@ for _TOASC_Shape in ["table", "dotted", "inline", "quoted"]
 _TOASC_LiteralDotsStayUnrelated() {
 	Folder := _TOAN_NewFolder()
 	Path := Folder . "\config.toml"
-	Source := '"metrics.metrics_enabled" = true`n"gestures.enabled" = true`n'
+	Source := '"metrics.enabled" = true`n"gestures.enabled" = true`n'
 	try {
 		AssertTrue(FSWrite(Path, Source))
 		Admitted := ConfigTomlDecodeSnapshot(Source)
@@ -82,7 +82,7 @@ _TOASC_InvalidNamespaceIsRefused() {
 	Folder := _TOAN_NewFolder()
 	Path := Folder . "\config.toml"
 	try {
-		AssertTrue(FSWrite(Path, 'metrics = { metrics_enabled = true }`nmetrics.metrics_enabled = false`n'))
+		AssertTrue(FSWrite(Path, 'metrics = { enabled = true }`nmetrics.enabled = false`n'))
 		AssertTrue(OnboardingReadCurrentValues(OnboardingCatalogue(), Path) is String,
 			"invalid duplicate namespace ownership must refuse the preview instead of showing neutral values")
 	} finally _TOAN_DeleteFolder(Folder)
