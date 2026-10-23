@@ -333,6 +333,32 @@ function checkReasonKeys() {
 // ==========================================
 // ==========================================
 
+/** Phase delivery retains the exact observer admission across the swap boundary. */
+function windowsProgressOwned(poll) {
+	const code = poll.replace(/^\s*;.*$/gm, '');
+	const phases = ['installing', 'restarting'].map((phase) => [
+		...code.matchAll(
+			new RegExp(
+				'\\b_Updater_NotifyInstallPhase\\(\\s*"' +
+					phase +
+					'"\\s*,\\s*""\\s*,\\s*0\\s*,\\s*Observation\\.Observer\\s*,\\s*Observation\\.Epoch\\s*\\)',
+				'g'
+			)
+		)
+	]);
+	if (phases.some((calls) => calls.length !== 1)) return false;
+	const ready = code.indexOf('ExitCode != 0 or Stdout != "READY"');
+	const verified = code.indexOf('LoggerSuccess(');
+	const swap = code.indexOf('_Updater_StartSwapTransaction(');
+	return (
+		ready >= 0 &&
+		verified > ready &&
+		phases[0][0].index > verified &&
+		swap > phases[0][0].index &&
+		phases[1][0].index > swap
+	);
+}
+
 function checkWindowsSequence() {
 	const body = ahkBody('modules/updater/release_install.ahk', 'ReleaseInstall_Start');
 	expect(body !== '', 'ReleaseInstall_Start not found');
@@ -351,9 +377,46 @@ function checkWindowsSequence() {
 	);
 	const poll = ahkBody('modules/updater/self_update.ahk', '_Updater_PollDownloadAsync');
 	expect(
-		poll.includes('_Updater_NotifyInstallPhase("installing")') &&
-			poll.includes('_Updater_NotifyInstallPhase("restarting")'),
+		windowsProgressOwned(poll),
 		'Windows: the verified download and the swap must reach the Versions window'
+	);
+	const installing =
+		'_Updater_NotifyInstallPhase("installing", "", 0, Observation.Observer, Observation.Epoch)';
+	const restarting =
+		'_Updater_NotifyInstallPhase("restarting", "", 0, Observation.Observer, Observation.Epoch)';
+	const rejectsMutation = (before, after, reason) => {
+		const changed = poll.replace(before, after);
+		expect(changed !== poll && !windowsProgressOwned(changed), reason);
+	};
+	rejectsMutation(installing, '', 'Windows: removing the installing delivery must fail');
+	rejectsMutation(restarting, '', 'Windows: removing the restarting delivery must fail');
+	rejectsMutation(
+		installing,
+		'; ' + installing,
+		'Windows: a commented installing delivery cannot certify progress'
+	);
+	rejectsMutation(
+		installing,
+		installing.replace('Observation.Observer', '_UpdaterInstallObserver'),
+		'Windows: installing cannot borrow the current global observer'
+	);
+	rejectsMutation(
+		restarting,
+		restarting.replace('Observation.Epoch', '_UpdaterInstallObserverEpoch'),
+		'Windows: restarting cannot borrow the current admission epoch'
+	);
+	rejectsMutation(
+		restarting,
+		restarting.replace(', Observation.Epoch', ''),
+		'Windows: restarting must retain its observer epoch'
+	);
+	const reversed = poll
+		.replace(installing, '__phase_placeholder__')
+		.replace(restarting, installing)
+		.replace('__phase_placeholder__', restarting);
+	expect(
+		reversed !== poll && !windowsProgressOwned(reversed),
+		'Windows: phase delivery must remain installing before swap and restarting afterward'
 	);
 }
 
