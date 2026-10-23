@@ -581,22 +581,15 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	Generation := _TEXT_CLIPBOARD_GENERATION
 	EraseCount := (Opts is Map) ? Opts.Get("erase_before", 0) : 0
 
-	; A failed write leaves the previous clipboard content intact. Never continue
-	; to ClipWait/^v in that state or the user receives unrelated stale text.
-	if !CB_Write(Text) {
+	; A failed setter does not authorize a paste or a restore of unknown content.
+	if !CB_WriteTextWithReceipt(Text, &OwnedSequence) {
 		LoggerError("TextSender", "TextSend: clipboard write failed - skipping paste to avoid injecting stale content.")
 		_TextSenderInvokeCallback(Callback, false, "clipboard write failed")
 		return
 	}
-	OwnedSequence := CB_GetSequenceNumber()
 	if !OwnedSequence {
 		LoggerError("TextSender", "TextSend: clipboard sequence is unavailable - skipping paste because ownership cannot be proven.")
-		; Delegate rollback to the central clipboard owner. The process generation
-		; excludes newer driver injections, but cannot exclude an external copy.
-		; With no recorded ownership sequence, any positive observable sequence
-		; wins even on the first attempt. An observed zero retains the existing
-		; unfenced rollback policy; it does not prove that this payload is still ours.
-		_TextSendForceRestoreClipboard(Saved, Generation)
+		; Unknown publication ownership must not restore over a newer user copy.
 		_TextSenderInvokeCallback(Callback, false, "clipboard ownership unavailable")
 		return
 	}
