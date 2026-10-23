@@ -288,6 +288,28 @@ bootstrap. Action: count macOS jobs per stage against the five-runner budget
 before splitting a cell, and keep the test build admitting both E2E and Build;
 the receipt chain refuses a missing stage.
 
+### project-ci-run-timing-and-rerun-facts
+
+`node tools/ci/run-timing.cjs <run-id>` ranks a finished run's lanes, jobs
+(with queue time) and steps; the report reporter prints the ten slowest AHK and
+Lua tests. Measured 2026-10-23: the Flatpak runtime download from Flathub took
+34 to 45 minutes in three of five runs and under two otherwise, so the
+`package-flatpak` job ended the Linux lane; the runtimes are now cached before
+the application is installed and the install step is bounded at 20 minutes.
+`gh run rerun --failed` lists every job it did not execute again as a copy under
+the new attempt with the original start and completion times, so the receipt of
+such a job names the older attempt: `producingAttempt` in
+`site-deploy-admission.cjs` maps the copy back. A launch-gate failure that a
+rerun then passes used to be lost, because the evidence artifact is overwritten;
+the failing attempt is now kept as `launch-gate-failed-*-attempt-N` (7 days).
+The single "Quit did not end both processes within 10 s" (2026-10-22, scenario
+`symlink_logs_dir`, passed on rerun) was the `osascript` Quit AppleEvent
+timing out after 10 s with the launcher log silent since startup, not a slow
+exit; the gate now records an unanswered Quit and which process outlived it.
+Vendor-header C++ tests of the owned runtime compile only in
+`remap-runtime-build.yml`, against Karabiner-Elements at the revision of
+`remap_runtime_patch.py`.
+
 ### project-js-gate-host-limits-on-windows
 
 On a Windows host the full JS gate has a known set of host-bound reds that are
