@@ -196,7 +196,7 @@ _LTR_Run(Menu, Screen, Locale, Body) {
 ; Stores a binding's llm_language value and runs the action.
 _LTR_Invoke(Value) {
 	global GestureActionParameters
-	Binding := "keyboard__translate_test"
+	Binding := "keyboard__ctrl_shift_t"
 	GestureActionParameters[GestureActionParameterKey(Binding, "llm_translate_selection")] := Value
 	return GestureInvokeAction("llm_translate_selection", Binding)
 }

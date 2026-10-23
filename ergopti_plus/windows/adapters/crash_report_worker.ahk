@@ -14,8 +14,8 @@
 ; 2. Exact lifecycle: start refusal, completion, exceptions, and shutdown each
 ;    close the mapping once and cannot retire a newer worker.
 ; 3. Minimal isolated fallback: if the schema-enrichment script cannot launch
-;    or complete, a small encoded child reads the same mapping and writes the
-;    snapshot before the owner is retired.
+;    or complete, the bundled minimal writer reads the same mapping and writes
+;    the snapshot before the owner is retired.
 ; ==============================================================================
 
 
@@ -214,31 +214,6 @@ _CrashReportWorkerCloseMapping(Mapping,
 ; ==============================================
 ; ==============================================
 
-_CrashReportWorkerEncodePowerShell(Command) {
-	Bytes := Buffer(StrLen(Command) * 2, 0)
-	if Bytes.Size
-		DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", StrPtr(Command), "UPtr", Bytes.Size)
-	return CryptoBase64Encode(Bytes)
-}
-
-_CrashReportWorkerFallbackSource(MappingName, DeadlineExpired := false) {
-	SafeName := StrReplace(MappingName, '"', "")
-	DeadlineDiagnostic := DeadlineExpired
-		? '$s|Add-Member -NotePropertyName enrichment_errors -NotePropertyValue @("primary worker deadline exceeded") -Force;'
-		: ""
-	return '$ErrorActionPreference="Stop";'
-		. '$m=[IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting("' . SafeName . '",[IO.MemoryMappedFiles.MemoryMappedFileRights]::Read);'
-		. '$v=$m.CreateViewAccessor(0,0,[IO.MemoryMappedFiles.MemoryMappedFileAccess]::Read);'
-		. '$n=$v.ReadInt32(0);if($n-lt 1-or $n-gt ' . CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES . '){throw "invalid payload length"};'
-		. '$b=New-Object byte[] $n;$null=$v.ReadArray(4,$b,0,$n);$v.Dispose();$m.Dispose();'
-		. '$s=[Text.Encoding]::UTF8.GetString($b)|ConvertFrom-Json;'
-		. DeadlineDiagnostic
-		. '$d=[string]$s._transport_reports_dir;if([string]::IsNullOrWhiteSpace($d)){throw "no crash reports folder"};[IO.Directory]::CreateDirectory($d)|Out-Null;'
-		. '$s.PSObject.Properties.Remove("_transport_script_dir");$s.PSObject.Properties.Remove("_transport_reports_dir");'
-		. '$p=Join-Path $d ((Get-Date -Format "yyyy-MM-ddTHH-mm-ss")+"_"+[guid]::NewGuid().ToString("N")+".json");'
-		. '[IO.File]::WriteAllText($p,($s|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false));Write-Output ("OK:"+$p)'
-}
-
 _CrashReportWorkerPowerShellPath() {
 	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
 }
@@ -262,10 +237,17 @@ _CrashReportWorkerPrimaryArgs(Owner) {
 	return Args
 }
 
+; The minimal writer is a bundled script like the primary worker, never an
+; encoded command: antivirus engines score -EncodedCommand launches as malware.
 _CrashReportWorkerFallbackArgs(Owner) {
-	return ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-EncodedCommand", _CrashReportWorkerEncodePowerShell(
-			_CrashReportWorkerFallbackSource(Owner["mapping"]["name"], Owner.Get("deadline_expired", false)))]
+	global _VendorDir, CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES
+	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		"-File", _VendorDir . "\ergopti_crash_fallback_worker.ps1",
+		"-MappingName", Owner["mapping"]["name"],
+		"-MaxPayloadBytes", String(CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES)]
+	if Owner.Get("deadline_expired", false)
+		Args.Push("-DeadlineExpired")
+	return Args
 }
 
 

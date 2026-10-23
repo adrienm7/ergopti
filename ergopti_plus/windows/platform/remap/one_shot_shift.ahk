@@ -17,20 +17,34 @@
 ; =================================
 
 OneShotShift() {
+		global OneShotShiftEnabled
 		; Skip entirely when the script is suspended — an in-flight InputHook would
 		; intercept keystrokes that belong to other applications while AHK is paused
 		if A_IsSuspended
 				return
-		global OneShotShiftEnabled := True
 		TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
-		; The characters with a result of their own, and the magic key, end the
-		; capture: _shared/tap_hold/one_shot_shift.json, which Linux reads too.
+		; Load the shared results before capture, not after its ownership settles.
+		; Full scalar membership must not append an astral magic key's high unit.
 		MagicKey := ScriptInformation["MagicKey"]
-		ihvText := InputHook("L1 T" . TimeoutSec . " E", TapHoldOneShotEndKeys(MagicKey))
-		ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
+		_TapHoldOneShotTable()
+		NamedKeys := "{BackSpace}{Enter}{Delete}"
+		ihvText := InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())
+		ihvText.KeyOpt(NamedKeys, "E") ; End keys to not swallow
 		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
-		if !OwnerToken {
-				OneShotShiftEnabled := False
+		; Refusing a second exclusive capture must leave the admitted capture's
+		; latch alone, including an explicit OneShotShiftFix from a chord.
+		if !OwnerToken
+				return
+		; Start may pump teardown before returning. Publish only while this exact
+		; token/hook still owns capture, atomically with the suspension check.
+		PreviousCritical := Critical("On")
+		try {
+				Admitted := SIHO_IsOwned(OwnerToken, ihvText) && !A_IsSuspended
+				if Admitted
+						OneShotShiftEnabled := True
+		} finally Critical(PreviousCritical)
+		if !Admitted {
+				SIHO_StopOwned(OwnerToken, ihvText)
 				return
 		}
 		try {
@@ -48,32 +62,30 @@ OneShotShift() {
 				global OneShotShiftEnabled := False
 				return
 		}
-		SpecialCharacter := TapHoldOneShotResult(ihvText.EndKey, MagicKey)
-
-		if (ihvText.EndReason == "Timeout") {
+		Capture := _SIHO_ReadScalar(ihvText, NamedKeys)
+		if Capture.Reason != ""
+				LoggerWarn("OneShotShift", "Discarded invalid scalar capture ({1}).", Capture.Reason)
+		if Capture.Kind == "timeout" || Capture.Kind == "invalid"
 				return
-		} else if (ihvText.EndReason == "EndKey" and (ihvText.EndKey = "BackSpace" or ihvText.EndKey = "Enter" or ihvText.EndKey = "Delete")) {
-				; InputHook is suppressive by default. Only the three KeyOpt("E") control
-				; keys (Backspace, Enter, Delete) end this one-shot capture yet still belong
-				; to the user and must reach the foreground app exactly once. The punctuation
-				; end keys (= % $ . , ' space + magic key) are ALSO EndKey terminations, so
-				; this branch must NOT swallow them — restricting it to the control keys lets
-				; them fall through to the SpecialCharacter dispatch below
-				SendNewResult("{" . ihvText.EndKey . "}", False, False)
+		if Capture.Kind == "control" {
+				SendNewResult("{" . Capture.Name . "}", False, False)
 				return
-		} else if SpecialCharacter != "" {
+		}
+		Scalar := Capture.Text
+		SpecialCharacter := TapHoldOneShotResult(Scalar, MagicKey)
+		if SpecialCharacter != "" {
 				if OneShotShiftEnabled {
 						ActivateHotstrings()
 						SendNewResult(SpecialCharacter)
 				} else {
-						SendNewResult(ihvText.EndKey)
+						SendNewResult(Scalar)
 				}
 		} else {
 				if OneShotShiftEnabled {
-						TitleCaseText := Format("{:T}", ihvText.Input)
+						TitleCaseText := Format("{:T}", Scalar)
 						SendNewResult(TitleCaseText)
 				} else {
-						SendNewResult(ihvText.Input)
+						SendNewResult(Scalar)
 				}
 		}
 }

@@ -35,8 +35,28 @@ GetKeyState(Key, *) {
 	return Key == "CapsLock" ? _LRPN_Caps : false
 }
 GetForegroundKeyboardLayout() => 0x7E570409
-DllCall(*) {
-	throw Error("native DLL calls are outside this passive ownership fixture")
+; The JSON owner ends each string run with the native text adapter's wcscspn
+; and skips whitespace and number runs with its wcsspn; both read memory only.
+; Replay exactly those calls unit by unit; every other native call, a layout or
+; profile probe above all, stays refused.
+DllCall(Function, Args*) {
+	Including := Function == "msvcrt\wcsspn"
+	if !((Including || Function == "msvcrt\wcscspn") && Args.Length == 5 && Args[1] == "Ptr"
+			&& Args[3] == "Ptr" && Args[5] == "Cdecl UPtr")
+		throw Error("native DLL calls are outside this passive ownership fixture")
+	static Members := Map(), MembersOf := 0
+	if !(IsObject(MembersOf) && MembersOf == Args[4]) {
+		Members := Map(), MembersOf := Args[4], SetIndex := 0
+		while Member := NumGet(MembersOf, SetIndex++ * 2, "UShort")
+			Members[Member] := true
+	}
+	Offset := 0
+	while Unit := NumGet(Args[2], Offset * 2, "UShort") {
+		if Members.Has(Unit) != Including
+			break
+		Offset++
+	}
+	return Offset
 }
 SendInput(*) {
 	throw Error("native input is outside this passive ownership fixture")

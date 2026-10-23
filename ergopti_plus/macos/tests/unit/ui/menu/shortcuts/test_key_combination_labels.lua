@@ -25,7 +25,7 @@ end
 local function with_menu(callback)
 	helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
 		"infra.i18n", "infra.locale", "locale.core", "infra.storage",
-		"infra.timer_scheduler", "tap_hold.combination_labels" }, function()
+		"infra.timer_scheduler", "tap_hold.combination_labels", "ui.action_picker" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local captured = package.loaded["infra.i18n"]
 		package.loaded["infra.i18n"] = nil
@@ -179,8 +179,14 @@ helpers.describe("canonical physical combination labels", function()
 					local pair = rows[index]
 					helpers.assert_eq(pair.title, expectation.title)
 					for slot_index, slot in ipairs({ "combo", "tap", "hold" }) do
-						local picker = pair.menu[slot_index + 2].menu
-						helpers.assert_eq(picker[2].title, "Copy fixture")
+						-- The slot opens the shared action picker; a pick confirms there.
+						local offered, confirm = nil, nil
+						package.loaded["ui.action_picker"] = {
+							open = function(opts, on_confirm) offered, confirm = opts, on_confirm; return true end,
+						}
+						helpers.assert_true(pair.menu[slot_index + 2].fn())
+						helpers.assert_eq(offered.items[2].label, "Copy fixture")
+						local picker = { [2] = { fn = function() return confirm(offered.items[2].id) end } }
 						observed.accepted = false
 						local before = observed.regenerations
 						picker[2].fn()

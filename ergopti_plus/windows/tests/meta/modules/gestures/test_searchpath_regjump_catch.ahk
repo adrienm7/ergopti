@@ -29,18 +29,18 @@ _SPRJC_CheckRegJumpHasCatch() {
 	Body := _DriverFuncBody("SearchPath")
 	Assert(Body != "", "SearchPath must exist in modules/shortcuts/win.ahk")
 
-	CallPos := InStr(Body, "RegJump(SelectedText)")
-	Assert(CallPos > 0, "SearchPath must still call RegJump(SelectedText) on the RegeditPath branch")
+	CallPos := InStr(Body, "RegJump(Value)")
+	Assert(CallPos > 0, "SearchPath must still call RegJump(Value) on its registry branch")
 
 	; The nearest preceding "try" (within a short lookback window) must be
 	; the one guarding this specific call, and a "catch" must follow it.
 	LookBack := SubStr(Body, Max(1, CallPos - 40), CallPos - Max(1, CallPos - 40))
 	Assert(InStr(LookBack, "try") > 0,
-		"SearchPath's RegeditPath branch must wrap RegJump(SelectedText) in a try, matching every sibling Run() branch in the same function")
+		"SearchPath's RegeditPath branch must wrap RegJump(Value) in a try, matching every sibling Run() branch in the same function")
 
 	LookAhead := SubStr(Body, CallPos, 150)
 	Assert(InStr(LookAhead, "catch") > 0,
-		"SearchPath's RegeditPath branch must have a catch clause after RegJump(SelectedText), matching every sibling Run() branch")
+		"SearchPath's RegeditPath branch must have a catch clause after RegJump(Value), matching every sibling Run() branch")
 }
 Test("shortcuts: SearchPath's RegeditPath branch wraps RegJump in try/catch (searchpath-regjump-uncaught)",
 	_SPRJC_CheckRegJumpHasCatch)

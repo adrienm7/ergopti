@@ -15,7 +15,9 @@
 
 
 ; Independent whole source images; the production renderer never creates these expectations.
-_CUK_RetiredRootVector(Kind) {
+; The root neighbors are bare root keys the cleanup itself offers as unknown;
+; a page-level test that counts every row omits them.
+_CUK_RetiredRootVector(Kind, WithRootNeighbors := true) {
 	switch Kind {
 		case "dotted":
 			Source := "# retired dotted root`n" . 'ahk.layout.flag = true' . "`n"
@@ -27,7 +29,7 @@ _CUK_RetiredRootVector(Kind) {
 				. 'id = "first"' . "`n[[ahk.items]]`nflag = 0`n" . 'id = "second"' . "`n`n"
 		default: throw ValueError("Unknown retired root fixture")
 	}
-	Root := "# exact root neighbors`n" . '"ahk.literal" = {keep = "literal", empty = []} # root comment' . "`n"
+	Root := !WithRootNeighbors ? "" : "# exact root neighbors`n" . '"ahk.literal" = {keep = "literal", empty = []} # root comment' . "`n"
 		. 'AHK = {keep = "case", flag = false}' . "`n`n"
 	Tables := _CUK_CurrentMetadata() . "`n[updater]`n" . 'channel = "stable" # updater comment' . "`n`n"
 		. "[hotstrings.personal.mine]`nenabled = true`ntime_activation_seconds = 0.75`n`n"
@@ -104,7 +106,7 @@ Test("config cleanup: privately captured table-array root removes all exact gene
 
 _CUK_RetiredRootPrivatePage() {
 	Folder := _CUK_RetiredNewDir(), Path := Folder . "\config.toml"
-	Vector := _CUK_RetiredRootVector("array")
+	Vector := _CUK_RetiredRootVector("array", false)
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Vector["source"]))
 		_CUK_AdmitCurrentSource(Path)

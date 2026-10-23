@@ -545,6 +545,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
 	private let fatalReportStore: EmbeddedFatalReportStore
 	private let childActivity: EmbeddedChildActivity
+	private let instanceLock: LauncherInstanceLock
+	private let runningApplicationsReader: (String) -> [NSRunningApplication]
 	private var applicationIsTerminating = false
 	// Monotonic origin of this launcher's startup trail.
 	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
@@ -564,6 +566,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
 	///   - fatalReportStore: Per-launch report the Lua runtime writes before a fatal exit.
 	///   - childActivity: Keeps App Nap off the launcher while its child runs.
+	///   - instanceLock: Per-user lock that makes this process the sole launcher.
+	///   - runningApplicationsReader: Lists running applications by bundle identifier.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -587,7 +591,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			makeEmbeddedProcessExitMonitor,
 		fatalReportStore: EmbeddedFatalReportStore =
 			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath),
-		childActivity: EmbeddedChildActivity = EmbeddedChildActivity()
+		childActivity: EmbeddedChildActivity = EmbeddedChildActivity(),
+		instanceLock: LauncherInstanceLock = LauncherInstanceLock(path: launcherInstanceLockPath()),
+		runningApplicationsReader: @escaping (String) -> [NSRunningApplication] = {
+			NSRunningApplication.runningApplications(withBundleIdentifier: $0)
+		}
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -597,6 +605,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.processExitMonitorFactory = processExitMonitorFactory
 		self.fatalReportStore = fatalReportStore
 		self.childActivity = childActivity
+		self.instanceLock = instanceLock
+		self.runningApplicationsReader = runningApplicationsReader
 		super.init()
 	}
 
@@ -609,7 +619,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		LauncherLog.write("launcher startup started — version \(bundleVersionString())")
+		acquireSoleLauncherOwnership(attempt: 0) { [weak self] in
+			self?.finishLaunchingAsSoleLauncher()
+		}
+	}
 
+	/// Becomes the only launcher of this user, or hands over to the one that is.
+	/// Everything that can start an embedded runtime runs only after this.
+	/// - Parameters:
+	///   - attempt: Retries already spent on a held lock.
+	///   - proceed: Continues startup once the lock is held.
+	@MainActor
+	private func acquireSoleLauncherOwnership(attempt: Int, then proceed: @escaping @MainActor () -> Void) {
+		switch instanceLock.acquire() {
+		case .acquired:
+			LauncherLog.write("launcher stage: sole-launcher lock held at \(instanceLock.path)")
+			proceed()
+		case .heldByAnotherLauncher where attempt < kLauncherLockRetryAttempts:
+			Task { @MainActor [weak self] in
+				try? await Task.sleep(nanoseconds: UInt64(kLauncherLockRetryIntervalSeconds * 1_000_000_000))
+				self?.acquireSoleLauncherOwnership(attempt: attempt + 1, then: proceed)
+			}
+		case .heldByAnotherLauncher:
+			// A second launcher would start a second embedded runtime beside the first
+			LauncherLog.write(
+				"another ErgoptiPlus launcher holds \(instanceLock.path); activating it and exiting"
+			)
+			let ownPid = ProcessInfo.processInfo.processIdentifier
+			for other in runningApplicationsReader(kErgoptiBundleId) where other.processIdentifier != ownPid {
+				_ = other.activate(options: [])
+			}
+			applicationIsTerminating = true
+			applicationTerminator(self)
+		case let .failed(errorCode):
+			fail("The ErgoptiPlus instance lock \(instanceLock.path) could not be taken (errno \(errorCode)).")
+		}
+	}
+
+	/// Startup that only the sole launcher performs.
+	@MainActor
+	private func finishLaunchingAsSoleLauncher() {
 		// Hide the launcher from the Dock — Hammerspoon's own menubar item
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
@@ -685,7 +734,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		LauncherLog.write(
 			"launcher stage: remap guardian registration left to the driver's Karabiner switch"
 		)
-		launchHammerspoon(at: hsBinary, remapGuardianStatus: .notRequested)
+		replaceStaleEmbeddedRuntimes { [weak self] in
+			self?.launchHammerspoon(at: hsBinary, remapGuardianStatus: .notRequested)
+		}
+	}
+
+	/// Ends every embedded runtime this launcher did not start, then proceeds.
+	/// Only the embedded bundle identity is scanned, so a Hammerspoon the user
+	/// installed is never touched. Runs after the sole-launcher lock, so a
+	/// runtime found here has no live launcher of its own.
+	/// - Parameter proceed: Starts this launcher's own runtime.
+	private func replaceStaleEmbeddedRuntimes(then proceed: @escaping () -> Void) {
+		let running = runningApplicationsReader(kEmbeddedHammerspoonBundleId)
+		let stalePids = Set(staleEmbeddedRuntimes(
+			running.map {
+				RunningRuntimeCandidate(processIdentifier: $0.processIdentifier, bundleIdentifier: $0.bundleIdentifier)
+			},
+			trackedChild: hsApplication?.processIdentifier
+		))
+		let stale = running.filter { stalePids.contains($0.processIdentifier) }
+		guard !stale.isEmpty else {
+			proceed()
+			return
+		}
+		for application in stale {
+			LauncherLog.write("replacing a leftover embedded Hammerspoon (pid \(application.processIdentifier))")
+			application.terminate()
+		}
+		waitForStaleRuntimes(
+			stale,
+			deadline: Date().addingTimeInterval(kStaleRuntimeTerminateGraceSeconds),
+			then: proceed
+		)
+	}
+
+	/// Polls the terminated runtimes, force-terminating any past the grace period.
+	/// - Parameters:
+	///   - stale: Runtimes asked to terminate.
+	///   - deadline: End of their grace period.
+	///   - proceed: Starts this launcher's own runtime.
+	private func waitForStaleRuntimes(
+		_ stale: [NSRunningApplication],
+		deadline: Date,
+		then proceed: @escaping () -> Void
+	) {
+		let alive = stale.filter { !$0.isTerminated }
+		if alive.isEmpty {
+			LauncherLog.write("launcher stage: leftover embedded Hammerspoon ended")
+			proceed()
+			return
+		}
+		if Date() >= deadline {
+			for application in alive {
+				LauncherLog.write(
+					"leftover embedded Hammerspoon pid \(application.processIdentifier) ignored terminate; forcing it"
+				)
+				application.forceTerminate()
+			}
+			proceed()
+			return
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + kStaleRuntimePollIntervalSeconds) { [weak self] in
+			self?.waitForStaleRuntimes(stale, deadline: deadline, then: proceed)
+		}
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {

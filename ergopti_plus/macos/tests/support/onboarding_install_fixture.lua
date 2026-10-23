@@ -22,6 +22,10 @@ local MODULE_NAMES = {
 	"infra.logger",
 	"infra.notifications",
 	"infra.text_utils",
+	-- The remap onboarding resolves its own folder and the scheduler admits delays
+	-- through these pure owners.
+	"native_path",
+	"number_policy",
 	"platform.remap.ke_paths",
 	"platform.remap.onboarding",
 	"tests.stubs.hs",

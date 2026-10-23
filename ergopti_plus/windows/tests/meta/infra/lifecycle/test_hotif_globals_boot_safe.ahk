@@ -92,11 +92,11 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 ; after the pump and both dependencies; no function-name exemption is involved.
 _HGBS_FeaturesPublishAfterDependencies(Entry, Driver) {
 	Entry := _HGBS_CodeOnly(Entry)
-	Driver := _HGBS_CodeOnly(Driver)
 	Publication := "im)^global\s+Features\s*:=\s*ManifestBuildFeaturesMap\(\)\s*$"
 	PublishPos := RegExMatch(Entry, Publication)
 	if !PublishPos
 		return false
+	Driver := _HGBS_CodeOnly(Driver)
 	for Source in [Entry, Driver] {
 		Count := 0
 		for Line in StrSplit(Source, "`n", "`r")
@@ -126,11 +126,17 @@ _HGBS_ColdFeaturesDirective(Text, ProvenAbsent) {
 ; paren, and a scanner that only reads the directive's first line is blind to
 ; everything after it — that blindness is itself a recorded finding.
 _HGBS_HotIfFunctions(Source := unset, ReadBody := _DriverFuncBodyOrEmpty, Entry := unset, Driver := unset) {
-	global _HGBS_HOTIF_PARENTS
 	Src := IsSet(Source) ? Source : _DriverSourceNoComments()
 	EntrySource := IsSet(Entry) ? Entry : (IsSet(Source) ? "" : _HGBS_EntrySource())
 	DriverSource := IsSet(Driver) ? Driver : _DriverSourceNoComments()
 	FeaturesAbsent := _HGBS_FeaturesPublishAfterDependencies(EntrySource, DriverSource)
+	return _HGBS_ScanHotIfFunctions(Src, ReadBody, FeaturesAbsent)
+}
+
+; Directive mutations share a captured publication image. Publication mutations
+; obtain a fresh proof through the public probe; no cross-invocation cache exists.
+_HGBS_ScanHotIfFunctions(Src, ReadBody, FeaturesAbsent) {
+	global _HGBS_HOTIF_PARENTS
 	; Only executable parentheses delimit directives; quoted examples are data.
 	Src := _DriverMaskNonCode(&Src)
 	Names := Map()
@@ -301,8 +307,7 @@ _HGBS_UnguardedGlobalsOf(Body) {
 ; only if that global is seeded before the first pump, or if it checks IsSet.
 _HGBS_EveryHotIfHelperIsBootSafe() {
 	global _HGBS_PRE_PUMP_SEEDED
-	_HGBS_ColdFeaturesGuardControls()
-	Fns := _HGBS_HotIfFunctions()
+	Fns := _HGBS_ColdFeaturesGuardControls()
 
 	Count := 0
 	for _, _ in Fns
@@ -333,7 +338,8 @@ _HGBS_ColdFeaturesGuardControls() {
 	Entry := _HGBS_EntrySource()
 	Driver := _DriverSourceNoComments()
 	Assert(Entry != "" && Driver != "", "cold-path proof requires the actual entry and whole driver")
-	Assert(_HGBS_FeaturesPublishAfterDependencies(Entry, Driver),
+	FeaturesAbsent := _HGBS_FeaturesPublishAfterDependencies(Entry, Driver)
+	Assert(FeaturesAbsent,
 		"the unique Features publication follows Bundle and the JSON/policy owners")
 	Directives := []
 	for Line in StrSplit(Driver, "`n", "`r")
@@ -341,10 +347,10 @@ _HGBS_ColdFeaturesGuardControls() {
 			Directives.Push(Line)
 	AssertEqual(3, Directives.Length, "all three actual control/zoom contexts must participate")
 	for Directive in Directives {
-		Cold := _HGBS_HotIfFunctions(Directive, _DriverFuncBodyOrEmpty, Entry, Driver)
+		Cold := _HGBS_ScanHotIfFunctions(Directive, _DriverFuncBodyOrEmpty, FeaturesAbsent)
 		AssertFalse(Cold.Has("LayoutRowIsEmulatedHotkey"), "the real AND prefix short-circuits before row lookup")
 		Multiline := StrReplace(Directive, "IsSet(Features) and ", "IsSet(Features) and (`n") . "`n)"
-		Cold := _HGBS_HotIfFunctions(Multiline, _DriverFuncBodyOrEmpty, Entry, Driver)
+		Cold := _HGBS_ScanHotIfFunctions(Multiline, _DriverFuncBodyOrEmpty, FeaturesAbsent)
 		AssertFalse(Cold.Has("LayoutRowIsEmulatedHotkey"), "the entire multiline AND expression must preserve dominance")
 		for Mutant in [StrReplace(Directive, "IsSet(Features) and ", ""),
 			StrReplace(Directive, "IsSet(Features) and ", "IsSet(Features) or "),
@@ -352,7 +358,7 @@ _HGBS_ColdFeaturesGuardControls() {
 			StrReplace(Directive, "IsSet(Features) and ", "BeforeGuard() and IsSet(Features) and "),
 			Directive . ", JsonParse(Probe)", Directive . " or (`nJsonParse(Probe)`n)"] {
 			Assert(StrCompare(Directive, Mutant, true) != 0, "each guard mutant must alter the actual directive")
-			Reachable := _HGBS_HotIfFunctions(Mutant, _DriverFuncBodyOrEmpty, Entry, Driver)
+			Reachable := _HGBS_ScanHotIfFunctions(Mutant, _DriverFuncBodyOrEmpty, FeaturesAbsent)
 			Assert(Reachable.Has("LayoutRowIsEmulatedHotkey") && Reachable.Has("JsonParse"),
 				"an absent, foreign, reversed or OR guard must restore the real transitive JSON path")
 		}
@@ -370,6 +376,9 @@ _HGBS_ColdFeaturesGuardControls() {
 	}
 	AssertFalse(_HGBS_FeaturesPublishAfterDependencies(Entry, Driver . "`nglobal Features := Map()"),
 		"a publication in another driver file must also invalidate absence")
+	; Restore the actual whole-driver graph after every adversarial probe, using
+	; the same immutable Driver image whose publication was proven above.
+	return _HGBS_ScanHotIfFunctions(Driver, _DriverFuncBodyOrEmpty, FeaturesAbsent)
 }
 
 _HGBS_FunctionScannerIgnoresLiteralBraces() {

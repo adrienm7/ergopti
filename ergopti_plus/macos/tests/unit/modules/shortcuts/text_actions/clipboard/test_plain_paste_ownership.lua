@@ -116,8 +116,14 @@ helpers.describe("plain paste restores only its own native clipboard generation"
 	end)
 
 	helpers.it("never adopts a later count when the initial mutation receipt was unavailable", function()
-		with_plain(function(f)
-			f.count_failure = "nil"
+		with_plain(function(f, board)
+			local native_write, first = board.setContents, true
+			board.setContents = function(value)
+				local written = native_write(value)
+				if first then first = false; f.count_failure = "nil" end
+				return written
+			end
+			hs.pasteboard.setContents = board.setContents
 			helpers.assert_eq(f.text.paste_as_plain_text(), false)
 			f.count_failure = nil
 			f.copy("NEW COPY")

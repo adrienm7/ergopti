@@ -17,7 +17,7 @@
 #Requires AutoHotkey v2.0
 
 global MENU_RELOAD_REPLAY_FILENAME := "menu_reload_replay.json"
-global MENU_RELOAD_REPLAY_SCHEMA := "ergopti.menu_reload_replay.v2"
+global MENU_RELOAD_REPLAY_SCHEMA := "ergopti.menu_reload_replay.v3"
 global MENU_RELOAD_REPLAY_MENU_PROPERTY := "__ErgoptiReplayMenuIdentity"
 
 ; Held rows in click order, keyed by an increasing integer.
@@ -97,11 +97,25 @@ MenuReloadReplay_Hold(HeldKey, Registration, &RefusedPath := unset) {
 			Registration.ItemId)
 		return 0
 	}
-	_MenuReloadReplayNextKey += 1
-	_MenuReloadReplayHeld[_MenuReloadReplayNextKey] := Path
+	MenuReloadReplay_CarryDesired(Path, Registration)
+	; A later click may interrupt diagnostics before this call returns its receipt.
+	Key := ++_MenuReloadReplayNextKey
+	_MenuReloadReplayHeld[Key] := Path
 	try LoggerInfo("MenuDispatcher", "Menu command '{1}' waits for the reload successor; {2} held.",
 		MenuReloadReplay_Describe(Path), _MenuReloadReplayHeld.Count)
-	return _MenuReloadReplayNextKey
+	return Key
+}
+
+/**
+ * Carries a check-row click's requested state onto its row path, so the
+ * successor skips a command an earlier click already applied instead of
+ * toggling the state back (menu-toggle-replay-double-flip).
+ * @param {Array} Path Row path from MenuReloadReplay_PathOf.
+ * @param {Object|Integer} Registration The click's registration, or 0.
+ */
+MenuReloadReplay_CarryDesired(Path, Registration) {
+	if IsObject(Registration) && Registration.HasOwnProp("Desired")
+		Path.ReplayDesired := Registration.Desired
 }
 
 /** Withdraws a held command whose next look could not be scheduled. */
@@ -353,6 +367,9 @@ _MenuReloadReplayRequirePath(Path) {
 		if !(Label is String) || Label == ""
 			throw ValueError("A menu row path holds only non-empty labels.")
 	}
+	if Path.HasOwnProp("ReplayDesired") && (!(Path.ReplayDesired is Integer)
+			|| (Path.ReplayDesired != 0 && Path.ReplayDesired != 1))
+		throw ValueError("A replayed click's requested check state must be 0 or 1.")
 	if Path.HasOwnProp("ReplayIdentity") {
 		if !(Path.ReplayIdentity is String) || Path.ReplayIdentity == "" || !Path.HasOwnProp("ReplayContext")
 				|| !(Path.ReplayContext is Array) || Path.ReplayContext.Length != Path.Length - 1
@@ -439,12 +456,18 @@ _MenuReloadReplayEncode(Paths) {
 		for Label in Path
 			Labels .= (Labels == "" ? "" : ",") . JsonStringLiteral(Label)
 		Encoded := "[" . Labels . "]"
-		if Path.HasOwnProp("ReplayIdentity") {
-			Context := ""
-			for Part in Path.ReplayContext
-				Context .= (Context == "" ? "" : ",") . JsonStringLiteral(Part)
-			Encoded := '{"labels":' . Encoded . ',"identity":' . JsonStringLiteral(Path.ReplayIdentity)
-				. ',"context":[' . Context . ']}'
+		if Path.HasOwnProp("ReplayIdentity") || Path.HasOwnProp("ReplayDesired") {
+			Members := '{"labels":' . Encoded
+			if Path.HasOwnProp("ReplayIdentity") {
+				Context := ""
+				for Part in Path.ReplayContext
+					Context .= (Context == "" ? "" : ",") . JsonStringLiteral(Part)
+				Members .= ',"identity":' . JsonStringLiteral(Path.ReplayIdentity)
+					. ',"context":[' . Context . ']'
+			}
+			if Path.HasOwnProp("ReplayDesired")
+				Members .= ',"desired":' . Path.ReplayDesired
+			Encoded := Members . "}"
 		}
 		Commands .= (Commands == "" ? "" : ",") . Encoded
 	}
@@ -525,13 +548,22 @@ _MenuReloadReplayDecode(Text) {
 	Paths := []
 	for Command in Commands {
 		if Command is Map {
-			if Command.Count != 3 || !Command.Has("labels") || !Command.Has("identity") || !Command.Has("context")
-					|| !(Command["identity"] is String) || Command["identity"] == ""
+			HasIdentity := Command.Has("identity") || Command.Has("context")
+			HasDesired := Command.Has("desired")
+			if !Command.Has("labels") || !(HasIdentity || HasDesired)
+					|| Command.Count != 1 + (HasIdentity ? 2 : 0) + (HasDesired ? 1 : 0)
+				throw ValueError("a command object holds its labels, an identity with its context, and an optional requested check state")
+			if HasIdentity && (!Command.Has("identity") || !Command.Has("context")
+					|| !(Command["identity"] is String) || Command["identity"] == "")
 				throw ValueError("a canonical command requires labels and its nonempty identity")
 			Path := Command["labels"]
 			_MenuReloadReplayRequirePath(Path)
-			Path.ReplayIdentity := Command["identity"]
-			Path.ReplayContext := Command["context"]
+			if HasIdentity {
+				Path.ReplayIdentity := Command["identity"]
+				Path.ReplayContext := Command["context"]
+			}
+			if HasDesired
+				Path.ReplayDesired := Command["desired"]
 		} else
 			Path := Command
 		_MenuReloadReplayRequirePath(Path)
@@ -562,9 +594,12 @@ MenuReloadReplay_Run(Path, NotifyFn := 0) {
 		return false
 	}
 	try LoggerInfo("MenuDispatcher", "Menu command '{1}' from before the reload replays.", Describe)
+	Registration := {ItemId: Target.ItemId, Token: _MenuDispatchTokens[Target.ItemId]}
+	if Path.HasOwnProp("ReplayDesired")
+		Registration.Desired := Path.ReplayDesired
 	return MenuCommandRun(_MenuDispatchCallbacks[Target.ItemId],
 		[Target.Label, Target.Position, MenuFromHandle(Target.Handle)], 0, 0, 0,
-		{ItemId: Target.ItemId, Token: _MenuDispatchTokens[Target.ItemId]})
+		Registration)
 }
 
 _MenuReloadReplayNotifyLost(NotifyFn) {

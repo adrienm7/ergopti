@@ -32,7 +32,7 @@ _UDRT_AssertDownloadReceiveBudget() {
 		"core.ahk must define UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS (updater-download-receive-timeout)")
 	Assert(Integer(m[1]) >= 600000,
 		"UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS must be >= the 600 s poll ceiling so the download is not aborted before the poll deadline (updater-download-receive-timeout)")
-	Worker := _DriverFuncBody("_Updater_BuildStagingWorkerScript")
+	Worker := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Assert(InStr(Worker, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,
 		"the worker must apply the dedicated budget while streaming the binary")
 }

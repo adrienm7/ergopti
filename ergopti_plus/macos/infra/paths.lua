@@ -23,7 +23,12 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local LOG    = "paths"
+
+-- Backslash is a filename byte on macOS and separates components only when the
+-- host itself is Windows (the headless suite): the shared owner applies that rule.
+local parent_of = NativePath.dirname
 
 -- Absolute path of this file's own directory — used as the script-relative
 -- fallback base when hs.configdir does not reach the repository root. The
@@ -31,7 +36,7 @@ local LOG    = "paths"
 local _script_dir = (function()
 	local src = (debug.getinfo(1, "S") or {}).source or ""
 	src = src:gsub("^@", "")
-	return src:match("^(.*)[/\\][^/\\]+$") or ""
+	return parent_of(src) or ""
 end)()
 
 
@@ -59,7 +64,7 @@ end)()
 --- @return string|nil Absolute path to the match, or nil.
 function M.find_upward(base_dir, relative_target, max_steps, required_mode)
 	max_steps = max_steps or 8
-	local current = (base_dir or ""):gsub("[/\\]+$", "")
+	local current = NativePath.without_trailing_separators(base_dir or "")
 	for _ = 1, max_steps do
 		local candidate = current .. "/" .. relative_target
 		local ok, attr = pcall(hs.fs.attributes, candidate)
@@ -67,7 +72,7 @@ function M.find_upward(base_dir, relative_target, max_steps, required_mode)
 			Logger.debug(LOG, "find_upward('%s'): found at '%s'.", relative_target, candidate)
 			return candidate
 		end
-		local parent = current:match("^(.*)[/\\][^/\\]+$")
+		local parent = parent_of(current)
 		if not parent or parent == current then break end
 		current = parent
 	end

@@ -284,14 +284,17 @@ local function fresh_harness()
 			h.launches[#h.launches + 1] = name
 			return h.name_launch_result
 		end,
-		get = function()
-			return {
+		-- The fallback resolves the application by bundle identifier only:
+		-- hs.application.get searches every window once nothing matches (#99).
+		applicationsForBundleID = function()
+			return { {
 				activate = function()
 					h.activations = h.activations + 1
 					return h.activation_result
 				end,
-			}
+			} }
 		end,
+		get = function() error("hs.application.get searches every window when nothing matches", 0) end,
 	}
 
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {

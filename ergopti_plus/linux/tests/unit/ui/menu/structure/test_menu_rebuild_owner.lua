@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local Factory = dofile(helpers.driver_root() .. "/ui/menu/rebuild_owner.lua")
 
 local function fixture()
-	local state = { builds = 0, publications = 0, actions = 0, errors = {}, value = "initial", active = true }
+	local state = { builds = 0, publications = 0, actions = 0, errors = {}, value = "initial", active = true, lost = 0 }
 	state.options = {
 		current = function() return state.active end,
 		build = function()
@@ -29,6 +29,7 @@ local function fixture()
 			return true
 		end,
 		on_error = function(reason) state.errors[#state.errors + 1] = reason end,
+		notify_lost = function() state.lost = state.lost + 1; return true end,
 	}
 	return state
 end
@@ -160,6 +161,106 @@ helpers.describe("menu rebuild: coalesced publication owner", function()
 		local state = fixture(); local owner = Factory.new(state.options)
 		state.options.build, state.options.publish, state.options.current = function() error("replacement") end, nil, nil
 		owner.request(); helpers.assert_true(owner.pump()); helpers.assert_eq(state.publications, 1)
+	end)
+end)
+
+--- A tray with one check row whose checkmark reads a live switch.
+local function check_fixture()
+	local state = { on = false, runs = 0, lost = 0, visible = nil }
+	state.options = {
+		current = function() return true end,
+		build = function()
+			local shown = state.on
+			return { { title = "Features", menu = { { title = "Preview", checked = shown, fn = function()
+				state.runs = state.runs + 1
+				state.on = not state.on
+				return state.on
+			end } } } }
+		end,
+		publish = function(items) state.visible = items; return true end,
+		notify_lost = function() state.lost = state.lost + 1; return true end,
+	}
+	return state
+end
+
+helpers.describe("menu rebuild: clicks during a refresh", function()
+	helpers.it("(menu-click-held-during-refresh) replays a retired-row click on the refreshed menu", function()
+		local state = fixture(); local owner = Factory.new(state.options)
+		owner.request(); helpers.assert_true(owner.pump())
+		local old = state.visible[1].menu[1].fn
+		state.value = "initial"; owner.request()
+		helpers.assert_eq(old("argument"), false, "the retired row does not run its own action")
+		helpers.assert_eq(state.actions, 0)
+		helpers.assert_true(owner.pump())
+		helpers.assert_eq(state.actions, 1, "the held click ran once on the refreshed menu")
+		helpers.assert_eq(state.lost, 0)
+		helpers.assert_true(owner.pump() == false); helpers.assert_eq(state.actions, 1, "a held click runs once")
+	end)
+
+	helpers.it("(menu-click-intent-skip) skips a held check-row click whose row already shows its state", function()
+		local state = check_fixture(); local owner = Factory.new(state.options)
+		owner.request(); helpers.assert_true(owner.pump())
+		local first, second = state.visible[1].menu[1].fn, state.visible[1].menu[1].fn
+		helpers.assert_eq(first(), true, "the first click turns the row on")
+		owner.request()
+		helpers.assert_eq(second(), false, "a second click on the stale unchecked row is held")
+		helpers.assert_true(owner.pump())
+		helpers.assert_eq(state.runs, 1, "the held click asked for checked, which the row already shows")
+		helpers.assert_eq(state.on, true, "the switch is not toggled back")
+	end)
+
+	helpers.it("(menu-click-intent-run) runs a held check-row click whose row still lacks its state", function()
+		local state = check_fixture(); local owner = Factory.new(state.options)
+		owner.request(); helpers.assert_true(owner.pump())
+		local stale = state.visible[1].menu[1].fn
+		owner.request()
+		helpers.assert_eq(stale(), false)
+		helpers.assert_true(owner.pump())
+		helpers.assert_eq(state.runs, 1); helpers.assert_eq(state.on, true)
+	end)
+
+	helpers.it("(menu-click-lost-notice) reports a held click whose row the refreshed menu lacks", function()
+		local state = fixture(); local owner = Factory.new(state.options)
+		owner.request(); helpers.assert_true(owner.pump())
+		local old = state.visible[1].menu[1].fn
+		state.value = "renamed"; owner.request(); old()
+		helpers.assert_true(owner.pump())
+		helpers.assert_eq(state.actions, 0, "a click never runs on a different row")
+		helpers.assert_eq(state.lost, 1, "the user is told the click was not applied")
+	end)
+
+	helpers.it("(menu-click-held-retry) keeps a held click across a refused publication", function()
+		local state = fixture(); local refuse = true; local publish = state.options.publish
+		state.options.publish = function(items) if refuse then return false end; return publish(items) end
+		local owner = Factory.new(state.options)
+		refuse = false; owner.request(); helpers.assert_true(owner.pump())
+		local old = state.visible[1].menu[1].fn
+		refuse = true; owner.request(); old()
+		helpers.assert_eq(owner.pump(), false); helpers.assert_eq(state.actions, 0)
+		refuse = false; helpers.assert_true(owner.pump())
+		helpers.assert_eq(state.actions, 1)
+	end)
+
+	helpers.it("(menu-click-dropped-logged) logs a click dropped by a stopped tray", function()
+		local warnings = {}
+		local previous = package.loaded["logger.shim"]
+		package.loaded["logger.shim"] = { info = function() end, error = function() end,
+			warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end }
+		local ok, err = pcall(function()
+			local Owner = dofile(helpers.driver_root() .. "/ui/menu/rebuild_owner.lua")
+			local state = fixture(); local owner = Owner.new(state.options)
+			owner.request(); helpers.assert_true(owner.pump())
+			local old = state.visible[1].menu[1].fn
+			owner.request(); old()
+			helpers.assert_true(owner.stop())
+			helpers.assert_eq(state.actions, 0)
+			helpers.assert_eq(#warnings, 1, "the held click is reported when the tray stops")
+			helpers.assert_true(warnings[1]:find("Action", 1, true) ~= nil, warnings[1])
+			old()
+			helpers.assert_eq(#warnings, 2, "a click on a stopped tray is reported")
+		end)
+		package.loaded["logger.shim"] = previous
+		if not ok then error(err, 0) end
 	end)
 end)
 

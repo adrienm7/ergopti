@@ -21,6 +21,7 @@
 
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
+local RunningApplication = require("adapters.running_application")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -647,11 +648,8 @@ function M.install(ctx)
 			return false
 		end
 
-		local hs_app = hs.application and hs.application.get
-			and hs.application.get("Hammerspoon") or nil
-		if not hs_app and hs.application and hs.application.find then
-			hs_app = hs.application.find("Hammerspoon")
-		end
+		-- By PID: a name lookup that misses reads every window of every app.
+		local hs_app = RunningApplication.current()
 		if hs_app and type(hs_app.activate) == "function"
 			and flow_is_authorized(flow) then
 			pcall(function() hs_app:activate(true) end)

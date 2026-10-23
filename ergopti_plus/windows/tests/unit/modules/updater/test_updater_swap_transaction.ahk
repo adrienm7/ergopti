@@ -282,7 +282,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 		if NewExists
 			_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW",
 				ExitAfterReady ? "" : ReleaseName, NewBootDelayMs)
-		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
+		FileAppend(FileRead(_Updater_SwapWorkerPath(), "UTF-8"), SwapScriptPath, "UTF-8-RAW")
 
 		ParentExitHandle := _USTX_StartParentGate(TestId, &ParentPid)
 		Assert(ParentPid > 0 and ProcessExist(ParentPid),

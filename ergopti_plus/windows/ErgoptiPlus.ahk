@@ -1,5 +1,14 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
+; Version resource of the compiled exe (Ahk2Exe directives, plain comments for
+; the interpreter): without it the exe carries only the runtime's defaults. The
+; version comes from BUNDLE_VERSION in infra/bundle.ahk.
+;@Ahk2Exe-SetProductName Ergopti+
+;@Ahk2Exe-SetCompanyName Ergopti
+;@Ahk2Exe-SetDescription Ergopti+: hotstrings and shortcuts to type faster and more ergonomically
+;@Ahk2Exe-SetCopyright Copyright (c) 2024 Adrien MOYAUX (MIT License) - https://ergopti.fr
+;@Ahk2Exe-SetOrigFilename ErgoptiPlus.exe
+;@Ahk2Exe-SetInternalName ErgoptiPlus
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 ; No process starts with a tray icon: the driver path reveals it once the custom
 ; icon and the safe bootstrap menu are in place, and a detached worker never does.
@@ -427,6 +436,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/text_utils.ahk
 #Include infra/text_case.ahk
 #Include infra/wrap_pair.ahk
+#Include infra/open_target.ahk
 #Include infra/send_input_parameter.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
@@ -731,6 +741,7 @@ if TOML_UnreadableFile(ConfigurationFile) {
 		try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
 }
 ReadScriptConfig(_IniCache)
+HotstringsConfigApplyMagicKey(ScriptInformation["MagicKey"])
 BootProfile_Stamp("Script preferences applied")
 ; Language-pack category gates come from the shared hotstring index, so they are
 ; added before the gates are read from config.toml.

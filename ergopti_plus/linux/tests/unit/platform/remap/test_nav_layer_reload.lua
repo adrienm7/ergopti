@@ -144,7 +144,9 @@ helpers.describe("boot navigation file isolation (nav-layer-boot-refusal)", func
 				end,
 			}
 		end
+		local release_source = helpers.route_source_through_stdio(target)
 		local called, result = pcall(callback)
+		release_source()
 		io.open = original_open
 		local closed = true
 		for _, record in ipairs(owned) do
@@ -470,7 +472,9 @@ helpers.describe("original configured Navigation source reservations", function(
 					return true
 				end }
 			end
+			local release_source = helpers.route_source_through_stdio(s.dir .. "/layers.toml")
 			local loaded, map, issuance = pcall(s.nav.load, s.opts)
+			release_source()
 			io.open = open
 			if not loaded then error(map, 0) end
 			helpers.assert_eq(closes, 1); helpers.assert_eq(map[36], { mods = {}, keys = {} })
@@ -572,8 +576,8 @@ helpers.describe("original configured Navigation source reservations", function(
 			s.hook.engine:process(56, 1, 0)
 			helpers.assert_eq(frame.current(), false); helpers.assert_nil(s.manager.capture_collision_inventory())
 			s.hook.engine:release_all()
-			helpers.assert_true(s.hook.engine:arm_caps_word(function() return true end))
-			helpers.assert_nil(s.manager.capture_collision_inventory(), "original private input_arm_state observes CapsWord")
+			helpers.assert_true(s.hook.engine:arm_one_shot(0, function() return true end))
+			helpers.assert_nil(s.manager.capture_collision_inventory(), "original private input_arm_state observes the one-shot Shift")
 			helpers.assert_true(s.hook.engine:clear_input_arm())
 			helpers.assert_true(has_nav(assert(s.manager.capture_collision_inventory())))
 		end)

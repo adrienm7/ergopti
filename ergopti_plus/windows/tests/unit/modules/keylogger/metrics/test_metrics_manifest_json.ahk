@@ -159,7 +159,7 @@ _MMJ_AppsPublication() {
 	global KLPF_LAST_JSON
 	Producer := _DriverFuncBody("KLPF_BuildAndWriteToPath")
 	AssertTrue(Producer != "", "the publication entry must resolve")
-	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*\)") > 0,
+	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*,\s*metrics_dir\s*\)") > 0,
 		"the production Apps path must retain the measured encoded-manifest optimization")
 	HadJson := IsSet(KLPF_LAST_JSON)
 	SavedJson := HadJson ? KLPF_LAST_JSON : 0
@@ -312,3 +312,24 @@ _MMJ_TitleProjection(Mode) {
 }
 for Mode in ["base", "projection"]
 	Test("manifest JSON: encoded titles preserve " . Mode . " ownership (metrics-encoded-titles)", _MMJ_TitleProjection.Bind(Mode))
+
+; Titles are grouped into native JSON too; a NUL inside a window title must not
+; fold that title into its own prefix (windows-reader-nul-json-keys).
+_MMJ_NulTitleKey() {
+	SavedApp := KLHook.prev_app
+	Db := _WJFM_OpenMemory()
+	try {
+		KLHook.prev_app := ""
+		AssertTrue(KLR_LoadSchema(Db))
+		for Spec in [["a" . Chr(0) . "b", 1], ["a", 10]]
+			AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day_titles(device_id,date,app,title,c,ms) VALUES ("
+				. "'one','2026-01-01','fixture.exe'," . SQLite_Q(Spec[1]) . "," . Spec[2] . ",0);"))
+		Raw := KLR_BuildManifestJson(Db)
+		AssertEqual("61|10,610062|1", _KLRNul_Keys(Db, Raw, '$."2026-01-01"."fixture.exe".win_titles'),
+			"a NUL title must stay beside its prefix")
+	} finally {
+		KLHook.prev_app := SavedApp
+		SQLite_Close(Db)
+	}
+}
+Test("manifest JSON: a NUL window title stays a distinct key (windows-reader-nul-json-keys)", _MMJ_NulTitleKey)

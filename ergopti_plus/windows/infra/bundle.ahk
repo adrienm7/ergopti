@@ -49,7 +49,14 @@
 ; the literal string "__BUNDLE_VERSION__" below is rewritten before Ahk2Exe
 ; runs so the compiled exe ships with a stable identifier. In dev mode the
 ; placeholder stays as-is and we treat it as ``dev`` to disable any skip.
+; The three Ahk2Exe directives after it copy the same value into the exe's
+; FileVersion and ProductVersion; an unstamped local build reads 0.0.0-dev. The
+; needle spells the placeholder as _{2}...: the stamp step rewrites every
+; literal copy of it in this file.
 global BUNDLE_VERSION := "__BUNDLE_VERSION__"
+;@Ahk2Exe-Let U_BundleVersion = %A_PriorLine~.*"(.*)".*~$1%
+;@Ahk2Exe-Let U_BundleVersion = %U_BundleVersion~_{2}BUNDLE_VERSION_{2}~0.0.0-dev%
+;@Ahk2Exe-SetVersion %U_BundleVersion%
 
 ; Commit the release was built from, stamped by the same CI step. The boot
 ; diagnostic snapshot reports it; a source checkout reads .git/HEAD instead.
@@ -254,30 +261,44 @@ _Bundle_RestoreRollback(Workspace, BundleDir) {
 	}
 }
 
-; Runs PowerShell's Expand-Archive synchronously to unzip ``ZipPath`` into
-; ``DestDir``. Returns true on success, false otherwise. We rely on PowerShell
-; because AHK v2 has no built-in unzip and adding a COM-based extractor would
-; bloat the bundle module for no real gain.
-_Bundle_BuildUnzipCommand(ZipPath, DestDir) {
-	; PowerShell single-quoted literals escape an embedded apostrophe by
-	; doubling it. LocalAppData is user-controlled and a legal Windows profile
-	; name may contain one, so neither path can be interpolated raw.
-	QuotedZipPath := StrReplace(ZipPath, "'", "''")
-	QuotedDestDir := StrReplace(DestDir, "'", "''")
-	return "powershell -NoProfile -ExecutionPolicy Bypass -Command "
-		. '"' . "Expand-Archive -LiteralPath '" . QuotedZipPath
-		. "' -DestinationPath '" . QuotedDestDir . "' -Force" . '"'
+; The archive extractor is the bsdtar that Windows ships as System32\tar.exe
+; since Windows 10 version 1803; it reads the deflated ZIP natively. A hidden
+; ``powershell -ExecutionPolicy Bypass`` child on the very first launch is
+; what antivirus sandboxes score as a dropper stage, and Expand-Archive took
+; 8-19 s on hosted runners where tar takes about half a second. The absolute
+; path keeps a planted tar.exe on PATH or in the working directory out.
+; @return {String} Absolute path of the system archive extractor.
+_Bundle_TarPath() {
+	return A_WinDir . "\System32\tar.exe"
 }
 
+; Builds the tar command line that extracts ``ZipPath`` into ``DestDir``.
+; Windows paths cannot contain a double quote, and a trailing backslash would
+; escape the closing quote under the C runtime's argument rules, so both are
+; refused instead of being quoted into a different argument vector.
+; @param {String} ZipPath Absolute path of the archive to extract.
+; @param {String} DestDir Existing directory that receives the entries.
+; @return {String} Command line for RunWait.
+_Bundle_BuildUnzipCommand(ZipPath, DestDir) {
+	for Path in [ZipPath, DestDir] {
+		if (Path == "" or InStr(Path, '"') or SubStr(Path, -1) == "\")
+			throw ValueError("Bundle extraction path cannot be quoted: " . Path)
+	}
+	return '"' . _Bundle_TarPath() . '" -x -f "' . ZipPath . '" -C "' . DestDir . '"'
+}
+
+; Extracts ``ZipPath`` into ``DestDir`` synchronously, without a console.
+; @return {Boolean} True only when the extractor exists and exits 0.
 _Bundle_Unzip(ZipPath, DestDir) {
-	; -NoProfile keeps cold-start fast; -Command is a single string we build
-	; via FormatTime-free concatenation to avoid quoting surprises.
-	Cmd := _Bundle_BuildUnzipCommand(ZipPath, DestDir)
+	if !FileExist(_Bundle_TarPath()) {
+		OutputDebug("[bundle] Unzip refused: " . _Bundle_TarPath() . " is missing")
+		return false
+	}
 	ExitCode := 1
 	try {
-		ExitCode := RunWait(Cmd, , "Hide")
+		ExitCode := RunWait(_Bundle_BuildUnzipCommand(ZipPath, DestDir), , "Hide")
 	} catch as Err {
-		OutputDebug("[bundle] Unzip RunWait threw: " . Err.Message)
+		OutputDebug("[bundle] Unzip refused: " . Err.Message)
 		return false
 	}
 	return ExitCode == 0
@@ -296,8 +317,8 @@ _Bundle_Unzip(ZipPath, DestDir) {
 ;
 ; The extraction strategy is "skip if marker matches, otherwise wipe + rewrite".
 ; Wiping before re-extracting prevents stale files from a previous version
-; lingering (Expand-Archive merges into the destination, it does not prune
-; orphan entries). Disk usage therefore stays bounded at ~one bundle worth.
+; lingering (tar merges into the destination, it does not prune orphan
+; entries). Disk usage therefore stays bounded at ~one bundle worth.
 Bundle_Init() {
 	; Dev mode: nothing to extract — the source tree is already laid out.
 	if !A_IsCompiled
@@ -355,7 +376,8 @@ Bundle_Init() {
 
 	if !_Bundle_Unzip(TmpZip, StagingDir) {
 		_Bundle_CleanupWorkspace(Workspace)
-		Ui_MsgBox("Bundle extraction failed (Expand-Archive returned non-zero).",
+		Ui_MsgBox("Bundle extraction failed: " . _Bundle_TarPath()
+			. " is missing or returned non-zero (Windows 10 version 1803 or later is required).",
 			"", "Icon!")
 		ExitApp(1)
 	}

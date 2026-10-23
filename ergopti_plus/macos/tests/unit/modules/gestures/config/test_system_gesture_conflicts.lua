@@ -10,14 +10,17 @@
 local helpers = require("tests.helpers")
 
 --- Loads real conflict policy over controlled process boundaries.
---- @param body function Receives the module and queued native completions.
+--- @param body function Receives the module, queued native completions, the
+---   notices shown and the warnings logged.
 local function fixture(body)
 	local names = { "modules.gestures.conflicts", "infra.logger", "infra.i18n", "ui.gesture_conflict_notice" }
 	local saved, pending = {}, {}
 	local saved_shell = package.loaded["adapters.shell_runner"]
 	local notices = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger, warnings = helpers.make_logger_stub(), {}
+	logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["ui.gesture_conflict_notice"] = { show = function(warning) notices[#notices + 1] = warning end }
 	package.loaded["adapters.shell_runner"] = {
@@ -29,7 +32,7 @@ local function fixture(body)
 				terminate = function() task.cancelled = true; callback(1, "", "cancelled") end }
 		end,
 	}
-	local ok, err = xpcall(function() body(require("modules.gestures.conflicts"), pending, notices) end, debug.traceback)
+	local ok, err = xpcall(function() body(require("modules.gestures.conflicts"), pending, notices, warnings) end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	package.loaded["adapters.shell_runner"] = saved_shell
 	if not ok then error(err, 0) end
@@ -37,10 +40,12 @@ end
 
 helpers.describe("system gesture snapshots (gesture-conflicts)", function()
 	helpers.it("cancels owned tasks and refuses late completion after shutdown", function()
-		fixture(function(subject, pending)
+		fixture(function(subject, pending, _, warnings)
 			local callbacks = 0
 			subject.refresh(function() callbacks = callbacks + 1 end)
 			subject.restore_all_overrides()
+			-- A quit during the boot read is routine (gesture-shutdown-cancel-info-99)
+			helpers.assert_eq(warnings, {}, "a read cancelled by shutdown is no warning")
 			for _, task in ipairs(pending) do
 				helpers.assert_true(task.cancelled)
 				task.done(0, "TrackpadRightClick = 0;", "")

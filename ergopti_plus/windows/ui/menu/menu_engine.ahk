@@ -66,7 +66,8 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 		"label",   MenuTitle,
 		"action",  (*) => ToggleFeatureV2(V2Path),
 		"replay_id", _MR_ReplayIdentity("@feature", V2Path),
-		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
+		"checked", (State.Has("enabled") and State["enabled"]) ? true : false,
+		"checked_fn", MenuFeatureRowChecked.Bind(V2Path))
 
 	; The master controls activation; its children remain configurable. Pause
 	; greying remains owned by the shared menu renderer.
@@ -123,8 +124,16 @@ MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
 		"label",   MenuTitle,
 		"action",  (*) => ToggleFeatureV2(V2Path),
 		"replay_id", _MR_ReplayIdentity("@feature", V2Path),
-		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
+		"checked", (State.Has("enabled") and State["enabled"]) ? true : false,
+		"checked_fn", MenuFeatureRowChecked.Bind(V2Path))
 	return Row
+}
+
+; The live tick of a feature row, read again when its click runs late so a
+; delayed toggle never undoes an earlier one (menu-toggle-replay-double-flip).
+MenuFeatureRowChecked(V2Path) {
+	State := ReadFeatureStateV2(V2Path)
+	return (State.Has("enabled") and State["enabled"]) ? true : false
 }
 
 ; Reads master_gates.hotstring_sub_categories from menu_manifest.json (MG-3).

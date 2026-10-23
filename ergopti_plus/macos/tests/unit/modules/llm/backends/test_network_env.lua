@@ -62,7 +62,9 @@ helpers.describe("managed-network-children", function()
 		local output = run("env -u https_proxy -u HTTPS_PROXY -u http_proxy -u HTTP_PROXY -u all_proxy -u ALL_PROXY bash -c "
 			.. sh_quote(prelude .. 'printf "__CHILD_STARTED__"'))
 		os.remove(fixture)
-		helpers.assert_eq(output, "[TEST] The system proxy configuration cannot be used by this client. No download was started.\n__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n")
+		helpers.assert_eq(output, "[TEST] The system proxy configuration (an automatic proxy configuration file (PAC)) "
+			.. "cannot be used by this client. No download was started.\n"
+			.. "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n")
 		helpers.assert_true(not output:find("__CHILD_STARTED__", 1, true), "refusal must stop the generated prelude")
 	end)
 

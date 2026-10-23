@@ -173,8 +173,14 @@ _G4B_OptionalDeferredRetry() {
 }
 Test("managed bootstrap: deferred retry preserves absent callbacks (groups247-optional-callbacks)", _G4B_OptionalDeferredRetry)
 
+; A cold Windows PowerShell 5.1 takes about 1 s on a hosted runner and more
+; than 5 s on a loaded one (run 39700749511). Each wait below also ends as soon
+; as the child exits, so a generous bound costs nothing on success.
+global _G4B_NATIVE_LISTENER_WAIT_MS := 30000
+
 /** Uses an actual owned Windows listener; this is not Ollama installation qualification. */
 _G4B_NativeListenerIdentity() {
+	global _G4B_NATIVE_LISTENER_WAIT_MS
 	Root := A_Temp . "\ergopti-native-listener-" . DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount
 	DirCreate(Root)
 	Observed := Map("terminal", false, "exit", -1, "stderr", "")
@@ -190,10 +196,11 @@ _G4B_NativeListenerIdentity() {
 	}
 	try {
 		AssertTrue(Task.start(), "The owned native listener must launch.")
-		Deadline := A_TickCount + 5000
+		Deadline := A_TickCount + _G4B_NATIVE_LISTENER_WAIT_MS
 		while !FileExist(Root . "\ready.json") && A_TickCount < Deadline && !Observed["terminal"]
 			Sleep(10)
-		AssertTrue(FileExist(Root . "\ready.json"), "The real process must publish its listener identity.")
+		AssertTrue(FileExist(Root . "\ready.json"), "The real process must publish its listener identity"
+			. " (exited: " . (Observed["terminal"] ? Observed["exit"] : "no") . ", stderr: " . Observed["stderr"] . ").")
 		Native := JsonParse(FileRead(Root . "\ready.json", "UTF-8"))
 		Receipt := Map("child_pid", Native["pid"], "child_created_filetime", Native["created_filetime"])
 		Target := Map("port", Native["port"], "origin", "http://127.0.0.1:" . Native["port"], "executable", PowerShell)
@@ -208,7 +215,7 @@ _G4B_NativeListenerIdentity() {
 		ForeignOrigin["origin"] .= "/api"
 		AssertFalse(OllamaNativeIdentityReady(Receipt, ForeignOrigin), "Configured origin must be the exact captured authority.")
 		FileAppend("stop`n", Root . "\stop", "UTF-8-RAW")
-		Deadline := A_TickCount + 5000
+		Deadline := A_TickCount + _G4B_NATIVE_LISTENER_WAIT_MS
 		while !Observed["terminal"] && A_TickCount < Deadline
 			Sleep(10)
 		AssertTrue(Observed["terminal"], "Natural tree retirement must be acknowledged.")

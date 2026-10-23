@@ -14,11 +14,11 @@ local M = {}
 --- @return table seen { calls, reports }
 local function recording(outcome)
 	outcome = outcome or {}
-	local seen = { calls = {}, reports = {}, pending = nil }
+	local seen = { calls = {}, reports = {}, pending = nil, levels = {} }
 	local function call(name) seen.calls[#seen.calls + 1] = name end
 	local logger = {}
 	for _, level in ipairs({ "start", "success", "info", "warn", "error", "debug", "done", "trace" }) do
-		logger[level] = function() end
+		logger[level] = function() seen.levels[#seen.levels + 1] = level end
 	end
 	local ports = {
 		logger = logger,
@@ -152,6 +152,16 @@ function M.register(helpers)
 			helpers.assert_eq(Install.new(ports).install("v9", "main"), false)
 			helpers.assert_eq(table.concat(seen.calls, ","), "blocked,find_release")
 			helpers.assert_eq(last(seen).reason_key, Install.REASON.no_details)
+			-- The page explains a feed-only list; an ERROR opened the error window
+			-- over it while the API was rate limited (install-no-details-warning-99)
+			helpers.assert_eq(table.concat(seen.levels, ","), "warn")
+		end)
+
+		helpers.it("refuses a tag the loaded API list lacks as an error: the page is stale", function()
+			local ports, seen = recording({ release = false, missing = Install.REASON.unknown_release })
+			helpers.assert_eq(Install.new(ports).install("v9", "main"), false)
+			helpers.assert_eq(last(seen).reason_key, Install.REASON.unknown_release)
+			helpers.assert_eq(table.concat(seen.levels, ","), "error")
 		end)
 
 		helpers.it("runs one install at a time", function()

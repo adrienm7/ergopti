@@ -4,6 +4,7 @@
 --- Source: _shared/modules/hotstrings/personal_files.json.
 local M = {}
 local Utf8 = require("compat.utf8")
+local NativePath = require("native_path")
 local NAMESPACE = "personal-file:"
 local SEPARATOR = ":"
 local LABEL_SEPARATOR = " / "
@@ -24,8 +25,7 @@ M.additional_scan_max_depth = 16
 function M.is_backup(name)
 	if type(name) ~= "string" then return false end
 	-- Backslash is a literal filename byte on POSIX, and a separator on Windows.
-	local pattern = package.config:sub(1, 1) == "\\" and "([^/\\]+)$" or "([^/]+)$"
-	local lower = (name:match(pattern) or ""):lower()
+	local lower = (NativePath.basename(name) or ""):lower()
 	if #lower <= #EXTENSION or lower:sub(-#EXTENSION) ~= EXTENSION then return false end
 	local stem, start, from = lower:sub(1, -#EXTENSION - 1), nil, 1
 	while true do

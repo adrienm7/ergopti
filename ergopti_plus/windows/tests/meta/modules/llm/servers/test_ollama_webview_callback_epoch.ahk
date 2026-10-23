@@ -27,3 +27,7 @@ _OWCE_DeferredCallbacksAreEpochBound() {
 }
 Test("ollama_webview: stale auto-close and deferred scripts cannot mutate a reopened window (ollama-webview-callback-epoch)",
 	_OWCE_DeferredCallbacksAreEpochBound)
+
+#Include ../../../../unit/modules/llm/servers/test_ollama_webview_message_owner.ahk
+
+#Include ../../../../unit/modules/llm/servers/test_ollama_webview_close_owner.ahk

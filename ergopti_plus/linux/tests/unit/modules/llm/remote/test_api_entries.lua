@@ -402,12 +402,15 @@ helpers.describe("API entry physical source refusals", function()
 			return original_open(path, ...)
 		end
 		local loaded, added
+		local release_source = helpers.route_source_through_stdio(PATH)
 		local ok, err = pcall(function()
 			loaded = #entries.list()
 			-- Restore read access before mutation: load refusal must stay owned.
 			io.open = original_open
+			release_source()
 			added = entries.add({ provider = "lmstudio", token = "", label = "Unexpected", model = "new" })
 		end)
+		release_source()
 		io.open = original_open
 		helpers.assert_eq(io.open, original_open)
 		if not ok then error(err) end

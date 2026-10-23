@@ -213,7 +213,7 @@ _MWS_WarmTerminalPaintsAnOpenWindow(MetricsDir, Paths) {
 	KLWV.first_paint_push_fn := (Which) => (Pushes.Push(Which), true)
 	Entry := Map("epoch", 93, "webview", _MWS_FakeWebView(), "first_paint_done", false, "metrics_dir", MetricsDir)
 	KLWV.windows["apps"] := Entry
-	KLWV_OnWarmTerminal("apps", KLWV.WARM_ORDER.Length, "ok")
+	KLWV_OnWarmTerminal("apps", KLWV.WARM_ORDER.Length, MetricsDir, "ok")
 	AssertEqual(1, Pushes.Length, "a window that deferred to the warm-up must be painted by it")
 	AssertTrue(Entry["first_paint_done"])
 	AssertTrue(Entry["full_build_done"], "the warm-up result is that window's full build")
@@ -249,3 +249,17 @@ _MWS_RegisterWarmSidecarCases() {
 			_MWS_Isolated.Bind(Fn))
 }
 _MWS_RegisterWarmSidecarCases()
+
+#Include test_metrics_warm_admission.ahk
+
+#Include test_metrics_warm_store_recovery.ahk
+
+#Include test_metrics_navigation_visibility_owner.ahk
+
+#Include test_metrics_warm_reload_recovery.ahk
+
+#Include test_metrics_warm_ingest_recovery.ahk
+
+#Include test_metrics_warm_terminal_budget.ahk
+
+#Include test_metrics_warm_after_exhaustion.ahk

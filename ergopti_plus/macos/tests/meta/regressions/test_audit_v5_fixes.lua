@@ -330,7 +330,9 @@ helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated 
 		helpers.assert_not_nil(gate_at,
 			"the ordinary-owned sensitivity mutation needs the real gate")
 		local without_gate = raw:sub(1, gate_at - 1) .. raw:sub(gate_end + 1)
-		local decode = "local keyCode = e:getKeyCode()"
+		-- The one native key decode; it reuses the code the wrapper already read
+		-- for the key pairing counters, so each key-down is decoded once.
+		local decode = "local keyCode = _key_down_context.keycode or e:getKeyCode()"
 		local decode_at = without_gate:find(decode, 1, true)
 		helpers.assert_not_nil(decode_at, "the key decode must remain locatable")
 		local late_gate_mutant = without_gate:sub(1, decode_at + #decode - 1)

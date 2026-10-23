@@ -92,6 +92,30 @@ helpers.describe("backend_detector.effective_backend", function()
 		-- Should fall back to auto_default == ollama
 		helpers.assert_eq(det.effective_backend(), det.BACKEND_OLLAMA)
 	end)
+
+	-- #99: an Ollama user on Apple silicon got the MLX runtime check and its
+	-- "AI stays off until MLX is installed" notice at every start, because the
+	-- boot read only the hs.settings key nothing writes (boot-backend-config-99)
+	helpers.it("the config.toml selection wins over the Apple-silicon default (boot-backend-config-99)", function()
+		local hs_stub, det = fresh_detector()
+		hs_stub.__set_exec("uname -m", "arm64\n")
+		hs_stub.__set_exec("sw_vers -productVersion", "26.0\n")
+		for _, backend in ipairs({ det.BACKEND_OLLAMA, det.BACKEND_API, det.BACKEND_MLX }) do
+			helpers.assert_eq(det.effective_backend(backend), backend)
+		end
+		helpers.assert_eq(det.effective_backend("garbage"), det.BACKEND_MLX, "an unknown selection is no choice")
+		helpers.assert_eq(det.effective_backend(nil), det.BACKEND_MLX)
+	end)
+
+	helpers.it("the boot bootstrap passes the config.toml selection (boot-backend-config-99)", function()
+		local src = helpers.read_driver_source("Bootstrapping default LLM backend")
+		helpers.assert_true(type(src) == "string" and src ~= "", "init.lua must be readable or this asserts nothing")
+		local body = src:match("local function start_llm_bootstrap%(%)(.-)\nend\n")
+		helpers.assert_true(body ~= nil, "start_llm_bootstrap must be locatable")
+		local argument = body:match("backend_detector%.effective_backend%(([^)]*)%)")
+		helpers.assert_true(argument ~= nil and argument:match("llm_backend") ~= nil,
+			"the boot check must follow the backend the menu applies, got: " .. tostring(argument))
+	end)
 end)
 
 helpers.describe("backend_detector.set_backend", function()

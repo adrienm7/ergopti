@@ -132,3 +132,23 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 - R3 stays enforced for stock processes by
   `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
   until the owned runtime lands together with the exact code it must allow.
+- The HS-274 tooling in `tools/diagnostics/hs274*` is an input of the owned
+  runtime, not a closed study: `tools/build/remap_runtime_source.py` pins the
+  producer patch set (`hs274_raw_patch.py`, `hs274_stream_patch.py`) and the
+  `hs274-*.hpp` stream headers by SHA-256, `tools/build/remap_runtime_build.py`
+  pins `hs274_native_build.py`, the macOS physical-history Lua tests load
+  `hs274-context*.lua` and `hs274_persistence_test.py`, and `hs274-remap.py`
+  with `hs274-core.py`, `hs274-provider.py` and the Hammerspoon harness is the
+  native fixture that acceptance builds on. `npm run test:hs274-diagnostics`
+  runs its portable Python suites and the two C++ tests without vendor
+  headers in the shared Linux lane; the C++ tests that include the pinned
+  Karabiner-Elements vendor headers run with the runtime build.
+- Retired on 2026-10-22: the 10-product « complete candidate » packaging
+  (`tools/build/karabiner_candidate*.py`, `karabiner_package_policy.py` and
+  their tests), which installed the fork over the official application against
+  decision 1, and the one-shot capability probes `hs274-native.swift`
+  (Quartz fields and user data cannot tell a remapped key from a physical one)
+  and `hs274-hid-device.c` (root does not grant the entitlement an ordinary
+  `IOHIDUserDevice` acquisition needs). Their findings stand in the
+  alternatives above and in `docs/memory/macos-hammerspoon.md`; the code is in
+  Git history before that date.

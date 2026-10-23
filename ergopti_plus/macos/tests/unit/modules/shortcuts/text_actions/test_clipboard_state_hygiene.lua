@@ -40,21 +40,38 @@ local helpers = require("tests.helpers")
 
 helpers.describe("a second text transform cannot start while one owns the clipboard", function()
 	helpers.it("guards the pipeline with an in-flight flag", function()
-		-- Selected by a declaration unique to modules/shortcuts/actions/text.lua rather than by path.
-		local src = helpers.read_driver_source("local function load_shared_groups")
-		helpers.assert_true(src ~= nil, "modules/shortcuts/actions/text.lua source must be locatable")
-		if not src then return end
+		-- The unique declaration selects the owner even if its source file moves.
+		local src = helpers.read_driver_source("local function do_transform(")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"modules/shortcuts/actions/text.lua source must be locatable")
+		if type(src) ~= "string" or src == "" then return end
 
-		helpers.assert_true(src:find("_transform_in_flight") ~= nil,
+		local declaration = "local function do_transform("
+		local following = "\nfunction M.paste_as_plain_text("
+		local first = src:find(declaration, 1, true)
+		local last = src:find(following, 1, true)
+		helpers.assert_true(first ~= nil and src:find(declaration, first + #declaration, true) == nil,
+			"the transform declaration must be unique and locatable")
+		helpers.assert_true(last ~= nil and src:find(following, last + #following, true) == nil,
+			"the following public declaration must be unique and locatable")
+		if not first or not last then return end
+		local header_end = src:find("\n", first, true)
+		helpers.assert_true(header_end ~= nil and first < header_end and header_end < last,
+			"the transform body must have valid nonempty bounds")
+		if not header_end or header_end >= last then return end
+		local body = ("\n" .. src:sub(header_end + 1, last - 1)):gsub("\n[ \t]*%-%-[^\n]*", "")
+		helpers.assert_true(body:find("%S") ~= nil, "the transform body must be nonempty")
+
+		helpers.assert_true(body:find("_transform_in_flight", 1, true) ~= nil,
 			"do_transform must refuse re-entry: a second press inside the ~0.5 s window "
 			.. "snapshots a clipboard the first run already overwrote and restores that "
 			.. "intermediate value as if it were the user's own")
 
-		local guard_at = src:find("if _transform_in_flight then")
-		local copy_at  = src:find("pasteboard%.getContents")
+		local guard_at = body:find("if _transform_in_flight then", 1, true)
+		local copy_at = body:find("capture_text_clipboard(owner, false)", 1, true)
 		helpers.assert_true(guard_at ~= nil and copy_at ~= nil,
 			"both the guard and the clipboard snapshot must be locatable")
-		helpers.assert_true(guard_at < copy_at,
+		helpers.assert_true(guard_at ~= nil and copy_at ~= nil and guard_at < copy_at,
 			"the guard must run BEFORE the clipboard is snapshotted — after it, the "
 			.. "damage is already done")
 	end)

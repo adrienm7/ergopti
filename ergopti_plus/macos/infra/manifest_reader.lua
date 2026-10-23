@@ -28,6 +28,7 @@
 
 local M = {}
 local Logger = require("infra.logger")
+local NativePath = require("native_path")
 local LOG = "manifest_reader"
 
 
@@ -44,8 +45,8 @@ local LOG = "manifest_reader"
 --- @return table The manifest table (version / section_order / sections / features).
 local function load_manifest()
 	local src   = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir   = src:match("^(.*)[/\\][^/\\]+$") or src   -- .../macos/lib
-	local macos = dir:match("^(.*)[/\\][^/\\]+$") or dir   -- .../macos
+	local dir   = NativePath.dirname(src) or src   -- .../macos/infra
+	local macos = NativePath.dirname(dir) or dir   -- .../macos
 	local path  = macos .. "/_generated/features_manifest.lua"
 
 	local chunk, load_err = loadfile(path)

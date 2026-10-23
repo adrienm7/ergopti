@@ -33,6 +33,9 @@ local REAL_MODULES = {
 	"ui.menu.keymap_lifecycle",
 	"ui.menu.global_actions_transaction",
 	"ui.menu.recoverable_file_moves",
+	"ui.menu.click_gate",
+	-- Captures hs at require time; each boot gets a fresh stub table.
+	"adapters.timer_scheduler",
 }
 
 --- Deep-copies plain Lua data so fixture snapshots cannot alias live state.
@@ -69,7 +72,8 @@ end
 
 --- Boots ui.menu.start once over in-memory boundaries.
 --- @param opts table Failure plan: load_status (ok, corrupt, absent), saved, editor_bind, gestures_enable,
---- gestures_query, keylogger_start.
+--- gestures_query, keylogger_start; generate(ctx, actions) returns the menu tree, and
+--- before_start() runs on the reset stubs just before ui.menu.start.
 --- @return table fixture Live state, saves, log records and the menu ctx.
 function M.boot(opts)
 	opts = opts or {}
@@ -81,6 +85,8 @@ function M.boot(opts)
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, fmt, ...) logs.errors[#logs.errors + 1] = format_message(fmt, ...) end
 	logger.warn = function(_, fmt, ...) logs.warns[#logs.warns + 1] = format_message(fmt, ...) end
+	logs.infos = {}
+	logger.info = function(_, fmt, ...) logs.infos[#logs.infos + 1] = format_message(fmt, ...) end
 
 	-- Pre-load defaults, as Preferences.build_initial_state produces them.
 	local state = {
@@ -155,6 +161,7 @@ function M.boot(opts)
 		generate = function(ctx, _menu_mods, actions)
 			fixture.ctx = ctx
 			fixture.actions = actions
+			if type(opts.generate) == "function" then return opts.generate(ctx, actions) end
 			return {}
 		end,
 		invalidate_cache = noop,
@@ -200,7 +207,7 @@ function M.boot(opts)
 	}
 	package.loaded["infra.termination_coordinator"] = {
 		request_exit = function() return true end,
-		is_pending = function() return false end,
+		is_pending = function() return fixture.terminal_pending == true end,
 	}
 	for _, module_name in ipairs({
 		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
@@ -319,6 +326,7 @@ function M.boot(opts)
 		end,
 		restore_settings = function() return true end,
 	}
+	if type(opts.before_start) == "function" then opts.before_start() end
 	fixture.menu = Menu.start("/virtual/", {}, gestures, keymap, {}, {}, karabiner, {})
 	helpers.assert_type(fixture.program_admission, "function", "menu startup registers its required program admission owner")
 	fixture.boot_saves = #saves

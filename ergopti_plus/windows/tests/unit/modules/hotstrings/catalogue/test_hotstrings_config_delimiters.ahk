@@ -569,3 +569,5 @@ _HCfgTestFixtureCleanupRefusal() {
 }
 Test("HotstringsConfig: refused fixture cleanup retains ownership until retry (hotstrings-fixture-ownership)",
 	_HCfgTestFixtureCleanupRefusal)
+
+#Include test_hotstrings_global_key_utf8.ahk

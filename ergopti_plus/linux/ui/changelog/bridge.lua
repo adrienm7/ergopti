@@ -414,7 +414,12 @@ local function find_release(tag)
 	local manager = updater()
 	if not _last_list then return nil, ReleaseInstall.REASON.unknown_release end
 	if _last_list.kind ~= "json" then
-		-- The Atom feed carries no asset list and no checksum.
+		-- The Atom feed carries no asset list and no checksum. Unlike macOS
+		-- (Sparkle verifies the appcast's EdDSA signature), Linux has no path that
+		-- verifies a release without the API list: the bundle is a tarball with no
+		-- signed update metadata (no AppImage zsync), and its .sha256 is only an
+		-- asset that list names. So no feed release installs, and the page keeps
+		-- the no-details warning (no __feed_install_handoff seed).
 		return nil, ReleaseInstall.REASON.no_details
 	end
 	if not manager or not manager.CHANNELS.channel_for_tag(tag) then

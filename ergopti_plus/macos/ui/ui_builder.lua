@@ -22,6 +22,7 @@ local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local OwnWindow = require("adapters.own_window")
 local WebviewCloseOwner = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 --- Monotonic milliseconds for webview open, load and close durations.
@@ -511,7 +512,9 @@ function M.force_focus(wv, is_new, lifecycle)
 		local ok_sp, hs_spaces = pcall(require, "hs.spaces")
 		if not current() then return false end
 		if ok_sp and hs_spaces then
-			local ok_win, win = pcall(function() return wv:hswindow() end)
+			-- Among this process's windows only: hswindow() alone reads every
+			-- window of every application (issue #100).
+			local ok_win, win = pcall(OwnWindow.for_webview, wv)
 			if not current() then return false end
 			if not ok_win then return fail("window lookup") end
 			if ok_win and win then
@@ -540,13 +543,13 @@ function M.force_focus(wv, is_new, lifecycle)
 	end
 
 	-- Bring to front and request system focus.
-	-- We use a retry mechanism because hswindow() might return nil while the
-	-- window is still being composited by the OS.
+	-- We use a retry mechanism because the window may not be listed yet while
+	-- it is still being composited by the OS.
 	local attempts = 0
 	local max_attempts = 20
 	local function try_focus()
 		if not wv or not current() then return false end
-		local ok, win = pcall(function() return wv:hswindow() end)
+		local ok, win = pcall(OwnWindow.for_webview, wv)
 		if not current() then return false end
 		if not ok then return fail("window lookup") end
 		
@@ -606,12 +609,8 @@ end
 --- @return boolean
 function M.is_window_focused(wv)
 	if not wv then return false end
-	local ok_win, win = pcall(function() return wv:hswindow() end)
-	if not ok_win or not win then return false end
-	local ok_focused, focused = pcall(function() return hs.window.focusedWindow() end)
-	if not ok_focused or not focused then return false end
-	local ok_same, same = pcall(function() return win:id() == focused:id() end)
-	return ok_same and same == true
+	local ok, focused = pcall(OwnWindow.is_webview_focused, wv)
+	return ok and focused == true
 end
 
 --- Composes a native window title. The product name is added here and only
@@ -640,7 +639,7 @@ end
 --- The one window kept above other apps: the Accessibility steps of the macOS
 --- permission dialog (ui/permission_dialog; its other kinds are focused like
 --- any window). It is shown only while ErgoptiPlus is not trusted for
---- Accessibility, where force_focus cannot find it (hswindow() is an
+--- Accessibility, where force_focus cannot find it (OwnWindow is an
 --- Accessibility lookup), and its steps are followed in System Settings, the
 --- active app, whose first click would bury a window at the normal level. It
 --- floats, never activates the app (it requires focus = false) and its owner

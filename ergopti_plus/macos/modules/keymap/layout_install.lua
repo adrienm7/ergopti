@@ -27,6 +27,7 @@
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local NativePath = require("native_path")
 local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
@@ -243,7 +244,7 @@ local function find_installed_bundles(dir)
 	local cmd = string.format("ls -1 %s 2>/dev/null", text_utils.shell_quote(dir))
 	local p = io.popen(cmd)
 	if not p then return out end
-	local dir_with_slash = dir:match("[/\\]$") and dir or (dir .. "/")
+	local dir_with_slash = NativePath.with_trailing_separator(dir)
 	for raw_line in p:lines() do
 		local line = raw_line:gsub("[\r\n]+$", "")
 		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
@@ -296,7 +297,7 @@ end
 --- @return table|nil Numeric version components, or nil when unreadable.
 local function read_bundle_version(bundle_path)
 	if type(bundle_path) ~= "string" or bundle_path == "" then return nil end
-	local plist_path = bundle_path:gsub("[/\\]$", "") .. "/Contents/Info.plist"
+	local plist_path = NativePath.without_trailing_separators(bundle_path) .. "/Contents/Info.plist"
 	local content, status, detail = FileSystem.read_with_status(plist_path)
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.warn(LOG, "Bundle version unreadable — %s (%s: %s).",
@@ -352,7 +353,7 @@ end
 --- @return table Array of { name, tis_id, keylayout } in Info.plist order.
 local function bundle_variants(bundle_path)
 	if type(bundle_path) ~= "string" or bundle_path == "" then return {} end
-	local root = bundle_path:gsub("[/\\]$", "")
+	local root = NativePath.without_trailing_separators(bundle_path)
 	local content, status, detail = FileSystem.read_with_status(root .. "/Contents/Info.plist")
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.warn(LOG, "Bundle Info.plist unreadable — %s (%s: %s).", root, tostring(status), tostring(detail))
@@ -394,11 +395,11 @@ local function layout_version(kl_name)
 	local maj, min, pat = kl_name:match("_v(%d+)[_.](%d+)[_.](%d+)")
 	if maj then return { tonumber(maj), tonumber(min), tonumber(pat) } end
 	-- A name is matched against file basenames only; a separator could never match.
-	if kl_name:find("[/\\]") then return nil end
+	if NativePath.has_separator(kl_name) then return nil end
 	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
 		local bundle = keylayout_index(dir)[kl_name]
 		if bundle then
-			local layouts_dir = dir:gsub("[/\\]$", "")
+			local layouts_dir = NativePath.without_trailing_separators(dir)
 			return read_bundle_version(layouts_dir .. "/" .. bundle)
 		end
 	end

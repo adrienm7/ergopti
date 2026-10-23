@@ -691,6 +691,10 @@ M.sqlite3 = {
 	MISUSE  = 21,
 	ROW     = 100,
 	DONE    = 101,
+	-- SQLite open flags, exported by Hammerspoon's lsqlite3 (SC(OPEN_*)).
+	OPEN_READONLY  = 0x1,
+	OPEN_READWRITE = 0x2,
+	OPEN_CREATE    = 0x4,
 	open = function(path)
 		table.insert(SQLITE3_CALLS, { op = "open", path = path })
 		-- Returns a stub db handle that succeeds on all calls
@@ -1250,6 +1254,13 @@ M.axuielement = {
 M.window = {
 	focusedWindow = function() return nil end,
 	frontmostWindow = function() return nil end,
+	-- Like the real call (AXUIElementSetMessagingTimeout on the system-wide
+	-- element): true for a positive number of seconds, recorded for assertions.
+	timeout = function(seconds)
+		if type(seconds) ~= "number" or seconds <= 0 then return false end
+		M.window.__messaging_timeout = seconds
+		return true
+	end,
 	filter = {
 		default = {
 			subscribe   = function(self, events, cb) end,

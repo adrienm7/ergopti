@@ -38,6 +38,9 @@
 
 #Requires Autohotkey v2.0+
 
+#Include keylogger_app_category_store.ahk
+#Include keylogger_app_category_edits.ahk
+
 
 
 
@@ -50,6 +53,10 @@
 
 class KLAppCatConst {
 		static FILE_NAME := "app_categories.json"
+		static STORE_SCHEMA := "ergopti.app_categories"
+		static STORE_VERSION := 1
+		static MIN_SCORE := -2
+		static MAX_SCORE := 2
 
 		; Delay before re-attempting a deferred save that fired while the driver was
 		; paused. Matches the original defer window: the write is not urgent, but it
@@ -164,10 +171,12 @@ class KLAppCatConst {
 ; ===============================
 
 class KLAppCat {
-		static categories  := Map()   ; lower(process_name) → category string
+		static categories  := Map()   ; lower(process_name) → legacy label or edit record
 		static file_path   := ""
 		static dirty       := false   ; new apps were seen and need a save
 		static save_fn     := unset   ; bound timer ref for deferred save
+		static write_owner := 0       ; serialises edits with deferred persistence
+		static store_model := 0       ; parser-owned metadata for the admitted path
 }
 
 
@@ -214,15 +223,16 @@ KL_AppCat_InitWithIo(metrics_dir, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 		}
 		path := metrics_dir . "\" . KLAppCatConst.FILE_NAME
 		cats := Map()
-		if !KL_AppCat_Load(path, &cats, ReadFn, ExistsFn, CreateFn)
+		if !KL_AppCat_Load(path, &cats, ReadFn, ExistsFn, CreateFn, &Model)
 				return false
 		KLAppCat.file_path := path
+		KLAppCat.store_model := Model
 		KLAppCat.categories := cats
 		KLAppCat.dirty := false
 		return true
 }
 
-KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
+KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0, &Model := unset) {
 		if !HasMethod(ReadFn, "Call")
 				ReadFn := FSRead
 		if !HasMethod(ExistsFn, "Call")
@@ -246,26 +256,18 @@ KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 						try LoggerError("KLAppCat", "Cannot read existing app_categories.json; original preserved.")
 						return false
 				}
-				try parsed := KL_JsonDecodeObject(raw)
+				try Model := _KL_AppCat_DecodeStore(raw, path)
 				catch as Err {
 						try LoggerError("KLAppCat", "Invalid app_categories.json; original preserved: {1}.", Err.Message)
 						return false
 				}
-				if !(parsed is Map) {
-						try LoggerError("KLAppCat", "Invalid app_categories.json shape; original preserved.")
-						return false
-				}
-				for k, v in parsed {
-						if !(k is String) || k = "" || !(v is String) || v = "" {
-								try LoggerError("KLAppCat", "Invalid app_categories.json entry; original preserved.")
-								return false
-						}
-						cats[StrLower(k)] := v
-				}
+				for k, v in Model["categories"]
+						cats[k] := v
 				return true
 		}
 
 		content := KL_JsonEncodeObject(cats)
+		Model := _KL_AppCat_DecodeStore(content, path)
 		if CreateFn.Call(path, content) != 1 {
 				try LoggerError("KLAppCat", "Cannot create app_categories.json without replacing an existing path.")
 				return false
@@ -276,12 +278,38 @@ KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 KL_AppCat_Reload(ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 		if !KL_AppCat_RequireInit("KL_AppCat_Reload")
 				return false
-		cats := Map()
-		if !KL_AppCat_Load(KLAppCat.file_path, &cats, ReadFn, ExistsFn, CreateFn)
+		Owner := _KL_AppCat_AcquireWrite()
+		if !IsObject(Owner)
 				return false
-		KLAppCat.categories := cats
-		KLAppCat.dirty := false
-		return true
+		try {
+				cats := Map()
+				if !KL_AppCat_Load(Owner["path"], &cats, ReadFn, ExistsFn, CreateFn, &Model)
+						return false
+				PreviousCritical := Critical("On")
+				try {
+						if !_KL_AppCat_WriterCurrent(Owner)
+								return false
+						Pending := false
+						; Preserve only new Get-owned discoveries admitted during this
+						; reload. Earlier pending values and explicit fresh disk values
+						; retain the ordinary authoritative reload semantics.
+						for Key, Value in KLAppCat.categories {
+								if !Owner["snapshot"].Has(Key) && !cats.Has(Key)
+										&& _KL_AppCat_IsDiscovery(Key, Value, Model) {
+										cats[Key] := Value
+										Pending := true
+								}
+						}
+						KLAppCat.categories := cats
+						KLAppCat.store_model := Model
+						KLAppCat.dirty := Pending
+				} finally Critical(PreviousCritical)
+				if Pending
+						_KL_AppCat_ScheduleDeferredSave()
+				return true
+		} finally {
+				_KL_AppCat_ReleaseWrite(Owner)
+		}
 }
 
 _KL_AppCat_SnapshotContent() {
@@ -290,10 +318,13 @@ _KL_AppCat_SnapshotContent() {
 				Snapshot := Map()
 				for Key, Value in KLAppCat.categories
 						Snapshot[Key] := Value
-				return KL_JsonEncodeObject(Snapshot)
+				Model := KLAppCat.store_model
+				if !(Model is Map) || Model["path"] != KLAppCat.file_path
+						Model := 0
 		} finally {
 				Critical(PreviousCritical)
 		}
+		return _KL_AppCat_RenderStore(Snapshot, Model)
 }
 
 _KL_AppCat_ScheduleDeferredSave() {
@@ -309,17 +340,49 @@ _KL_AppCat_ScheduleDeferredSave() {
 		}
 }
 
-KL_AppCat_Save(WriteFn := 0) {
-		if (KLAppCat.file_path = "")
-				return false
-		if !IsObject(WriteFn)
-				WriteFn := KL_WriteAtomic
+; An edit stages a detached candidate while classification keeps reading the
+; proven map. Deferred persistence must not replace that candidate from old RAM.
+_KL_AppCat_AcquireWrite() {
+		PreviousCritical := Critical("On")
 		try {
-				Content := _KL_AppCat_SnapshotContent()
-				WriteFn.Call(KLAppCat.file_path, Content)
+				if KLAppCat.file_path = "" || IsObject(KLAppCat.write_owner)
+						return false
+				Snapshot := Map()
+				for Key, Value in KLAppCat.categories
+						Snapshot[Key] := Value
+				Owner := Map("path", KLAppCat.file_path,
+						"categories", KLAppCat.categories, "snapshot", Snapshot, "model", KLAppCat.store_model)
+				KLAppCat.write_owner := Owner
+				return Owner
+		} finally Critical(PreviousCritical)
+}
+
+_KL_AppCat_ReleaseWrite(Owner) {
+		PreviousCritical := Critical("On")
+		try {
+				if KLAppCat.write_owner == Owner
+						KLAppCat.write_owner := 0
+		} finally Critical(PreviousCritical)
+}
+
+KL_AppCat_Save(WriteFn := 0) {
+		Owner := _KL_AppCat_AcquireWrite()
+		if !IsObject(Owner) {
+				if KLAppCat.file_path != "" && KLAppCat.dirty
+						_KL_AppCat_ScheduleDeferredSave()
+				return false
+		}
+		try {
+				Content := _KL_AppCat_RenderStore(Owner["snapshot"], _KL_AppCat_OwnerModel(Owner))
+				NextModel := _KL_AppCat_DecodeStore(Content, Owner["path"])
+				if IsObject(WriteFn)
+						WriteFn.Call(Owner["path"], Content)
+				else if !_KL_AppCat_WriteOwned(Owner, Content)
+						throw Error("The app category source changed or its write was refused.")
 				PreviousCritical := Critical("On")
 				try {
-						Pending := _KL_AppCat_SnapshotContent() != Content
+						KLAppCat.store_model := NextModel
+						Pending := !_KL_AppCat_MapsEqual(KLAppCat.categories, Owner["snapshot"])
 						KLAppCat.dirty := Pending
 				} finally {
 						Critical(PreviousCritical)
@@ -340,6 +403,8 @@ KL_AppCat_Save(WriteFn := 0) {
 				if (KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn))
 						_KL_AppCat_ScheduleDeferredSave()
 				return false
+		} finally {
+				_KL_AppCat_ReleaseWrite(Owner)
 		}
 }
 
@@ -348,6 +413,9 @@ KL_AppCat_Save(WriteFn := 0) {
 ; and re-arms the normal retry, so the caller can reject exit without losing the
 ; discovery or permanently disabling future saves.
 KL_AppCat_PrepareShutdown(WriteFn := 0) {
+		; A detached explicit edit can own staging while the proven map is clean.
+		if IsObject(KLAppCat.write_owner)
+				return false
 		if KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn)
 				try SetTimer(KLAppCat.save_fn, 0)
 		if !KLAppCat.dirty
@@ -402,7 +470,7 @@ KL_AppCat_Get(app_name) {
 				return "unknown"
 		key := StrLower(app_name)
 		if KLAppCat.categories.Has(key)
-				return KLAppCat.categories[key]
+				return _KL_AppCat_RecordLabel(KLAppCat.categories[key])
 
 		; New app — register and schedule a lazy save
 		KLAppCat.categories[key] := "unknown"
@@ -415,13 +483,49 @@ KL_AppCat_Get(app_name) {
 		return "unknown"
 }
 
-; Allows the future settings UI or a user script to override a category.
+; Publish the category only after its detached candidate is durable. The
+; ordinary classifier remains available while native staging pumps messages.
+; @param app_name {String} Process name; lookup is case-insensitive.
+; @param category {String} Nonempty category label.
+; @return {Boolean} True only after the new value is durable and published.
 KL_AppCat_Set(app_name, category) {
-	if !KL_AppCat_RequireInit("KL_AppCat_Set")
-		return
-		key := StrLower(app_name)
-		KLAppCat.categories[key] := category
-		KL_AppCat_Save()
+		if !KL_AppCat_RequireInit("KL_AppCat_Set")
+				return false
+		if !(app_name is String) || app_name = "" || !(category is String) || category = ""
+				return false
+		Owner := _KL_AppCat_AcquireWrite()
+		if !IsObject(Owner)
+				return false
+		try {
+				Candidate := Map()
+				for Key, Value in Owner["snapshot"]
+						Candidate[Key] := Value
+				Key := StrLower(app_name)
+				Candidate[Key] := _KL_AppCat_RecordWithLabel(Candidate.Get(Key, ""), category)
+				Content := _KL_AppCat_RenderStore(Candidate, _KL_AppCat_OwnerModel(Owner))
+				NextModel := _KL_AppCat_DecodeStore(Content, Owner["path"])
+				if !_KL_AppCat_WriteOwned(Owner, Content)
+						return false
+				PreviousCritical := Critical("On")
+				try {
+						if KLAppCat.write_owner != Owner || KLAppCat.file_path != Owner["path"]
+								|| KLAppCat.categories != Owner["categories"]
+								return false
+						KLAppCat.categories[Key] := Candidate[Key]
+						KLAppCat.store_model := NextModel
+						; A new application discovered during the write was not in this
+						; durable image. Preserve its ordinary deferred-save obligation.
+						KLAppCat.dirty := !_KL_AppCat_MapsEqual(KLAppCat.categories, Candidate)
+				} finally Critical(PreviousCritical)
+				if KLAppCat.dirty
+						_KL_AppCat_ScheduleDeferredSave()
+				return true
+		} catch as Err {
+				try LoggerError("KLAppCat", "Category edit did not commit: {1}.", Err.Message)
+				return false
+		} finally {
+				_KL_AppCat_ReleaseWrite(Owner)
+		}
 }
 
 

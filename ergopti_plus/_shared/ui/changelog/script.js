@@ -31,6 +31,11 @@
  *    A tab only changes what is shown; the window opens on the channel the user
  *    subscribed to, and a banner offers to subscribe to the one on screen. The
  *    host owns the subscription and answers with setSubscribedChannel().
+ *    Every host fetches the same list whatever the channel (about 2 MB of
+ *    release notes), so the page keeps the last complete list and a tab filters
+ *    it locally: no bridge message, download or re-parse on a switch. Only a
+ *    switch with no complete list (still loading, or after an error, when the
+ *    host dropped its list too) asks the host again.
  * 7. One-click install: every release but the installed one carries « Install
  *    this version » (« Go back to this version » when it is older, by the
  *    shared semver order in ../version_order.js) beside « View on GitHub ». The
@@ -42,6 +47,17 @@
  *    names why, and the button stays greyed with that reason.
  * 8. Restoring the backup: the host names the latest pre-install backup it can
  *    restore; the banner's button posts restore_backup with its id.
+ * 9. Feed-only lists: the Atom feed names no files and no digests, so no host
+ *    can download and verify a release from it, and a direct install is
+ *    refused with the install_error_no_details warning. A host whose own
+ *    updater verifies a release without the list (macOS: Sparkle checks the
+ *    EdDSA signature of its channel appcast) seeds __feed_install_handoff.
+ *    Its page then offers, for the newest release of the channel on screen
+ *    only and only when the shared offer rule offers it, an install that posts
+ *    install_through_updater: the host hands the channel to that updater,
+ *    which shows its own dialog. Older rows keep the warning. Windows and
+ *    Linux seed nothing: their updaters verify only against the digest or the
+ *    checksum asset that the API list names.
  * ==============================================================================
  */
 
@@ -61,6 +77,15 @@ var _switchRestarts = window.__channel_switch_restarts === true;
 // (request posted, waiting for the host) or 'failed' (the host refused).
 var _subscribeState = 'idle';
 var _releases = [];
+// The last complete, unfiltered release list a host or the preview fetch
+// delivered, or null. A tab filters it locally; an error clears it, as the
+// hosts clear the list an install is looked up in.
+var _allReleases = null;
+// Whether _allReleases came from the Atom feed, which names no files or digests.
+var _listFromFeed = false;
+// Whether the host's own updater can install a feed-only list's newest release
+// after verifying its signature itself (macOS: Sparkle), seeded before the page runs.
+var _feedHandoff = window.__feed_install_handoff === true;
 var _selectedIndex = -1;
 var _currentReleaseUrl = null;
 var _ghOwner = window.__changelog_gh_owner || 'adrienm7';
@@ -77,6 +102,7 @@ var CHANGELOG_WATCHDOG_MS = 45000;
 var CLIENT_FETCH_TIMEOUT_MS = 15000;
 // The install phases a host reports, in order; 'failed' ends any of them.
 var INSTALL_PHASES = {
+	handed_off: true,
 	backing_up: true,
 	downloading: true,
 	installing: true,
@@ -229,7 +255,7 @@ if (window.__ergopti_host === 'linux') {
 		}
 		if (typeof response.feed === 'string') injectReleasesFeed(response.feed, response.channel);
 		else if (typeof response.json === 'string') injectReleasesJson(response.json, response.channel);
-		else injectReleases(response.releases, response.channel);
+		else injectReleases(response.releases, response.channel, true);
 	};
 }
 
@@ -260,8 +286,12 @@ function _postChangelogMessage(payload) {
  * Replaces any in-flight fetch and re-renders the release list.
  * @param {Array} releases - Array of GitHub release objects.
  * @param {string} channel - Registry channel the list is shown for.
+ * @param {boolean} [partial] - True for an interim answer that is not the
+ *   complete list (the Linux host's cached release): it is shown but not kept
+ *   for local tab switches.
+ * @param {boolean} [fromFeed] - True when the list was read from the Atom feed.
  */
-function injectReleases(releases, channel) {
+function injectReleases(releases, channel, partial, fromFeed) {
 	if (!Array.isArray(releases)) {
 		injectError(_t('changelog_window.error_parse'));
 		return;
@@ -271,21 +301,34 @@ function injectReleases(releases, channel) {
 		injectError(_t('changelog_window.error_parse'));
 		return;
 	}
-	// Remote records are data of unknown shape; only objects are listed, and a
-	// channel's view lists its own tags and those of every more stable channel
-	// (decided by the tag family, never by GitHub's prerelease flag).
-	releases = releases.filter(function (r) {
-		return r !== null && typeof r === 'object' && _channels.visibleIn(shown, r.tag_name);
+	// Remote records are data of unknown shape; only objects are listed.
+	var records = releases.filter(function (r) {
+		return r !== null && typeof r === 'object';
 	});
 	_endLoad();
 	hideError();
-	_currentChannel = shown;
+	_allReleases = partial === true ? null : records;
+	_listFromFeed = fromFeed === true && _allReleases !== null;
+	_showReleases(records, shown);
+	hideLoading();
+}
+
+/**
+ * Shows one channel's view of a release list: its own tags and those of every
+ * more stable channel (decided by the tag family, never by GitHub's prerelease
+ * flag), the newest selected.
+ * @param {Array} records - Release objects, unfiltered.
+ * @param {string} channel - Registry channel id.
+ */
+function _showReleases(records, channel) {
+	_currentChannel = channel;
 	_renderChannelTabs();
 	_renderSubscribeBanner();
-	_releases = releases;
+	_releases = records.filter(function (r) {
+		return _channels.visibleIn(channel, r.tag_name);
+	});
 	_selectedIndex = -1;
 	renderReleaseList();
-	hideLoading();
 	if (_releases.length > 0) {
 		selectRelease(0);
 	} else {
@@ -299,6 +342,8 @@ function injectReleases(releases, channel) {
  */
 function injectError(message) {
 	_endLoad();
+	_allReleases = null;
+	_listFromFeed = false;
 	showError(
 		message || _t('changelog_window.error_network') || 'Impossible de charger les versions.'
 	);
@@ -344,7 +389,7 @@ function injectReleasesFeed(xml, channel) {
 		var owner = _channels.channelForTag(release.tag_name);
 		release.prerelease = owner !== null && _channels.channel(owner).githubPrerelease;
 	});
-	injectReleases(releases, channel);
+	injectReleases(releases, channel, false, true);
 }
 
 // Signal readiness so the native backend can flush queued calls.
@@ -433,6 +478,12 @@ function setChannel(channel) {
 	var shown = _channels.resolve(channel);
 	if (!shown) return;
 	if (shown === _currentChannel && _releases.length > 0) return;
+	// The complete list is already here and no load replaces it: filter it.
+	if (_allReleases !== null && _watchdogTimer === null) {
+		if (_subscribeState !== 'pending') _subscribeState = 'idle';
+		_showReleases(_allReleases, shown);
+		return;
+	}
 	_requestReleases(shown);
 }
 
@@ -555,6 +606,8 @@ function _requestReleases(channel) {
 	_renderSubscribeBanner();
 
 	_releases = [];
+	_allReleases = null;
+	_listFromFeed = false;
 	_selectedIndex = -1;
 	var list = document.getElementById('release-list');
 	if (list) list.replaceChildren();
@@ -922,9 +975,39 @@ function _installLabelKey(release) {
 	return older ? 'changelog_window.rollback_release' : 'changelog_window.install_release';
 }
 
-/** Whether an install the page asked for is still running on the host. */
+/**
+ * Whether an install the page asked for is still running on the host. Once
+ * handed to the host's updater the install is that updater's, whose own dialog
+ * may be cancelled, so the page is free again.
+ */
 function _installRunning() {
-	return _install !== null && _install.phase !== 'failed';
+	return _install !== null && _install.phase !== 'failed' && _install.phase !== 'handed_off';
+}
+
+/**
+ * The release of a feed-only list that the host's updater can install: the
+ * newest release of the channel on screen, when the shared offer rule offers
+ * it (a newer build of the installed channel, or a switch of channel). The
+ * updater installs its channel's newest release only, so no other row has one.
+ * @return {?Object} Release record, or null.
+ */
+function _handoffRelease() {
+	if (!_listFromFeed || !_feedHandoff || _installedVersion === null || _allReleases === null) {
+		return null;
+	}
+	var tags = _allReleases.map(function (release) {
+		return release.tag_name;
+	});
+	var best = _channels.pickLatest(tags, _currentChannel, ReleaseVersionOrder.compare);
+	if (best < 0) return null;
+	var offered = _channels.shouldOffer(
+		tags[best],
+		_installedVersion,
+		_currentChannel,
+		_channels.channelForTag(_installedVersion),
+		ReleaseVersionOrder.compare
+	);
+	return offered ? _allReleases[best] : null;
 }
 
 /** Fills a template's {tag} and {path} placeholders. */
@@ -940,6 +1023,8 @@ function _fillInstall(key, tag, path) {
 function _installStatusText() {
 	var tag = _install.tag;
 	var path = _install.backupPath;
+	if (_install.phase === 'handing_off' || _install.phase === 'handed_off')
+		return _fillInstall('changelog_window.install_handed_off', tag, path);
 	if (_install.phase === 'requested' || _install.phase === 'backing_up')
 		return _fillInstall('changelog_window.install_backing_up', tag, path);
 	if (_install.phase === 'downloading')
@@ -970,6 +1055,7 @@ function _renderInstallControls() {
 	// No host announced its build: nothing on this page can install.
 	var offered = release !== null && release !== undefined && _installedVersion !== null;
 	var installed = offered && _isInstalled(release);
+	var handoff = offered && !installed && release === _handoffRelease();
 	if (button) {
 		var shown = offered && !installed;
 		button.style.display = shown ? 'block' : 'none';
@@ -984,7 +1070,9 @@ function _renderInstallControls() {
 			? 'changelog_window.installed_note'
 			: offered && _installBlockedKey !== ''
 				? _installBlockedKey
-				: '';
+				: handoff
+					? 'changelog_window.install_handoff_note'
+					: '';
 		note.style.display = noteKey ? 'block' : 'none';
 		note.textContent = noteKey ? _t(noteKey) || '' : '';
 	}
@@ -1010,6 +1098,10 @@ function requestInstall() {
 	var release = _selectedIndex >= 0 ? _releases[_selectedIndex] : null;
 	if (!release || _installedVersion === null || _isInstalled(release)) return;
 	if (_installBlockedKey !== '' || _installRunning()) return;
+	if (release === _handoffRelease()) {
+		_postHandoff(release.tag_name, _currentChannel);
+		return;
+	}
 	_postInstall(release.tag_name, _currentChannel);
 }
 
@@ -1017,7 +1109,8 @@ function requestInstall() {
 function retryInstall() {
 	if (!_install || _install.phase !== 'failed' || _install.managedFailure) return;
 	if (_installBlockedKey !== '') return;
-	_postInstall(_install.tag, _install.channel);
+	if (_install.handoff) _postHandoff(_install.tag, _install.channel);
+	else _postInstall(_install.tag, _install.channel);
 }
 
 /**
@@ -1030,6 +1123,26 @@ function _postInstall(tag, channel) {
 	_install = { tag: tag, channel: channel, phase: 'requested', reasonKey: '', backupPath: '' };
 	_renderInstallControls();
 	_postChangelogMessage({ action: 'install_release', tag: tag, channel: channel });
+}
+
+/**
+ * Records the hand-off of a feed-only list's newest release to the host's
+ * updater and posts it; the host checks again that the tag is that release.
+ * @param {string} tag - Release tag.
+ * @param {string} channel - Registry channel on screen, whose updater feed is read.
+ */
+function _postHandoff(tag, channel) {
+	if (typeof tag !== 'string' || tag === '') return;
+	_install = {
+		tag: tag,
+		channel: channel,
+		phase: 'handing_off',
+		reasonKey: '',
+		backupPath: '',
+		handoff: true
+	};
+	_renderInstallControls();
+	_postChangelogMessage({ action: 'install_through_updater', tag: tag, channel: channel });
 }
 
 /**
@@ -1046,6 +1159,10 @@ function setInstallProgress(message) {
 		tag: tag,
 		channel: _install && _install.tag === tag ? _install.channel : _currentChannel,
 		phase: message.phase,
+		// A failed hand-off is retried as a hand-off, never as a direct install.
+		handoff:
+			message.phase === 'handed_off' ||
+			(_install !== null && _install.tag === tag && _install.handoff === true),
 		reasonKey: _hostKey(message.reason_key, INSTALL_REASON_KEY),
 		backupPath: _hostString(message.backup_path) || '',
 		operation:

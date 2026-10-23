@@ -91,7 +91,19 @@ helpers.describe("declared Linux simultaneous publication through original owner
    helpers.assert_eq(doc.mod_combos.config[pair].future,17);helpers.assert_eq(s.pairs.get_chord(pair),"none")
   end)
  end)
- for _,action in ipairs({"one_shot_shift","caps_word","run_program","alt_tab_monitor","unknown_action"}) do
+ -- Chord slots once refused CapsWord, which only the engine's per-letter mode
+ -- could run; it now toggles the session through the executor like a pair tap.
+ helpers.it("(linux-chord-caps-word) the chord picker publishes a simultaneous CapsWord",function()
+  with_menu(function(s)
+   local row=find_menu(s.build(),'caps_lock → tab')
+   local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
+   helpers.assert_true(chord.fn());helpers.assert_true(s.pairs.validate_slot("combo",pair,"caps_word"))
+   helpers.assert_true(s.picker.confirm('caps_word'))
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,'caps_word')
+   helpers.assert_eq(s.pairs.get_chord(pair),'caps_word')
+  end,true)
+ end)
+ for _,action in ipairs({"one_shot_shift","run_program","alt_tab_monitor","unknown_action"}) do
   helpers.it("refuses unqualified simultaneous action "..action,function()
    with_public_owner(function(s)
     helpers.assert_eq(s.scope.edit({{section="mod_combos.config."..pair,key="combo",value=action}}),false)
@@ -204,7 +216,12 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    local row=find_menu(s.build(),'caps_lock → tab')
    local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
    helpers.assert_true(chord.fn());helpers.assert_eq(s.picker.binding,binding)
-   for _,item in ipairs(s.picker.items) do helpers.assert_true(item.id~='one_shot_shift' and item.id~='caps_word' and item.id~='run_program' and item.id~='alt_tab_monitor') end
+   local offers_caps_word=false
+   for _,item in ipairs(s.picker.items) do
+    helpers.assert_true(item.id~='one_shot_shift' and item.id~='run_program' and item.id~='alt_tab_monitor')
+    offers_caps_word=offers_caps_word or item.id=='caps_word'
+   end
+   helpers.assert_true(offers_caps_word,'the chord picker offers CapsWord')
    helpers.assert_true(s.picker.confirm('copy'))
    helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,'copy')
    helpers.assert_eq(s.pairs.get_chord(pair),'copy');helpers.assert_eq(s.refreshes,1)

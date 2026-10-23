@@ -52,7 +52,27 @@
 				"tap_hold_action": {
 					"kind": "contextual_title",
 					"title_key": "tap_hold.picker.title_prefix",
-					"platforms": ["linux"]
+					"platforms": ["linux", "hs"]
+				},
+				"tap_hold_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "tap_hold.picker.hold_title_prefix",
+					"platforms": ["linux", "hs"]
+				},
+				"key_combination_chord_action": {
+					"kind": "contextual_title",
+					"title_key": "menu.shortcuts.key_combinations_chord_title_prefix",
+					"platforms": ["hs"]
+				},
+				"key_combination_tap_action": {
+					"kind": "contextual_title",
+					"title_key": "menu.shortcuts.key_combinations_hold_tap_title_prefix",
+					"platforms": ["hs"]
+				},
+				"key_combination_hold_action": {
+					"kind": "contextual_title",
+					"title_key": "menu.shortcuts.key_combinations_hold_hold_title_prefix",
+					"platforms": ["hs", "linux"]
 				}
 			}
 		},

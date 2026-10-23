@@ -212,15 +212,19 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 			end,
 			set_buffer = function() end,
 		})
+		local native_set_contents = fixture.hs.pasteboard.setContents
+		local native_write_all_data = fixture.hs.pasteboard.writeAllData
 		local write_attempts = 0
 		local original = { ["public.utf8-plain-text"] = "ORIGINAL" }
 		local current = original
 		fixture.hs.pasteboard.readAllData = function() return original end
 		fixture.hs.pasteboard.writeAllData = function(saved)
+			native_write_all_data(saved)
 			current = saved
 			return true
 		end
 		fixture.hs.pasteboard.setContents = function(value)
+			native_set_contents(value)
 			write_attempts = write_attempts + 1
 			current = value -- native APIs may mutate before reporting refusal
 			return false

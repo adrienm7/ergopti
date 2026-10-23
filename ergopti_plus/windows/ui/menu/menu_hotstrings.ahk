@@ -364,8 +364,7 @@ _HS_WordExpanderRows(Commands := unset) {
 					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
 		}
 	}
-	Loop Parse, Current {
-		Ch := A_LoopField
+	for Ch in _TextCodepoints(Current) {
 		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch) or InStr(RecordChars, Ch))
 			continue
 		ConsumedSfx := (InStr(Consumed, Ch) > 0) ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
@@ -894,16 +893,12 @@ _HS_PersonalRows(Options := unset) {
 		; relevant label below is built from this map instead of the raw
 		; (possibly-duplicate) description.
 		DisambiguatedLabels := _HS_BuildDisambiguatedSectionLabels(TomlData)
-		; The two Menu objects are created here and kept, because two callbacks
-		; below REPAINT them: choosing a default section renames the parent row and
-		; moves the tick without rebuilding anything, and so does the close-on-add
-		; switch. A full RebuildTrayMenu costs about a second, which is not a price
-		; a checkmark can pay.
-		;
-		; That is not a reason for the rows themselves to be hand-built, which is
-		; what they were until 2026-08-07: MenuRenderer_AppendRows renders row DATA
-		; into a menu the CALLER owns, so the driver can hold the reference it needs
-		; and still let the renderer draw every row in it.
+		; Two callbacks below REPAINT instead of rebuilding: choosing a default
+		; section renames the parent row and moves the tick, and the close-on-add
+		; switch moves its tick. A full RebuildTrayMenu costs about a second, which
+		; is not a price a checkmark can pay. The default-section child is reserved
+		; from the renderer, so its callbacks hold a handle that only the renderer
+		; can redraw, and only while it still publishes that child.
 		; An empty inventory has no dynamic leaf source to admit on any driver.
 		HasDefaultChoices := false
 		for _, SecName in TomlData["sections_order"] {
@@ -920,8 +915,7 @@ _HS_PersonalRows(Options := unset) {
 		}
 		PersonalMenu := Menu()
 		OwnedMenus.Push(PersonalMenu)
-		DefaultSectionMenu := Menu()
-		OwnedMenus.Push(DefaultSectionMenu)
+		DefaultChild := MenuRenderer_TemplateChild(OwnedMenus)
 		EditorRow := _HS_PersonalEditorRow((*) => OpenPersonalEditor())
 
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
@@ -933,27 +927,27 @@ _HS_PersonalRows(Options := unset) {
 				continue
 			SecLabel := DisambiguatedLabels[SecName]
 			DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",
-				Map("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)),
+				Map("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels)),
 				Map("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),
 					"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))
 			if !(DefaultChoice is Map)
 				return []
 			DefaultRows.Push(DefaultChoice)
 		}
-		DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
+		DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultChild, DisambiguatedLabels))
 		DefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)
 		DefaultProviders := Map("personal_default_choices", (*) => DefaultRows)
 		DefaultFrame := MenuRenderer_TemplateRows("hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders)
 		if !(DefaultFrame is Array)
 			return []
-		if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted
+		if MenuRenderer_FillTemplateChild(DefaultChild, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted
 			return []
 
 		CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
 			: (DisambiguatedLabels.Has(CurDefaultSec) ? DisambiguatedLabels[CurDefaultSec] : CurDefaultSec)
 		DefaultLabelForHandoff := CurDefaultLabel
 		DefaultCaption := MenuRenderer_GroupRow("hotstring_personal_default_parent", "personal_default_caption",
-			DefaultSectionMenu, Map("personal_default_label", (*) => CurDefaultLabel))
+			DefaultChild, Map("personal_default_label", (*) => CurDefaultLabel))
 		if !(DefaultCaption is Map)
 			return []
 		DefaultParent := [DefaultCaption]
@@ -1075,13 +1069,13 @@ _HS_PersonalRows(Options := unset) {
 ; One TOML file of the personal-extensions tree, as a row whose submenu holds
 ; independent admitted controls, or a read-only unavailable section inventory.
 ;
-; Its own Menu, filled by the renderer from row data: a folder tree follows the
-; USER's directories, so each level builds a menu and hands the level below it
+; Its own renderer-reserved child, filled from row data: a folder tree follows the
+; USER's directories, so each level fills a child and hands the level below it
 ; over as `submenu` rather than describing the whole tree as one nested array.
 ; Every level is still drawn by the renderer, which is the point — the driver
 ; decides the SHAPE of the tree, never how a row is drawn.
 _HS_TomlFileRow(TF) {
-	TFMenu := Menu(), HandedOff := false
+	TFMenus := [], TFChild := MenuRenderer_TemplateChild(TFMenus), HandedOff := false
 	PrimaryFailure := 0
 	try {
 	CaptionPolicy := MenuRenderer_PersonalFileCaptionPolicy()
@@ -1110,14 +1104,14 @@ _HS_TomlFileRow(TF) {
 	FileRows := MenuRenderer_TemplateRows("hotstring_personal_file_frame", Commands, Getters, Providers)
 	if !(FileRows is Array)
 		return false
-	if MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
+	if MenuRenderer_FillTemplateChild(TFChild, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
 		return false
 	; Keep original late reads and native concatenation coercion before projection.
 	Result := (FileStem := TF.stem . "",
 		FileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",
 		CaptionOwner := CaptionPolicy["parent"],
 		CaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
-			? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))
+			? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFChild))
 	if !(Result is Map)
 		return false
 	HandedOff := true
@@ -1127,7 +1121,7 @@ _HS_TomlFileRow(TF) {
 		throw ErrorInfo
 	} finally {
 		if !HandedOff {
-			try _HS_PersonalReleaseMenus([TFMenu])
+			try _HS_PersonalReleaseMenus(TFMenus)
 			catch as CleanupFailure {
 				if !PrimaryFailure
 					throw CleanupFailure
@@ -1272,8 +1266,7 @@ _HS_RenderTree(Tree, Rows, OwnedMenus := unset) {
 				FolderRows.Push(Unavailable)
 			continue
 		}
-		FolderMenu := Menu()
-		OwnedMenus.Push(FolderMenu)
+		FolderChild := MenuRenderer_TemplateChild(OwnedMenus)
 		FileNodeList := Node["tomls"]
 		loop FileNodeList.Length {
 			i := A_Index
@@ -1302,7 +1295,7 @@ _HS_RenderTree(Tree, Rows, OwnedMenus := unset) {
 		FolderChildren := MenuRenderer_TemplateRows("hotstring_personal_directory_frame", Map(), Getters, Providers)
 		if !(FolderChildren is Array)
 			return false
-		if MenuRenderer_AppendTemplate(FolderMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted
+		if MenuRenderer_FillTemplateChild(FolderChild, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted
 			return false
 		FolderTotal := _HS_NodeTotal(Node)
 		; Preserve positive count coercion before the original outer name coercion.
@@ -1311,7 +1304,7 @@ _HS_RenderTree(Tree, Rows, OwnedMenus := unset) {
 			FolderNameReceipt := FolderName . "",
 			CaptionOwner := CaptionPolicy["parent"],
 			CaptionOwner != MenuRenderer_PersonalFolderParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
-				? false : CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu))
+				? false : CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderChild))
 		if !(FolderRow is Map)
 			return false
 		FolderRows.Push(FolderRow)

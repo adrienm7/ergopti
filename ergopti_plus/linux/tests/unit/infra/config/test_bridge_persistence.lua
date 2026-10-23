@@ -413,6 +413,7 @@ helpers.describe("hotstring editor classified source admission", function()
 		local context = { app_name = "hotstring_editor", epoch = 73 }
 		local state = { config = { get_config_dir = function() return root end, reload = function() obs.reloads = obs.reloads + 1; return 10 end } }
 		package.loaded["ui.webview_manager"] = { current_epoch = function() obs.epochs = obs.epochs + 1; return 73 end, eval_js = function() return true end }
+		local release_source = helpers.route_source_through_stdio(path)
 		local ok, problem = pcall(function()
 			io.open = function(target, access)
 				if target == path and access == "r" then
@@ -468,6 +469,7 @@ helpers.describe("hotstring editor classified source admission", function()
 				sections_order = { "english" }, sections = { english = { entries = { { trigger = "new", output = "next" } } } },
 			} }, state, context)
 		end)
+		release_source()
 		io.open, os.rename = native_open, native_rename
 		package.loaded["ui.hotstring_editor.bridge"] = old_bridge
 		package.loaded["ui.webview_manager"] = old_manager

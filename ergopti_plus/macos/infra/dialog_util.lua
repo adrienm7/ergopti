@@ -27,6 +27,7 @@ local hs = hs
 local Logger         = require("infra.logger")
 local ShellRunner    = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local RunningApplication = require("adapters.running_application")
 local text_utils     = require("infra.text_utils")
 local WindowTitles   = require("window_titles")
 
@@ -94,7 +95,7 @@ local function focus_hammerspoon(defer_open)
 			Logger.debug(LOG, "hs.focus raised before dialog: %s.", tostring(err))
 		end
 		pcall(function()
-			local app = hs.application.get("Hammerspoon")
+			local app = RunningApplication.current()
 			if app then app:activate(true) end
 		end)
 	end

@@ -11,6 +11,10 @@
 
 #Requires AutoHotkey v2.0
 
+; Monotonic count of complete semantic parses. A configuration transaction's
+; cost is mostly its parses, so tests pin how many one transaction spends.
+global _TOML_DocumentParses := 0
+
 /** Returns a case-sensitive semantic table without native configuration effects. */
 _TOML_DocumentTable() {
 	Table := Map()
@@ -250,8 +254,10 @@ _TOML_DocumentContainer(Root, Parts, Limit, Arrays, Sealed) {
  * @returns {Map} Case-sensitive semantic document; malformed namespaces throw.
  */
 TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
+	global _TOML_DocumentParses
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
+	_TOML_DocumentParses += 1
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
@@ -826,6 +832,21 @@ _TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped,
 	}
 }
 
+; The expected model starts as the parsed source and is then mutated. Only the
+; semantic setter mutates it, and it changes Maps alone (arrays are never
+; traversed, values are replaced whole), so every table is copied and every
+; array or scalar is shared. A second parse of the same source was the cost.
+_TOML_DocumentCloneTables(Value) {
+	if !(Value is Map)
+		return Value
+	Copy := Value.Clone()
+	for Key, Child in Value {
+		if Child is Map
+			Copy[Key] := _TOML_DocumentCloneTables(Child)
+	}
+	return Copy
+}
+
 /**
  * Renders explicit configuration effects against the complete semantic source.
  * @param {String} Source Exact source image captured by the existing I/O owner.
@@ -836,7 +857,7 @@ _TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped,
  */
 TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
-	Expected := TOML_ParseDocument(Source)
+	Expected := _TOML_DocumentCloneTables(Document)
 	for PhysicalRecord in Physical {
 		if PhysicalRecord.Kind == "opaque"
 			throw ValueError("Cannot retain an unclassified configuration source record")
@@ -855,8 +876,14 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	for Update in Updates {
 		Parts := _TOML_ConfigPath(Update.Section, Update.Key)
 		_TOML_ConfigSet(Expected, Parts, Update)
-		if Update.HasOwnProp("Delete") && Update.Delete == 1
+		if Update.HasOwnProp("Delete") && Update.Delete == 1 {
 			Deleted.Push(Parts)
+			; A deleted array owns every [[...]] generation header and record
+			; beneath it; keeping a header would recreate an empty generation.
+			Original := _TOML_DocumentLookup(Document, Parts)
+			if Original["found"] && Original["value"] is Array
+				Dropped.Push(Parts)
+		}
 		Owned[_TOML_ConfigPathName(Parts)] := Parts
 	}
 	_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned)

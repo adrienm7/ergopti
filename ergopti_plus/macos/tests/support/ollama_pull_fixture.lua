@@ -71,7 +71,7 @@ local function with_fixture(options, callback)
 	}
 	package.loaded["infra.text_utils"] = nil
 	package.loaded["modules.llm.ollama_binary"] = {
-		resolve = function() return options.binary_path or "/fixture/ollama" end,
+		resolve = function() return options.binary_path or "/fixture/ollama", nil, options.binary_source end,
 	}
 	package.loaded["modules.llm.ollama_server_command"] = {
 		build = function() return "fixture restart" end,

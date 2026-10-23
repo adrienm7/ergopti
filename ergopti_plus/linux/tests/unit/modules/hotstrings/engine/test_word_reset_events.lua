@@ -22,12 +22,12 @@ local helpers = require("tests.helpers")
 local EV_KEY = 1
 
 -- evdev codes of the keys the cases strike.
-local K = { a = 30, r = 19, z = 44, e = 18, v = 47, s = 31, enter = 28, backspace = 14, home = 102,
+local K = { a = 30, r = 19, z = 44, e = 18, v = 47, s = 31, l = 38, enter = 28, backspace = 14, home = 102,
 	left = 105, right = 106, up = 103, down = 108, lshift = 42, lctrl = 29, lalt = 56, altgr = 100,
 	lmeta = 125, caps = 58, nav_left = 37 }
 
 -- What the capture double types for a letter key.
-local LETTERS = { [K.a] = "a", [K.r] = "r", [K.z] = "z", [K.e] = "e", [K.v] = "v", [K.s] = "s" }
+local LETTERS = { [K.a] = "a", [K.r] = "r", [K.z] = "z", [K.e] = "e", [K.v] = "v", [K.s] = "s", [K.l] = "l" }
 
 -- The fixture pack: one word-start entry and one entry that is not.
 local FIXTURE_PATH = "/virtual/word_reset_fixture.toml"
@@ -91,15 +91,18 @@ local function capture_double()
 end
 
 --- Types `events` through the hook into the fixture engine, wired as the
---- daemon wires them: a character to on_char, a control key or a shortcut to
---- WordReset.apply_control, a tap action to WordReset.apply_tap_action.
+--- daemon wires them: a character to on_char (then WordReset.apply_typed_newline
+--- when nothing fired), a one-character Backspace to engine:backspace, any other
+--- control key or a shortcut to WordReset.apply_control, a tap action to
+--- WordReset.apply_tap_action.
 --- @param events table Array of { code, value }.
 --- @param switches table The [hotstrings] leaves to adopt.
 --- @param tap_holds boolean|nil Install the tap-hold engine.
+--- @param app_id string|nil The focused application id.
 --- @return string screen The text the application shows.
 --- @return table effects "<name>=<effect>" per control key and tap action.
 --- @return table keys { name, detail } per control-key callback.
-local function type_through_hook(events, switches, tap_holds)
+local function type_through_hook(events, switches, tap_holds, app_id)
 	local previous = package.loaded["modules.hotstrings.word_reset"]
 	local ok, screen, effects, keys = pcall(function()
 		local WordReset = helpers.load_module("modules.hotstrings.word_reset")
@@ -125,11 +128,21 @@ local function type_through_hook(events, switches, tap_holds)
 				if result then
 					for _ = 1, result.backspace_count do table.remove(text) end
 					text[#text + 1] = result.replacement
+				elseif WordReset.apply_typed_newline(engine, ch, app_id) then
+					-- The terminal submitted the line: its new prompt is empty.
+					text = {}
 				end
 			end,
 			onKey = function(name, detail)
 				seen[#seen + 1] = { name = name, detail = detail }
-				log[#log + 1] = name .. "=" .. WordReset.apply_control(engine, name, detail)
+				local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+				if name == "backspace" and not (mods.ctrl or mods.alt or mods.meta) then
+					engine:backspace()
+					table.remove(text)
+					log[#log + 1] = "backspace=edited"
+					return
+				end
+				log[#log + 1] = name .. "=" .. WordReset.apply_control(engine, name, detail, app_id)
 			end,
 		}, true)
 		kh.set_remapper(nil)
@@ -297,11 +310,17 @@ helpers.describe("word reset events: typing and the unconditional keys", functio
 		end
 	end)
 
-	helpers.it("word reset events, still resets at an unknown position on Ctrl+Backspace with every option off", function()
+	helpers.it("word reset events, starts a word on Ctrl+Backspace whatever the options (bs-word-start)", function()
 		for _, on in ipairs({ true, false }) do
-			local screen, effects = type_through_hook(around(chord({ K.lctrl }, K.backspace)), switches_for(nil, on))
-			helpers.assert_eq(effects, { "backspace=unknown" }, "Ctrl+Backspace deleted an unknown amount")
-			helpers.assert_eq(screen, "ar", "an unknown position is no word start")
+			local _, effects = type_through_hook(around(chord({ K.lctrl }, K.backspace)), switches_for(nil, on))
+			helpers.assert_eq(effects, { "backspace=word_start" }, "the caret sits where the deleted word began")
+			local _, shifted = type_through_hook(around(chord({ K.lctrl, K.lshift }, K.backspace)),
+				switches_for(nil, on))
+			helpers.assert_eq(shifted, { "backspace=word_start" }, "Ctrl+Shift+Backspace too")
+			local _, alt = type_through_hook(around(chord({ K.lalt }, K.backspace)), switches_for(nil, on))
+			helpers.assert_eq(alt, { "backspace=unknown" }, "Alt+Backspace (undo) deleted an unknown amount")
+			local _, altgr = type_through_hook(around(chord({ K.lctrl, K.altgr }, K.backspace)), switches_for(nil, on))
+			helpers.assert_eq(altgr, { "backspace=unknown" }, "Ctrl+AltGr+Backspace is no word deletion")
 		end
 	end)
 
@@ -363,5 +382,90 @@ helpers.describe("word reset events: who produced the chord", function()
 		end)
 		package.loaded["modules.hotstrings.word_reset"] = previous
 		if not ok then error(err, 0) end
+	end)
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ Erasing what was typed ===============================
+-- =================================================================
+-- =================================================================
+
+--- The events of a key struck alone.
+--- @param code integer The key.
+--- @return table events
+local function tap(code)
+	return { { code, 1 }, { code, 0 } }
+end
+
+--- Concatenates event lists.
+--- @return table events
+local function seq(...)
+	local events = {}
+	for _, part in ipairs({ ... }) do
+		for _, pair in ipairs(part) do events[#events + 1] = pair end
+	end
+	return events
+end
+
+helpers.describe("word reset events: erasing what was typed (bs-word-start)", function()
+	local on = switches_for(nil, true)
+
+	helpers.it("bs-word-start: the Backspace that erases every typed letter starts a word", function()
+		local screen = type_through_hook(seq(tap(K.home), tap(K.a), tap(K.e), tap(K.backspace),
+			tap(K.backspace), tap(K.r)), on)
+		helpers.assert_eq(screen, "R", "« ae » erased after an unknown start, then the word-start « r »")
+	end)
+
+	helpers.it("bs-word-start: a correction keeps the word open", function()
+		local screen = type_through_hook(seq(tap(K.home), tap(K.a), tap(K.e), tap(K.backspace), tap(K.r)), on)
+		helpers.assert_eq(screen, "ar", "one of two letters erased: « r » is inside the word")
+	end)
+
+	helpers.it("bs-word-start: a Backspace past the typed letters leaves an unknown start", function()
+		local screen = type_through_hook(seq(tap(K.a), tap(K.backspace), tap(K.backspace), tap(K.r)), on,
+			nil, "org.gnome.TextEditor")
+		helpers.assert_eq(screen, "r", "the second Backspace deleted text the engine never saw")
+	end)
+
+	helpers.it("bs-word-start: a terminal prompt after Enter keeps its word start", function()
+		local events = seq(tap(K.a), tap(K.enter), tap(K.a), tap(K.backspace), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(events, on, nil, "org.gnome.Terminal"), "R",
+			"the extra Backspace hit the empty prompt and deleted nothing")
+		helpers.assert_eq(type_through_hook(events, on, nil, "kitty"), "R", "kitty is a terminal too")
+		local editor = type_through_hook(events, on, nil, "org.gnome.TextEditor")
+		helpers.assert_eq(editor:sub(-1), "r", "in an editor the extra Backspace joined the lines")
+	end)
+
+	helpers.it("bs-word-start: Ctrl+A and a browser's Ctrl+L leave an empty field", function()
+		local select_all = seq(tap(K.a), chord({ K.lctrl }, K.a), tap(K.backspace), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(select_all, on, nil, "org.gnome.TextEditor"), "R",
+			"Ctrl+A then Backspace empties the field")
+		helpers.assert_eq(type_through_hook(select_all, on, nil, "kitty"), "r",
+			"Ctrl+A in a terminal moves to the line start and selects nothing")
+		local address = seq(chord({ K.lctrl }, K.l), tap(K.backspace), tap(K.r))
+		helpers.assert_eq(type_through_hook(address, on, nil, "firefox"), "R", "Ctrl+L selects the whole address")
+		helpers.assert_eq(type_through_hook(address, on, nil, "org.gnome.TextEditor"), "r",
+			"Ctrl+L outside a browser promises no empty field")
+	end)
+
+	helpers.it("bs-word-start: names terminals and the delete-word chord", function()
+		local WordReset = require("modules.hotstrings.word_reset")
+		for _, id in ipairs({ "org.gnome.Terminal", "org.gnome.Console", "kitty", "Alacritty", "foot",
+			"org.wezfurlong.wezterm", "konsole", "org.kde.konsole", "xterm", "com.mitchellh.ghostty" }) do
+			helpers.assert_true(WordReset.is_terminal_app(id), id .. " is a terminal")
+		end
+		for _, id in ipairs({ "firefox", "org.gnome.TextEditor", "code", "", nil }) do
+			helpers.assert_true(not WordReset.is_terminal_app(id), tostring(id) .. " is no terminal")
+		end
+		helpers.assert_true(WordReset.deletes_previous_word({ mods = { ctrl = true } }))
+		helpers.assert_true(WordReset.deletes_previous_word({ mods = { ctrl = true, shift = true } }))
+		helpers.assert_true(not WordReset.deletes_previous_word({ mods = { ctrl = true, alt = true } }))
+		helpers.assert_true(not WordReset.deletes_previous_word({ mods = { ctrl = true, meta = true } }))
+		helpers.assert_true(not WordReset.deletes_previous_word({ mods = { alt = true } }))
+		helpers.assert_true(not WordReset.deletes_previous_word(nil))
 	end)
 end)

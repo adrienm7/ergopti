@@ -21,6 +21,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
@@ -158,8 +159,6 @@ local function _run_tap(action, binding)
 	-- CapsWord is an ordinary catalogue action, as on Windows: the executor
 	-- toggles the shortcuts manager's session, the one the tray row shows,
 	-- which locks CapsLock and ends on the [shortcuts.caps_word] settings.
-	-- Returning its id would ask the hook for the engine's own per-letter
-	-- mode instead, a second CapsWord with neither those endings nor the row.
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -481,7 +480,7 @@ local function _build(loaded, boot)
  local issued={loaded=loaded,catalogue=copy_fields(loaded.catalog),keys=copy_fields(loaded.keys),holds=copy_fields(loaded.hold_picker)}
 	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
-	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
+	local config_dir = assert(NativePath.dirname(_user_path), "tap-hold path needs a configuration folder")
 	local nav_eligible = nav_ports_current()
 	local root_port = nav_eligible and original_shared_root or Paths.shared_root
 	local shared_root = root_port()
@@ -514,7 +513,6 @@ local function _build(loaded, boot)
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
-		caps_word_plan = function(text) return _hook.plan_caps_word(text) end,
 		one_shot_result = _one_shot_result,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,

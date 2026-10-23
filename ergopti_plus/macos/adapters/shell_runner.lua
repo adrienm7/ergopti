@@ -11,6 +11,8 @@
 --- 1. exec(): synchronous shell execution via hs.execute. Returns the stdout
 ---    string. Best-effort — failures return "" rather than raising. Used for
 ---    fire-and-forget operations (mkdir, pkill, nohup daemon starts, stat calls).
+---    exec_checked() returns stdout only after a zero exit. Both refuse a
+---    command containing NUL, which popen(3) would silently cut short.
 --- 2. spawn(): async subprocess via hs.task. Returns an opaque handle with
 ---    lifecycle and streaming-input methods. Supports both the 3-arg form (no
 ---    streaming callback) and the 4-arg form (streaming chunk callback). Used
@@ -66,21 +68,151 @@ M._active_tasks = {}
 -- =========================================
 -- =========================================
 
+--- Returns the C-string refusal for a synchronous command, or nil when admissible.
+--- hs.execute hands the command to popen(3) as a char *, so /bin/sh would run
+--- only the prefix before an embedded NUL: a different command than composed.
+--- @param cmd any Candidate command.
+--- @return string|nil reason
+local function sync_command_refusal(cmd)
+	if type(cmd) ~= "string" or cmd == "" then return "command must be a non-empty string" end
+	if cmd:find("\0", 1, true) then return "command contains NUL, which /bin/sh cannot receive" end
+	return nil
+end
+
+--- Runs one admitted command through hs.execute and records its exit.
+--- @param cmd string Admitted command.
+--- @return boolean ok, any output, any status, any exit_type, any code
+local function run_sync(cmd)
+	local started_ms = now_ms()
+	local ok, output, status, exit_type, rc = pcall(hs.execute, cmd)
+	if ok then _record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms) end
+	return ok, output, status, exit_type, rc
+end
+
 --- Executes a shell command synchronously and returns its stdout.
 --- Wraps hs.execute(). The command is run via /bin/sh -c.
 --- Failures return an empty string — the adapter never raises.
 --- @param cmd string Shell command string.
 --- @return string stdout output, or "" on any error.
 function M.exec(cmd)
-	if type(cmd) ~= "string" or cmd == "" then return "" end
-	local started_ms = now_ms()
-	local ok, result, _, _, rc = pcall(hs.execute, cmd)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then
+		if type(cmd) == "string" and cmd ~= "" then
+			Logger.error(LOG, "exec() refused for '%s': %s.",
+				RuntimeLog.program_name(cmd:match("^[^%z]*")), refusal)
+		end
+		return ""
+	end
+	local ok, result = run_sync(cmd)
 	if not ok then
 		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), tostring(result))
 		return ""
 	end
-	_record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms)
 	return type(result) == "string" and result or ""
+end
+
+--- Executes a shell command synchronously and admits stdout only after exit 0.
+--- Useful output alone is not success: a failed openssl prints the blocks it
+--- decrypted before its padding check, and that prefix is not the plaintext.
+--- @param cmd string Shell command string.
+--- @return string|nil stdout Exact output after a verified zero exit.
+--- @return string|nil reason Fixed refusal text; it never quotes the command.
+function M.exec_checked(cmd)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	local ok, output, status, exit_type, rc = run_sync(cmd)
+	if not ok then return nil, "the native shell call raised" end
+	if exit_type ~= "exit" or rc ~= 0 or status ~= true then
+		return nil, string.format("the shell ended by %s with status %s",
+			tostring(exit_type), tostring(rc))
+	end
+	if type(output) ~= "string" then return nil, "the shell returned no output string" end
+	return output
+end
+
+--- Composes `cmd` so that it receives EXACTLY `input` on standard input.
+--- The bytes travel as one printf %b operand: every backslash is doubled and
+--- every NUL becomes backslash-0000, so the command stays a valid C string while
+--- the pipe still carries NUL. Unlike a heredoc, nothing is appended, nothing
+--- is staged in a temporary file, and a leading "-" is an operand, not an
+--- option. pipefail makes a failed producer the pipeline's status; a shell
+--- without pipefail refuses the whole command rather than trusting the last
+--- stage.
+--- @param cmd string Composed consumer command without NUL.
+--- @param input string Exact standard-input bytes.
+--- @return string|nil command
+--- @return string|nil reason
+function M.exact_stdin_pipeline(cmd, input)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	if type(input) ~= "string" then return nil, "input must be a string" end
+	local operand = input:gsub("\\", "\\\\"):gsub("\0", "\\0000"):gsub("'", "'\\''")
+	return "set -o pipefail; printf '%b' '" .. operand .. "' | " .. cmd
+end
+
+-- Native boundary of exec_private_stdin(); replaced only by tests, which cannot
+-- start a real openssl. Fields: popen, tmpname, open, remove.
+local DEFAULT_PRIVATE_STDIN_NATIVE = { popen = io.popen, tmpname = os.tmpname, open = io.open, remove = os.remove }
+local _private_stdin_native = DEFAULT_PRIVATE_STDIN_NATIVE
+
+--- Replaces the native boundary of exec_private_stdin(); nil restores it.
+--- @param native table|nil Table with popen, tmpname, open and remove.
+function M._set_private_stdin_native(native)
+	_private_stdin_native = type(native) == "table" and native or DEFAULT_PRIVATE_STDIN_NATIVE
+end
+
+--- Runs `cmd` with `input` written to its standard input by this process, and
+--- returns its stdout after a zero exit. Unlike exact_stdin_pipeline, the
+--- bytes never become part of the command: an `sh -c` argument is readable by
+--- every local account through the process table, so a secret (typed text, a
+--- machine id) must not travel there. stdout goes to a mkstemp(3) file (mode
+--- 0600) that is read back and removed, because popen(3) has one direction.
+--- @param cmd string Composed consumer command without NUL.
+--- @param input string Exact standard-input bytes, NUL included.
+--- @return string|nil stdout Exact output after a verified zero exit.
+--- @return string|nil reason Fixed refusal text; it never quotes the command or input.
+function M.exec_private_stdin(cmd, input)
+	local refusal = sync_command_refusal(cmd)
+	if refusal then return nil, refusal end
+	if type(input) ~= "string" then return nil, "input must be a string" end
+	local native = _private_stdin_native
+	local made, out_path = pcall(native.tmpname)
+	-- The path is spliced unquoted into the command, so only a plain path is admitted
+	if not made or type(out_path) ~= "string" or not out_path:match("^/[%w/._-]+$") then
+		return nil, "no private output file could be created"
+	end
+	local function discard()
+		local removed, remove_err = pcall(native.remove, out_path)
+		if not removed then
+			Logger.error(LOG, "exec_private_stdin() could not remove its output file: %s.",
+				tostring(remove_err))
+		end
+	end
+	local started_ms = now_ms()
+	local opened, pipe = pcall(native.popen, cmd .. " > " .. out_path, "w")
+	if not opened or not pipe then
+		discard()
+		return nil, "the native shell pipe could not be opened"
+	end
+	local written_ok, written = pcall(function() return pipe:write(input) end)
+	local closed_ok, status, exit_type, rc = pcall(function() return pipe:close() end)
+	if closed_ok then _record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms) end
+	local read_ok, output = pcall(function()
+		local handle = native.open(out_path, "rb")
+		if not handle then return nil end
+		local data = handle:read("a")
+		handle:close()
+		return data
+	end)
+	discard()
+	-- A short write means the consumer saw a prefix: its output is not the value's
+	if not written_ok or not written then return nil, "standard input was not fully delivered" end
+	if not closed_ok or exit_type ~= "exit" or rc ~= 0 or status ~= true then
+		return nil, string.format("the shell ended by %s with status %s",
+			tostring(exit_type), tostring(rc))
+	end
+	if not read_ok or type(output) ~= "string" then return nil, "the command output could not be read" end
+	return output
 end
 
 
@@ -107,6 +239,9 @@ function M.validate_spawn_args(executable, args)
 	if type(executable) ~= "string" or executable == "" then
 		return "executable must be a non-empty string"
 	end
+	-- NSTask passes every argv element to execve(2) as a C string: an embedded
+	-- NUL would launch a shorter word than composed. Name the slot, never bytes.
+	if executable:find("\0", 1, true) then return "executable must not contain NUL" end
 	if args == nil then return "" end
 	if type(args) ~= "table" then
 		return "args must be a table, got " .. type(args)
@@ -120,6 +255,9 @@ function M.validate_spawn_args(executable, args)
 		if type(args[index]) ~= "string" then
 			return string.format("argument %d must be a string, got %s",
 				index, type(args[index]))
+		end
+		if args[index]:find("\0", 1, true) then
+			return string.format("argument %d must not contain NUL", index)
 		end
 	end
 	return ""

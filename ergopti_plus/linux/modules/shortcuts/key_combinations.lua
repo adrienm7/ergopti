@@ -130,7 +130,7 @@ function M.new(options)
 				local row=namespace(configured[pair])
 				local action=row.combo
 				if action==nil then action="none" end
-				assert(action=="none" or type(action)=="string" and action~="one_shot_shift" and action~="caps_word"
+				assert(action=="none" or type(action)=="string" and action~="one_shot_shift"
 					and catalogue.is_assignable(action)==true,"invalid known chord slot")
 				chords[pair]=action; explicit=explicit or row.combo~=nil
 			end
@@ -363,7 +363,7 @@ function M.new(options)
 		if kind == "tap" then return value == "none" or catalogue.is_assignable(value) == true end
 		if kind == "combo" then
 			local declared=pcall(declared_settings)
-			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="caps_word" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)
+			return declared and next(declarations)~=nil and (value=="none" or value~="one_shot_shift" and value~="run_program" and value~="alt_tab_monitor" and catalogue.is_assignable(value)==true)
 		end
 		if kind == "hold" then return holds[value] == true end
 		return false

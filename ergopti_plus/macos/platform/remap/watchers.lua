@@ -40,6 +40,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local KeyState       = require("adapters.key_state")
 local MouseControl   = require("adapters.mouse_control")
 local Registrar      = require("adapters.hotkey_registrar")
+local RunningApplication = require("adapters.running_application")
 local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
@@ -1470,7 +1471,9 @@ local function focus_previous_app_direct()
 	end
 
 	if type(_previous_bundle_id) == "string" and _previous_bundle_id ~= "" then
-		local target = hs.application.get(_previous_bundle_id)
+		-- By bundle identifier only: hs.application.get searches every window of
+		-- every application once the previous application has quit.
+		local target = RunningApplication.by_bundle_id(_previous_bundle_id)
 		if target then
 			local ok_activate, activate_result = pcall(function() return target:activate() end)
 			return ok_activate and activate_result == true

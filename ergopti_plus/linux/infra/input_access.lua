@@ -30,6 +30,8 @@
 
 local M = {}
 
+local LOG = "infra.input_access"
+
 --- sysexits.h EX_CONFIG. Pinned by ergopti-hotstrings.service's
 --- RestartPreventExitStatus= (tests/unit/infra/lifecycle/test_input_access.lua).
 M.EXIT_ACCESS = 78
@@ -89,8 +91,77 @@ function M.report(deps, detail)
 	if deps.notifier and type(deps.notifier.send) == "function" then
 		pcall(deps.notifier.send, body, { title = notification_label, level = "error" })
 	end
-	if deps.tray then M.hold_tray(deps, notification_label) end
+	if deps.tray then M.hold_tray(deps, { label = notification_label, title = title, body = body }) end
 	return M.EXIT_ACCESS
+end
+
+--- The window title of the degraded state: the product name, which is what
+--- the AppImage catalogue and a user's task switcher show.
+M.WINDOW_TITLE = "Ergopti+"
+
+--- A translated label, or its key when the catalogue cannot supply one.
+--- @param i18n table|nil
+--- @param key string
+--- @return string
+local function label_for(i18n, key)
+	if not i18n then return key end
+	local ok, translated = pcall(i18n.get, key)
+	return (ok and type(translated) == "string") and translated or key
+end
+
+--- Opens a path or URL on the desktop, logging a refusal or a failed launch.
+--- @param target string
+local function open_on_desktop(target)
+	local request, reason = require("adapters.desktop_opener").open(target, function(result)
+		if result.ok ~= true then
+			require("logger.shim").error(LOG, "Desktop open of %s failed (%s).",
+				target, tostring(result.error or result.code))
+		end
+	end)
+	if not request then
+		require("logger.shim").error(LOG, "Desktop open of %s refused: %s.", target, tostring(reason))
+	end
+end
+
+--- The bug form, prefilled with nothing the daemon would need to collect.
+--- @return string
+local function bug_form_url()
+	local documents = require("ui.healthcheck.bridge").config()
+	return require("diagnostics.issue_link").build_url(documents.templates, documents.repository, "bug", {})
+end
+
+--- Default side effects of the degraded menu; tests replace each one.
+local DEFAULT_ACTIONS = {
+	open_logs = function() open_on_desktop(require("infra.config_paths").get_logs_dir()) end,
+	report_bug = function() open_on_desktop(bug_form_url()) end,
+	-- The menu's actions start desktop helpers on the libuv loop, which the
+	-- daemon's own loop never runs in this state: drain it beside the tray.
+	run_once = function()
+		local ok, luv = pcall(require, "luv")
+		if ok and type(luv) == "table" then luv.run("nowait") end
+	end,
+}
+
+--- The degraded menu: what is wrong, how to read more, and the ways out.
+---
+--- The shared renderer is not initialised in this state, so the tray adapter's
+--- fallback builder draws it; every label still comes from the shared catalogue.
+--- @param deps table tray; i18n optional; actions overrides.
+--- @param texts table { label, title, body }.
+--- @param show_details function Shows the status window.
+--- @param on_quit function
+local function install_degraded_menu(deps, texts, show_details, on_quit)
+	local actions = deps.actions or DEFAULT_ACTIONS
+	local quit_label = label_for(deps.i18n, "menu.global.quit")
+	-- The menu key carries the row's emoji, which this short menu does not need.
+	if quit_label ~= "menu.global.quit" then quit_label = quit_label:gsub("^%S+%s+", "") end
+	deps.tray.setFallbackMenu(texts.label, quit_label, on_quit, {
+		{ { label = texts.title, fn = show_details } },
+		{
+			{ label = label_for(deps.i18n, "menu.debug.open_logs"), fn = actions.open_logs },
+			{ label = label_for(deps.i18n, "menu.debug.report_bug"), fn = actions.report_bug },
+		},
+	})
 end
 
 --- Keeps a tray icon that names the failure until the user quits it.
@@ -100,26 +171,36 @@ end
 --- screen, which a user reads as "it does not launch" and the AppImage
 --- catalogue test fails outright: it starts the app without the input group
 --- and requires a window or a tray icon.
---- @param deps table tray (tray_menu adapter); i18n, sleep_ms optional.
---- @param label string The translated failure, shown as the first row.
-function M.hold_tray(deps, label)
+---
+--- The status window opens at once as well. The catalogue screenshots the
+--- first named window it finds; with only an icon it left-clicks it, which
+--- pops the menu, then right-clicks the same spot, which lands outside the
+--- grabbed menu and closes it, so its screenshot showed the bare icon.
+--- @param deps table tray (tray_menu adapter); i18n, sleep_ms, actions optional.
+--- @param texts table { label, title, body }: translated label, title, body.
+function M.hold_tray(deps, texts)
+	local Logger = require("logger.shim")
 	local tray = deps.tray
 	tray.setIcon({ title = "Ergopti" })
 	if tray.getBackend() == nil then return end
-	local quit_label = "Quit"
-	if deps.i18n then
-		local ok, translated = pcall(deps.i18n.get, "menu.global.quit")
-		-- The menu key carries the row's emoji, which a lone row does not need.
-		if ok and type(translated) == "string" then quit_label = translated:gsub("^%S+%s+", "") end
+	local actions = deps.actions or DEFAULT_ACTIONS
+	local function show_details()
+		if not tray.showStatusWindow(M.WINDOW_TITLE, texts.title .. "\n\n" .. texts.body) then
+			Logger.error(LOG, "The status window could not be shown.")
+		end
 	end
 	local quit = false
-	tray.setFallbackMenu(label, quit_label, function() quit = true end)
+	install_degraded_menu(deps, texts, show_details, function() quit = true end)
+	show_details()
+	Logger.start(LOG, "Holding the degraded tray until Quit.")
 	local sleep_ms = deps.sleep_ms or require("adapters.event_loop").sleep_ms
 	while not quit do
 		tray.pump()
+		actions.run_once()
 		sleep_ms(100)
 	end
 	tray.destroy()
+	Logger.success(LOG, "Degraded tray released by Quit.")
 end
 
 return M

@@ -1,5 +1,5 @@
 {
-	"_comment": "Handwritten expected child-template composition. Shared declarations own platform caption variants and order; native owners retain callbacks, action-label data and child picker payloads.",
+	"_comment": "Handwritten expected child-template composition: every driver opens the shared action picker for the tap and for the hold. Shared declarations own platform caption variants and order; native owners retain callbacks, action-label data and child picker payloads.",
 	"section": "tap_hold_key_head",
 	"include": "tap_hold_key_native_commands",
 	"rows": [
@@ -15,58 +15,43 @@
 			"id": "tap_hold_key_tap",
 			"i18n": "tap_hold.picker.tap",
 			"caption_getter": "tap_hold_key_tap_caption",
-			"platforms": ["ahk", "linux"],
-			"unavailable": "hide"
+			"platforms": ["ahk", "hs", "linux"]
 		},
 		{
-			"type": "group",
-			"id": "tap_hold_key_tap_picker",
-			"i18n": "menu.tapholds.tap_arrow",
-			"caption_getter": "tap_hold_key_tap_caption",
-			"platforms": ["hs"],
-			"unavailable": "hide"
-		},
-		{
-			"type": "group",
-			"id": "tap_hold_key_hold",
+			"type": "command",
+			"id": "tap_hold_key_hold_action",
 			"i18n": "tap_hold.picker.hold",
 			"caption_getter": "tap_hold_key_hold_caption",
-			"platforms": ["ahk", "linux"],
-			"unavailable": "hide"
-		},
-		{
-			"type": "group",
-			"id": "tap_hold_key_hold_picker",
-			"i18n": "menu.tapholds.hold_arrow",
-			"caption_getter": "tap_hold_key_hold_caption",
-			"platforms": ["hs"],
-			"unavailable": "hide"
+			"platforms": ["ahk", "hs", "linux"]
 		}
 	],
 	"platforms": {
 		"ahk": {
 			"native": "tap_hold_key_native",
 			"tap": "tap_hold_key_tap",
-			"hold": "tap_hold_key_hold",
+			"hold": "tap_hold_key_hold_action",
 			"tap_label": "tap_hold.picker.tap",
 			"hold_label": "tap_hold.picker.hold",
-			"tap_kind": "action"
+			"tap_kind": "action",
+			"hold_kind": "action"
 		},
 		"linux": {
 			"native": "tap_hold_key_native",
 			"tap": "tap_hold_key_tap",
-			"hold": "tap_hold_key_hold",
+			"hold": "tap_hold_key_hold_action",
 			"tap_label": "tap_hold.picker.tap",
 			"hold_label": "tap_hold.picker.hold",
-			"tap_kind": "action"
+			"tap_kind": "action",
+			"hold_kind": "action"
 		},
 		"hs": {
 			"native": "tap_hold_key_no_action",
-			"tap": "tap_hold_key_tap_picker",
-			"hold": "tap_hold_key_hold_picker",
-			"tap_label": "menu.tapholds.tap_arrow",
-			"hold_label": "menu.tapholds.hold_arrow",
-			"tap_kind": "items"
+			"tap": "tap_hold_key_tap",
+			"hold": "tap_hold_key_hold_action",
+			"tap_label": "tap_hold.picker.tap",
+			"hold_label": "tap_hold.picker.hold",
+			"tap_kind": "action",
+			"hold_kind": "action"
 		}
 	}
 }

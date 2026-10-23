@@ -698,6 +698,8 @@ LLM_Menu_OnResume() {
 	global _LLM_Menu
 	if A_IsSuspended
 		return
+	if IsSet(OllamaWV_OnResume)
+		OllamaWV_OnResume()
 	; The AI hotkeys of a first menu build made under a pause (a driver
 	; reloaded while paused) were deferred to this resume.
 	LLM_Menu_ActivateDeferredHotkeys()

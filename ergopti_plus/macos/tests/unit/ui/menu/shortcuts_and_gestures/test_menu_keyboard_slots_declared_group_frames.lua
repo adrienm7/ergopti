@@ -50,19 +50,23 @@ local function keyboard_frame_json(relative)
 end
 
 helpers.describe("menu_keyboard_slots: complete declared group frame", function()
-	it("preserves independently specified fixed, assigned and Add row order", function()
+	it("preserves independently specified scope, fixed, assigned and Add row order", function()
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
 		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "a"
 		local fixed = { label = "Independent fixed row", action = function() error("a fixed row must not run during build") end }
-		local add_label = require("infra.i18n").get("menu.shortcuts.alt_add")
+		local i18n = require("infra.i18n")
+		local add_label = i18n.get("menu.shortcuts.alt_add")
+		local restore_label = i18n.get("common.restore_recommended")
+		local clear_label = i18n.get("common.clear_to_system")
 		local assigned_label = shortcuts.get_keyboard_slot_label(slot) .. " : Label:lookup"
 		local cases = {
-			{ fixed = false, assigned = false, labels = { add_label } },
-			{ fixed = true, assigned = false, labels = { fixed.label, "-", add_label } },
-			{ fixed = false, assigned = true, labels = { assigned_label, add_label } },
-			{ fixed = true, assigned = true, labels = { fixed.label, "-", assigned_label, add_label } },
+			{ fixed = false, assigned = false, labels = { restore_label, clear_label, "-", add_label } },
+			{ fixed = true, assigned = false, labels = { restore_label, clear_label, "-", fixed.label, "-", add_label } },
+			{ fixed = false, assigned = true, labels = { restore_label, clear_label, "-", assigned_label, add_label } },
+			{ fixed = true, assigned = true,
+				labels = { restore_label, clear_label, "-", fixed.label, "-", assigned_label, add_label } },
 		}
 		for _, case in ipairs(cases) do
 			helpers.assert_true(shortcuts.set_keyboard_action(slot, case.assigned and "lookup" or "none"))
@@ -73,7 +77,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 				helpers.assert_eq(rows[index].separator and "-" or rows[index].label, expected,
 					"the fixed/dynamic boundary must be in its original position")
 			end
-			if case.fixed then helpers.assert_true(rawequal(rows[1], fixed), "borrowed fixed child identity is retained") end
+			if case.fixed then helpers.assert_true(rawequal(rows[4], fixed), "borrowed fixed child identity is retained") end
 		end
 	end)
 

@@ -774,6 +774,18 @@ LLM_Agent_OnTyping(Buffer, PublishGuard := unset) {
 	}
 }
 
+/** Retires typing-derived work without arming a pause on incomplete text. */
+LLM_Agent_InvalidateTyping() {
+	global _LLM_Agent_Generation
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_Agent_Generation += 1
+		_LLM_Agent_CancelPause()
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 /**
  * Sends one System 1 request and reads its triage: the one transport of
  * System 1. A chat model reads the triage prompt; Jev (a decisions provider,

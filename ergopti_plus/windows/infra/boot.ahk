@@ -111,6 +111,9 @@ HotstringsConfigLoadSharedDefaults()
 TimingsLoadShared()
 KeyloggerWalkerLoadTimings()
 TapHoldsLoadTimings()
+; Native scalar EndChars takes a measured ~30 ms to build cold. Warm the pure
+; static cache before configured tap-hold criteria become eligible.
+_SIHO_ScalarEndKeys()
 LLMApiLoadTimings()
 if !LLM_Ollama_LoadDefaults()
 	throw Error("Shared Ollama defaults are missing or invalid.")

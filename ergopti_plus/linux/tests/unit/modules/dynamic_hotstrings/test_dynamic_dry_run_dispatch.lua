@@ -15,6 +15,20 @@ local routes = {
 	user = { trigger = "@u★", output = "ok" },
 }
 
+local jit_suspended = false
+
+--- Runs only the interpreter, dropping every trace, so the call hook sees each call.
+local function suspend_jit()
+	if not jit or not jit.status() then return end
+	jit.off(); jit.flush()
+	jit_suspended = true
+end
+
+--- Restores the compiler that suspend_jit turned off, once.
+local function resume_jit()
+	if jit_suspended then jit.on(); jit_suspended = false end
+end
+
 --- Drains the real deferred programmable callback without changing its policy.
 local function drain()
 	local timer, uv = require("adapters.timer_scheduler"), require("luv")
@@ -151,6 +165,11 @@ local function exercise(kind, dry_run)
 				else compiled = assert(load(body, "original Main handle_char", "t", environment)) end
 				handler = gate.guard(compiled())
 				local read = require("adapters.file_system").read_with_status
+				-- LuaJIT calls no hook from a compiled trace, so a hot read or request
+				-- loop went uncounted on one Arch run (dyn-dry-run-hook-jit). The
+				-- interpreter alone runs while the calls are counted.
+				suspend_jit()
+				if jit then h.assert_eq(jit.status(), false, "the call hook counts only interpreted calls") end
 				debug.sethook(function()
 					local info = debug.getinfo(2, "f")
 					if not info then return end
@@ -172,6 +191,7 @@ local function exercise(kind, dry_run)
 				end
 				drain()
 				debug.sethook()
+				resume_jit()
 				h.assert_eq(calls.manager, dry_run and 0 or #routes[kind].trigger:gsub("[\128-\191]", ""), "Main gates before dynamic dispatch")
 				if dry_run then
 					h.assert_eq(calls, { manager = 0, inject = 0, fields = 0, user = 0, source = 0 }, "no output or programmable source I/O is dispatched")
@@ -196,6 +216,7 @@ local function exercise(kind, dry_run)
 		end)
 	end)
 	debug.sethook()
+	resume_jit()
 	local cleanup_errors = {}
 	local function cleanup(action)
 		local cleaned, detail = pcall(action)

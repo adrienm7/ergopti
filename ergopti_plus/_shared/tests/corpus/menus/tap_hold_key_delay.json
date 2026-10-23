@@ -18,18 +18,10 @@
 			"unavailable": "hide"
 		},
 		{
-			"type": "group",
+			"type": "command",
 			"id": "tap_hold_key_delay",
 			"i18n": "menu.tapholds.key_tap_delay",
 			"caption_getter": "tap_hold_key_delay_caption"
-		}
-	],
-	"children_section": "tap_hold_key_delay_rows",
-	"children": [
-		{
-			"type": "command",
-			"id": "tap_hold_key_delay_set",
-			"i18n": "menu.tapholds.key_tap_delay_set"
 		},
 		{
 			"type": "check",
@@ -45,17 +37,14 @@
 	"platforms": {
 		"ahk": {
 			"key_rows": 5,
-			"delay_children": 1,
 			"delay_index": 5
 		},
 		"hs": {
-			"key_rows": 6,
-			"delay_children": 2,
+			"key_rows": 7,
 			"delay_index": 6
 		},
 		"linux": {
 			"key_rows": 5,
-			"delay_children": 1,
 			"delay_index": 5
 		}
 	}

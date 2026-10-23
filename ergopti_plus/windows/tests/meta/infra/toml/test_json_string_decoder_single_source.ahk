@@ -15,9 +15,26 @@ _JSDS_AllDecodersDelegate() {
 		Assert(Body != "" && InStr(Body, "JsonStringDecodeContents(") > 0,
 			Name . " must delegate to the shared complete JSON string decoder")
 	}
+	; Release metadata validates the whole release object with the complete parser
+	; and decodes only the member it reads, through the parser's own object
+	; grammar, rather than from a captured string slice: it never needs the
+	; contents decoder, and no partial replacement may decode the notes.
 	UpdaterBody := _DriverFuncBody("Updater_ParseBody")
-	Assert(UpdaterBody != "" && InStr(UpdaterBody, "JsonStringDecodeContents(") > 0,
-		"Updater_ParseBody must decode captured string contents through the shared parser")
+	Assert(UpdaterBody != "" && InStr(UpdaterBody, "_Updater_ReleaseMember(") > 0,
+		"Updater_ParseBody must read the notes through the shared release member decoder")
+	MemberBody := _DriverFuncBody("_Updater_ReleaseMember")
+	Assert(MemberBody != "" && InStr(MemberBody, "JsonObjectMembers(") > 0,
+		"the release member decoder must use the shared JSON member selection")
+	SelectionBody := _DriverFuncBody("JsonObjectMembers")
+	Assert(SelectionBody != "" && InStr(SelectionBody, "_JsonParseObject(") > 0,
+		"the JSON member selection must decode through the complete parser's object grammar")
+	for Name, Body in Map("Updater_ParseBody", UpdaterBody, "_Updater_ReleaseMember", MemberBody) {
+		Assert(!InStr(Body, "StrReplace(") && !InStr(Body, "RegExMatch(") && !InStr(Body, "RegExReplace("),
+			Name . " must not decode release text with a partial replacement or pattern")
+	}
+	DecoderBody := _DriverFuncBody("_Updater_DecodeRelease")
+	Assert(DecoderBody != "" && InStr(DecoderBody, "JsonParse(") > 0,
+		"the release decoder must use the complete shared JSON parser")
 }
 Test("JSON decode: every compatibility boundary uses one complete decoder (json-string-decoder-single-source)",
 	_JSDS_AllDecodersDelegate)

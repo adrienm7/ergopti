@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Screenshot Worker Ownership Regression Tests
 ; DESCRIPTION:
-; Exercises the AHK-13 process state machine with fake ShellRunner handles. The
+; Exercises the AHK-13 worker state machine with fake capture handles. The
 ; tests prove cancellation claims every screenshot owner before termination,
 ; remains safe when the kill request fails, rejects late completion side effects,
 ; and cleans each private stage exactly once.
@@ -43,11 +43,10 @@ _GSWO_FakeRequestTerminate(Record, *) {
 	return Record["terminate_result"]
 }
 
-_GSWO_FakeSpawn(Executable, Args, Done) {
+_GSWO_FakeSpawn(Capture, Done) {
 	global _GSWO_Handles
 	Record := Map(
-		"executable", Executable,
-		"args", Args,
+		"capture", Capture,
 		"done", Done,
 		"start_result", true,
 		"terminate_result", true,
@@ -84,23 +83,33 @@ _GSWO_FakePublishFilePartialFailure(Stage, Destination) {
 	return Map("published", false, "snapshot", Map("fake_owned_path", Destination))
 }
 
-_GSWO_FakePublishClipboard(Stage) {
+_GSWO_FakePublishClipboard(Stage, AdmissionFn := 0) {
 	global _GSWO_ExistingFiles, _GSWO_ClipboardPublishes
 	global _GSWO_ClipboardSequence, _GSWO_ClipboardHasImage
 	_GSWO_ClipboardPublishes += 1
 	if !_GSWO_ExistingFiles.Get(Stage, false)
 		return Map("published", false, "sequence", 0)
+	if HasMethod(AdmissionFn, "Call") {
+		Admitted := AdmissionFn.Call()
+		if !(Admitted is Integer && Admitted == 1)
+			return Map("published", false, "sequence", 0)
+	}
 	_GSWO_ClipboardSequence += 1
 	_GSWO_ClipboardHasImage := true
 	return Map("published", true, "sequence", _GSWO_ClipboardSequence)
 }
 
-_GSWO_FakePublishClipboardPartialFailure(Stage) {
+_GSWO_FakePublishClipboardPartialFailure(Stage, AdmissionFn := 0) {
 	global _GSWO_ExistingFiles, _GSWO_ClipboardPublishes
 	global _GSWO_ClipboardSequence, _GSWO_ClipboardHasImage
 	_GSWO_ClipboardPublishes += 1
 	if !_GSWO_ExistingFiles.Get(Stage, false)
 		return Map("published", false, "sequence", 0)
+	if HasMethod(AdmissionFn, "Call") {
+		Admitted := AdmissionFn.Call()
+		if !(Admitted is Integer && Admitted == 1)
+			return Map("published", false, "sequence", 0)
+	}
 	; Models EmptyClipboard succeeding before SetClipboardData fails.
 	_GSWO_ClipboardSequence += 1
 	_GSWO_ClipboardHasImage := false
@@ -189,6 +198,7 @@ _GSWO_Install() {
 		"clipboard_has_image_fn", GestureScreenshotWorkerState.clipboard_has_image_fn,
 		"clipboard_save_fn", GestureScreenshotWorkerState.clipboard_save_fn,
 		"clipboard_restore_fn", GestureScreenshotWorkerState.clipboard_restore_fn,
+		"native_probe_fn", GestureScreenshotWorkerState.native_probe_fn,
 		"direct", _GestureDirectCaptures,
 		"direct_epoch", _GestureDirectCaptureEpoch,
 		"region", _GestureRegionCapture,
@@ -238,6 +248,7 @@ _GSWO_Restore(Old) {
 	GestureScreenshotWorkerState.clipboard_has_image_fn := Old["clipboard_has_image_fn"]
 	GestureScreenshotWorkerState.clipboard_save_fn := Old["clipboard_save_fn"]
 	GestureScreenshotWorkerState.clipboard_restore_fn := Old["clipboard_restore_fn"]
+	GestureScreenshotWorkerState.native_probe_fn := Old["native_probe_fn"]
 	_GestureDirectCaptures := Old["direct"]
 	_GestureDirectCaptureEpoch := Old["direct_epoch"]
 	_GestureRegionCapture := Old["region"]
@@ -589,6 +600,69 @@ _GSWO_ShutdownCancelsAndCleansWorker() {
 Test("screenshot-worker-ownership: shutdown cancels and cleans retained workers",
 	_GSWO_ShutdownCancelsAndCleansWorker)
 
+_GSWO_NativeDone(Calls, ExitCode, Stdout, Stderr) {
+	Calls.Push(Map("code", ExitCode, "stdout", Stdout, "stderr", Stderr))
+}
+
+_GSWO_NativeCapture(Ran) {
+	Ran.Push(true)
+}
+
+_GSWO_NativeCaptureTerminatesItself(Holder) {
+	Holder.Receipt := Holder.Handle.requestTerminate()
+}
+
+_GSWO_NativeCaptureFails() {
+	throw Error("The fixture capture failed.")
+}
+
+_GSWO_WaitCalls(Calls) {
+	Started := A_TickCount
+	while Calls.Length = 0 && TickElapsed(Started) < 2000
+		Sleep(10)
+}
+
+_GSWO_NativeTaskReportsExactlyOnce() {
+	Ran := [], Calls := []
+	Handle := _GestureScreenshotSpawnNative(_GSWO_NativeCapture.Bind(Ran), _GSWO_NativeDone.Bind(Calls))
+	AssertTrue(Handle.start(), "the in-process capture must start")
+	AssertEqual(0, Ran.Length, "start must defer the capture to its own timer thread")
+	AssertFalse(Handle.start(), "a started capture must refuse a second start")
+	_GSWO_WaitCalls(Calls)
+	AssertEqual(1, Ran.Length, "the capture must run exactly once")
+	AssertEqual(1, Calls.Length, "the capture must report exactly once")
+	AssertEqual(0, Calls[1]["code"], "a successful capture reports exit code 0")
+
+	Ran := [], Calls := []
+	Handle := _GestureScreenshotSpawnNative(_GSWO_NativeCapture.Bind(Ran), _GSWO_NativeDone.Bind(Calls))
+	AssertTrue(Handle.start())
+	AssertEqual(1, Handle.requestTerminate(), "a pending capture must return an exact quiescence receipt")
+	_GSWO_WaitCalls(Calls)
+	AssertEqual(0, Ran.Length, "a capture terminated before its timer must never read the screen")
+	AssertEqual(1, Calls.Length, "a terminated capture must still report once so its job is reaped")
+	AssertTrue(Calls[1]["code"] != 0, "a terminated capture must not report success")
+
+	Calls := [], Holder := {Handle: 0, Receipt: -1}
+	Holder.Handle := _GestureScreenshotSpawnNative(_GSWO_NativeCaptureTerminatesItself.Bind(Holder),
+		_GSWO_NativeDone.Bind(Calls))
+	AssertTrue(Holder.Handle.start())
+	_GSWO_WaitCalls(Calls)
+	AssertEqual(0, Holder.Receipt,
+		"a capture interrupted mid-run must not claim quiescence: it can still write its stage")
+	AssertEqual(1, Calls.Length, "an interrupted capture must still report once")
+
+	Calls := []
+	Handle := _GestureScreenshotSpawnNative(_GSWO_NativeCaptureFails, _GSWO_NativeDone.Bind(Calls))
+	AssertTrue(Handle.start())
+	_GSWO_WaitCalls(Calls)
+	AssertEqual(1, Calls.Length)
+	AssertTrue(Calls[1]["code"] != 0, "a failed capture must not report success")
+	AssertEqual("The fixture capture failed.", Calls[1]["stderr"], "the failure must carry its native reason")
+}
+
+Test("screenshot-worker-ownership: the in-process capture task starts once and reports once",
+	_GSWO_NativeTaskReportsExactlyOnce)
+
 
 
 
@@ -605,9 +679,13 @@ _GSWO_AllEntryPointsShareOwnership() {
 	Fullscreen := _DriverFuncBody("GestureScreenshotFullscreen")
 	Region := _DriverFuncBody("GestureScreenshotRegion")
 	ScreenshotPath := _DriverFuncBody("GestureScreenshotPath")
-	DirectScript := _DriverFuncBody("_GestureScreenshotDirectScript")
-	RegionScript := _DriverFuncBody("_GestureScreenshotRegionSaveScript")
+	DirectCapture := _DriverFuncBody("_GestureScreenshotCaptureScreenGdip")
+	RegionScript := _DriverFuncBody("_GestureScreenshotCaptureClipboardImage")
+	DirectOwner := _DriverFuncBody("GestureCaptureRegion")
+	NativeRun := _DriverFuncBody("_GestureScreenshotNativeRun")
+	NativeStart := _DriverFuncBody("_GestureScreenshotNativeStart")
 	ClipboardPublish := _DriverFuncBody("CB_WriteBitmapFile")
+	LoadedPublish := _DriverFuncBody("_CB_PublishLoadedBitmap")
 	DefaultClipboardPublish := _DriverFuncBody("_GestureScreenshotDefaultPublishClipboard")
 	SuspendBody := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
@@ -622,9 +700,13 @@ _GSWO_AllEntryPointsShareOwnership() {
 	for Name, Body in Map(
 		"instant", Instant, "window", Window, "fullscreen", Fullscreen,
 		"region", Region, "screenshot path", ScreenshotPath,
-		"direct script", DirectScript,
-		"region script", RegionScript,
+		"direct capture", DirectCapture,
+		"region capture", RegionScript,
+		"direct owner", DirectOwner,
+		"native run", NativeRun,
+		"native start", NativeStart,
 		"clipboard publish", ClipboardPublish,
+		"loaded bitmap publication", LoadedPublish,
 		"default clipboard publish", DefaultClipboardPublish,
 		"suspend", SuspendBody,
 		"shutdown", ShutdownBody,
@@ -686,26 +768,30 @@ _GSWO_AllEntryPointsShareOwnership() {
 	}
 	Assert(InStr(Region, "GestureScreenshotCancelAll") > 0,
 		"interactive region capture must supersede every previous screenshot owner")
-	Assert(InStr(DirectScript, "Clipboard]::SetImage") = 0
-		&& InStr(DirectScript, "Stage") > 0 && InStr(DirectScript, '"Bmp"') > 0,
+	Assert(InStr(DirectCapture, "SetClipboardData") = 0 && InStr(DirectCapture, "CB_Write") = 0
+		&& InStr(DirectCapture, "_GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge)") > 0
+		&& InStr(DirectOwner, '(Mode == "clipboard") ? GESTURE_SCREENSHOT_BMP_ENCODER') > 0,
 		"direct workers may write only a private stage, never the clipboard")
-	Assert(InStr(DefaultClipboardPublish, "CB_WriteBitmapFile(Stage, &MutationSequence)") > 0
+	Assert(InStr(DefaultClipboardPublish, "CB_WriteBitmapFile(Stage, &MutationSequence, AdmissionFn)") > 0
 		&& InStr(ClipboardPublish, "LoadImageW") > 0
-		&& InStr(ClipboardPublish, "SetClipboardData") > 0
-		&& InStr(ClipboardPublish, "_CB_BeginOwnedMutation") > 0,
+		&& InStr(ClipboardPublish, "_CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn)") > 0
+		&& InStr(LoadedPublish, "SetClipboardData") > 0
+		&& InStr(LoadedPublish, "_CB_BeginOwnedMutation") > 0,
 		"only the current AHK owner may publish a staged bitmap through clipboard provenance")
-	Assert(InStr(ClipboardPublish, "OpenClipboard")
-		< InStr(ClipboardPublish, "_CB_BeginOwnedMutation")
-		&& InStr(ClipboardPublish, "_CB_BeginOwnedMutation")
-		< InStr(ClipboardPublish, "EmptyClipboard"),
+	Assert(InStr(LoadedPublish, "OpenClipboard")
+		< InStr(LoadedPublish, "AdmissionFn.Call()")
+		&& InStr(LoadedPublish, "AdmissionFn.Call()") < InStr(LoadedPublish, "_CB_BeginOwnedMutation")
+		&& InStr(LoadedPublish, "_CB_BeginOwnedMutation") < InStr(LoadedPublish, "EmptyClipboard"),
 		"clipboard provenance must be reserved only after the file load and lock, immediately before mutation")
 	Assert(InStr(RegionScript, "Stage") > 0 && InStr(RegionScript, 'State["path"]') = 0,
 		"region-save workers may write only their private stage, never the final path")
-	Assert(InStr(DirectScript, "Get-Process -Id") > 0
-		&& InStr(RegionScript, "Get-Process -Id") > 0
-		&& InStr(DirectScript, "Remove-Item -LiteralPath") > 0
-		&& InStr(RegionScript, "Remove-Item -LiteralPath") > 0,
-		"every worker must self-delete its private stage if shutdown removes its AHK owner")
+	; Workers run in the driver's own process, so none can outlive its owner;
+	; a canceled task must still report once so the registry reaps its stage.
+	Assert(InStr(NativeStart, "SetTimer(_GestureScreenshotNativeRun.Bind(Task), -1)") > 0
+		&& InStr(NativeRun, 'if !Task["terminated"]') > 0
+		&& InStr(NativeRun, 'Task["done"].Call(ExitCode, "", ErrorText)') > 0
+		&& InStr(NativeRun, 'Task["done"].Call') > InStr(NativeRun, "catch as Err"),
+		"every in-process worker must defer its capture and report exactly once, even when terminated first")
 	Assert(InStr(SuspendBody, 'GestureScreenshotCancelAll("suspended")') > 0
 		&& InStr(ShutdownBody, 'GestureScreenshotCancelAll("shutdown")') > 0,
 		"both suspend and shutdown must cancel the complete screenshot worker class")
@@ -768,3 +854,5 @@ Test("screenshot-worker-ownership: every entry point and lifecycle boundary shar
 #Include test_screenshot_file_publication.ahk
 
 #Include test_screenshot_clipboard_publication.ahk
+
+#Include test_screenshot_stage_cleanup.ahk

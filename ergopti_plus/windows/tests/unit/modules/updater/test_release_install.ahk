@@ -172,6 +172,36 @@ _RIT_RefusalsBeforeBackup() {
 Test("Release install: busy, blocked and unknown releases are refused before any backup (release-install-refusals)",
 	_RIT_RefusalsBeforeBackup)
 
+; Issue #99: with the GitHub API rate limited the window lists the Atom feed,
+; which names no files to verify. The page explains the refusal; an ERROR line
+; opened the error window over it. A tag missing from an API list stays one.
+_RIT_FeedOnlyRefusalIsAWarning() {
+	_RIT_Reset()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		AssertFalse(ReleaseInstall_Start("v1.0.4", "main", _RIT_Deps(Map("found", false,
+			"reason", "changelog_window.install_error_no_details"))))
+		AssertFalse(ReleaseInstall_Start("v1.0.5", "main", _RIT_Deps(Map("found", false,
+			"reason", "changelog_window.install_error_unknown_release"))))
+	} finally {
+		LoggerClearTestSink()
+		_RIT_Reset()
+	}
+	FeedLine := "", ApiLine := ""
+	for Line in Captured {
+		if InStr(Line, "v1.0.4")
+			FeedLine := Line
+		if InStr(Line, "v1.0.5")
+			ApiLine := Line
+	}
+	Assert(InStr(FeedLine, "[WARNING]") > 0 && InStr(FeedLine, "Atom feed") > 0,
+		"a feed-only list refuses with a warning naming the feed. Got: " . FeedLine)
+	Assert(InStr(ApiLine, "[ERROR]") > 0, "a tag missing from the API list is a stale page. Got: " . ApiLine)
+}
+Test("Release install: a feed-only list refuses with a warning, not an error (install-no-details-warning-99)",
+	_RIT_FeedOnlyRefusalIsAWarning)
+
 _RIT_FailuresReachTheObserver() {
 	global _UpdaterInstallObserver
 	Seen := []

@@ -150,8 +150,9 @@ local UNKNOWN_CONTEXT_MARKERS = {
 
 -- Plain resets are reserved for genuine word starts: an idle pause, a
 -- final_result expansion and a consumed dynamic trigger.
+-- The idle pause starts its word through engine:reset_after_pause(), which
+-- keeps an empty line it knows of (the next test checks that call).
 local BOUNDARY_RESET_CONTEXTS = {
-	"if WordReset.observe_key(now_ms) then",
 	"if result.final_result then",
 	"Dynamic expansion consumed the trigger",
 }
@@ -215,6 +216,10 @@ helpers.describe("Linux reviewed unknown-context resets (unknown-context-resets)
 			end
 		end
 		helpers.assert_eq(plain, #BOUNDARY_RESET_CONTEXTS, "each genuine word-start reset is accounted for")
+		local idle = source:find("if WordReset.observe_key(now_ms) then", 1, true)
+		local pause = source:find("if engine:reset_after_pause() then", 1, true)
+		helpers.assert_true(idle ~= nil and pause ~= nil and idle < pause,
+			"the idle pause starts a word through the engine (bs-word-start)")
 		helpers.assert_true(explicit >= #UNKNOWN_CONTEXT_MARKERS, "the reviewed sites pass an explicit boundary")
 	end)
 end)

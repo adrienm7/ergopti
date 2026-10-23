@@ -138,6 +138,28 @@ function M.openssl_stdout_receipt(command, output, status)
 	return output
 end
 
+--- Hands one admitted regular source to stdio on its own path name.
+--- Production reads TOML through a pinned /proc/self/fd alias, which a test's
+--- io.open double keyed on the path never sees. Native classification still
+--- runs first, so a FIFO or a missing file keeps its real receipt; only the
+--- stream of an admitted regular file is reopened by name for the double.
+--- A virtual path exists only inside the double, so it skips native admission.
+--- @param path string Exact source path the test's io.open double recognises.
+--- @param virtual boolean|nil True when no file exists on disk at that path.
+--- @return function restore Reinstates the native admission.
+function M.route_source_through_stdio(path, virtual)
+	local Reader = require("infra.regular_file_reader")
+	local native = Reader.open
+	Reader.open = function(candidate)
+		if virtual and candidate == path then return io.open(candidate, "r") end
+		local stream, detail, errno = native(candidate)
+		if candidate ~= path or not stream then return stream, detail, errno end
+		assert(stream:close(), "admitted source stream must close before stdio reopens it")
+		return io.open(candidate, "r")
+	end
+	return function() Reader.open = native end
+end
+
 
 
 

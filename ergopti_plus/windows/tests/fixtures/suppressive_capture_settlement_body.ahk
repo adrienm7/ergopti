@@ -6,7 +6,7 @@
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", "★")
 global OneShotShiftEnabled := false, InDeadKeySequence := false
-global _SIC_Mode := A_Args[2], _SIC_Emits := [], _SIC_Activations := 0
+global _SIC_Mode := A_Args[2], _SIC_Emits := [], _SIC_Activations := 0, _SIC_Warnings := 0
 global _SIC_Hook := 0, _SIC_Successor := 0, _SIC_SuccessorToken := 0
 
 _SIC_Require(Condition, Message) {
@@ -15,6 +15,19 @@ _SIC_Require(Condition, Message) {
 }
 
 LoggerError(Args*) {
+}
+
+LoggerWarn(Tag, Message, Reason) {
+	global _SIC_Warnings
+	_SIC_Require(Reason == "incomplete-scalar" || Reason == "incomplete-timeout" || Reason == "incomplete-control-prefix",
+		"the warning must report a reason code instead of converting an invalid surrogate to text")
+	_SIC_Warnings += 1
+}
+
+_SIC_RawUnit(Unit) {
+	Bytes := Buffer(4, 0)
+	NumPut("UShort", Unit, Bytes)
+	return StrGet(Bytes, 1, "UTF-16")
 }
 
 ActivateHotstrings() {
@@ -35,11 +48,21 @@ Send(Keys) {
 class _SIC_CaptureHook {
 	__New(Mode) {
 		this.Mode := Mode
-		this.Input := Mode == "text" || Mode == "completed-revoked" || Mode == "stop-reentrant" || Mode == "stop-refusal" ? "a" : ""
-		this.EndKey := Mode == "end-key" ? "Enter" : ""
-		this.EndReason := Mode == "timeout" ? "Timeout" : (Mode == "end-key" ? "EndKey" : "Max")
+		this.Input := ""
+		this.EndKey := Mode == "end-key" ? "Enter" : (Mode == "timeout" || Mode == "stopped-resumed" ? "" : "a")
+		this.EndReason := Mode == "timeout" ? "Timeout" : "EndKey"
 		if Mode == "stopped-resumed"
 			this.EndReason := ""
+		if Mode == "invalid-low"
+			this.EndKey := _SIC_RawUnit(0xDE00)
+		if Mode == "invalid-high-BMP" || Mode == "partial-timeout" || Mode == "control-after-high"
+			this.Input := _SIC_RawUnit(0xD83D)
+		if Mode == "partial-timeout"
+			this.EndKey := "", this.EndReason := "Timeout"
+		if Mode == "control-after-high"
+			this.EndKey := "Enter"
+		if Mode == "named-insert"
+			this.EndKey := "Insert"
 		this.Starts := 0, this.Stops := 0
 	}
 	KeyOpt(Keys, Options) {
@@ -65,7 +88,11 @@ class _SIC_CaptureHook {
 
 _SIC_CreateHook(Options, EndKeys := "") {
 	global _SIC_Hook, _SIC_Mode
-	_SIC_Require(InStr(Options, "L1") > 0 && InStr(Options, "T") > 0, "the real bounded capture options must reach the constructor")
+	_SIC_Require(InStr(Options, "L2") > 0 && InStr(Options, "T") > 0
+		&& InStr(Options, " E") > 0 && InStr(Options, " C") > 0, "the real bounded capture options must reach the constructor")
+	if A_Args[1] == "dead-key"
+		_SIC_Require(InStr(EndKeys, "{Insert}", true) > 0 && !InStr(EndKeys, "{Ins}", true),
+			"the same control spelling must match native canonical Insert completion")
 	_SIC_Hook := _SIC_CaptureHook(_SIC_Mode)
 	return _SIC_Hook
 }
@@ -87,7 +114,7 @@ _SIC_Revoke(WithSuccessor) {
 }
 
 _SIC_Run() {
-	global _SIC_Hook, _SIC_Mode, _SIC_Emits, _SIC_Activations, OneShotShiftEnabled
+	global _SIC_Hook, _SIC_Mode, _SIC_Emits, _SIC_Activations, _SIC_Warnings, OneShotShiftEnabled
 	global _SIC_Successor, _SIC_SuccessorToken, InDeadKeySequence
 	Owner := A_Args[1]
 	if Owner == "one-shot"
@@ -102,9 +129,11 @@ _SIC_Run() {
 	Expected := []
 	if _SIC_Mode == "text"
 		Expected := [Owner == "one-shot" ? "A" : "ä"]
-	else if _SIC_Mode == "end-key"
+	else if _SIC_Mode == "end-key" || _SIC_Mode == "control-after-high"
 		Expected := Owner == "one-shot" ? ["{Enter}"] : ["¨", "", "{Enter}"]
-	else if _SIC_Mode == "timeout" && Owner == "dead-key"
+	else if _SIC_Mode == "named-insert"
+		Expected := ["¨", "", "{Insert}"]
+	else if (_SIC_Mode == "timeout" || _SIC_Mode == "partial-timeout") && Owner == "dead-key"
 		Expected := ["¨"]
 	_SIC_Require(_SIC_Emits.Length == Expected.Length, "only a settled current capture may emit, including an empty send")
 	for Index, Text in Expected
@@ -118,6 +147,8 @@ _SIC_Run() {
 	}
 	if _SIC_Mode == "stopped-resumed"
 		_SIC_Require(_SIC_Hook.EndReason == "Stopped" && _SIC_Hook.Input == "", "the stopped empty capture is distinct from timeout")
+	ExpectedWarnings := _SIC_Mode == "invalid-low" || _SIC_Mode == "invalid-high-BMP" || _SIC_Mode == "partial-timeout" || _SIC_Mode == "control-after-high" ? 1 : 0
+	_SIC_Require(_SIC_Warnings == ExpectedWarnings, "invalid scalar input must be reported once without any partial text emission")
 	SIHO_StopAll()
 	_SIC_Require(SIHO_Count() == 0, "the child must retire every exact hook before completion")
 }

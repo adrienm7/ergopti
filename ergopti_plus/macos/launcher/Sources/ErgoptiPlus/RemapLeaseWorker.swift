@@ -2327,6 +2327,7 @@ final class KarabinerLeaseOuterRuntime {
 	private var lastPrivateCommandLine: String?
 	private var lastPrivateCommandSentAt: TimeInterval?
 	private var lossReported = false
+	private var parentEOFReported = false
 
 	/// Creates the only role allowed to retain Hammerspoon stdin/stdout.
 	/// - Parameters:
@@ -2395,15 +2396,21 @@ final class KarabinerLeaseOuterRuntime {
 			return LeaseWorkerExit.success.rawValue
 		}
 
+		let preparationStarted = diagnosticClock()
 		guard let guardianRegistration,
 			guardianRegistration.arm()
 		else { return LeaseWorkerExit.guardianUnavailable.rawValue }
 		defer { guardianRegistration.closePreservingAbandonment() }
+		let guardianArmed = diagnosticClock()
 
 		guard let spawned = spawnInnerWithGuardianDescriptors() else {
 			guardianRegistration.cancelBeforeActivation()
 			return LeaseWorkerExit.innerSpawnFailed.rawValue
 		}
+		reportSlowActivationPreparation(
+			guardianArmSeconds: guardianArmed - preparationStarted,
+			innerSpawnSeconds: diagnosticClock() - guardianArmed
+		)
 		inner = spawned
 		if let terminal = perform(machine.start()) { return terminal }
 
@@ -2437,7 +2444,7 @@ final class KarabinerLeaseOuterRuntime {
 				// same bounded batch, then inner ACKs can clear an expired command.
 				if descriptors[0].revents != 0 {
 					if leasePollReportsTerminal(descriptors[0].revents) {
-						if let terminal = perform(machine.receiveParentEOF()) { return terminal }
+						if let terminal = performParentEOF() { return terminal }
 					} else if let terminal = consumeParentInput() {
 						return terminal
 					}
@@ -2468,7 +2475,7 @@ final class KarabinerLeaseOuterRuntime {
 			if boundaryPollResult > 0 {
 				if descriptors[0].revents != 0 {
 					if leasePollReportsTerminal(descriptors[0].revents) {
-						if let terminal = perform(machine.receiveParentEOF()) { return terminal }
+						if let terminal = performParentEOF() { return terminal }
 					} else if let terminal = consumeParentInput() {
 						return terminal
 					}
@@ -2514,7 +2521,7 @@ final class KarabinerLeaseOuterRuntime {
 		case .lines(let lines):
 			return consumeParentBatch(lines)
 		case .eof(_):
-			return perform(machine.receiveParentEOF())
+			return performParentEOF()
 		case .invalid:
 			return perform(machine.receiveParent(line: "MALFORMED"))
 		case .retry:
@@ -2731,7 +2738,7 @@ final class KarabinerLeaseOuterRuntime {
 					}
 				}
 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
-					if let terminal = perform(machine.receiveParentEOF()) { return terminal }
+					if let terminal = performParentEOF() { return terminal }
 					return nil
 				}
 				endLiveTransportIfNeeded()
@@ -2816,6 +2823,41 @@ final class KarabinerLeaseOuterRuntime {
 			diagnostic("lease lost (exit \(exitCode)): \(reason); \(privateTransportDescription()).")
 			return
 		}
+	}
+
+	/// Fences on Hammerspoon pipe EOF, first naming an EOF that no STOP preceded.
+	/// Hammerspoon closes its input without STOP when it fails the lease on an
+	/// acknowledgement deadline, quits abruptly or crashes. The last private
+	/// command's age and state then tell a PING that never reached this worker
+	/// from an inner still waiting on karabiner_cli: issue #99 logged six such
+	/// deadlines and no worker-side fact about any of them.
+	/// - Returns: Terminal process result, or nil to keep polling.
+	private func performParentEOF() -> Int32? {
+		if !machine.stopping && !parentEOFReported {
+			parentEOFReported = true
+			diagnostic("Hammerspoon closed its input without STOP; \(privateTransportDescription()).")
+		}
+		return perform(machine.receiveParentEOF())
+	}
+
+	/// Reports activation preparation slow enough to approach the READY deadline.
+	/// Hammerspoon's READY wait also covers this work, which issue #99 saw take
+	/// several seconds with nothing naming the slow part.
+	/// - Parameters:
+	///   - guardianArmSeconds: Durable record publication and guardian ARM wait.
+	///   - innerSpawnSeconds: Suspended inner spawn and its identity revalidation.
+	private func reportSlowActivationPreparation(
+		guardianArmSeconds: TimeInterval,
+		innerSpawnSeconds: TimeInterval
+	) {
+		let total = guardianArmSeconds + innerSpawnSeconds
+		guard total >= kSlowPrivateCommandReportSeconds else { return }
+		diagnostic(String(
+			format: "activation preparation took %.2f s (guardian ARM %.2f s, inner spawn %.2f s).",
+			total,
+			guardianArmSeconds,
+			innerSpawnSeconds
+		))
 	}
 
 	/// Reports a private round trip slow enough to approach its deadline.

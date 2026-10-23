@@ -131,6 +131,14 @@ global _MENU_RETRY_DELAY_MS := 60
 global MENU_COMMAND_DEFERRAL_RETRY_MS := 100
 global MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS := 100
 
+; Check rows register the predicate that draws their checkmark, keyed by native
+; item ID and fenced by registration token. A click records the state it asks
+; for (the opposite of the checkmark it was made on), so a command that runs
+; late (behind a write, after startup, in a reload successor) does not flip a
+; state an earlier click already set (menu-toggle-replay-double-flip).
+global _MenuDispatchCheckedFns := Map()
+global MENU_DISPATCH_MF_CHECKED := 0x8
+
 
 
 
@@ -156,10 +164,12 @@ global MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS := 100
 ; re-registers the dropped IDs.
 MenuDispatcher_Reset() {
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
+		global _MenuDispatchCheckedFns
 		_MenuDispatcherEpoch += 1
 		_MenuDispatchCallbacks := Map()
 		_MenuDispatchLastFire  := Map()
 		_MenuDispatchTokens    := Map()
+		_MenuDispatchCheckedFns := Map()
 		MenuReloadReplay_ClearIdentities()
 		_MenuDispatchClickSequences := Map()
 		; Nothing is tracked any more, so the ownership set must go with it —
@@ -199,6 +209,7 @@ MenuDispatcher_BeginReplacement() {
 ; and this prune runs from a timer thread that lands inside that window.
 MenuDispatcher_PruneMenu(MenuObj) {
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens, _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
+		global _MenuDispatchCheckedFns
 
 		; Collect the IDs currently live in this menu's HMENU.
 		LiveIds := Map()
@@ -285,6 +296,8 @@ MenuDispatcher_PruneMenu(MenuObj) {
 		for Id in DeadIds {
 				_MenuDispatchCallbacks.Delete(Id)
 				MenuReloadReplay_ForgetIdentity(Id)
+				if _MenuDispatchCheckedFns.Has(Id)
+						_MenuDispatchCheckedFns.Delete(Id)
 				if _MenuDispatchLastFire.Has(Id) {
 						_MenuDispatchLastFire.Delete(Id)
 				}
@@ -430,9 +443,10 @@ MenuDispatcher_Shutdown(RootMenu := unset) {
 ; click. Returns 1 on successful tracking, 0 if the item was added but
 ; its ID could not be discovered (in which case AHK's native dispatch is
 ; the only path — same behavior as before the bypass was installed).
-RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {
+RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "", CheckedFn := 0) {
 		if !(ReplayIdentity is String)
 				throw TypeError("A menu replay identity must be a String.")
+		_MenuDispatchRequireCheckedFn(CheckedFn)
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
 
 		; To avoid the double-Add penalty (placeholder then replace), we use a
@@ -475,8 +489,90 @@ RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {
 		_MenuDispatchLastFire[ItemId]  := 0
 		_MenuDispatchTokens[ItemId]    := TrackedObj.Token
 		MenuReloadReplay_RegisterIdentity(ItemId, TrackedObj.Token, ReplayIdentity)
+		_MenuDispatchRegisterCheckedFn(ItemId, TrackedObj.Token, CheckedFn)
 		_MenuDispatchTrackOwner(MenuObj)
 		return 1
+}
+
+_MenuDispatchRequireCheckedFn(CheckedFn) {
+		if (CheckedFn is Integer) && CheckedFn == 0
+				return
+		if !HasMethod(CheckedFn, "Call")
+				throw TypeError("A menu checkmark predicate must be callable or 0.")
+}
+
+_MenuDispatchRegisterCheckedFn(ItemId, Token, CheckedFn) {
+		global _MenuDispatchCheckedFns
+		if _MenuDispatchCheckedFns.Has(ItemId)
+				_MenuDispatchCheckedFns.Delete(ItemId)
+		if HasMethod(CheckedFn, "Call")
+				_MenuDispatchCheckedFns[ItemId] := {Token: Token, Fn: CheckedFn}
+}
+
+; The checkmark predicate of the live registration, or 0 for a plain row.
+_MenuDispatchCheckedFnOf(ItemId, Token) {
+		global _MenuDispatchCheckedFns, _MenuDispatchTokens
+		if !_MenuDispatchCheckedFns.Has(ItemId) || !_MenuDispatchTokens.Has(ItemId)
+				|| _MenuDispatchTokens[ItemId] != Token
+				return 0
+		Entry := _MenuDispatchCheckedFns[ItemId]
+		return Entry.Token == Token ? Entry.Fn : 0
+}
+
+/**
+ * The registration a click hands to MenuCommandRun. A check row also records
+ * the state the click asks for: the opposite of the checkmark the user saw on
+ * the native row, or of the live predicate when the click arrives without its
+ * menu (the bypass dispatch of a dropped click).
+ * @param {Integer} ItemId Native item ID.
+ * @param {Integer} Token Registration token.
+ * @param {Array} Args The arguments AutoHotkey gave the row (Name, Position, Menu).
+ * @returns {Object} {ItemId, Token} plus Desired (0 or 1) for a check row.
+ */
+_MenuDispatchClickRegistration(ItemId, Token, Args) {
+		Registration := {ItemId: ItemId, Token: Token}
+		CheckedFn := _MenuDispatchCheckedFnOf(ItemId, Token)
+		if !CheckedFn
+				return Registration
+		Shown := -1
+		if Args.Length >= 3 && (Args[3] is Menu) && (Args[2] is Integer) && Args[2] > 0 {
+				Flags := 0xFFFFFFFF
+				try Flags := TrayMenuHandleItemState(Args[3].Handle, Args[2] - 1)
+				if Flags != 0xFFFFFFFF
+						Shown := (Flags & MENU_DISPATCH_MF_CHECKED) ? 1 : 0
+		}
+		if (Shown < 0) {
+				try Shown := CheckedFn.Call() ? 1 : 0
+				catch as Err {
+						try LoggerError("MenuDispatcher", "The checkmark of menu item {1} could not be read: {2}; its click runs as a plain toggle.",
+								ItemId, Err.Message)
+						return Registration
+				}
+		}
+		Registration.Desired := Shown ? 0 : 1
+		return Registration
+}
+
+; Whether a late check-row command would only re-apply the state its click
+; asked for. Running it would toggle that state back: two clicks, one of them
+; delayed, cancelled each other and the row « did nothing ».
+_MenuCommandAlreadyApplied(Registration) {
+		if !IsObject(Registration) || !Registration.HasOwnProp("Desired")
+				return false
+		CheckedFn := _MenuDispatchCheckedFnOf(Registration.ItemId, Registration.Token)
+		if !CheckedFn
+				return false
+		try Current := CheckedFn.Call() ? 1 : 0
+		catch as Err {
+				try LoggerError("MenuDispatcher", "The checkmark of menu item {1} could not be read before its command: {2}; the command runs.",
+						Registration.ItemId, Err.Message)
+				return false
+		}
+		if Current != Registration.Desired
+				return false
+		try LoggerInfo("MenuDispatcher", "Menu command skipped: its row is already {1}, the state its click asked for.",
+				Current ? "checked" : "unchecked")
+		return true
 }
 
 _TrackedDispatch(TrackedObj, Args*) {
@@ -509,7 +605,8 @@ _TrackedDispatch(TrackedObj, Args*) {
 				and _MenuDispatchTokens.Has(TrackedObj.ItemId)
 				and _MenuDispatchTokens[TrackedObj.ItemId] = TrackedObj.Token) {
 				_MenuDispatchLastFire[TrackedObj.ItemId] := A_TickCount
-				MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0, TrackedObj)
+				MenuCommandRun(TrackedObj.Callback, Args, 0, 0, 0,
+						_MenuDispatchClickRegistration(TrackedObj.ItemId, TrackedObj.Token, Args))
 		}
 }
 
@@ -542,7 +639,34 @@ _MenuCommandRegistrationSnapshot(Registration) {
 		if !(AcceptedItem is Integer) || AcceptedItem <= 0
 				|| !(AcceptedToken is Integer) || AcceptedToken <= 0
 				throw TypeError("A menu command registration requires positive integer identity.")
-		return {ItemId: AcceptedItem, Token: AcceptedToken}
+		Snapshot := {ItemId: AcceptedItem, Token: AcceptedToken}
+		if Registration.HasOwnProp("Desired") {
+				Desired := Registration.Desired
+				if !(Desired is Integer) || (Desired != 0 && Desired != 1)
+						throw TypeError("A menu click's requested check state must be 0 or 1.")
+				Snapshot.Desired := Desired
+		}
+		return Snapshot
+}
+
+/**
+ * Whether a menu command must wait before it runs: a configuration write or
+ * read is in progress, or a terminal transition (a scoped configuration
+ * commit, a reload preflight) is still on its way to a successor launch or a
+ * release. AutoHotkey lets the tray open over such a transition, and the
+ * click then runs on top of the thread that owns it, so the command could
+ * only be refused (« another configuration transaction is already in
+ * progress », seen on 2026-10-22 when the private-browsing filter was clicked
+ * during a scoped commit). Once the successor launched, MenuReloadReplay_Hold
+ * hands the command over instead; a barrier retained after a failed rollback
+ * lasts until exit, so waiting for it would only delay the refusal.
+ * @returns {Boolean}
+ */
+MenuCommandConfigBusy() {
+		if ConfigMutationBusy()
+				return true
+		return _ConfigWriteTerminalIsActive() && !ReloadTerminalHandoffActive()
+				&& !(ConfigTransitionRetainedBarrier() is Object)
 }
 
 /** Checks the actual dispatcher token table; legacy commands explicitly pass zero. */
@@ -595,7 +719,7 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 						try LoggerError("MenuDispatcher", "The menu command waiting for the reload successor could not be scheduled: {1}; it runs now.", Err.Message)
 				}
 		}
-		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : ConfigMutationBusy()
+		Busy := HasMethod(BusyFn, "Call") ? BusyFn.Call() : MenuCommandConfigBusy()
 		if (Busy and Attempt < MENU_COMMAND_DEFERRAL_MAX_ATTEMPTS) {
 				if (Attempt == 0)
 						try LoggerInfo("MenuDispatcher", "Menu command deferred: a configuration write is in progress; it runs when that write ends.")
@@ -618,6 +742,8 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 				try LoggerWarn("MenuDispatcher", "Menu command refused because its native registration retired before delivery.")
 				return false
 		}
+		if _MenuCommandAlreadyApplied(Registration)
+				return ""
 		return Callback.Call(Args*)
 }
 
@@ -870,7 +996,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire, ExpectedEpoch := 0, ExpectedToken :=
 		}
 		Callback := _MenuDispatchCallbacks[ItemId]
 		Registration := _MenuDispatchTokens.Has(ItemId)
-			? {ItemId: ItemId, Token: _MenuDispatchTokens[ItemId]} : 0
+			? _MenuDispatchClickRegistration(ItemId, _MenuDispatchTokens[ItemId], ["", 0, 0]) : 0
 		_MenuDispatchLastFire[ItemId] := A_TickCount
 		Critical "Off"   ; Release before the callback so the keyboard hook is never starved.
 		try LoggerInfo("MenuDispatcher",

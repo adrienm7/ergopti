@@ -19,6 +19,7 @@ local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
 local Logger    = require("infra.logger")
 local dialog    = require("infra.dialog_util")
+local RunningApplication = require("adapters.running_application")
 local llm_mod   = require("modules.llm")
 local i18n      = require("infra.i18n")
 local Paths     = require("infra.paths")
@@ -282,11 +283,16 @@ function M.new(deps)
 		local requirement_lifecycle = type(opts) == "table"
 			and opts._requirement_lifecycle or nil
 		local cancellation_sent = false
-		local function cancel_once(label)
+		--- Cancels the requirement once.
+		--- @param label string Diagnostic label of the cancelling boundary.
+		--- @param reason string|nil RequirementRegistry.CANCEL_* when the user
+		---   chose it or the disk cannot hold the model: the caller tells that
+		---   from a failure.
+		local function cancel_once(label, reason)
 			if cancellation_sent then return false end
 			cancellation_sent = true
 			if type(on_cancel) ~= "function" then return true end
-			local ok, result = Logger.callback(LOG, label, on_cancel)
+			local ok, result = Logger.callback(LOG, label, on_cancel, reason)
 			return ok and result ~= false
 		end
 		local function still_current()
@@ -470,15 +476,9 @@ function M.new(deps)
 						and owner.requirement_registered == true
 				end
 				if not owner_current_or_cancel() then return true end
-				local app_ok, hs_app = xpcall(function()
-					local application = hs.application
-					local app = application and application.get
-						and application.get("Hammerspoon") or nil
-					if not app and application and application.find then
-						app = application.find("Hammerspoon")
-					end
-					return app
-				end, debug.traceback)
+				-- By PID: a name lookup that misses falls back to reading every
+				-- window of every application (issue #99).
+				local app_ok, hs_app = xpcall(RunningApplication.current, debug.traceback)
 				if app_ok ~= true then
 					Logger.error(LOG, "Model system-check application lookup raised: %s.",
 						tostring(hs_app))
@@ -496,7 +496,7 @@ function M.new(deps)
 				if not owner_current_or_cancel() then return true end
 				if is_critical then
 					pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
-					cancel_once("System-check cancellation")
+					cancel_once("System-check cancellation", RequirementRegistry.CANCEL_DISK_INSUFFICIENT)
 					return true
 				end
 				
@@ -533,7 +533,7 @@ function M.new(deps)
 						return false
 					end
 				else
-					cancel_once("Download prompt cancellation")
+					cancel_once("Download prompt cancellation", RequirementRegistry.CANCEL_DOWNLOAD_DECLINED)
 				end
 				return true
 			end

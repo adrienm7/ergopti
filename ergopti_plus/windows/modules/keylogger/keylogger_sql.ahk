@@ -16,12 +16,9 @@
 ; data.sql; no SQLite is opened on the AHK side. The launcher rebuilds
 ; db.sqlite from data.sql on demand.
 
+; Delegates to the driver's one literal encoder, which keeps NUL and CR exact.
 KL_SqlStr(s) {
-    if (s = "" && !IsNumber(s))
-        return "''"
-    s := String(s)
-    s := StrReplace(s, "'", "''")
-    return "'" . s . "'"
+    return SQLite_Q(s)
 }
 
 KL_SqlNum(n) {

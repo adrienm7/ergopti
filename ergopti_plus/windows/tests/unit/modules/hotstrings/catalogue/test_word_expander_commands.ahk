@@ -653,3 +653,5 @@ _HSDT_ParameterFrameNativeMenuContract() {
 }
 Test("hotstrings parameter frames: genuine native child Menu and withdrawal retain the original contract",
 	_HSDT_ParameterFrameNativeMenuContract)
+
+#Include test_terminator_historical_scalars.ahk

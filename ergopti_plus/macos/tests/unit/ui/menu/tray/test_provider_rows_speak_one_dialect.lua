@@ -140,14 +140,12 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	local PROVIDER_ONLY_MODULES = {
 		{ anchor = "function M.build_groups",           what = "the hotstring category builder" },
 		{ anchor = "local function render_ext_tree",    what = "the personal-extensions tree" },
-		-- Added 2026-08-07 with the bug they were carrying: build_action_picker and
-		-- build_section_header returned `title`/`fn` while every caller fed the
-		-- result into an `items` array, so the Karabiner tap and hold pickers showed
-		-- their two ungrouped « Spécial » entries and dropped every grouped action,
-		-- and the mod-combo list lost every category header. as_provider_row READS
+		-- Added 2026-08-07 with the bug it was carrying: build_section_header
+		-- returned `title` while every caller fed the result into an `items` array,
+		-- so the mod-combo list lost every category header. as_provider_row READS
 		-- `row.title`, which is the one legitimate mention — the scan below skips it
 		-- because a read has no `=` after the field.
-		{ anchor = "function M.build_action_picker",    what = "the shared picker builders" },
+		{ anchor = "function M.build_section_header",   what = "the shared section header builder" },
 		{ anchor = "local function build_one_combo_item", what = "the Karabiner picker trees" },
 	}
 

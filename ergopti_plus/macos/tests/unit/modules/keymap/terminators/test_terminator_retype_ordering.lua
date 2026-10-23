@@ -191,8 +191,11 @@ local function load_fixture(options)
 
 	local clipboard_writes = {}
 	hs_stub.pasteboard.readAllData = function() return { original = "snapshot" } end
-	hs_stub.pasteboard.writeAllData = function() return true end
+	local native_set_contents = hs_stub.pasteboard.setContents
+	local native_write_all_data = hs_stub.pasteboard.writeAllData
+	hs_stub.pasteboard.writeAllData = native_write_all_data
 	hs_stub.pasteboard.setContents = function(value)
+		native_set_contents(value)
 		if value ~= "" then clipboard_writes[#clipboard_writes + 1] = value end
 		return true
 	end

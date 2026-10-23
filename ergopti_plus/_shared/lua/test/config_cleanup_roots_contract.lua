@@ -110,6 +110,31 @@ function M.register(h, ports)
 			end)
 		end)
 	end
+	-- A table array below a root a reader consumes had no addressable record and
+	-- no whole-root preview, so it was never offered (config-unused-keys-root-and-arrays).
+	h.it('unread table array below a read root: offered and removed whole with every generation',function()
+		local head='[hotstrings]\ntrigger_char="@" # kept\n\n'
+		local source=head..'[[hotstrings.old_rows]]\nx=1\n[[hotstrings.old_rows]]\nx=2\n[[hotstrings.old_rows.inner]]\ny=3\n\n'..tail
+		local function scan(content)
+			local rows={}
+			local found=Engine.find({path='/virtual/config.toml',collect=ports.collect,whole_unread_roots=true,
+				read=function() return content,'ok' end})
+			h.assert_eq(found.status,'ok')
+			-- Only the array: whether this driver reads trigger_char is its own policy.
+			for _,row in ipairs(found.keys) do if row.path[1]=='hotstrings' and row.path[2]=='old_rows' then rows[#rows+1]=row end end
+			return rows
+		end
+		local rows=scan(source)
+		h.assert_eq(#rows,1); if #rows~=1 then return end
+		h.assert_eq(rows[1].section,'hotstrings'); h.assert_eq(rows[1].key,'old_rows'); h.assert_eq(rows[1].kind,'leaf')
+		h.assert_eq(rows[1].path,{'hotstrings','old_rows'})
+		local candidate,removed=Engine.remove_from_source(source,rows)
+		h.assert_eq(removed,1); h.assert_eq(candidate,head..'\n'..tail)
+		local model=Codec.decode(candidate); h.assert_nil(model.hotstrings.old_rows); h.assert_eq(model.hotstrings.trigger_char,'@')
+		h.assert_eq(#scan(candidate),0)
+		local unchanged,count=Engine.remove_from_source(candidate,rows)
+		h.assert_eq(count,0,'a vanished array is absent from the count'); h.assert_eq(unchanged,candidate)
+	end)
 	h.it('whole unread root: protected and partially consumed roots cannot obtain whole-root preview',function()
 		local source='hotstrings={trigger_char="@",future=1}\nupdater={future=true}\n_meta={schema_version=11}\n'
 		local path=(os.getenv('TMPDIR') or '/tmp')..'/ergopti_root_protected_'..ports.driver..'.toml';write(path,source)

@@ -90,3 +90,104 @@ Test("Config binding identity: keyboard rejects named Array metadata without inv
 	TestConfigKeyboardBindingIdentity_NamedProperties)
 Test("Config binding identity: keyboard rejects derived and inherited callback Array sources",
 	TestConfigKeyboardBindingIdentity_DerivedSources)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= Native Keyboard Slot Publication =======
+; ================================================
+; ================================================
+
+; The boot loader, the cleanup and the input owner judged keyboard slots by
+; three different rules: the loader by a lowercase grammar, the input owner by
+; no rule at all (any persisted slot whose prefix resolved became a live
+; hotkey, a case-insensitive « CTRL_K » or a hand-written « ctrl_f1 »
+; included, while the cleanup offered to delete it), and the parameter owner
+; never judged a keyboard binding, so a parameter of a slot this build lacks
+; stayed unread and unoffered forever. One published slot domain now serves
+; all three (keyboard-slot-publication).
+_CKBI_CurrentSlots() {
+	return ["ctrl_k", "ctrl_shift_space", "alt_9", "win_period", "win_sc029", "win_SC03A", "magic_editor"]
+}
+_CKBI_ForeignSlots() {
+	return ["ctrl_f1", "CTRL_K", "ctrl_alt_k", "win_SC0FF", "super_space"]
+}
+
+TestConfigKeyboardBindingIdentity_OwnerAndLoaderAgree() {
+	global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, KEYBOARD_SLOT_GROUPS
+	SavedAssignments := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
+	SavedDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
+	SavedCache := IsSet(_IniCache) ? _IniCache : unset
+	try {
+		Tree := ManifestBuildFeaturesMap()
+		Stored := Map()
+		Stored.CaseSense := "On"
+		for Slot in _CKBI_CurrentSlots() {
+			AssertEqual("", TomlConfigUnknownKind(Tree, "shortcuts.keyboard", Slot), Slot . ": a slot the input owner binds is no unused key")
+			Stored[Slot] := "none"
+		}
+		for Slot in _CKBI_ForeignSlots() {
+			AssertEqual("leaf", TomlConfigUnknownKind(Tree, "shortcuts.keyboard", Slot), Slot . ": the loader reports it as unused")
+			Stored[Slot] := "none"
+		}
+		KEYBOARD_SHORTCUT_DEFAULTS := Map()
+		KeyboardShortcutAssignments := Map()
+		KeyboardShortcutAssignments.CaseSense := "On"
+		_IniCache := Map("shortcuts.keyboard", Stored)
+		ReadKeyboardShortcutsConfig()
+		for Slot in _CKBI_CurrentSlots()
+			AssertTrue(KeyboardShortcutAssignments.Has(Slot), Slot . ": the input owner reads its own slot")
+		for Slot in _CKBI_ForeignSlots()
+			AssertFalse(KeyboardShortcutAssignments.Has(Slot), Slot . ": an unused key never becomes a live hotkey")
+		Offered := []
+		for Group in KEYBOARD_SLOT_GROUPS {
+			if Group["prefix"] != "magic_"
+				Offered.Push(Group["prefix"])
+		}
+		AssertEqual(_CUK_Join(KeyboardSlotDeclaration()["groups"]), _CUK_Join(Offered),
+			"the tray's chord groups are exactly the published slot groups")
+	} finally {
+		KeyboardShortcutAssignments := IsSet(SavedAssignments) ? SavedAssignments : unset
+		KEYBOARD_SHORTCUT_DEFAULTS := IsSet(SavedDefaults) ? SavedDefaults : unset
+		_IniCache := IsSet(SavedCache) ? SavedCache : unset
+	}
+}
+Test("Config binding identity: the keyboard input owner and the boot loader admit the same slots (keyboard-slot-publication)",
+	TestConfigKeyboardBindingIdentity_OwnerAndLoaderAgree)
+
+TestConfigKeyboardBindingIdentity_ParametersFollowThePublication() {
+	global GestureActionParameters
+	Saved := GestureActionParameters
+	try {
+		Tree := ManifestBuildFeaturesMap()
+		for Slot in _CKBI_CurrentSlots() {
+			if Slot == "win_SC03A"
+				continue
+			Key := GestureBindingId("keyboard", Slot) . "__open_url"
+			AssertEqual("current", TomlConfigActionParameterBindingStatus(Key), Slot)
+			Owner := ""
+			AssertEqual("", TomlConfigUnknownKind(Tree, "action_parameters", Key, &Owner), Slot)
+			AssertEqual("Gestures", Owner, Slot)
+		}
+		Retired := "keyboard__ctrl_f1__open_url"
+		AssertEqual("retired", TomlConfigActionParameterBindingStatus(Retired))
+		AssertEqual("section", TomlConfigUnknownKind(Tree, "action_parameters", Retired),
+			"a retired keyboard parameter is offered for explicit cleanup")
+		AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Keyboard__ctrl_k__open_url"),
+			"another prefix spelling is no keyboard binding")
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters[Retired] := "https://example.invalid/"
+		AssertEqual("", GestureGetActionParameter("keyboard__ctrl_f1", "open_url"), "a retired binding reads neutral")
+		Writes := 0
+		Writer := (*) => (Writes += 1, true)
+		AssertFalse(GestureSetActionParameter("keyboard__ctrl_f1", "open_url", "https://other.invalid/", Writer, (*) => 0))
+		AssertEqual(0, Writes, "a retired binding is refused before any write")
+		AssertEqual("https://example.invalid/", GestureActionParameters[Retired], "its source value is kept for the cleanup")
+	} finally GestureActionParameters := Saved
+}
+Test("Config binding identity: keyboard parameters are judged against the published slot domain (keyboard-slot-publication)",
+	TestConfigKeyboardBindingIdentity_ParametersFollowThePublication)

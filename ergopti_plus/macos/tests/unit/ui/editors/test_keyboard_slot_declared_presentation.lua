@@ -550,13 +550,30 @@ helpers.describe("declared keyboard action contextual title receiving", function
 			end)
 		end)
 	end
-	helpers.it("refuses the Linux context and forged contextual receipts before native allocation", function()
-		fixture(function(state, builder, _, _, _, open)
-			helpers.assert_eq(open({ presentation_id = "tap_hold_action", presentation_suffix = "K1", items = {} }), false)
+	helpers.it("refuses another platform's context and forged contextual receipts before native allocation", function()
+		fixture(function(state, builder, _, _, titles, open)
+			helpers.assert_nil(titles.presentation_for_app("action_picker", "keyboard_slot_action", "linux"),
+				"a macOS-only context is not Linux's")
+			helpers.assert_nil(titles.presentation_for_app("action_picker", "key_combination_tap_action", "linux"))
+			-- The hold contexts are shared with Linux since its hold opens the
+			-- shared picker too (2026-10-22): each driver reads its own declaration.
+			helpers.assert_type(titles.presentation_for_app("action_picker", "tap_hold_hold_action", "linux"), "table")
+			helpers.assert_nil(titles.presentation_for_app("action_picker", "tap_hold_hold_action", "ahk"),
+				"Windows titles its hold picker natively")
+			helpers.assert_eq(open({ presentation_id = "linux_only_context", presentation_suffix = "K1", items = {} }), false)
 			helpers.assert_eq(builder.show_webview({ app_id = "action_picker", presentation_id = "keyboard_slot_action",
 				presentation_receipt = {} }), nil)
 			helpers.assert_eq(state.bridges, 0); helpers.assert_eq(state.creates, 0)
 			helpers.assert_true(open({ presentation_id = "keyboard_slot_action", presentation_suffix = "K1", items = {} }))
+		end)
+	end)
+	helpers.it("opens both tap-hold slot contexts on macOS (tap-hold-action-picker)", function()
+		fixture(function(state, _, _, _, titles, open)
+			helpers.assert_type(titles.presentation_for_app("action_picker", "tap_hold_action", "hs"), "table")
+			helpers.assert_type(titles.presentation_for_app("action_picker", "tap_hold_hold_action", "hs"), "table")
+			helpers.assert_true(open({ presentation_id = "tap_hold_action", presentation_suffix = "K1", items = {} }))
+			helpers.assert_true(open({ presentation_id = "tap_hold_hold_action", presentation_suffix = "K1", items = {} }))
+			helpers.assert_eq(state.creates, 2)
 		end)
 	end)
 	helpers.it("refuses a withdrawn factory prepare owner then accepts its exact repair", function()

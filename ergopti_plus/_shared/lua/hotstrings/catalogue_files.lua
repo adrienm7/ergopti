@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local PersonalFiles = require("hotstrings.personal_files")
+local NativePath = require("native_path")
 
 local M = {}
 
@@ -55,8 +56,7 @@ local CONFIGURATION_FILES = {
 function M.is_category_file(path)
 	if type(path) ~= "string" or path == "" then return false end
 	-- Backslash is a literal filename byte on POSIX, and a separator on Windows.
-	local pattern = package.config:sub(1, 1) == "\\" and "([^/\\]+)$" or "([^/]+)$"
-	local name = path:match(pattern)
+	local name = NativePath.basename(path)
 	if not name or not name:match("%.toml$") then return false end
 	-- A writer backup (<stem>.backup-<stamp>.toml) duplicates its source.
 	return name:sub(1, 1) ~= "_" and not METADATA_FILES[name] and not CONFIGURATION_FILES[name]

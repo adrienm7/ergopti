@@ -89,6 +89,10 @@ M.SESSION_BLOCK_HISTORY_LIMIT = 64
 -- instead of letting each consumer manufacture its own action boundary.
 M.STALE_CONTEXT_DEDUPE_LIMIT = M.RECORD_LIMIT
 M.PUMP_DELIVERY_TIMEOUT_SEC = 0.25
+-- A physical event reaching a tap this much later than the freshest recent
+-- events waited behind the main thread: it is never consumed, replayed or
+-- answered with output, which macOS may already have overtaken.
+M.STALE_PHYSICAL_EVENT_MS = 500
 M.PUMP_MOUSE_BUTTON = 31
 M.PUMP_WATCHDOG_MAX_FAILURES = 5
 M.ACTION_LISTENER_RETRY_SEC = 0.05
@@ -245,6 +249,12 @@ local _deferred_lifecycle_backup_dispatcher = nil
 local _deferred_lifecycle_fallback_timer = nil
 local _deferred_post_callback_count = 0
 local _ordered_input = { count = 0, replays = {}, head = 1, tail = 0 }
+-- Physical key edges the fence pairs (a key-up waits only behind its own
+-- key-down). Kept on this table: the chunk is at Lua's 200-local limit.
+_ordered_input.key_edges = {
+	[assert(event_types.keyDown, "adapters.synthetic_input: keyDown is unavailable")] = "down",
+	[assert(event_types.keyUp, "adapters.synthetic_input: keyUp is unavailable")] = "up",
+}
 local _owned_completion_depth = 0
 
 
@@ -3990,16 +4000,64 @@ local function handoff_returned_batch(batch)
 end
 
 
+--- Reads whether a physical event is a key press or release, and its key code.
+--- An unreadable event is not paired: it keeps the ordinary fence.
+--- @param event userdata|table Physical event.
+--- @return string|nil edge "down", "up", or nil for any other event.
+--- @return any code Key code of a key event.
+function _ordered_input.key_edge_of(event)
+	local ok_type, kind = pcall(event.getType, event)
+	local edge = ok_type and _ordered_input.key_edges[kind] or nil
+	if edge == nil then return nil, nil end
+	local ok_code, code = pcall(event.getKeyCode, event)
+	if not ok_code or code == nil then return nil, nil end
+	return edge, code
+end
+
+
+--- Whether a consumed key-down of this key still waits in the FIFO, unposted.
+--- @param code any Key code.
+--- @return boolean waiting
+function _ordered_input.key_down_waits(code)
+	local function waits(batch)
+		local owner = batch and batch.physical_owner
+		return batch ~= nil and batch.mode == "physical" and batch.status == "queued"
+			and owner ~= nil and owner.key_down_code == code and owner.ordinal == 1
+	end
+	if waits(_inflight_batch) then return true end
+	for index = _deferred_head, _deferred_tail do
+		if waits(_deferred_queue[index]) then return true end
+	end
+	for index = _ordered_input.head, _ordered_input.tail do
+		local owner = _ordered_input.replays[index]
+		if owner and owner.status == "prepared" and owner.key_down_code == code then return true end
+	end
+	return false
+end
+
+
 --- Claims every eligible older deferred payload at the first physical-input tap.
 --- Paced output keeps its cadence and exact target. When such output remains,
 --- the original event is copied into the global FIFO and the caller consumes the
 --- original; the tagged replay later re-enters every tap as physical input.
 --- The empty fast path is one integer comparison on every ordinary input event.
+---
+--- A key-up is held back only behind its own key-down: when that key-down
+--- already reached the application, holding its release behind an expansion
+--- that is still typing made the application see the key held for as long as
+--- the expansion took, long enough for the press-and-hold accent popup on a
+--- plain tap (issue #100), and a release types nothing that could overtake.
 --- @param event userdata|table Physical event to fence.
 --- @return table|nil fence { events, batches, consume_original }, or nil.
 function M.claim_physical_fence(event)
 	if _pending_count == 0 and _pending_loopback_count == 0
 		and _ordered_input.count == 0 then return nil end
+	-- A callback this late waited behind the main thread. macOS stops waiting
+	-- for a tap that holds an event too long (kCGEventTapDisabledByTimeout) and
+	-- delivers it without the tap, so the original may already be in the
+	-- application and a replayed copy would type it twice. It passes untouched.
+	local lateness = require("adapters.event_clock").lateness_ms(event)
+	if lateness ~= nil and lateness >= M.STALE_PHYSICAL_EVENT_MS then return nil end
 	_lifecycle_defer_depth = _lifecycle_defer_depth + 1
 	local ok, adoption_or_err = xpcall(function()
 		local adoption
@@ -4011,8 +4069,12 @@ function M.claim_physical_fence(event)
 		local physical_owner = nil
 		local ordered_input_pending = _ordered_input.count > 0
 		if #adoption.remaining_batches > 0 or ordered_input_pending then
-			physical_owner = prepare_physical_replay(event)
-			if physical_owner == nil then return nil end
+			local edge, code = _ordered_input.key_edge_of(event)
+			if edge ~= "up" or _ordered_input.key_down_waits(code) then
+				physical_owner = prepare_physical_replay(event)
+				if physical_owner == nil then return nil end
+				if edge == "down" then physical_owner.key_down_code = code end
+			end
 		end
 
 		-- No FIFO node, trigger claim, or transaction acknowledgement mutates until

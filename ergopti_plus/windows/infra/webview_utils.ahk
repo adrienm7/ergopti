@@ -34,6 +34,32 @@ global _WebView_SharedEnvRetired := false
 global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
 global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS := 5000
 
+/** Compare native Core identity without interning vendor wrappers or trusting a raw Ptr. */
+WebView_SameCore(Sender, Expected) {
+	if !IsObject(Sender) || !IsObject(Expected)
+		return false
+	CoreAvailable := IsSet(WebView2) && HasProp(WebView2, "Core")
+	SenderIsCore := CoreAvailable && (Sender is WebView2.Core)
+	ExpectedIsCore := CoreAvailable && (Expected is WebView2.Core)
+	; Passive headless views keep exact identity without native-property reads.
+	; Even an identical native wrapper must still own a usable Core pointer.
+	if !SenderIsCore && !ExpectedIsCore
+		return Sender == Expected
+	if !SenderIsCore || !ExpectedIsCore || !Sender.Ptr || !Expected.Ptr
+		return false
+	try {
+		; IUnknown is COM's canonical identity. Retain both queried references
+		; until comparison; interface addresses and AHK wrapper objects can differ.
+		IUnknown := "{00000000-0000-0000-C000-000000000046}"
+		SenderUnknown := ComObjQuery(Sender, IUnknown)
+		ExpectedUnknown := ComObjQuery(Expected, IUnknown)
+		return ComObjValue(SenderUnknown) == ComObjValue(ExpectedUnknown)
+	} catch as Err {
+		try LoggerWarn("WebView", "Browser identity query refused: {1}.", Err.Message)
+		return false
+	}
+}
+
 /** Invalidate virtual-host subresources before reusing a native document host. */
 WebView_ClearDocumentCache(WebView) {
 	global WEBVIEW_DOCUMENT_CACHE_TIMEOUT_MS
@@ -225,7 +251,8 @@ class WebViewHost {
 		; The caller checks the return value: if falsy, build the native fallback.
 		;
 		; Opts keys (all optional unless noted):
-		;   Title (required)     — window title string
+		;   Title                — brandless contextual caption label; default is the
+		;                          manifest title_key translated. Gui_Create brands it.
 		;   OnMessage (required) — (Host, Payload) => void; called with parsed JSON
 		;   OnReady              — (Host) => void; called once when page is ready
 		;   MinSize              — override manifest min-size ("WxH"); auto-computed
@@ -338,13 +365,27 @@ class WebViewHost {
 		}
 
 		/**
+		 * Returns the brandless label of this window's caption. The manifest owns it;
+		 * a caller supplies Title only for a contextual label. Gui_Create adds the
+		 * product name, so a label that already carries it would show it twice.
+		 * @returns {string} The translated, brandless caption label.
+		 */
+		_CaptionLabel() {
+				if this.Opts.Has("Title")
+						return this.Opts["Title"]
+				Entry := this._ManifestEntry()
+				if !Entry.Has("title_key") || Entry["title_key"] == ""
+						throw ValueError("WebViewHost: the manifest declares no title_key for this window.", -1, this.AppId)
+				return t(Entry["title_key"])
+		}
+
+		/**
 		 * Creates the native host window before attaching the WebView controller.
 		 * @param {string} MinSize - The manifest's minimum window dimensions.
 		 * @returns {Gui} The window with a shared-policy caption.
 		 */
 		_NewWindow(MinSize) {
-				Title := this.Opts.Get("Title", "")
-				return Gui_Create("+Resize +MinSize" . MinSize, Title)
+				return Gui_Create("+Resize +MinSize" . MinSize, this._CaptionLabel())
 		}
 
 		; --------------------------------------------------------------------------

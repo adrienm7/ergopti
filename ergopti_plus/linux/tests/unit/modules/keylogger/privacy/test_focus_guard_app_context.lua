@@ -27,7 +27,7 @@ local function fixture(body)
 			InputEvent = require("infra.input_event"), Monotonic = { now_ms = function() return state.now end },
 			injector = { _is_injecting = function() return false end },
 			script_actions = { is_paused = function() return false end },
-			WordReset = { observe_key = function() return false end },
+			WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
 			terminators_mod = { is_terminator = function() return false end,
 				terminator_is_consumed = function() return false end },
 			engine = { on_char = function() state.engine_calls = (state.engine_calls or 0) + 1; return nil end },

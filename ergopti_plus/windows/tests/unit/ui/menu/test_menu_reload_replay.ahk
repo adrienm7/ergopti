@@ -492,3 +492,5 @@ Test("menu reload replay: OnExit publishes, boot consumes and every dispatch mee
 	_MRR_WiringBody)
 
 #Include test_menu_reload_replay_identity.ahk
+
+#Include test_menu_reload_replay_hold_owner.ahk

@@ -21,12 +21,16 @@
 ---    the central file logger instead of disappearing in Hammerspoon's runloop.
 --- 4. Idempotent cancel: cancel() fences callbacks before native stop and retains
 ---    the exact handle until stop is proven, including explicit false returns.
+--- 5. Shared delay ceiling: a delay that is not finite or exceeds the shared
+---    timer ceiling is refused before hs.timer sees it, as on Linux.
 --- ==============================================================================
 
 local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local ErrorDescription = require("error_description")
+local NumberPolicy = require("number_policy")
 
 local LOG = "adapters.timer_scheduler"
 
@@ -94,13 +98,27 @@ local function publish_monotonic_sample(source, raw_ns)
 end
 
 --- Invokes one user callback without letting Hammerspoon swallow its failure.
+--- The failure is described without tostring(): an error object whose
+--- __tostring raises would otherwise escape this guard and drop the caller's
+--- remaining work (settlement observers, the native timer callback).
 --- @param kind string Scheduler method owning the callback.
 --- @param fn function User callback.
 local function invoke_callback(kind, fn)
 	local ok, err = xpcall(fn, debug.traceback)
 	if not ok then
-		Logger.error(LOG, "%s() callback raised: %s", kind, tostring(err))
+		Logger.error(LOG, "%s() callback raised: %s", kind, ErrorDescription.describe(err))
 	end
+end
+
+--- Refuses a delay outside the shared timer ceiling before any native work.
+--- @param kind string Scheduler method receiving the delay.
+--- @param seconds any Requested delay in seconds.
+--- @return boolean admitted
+local function admit_delay(kind, seconds)
+	if NumberPolicy.timer_delay_ms(seconds) ~= nil then return true end
+	Logger.error(LOG, "%s(): delay %s s is not finite or exceeds the timer ceiling — timer rejected.",
+		kind, tostring(seconds))
+	return false
 end
 
 --- Marks a handle terminal only after no native timer remains owned, then
@@ -166,6 +184,10 @@ function M.after(delaySec, fn)
 		id = _new_id(),
 		settlement_observers = {},
 	}
+	if not admit_delay("after", delaySec) then
+		settle_handle(handle)
+		return handle, false
+	end
 	local activation_in_progress = true
 	local delivered_before_commit = false
 	-- Opportunistically retry exact native cleanup debt before adding a new
@@ -246,6 +268,10 @@ function M.every(intervalSec, fn)
 		id = _new_id(),
 		settlement_observers = {},
 	}
+	if not admit_delay("every", intervalSec) then
+		settle_handle(handle)
+		return handle, false
+	end
 	local activation_in_progress = true
 	local delivered_before_commit = false
 	M.retryCleanup()
@@ -422,10 +448,16 @@ function M.awake_time()
 end
 
 --- Suspends execution for the given number of microseconds.
---- Wraps hs.timer.usleep(). Use sparingly — this blocks the Lua thread.
+--- Wraps hs.timer.usleep(). Use sparingly — this blocks the Lua thread. A
+--- wait outside the shared timer ceiling is refused and logged.
 --- @param microseconds integer Number of microseconds to sleep.
 function M.sleep_us(microseconds)
-	if type(microseconds) ~= "number" or microseconds <= 0 then return end
+	if not NumberPolicy.within_timer_ceiling(type(microseconds) == "number" and microseconds / 1000 or nil) then
+		Logger.error(LOG, "sleep_us(): %s us is not finite or exceeds the timer ceiling — sleep refused.",
+			tostring(microseconds))
+		return
+	end
+	if microseconds <= 0 then return end
 	pcall(hs.timer.usleep, math.floor(microseconds))
 end
 

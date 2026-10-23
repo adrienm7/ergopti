@@ -872,7 +872,31 @@ local function create_menu(deps)
 		-- ===== 2.4) Lifecycle & Main Build =======
 		-- =========================================
 
-		local check_startup, startup_scope_idle
+		local check_startup, startup_scope_idle, startup_runtime
+
+		--- Arms what the AI runs at the switch-on and disarms it at the switch-off:
+		--- the profile hotkeys and the download reattachment an off boot left
+		--- waiting. A refused hotkey is logged and leaves the switch committed, as
+		--- on Windows, where a refused AI hotkey leaves the driver running.
+		--- @param enabled boolean The committed switch position.
+		local function sync_ai_runtime(enabled)
+				local phase = enabled == true and "armed at the switch-on" or "disarmed at the switch-off"
+				local shortcuts_fn = enabled == true and trigger_orch.arm_shortcuts or trigger_orch.disarm_shortcuts
+				local shortcuts_ok, shortcuts_settled = pcall_log("AI profile shortcuts " .. phase, shortcuts_fn)
+				local startup_ok, startup_settled = false, false
+				if type(startup_runtime) == "table" then
+						local startup_fn = enabled == true and startup_runtime.arm or startup_runtime.disarm
+						startup_ok, startup_settled = pcall_log("AI startup runtime " .. phase, startup_fn)
+				else
+						Logger.error(LOG, "AI startup runtime cannot be %s: no startup owner.", phase)
+				end
+				if shortcuts_ok == true and shortcuts_settled == true
+					and startup_ok == true and startup_settled == true then
+						Logger.info(LOG, "AI runtime %s.", phase)
+				else
+						Logger.error(LOG, "AI runtime only partly %s.", phase)
+				end
+		end
 		local activation_generation = 0
 		local enable_probe = OllamaEnableProbe.new()
 		local repair_pending = false
@@ -1503,6 +1527,7 @@ local function create_menu(deps)
 										return false
 								end
 								if enabled ~= true then M.reset_llm_health_status() end
+								sync_ai_runtime(enabled)
 								return true
 						end
 
@@ -1989,7 +2014,7 @@ local function create_menu(deps)
 				})
 		end
 
-		check_startup, startup_scope_idle = StartupCtrl.new({
+		check_startup, startup_scope_idle, startup_runtime = StartupCtrl.new({
 				state                      = state,
 				keymap                     = keymap,
 				models_mgr                 = models_mgr,
@@ -2007,6 +2032,7 @@ local function create_menu(deps)
 				get_startup_silence        = get_startup_silence,
 				set_startup_silence        = set_startup_silence,
 				get_profile_hks            = get_profile_hks,
+				disarm_shortcuts           = trigger_orch.disarm_shortcuts,
 		})
 
 		--- Returns a menu item for the active download progress shortcut, or nil if no download is running.

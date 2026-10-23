@@ -428,7 +428,7 @@ end
 M.keyboard_source_answer = keyboard_source_answer
 
 -- The machines a scenario can boot on. `worker` delays are within the lease
---- worker's own budgets (READY_ACK_TIMEOUT_SEC 7.5 s, a command 2.5 s). A
+--- worker's own budgets (READY_ACK_TIMEOUT_SEC 11.5 s, a command 2.5 s). A
 --- `during_resume` event happens once, `after` seconds into the boot's first
 --- RESUME, while its answer is still due.
 M.MACHINES = {
@@ -812,6 +812,15 @@ end
 --- @param arch string One of M.ARCHITECTURES.
 --- @param machine_root string
 local function install_natives(hs, env, arch, machine_root)
+	-- A live foreground application exposes native identity readers, including an integer PID.
+	hs.application.frontmostApplication = function()
+		return {
+			name = function() return "Test" end,
+			bundleID = function() return "test.bundle" end,
+			path = function() return "/Applications/Test.app" end,
+			pid = function() return 4243 end,
+		}
+	end
 	hs.accessibilityState = function() return true end
 	hs.settings.getKeys = function()
 		local keys = {}

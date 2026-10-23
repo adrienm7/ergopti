@@ -298,18 +298,20 @@ local _cached_actions = nil
 ---
 --- @param list table The action list to re-resolve IN PLACE.
 --- @return number How many actions were resolved.
---- @return string The captured virtual keyboard convention.
+--- @return string The captured layout keycode convention (the keycodes keys arrive as).
 function M.resolve_layout_actions(list)
 	if type(list) ~= "table" then
 		Logger.error(LOG, "resolve_layout_actions(): expected a table — nothing resolved.")
 		return 0
 	end
-	-- One declaration owns every logical character in this generation.
+	-- One declaration owns every logical character in this generation. It names
+	-- the keycodes keys arrive as; the names are written for the deployed
+	-- virtual keyboard product, which passes the ISO pair through unswapped.
 	local form = Layout.keyboard_form()
 	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
-			local key_code = Layout.key_code_for_char(action.logical_char, form)
+			local key_code = Layout.key_code_for_char(action.logical_char, Layout.VIRTUAL_KEYBOARD_PRODUCT)
 			local mods     = action.karabiner_modifiers
 			local entry    = { key_code = key_code }
 			if type(mods) == "table" and #mods > 0 then
@@ -663,6 +665,32 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	}, "ok", source
 end
 
+-- The scalar leaves a menu setter can name as explicitly set by the user.
+local INTENT_LEAVES = {
+	["tap_holds.enabled"] = true, ["tap_holds.timeout_ms"] = true, ["tap_holds.sticky_timeout_ms"] = true,
+	["mod_combos.enabled"] = true, ["mod_combos.simultaneous_threshold_ms"] = true,
+	["mod_combos.symmetric"] = true,
+}
+
+--- Validates a save's explicit leaf intent: only owned leaves, each set to true.
+--- A carried value is never intent; only the setter of that leaf supplies it.
+--- @param intent table|nil `{ leaves = { [path] = true } }`.
+--- @return table leaves Set of explicitly owned leaf paths (empty when nil).
+function M.explicit_leaves(intent)
+	if intent == nil then return {} end
+	assert(type(intent) == "table" and getmetatable(intent) == nil and type(intent.leaves) == "table",
+		"remap leaf intent must be a plain { leaves = ... } table")
+	for name in pairs(intent) do assert(name == "leaves", "remap leaf intent has an unknown field") end
+	local leaves = {}
+	for path, owned in pairs(intent.leaves) do
+		assert(type(path) == "string" and owned == true, "remap leaf intent names each leaf with true")
+		local binding = path:match("^tap_holds%.config%.([%w_]+)$") or path:match("^mod_combos%.config%.([%w_+]+)$")
+		assert(INTENT_LEAVES[path] or binding ~= nil, "remap leaf intent names a leaf this owner does not write: " .. path)
+		leaves[path] = true
+	end
+	return leaves
+end
+
 --- Persists the non-neutral state sparsely to config_karabiner.toml.
 --- Refuses to publish over a file that exists but cannot be decoded as TOML:
 --- load_user_config() already falls back to defaults without touching such a
@@ -674,13 +702,18 @@ end
 ---        action — the one case where clobbering an unparseable file is the intent.
 --- @param expected_source table|nil `{ status, content }` a scope transaction read
 ---        and backed up: the save refuses when the file no longer holds exactly it.
+--- @param intent table|nil `{ leaves = { ["<section>.<key>"] = true } }` naming the
+---        leaves the caller's user explicitly set. An obsolete value at such a leaf
+---        is replaced; every other obsolete leaf keeps the ordinary preservation.
 --- @return boolean True only after publication and native cleanup settle.
 --- @return string|nil detail Publication refusal.
 --- @return table|nil receipt Private exact source/candidate and retained native cleanup.
-function M.save_user_config(state, user_config_path, overwrite_corrupt, expected_source)
+function M.save_user_config(state, user_config_path, overwrite_corrupt, expected_source, intent)
 	assert(expected_source == nil or (not overwrite_corrupt and type(expected_source) == "table"
 		and (expected_source.status == "absent" or (expected_source.status == "ok"
 			and type(expected_source.content) == "string"))), "invalid remap source precondition")
+	local explicit = M.explicit_leaves(intent)
+	assert(intent == nil or not overwrite_corrupt, "a reset already owns every remap leaf")
 	local document = {}
 	local document_shapes
 	local source, source_status
@@ -743,7 +776,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		end
 		local function assign_timing(target, section, key, value, neutral)
 			local _, outdated = timing_leaf(target, key, neutral, user_config_path, section)
-			if not overwrite_corrupt and outdated then
+			if not overwrite_corrupt and outdated and not explicit[section .. "." .. key] then
 				if value ~= neutral then
 					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
 					error(candidate_refusal, 0)
@@ -754,7 +787,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		end
 		local function assign_boolean(target, section, key, value, neutral, classify)
 			local _, outdated = classify(target, user_config_path)
-			if not overwrite_corrupt and outdated then
+			if not overwrite_corrupt and outdated and not explicit[section .. "." .. key] then
 				if value ~= neutral then
 					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
 					error(candidate_refusal, 0)
@@ -766,10 +799,18 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		local function merge_bindings(target, updates, fields, section)
 			for id, values in pairs(updates or {}) do
 				assert(type(id) == "string" and type(values) == "table", "invalid remap binding candidate")
-				local preserve_array = not overwrite_corrupt and document_shapes and document_shapes.arrays[target[id]]
+				local repaired = explicit[section .. ".config." .. id] == true
+				local preserve_array = not overwrite_corrupt and not repaired
+					and document_shapes and document_shapes.arrays[target[id]]
 				-- Combo strings keep their distinct explicit legacy migration path.
-				local preserve_scalar = not overwrite_corrupt and target[id] ~= nil and type(target[id]) ~= "table"
+				local preserve_scalar = not overwrite_corrupt and not repaired
+					and target[id] ~= nil and type(target[id]) ~= "table"
 					and (section == "tap_holds" or (section == "mod_combos" and type(target[id]) ~= "string"))
+				-- The user's own edit of this binding replaces its unusable value.
+				if repaired and (type(target[id]) ~= "table"
+					or (document_shapes and document_shapes.arrays[target[id]])) then
+					target[id] = nil
+				end
 				if preserve_scalar or preserve_array then
 					Outdated.report_in_file(user_config_path, { section, "config", id },
 						(preserve_array and OUTDATED_ARRAY_REASON
@@ -844,7 +885,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			local mod_combos = table_at(document, "mod_combos")
 			-- Written only once set: an absent flag is on (Generator.key_combinations_enabled).
 			local _, outdated_enabled = combinations_enabled(mod_combos, user_config_path)
-			if not overwrite_corrupt and outdated_enabled then
+			if not overwrite_corrupt and outdated_enabled and not explicit["mod_combos.enabled"] then
 				if state.mod_combos_enabled ~= nil then
 					candidate_refusal = "candidate has no explicit repair owner for mod_combos.enabled"
 					error(candidate_refusal, 0)

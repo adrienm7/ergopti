@@ -18,11 +18,11 @@ local logger_shared_root
 do
 	local _src = debug.getinfo(1, "S").source:gsub("^@", "")
 	-- Resolve absolute path when source is relative (Hammerspoon always provides abs)
-	local _abs = _src:match("^[/\\]") and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
+	local _abs = _src:sub(1, 1) == "/" and _src or (hs.fs and hs.fs.currentDir and hs.fs.currentDir() .. "/" .. _src or _src)
 	-- Strip "init.lua" to get the HS driver root
-	local _hs_root = _abs:match("^(.*)[/\\][^/\\]+$") or _abs
+	local _hs_root = _abs:match("^(.*)/[^/]+$") or _abs
 	-- _shared/ lives one level up from the HS driver root (in ergopti_plus/)
-	local _ergopti_plus = _hs_root:match("^(.*)[/\\][^/\\]+$") or _hs_root
+	local _ergopti_plus = _hs_root:match("^(.*)/[^/]+$") or _hs_root
 	logger_shared_root = _ergopti_plus .. "/_shared"
 	local _shared       = logger_shared_root .. "/lua"
 	if not package.path:find(_shared, 1, true) then
@@ -95,6 +95,61 @@ do
 	end
 end
 local Storage            = require("adapters.storage")
+
+-- Instance admission comes before every settings write, timer, watcher and
+-- path resolution: a process that may not run the driver must leave no trace
+-- beyond its refusal line (see infra/instance_admission.lua).
+do
+	local InstanceAdmission = require("infra.instance_admission")
+	local process_info = type(hs.processInfo) == "table" and hs.processInfo or {}
+	local admission_mode = Logger.classify_async_sink_boot_environment()
+	-- An unanswerable identity is treated as foreign: refusing never quits a process
+	local identity_ok, local_source = pcall(function() return require("modules.updater").is_local_source() end)
+	if not identity_ok then
+		Logger.error("init", "Runtime identity unavailable; treating this Hammerspoon as foreign: %s.",
+			tostring(local_source))
+	end
+	local packaged_runtime = identity_ok and local_source == false
+	local decision = InstanceAdmission.decide(admission_mode, packaged_runtime)
+	if decision ~= InstanceAdmission.ADMIT then
+		local launcher_ok, launcher_app = pcall(function()
+			return require("adapters.running_application").by_bundle_id(InstanceAdmission.LAUNCHER_BUNDLE_ID)
+		end)
+		local identity = InstanceAdmission.describe({
+			pid = process_info.processID,
+			bundle_id = process_info.bundleID,
+			bundle_path = process_info.bundlePath,
+			launcher_running = launcher_ok and launcher_app ~= nil or "unknown",
+		})
+		local timers_ok, timers_err = pcall(function() require("adapters.timer_scheduler").cancelAll() end)
+		if not timers_ok then
+			Logger.error("init", "Refused instance could not cancel its timers: %s.", tostring(timers_err))
+		end
+		if InstanceAdmission.may_exit_process(decision) then
+			Logger.warn("init", "Refusing a second Ergopti runtime started without the launcher (%s); "
+				.. "exiting before any module starts.", identity)
+			require("adapters.boot_journal").append("WARNING",
+				"Stray Ergopti runtime refused before boot: " .. identity .. ".")
+			os.exit(0)
+			return
+		end
+		Logger.warn("init", "Ergopti driver not started in this Hammerspoon (%s, launcher authority %s); "
+			.. "it keeps running without the driver.", identity, tostring(admission_mode))
+		if InstanceAdmission.shows_dialog(decision) then
+			local shown_ok, shown_err = pcall(function()
+				local i18n_boot = require("infra.i18n")
+				i18n_boot.set_locale_injector(function(code) require("infra.locale").set_locale(code) end)
+				i18n_boot.init()
+				hs.dialog.blockAlert(i18n_boot.get("launcher.fatal.title"),
+					i18n_boot.get("startup.native_logger_unavailable"), i18n_boot.get("common.ok"))
+			end)
+			if not shown_ok then
+				Logger.error("init", "Foreign Hammerspoon refusal dialog could not be shown: %s.", tostring(shown_err))
+			end
+		end
+		return
+	end
+end
 local TimerScheduler     = require("adapters.timer_scheduler")
 if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
@@ -249,6 +304,20 @@ end
 local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	local message = i18n.get(alert_key or "dialog.fatal_error.cannot_start")
 	local launcher_notified = BootFatal.report(stage, detail, message)
+	-- Modules required before the abort may already poll (the KC ledger bridge
+	-- arms a timer and a path watcher at load). A modal dialog keeps the run
+	-- loop turning, so they are stopped first or they write to the shared log
+	-- for as long as the dialog stays up.
+	local quiet_ok, quiet_err = pcall(function()
+		if TimerScheduler.cancelAll() ~= true then error("a native timer refused to stop") end
+		local kc_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		if type(kc_bridge) == "table" and kc_bridge.stop() ~= true then
+			error("the KC ledger bridge did not stop")
+		end
+	end)
+	if not quiet_ok then
+		Logger.error(LOG, "Pre-runtime boot abort could not stop every producer: %s.", tostring(quiet_err))
+	end
 	if before_exit ~= nil then
 		local cleanup_ok, cleanup_result = xpcall(before_exit, debug.traceback)
 		if not cleanup_ok or cleanup_result ~= true then
@@ -275,8 +344,7 @@ Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 local script_path = debug.getinfo(1, "S").source
 if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 
-local base_dir = script_path:match("^(.*[/\\])") or "./"
-if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
+local base_dir = require("native_path").directory_prefix(script_path) or "./"
 
 -- Boot initialises the RESOLVER, not the path editor: every consumer below
 -- resolves through it, and none of them draws a UI. The editor's reload
@@ -1348,6 +1416,13 @@ if accessibility_trusted ~= true then
 	return
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
+-- Before any input owner: an Accessibility call to a hung application must
+-- fail within a second instead of holding every event tap for six.
+local ax_bounded, ax_bound_err = AccessibilityPermission.bound_messaging_timeout()
+if ax_bounded ~= true then
+	Logger.error(LOG, "Accessibility calls stay unbounded (macOS waits up to 6 s per hung application): %s.",
+		tostring(ax_bound_err))
+end
 Boot.mark("Accessibility permission")
 Boot.stage("Shortcuts pre-start")
 
@@ -1499,7 +1574,9 @@ if boot_llm_enabled == nil then
 end
 
 local function start_llm_bootstrap()
-	local active_backend = backend_detector.effective_backend()
+	-- The backend config.toml selects, as the menu applies it: its runtime is
+	-- the one to check and to offer, not the Apple-silicon default (#99)
+	local active_backend = backend_detector.effective_backend(boot_saved_prefs.llm_backend)
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
 	-- Each checker owns its retained zero-delay timer, pause admission, exact
 	-- task settlement, and same-epoch replay. A PAUSED caller is rejected and
@@ -1642,12 +1719,11 @@ ExtensionPacks.discover()
 do
 	local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 	local override_path = config_paths.get_config_dir()
-	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
-	override_path = override_path .. "hotstrings_config.toml"
+	override_path = require("native_path").with_trailing_separator(override_path) .. "hotstrings_config.toml"
 	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
 		current_override_path = function()
-			return config_paths.get_config_dir():gsub("[/\\]+$", "") .. "/hotstrings_config.toml"
+			return require("native_path").without_trailing_separators(config_paths.get_config_dir()) .. "/hotstrings_config.toml"
 		end,
 		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
@@ -2090,7 +2166,7 @@ ui_restore.restore()
 local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
-	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	personal_hotstrings_dir = require("native_path").without_trailing_separators(config_paths.get("PersonalHotstringsDir") or ""),
 	personal_info_path       = personal_info_toml_path,
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
@@ -2111,7 +2187,7 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	-- driver, so a pull there must be gated by its own .git, not the driver's.
 	git_roots               = {
 		base_dir,
-		(config_paths.get("HotstringsDirPath") or ""):gsub("[/\\]+$", ""),
+		require("native_path").without_trailing_separators(config_paths.get("HotstringsDirPath") or ""),
 	},
 })
 if file_watchers_committed ~= true then

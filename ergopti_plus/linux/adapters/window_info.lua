@@ -56,6 +56,12 @@ local WAYLAND_BACKENDS = { "sway", "hyprland", "niri" }
 -- rather than repeating it on every keystroke's context refresh.
 local _reported_unsupported = false
 
+-- Set once when wmctrl is missing, for the same reason.
+local _reported_no_window_list = false
+
+-- The /proc process-name reader getAll() uses; a test seam replaces it.
+local _read_proc_comm = nil
+
 
 
 
@@ -94,6 +100,19 @@ local function comm_of(pid)
 	local comm = Shell.exec_line("cat " .. Shell.quote("/proc/" .. tostring(pid) .. "/comm"))
 	return comm or ""
 end
+
+--- Reads a process name from /proc in this process: the window list names
+--- every window, and a spawn per window froze the menu that asked for it.
+--- @param pid number
+--- @return string The name, or "" when the process is gone.
+local function read_proc_comm(pid)
+	local handle = io.open("/proc/" .. tostring(pid) .. "/comm", "rb")
+	if not handle then return "" end
+	local comm = handle:read("*a") or ""
+	handle:close()
+	return (comm:gsub("%s+$", ""))
+end
+_read_proc_comm = read_proc_comm
 
 -- Window titles are not identities: two applications can both show "Untitled".
 -- Retain the window ID too, while avoiding repeated process lookups at each poll.
@@ -154,19 +173,50 @@ local function focused_x11()
 	return info, _x11_cache.identity, _x11_cache.pid
 end
 
---- Lists every visible window through xdotool.
+--- Parses `wmctrl -lp`: one managed window per line, as its id, desktop,
+--- owning process (0 when the client does not say), client machine and title.
+--- @param text string
+--- @return table Array of { id, pid, title }.
+function M._parse_wmctrl_list(text)
+	local windows = {}
+	for line in tostring(text or ""):gmatch("[^\n]+") do
+		local id, pid, title = line:match("^(0x%x+)%s+%-?%d+%s+(%d+)%s+%S+ ?(.-)\r?$")
+		if id then
+			windows[#windows + 1] = { id = id, pid = tonumber(pid), title = title }
+		else
+			Logger.warn(LOG, "Unexpected wmctrl -lp line ignored: '%s'.", line)
+		end
+	end
+	return windows
+end
+
+--- Lists every managed window in one wmctrl query, each named by the process
+--- name focused_x11() reports, read from /proc without a spawn per window:
+--- the excluded-applications picker builds this list on the menu path.
 --- @return table Array of WindowInfo.
 local function all_x11()
-	local infos = {}
-	local out = Shell.exec("xdotool search --onlyvisible --name '' 2>/dev/null")
-	for win_id in out:gmatch("[^\r\n]+") do
-		local id = win_id:match("^%s*(.-)%s*$")
-		if id ~= "" then
-			local entry = empty_info()
-			local title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(id) .. " 2>/dev/null")
-			if title then entry.windowTitle = title end
-			infos[#infos + 1] = entry
+	if not Shell.has_command("wmctrl", true) then
+		if not _reported_no_window_list then
+			_reported_no_window_list = true
+			Logger.warn(LOG, "wmctrl is not installed — the X11 window list is empty, so the "
+				.. "excluded-applications picker offers no running application.")
 		end
+		return {}
+	end
+	local ok, out, err = Shell.exec_checked("timeout 1 wmctrl -lp 2>/dev/null")
+	if not ok then
+		Logger.error(LOG, "getAll(): wmctrl -lp failed — %s.", tostring(err))
+		return {}
+	end
+	local infos, names = {}, {}
+	for _, window in ipairs(M._parse_wmctrl_list(out)) do
+		local entry = empty_info()
+		entry.windowTitle = window.title
+		if window.pid and window.pid > 0 then
+			if names[window.pid] == nil then names[window.pid] = _read_proc_comm(window.pid) end
+			entry.appId = names[window.pid]
+		end
+		infos[#infos + 1] = entry
 	end
 	return infos
 end
@@ -428,11 +478,19 @@ end
 --- identity cache, so consecutive cases cannot inherit each other's answers.
 function M._reset_state()
 	_reported_unsupported = false
+	_reported_no_window_list = false
+	_read_proc_comm = read_proc_comm
 	_x11_cache.id = nil
 	_x11_cache.title = nil
 	_x11_cache.appId = ""
 	_x11_cache.identity = nil
 	_x11_cache.pid = nil
+end
+
+--- Test seam: replaces the /proc process-name reader until the next reset.
+--- @param reader function pid -> string
+function M._set_proc_comm_reader_for_test(reader)
+	_read_proc_comm = reader
 end
 
 return M

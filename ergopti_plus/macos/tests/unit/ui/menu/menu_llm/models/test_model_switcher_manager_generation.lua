@@ -778,6 +778,8 @@ helpers.describe("model manager generation fences", function()
 			"hs", "infra.logger", "infra.i18n", "infra.notifications",
 			"adapters.task_lifecycle", "adapters.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
+			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
+			"adapters.file_system",
 		}
 		local saved_io_open = io.open
 		local saved_os_execute = os.execute
@@ -790,6 +792,8 @@ helpers.describe("model manager generation fences", function()
 			local exit_available = false
 			local current = true
 			local hs_fixture = {
+				-- Without hs.fs, FileSystem.exists() locates the bundled policy through test(1).
+				execute = helpers.existence_probe_execute(),
 				json = {
 					decode = function(raw)
 						return {
@@ -1010,14 +1014,17 @@ helpers.describe("model manager generation fences", function()
 			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.task_lifecycle", "ui.download_window",
-			"ui.menu.menu_llm.models_manager_ollama",
+			"ui.menu.menu_llm.models_manager_ollama", "modules.llm.network_env",
+			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
+			"adapters.file_system",
 		}
 		local pull_done
 		local pull_tasks, progress_shows = {}, 0
 		local http_posts = 0
 		local notifications = 0
 		local hs_fixture = {
-			execute = function() return "", true end,
+			-- The pull's network prelude locates the bundled policy through test(1).
+			execute = helpers.existence_probe_execute(function() return "", true end),
 			http = {asyncPost = function() http_posts = http_posts + 1 end},
 			json = {encode = function() return "{}" end},
 			timer = {

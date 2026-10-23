@@ -40,6 +40,11 @@ _SIHO_OverlappingOwnersStopAndUnregisterExactly() {
 		SecondToken := SIHO_StartOwned(Second, "observer-b", false)
 		Assert(FirstToken > 0 and SecondToken > FirstToken,
 			"each overlapping hook must receive a distinct owner token")
+		Assert(IsSet(SIHO_IsOwned), "post-Start publication needs an exact owner query")
+		AssertTrue(SIHO_IsOwned(FirstToken, First), "a live token must acknowledge its exact hook")
+		AssertFalse(SIHO_IsOwned(FirstToken, Second), "a token cannot acknowledge another hook")
+		AssertFalse(SIHO_IsOwned(0, First), "zero never identifies an admitted hook")
+		AssertFalse(SIHO_IsOwned(String(FirstToken), First), "a textual token cannot claim native capture authority")
 		AssertEqual(1, First.StartCalls)
 		AssertEqual(1, Second.StartCalls)
 		Duplicate := _SIHO_TestHook("duplicate")
@@ -71,6 +76,8 @@ _SIHO_OverlappingOwnersStopAndUnregisterExactly() {
 		FirstToken := 0
 		AssertEqual(1, SIHO_Count(),
 			"an old finally must not remove the successor hook")
+		AssertFalse(SIHO_IsOwned(SecondToken, Second), "a revoked token must remain retired after a successor starts")
+		AssertTrue(SIHO_IsOwned(SuccessorToken, Successor), "the successor retains its own exact acknowledgement")
 		AssertFalse(SIHO_Unregister(SecondToken, Second),
 			"a completed owner cannot unregister twice")
 		AssertEqual(1, SIHO_Count(),
@@ -155,14 +162,8 @@ _SIHO_PartialStartRollbackRefusalRemainsLifecycleVisible() {
 Test("input hooks: partial Start rollback refusal remains lifecycle-owned (AHK-169)",
 	_SIHO_PartialStartRollbackRefusalRemainsLifecycleVisible)
 
-_SIHO_RefusedOneShotShiftClearsItsLogicalLatch() {
-	Body := _DriverFuncBody("OneShotShift")
-	Assert(RegExMatch(Body,
-		"s)OwnerToken\s*:=\s*SIHO_StartOwned\(ihvText,\s*\x22one-shot-shift\x22,\s*true\).*?if\s*!OwnerToken\s*\{\s*OneShotShiftEnabled\s*:=\s*False\s*return\s*\}"),
-		"a refused native one-shot capture must also retire its logical shift latch")
-}
-
-Test("input hooks: refused one-shot shift admission clears its logical latch",
-	_SIHO_RefusedOneShotShiftClearsItsLogicalLatch)
+Test("input hooks: refused one-shot preserves a different owner's disabled latch (one-shot-rearm-admission)",
+	_OSRA_Case.Bind("busy-other"))
 
 #Include test_suppressive_capture_settlement.ahk
+#Include test_one_shot_rearm_admission.ahk

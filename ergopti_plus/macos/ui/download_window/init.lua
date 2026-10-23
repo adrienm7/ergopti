@@ -31,6 +31,7 @@ local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ShellRunner = require("adapters.shell_runner")
+local OwnWindow  = require("adapters.own_window")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
@@ -441,7 +442,7 @@ function M.focus()
 		view:show()
 		if not operation_is_active() or _wv ~= view or _session ~= session then return false end
 		if type(view.hswindow) == "function" then
-			local win = view:hswindow()
+			local win = OwnWindow.for_webview(view)
 			if not operation_is_active() or _wv ~= view or _session ~= session then return false end
 			if win and type(win.focus) == "function" then win:focus() end
 		end

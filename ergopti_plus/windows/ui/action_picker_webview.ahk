@@ -64,6 +64,9 @@ global _ActPickWeb_Confirming := false
 ; The chosen-action callback + the init payload captured at open time.
 global _ActPickWeb_OnConfirm  := 0
 global _ActPickWeb_InitJs     := ""
+; A slot picker's step after a committed pick (ShowActionPicker's Slot), or 0:
+; its OnConfirm then runs while the window is still open.
+global _ActPickWeb_AfterClose := 0
 
 ; Virtual host that maps to _SharedDir so the document and its relative assets
 ; (style.css, ../i18n.js) and the locale fetch all resolve over https.
@@ -85,11 +88,13 @@ _ActPickWeb_Available() {
 ; (the caller must NOT also build the native ListBox), false to fall back.
 ; Items is an ordered array of headings ({ Type:"heading", Level, Text }) and
 ; actions ({ Type:"action", Id, Label }); Current is the assigned id ("" means the
-; synthetic native pick); OnConfirm(id) is invoked with the chosen id.
-_ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, BindingId := "") {
+; synthetic native pick); OnConfirm(id) is invoked with the chosen id. With
+; AfterClose, OnConfirm commits the pick before the window closes: the integer
+; 1 closes it and then calls AfterClose(id), anything else keeps it open.
+_ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, BindingId := "", AfterClose := 0) {
 	global _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
 	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_OnConfirm, _ActPickWeb_InitJs
-	global _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch
+	global _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch, _ActPickWeb_AfterClose
 	global _VendorDir, _SharedDir
 
 	if !_ActPickWeb_Available()
@@ -104,6 +109,7 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	_ActPickWeb_ResetDone := false
 
 	_ActPickWeb_OnConfirm := OnConfirm
+	_ActPickWeb_AfterClose := AfterClose
 	_ActPickWeb_ProgramCapture()
 	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId)
 
@@ -236,12 +242,27 @@ _ActPickWeb_PushInit() {
 ; callback's assignment runs, for this action only, and withdrawn afterwards.
 _ActPickWeb_Confirm(Id, HasParameter := false, Parameter := "", HasProvider := false, Provider := false) {
 	global _ActPickWeb_OnConfirm, _ActPickWeb_ProgramOwner, _ActPickWeb_SessionEpoch
-	global _ActPickWeb_Confirming, _ActPickWeb_ResetDone
+	global _ActPickWeb_Confirming, _ActPickWeb_ResetDone, _ActPickWeb_AfterClose
 	if A_IsSuspended || _ActPickWeb_Confirming
 		return false
 	_ActPickWeb_Confirming := true
 	Epoch := _ActPickWeb_SessionEpoch
 	try {
+		AfterClose := _ActPickWeb_AfterClose
+		if HasMethod(AfterClose, "Call") {
+			; A slot picker commits while its window is open, so a refused pick
+			; keeps it open for another one. Its items carry no parameter.
+			cb := _ActPickWeb_OnConfirm
+			if HasParameter || HasProvider || (cb == 0 || cb == "")
+				return false
+			Mapped := (Id == "__native__") ? "" : Id
+			if !_ActionPickerSlotCommitted(cb, Mapped) || !_ActPickWeb_SessionCurrent(Epoch)
+				return false
+			_ActPickWeb_ProgramRetire()
+			_ActPickWeb_Close()
+			AfterClose.Call(Mapped)
+			return true
+		}
 		if HasProvider {
 			Owner := _ActPickWeb_ProgramOwner
 			if Id != "run_program" || !(Provider is Map) || !(Owner is ProgramProviderSession)
@@ -522,7 +543,7 @@ _ActPickWeb_Close() {
 ; again.
 _ActPickWeb_Reset() {
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
-	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch
+	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch, _ActPickWeb_AfterClose
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
 	; Completed against this controller. Re-running the unset lines below would
@@ -554,6 +575,7 @@ _ActPickWeb_Reset() {
 	_ActPickWeb_Controller := unset
 	_ActPickWeb_WebView    := unset
 	_ActPickWeb_OnConfirm  := 0
+	_ActPickWeb_AfterClose := 0
 }
 
 ; Discovery closes its resources independently from WebView COM teardown. An

@@ -59,6 +59,20 @@ SIHO_StartOwned(Hook, Owner, Exclusive := false) {
 	} finally Critical(PreviousCritical)
 }
 
+; Whether the exact token/hook pair is still admitted. A caller publishing
+; logical state after Start must keep its query and publication in one Critical.
+; @param Token {Integer} Immutable ownership token returned by SIHO_StartOwned.
+; @param Hook {Object} The suppressive hook admitted with that token.
+; @returns {Boolean} True only while that exact pair remains registered.
+SIHO_IsOwned(Token, Hook) {
+	global _SIHO_Owners
+	PreviousCritical := Critical("On")
+	try {
+		return Token is Integer && Token > 0 && _SIHO_Owners.Has(Token)
+			&& _SIHO_Owners[Token]["hook"] == Hook
+	} finally Critical(PreviousCritical)
+}
+
 ; Stops and unregisters one exact owner as a single terminal transaction. A
 ; refused native Stop leaves the record intact so lifecycle teardown can retry.
 SIHO_StopOwned(Token, Hook) {
@@ -156,4 +170,80 @@ SIHO_Count() {
 
 SIHO_HasActive() {
 	return SIHO_Count() > 0
+}
+
+; Native L1 limits UTF-16 units, so it can stop halfway through a scalar.
+; EndChars stops synchronously before buffering: every ordinary unit and low
+; surrogate ends capture, while a high is retained for its matching low.
+; Boot warms this immutable table before configured capture hotkeys can fire.
+_SIHO_ScalarEndKeys() {
+	static Cached := 0
+	if Cached is String
+		return Cached
+	Units := 0xFFFF - 0x400 + 4
+	Bytes := Buffer((Units + 1) * 2, 0)
+	Offset := 0
+	loop 0xFFFF {
+		Unit := A_Index
+		if Unit >= 0xD800 && Unit <= 0xDBFF
+			continue
+		if Unit == 0x7B || Unit == 0x7D {
+			NumPut("UShort", 0x7B, "UShort", Unit, "UShort", 0x7D, Bytes, Offset)
+			Offset += 6
+		} else {
+			NumPut("UShort", Unit, Bytes, Offset)
+			Offset += 2
+		}
+	}
+	if Offset != Units * 2
+		throw Error("The scalar capture table did not fill its exact buffer.")
+	Candidate := StrGet(Bytes, Units, "UTF-16")
+	if StrLen(Candidate) != Units
+		throw Error("The scalar capture table lost a UTF-16 unit.")
+	; Publish only the complete validated string, including on a cold reentry.
+	; No registry globals are available at the earlier boot prewarm position.
+	Cached := Candidate
+	return Cached
+}
+
+; Named controls are explicit native EndKeys, never literal text. The only
+; text completions admitted here are a BMP unit or a complete high/low pair.
+; Invalid prefixes stay out of emitters and logs even when a control follows.
+_SIHO_ReadScalar(Hook, NamedKeys) {
+	Text := Hook.Input, EndKey := Hook.EndKey
+	Result := { Kind: "invalid", Text: "", Name: "", Reason: "incomplete-scalar" }
+	if Hook.EndReason == "Timeout" {
+		Result.Kind := "timeout"
+		Result.Reason := Text == "" ? "" : "incomplete-timeout"
+		return Result
+	}
+	if Hook.EndReason != "EndKey" {
+		Result.Reason := "unexpected-end-reason"
+		return Result
+	}
+	if StrLen(EndKey) > 1 {
+		; In v2, a String delimiter is one substring, not a character set.
+		for Name in StrSplit(NamedKeys, ["{", "}"]) {
+			if Name != "" && EndKey = Name {
+				Result.Kind := "control", Result.Name := EndKey
+				Result.Reason := Text == "" ? "" : "incomplete-control-prefix"
+				return Result
+			}
+		}
+		Result.Reason := "unknown-end-key"
+		return Result
+	}
+	if StrLen(EndKey) != 1
+		return Result
+	Unit := NumGet(StrPtr(EndKey), 0, "UShort")
+	if Text == "" && Unit > 0 && !(Unit >= 0xD800 && Unit <= 0xDFFF) {
+		Result.Kind := "text", Result.Text := EndKey, Result.Reason := ""
+		return Result
+	}
+	if StrLen(Text) == 1 && Unit >= 0xDC00 && Unit <= 0xDFFF {
+		High := NumGet(StrPtr(Text), 0, "UShort")
+		if High >= 0xD800 && High <= 0xDBFF
+			Result.Kind := "text", Result.Text := Text . EndKey, Result.Reason := ""
+	}
+	return Result
 }

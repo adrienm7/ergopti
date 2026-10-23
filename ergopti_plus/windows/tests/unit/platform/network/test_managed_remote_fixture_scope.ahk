@@ -21,6 +21,7 @@ class _ManagedRemoteTimingControlHttp {
 		this.Pending := false
 		this.Status := 0
 		this.ResponseText := ""
+		this.ResponseEncodingValid := true
 	}
 
 	SetManagedRouting(Args*) {

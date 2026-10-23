@@ -11,8 +11,9 @@
 --- 1. Row data, not menu rows — the provider must hand over labels and callbacks
 ---    and never the hs.menubar shape, or menu rows are being built outside the
 ---    renderer again.
---- 2. A group lists what is bound plus one "add" row, in catalogue order, so the
----    rows do not reshuffle between two openings of the same menu.
+--- 2. A bindable group opens with its restore, clear and a separator, then lists
+---    what is bound plus one "add" row, in catalogue order, so the rows do not
+---    reshuffle between two openings of the same menu.
 --- 3. The slot picker offers only FREE slots — offering a bound one would let a
 ---    row that looks like a fresh binding silently overwrite an existing one.
 --- 4. Picking a slot then an action actually persists the assignment and binds it.
@@ -29,6 +30,9 @@ local it = Fixture.it
 local make_ctx = Fixture.make_ctx
 local physical_groups = Fixture.physical_groups
 local physical_rows = Fixture.physical_rows
+
+-- Restore, clear and their separator open every bindable group.
+local SCOPE_ROWS = 3
 
 
 
@@ -105,7 +109,10 @@ helpers.describe("menu_keyboard_slots: provided rows", function()
 		for _, row in ipairs(ui.provide_rows(ctx, true)) do
 			helpers.assert_eq(row.disabled, true, "a disabled section must grey its group rows")
 			for _, inner in ipairs(row.items) do
-				helpers.assert_eq(inner.disabled, true, "and the rows inside them")
+				-- A separator is not a row the user can click, so it has no state.
+				if not inner.separator then
+					helpers.assert_eq(inner.disabled, true, "and the rows inside them")
+				end
 			end
 		end
 	end)
@@ -200,7 +207,7 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		local rows = ui.provide_rows(ctx, nil)
 		local found = nil
 		for _, inner in ipairs(physical_rows(rows, shortcuts)[1].items) do
-			if inner.label:find("Label:lookup", 1, true) then found = inner end
+			if not inner.separator and inner.label:find("Label:lookup", 1, true) then found = inner end
 		end
 		helpers.assert_true(found ~= nil,
 			"an assigned slot must appear in its group, labelled with what it does")
@@ -216,7 +223,7 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
 
 		local rows = ui.provide_rows(ctx, nil)
-		physical_rows(rows, shortcuts)[1].items[1].action()
+		physical_rows(rows, shortcuts)[1].items[SCOPE_ROWS + 1].action()
 
 		helpers.assert_eq(picker.opened[1].opts.current, "lookup",
 			"the picker must open on what the slot holds, not on 'none'")
@@ -232,7 +239,7 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
 
 		local rows = ui.provide_rows(ctx, nil)
-		physical_rows(rows, shortcuts)[1].items[1].action()
+		physical_rows(rows, shortcuts)[1].items[SCOPE_ROWS + 1].action()
 		picker.opened[1].confirm("none")
 
 		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none",
@@ -240,7 +247,9 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		helpers.assert_eq(persisted[slot], "none", "choosing None must preserve explicit personal intent")
 		local still_listed = false
 		for _, inner in ipairs(physical_rows(ui.provide_rows(ctx, nil), shortcuts)[1].items) do
-			if inner.label:find(shortcuts.get_keyboard_slot_label(slot), 1, true) then still_listed = true end
+			if not inner.separator and inner.label:find(shortcuts.get_keyboard_slot_label(slot), 1, true) then
+				still_listed = true
+			end
 		end
 		helpers.assert_eq(still_listed, false, "and the row must disappear from the group")
 	end)

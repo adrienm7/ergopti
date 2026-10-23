@@ -53,7 +53,9 @@
 local M = {}
 
 local Redact = require("diagnostics.redact")
+local NativePath = require("native_path")
 local Json = require("json")
+local ErrorDescription = require("error_description")
 local _redact_message = nil
 
 --- Captures canonical privacy rules before bootstrap permits any log output.
@@ -569,7 +571,7 @@ function M.init_log_path(log_dir, max_age_days)
 	if type(log_dir) ~= "string" or log_dir == "" then
 		return false, "log_dir must be a non-empty string"
 	end
-	if not log_dir:match("[/\\]$") then log_dir = log_dir .. "/" end
+	log_dir = NativePath.with_trailing_separator(log_dir)
 
 	-- Created in-process, not by forking /bin/sh.
 	--
@@ -910,6 +912,46 @@ local function _console_out(line)
 	_emitting = false
 end
 
+-- Channels whose refusal was already reported; cleared by the next success so a
+-- full disk prints one line per episode rather than one per lost log line.
+local _refused_channels = {}
+
+--- Reports one refused synchronous log channel on the console. Never through
+--- the logger: the line would go back to the very file that refused it.
+--- @param channel string Channel name ("unified", "topical", "errors-only").
+--- @param detail any Native refusal message.
+local function _report_sink_refusal(channel, detail)
+	if _refused_channels[channel] then return end
+	_refused_channels[channel] = true
+	_console_out("[logger] " .. channel .. " log write refused: " .. tostring(detail))
+end
+
+--- Ends a reported refusal episode once the channel accepts a line again.
+--- @param channel string Channel name.
+local function _sink_accepted(channel)
+	_refused_channels[channel] = nil
+end
+
+--- Runs native file operations and returns the first refusal message, or nil.
+--- ENOSPC often surfaces only at flush or close, from the stdio buffer.
+--- @param fn function Performs the operations; returns a message on refusal.
+--- @return string|nil detail
+local function _sink_refusal(fn)
+	local ok, detail = pcall(fn)
+	if not ok then return tostring(detail) end
+	return detail
+end
+
+--- Returns nil for a successful file method result, else its refusal message.
+--- Real Lua files return a value on success and nil plus a message on refusal.
+--- @param result any First value returned by write/flush/close.
+--- @param message any Second value.
+--- @return string|nil
+local function _refused(result, message)
+	if result == nil then return tostring(message or "operation refused") end
+	return nil
+end
+
 
 
 
@@ -969,14 +1011,19 @@ local function _ensure_log_file()
 	end
 	local ok, fh = pcall(io.open, _unified_path, "a")
 	if not ok or not fh then return nil end
+	-- Session boundary marker so tailing reveals where HS restarted
+	local refusal = _sink_refusal(function()
+		local wrote, write_err = fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
+		return _refused(wrote, write_err) or _refused(fh:flush())
+	end)
+	if refusal then
+		pcall(function() fh:close() end)
+		_report_sink_refusal("unified", refusal)
+		return nil
+	end
 	_file_handle   = fh
 	_last_log_date = today
 	_last_log_path = _unified_path
-	-- Session boundary marker so tailing reveals where HS restarted
-	pcall(function()
-		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
-		fh:flush()
-	end)
 	if previous_date and previous_date ~= today and _log_retention_days then
 		_schedule_log_purge(_log_dir, _log_retention_days, false)
 	end
@@ -1044,19 +1091,24 @@ local function _write_to_file(line, immediate)
 	local full = line .. "\n"
 	local fh = _ensure_log_file()
 	if fh then
-		pcall(function()
-			fh:write(full)
+		local refusal = _sink_refusal(function()
+			local wrote, write_err = fh:write(full)
+			if wrote == nil then return _refused(wrote, write_err) end
 			if immediate == false then
 				_unflushed_debug = _unflushed_debug + 1
-				if _unflushed_debug >= FLUSH_EVERY_N_DEBUG then
-					fh:flush()
-					_unflushed_debug = 0
-				end
-			else
-				fh:flush()
-				_unflushed_debug = 0
+				if _unflushed_debug < FLUSH_EVERY_N_DEBUG then return nil end
 			end
+			_unflushed_debug = 0
+			return _refused(fh:flush())
 		end)
+		if refusal then
+			-- Retire the refusing handle; the next line reopens a repaired file.
+			if _file_handle == fh then _file_handle = nil end
+			pcall(function() fh:close() end)
+			_report_sink_refusal("unified", refusal)
+		else
+			_sink_accepted("unified")
+		end
 	end
 	-- Fan-out to topical sub-files.
 	--
@@ -1074,8 +1126,8 @@ local function _write_to_file(line, immediate)
 	local today = os.date("%Y-%m-%d")
 	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
-			pcall(function()
-				local path = _log_dir .. sub.name
+			local path = _log_dir .. sub.name
+			local refusal = _sink_refusal(function()
 				local mode = _sub_file_mode(path, today)
 				local entry = _sub_handles[path]
 				-- Re-open when the mode changes: "w" means a new calendar day has
@@ -1086,13 +1138,23 @@ local function _write_to_file(line, immediate)
 				end
 				if not entry then
 					local fh = io.open(path, mode)
-					if not fh then return end
+					if not fh then return nil end
 					entry = { fh = fh, mode = "a" }
 					_sub_handles[path] = entry
 				end
-				entry.fh:write(full)
-				if immediate ~= false then entry.fh:flush() end
+				local wrote, write_err = entry.fh:write(full)
+				if wrote == nil then return _refused(wrote, write_err) end
+				if immediate ~= false then return _refused(entry.fh:flush()) end
+				return nil
 			end)
+			if refusal then
+				local entry = _sub_handles[path]
+				_sub_handles[path] = nil
+				if entry then pcall(function() entry.fh:close() end) end
+				_report_sink_refusal("topical", refusal)
+			else
+				_sink_accepted("topical")
+			end
 		end
 	end
 end
@@ -1162,13 +1224,18 @@ _driver_sink = function(line, variant)
 	-- without drowning in the full daily unified log.
 	if level >= Core.LEVELS.WARNING then
 		local err_full = line .. "\n"
-		pcall(function()
+		local refusal = _sink_refusal(function()
 			local f = io.open(_errors_path, "a")
-			if f then
-				f:write(err_full)
-				f:close()
-			end
+			if not f then return nil end
+			local wrote, write_err = f:write(err_full)
+			local closed, close_err = f:close()
+			return _refused(wrote, write_err) or _refused(closed, close_err)
 		end)
+		if refusal then
+			_report_sink_refusal("errors-only", refusal)
+		else
+			_sink_accepted("errors-only")
+		end
 	end
 end
 
@@ -1709,6 +1776,63 @@ end
 -- One-shot guard so the constructors are patched exactly once.
 local _capture_installed = false
 
+-- A timer callback that holds the main thread this long delays every event
+-- tap, the Karabiner lease heartbeat and each typed key behind it. macOS
+-- disables an event tap that waits about a second, so a shorter hold is
+-- invisible to the user and a longer one is named in the log.
+local SLOW_TIMER_CALLBACK_REPORT_MS = 1000
+-- One report per callback site per minute: a callback that stalls on every
+-- tick would otherwise write a line per tick.
+local SLOW_TIMER_CALLBACK_REPEAT_SEC = 60
+local NANOSECONDS_PER_MILLISECOND = 1000000
+local MILLISECONDS_PER_SECOND = 1000
+-- Monotonic nanosecond clock captured at install; nil without hs.timer.
+local _callback_clock = nil
+local _slow_callback_reported_at = {}
+
+--- Names the source line of the function a timer callback runs.
+--- adapters/timer_scheduler.lua wraps every owner's callback in a closure of
+--- its own, so its site names nothing: the first function upvalue defined in
+--- another file is the owner's callback.
+--- @param fn function Callback handed to the hs.timer constructor.
+--- @return string site "path:line" of the owner's function.
+local function describe_callback_site(fn)
+	local info = debug.getinfo(fn, "S")
+	local site = info and (tostring(info.short_src) .. ":" .. tostring(info.linedefined)) or "?"
+	if not (info and tostring(info.short_src):find("timer_scheduler", 1, true)) then return site end
+	for index = 1, 16 do
+		local name, value = debug.getupvalue(fn, index)
+		if name == nil then break end
+		if type(value) == "function" then
+			local inner = debug.getinfo(value, "S")
+			if inner and not tostring(inner.short_src):find("timer_scheduler", 1, true) then
+				return tostring(inner.short_src) .. ":" .. tostring(inner.linedefined)
+			end
+		end
+	end
+	return site
+end
+
+--- Reports one timer callback that held the main thread past the threshold.
+--- @param fn function The callback that ran.
+--- @param kind string Timer family label.
+--- @param started integer Monotonic start, nanoseconds.
+local function report_slow_timer_callback(fn, kind, started)
+	local ok_now, now = pcall(_callback_clock)
+	if not ok_now or type(now) ~= "number" then return end
+	local held_ms = (now - started) / NANOSECONDS_PER_MILLISECOND
+	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then return end
+	local ok_site, site = pcall(describe_callback_site, fn)
+	site = ok_site and site or "?"
+	local previous = _slow_callback_reported_at[site]
+	local now_sec = now / NANOSECONDS_PER_MILLISECOND / MILLISECONDS_PER_SECOND
+	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
+	_slow_callback_reported_at[site] = now_sec
+	M.warn("runtime",
+		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.",
+		kind, site, math.floor(held_ms))
+end
+
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback
 --- instead of vanishing into the Hammerspoon Console. hs.timer ignores callback
 --- return values, so discarding them here changes nothing.
@@ -1730,9 +1854,24 @@ local _capture_installed = false
 local function _guard_timer_cb(fn, kind)
 	if type(fn) ~= "function" then return fn end
 	return function(...)
+		local started = nil
+		if _callback_clock then
+			local ok_start, value = pcall(_callback_clock)
+			if ok_start and type(value) == "number" then started = value end
+		end
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
-			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+			-- Never tostring() a caught object: its own __tostring may raise again.
+			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, ErrorDescription.describe(err))
+		end
+		-- A main-thread hold has no error to report, yet it is what disabled the
+		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
+		-- ingest flush). Naming the callback makes the next log say which one.
+		if started then
+			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started)
+			if not reported then
+				M.error("runtime", "Slow timer callback report failed: %s", ErrorDescription.describe(report_err))
+			end
 		end
 	end
 end
@@ -1796,6 +1935,7 @@ function M.install_runtime_error_capture()
 	local hs_ref = rawget(_G, "hs")
 	if type(hs_ref) == "table" and type(hs_ref.timer) == "table" then
 		local timer = hs_ref.timer
+		if type(timer.absoluteTime) == "function" then _callback_clock = timer.absoluteTime end
 		if type(timer.doAfter) == "function" then
 			local orig = timer.doAfter
 			timer.doAfter = function(delay, fn, ...) return orig(delay, _guard_timer_cb(fn, "doAfter"), ...) end
@@ -1814,7 +1954,8 @@ function M.install_runtime_error_capture()
 		end
 	end
 
-	_log("INFO", "logger", "Runtime error capture installed (hs.timer guards + console tee).")
+	_log("INFO", "logger",
+		"Runtime error capture installed (hs.timer guards with slow-callback reports + console tee).")
 end
 
 --- Reads only the logger state this module owns; no persistence occurs here.

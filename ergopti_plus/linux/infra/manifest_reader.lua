@@ -30,6 +30,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local NativePath = require("native_path")
 
 local LOG = "infra.manifest_reader"
 
@@ -47,8 +48,8 @@ local LOG = "infra.manifest_reader"
 --- @return table The manifest table (version / section_order / sections / features).
 local function load_manifest()
 	local src    = debug.getinfo(1, "S").source:gsub("^@", "")
-	local dir    = src:match("^(.*)[/\\][^/\\]+$") or src   -- .../linux/lib
-	local driver = dir:match("^(.*)[/\\][^/\\]+$") or dir   -- .../linux
+	local dir    = NativePath.dirname(src) or src   -- .../linux/infra
+	local driver = NativePath.dirname(dir) or dir   -- .../linux
 	local path   = driver .. "/_generated/features_manifest.lua"
 
 	local chunk, load_err = loadfile(path)

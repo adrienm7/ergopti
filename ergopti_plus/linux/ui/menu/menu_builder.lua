@@ -2572,6 +2572,7 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
+		local save_edit, edit_current, select_edit, delete_edit = require("ui.menu.profile_editor_request").capture(ProfileSettings)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
@@ -2581,6 +2582,10 @@ local function _build_llm(ctx)
 		end
 		local function select_profile(profile_id)
 			if type(profile_id) ~= "string" or profile_id == "" then return false end
+			if type(edit_current) ~= "function" or edit_current() ~= true then
+				Logger.error(LOG, "Profile selection refused: its originating configuration is no longer current.")
+				return false
+			end
 			if type(llm.get_live) ~= "function" or type(llm.set_live) ~= "function" then
 				Logger.error(LOG, "Manual profile selection refused: its live override owner is unavailable.")
 				return false
@@ -2595,13 +2600,13 @@ local function _build_llm(ctx)
 					return false
 				end
 			end
-			local saved = ProfileSettings.set("active", profile_id, current_model)
+			local saved = select_edit and select_edit(profile_id, current_model) == true
+			if not saved then Logger.error(LOG, "Profile selection was not committed.") end
 			if saved then refresh() end
 			return saved
 		end
 		local function save_profile(profile, activate, expected_existing)
-			local saved = ProfileSettings.save_user_profile(
-				profile, activate, expected_existing)
+			local saved = save_edit and save_edit(profile, activate, expected_existing) == true
 			if saved then refresh() end
 			return saved
 		end
@@ -2611,6 +2616,10 @@ local function _build_llm(ctx)
 			return ok and current == false
 		end
 		local function open_editor(existing, activate, opts, create)
+			if type(edit_current) ~= "function" or edit_current() ~= true then
+				Logger.error(LOG, "Profile editor refused: its originating configuration is no longer current.")
+				return false
+			end
 			if create and not create_ready() then return false end
 			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
 			if not ok_editor or type(Editor.open) ~= "function" then
@@ -2692,6 +2701,10 @@ local function _build_llm(ctx)
 						["llm_profile_use"] = function() return select_profile(profile_id) end,
 						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
 						["llm_profile_delete"] = function()
+								if type(edit_current) ~= "function" or edit_current() ~= true then
+									Logger.error(LOG, "Profile deletion refused: its originating configuration is no longer current.")
+									return false
+								end
 								local title = string.format(
 									i18n_safe("menu.profiles.delete_confirm_title"), label)
 								local confirmed
@@ -2705,7 +2718,8 @@ local function _build_llm(ctx)
 										i18n_safe("button.cancel"))
 								end
 								if confirmed ~= true then return false end
-								local deleted = ProfileSettings.delete_user_profile(profile_id)
+								local deleted = delete_edit and delete_edit(profile_id) == true
+								if not deleted then Logger.error(LOG, "Profile deletion was not committed.") end
 								if deleted then refresh() end
 								return deleted
 							end,
@@ -2945,7 +2959,11 @@ local function _build_llm(ctx)
 	-- whatever Ollama reports and no static entry can enumerate them.
 	local function ollama_model_rows()
 		if type(llm.get_models) ~= "function" then return {} end
-		local models = llm.get_models()
+		-- With the AI off no tray build may ask Ollama for its models: the
+		-- inventory GET (/api/tags) is a probe, and the AI is inert until the
+		-- switch-on, as on Windows and macOS (ai-off-inert-linux-2026-10-22)
+		local ai_on = type(llm.is_enabled) == "function" and llm.is_enabled() == true
+		local models = ai_on and llm.get_models() or {}
 		if type(models) ~= "table" then return {} end
 		local current = llm.get_current_model and llm.get_current_model() or nil
 		local rows = {}
@@ -3854,6 +3872,31 @@ local function _build_shortcuts(ctx)
 			end
 			return assigned
 		end
+		-- The restore and the clear at the top of a bindable group: the
+		-- Shortcuts scope narrowed to that group's slots and parameters, at once
+		-- and without a question, like every scope row.
+		local function group_scope_rows(prefix)
+			local function apply_group_scope(mode)
+				if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+				local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "keyboard_group:" .. prefix)
+				if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return committed
+			end
+			local rows = ManifestMenu.template_rows("keyboard_group_scope_controls", {
+				["scope_restore"] = function() return apply_group_scope("recommended") end,
+				["scope_clear"] = function() return apply_group_scope("clear") end,
+			}, {
+				["keyboard_group_ready"] = function()
+					return ctx.paused ~= true and type(ctx.is_paused) == "function" and ctx.is_paused() == false
+				end,
+			}, {})
+			-- A withdrawn declaration withdraws both rows: no half-declared group.
+			if type(rows) ~= "table" or #rows ~= 3 then
+				Logger.error(LOG, "Keyboard group '%s' scope rows refused by the manifest.", prefix)
+				return {}
+			end
+			return rows
+		end
 		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
@@ -3878,6 +3921,10 @@ local function _build_shortcuts(ctx)
 			-- A group with no slot is the key catalogue failing to load: drawing it
 			-- anyway put three submenus that open onto nothing in the tray.
 			if #rows > 0 then
+				if group.add_key ~= nil then
+					local scope_rows = group_scope_rows(group.prefix)
+					for index = #scope_rows, 1, -1 do table.insert(rows, 1, scope_rows[index]) end
+				end
 				out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
 			else
 				skipped[#skipped + 1] = group.prefix
@@ -3948,8 +3995,20 @@ local function _build_shortcuts(ctx)
 				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
 					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
 			end,
-			prompt_hold = function(label, current, choices)
-				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
+			-- A pair's hold opens the shared action picker, titled by its slot
+			-- and the pair, with the hold options the provider lists.
+			open_hold_picker = function(pair_label, current, items, on_confirm)
+				local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+				if not ok_picker or type(Picker.open) ~= "function" then
+					Logger.error(LOG, "Action picker is unavailable for the hold of '%s'.", tostring(pair_label))
+					return false
+				end
+				return Picker.open({
+					presentation_id = "key_combination_hold_action",
+					presentation_suffix = pair_label,
+					current = current,
+					items = items,
+				}, function(picked) return on_confirm(picked) end) == true
 			end,
 			parameter = function(context, gestures, binding, action, spec)
 				local prior = gestures.get_action_parameter(binding, action)
@@ -4365,6 +4424,45 @@ local function _build_tap_holds(ctx)
 		end)
 	end
 
+	--- Opens the shared action picker on a key's hold, listing what a hold can
+	--- be: the options of [tap_hold.hold_picker] (the modifiers, their
+	--- combinations and the navigation layer). A pick is written by the same
+	--- set_hold as the former submenu; an id the hold does not offer, or a
+	--- refused write, keeps the picker open.
+	--- @param catalog_entry table The key's entry of the manager's key_catalog().
+	--- @param current table|nil The key's hold option now.
+	--- @return boolean opened
+	local function pick_hold(catalog_entry, current)
+		local key_id = catalog_entry.id
+		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+		if not ok_picker or type(Picker.open) ~= "function" then
+			Logger.error(LOG, "Action picker is unavailable for the hold of '%s'.", key_id)
+			return false
+		end
+		local items, by_id = HoldOptions.picker_items(options, i18n_safe)
+		local opened = Picker.open({
+			presentation_id = "tap_hold_hold_action",
+			presentation_suffix = _tap_hold_key_label(catalog_entry),
+			current = current and HoldOptions.picker_id(current) or "none",
+			items = items,
+		}, function(picked)
+			local option = type(picked) == "string" and by_id[picked] or nil
+			if not option then
+				Logger.error(LOG, "The hold of '%s' does not offer the picked action '%s'.", key_id, tostring(picked))
+				return false
+			end
+			local called, persisted = pcall(Writer.set_hold, key_id, option.kind, option.id)
+			local accepted = called and persisted == true
+			changed(accepted)
+			return accepted
+		end)
+		if opened ~= true then
+			Logger.error(LOG, "The hold picker of '%s' did not open.", key_id)
+			return false
+		end
+		return true
+	end
+
 	--- Asks for a key's own delay, in milliseconds.
 	local function ask_delay(key_id, current_ms)
 		local guard, setter = edit_guard("set_threshold")
@@ -4407,29 +4505,17 @@ local function _build_tap_holds(ctx)
 			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
 			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
 
-			local hold_rows = {}
-			for _, option in ipairs(options) do
-				hold_rows[#hold_rows + 1] = {
-					label = HoldOptions.label(option, i18n_safe),
-					checked = (hold == option) or nil,
-					action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
-				}
-			end
-
-			local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
-				["tap_hold_key_delay_set"] = function() return ask_delay(key_id, ms) end,
-			})
-			if not delay_rows then return nil end
-
 			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
+				["tap_hold_key_hold_action"] = function() return pick_hold(catalog_entry, hold) end,
+				["tap_hold_key_delay"] = function() return ask_delay(key_id, ms) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
 				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
-			}, { ["tap_hold_key_hold"] = hold_rows, ["tap_hold_key_delay"] = delay_rows })
+			}, {})
 			if key_rows then
 
 				rows[#rows + 1] = {

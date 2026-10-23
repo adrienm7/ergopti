@@ -106,30 +106,69 @@ _BRDL_CheckUsesSharedResolver() {
 		"_Bundle_ResolveDir must resolve Local AppData via the shared ResolveLocalAppDataDir() helper")
 }
 
-_BRDL_CheckUnzipCommandEscapesLiteralPaths() {
+; An apostrophe is legal in a profile name and inert in a tar argument vector,
+; so the paths pass verbatim, each inside its own double quotes.
+_BRDL_CheckUnzipCommandQuotesEachPath() {
 	ZipPath := "C:\Users\O'Brien\App Data\Local\Temp\bundle.zip"
 	DestDir := "C:\Users\O'Brien\App Data\Local\Ergopti\bundle-stage"
-	Command := _Bundle_BuildUnzipCommand(ZipPath, DestDir)
-
-	AssertContains(Command,
-		"-LiteralPath 'C:\Users\O''Brien\App Data\Local\Temp\bundle.zip'",
-		"PowerShell literal-path quoting must double every embedded apostrophe in the archive path")
-	AssertContains(Command,
-		"-DestinationPath 'C:\Users\O''Brien\App Data\Local\Ergopti\bundle-stage'",
-		"PowerShell literal-path quoting must double every embedded apostrophe in the staging path")
-	AssertFalse(InStr(Command, "-LiteralPath '" . ZipPath . "'"),
-		"the raw apostrophe-bearing archive path must never be interpolated into -Command")
-}
-
-_BRDL_CheckUnzipCommandPreservesOrdinaryFormat() {
-	ZipPath := "C:\Users\Admin User\AppData\Local\Temp\bundle.zip"
-	DestDir := "C:\Users\Admin User\AppData\Local\Ergopti\bundle-stage"
-	Expected := "powershell -NoProfile -ExecutionPolicy Bypass -Command "
-		. Chr(34) . "Expand-Archive -LiteralPath '" . ZipPath
-		. "' -DestinationPath '" . DestDir . "' -Force" . Chr(34)
+	Expected := Chr(34) . A_WinDir . "\System32\tar.exe" . Chr(34)
+		. " -x -f " . Chr(34) . ZipPath . Chr(34) . " -C " . Chr(34) . DestDir . Chr(34)
 
 	AssertEqual(Expected, _Bundle_BuildUnzipCommand(ZipPath, DestDir),
-		"paths without apostrophes must retain the existing command format byte-for-byte")
+		"the bundle extractor must be the absolute System32 tar.exe with each path quoted once")
+}
+
+; The first launch is what an antivirus sandbox detonates: the bundle must not
+; be expanded by a hidden script host started with its policy bypassed.
+_BRDL_CheckUnzipStartsNoScriptHost() {
+	Command := _Bundle_BuildUnzipCommand("C:\a\bundle.zip", "C:\a\stage")
+	for Needle in ["powershell", "pwsh", "ExecutionPolicy", "Expand-Archive", "cmd.exe", "-Command"]
+		AssertFalse(InStr(Command, Needle),
+			"the bundle extraction command must not contain " . Needle . ": " . Command)
+	Body := _DriverFuncBody("_Bundle_Unzip")
+	Assert(Body != "", "_Bundle_Unzip must be present in infra/bundle.ahk")
+	AssertContains(Body, "_Bundle_BuildUnzipCommand(ZipPath, DestDir)",
+		"_Bundle_Unzip must run the command its builder returns")
+}
+
+; A trailing backslash escapes the closing quote under the C runtime rules and a
+; double quote would end the argument early: both change the argument vector.
+_BRDL_CheckUnzipCommandRefusesUnquotablePaths() {
+	for Pair in [["C:\a\bundle.zip", "C:\a\stage\"], ["C:\a\bun" . Chr(34) . "dle.zip", "C:\a\stage"],
+			["", "C:\a\stage"]] {
+		Threw := false
+		try _Bundle_BuildUnzipCommand(Pair[1], Pair[2])
+		catch ValueError
+			Threw := true
+		AssertTrue(Threw, "an unquotable bundle path must be refused: " . Pair[1] . " -> " . Pair[2])
+	}
+}
+
+; Behaviour: the real extractor reproduces a deflated archive's tree and bytes,
+; including an apostrophe-bearing destination like a real profile path.
+_BRDL_CheckUnzipExtractsDeflatedArchive() {
+	Root := A_Temp . "\ergopti-bundle-unzip-" . ProcessExist() . "-" . A_TickCount
+	Source := Root . "\source"
+	Dest := Root . "\O'Brien stage"
+	DirCreate(Source . "\static\nested")
+	DirCreate(Dest)
+	try {
+		Payload := "été " . "Ergopti`n"
+		FileAppend(Payload, Source . "\static\nested\asset.txt", "UTF-8-RAW")
+		FileAppend("vendor", Source . "\top.txt", "UTF-8-RAW")
+		ZipPath := Root . "\archive.zip"
+		RunWait('"' . _Bundle_TarPath() . '" -a -c -f "' . ZipPath . '" -C "' . Source . '" static top.txt', , "Hide")
+		AssertTrue(FileExist(ZipPath) != "", "the fixture archive must be created")
+		AssertTrue(_Bundle_Unzip(ZipPath, Dest), "_Bundle_Unzip must succeed on a deflated archive")
+		AssertEqual(Payload, FileRead(Dest . "\static\nested\asset.txt", "UTF-8-RAW"),
+			"a nested entry must be extracted byte for byte")
+		AssertEqual("vendor", FileRead(Dest . "\top.txt", "UTF-8-RAW"),
+			"a top-level entry must be extracted byte for byte")
+		AssertFalse(_Bundle_Unzip(Root . "\missing.zip", Dest),
+			"a missing archive must report failure, not success")
+	} finally {
+		DirDelete(Root, true)
+	}
 }
 
 
@@ -145,8 +184,14 @@ Test("meta bundle-resolve-dir: does not use A_AppData with '..' traversal",
 Test("meta bundle-resolve-dir: uses the shared ResolveLocalAppDataDir() helper, not A_LocalAppData",
 	_BRDL_CheckUsesSharedResolver)
 
-Test("bundle bootstrap quotes apostrophe-bearing PowerShell paths (ahk6-01-bundle-powershell-quote)",
-	_BRDL_CheckUnzipCommandEscapesLiteralPaths)
+Test("bundle bootstrap quotes apostrophe-bearing paths for tar.exe (ahk6-01-bundle-powershell-quote)",
+	_BRDL_CheckUnzipCommandQuotesEachPath)
 
-Test("bundle bootstrap preserves ordinary PowerShell command format (ahk6-01-bundle-powershell-quote)",
-	_BRDL_CheckUnzipCommandPreservesOrdinaryFormat)
+Test("bundle bootstrap starts no hidden script host on first launch (exe-av-surface)",
+	_BRDL_CheckUnzipStartsNoScriptHost)
+
+Test("bundle bootstrap refuses paths that cannot be quoted for tar.exe",
+	_BRDL_CheckUnzipCommandRefusesUnquotablePaths)
+
+Test("bundle bootstrap extracts a deflated archive with the system tar.exe",
+	_BRDL_CheckUnzipExtractsDeflatedArchive)

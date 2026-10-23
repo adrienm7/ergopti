@@ -28,6 +28,7 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local Paths  = require("infra.paths")
+local Literal = require("sqlite.literal")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keylogger.text_cipher")
@@ -313,9 +314,23 @@ local function _initialize_db(db, existed)
 	end
 
 	local next_event_id = 1
-	-- Restore persisted counter.
+	-- Restore persisted counter. Only a positive decimal integer is a cursor: a
+	-- silent restart at 1 would make INSERT OR IGNORE drop every colliding new
+	-- event, and a float would raise later in the insert builders.
+	local cursor_refused = false
 	for r in db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
-		next_event_id = tonumber(r.value) or 1
+		local text = math.type(r.value) == "integer" and tostring(r.value) or r.value
+		local value = type(text) == "string" and text:match("^[1-9]%d*$")
+			and math.tointeger(tonumber(text)) or nil
+		if value and tostring(value) == text then
+			next_event_id = value
+		else
+			cursor_refused = true
+		end
+	end
+	if cursor_refused then
+		Logger.error(LOG, "Persisted next_event_id is not a positive integer; SQLite ingest refused.")
+		return false
 	end
 
 	-- Upsert the local device row so name / os_version stay fresh.
@@ -447,10 +462,12 @@ end
 -- =================================
 
 --- Escape a Lua string for a SQL single-quoted literal. nil → SQL NULL.
+--- db:exec hands SQL to sqlite3_exec as a C string, so NUL (and CR) are spelled
+--- as char() by the shared encoder instead of being embedded raw.
 local function _sql_str(s)
 	if s == nil then return "NULL" end
 	if type(s) ~= "string" then s = tostring(s) end
-	return "'" .. s:gsub("'", "''") .. "'"
+	return "'" .. Literal.escape(s) .. "'"
 end
 
 --- Format a numeric / boolean for SQL.

@@ -16,6 +16,9 @@
 ;                                      manifest[date][app] Map shape.
 ;   keylogger_reader_ngrams.ahk      — projects ngram_* tables into the n-gram
 ;                                      Maps and today_idx JSON shapes.
+;   keylogger_reader_partial.ahk     — lets the projection worker show the
+;                                      rows SQLite answered when another
+;                                      query of the same read is refused.
 ;
 ; FEATURES & RATIONALE:
 ; 1. In-memory database: opening a `:memory:` SQLite handle and exec()-ing
@@ -40,5 +43,6 @@
 #Include keylogger_reader_db.ahk
 #Include keylogger_reader_cache.ahk
 #Include keylogger_reader_rebuild.ahk
+#Include keylogger_reader_partial.ahk
 #Include keylogger_reader_manifest.ahk
 #Include keylogger_reader_ngrams.ahk

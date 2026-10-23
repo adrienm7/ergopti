@@ -177,7 +177,7 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 				if stale_line then
 					ctx.chunk(1, stale_line)
 				else
-					ctx.fire_latest_timer()
+					ctx.fire_ack_deadline()
 				end
 
 				helpers.assert_eq(controller.status(), "fencing",
@@ -221,9 +221,189 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			ctx.fire_latest_timer()
 			ctx.clock = ctx.clock + 1
 			ctx.fire_latest_timer()
+			-- A modal window may still keep task output unread when the grace
+			-- runs out: the verdict waits for a proven read turn, as on time.
+			helpers.assert_true(controller.status() ~= "fencing",
+				"a grace that ran out proves no more than an on-time deadline")
+			ctx.deliver_output_turn()
 			helpers.assert_eq(controller.status(), "fencing",
-				"a worker silent through the grace of running time is dead")
+				"a worker silent through the grace once output is read is dead")
 			helpers.assert_not_nil(find_native_revoke(ctx, variables))
+		end)
+	end)
+
+	-- Issue #100: seven leases failed "0.00 s late" while the user browsed the
+	-- Ergopti menu. hs.task reads child output only in the default run loop
+	-- mode, timers fire in every mode, so the worker's PONG or READY sat unread
+	-- in the pipe while its deadline expired on time (lease-output-turn).
+	helpers.it("(lease-output-turn) a PONG held back by an open menu keeps the lease", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_latest_timer()
+			helpers.assert_true(controller.status() ~= "fencing",
+				"an on-time deadline is not proof of a silent worker while task output may be unread")
+			local probe = ctx.output_probe()
+			helpers.assert_not_nil(probe, "the deadline must ask for a proven output turn first")
+			ctx.clock = ctx.clock + 6
+			-- The menu closes: the waiting PONG is read before the probe's echo.
+			ctx.chunk(1, "PONG 1\n")
+			ctx.deliver_output_turn()
+			helpers.assert_eq(controller.status(), "active", "the held-back PONG settles the heartbeat")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG"), 0)
+			helpers.assert_true(probe.closed, "a settled ACK retires the probe's echo child")
+			helpers.assert_eq(level_lines(ctx, "info", "read PONG 1 6.00 s after its deadline"), 1,
+				"the log names an ACK that only an unread pipe delayed")
+		end)
+	end)
+
+	helpers.it("(lease-output-turn) a READY held back by an open menu activates the lease", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			local started_ok = nil
+			controller.start_paused(function(ok) started_ok = ok end)
+			ctx.clock = ctx.clock + 11.5
+			ctx.fire_latest_timer()
+			helpers.assert_nil(started_ok, "the READY verdict waits for task output to be read")
+			ctx.chunk(1, "READY\n")
+			helpers.assert_true(started_ok == true, "a READY read after the deadline still activates")
+			helpers.assert_eq(controller.status(), "paused")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for READY"), 0)
+		end)
+	end)
+
+	helpers.it("(lease-output-turn) a worker still silent once output is read again is fenced", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			local variables = controller.variables()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_latest_timer()
+			helpers.assert_nil(find_native_revoke(ctx, variables), "no fence before the output turn")
+			ctx.deliver_output_turn()
+			helpers.assert_eq(controller.status(), "fencing",
+				"an echo read with no PONG before it proves the worker silent")
+			helpers.assert_not_nil(find_native_revoke(ctx, variables))
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG 1"), 1)
+		end)
+	end)
+
+	helpers.it("(lease-output-turn) a probe that cannot start leaves the deadline's verdict", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.next_start_result = false
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "fencing", "an unprovable turn must not suspend the verdict")
+			helpers.assert_eq(level_lines(ctx, "warn", "could not prove that task output is read"), 1)
+		end)
+	end)
+
+	helpers.it("(lease-output-turn) output unread past the ceiling fences the lease", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.fire_latest_timer()
+			local ceiling = ctx.timers[#ctx.timers]
+			helpers.assert_eq(ceiling.delay, 120.0,
+				"the probe wait is bounded; keepalives hold the worker's own budget off meanwhile")
+			ctx.fire_latest_timer()
+			helpers.assert_eq(controller.status(), "fencing")
+			helpers.assert_eq(level_lines(ctx, "warn", "task output stayed unread for 120.0 s after the PONG 1 deadline"), 1)
+			helpers.assert_true(ctx.output_probe().closed, "the fence retires the unanswered probe")
+		end)
+	end)
+
+	-- The output turn probe alone was not enough: Lua sends the next PING only
+	-- once the previous PONG is read, and the worker's inner fences itself after
+	-- 17.5 s without one (heartbeat 5 s plus 12.5 s of slack), so an Ergopti menu
+	-- held open that long still cost a healthy lease, exit 73 (issue #100). Each
+	-- fence switched every Ergopti rule off under the fingers and redeployed
+	-- karabiner.json (lease-output-keepalive).
+	helpers.it("(lease-output-keepalive) unread answers keep the worker fed past its silence budget", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			helpers.assert_eq(ctx.spawns[1].inputs[1], "PING 1\n")
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_latest_timer()
+			helpers.assert_not_nil(ctx.output_probe(), "the on-time deadline asks for a read turn")
+			helpers.assert_eq(ctx.spawns[1].inputs[2], "PING 2\n",
+				"the deadline feeds the idle worker a keepalive at once")
+			ctx.clock = ctx.clock + 0.5
+			ctx.fire_heartbeat_timer()
+			helpers.assert_eq(#ctx.spawns[1].inputs, 2,
+				"no PING may overlap the keepalive the worker may still be serving (exit 74)")
+			-- The menu stays open for 25 s, longer than the worker's silence budget.
+			for sequence = 3, 7 do
+				ctx.clock = ctx.clock + 5
+				ctx.fire_heartbeat_timer()
+				helpers.assert_eq(ctx.spawns[1].inputs[#ctx.spawns[1].inputs], "PING " .. sequence .. "\n",
+					"each heartbeat tick keeps the worker's heartbeat alive")
+			end
+			-- The menu closes: every answer is read, in order.
+			ctx.chunk(1, "PONG 1\nPONG 2\nPONG 3\nPONG 4\nPONG 5\nPONG 6\nPONG 7\n")
+			helpers.assert_eq(controller.status(), "active")
+			helpers.assert_eq(level_lines(ctx, "error", "failed"), 0, "no lease was lost")
+			helpers.assert_eq(level_lines(ctx, "info", "keeps the worker's heartbeat alive meanwhile"), 1,
+				"the first keepalive of an episode is named once")
+			ctx.clock = ctx.clock + 5
+			ctx.fire_heartbeat_timer()
+			helpers.assert_eq(ctx.spawns[1].inputs[#ctx.spawns[1].inputs], "PING 8\n",
+				"the ordinary heartbeat resumes with the next sequence")
+		end)
+	end)
+
+	helpers.it("(lease-output-keepalive) an unread READY keeps the new worker fed too", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			local started_ok = nil
+			controller.start_paused(function(ok) started_ok = ok end)
+			ctx.clock = ctx.clock + 11.5
+			ctx.fire_latest_timer()
+			helpers.assert_eq(ctx.spawns[1].inputs[1], "PING 1\n")
+			ctx.clock = ctx.clock + 5
+			local keepalive = ctx.fire_heartbeat_timer()
+			helpers.assert_eq(ctx.spawns[1].inputs[2], "PING 2\n",
+				"no heartbeat timer exists before READY: its own keepalive cadence covers it")
+			ctx.chunk(1, "READY\nPONG 1\nPONG 2\n")
+			helpers.assert_true(started_ok == true)
+			helpers.assert_eq(controller.status(), "paused")
+			helpers.assert_true(keepalive.cancelled, "a read READY retires the keepalive cadence")
+			helpers.assert_eq(level_lines(ctx, "error", "failed"), 0)
+		end)
+	end)
+
+	helpers.it("(lease-output-keepalive) an answer read after the verdict is logged as late, not missing", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_ack_deadline()
+			helpers.assert_eq(controller.status(), "fencing")
+			ctx.chunk(1, "PONG 1\n")
+			helpers.assert_eq(level_lines(ctx, "info", "answered PONG 1 after the driver had failed it"), 1)
 		end)
 	end)
 
@@ -521,8 +701,8 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			local controller, ctx = load_controller()
 			controller.init()
 			controller.start()
-			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 7.5,
-				"READY covers the 3 s guardian ARM, one 2.5 s mode write and 2 s of latency")
+			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 11.5,
+				"READY covers two 2 s launcher launches, the 3 s guardian ARM, one 2.5 s mode write and 2 s of latency")
 			ctx.chunk(1, "READY\n")
 
 			controller.pause()
@@ -761,14 +941,15 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 
 			local paused_ok = nil
 			controller.pause(function(ok) paused_ok = ok end)
-			ctx.fire_latest_timer()
+			ctx.fire_ack_deadline()
 
 			helpers.assert_eq(controller.status(), "fencing", "an ambiguous pause outcome must fence first")
 			helpers.assert_nil(paused_ok, "pause callback must not permit retry before fencing")
 			helpers.assert_not_nil(find_native_revoke(ctx, vars), "timeout must launch exact fallback revocation")
 			helpers.assert_true(not ctx.spawns[1].terminated,
 				"controller must close native stdin and let the worker fence; it must not signal any process")
-			ctx.complete(2, 0, "")
+			local _, probe_index = ctx.output_probe()
+			ctx.complete(probe_index + 1, 0, "")
 			helpers.assert_true(paused_ok == false, "pause callback must expose the missing ACK after fencing")
 			helpers.assert_eq(controller.status(), "failed")
 		end)
@@ -860,5 +1041,104 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			helpers.assert_eq(callback_calls, 1, "the failed pause must settle exactly once after fencing")
 			helpers.assert_true(callback_ok == false)
 		end)
+	end)
+
+	-- Issue #99 logged six bare "timeout waiting for PONG 1" / "READY" failures:
+	-- nothing said how long the driver had waited, whether its own run loop had
+	-- held the deadline, or how the worker ended afterwards (lease-timeout-evidence).
+	helpers.it("(lease-timeout-evidence) an ACK timeout names its wait and the timer's lateness", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_ack_deadline()
+			helpers.assert_eq(controller.status(), "fencing")
+			helpers.assert_eq(level_lines(ctx, "error", "timeout waiting for PONG 1"), 1,
+				"the failure reason stays exact: the diagnostics report parses it")
+			helpers.assert_eq(level_lines(ctx, "warn", "waited 4.50 s for PONG 1; the deadline timer fired 0.00 s late"), 1,
+				"an on-time deadline means the worker was silent, not that Hammerspoon held it")
+		end)
+	end)
+
+	helpers.it("(lease-timeout-evidence) a deadline past the parked-loop grace reports the whole wait", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 10
+			ctx.fire_latest_timer()
+			ctx.clock = ctx.clock + 1
+			ctx.fire_ack_deadline()
+			helpers.assert_eq(level_lines(ctx, "warn", "waited 11.00 s for PONG 1"), 1,
+				"the grace extension must not restart the reported wait")
+		end)
+	end)
+
+	helpers.it("(lease-timeout-evidence) the worker's exit after a driver-side failure is logged", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.chunk(1, "READY\n")
+			ctx.fire_heartbeat_timer()
+			ctx.clock = ctx.clock + 4.5
+			ctx.fire_ack_deadline()
+			ctx.spawns[1].on_done(0, "", "lease worker: Hammerspoon closed its input without STOP\n")
+			helpers.assert_eq(level_lines(ctx, "info",
+				"worker exited (exit 0) after the driver had failed it: lease worker: Hammerspoon closed its input without STOP"), 1,
+				"how the worker ended tells a live worker from a lost one")
+			helpers.assert_eq(level_lines(ctx, "error", "watchdog exited unexpectedly"), 0,
+				"the exit of an already failed worker is not a second failure")
+		end)
+	end)
+
+	helpers.it("(lease-timeout-evidence) a slow READY reports how long it took", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.clock = ctx.clock + 4.1
+			ctx.chunk(1, "READY\n")
+			helpers.assert_eq(level_lines(ctx, "info", "READY arrived 4.10 s after launch (deadline 11.5 s)"), 1)
+			local quick, quick_ctx = load_controller()
+			quick.init()
+			quick.start()
+			quick_ctx.clock = quick_ctx.clock + 0.25
+			quick_ctx.chunk(1, "READY\n")
+			helpers.assert_eq(level_lines(quick_ctx, "info", "READY arrived"), 0,
+				"a usual READY is not news")
+		end)
+	end)
+
+	helpers.it("(keystroke-exposure-report) fencing a live lease names the keys typed across it", function()
+		local saved = package.loaded["infra.keystroke_integrity"]
+		local causes = {}
+		local ok, err = pcall(with_fixture, function(load_controller)
+			package.loaded["infra.keystroke_integrity"] = {
+				note_exposure = function(cause) causes[#causes + 1] = cause; return true end,
+			}
+			local controller, ctx = load_controller()
+			controller.init()
+			controller.start()
+			ctx.clock = ctx.clock + 11.5
+			ctx.fire_ack_deadline()
+			helpers.assert_eq(#causes, 0, "a lease that never answered READY switched no rule off")
+			local live, live_ctx = load_controller()
+			live.init()
+			live.start()
+			live_ctx.chunk(1, "READY\n")
+			live_ctx.fire_heartbeat_timer()
+			live_ctx.clock = live_ctx.clock + 4.5
+			live_ctx.fire_ack_deadline()
+		end)
+		package.loaded["infra.keystroke_integrity"] = saved
+		if not ok then error(err, 0) end
+		helpers.assert_eq(causes, { "a Karabiner lease fence that switched Ergopti's rules off" },
+			"the live lease's fence is the transition a held key can be lost across")
 	end)
 end)

@@ -38,6 +38,11 @@ M.REASON = {
 	verify = "changelog_window.install_error_verify",
 	install = "changelog_window.install_error_install",
 	unknown_release = "changelog_window.install_error_unknown_release",
+	-- A feed-only list: no driver verifies a download without the API's digest
+	-- or checksum asset. The macOS window hands the channel's newest release to
+	-- Sparkle instead (ui/changelog/init.lua); Windows and Linux have no updater
+	-- that verifies a release on its own (the Windows exe is not signed on every
+	-- channel, and the Linux tarball has no signed update metadata).
 	no_details = "changelog_window.install_error_no_details",
 }
 
@@ -206,7 +211,14 @@ function M.new(ports)
 		local release, missing = ports.find_release(tag, channel)
 		if not admission_current() then return false end
 		if not release then
-			Logger.error(LOG, "Refused to install %s: it is not in the release list the window loaded.", tag)
+			if missing == M.REASON.no_details then
+				-- Expected while the API is rate limited: the page says why and
+				-- when to retry, so no error window opens over it (#99)
+				Logger.warn(LOG, "Refused to install %s: the window's list came from the Atom feed, "
+					.. "which names no files or digests to verify.", tag)
+			else
+				Logger.error(LOG, "Refused to install %s: it is not in the release list the window loaded.", tag)
+			end
 			if not admission_current() then return false end
 			report({ tag = tag, phase = "failed", reason_key = missing or M.REASON.unknown_release })
 			return false

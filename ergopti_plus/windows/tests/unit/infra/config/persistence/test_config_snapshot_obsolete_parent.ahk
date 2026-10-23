@@ -16,10 +16,15 @@
 
 ; The whole native collector remains real: isolate its unrelated runtime owners
 ; at their published neutral values, then preserve one actual accepted change.
-_FMS_FullSnapshotParentSource(Literal) {
+; Scenario "layout-array" puts a foreign table-array generation inside the
+; [layout] namespace the full save writes, between its owned leaf and the next
+; table (full-snapshot-layout-table-array).
+_FMS_FullSnapshotParentSource(Literal, Scenario := "complete") {
+	LayoutArray := Scenario == "layout-array"
+		? '[[layout."future.rows"]]`nvalue = "first" # kept`n[[layout."future.rows"]]`nvalue = "second"`n' : ""
 	return '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
 		. '`n[hotstrings]`nautocorrection = ' . Literal . ' # retained until explicit cleanup`n'
-		. '[layout]`nergopti_variant = "ergopti"`n'
+		. '[layout]`nergopti_variant = "ergopti"`n' . LayoutArray
 		. '[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27, count = 9223372036854775807 } # future source`n'
 		. '[[private."future.rows"]]`nvalue = "first"`n[[private."future.rows"]]`nvalue = "second"`n'
 }
@@ -215,6 +220,9 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			else
 				Assert(TOML_SameValue(TOML_ParseDocument(Original)["hotstrings"], Doc["hotstrings"]), "the obsolete raw model is retained without normalization")
 			Assert(TOML_SameValue(TOML_ParseDocument(Original)["private"], Doc["private"]), "quoted future fields, dates, maximum integers and table-array generations remain unchanged")
+			if Scenario == "layout-array"
+				Assert(TOML_SameValue(TOML_ParseDocument(Original)["layout"]["future.rows"], Doc["layout"]["future.rows"]),
+					"a table array inside a written namespace keeps every generation")
 			Restart := Path . ".restart.toml"
 			try {
 				Assert(FSWriteCreateDurable(Restart, Expected))
@@ -283,7 +291,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 }
 
 _FMS_FullSnapshotParentCase(Literal, Scenario := "complete") {
-	_FMS_WithSource("full_parent_" . Scenario . "_" . A_TickCount, _FMS_FullSnapshotParentSource(Literal),
+	_FMS_WithSource("full_parent_" . Scenario . "_" . A_TickCount, _FMS_FullSnapshotParentSource(Literal, Scenario),
 		_FMS_FullSnapshotParent.Bind(, Literal, Scenario))
 }
 Test("full-snapshot-obsolete-parent: actual scalar namespace retains source and unrelated state", _FMS_FullSnapshotParentCase.Bind('false'))
@@ -304,6 +312,8 @@ Test("full-snapshot-obsolete-parent: fresh older migration-eligible stamp refuse
 Test("full-snapshot-obsolete-parent: fresh Boolean stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-boolean"))
 Test("full-snapshot-obsolete-parent: fresh fractional stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-fractional"))
 Test("full-snapshot-obsolete-parent: fresh scalar metadata-parent stamp refuses before collection", _FMS_FullSnapshotParentCase.Bind('false', "stamp-parent"))
+Test("full-snapshot-obsolete-parent: a table array inside the written [layout] namespace survives "
+	. "(full-snapshot-layout-table-array)", _FMS_FullSnapshotParentCase.Bind('false', "layout-array"))
 
 _FMS_FullSnapshotScopeAndIndividualStayStrict() {
 	Source := '[hotstrings]`nautocorrection = false # retained`n'

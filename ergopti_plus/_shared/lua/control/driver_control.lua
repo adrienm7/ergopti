@@ -22,6 +22,8 @@
 
 local M = {}
 
+local NativePath = require("native_path")
+
 local SPEC_KEYS = { "_comment", "schema", "max_request_bytes", "token_hex_length", "request_id_pattern",
 	"files", "folders", "windows_message", "states", "reasons" }
 local REQUEST_KEYS = { schema = true, token = true, request_id = true }
@@ -113,7 +115,7 @@ function M.folder(spec, platform, getenv, app_folder, separator)
 	if declared == nil then error("driver control: no folder for " .. tostring(platform), 2) end
 	local base = getenv(declared.base)
 	if type(base) ~= "string" or base == "" then return nil, declared.base .. " is not set" end
-	local parts = { (base:gsub("[/\\]+$", "")) }
+	local parts = { NativePath.without_trailing_separators(base) }
 	for _, segment in ipairs(declared.segments) do
 		parts[#parts + 1] = segment == "{app}" and app_folder or segment
 	end

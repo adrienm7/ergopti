@@ -80,6 +80,11 @@ local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
+-- Shipped TOML is read through the native descriptor admission, which looks luv
+-- up when it opens a file. Load the timings registry while the genuine backend
+-- is installed: fixtures swap package.loaded.luv for a double while requiring
+-- the HTTP engine, and a first registry read inside that window read nothing.
+require("infra.timings")
 local shell_quote = require("text_utils").shell_quote
 helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")

@@ -88,6 +88,11 @@ KLPF_NewOwnerId() {
 class KLPFWorker {
 		static MAX_SEED_HEADER_CHARS := 65536
 		static FULL_REQUIRED_EXIT_CODE := 3
+		; The stage holds a partial read: delivered to its window, never published.
+		static INCOMPLETE_EXIT_CODE := 4
+		; Read kinds ("typing:full", "range:typing"...) whose last read was
+		; incomplete, so the warning and its recovery are each logged once.
+		static incomplete_reads := Map()
 		static generation := 0
 		static owner_id := KLPF_NewOwnerId()
 		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
@@ -674,11 +679,17 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 		job["terminal_claimed"] := true
 
 		owned_stage := job["stage"]
-		if (status = "ok") && ((stage = "") || (stage != owned_stage) || !FSExists(owned_stage))
+		if (status = "ok" || status = "incomplete")
+						&& ((stage = "") || (stage != owned_stage) || !FSExists(owned_stage))
 				status := "failed"
 
 		delivery_stage := ""
-		if (status = "ok") {
+		if (status = "incomplete") {
+				; A partial read is shown by the window that asked for it, never
+				; published as the reusable snapshot nor kept in RAM, so the next
+				; dashboard open reads the history again.
+				delivery_stage := owned_stage
+		} else if (status = "ok") {
 				if (job["kind"] = "range" || job["kind"] = "delta") {
 						delivery_stage := owned_stage
 				} else {
@@ -704,14 +715,16 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 		; result so resume can rebuild the history instead of forgetting it.
 		if job.Get("cancel_requested", false) || (A_IsSuspended && status != "full_required")
 				status := "canceled"
-		if (status != "ok")
+		if (status != "ok" && status != "incomplete")
 				KLPF_DeletePrivateStage(owned_stage)
 		if job.Get("request", "") != ""
 				KLPF_DeletePrivateStage(job["request"])
 		delivered := KLPF_InvokeTerminal(job["on_terminal"], status, delivery_stage)
 		; Delta delivery is synchronous: the recipient reads its captured stage
-		; before returning. Unlike range fetches, it never transfers file ownership.
-		if ((job["kind"] = "delta") || (job["kind"] = "range" && !delivered)) && (delivery_stage != "")
+		; before returning. Unlike range fetches, it never transfers file ownership;
+		; neither does an incomplete snapshot, which is read the same way.
+		if ((job["kind"] = "delta") || (job["kind"] = "range" && !delivered)
+						|| (job["kind"] = "prefetch" && status = "incomplete")) && (delivery_stage != "")
 				KLPF_DeletePrivateStage(delivery_stage)
 		if KLPFWorker.jobs.Has(job_key)
 				&& KLPFWorker.jobs[job_key]["generation"] = generation
@@ -730,9 +743,36 @@ KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
 		if exit_code = KLPFWorker.FULL_REQUIRED_EXIT_CODE
 				&& job["kind"] = "delta" && job.Get("request", "") != ""
 				status := "full_required"
+		if exit_code = KLPFWorker.INCOMPLETE_EXIT_CODE && !A_IsSuspended && FSExists(stage)
+				status := "incomplete"
 		if (status = "failed")
 				try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}): {3}", which, exit_code, KLPF_WorkerDiagnostic(stdout, stderr))
+		if (status = "ok" || status = "incomplete")
+				KLPF_NoteReadCompleteness(which . ":" . job.Get("mode", "range"), status = "ok",
+						KLPF_WorkerDiagnostic(stdout, stderr))
 		KLPF_CompleteJob(which, generation, status, stage)
+}
+
+; Pair the warning of an incomplete history read with the info of the first
+; complete read of the same kind after it. The worker owns no logger, so the
+; resident logs both; repeats of either are not logged again.
+; @param ReadKind {String} Job key and mode, such as "typing:full".
+; @param Complete {Boolean} Whether the worker read every query.
+; @param Diagnostic {String} The worker's one-line account of refused queries.
+; @returns {Boolean} True when a line was logged.
+KLPF_NoteReadCompleteness(ReadKind, Complete, Diagnostic := "") {
+		if Complete {
+				if !KLPFWorker.incomplete_reads.Has(ReadKind)
+						return false
+				KLPFWorker.incomplete_reads.Delete(ReadKind)
+				try LoggerInfo("KLReader", "Metrics history read '{1}' is complete again; the dashboard shows the whole history.", ReadKind)
+				return true
+		}
+		if KLPFWorker.incomplete_reads.Has(ReadKind)
+				return false
+		KLPFWorker.incomplete_reads[ReadKind] := true
+		try LoggerWarn("KLReader", "Metrics history read '{1}' was incomplete; the dashboard shows the partial counts, not cached: {2}", ReadKind, Diagnostic)
+		return true
 }
 
 ; Condense the worker's captured output into one log-safe line. The worker is
@@ -798,6 +838,36 @@ KLPF_WorkerFail(stage, phase, failure := 0) {
 		ExitApp(1)
 }
 
+; End a worker whose staged read is partial. The one-line transcript names the
+; refused queries structurally; the resident logs it and never publishes the
+; stage, so the next dashboard open reads the history again.
+; @param Refused {Array} Result of KLR_EndPartialRead, never empty here.
+KLPF_WorkerExitIncomplete(Refused) {
+		try FileAppend("keylogger-prefetch-worker: incomplete read ("
+				. KLR_DescribePartialRead(Refused) . ").`n", "*")
+		ExitApp(KLPFWorker.INCOMPLETE_EXIT_CODE)
+}
+
+; Add the incomplete flag the shared page reads to a JSON object.
+; @param Json {String} An encoder-owned JSON object.
+; @returns {String} The same object with "incomplete":true as its last member.
+KLPF_MarkJsonIncomplete(Json) {
+		if SubStr(Json, -1) != "}"
+				throw ValueError("An incomplete read can only be flagged on a JSON object.")
+		return SubStr(Json, 1, StrLen(Json) - 1) . (Json = "{}" ? "" : ",") . '"incomplete":true}'
+}
+
+; Persist the reader image a deferring worker built only when its read was
+; complete; an incomplete read leaves the last good cache for the next worker.
+; @param Complete {Boolean} Whether every projection query was answered.
+; @returns {Boolean} True when an image was saved.
+KLPF_SettleReaderCache(Complete) {
+		if Complete
+				return KLR_CacheCommitDeferredSave()
+		KLR_CacheDropDeferredSave()
+		return false
+}
+
 ; Runs in the detached /force instance.  It exits before the normal boot block,
 ; so it never registers a hook, hotkey, timer, tray menu, or WebView callback.
 KLPF_WorkerMain() {
@@ -825,6 +895,8 @@ KLPF_WorkerMain() {
 		; next worker. The resident driver must never claim this — its handle
 		; carries live-walker deltas that data.sql alone cannot reproduce.
 		KLRCache.disposable := true
+		; The image is persisted only after a complete read (see KLPF_SettleReaderCache).
+		KLRCache.defer_saves := true
 		phase := "timing decode"
 		try {
 				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[flag + 6])
@@ -844,8 +916,19 @@ KLPF_WorkerMain() {
 						if !(apps is Array)
 								KLPF_WorkerRefuse("range mode received a non-array app filter")
 						db := KLR_BuildDatabase(metrics_dir)
-						if !db || !KLPF_WriteAtomic(stage, KLR_BuildRangeSplitTodayJson(db, A_Args[flag + 12], A_Args[flag + 13], apps))
+						if !db
 								KLPF_WorkerFail(stage, phase)
+						Refused := []
+						KLR_BeginPartialRead()
+						try RangeJson := KLR_BuildRangeSplitTodayJson(db, A_Args[flag + 12], A_Args[flag + 13], apps)
+						finally Refused := KLR_EndPartialRead()
+						if Refused.Length
+								RangeJson := KLPF_MarkJsonIncomplete(RangeJson)
+						if !KLPF_WriteAtomic(stage, RangeJson)
+								KLPF_WorkerFail(stage, phase)
+						KLPF_SettleReaderCache(Refused.Length = 0)
+						if Refused.Length
+								KLPF_WorkerExitIncomplete(Refused)
 				} else {
 						phase := "projection"
 						; A cold rebuild of a large store publishes what it rebuilt so far.
@@ -861,16 +944,19 @@ KLPF_WorkerMain() {
 								if StrLen(RequestJson) > KLPFWorker.MAX_SEED_HEADER_CHARS
 										throw Error("Metrics history request exceeds the size limit.")
 								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode,
-										JsonParse(RequestJson))
+										JsonParse(RequestJson), &Refused)
 						} else {
-								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode)
+								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode, , &Refused)
 						}
 						if (Outcome is String) && Outcome = "full_required"
 								ExitApp(KLPFWorker.FULL_REQUIRED_EXIT_CODE)
 						if !Outcome
 								KLPF_WorkerFail(stage, phase)
-						; The complete snapshot supersedes every partial one.
+						; The finished snapshot supersedes every rebuild preview, even a
+						; partial read of it: the rebuild itself is over.
 						Publisher.Retire()
+						if (Outcome is String) && Outcome = "incomplete"
+								KLPF_WorkerExitIncomplete(Refused)
 				}
 		} catch as Err {
 				KLPF_WorkerFail(stage, phase, Err)
@@ -889,9 +975,10 @@ KLPF_WorkerMain() {
 ; ===============================
 
 ; Build and write the prefetch blob for the named dashboard. Returns true
-; on success, false on a rejected build/write. Projection errors propagate to
-; the worker's failure boundary before publication, leaving the previous file
-; intact instead of replacing it with an incomplete payload.
+; on success, false on a rejected build/write. A refused SQLite query makes the
+; read incomplete; such a read is refused here, leaving the previous file intact
+; instead of replacing it with a partial payload. Other projection errors
+; propagate to the worker's failure boundary before publication.
 ; mode: "full" (default) — manifest + n-grams + range data.
 ;       "manifest" — skip n-grams. Used by the fast 500 ms flush tick
 ;       so the dashboard’s KPI counters update near-instantly without
@@ -902,9 +989,14 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
 		return KLPF_BuildAndWriteToPath(which, metrics_dir, KLPF_PrefetchPath(which, metrics_dir), dbg, mode)
 }
 
-; Returns true after publication, false on build/write failure, or the explicit
-; "full_required" outcome when a supplied checkpoint cannot admit this delta.
-KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", HistorySeed := unset) {
+; Returns true after publication, false on build/write failure, "incomplete"
+; after writing a partial read that its window shows but nobody publishes, or
+; the explicit "full_required" outcome when a supplied checkpoint cannot admit
+; this delta.
+; @param Refused {VarRef} Receives the refused queries of the read, empty when complete.
+KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", HistorySeed := unset,
+		&Refused := unset) {
+		Refused := []
 		if (dbg = "") {
 				try DirCreate(LoggerLogsDir())
 				dbg := LoggerLogsDir() . "prefetch_debug.log"
@@ -916,27 +1008,47 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		if !db {
 				KLPF_DbgWrite(dbg, "FAIL: KLR_BuildDatabase returned 0")
 				try LoggerError("KLReader", "Metrics DB build failed (winsqlite3.dll/schema.sql/data.sql) — dashboard '{1}' shows no data.", which)
+				KLPF_SettleReaderCache(false)
 				return false
 		}
 		t_db := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF db=" . (t_db - t0) . "ms")
 
-		; Cheap sanity probe — count agg_app_day rows so we know the data
-		; actually landed. SQLite_Query returns Array<Map>.
-		rows := SQLite_Query(db, "SELECT COUNT(*) AS n FROM agg_app_day")
-		n := (rows.Length > 0 && rows[1].Has("n")) ? rows[1]["n"] : "?"
-		KLPF_DbgWrite(dbg, "agg_app_day row count = " . n)
-
 		blob := Map()
 		seed := 0
-		if (which = "typing") {
-				SnapshotDay := FormatTime(A_Now, "yyyy-MM-dd")
-				seed := KLPF_CaptureHistorySeed(metrics_dir, SnapshotDay)
-				if mode != "full" && IsSet(HistorySeed) && !KLPF_HistorySeedAllowsDelta(HistorySeed, seed)
-						return "full_required"
-				blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
-		} else if (which = "apps") {
-				blob := KLPF_BuildApps(db, true)
+		FullRequired := false
+		; A refused query leaves its rows out and marks its dashboard part; every
+		; other query keeps its exact counts (see keylogger_reader_partial.ahk).
+		KLR_BeginPartialRead()
+		try {
+				; Cheap sanity probe — count agg_app_day rows so we know the data
+				; actually landed. SQLite_Query returns Array<Map>.
+				rows := KLR_ProjectionQuery(db, "SELECT COUNT(*) AS n FROM agg_app_day", "manifest", "probe")
+				n := (rows.Length > 0 && rows[1].Has("n")) ? rows[1]["n"] : "?"
+				KLPF_DbgWrite(dbg, "agg_app_day row count = " . n)
+				if (which = "typing") {
+						SnapshotDay := FormatTime(A_Now, "yyyy-MM-dd")
+						seed := KLPF_CaptureHistorySeed(metrics_dir, SnapshotDay)
+						FullRequired := mode != "full" && IsSet(HistorySeed)
+								&& !KLPF_HistorySeedAllowsDelta(HistorySeed, seed)
+						if !FullRequired
+								blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
+				} else if (which = "apps") {
+						blob := KLPF_BuildApps(db, true, metrics_dir)
+				}
+		} finally Refused := KLR_EndPartialRead()
+		if FullRequired {
+				; Nothing was read: the image itself is sound and serves the full build.
+				KLPF_SettleReaderCache(true)
+				return "full_required"
+		}
+		Incomplete := Refused.Length > 0
+		if Incomplete {
+				KLPF_DbgWrite(dbg, "INCOMPLETE read: " . KLR_DescribePartialRead(Refused))
+				if KLR_PartialReadMissed(Refused, "manifest")
+						blob["metrics_manifest_incomplete"] := true
+				if KLR_PartialReadMissed(Refused, "range")
+						blob["__klpf_range_incomplete"] := true
 		}
 		t_proj := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
@@ -957,15 +1069,25 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		; disk publication, never expose bytes from a refused atomic replacement.
 		global KLPF_LAST_JSON
 		cache_key := KLPF_PrefetchPath(which, metrics_dir)
+		if Incomplete && (path = cache_key) {
+				; The reusable snapshot is every later open's first paint: a partial
+				; read must never become it, or the next open would not read again.
+				KLPF_DbgWrite(dbg, "REFUSED: an incomplete read cannot replace the published snapshot")
+				KLPF_SettleReaderCache(false)
+				return false
+		}
 		written := KLPF_WriteAtomic(path, json)
-		if written && !(which = "typing" && mode != "full") {
+		if written && !Incomplete && !(which = "typing" && mode != "full") {
 				if !IsSet(KLPF_LAST_JSON)
 						KLPF_LAST_JSON := Map()
 				KLPF_LAST_JSON[cache_key] := json
 		}
+		KLPF_SettleReaderCache(!Incomplete)
 		t_write := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
-		return written
+		if !written
+				return false
+		return Incomplete ? "incomplete" : true
 }
 
 ; Encode a dashboard blob, splicing the SQL-built JSON members it carries.
@@ -990,6 +1112,18 @@ KLPF_SerializeBlob(blob) {
 				blob.Delete("__klpf_today_json")
 				blob.Delete("_prefetch_data")
 		}
+		; The n-gram range data of an incomplete read says so inside _prefetch_data,
+		; where the shared page reads it for each part it receives.
+		range_incomplete := blob.Has("__klpf_range_incomplete")
+		if range_incomplete {
+				blob.Delete("__klpf_range_incomplete")
+				if prefetch_json_raw != ""
+						prefetch_json_raw := KLPF_MarkJsonIncomplete(prefetch_json_raw)
+				else if today_json_raw = "" && blob.Has("_prefetch_data") && blob["_prefetch_data"] is Map
+						blob["_prefetch_data"]["incomplete"] := true
+				else if today_json_raw = ""
+						throw Error("An incomplete n-gram read produced no range data to flag.")
+		}
 		json := KL_JsonEncode(blob)
 		if (manifest_json_raw != "")
 				json := SubStr(json, 1, StrLen(json) - 1)
@@ -1002,7 +1136,8 @@ KLPF_SerializeBlob(blob) {
 		}
 		if (today_json_raw != "") {
 				json := SubStr(json, 1, StrLen(json) - 1)
-						. ',"_prefetch_data":{"today":' . today_json_raw . "}}"
+						. ',"_prefetch_data":{"today":' . today_json_raw
+						. (range_incomplete ? ',"incomplete":true' : "") . "}}"
 		}
 		return json
 }
@@ -1265,15 +1400,24 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 ; ======================================
 ; ======================================
 
-KLPF_BuildApps(db, EncodeManifest := false) {
+KLPF_BuildApps(db, EncodeManifest := false, MetricsRoot := "") {
+		Categories := Map()
+		if MetricsRoot != "" {
+				Apps := []
+				for Row in KLR_ProjectionQuery(db, "SELECT DISTINCT app FROM agg_app_day;", "manifest", "categories")
+						Apps.Push(Row["app"])
+				Categories := KL_AppCat_ProjectAt(MetricsRoot, Apps)
+		}
 		; metrics_apps reads (date, app) totals only — no n-grams. The same
 		; manifest projection covers it.
 		if EncodeManifest
-				return Map("__klpf_manifest_json", KLR_BuildManifestJson(db), "app_icons", Map())
+				return Map("__klpf_manifest_json", KLR_BuildManifestJson(db),
+						"app_icons", Map(), "user_categories", Categories)
 		manifest := KLR_ReadManifest(db)
 		return Map(
 				"metrics_manifest", manifest,
-				"app_icons", Map()
+				"app_icons", Map(),
+				"user_categories", Categories
 		)
 }
 
@@ -1400,10 +1544,10 @@ KLPF_PartialSnapshotPath(which, metrics_dir) {
 ; @param db {Integer} The rebuild's private candidate, borrowed for this call.
 ; @param Partial {Map} oldest / newest rolled-up day.
 ; @returns {String} Dashboard JSON.
-KLPF_BuildPartialJson(which, db, Partial) {
+KLPF_BuildPartialJson(which, db, Partial, MetricsRoot := "") {
 		Blob := (which = "typing")
 				? KLPF_BuildTyping(db, "full", true, FormatTime(A_Now, "yyyy-MM-dd"), true)
-				: KLPF_BuildApps(db, true)
+				: KLPF_BuildApps(db, true, MetricsRoot)
 		Blob["_partial"] := Partial
 		return KLPF_SerializeBlob(Blob)
 }
@@ -1487,7 +1631,7 @@ class KLPFRebuildPublisher {
 				for which in ["typing", "apps"] {
 						; A missed partial only delays the preview; the rebuild goes on.
 						if !KLPF_WriteAtomic(KLPF_PartialSnapshotPath(which, this.metrics_dir),
-										KLPF_BuildPartialJson(which, Info["db"], Partial))
+										KLPF_BuildPartialJson(which, Info["db"], Partial, this.metrics_dir))
 								return false
 				}
 				this.partial_cost := TickElapsed64(Tick, this.clock.Call())

@@ -4,8 +4,9 @@
 --- MODULE: Menu Keyboard Slots
 --- DESCRIPTION:
 --- Renders the configurable keyboard-shortcut groups in the Shortcuts submenu:
---- one submenu per modifier group, listing every slot the user has assigned, plus
---- a row that offers the unassigned ones.
+--- one submenu per modifier group, opening with the group's restore and clear,
+--- then listing every slot the user has assigned, plus a row that offers the
+--- unassigned ones.
 ---
 --- The module underneath (modules/shortcuts/keyboard_shortcuts.lua) has always
 --- bound, persisted and released these shortcuts; what it never had was a way to
@@ -251,6 +252,7 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		return function() return not group.fixed and group.prefix == prefix end
 	end
 	local getters = {
+		keyboard_group_has_scope = function() return not group.fixed end,
 		keyboard_group_has_fixed = function() return #fixed > 0 end,
 		keyboard_group_ready = function() return not disabled and ctx.paused ~= true and not group.fixed end,
 		keyboard_group_add_option = add_for("hs_option_"),
@@ -263,15 +265,31 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		if not getters.keyboard_group_ready() then return false end
 		return add_binding_to(group.prefix, ctx)
 	end
+	-- The group's restore and clear: the Shortcuts scope narrowed to its slots.
+	local function apply_scope(mode)
+		if not getters.keyboard_group_ready() or type(ctx.apply_keyboard_group_scope) ~= "function" then
+			return false
+		end
+		return ctx.apply_keyboard_group_scope(group.prefix, mode) == true
+	end
+	local function restore_action() return apply_scope("recommended") end
+	local function clear_action() return apply_scope("clear") end
 	local function fixed_provider() return fixed end
 	local function assigned_provider() return assigned end
 	-- Admit the entire declared frame before querying the genuine assignment and
 	-- parameter owners. Empty assigned data exercises the same renderer policy.
-	local admission = ManifestMenu.template_rows("keyboard_group_frame", { keyboard_group_add = add_action }, getters, {
+	local admission = ManifestMenu.template_rows("keyboard_group_frame", {
+		keyboard_group_add = add_action,
+		scope_restore = restore_action,
+		scope_clear = clear_action,
+	}, getters, {
 		keyboard_group_fixed_rows = fixed_provider,
 		keyboard_group_assigned_rows = assigned_provider,
 	})
-	local fixed_count = #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
+	-- The scope group (restore, clear, separator) and the Add row belong to
+	-- every group the user can bind; a fixed group has neither.
+	local scope_count = not group.fixed and 3 or 0
+	local fixed_count = scope_count + #fixed + (#fixed > 0 and 1 or 0) + (not group.fixed and 1 or 0)
 	if type(admission) ~= "table" or #admission ~= fixed_count then
 		Logger.error(LOG, "Declared keyboard group admission refused for '%s'.", tostring(group.prefix))
 		return nil
@@ -290,12 +308,17 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 		}
 	end
 
-	local rows = ManifestMenu.template_rows("keyboard_group_frame", { keyboard_group_add = add_action }, getters, {
+	local rows = ManifestMenu.template_rows("keyboard_group_frame", {
+		keyboard_group_add = add_action,
+		scope_restore = restore_action,
+		scope_clear = clear_action,
+	}, getters, {
 		keyboard_group_fixed_rows = fixed_provider,
 		keyboard_group_assigned_rows = assigned_provider,
 	})
-	-- A withdrawn Add declaration must not publish a group with no creation port.
-	local expected = #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
+	-- A withdrawn Add, restore or clear declaration must not publish a group
+	-- missing one of its ports.
+	local expected = scope_count + #fixed + (#fixed > 0 and 1 or 0) + #assigned + (not group.fixed and 1 or 0)
 	if type(rows) ~= "table" or #rows ~= expected then
 		Logger.error(LOG, "Declared keyboard group frame refused for '%s'.", tostring(group.prefix))
 		return nil

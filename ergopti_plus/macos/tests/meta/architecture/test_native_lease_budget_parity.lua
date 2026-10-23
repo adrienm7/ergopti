@@ -20,6 +20,10 @@ local MIN_CHILD_SETTLEMENT_HEADROOM_SEC = 0.5
 local MEASURED_HOST_STALL_SEC = 5.0
 -- Pipe and main-thread latency every Lua ACK deadline keeps over the worker.
 local MIN_LUA_LATENCY_MARGIN_SEC = 2.0
+-- One start of the launcher executable on the loaded Mac of issue #99: its
+-- detached revokers and guardian probes ran 2.0 to 2.2 s, and the probe's own
+-- 2.0 s deadline expired twice.
+local MEASURED_LAUNCHER_LAUNCH_SEC = 2.0
 local MICROSECONDS_PER_SECOND = 1000000
 
 
@@ -172,5 +176,48 @@ helpers.describe("native Karabiner lease budgets stay ordered", function()
 		helpers.assert_true(ack >= command + MIN_LUA_LATENCY_MARGIN_SEC, string.format(
 			"COMMAND_ACK_TIMEOUT_SEC (%.2f s) must cover one write (%.2f s) and %.1f s of latency",
 			ack, command, MIN_LUA_LATENCY_MARGIN_SEC))
+	end)
+
+	-- Lua sends the next PING only after reading the last PONG, and the inner
+	-- fences on silence: an Ergopti menu kept open past that budget lost a
+	-- healthy lease (issue #100). An on-time deadline therefore writes a
+	-- keepalive at once and every heartbeat interval after it, and both must
+	-- land inside the inner's budget while the outer is idle.
+	helpers.it("(lease-output-keepalive) keepalives reach the inner before its silence budget ends", function()
+		local swift = swift_constants()
+		local lua = lua_constants()
+		local heartbeat = evaluate(lua, "HEARTBEAT_INTERVAL_SEC")
+		local inner_budget = heartbeat + evaluate(swift, "kLeaseInnerSilenceSlackSeconds")
+		local command_deadline = evaluate(lua, "COMMAND_ACK_TIMEOUT_SEC")
+		local ready_deadline = evaluate(lua, "READY_ACK_TIMEOUT_SEC")
+		local outer_command = evaluate(swift, "kPrivateCommandAckTimeoutSeconds")
+		helpers.assert_true(command_deadline < inner_budget, string.format(
+			"the first keepalive after an unread PONG (%.2f s) must precede the inner's silence fence (%.2f s)",
+			command_deadline, inner_budget))
+		helpers.assert_true(ready_deadline < inner_budget, string.format(
+			"the first keepalive after an unread READY (%.2f s after launch) must precede the inner's silence fence (%.2f s)",
+			ready_deadline, inner_budget))
+		helpers.assert_true(heartbeat < inner_budget,
+			"the keepalive cadence must stay inside the inner's silence budget")
+		helpers.assert_true(command_deadline >= outer_command and heartbeat >= outer_command, string.format(
+			"keepalives (first at %.2f s, then every %.2f s) must find the outer idle past its %.2f s command budget",
+			command_deadline, heartbeat, outer_command))
+	end)
+
+	-- The worker's budgets start once it runs; READY also waits for the outer
+	-- and its suspended inner to launch. Issue #99 activated leases in 3.4 to
+	-- 6.0 s on a loaded Mac and failed every slower one at 7.5 s, each failure
+	-- redeploying karabiner.json and starting another lease.
+	helpers.it("(lease-ready-launch) Lua's READY deadline also covers launching the outer and its inner", function()
+		local swift = swift_constants()
+		local lua = lua_constants()
+		local arm = evaluate(swift, "kGuardianArmTimeoutSeconds")
+		local command = evaluate(swift, "kPrivateCommandAckTimeoutSeconds")
+		local ready = evaluate(lua, "READY_ACK_TIMEOUT_SEC")
+		local required = 2 * MEASURED_LAUNCHER_LAUNCH_SEC + arm + command + MIN_LUA_LATENCY_MARGIN_SEC
+		helpers.assert_true(ready >= required, string.format(
+			"READY_ACK_TIMEOUT_SEC (%.2f s) must cover two launcher launches (%.1f s each), ARM (%.2f s), "
+				.. "one write (%.2f s) and %.1f s of latency",
+			ready, MEASURED_LAUNCHER_LAUNCH_SEC, arm, command, MIN_LUA_LATENCY_MARGIN_SEC))
 	end)
 end)

@@ -17,7 +17,8 @@
 ---
 --- DEPENDENCIES:
 --- - infra.logger, infra.i18n, infra.fs_dir (project-wide).
---- - hs.application, hs.sqlite3, hs.json, hs.fs.
+--- - adapters.running_application for the running-application lookup.
+--- - hs.application (bundle info), hs.sqlite3, hs.json, hs.fs.
 --- ==============================================================================
 
 local M = {}
@@ -30,6 +31,7 @@ local sqlite3 = require("hs.sqlite3")
 local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local FsDir  = require("infra.fs_dir")
+local RunningApplication = require("adapters.running_application")
 local LOG    = "keylogger.export"
 
 
@@ -151,8 +153,11 @@ function M.get_native_app_category(app_name)
 	local resolved = nil
 	-- Two structurally different misses, and only one of them may be memoised.
 	-- `app` nil means "not running RIGHT NOW", which is a property of this instant
-	-- and not of the name.
-	local app = hs.application.get(app_name)
+	-- and not of the name. The lookup must stay on the process list: the ingest
+	-- flush asks for every application of its batch, including ones that have
+	-- quit, and a name lookup that falls back to a window search read every
+	-- window of every application on the main thread (13.4 s, issue #99).
+	local app = RunningApplication.by_name(app_name)
 	local bundle_was_readable = false
 	if app then
 		local app_path = app:path()

@@ -431,9 +431,9 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
 
         ; Exercise a real search template too: % and & must survive TOML
         ; serialization verbatim rather than becoming a generic/global setting.
-        SearchKey := GestureActionParameterKey("keyboard__cmd_k", "search_web")
+        SearchKey := GestureActionParameterKey("keyboard__ctrl_k", "search_web")
         SearchTemplate := "https://search.example/?q=%s&source=ergopti"
-        AssertTrue(GestureSetActionParameter("keyboard__cmd_k", "search_web", SearchTemplate),
+        AssertTrue(GestureSetActionParameter("keyboard__ctrl_k", "search_web", SearchTemplate),
             "the second parameter write must acknowledge")
         Parsed := ParseTomlFile(TempConfig)
         AssertTrue(Parsed.Has("action_parameters"), "action parameter section must be persisted")
@@ -447,7 +447,7 @@ TestGestures_ParameterizedActionValuesPersistToUserToml() {
         _IniCache := Parsed
         GesturesReadConfig()
         AssertEqual("https://saved.example/path", GestureGetActionParameter("gesture__tap_3", "open_url"), "saved parameter must reload from TOML")
-		AssertEqual(SearchTemplate, GestureGetActionParameter("keyboard__cmd_k", "search_web"), "scoped search template must reload from TOML")
+		AssertEqual(SearchTemplate, GestureGetActionParameter("keyboard__ctrl_k", "search_web"), "scoped search template must reload from TOML")
         AssertFalse(GestureActionParameters.Has("stale__open_url"), "reload must not retain stale parameter values")
     } finally {
         ConfigurationFile := OriginalConfig

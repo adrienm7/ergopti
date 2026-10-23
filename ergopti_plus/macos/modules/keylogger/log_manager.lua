@@ -36,6 +36,7 @@ local M = {}
 
 local hs      = hs
 local fs      = require("hs.fs")
+local NativePath = require("native_path")
 local text_utils = require("infra.text_utils")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
@@ -43,6 +44,7 @@ local timer   = require("hs.timer")
 
 local Logger  = require("infra.logger")
 local Timings = require("infra.timings")
+local Literal = require("sqlite.literal")
 local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
 local FileSystem = require("adapters.file_system")
 local LedgerAppend = require("adapters.ledger_append")
@@ -219,8 +221,7 @@ end
 local function _resolve_tmpdir()
 	local t = os.getenv("TMPDIR")
 	if type(t) == "string" and t ~= "" then
-		if not t:match("[/\\]$") then t = t .. "/" end
-		return t
+		return NativePath.with_trailing_separator(t)
 	end
 	return "/tmp/"
 end
@@ -231,8 +232,7 @@ end
 --- @return table Resolved path bundle. The caller publishes it only after the
 --- device identity transaction commits.
 local function _resolve_paths(metrics_dir, device_id)
-	local md = metrics_dir
-	if not md:match("[/\\]$") then md = md .. "/" end
+	local md = NativePath.with_trailing_separator(metrics_dir)
 
 	local by_dev  = md .. "by_device/" .. device_id .. "/"
 	local tmp_dir = _resolve_tmpdir() .. "ergopti_metrics/" .. device_id .. "/"
@@ -266,8 +266,7 @@ end
 --- identity scan did not commit.
 --- @return boolean needs_publication True only for a newly generated identity.
 local function _resolve_device(metrics_dir)
-	local md = metrics_dir
-	if not md:match("[/\\]$") then md = md .. "/" end
+	local md = NativePath.with_trailing_separator(metrics_dir)
 	local by_root = md .. "by_device/"
 	_mkdir_p(by_root)
 
@@ -912,7 +911,7 @@ end
 
 --- Helper to safely SQL-escape a string.
 local function _sq(s)
-	return "'" .. tostring(s):gsub("'", "''") .. "'"
+	return "'" .. Literal.escape(tostring(s)) .. "'"
 end
 
 --- Require an exact SQLite success code inside a transaction.

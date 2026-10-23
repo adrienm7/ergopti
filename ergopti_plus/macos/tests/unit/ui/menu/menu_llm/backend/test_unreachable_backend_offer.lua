@@ -251,7 +251,7 @@ helpers.describe("The offer lists what the real sweep found (unreachable-backend
 				helpers.assert_eq(#world.dialogs, 1)
 				local dialog = world.dialogs[1]
 				helpers.assert_eq(dialog.choices, {
-					"llm.unreachable.use_server|oMLX|Qwen3-8B-4bit|localhost:8000",
+					"llm.unreachable.use_server|oMLX|Qwen3-8B-4bit|127.0.0.1:8000",
 					"llm.unreachable.install|Ollama",
 				})
 				helpers.assert_true(dialog.message:find("llm.unreachable.body_missing|Ollama|http://127.0.0.1:11434", 1, true)

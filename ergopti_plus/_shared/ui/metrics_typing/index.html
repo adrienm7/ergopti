@@ -1276,6 +1276,8 @@
 				// window._prefetch_data on the first paint, so we can't rely on
 				// it for the live merge — we keep our own copy here instead.
 				let cached_historical = null;
+				// Whether that history came from an incomplete host read.
+				let cached_historical_incomplete = false;
 				let manifest_seeded = false;
 				// Apply a prefetch blob (initial fetch or live push) onto the
 				// global state and re-render.
@@ -1292,6 +1294,13 @@
 					// A partial rebuild snapshot is labelled until a complete one lands.
 					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
 					window.metrics_manifest = blob.metrics_manifest || {};
+					// The host shows what it read but never caches an incomplete read.
+					if (window.metrics_freshness) {
+						window.metrics_freshness.mark_incomplete(
+							'manifest',
+							blob.metrics_manifest_incomplete === true
+						);
+					}
 					window.app_icons = blob.app_icons || {};
 					window.driver_meta = blob.driver_meta ||
 						window.driver_meta || { os: 'mac', heatmap_id: 'kc' };
@@ -1304,6 +1313,7 @@
 							: blob.keycode_layout || {};
 					let merged = null;
 					let next_historical = cached_historical;
+					let next_historical_incomplete = cached_historical_incomplete;
 					if (has_prefetch) {
 						const incoming = blob._prefetch_data || {};
 						let incoming_hist = incoming.historical || {};
@@ -1321,10 +1331,12 @@
 						// Omission is a live delta; an explicit empty object clears history.
 						if (Object.prototype.hasOwnProperty.call(incoming, 'historical')) {
 							next_historical = incoming_hist;
+							next_historical_incomplete = incoming.incomplete === true;
 						}
 						merged = {
 							historical: next_historical || incoming_hist || {},
-							today: incoming_today
+							today: incoming_today,
+							incomplete: next_historical_incomplete || incoming.incomplete === true
 						};
 						window._prefetch_data = merged;
 					}
@@ -1352,6 +1364,7 @@
 								window._lua_request = null;
 								if (window.receive_range_data(merged, request_id) === true) {
 									cached_historical = next_historical;
+									cached_historical_incomplete = next_historical_incomplete;
 								}
 							}
 						} catch (e) {

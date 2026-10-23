@@ -299,7 +299,8 @@ _CUK_RetiredScriptBindingOwnershipBody() {
 		AssertEqual("Gestures", Owner, Slot)
 	}
 	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Script__script_altgr_enter__open_url"))
-	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
+	; The keyboard owner publishes its own complete slot domain (keyboard-slot-publication).
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
 }
 Test("config: script boot and cleanup consume the same complete published domain (script-binding-identity)",
 	_CUK_RetiredScriptBindingOwnership)
@@ -429,7 +430,8 @@ _CUK_RetiredTapBindingOwnershipBody() {
 		AssertEqual("Gestures", Owner, Slot)
 	}
 	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("Tap_key__number_row_left__open_url"))
-	AssertEqual("unjudged", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
+	; The keyboard owner publishes its own complete slot domain (keyboard-slot-publication).
+	AssertEqual("retired", TomlConfigActionParameterBindingStatus("keyboard__removed_slot__open_url"))
 }
 Test("config: tap boot and cleanup consume the same complete published domain (tap-binding-identity)",
 	_CUK_RetiredTapBindingOwnership)

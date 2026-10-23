@@ -25,6 +25,7 @@
 
 local M = {}
 local WebviewResult = require("adapters.webview_result")
+local NativePath = require("native_path")
 
 local hs                = hs
 local ui_builder        = require("ui.ui_builder")
@@ -250,8 +251,8 @@ end
 --- @param toml_path string
 --- @return string
 local function stem(toml_path)
-	local name = toml_path:match("[/\\]([^/\\]+)%.toml$") or toml_path
-	return name
+	local name = NativePath.dirname(toml_path) and NativePath.basename(toml_path)
+	return name and name:match("^(.+)%.toml$") or toml_path
 end
 
 --- Discovers installed extensions that expose hotstrings.

@@ -55,9 +55,9 @@ _UWB_WrapResetsBothBuffers() {
 	Reset := _DriverFuncBody("_PrefixInvalidateInputContext")
 	Commit := _DriverFuncBody("_PrefixCommitInputContext")
 	EnterCritical := InStr(Reset, 'Critical("On")')
-	CommitCall := InStr(Reset, "_PrefixCommitInputContext(FocusToken, KnownBoundary)", true, EnterCritical)
+	CommitCall := InStr(Reset, "_PrefixCommitInputContext(FocusToken, KnownBoundary, AtLineStart)", true, EnterCritical)
 	LeaveCritical := InStr(Reset, "Critical(PreviousCritical)", true, CommitCall)
-	ResetEngine := InStr(Commit, "HSE_FeedReset(KnownBoundary, true)")
+	ResetEngine := InStr(Commit, "HSE_FeedReset(KnownBoundary, true, AtLineStart)")
 	ResetPreview := InStr(Commit, '_PrefixSetBuffer("")', true, ResetEngine)
 	Assert(EnterCritical > 0 and CommitCall > EnterCritical and LeaveCritical > CommitCall
 		and ResetEngine > 0 and ResetPreview > ResetEngine,

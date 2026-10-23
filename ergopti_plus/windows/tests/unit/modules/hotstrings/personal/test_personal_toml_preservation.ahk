@@ -279,3 +279,5 @@ _PTIO_PreservationUnownedDescriptions(EditDescription) {
 }
 Test("personal-editor-preservation: unchanged fallbacks preserve invisible description data", _PTIO_PreservationUnownedDescriptions.Bind(false))
 Test("personal-editor-preservation: edited fallbacks refuse replacing invisible description data", _PTIO_PreservationUnownedDescriptions.Bind(true))
+
+#Include test_personal_info_editor_consent.ahk

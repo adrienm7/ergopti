@@ -655,3 +655,5 @@ for Entry in ["GesturePastePlain", "PasteWithoutFormatting"] {
 }
 
 #Include test_clipboardall_external_lock.ahk
+
+#Include test_clipboard_restore_debt_cas.ahk
