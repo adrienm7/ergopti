@@ -427,15 +427,26 @@ _ComposerCheck_ShowWindow(Title, Text) {
 	Window.AddEdit("w560 r10 ReadOnly -Wrap", Text)
 	Copy := Window.AddButton("w140 Default", t("field_check.copy"))
 	Close := Window.AddButton("x+10 w140", t("field_check.close"))
-	Copy.OnEvent("Click", _ComposerCheck_CopyReport.Bind(Text))
+	Copy.OnEvent("Click", (*) => ComposerCheck_CopyReport(Text))
 	Close.OnEvent("Click", (*) => Window.Destroy())
 	Window.OnEvent("Close", (*) => Window.Destroy())
 	Window.Show()
 }
 
-_ComposerCheck_CopyReport(Text, *) {
+/**
+ * Copies a report to the clipboard and says so.
+ * @param {string} Text - The report text.
+ * @param {Func} WriteFn - Receives the text; the clipboard by default.
+ * @param {Func} NoticeFn - Receives the notice text; a tray tip by default.
+ */
+ComposerCheck_CopyReport(Text, WriteFn := 0, NoticeFn := 0) {
 	global COMPOSER_CHECK_TAG
-	A_Clipboard := Text
+	if !HasMethod(WriteFn, "Call")
+		WriteFn := (Value) => A_Clipboard := Value
+	if !HasMethod(NoticeFn, "Call")
+		NoticeFn := (Notice) => TrayTip(Notice, WindowTitle(t("menu.debug.composer_check")))
+	; The clipboard takes Windows line breaks, as the window's own text has.
+	WriteFn.Call(StrReplace(Text, "`n", "`r`n"))
 	LoggerInfo(COMPOSER_CHECK_TAG, "Report copied to the clipboard.")
-	TrayTip(t("field_check.copied"), WindowTitle(t("menu.debug.composer_check")))
+	NoticeFn.Call(t("field_check.copied"))
 }

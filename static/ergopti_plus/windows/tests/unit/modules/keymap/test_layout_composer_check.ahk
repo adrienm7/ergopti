@@ -390,3 +390,11 @@ _LCC_WindowText() {
 	AssertEqual(ComposerCheck_Text(Report, t), Shown[2], "the window text is the clipboard text")
 }
 Test("composer check: the window shows the report text (composer-check)", _LCC_WindowText)
+
+_LCC_CopyReport() {
+	Written := [], Notices := []
+	ComposerCheck_CopyReport("the`nreport", (Value) => Written.Push(Value), (Notice) => Notices.Push(Notice))
+	AssertEqual("the`r`nreport", _LCC_Join(Written), "the clipboard gets the text the window shows, with Windows line breaks")
+	AssertEqual(t("field_check.copied"), _LCC_Join(Notices), "and the user is told")
+}
+Test("composer check: Copy report writes the report and says so (composer-check)", _LCC_CopyReport)
