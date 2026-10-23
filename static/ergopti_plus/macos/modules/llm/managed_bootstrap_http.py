@@ -64,6 +64,18 @@ def _native_request(*args, **kwargs):
         raise
 
 
+def _report_route_fallback(stage):
+    """Name, on stderr, the lookup step after which the worker went direct.
+
+    Only a stage code from the loaded engine's closed vocabulary is printed, so
+    the company PAC address can never reach a log through this line.
+    """
+    engine = sys.modules.get("_ergopti_native_http")
+    vocabulary = getattr(engine, "FAILURE_STAGES", None)
+    if type(stage) is str and type(vocabulary) is dict and stage in vocabulary:
+        print("# managed_bootstrap_route direct_fallback=" + stage, file=sys.stderr, flush=True)
+
+
 def _url(value, maximum):
     if (
         not isinstance(value, str)
@@ -142,6 +154,7 @@ def download(url, output, digest, size, deadline, idle_timeout, request=_native_
                     idle_timeout=idle_timeout,
                     direct=_direct_route(current),
                 ) as response:
+                    _report_route_fallback(getattr(response, "route_fallback", None))
                     if policy["status_min"] <= response.status <= policy["status_max"]:
                         locations = [
                             value for name, value in response.headers if name.lower() == "location"
@@ -596,6 +609,7 @@ def _report_failure(failure, reason):
                 }:
                     fact["native_receipt_reason"] = terminal
     print("# managed_bootstrap_failure " + json.dumps(fact, sort_keys=True), file=sys.stderr)
+    _report_route_fallback(getattr(failure, "native_route_fallback", None))
     print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
     return fact
 

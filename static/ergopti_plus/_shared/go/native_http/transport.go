@@ -44,6 +44,36 @@ func validNativeFailureStage(stage, reason string) bool {
 		case "unavailable":
 			return true
 		}
+	case "native_proxy_budget":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_candidates":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_pac_download":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_pac_evaluation":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_proxy_routes":
+		switch reason {
+		case "unavailable":
+			return true
+		}
+	case "native_wpad_discovery":
+		switch reason {
+		case "unavailable":
+			return true
+		}
 	case "native_proxy_dictionary":
 		switch reason {
 		case "proxy":
