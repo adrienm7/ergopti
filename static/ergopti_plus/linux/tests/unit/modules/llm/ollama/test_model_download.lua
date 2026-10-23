@@ -437,7 +437,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
 			tooltip_preview = false, gestures = false, input_capture_gate = false,
 			package = { loaded = {} }, require = function() return { cleanup = function() end, flush = function() end } end,
-			TimerScheduler = { cancelAll = function() end }, Logger = { warn = function() end },
+			TimerScheduler = { cancelAll = function() return true end }, Logger = { warn = function() end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		}, { __index = _G })
