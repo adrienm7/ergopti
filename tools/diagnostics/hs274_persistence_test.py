@@ -1,8 +1,10 @@
 # tools/diagnostics/hs274_persistence_test.py
-"""Prove physical release persistence and raw rebuild against real SQLite."""
+"""Real-SQLite bridge for the macOS physical persistence Lua tests, and its confinement proof.
+
+The live-ingest and two-rebuild proof that lived here is test_physical_history_persistence.lua.
+"""
 
 import json
-from contextlib import closing
 import os
 from pathlib import Path
 import shutil
@@ -188,50 +190,6 @@ class PhysicalReleasePersistenceTests(unittest.TestCase):
             self.assertFalse((root / "escaped-directory").exists())
             self.assertFalse((root / "escaped.sqlite").exists())
             self.assertEqual(list(outside.iterdir()), [])
-
-    def test_physical_release_survives_ingest_and_two_raw_cache_rebuilds(self):
-        lua = os.environ.get("ERGOPTI_DIAGNOSTIC_LUA54") or shutil.which("lua5.4")
-        self.assertTrue(lua, "Selected physical persistence proof requires Lua 5.4")
-        with tempfile.TemporaryDirectory(prefix="ergopti-physical-release-") as temporary:
-            receipt = run_fixture(lua, temporary)
-            self.assertEqual(receipt["runtime"], "real SQLite; adapted macOS APIs")
-            expected = [
-                {
-                    "date": "2026-09-12",
-                    "app": "Original",
-                    "keycode": 53,
-                    "sum_ms": 1401,
-                    "count": 4,
-                    "max_ms": 900,
-                    "tap_count": 2,
-                    "hold_count": 2,
-                },
-                {
-                    "date": "2026-09-12",
-                    "app": "Other",
-                    "keycode": 49,
-                    "sum_ms": 125,
-                    "count": 1,
-                    "max_ms": 125,
-                    "tap_count": 1,
-                    "hold_count": 0,
-                },
-            ]
-            for phase in ("live", "rebuild_one", "rebuild_two"):
-                self.assertEqual(receipt[phase]["holds"], expected)
-                self.assertEqual(receipt[phase]["presses"], [{"keycode": 53, "c": 1}])
-                self.assertEqual(receipt[phase]["raw_releases"], 5)
-            with closing(sqlite3.connect(owned_path(temporary, receipt["database"]))) as database:
-                metadata = [
-                    json.loads(row[0])
-                    for row in database.execute(
-                        "SELECT metadata_json FROM events_system WHERE action='physical_release' ORDER BY id"
-                    )
-                ]
-            self.assertEqual([row["hold_ms"] for row in metadata], [0, 250, 251, 900, 125])
-            self.assertEqual(metadata[0]["capture"], "capture-original")
-            self.assertEqual(metadata[0]["device"], "18446744073709551615")
-            self.assertEqual(metadata[0]["app"], "Original")
 
 
 if __name__ == "__main__":
