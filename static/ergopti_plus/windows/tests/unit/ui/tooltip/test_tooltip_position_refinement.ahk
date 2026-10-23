@@ -295,3 +295,5 @@ Test("tooltip position: cancel releases the preview cache callback (tooltip-posi
 	_TPR_CancelReleasesOwner.Bind(true))
 Test("tooltip position: default state closure releases its preview owner (tooltip-position-owner-release)",
 	_TPR_CancelReleasesOwner.Bind(true, true))
+
+#Include test_tooltip_hostile_native64.ahk
