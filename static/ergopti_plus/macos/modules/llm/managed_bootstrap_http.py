@@ -597,6 +597,7 @@ def _report_failure(failure, reason):
                     fact["native_receipt_reason"] = terminal
     print("# managed_bootstrap_failure " + json.dumps(fact, sort_keys=True), file=sys.stderr)
     print("Managed bootstrap request failed: " + reason + ".", file=sys.stderr)
+    return fact
 
 
 if __name__ == "__main__":
@@ -621,5 +622,8 @@ if __name__ == "__main__":
             "content_encoding",
         }:
             reason = "unavailable"
-        _report_failure(failure, reason)
-        sys.exit(74)
+        fact = _report_failure(failure, reason)
+        # Status 78 is EX_CONFIG: the native client cannot apply the configured
+        # route (for example a PAC it cannot evaluate). The next attempt reads the
+        # same settings, so the shell must not retry it (issue #101).
+        sys.exit(78 if fact.get("native_child_status") == 78 else 74)
