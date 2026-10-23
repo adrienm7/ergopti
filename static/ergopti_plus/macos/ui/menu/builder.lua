@@ -15,6 +15,7 @@ local M = {}
 local PersonalFiles = require("hotstrings.personal_files")
 local hs         = hs
 local Logger     = require("infra.logger")
+local PhaseStats = require("infra.phase_stats")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
 local i18n       = require("infra.i18n")
@@ -649,6 +650,22 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	return parent and { parent } or {}
 end
 
+-- Phase name of each top-level id, built once: the menu build never
+-- concatenates a name per item.
+local _item_phase_names = {}
+
+--- Returns the phase name `menu_item.<id>` of a top-level row.
+--- @param id string Top-level id declared by the manifest.
+--- @return string
+local function phase_name(id)
+	local name = _item_phase_names[id]
+	if name == nil then
+		name = "menu_item." .. tostring(id)
+		_item_phase_names[id] = name
+	end
+	return name
+end
+
 --- Generates the complete items list for the Hammerspoon menubar.
 ---
 --- Every top-level row, separators included, is placed in the order the
@@ -901,6 +918,7 @@ function M.generate(ctx, menu_mods, actions)
 	}
 
 	local items = {}
+	local item_timings = {}
 	for _, entry in ipairs(load_top_level()) do
 		if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 		local id = entry.id
@@ -916,7 +934,10 @@ function M.generate(ctx, menu_mods, actions)
 			-- promised and will not see.
 			Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
 		else
+			local item_started = PhaseStats.now()
 			local children = builders[id]() or {}
+			local item_ms = PhaseStats.stop(phase_name(id), item_started)
+			item_timings[#item_timings + 1] = { id = id, ms = item_ms }
 			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 			for _, row in ipairs(children) do
 				-- « Pause = tout éteint »: every row the manifest marks as a feature
@@ -937,6 +958,7 @@ function M.generate(ctx, menu_mods, actions)
 		end
 	end
 
+	M.last_item_timings = item_timings
 	-- Everything above collected row DATA; this is where the shared renderer turns
 	-- it into the table hs.menubar consumes, dropping any separator that would not
 	-- sit between two rows.

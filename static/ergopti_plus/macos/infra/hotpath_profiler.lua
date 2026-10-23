@@ -25,7 +25,11 @@ local M = {}
 
 local Logger = require("infra.logger")
 local Timer  = require("adapters.timer_scheduler")
+local PhaseStats = require("infra.phase_stats")
 local LOG    = "HotPath"
+
+-- Phase name of each label, built once so a keystroke never concatenates.
+local _phase_names = {}
 
 -- Keystrokes whose hot-path processing exceeds this many milliseconds are logged
 -- at WARNING. A 20 ms budget filters harmless one-off scheduler jitter while
@@ -81,7 +85,14 @@ end
 --- @param detail string|nil Context shown when slow (typed char, buffer, …).
 --- @return number elapsed_ms The measured duration in milliseconds.
 function M.log_if_slow(label, start_ns, detail)
-	local elapsed_ms = (M.now() - (start_ns or 0)) / NS_PER_MS
+	local elapsed_ns = M.now() - (start_ns or 0)
+	local elapsed_ms = elapsed_ns / NS_PER_MS
+	local phase = _phase_names[label]
+	if phase == nil then
+		phase = "hotpath." .. tostring(label)
+		_phase_names[label] = phase
+	end
+	PhaseStats.add(phase, elapsed_ns)
 	if elapsed_ms > _slow_ms then
 		pcall(Logger.warn, LOG, "Slow %s: %.2f ms (%s).",
 			tostring(label), elapsed_ms, tostring(detail or ""))

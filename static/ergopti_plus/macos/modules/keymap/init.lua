@@ -41,6 +41,7 @@ local MagicKeySource = require("modules.keymap.magic_key_source")
 local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
+local PhaseStats = require("infra.phase_stats")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local KeyEventHealth = require("infra.key_event_health")
 local EventClock = require("adapters.event_clock")
@@ -1870,20 +1871,20 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	_tc_dt           = dt
 	_tc_complex_mult = complex_mult
 
-	-- DEBUG-only sub-segment timing (Perf gate): attribute a slow keystroke to
-	-- trigger matching vs. preview rebuild in the HotPath warning line.
-	local hot_dbg = Perf.is_enabled()
-	local ck0 = hot_dbg and HotPath.now() or nil
+	-- Sub-segment timing, always on: it feeds the phase counters summarised
+	-- every interval and attributes a slow keystroke to trigger matching vs.
+	-- preview rebuild in the HotPath warning line.
+	local ck0 = PhaseStats.now()
 	local fired = run_trigger_checks()
-	if ck0 then _tc_dbg_checks_ms = HotPath.elapsed_ms(ck0) end
+	_tc_dbg_checks_ms = PhaseStats.stop("keymap.match", ck0)
 	if fired then return true end
 
 	-- No trigger fired — the buffer is still the one we appended `chars` to,
 	-- so refresh the preview now (expander.update_preview is only reached
 	-- when an expansion happens, which we just ruled out).
-	local pv0 = hot_dbg and HotPath.now() or nil
+	local pv0 = PhaseStats.now()
 	update_preview_with_action_recovery(CoreState.buffer)
-	if pv0 then _tc_dbg_preview_ms = HotPath.elapsed_ms(pv0) end
+	_tc_dbg_preview_ms = PhaseStats.stop("keymap.preview", pv0)
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys

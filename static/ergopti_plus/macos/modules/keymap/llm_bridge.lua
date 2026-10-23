@@ -31,6 +31,7 @@ local SyntheticInput   = require("adapters.synthetic_input")
 local text_utils       = require("infra.text_utils")
 local core_llm         = require("modules.llm")
 local Logger           = require("infra.logger")
+local PhaseStats       = require("infra.phase_stats")
 local Keycodes         = require("infra.keycodes")
 local keystats        = require("modules.keystats")
 local tooltip          = require("ui.tooltip")
@@ -705,7 +706,7 @@ end
 ---   4. Otherwise → reset predictions and arm the inactivity timer.
 ---
 --- @param buf string The current typed buffer.
-function M.update_preview(buf)
+local function update_preview_body(buf)
 	if not require_state("update_preview") then return end
 	-- This is the sole observation seam for physical text. Hotstring matching owns
 	-- `_state.buffer`; LLM prompting owns this separate context so navigation can
@@ -779,6 +780,7 @@ function M.update_preview(buf)
 	-- consumes its records without scanning registry buckets or re-arbitrating.
 	local matches = {}
 	local winner_match = nil
+	local providers_started = PhaseStats.now()
 	for provider_index, provider in ipairs(_state.preview_providers) do
 		-- The optional second result is an opaque action identity. It lets a
 		-- side-effectful provider bind the successfully rendered row to the exact
@@ -830,8 +832,11 @@ function M.update_preview(buf)
 		return _state.mapping_delay_remaining(
 			mapping, elapsed, tonumber(_state.COMPLEX_DELAY_MULT) or 1)
 	end
+	PhaseStats.stop("preview.providers", providers_started)
+	local resolve_started = PhaseStats.now()
 	local resolution = #matches == 0 and not engine_blocked
 		and expander.resolve_magic_action(buf, literal_preview_allowed) or nil
+	PhaseStats.stop("preview.resolve", resolve_started)
 	if resolution and resolution.winner then
 		for _, action in ipairs(resolution.candidates) do
 			local mapping = action.mapping
@@ -1221,6 +1226,16 @@ function M.update_preview(buf)
 			end
 		end
 	end
+end
+
+--- Refreshes the hotstring preview for the buffer, timing the whole refresh as
+--- the `preview.total` phase so a slow keystroke can be split into providers,
+--- the magic-action resolution and the remaining row and tooltip work.
+--- @param buf string The current typed buffer.
+function M.update_preview(buf)
+	local started = PhaseStats.now()
+	update_preview_body(buf)
+	PhaseStats.stop("preview.total", started)
 end
 
 

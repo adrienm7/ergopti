@@ -222,6 +222,7 @@ if scripting_observed ~= true or scripting_written ~= true then
 	BootJournal.append("INFO", "Native scripting server witness publication unacknowledged.")
 end
 Boot.begin()
+Boot.trace_requires()
 
 --- Records one boot fact in the log and in the synchronous boot journal, which
 --- reaches launcher.log until the configured log folder is committed. Callers
@@ -1940,6 +1941,7 @@ for _, g in ipairs(personal_files) do
 	table.insert(hotfiles, g.name)
 	hotfile_paths[g.name] = g.path
 end
+Boot.sub("personal hotstrings")
 
 -- Extension packs next: the package tier sits between the personal groups and
 -- the bundled ones. Each pack registers under its namespaced ext: key and stays
@@ -1948,6 +1950,8 @@ for _, group in ipairs(ExtensionPacks.load(ExtensionPacks.catalogue(), keymap)) 
 	table.insert(hotfiles, group.name)
 	hotfile_paths[group.name] = group.path
 end
+
+Boot.sub("extension packs")
 
 -- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
 -- before common TOMLs, so dynamic rules beat same-length common hotstrings.
@@ -1975,6 +1979,7 @@ if dynamic_hotstrings.set_enabled(boot_personal_info) ~= true
 	error("canonical personal-info preference did not commit before eventtap startup")
 end
 table.insert(hotfiles, "dynamichotstrings")
+Boot.sub("dynamic hotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
 -- A layout extension may bind a category, or some of its sections, to its own
@@ -1989,17 +1994,25 @@ local carried_categories = {}
 -- choice catalogue is published only from a complete load.
 local bundled_complete = true
 local build_sections = {}
+local slowest_common_ms, slowest_common_name = 0, "none"
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
 	local own = hotstrings_dir .. fname
 	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
+	local PhaseStats = require("infra.phase_stats")
+	local load_started = PhaseStats.now()
 	local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
+	local load_ms = PhaseStats.stop("hotstring_load.common_file", load_started)
+	if load_ms > slowest_common_ms then slowest_common_ms, slowest_common_name = load_ms, name end
 	if receipt.committed then common_file_count = common_file_count + 1 else bundled_complete = false end
 	build_sections[name] = receipt.committed and path == own and section_sources == nil
 		and not is_user_hotstrings_copy(own)
 	carried_categories[name] = true
 end
+Boot.sub("common hotstring files")
+Logger.evidence(LOG, "Common hotstring load: %d file(s), slowest '%s' %.1f ms.",
+	common_file_count, slowest_common_name, slowest_common_ms)
 -- Language packs after the neutral files. A declared pack whose file is missing
 -- is a broken install: it is logged as an error rather than silently absent from
 -- the menu.
@@ -2022,6 +2035,7 @@ for _, pack in ipairs(language_packs) do
 		end
 	end
 end
+Boot.sub("language hotstring files")
 -- A category an extension binds whole is its file even when no bundled file
 -- carries it. Sections bound into a category this driver does not carry have
 -- no metadata to join, so they are reported instead of guessed.
@@ -2068,6 +2082,7 @@ do
 			s.hits or 0, s.misses or 0, s.writes or 0, tostring(s.enabled)))
 	end
 end
+Boot.sub("choice catalogue and cache stats")
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
 Boot.stage("Final mapping sort + tail-index rebuild")
 
@@ -2278,6 +2293,9 @@ end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
 Boot.complete()
+-- Permanent phase counters (hot path, menu, boot sub-stages, config parses,
+-- child processes): one summary line per family every interval, never at boot.
+require("infra.phase_stats").start()
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
