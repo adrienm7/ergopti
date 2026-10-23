@@ -1,0 +1,29 @@
+{
+	"expected_count": 26,
+	"filters": [
+		{
+			"contains": "ollama-nonstream-response-utf8",
+			"expected_count": 3
+		},
+		{
+			"contains": "personal-info-reader-publication",
+			"expected_count": 3
+		},
+		{
+			"contains": "managed-local-models-utf8",
+			"expected_count": 6
+		},
+		{
+			"contains": "gesture-keywatcher-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "gesture-click-pause-admission",
+			"expected_count": 4
+		},
+		{
+			"contains": "external-suspend-program-owner",
+			"expected_count": 4
+		}
+	]
+}
