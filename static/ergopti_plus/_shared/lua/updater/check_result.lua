@@ -36,9 +36,12 @@ M.REASONS = {
 
 --- Classifies one release list for a manual check of one channel.
 --- @param body string Raw GitHub releases array JSON.
---- @param opts table { registry, channel, current, installed }: the channel
----   interpreter, the checked channel, the installed version and its channel.
---- @return table result { state, channel, current, latest?, release?, others }
+--- @param opts table { registry, channel, current, installed, check_only? }: the
+---   channel interpreter, the checked channel, the installed version and its
+---   channel. check_only marks a list read from the public Atom feed: it names
+---   tags only, so an available release is announced but cannot be installed
+---   (the install needs the API's asset list and digests).
+--- @return table result { state, channel, current, latest?, release?, others, check_only? }
 ---   where release is the JSON object of the offered or latest release.
 function M.classify(body, opts)
 	local registry = opts.registry
@@ -61,6 +64,7 @@ function M.classify(body, opts)
 	result.release = chunks[best]
 	if registry.should_offer(tags[best], opts.current, opts.channel, opts.installed) then
 		result.state = "available"
+		if opts.check_only == true then result.check_only = true end
 	else
 		result.state = "up_to_date"
 	end

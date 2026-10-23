@@ -283,6 +283,32 @@ const OTHERS = [{ channel: 'main', tag: 'v1.2.0' }];
 	expect(el.others.hidden && el.others.childNodes.length === 0, 'a stale other-channel line stays');
 	expect(el['btn-report'].hidden, 'a new release offers a report');
 
+	// A release read from the public feed is announced, not installable: no Update
+	// button, and the page says why
+	receive({
+		type: 'state',
+		state: 'available',
+		channel: 'dev',
+		current: 'v0.0.0-dev.144',
+		latest: 'v0.0.0-dev.150',
+		others: [],
+		check_only: true
+	});
+	expect(el['btn-update'].hidden, 'a check-only release still offers the Update button');
+	expect(
+		el.status.textContent === en['update_check.check_only'],
+		`a check-only release reads "${el.status.textContent}" instead of the reason`
+	);
+	receive({
+		type: 'state',
+		state: 'available',
+		channel: 'dev',
+		current: 'v0.0.0-dev.144',
+		latest: 'v0.0.0-dev.150',
+		others: []
+	});
+	expect(!el['btn-update'].hidden, 'a regular release lost its Update button');
+
 	// Buttons send their action name only
 	for (const [id, action] of [
 		['btn-update', 'update'],
