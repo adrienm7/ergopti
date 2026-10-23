@@ -1368,6 +1368,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/paths_editor/init.ahk
 #Include ui/layout_manager/init.ahk
 #Include ui/layout_manager/composer.ahk
+#Include ui/layout_manager/composer_check.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 

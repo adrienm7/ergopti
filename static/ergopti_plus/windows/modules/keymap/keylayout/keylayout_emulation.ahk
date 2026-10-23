@@ -397,6 +397,46 @@ KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
 	return _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
 }
 
+/**
+ * Whether the emulation would accept a .keylayout, without loading it: the
+ * same parse, the same level lookup, the same resolution of every key of every
+ * level and the same dead-key composition as KeylayoutEmulation_Load, but the
+ * emulated layout and the typing state are left alone. The composer's Debug
+ * check reads a user's installed layout through it while the emulation runs.
+ * @param {string} Id - Registry id.
+ * @param {string} Text - .keylayout content.
+ * @param {string} Convention - Registry keycode_convention ("iso" | "ansi").
+ * @param {Map} KeycodeTable - Parsed _shared/modules/layouts/mac_keycodes.json.
+ * @returns {Integer} Number of keys the emulation would take.
+ * @throws {Error} Where Load would refuse the layout.
+ */
+KeylayoutEmulation_Check(Id, Text, Convention, KeycodeTable) {
+	KeyCodes := KeylayoutEmulation_KeyCodes(KeycodeTable, Convention)
+	Model := Keylayout_Parse(Text)
+	LevelIndex := Map()
+	for Shift in [false, true] {
+		for Caps in [false, true] {
+			for Option in [false, true] {
+				Pressed := Map()
+				if Shift
+					Pressed["shift"] := true
+				if Caps
+					Pressed["caps"] := true
+				if Option
+					Pressed["option"] := true
+				LevelIndex[_KLE_ComboKey(Shift, Caps, Option)] := Keylayout_KeyMapIndex(Model, Pressed)
+			}
+		}
+	}
+	LevelIndex["command"] := Keylayout_KeyMapIndex(Model, Map("command", true))
+	_KLE_ShortcutLevels(Model, Id, LevelIndex)
+	for _, Index in LevelIndex
+		for _, Code in KeyCodes
+			Keylayout_Resolve(Model, Index, Code)
+	_KLE_BuildCompositions(Model)
+	return KeyCodes.Count
+}
+
 ; The shortcut levels of a loaded layout. A registry layout types every Ctrl, Alt
 ; and Win chord from its Command level; the layout the composer built
 ; (docs/layout-composer.md) selects a keyMap of its own for each of the three, so
