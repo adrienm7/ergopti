@@ -31,9 +31,9 @@ helpers.describe("hotstrings config window: the default delay comes from the can
 		helpers.assert_true(type(src) == "string" and src ~= "",
 			"the config window source must be readable or this asserts nothing")
 		local code = src:gsub("%-%-[^\n]*", "")
-		helpers.assert_true(code:find("GLOBAL_DEFAULT_DELAY_MS%s*=%s*750") == nil,
-			"a mirrored constant asking humans to keep it in sync is the second source; the "
-			.. "remaining literal must be reachable only as a fallback")
+		helpers.assert_true(code:find("750", 1, true) == nil,
+			"the window must hold no copy of the shared delay, not even as a fallback: a "
+			.. "missing canon is a broken install and has to fail loudly")
 	end)
 
 end)
