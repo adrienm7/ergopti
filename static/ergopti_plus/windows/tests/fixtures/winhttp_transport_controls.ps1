@@ -263,6 +263,55 @@ try {
     Require ($Receipt.stage -ceq 'proxy_connect' -and $Receipt.proxy_connect_status -eq 403 -and $Receipt.http_response_source -ceq 'proxy') 'The CONNECT refusal receipt changed.'
     Pass 'connect_refusal_is_attributed_to_the_proxy'
 
+    # The engine tells an origin answer from a proxy answer to a tunnel by whether a TLS
+    # session exists (the server certificate context). A successful TLS exchange needs a
+    # trusted root, so this control checks the operating-system behavior the engine relies
+    # on with a raw WinHTTP call that is TEST ONLY: it ignores certificate errors so the
+    # handshake completes. The engine itself never does.
+    Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class ErgoptiWinHttpRawProbe {
+ [DllImport("winhttp.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr WinHttpOpen(string a, uint t, string p, string b, uint f);
+ [DllImport("winhttp.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr WinHttpConnect(IntPtr s, string h, ushort p, uint r);
+ [DllImport("winhttp.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr WinHttpOpenRequest(IntPtr c, string v, string o, string ver, string r, IntPtr a, uint f);
+ [DllImport("winhttp.dll", SetLastError=true)] static extern bool WinHttpSetOption(IntPtr h, uint o, ref uint v, uint l);
+ [DllImport("winhttp.dll", SetLastError=true)] static extern bool WinHttpSendRequest(IntPtr r, string h, uint hl, IntPtr o, uint ol, uint tl, UIntPtr c);
+ [DllImport("winhttp.dll", SetLastError=true)] static extern bool WinHttpReceiveResponse(IntPtr r, IntPtr x);
+ [DllImport("winhttp.dll", SetLastError=true)] static extern bool WinHttpQueryOption(IntPtr h, uint o, IntPtr b, ref uint l);
+ [DllImport("winhttp.dll", SetLastError=true)] static extern bool WinHttpQueryHeaders(IntPtr r, uint level, string name, IntPtr buf, ref uint len, IntPtr idx);
+ [DllImport("winhttp.dll")] static extern bool WinHttpCloseHandle(IntPtr h);
+ [DllImport("crypt32.dll")] static extern bool CertFreeCertificateContext(IntPtr c);
+ // Returns "<status>:<certificate context present>" or "failed:<native error>".
+ public static string Get(string proxy, string host, int port) {
+  IntPtr s = WinHttpOpen("probe", string.IsNullOrEmpty(proxy) ? 1u : 3u, string.IsNullOrEmpty(proxy) ? null : proxy, null, 0);
+  IntPtr c = WinHttpConnect(s, host, (ushort)port, 0);
+  IntPtr r = WinHttpOpenRequest(c, "GET", "/", null, null, IntPtr.Zero, 0x00800000);
+  uint flags = 0x3300; WinHttpSetOption(r, 31, ref flags, 4);
+  try {
+   if (!WinHttpSendRequest(r, null, 0, IntPtr.Zero, 0, 0, UIntPtr.Zero) || !WinHttpReceiveResponse(r, IntPtr.Zero)) return "failed:" + Marshal.GetLastWin32Error();
+   IntPtr buffer = Marshal.AllocHGlobal(8); uint length = 8;
+   bool present = false;
+   if (WinHttpQueryOption(r, 78, buffer, ref length)) {
+    IntPtr context = Marshal.ReadIntPtr(buffer); present = context != IntPtr.Zero;
+    if (present) CertFreeCertificateContext(context);
+   }
+   Marshal.FreeHGlobal(buffer);
+   IntPtr status = Marshal.AllocHGlobal(4); uint size = 4;
+   WinHttpQueryHeaders(r, 19 | 0x20000000, null, status, ref size, IntPtr.Zero);
+   int code = Marshal.ReadInt32(status); Marshal.FreeHGlobal(status);
+   return code + ":" + present;
+  } finally { WinHttpCloseHandle(r); WinHttpCloseHandle(c); WinHttpCloseHandle(s); }
+ }
+}
+'@ -ErrorAction Stop
+    # A fresh service: Schannel remembers a refused certificate per server in this process.
+    $TlsProbe = New-Server 'tls' @($Ok200) @{ Certificate = [ErgoptiWinHttpTestServer]::NewUntrustedCertificate() }
+    $Tunnel2 = New-Server 'proxy_sspi' @() @{ Package = 'NTLM'; TunnelPort = $TlsProbe.Port }
+    Require ([ErgoptiWinHttpRawProbe]::Get($null, '127.0.0.1', $TlsProbe.Port) -ceq '200:True') 'A completed direct TLS exchange must expose its server certificate context.'
+    Require ([ErgoptiWinHttpRawProbe]::Get(('127.0.0.1:' + $Tunnel2.Port), 'tls-origin.invalid', $TlsProbe.Port) -ceq '200:True') 'A completed TLS exchange through an authenticated tunnel must expose its server certificate context.'
+    Require ([ErgoptiWinHttpRawProbe]::Get(('127.0.0.1:' + $Deny.Port), 'tls-origin.invalid', $TlsProbe.Port) -ceq '403:False') 'A tunnel refused by the proxy must expose no server certificate context.'
+    Pass 'server_certificate_context_exists_exactly_after_a_tls_negotiation'
+
     # --- capability --------------------------------------------------------
     $Capability = (New-Engine).Engine.ObserveCapability()
     Require ($Capability.tls_backend -ceq 'schannel' -and $Capability.sspi -and $Capability.spnego -and $Capability.ntlm) 'The observed capability does not list the integrated schemes.'
