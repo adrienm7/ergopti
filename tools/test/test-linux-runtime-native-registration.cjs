@@ -220,8 +220,9 @@ function validate(root) {
 	assert.equal(Pipeline.stepField(body, 'timeout-minutes'), '5');
 	const command = Pipeline.stepField(body, 'run');
 	assert.match(command, /set -euo pipefail/);
+	assert.doesNotMatch(command, /ubuntu_apt\.py/, 'the install has its own step');
 	assert.match(
-		command,
+		Pipeline.stepField(Pipeline.step(job, `Install prerequisites for ${STEP}`), 'run'),
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y --no-install-recommends zstd/
 	);
 	assert.match(
@@ -234,7 +235,10 @@ function validate(root) {
 		steps.indexOf(STEP) > steps.indexOf('Qualify native HTTP streaming receipts'),
 		'native dependencies precede this proof'
 	);
-	const early = Pipeline.step(job, 'Terminate real descendants after their process leader exits');
+	const early = Pipeline.step(
+		job,
+		'Install prerequisites for Terminate real descendants after their process leader exits'
+	);
 	assert.match(
 		Pipeline.stepField(early, 'run'),
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y --no-install-recommends lua-luv lua5\.4 curl/

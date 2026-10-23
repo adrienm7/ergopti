@@ -97,7 +97,10 @@ function mandatory(text) {
 	const body = jobs[0].body,
 		steps = Pipeline.steps(body);
 	const preparation = Pipeline.runOf(
-		Pipeline.step(body, 'Terminate real descendants after their process leader exits')
+		Pipeline.step(
+			body,
+			'Install prerequisites for Terminate real descendants after their process leader exits'
+		)
 	).join('\n');
 	for (const name of ['build-essential', 'lua5.4', 'lua-luv', 'strace', 'openssl'])
 		assert.ok(preparation.split(/\s+/).includes(name), name);
@@ -526,7 +529,8 @@ function providerRegistration(source, producer, planner, text, entry) {
 	);
 	assert.ok(job);
 	const steps = Pipeline.steps(job.body);
-	const prepName = 'Terminate real descendants after their process leader exits';
+	const prepName =
+		'Install prerequisites for Terminate real descendants after their process leader exits';
 	const prep = Pipeline.runOf(Pipeline.step(job.body, prepName)).join('\n');
 	for (const pkg of ['meson', 'ninja-build', 'liblua5.4-dev', 'libffi-dev', 'pkg-config'])
 		assert.ok(prep.split(/\s+/).includes(pkg), pkg);
