@@ -475,16 +475,16 @@ Ergopti_OnSuspendEnter() {
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
-	if IsSet(ProgramActions_Stop)
-		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
-	if IsSet(UserHotstringsInvalidate)
-		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if !_LifecycleRunRequiredStep(Transition, "navigation-event",
 			() => _LifecycleSetNavEventOwnerSuspended(true), true) {
 		LifecycleTransitionFinish(Transition)
 		_LifecycleLogTransitionDebt(Transition)
 		return false
 	}
+	if IsSet(ProgramActions_Stop)
+		_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(true), true)
+	if IsSet(UserHotstringsInvalidate)
+		_LifecycleRunRequiredStep(Transition, "user-hotstrings", UserHotstringsInvalidate.Bind("suspend"), true)
 	if IsSet(LLM_AuxInvalidate)
 		_LifecycleRunRequiredStep(Transition, "llm-aux-context",
 			LLM_AuxInvalidate.Bind("suspend"))
