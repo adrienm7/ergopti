@@ -272,6 +272,8 @@ LayoutComposer_Entry(Declaration, Keylayout) {
 _LayoutComposer_WriteText(Path, Text) {
 	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
 	Partial := Path . LAYOUT_REGISTRY_PARTIAL_SUFFIX
+	SplitPath(Path, , &Parent)
+	DirCreate(Parent)
 	if !FSWrite(Partial, Text)
 		throw Error("Cannot write " . Partial)
 	if !FSAtomicMoveReplace(Partial, Path)
@@ -353,6 +355,12 @@ _LayoutComposer_Save(Deps, DeclarationText, Keylayout, Use) {
 	try Deps["write_text"].Call(LayoutComposer_DeclarationPath(Deps["config_dir"]), DeclarationText)
 	catch as Err {
 		LoggerError("LayoutComposer", "The composition could not be stored: {1}", Err.Message)
+		_LayoutComposer_Report(Deps, Action, false, LAYOUT_COMPOSER_FAILURE_WRITE, Err.Message)
+		return
+	}
+	try DirCreate(Deps["local_dir"])
+	catch as Err {
+		LoggerError("LayoutComposer", "The layouts folder could not be created: {1}", Err.Message)
 		_LayoutComposer_Report(Deps, Action, false, LAYOUT_COMPOSER_FAILURE_WRITE, Err.Message)
 		return
 	}

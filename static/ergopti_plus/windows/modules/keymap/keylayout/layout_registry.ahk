@@ -116,7 +116,7 @@ LayoutRegistry_Settings() {
 LayoutRegistry_Composer() {
 	global _LayoutRegistryComposer
 	if !IsObject(_LayoutRegistryComposer)
-		_LayoutRegistryComposer := _LayoutRegistryReadJson("moduleslayoutsdefaults.json")["composer"]
+		_LayoutRegistryComposer := _LayoutRegistryReadJson("modules\layouts\defaults.json")["composer"]
 	return _LayoutRegistryComposer
 }
 
