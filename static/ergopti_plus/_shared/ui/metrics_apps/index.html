@@ -1191,6 +1191,7 @@
 
 		<script src="../i18n.js"></script>
 		<script src="../metrics_rebuild_banner.js"></script>
+		<script src="../metrics_freshness.js"></script>
 		<!-- Load order: helpers (colors/format) → state → main (init+render) → charts → modal -->
 		<script src="helpers.js"></script>
 		<script src="state.js"></script>
@@ -1212,6 +1213,16 @@
 					// A partial rebuild snapshot is labelled until a complete one lands.
 					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
 					const manifest = blob.metrics_manifest || {};
+					// The host shows what it read but never caches an incomplete read.
+					if (
+						window.metrics_freshness &&
+						typeof window.metrics_freshness.mark_incomplete === 'function'
+					) {
+						window.metrics_freshness.mark_incomplete(
+							'manifest',
+							blob.metrics_manifest_incomplete === true
+						);
+					}
 					const categories = blob.user_categories || {};
 					const icons = blob.app_icons || {};
 					if (typeof window.bootstrapMetricsAppsData === 'function') {

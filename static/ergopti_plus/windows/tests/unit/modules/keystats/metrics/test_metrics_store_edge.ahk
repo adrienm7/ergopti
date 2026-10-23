@@ -137,3 +137,49 @@ for Which in ["typing", "apps"]
 for Which in ["typing", "apps"]
 	Test("metrics Edge: close all retires pending " . Which . " projection (metrics-edge-close-all)",
 		_MSE_CancelPendingProjection.Bind(Which, true))
+
+_MSE_IncompleteReadLaunchesPartial(Which) {
+	SavedPending := KLUI.pending
+	SavedLaunch := KLUI.launch_edge_fn
+	Stage := A_Temp . "\ergopti_edge_partial_stage_" . A_ScriptHwnd . ".json"
+	Launches := []
+	Attempt := Map()
+	Launch(LaunchWhich, Url, Title, PartialStage := "") {
+		Launches.Push([LaunchWhich, Url, PartialStage])
+		return true
+	}
+	try {
+		FileOpen(Stage, "w").Write('{"incomplete":true}')
+		KLUI.launch_edge_fn := Launch
+		KLUI.pending := Map(Which, Attempt)
+		KLUI_OnPrefetchTerminal(Which, "page", "fixture", Attempt, "incomplete", Stage)
+		AssertEqual(1, Launches.Length, "an incomplete read must still open the dashboard")
+		AssertEqual(Stage, Launches[1][3], "the page must be given the partial stage")
+		AssertFalse(KLUI.pending.Has(Which), "the launch intent must be retired")
+
+		KLUI.pending := Map(Which, Attempt)
+		KLUI_OnPrefetchTerminal(Which, "page", "fixture", Attempt, "incomplete", "")
+		AssertEqual(1, Launches.Length, "an incomplete read without a stage must not launch")
+
+		KLUI.pending := Map(Which, Attempt)
+		KLUI_OnPrefetchTerminal(Which, "page", "fixture", Attempt, "ok", Stage)
+		AssertEqual(2, Launches.Length)
+		AssertEqual("", Launches[2][3], "a complete read keeps the published sidecar")
+	} finally {
+		try FileDelete(Stage)
+		KLUI.pending := SavedPending
+		KLUI.launch_edge_fn := SavedLaunch
+	}
+}
+for Which in ["typing", "apps"]
+	Test("metrics Edge: " . Which . " incomplete read opens with its partial stage (metrics-edge-partial)",
+		_MSE_IncompleteReadLaunchesPartial.Bind(Which))
+
+_MSE_PartialPrefetchUrl() {
+	Url := KLUI_WithPrefetchPath("file:///page.html#prefetch=old", "C:\tmp\partial.json")
+	Parts := StrSplit(Url, "#prefetch=")
+	AssertEqual(2, Parts.Length, "the old sidecar fragment must be replaced, not appended")
+	AssertEqual("file:///C:/tmp/partial.json", UriDecode(UriDecode(Parts[2])))
+}
+Test("metrics Edge: a partial stage replaces the sidecar fragment (metrics-edge-partial-url)",
+	_MSE_PartialPrefetchUrl)
