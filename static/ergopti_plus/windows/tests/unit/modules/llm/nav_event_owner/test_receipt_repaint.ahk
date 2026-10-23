@@ -621,12 +621,20 @@ _LNEO_AllPlaceholderCannotReplaceVisiblePrediction() {
 		_TooltipActiveSurface := 0
 		AssertTrue(LLM_NavEventOwner_CommitSurfaceSwap(HideTx),
 			"the control path must commit A-to-empty ownership")
-		AssertTrue(LLM_TooltipShowLoading(Meta),
+		; The published request is read in the same Critical section that
+		; publishes it: its debounced render timer can otherwise fire between two
+		; lines of a slow runner and consume it before it is read (run 39887661465).
+		PreviousCritical := Critical("On")
+		try {
+			Shown := LLM_TooltipShowLoading(Meta)
+			Published := _TooltipPendingRequest
+			PublishedSerial := _TooltipRequestSerial
+		} finally Critical(PreviousCritical)
+		AssertTrue(Shown,
 			"the same loading request must remain eligible on an empty surface")
-		AssertTrue(IsObject(_TooltipPendingRequest)
-				&& ObjPtr(_TooltipPendingRequest) != ObjPtr(Pending),
+		AssertTrue(IsObject(Published) && ObjPtr(Published) != ObjPtr(Pending),
 			"an eligible loading request must publish a fresh pending owner")
-		AssertEqual(272, _TooltipRequestSerial,
+		AssertEqual(272, PublishedSerial,
 			"an eligible loading request must advance the serial exactly once")
 	} finally {
 		if IsObject(_TooltipPendingRequest)
