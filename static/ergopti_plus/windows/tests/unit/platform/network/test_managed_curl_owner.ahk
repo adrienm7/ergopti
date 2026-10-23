@@ -335,3 +335,5 @@ Test("managed curl owner: real generation cancellation revokes a queued native a
 Test("managed curl owner: generation replacement after Send revokes native admission", _ManagedCurlControlGenerationAdmissionRevoked.Bind(true))
 Test("managed curl owner: queued admission cannot beat cancellation after a yielded ACK", _ManagedCurlControlGenerationAdmissionRevoked.Bind(false, true))
 Test("managed curl owner: queued admission cannot beat replacement after a yielded ACK", _ManagedCurlControlGenerationAdmissionRevoked.Bind(true, true))
+
+#Include test_layout_registry_retirement.ahk
