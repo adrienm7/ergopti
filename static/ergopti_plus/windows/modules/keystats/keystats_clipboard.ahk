@@ -216,6 +216,16 @@ KL_Clip_OnChange(data_type) {
 				}
 		}
 
+	; The hook snapshot can lag behind the current focus filter. Classify the
+	; captured copy source itself without persisting its window title.
+	SourceFiltered := true
+	try SourceFiltered := MF_ShouldFilterFor(Context.app, Context.title)
+	catch {
+		try LoggerWarn("Keystats", "Clipboard source privacy classification failed closed.")
+	}
+	if SourceFiltered
+		return
+
 	Now := A_TickCount
 	RejectedBySuspend := false
 	; Provenance belongs to the same acceptance transaction as the actual row.
