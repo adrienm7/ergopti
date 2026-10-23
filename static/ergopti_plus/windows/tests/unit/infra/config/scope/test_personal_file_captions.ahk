@@ -113,8 +113,7 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 	SavedSectionsCache := IsSet(_ParseExtTomlSectionsCache) ? _ParseExtTomlSectionsCache : unset
 	SavedFileCache := IsSet(_TomlFileCache) ? _TomlFileCache : unset
 	SavedUnreadableCache := IsSet(_TomlUnreadableFiles) ? _TomlUnreadableFiles : unset
-	Directory := A_Temp . "\ergopti-caption-" . A_TickCount . "-" . Random(10000, 99999)
-	DirectoryOwned := false, Menus := [], HadPrimary := false, CleanupFailures := []
+	Fixture := 0, Menus := [], HadPrimary := false, CleanupFailures := []
 	StemReads := 0, CountReads := 0, ChildObserved := false, ForeignReads := 0
 	PoisonedRoot := false, PoisonedOwner := false
 	CallOwner := CallTarget == "formatter" ? _MR_CaptionValues : MenuRenderer_PersonalFileParentRow
@@ -170,9 +169,11 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 		global _TomlUnreadableFiles
 		_TomlUnreadableFiles := IsSet(SavedUnreadableCache) ? SavedUnreadableCache : unset
 	}
+	; The fixture owns the personal root, the configuration and every global the
+	; adoption touches; its cleanup also removes the physical source.
 	DeleteDirectory(*) {
-		if DirectoryOwned && DirExist(Directory)
-			DirDelete(Directory, true)
+		if IsObject(Fixture)
+			_PFC_Cleanup(Fixture)
 	}
 	Attempt(Owner, Operation) {
 		try Operation.Call()
@@ -182,17 +183,18 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 	try {
 		; The headless host omits tray startup; own every cache used by the real parser.
 		_ParseExtTomlSectionsCache := Map(), _TomlFileCache := Map(), _TomlUnreadableFiles := Map()
-		AssertFalse(DirExist(Directory), "fresh physical fixture directory has no foreign owner")
-		DirectoryOwned := true
-		DirCreate(Directory)
-		Path := Directory . "\late_label.toml"
+		Fixture := _PFC_Fixture()
+		Path := Fixture.root . "\late_label.toml"
 		Assert(FSWriteDurable(Path, Source))
 		AssertEqual(Source, FSReadUtf8Exact(Path))
 		Sections := _ParseExtTomlSections(Path), ActualCount := 0
 		for Section in Sections
 			ActualCount += Section["count"]
 		AssertEqual(2, ActualCount, "genuine native parsing supplies the original physical count")
-		AssertFalse(PersonalFileControls.ForPath(Path), "fresh source genuinely has no adopted metadata owner")
+		; Only an adopted source is active, so the caption reads the owner's count.
+		PersonalFileControls.Refresh()
+		AdoptedOwner := PersonalFileControls.ForPath(Path)
+		Assert(AdoptedOwner is PersonalFileAdoptedOwner, "the physical source is a genuine adopted owner")
 		SplitPath Path, , , , &Stem
 		AssertEqual("late_label", Stem, "real filename supplies the frozen donor stem")
 		Cleaner := Menu(), Menus.Push(Cleaner)
@@ -207,7 +209,7 @@ _HSCS_PersonalFileCaptionNative(Kind, CallTarget := "formatter") {
 		_FmtCountCache := Map()
 		TF := {path: Path, sections: [], stem: Stem, count: ActualCount}
 		TF.DeleteProp("stem"), TF.DefineProp("stem", {Get: ReadStem})
-		TF.DeleteProp("count"), TF.DefineProp("count", {Get: ReadCount})
+		AdoptedOwner.DefineProp("ActiveCount", {Call: ReadCount})
 		if Kind == "mapping"
 			Root[Key] := Map("format", "%s [%s]")
 		else if Kind == "missing"
@@ -419,9 +421,10 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 	SavedSectionsCache := IsSet(_ParseExtTomlSectionsCache) ? _ParseExtTomlSectionsCache : unset
 	SavedFileCache := IsSet(_TomlFileCache) ? _TomlFileCache : unset
 	SavedUnreadableCache := IsSet(_TomlUnreadableFiles) ? _TomlUnreadableFiles : unset
-	Directory := A_Temp . "\ergopti-folder-caption-" . A_TickCount . "-" . Random(10000, 99999)
-	DirectoryOwned := false, Menus := [], HadPrimary := false, CleanupFailures := []
+	Fixture := 0, Menus := [], HadPrimary := false, CleanupFailures := []
 	CountReads := 0, FormatReads := 0, ChildObserved := false, ForeignReads := 0
+	; The adopted file captions its two sections before its own count.
+	SectionFormats := 2
 	PoisonedRoot := false, PoisonedOwner := false, Held := []
 	CallOwner := Kind == "parent_call" ? MenuRenderer_PersonalFolderParentRow : _MR_CaptionValues
 	Primary := Error("original late folder count failure")
@@ -457,7 +460,7 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 	}
 	ReadCache(This, Number) {
 		FormatReads += 1
-		if Kind == "format_throw" && FormatReads == 2
+		if Kind == "format_throw" && FormatReads == SectionFormats + 2
 			throw Primary
 		return Map.Prototype.Has.Call(This, Number)
 	}
@@ -491,9 +494,11 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 		global _TomlUnreadableFiles
 		_TomlUnreadableFiles := IsSet(SavedUnreadableCache) ? SavedUnreadableCache : unset
 	}
+	; The fixture owns the personal root, the configuration and every global the
+	; adoption touches; its cleanup also removes the physical source.
 	DeleteDirectory(*) {
-		if DirectoryOwned && DirExist(Directory)
-			DirDelete(Directory, true)
+		if IsObject(Fixture)
+			_PFC_Cleanup(Fixture)
 	}
 	Attempt(Owner, Operation) {
 		try Operation.Call()
@@ -515,17 +520,18 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 	try {
 		; The headless host omits tray startup; own every cache used by the real parser.
 		_ParseExtTomlSectionsCache := Map(), _TomlFileCache := Map(), _TomlUnreadableFiles := Map()
-		AssertFalse(DirExist(Directory), "fresh physical directory has no foreign owner")
-		DirectoryOwned := true, DirCreate(Directory)
-		Path := Directory . "\late_label.toml"
+		Fixture := _PFC_Fixture()
+		Path := Fixture.root . "\late_label.toml"
 		Assert(FSWriteDurable(Path, Source)), AssertEqual(Source, FSReadUtf8Exact(Path))
 		Sections := _ParseExtTomlSections(Path), ActualCount := 0
 		for Section in Sections
 			ActualCount += Section["count"]
 		AssertEqual(2, ActualCount, "the actual TOML parser supplies the independent positive total")
-		AssertFalse(PersonalFileControls.ForPath(Path), "the actual physical source has no adopted owner")
+		PersonalFileControls.Refresh()
+		AdoptedOwner := PersonalFileControls.ForPath(Path)
+		Assert(AdoptedOwner is PersonalFileAdoptedOwner, "the actual physical source is a genuine adopted owner")
 		TF := {path: Path, sections: [], stem: "late_label", count: ActualCount}
-		TF.DeleteProp("count"), TF.DefineProp("count", {Get: ReadCount})
+		AdoptedOwner.DefineProp("ActiveCount", {Call: ReadCount})
 		Tree := Map("Folder", Map("tomls", [TF], "subfolders", Map()))
 		Cleaner := Menu(), Menus.Push(Cleaner)
 		try Cleaner.Delete()
@@ -559,7 +565,7 @@ _HSCS_PersonalFolderCaptionNative(Kind) {
 			AssertEqual(Kind == "valid_rows" || Kind == "mapping", Accepted)
 		}
 		AssertEqual(Kind == "missing" ? 0 : 2, CountReads, "genuine file count precedes exactly one late _HS_NodeTotal read")
-		AssertEqual(Kind == "missing" ? 0 : Kind == "total_throw" ? 1 : 2, FormatReads, "original positive count format is not evaluated before late total")
+		AssertEqual(Kind == "missing" ? 0 : SectionFormats + (Kind == "total_throw" ? 1 : 2), FormatReads, "original positive count format is not evaluated before late total")
 		if Kind != "missing"
 			AssertTrue(ChildObserved, "real finished registered child exists before late total")
 		if Kind == "valid_rows" || Kind == "mapping" {
@@ -732,3 +738,29 @@ _HSCS_TemplateChildPublication() {
 }
 Test("template-child: only a filled child the renderer still publishes gets a parent row or a repaint",
 	_HSCS_TemplateChildPublication)
+
+
+; A source the adoption refused loads nothing, so neither its row caption nor
+; its folder may count its raw entries as active mappings (regression 102).
+_HSCS_RefusedFileCountsNothing() {
+	Fixture := _PFC_Fixture()
+	Row := 0
+	try {
+		Path := Fixture.root . "\broken.toml"
+		Assert(FSWriteDurable(Path, '[[alpha]]`n"abcd" = "first"`n"efgh" = "second"`n[[beta`n'))
+		PersonalFileControls.Refresh()
+		AssertFalse(PersonalFileControls.ForPath(Path), "the malformed source is refused by the adoption")
+		TF := {path: Path, sections: [], stem: "broken", count: 2}
+		Row := _HS_TomlFileRow(TF)
+		Assert(Row is Map, "the refused file still has its inventory row")
+		AssertEqual("broken (0)", Row["label"], "a refused file's caption counts no active mapping")
+		AssertEqual(0, _HS_NodeTotal(Map("tomls", [TF], "subfolders", Map())),
+			"a refused file adds nothing to its folder")
+	} finally {
+		if Row is Map
+			_HS_PersonalReleaseMenus([Row["submenu"]])
+		_PFC_Cleanup(Fixture)
+	}
+}
+Test("shared-personal-file-caption: a refused file counts no active mapping (personal-refused-caption)",
+	_HSCS_RefusedFileCountsNothing)

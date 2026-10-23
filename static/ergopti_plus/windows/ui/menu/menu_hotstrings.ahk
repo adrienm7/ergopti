@@ -1106,9 +1106,11 @@ _HS_TomlFileRow(TF) {
 		return false
 	if MenuRenderer_FillTemplateChild(TFChild, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
 		return false
-	; Keep original late reads and native concatenation coercion before projection.
+	; A source the adoption refused loads nothing (PersonalFileControls.ActiveOwner), so
+	; its caption counts no active mapping; its raw entry count is only the inventory
+	; below. Keep native concatenation coercion before projection.
 	Result := (FileStem := TF.stem . "",
-		FileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",
+		FileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : 0) . "",
 		CaptionOwner := CaptionPolicy["parent"],
 		CaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
 			? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFChild))
@@ -1208,7 +1210,8 @@ _HS_NodeTotal(Node) {
 	Total := 0
 	for _, TF in Node["tomls"] {
 		Owner := PersonalFileControls.ForPath(TF.path)
-		Total += Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count
+		; A refused source is inactive: it adds nothing to its folder.
+		Total += Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : 0
 	}
 	for _, Sub in Node["subfolders"]
 		Total += _HS_NodeTotal(Sub)
