@@ -13,6 +13,8 @@
  *    `i18n.get`, except the two acronyms that are the same in every language.
  * 3. Linux shortcut labels: the key names "Espace" and "Entrée" were French
  *    literals shown to every language; they now come from the catalogue.
+ * 4. Platform reasons: none names kanata, an engine Linux no longer runs, and
+ *    the Linux personal-shortcuts reason says where its shortcuts live.
  *
  * WHY A TARGETED GUARD AND NOT A WORD FILTER:
  * A scan for accented literals was measured and rejected: 154 hits in 37 files,
@@ -82,6 +84,22 @@ const shortcuts = fs.readFileSync(
 );
 for (const french of ['"Espace"', '"Entrée"']) {
 	assert(!shortcuts.includes(french), `${french} is a French literal in a shared menu label`);
+}
+
+// 4. Platform reasons never name an engine the Linux driver no longer runs, and
+// the Linux personal-shortcuts reason describes the keyboard slots it has.
+const LOCALES = path.join(DRIVERS, '_shared', 'data', 'locales');
+for (const file of fs.readdirSync(LOCALES).filter((name) => name.endsWith('.json'))) {
+	const catalogue = JSON.parse(fs.readFileSync(path.join(LOCALES, file), 'utf8'));
+	for (const [key, value] of Object.entries(catalogue)) {
+		if (key.startsWith('platform_reason.')) {
+			assert(!/kanata/i.test(value), `${file} ${key} names kanata, which Linux no longer runs`);
+		}
+	}
+	assert(
+		catalogue['platform_reason.no_personal_shortcuts_file_on_linux'].includes('config.toml'),
+		`${file}: the Linux reason must say where shortcuts are kept`
+	);
 }
 
 console.log('visible text is localized: ok');
