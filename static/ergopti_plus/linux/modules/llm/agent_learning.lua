@@ -114,8 +114,14 @@ function M.flush()
 		Logger.error(LOG, "The agent's learning could not be written.")
 		return false
 	end
-	fh:write(text)
-	fh:close()
+	-- Buffered close can fail after write accepted every byte. Never replace the
+	-- committed map until both receipts succeed, and close even a throwing write.
+	local wrote, written = pcall(fh.write, fh, text)
+	local closed, flushed = pcall(fh.close, fh)
+	if not wrote or not written or not closed or flushed ~= true then
+		Logger.error(LOG, "The agent's learning write or close was refused.")
+		return false
+	end
 	local renamed, err = os.rename(temp, path)
 	if not renamed then
 		Logger.error(LOG, "The agent's learning could not be saved: %s", tostring(err))
