@@ -679,6 +679,7 @@ try {
 		LoggerAppendBootstrapLine("ERROR", "ErgoptiPlus", "Personal shortcuts bootstrap failed: " . _epsErr.Message)
 		ExitApp(1)
 }
+BootProfile_Stamp("Personal shortcuts file ensured")
 #Include infra/tray_bootstrap.ahk
 #Include adapters/tray_startup_click.ahk
 #Include adapters/tray_startup_commands.ahk
@@ -704,9 +705,11 @@ if (_DriverStartupSmokeDir != "" && IsSet(_DriverStartupSmokeInspectBootstrap))
 	_DriverStartupSmokeInspectBootstrap.Call()
 ; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
 ; the safe menu, never with AutoHotkey's default icon and stock items.
+BootProfile_Stamp("Safe tray and startup commands installed")
 A_IconHidden := false
 ; Read-only construction precedes the wizard; the genuine migration stays below it.
 ConfigSchemaPrepareSource(ConfigurationFile)
+BootProfile_Stamp("Configuration schema source prepared")
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
 		; Reproduce that hazard without an interactive window: the suspend watchdog
@@ -1479,6 +1482,9 @@ LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _Boo
 ; Evidence, never collapsed: the per-stage table that boot-time comparisons need.
 LoggerEvidence("BootProfile", "Boot summary: total_ms={1} stage_ms: {2}.", _BootTotalMs,
 	BootProfile_StageSummary())
+; The counted operations of the whole boot (parses, reads, rebuilds), published as
+; their own window so the first minute's interval record starts from ready.
+PerfCounters_Flush()
 ; One environment summary with the same field names on every driver. A probe
 ; failure is reported and never allowed to turn a ready driver into a dead one.
 try DiagSnapshot_Emit(_BootTotalMs)

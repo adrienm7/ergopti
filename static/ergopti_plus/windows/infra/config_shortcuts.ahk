@@ -99,7 +99,7 @@ CS_Read() {
 		; Dotted assignments, inline namespaces and quoted headers can all name
 		; the metrics section; a flat parse silently loses those consent choices.
 		; Project the bytes already read without publishing another boot snapshot.
-		return ConfigTomlDecodeSnapshot(content).Cache
+		return ConfigTomlDecodeSnapshotShared(content).Cache
 }
 
 ; Truncate a value at the first '#' that sits OUTSIDE a quoted string, so an

@@ -28,7 +28,9 @@ InitSubMenus() {
 	_HS_PreScanPersonal()
 	BootProfile_Mark("MENU/InitSub: prescan personal")
 	SubMenus := Map()
+	_perfReg := PerfStage_Begin()
 	_HS_RegisterLanguageMenuCategories()
+	PerfStage_End("Menu.register_language_categories", _perfReg)
 
 	; Flat hotstring categories — order = sections_order from the TOML (which
 	; includes "-" separators); falls back to manifest declaration order when
@@ -39,6 +41,7 @@ InitSubMenus() {
 		TomlPath := HotstringsBundledTomlPath(V1Cat)
 		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
 		Rows := []
+		_perfCat := PerfStage_Begin()
 		if (V2Section != "") {
 			Entries := ManifestFeaturesForSection(V2Section)
 			; Build a map from the section-name part of the v2 path to its entry
@@ -50,7 +53,9 @@ InitSubMenus() {
 				Parts := StrSplit(Entry["path"], ".")
 				EntryBySectionId[Parts[Parts.Length]] := Entry
 			}
+			_perfOrder := PerfStage_Begin()
 			SectionsOrder := ReadTomlSectionsOrder(V1Cat, TomlPath)
+			PerfStage_End("Menu.cat.sections_order", _perfOrder, SectionsOrder.Length)
 			if (SectionsOrder.Length > 0) {
 				; Render following TOML sections_order, honouring "-" separators.
 				; Extension-owned leaves, including the native replacement choice,
@@ -92,7 +97,10 @@ InitSubMenus() {
 				}
 			}
 		}
+		PerfStage_End("Menu.cat.rows", _perfCat, Rows.Length)
+		_perfRender := PerfStage_Begin()
 		SubMenu := _HS_CategoryMenu(V1Cat, TomlPath, Rows)
+		PerfStage_End("Menu.cat.render", _perfRender, Rows.Length)
 		SubMenus[V1Cat] := SubMenu
 		; Per-category attribution. This loop is the largest post-ready boot
 		; segment by a wide margin — 1094 ms of a 3406 ms warm boot on 2026-07-30,

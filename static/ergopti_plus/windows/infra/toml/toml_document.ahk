@@ -258,6 +258,7 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 	if !(Source is String)
 		throw TypeError("TOML document source must be a String")
 	_TOML_DocumentParses += 1
+	PerfCount("toml.document_parse")
 	if SubStr(Source, 1, 1) == Chr(0xFEFF)
 		Source := SubStr(Source, 2)
 	Root := _TOML_DocumentTable(), Current := Root, CurrentPath := [], NativeSection := ""
@@ -346,6 +347,40 @@ TOML_ParseDocument(Source, &Records := 0, &Physical := 0) {
 		Physical.Push({ Kind: "assignment", Section: NativeSection, Key: NativeKey, Text: RawRecord })
 	}
 	return Root
+}
+
+/**
+ * Parses an exact source once for READ-ONLY consumers. The memo is keyed by the
+ * whole source text, so a changed file can never be served a stale document; the
+ * returned Document, Records and Physical are shared and must not be mutated.
+ * Boot and every tray rebuild used to parse the same config.toml text more than
+ * twenty times (about 35 ms each) for lookups that only read it.
+ * @param {String} Source - Exact source text.
+ * @param {Array} Records - Receives the shared typed assignment records.
+ * @param {Array} Physical - Receives the shared physical record spans.
+ * @returns {Map} The shared, read-only semantic document; malformed input throws.
+ */
+TOML_ParseDocumentShared(Source, &Records := 0, &Physical := 0) {
+	static Entries := []
+	static MAX_ENTRIES := 4
+	static MAX_SOURCE_CHARS := 262144
+	if !(Source is String)
+		throw TypeError("TOML document source must be a String")
+	for Entry in Entries {
+		if Entry.Source == Source {
+			PerfCount("toml.document_shared_hit")
+			Records := Entry.Records, Physical := Entry.Physical
+			return Entry.Document
+		}
+	}
+	PerfCount("toml.document_shared_miss")
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	if StrLen(Source) <= MAX_SOURCE_CHARS {
+		Entries.Push({ Source: Source, Document: Document, Records: Records, Physical: Physical })
+		while Entries.Length > MAX_ENTRIES
+			Entries.RemoveAt(1)
+	}
+	return Document
 }
 
 

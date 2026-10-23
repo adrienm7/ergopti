@@ -109,6 +109,39 @@ ConfigTomlDecodeSnapshot(Source) {
 		Rows: Rows, ArrayRows: ArrayRows, SkippedRecords: SkippedRecords }
 }
 
+/**
+ * Decodes an exact source once for READ-ONLY consumers of its Cache, Rows or
+ * Document. Keyed by the whole source text and by the identity of the loaded
+ * manifest feature list (the projection reads it), so a changed file or a
+ * reloaded manifest is decoded afresh. The result is shared and must not be
+ * mutated; ConfigTomlReadSnapshot keeps its own independent decodes because it
+ * compares a snapshot against a private shadow.
+ * @param {String} Source - Exact source text.
+ * @returns {Object} The shared snapshot described by ConfigTomlDecodeSnapshot.
+ */
+ConfigTomlDecodeSnapshotShared(Source) {
+	static Entries := []
+	static MAX_ENTRIES := 4
+	static MAX_SOURCE_CHARS := 262144
+	if !(Source is String)
+		throw TypeError("Configuration source must be a String")
+	Manifest := ObjPtr(ManifestFeatures())
+	for Entry in Entries {
+		if Entry.Manifest == Manifest && Entry.Source == Source {
+			PerfCount("config.snapshot_shared_hit")
+			return Entry.Snapshot
+		}
+	}
+	PerfCount("config.snapshot_shared_miss")
+	Snapshot := ConfigTomlDecodeSnapshot(Source)
+	if StrLen(Source) <= MAX_SOURCE_CHARS {
+		Entries.Push({ Source: Source, Manifest: Manifest, Snapshot: Snapshot })
+		while Entries.Length > MAX_ENTRIES
+			Entries.RemoveAt(1)
+	}
+	return Snapshot
+}
+
 ; Reuses the actual inline-table owner to preserve each child literal spelling.
 ; Typed rendering alone would manufacture legacy Boolean intent from signed zero.
 _ConfigTomlRawTree(Value, Raw) {
@@ -168,6 +201,7 @@ _ConfigTomlProjectRecord(Parts, Value, Raw, Namespaces, Cache, Rows) {
  */
 ConfigTomlReadSnapshot(Path) {
 	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	PerfCount("config.snapshot_read")
 	global _TomlReadFailures, _TomlUnreadableFiles
 	static Generations := Map()
 	static DecodeOwner := ConfigTomlDecodeSnapshot, JournalOwner := ConfigMigrateBoot
