@@ -20,7 +20,9 @@ _PPSFT_ChildSource(Client) {
 	global _DriverDir
 	Code := _PPSNT_ChildSource(Client)
 	Suffix := "#Include " . _DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk`n"
-	AssertEqual(Suffix, SubStr(Code, 1 - StrLen(Suffix)), "The canonical builder must end at its exact fixture boundary")
+	SuffixStart := StrLen(Code) - StrLen(Suffix) + 1
+	AssertTrue(SuffixStart > 0, "The canonical builder must contain its complete fixture suffix")
+	AssertEqual(Suffix, SubStr(Code, SuffixStart), "The canonical builder must end at its exact fixture boundary")
 	Code := SubStr(Code, 1, StrLen(Code) - StrLen(Suffix))
 	Code := _PPSFT_Replace(Code, "CB_RestoreAll(Saved) {", "_PPSFT_ActualRestoreAll(Saved) {")
 	Library := FileRead(_DriverDir . "\tests\fixtures\plain_paste_snapshot_owner_body.ahk", "UTF-8")
