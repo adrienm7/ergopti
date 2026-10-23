@@ -49,6 +49,10 @@ GestureToggleLeftClick() {
 	PreviousCritical := Critical("On")
 	DownAttempted := false
 	try {
+		; The pre-acquisition log can yield after a pause completed its cleanup.
+		; Existing holds still take the release branch above while suspended.
+		if A_IsSuspended
+			return false
 		; Prepare all fallible cleanup resources before the OS button is acquired
 		GestureStartKeyboardWatcher()
 		HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
@@ -233,6 +237,10 @@ GestureToggleRightClick() {
 	PreviousCritical := Critical("On")
 	DownAttempted := false
 	try {
+		; The pre-acquisition log can yield after a pause completed its cleanup.
+		; Existing holds still take the release branch above while suspended.
+		if A_IsSuspended
+			return false
 		; Prepare all fallible cleanup resources before the OS button is acquired
 		GestureStartKeyboardWatcher()
 		HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)
