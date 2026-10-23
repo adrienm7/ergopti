@@ -192,6 +192,8 @@ _HUCT_Query(Seed := false) {
 	Reads := _HUCT_ExpiryReads(), Started := A_TickCount
 	_HUCT_Require(TooltipPositionWarmStart(), "The real public warm service must start once.")
 	try {
+		; The private auto-execute waiter must admit the real priority -1 timer.
+		Thread("Priority", -1)
 		Loop {
 			if IsObject(_HUCT.Failure)
 				throw _HUCT.Failure
@@ -203,7 +205,10 @@ _HUCT_Query(Seed := false) {
 			_HUCT_Require(A_TickCount - Started < 1500, "The actual warm callback and transport must settle within the bounded observation.")
 			Sleep(5)
 		}
-	} finally TooltipPositionWarmStop()
+	} finally {
+		try TooltipPositionWarmStop()
+		finally Thread("Priority", 0)  ; Restore this private child main thread.
+	}
 	if IsObject(_HUCT.Failure)
 		throw _HUCT.Failure
 	_HUCT_Context()
