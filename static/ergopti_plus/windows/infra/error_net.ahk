@@ -377,7 +377,7 @@ _CrashReport_CheapSnapshot(Exc) {
 	try Version := Updater_CurrentVersion()
 	UptimeSec := -1
 	if IsSet(_HealthCheckStartMs)
-		UptimeSec := (A_TickCount - _HealthCheckStartMs & 0xFFFFFFFF) // 1000
+		UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000
 	ActiveWindowTitle := ""
 	ActiveWindowProcess := ""
 	try ActiveWindowTitle := WinGetTitle("A")
