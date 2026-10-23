@@ -355,9 +355,12 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 	return out
 end
 
---- Whether a timed match stayed within its configured inter-key delay.
+--- Whether a timed match stayed within its configured expansion delay: the time
+--- between the LAST LETTER OF THE INPUT and the EXPANDER, to decide whether to
+--- give the output (the expander is the magic key when the trigger ends with it,
+--- otherwise the end character that completes the trigger).
 --- A zero delay disables expiry. A positive delay fails closed when the caller
---- did not provide monotonic timestamps for every consumed codepoint.
+--- did not provide monotonic timestamps for the letter and its expander.
 ---
 --- A gap is the difference of two clock readings, which overstates the real
 --- pause by up to the clock's resolution: on a whole-second clock two keys
@@ -365,18 +368,18 @@ end
 --- between them, and a 0.75 s delay then dropped the trigger. So only a pause
 --- that exceeds the delay by more than the resolution expires the match.
 --- @param result table Match returned by engine:on_char().
---- @param delay_sec number Maximum adjacent pause in seconds; zero disables it.
+--- @param delay_sec number Maximum last-letter-to-expander pause in seconds; zero disables it.
 --- @param resolution_ms number Resolution of the clock that stamped the keys; zero when exact.
 --- @return boolean
-function M.within_interkey_delay(result, delay_sec, resolution_ms)
+function M.within_expansion_delay(result, delay_sec, resolution_ms)
 	if type(resolution_ms) ~= "number" or resolution_ms < 0 then
-		error("within_interkey_delay(): the clock resolution must be a non-negative number, got "
+		error("within_expansion_delay(): the clock resolution must be a non-negative number, got "
 			.. tostring(resolution_ms), 2)
 	end
 	local limit = tonumber(delay_sec)
 	if not limit or limit <= 0 then return true end
 	if type(result) ~= "table" then return false end
-	local gap_ms = tonumber(result.max_interkey_gap_ms)
+	local gap_ms = tonumber(result.expander_gap_ms)
 	return gap_ms ~= nil and gap_ms - resolution_ms <= limit * 1000
 end
 
@@ -397,7 +400,7 @@ end
 --- Windows engine applies the same rule in HSE_IdleResetsWord.
 --- @param last_ms number|nil Monotonic time of the previous keystroke, nil before any.
 --- @param now_ms number Monotonic time of the current keystroke.
---- As in within_interkey_delay, a gap read on a coarse clock overstates the
+--- As in within_expansion_delay, a gap read on a coarse clock overstates the
 --- real pause by up to its resolution, so only a gap that still reaches the
 --- delay once the resolution is taken off starts a new word: two keys typed
 --- together across a whole-second turnover must not split a word.
@@ -459,23 +462,24 @@ function M.new()
 
 	local engine = {}
 
-	--- Returns the largest adjacent timestamp gap in the last `count` codepoints.
+	--- The expansion delay's interval: the time between the LAST LETTER OF THE
+	--- INPUT and the EXPANDER, which decides whether to give the output. The
+	--- expander is the last consumed codepoint (the magic key when the trigger
+	--- ends with it, otherwise the end character that completes the trigger), and
+	--- the last input letter is the codepoint typed immediately before it.
+	--- @param offset number Distance from the expander back to the last input letter
+	---        (1, or 2 when a no-break space sat between the letter and the end character).
 	--- @param count number Number of codepoints consumed by the match.
 	--- @return number|nil Milliseconds, or nil when timing was not supplied.
-	local function max_tail_gap_ms(count)
-		if count <= 1 then return 0 end
-		local first = #_buf_times - count + 1
-		if first < 1 then return nil end
-		local largest = 0
-		for index = first + 1, #_buf_times do
-			local previous = _buf_times[index - 1]
-			local current = _buf_times[index]
-			if type(previous) ~= "number" or type(current) ~= "number" or current < previous then
-				return nil
-			end
-			largest = math.max(largest, current - previous)
+	local function expander_gap_ms(offset, count)
+		-- A match that is nothing but its expander has no letter to measure from.
+		if count <= offset then return 0 end
+		local current = _buf_times[#_buf_times]
+		local reference = _buf_times[#_buf_times - offset]
+		if type(reference) ~= "number" or type(current) ~= "number" or current < reference then
+			return nil
 		end
-		return largest
+		return current - reference
 	end
 
 	--- Loads a flat list of mapping tables into the engine, replacing any
@@ -832,10 +836,11 @@ function M.new()
 			-- the same thing — see expander.lua, which threads the flag through every
 			-- sink rather than re-deriving it.
 			is_private         = mapping.is_private,
-			-- The largest pause across the ENTIRE consumed suffix, not merely the
-			-- final pair. The Linux delay policy uses this to invalidate a trigger
-			-- after a pause at any position; other shared-engine users may omit time.
-			max_interkey_gap_ms = max_tail_gap_ms(bc),
+			-- The expansion delay's interval: last input letter to expander. An
+			-- earlier pause in the trigger does not count (the delay measures how
+			-- long the user waited before giving the expander); other shared-engine
+			-- users may omit time.
+			expander_gap_ms = expander_gap_ms(via_end_char and (bc - tlen) or 1, bc),
 		}
 	end
 
@@ -951,14 +956,15 @@ function M.new()
 		return _start_is_boundary == true
 	end
 
-	--- Captures timing for an exact tail from this engine's physical input owner.
+	--- Captures timing for an exact tail from this engine's physical input owner;
+	--- the tail's last codepoint is its expander.
 	--- @param count number Positive integer of retained codepoints.
 	--- @return table|nil Detached timing summary, or nil for an invalid tail.
 	function engine:tail_timing_receipt(count)
 		if type(count) ~= "number" or count < 1 or count % 1 ~= 0 or count > #_buf_cps then
 			return nil
 		end
-		return { max_interkey_gap_ms = max_tail_gap_ms(count) }
+		return { expander_gap_ms = expander_gap_ms(1, count) }
 	end
 
 	--- The mappings the engine is currently considering, for the preview bubble.

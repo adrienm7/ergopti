@@ -1196,21 +1196,21 @@ local function main()
 		-- settings window persisted resolved into nothing, so setting a delay saved
 		-- it to disk and changed no behaviour.
 		--
-		-- The semantics are macOS's, read out of keymap/init.lua so the two agree:
-		-- the delay is the maximum PAUSE BETWEEN ANY CONSECUTIVE KEYSTROKES in the
-		-- consumed trigger, and 0 means "always". The engine keeps timestamps aligned
-		-- with its rolling buffer, including resets and chained expansions, so an
-		-- earlier pause cannot disappear merely because the final pair was quick.
+		-- The semantics are macOS's and Windows's: the delay is the time between the
+		-- LAST LETTER OF THE INPUT and the EXPANDER (the magic key when the trigger
+		-- ends with it, otherwise the end character), and 0 means "always". The engine
+		-- keeps timestamps aligned with its rolling buffer, including resets and
+		-- chained expansions, and reports that one interval.
 		-- The clock's resolution goes with the stamps: without luv it counts whole
 		-- seconds, and a trigger typed across a second boundary read as a pause.
 		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec, Monotonic.resolution_ms()) then
+			if delay_sec and not engine_mod.within_expansion_delay(result, delay_sec, Monotonic.resolution_ms()) then
 				Logger.debug(LOG,
-					"Expired: '%s' had a %.2fs pause, its category allows %.2fs.",
+					"Expired: '%s' waited %.2fs for its expander, its category allows %.2fs.",
 					tostring(result.trigger),
-					(tonumber(result.max_interkey_gap_ms) or math.huge) / 1000, delay_sec)
+					(tonumber(result.expander_gap_ms) or math.huge) / 1000, delay_sec)
 				result = nil
 			end
 		end

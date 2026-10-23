@@ -34,7 +34,7 @@ function M.new(options)
 		if buffer:sub(-(#rule.suffix + #magic)) ~= rule.suffix .. magic then return nil end
 		local count = Utf8.len(rule.suffix) + 1
 		local timing = engine:tail_timing_receipt(count)
-		if not Engine.within_interkey_delay(timing, seconds, Monotonic.resolution_ms()) then return nil end
+		if not Engine.within_expansion_delay(timing, seconds, Monotonic.resolution_ms()) then return nil end
 		return { destination = destination, input = input_epoch, buffer = buffer,
 			magic = magic, focus_epoch = options.detector.currentEpoch() }
 	end

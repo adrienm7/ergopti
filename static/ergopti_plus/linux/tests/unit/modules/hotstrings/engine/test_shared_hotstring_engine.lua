@@ -654,25 +654,33 @@ local function _timed_abcd(times)
 	return result
 end
 
-helpers.describe("shared hotstring engine — inter-key trigger timing", function()
-	helpers.it("rejects an excessive pause at every trigger position", function()
-		for pause_after = 1, 3 do
+helpers.describe("shared hotstring engine — expansion delay (last letter to expander)", function()
+	helpers.it("rejects a pause between the last letter and the expander", function()
+		local result = _timed_abcd({ 0, 100, 200, 1300 })
+		helpers.assert_not_nil(result, "the matcher must expose the completed candidate")
+		helpers.assert_eq(result.expander_gap_ms, 1100,
+			"the interval is the last letter to the expander, the magic key here")
+		helpers.assert_true(not engine_mod.within_expansion_delay(result, 0.75, 0),
+			"a pause before the expander must expire the trigger")
+	end)
+
+	helpers.it("ignores a pause earlier in the trigger", function()
+		for pause_after = 1, 2 do
 			local times = { 0, 100, 200, 300 }
-			for index = pause_after + 1, #times do times[index] = times[index] + 1000 end
+			for index = pause_after + 1, 3 do times[index] = times[index] + 1000 end
+			times[4] = times[3] + 100
 			local result = _timed_abcd(times)
-			helpers.assert_not_nil(result, "the matcher must expose the completed candidate")
-			helpers.assert_eq(result.max_interkey_gap_ms, 1100,
-				"the largest pause must stay aligned at position " .. tostring(pause_after))
-			helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75, 0),
-				"a pause before any character must expire the trigger")
+			helpers.assert_eq(result.expander_gap_ms, 100,
+				"only the last letter to the expander counts (pause after letter " .. pause_after .. ")")
+			helpers.assert_true(engine_mod.within_expansion_delay(result, 0.75, 0),
+				"a slow start must not expire a trigger whose expander came promptly")
 		end
 	end)
 
-	helpers.it("accepts a trigger when every adjacent pause is within the limit", function()
+	helpers.it("accepts the configured boundary", function()
 		local result = _timed_abcd({ 0, 750, 1500, 2250 })
-		helpers.assert_eq(result.max_interkey_gap_ms, 750,
-			"the complete trigger span must report its largest adjacent pause")
-		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75, 0),
+		helpers.assert_eq(result.expander_gap_ms, 750)
+		helpers.assert_true(engine_mod.within_expansion_delay(result, 0.75, 0),
 			"the configured boundary is inclusive")
 	end)
 
@@ -688,9 +696,9 @@ helpers.describe("shared hotstring engine — inter-key trigger timing", functio
 		for index, char in ipairs({ "a", "b", "c", "d" }) do
 			result = engine:on_char(char, { typed_at_ms = 1000 + index * 100 })
 		end
-		helpers.assert_eq(result.max_interkey_gap_ms, 100,
+		helpers.assert_eq(result.expander_gap_ms, 100,
 			"a click, control key or focus reset must discard the earlier timestamp")
-		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75, 0),
+		helpers.assert_true(engine_mod.within_expansion_delay(result, 0.75, 0),
 			"fresh post-reset typing must remain eligible")
 	end)
 
@@ -698,29 +706,87 @@ helpers.describe("shared hotstring engine — inter-key trigger timing", functio
 	-- without luv: keys typed together read 1000 ms apart when the second turns
 	-- over between them, and the 0.75 s default delay dropped the trigger.
 	helpers.it("a whole-second clock turning over between two keys is no pause", function()
-		local result = _timed_abcd({ 5000, 5000, 6000, 6000 })
-		helpers.assert_eq(result.max_interkey_gap_ms, 1000, "the second boundary reads as a 1000 ms gap")
-		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75, 1000),
+		local result = _timed_abcd({ 5000, 5000, 5000, 6000 })
+		helpers.assert_eq(result.expander_gap_ms, 1000, "the second boundary reads as a 1000 ms gap")
+		helpers.assert_true(engine_mod.within_expansion_delay(result, 0.75, 1000),
 			"a gap no wider than the clock's resolution may be no pause at all")
-		helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75, 0),
+		helpers.assert_true(not engine_mod.within_expansion_delay(result, 0.75, 0),
 			"on an exact clock the same gap is a real pause")
 	end)
 
 	helpers.it("a whole-second clock still expires a pause it can prove", function()
-		local result = _timed_abcd({ 5000, 5000, 7000, 7000 })
-		helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75, 1000),
+		local result = _timed_abcd({ 5000, 5000, 5000, 7000 })
+		helpers.assert_true(not engine_mod.within_expansion_delay(result, 0.75, 1000),
 			"two seconds apart on that clock is more than a second of real pause")
 	end)
 
 	helpers.it("refuses a missing or negative clock resolution", function()
 		local result = _timed_abcd({ 0, 100, 200, 300 })
 		for _, resolution in ipairs({ -1, "0", false }) do
-			helpers.assert_throws(function() engine_mod.within_interkey_delay(result, 0.75, resolution) end,
+			helpers.assert_throws(function() engine_mod.within_expansion_delay(result, 0.75, resolution) end,
 				"a resolution of " .. tostring(resolution) .. " must be refused")
 		end
-		helpers.assert_throws(function() engine_mod.within_interkey_delay(result, 0.75) end,
+		helpers.assert_throws(function() engine_mod.within_expansion_delay(result, 0.75) end,
 			"a caller that names no clock resolution must be refused")
 	end)
+end)
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 8/ Shared time-gate corpus ========================
+-- ==========================================================
+-- ==========================================================
+
+--- The shared time-gate vectors (the expansion delay is the time between the
+--- last letter of the input and the expander), replayed through the engine.
+local function _time_gate_vectors()
+	local this = debug.getinfo(1, "S").source:gsub("^@", "")
+	local linux_root = this:match("^(.*[/\\])tests[/\\]")
+	local handle = assert(io.open(linux_root .. "../_shared/tests/corpus/hotstrings/time_gate_vectors.json", "r"))
+	local raw = handle:read("*a")
+	handle:close()
+	return require("json").decode(raw).vectors
+end
+
+helpers.describe("shared hotstring engine — time-gate corpus (time-gate-corpus)", function()
+	for _, vector in ipairs(_time_gate_vectors()) do
+		-- Case-conform is a registration mode of the magic-key family, not another
+		-- interval: its star vector is the same interval as the plain one.
+		helpers.it(vector.id .. " (time-gate-corpus)", function()
+			local engine = engine_mod.new()
+			local mapping = { trigger = vector.trigger, replacement = "out" }
+			if vector.ends_with_magic then
+				mapping.auto_expand = true
+			else
+				mapping.auto_expand = false
+				mapping.is_case_sensitive = true
+				mapping.is_case_sensitive_strict = true
+			end
+			if vector.case_conform then
+				mapping.is_case_sensitive = nil
+				mapping.is_case_sensitive_strict = nil
+			else
+				mapping.is_case_sensitive = true
+				mapping.is_case_sensitive_strict = true
+			end
+			engine:load_mappings({ mapping })
+			local result
+			for _, key in ipairs(vector.typed) do
+				result = engine:on_char(key.char, { typed_at_ms = key.down_ms })
+			end
+			result = engine:on_char(vector.expander.char, {
+				typed_at_ms = vector.expander.down_ms,
+				is_terminator = not vector.ends_with_magic,
+				terminator_consumed = false,
+			})
+			helpers.assert_not_nil(result, "the typed text must complete the trigger")
+			helpers.assert_eq(result.expander_gap_ms, vector.elapsed_ms,
+				"the interval is the reference character to the expander")
+			helpers.assert_eq(engine_mod.within_expansion_delay(result, vector.delay_s, 0), vector.fires,
+				"the delay gate verdict")
+		end)
+	end
 end)
 
 helpers.describe("shared hotstring engine — Backspace edits the buffer", function()

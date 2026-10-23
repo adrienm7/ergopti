@@ -117,11 +117,11 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
       helpers.assert_true(src:find("typed_at_ms         = now_ms", 1, true) ~= nil,
         "each matcher input must carry its monotonic timestamp")
-      local expiry_call = "engine_mod.within_interkey_delay(result, delay_sec, Monotonic.resolution_ms())"
+      local expiry_call = "engine_mod.within_expansion_delay(result, delay_sec, Monotonic.resolution_ms())"
       helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
-        "expiry must evaluate every retained interval against the stamping clock's resolution")
+        "expiry must evaluate the last-letter-to-expander interval against the stamping clock's resolution")
       helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
-        "a single previous-key timestamp recreates the original final-pair-only bug")
+        "a single previous-key timestamp cannot be reset at every text-context boundary")
 
       local control_start = assert(src:find("local function handle_control", 1, true))
       local click_start = assert(src:find("local function on_click", control_start, true))
