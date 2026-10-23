@@ -19,7 +19,7 @@ local Compose = helpers.load_module("modules.llm.runtime_composition")
 local ManagedEnvironment = helpers.load_module("modules.llm.managed_ollama_environment")
 local function eq(a,b)assert(a==b,'expected '..tostring(b)..' got '..tostring(a))end
 local function test(name, body) helpers.it(name .. " (ollama-runtime)", body) end
-local function fixture()
+local function fixture(extra)
 	local w={authorized=true,ancestry=true,left=100,env={'PATH=/usr/bin','OLLAMA_HOST=https://remote:443','OLLAMA_NO_CLOUD=0'},op={token='exact native operation'}}
 	local source={current=function()return w.authorized end,publish=function()end,app_capture=function()end,app_current=function()end,compensate=function()return true end}
 	local resolver={plan=function()return{asset=w.asset}end,current=function()return w.ancestry end}
@@ -36,7 +36,7 @@ local function fixture()
 	w.factory={}
 	w.controller=Compose.new({source=source,resolver=resolver,installed=installed,file_factory=w.factory,admission=admission,
 		install_phase=phase,process=process,http=http,owned_timer=timer,timings=timings,environment=function()return w.env end,
-		serve_environment=w.serve_environment or ManagedEnvironment.load()})
+		serve_environment=w.serve_environment or ManagedEnvironment.load(),network=extra and extra.network})
 	w.budget={remaining_ms=function()return w.left end}
 	w.authorizer=function()if w.on_authorized then w.on_authorized()end;return w.authorized end
 	w.options={authorized=w.authorizer,owner='originating-service',host='127.0.0.1:12345'}
@@ -101,6 +101,36 @@ end)
 test('stale logical HTTP response does not publish callback or erase capability',function()
 	local w=fixture();local count=0;local o=w.controller.ports.probe('http://127.0.0.1:12345/api/version',w.budget,w.authorizer,function()count=count+1 end)
 	w.authorized=false;w.http.done({ok=true});eq(count,0);eq(o,w.op)
+end)
+
+local function network()return{policy={route=function()return{mode='system',environment_exclusions={}}end,environment_names=function()return{}end,
+	selection=function()return nil end},lookup=function()end,timeout_ms=7}end
+test('without a network dependency the composition has no proxy stage',function()local w=fixture();eq(w.controller.ports.network,nil)end)
+test('a network dependency adds the proxy stage and refuses an incomplete one',function()
+	local w=fixture({network=network()});eq(type(w.controller.ports.network),'function')
+	eq(pcall(fixture,{network={policy={}}}),false)
+end)
+test('the selected proxy reaches the owned daemon and replaces only that variable',function()
+	local w=fixture({network=network()});w.env={'PATH=/usr/bin','HTTPS_PROXY=','https_proxy=keep'}
+	w.options.environment={'HTTPS_PROXY=http://proxy.corp.example:3128'}
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	local proxies={}
+	for _,entry in ipairs(w.service.opts.env)do if entry:lower():match('^https_proxy=')then proxies[#proxies+1]=entry end end
+	eq(#proxies,2);eq(proxies[1],'https_proxy=keep');eq(proxies[2],'HTTPS_PROXY=http://proxy.corp.example:3128')
+end)
+test('an exported proxy reaches the daemon untouched when the stage selected none',function()
+	local w=fixture({network=network()});w.env={'PATH=/usr/bin','HTTPS_PROXY=http://mine:1'};w.options.environment={}
+	w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+	local seen=false
+	for _,entry in ipairs(w.service.opts.env)do if entry=='HTTPS_PROXY=http://mine:1'then seen=true end end
+	eq(seen,true)
+end)
+test('proxy rows naming another variable or carrying a newline dispatch no process',function()
+	for _,row in ipairs({'OLLAMA_HOST=0.0.0.0:1','NO_PROXY=*','HTTPS_PROXY=a\nB=c',42})do
+		local w=fixture({network=network()});w.options.environment={row}
+		local o=w.controller.ports.start_service('/managed/ollama',{'serve'},w.options,function()end)
+		eq(w.service,nil);eq(o:is_settled(),true)
+	end
 end)
 
 end

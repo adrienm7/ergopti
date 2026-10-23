@@ -323,10 +323,24 @@ function M.new(ports, policy)
 			service=acquire('service', function(done)
 				return P.start_service(executable, {'serve'}, {origin=entry.origin,
 					host=entry.host, timeout_ms=false, authorized=service_authorized,
+					environment=entry.service_environment or {},
 					owner='ollama-runtime-' .. tostring(sequence)}, done)
 			end)
 			if not service_live() then fail('runtime_service_unavailable'); return end
 			request.started=true; start_probe()
+		end
+		-- The optional network port selects the proxy the daemon is started with
+		-- (a PAC the daemon cannot evaluate); a driver without one starts directly.
+		local function begin_network()
+			if P.network==nil then begin_service(); return end
+			if not current() or not yes(runtime_current) or not current() then fail('runtime_source_changed'); return end
+			entry.stage='network'
+			entry.network=acquire('network', function(done)
+				return P.network(budget, service_authorized, done)
+			end)
+			if entry.network.unknown then fail('runtime_network_acquisition_unknown'); return end
+			-- A lookup that settled synchronously must be observed by this pump.
+			again=true
 		end
 		local function resolved()
 			if not current() then fail('runtime_source_changed'); return end
@@ -343,7 +357,7 @@ function M.new(ports, policy)
 			executable=call(get)
 			if type(executable)~='string' or executable:sub(1,1)~='/' or executable:find('\0',1,true)
 				or not yes(runtime_current) or not current() then fail('runtime_source_changed'); return end
-			begin_service()
+			begin_network()
 		end
 		pump=function()
 			if pumping then again=true; return end
@@ -360,6 +374,18 @@ function M.new(ports, policy)
 						if held.delivered and type(held.result)=='table' and held.result.ok==true then
 							entry.installed=true; resolved()
 						else fail('runtime_install_failed') end
+					end
+				elseif entry.stage=='network' then
+					local held=entry.network
+					if held and op_settled(held) then
+						local answer=held.result
+						if held.delivered and type(answer)=='table' and answer.ok==true
+							and type(answer.environment)=='table' then
+							entry.service_environment=answer.environment
+							begin_service()
+						else
+							fail('runtime_proxy_unavailable')
+						end
 					end
 				elseif entry.stage=='probe' then
 					local held=entry.probe
