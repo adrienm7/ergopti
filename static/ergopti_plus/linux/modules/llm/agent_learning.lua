@@ -23,6 +23,7 @@ local Logger = require("logger.shim")
 local Json = require("json")
 local Agent = require("llm.agent")
 local NoReplaceMove = require("infra.no_replace_move")
+local RegularFileReader = require("infra.regular_file_reader")
 
 local LOG = "modules.llm.agent_learning"
 
@@ -83,7 +84,7 @@ local function load()
 	if _apps and not _load_blocked then return end
 	_apps, _sequence = {}, 0
 	local path = state_path()
-	local fh, _, errno = io.open(path, "r")
+	local fh, _, errno = RegularFileReader.open_source(path)
 	if not fh then
 		_load_blocked = errno ~= ENOENT
 		if _load_blocked then Logger.error(LOG, "The agent's learning source could not be read; mutations are blocked.") end
