@@ -372,3 +372,47 @@ _TIT_BlankRuns() {
 	AssertEqual(9, Physical.Length)
 }
 Test("TOML: blank runs rebuild the source and keep their section (toml-blank-runs)", _TIT_BlankRuns)
+
+
+; The bare dotted fast path must answer exactly what the general scan answers,
+; and every shape it does not take must still reach the general scan.
+_TIT_KeyPathFastPathAgreesWithScan() {
+	Cases := [
+		["a", ["a"]], ["a.b.c", ["a", "b", "c"]], [" a.b ", ["a", "b"]],
+		["a_b-9.C", ["a_b-9", "C"]], ['"a.b".c', ["a.b", "c"]],
+		["a . b", ["a", "b"]], ["'x'.y", ["x", "y"]]]
+	for Item in Cases {
+		Parts := TOML_ParseKeyPath(Item[1], true)
+		AssertEqual(Item[2].Length, Parts.Length, "segments of " . Item[1])
+		for Index, Part in Item[2]
+			AssertEqual(Part, Parts[Index], "segment " . Index . " of " . Item[1])
+	}
+	for Bad in ["", "a..b", ".a", "a.", "a b", "a.b`r", "a.é"] {
+		Threw := false
+		try TOML_ParseKeyPath(Bad, true)
+		catch
+			Threw := true
+		AssertTrue(Threw, "'" . Bad . "' must stay an invalid strict key path")
+	}
+}
+Test("TOML: the bare key path fast path agrees with the general scan "
+	. "(toml-key-path-fast-path)", _TIT_KeyPathFastPathAgreesWithScan)
+
+
+; The flat writer parsed the source and the candidate a second time inside the
+; foreign-record retention it had already admitted with the first two parses.
+_TIT_FlatWriteParsesOnce() {
+	global _TOML_DocumentParses
+	Path := _CTU_NewPath()
+	try {
+		AssertTrue(FSWrite(Path, "# user note`n[sample]`nafter = 1`nkeep = 3`n"))
+		Before := _TOML_DocumentParses
+		AssertTrue(TOML_BatchWrite(Path, [{ Section: "sample", Key: "after", Value: 2 }]))
+		Spent := _TOML_DocumentParses - Before
+		AssertTrue(InStr(FSRead(Path), "# user note") > 0, "the foreign comment is retained")
+		AssertEqual(2, TOML_ParseFreshFile(Path)["sample"]["after"])
+		AssertEqual(6, Spent, "parses spent by one flat write")
+	} finally FSDelete(Path)
+}
+Test("TOML: one flat write does not tokenize its source or candidate twice "
+	. "(toml-flat-write-parse-count)", _TIT_FlatWriteParsesOnce)

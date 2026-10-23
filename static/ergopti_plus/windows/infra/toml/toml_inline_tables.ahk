@@ -26,6 +26,12 @@ _TOML_IsLiteralStart(Text, Position) {
  * @returns {Array} Exact semantic segments; malformed paths throw.
  */
 TOML_ParseKeyPath(Text, Strict := false) {
+	; Bare dotted segments are nearly every key of a real configuration: one
+	; anchored match replaces the element scan and the per-segment matches
+	; (measured: about 0.055 ms per key before, see the commit message).
+	Trimmed := Trim(Text, " " . Chr(9))
+	if RegExMatch(Trimmed, "^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\z")
+		return StrSplit(Trimmed, ".")
 	Keys := TOML_SplitArrayElements(Text, ".", true)
 	if !Keys.Length
 		throw ValueError("A TOML key path requires a segment")
