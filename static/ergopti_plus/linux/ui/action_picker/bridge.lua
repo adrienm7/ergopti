@@ -142,9 +142,12 @@ local function close_session(session, context)
 			tostring(session.epoch))
 		return false
 	end
-	_active_session = nil
 	ProgramProviderPicker.close(session.providers)
-	M.pending_opts = nil
+	-- Window/provider retirement can synchronously open a different binding.
+	if _active_session == session then
+		_active_session = nil
+		M.pending_opts = nil
+	end
 	return true
 end
 
@@ -204,13 +207,17 @@ function M.open(opts, on_confirm, on_cancel)
 	end
 
 	if _active_session then
+		local previous_session = _active_session
 		local visible = type(Manager.is_visible) == "function"
 			and Manager.is_visible("action_picker") == true
+		if _active_session ~= previous_session then return false end
 		if visible and Manager.hide("action_picker") ~= true then
 			Logger.error(LOG, "Action picker replacement refused; prior session retained.")
 			return false
 		end
-		ProgramProviderPicker.close(_active_session.providers)
+		if _active_session ~= previous_session then return false end
+		ProgramProviderPicker.close(previous_session.providers)
+		if _active_session ~= previous_session then return false end
 		_active_session = nil
 		M.pending_opts = nil
 	end
@@ -244,10 +251,16 @@ function M.open(opts, on_confirm, on_cancel)
 	else
 		opened = Manager.show("action_picker")
 	end
+	if _active_session ~= session then
+		ProgramProviderPicker.close(session.providers)
+		return false
+	end
 	if opened ~= true then
 		ProgramProviderPicker.close(session.providers)
-		_active_session = nil
-		M.pending_opts = nil
+		if _active_session == session then
+			_active_session = nil
+			M.pending_opts = nil
+		end
 		Logger.error(LOG, "Action picker native window could not be opened.")
 		return false
 	end
