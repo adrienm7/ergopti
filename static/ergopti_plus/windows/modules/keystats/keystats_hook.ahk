@@ -249,7 +249,15 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 						; previous app, not the new one. Mirrors HS log_manager flush_buffer
 						; calls on app_switch.
 						try KL_FlushBuffer()
-						try KL_LogAppSwitch(KLHook.prev_app, NewApp, duration)
+						; The retained destination may differ from the later live focus.
+						; Refuse only its row; context projection must still advance.
+						DestinationFiltered := true
+						try DestinationFiltered := MF_ShouldFilterFor(NewApp, NewTitle)
+						catch {
+								try LoggerWarn("keystats_hook", "Captured app-switch destination could not be classified; its row was refused.")
+						}
+						if !DestinationFiltered
+								try KL_LogAppSwitch(KLHook.prev_app, NewApp, duration)
 				}
 				KLHook.prev_app := NewApp
 				KLHook.app_entered_at := Now
@@ -261,7 +269,15 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 						; the previous window context, not the new one. Mirrors the
 						; flush that already precedes KL_LogAppSwitch above (M-01 fix).
 						try KL_FlushBuffer()
-						try KL_LogWindowSwitch(outgoing_app, KLHook.prev_title, NewTitle, duration)
+						; The retained destination may differ from the later live focus.
+						; Refuse only its row; context projection must still advance.
+						DestinationFiltered := true
+						try DestinationFiltered := MF_ShouldFilterFor(NewApp, NewTitle)
+						catch {
+								try LoggerWarn("keystats_hook", "Captured window-switch destination could not be classified; its row was refused.")
+						}
+						if !DestinationFiltered
+								try KL_LogWindowSwitch(outgoing_app, KLHook.prev_title, NewTitle, duration)
 				}
 				KLHook.prev_title := NewTitle
 				KLHook.title_entered_at := Now
