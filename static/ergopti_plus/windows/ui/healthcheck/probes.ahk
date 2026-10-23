@@ -75,6 +75,7 @@ HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides :=
 	_HC_ProbeHttp(Run, "github_api", Github["url"],
 		Map("User-Agent", HC_PROBE_USER_AGENT, "Accept", "application/vnd.github+json"),
 		Github["timeout_ms"], _HC_GithubAnswer)
+	_HC_ProbePac(Run, Probes["proxy_pac"])
 	_HC_ProbeAi(Run, Probes["ai_health"])
 	_HC_ProbeCpu(Run, Probes["cpu_load"])
 	return true
@@ -254,6 +255,48 @@ _HC_GithubAnswer(Status, Body) {
 		LoggerWarn("Healthcheck", "GitHub's rate limit answer could not be read: {1}.", Err.Message)
 	}
 	return Map("result", Map("state", "ok"), "sections", Map("network", Map("github_api", Value)))
+}
+
+; The system proxy auto-config (PAC): configured, downloadable and usable by the
+; managed downloader. The URL is read and fetched here but never reported.
+; @param Run {Object}
+; @param Config {Map} The schema's proxy_pac probe.
+_HC_ProbePac(Run, Config) {
+	Url := _HC_PacUrl()
+	if (Url == "") {
+		Started := A_TickCount
+		_HC_ProbeStarted("proxy_pac", "no PAC configured")
+		_HC_ProbeFinish(Run, "proxy_pac", Started, Map("state", "ok"), Map("network", Map("proxy_pac", "No PAC configured")))
+		return
+	}
+	_HC_ProbeHttp(Run, "proxy_pac", Url, Map("User-Agent", HC_PROBE_USER_AGENT), Config["timeout_ms"], _HC_PacAnswer)
+}
+
+; The PAC URL the user's Windows settings name, "" when none is set.
+; @returns {String}
+_HC_PacUrl() {
+	try return Trim(RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings", "AutoConfigURL"))
+	return ""
+}
+
+; Judges a PAC answer like the managed downloader: status 200, a bounded size,
+; UTF-8 (a U+FFFD means the bytes were not) and a FindProxyForURL function.
+; @param Status {Integer}
+; @param Body {String}
+; @returns {Map} { result, sections? }
+_HC_PacAnswer(Status, Body) {
+	if (Status != 200)
+		return Map("result", Map("state", "error", "detail", Status > 0 ? "PAC download: HTTP " . Status : "PAC download failed"))
+	if (Body == "")
+		return Map("result", Map("state", "error", "detail", "PAC is empty"))
+	if (StrLen(Body) > 1048576)
+		return Map("result", Map("state", "error", "detail", "PAC is over the 1048576 byte limit"))
+	if InStr(Body, Chr(0xFFFD))
+		return Map("result", Map("state", "error", "detail", "PAC is not UTF-8 (the managed download refuses it)"))
+	if !InStr(Body, "FindProxyForURL")
+		return Map("result", Map("state", "error", "detail", "PAC does not define FindProxyForURL"))
+	Value := "HTTP 200, " . StrLen(Body) . " characters, UTF-8, FindProxyForURL found"
+	return Map("result", Map("state", "ok"), "sections", Map("network", Map("proxy_pac", Value)))
 }
 
 ; The local AI backend answers its version endpoint.

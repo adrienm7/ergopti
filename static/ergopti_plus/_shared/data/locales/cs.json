@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "Profil",
 	"healthcheck.field.ai_health": "Backend odpovídá",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "Automatická konfigurace proxy (PAC)",
 	"healthcheck.field.wifi_signal": "Signál Wi-Fi",
 	"healthcheck.field.warn_count": "Varování v této relaci",
 	"healthcheck.field.err_count": "Chyby v této relaci",

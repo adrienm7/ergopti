@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "配置文件",
 	"healthcheck.field.ai_health": "后端响应",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "代理自动配置 (PAC)",
 	"healthcheck.field.wifi_signal": "Wi-Fi 信号",
 	"healthcheck.field.warn_count": "本次会话的警告",
 	"healthcheck.field.err_count": "本次会话的错误",
