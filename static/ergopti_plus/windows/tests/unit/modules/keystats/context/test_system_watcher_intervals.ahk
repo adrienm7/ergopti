@@ -252,3 +252,5 @@ _KLSW_PausedShutdownDrain() {
 }
 Test("system watchers: paused shutdown drains only completed records (system-paused-delivery-debt)",
 	_KLSW_PausedShutdownDrain)
+
+#Include test_system_delivery_owner.ahk
