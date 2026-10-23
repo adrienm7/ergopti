@@ -121,10 +121,16 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false, Bindi
 	g.OnEvent("Close", _ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_OnClose))
 	g.OnEvent("Size",  _ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_OnResize))
 
+	; Native Show can dispatch Close before returning. Its existing handler
+	; must already own this exact window so cancellation can destroy it.
+	_ActPickWeb_Gui := g
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
 	g.Show("w" . ACTPICK_WIDTH . " h" . ACTPICK_HEIGHT . " Center")
-	_ActPickWeb_Gui := g
+	if !_ActPickWeb_StartupCurrent(SessionEpoch, g) {
+		try g.Destroy()
+		return true
+	}
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	Installed := false
