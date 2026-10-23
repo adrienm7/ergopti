@@ -580,7 +580,12 @@ keys passed untouched and lease failures by kind. Every line carries the
 session totals and no key code or character. Read those lines first in a
 macOS report of swallowed keys or an unasked accent popup: a long hold of
 macOS's own stamps with no late callback points upstream (Karabiner), a late
-key-up points at the main thread.
+key-up points at the main thread. The same totals are the `key_*` counts of
+the diagnostics report's input section (`collect_input`; schema, projection and
+`healthcheck.field.key_*` labels). A Karabiner lease failure is also held by the
+error window for `RECOVERY_GRACE_SEC` (`ui/error_dialog`) and dropped when the
+lease controller reports a running (`active`) generation at its end: an ERROR
+that the driver fixed by itself opens no window, it stays in the log.
 
 ### project-hs-native-eventtap-disable-recovery
 

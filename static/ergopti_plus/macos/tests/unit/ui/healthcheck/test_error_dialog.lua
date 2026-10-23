@@ -302,6 +302,47 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 		helpers.assert_eq(#context.timers, 1, "after close, a new error opens a window again")
 	end)
 
+	-- A lease failure is followed by a bounded recovery with a fresh lease; the
+	-- window for one that recovered by itself alarmed the user about nothing.
+	local LEASE_FAILURE = "Karabiner lease %s failed; fencing before publishing failure: %s"
+
+	--- Installs a lease controller stub reporting a phase.
+	local function lease_phase(phase)
+		package.loaded["platform.remap.lease_controller"] = { status = function() return phase, { phase = phase } end }
+	end
+
+	helpers.it("holds a Karabiner lease failure and opens nothing once the lease runs again (hold-recoverable-error)", function()
+		local dialog, context = load_dialog()
+		dialog.init()
+		dialog.on_error("karabiner.lease", LEASE_FAILURE, "Karabiner lease abc failed; fencing before publishing failure: PONG")
+		helpers.assert_eq(#context.timers, 1, "only the hold timer is armed, not the window's")
+		helpers.assert_eq(context.timers[1].delay, dialog.RECOVERY_GRACE_SEC)
+		lease_phase("active")
+		fire_timers(context)
+		fire_timers(context)
+		package.loaded["platform.remap.lease_controller"] = nil
+		helpers.assert_eq(context.windows, nil, "a failure that recovered by itself never opens the window")
+	end)
+
+	helpers.it("still opens the window for a lease failure nothing recovered (hold-recoverable-error)", function()
+		local dialog, context = load_dialog()
+		dialog.init()
+		dialog.on_error("karabiner.lease", LEASE_FAILURE, "Karabiner lease abc failed; fencing before publishing failure: PONG")
+		helpers.assert_eq(context.windows, nil)
+		lease_phase("fenced")
+		fire_timers(context)
+		fire_timers(context)
+		package.loaded["platform.remap.lease_controller"] = nil
+		helpers.assert_eq(context.windows, 1, "after the grace period the failure is decided like any error")
+	end)
+
+	helpers.it("the held template is the one the lease controller logs (hold-recoverable-error)", function()
+		local source = helpers.read_driver_source('local LOG = "karabiner.lease"')
+		helpers.assert_not_nil(source, "the lease controller declares the module the window holds")
+		helpers.assert_true(source:find('Logger.error(LOG, "Karabiner lease %s failed; fencing before publishing failure: %s"', 1, true) ~= nil,
+			"the lease controller must log the failure the error window holds")
+	end)
+
 	helpers.it("nothing opens while the setting is unticked (error-dialog-macos)", function()
 		local dialog, context = load_dialog({ stored = false })
 		dialog.init()
