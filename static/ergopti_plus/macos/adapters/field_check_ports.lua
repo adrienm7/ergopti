@@ -124,6 +124,34 @@ local function keystats_facts()
 	}
 end
 
+--- Downloads the PAC the way the diagnostics probe does; the address is never logged.
+--- @param url string PAC address from the system proxy settings.
+--- @param callback function fn(status|nil, body|nil).
+local function fetch_pac(url, callback)
+	local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+	client.get(url, {}, function(result)
+		callback(result.status, result.body)
+	end)
+end
+
+--- Runs the native network helper (one HEAD through the managed transport).
+--- @param callback function fn(exit_code|nil, stdout); nil when it cannot start.
+local function network_chain(callback)
+	local python = require("adapters.python_interpreter").resolve()
+	local source = debug.getinfo(1, "S").source or ""
+	local root = (source:sub(1, 1) == "@" and source:sub(2) or source):match("^(.*)/adapters/field_check_ports%.lua$")
+	if not python or not root then
+		Logger.warn(LOG, "Network helper unavailable: %s.", python and "no driver root" or "no native Python")
+		callback(nil, "")
+		return
+	end
+	exec(python, { "-B", root .. "/modules/llm/managed_network_check.py" }, 40, callback)
+end
+
+
+--- The bounded command runner, shared with adapters/runtime_owner_ports.lua.
+M.exec = exec
+
 --- The ports of the real Mac.
 --- @return table ports
 function M.new()
@@ -135,6 +163,8 @@ function M.new()
 		keystats_facts = keystats_facts,
 		health_counts = function() return require("infra.key_event_health").counts() end,
 		count_keys = count_keys,
+		fetch_pac = fetch_pac,
+		network_chain = network_chain,
 	}
 end
 
