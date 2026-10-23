@@ -1,64 +1,42 @@
 ﻿; tests/meta/modules/llm/menu/test_modelbrowser_sort_callback.ahk
 
-; ==============================================================================
+; =================================================================
 ; MODULE: LLM Model Browser Sort Callback Guard
 ; DESCRIPTION:
-; Static source guard for the _LLM_ModelBrowser_Sort O(n log n) fix in
-; ui/llm_model_browser.ahk.
+; Guards the actual native Array API and catalogue comparator. Runtime tests
+; cover sorted family/parameter order, independent copies and duplicates.
 ;
 ; ROOT CAUSE ENCODED:
-; The original _LLM_ModelBrowser_Sort used a manual O(n²) bubble sort
-; implemented with nested Loop constructs. With a large Ollama model library
-; (100+ models), this produced visible UI lag every time the browser was opened
-; or refreshed. The fix replaces the bubble sort with out.Sort(...) passing a
-; comparator callback (_LLM_ModelBrowser_Compare), giving O(n log n) behaviour
-; through AHK's built-in Array.Sort.
-; ==============================================================================
+; The previous assertion required out.Sort even though native AutoHotkey v2
+; Array does not expose that method. It passed on an implementation that threw
+; before returning any sorted result. Reject that unsupported API explicitly;
+; the separate native component cases exercise the actual sorting contract.
+; =================================================================
 
 #Requires AutoHotkey v2.0
 
-_TMBSC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
-
-_TMBSC_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
 
 
 
 
+; ============================================================
+; ============================================================
+; ======= 1/ Supported Native Array API and Comparator =======
+; ============================================================
+; ============================================================
 
-; =========================================================================
-; =========================================================================
-; ======= 1/ _LLM_ModelBrowser_Sort uses Array.Sort with comparator =======
-; =========================================================================
-; =========================================================================
-
-_TMBSC_SortUsesCallback() {
-	Src := _TMBSC_StripLineComments(_TMBSC_ReadSource("ui/model_browser/init.ahk"))
-	Assert(Src != "", "ui/llm_model_browser.ahk must be readable")
-
+_TMBSC_UsesSupportedArrayApi() {
 	Body := _DriverFuncBody("_LLM_ModelBrowser_Sort")
-	Assert(Body != "", "_LLM_ModelBrowser_Sort must be defined in ui/llm_model_browser.ahk")
-
-	; Must use Array.Sort with a comparison callback (not a nested loop bubble sort)
-	Assert(InStr(Body, ".Sort(") > 0,
-		"_LLM_ModelBrowser_Sort must use Array.Sort() with a comparator callback (O(n log n)), not a manual bubble sort")
-
-	; Must reference the comparator function
+	Comparator := _DriverFuncBody("_LLM_ModelBrowser_Compare")
+	Assert(Body != "", "The actual model-browser sort helper must exist")
+	Assert(Comparator != "", "The actual catalogue comparator must exist")
+	; Native AutoHotkey v2 Array has no Sort method. The old positive assertion
+	; certified an unsupported call; actual ordering and cloning run separately.
+	Assert(InStr(Body, ".Sort(") = 0,
+		"A native array must not call the unsupported Array.Sort API")
 	Assert(InStr(Body, "_LLM_ModelBrowser_Compare") > 0,
-		"_LLM_ModelBrowser_Sort must pass _LLM_ModelBrowser_Compare as the sort comparator")
-
-	; The O(n²) nested loop form must be absent
-	Assert(InStr(Body, "loop n - 1") = 0,
-		"_LLM_ModelBrowser_Sort must NOT use a manual nested-loop bubble sort (replaced by Array.Sort)")
+		"The actual sorting path must reference its catalogue comparator")
+	Assert(InStr(Comparator, "LLM_GetModelInfo") > 0 && InStr(Comparator, "StrCompare") > 0,
+		"The real comparator must retain both catalogue size and family comparison")
 }
-Test("llm_model_browser: _LLM_ModelBrowser_Sort uses Array.Sort with comparator (O(n log n))", _TMBSC_SortUsesCallback)
+Test("llm_model_browser: sorting uses supported native array operations and the real comparator", _TMBSC_UsesSupportedArrayApi)
