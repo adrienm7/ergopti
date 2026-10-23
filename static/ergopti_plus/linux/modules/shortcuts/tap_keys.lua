@@ -313,18 +313,26 @@ function M.on_key(detail)
 	for _, name in ipairs(BLOCKING_MODIFIERS) do
 		if mods[name] then return false end
 	end
+	-- Initial admission is itself a foreign callback and can revoke this source.
+	local generation, active = _dispatch_generation, _is_active
 	local action = M.get_action(id)
-	if action == "none" or not _is_active(action) then return false end
+	local function current()
+		if _configuration_owner ~= nil or generation ~= _dispatch_generation or _is_active ~= active then return false end
+		local admitted = active(action)
+		return admitted == true and _configuration_owner == nil and generation == _dispatch_generation and _is_active == active
+	end
+	if action == "none" or not current() then return false end
 	if not _defer then
 		Logger.error(LOG, "Tap key '%s' pressed before init() — the key is typed instead.", id)
 		return false
 	end
-	local generation = _dispatch_generation
 	local queued = _defer(function()
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation or not _is_active(action) then return end
+		if not current() then return end
 		local Gestures = action_catalogue()
 		if not Gestures then return end
 		Logger.debug(LOG, "Tap key '%s' fired → '%s'.", id, action)
+		-- Admission and logging may synchronously revoke this queued source.
+		if not current() then return end
 		Gestures.execute_action(action, M.binding_id(id))
 	end)
 	if queued ~= true then
