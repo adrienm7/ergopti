@@ -1577,24 +1577,59 @@ global _UpdaterManagedFailurePresenter := 0
 global _UpdaterManagedFailureRetireFn := 0
 global _UpdaterManagedFailureOwner := 0
 
+; Capture callback identity and its admission epoch together before callouts.
+_Updater_CaptureInstallObservation() {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	PreviousCritical := Critical("On")
+	try return {Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}
+	finally Critical(PreviousCritical)
+}
+
+_Updater_InstallObservationValid(Observation) {
+	return Type(Observation) == "Object" && Observation.HasOwnProp("Observer")
+		&& Observation.HasOwnProp("Epoch") && Observation.Epoch is Integer
+		&& Observation.Epoch >= 0
+}
+
+_Updater_InstallObservationCurrent(Observation) {
+	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
+	return _Updater_InstallObservationValid(Observation)
+		&& Observation.Epoch == _UpdaterInstallObserverEpoch
+		&& Observation.Observer == _UpdaterInstallObserver
+}
+
+; Missing transaction metadata never borrows the current observer. The actual
+; reservation, artifact registration and swap constructor own this receipt.
+_Updater_ArtifactInstallObservation(Artifacts) {
+	Observation := IsObject(Artifacts) && Artifacts.HasOwnProp("InstallObservation")
+		? Artifacts.InstallObservation : 0
+	return _Updater_InstallObservationValid(Observation) ? Observation : 0
+}
+
 ; Tells the Versions window one phase of the install it follows: "installing",
 ; "restarting" or "failed" (which ends the following).
 ; @param Phase {String}
 ; @param ReasonKey {String} Page locale key of a failure.
 ; @returns {Boolean} True when a window follows this install.
-_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset) {
+_Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, ExpectedObserver := unset, ExpectedEpoch := unset) {
 	global _UpdaterInstallObserver, _UpdaterInstallObserverEpoch
 	PreviousCritical := Critical("On")
 	try {
 		Observer := IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver
+		if IsSet(ExpectedEpoch) && (ExpectedEpoch != _UpdaterInstallObserverEpoch
+			|| Observer != _UpdaterInstallObserver)
+			return false
 		if IsObject(Observer) && Phase == "failed"
 			&& IsObject(_UpdaterInstallObserver) && _UpdaterInstallObserver == Observer {
 			_UpdaterInstallObserver := 0
 			_UpdaterInstallObserverEpoch += 1
 		}
+		DeliveryEpoch := _UpdaterInstallObserverEpoch
 	} finally {
 		Critical(PreviousCritical)
 	}
+	if IsSet(ExpectedEpoch) && _UpdaterInstallObserverEpoch != DeliveryEpoch
+		return false
 	if !IsObject(Observer)
 		return false
 	try {
@@ -1613,10 +1648,18 @@ _Updater_NotifyInstallPhase(Phase, ReasonKey := "", FailureReceipt := 0, Expecte
 ; @param MessageKey {String} Updater locale key of the modal box.
 ; @param ReasonKey {String} Page locale key of the window's failure.
 ; @param Icon {String} Modal box icon option.
-_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0) {
-	if _Updater_NotifyInstallPhase("failed", ReasonKey, FailureReceipt)
-		return
+_Updater_ReportInstallFailure(MessageKey, ReasonKey, Icon := "Icon!", FailureReceipt := 0, Observation := unset) {
+	if !IsSet(Observation)
+		Observation := _Updater_CaptureInstallObservation()
+	if !_Updater_InstallObservationCurrent(Observation)
+		return false
+	if _Updater_NotifyInstallPhase("failed", ReasonKey, FailureReceipt,
+		Observation.Observer, Observation.Epoch)
+		return true
+	if !_Updater_InstallObservationCurrent(Observation)
+		return false
 	Ui_MsgBox(t(MessageKey), t("updater.window_title"), Icon)
+	return true
 }
 
 ; Whether the staging worker's ERR line is a refused verification (a missing or
@@ -1778,15 +1821,18 @@ _Updater_AdmitStagingReceipt(Receipt, Contract) {
 	return Admitted
 }
 
-_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset) {
+_Updater_NewManagedFailureOwner(Release, Request, AssetUrl, Digest, StagingEpoch, ExpectedObserver := unset, ExpectedObserverEpoch := unset) {
 	global _UpdaterInstallObserver
 	if !_Updater_RequestContextValid(Request) || Type(Release) != "Object"
 		|| !Release.HasProp("RawJson") || !Release.HasProp("Tag")
 		return 0
+	Observation := _Updater_CaptureInstallObservation()
 	return Map("release", { RawJson: Release.RawJson, Tag: Release.Tag },
 		"request", Request, "asset_url", AssetUrl, "digest", Digest,
 		"staging_epoch", StagingEpoch, "terminal", false, "retired", false,
-		"install_observer", IsSet(ExpectedObserver) ? ExpectedObserver : _UpdaterInstallObserver)
+		"install_observer", IsSet(ExpectedObserver) ? ExpectedObserver : Observation.Observer,
+		"install_observer_epoch", IsSet(ExpectedObserverEpoch) ? ExpectedObserverEpoch
+			: IsSet(ExpectedObserver) ? -1 : Observation.Epoch)
 }
 
 _Updater_DispatchManagedFailureRetirement(Owner) {
@@ -1845,10 +1891,11 @@ _Updater_RetryManagedFailure(Owner, Observer := unset) {
 	return _Updater_StartObservedInstall(Release, IsSet(Observer) ? Observer : _UpdaterInstallObserver, Owner["request"], Owner) == true
 }
 
-_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
+_Updater_PublishManagedFailure(Failure, Owner, StagingEpoch, Observation := 0) {
 	global _UpdaterManagedFailureOwner, _UpdaterManagedFailurePresenter
 	global _UpdaterSelfUpdateEpoch, _UpdaterInstallObserver
-	Observer := Owner is Map ? Owner.Get("install_observer", 0) : _UpdaterInstallObserver
+	if Owner is Map
+		Observation := {Observer: Owner.Get("install_observer", 0), Epoch: Owner.Get("install_observer_epoch", -1)}
 	if Failure.Get("native_cleanup_debt", false)
 		try LoggerWarn("Updater", "Staging reported native resolver retirement debt; its owned process tree has physically retired.")
 	if Failure.Get("cleanup_debt", []).Length > 0
@@ -1868,17 +1915,21 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+	if (Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner))
+		|| !_Updater_InstallObservationCurrent(Observation)
 		return false
 	if Failure["reason"] == "verify" {
 		if !_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_verify",
-			Failure["receipt"], Observer)
-			Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
+			Failure["receipt"], Observation.Observer, Observation.Epoch)
+			if _Updater_InstallObservationCurrent(Observation)
+				Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
 		return true
 	}
 	Observed := _Updater_NotifyInstallPhase("failed",
-		"changelog_window.install_error_download", Failure["receipt"], Observer)
+		"changelog_window.install_error_download", Failure["receipt"], Observation.Observer, Observation.Epoch)
 	if Owner is Map && !_Updater_ManagedFailureOwnerIsCurrent(Owner)
+		return false
+	if !Observed && !_Updater_InstallObservationCurrent(Observation)
 		return false
 	if !Observed && HasMethod(_UpdaterManagedFailurePresenter, "Call") {
 		try {
@@ -1886,7 +1937,7 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 				return true
 		}
 	}
-	if !Observed
+	if !Observed && _Updater_InstallObservationCurrent(Observation)
 		Ui_MsgBox(t("updater.install_error_download"), t("updater.window_title"), "Icon!")
 	return true
 }
@@ -1896,11 +1947,13 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 ; disk persistence, integrity checks and swap-script creation must never run here.
 ; This side only validates the request, launches/polls the worker and performs
 ; the final non-blocking process hand-off after the worker reports READY.
-_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0) {
+_Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0, Observation := unset) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
-	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt
+	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt, _UpdaterDownloadArtifacts
 	global UPDATER_REQUEST_POLICY_ALLOW
+	if !IsSet(Observation)
+		Observation := _Updater_CaptureInstallObservation()
 	Outcome := {
 		Reserved: false,
 		ShouldDrop: false,
@@ -1929,6 +1982,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 			_UpdaterDownloadInProgress := true
 			Outcome.Epoch := ++_UpdaterSelfUpdateEpoch
 			_UpdaterDownloadRequest := Request
+			_UpdaterDownloadArtifacts := {InstallObservation: Observation}
 			_UpdaterDownloadStartedTick := A_TickCount
 			Outcome.Reserved := true
 		}
@@ -1942,11 +1996,13 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 ; can pump lifecycle callbacks: if START itself is interrupted by Pause, there
 ; is deliberately no transaction for cancellation to terminate. The resumed
 ; reservation then observes stale provenance and closes START with WARNING.
-_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0) {
+_Updater_BeginDownloadTransaction(Request, BoundarySuspended, Tag, AssetUrl, ExpectedFailureOwner := 0, Observation := unset) {
+	if !IsSet(Observation)
+		Observation := _Updater_CaptureInstallObservation()
 	try LoggerStart("Updater", "Downloading update '{1}' from {2}…", Tag, AssetUrl)
 	try {
 		Outcome := _Updater_TryReserveDownloadTransaction(
-			Request, BoundarySuspended, ExpectedFailureOwner)
+			Request, BoundarySuspended, ExpectedFailureOwner, Observation)
 	} catch as Err {
 		try LoggerError("Updater", "Download reservation failed after START: {1}.", Err.Message)
 		throw Err
@@ -1972,7 +2028,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	global _UpdaterDownloadInProgress
 	global _UpdaterRecoveryPublishTarget, UPDATER_REQUEST_ORIGIN_MANUAL
 	global _UpdaterInstallObserver
-	InstallObserver := _UpdaterInstallObserver
+	InstallObserver := _Updater_CaptureInstallObservation()
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
 		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
@@ -2002,7 +2058,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy", "Icon!", 0, InstallObserver)
 		return false
 	}
 	if (Type(Release) != "Object" or !Release.HasProp("RawJson")) {
@@ -2013,7 +2069,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_unexpected", "Icon!", 0, InstallObserver)
 		return false
 	}
 	; Re-entrancy guard: two independent "Update now" triggers (the TrayTip
@@ -2026,7 +2082,8 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	; (updater-download-reentrancy).
 	if _UpdaterDownloadInProgress {
 		try LoggerWarn("Updater", "Download already in progress -- ignoring duplicate Updater_DownloadAndInstall call.")
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy", 0,
+			InstallObserver.Observer, InstallObserver.Epoch)
 		return false
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
@@ -2046,7 +2103,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_error_no_asset", "changelog_window.install_error_no_asset")
+		_Updater_ReportInstallFailure("updater.install_error_no_asset", "changelog_window.install_error_no_asset", "Icon!", 0, InstallObserver)
 		return false
 	}
 	AssetUrl := Asset.Url
@@ -2060,7 +2117,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 			return false
 		}
-		_Updater_ReportInstallFailure("updater.install_local_source", "changelog_window.install_error_unexpected", "Iconi")
+		_Updater_ReportInstallFailure("updater.install_local_source", "changelog_window.install_error_unexpected", "Iconi", 0, InstallObserver)
 		return false
 	}
 
@@ -2078,7 +2135,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		return false
 	}
 	if (LocalAppData == "") {
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, InstallObserver)
 		return false
 	}
 	StagingDir := LocalAppData . "\Ergopti\updates"
@@ -2090,7 +2147,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	; atomically claims the exact request + epoch.
 	BoundarySuspended := HasSuspendOverride ? IsSuspended : A_IsSuspended
 	Reservation := _Updater_BeginDownloadTransaction(
-		Request, BoundarySuspended, Release.Tag, AssetUrl, ExpectedFailureOwner)
+		Request, BoundarySuspended, Release.Tag, AssetUrl, ExpectedFailureOwner, InstallObserver)
 	if Reservation.RetryStale
 		return false
 	if Reservation.ShouldDrop {
@@ -2099,11 +2156,12 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	if Reservation.RecoveryBusy {
 		if _Updater_RequestMayPublish(Request, BoundarySuspended, NotifyFn)
-			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy")
+			_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_busy", "Icon!", 0, InstallObserver)
 		return false
 	}
 	if Reservation.DuplicateDownload {
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_busy", 0,
+			InstallObserver.Observer, InstallObserver.Epoch)
 		return false
 	}
 	if !Reservation.Reserved
@@ -2251,11 +2309,14 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
 	StagingWorker := _Updater_StagingWorkerPath()
 	SwapWorker := _Updater_SwapWorkerPath()
-	FailureOwner := IsSet(InstallObserver)
-		? _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
-			ExpectedSha256, StagingEpoch, InstallObserver)
-		: _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
-			ExpectedSha256, StagingEpoch)
+	Observation := IsSet(InstallObserver) ? InstallObserver
+		: _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+	if !_Updater_InstallObservationValid(Observation) {
+		_Updater_CancelSelfUpdateTransaction("Staging launch lacked its original install observation.", false, false, StagingEpoch)
+		return
+	}
+	FailureOwner := _Updater_NewManagedFailureOwner(Release, Request, AssetUrl,
+		ExpectedSha256, StagingEpoch, Observation.Observer, Observation.Epoch)
 	_OnDone := (ExitCode, Stdout, Stderr) => _Updater_PollDownloadAsync(
 		ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, CurrentExe, Tag,
 		StagingEpoch, FailureOwner)
@@ -2337,7 +2398,7 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		} else {
 			try LoggerError("Updater", "Could not launch the isolated update staging worker.")
 		}
-		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
@@ -2374,9 +2435,13 @@ _Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
 		if (!_UpdaterDownloadInProgress
 			or _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
+		Observation := _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+		if !_Updater_InstallObservationValid(Observation)
+			return false
 		_UpdaterDownloadArtifacts := {
 			NewExe: NewExe,
-			SwapScript: SwapScriptPath
+			SwapScript: SwapScriptPath,
+			InstallObservation: Observation
 		}
 		return true
 	} finally {
@@ -2410,6 +2475,7 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	Owner := 0
 	Request := 0
 	Artifacts := 0
+	Observation := 0
 	HadTransaction := false
 	PreviousCritical := Critical("On")
 	try {
@@ -2423,6 +2489,9 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		Request := IsObject(_UpdaterDownloadRequest) ? _UpdaterDownloadRequest : 0
 		Artifacts := IsObject(_UpdaterDownloadArtifacts)
 			? _UpdaterDownloadArtifacts : 0
+		if HadTransaction
+			Observation := Owner is Map ? Owner.Get("InstallObservation", 0)
+				: _Updater_ArtifactInstallObservation(Artifacts)
 		_UpdaterDownloadWorker := 0
 		_UpdaterDownloadRequest := 0
 		_UpdaterDownloadArtifacts := 0
@@ -2455,7 +2524,9 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		_Updater_RequestMayPublish(Request, true)
 	if HadTransaction {
 		try LoggerError("Updater", LogMessage)
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
+		if _Updater_InstallObservationValid(Observation)
+			_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", 0,
+				Observation.Observer, Observation.Epoch)
 		if RebuildMenu
 			try TimerArmOneShotMs((*) => _Updater_RebuildMenu(), 50)
 	}
@@ -2526,35 +2597,52 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if !_Updater_AdmitStagingCompletion(StagingEpoch)
 		return
 	global _UpdaterDownloadArtifacts
+	Observation := FailureOwner is Map
+		? {Observer: FailureOwner.Get("install_observer", 0), Epoch: FailureOwner.Get("install_observer_epoch", -1)}
+		: _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+	if !_Updater_InstallObservationValid(Observation) {
+		_Updater_CancelSelfUpdateTransaction("Staging completion lacked its original install observation.", false, false, StagingEpoch)
+		return
+	}
 	if !_Updater_RetireCurlCaptureArtifacts(_UpdaterDownloadArtifacts) {
-		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download", "Icon!", 0, Observation)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
-		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
+		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download", 0,
+			Observation.Observer, Observation.Epoch)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
 	if (ExitCode != 0 or Stdout != "READY") {
 		try LoggerError("Updater", "Update staging worker failed (exit {1}); private output omitted.", ExitCode)
 		Failure := _Updater_ParseStagingFailure(Stdout)
-		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch)
+		_Updater_PublishManagedFailure(Failure, FailureOwner, StagingEpoch, Observation)
 		return
 	}
 	try LoggerSuccess("Updater", "Update downloaded and verified for '{1}'.", Tag)
-	_Updater_NotifyInstallPhase("installing")
+	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return
+	_Updater_NotifyInstallPhase("installing", "", 0, Observation.Observer, Observation.Epoch)
 	if !_Updater_StartSwapTransaction(SwapScriptPath, NewExe, CurrentExe, Tag,
 		StagingEpoch) {
 		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 			return
-		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
+		_Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, Observation)
 		_Updater_EndDownloadTransaction(StagingEpoch)
 		return
 	}
-	_Updater_NotifyInstallPhase("restarting")
-	global UPDATER_LAST_NOTIFIED_TAG := ""
+	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+		return
+	_Updater_NotifyInstallPhase("restarting", "", 0, Observation.Observer, Observation.Epoch)
+	global UPDATER_LAST_NOTIFIED_TAG
+	PreviousCritical := Critical("On")
+	try {
+		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			UPDATER_LAST_NOTIFIED_TAG := ""
+	} finally Critical(PreviousCritical)
 }
 
 _Updater_QuoteCreateProcessArg(Value) {
@@ -2813,7 +2901,8 @@ _Updater_NewSwapOwner(TransactionId) {
 		"PhaseStartedTick", A_TickCount,
 		"FinalExitSignaled", false,
 		"ExitRetryCount", 0,
-		"Tag", "")
+		"Tag", "",
+		"InstallObservation", _Updater_CaptureInstallObservation())
 }
 
 ; Reserve the process-wide owner before any native child exists. OnExit can
@@ -2822,7 +2911,7 @@ _Updater_NewSwapOwner(TransactionId) {
 ; suspended handles instead of orphaning an unpublished process.
 _Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
-	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
 	Owner := _Updater_NewSwapOwner(TransactionId)
 	PreviousCritical := Critical("On")
 	try {
@@ -2832,6 +2921,12 @@ _Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
 		if (_UpdaterSwapOwner is Map)
 			return 0
 		Owner["Epoch"] := StagingEpoch
+		if StagingEpoch {
+			Observation := _Updater_ArtifactInstallObservation(_UpdaterDownloadArtifacts)
+			if !_Updater_InstallObservationValid(Observation)
+				return 0
+			Owner["InstallObservation"] := Observation
+		}
 		_UpdaterSwapOwner := Owner
 		_UpdaterExitIntent := 0
 		_UpdaterExitInvocation := 0
@@ -3127,10 +3222,11 @@ _Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
 	if !(Owner is Map)
 		return
 	StagingEpoch := Owner.Get("Epoch", 0)
+	Observation := Owner.Get("InstallObservation", 0)
 	_Updater_CloseSwapOwner(Owner, true)
 	try LoggerError("Updater", "Swap transaction {1} aborted: {2}.", TransactionId, Message)
 	if ShowUi {
-		try _Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install")
+		try _Updater_ReportInstallFailure("updater.install_error", "changelog_window.install_error_install", "Icon!", 0, Observation)
 	} else {
 		TimerArmOneShotMs(_Updater_ShowDeferredSwapFailureNotice, 1)
 	}
