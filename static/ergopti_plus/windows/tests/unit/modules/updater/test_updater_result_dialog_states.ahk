@@ -352,3 +352,5 @@ _TUCD_OtherChannelsCase() {
 }
 Test("update check: a manual check keeps the other channels with a newer release (update-check-window)",
 	_TUCD_OtherChannelsOnManualChecks)
+
+#Include test_update_check_native_consent.ahk
