@@ -24,7 +24,7 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 		_AhkSubDir := ""
 		Path := CS_GetTomlPath()
 		Cases := [
-			["metrics_enabled", '"false"'],
+			["enabled", '"false"'],
 			["metrics_wpm_menubar_colors", "2"],
 			["private_filter_enabled", '""'],
 			["secure_filter_enabled", '""'],
@@ -62,7 +62,7 @@ TestConfigShortcutsValidatesBeforePublishing() {
 		_AhkSubDir := ""
 		MetricsShortcuts.enabled := true
 		_CSTT_WriteConfig(CS_GetTomlPath(),
-			'metrics_enabled = false`nsecure_filter_enabled = ""')
+			'enabled = false`nsecure_filter_enabled = ""')
 		Thrown := false
 		try CS_Load()
 		catch
@@ -84,11 +84,11 @@ Test("metrics config: validation precedes live publication (AHK-105)",
 _CSTT_RetiredShortcutValuesAreUnknown() {
 	for Value in ["ctrl+alt+m", 9, false, Map("future", "keep")] {
 		Section := Map("metrics_shortcut_typing", Value, "metrics_shortcut_apps", Value,
-			"metrics_enabled", true)
+			"enabled", true)
 		Validated := _CS_ValidateMetricsSection(Section)
 		AssertFalse(Validated.Has("metrics_shortcut_typing"), "the retired typing field has no live owner")
 		AssertFalse(Validated.Has("metrics_shortcut_apps"), "the retired apps field has no live owner")
-		AssertTrue(Validated["metrics_enabled"], "retirement preserves collection consent validation")
+		AssertTrue(Validated["enabled"], "retirement preserves collection consent validation")
 		AssertEqual(Value, Section["metrics_shortcut_typing"], "validation must not mutate unknown data")
 	}
 }
@@ -112,14 +112,14 @@ _CSTT_ValidTomlPrivacySettings() {
 		_ConfigDir := TestDir
 		_AhkSubDir := ""
 		Path := CS_GetTomlPath()
-		Body := "metrics_enabled = false`nmetrics_disabled_apps = [`n"
+		Body := "enabled = false`nmetrics_disabled_apps = [`n"
 			. ' "CHROME.EXE", # excluded browser' . "`n"
 			. " 'editor#1.exe',`n] # excluded applications`n"
 		_CSTT_WriteConfig(Path, Body, "[metrics] # explicit recording opt-out")
 		Data := CS_Read()
 		Assert(Data.Has("metrics"), "a commented header must retain the metrics section")
 		Section := Data["metrics"]
-		AssertEqual(false, Section["metrics_enabled"], "the recording opt-out must remain a native false")
+		AssertEqual(false, Section["enabled"], "the recording opt-out must remain a native false")
 		Apps := Section["metrics_disabled_apps"]
 		Assert(Apps is Array, "a multiline array must remain an array")
 		AssertEqual(2, Apps.Length, "comments must not add or discard applications")
@@ -160,11 +160,11 @@ _CSTT_SemanticPrivacySettings(Shape, Enabled) {
 		Literal := Enabled ? "true" : "false"
 		Apps := '["CHROME.EXE", "editor#1.exe"]'
 		switch Shape {
-			case "dotted": Source := "metrics.metrics_enabled = " . Literal
+			case "dotted": Source := "metrics.enabled = " . Literal
 				. "`nmetrics.metrics_disabled_apps = " . Apps . "`n"
-			case "inline": Source := "metrics = { metrics_enabled = " . Literal
+			case "inline": Source := "metrics = { enabled = " . Literal
 				. ", metrics_disabled_apps = " . Apps . " }`n"
-			case "quoted": Source := '["metrics"]`nmetrics_enabled = ' . Literal
+			case "quoted": Source := '["metrics"]`nenabled = ' . Literal
 				. "`nmetrics_disabled_apps = " . Apps . "`n"
 			default: throw ValueError("Unknown metrics semantic fixture")
 		}
@@ -172,7 +172,7 @@ _CSTT_SemanticPrivacySettings(Shape, Enabled) {
 		AssertTrue(FSWrite(Path, Source))
 		Data := CS_Read()
 		AssertTrue(Data.Has("metrics"), "the real metrics reader must retain the semantic namespace")
-		AssertEqual(Enabled, Data["metrics"]["metrics_enabled"])
+		AssertEqual(Enabled, Data["metrics"]["enabled"])
 		AssertTrue(Data["metrics"]["metrics_disabled_apps"] is Array)
 		MetricsShortcuts.enabled := !Enabled
 		CS_Load()

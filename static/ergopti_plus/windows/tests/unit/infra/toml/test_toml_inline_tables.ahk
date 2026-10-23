@@ -284,13 +284,13 @@ Test("TOML: document records retain exact typed identities and owner generations
 ; The document owner skips comments in the original source. A literal token on
 ; the next physical line must not inherit that discarded comment's last byte.
 _TIT_LiteralLineBoundary(Comment) {
-	Source := '[metrics]`nmetrics_enabled = false`nmetrics_disabled_apps = [`n'
+	Source := '[metrics]`nenabled = false`nmetrics_disabled_apps = [`n'
 		. ' "CHROME#1.EXE", ' . Comment . "`n"
 		. "`t'editor#1.exe',`n]`n"
 	Document := TOML_ParseDocument(Source)
 	Section := Document["metrics"]
-	AssertTrue(Section["metrics_enabled"] is TOML_Bool)
-	AssertFalse(Section["metrics_enabled"].Value, "comments cannot invert the authored opt-out")
+	AssertTrue(Section["enabled"] is TOML_Bool)
+	AssertFalse(Section["enabled"].Value, "comments cannot invert the authored opt-out")
 	Apps := Section["metrics_disabled_apps"]
 	AssertTrue(Apps is Array)
 	AssertEqual(2, Apps.Length, "comment punctuation cannot create or discard array elements")
@@ -299,7 +299,7 @@ _TIT_LiteralLineBoundary(Comment) {
 	AssertEqual("editor#1.exe", Apps[2], "a hash in a literal string remains data")
 	Cache := ConfigTomlDecodeSnapshot(Source).Cache
 	Validated := _CS_ValidateMetricsSection(Cache["metrics"])
-	AssertFalse(Validated["metrics_enabled"])
+	AssertFalse(Validated["enabled"])
 	AssertEqual(2, Validated["metrics_disabled_apps"].Count)
 	AssertTrue(Validated["metrics_disabled_apps"].Has("chrome#1.exe"))
 	AssertTrue(Validated["metrics_disabled_apps"].Has("editor#1.exe"))

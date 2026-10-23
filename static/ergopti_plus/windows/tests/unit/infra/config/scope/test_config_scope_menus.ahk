@@ -11,7 +11,7 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 
 _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"]) {
 	global _MenuDispatchCallbacks
-	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
+	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
 	Fixture := _ScopeOwnerFixture(Source)
 	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))

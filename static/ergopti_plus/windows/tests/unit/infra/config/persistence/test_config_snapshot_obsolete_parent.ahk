@@ -51,7 +51,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	SavedUPDATERCHANNEL := IsSet(UPDATER_CHANNEL) ? UPDATER_CHANNEL : unset
 	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
 	Fields := [
-		{ target: MetricsShortcuts, key: "enabled", path: "metrics.metrics_enabled" },
+		{ target: MetricsShortcuts, key: "enabled", path: "metrics.enabled" },
 		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
 		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
 		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },
@@ -367,7 +367,7 @@ _FMS_PersonalFileCaseAlias(Path, Name) {
 	SavedUPDATERCHANNEL := IsSet(UPDATER_CHANNEL) ? UPDATER_CHANNEL : unset
 	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
 	Fields := [
-		{ target: MetricsShortcuts, key: "enabled", path: "metrics.metrics_enabled" },
+		{ target: MetricsShortcuts, key: "enabled", path: "metrics.enabled" },
 		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
 		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
 		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },

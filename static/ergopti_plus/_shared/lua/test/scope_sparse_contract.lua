@@ -61,7 +61,7 @@ return function(helpers)
 		end)
 		helpers.it("retains consent exclusions and explicit deletion during clear", function()
 			local indexed = rows("global", "recommended")
-			for _, path in ipairs({ "llm.enabled", "metrics.enabled", "metrics.metrics_enabled", "hotstrings.preview_ai_enabled" }) do
+			for _, path in ipairs({ "llm.enabled", "metrics.enabled", "hotstrings.preview_ai_enabled" }) do
 				helpers.assert_eq(indexed[path], nil, path)
 			end
 			-- An entry active by default (the script chords) is the one exception:

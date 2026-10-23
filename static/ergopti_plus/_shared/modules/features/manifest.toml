@@ -1635,17 +1635,6 @@ type = "boolean"
 description_key = "menu.metrics.encrypt_toggle"
 
 [[features.metrics]]
-id = "metrics_enabled"
-platforms = ["ahk"]
-default = false
-recommended = true
-input_altering = true
-type = "boolean"
-description_key = "menu.metrics.metrics_enabled"
-
-
-
-[[features.metrics]]
 id = "metrics_wpm_menubar_colors"
 platforms = ["ahk"]
 default = false
@@ -7053,7 +7042,7 @@ dynamic_defaults = [{ prefix = "llm.profiles.shortcuts", depth = 2, suffix = "mo
 
 [scopes.metrics]
 prefixes = ["metrics"]
-restore_exclude = ["metrics.enabled", "metrics.metrics_enabled"]
+restore_exclude = ["metrics.enabled"]
 
 [scopes.global]
 includes = ["tap_holds", "shortcuts", "gestures", "keyboard_layout", "hotstrings", "llm", "metrics"]
@@ -7251,7 +7240,7 @@ checklist = "none"
 title_key = "menu.metrics.title"
 question_key = "menu.metrics.enable"
 description_key = "onboarding.metrics.desc"
-master = { ahk = "metrics.metrics_enabled", hs = "metrics.enabled", linux = "metrics.enabled" }
+master = { ahk = "metrics.enabled", hs = "metrics.enabled", linux = "metrics.enabled" }
 checklist = "none"
 consent = true
 

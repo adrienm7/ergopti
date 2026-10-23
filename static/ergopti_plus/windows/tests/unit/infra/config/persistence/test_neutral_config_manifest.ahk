@@ -156,7 +156,7 @@ _NeutralConfigScopesExcludeConsent() {
 	FoundShortcut := false
 	for Row in Rows {
 		Path := Row.Section . "." . Row.Key
-		Assert(Path != "llm.enabled" && Path != "metrics.enabled" && Path != "metrics.metrics_enabled",
+		Assert(Path != "llm.enabled" && Path != "metrics.enabled",
 			"restore recommended must never import consent")
 		if Path == "category_enabled.shortcuts"
 			FoundShortcut := Row.Value == true
@@ -252,7 +252,7 @@ _NeutralConfigSparseRestore() {
 			Assert(!Row.HasOwnProp("Delete"), "non-neutral recommendation must remain assigned: " . Path)
 			Assert(ManifestValuesEqual(Row.Value, Recommended), "preserve recommendation: " . Path)
 		}
-		Assert(Path != "llm.enabled" && Path != "metrics.enabled" && Path != "metrics.metrics_enabled"
+		Assert(Path != "llm.enabled" && Path != "metrics.enabled"
 			&& Path != "hotstrings.preview_ai_enabled", "restore must never import consent")
 	}
 	Assert(NeutralScalars > 0 && NeutralLeaves > 0 && NonNeutral > 0, "exercise all real recommendation shapes")
