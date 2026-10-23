@@ -64,7 +64,7 @@ _KSSI_PreDrainGuardsAreShutdownAware() {
 	Guards := Map(
 		"A_IsSuspended",
 			"the pause guard already bypasses on _shutting_down",
-		"KeylogConst.INGEST_IDLE_MS",
+		"KeystatsConst.INGEST_IDLE_MS",
 			"the typing-idle defer must bypass on _shutting_down too -- at shutdown there is "
 			. "no next tick to defer to, so it discards the batch instead of postponing it, "
 			. "and _pending_entries exists only in RAM"

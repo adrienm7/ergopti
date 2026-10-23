@@ -5,7 +5,7 @@
 ; DESCRIPTION: Shared limits for the resident journal and its ingestion tests.
 ; ==============================================================================
 
-class KeylogConst {
+class KeystatsConst {
     static INGEST_TICK_MS           := 5000     ; Background ingest tick.
     static INGEST_BATCH_LINES       := 5000     ; Max lines per ingest cycle.
     static THINK_PAUSE_MS           := 2000     ; Active vs thinking pause threshold.

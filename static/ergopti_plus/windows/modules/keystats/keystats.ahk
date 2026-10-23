@@ -729,8 +729,8 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
 		meta := ev[3]
 		if !(meta is Map) || !meta.Has("s") || !meta["s"] {
 			d := ev[2]
-			if (d > KeylogConst.WPM_MAX_DELAY_MS)
-				d := KeylogConst.WPM_MAX_DELAY_MS
+			if (d > KeystatsConst.WPM_MAX_DELAY_MS)
+				d := KeystatsConst.WPM_MAX_DELAY_MS
 			total_time_ms += d
 			total_chars += 1
 		}
@@ -995,7 +995,7 @@ KL_BootstrapDataSql() {
 		}
 	}
     header := "-- ergopti metrics — device " . Keystats.device_id
-        .  " — schema_version " . KeylogConst.SCHEMA_VERSION . "`n"
+        .  " — schema_version " . KeystatsConst.SCHEMA_VERSION . "`n"
         .  "-- This file is APPEND-ONLY. Do not edit by hand.`n"
         .  "-- The launcher rebuilds db.sqlite from this file on demand.`n"
         .  "PRAGMA foreign_keys = OFF;`n"
@@ -1060,7 +1060,7 @@ KL_Init(metrics_dir) {
     try {
         if state_loaded {
             sql_text := _KL_ReadRecoveryText(Keystats.data_sql_path, 0,
-                KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+                KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES)
             sql_max_id := KL_ScanMaxEventId(sql_text, Keystats._device_id_lit)
         } else {
             if FileExist(Keystats.data_sql_path)
@@ -1111,9 +1111,9 @@ KL_Init(metrics_dir) {
 		; the initial one-shot so a later initialization failure can cancel it too.
 		if !KL_TimerGroupStart(Keystats, [
 			Map("property", "_ingest_timer", "callback", KL_IngestOnce.Bind(),
-				"period", KeylogConst.INGEST_TICK_MS),
+				"period", KeystatsConst.INGEST_TICK_MS),
 			Map("property", "_midnight_timer", "callback", KL_MidnightCheck.Bind(),
-				"period", KeylogConst.MIDNIGHT_CHECK_TICK_MS),
+				"period", KeystatsConst.MIDNIGHT_CHECK_TICK_MS),
 			Map("property", "_initial_ingest_timer",
 				"callback", KL_IngestOnce.Bind(), "period", -250)
 		], SetTimer, "core")
@@ -1235,7 +1235,7 @@ KL_Stop(Token := 0) {
 	    ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
 	    ; flushed once the reader reaches EOF, so a backlog has to be walked out.
 		IngestComplete := false
-	    loop KeylogConst.SHUTDOWN_INGEST_MAX_PASSES {
+	    loop KeystatsConst.SHUTDOWN_INGEST_MAX_PASSES {
 	        ingest_result := KL_IngestOnce(true, false, Scope.Token)
 	        ; A rollover result carries no "eof" key — nothing left to walk either way.
 			if !ingest_result["ok"] {

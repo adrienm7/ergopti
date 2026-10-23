@@ -107,7 +107,7 @@ KL_ReadNewTodayLog(Token := 0) {
 	    if Keystats.HasOwnProp("_today_fh") && !KL_FlushTodayFh(Keystats._today_fh)
 	        return Map("ok", false, "offset", Keystats.today_log_offset, "entries", [], "eof", false)
 		return _KL_JournalReadLines(Keystats.today_log_path,
-			Keystats.today_log_offset, KeylogConst.INGEST_BATCH_LINES, KL_JsonDecode)
+			Keystats.today_log_offset, KeystatsConst.INGEST_BATCH_LINES, KL_JsonDecode)
 	} finally {
 		_KL_JournalLeave(Scope)
 	}
@@ -159,7 +159,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 	    ; RAM only, so quitting or reloading within INGEST_IDLE_MS of a keystroke
 	    ; used to throw away the whole closing batch (session_end, idle_end, the
 	    ; final roi_snapshot), leaving events_session with an unpaired session_start.
-	    if (!force and !Keystats._shutting_down and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS) {
+	    if (!force and !Keystats._shutting_down and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeystatsConst.INGEST_IDLE_MS) {
 			JournalResult := _KL_JournalPendingEntries(0, Scope.Token)
 			if !JournalResult["ok"]
 				return Map("ok", false, "eof", false,
@@ -393,7 +393,7 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 	    ; filesystem and native process APIs. Busy commits retain their revision
 	    ; and dirty mode in memory, so a later manifest/drain can recover without
 	    ; requiring another SQL append.
-	    if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS) {
+	    if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeystatsConst.INGEST_LIVE_PUSH_IDLE_MS) {
 	        try KLWV_NotifyIngest()
 	    } else {
 	        try KLWV_RecordCommittedIngest()

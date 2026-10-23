@@ -18,7 +18,7 @@ _KFIR_OutOfOrderHistory() {
 				. ",'" . Format("{:200}", "synthetic") . "');`n"
 		FileAppend(Sql, Path, "UTF-8-RAW")
 		Before := KLR_LedgerSnapshot(Path)
-		Tail := _KL_ReadRecoveryText(Path, 0, KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+		Tail := _KL_ReadRecoveryText(Path, 0, KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES)
 		AssertEqual(1000, KL_ScanMaxEventId(Tail, "'device-a'"), "the old high ID must be outside the ordinary tail")
 		Recovered := KL_ResolveStartId(1, KL_RecoverSqlEventId(Path, "'device-a'"))
 		AssertEqual(10001, Recovered)
@@ -47,7 +47,7 @@ _KFIR_ChunkBoundaries() {
 		Sql := "VALUES ('dev-é'," . Format("{:4096}", "") . Format("{:04096}", 0) . "12345);`n"
 			. "VALUES ('other',999999);`nVALUES ('dev-é',234);`nVALUES ('dev-é',0007"
 		FileAppend(Sql, Path, "UTF-8-RAW")
-		for Size in [7, 31, KeylogConst.DATA_SQL_SCAN_TAIL_BYTES]
+		for Size in [7, 31, KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES]
 			AssertEqual(12345, KL_RecoverSqlEventId(Path, "'dev-é'", Size),
 				"markers, UTF-8, whitespace, zero runs and IDs must survive chunk boundaries")
 		AssertEqual(0, KL_RecoverSqlEventId(Path, "'missing'", 31))
