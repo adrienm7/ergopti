@@ -394,15 +394,14 @@ _HC_PacDecodeSource(Raw, Maximum) {
 			}
 			WidePtr := Wide.Ptr
 		}
-		; Explicit UTF16 unit count and WC_ERR_INVALID_CHARS reject unpaired
-		; surrogates before StrGet, which otherwise copies them unchanged.
-		NormalizedBytes := DllCall("Kernel32\WideCharToMultiByte", "UInt", 65001, "UInt", 0x80,
-			"Ptr", WidePtr, "Int", Units, "Ptr", 0, "Int", 0, "Ptr", 0, "Ptr", 0, "Int")
-		if NormalizedBytes == 0
+		; Reuse the native boundary before StrGet, which copies lone surrogates.
+		if !NativeTextIsWellFormedUtf16(WidePtr, Units)
 			return Map("error", "PAC encoding is invalid")
+		; The source bound also bounds this UTF16 text allocation to one MiB.
+		Body := StrGet(WidePtr, -Units, "UTF-16")
+		NormalizedBytes := StrPut(Body, "UTF-8") - 1
 		if NormalizedBytes > Maximum
 			return Map("error", "PAC is over the 1048576 byte limit")
-		Body := StrGet(WidePtr, -Units, "UTF-16")
 	}
 	if RegExMatch(Body, "\x00")
 		return Map("error", "PAC contains a null character")
