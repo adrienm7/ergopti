@@ -105,3 +105,61 @@ _RKF_EveryDecisionSiteHonoursTheFence() {
 }
 Test("meta hotstrings: every expansion decision site honours the live-rebuild fence",
 	_RKF_EveryDecisionSiteHonoursTheFence)
+
+
+
+
+
+
+; ========================================================================
+; ========================================================================
+; ======= 3/ The shared corpora (repeat key and idle reset, PAR-2) =======
+; ========================================================================
+; ========================================================================
+
+; Reads one shared hotstrings corpus file and returns its vector list. A missing
+; or malformed file throws: a cross-driver contract that can be deleted without
+; the suite noticing is not a contract.
+_RKF_CorpusVectors(Name) {
+	Path := A_ScriptDir . "\..\..\_shared\tests\corpus\hotstrings\" . Name
+	if !FileExist(Path)
+		throw Error("shared corpus not found at '" . Path . "'")
+	Corpus := JsonParse(FileRead(Path, "UTF-8"))
+	if !(Corpus is Map) or !Corpus.Has("vectors") or Corpus["vectors"].Length = 0
+		throw Error("shared corpus '" . Name . "' has no vectors")
+	return Corpus["vectors"]
+}
+
+_RKF_ReplaysRepeatKeyCorpus() {
+	global HSE_Buffer, HSE_StartIsWordBoundary
+	_RKF_Reset()
+	try {
+		for Vector in _RKF_CorpusVectors("repeat_key_vectors.json") {
+			HSE_Buffer := Vector["buffer"]
+			HSE_StartIsWordBoundary := true
+			Spec := HSE_TryRepeatKey(Vector["magic_key"])
+			if Vector["fires"] {
+				Assert(IsObject(Spec), Vector["id"] . ": " . Vector["description"])
+				AssertEqual(Vector["replacement"] . Vector["replacement"], Spec.Replacement,
+					Vector["id"] . ": the doubled character")
+			} else {
+				Assert(!IsObject(Spec), Vector["id"] . ": " . Vector["description"])
+			}
+		}
+	} finally {
+		_RKF_Reset()
+	}
+}
+Test("hotstrings: the repeat key replays the shared repeat_key_vectors corpus (repeat-key-corpus)",
+	_RKF_ReplaysRepeatKeyCorpus)
+
+_RKF_ReplaysIdleResetCorpus() {
+	for Vector in _RKF_CorpusVectors("idle_reset_vectors.json") {
+		Last := Vector["last_ms"] is Number ? Vector["last_ms"] : ""
+		AssertEqual(Vector["resets"] ? true : false,
+			HSE_IdleResetsWord(Last, Vector["now_ms"], Vector["idle_seconds"]) ? true : false,
+			Vector["id"] . ": " . Vector["description"])
+	}
+}
+Test("hotstrings: the idle word reset replays the shared idle_reset_vectors corpus (idle-reset-corpus)",
+	_RKF_ReplaysIdleResetCorpus)

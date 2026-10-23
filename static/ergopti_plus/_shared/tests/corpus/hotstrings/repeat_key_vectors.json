@@ -1,0 +1,100 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
+	"description": "Cross-driver repeat-key vectors (PAR-2): the magic key typed after a character that no hotstring claimed doubles that character, but only mid-word. Replayed by the Windows engine (HSE_TryRepeatKey), the macOS expander (try_repeat_feature) and the Linux rule (repeat_key.resolve). Only cases on which the three drivers agree belong here.",
+	"field_semantics": {
+		"buffer": "The typed buffer INCLUDING the magic key just typed, which is the last character of the buffer. The buffer starts at a word boundary.",
+		"magic_key": "The magic key in effect.",
+		"fires": "Whether the repeat fires.",
+		"replacement": "When it fires: the character that is doubled, so the buffer afterwards is the buffer without the magic key plus this character."
+	},
+	"vectors": [
+		{
+			"id": "mid_word_letter_doubles",
+			"description": "A letter after another letter doubles: po then the key gives poo.",
+			"buffer": "po★",
+			"magic_key": "★",
+			"fires": true,
+			"replacement": "o"
+		},
+		{
+			"id": "accented_letter_doubles_whole",
+			"description": "A two-byte or two-code-unit-wide letter is doubled whole, never by its trailing byte.",
+			"buffer": "café★",
+			"magic_key": "★",
+			"fires": true,
+			"replacement": "é"
+		},
+		{
+			"id": "second_word_letter_doubles",
+			"description": "The rule applies in a later word of the buffer, not only the first.",
+			"buffer": "un po★",
+			"magic_key": "★",
+			"fires": true,
+			"replacement": "o"
+		},
+		{
+			"id": "word_start_letter_is_not_doubled",
+			"description": "The first letter of the buffer is a word start: c then the key must not give cc (the user wants a text expansion there).",
+			"buffer": "c★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "word_start_after_space_is_not_doubled",
+			"description": "The first letter of a later word is a word start too.",
+			"buffer": "ab c★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "word_start_after_newline_is_not_doubled",
+			"description": "A newline opens a word as a space does.",
+			"buffer": "ab\nc★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "word_start_after_period_is_not_doubled",
+			"description": "A period before the letter makes it a word start.",
+			"buffer": "ab.c★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "word_start_after_opening_quote_is_not_doubled",
+			"description": "After an opening quote the letter is the first of its word.",
+			"buffer": "ab \"c★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "space_is_not_repeated",
+			"description": "A space before the key is never repeated.",
+			"buffer": "ab ★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "newline_is_not_repeated",
+			"description": "A newline before the key is never repeated.",
+			"buffer": "ab\n★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "magic_key_alone_has_nothing_to_repeat",
+			"description": "The key as the whole buffer has no character before it.",
+			"buffer": "★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "user_chosen_magic_key",
+			"description": "The key is read from the caller, so a user who changed it gets the same behaviour.",
+			"buffer": "ab@",
+			"magic_key": "@",
+			"fires": true,
+			"replacement": "b"
+		}
+	]
+}
