@@ -149,3 +149,5 @@ _PPSNT_Case(Client) {
 
 Test("Plain paste snapshot: gesture preserves a new non-text copy (plain-paste-snapshot-owner)", _PPSNT_Case.Bind("gesture"))
 Test("Plain paste snapshot: shortcut preserves a new non-text copy (plain-paste-snapshot-owner)", _PPSNT_Case.Bind("shortcut"))
+
+#Include test_plain_native_cas_owner.ahk
