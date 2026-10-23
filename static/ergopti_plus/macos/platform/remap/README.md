@@ -34,18 +34,24 @@ implemented today.
 
   Dormant Lua side (WP6 and WP7): `runtime_owner.lua` admits the runtime (pinned
   artifact, install, VirtualHIDDevice version through `runtime_vhid.lua`,
-  launchd jobs, other running Karabiner) and names every refusal, then starts
-  the user-side Console with `XDG_CONFIG_HOME` and the owner PID and stops it
-  with the physical capture. It is reached only when `config_karabiner.toml`
+  launchd jobs, other running Karabiner) and names every refusal, then requests
+  the physical capture. The signed launcher's installed-source role owns the
+  Console (ADR 011, decision 8), so the owner spawns no process and is ready
+  only when the capture admits its first stream. It is reached only when `config_karabiner.toml`
   holds the hidden `[karabiner] runtime = "owned"`; the absent default is
   `shared` and changes nothing. `ke_paths.lua` selects the command line tool of
   the runtime once, `Generator.deploy_owned_config` writes the complete file
   under `~/Library/Application Support/ErgoptiPlus/karabiner/`, and
   `onboarding.health_check("owned")` checks the owned install. The real ports
-  (`adapters/runtime_owner_ports.lua`) are read-only and bind no closer for
-  another Karabiner and no artifact manifest, so an opted-in boot reports
-  `unavailable` today. The Swift lease worker still accepts only the shared
-  `karabiner_cli` path.
+  (`adapters/runtime_owner_ports.lua`) observe read-only, bind the consented
+  closer of another Karabiner (`adapters/karabiner_coexistence.lua`, Karabiner's
+  own quit steps, hidden `[karabiner] close_other_instances`, default `true`) and
+  the capture port (`adapters/runtime_capture_port.lua` over
+  `adapters/installed_physical_source.lua`). The artifact comes from
+  `vendor/remap-runtime/manifest.json`, which stays unpinned until the hosted
+  build, so an opted-in boot reports `artifact_unpinned` today. The Swift lease
+  worker and guardian accept the owned `ergoptiplus_remap_cli` next to the shared
+  tool, and the guardian record names the runtime.
 
 ## « Ergopti uses Karabiner »
 
