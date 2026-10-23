@@ -62,7 +62,7 @@ helpers.describe("Linux global scope: registry and composition", function()
 			helpers.assert_eq(ids, { "global", "llm", "tap_holds" })
 			local gestures = { scope_participant = function() return stub(trace, "gestures") end,
 				scope_available = function() return true end }
-			registry = GlobalScope.participants({ shortcuts = {}, gestures = gestures, keylogger = {} })
+			registry = GlobalScope.participants({ shortcuts = {}, gestures = gestures, keystats = {} })
 			ids = {}
 			for id in pairs(registry) do ids[#ids + 1] = id end
 			table.sort(ids)

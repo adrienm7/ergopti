@@ -53,7 +53,7 @@ local OWNED_MODULES = {
 	"adapters.http_client",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"modules.keylogger",
+	"modules.keystats",
 	"modules.llm",
 	"modules.llm.api_mlx",
 	"modules.llm.api_ollama",
@@ -405,7 +405,7 @@ local function with_fixture(callback)
 			end
 			package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 			package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
-			package.loaded["modules.keylogger"] = {
+			package.loaded["modules.keystats"] = {
 				resync_context = function() return true end,
 				log_shortcut = function() return true end,
 			}

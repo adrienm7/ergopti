@@ -88,7 +88,7 @@ function M.apply(mode, is_paused)
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
 	_owner = M.new({ path = path, backup_path = path .. ".metrics-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
-		collector = require("modules.keylogger.keylogger"), widget = require("ui.wpm.widget"),
+		collector = require("modules.keystats.keystats"), widget = require("ui.wpm.widget"),
 		readout = require("ui.wpm.tray_readout") })
 	Logger.info(LOG, "Metrics scope '%s' started.", mode)
 	local committed, detail = _owner.apply(mode)

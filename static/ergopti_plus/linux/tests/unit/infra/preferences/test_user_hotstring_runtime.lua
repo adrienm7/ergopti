@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local Atspi = require("adapters.atspi_focus")
 local Detector = require("adapters.secure_field_detector")
-local FocusGuard = require("modules.keylogger.focus_guard")
+local FocusGuard = require("modules.keystats.focus_guard")
 local CaptureGate = require("infra.input_capture_gate")
 local Engine = require("modules.hotstrings.engine")
 local Runtime = require("infra.user_hotstring_runtime")
@@ -75,7 +75,7 @@ local function with_runtime(body)
 	end)
 	Detector._set_probe_for_test(nil)
 	local engine = Engine.new()
-	local guard = FocusGuard.new({ detector = Detector, keylogger = { set_secure_field = function() end },
+	local guard = FocusGuard.new({ detector = Detector, keystats = { set_secure_field = function() end },
 		now_ms = function() return f.now end, reset_text = function() engine:reset() end })
 	local capture = CaptureGate.new()
 	f.guard, f.capture_gate, f.engine = guard, capture, engine
@@ -98,7 +98,7 @@ local function with_runtime(body)
 			return f.enabled
 		end },
 		window_info = { getFocused = function() return { appId = f.app, windowTitle = f.title } end },
-		keylogger = { is_password_app = function(app) return app == "bitwarden" end,
+		keystats = { is_password_app = function(app) return app == "bitwarden" end,
 			is_private_window = function(title) return title == "Private browsing" end },
 		paused = function() return f.paused == true end,
 		replay_input = function(queued)

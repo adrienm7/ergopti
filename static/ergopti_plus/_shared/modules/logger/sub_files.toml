@@ -130,11 +130,11 @@ patterns    = [
 ]
 
 [[sub_files]]
-name        = "keylogger"
+name        = "keystats"
 description = "Keystroke logging, SQLite writes, rotation, export."
 platforms   = ["hs"]
 patterns    = [
-    "[keylogger",
+    "[keystats",
 ]
 
 [[sub_files]]

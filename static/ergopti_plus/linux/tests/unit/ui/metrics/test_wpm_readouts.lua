@@ -22,7 +22,7 @@ local Fakes = helpers.load_module("tests.fakes")
 local Model = require("wpm_widget.model")
 local Codec = require("toml_codec")
 local Paths = require("infra.paths")
-local LiveWpm = require("keylogger.live_wpm")
+local LiveWpm = require("keystats.live_wpm")
 
 local CANON_PATH = Paths.shared("modules/wpm_widget/constants.toml")
 
@@ -30,7 +30,7 @@ local function canon()
 	return assert(Model.load(CANON_PATH, Codec.decode))
 end
 
---- Live stats as the keylogger reports them.
+--- Live stats as the keystats reports them.
 local function stats(wpm, source, variant, at_s)
 	return { wpm = wpm, source = source or "none", source_variant = variant or source or "none",
 		source_time = at_s or 0 }
@@ -277,19 +277,19 @@ helpers.describe("wpm readouts: the live speed", function()
 		helpers.assert_eq(s.source_time, 4.2)
 	end)
 
-	helpers.it("is fed by the Linux keylogger's typing, expansions and completions", function()
-		local keylogger = helpers.load_module("modules.keylogger.keylogger")
-		require("tests.support.metrics_consent_fixture").enable(keylogger)
-		keylogger.reset_session()
-		for index = 0, 29 do keylogger.on_keydown("a", 1000 + index * 150, "app", 30) end
-		keylogger.record_hotstring("app", "adn", "au début", 5600, "magickey", 3, false)
-		local live = keylogger.get_live_stats(5700)
+	helpers.it("is fed by the Linux keystats's typing, expansions and completions", function()
+		local keystats = helpers.load_module("modules.keystats.keystats")
+		require("tests.support.metrics_consent_fixture").enable(keystats)
+		keystats.reset_session()
+		for index = 0, 29 do keystats.on_keydown("a", 1000 + index * 150, "app", 30) end
+		keystats.record_hotstring("app", "adn", "au début", 5600, "magickey", 3, false)
+		local live = keystats.get_live_stats(5700)
 		helpers.assert_true(live.wpm > 0, "the speed reaches the readouts")
 		helpers.assert_eq(live.source, "hotstring")
 		helpers.assert_eq(live.source_variant, "magickey", "the group picks the colour")
-		keylogger.record_synthetic_output("app", "suite", "llm", 5800, 0, 0)
-		helpers.assert_eq(keylogger.get_live_stats(5900).source, "llm")
-		keylogger.reset_session()
+		keystats.record_synthetic_output("app", "suite", "llm", 5800, 0, 0)
+		helpers.assert_eq(keystats.get_live_stats(5900).source, "llm")
+		keystats.reset_session()
 	end)
 
 end)

@@ -17,7 +17,7 @@ local STUBBED_MODULES = {
 	"infra.text_utils",
 	"modules.llm",
 	"infra.keycodes",
-	"modules.keylogger",
+	"modules.keystats",
 	"ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
@@ -78,7 +78,7 @@ local function load_fixture(options, lifetime)
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
 	}
-	package.loaded["modules.keylogger"] = setmetatable({}, {
+	package.loaded["modules.keystats"] = setmetatable({}, {
 		__index = function() return function() end end,
 	})
 

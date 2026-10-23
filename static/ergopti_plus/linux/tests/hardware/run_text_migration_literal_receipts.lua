@@ -9,10 +9,10 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Cipher = require("modules.keylogger.text_cipher")
-local Migration = require("modules.keylogger.text_migration")
-local TextCrypto = require("keylogger.text_crypto")
+local Writer = require("modules.keystats.sqlite_writer")
+local Cipher = require("modules.keystats.text_cipher")
+local Migration = require("modules.keystats.text_migration")
+local TextCrypto = require("keystats.text_crypto")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-migration-literals-XXXXXX"))
 local machine = assert(io.open(root .. "/machine-id", "wb"))
 assert(machine:write("0123456789abcdef0123456789abcdef\n")); assert(machine:close())

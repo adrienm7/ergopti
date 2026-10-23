@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Typing NONE Selection In Real WebKit And SQLite
 --- DESCRIPTION:
---- Opens the production typing page with a genuine keylogger and private SQLite
+--- Opens the production typing page with a genuine keystats and private SQLite
 --- fixture, then applies the real application picker buttons. Explicit NONE
 --- must exclude both historical n-grams and Unknown live data. Software output
 --- and independent SQL counts provide healthy controls; no physical input is
@@ -43,7 +43,7 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", directory))
 end
 print("OWNED_PROFILE " .. profile)
-local J=require('json'); local K=require('modules.keylogger.keylogger'); local W=require('modules.keylogger.sqlite_writer')
+local J=require('json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
 -- Flushes are asynchronous owned SQLite batches; wait for their physical ACK.
 local Drain=require('tests.support.sqlite_flush_native')
 local root=assert(os.getenv('XDG_CONFIG_HOME')); assert(uv.fs_mkdir(root..'/ergopti',448))
@@ -55,7 +55,7 @@ assert(W.upsert_app_day('owned-webkit','2000-01-01','Editor',{chars=7,time_ms=70
 assert(W.upsert_ngrams('owned-webkit','2000-01-01','Editor',{h={c=7,td=700,cd=7}},'ngram_chars'))
 assert(W.upsert_app_day('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{chars=3,time_ms=300}))
 assert(W.upsert_ngrams('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{u={c=3,td=300,cd=3}},'ngram_chars'))
-local Manager=require('ui.webview_manager'); Manager.set_daemon_state({keylogger=K})
+local Manager=require('ui.webview_manager'); Manager.set_daemon_state({keystats=K})
 local checks,failed=0,0
 local function check(name,fn) checks=checks+1; local ok,e=xpcall(fn,debug.traceback); print((ok and 'PASS ' or 'FAIL ')..name..(ok and '' or ': '..e)); if not ok then failed=failed+1 end end
 print('ENGINE WebKit '..WK.get_major_version()..'.'..WK.get_minor_version()..'.'..WK.get_micro_version()..'; real SQLite; virtual X11; deadline180s; sandbox enabled')

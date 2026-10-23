@@ -168,7 +168,7 @@ package.loaded["ui.menu.menu_tap_holds"] = {
 	prime = function() prime_counts.karabiner = prime_counts.karabiner + 1 end,
 }
 package.loaded["modules.llm"] = { set_backend = function() end }
-package.loaded["modules.keylogger"] = {}
+package.loaded["modules.keystats"] = {}
 package.loaded["modules.shortcuts"] = shortcuts
 package.loaded["modules.dynamic_hotstrings"] = {}
 package.loaded["modules.gestures"] = {}

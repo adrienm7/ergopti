@@ -17,7 +17,7 @@ local function with_manager(selected, body)
 		event_loop = "adapters.event_loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
-		keylogger = "modules.keylogger.keylogger",
+		keystats = "modules.keystats.keystats",
 		hook = "adapters.keyboard_hook",
 	}
 	local previous = {}
@@ -34,7 +34,7 @@ local function with_manager(selected, body)
 	package.loaded[names.event_loop] = { sleep_ms = function() return true end, defer = function() return true end }
 	package.loaded[names.combo] = { press = function() return true end }
 	package.loaded[names.injector] = { inject = function() return { ok = true } end }
-	package.loaded[names.keylogger] = { record_shortcut = function() return true end }
+	package.loaded[names.keystats] = { record_shortcut = function() return true end }
 	-- No keyboard is captured here: a CapsWord session locks a fake CapsLock.
 	package.loaded[names.hook] = require("tests.support.caps_word_lock_hook_fake").new()
 	package.loaded[names.manager] = nil
@@ -209,7 +209,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 	helpers.it("rechecks a real reservation acquired inside protected metric delivery (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row, changed)
 			local owner, observed = {}, {}
-			package.loaded["modules.keylogger.keylogger"].record_shortcut = function(_, key)
+			package.loaded["modules.keystats.keystats"].record_shortcut = function(_, key)
 				observed.key = key
 				observed.acquired = manager.acquire_configuration(owner)
 			end
@@ -221,7 +221,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 			helpers.assert_eq(manager.configuration_snapshot(owner).caps_word_active, false)
 			helpers.assert_eq(changed.count, 0)
 			helpers.assert_eq(manager.release_configuration(owner), true)
-			package.loaded["modules.keylogger.keylogger"].record_shortcut = function() end
+			package.loaded["modules.keystats.keystats"].record_shortcut = function() end
 			helpers.assert_eq(row().fn(), true)
 			helpers.assert_eq(manager.is_caps_word_active(), true)
 		end)
@@ -230,7 +230,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 	helpers.it("keeps a metric callback's acknowledged reservation even when it throws (selection-caps-word)", function()
 		with_caps_word_menu(function(manager, row, changed)
 			local owner, observed = {}, {}
-			package.loaded["modules.keylogger.keylogger"].record_shortcut = function()
+			package.loaded["modules.keystats.keystats"].record_shortcut = function()
 				observed.acquired = manager.acquire_configuration(owner)
 				error("controlled metric failure after reservation")
 			end
@@ -348,7 +348,7 @@ helpers.describe("shared selection case command ownership", function()
 		helpers.it("rechecks " .. vector.id .. " reservation after protected metrics (selection-case-command)", function()
 			with_case_menu(function(manager, item, observed)
 				local owner = {}
-				package.loaded["modules.keylogger.keylogger"].record_shortcut = function(_, key)
+				package.loaded["modules.keystats.keystats"].record_shortcut = function(_, key)
 					observed.metric_key = key
 					observed.acquired = manager.acquire_configuration(owner)
 					error("controlled metric refusal after reservation")
@@ -360,7 +360,7 @@ helpers.describe("shared selection case command ownership", function()
 				helpers.assert_eq(observed.clipboard_calls, 0)
 				helpers.assert_eq(observed.replacement, nil)
 				helpers.assert_eq(manager.release_configuration(owner), true)
-				package.loaded["modules.keylogger.keylogger"].record_shortcut = function() end
+				package.loaded["modules.keystats.keystats"].record_shortcut = function() end
 				helpers.assert_eq(item(vector.label_key).fn(), true)
 				helpers.assert_eq(observed.clipboard_calls, 1)
 			end)
@@ -427,7 +427,7 @@ helpers.describe("shared selection case command ownership", function()
 			helpers.assert_eq(manager.transform_to_titlecase(), true)
 			helpers.assert_eq(observed.replacement, "«Été» Straße Москва")
 			local owner = {}
-			package.loaded["modules.keylogger.keylogger"].record_shortcut = function()
+			package.loaded["modules.keystats.keystats"].record_shortcut = function()
 				observed.acquired = manager.acquire_configuration(owner)
 			end
 			local before = observed.clipboard_calls

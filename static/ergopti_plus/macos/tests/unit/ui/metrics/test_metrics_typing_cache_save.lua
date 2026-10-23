@@ -16,7 +16,7 @@ local function with_save(mode, callback)
 	local ok, err = xpcall(function()
 		Scope.run(function()
 			package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
-			package.loaded["modules.keylogger.sqlite_reader"] = {}
+			package.loaded["modules.keystats.sqlite_reader"] = {}
 			local pending, warnings = {}, {}
 			local dashboard, window = load_dashboard({
 				after = function(_, fn)
@@ -33,7 +33,7 @@ local function with_save(mode, callback)
 				state.codes[#state.codes + 1] = code
 				return self
 			end
-			package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function() return nil end
+			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
 			package.loaded["infra.logger"].warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end

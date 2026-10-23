@@ -36,8 +36,8 @@ local StreamRetirement = require("modules.llm.mlx_stream_retirement")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 -- Dedicated client for non-streaming inference POSTs; isolated so it never shares
 -- state with the warmup/probe/check clients that live in api_mlx.lua.
@@ -430,8 +430,8 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
                 if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return
             end
             Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
-            if keylogger and type(keylogger.log_llm) == "function" then
-                pcall(keylogger.log_llm, full_text, results, nil, {
+            if keystats and type(keystats.log_llm) == "function" then
+                pcall(keystats.log_llm, full_text, results, nil, {
                     backend       = "mlx",
                     model         = tostring(model_name),
                     system_prompt = system_prompt,
@@ -939,8 +939,8 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
-		if keylogger and type(keylogger.log_llm) == "function" then
-			pcall(keylogger.log_llm, full_text, results, nil, {
+		if keystats and type(keystats.log_llm) == "function" then
+			pcall(keystats.log_llm, full_text, results, nil, {
 				backend       = "mlx",
 				model         = tostring(model_name),
 				system_prompt = system_prompt,

@@ -110,7 +110,7 @@ local function build_world()
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return world.paused end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
 		log_llm_failed = function() end,
@@ -639,8 +639,8 @@ local function with_live_boundary_owner(scenario)
 		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true); helpers.assert_eq(scheduler.activeCount(), 0)
 		end
-		local bridge = package.loaded["modules.keylogger.kc_bridge"]
-		if bridge and not rawequal(bridge, previous["modules.keylogger.kc_bridge"]) then bridge.stop() end
+		local bridge = package.loaded["modules.keystats.kc_bridge"]
+		if bridge and not rawequal(bridge, previous["modules.keystats.kc_bridge"]) then bridge.stop() end
 	end)
 	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(previous) do package.loaded[name] = value end

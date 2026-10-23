@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Clipboard output telemetry and provenance
 --- DESCRIPTION:
---- Clipboard text must reach logical keylogger telemetry even though Quartz only
+--- Clipboard text must reach logical keystats telemetry even though Quartz only
 --- carries a tagged Cmd+V pair. This suite checks both channels independently:
 --- exact event tags for ownership, and the full logical payload for statistics.
 --- ==============================================================================
@@ -11,11 +11,11 @@
 local helpers = require("tests.helpers")
 
 
-local function load_fixture(keylogger)
+local function load_fixture(keystats)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name == "modules.keylogger"
+			or name == "modules.keystats"
 			or name:match("^adapters%.")
 			or name == "infra.logger"
 			or name == "infra.timings"
@@ -34,7 +34,7 @@ local function load_fixture(keylogger)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
 	}
-	if keylogger then package.loaded["modules.keylogger"] = keylogger end
+	if keystats then package.loaded["modules.keystats"] = keystats end
 
 	return {
 		hs = hs_stub,
@@ -196,7 +196,7 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 		helpers.assert_eq(paste.ordinal, 4)
 		helpers.assert_eq(events[7].key, "v")
 
-		helpers.assert_not_nil(received, "keylogger must receive the logical paste")
+		helpers.assert_not_nil(received, "keystats must receive the logical paste")
 		helpers.assert_eq(received.text, pasted)
 		helpers.assert_eq(received.physical, "")
 		helpers.assert_eq(received.deletes, 3)

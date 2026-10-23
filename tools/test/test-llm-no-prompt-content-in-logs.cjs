@@ -11,7 +11,7 @@
  * windows/modules/llm/prediction_exec.ahk built `preview := SubStr(tail, -40)`
  * and logged it at INFO on EVERY prediction request, so the daily log
  * accumulated a rolling 40-character sample of everything typed while the LLM
- * was enabled. docs/security/keylogger_privacy.md governs today.log and
+ * was enabled. docs/security/keystats_privacy.md governs today.log and
  * data.sql; it says nothing about this sink, so the trade-off was never
  * accepted. macOS logged only a character count for the same event.
  *

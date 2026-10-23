@@ -68,7 +68,7 @@ helpers.describe("init: a fatal abort stops producers first (hs-fatal-dialog-aft
 		local body = code:sub(abort_at, stop)
 		local report_at = body:find("BootFatal.report(stage, detail, message)", 1, true)
 		local cancel_at = body:find("TimerScheduler.cancelAll()", 1, true)
-		local bridge_at = body:find('package.loaded["modules.keylogger.kc_bridge"]', 1, true)
+		local bridge_at = body:find('package.loaded["modules.keystats.kc_bridge"]', 1, true)
 		local dialog_at = body:find("show_blocking_fatal_dialog(message, stage)", 1, true)
 		local exit_at = body:find("os.exit(1)", 1, true)
 		helpers.assert_true(report_at and cancel_at and bridge_at and dialog_at and exit_at)

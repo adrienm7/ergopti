@@ -50,7 +50,7 @@ en tâche de fond et ajoute tout le reste :
 | **Gestes trackpad**       | 2 à 5 doigts, balayages et axes continus, liés à des actions                                           |
 | **Raccourcis**            | une couche de raccourcis propre au driver, plus des accords assignables                                |
 | **Prédiction LLM**        | complétion de mot/phrase par modèle local (Ollama, MLX) ou distant, affichée en infobulle              |
-| **Métriques de frappe**   | keylogger local, WPM, n-grammes, heatmap, temps par application, tableaux de bord webview              |
+| **Métriques de frappe**   | keystats local, WPM, n-grammes, heatmap, temps par application, tableaux de bord webview               |
 | **Infobulle**             | aperçu des expansions et des prédictions, rendu natif                                                  |
 | **Widget WPM**            | affichage à l'écran de la vitesse de frappe                                                            |
 | **Mise à jour**           | polling GitHub, changelog, installation                                                                |
@@ -89,7 +89,7 @@ static/ergopti_plus/
 ├── macos/            driver Hammerspoon
 ├── linux/            driver LuaJIT
 ├── extensions/       packs d'extensions (hotstrings + raccourcis tiers)
-└── docs/             architecture.md (généré), ADR, spec keylogger, glossaire
+└── docs/             architecture.md (généré), ADR, spec keystats, glossaire
 ```
 
 **La frontière la plus source de confusion** : `_shared/lua/` contre `_shared/modules/`. Ce
@@ -133,7 +133,7 @@ pour naviguer aujourd'hui :
 | Tap-hold                 | `platform/remap/`                                          | `platform/remap/`                                                       | `platform/remap/`                                        |
 | Menu tray                | `ui/menu/` (+ barrel `ui/tray_menu.ahk`, **hors dossier**) | `ui/menu/` (barrel `init.lua` **dans** le dossier)                      | **`modules/menu/`**                                      |
 | Fenêtres webview         | `ui/<fenêtre>/` (+ 5 fichiers plats à la racine de `ui/`)  | `ui/<fenêtre>/`                                                         | **`modules/ui/bridge_handlers/`** + `ui/webkit_host.lua` |
-| Métriques (hôtes)        | `modules/keylogger/keylogger_{ui,webview,prefetch}.ahk`    | `ui/metrics_{typing,apps}/`                                             | `modules/ui/bridge_handlers/`                            |
+| Métriques (hôtes)        | `modules/keystats/keystats_{ui,webview,prefetch}.ahk`      | `ui/metrics_{typing,apps}/`                                             | `modules/ui/bridge_handlers/`                            |
 | Updater                  | `lib/updater/`                                             | `lib/updater.lua`                                                       | `modules/updater/`                                       |
 | Crash reporter           | `lib/crash_reporter.ahk`                                   | `lib/crash_reporter.lua`                                                | `modules/diagnostics/`                                   |
 | Chemins de config        | `lib/boot.ahk`                                             | **`ui/menu/menu_paths.lua`**                                            | _(aucun résolveur)_                                      |
@@ -165,7 +165,7 @@ ne jamais l'éditer à la main.
 | `_shared/modules/hotstrings/*.toml` (2 994 entrées)                                  | les hotstrings livrées, par catégorie                                        | non                        | les trois                                           | corpus `hotstrings/`                              |
 | `_shared/modules/hotstrings/priority.json`                                           | les 3 rangs de priorité (10/30/50)                                           | non                        | Windows + macOS                                     | `test:priority-parity`                            |
 | `_shared/tap_hold/defaults.toml` (430 l)                                             | défauts tap-hold ⚠ **deux espaces de noms non reliés dans un seul fichier** | non                        | Windows + Linux (`[tap_hold.*]`) ; macOS (`[hs_*]`) | corpus `tap_hold/`                                |
-| `_shared/modules/timings/constants.toml` (523 l)                                     | tous les délais nommés                                                       | non                        | les trois                                           | `test-keylogger-timings-single-source` etc.       |
+| `_shared/modules/timings/constants.toml` (523 l)                                     | tous les délais nommés                                                       | non                        | les trois                                           | `test-keystats-timings-single-source` etc.        |
 | `_shared/modules/tooltip/constants.toml` (360 l)                                     | style visuel de l'infobulle                                                  | non                        | Windows + macOS (échec bruyant si manquant)         | `test:tooltip-shared-style` (partiel)             |
 | `_shared/modules/llm/*.json`                                                         | fournisseurs, modèles, profils, défauts, layout du menu IA                   | `models.json` **oui**      | les trois (partiellement)                           | famille `*-single-source`                         |
 | `_shared/data/locales/en.json` + 20 autres                                           | **toutes** les chaînes visibles par l'utilisateur                            | non                        | les trois + les webviews                            | `test_locale_json_valid.ahk`                      |
@@ -230,12 +230,12 @@ macos/init.lua
  → ui/menu/init.lua → ui/menu/menu_hotstrings.lua
  → modules/keymap/init.lua → modules/keymap/llm_bridge.lua
  → modules/llm/prediction_engine.lua
- → modules/keylogger/init.lua → watchers → log_manager → aggregator → aggregator/events → aggregator/core
+ → modules/keystats/init.lua → watchers → log_manager → aggregator → aggregator/events → aggregator/core
  → lib/timings.lua → lib/toml/reader.lua → _shared/lua/toml_codec/reader.lua → _shared/lua/logger/shim.lua
 ```
 
 Lisez-la comme un énoncé de risque de changement : **ouvrir le menu Hotstrings charge
-transitivement le keylogger, son agrégateur SQLite et le lecteur TOML partagé.**
+transitivement le keystats, son agrégateur SQLite et le lecteur TOML partagé.**
 
 ⚠ **Et une partie du couplage est invisible à la lecture.** Deux mécanismes à connaître :
 
@@ -441,7 +441,7 @@ différentes, des unités différentes et des types différents** pour les même
 `config.toml` n'est donc pas portable d'un OS à l'autre. Ses deux validateurs Python ne sont
 câblés nulle part, et l'un pointe vers un chemin disparu depuis un renommage.
 
-### 6.7 Métriques (keylogger)
+### 6.7 Métriques (keystats)
 
 Trois pipelines, une base de données déclarée partagée, trois formes sur disque.
 
@@ -590,7 +590,7 @@ volontaire : `shell_runner` (les trois), `json_codec` / `toml_cache`
 si vous suivez la piste `expander.lua` → `adapters/text_sender` → `TextSender.spec.js` sur
 macOS, les trois sauts sont vrais. Sur Windows la même piste est un **piège** : la spec en
 prose vous dit que l'implémentation AHK de `KeyboardHook` est une fonction du module
-keylogger, l'adaptateur prétend le contraire, la barrière de conformité valide l'adaptateur,
+keystats, l'adaptateur prétend le contraire, la barrière de conformité valide l'adaptateur,
 et le code qui tourne implémente la fonction du module. Et le diagnostic santé affiche
 « 100 % sain » pour les 12 adaptateurs morts.
 
@@ -1106,7 +1106,7 @@ répétés ici parce qu'ils changent la façon de lire le code.
    `--tray`, et aucune des 5 unités systemd ne le passe.
 3. **La config kanata générée est inchargeable** (quatre alias pendants). _Caduc depuis le
    2026-09-24 : kanata a été remplacé par le moteur tap-hold du daemon._
-4. **Le keylogger tourne toujours, en clair, sans détection de champ sécurisé et sans
+4. **Le keystats tourne toujours, en clair, sans détection de champ sécurisé et sans
    possibilité de désactivation**, et le texte tapé transite par un fichier `/tmp` lisible
    par tous à chaque flush.
 

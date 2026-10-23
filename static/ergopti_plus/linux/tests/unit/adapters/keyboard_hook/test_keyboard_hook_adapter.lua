@@ -266,7 +266,7 @@ helpers.describe("keyboard_hook adapter", function()
 
     -- refreshContext shells out to xdotool. When it is absent the context must
     -- stay at its documented empty default rather than become nil — every
-    -- consumer indexes ctx.appId, and the keylogger writes it into a row.
+    -- consumer indexes ctx.appId, and the keystats writes it into a row.
     helpers.it("refreshContext leaves a usable context when xdotool is absent", function()
       hook.refreshContext()
       local ctx = hook.getContext()

@@ -2327,7 +2327,7 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 	}
 	; The engine registry has just been rewritten in place. The tooltip now asks
 	; that registry directly, so this rebuild is no longer a correctness fence;
-	; it refreshes only the auxiliary near-miss catalogue used by keylogger ROI.
+	; it refreshes only the auxiliary near-miss catalogue used by keystats ROI.
 	;
 	; The resync belongs HERE rather than in the two save handlers: this is the
 	; function that mutates the engine registry, so pairing the two makes the

@@ -413,7 +413,7 @@ helpers.describe("keymap action epochs", function()
 		fixture.keymap.stop()
 	end)
 
-	helpers.it("claims older output before a focus-changing click without keylogger", function()
+	helpers.it("claims older output before a focus-changing click without keystats", function()
 		local fixture = load_fixture()
 		local older_events = { { key = "before-focus-change" } }
 		fixture.queue_fence(older_events)

@@ -163,7 +163,7 @@ end
 --- understands that syntax natively, macOS had no equivalent, and the two
 --- onboarding call sites reached for string.format instead. string.format looks
 --- for %s and leaves {1} untouched, so the privacy warning shown before enabling
---- the keylogger displayed a literal "{1}" where the metrics path belongs — on
+--- the keystats displayed a literal "{1}" where the metrics path belongs — on
 --- the one screen where the user most needs to see where their data will go.
 --- @param key string Locale key.
 --- @param ... any Values substituted for {1}, {2}, … in order.

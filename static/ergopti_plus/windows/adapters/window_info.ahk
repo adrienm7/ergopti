@@ -29,7 +29,7 @@
 ;
 ; BOUNDED FOCUS SNAPSHOT:
 ; WICaptureBoundedFocusSnapshot is the Windows-only privacy path used by the
-; metrics and keylogger modules. Its resident poll reads the system-cached
+; metrics and keystats modules. Its resident poll reads the system-cached
 ; top-level caption without messaging the target process and retains one exact
 ; process handle so path resolution runs only when the process identity changes.
 ; Any partial or raced acquisition is rejected so privacy consumers fail closed.

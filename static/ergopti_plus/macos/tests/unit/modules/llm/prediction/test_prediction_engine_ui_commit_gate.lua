@@ -153,7 +153,7 @@ local function load_fixture(loading_result, options)
 		get_rate_limit_min_interval_s = function() return options.min_interval or 0 end,
 	}
 	package.loaded["modules.shortcuts.script_control"] = nil
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}

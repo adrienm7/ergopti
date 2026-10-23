@@ -33,7 +33,7 @@ global ERROR_NET_DEDUP_TTL_MS := 60000
 ; DISTINCT error signatures accumulate over a long-running session.
 global ERROR_NET_DEDUP_CACHE_CAP := 256
 
-; A detached worker (keylogger prefetch, UIA selection) owns no log file, no
+; A detached worker (keystats prefetch, UIA selection) owns no log file, no
 ; tray and no dialog: the resident driver reads its captured standard output. An
 ; uncaught error ends it with one structural line instead of the driver's fatal
 ; startup dialog, crash report and log initialisation. The message is omitted:
@@ -72,7 +72,7 @@ _ErrorNetReleaseNeedsMenuMask(ModKeys) {
 
 ; Retire input state that can already be owned while startup is still partial.
 ; This function is intentionally independent of the full OnExit transaction:
-; OnExit is registered only after the keylogger starts, while parse-time hotkeys
+; OnExit is registered only after the keystats starts, while parse-time hotkeys
 ; can acquire a synthetic modifier much earlier whenever startup pumps messages.
 ; Every late global is IsSet-guarded so a fault before its include remains safe.
 ; Optional callbacks provide a behavioural seam without injecting real keys or
@@ -389,8 +389,8 @@ _CrashReport_CheapSnapshot(Exc) {
 				StuckMods.Push(ModKey)
 		}
 	}
-	KeyloggerInitialized := "unknown"
-	try KeyloggerInitialized := Keylogger.initialized ? "true" : "false"
+	KeystatsInitialized := "unknown"
+	try KeystatsInitialized := Keystats.initialized ? "true" : "false"
 	AdapterState := _CrashReport_CheapAdapterState()
 	LogTail := ""
 	try LogTail := _CrashReport_JoinNewlines(LoggerRingBufferSnapshot())
@@ -426,7 +426,7 @@ _CrashReport_CheapSnapshot(Exc) {
 		"adapters_failed", AdapterState["failed"],
 		"session_warnings", IsSet(_HealthCheckWarnCount) ? String(_HealthCheckWarnCount) : "unknown",
 		"session_errors", IsSet(_HealthCheckErrCount) ? String(_HealthCheckErrCount) : "unknown",
-		"keylogger_initialized", KeyloggerInitialized,
+		"keystats_initialized", KeystatsInitialized,
 		"config_dir", _ConfigDir, "log_tail", LogTail)
 	; These two values authorize only local worker operations. They are excluded
 	; from the canonical schema and removed before either worker writes a report.

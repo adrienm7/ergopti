@@ -29,8 +29,8 @@ local PRODUCTION_SOURCE_FLOOR = 200
 local RAW_TIMER_NEW_OWNERS = {
 	["adapters/timer_scheduler.lua"] = "canonical native timer owner",
 	["infra/launcher_guard.lua"] = "runs before TimerScheduler and publishes before start",
-	["modules/keylogger/init.lua"] = "legacy keylogger runtime transaction pending migration",
-	["modules/keylogger/log_manager.lua"] = "legacy ingest owner pending migration",
+	["modules/keystats/init.lua"] = "legacy keystats runtime transaction pending migration",
+	["modules/keystats/log_manager.lua"] = "legacy ingest owner pending migration",
 	["modules/keymap/init.lua"] = "legacy tap-watchdog owner pending migration",
 	["platform/remap/watchers.lua"] = "legacy layout-poll owner pending migration",
 }

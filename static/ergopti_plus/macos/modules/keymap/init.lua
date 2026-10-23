@@ -915,7 +915,7 @@ end
 --- to emit synthetic keystrokes and accurately sync the core buffer.
 ---
 --- `is_private` is NOT optional decoration: it is the only channel through which
---- a dynamic injector can tell the keylogger that what it just emitted is a
+--- a dynamic injector can tell the keystats that what it just emitted is a
 --- secret. perform_text_replacement forwards it to notify_synthetic, which keeps
 --- the discard markers intact and redacts only what it persists. Omitting it —
 --- which this function structurally forced, by stopping one argument short —
@@ -1121,7 +1121,7 @@ end
 --- is never used as transaction identity.
 ---
 --- Arming only: does NOT emit any keystroke. The caller is responsible for
---- also calling suppress_rescan() and keylogger.notify_synthetic() to complete
+--- also calling suppress_rescan() and keystats.notify_synthetic() to complete
 --- the synthetic-injection contract (see docs/PROJECT_MEMORY.md §synthetic).
 ---
 --- @param deletes number Retained for compatibility with legacy callers.
@@ -1966,7 +1966,7 @@ local function onKeyDown(e)
 	-- reconciliation deliberately runs from this immutable provenance result.
 	-- The first Ergopti tap reached by a
 	-- physical event claims every older deferred action, publishes its epoch and
-	-- returns its payload before the original. This makes keymap/keylogger ordering
+	-- returns its payload before the original. This makes keymap/keystats ordering
 	-- independent of Quartz tap insertion order.
 	local provenance = nil
 	local provenance_status = EventProvenance.STATUS_UNREADABLE
@@ -2236,7 +2236,7 @@ mouse_tap = eventtap.new(
 	function(e)
 		-- A click can move focus to another app before the deferred broker runs.
 		-- Claim older output here and return it ahead of the original mouseDown, even
-		-- when the optional keylogger tap is disabled. Otherwise an Ergopti shortcut
+		-- when the optional keystats tap is disabled. Otherwise an Ergopti shortcut
 		-- queued for app A can land in app B after the click changes focus.
 		local provenance, provenance_status, fence = EventProvenance.classify_with_fence(
 			e, "keymap.mouse")

@@ -8,7 +8,7 @@
 # ----------------------
 # The wizard was rewritten to add new keys (welcome.title/heading,
 # magic_key.choose_freely, the gestures.register_* family) and to update the
-# *content* of several existing keys (the keylogger warning, the metrics
+# *content* of several existing keys (the keystats warning, the metrics
 # description, the magic-key description/hint, the gestures description).
 #
 # Translating every change into the 19 non-EN/FR languages by hand is not
@@ -43,7 +43,7 @@ $Ellipsis    = [char]0x2026  # 'horizontal ellipsis'
 # rendering. The script is idempotent so subsequent runs only re-write lines
 # whose content actually differs from the source-of-truth here.
 $ReplacedKeys = @{
-	"dialog.metrics.enable_warning"   = "WARNING: You are about to enable the keylogger.\n\nIt records your keystrokes to the millisecond. Logs are stored locally under:\n    %s\n\nPassword fields are ignored automatically (UIA filter), and key content is also dropped while you are in a private/incognito browser window. Even so, this remains a keylogger " + $EmDash + " PAUSE the script when entering sensitive data outside those contexts.\n\nEnable?"
+	"dialog.metrics.enable_warning"   = "WARNING: You are about to enable the keystats.\n\nIt records your keystrokes to the millisecond. Logs are stored locally under:\n    %s\n\nPassword fields are ignored automatically (UIA filter), and key content is also dropped while you are in a private/incognito browser window. Even so, this remains a keystats " + $EmDash + " PAUSE the script when entering sensitive data outside those contexts.\n\nEnable?"
 	"onboarding.gestures.desc"             = "Do you want to enable trackpad gesture support?\n\nThis lets you trigger custom actions with trackpad gestures (swipes, taps, pinches)."
 	"onboarding.gestures.register_auto"      = "Automatic configuration"
 	"onboarding.gestures.register_auto_hint" = "Fills in every gesture slot in Windows Settings for you. Does not require administrator rights."

@@ -441,9 +441,9 @@ helpers.describe("init: controlled reload owns the native shutdown handoff", fun
 			helpers.assert_eq(state.error_dialog_inits, 1, "init.lua must initialise the error window once")
 			helpers.assert_eq(type(state.notification_handler), "function",
 				"init.lua must register the logger's error handler")
-			helpers.assert_eq(state.notification_handler("keylogger", "Flush failed: disk full", "Flush failed: %s"), true,
+			helpers.assert_eq(state.notification_handler("keystats", "Flush failed: disk full", "Flush failed: %s"), true,
 				"the handler reports the error as handled")
-			helpers.assert_eq(state.error_dialog_calls, { { "keylogger", "Flush failed: %s", "Flush failed: disk full" } },
+			helpers.assert_eq(state.error_dialog_calls, { { "keystats", "Flush failed: %s", "Flush failed: disk full" } },
 				"the error window receives the module, the template and the message")
 		end)
 	end)

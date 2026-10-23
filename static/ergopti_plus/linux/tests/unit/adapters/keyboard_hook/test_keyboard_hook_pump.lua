@@ -8,7 +8,7 @@
 --- ROOT CAUSE ENCODED:
 --- _pump_one() ended with `if ch and _on_char then pcall(_on_char, ch)` but never
 --- assigned `ch` — _resolve_char() was never called. So no character ever reached
---- on_char and the ENTIRE daemon was inert: hotstrings, keylogger and the LLM got
+--- on_char and the ENTIRE daemon was inert: hotstrings, keystats and the LLM got
 --- zero keystrokes. The fix resolves the keycode (forward-declaring _resolve_char
 --- to avoid the same non-hoisted-local trap) before the modifier reset.
 ---

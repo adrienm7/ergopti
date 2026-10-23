@@ -116,7 +116,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 }
 
 --- Drives the real ScriptControl transaction over either the exact warmup-owner
@@ -220,7 +220,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
-		package.loaded["modules.keylogger"] = { resync_context = function() return true end }
+		package.loaded["modules.keystats"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
 		local pause_accepted = ScriptControl.pause_all()
@@ -314,7 +314,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
-			"ui.tooltip", "modules.keylogger", "infra.notifications", "infra.keycodes",
+			"ui.tooltip", "modules.keystats", "infra.notifications", "infra.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
@@ -431,7 +431,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			show_loading = function() return true end, show_predictions = function() return true end,
 			tint = function(_) return nil end,
 		}
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			get_live_stats = function() return { wpm_physical = 0 } end,
 			log_llm_dismissed = function(_, _p) end,
 		}

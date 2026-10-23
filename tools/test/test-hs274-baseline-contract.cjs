@@ -50,7 +50,7 @@ function check(root) {
 /** Writes independently chosen declarations for all four baseline boundaries. */
 function fixture(dir, consumer, producer, reader, cli) {
 	const files = {
-		'static/ergopti_plus/macos/modules/keylogger/physical_baseline.lua': `local M = {}\nM.VERSION = ${consumer}\nreturn M\n`,
+		'static/ergopti_plus/macos/modules/keystats/physical_baseline.lua': `local M = {}\nM.VERSION = ${consumer}\nreturn M\n`,
 		'tools/diagnostics/hs274-stream-source.hpp': `opened["baseline"] = {{"version", ${producer}u}, {"rows", 1}};\n`,
 		'tools/diagnostics/hs274_baseline_frames.py': `integer(descriptor["version"], "baseline version", ${reader}, ${reader})\n`,
 		'tools/diagnostics/hs274-stream-baseline-client.hpp': `if (descriptor.at("version") != ${cli}u) throw std::invalid_argument("Invalid capture baseline descriptor");\n`
@@ -99,7 +99,7 @@ if (!fs.existsSync(SCRIPT)) {
 			);
 		const declarations = {
 			consumer: [
-				'static/ergopti_plus/macos/modules/keylogger/physical_baseline.lua',
+				'static/ergopti_plus/macos/modules/keystats/physical_baseline.lua',
 				'M.VERSION = 1\n'
 			],
 			producer: [

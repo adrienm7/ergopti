@@ -171,7 +171,7 @@ _PIPP_MultiLetterComboIsPreviewed() {
 		AssertEqual("Moreau " . Chr(0x21E5) . " Adrien", Row.Output,
 			"a multi-field combo previews its fields joined by the tab glyph. The registered replacement is a send string full of {Tab} escapes, so the row has to be rebuilt from the personal-info values rather than shown raw")
 		Assert(Row.HasOwnProp("IsPrivate") and Row.IsPrivate,
-			"a personal decision is private, so resolving the user's own data cannot leak it into the 14-day keylogger")
+			"a personal decision is private, so resolving the user's own data cannot leak it into the 14-day keystats")
 	} finally {
 		_PIPP_Teardown(Saved)
 	}
@@ -571,7 +571,7 @@ Test("hotstrings: masking the preview leaves the typed expansion complete (previ
 ; ==========================================
 
 ; The preview's telemetry writes the trigger AND the replacement to the 14-day
-; keylogger on every suggestion. Landing the @ preview without this would put the
+; keystats on every suggestion. Landing the @ preview without this would put the
 ; phone, IBAN, SSN and card number in there on every preview keystroke — a
 ; regression against the already-shipped log-redaction contract that no existing
 ; test would have caught, because nothing previewable reached that sink before.
@@ -592,7 +592,7 @@ _PIPP_PrivateSuggestionIsWithheldWhole() {
 		_KLLastShownSuggestion := Prev
 	}
 }
-Test("hotstrings: a private preview row is never persisted to the keylogger (at-triggers-have-no-preview-candidate-source)",
+Test("hotstrings: a private preview row is never persisted to the keystats (at-triggers-have-no-preview-candidate-source)",
 	_PIPP_PrivateSuggestionIsWithheldWhole)
 
 
@@ -733,7 +733,7 @@ _PIPP_VisibleDynamicDecisionImpl() {
 
 _PIPP_VisibleDynamicDecisionIsReusedByDispatch() {
 	; Reuse the send-transaction harness that already owns suppression timers,
-	; synthetic-keylogger state and the dry-run sender. A local ad-hoc stub would
+	; synthetic-keystats state and the dry-run sender. A local ad-hoc stub would
 	; let those asynchronous releases leak into the next shared-suite test.
 	_AHK04_RunIsolated(_PIPP_VisibleDynamicDecisionImpl)
 }

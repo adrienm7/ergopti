@@ -854,7 +854,7 @@ TooltipHide(DbgTag := "?", Force := false, ExpectedGeneration := unset,
 			if RefusedReason == "" {
 				Authorized := true
             if IsSet(HotstringPrefixWatcherClearVisibleDecisions) {
-                ; Pure detach only. Privacy/keylogger work is emitted below after
+                ; Pure detach only. Privacy/keystats work is emitted below after
                 ; restoring the caller's interruptibility.
                 try DismissedRecord := HotstringPrefixWatcherClearVisibleDecisions(false)
                 catch Error as Err

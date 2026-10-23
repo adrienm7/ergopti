@@ -379,7 +379,7 @@ _MAD_Main() {
 		FSCreateDirectoryExclusiveStrict(_MAD_Root)
 		_MAD_CopyShared()
 		TimingsLoadShared()
-		KeyloggerWalkerLoadTimings()
+		KeystatsWalkerLoadTimings()
 		_MVSP.Gui := Gui("+ToolWindow", "Private Apps DOM integration")
 		_MVSP.Gui.Show("w1000 h760")
 		_MAD.App := StrLower(WinGetProcessName("ahk_id " . _MVSP.Gui.Hwnd))

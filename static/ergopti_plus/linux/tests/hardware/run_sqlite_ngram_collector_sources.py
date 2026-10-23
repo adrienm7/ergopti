@@ -121,7 +121,7 @@ with tempfile.TemporaryDirectory(prefix="ngram-collector-") as owned:
             lambda: projection(result["split"]["today"]["owned-collector"]["c"]["x"]),
         )
         check(
-            "public keylogger range after flush matches independent SQL",
+            "public keystats range after flush matches independent SQL",
             lambda: projection(result["public_range"]["today"]["owned-collector"]["c"]["x"]),
         )
         check(

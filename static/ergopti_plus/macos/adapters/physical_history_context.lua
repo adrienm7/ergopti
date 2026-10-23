@@ -3,7 +3,7 @@
 --- Borrows actual CaptureScope/CLOCK2 and freezes a native accepted calendar.
 --- Default startup never loads this adapter or enables the dormant producer.
 local M = {}
-local Accepted = require("keylogger.physical_accepted_context")
+local Accepted = require("keystats.physical_accepted_context")
 
 local function native_function(value)
 	return type(value) == "function" and debug.getinfo(value, "S").what == "C"

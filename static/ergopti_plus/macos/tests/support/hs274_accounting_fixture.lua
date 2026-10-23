@@ -3,31 +3,31 @@
 --- ==============================================================================
 --- MODULE: HS-274 Accounting Fixture
 --- DESCRIPTION:
---- Drives the real keylogger event callback and the real metrics aggregator
+--- Drives the real keystats event callback and the real metrics aggregator
 --- for the HS-274 regressions ported from
 --- docs/audits/hammerspoon/2026_09_08/proofs/. Only persistence and OS
---- lifecycle boundaries are doubles (tests.support.keylogger_provenance_fixture):
+--- lifecycle boundaries are doubles (tests.support.keystats_provenance_fixture):
 --- the keyDown and flagsChanged branches, their meta.kc decision and the
 --- aggregator's kc_ngram credits are production code.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.keylogger_provenance_fixture")
+local Fixture = require("tests.support.keystats_provenance_fixture")
 
 local M = {}
 
 -- Every module the scenario loads or replaces, restored after each run so no
--- keylogger, aggregator or accounting state leaks into a sibling test.
+-- keystats, aggregator or accounting state leaks into a sibling test.
 local OWNED_MODULES = {
 	"hs", "tests.stubs.hs", "infra.logger", "infra.manifest_reader", "infra.config_paths",
-	"infra.dialog_util", "infra.teardown_transaction", "modules.keylogger.init",
-	"modules.keylogger.log_manager", "modules.keylogger.context_tracker",
-	"modules.keylogger.kc_bridge", "modules.keylogger.watchers", "modules.keylogger.timestamp",
-	"modules.keylogger.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
+	"infra.dialog_util", "infra.teardown_transaction", "modules.keystats.init",
+	"modules.keystats.log_manager", "modules.keystats.context_tracker",
+	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
+	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
 	"adapters.keyboard_hook", "adapters.input_source_broker", "adapters.storage",
-	"adapters.timer_scheduler", "modules.keylogger.aggregator.events",
-	"modules.keylogger.aggregator.state", "modules.keylogger.aggregator.core",
-	"modules.keylogger.aggregator.physical", "ui.metrics_typing.init",
+	"adapters.timer_scheduler", "modules.keystats.aggregator.events",
+	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
+	"modules.keystats.aggregator.physical", "ui.metrics_typing.init",
 }
 
 -- The calendar day and application every scenario records under.
@@ -67,33 +67,33 @@ local function quartz_event(event_type, keycode, chars, flags)
 	}
 end
 
---- Runs one scenario against a freshly loaded keylogger and aggregator.
+--- Runs one scenario against a freshly loaded keystats and aggregator.
 --- The callback receives a scenario table:
 ---   key_down(keycode, chars)        drives the real keyDown branch;
 ---   flags_changed(keycode, flags)   drives the real flagsChanged branch;
 ---   ledger_press(keycode)           appends a Karabiner ledger credit;
 ---   stream_press(keycode)           appends an admitted producer credit;
----   typing_events()                 every event the keylogger recorded;
----   system_events                   the modifier events the keylogger appended;
+---   typing_events()                 every event the keystats recorded;
+---   system_events                   the modifier events the keystats appended;
 ---   counts()                        kc_ngram credits after aggregation;
 ---   aggregate()                     the aggregator state after aggregation;
 ---   ledger_may_persist()            the gate the bridge asks before a ledger credit;
 ---   admit_stream()                  selects the stream and admits a complete capture;
----   kc_bridge                       the keylogger's (stubbed) Karabiner bridge;
----   mode                            the physical accounting policy the keylogger uses;
----   state                           the keylogger's CoreState.
+---   kc_bridge                       the keystats's (stubbed) Karabiner bridge;
+---   mode                            the physical accounting policy the keystats uses;
+---   state                           the keystats's CoreState.
 --- @param callback function Scenario body.
 function M.run(callback)
 	helpers.with_stub_scope(OWNED_MODULES, function()
-		local fixture = Fixture.load_keylogger()
-		local handle_key = find_upvalue(fixture.keylogger.start, "handle_key")
+		local fixture = Fixture.load_keystats()
+		local handle_key = find_upvalue(fixture.keystats.start, "handle_key")
 		local types = fixture.hs.eventtap.event.types
 		fixture.state.is_enabled = true
 		fixture.state.is_secure_field = false
 		fixture.state.session_start_time = 1
 
 		local system_events = {}
-		local log_manager = package.loaded["modules.keylogger.log_manager"]
+		local log_manager = package.loaded["modules.keystats.log_manager"]
 		log_manager.log_modifier_press = function(keycode, app)
 			system_events[#system_events + 1] = { action = "modifier_press", keycode = keycode, app = app }
 		end
@@ -104,8 +104,8 @@ function M.run(callback)
 
 		local credits = {}
 		local scenario = {
-			kc_bridge = package.loaded["modules.keylogger.kc_bridge"],
-			mode = require("modules.keylogger.physical_accounting_mode"),
+			kc_bridge = package.loaded["modules.keystats.kc_bridge"],
+			mode = require("modules.keystats.physical_accounting_mode"),
 			state = fixture.state,
 			system_events = system_events,
 		}
@@ -149,9 +149,9 @@ function M.run(callback)
 		end
 
 		function scenario.aggregate()
-			local Events = require("modules.keylogger.aggregator.events")
-			local State = require("modules.keylogger.aggregator.state")
-			local Core = require("modules.keylogger.aggregator.core")
+			local Events = require("modules.keystats.aggregator.events")
+			local State = require("modules.keystats.aggregator.state")
+			local Core = require("modules.keystats.aggregator.core")
 			State.initialized = true
 			State.device_id = "hs274-accounting"
 			Core.reset_batch()

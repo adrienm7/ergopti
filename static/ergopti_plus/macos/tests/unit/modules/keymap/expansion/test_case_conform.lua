@@ -44,7 +44,7 @@ local ENGINE_OWNERSHIP = {
 	"infra.text_utils",
 	"text_utils",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 }
 
 
@@ -168,12 +168,12 @@ end)
 -- =========================================
 
 -- Build a registry + expander sharing ONE CoreState so a registered conform entry
--- can be driven through the real auto-expansion path. tooltip/keylogger are stubbed
+-- can be driven through the real auto-expansion path. tooltip/keystats are stubbed
 -- so perform_text_replacement's side-effects never touch real UI/OS code.
 local function fresh_engine()
 	return helpers.with_fresh_modules(ENGINE_OWNERSHIP, function()
 		package.loaded["ui.tooltip"] = { hide = function() end, hide_forced = function() end }
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			notify_synthetic = function() end,
 			set_buffer       = function() end,
 			log_hotstring    = function() end,

@@ -386,7 +386,7 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state  table Daemon state { engine, keystats, config, llm, layout }.
 --- @param context table|nil Trusted routing capabilities owned by this window.
 --- @return any|nil  Response to send back to JS.
 function M.on_message(payload, state, context)

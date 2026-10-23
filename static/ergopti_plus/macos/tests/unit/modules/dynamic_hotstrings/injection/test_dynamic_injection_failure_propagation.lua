@@ -215,7 +215,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		reset_driver_modules()
 		local logs = logger_capture()
 		package.loaded["modules.keymap.utils"] = { emit_text = function() error("must not emit") end }
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["adapters.synthetic_input"] = api()
 
 		local rules = require("modules.dynamic_hotstrings.rules_engine")
@@ -266,7 +266,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		package.loaded["modules.keymap.utils"] = {
 			emit_text = function() error("forced fallback emitter failure") end,
 		}
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 
 		local synthetic = require("adapters.synthetic_input")
 		local rules = require("modules.dynamic_hotstrings.rules_engine")
@@ -312,7 +312,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 	helpers.it("passes the magic key through and does not log completion", function()
 		local hs_stub = reset_driver_modules()
 		local logs = logger_capture()
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["adapters.synthetic_input"] = api()
 
 		local personal = require("modules.dynamic_hotstrings.personal_info")
@@ -358,7 +358,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 	helpers.it("cancels private fallback deletes when field construction throws", function()
 		reset_driver_modules()
 		logger_capture()
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 
 		local synthetic = require("adapters.synthetic_input")
 		local personal = require("modules.dynamic_hotstrings.personal_info")

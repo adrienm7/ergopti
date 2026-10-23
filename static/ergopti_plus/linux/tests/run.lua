@@ -71,9 +71,9 @@ end
 
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and
--- several shared modules (keylogger/utils.lua, toml_codec, terminators) use
+-- several shared modules (keystats/utils.lua, toml_codec, terminators) use
 -- utf8.len / utf8.offset / utf8.codes as globals. Without this early install,
--- require("keylogger.utils") crashes with "attempt to index global 'utf8' (a
+-- require("keystats.utils") crashes with "attempt to index global 'utf8' (a
 -- nil value)" and every dependent test (pop_utf8, compat.utf8, device_finder)
 -- fails before the daemon_smoke test even reaches its compat.utf8 check.
 local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")

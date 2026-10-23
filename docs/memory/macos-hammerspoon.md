@@ -582,7 +582,7 @@ key-up points at the main thread.
 
 Hammerspoon consumes CoreGraphics tap-disable notifications in native code and
 re-enables the tap before Lua callbacks run. Lua handlers or disable counters are
-unreachable false fixes. Keep the keymap, keylogger, and script-control watchdogs
+unreachable false fixes. Keep the keymap, keystats, and script-control watchdogs
 that poll native enabled state and restart persistent taps.
 
 ### project-hs-sentinel-key-misfire
@@ -880,7 +880,7 @@ Never construct `hs.window.filter` anywhere in the driver. Its first instantiati
 enumerates every window of every app on the main thread: lazily built on the
 first browser activation it still froze Hammerspoon for 4.8 s and 3.3 s and cost
 the Karabiner lease (#95). Bind `app:newWatcher` and `win:newWatcher` to the one
-application and window that matter, as the keylogger browser watchers and the
+application and window that matter, as the keystats browser watchers and the
 keymap ignored-window watchers do.
 
 ### project-hs-application-get-scans-every-window
@@ -891,7 +891,7 @@ application matches, it calls `hs.window.find(name)`, i.e.
 application on the main thread with six seconds allowed per application.
 The tell in a log is the console line "Some applications have alternate
 names…", which `find()` prints (once per Lua state) just before that
-fallback. The keylogger's per-flush category lookup of a quit application
+fallback. The keystats's per-flush category lookup of a quit application
 froze Hammerspoon 13.4 s and cost the Karabiner lease (#99). Resolve
 applications through `adapters/running_application.lua` (exact name, bundle
 identifier, PID); `tests/meta/runloop/test_app_lookup_never_scans_windows.lua`
@@ -1040,7 +1040,7 @@ exact restoration commits. Failed restoration remains cleanup debt.
 A wrap-selection key is consumed only after paste and full clipboard restoration
 are both owned; partial success must not lose the user's clipboard.
 
-### project-hs-keylogger-append-commit
+### project-hs-keystats-append-commit
 
 A non-throwing file-write refusal retains the exact detached snapshot and FIFO
 head for retry. Do not acknowledge data before append commits.
@@ -1067,7 +1067,7 @@ Controlled quit/reload teardown runs on the Hammerspoon main thread, so a
 synchronous shell-out there (`hs.execute(cmd, true)` is a login and interactive
 shell with no timeout) freezes the app as "not responding", and no timer can
 fire to rescue it. Teardown steps dispatch absolute-binary `ShellRunner.spawn`
-tasks and never wait. The keylogger process-exit stop skips the final ingest,
+tasks and never wait. The keystats process-exit stop skips the final ingest,
 and the MLX shutdown skips the listener proof when this Lua generation owns no
 server. User quits go through `TerminationCoordinator.request_user_exit`. It
 arms `user_quit_deadline_ms` before the lease fence, so a stuck async stage or a
@@ -1148,7 +1148,7 @@ deduplicating. EventViewer raw capture disables remapping, a first
 provides neither coverage nor provenance. Consult the
 [HS-274 evidence and rejected paths](../audits/hammerspoon/2026_09_09/discoveries.md)
 before repeating acquisition experiments or using historical TODOs.
-`modules/keylogger/physical_accounting_mode.lua` is the one owner of the
+`modules/keystats/physical_accounting_mode.lua` is the one owner of the
 answer: the event tap (keyDown `kc`, flagsChanged modifier events) and the
 ledger credit only under the legacy source; a selected stream makes both
 silent, and a stream without an admitted complete capture is a gap, not a
@@ -1359,7 +1359,7 @@ press the key-identity policy cannot attribute is tallied in the receiver's
 
 The stream credits the macOS virtual keycode Quartz would have reported for the
 same physical key, so history and the heatmap keep one identity:
-`modules/keylogger/physical_key_identity.lua` resolves through
+`modules/keystats/physical_key_identity.lua` resolves through
 `_generated/hid_key_identity.lua`, generated from the registry's `hs` and
 `macos_iso.hs` and from `_shared/data/keycodes/hid_usages.json`
 (`npm run codegen:hid-key-identity:hs`). Keep HID data out of

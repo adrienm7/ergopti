@@ -18,7 +18,7 @@ test seams could remain platform-only.
 Collect `infra/hotpath_profiler.lua`, `infra/boot_profiler.lua`, and
 `infra/perf.lua` artifacts from the resolved configuration directory on the
 target Mac. Measure synchronous MLX adoption, WPM `mouseMoved` traffic,
-Terminal identity lookup, keylogger app attribution, canvas/AX work, and
+Terminal identity lookup, keystats app attribution, canvas/AX work, and
 remaining synchronous shell helpers before prioritizing optimizations. The
 candidate-loop lowercase allocation has already been removed; do not optimize
 the remaining hypotheses from source inspection alone. Without this profile,

@@ -91,8 +91,8 @@ _DHLC_AllFireSinksGuardBeforeMutation() {
 	Assert(PublishBody != "", "_KL_PublishBufferSnapshot() must exist in the driver source")
 	Assert(InStr(PublishBody, "_KL_RestoreBufferSnapshot") > 0,
 		"AHK-22: a lifecycle loss observed after the snapshot must restore the pre-pause buffer instead of destroying it")
-	LatchPos := InStr(FlushBody, "if Keylogger._flush_in_progress")
-	ClaimPos := InStr(FlushBody, "Keylogger._flush_in_progress := true")
+	LatchPos := InStr(FlushBody, "if Keystats._flush_in_progress")
+	ClaimPos := InStr(FlushBody, "Keystats._flush_in_progress := true")
 	Assert(LatchPos > 0 && ClaimPos > LatchPos && LatchPos < SnapshotPos,
 		"AHK-22: detached snapshots must be serialised before the destructive swap so rejected restores cannot reverse typing order")
 	Assert(InStr(PublishBody, "KL_AppendLog(entry, &RejectedBySuspend)") > 0
@@ -105,7 +105,7 @@ _DHLC_AllFireSinksGuardBeforeMutation() {
 		"AHK-22: KL_AppendLog must identify its native-Suspend rejection for detached-state callers")
 	AppendCriticalPos := InStr(AppendBody, 'AppendCritical := Critical("On")')
 	AppendFinalPausePos := InStr(AppendBody, "A_IsSuspended", , AppendCriticalPos)
-	AppendMutationPos := InStr(AppendBody, "Keylogger._pending_entries.Push")
+	AppendMutationPos := InStr(AppendBody, "Keystats._pending_entries.Push")
 	Assert(AppendCriticalPos > 0 && AppendFinalPausePos > AppendCriticalPos
 		&& AppendMutationPos > AppendFinalPausePos,
 		"AHK-22: KL_AppendLog must pair its post-filter pause recheck and pending-queue mutation in one short Critical transaction")
@@ -164,7 +164,7 @@ _DHLC_LifecycleOwnsDeferredCallbacks() {
 	Assert(LeasePos > 0 && PreparePos > LeasePos
 		&& FinalGatePos > PreparePos && ProducerStopPos > FinalGatePos
 		&& DrainPos > ProducerStopPos && StopPos > DrainPos,
-		"AHK-22: reload/exit must publish the reversible keylogger lease, prepare the retained batch, accept every refusal gate, then stop the producer and close the sinks")
+		"AHK-22: reload/exit must publish the reversible keystats lease, prepare the retained batch, accept every refusal gate, then stop the producer and close the sinks")
 	DrainFailurePos := InStr(ShutdownBody, "if !FireDrainComplete")
 	FinalAuthorizationPos := InStr(ShutdownBody,
 		"FinalExitAuthorized := false", , DrainFailurePos)

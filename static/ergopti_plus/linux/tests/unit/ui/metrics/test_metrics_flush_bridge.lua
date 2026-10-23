@@ -42,7 +42,7 @@ local function fixture(app)
 		generation = generation + 1
 		return true
 	end
-	local state = { keylogger = K, webview_manager = {
+	local state = { keystats = K, webview_manager = {
 		page_current = function(name, owner) return name == app and owner == epoch end,
 		eval_js = function(_, js) pushed[#pushed + 1] = js return true end,
 	} }
@@ -222,7 +222,7 @@ H.describe("metrics flush bridge", function()
 	H.it("source replacement cannot publish an old settlement", function()
 		local F = fixture("metrics_apps")
 		F.B.on_message("ready", F.state, F.context)
-		F.state.keylogger = require("tests.fakes.metrics_keylogger").synchronous({})
+		F.state.keystats = require("tests.fakes.metrics_keystats").synchronous({})
 		F.settle()
 		H.assert_eq(F.c.reads, 0)
 		H.assert_eq(#F.pushed, 0)
@@ -278,7 +278,7 @@ H.describe("metrics flush bridge", function()
 		H.assert_eq(F.c.reads, 1)
 		H.assert_eq(#F.pushed, 0)
 	end)
-	H.it("typing cache is scoped to its actual keylogger generation", function()
+	H.it("typing cache is scoped to its actual keystats generation", function()
 		local F = fixture("metrics_typing")
 		F.read_safe()
 		local first = F.B.on_message("ready", F.state, F.context)
@@ -324,7 +324,7 @@ H.describe("metrics flush bridge", function()
 			H.assert_eq(#F.pushed, 0)
 		end)
 	end
-	H.it("a coherent stopped keylogger status remains inspectable but cannot admit UI", function()
+	H.it("a coherent stopped keystats status remains inspectable but cannot admit UI", function()
 		local F = fixture("metrics_apps")
 		F.read_safe()
 		local status = F.K.get_flush_status()

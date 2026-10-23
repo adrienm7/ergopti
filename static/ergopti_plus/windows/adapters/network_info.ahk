@@ -95,7 +95,7 @@ global NI_IF_OPER_STATUS_UP                   := 1
 ; out of the SAME WLAN_CONNECTION_ATTRIBUTES buffer. Callers may ask for them
 ; back to back, so a stateless implementation pays two full round-trips for one
 ; buffer. WlanOpenHandle is an RPC to the WLAN AutoConfig service and
-; dominates the cost (measured on this machine: 9.3 ms of the 18.0 ms a keylogger
+; dominates the cost (measured on this machine: 9.3 ms of the 18.0 ms a keystats
 ; tick spent querying twice, against 9.8 ms for a single query). It runs as a
 ; DllCall on the AHK script thread, which cannot be interrupted mid-flight, so a
 ; keystroke arriving during it simply waits. 2 s is an order of magnitude below
@@ -175,7 +175,7 @@ _NI_QueryWlan() {
     global NI_WLAN_CACHE, NI_WLAN_CACHE_AT, NI_WLAN_CACHE_TTL_MS
     ; Serve back-to-back callers from one round-trip. NI_GetSsidHash() and
     ; NI_GetSignalStrength() are two port methods reading two fields of the same
-    ; buffer, and the keylogger network tick calls them one after the other; the
+    ; buffer, and the keystats network tick calls them one after the other; the
     ; second WlanOpenHandle RPC was pure duplicated work on the script thread.
     if (NI_WLAN_CACHE_AT != 0
         and ((A_TickCount - NI_WLAN_CACHE_AT) & 0xFFFFFFFF) < NI_WLAN_CACHE_TTL_MS)

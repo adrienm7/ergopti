@@ -13,7 +13,7 @@ local Fixture = require("tests.support.escape_context_fixture")
 local OWNERS = {
 	"infra.logger", "adapters.event_provenance", "adapters.synthetic_input",
 	"adapters.timer_scheduler", "modules.keymap.utils", "infra.text_utils",
-	"modules.llm", "infra.keycodes", "modules.keylogger", "ui.tooltip",
+	"modules.llm", "infra.keycodes", "modules.keystats", "ui.tooltip",
 	"modules.llm.prediction_engine", "modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config", "modules.keymap.expander",
 	"infra.manifest_reader", "modules.keymap.llm_bridge",

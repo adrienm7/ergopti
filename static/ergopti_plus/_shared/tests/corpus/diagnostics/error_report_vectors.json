@@ -5,12 +5,12 @@
 			"id": "error_with_recent_issues",
 			"error": {
 				"kind": "error",
-				"module": "keylogger",
+				"module": "keystats",
 				"message": "Flush failed: disk full",
 				"time": "2026-09-24 10:15:02:117",
 				"recent": [
-					"2026-09-24 10:15:02:117 [ERROR] [keylogger] Flush failed: disk full",
-					"2026-09-24 10:14:58:003 [WARNING] [keylogger] Flush slow: 812 ms"
+					"2026-09-24 10:15:02:117 [ERROR] [keystats] Flush failed: disk full",
+					"2026-09-24 10:14:58:003 [WARNING] [keystats] Flush slow: 812 ms"
 				]
 			},
 			"identity": {
@@ -23,9 +23,9 @@
 				"err_count": 1
 			},
 			"expected": {
-				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit | f58d15798 (build) |\n| OS | Windows 11 Home 26100.9457 |\n| Driver | windows |\n| Generated (UTC) | 2026-09-24T08:15:02Z |\n| Warnings / errors this session | 3 / 1 |\n\n```text\nerror:\n  kind: error\n  message: Flush failed: disk full\n  module: keylogger\n  time: 2026-09-24 10:15:02:117\nrecent_issues:\n  - 2026-09-24 10:15:02:117 [ERROR] [keylogger] Flush failed: disk full\n  - 2026-09-24 10:14:58:003 [WARNING] [keylogger] Flush slow: 812 ms\n```\n",
+				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit | f58d15798 (build) |\n| OS | Windows 11 Home 26100.9457 |\n| Driver | windows |\n| Generated (UTC) | 2026-09-24T08:15:02Z |\n| Warnings / errors this session | 3 / 1 |\n\n```text\nerror:\n  kind: error\n  message: Flush failed: disk full\n  module: keystats\n  time: 2026-09-24 10:15:02:117\nrecent_issues:\n  - 2026-09-24 10:15:02:117 [ERROR] [keystats] Flush failed: disk full\n  - 2026-09-24 10:14:58:003 [WARNING] [keystats] Flush slow: 812 ms\n```\n",
 				"fields": {
-					"title": "keylogger: Flush failed: disk full",
+					"title": "keystats: Flush failed: disk full",
 					"version": "2.1.0",
 					"os": "Windows 11 Home 26100.9457",
 					"driver": "windows"

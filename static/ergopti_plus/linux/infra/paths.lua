@@ -17,7 +17,7 @@
 ---     `{"en", "fr"}` took over — so the language menu offered 2 locales out of
 ---     the 21 that ship. Nothing failed; the menu just quietly had two rows.
 ---
----   * modules/keylogger/sqlite_writer.lua walked `../../../` for
+---   * modules/keystats/sqlite_writer.lua walked `../../../` for
 ---     `_shared/data/db/schema.sql`. Two levels too high, with a bare relative
 ---     path as the fallback — which made schema loading depend on the process's
 ---     CURRENT DIRECTORY rather than on where the driver is installed.

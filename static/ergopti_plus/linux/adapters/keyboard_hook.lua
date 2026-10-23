@@ -1838,7 +1838,7 @@ local function _dispatch_post_remap(ev, source)
 		-- The chord's IDENTITY travels with the event. Reporting only "shortcut"
 		-- told the caller that the caret had probably moved and nothing else, so
 		-- the daemon could neither record which shortcut fired nor act on one —
-		-- `keylogger.record_shortcut` had no caller at all, and the configurable
+		-- `keystats.record_shortcut` had no caller at all, and the configurable
 		-- slots had nothing to match against.
 		--
 		-- A second argument rather than a different event name: every existing

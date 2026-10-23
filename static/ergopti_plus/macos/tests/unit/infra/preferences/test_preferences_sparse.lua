@@ -5,12 +5,12 @@ local codec = require("toml_codec")
 
 helpers.describe("sparse preference transactions", function()
 	helpers.it("saves a real neutral module snapshot without adding enabled overrides", function()
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system", "modules.keylogger.kc_bridge" }, function()
+		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system", "modules.keystats.kc_bridge" }, function()
 			local source = '[future]\nkeep = 99\n'
-			package.loaded["modules.keylogger.kc_bridge"] = { init = function() return true end }
+			package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 			local modules = {}
 			for key, name in pairs({ keymap = "keymap", dyn_hot_mod = "dynamic_hotstrings",
-				shortcuts_mod = "shortcuts", gestures = "gestures", keylogger = "keylogger" }) do
+				shortcuts_mod = "shortcuts", gestures = "gestures", keystats = "keystats" }) do
 				modules[key] = helpers.load_with_stubs("modules." .. name)
 			end
 			package.loaded["adapters.file_system"] = {

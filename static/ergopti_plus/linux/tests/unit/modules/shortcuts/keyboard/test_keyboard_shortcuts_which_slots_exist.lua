@@ -12,7 +12,7 @@
 --- nowhere to store an assignment. The hook reported every modified keystroke as
 --- the bare string "shortcut" — enough to tell the engine the caret had moved,
 --- and not enough to say WHICH shortcut. So there was nothing to match, and
---- `keylogger.record_shortcut` had no caller for the same reason: every action
+--- `keystats.record_shortcut` had no caller for the same reason: every action
 --- that types no text was absent from the metrics.
 ---
 --- THE MATCHING RULE THAT MATTERS:

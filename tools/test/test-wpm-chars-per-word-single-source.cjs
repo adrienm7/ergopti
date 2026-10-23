@@ -5,7 +5,7 @@
  * MODULE: WPM Chars-Per-Word Single Source
  * DESCRIPTION:
  * The words-per-minute divisor is defined once, in
- * `_shared/lua/keylogger/metrics.lua` as `DEFAULT_CHARS_PER_WORD`. No Lua driver
+ * `_shared/lua/keystats/metrics.lua` as `DEFAULT_CHARS_PER_WORD`. No Lua driver
  * may divide by a literal instead, and the JavaScript metrics views may not add
  * a copy beyond the five they already have.
  *
@@ -38,7 +38,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
-const CANON = path.join(SP, '_shared', 'lua', 'keylogger', 'metrics.lua');
+const CANON = path.join(SP, '_shared', 'lua', 'keystats', 'metrics.lua');
 
 // Frozen on 2026-08-01: the metrics WebView's own copies.
 const JS_BASELINE = 5;
@@ -61,7 +61,7 @@ const canonSrc = fs.readFileSync(CANON, 'utf8');
 const decl = canonSrc.match(/^M\.DEFAULT_CHARS_PER_WORD\s*=\s*(\d+)/m);
 if (!decl) {
 	errors.push(
-		'_shared/lua/keylogger/metrics.lua no longer declares M.DEFAULT_CHARS_PER_WORD — the single ' +
+		'_shared/lua/keystats/metrics.lua no longer declares M.DEFAULT_CHARS_PER_WORD — the single ' +
 			'source is gone and every driver is now free to pick its own divisor'
 	);
 }

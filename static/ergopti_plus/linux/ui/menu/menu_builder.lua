@@ -3210,7 +3210,7 @@ local function _build_agent(ctx)
 	})
 end
 
---- Builds the metrics/keylogger submenu.
+--- Builds the metrics/keystats submenu.
 --- Reports the at-rest migration and offers to stop it.
 --- Converting a year of stored rows takes minutes, and without this entry the
 --- user ticks menu.metrics.encrypt_at_rest and sees nothing happen at all.
@@ -3218,7 +3218,7 @@ end
 --- PROVIDER data — the `metrics_migration` list declares the slot and the shared
 --- renderer draws the row. A `list` and not a `command`, because the label IS the
 --- progress: "n / total", which no static declaration can spell.
---- @param k table The keylogger module.
+--- @param k table The keystats module.
 --- @return table One provider row.
 local function _migration_row(k)
 	if type(k.get_migration_progress) ~= "function" then
@@ -3245,7 +3245,7 @@ end
 --- above its definition would bind the nil global
 --- (project-lua-closure-before-local-nil-global).
 --- @param ctx table Menu context; ctx.webview opens the two metrics windows.
---- @param k table The keylogger module.
+--- @param k table The keystats module.
 --- @return table Menu rows, empty when the renderer could not be bound.
 local function _manifest_metrics_rows(ctx, k)
 	if not ManifestMenu then
@@ -3253,7 +3253,7 @@ local function _manifest_metrics_rows(ctx, k)
 		return {}
 	end
 
-	--- Reads one flag out of the keylogger's privacy state.
+	--- Reads one flag out of the keystats's privacy state.
 	--- @param key string
 	--- @return function
 	local function privacy(key)
@@ -3278,7 +3278,7 @@ local function _manifest_metrics_rows(ctx, k)
 	-- not a silent always-enabled row — which is the whole point of resolving them
 	-- declaratively instead of re-deriving the condition at each call site.
 	local getters = {
-		keylogger_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
+		keystats_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
 		metrics_filter_private = privacy("private_filter_enabled"),
 		metrics_filter_secure  = privacy("secure_filter_enabled"),
 		metrics_filter_sysauth = privacy("system_auth_filter_enabled"),
@@ -3418,7 +3418,7 @@ local function _manifest_metrics_rows(ctx, k)
 		["scope_restore"] = restore_metrics_scope,
 		["metrics_toggle"] = function()
 			if type(k.set_enabled) ~= "function" then
-				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
+				Logger.error(LOG, "The keystats exposes no set_enabled — the gate does nothing.")
 				return
 			end
 			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
@@ -3443,7 +3443,7 @@ local function _manifest_metrics_rows(ctx, k)
 		-- rather than the driver keeping it to itself.
 		["metrics_suspend"] = function()
 			if type(k.is_suppressed) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no is_suppressed — the row cannot toggle anything.")
+				Logger.error(LOG, "Keystats exposes no is_suppressed — the row cannot toggle anything.")
 				return
 			end
 			if k.is_suppressed() then k.unsuppress() else k.suppress() end
@@ -3474,7 +3474,7 @@ local function _manifest_metrics_rows(ctx, k)
 		end,
 		["metrics_reset_session"] = function()
 			if type(k.reset_session) ~= "function" then
-				Logger.error(LOG, "Keylogger exposes no reset_session — the row does nothing.")
+				Logger.error(LOG, "Keystats exposes no reset_session — the row does nothing.")
 				return
 			end
 			k.reset_session()
@@ -3505,7 +3505,7 @@ end
 --- because they configure features the FEATURE manifest already declares
 --- elsewhere: the WPM widget (it has since come back, see ui/wpm),
 --- the two metrics-window shortcuts, and the app-exclusion list, for which this
---- driver's keylogger exposes no setter. A row that cannot be rendered is a
+--- driver's keystats exposes no setter. A row that cannot be rendered is a
 --- promise the manifest makes on this driver's behalf and the driver breaks.
 ---
 --- What stays hand-built below is what the manifest does not describe on any
@@ -3583,7 +3583,7 @@ end
 local function _build_metrics(ctx)
 	local root, top, section, parent, fields = metrics_source(ManifestMenu, "linux")
 	if root == nil then return nil end
-	local k = ctx.keylogger
+	local k = ctx.keystats
 	if type(k) ~= "table" then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})
 		if not status_rows then return nil end
@@ -3593,7 +3593,7 @@ local function _build_metrics(ctx)
 		if not rawequal(root, current_root) or not rawequal(top, current_top)
 			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
 			or not metrics_parent_unchanged(parent, fields) then return nil end
-		local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })
+		local projected = ManifestMenu.group_row("top_level", "metrics", items, { keystats_enabled = function() return nil end })
 		current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
 		if not rawequal(root, current_root) or not rawequal(top, current_top)
 			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
@@ -3613,7 +3613,7 @@ local function _build_metrics(ctx)
 	if not rawequal(root, current_root) or not rawequal(top, current_top)
 		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
 		or not metrics_parent_unchanged(parent, fields) then return nil end
-	local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return on end })
+	local projected = ManifestMenu.group_row("top_level", "metrics", items, { keystats_enabled = function() return on end })
 	current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
 	if not rawequal(root, current_root) or not rawequal(top, current_top)
 		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
@@ -5490,7 +5490,7 @@ end
 ---   config         table    Hotstrings_config module.
 ---   layout         string   Current keyboard layout.
 ---   on_layout_change function Called with new layout name.
----   keylogger      table    Keylogger module.
+---   keystats      table    Keystats module.
 ---   llm            table|nil LLM prediction engine state.
 ---   dry_run        boolean  Dry-run mode flag.
 ---   verbose        boolean  Verbose flag.

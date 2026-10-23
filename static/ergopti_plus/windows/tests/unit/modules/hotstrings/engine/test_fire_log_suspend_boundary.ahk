@@ -4,7 +4,7 @@
 ; MODULE: AHK-22 Deferred Fire-Log Suspend Boundary Regression
 ; DESCRIPTION:
 ; Drives the real prefix-watcher queue/drain and the real KL_LogHotstring sink
-; against the recording keylogger/ROI/WPM stubs. A fired record belongs to the
+; against the recording keystats/ROI/WPM stubs. A fired record belongs to the
 ; lifecycle generation that armed its timer. If pause wins the 90 ms race, that
 ; callback must not call the destructive buffer flush, append a row, mutate ROI,
 ; or push WPM state; the record remains queued and a fresh resume owner emits it
@@ -47,14 +47,14 @@ _FLSB_PauseRetainsAndResumeOwnsOnce() {
 	SavedWpmCalls := _Stub_WpmPushCalls
 	SavedFlushCalls := _Stub_FlushBufferCalls
 	SavedFlushMutates := _Stub_FlushBufferMutates
-	SavedInitialized := Keylogger.initialized
-	SavedShuttingDown := Keylogger._shutting_down
-	SavedBufferText := Keylogger.buffer_text
-	SavedBufferEvents := Keylogger.buffer_events
-	SavedRichChunks := Keylogger.rich_chunks
-	SavedSessionClicks := Keylogger.session_clicks
-	SavedSessionScrolls := Keylogger.session_scrolls
-	SavedMouseDistance := Keylogger.mouse_distance
+	SavedInitialized := Keystats.initialized
+	SavedShuttingDown := Keystats._shutting_down
+	SavedBufferText := Keystats.buffer_text
+	SavedBufferEvents := Keystats.buffer_events
+	SavedRichChunks := Keystats.rich_chunks
+	SavedSessionClicks := Keystats.session_clicks
+	SavedSessionScrolls := Keystats.session_scrolls
+	SavedMouseDistance := Keystats.mouse_distance
 
 	; Suppress the real one-shot while exercising ownership synchronously.
 	_HSE_FireLogQueue := []
@@ -69,14 +69,14 @@ _FLSB_PauseRetainsAndResumeOwnsOnce() {
 	_Stub_WpmPushCalls := []
 	_Stub_FlushBufferCalls := 0
 	_Stub_FlushBufferMutates := true
-	Keylogger.initialized := true
-	Keylogger._shutting_down := false
-	Keylogger.buffer_text := "typed-before-fire"
-	Keylogger.buffer_events := [["t", 10, Map("s", 0)]]
-	Keylogger.rich_chunks := []
-	Keylogger.session_clicks := 0
-	Keylogger.session_scrolls := 0
-	Keylogger.mouse_distance := 0
+	Keystats.initialized := true
+	Keystats._shutting_down := false
+	Keystats.buffer_text := "typed-before-fire"
+	Keystats.buffer_events := [["t", 10, Map("s", 0)]]
+	Keystats.rich_chunks := []
+	Keystats.session_clicks := 0
+	Keystats.session_scrolls := 0
+	Keystats.mouse_distance := 0
 
 	try {
 		Assert(_HSE_QueueFireLog("pex", "par exemple", "endchar",
@@ -93,7 +93,7 @@ _FLSB_PauseRetainsAndResumeOwnsOnce() {
 			"AHK-22: a drain that observes pause must relinquish ownership")
 		AssertEqual(1, _HSE_FireLogQueue.Length,
 			"AHK-22: a paused attempt must retain the fired batch for resume")
-		AssertEqual("typed-before-fire", Keylogger.buffer_text,
+		AssertEqual("typed-before-fire", Keystats.buffer_text,
 			"AHK-22: pre-pause typing state must remain intact")
 		AssertEqual(0, _Stub_FlushBufferCalls,
 			"AHK-22: the pause guard must run before KL_FlushBuffer")
@@ -121,9 +121,9 @@ _FLSB_PauseRetainsAndResumeOwnsOnce() {
 			"AHK-22: resume must consume the retained record")
 		AssertEqual(1, _Stub_FlushBufferCalls,
 			"AHK-22: the retained typing buffer must flush exactly once")
-		AssertEqual("", Keylogger.buffer_text,
+		AssertEqual("", Keystats.buffer_text,
 			"AHK-22: the resumed owner must clear the retained typing buffer after accepting it")
-		AssertEqual(0, Keylogger.buffer_events.Length,
+		AssertEqual(0, Keystats.buffer_events.Length,
 			"AHK-22: the resumed owner must consume the retained typing events exactly once")
 		AssertEqual(1, _Stub_AppendLogRows.Length,
 			"AHK-22: resume must emit exactly one hotstring row")
@@ -154,14 +154,14 @@ _FLSB_PauseRetainsAndResumeOwnsOnce() {
 		_Stub_WpmPushCalls := SavedWpmCalls
 		_Stub_FlushBufferCalls := SavedFlushCalls
 		_Stub_FlushBufferMutates := SavedFlushMutates
-		Keylogger.initialized := SavedInitialized
-		Keylogger._shutting_down := SavedShuttingDown
-		Keylogger.buffer_text := SavedBufferText
-		Keylogger.buffer_events := SavedBufferEvents
-		Keylogger.rich_chunks := SavedRichChunks
-		Keylogger.session_clicks := SavedSessionClicks
-		Keylogger.session_scrolls := SavedSessionScrolls
-		Keylogger.mouse_distance := SavedMouseDistance
+		Keystats.initialized := SavedInitialized
+		Keystats._shutting_down := SavedShuttingDown
+		Keystats.buffer_text := SavedBufferText
+		Keystats.buffer_events := SavedBufferEvents
+		Keystats.rich_chunks := SavedRichChunks
+		Keystats.session_clicks := SavedSessionClicks
+		Keystats.session_scrolls := SavedSessionScrolls
+		Keystats.mouse_distance := SavedMouseDistance
 	}
 }
 
@@ -181,25 +181,25 @@ _FLSB_MidSinkLifecycleLossStopsBeforeFlush() {
 	global _FLSB_GuardCalls, _Stub_AppendLogRows, _Stub_RoiHotstringCalls
 	global _Stub_WpmPushCalls, _Stub_FlushBufferCalls
 	global _Stub_FlushBufferMutates
-	SavedInitialized := Keylogger.initialized
-	SavedShuttingDown := Keylogger._shutting_down
+	SavedInitialized := Keystats.initialized
+	SavedShuttingDown := Keystats._shutting_down
 	SavedAppendRows := _Stub_AppendLogRows
 	SavedRoiCalls := _Stub_RoiHotstringCalls
 	SavedWpmCalls := _Stub_WpmPushCalls
 	SavedFlushCalls := _Stub_FlushBufferCalls
 	SavedFlushMutates := _Stub_FlushBufferMutates
-	SavedBufferText := Keylogger.buffer_text
-	SavedBufferEvents := Keylogger.buffer_events
+	SavedBufferText := Keystats.buffer_text
+	SavedBufferEvents := Keystats.buffer_events
 	_FLSB_GuardCalls := 0
 	_Stub_AppendLogRows := []
 	_Stub_RoiHotstringCalls := []
 	_Stub_WpmPushCalls := []
 	_Stub_FlushBufferCalls := 0
 	_Stub_FlushBufferMutates := true
-	Keylogger.initialized := true
-	Keylogger._shutting_down := false
-	Keylogger.buffer_text := "still-owned"
-	Keylogger.buffer_events := [["s", 5, Map("s", 0)]]
+	Keystats.initialized := true
+	Keystats._shutting_down := false
+	Keystats.buffer_text := "still-owned"
+	Keystats.buffer_events := [["s", 5, Map("s", 0)]]
 	try {
 		AssertFalse(KL_LogHotstring("pex", "par exemple", "endchar", "",
 			"magickey", "abbreviations", false, _FLSB_ExpireOnSecondCheck),
@@ -208,9 +208,9 @@ _FLSB_MidSinkLifecycleLossStopsBeforeFlush() {
 			"AHK-22 setup: the lifecycle predicate must expire at the flush boundary")
 		AssertEqual(0, _Stub_FlushBufferCalls,
 			"AHK-22: lifecycle ownership must be rechecked inside KL_FlushBuffer before its destructive snapshot")
-		AssertEqual("still-owned", Keylogger.buffer_text,
+		AssertEqual("still-owned", Keystats.buffer_text,
 			"AHK-22: mid-sink lifecycle loss must leave the pre-pause typing buffer untouched")
-		AssertEqual(1, Keylogger.buffer_events.Length,
+		AssertEqual(1, Keystats.buffer_events.Length,
 			"AHK-22: mid-sink lifecycle loss must leave the pre-pause typing events untouched")
 		AssertEqual(0, _Stub_AppendLogRows.Length,
 			"AHK-22: an expired mid-sink owner must not append the fire row")
@@ -219,15 +219,15 @@ _FLSB_MidSinkLifecycleLossStopsBeforeFlush() {
 		AssertEqual(0, _Stub_WpmPushCalls.Length,
 			"AHK-22: an expired mid-sink owner must not mutate WPM")
 	} finally {
-		Keylogger.initialized := SavedInitialized
-		Keylogger._shutting_down := SavedShuttingDown
+		Keystats.initialized := SavedInitialized
+		Keystats._shutting_down := SavedShuttingDown
 		_Stub_AppendLogRows := SavedAppendRows
 		_Stub_RoiHotstringCalls := SavedRoiCalls
 		_Stub_WpmPushCalls := SavedWpmCalls
 		_Stub_FlushBufferCalls := SavedFlushCalls
 		_Stub_FlushBufferMutates := SavedFlushMutates
-		Keylogger.buffer_text := SavedBufferText
-		Keylogger.buffer_events := SavedBufferEvents
+		Keystats.buffer_text := SavedBufferText
+		Keystats.buffer_events := SavedBufferEvents
 		_FLSB_GuardCalls := 0
 	}
 }
@@ -273,8 +273,8 @@ _FLSB_AcceptedAppendIsNeverReplayed() {
 	SavedAppendAccept := _Stub_AppendLogAccept
 	SavedAppendRejectSuspend := _Stub_AppendLogRejectSuspend
 	SavedAppendHook := _Stub_AppendLogHook
-	SavedInitialized := Keylogger.initialized
-	SavedShuttingDown := Keylogger._shutting_down
+	SavedInitialized := Keystats.initialized
+	SavedShuttingDown := Keystats._shutting_down
 
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := true
@@ -290,8 +290,8 @@ _FLSB_AcceptedAppendIsNeverReplayed() {
 	_Stub_AppendLogAccept := true
 	_Stub_AppendLogRejectSuspend := false
 	_Stub_AppendLogHook := _FLSB_InvalidateDuringAppend
-	Keylogger.initialized := true
-	Keylogger._shutting_down := false
+	Keystats.initialized := true
+	Keystats._shutting_down := false
 
 	try {
 		Assert(_HSE_QueueFireLog("brb", "be right back", "endchar",
@@ -330,8 +330,8 @@ _FLSB_AcceptedAppendIsNeverReplayed() {
 		_Stub_AppendLogAccept := SavedAppendAccept
 		_Stub_AppendLogRejectSuspend := SavedAppendRejectSuspend
 		_Stub_AppendLogHook := SavedAppendHook
-		Keylogger.initialized := SavedInitialized
-		Keylogger._shutting_down := SavedShuttingDown
+		Keystats.initialized := SavedInitialized
+		Keystats._shutting_down := SavedShuttingDown
 	}
 }
 
@@ -362,8 +362,8 @@ _FLSB_SuspendRejectedAppendRetriesOnce() {
 	SavedAppendAccept := _Stub_AppendLogAccept
 	SavedAppendRejectSuspend := _Stub_AppendLogRejectSuspend
 	SavedAppendHook := _Stub_AppendLogHook
-	SavedInitialized := Keylogger.initialized
-	SavedShuttingDown := Keylogger._shutting_down
+	SavedInitialized := Keystats.initialized
+	SavedShuttingDown := Keystats._shutting_down
 
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := true
@@ -379,8 +379,8 @@ _FLSB_SuspendRejectedAppendRetriesOnce() {
 	_Stub_AppendLogAccept := false
 	_Stub_AppendLogRejectSuspend := true
 	_Stub_AppendLogHook := 0
-	Keylogger.initialized := true
-	Keylogger._shutting_down := false
+	Keystats.initialized := true
+	Keystats._shutting_down := false
 
 	try {
 		Assert(_HSE_QueueFireLog("omw", "on my way", "endchar",
@@ -425,8 +425,8 @@ _FLSB_SuspendRejectedAppendRetriesOnce() {
 		_Stub_AppendLogAccept := SavedAppendAccept
 		_Stub_AppendLogRejectSuspend := SavedAppendRejectSuspend
 		_Stub_AppendLogHook := SavedAppendHook
-		Keylogger.initialized := SavedInitialized
-		Keylogger._shutting_down := SavedShuttingDown
+		Keystats.initialized := SavedInitialized
+		Keystats._shutting_down := SavedShuttingDown
 	}
 }
 
@@ -457,8 +457,8 @@ _FLSB_PrivacyDropIsTerminalAcrossPause() {
 	SavedAppendAccept := _Stub_AppendLogAccept
 	SavedAppendRejectSuspend := _Stub_AppendLogRejectSuspend
 	SavedAppendHook := _Stub_AppendLogHook
-	SavedInitialized := Keylogger.initialized
-	SavedShuttingDown := Keylogger._shutting_down
+	SavedInitialized := Keystats.initialized
+	SavedShuttingDown := Keystats._shutting_down
 
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := true
@@ -474,8 +474,8 @@ _FLSB_PrivacyDropIsTerminalAcrossPause() {
 	_Stub_AppendLogAccept := false
 	_Stub_AppendLogRejectSuspend := false
 	_Stub_AppendLogHook := _FLSB_InvalidateDuringAppend
-	Keylogger.initialized := true
-	Keylogger._shutting_down := false
+	Keystats.initialized := true
+	Keystats._shutting_down := false
 
 	try {
 		Assert(_HSE_QueueFireLog("secret", "withheld", "endchar",
@@ -510,8 +510,8 @@ _FLSB_PrivacyDropIsTerminalAcrossPause() {
 		_Stub_AppendLogAccept := SavedAppendAccept
 		_Stub_AppendLogRejectSuspend := SavedAppendRejectSuspend
 		_Stub_AppendLogHook := SavedAppendHook
-		Keylogger.initialized := SavedInitialized
-		Keylogger._shutting_down := SavedShuttingDown
+		Keystats.initialized := SavedInitialized
+		Keystats._shutting_down := SavedShuttingDown
 	}
 }
 
@@ -543,8 +543,8 @@ _FLSB_ShutdownDrainsRetainedBatchOnce() {
 	SavedAppendAccept := _Stub_AppendLogAccept
 	SavedAppendRejectSuspend := _Stub_AppendLogRejectSuspend
 	SavedAppendHook := _Stub_AppendLogHook
-	SavedInitialized := Keylogger.initialized
-	SavedShuttingDown := Keylogger._shutting_down
+	SavedInitialized := Keystats.initialized
+	SavedShuttingDown := Keystats._shutting_down
 
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := true
@@ -560,8 +560,8 @@ _FLSB_ShutdownDrainsRetainedBatchOnce() {
 	_Stub_AppendLogAccept := true
 	_Stub_AppendLogRejectSuspend := false
 	_Stub_AppendLogHook := 0
-	Keylogger.initialized := true
-	Keylogger._shutting_down := true
+	Keystats.initialized := true
+	Keystats._shutting_down := true
 
 	try {
 		Assert(_HSE_QueueFireLog("fyi", "for your information", "endchar",
@@ -622,8 +622,8 @@ _FLSB_ShutdownDrainsRetainedBatchOnce() {
 		_Stub_AppendLogAccept := SavedAppendAccept
 		_Stub_AppendLogRejectSuspend := SavedAppendRejectSuspend
 		_Stub_AppendLogHook := SavedAppendHook
-		Keylogger.initialized := SavedInitialized
-		Keylogger._shutting_down := SavedShuttingDown
+		Keystats.initialized := SavedInitialized
+		Keystats._shutting_down := SavedShuttingDown
 	}
 }
 

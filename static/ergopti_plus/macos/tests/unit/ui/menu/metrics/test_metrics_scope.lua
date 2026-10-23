@@ -35,10 +35,10 @@ local function fixture(demoted)
 		local path = row.section .. "." .. row.key
 		state[Preferences.flat_key_for(path)] = clone(Manifest.default_for(path))
 	end
-	state.keylogger_enabled, state.keylogger_private_filter_enabled = not demoted, false
-	state.keylogger_encrypt, state.keylogger_float_colors = true, false
+	state.keystats_enabled, state.keystats_private_filter_enabled = not demoted, false
+	state.keystats_encrypt, state.keystats_float_colors = true, false
 	local demotions = require("ui.menu.session_demotions").new()
-	if demoted then demotions.record({ feature = "metrics", key = "keylogger_enabled", persisted = true, demoted = false }) end
+	if demoted then demotions.record({ feature = "metrics", key = "keystats_enabled", persisted = true, demoted = false }) end
 	local native = { enabled = not demoted, options = { encrypt = true }, cipher_enabled = true,
 		disabled_apps = {}, private_filter_enabled = false, secure_field_filter_enabled = true,
 		system_auth_filter_enabled = true }
@@ -91,7 +91,7 @@ helpers.describe("macOS complete Metrics scope", function()
 		local native, starts = runtime()
 		helpers.assert_eq(native.enabled, false)
 		helpers.assert_eq(starts, 0)
-		helpers.assert_eq(state.keylogger_enabled, false)
+		helpers.assert_eq(state.keystats_enabled, false)
 		helpers.assert_eq(bar.running, false)
 		helpers.assert_eq(widget.running, false)
 		helpers.assert_eq(save(), true)
@@ -114,7 +114,7 @@ helpers.describe("macOS complete Metrics scope", function()
 			local native, starts = runtime()
 			helpers.assert_eq(native.enabled, not demoted)
 			helpers.assert_eq(starts, 0, "Restore cannot grant or retry collection consent")
-			helpers.assert_eq(state.keylogger_enabled, not demoted)
+			helpers.assert_eq(state.keystats_enabled, not demoted)
 			helpers.assert_eq(#demotions.list(), demoted and 1 or 0)
 			helpers.assert_eq(save(), true)
 			helpers.assert_eq(Codec.decode(files.config).metrics.enabled, true)
@@ -148,7 +148,7 @@ helpers.describe("macOS complete Metrics scope", function()
 				control.restore_result = nil
 				helpers.assert_eq(owner.retry_restore(), true)
 			end
-			helpers.assert_eq(state.keylogger_enabled, true)
+			helpers.assert_eq(state.keystats_enabled, true)
 			helpers.assert_eq(runtime().enabled, true)
 			control.publication, control.stop_result = nil, nil
 			helpers.assert_eq(save(), true)
@@ -169,7 +169,7 @@ helpers.describe("Metrics scope provider", function()
 		local ok, err = xpcall(function()
 			local menu = helpers.load_with_stubs("ui.menu.menu_metrics")
 			local selected, mode, paused
-			menu.build({ state = { keylogger_enabled = false, keylogger_disabled_apps = {} },
+			menu.build({ state = { keystats_enabled = false, keystats_disabled_apps = {} },
 				base_dir = helpers.driver_root(), updateMenu = function() end,
 				script_control = { is_paused = function() return paused == true end },
 				save_prefs = function() error("only the scope transaction publishes") end,

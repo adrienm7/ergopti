@@ -20,7 +20,7 @@
 ; (which item greys out on which toggle) lives once in menu_manifest.json
 ; instead of being re-derived per handler.
 global _MET_STATE_GETTERS := Map(
-	"keylogger_enabled",       () => MetricsShortcuts.enabled,
+	"keystats_enabled",       () => MetricsShortcuts.enabled,
 	"wpm_widget_visible",      () => WPMWidget.visible,
 	"metrics_widget_colors",   () => WPMWidget.use_colors,
 	"metrics_widget_graph",    () => WPMWidget.show_graph,
@@ -36,7 +36,7 @@ global _MET_STATE_GETTERS := Map(
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
 ; to the tray, so expensive renderer work never runs after the live root has
-; been cleared. Its first row is the category switch for the global keylogger
+; been cleared. Its first row is the category switch for the global keystats
 ; feature: ticked from MetricsShortcuts.enabled, and clicking it runs
 ; ToggleMetricsEnabled() with a confirmation dialog before turning ON. The
 ; parent entry carries the same tick but cannot be clicked: a Win32 item that

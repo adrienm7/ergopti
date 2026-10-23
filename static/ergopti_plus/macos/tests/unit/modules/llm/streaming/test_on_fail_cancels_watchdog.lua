@@ -74,8 +74,8 @@ local function make_core_llm_stub()
 	}
 end
 
---- Builds a minimal keylogger stub.
-local function make_keylogger_stub()
+--- Builds a minimal keystats stub.
+local function make_keystats_stub()
 	return {
 		log_llm          = function() end,
 		log_llm_suggested = function() end,
@@ -151,9 +151,9 @@ helpers.describe("streaming_handler: on_fail() cancels the stream watchdog", fun
 	--- but lib.timings must stay stubbed so the module reloads cleanly here.
 	local tooltip    = make_tooltip_stub()
 	local core_llm   = make_core_llm_stub()
-	local keylogger  = make_keylogger_stub()
+	local keystats  = make_keystats_stub()
 
-	Handler.init({ core_llm = core_llm, tooltip = tooltip, keylogger = keylogger })
+	Handler.init({ core_llm = core_llm, tooltip = tooltip, keystats = keystats })
 
 	helpers.it("arm_watchdog creates a running timer", function()
 		-- Reset hs stub timers to a clean slate for this test
@@ -283,12 +283,12 @@ helpers.describe("streaming_handler: watchdog body respects fetch_id guard", fun
 
 	local tooltip2  = make_tooltip_stub()
 	local core_llm2 = make_core_llm_stub()
-	local keylogger2 = make_keylogger_stub()
+	local keystats2 = make_keystats_stub()
 
 	--- Reload the module so _core_llm is nil again (fresh state, avoids duplicate-init warning).
 	package.loaded["modules.llm.streaming_handler"] = nil
 	local Handler2 = require("modules.llm.streaming_handler")
-	Handler2.init({ core_llm = core_llm2, tooltip = tooltip2, keylogger = keylogger2 })
+	Handler2.init({ core_llm = core_llm2, tooltip = tooltip2, keystats = keystats2 })
 
 	helpers.it("watchdog body does not call show_predictions when fetch_id has advanced", function()
 		hs_stub.__reset()

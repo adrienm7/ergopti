@@ -13,7 +13,7 @@
 --- 2. tap_hold/vectors.json           — replayed through platform/remap/tap_hold_loader
 --- 3. llm/parser_test_vectors.json    — replayed by test_corpus_llm_parser.lua
 --- 4. prompt_builder/vectors.json     — replayed by test_corpus_prompt_builder.lua
---- 5. security/keylogger vectors      — partially tested (pure-logic paths)
+--- 5. security/keystats vectors      — partially tested (pure-logic paths)
 --- 6. toml/fuzz_corpus.json           — tested (shared TOML codec)
 --- 7. locale/resolution_vectors.json  — replayed by test_corpus_locale_resolution.lua
 --- 8. tooltip/{layout,dequeue}         — SKIP (canonical layout math is JS)
@@ -24,7 +24,7 @@
 --- Even SKIP-marked vectors must be consumed (file loaded, vectors counted)
 --- so the corpus is visible in the Linux test report and gaps are tracked
 --- rather than silently absent. This mirrors the AHK approach in
---- meta/test_corpus_security_keylogger.ahk.
+--- meta/test_corpus_security_keystats.ahk.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -259,8 +259,8 @@ end)
 -- =============================================================
 -- =============================================================
 
-describe("Corpus: security/keylogger_no_persist_vectors.json", function()
-	local path = corpus_root .. "/security/keylogger_no_persist_vectors.json"
+describe("Corpus: security/keystats_no_persist_vectors.json", function()
+	local path = corpus_root .. "/security/keystats_no_persist_vectors.json"
 
 	it("corpus file exists on disk", function()
 		assert_true(io.open(path, "r") ~= nil, "security corpus must exist at: " .. path)
@@ -274,7 +274,7 @@ describe("Corpus: security/keylogger_no_persist_vectors.json", function()
 	end)
 
 	-- SEC-001..006 are macOS-only (AX APIs, bundle IDs, private window detection).
-	-- SEC-007..008 require a live keylogger session (cannot run headless anywhere).
+	-- SEC-007..008 require a live keystats session (cannot run headless anywhere).
 	-- SEC-009 and SEC-010 are AHK-specific (Win32 ES_PASSWORD, UIA.IsPassword).
 	-- STALE RATIONALE, corrected 2026-07-31. This skip said Linux secure-field
 	-- detection was "not yet implemented" and called the adapter a stub. It is a

@@ -24,10 +24,10 @@ require("test.metrics_widget_menu_contract").register(helpers, {
 		local menu = helpers.load_with_stubs("ui.menu.menu_metrics")
 		return menu.build({
 			state = {
-				keylogger_enabled = values.keylogger_enabled,
-				keylogger_float_wpm = values.wpm_widget_visible,
-				keylogger_float_colors = values.metrics_widget_colors,
-				keylogger_float_graph = values.metrics_widget_graph,
+				keystats_enabled = values.keystats_enabled,
+				keystats_float_wpm = values.wpm_widget_visible,
+				keystats_float_colors = values.metrics_widget_colors,
+				keystats_float_graph = values.metrics_widget_graph,
 			},
 			save_prefs = function() return true end,
 			updateMenu = function() return true end,

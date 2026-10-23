@@ -3,7 +3,7 @@
 # ErgoptiPlus continuation checklist
 
 Updated: 2026-10-23. Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
-(tag 950979d19c, 2026-10-23). **Next step: the keylogger to `keystats` rename (Backlog).** Open work only: a finished item is removed, its lessons go to
+(tag 950979d19c, 2026-10-23). **Next step: the keystats to `keystats` rename (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
 questions are in [questions-for-maintainer.md](questions-for-maintainer.md); per-work handoff files
@@ -46,7 +46,7 @@ a sealed Windows updater source, reseal with
       `.github/ci/stable_windows_signing_exception.json`. Before applying, check the current
       conditions on signpath.org/foundation (open-source license, public repository, build and
       signing from CI with a maintainer approval per signing request, a published code-signing
-      policy and privacy statement, a reputable project; the keylogger-like metrics module and the
+      policy and privacy statement, a reputable project; the keystats-like metrics module and the
       hooks need a clear explanation). Decided 2026-10-22: apply now. Done: SignPath wired in
       `ci-windows.yml`, off until configured (61fb29d64d); README code signing policy and privacy
       (c6db589c76). Left (maintainer): apply, then set the variables and secrets; eligibility table,
@@ -61,7 +61,7 @@ a sealed Windows updater source, reseal with
       unsigned hash. Done on dev: first launch extracts with tar.exe, no hidden PowerShell
       (3d2c78d7b7); build gate over the compiled exe (745f07fa51). Left: signing (132), the
       Microsoft false-positive submission (text and hashes in the handoff), the tester's retry,
-      and the "keylogger" naming (about 1 070 shipped strings) as a cross-driver rename to
+      and the "keystats" naming (about 1 070 shipped strings) as a cross-driver rename to
       `keystats` (maintainer, October 22; one word, code, config keys and logs; queued until the
       parallel agents finish). Analysis,
       playbook and download matrix: [handoff](todo-agents/windows-exe-flagged-by-proxy.md).
@@ -243,12 +243,12 @@ Added October 22 (from the agents' reports; details in their commits):
       a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
       they need a Mac day of typing with the `key_event_health` counters; handoff in
       [issue99-karabiner-input.md](todo-agents/issue99-karabiner-input.md).
-- [ ] **NEXT STEP: rename keylogger to `keystats` and make renames cheap.** [CODE] 12 191 occurrences in
+- [ ] **NEXT STEP: rename keystats to `keystats` and make renames cheap.** [CODE] 12 191 occurrences in
       1 360 files (953 tests, 579 paths). Declare each persisted name once (database, config
       namespace, log tag, data file names), make tests read names from that source instead of
       pinning spellings, regenerate seals and generated files through their owners, keep the
       maintainer's existing data readable, and end with a repository grep that finds no
-      `keylogger` outside history.
+      `keystats` outside history.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Each lease recovery rewrites the 743 KB
       karabiner.json while typing (reuse the token once its writers retire);
       `context_tracker.handle_ax_value_changed` reads the whole AXValue on the main thread at each
@@ -258,7 +258,7 @@ Added October 22 (from the agents' reports; details in their commits):
 - [ ] **Last path-separator sites.** [CODE] macOS, `_shared/lua` and Linux go through
       `native_path.lua` (6c317ffd43), guarded by `test_posix_path_separator_owner.lua`. Four sites
       remain in its BASELINE: `config_migrate.lua` (2), `config_unused_keys.lua` (2),
-      `llm/profile_selector.lua` (2), `linux/modules/keylogger/sqlite_writer.lua` (1). No-FFI
+      `llm/profile_selector.lua` (2), `linux/modules/keystats/sqlite_writer.lua` (1). No-FFI
       injector sleeps refuse the ceiling (e73fadfa84); left: the periodic clock diagnostic without
       luv.
 - [ ] **Linux correction parity remainders.** [CODE] On Backspace the word is dropped instead of
@@ -420,7 +420,7 @@ Standing checks:
    edge-key choice, each row emulation switch, an inert choice ticked, greyed and suffixed « — non
    appliqué », the ² key; a pair assignment saved and reloaded.
 4. **Installed build**: install, start, Diagnostics cold and reopened (UIA/render probes, cold
-   WebView), Quit during a keylogger flush, File/Exit and Windows shutdown with exit code 0;
+   WebView), Quit during a keystats flush, File/Exit and Windows shutdown with exit code 0;
    uninstall greyed on a source run. Item 101: capture the watcher/debt state if `watchers=0`
    recurs.
 5. **Item 51 matrix**: arrows and both Shift+Tab over a multi-slot prediction move the marker once

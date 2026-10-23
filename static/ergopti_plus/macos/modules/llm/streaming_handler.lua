@@ -6,7 +6,7 @@
 --- Owns the HTTP async streaming pipeline for LLM predictions: fires the backend
 --- request via core_llm.fetch_llm_prediction, handles chunked streaming responses,
 --- parses streaming JSON tokens, manages the watchdog timer, and calls the tooltip
---- and keylogger APIs as predictions arrive. Extracted from prediction_engine so
+--- and keystats APIs as predictions arrive. Extracted from prediction_engine so
 --- the orchestrator can stay focused on state management and routing.
 ---
 --- FEATURES & RATIONALE:
@@ -60,7 +60,7 @@ local CONSECUTIVE_FAIL_WARN_THRESHOLD = 4
 -- Injected dependencies
 local _core_llm  = nil
 local _tooltip   = nil
-local _keylogger = nil
+local _keystats = nil
 
 local _consecutive_llm_failures = 0  -- Reset on success; triggers notification at threshold
 local _stream_watchdog_timer    = nil
@@ -76,7 +76,7 @@ local _stream_watchdog_timer    = nil
 --- @param func_name string Name of the calling function (for the error log).
 --- @return boolean True if dependencies are ready, false otherwise.
 local function require_state(func_name)
-	if not _core_llm or not _tooltip or not _keylogger then
+	if not _core_llm or not _tooltip or not _keystats then
 		Logger.error(LOG, "'%s' called before M.init() — dependencies not initialized.", func_name)
 		return false
 	end
@@ -427,7 +427,7 @@ function M.build_callbacks(ctx)
 		local front    = hs.application.frontmostApplication()
 		local app_name = front and front:title() or nil
 		if not request_is_current() then return end
-		_keylogger.log_llm(buffer, raw_predictions, app_name)
+		_keystats.log_llm(buffer, raw_predictions, app_name)
 
 		-- ── Filter: remove noise, invalid entries, and exact duplicates ──────
 		local valid_preds, seen_keys = {}, {}
@@ -532,7 +532,7 @@ function M.build_callbacks(ctx)
 
 		pending_ref.value = valid_preds
 		visible_ref.value = true
-		_keylogger.log_llm_suggested(app_name, #valid_preds)
+		_keystats.log_llm_suggested(app_name, #valid_preds)
 		if not request_is_current() then return end
 
 		if is_final then
@@ -815,7 +815,7 @@ end
 
 --- Initializes the streaming handler with its required dependencies.
 --- Must be called exactly once before any other function.
---- @param deps table Must contain: core_llm (table), tooltip (table), keylogger (table).
+--- @param deps table Must contain: core_llm (table), tooltip (table), keystats (table).
 --- @return boolean committed True only when every dependency is ready.
 function M.init(deps)
 	Logger.start(LOG, "Initializing…")
@@ -824,7 +824,7 @@ function M.init(deps)
 		return false
 	end
 	if _core_llm then
-		if _core_llm == deps.core_llm and _tooltip == deps.tooltip and _keylogger == deps.keylogger then
+		if _core_llm == deps.core_llm and _tooltip == deps.tooltip and _keystats == deps.keystats then
 			Logger.warn(LOG, "M.init() called more than once with the active dependencies — ignoring duplicate call.")
 			return true
 		end
@@ -839,13 +839,13 @@ function M.init(deps)
 		Logger.error(LOG, "M.init(): deps.tooltip must be a table — module non-functional.")
 		return false
 	end
-	if type(deps.keylogger) ~= "table" then
-		Logger.error(LOG, "M.init(): deps.keylogger must be a table — module non-functional.")
+	if type(deps.keystats) ~= "table" then
+		Logger.error(LOG, "M.init(): deps.keystats must be a table — module non-functional.")
 		return false
 	end
 	_core_llm  = deps.core_llm
 	_tooltip   = deps.tooltip
-	_keylogger = deps.keylogger
+	_keystats = deps.keystats
 	Logger.success(LOG, "Initialized.")
 	return true
 end

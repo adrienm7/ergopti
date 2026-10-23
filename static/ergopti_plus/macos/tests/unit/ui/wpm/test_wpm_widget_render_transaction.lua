@@ -15,7 +15,7 @@ local with_menubar = require("tests.support.wpm_menubar_fixture")
 --- @param position table|nil Persisted coordinates keyed by storage setting.
 local function with_widget(callback, position)
 	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "ui.tooltip",
-		"modules.keylogger", "infra.logger", "infra.paths", "infra.timings", "adapters.timer_scheduler",
+		"modules.keystats", "infra.logger", "infra.paths", "infra.timings", "adapters.timer_scheduler",
 		"adapters.graphics_renderer", "adapters.storage" }, function()
 		local state = { timers = {}, taps = {}, canvases = {}, logs = {} }
 		local function phase(name)
@@ -32,7 +32,7 @@ local function with_widget(callback, position)
 		package.loaded["infra.paths"] = { shared = helpers.shared }
 		package.loaded["adapters.storage"] = { get = function(key) return position and position[key] end,
 			set = function() end, delete = function() end }
-		package.loaded["modules.keylogger"] = { get_live_stats = function()
+		package.loaded["modules.keystats"] = { get_live_stats = function()
 			phase("stats")
 			if state.stats_failure then error("PRIVATE_DETAIL") end
 			return { wpm = 42 }

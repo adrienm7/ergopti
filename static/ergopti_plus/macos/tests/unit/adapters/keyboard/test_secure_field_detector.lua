@@ -172,7 +172,7 @@ helpers.describe("SecureFieldDetector: refresh → isSecureField", function()
 	-- Regression: Chromium-family browsers (Chrome, Edge, Brave, Arc) surface
 	-- <input type="password"> as AXRole = AXTextField with the secure marker on
 	-- the AXSubrole. The adapter used to read AXRole only, so every browser login
-	-- form failed OPEN and the keylogger recorded the user's password characters.
+	-- form failed OPEN and the keystats recorded the user's password characters.
 	helpers.it("isSecureField returns true for the Chromium shape (AXSubrole = AXSecureTextField)", function()
 		local adapter = helpers.load_with_stubs(
 			"adapters.secure_field_detector",

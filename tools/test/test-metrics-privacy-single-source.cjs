@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Metrics Privacy Defaults — Single Source
  * DESCRIPTION:
- * The three keylogger privacy filters and the at-rest encryption opt-in are
+ * The three keystats privacy filters and the at-rest encryption opt-in are
  * declared once, in `_shared/modules/features/manifest.toml` under
  * `[[features.metrics]]`, and every driver resolves its default from there.
  *
@@ -54,7 +54,7 @@ const AHK_FILTERS = P(
 );
 const AHK_LOADER = P('static', 'ergopti_plus', 'windows', 'infra', 'config_shortcuts.ahk');
 const AHK_WRITER = P('static', 'ergopti_plus', 'windows', 'infra', 'config_io.ahk');
-const HS_KEYLOGGER = P('static', 'ergopti_plus', 'macos', 'modules', 'keylogger', 'init.lua');
+const HS_KEYSTATS = P('static', 'ergopti_plus', 'macos', 'modules', 'keystats', 'init.lua');
 
 // The canonical id of each setting, and the default it must resolve to.
 const CANONICAL = [
@@ -89,7 +89,7 @@ const manifest = read(MANIFEST);
 const ahkFilters = read(AHK_FILTERS);
 const ahkLoader = read(AHK_LOADER);
 const ahkWriter = read(AHK_WRITER);
-const hsKeylogger = read(HS_KEYLOGGER);
+const hsKeystats = read(HS_KEYSTATS);
 
 // ==================================================
 // ==================================================
@@ -213,9 +213,9 @@ for (const id of [
 	'secure_filter_enabled',
 	'system_auth_filter_enabled'
 ]) {
-	if (hsKeylogger && !hsKeylogger.includes(`Manifest.default_for("metrics.${id}")`)) {
+	if (hsKeystats && !hsKeystats.includes(`Manifest.default_for("metrics.${id}")`)) {
 		errors.push(
-			`macos/modules/keylogger/init.lua does not resolve metrics.${id} from the manifest — ` +
+			`macos/modules/keystats/init.lua does not resolve metrics.${id} from the manifest — ` +
 				'the two drivers are back to two independent privacy defaults'
 		);
 	}

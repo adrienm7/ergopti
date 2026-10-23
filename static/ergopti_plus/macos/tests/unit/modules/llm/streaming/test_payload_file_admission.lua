@@ -14,7 +14,7 @@ local OWNED = {
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
 	"adapters.shell_runner", "adapters.timer_scheduler", "adapters.http_client", "adapters.file_system",
 	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
-	"llm.prompt_builder", "llm.rewrite", "modules.keylogger",
+	"llm.prompt_builder", "llm.rewrite", "modules.keystats",
 	"adapters.json_codec", "adapters.storage", "compat.utf8", "infra.toml.reader", "json",
 	"llm.parser", "logger", "logger.shim", "text_utils", "toml_codec.basic_string",
 	"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
@@ -38,7 +38,7 @@ local function with_stream(backend, callback)
 	helpers.with_stub_scope(OWNED, function()
 		-- Transport, scheduling, metrics and diagnostic boundaries are irrelevant
 		-- until the real request path admits its payload. Keep those ports local.
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["adapters.file_system"] = { exists = function(path)
 			local file = io.open(path, "rb"); if not file then return false end
 			assert(file:close()); return true

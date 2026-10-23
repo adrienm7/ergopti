@@ -395,7 +395,7 @@ check(
 		bodyOf(actions, 'GestureLivePromptToggle').includes('LLM_Menu_ToggleLiveMode('),
 	'llm_live_prompt_toggle must be a registered action running the live toggle'
 );
-const keystrokes = read('modules/llm/prediction_keylogger.ahk');
+const keystrokes = read('modules/llm/prediction_keystats.ahk');
 // StartTimer's signature spans two lines, which bodyOf does not follow.
 const bodyFrom = (source, name) => {
 	const start = source.search(new RegExp(`^${name}\\(`, 'm'));

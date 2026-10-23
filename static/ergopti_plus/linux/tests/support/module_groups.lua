@@ -39,7 +39,7 @@ M.GROUPS = {
 		"tests/unit/adapters/processes/test_owned_process_deadline.lua",
 		"tests/unit/infra/lifecycle/test_callback_error_description.lua",
 		"tests/unit/infra/lifecycle/test_native_timer.lua",
-		"tests/unit/modules/keylogger/storage/test_sqlite_first_open.lua",
+		"tests/unit/modules/keystats/storage/test_sqlite_first_open.lua",
 		"tests/unit/modules/llm/prediction/test_llm_prediction_engine_integration.lua",
 		"tests/unit/modules/updater/install/test_config_backup_files.lua",
 		"tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua",

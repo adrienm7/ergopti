@@ -572,7 +572,7 @@ Test("hotstrings: a newer physical key-down cancels the selection capture (selec
 
 ; The copy chord is driver output: sent from the #InputLevel 2 Win broker at the
 ; thread's own level, the driver's "I1" InputHooks took it for typing (a "Win+C"
-; in the keylogger) and it advanced the physical generation the capture is
+; in the keystats) and it advanced the physical generation the capture is
 ; judged by. GetSelectionAsync's default copy must go out at level 0.
 _SCSL_CopyLevel() {
 	Seg := _DriverFuncBody("GetSelectionAsync")

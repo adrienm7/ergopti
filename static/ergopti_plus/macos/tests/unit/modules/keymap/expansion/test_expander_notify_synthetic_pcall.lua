@@ -4,7 +4,7 @@
 --- MODULE: Regression — expander guards notify_synthetic against raising (F-HIGH-16)
 --- DESCRIPTION:
 --- perform_text_replacement — the synthetic-injection choke point used by every
---- hotstring/LLM-paste path — called keylogger.notify_synthetic(...) WITHOUT a
+--- hotstring/LLM-paste path — called keystats.notify_synthetic(...) WITHOUT a
 --- pcall, unlike the neighboring buffer_action call a few lines below (which is
 --- explicitly pcall-wrapped, with a comment acknowledging exactly this desync
 --- risk). notify_synthetic's own utf8.codes loop can raise on malformed UTF-8
@@ -12,7 +12,7 @@
 --- expansion mid-flight and drop the replacement before callback handoff.
 ---
 --- This test drives the REAL perform_text_replacement with an injected
---- modules.keylogger stub whose notify_synthetic always raises, and asserts the
+--- modules.keystats stub whose notify_synthetic always raises, and asserts the
 --- expansion still commits one complete, provenance-tagged transaction.
 --- ==============================================================================
 
@@ -82,11 +82,11 @@ end
 helpers.describe("keymap.expander: perform_text_replacement survives notify_synthetic raising (F-HIGH-16)", function()
 
 	helpers.it("completes the expansion (buffer_action still runs) when notify_synthetic throws", function()
-		-- Inject a keylogger stub whose notify_synthetic always raises, mimicking
+		-- Inject a keystats stub whose notify_synthetic always raises, mimicking
 		-- notify_synthetic's own utf8.codes crash on malformed UTF-8 input BEFORE
-		-- the keylogger-side fix guards it — pins that the CALL SITE in expander.lua
+		-- the keystats-side fix guards it — pins that the CALL SITE in expander.lua
 		-- must not let this propagate regardless of what notify_synthetic does.
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			notify_synthetic = function() error("simulated malformed-UTF-8 crash") end,
 			set_buffer       = function() end,
 		}
@@ -115,15 +115,15 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 
 		-- Must run before any assertion could fail-and-return-early below:
 		-- this test is the only one that ever assigns a raising stub into
-		-- package.loaded["modules.keylogger"]. Without clearing it here, the
+		-- package.loaded["modules.keystats"]. Without clearing it here, the
 		-- poisoned stub leaks into every later test file that requires
-		-- modules.keylogger in this same Lua process — it doesn't crash them
+		-- modules.keystats in this same Lua process — it doesn't crash them
 		-- (the real notify_synthetic pcall guard swallows it), but for a
 		-- module like test_expander.lua that reads notify_synthetic's return
 		-- value or side effects, the always-raising stub silently changes
 		-- behaviour and fails unrelated tests with this file's own error
 		-- message, which is exactly what happened in CI on 2026-07-01.
-		package.loaded["modules.keylogger"] = nil
+		package.loaded["modules.keystats"] = nil
 
 		helpers.assert_true(ok, "perform_text_replacement must not propagate a notify_synthetic error")
 		helpers.assert_true(replaced, "telemetry failure must not veto a valid replacement")
@@ -138,7 +138,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 	end)
 
 	helpers.it("seals repeat-key output and releases its transaction when notification raises", function()
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			notify_synthetic = function() error("simulated repeat telemetry failure") end,
 			set_buffer       = function() end,
 		}
@@ -150,7 +150,7 @@ helpers.describe("keymap.expander: perform_text_replacement survives notify_synt
 		local call_ok, fired = pcall(E.try_repeat_feature, "★", false)
 		local consume, events = SyntheticInput.leave_callback(fired)
 		if hs and hs.timer and hs.timer.__fire_all then hs.timer.__fire_all() end
-		package.loaded["modules.keylogger"] = nil
+		package.loaded["modules.keystats"] = nil
 
 		helpers.assert_true(call_ok,
 			"telemetry failure must not escape the repeat-key producer")

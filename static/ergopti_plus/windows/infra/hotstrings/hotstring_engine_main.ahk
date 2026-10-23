@@ -1293,7 +1293,7 @@ HSE_TryPersonalInfoCombo(MagicKey) {
 		; own data and must not reach the metrics row or the fire trace.
 		; FinalResult routes the send through SendFinalResult (SendInput), which is
 		; what every other @ registration uses — measured, it is the path the
-		; keylogger's InputHook does not observe.
+		; keystats's InputHook does not observe.
 		return {
 				Trigger:     TriggerStr,
 				Length:      StrLen(TriggerStr),

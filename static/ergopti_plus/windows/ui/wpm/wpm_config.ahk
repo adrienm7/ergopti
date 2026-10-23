@@ -115,8 +115,8 @@ WPMWidget_LoadSharedConst() {
 		WPMWidgetConst.IDLE_HIDE_MS        := _WPMWidget_NeedTiming("ui", "wpm_widget_idle_hide_ms", Missing)
 		WPMWidgetConst.COLOR_HOLD_MS       := _WPMWidget_NeedTiming("ui", "wpm_color_hold_ms", Missing)
 		WPMWidgetConst.TICK_MS             := _WPMWidget_NeedTiming("ui", "wpm_widget_update_ms", Missing)
-		WPMWidgetConst.WINDOW_MS           := _WPMWidget_NeedTiming("keylogger", "wpm_window_ms", Missing)
-		WPMWidgetConst.WPM_MIN_DURATION_MS := _WPMWidget_NeedTiming("keylogger", "wpm_min_duration_ms", Missing)
+		WPMWidgetConst.WINDOW_MS           := _WPMWidget_NeedTiming("keystats", "wpm_window_ms", Missing)
+		WPMWidgetConst.WPM_MIN_DURATION_MS := _WPMWidget_NeedTiming("keystats", "wpm_min_duration_ms", Missing)
 
 		if Missing.Length {
 				Names := ""

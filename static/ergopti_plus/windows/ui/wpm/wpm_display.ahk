@@ -68,7 +68,7 @@ class WPMWidgetConst {
     ; [transparency]
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
-    ; Timings: [ui] and [keylogger].
+    ; Timings: [ui] and [keystats].
     static IDLE_HIDE_MS       := 0
     static COLOR_HOLD_MS      := 0
     static TICK_MS            := 0
@@ -207,7 +207,7 @@ _WPMWidget_NeutralCategory(category) {
     return WPMWidgetConst.NEUTRAL.Has(category)
 }
 
-; Called by the keylogger hook after each accepted keystroke.
+; Called by the keystats hook after each accepted keystroke.
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
 ;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.

@@ -38,8 +38,8 @@ local CapsWordOutput   = require("infra.capsword_output")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 local _state    = nil  -- Shared CoreState injected via M.init().
 local _registry = nil  -- Registry module injected via M.init().
@@ -79,8 +79,8 @@ end
 --- @param buffer_action function Called to sync _state.buffer after emission.
 --- @param is_final boolean When true, suppresses re-scanning after completion.
 --- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
---- @param source_type string Telemetry label passed to the keylogger.
---- @param source_variant string|nil Optional sub-type for the keylogger.
+--- @param source_type string Telemetry label passed to the keystats.
+--- @param source_variant string|nil Optional sub-type for the keystats.
 --- @param publication table|nil Retained programmable output guards.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored,
 	source_type, source_variant, is_private, terminator_spec, terminal_target_override, publication)
@@ -305,14 +305,14 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	-- Guard: skip telemetry when nothing was actually injected. This runs only
 	-- after the buffer commit succeeded, so a rolled-back replacement cannot be
 	-- persisted as output the application never received.
-	if (deletes > 0 or logical_text ~= "") and keylogger and type(keylogger.notify_synthetic) == "function" then
+	if (deletes > 0 or logical_text ~= "") and keystats and type(keystats.notify_synthetic) == "function" then
 		-- pcall-wrapped like the neighboring buffer_action call above: a truncated
 		-- LLM completion cut mid-codepoint (French accents, curly quotes, em-dashes)
 		-- can reach notify_synthetic with malformed UTF-8, and its utf8.codes loop
 		-- would otherwise raise and abort the expansion mid-flight. is_private is
 		-- forwarded so every logical persistence field is redacted; immutable event
 		-- tags exclude the later OS echoes independently of payload contents.
-		local ok_notify, notify_err = pcall(keylogger.notify_synthetic,
+		local ok_notify, notify_err = pcall(keystats.notify_synthetic,
 			logical_text, source_type or "hotstring", deletes, source_variant, emitted_str,
 			is_private)
 		if not ok_notify then
@@ -320,10 +320,10 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		end
 	end
 
-	if keylogger and type(keylogger.set_buffer) == "function" then
-		local ok_set, set_err = pcall(keylogger.set_buffer, _state.buffer)
+	if keystats and type(keystats.set_buffer) == "function" then
+		local ok_set, set_err = pcall(keystats.set_buffer, _state.buffer)
 		if not ok_set then
-			pcall(Logger.error, LOG, "keylogger.set_buffer failed: %s.", tostring(set_err))
+			pcall(Logger.error, LOG, "keystats.set_buffer failed: %s.", tostring(set_err))
 		end
 	end
 
@@ -856,7 +856,7 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	if not replaced then return false end
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
-	-- IBAN). keylogger.log_hotstring writes trigger + replacement verbatim into
+	-- IBAN). keystats.log_hotstring writes trigger + replacement verbatim into
 	-- today.log, which ingest copies into events_hotstring and the export then
 	-- replicates to every other device; the DEBUG line below reaches the same
 	-- 14-day log because DEBUG is the driver's default level. Both sinks are
@@ -865,8 +865,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 	if m.is_private then
 		Logger.debug(LOG, "Auto-expand: private mapping fired (content withheld).")
 	else
-		if keylogger and type(keylogger.log_hotstring) == "function" then
-			pcall(keylogger.log_hotstring, trigger, repl_text)
+		if keystats and type(keystats.log_hotstring) == "function" then
+			pcall(keystats.log_hotstring, trigger, repl_text)
 		end
 		Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", typed, repl_text)
 	end
@@ -973,7 +973,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 				-- through as a floor for the paste path, where there is no
 				-- per-character echo to wait on.
 				if not consume_term then
-					-- Keep the logical replacement and keylogger record aligned with
+					-- Keep the logical replacement and keystats record aligned with
 					-- the later owned replay.
 					s = s .. chars
 					logical = logical .. chars
@@ -998,13 +998,13 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 		if not replacement_ok then return false end
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
-		-- and replacement are both secrets and must reach neither the keylogger
+		-- and replacement are both secrets and must reach neither the keystats
 		-- nor the log.
 		if m.is_private then
 			Logger.debug(LOG, "Terminator-expand: private mapping fired (content withheld).")
 		else
-			if keylogger and type(keylogger.log_hotstring) == "function" then
-				pcall(keylogger.log_hotstring, trigger, repl_text)
+			if keystats and type(keystats.log_hotstring) == "function" then
+				pcall(keystats.log_hotstring, trigger, repl_text)
 			end
 			Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", typed_trigger, repl_text)
 		end

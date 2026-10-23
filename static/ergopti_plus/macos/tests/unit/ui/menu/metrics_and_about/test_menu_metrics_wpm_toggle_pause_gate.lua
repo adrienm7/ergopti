@@ -33,17 +33,17 @@ helpers.describe("menu_metrics WPM toggle handlers gate start() on pause", funct
 		local src = read_src()
 		-- The ungated patterns the bug had must be gone: a WPM start gated only on the
 		-- feature flag with no `and not paused`/`and not paused_now()`.
-		helpers.assert_true(src:find("keylogger_float_wpm then WpmWidget.start", 1, true) == nil,
+		helpers.assert_true(src:find("keystats_float_wpm then WpmWidget.start", 1, true) == nil,
 			"a WPM widget start is not pause-gated")
-		helpers.assert_true(src:find("keylogger_menubar_wpm then WpmMenubar.start", 1, true) == nil,
+		helpers.assert_true(src:find("keystats_menubar_wpm then WpmMenubar.start", 1, true) == nil,
 			"a WPM menubar start is not pause-gated")
 		-- The shared transactional toggle now owns the actual start call. Pin both
 		-- the click-time pause fence and delegation of each visibility key to it.
 		helpers.assert_true(src:find("if desired and not paused_now() then", 1, true) ~= nil,
 			"the lifecycle transaction must gate activation on the live pause state")
-		helpers.assert_true(src:find('toggle_wpm_visibility("keylogger_float_wpm"', 1, true) ~= nil,
+		helpers.assert_true(src:find('toggle_wpm_visibility("keystats_float_wpm"', 1, true) ~= nil,
 			"the interactive widget row must delegate to the pause-gated transaction")
-		helpers.assert_true(src:find('toggle_wpm_visibility("keylogger_menubar_wpm"', 1, true) ~= nil,
+		helpers.assert_true(src:find('toggle_wpm_visibility("keystats_menubar_wpm"', 1, true) ~= nil,
 			"the interactive menubar row must delegate to the pause-gated transaction")
 	end)
 end)

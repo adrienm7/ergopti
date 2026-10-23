@@ -41,14 +41,14 @@ end
 --- @param body function function(fixture).
 local function with_fixture(seal_result, body)
 	local trace = {}
-	local previous_keylogger = package.loaded["modules.keylogger"]
+	local previous_keystats = package.loaded["modules.keystats"]
 	local previous_timings = package.loaded["infra.timings"]
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function()
 			trace[#trace + 1] = "telemetry"
 		end,
 		set_buffer = function()
-			trace[#trace + 1] = "keylogger-buffer"
+			trace[#trace + 1] = "keystats-buffer"
 		end,
 	}
 	package.loaded["infra.timings"] = {
@@ -59,7 +59,7 @@ local function with_fixture(seal_result, body)
 		local expander, adapter = SyntheticStack.load("modules.keymap.expander")
 		return expander, adapter
 	end)
-	package.loaded["modules.keylogger"] = previous_keylogger
+	package.loaded["modules.keystats"] = previous_keystats
 	package.loaded["infra.timings"] = previous_timings
 	if not loaded_ok then error(expander_or_err, 0) end
 	local expander = expander_or_err
@@ -166,7 +166,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 			helpers.assert_eq(fixture.forced_replays(), 0,
 				"a routine replacement must not force an earlier terminator through its settle fence")
 			helpers.assert_eq(table.concat(fixture.trace, ","),
-				"prepare,seal,authorize,buffer,commit,telemetry,keylogger-buffer",
+				"prepare,seal,authorize,buffer,commit,telemetry,keystats-buffer",
 				"the guaranteed serializer commit must precede fallible telemetry")
 			helpers.assert_eq(fixture.cancelled(), 0)
 		end)
@@ -312,8 +312,8 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 	end)
 
 	helpers.it("keeps Enter behind a paced plan longer than the base watchdog margin", function()
-		local previous_keylogger = package.loaded["modules.keylogger"]
-		package.loaded["modules.keylogger"] = {
+		local previous_keystats = package.loaded["modules.keystats"]
+		package.loaded["modules.keystats"] = {
 			notify_synthetic = function() end,
 			set_buffer = function() end,
 		}
@@ -338,7 +338,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 		local expander, synthetic = SyntheticStack.load("modules.keymap.expander", {
 			eventtap = event_hs.eventtap,
 		})
-		package.loaded["modules.keylogger"] = previous_keylogger
+		package.loaded["modules.keystats"] = previous_keystats
 		local text_sender = require("adapters.text_sender")
 		local replay = require("modules.keymap.terminator_replay")
 		local original_target = text_sender.terminalInputTarget

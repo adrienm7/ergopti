@@ -14,7 +14,7 @@ local function with_window(module_name, callback)
 		helpers.with_fresh_modules({
 			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "ui.ui_builder",
 			"infra.logger", "infra.paths", "infra.i18n", "infra.deferred_work",
-			"infra.dialog_util", "adapters.timer_scheduler", "modules.keylogger.log_manager",
+			"infra.dialog_util", "adapters.timer_scheduler", "modules.keystats.log_manager",
 		}, function()
 			local native = require("tests.stubs.hs")
 			native.__reset()
@@ -34,7 +34,7 @@ local function with_window(module_name, callback)
 			}
 			package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
-			package.loaded["modules.keylogger.log_manager"] = { on_ingest_done = function() return true end }
+			package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 			package.loaded["adapters.timer_scheduler"] = {
 				after = function() return { timer = {} }, true end,
 				cancel = function(handle) handle.timer = nil; return true end,

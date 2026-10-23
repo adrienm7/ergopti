@@ -18,24 +18,24 @@ local MODULES = {
 	"infra.manifest_reader",
 	"infra.manifest_menu",
 	"infra.text_utils",
-	"modules.keylogger",
+	"modules.keystats",
 	"ui.menu.menu_metrics",
 }
 
 local FILTERS = {
 	{
 		command = "filter_private",
-		field = "keylogger_private_filter_enabled",
+		field = "keystats_private_filter_enabled",
 		setter = "set_private_filter_enabled",
 	},
 	{
 		command = "filter_secure",
-		field = "keylogger_secure_filter_enabled",
+		field = "keystats_secure_filter_enabled",
 		setter = "set_secure_field_filter_enabled",
 	},
 	{
 		command = "filter_sysauth",
-		field = "keylogger_system_auth_filter_enabled",
+		field = "keystats_system_auth_filter_enabled",
 		setter = "set_system_auth_filter_enabled",
 	},
 }
@@ -58,22 +58,22 @@ local function with_filter(filter, options, callback)
 		setter_values = {},
 		updates = 0,
 	}
-	local keylogger = {
+	local keystats = {
 		DEFAULT_STATE = {
-			keylogger_disabled_apps = {},
-			keylogger_enabled = false,
-			keylogger_encrypt = false,
-			keylogger_float_colors = false,
-			keylogger_float_graph = false,
-			keylogger_float_wpm = false,
-			keylogger_menubar_colors = false,
-			keylogger_menubar_wpm = false,
-			keylogger_private_filter_enabled = true,
-			keylogger_secure_filter_enabled = true,
-			keylogger_system_auth_filter_enabled = true,
+			keystats_disabled_apps = {},
+			keystats_enabled = false,
+			keystats_encrypt = false,
+			keystats_float_colors = false,
+			keystats_float_graph = false,
+			keystats_float_wpm = false,
+			keystats_menubar_colors = false,
+			keystats_menubar_wpm = false,
+			keystats_private_filter_enabled = true,
+			keystats_secure_filter_enabled = true,
+			keystats_system_auth_filter_enabled = true,
 		},
 	}
-	keylogger[filter.setter] = function(value)
+	keystats[filter.setter] = function(value)
 		observations.setter_values[#observations.setter_values + 1] = value
 		observations.runtime = value
 		if options.setter_throws and #observations.setter_values == 1 then
@@ -101,20 +101,20 @@ local function with_filter(filter, options, callback)
 		resolve_disabled_when = function() return false end,
 	}
 	package.loaded["infra.text_utils"] = {}
-	package.loaded["modules.keylogger"] = keylogger
+	package.loaded["modules.keystats"] = keystats
 
 	local state = {
-		keylogger_disabled_apps = {},
-		keylogger_enabled = false,
-		keylogger_encrypt = false,
-		keylogger_float_colors = false,
-		keylogger_float_graph = false,
-		keylogger_float_wpm = false,
-		keylogger_menubar_colors = false,
-		keylogger_menubar_wpm = false,
-		keylogger_private_filter_enabled = true,
-		keylogger_secure_filter_enabled = true,
-		keylogger_system_auth_filter_enabled = true,
+		keystats_disabled_apps = {},
+		keystats_enabled = false,
+		keystats_encrypt = false,
+		keystats_float_colors = false,
+		keystats_float_graph = false,
+		keystats_float_wpm = false,
+		keystats_menubar_colors = false,
+		keystats_menubar_wpm = false,
+		keystats_private_filter_enabled = true,
+		keystats_secure_filter_enabled = true,
+		keystats_system_auth_filter_enabled = true,
 	}
 	local MenuMetrics = require("ui.menu.menu_metrics")
 	MenuMetrics.build({
@@ -188,7 +188,7 @@ helpers.describe("menu_metrics filter toggles are transactional", function()
 		with_filter(FILTERS[1], { save_throws = true }, function(ok, result, state, observations)
 			helpers.assert_eq(ok, true)
 			helpers.assert_eq(result, false)
-			helpers.assert_eq(state.keylogger_private_filter_enabled, true)
+			helpers.assert_eq(state.keystats_private_filter_enabled, true)
 			helpers.assert_eq(observations.runtime, true)
 			helpers.assert_eq(observations.setter_values[2], true)
 			helpers.assert_eq(observations.updates, 1)

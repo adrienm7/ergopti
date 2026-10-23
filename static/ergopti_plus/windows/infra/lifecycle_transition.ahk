@@ -5,24 +5,24 @@
 ; but once an owner is present its exception or explicit false result is debt.
 global LIFECYCLE_REQUIRED_OWNERS := Map(
 	"suspend", [
-		"user-programs", "navigation-event", "llm-aux-context", "llm-local-servers", "keylogger-system-intervals", "tap-hold-synthetic-keys",
+		"user-programs", "navigation-event", "llm-aux-context", "llm-local-servers", "keystats-system-intervals", "tap-hold-synthetic-keys",
 		"screen-brightness", "tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
 		"selection-capture", "space-hold-input-hook",
 		"suppressive-input-hooks", "magic-key-editor-input-hook",
 		"suspend-tooltip", "llm-tooltip", "llm-live-mode", "llm-generation-timer",
 		"llm-generation", "ollama-warmup", "llm-pointer-watch", "llm-agent-typing",
 		"metrics-focus-refresh", "updater-checks", "updater-self-update",
-		"keylogger-prefetch-typing", "keylogger-prefetch-apps",
-		"keylogger-prefetch-range", "uia-selection-worker",
-		"keylogger-text-migration", "keep-awake", "gesture-left-hold",
+		"keystats-prefetch-typing", "keystats-prefetch-apps",
+		"keystats-prefetch-range", "uia-selection-worker",
+		"keystats-text-migration", "keep-awake", "gesture-left-hold",
 		"gesture-right-hold", "caps-word", "hotstring-engine", "user-hotstrings",
 		"llm-dependency-poll"
 	],
 	"resume", [
 		"user-programs", "navigation-event", "hotstring-prefix-watcher", "prefix-buffer",
 		"prefix-index", "llm-dependency-poll", "llm-pointer-watch",
-		"metrics-focus-refresh", "keylogger-webview",
-		"keylogger-text-migration", "llm-menu", "updater",
+		"metrics-focus-refresh", "keystats-webview",
+		"keystats-text-migration", "llm-menu", "updater",
 		"uia-selection-worker"
 	]
 )

@@ -9,7 +9,7 @@
 local uv = require('luv')
 require('compat.utf8').install()
 local Json = require('json')
-local W = require('modules.keylogger.sqlite_writer')
+local W = require('modules.keystats.sqlite_writer')
 local root = assert(os.getenv('OWN_NGRAM_FAIL_ROOT'))
 assert(uv.fs_mkdir(root, 448))
 assert(W.open_db(root .. '/metrics.sqlite'))

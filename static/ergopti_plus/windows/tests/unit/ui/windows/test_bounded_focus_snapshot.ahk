@@ -10,7 +10,7 @@
 ; inherit Critical, and A cannot overwrite B after yielding.
 ;
 ; A companion case drives KL_Hook_RefreshContext against the same production
-; cache. It proves an invalid snapshot cannot mutate the keylogger projection
+; cache. It proves an invalid snapshot cannot mutate the keystats projection
 ; and a valid snapshot is consumed without a second OS acquisition.
 ; ==============================================================================
 
@@ -332,15 +332,15 @@ Test("metrics focus: failed timer stop retains retry ownership (focus-refresh-st
 
 ; =============================================================
 ; =============================================================
-; ======= 5/ Keylogger consumes the canonical validity gate ===
+; ======= 5/ Keystats consumes the canonical validity gate ===
 ; =============================================================
 ; =============================================================
 
-_BFS_KeyloggerRejectsInvalidCanonicalSnapshot() {
+_BFS_KeystatsRejectsInvalidCanonicalSnapshot() {
 	SavedState := MetricsFocusCache.state
-	SavedInitialized := Keylogger.initialized
-	SavedSessionApp := Keylogger.session_app
-	SavedSessionTitle := Keylogger.session_title
+	SavedInitialized := Keystats.initialized
+	SavedSessionApp := Keystats.session_app
+	SavedSessionTitle := Keystats.session_title
 	SavedContextAt := KLHook.context_at
 	SavedPrevApp := KLHook.prev_app
 	SavedPrevTitle := KLHook.prev_title
@@ -348,9 +348,9 @@ _BFS_KeyloggerRejectsInvalidCanonicalSnapshot() {
 	SavedTitleEnteredAt := KLHook.title_entered_at
 	SavedSuspendTick := KLHook.suspend_tick
 	try {
-		Keylogger.initialized := true
-		Keylogger.session_app := "old.exe"
-		Keylogger.session_title := "Old title"
+		Keystats.initialized := true
+		Keystats.session_app := "old.exe"
+		Keystats.session_title := "Old title"
 		KLHook.context_at := 0
 		KLHook.prev_app := ""
 		KLHook.prev_title := ""
@@ -361,23 +361,23 @@ _BFS_KeyloggerRejectsInvalidCanonicalSnapshot() {
 		MetricsFocusCache.state := _BFS_State(false, "", "", "", 0,
 			"title_unavailable", true, 1000)
 		AssertFalse(KL_Hook_RefreshContext(true),
-			"the keylogger projection must refuse an invalid canonical snapshot")
-		AssertEqual("old.exe", Keylogger.session_app,
-			"invalid focus must not erase or relabel the existing keylogger session")
-		AssertEqual("Old title", Keylogger.session_title,
+			"the keystats projection must refuse an invalid canonical snapshot")
+		AssertEqual("old.exe", Keystats.session_app,
+			"invalid focus must not erase or relabel the existing keystats session")
+		AssertEqual("Old title", Keystats.session_title,
 			"invalid focus must not emit a plausible empty-title transition")
 
 		MetricsFocusCache.state := _BFS_State(true, "new.exe", "New title",
 			"NewClass", 88, "", false, 1001)
 		AssertTrue(KL_Hook_RefreshContext(true),
-			"the keylogger projection must accept a complete canonical snapshot")
-		AssertEqual("new.exe", Keylogger.session_app)
-		AssertEqual("New title", Keylogger.session_title)
+			"the keystats projection must accept a complete canonical snapshot")
+		AssertEqual("new.exe", Keystats.session_app)
+		AssertEqual("New title", Keystats.session_title)
 	} finally {
 		MetricsFocusCache.state := SavedState
-		Keylogger.initialized := SavedInitialized
-		Keylogger.session_app := SavedSessionApp
-		Keylogger.session_title := SavedSessionTitle
+		Keystats.initialized := SavedInitialized
+		Keystats.session_app := SavedSessionApp
+		Keystats.session_title := SavedSessionTitle
 		KLHook.context_at := SavedContextAt
 		KLHook.prev_app := SavedPrevApp
 		KLHook.prev_title := SavedPrevTitle
@@ -387,8 +387,8 @@ _BFS_KeyloggerRejectsInvalidCanonicalSnapshot() {
 	}
 }
 
-Test("keylogger focus: invalid canonical snapshot cannot mutate context (focus-refresh-bounded-resident)",
-	_BFS_KeyloggerRejectsInvalidCanonicalSnapshot)
+Test("keystats focus: invalid canonical snapshot cannot mutate context (focus-refresh-bounded-resident)",
+	_BFS_KeystatsRejectsInvalidCanonicalSnapshot)
 
 
 

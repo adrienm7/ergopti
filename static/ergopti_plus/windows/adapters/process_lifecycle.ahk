@@ -405,7 +405,7 @@ PLC_Poll() {
 	; Pause invariant: a suspended driver must be fully silent. This SetTimer
 	; callback is not gated by native Suspend, so early-return while suspended -
 	; otherwise focus changes keep being observed and fanned out to the
-	; registered callbacks (which downstream feed keylogger app-switch events)
+	; registered callbacks (which downstream feed keystats app-switch events)
 	; while the user expects every feature paused. The timer is periodic, so
 	; polling resumes automatically on unpause; no re-arm is needed.
 	if A_IsSuspended {

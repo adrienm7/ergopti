@@ -45,7 +45,7 @@
 		},
 		{
 			"owner": "metrics",
-			"context": "keylogger",
+			"context": "keystats",
 			"section": "linux_metrics_absent_rows",
 			"parent_key": "menu.metrics.title",
 			"rows": [

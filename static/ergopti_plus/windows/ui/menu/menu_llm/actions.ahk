@@ -357,7 +357,7 @@ _LLM_Menu_FireHealthProbe(Force := false, NowTick := unset, DispatchFn := unset)
 	; Pause invariant: SetTimer callbacks bypass native Suspend, so this 10 s
 	; health tick keeps pinging Ollama (and can trigger a full tray rebuild)
 	; while the user believes the driver is fully paused. Mirror the guard used
-	; in hotstring_prefix_watcher.ahk / tooltip.ahk / keylogger so the probe is
+	; in hotstring_prefix_watcher.ahk / tooltip.ahk / keystats so the probe is
 	; inert during suspend; the next unpaused tick refreshes the dot. Force is
 	; powerless here — a paused driver stays silent whoever asks.
 	if A_IsSuspended

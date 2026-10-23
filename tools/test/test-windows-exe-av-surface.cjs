@@ -232,10 +232,10 @@ assert.equal(
 	'binary bundle members are not scanned as text'
 );
 
-// 7. The keylogger wording is measured on every build without gating it.
+// 7. The keylog wording is measured on every build without gating it.
 assert.ok(
-	scanExecutable(exe(CLEAN_SCRIPT + 'KeyloggerInit()\n'), policy).notes.includes(
-		'script: keylogger_wording = 1 (reported only)'
+	scanExecutable(exe(CLEAN_SCRIPT + 'KeylogInit()\n'), policy).notes.includes(
+		'script: keylog_wording = 1 (reported only)'
 	)
 );
 assert.throws(

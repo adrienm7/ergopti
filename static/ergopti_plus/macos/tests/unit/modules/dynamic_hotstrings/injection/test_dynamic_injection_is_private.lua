@@ -1,7 +1,7 @@
 --- tests/unit/modules/dynamic_hotstrings/injection/test_dynamic_injection_is_private.lua
 
 --- ==============================================================================
---- MODULE: Regression — dynamic injections must reach the keylogger marked PRIVATE
+--- MODULE: Regression — dynamic injections must reach the keystats marked PRIVATE
 --- DESCRIPTION:
 --- keymap.inject_dynamic is the choke point every dynamic-hotstring injector was
 --- migrated onto, precisely so the two synthetic trackers cannot desync. That
@@ -9,14 +9,14 @@
 --- perform_text_replacement with SEVEN arguments and stopped one short of the
 --- eighth, `is_private`. The flag was therefore structurally unreachable from the
 --- dynamic-hotstrings layer, and an @-tag expansion of an SSN, IBAN, card number
---- or phone number was recorded by the keylogger as an ordinary expansion and
+--- or phone number was recorded by the keystats as an ordinary expansion and
 --- persisted verbatim into a 14-day log.
 ---
 --- ROOT CAUSE ENCODED:
 --- Not "personal_info forgot a flag" but "the shared entry point could not carry
 --- one". rules_engine already stated the invariant in a comment above its own
 --- injection — "the result may contain private data (phone number, SSN, IBAN)
---- whose plaintext must never reach the log" — and declined keylogger.log_hotstring
+--- whose plaintext must never reach the log" — and declined keystats.log_hotstring
 --- accordingly, while the inject_dynamic call three lines below reached the same
 --- sink through notify_synthetic with no flag at all. A documented invariant with
 --- one missed sibling route is this repository's dominant failure shape.
@@ -183,18 +183,18 @@ end)
 
 -- ==============================================================
 -- ==============================================================
--- ======= 3/ The flag actually reaches the keylogger ===========
+-- ======= 3/ The flag actually reaches the keystats ===========
 -- ==============================================================
 -- ==============================================================
 
-helpers.describe("expander: is_private is forwarded to the keylogger, not dropped en route", function()
+helpers.describe("expander: is_private is forwarded to the keystats, not dropped en route", function()
 
 	helpers.it("perform_text_replacement passes is_private through to notify_synthetic", function()
 		package.loaded["modules.keymap.expander"] = nil
 		local Expander = helpers.load_with_stubs("modules.keymap.expander")
 
 		local seen = {}
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			notify_synthetic = function(...)
 				seen.n          = select("#", ...)
 				seen.is_private = select(NOTIFY_SYNTHETIC_PRIVATE_ARG, ...)
@@ -245,12 +245,12 @@ helpers.describe("expander: is_private is forwarded to the keylogger, not droppe
 		)
 
 		helpers.assert_true(seen.n ~= nil,
-			"notify_synthetic must be called — without it the keylogger never learns the expansion happened")
+			"notify_synthetic must be called — without it the keystats never learns the expansion happened")
 		helpers.assert_eq(seen.is_private, true,
 			"is_private must survive the hop from perform_text_replacement to notify_synthetic; "
 			.. "a flag that is accepted and dropped is worse than one that is absent")
 
-		package.loaded["modules.keylogger"] = nil
+		package.loaded["modules.keystats"] = nil
 	end)
 
 end)

@@ -9,8 +9,8 @@
 -- Native metadata controls keep existing scalar admission and malformed fallback.
 local uv=require("luv")
 require("compat.utf8").install()
-local W=require("modules.keylogger.sqlite_writer")
-local R=require("modules.keylogger.sqlite_reader")
+local W=require("modules.keystats.sqlite_writer")
+local R=require("modules.keystats.sqlite_reader")
 local root=assert(uv.fs_mkdtemp("/tmp/ergopti-source-types-XXXXXX"))
 local db=root.."/metrics.sqlite"
 assert(W.open_db(db))

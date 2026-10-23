@@ -13,7 +13,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One log directory, resolved in one place. `M.log_dir()` is the single
----    resolver; the tray's "open logs" action and the keylogger fallback both call
+---    resolver; the tray's "open logs" action and the keystats fallback both call
 ---    it instead of re-deriving `$HOME` (three independent expressions before).
 --- 2. Dual output. The daily file is the durable record; stdout is mirrored so
 ---    `journalctl --user -u ergopti-hotstrings` shows the same lines when the

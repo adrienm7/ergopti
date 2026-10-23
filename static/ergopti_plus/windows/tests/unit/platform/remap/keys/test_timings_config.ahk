@@ -9,7 +9,7 @@
 ; tests pin:
 ;   1. TimingsGet returns the raw millisecond value and TimingsGetSec is
 ;      exactly TimingsGet / 1000; both fail fast on an unknown section/key.
-;   2. The reassign-at-boot loaders (KeyloggerWalkerLoadTimings,
+;   2. The reassign-at-boot loaders (KeystatsWalkerLoadTimings,
 ;      TapHoldsLoadTimings) replace the sentinel 0 with the canonical registry
 ;      values — a single-source tripwire on every consumed constant, so a drift
 ;      in constants.toml (which would silently change runtime timings) turns red.
@@ -19,7 +19,7 @@
 ; at it) exactly as production does at boot, then run the two reassign loaders so
 ; the consumer-constant assertions below see the values production would.
 TimingsLoadShared()
-KeyloggerWalkerLoadTimings()
+KeystatsWalkerLoadTimings()
 TapHoldsLoadTimings()
 
 
@@ -32,7 +32,7 @@ TapHoldsLoadTimings()
 ; ============================================================
 
 TestTimings_GetReturnsRawMs() {
-    AssertEqual(3, TimingsGet("keylogger", "synth_match_delay_ms"), "keylogger.synth_match_delay_ms")
+    AssertEqual(3, TimingsGet("keystats", "synth_match_delay_ms"), "keystats.synth_match_delay_ms")
     AssertEqual(700, TimingsGet("gestures", "tap_max_ms"), "gestures.tap_max_ms")
     AssertEqual(500, TimingsGet("llm", "chain_fallback_ms"), "llm.chain_fallback_ms")
 }
@@ -46,7 +46,7 @@ Test("Timings: TimingsGetSec is exactly TimingsGet / 1000", TestTimings_GetSecIs
 
 TestTimings_GetFailsFast() {
     AssertThrows(() => TimingsGet("nope", "whatever_ms"), "unknown section throws")
-    AssertThrows(() => TimingsGet("keylogger", "does_not_exist_ms"), "unknown key throws")
+    AssertThrows(() => TimingsGet("keystats", "does_not_exist_ms"), "unknown key throws")
 }
 Test("Timings: TimingsGet fails fast on an unknown section/key", TestTimings_GetFailsFast)
 
@@ -59,9 +59,9 @@ Test("Timings: TimingsGet fails fast on an unknown section/key", TestTimings_Get
 ; ============================================================
 ; ============================================================
 
-TestTimings_KeyloggerWalkerSourced() {
+TestTimings_KeystatsWalkerSourced() {
     ; KLWConst started at sentinel 0; the loader must have replaced each with the
-    ; canonical [keylogger] registry value.
+    ; canonical [keystats] registry value.
     AssertEqual(5000, KLWConst.MAX_KEYSTROKE_DELAY_MS, "KLWConst.MAX_KEYSTROKE_DELAY_MS")
     AssertEqual(2000, KLWConst.THINK_PAUSE_MS, "KLWConst.THINK_PAUSE_MS")
     AssertEqual(1000, KLWConst.BURST_GAP_MS, "KLWConst.BURST_GAP_MS")
@@ -69,7 +69,7 @@ TestTimings_KeyloggerWalkerSourced() {
     AssertEqual(50, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, "KLWConst.AUTO_REPEAT_MAX_DELAY_MS")
     AssertEqual(250, KLWConst.HOLD_THRESHOLD_MS, "KLWConst.HOLD_THRESHOLD_MS")
 }
-Test("Timings: keylogger-walker constants sourced from the registry", TestTimings_KeyloggerWalkerSourced)
+Test("Timings: keystats-walker constants sourced from the registry", TestTimings_KeystatsWalkerSourced)
 
 TestTimings_TapHoldsSourced() {
     global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
