@@ -120,6 +120,9 @@ local _init_cleanup_pending = false
 --- with infra.fs_dir's own diagnostic; a changed failure is reported again.
 local _foreign_sync_error_key = nil
 
+--- Retry rollover before any producer queue drain or journal EOF check.
+local _pending_rollover = false
+
 --- Registered post-ingest listeners — called after every successful ingest cycle.
 --- Each entry is a function(); failures are logged and contained so one broken
 --- listener cannot prevent the others from firing. Register via M.on_ingest_done().
@@ -1294,6 +1297,13 @@ local function _clear_local_outbox(db)
 	return true
 end
 
+--- Admits only complete ledger transactions and harmless trailing comments.
+local function _ledger_origin_is_complete(content)
+	local committed = _last_complete_ledger_offset(content)
+	local suffix = content:sub(committed + 1):gsub("%-%-[^\n]*", ""):gsub("%s+", "")
+	return suffix == "" or (committed == 0 and suffix == "PRAGMAforeign_keys=OFF;")
+end
+
 --- Flush a committed local batch before allocating any new event id.
 --- The adjacent durable intent also survives loss of the disposable SQLite cache.
 --- @return boolean True when the exact batch and its publication journal settled.
@@ -1301,11 +1311,40 @@ local function _flush_local_data_sql_outbox(db)
 	local batch_text = _get_local_outbox(db)
 	return LedgerAppend.flush(_paths.data_sql_path, batch_text, function()
 		return _clear_local_outbox(db)
-	end, function(content)
-		local committed = _last_complete_ledger_offset(content)
-		local suffix = content:sub(committed + 1):gsub("%-%-[^\n]*", ""):gsub("%s+", "")
-		return suffix == "" or (committed == 0 and suffix == "PRAGMAforeign_keys=OFF;")
+	end, _ledger_origin_is_complete)
+end
+
+--- Commits the idempotent rollover cursor reset before its durable intent settles.
+local function _reset_rollover_cache(next_date)
+	local db = SqliteWriter.get_db()
+	if not db then return false end
+	local ok, err = pcall(function()
+		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin rollover reset")
+		if _get_local_outbox(db) ~= "" then error("rollover reset requires an empty SQL outbox", 0) end
+		_exec_sqlite_or_error(db, "UPDATE meta SET value='0' WHERE key='today_log_offset';",
+			"cannot reset rollover offset")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value=" .. _sq(next_date) .. " WHERE key='today_log_date';",
+			"cannot reset rollover date")
+		_exec_sqlite_or_error(db, "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';",
+			"cannot reset rollover context")
+		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit rollover reset")
 	end)
+	if not ok then
+		_rollback_sqlite(db, "Rollover reset")
+		Logger.error(LOG, "Rollover cache reset remains pending: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Completes the exact fenced attempt; never begins another after uncertain release.
+local function _resume_pending_rollover(read_status)
+	if not _pending_rollover then return true end
+	if Rotation.rollover(_paths.data_sql_path, read_status,
+		_reset_rollover_cache, _ledger_origin_is_complete) ~= true then return false end
+	Aggregator.reset_ngram_ctx()
+	_pending_rollover = false
+	return true
 end
 
 --- Runs foreign ledger sync behind one checked boundary for ingest and startup.
@@ -1334,6 +1373,8 @@ end
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
+	if not _resume_pending_rollover() then return false end
+
 	local trace = IngestTrace.begin(function() return timer.absoluteTime() end, function(line)
 		Logger.warn(LOG, "%s", line)
 	end)
@@ -1612,6 +1653,7 @@ end
 --- retry on the next midnight tick.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return false end
+	if _pending_rollover then return _resume_pending_rollover() end
 
 	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent
@@ -1662,21 +1704,15 @@ function M.day_rollover()
 	-- only durable source from which a fresh cache can recreate that batch.
 	-- Keep the old day intact and retry the append before a later rotation.
 	local db = SqliteWriter.get_db()
-	if db and not _flush_local_data_sql_outbox(db) then
+	if not db or not _flush_local_data_sql_outbox(db) then
 		Logger.warn(LOG, "day_rollover: local data.sql outbox is not durable — preserving today.log.")
 		return false
 	end
 
-	if Rotation.rollover(_paths.data_sql_path, committed_eof) == false then
-		Logger.warn(LOG, "day_rollover: rotation rejected the EOF proof — today.log preserved.")
+	_pending_rollover = true
+	if not _resume_pending_rollover(committed_eof) then
+		Logger.warn(LOG, "day_rollover: durable rollover remains pending; journal writer fenced.")
 		return false
-	end
-	Aggregator.reset_ngram_ctx()
-	if db then
-		db:exec("UPDATE meta SET value='0' WHERE key='today_log_offset';")
-		db:exec(string.format(
-			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""))
-		db:exec("UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';")
 	end
 	return true
 end
@@ -1803,11 +1839,16 @@ local function _init(core_state)
 	Export.init({ paths = _paths, device_id = _device_id, get_db = SqliteWriter.get_db })
 
 	if not SqliteWriter.open_db() then
+		-- A pending retirement cannot admit a replacement writer without its reset.
+		if not LedgerAppend.recover(_paths.data_sql_path, "", _paths.today_log_path) then
+			error("pending canonical ledger recovery requires the SQLite cache", 0)
+		end
 		Logger.error(LOG, "Cannot open db.sqlite — log manager will only write JSONL.")
 	else
 		local db = SqliteWriter.get_db()
 		-- Repair only the exact journal-owned tail before any cache replay sees SQL.
-		if db and not LedgerAppend.recover(_paths.data_sql_path, _get_local_outbox(db)) then
+		if db and not LedgerAppend.recover(_paths.data_sql_path, _get_local_outbox(db),
+			_paths.today_log_path, _reset_rollover_cache) then
 			error("pending canonical ledger recovery was refused", 0)
 		end
 		local recovery_cursor = nil

@@ -29,6 +29,7 @@
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 local saved_file_system = package.loaded["adapters.file_system"]
+local saved_ledger_append = package.loaded["adapters.ledger_append"]
 local Logger = helpers.load_with_stubs("infra.logger")
 
 local function matching_errors(needle_a, needle_b)
@@ -193,6 +194,59 @@ end)
 -- =======================================================
 -- =======================================================
 
+--- Records only the transactional reset statements owned by day_rollover.
+--- @param observed table Fixture observations shared with the checked Rotation port.
+--- @return table db Recording SQLite port with numeric native OK acknowledgements.
+local function recording_reset_db(observed)
+	local meta = { today_log_offset = "0", today_log_date = "2099-06-30",
+		ngram_ctx_json = '{"Editor":{"cur_word":"x"}}', local_data_sql_outbox = "" }
+	local pending, step = nil, 0
+	local updates = {
+		{ "UPDATE meta SET value='0' WHERE key='today_log_offset';", "today_log_offset", "0" },
+		{ "UPDATE meta SET value='2099-07-01' WHERE key='today_log_date';", "today_log_date", "2099-07-01" },
+		{ "UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';", "ngram_ctx_json", "{}" },
+	}
+	observed.meta = meta
+	return {
+		errmsg = function() return "fixture reset statement refused" end,
+		nrows = function(_self, sql)
+			helpers.assert_eq(sql, "SELECT value FROM meta WHERE key='local_data_sql_outbox'",
+				"the reset fixture admits only the explicit local-outbox read")
+			table.insert(observed.timeline, "outbox")
+			local yielded = false
+			return function()
+				if yielded then return nil end
+				yielded = true
+				return { value = meta.local_data_sql_outbox }
+			end
+		end,
+		exec = function(_self, sql)
+			table.insert(observed.meta_exec_statements, sql)
+			if sql == "BEGIN TRANSACTION;" then
+				helpers.assert_eq(pending, nil, "reset must begin one fresh transaction")
+				pending, step = {}, 0
+				table.insert(observed.timeline, "BEGIN")
+			elseif sql == "COMMIT;" then
+				helpers.assert_eq(step, 3, "all three exact reset rows must precede COMMIT")
+				helpers.assert_true(pending ~= nil, "reset COMMIT requires an active transaction")
+				for key, value in pairs(pending) do meta[key] = value end
+				pending = nil
+				observed.commits = observed.commits + 1
+				table.insert(observed.timeline, "COMMIT")
+			else
+				helpers.assert_true(pending ~= nil, "reset UPDATE must be inside its checked transaction")
+				local expected = updates[step + 1]
+				helpers.assert_true(expected ~= nil, "reset cannot issue an extra UPDATE")
+				helpers.assert_eq(sql, expected[1], "reset must write the exact offset/date/literal-empty-context row")
+				step = step + 1
+				pending[expected[2]] = expected[3]
+				table.insert(observed.timeline, expected[2])
+			end
+			return 0 -- native hs.sqlite3.OK, never a boolean or nil-success default
+		end,
+	}
+end
+
 --- Loads the real modules.keystats.log_manager with every I/O sub-module
 --- stubbed, so M.day_rollover() runs its actual production logic (not a
 --- hand-copied harness) while Rotation/Aggregator/SqliteWriter stay
@@ -207,8 +261,12 @@ local function load_real_day_rollover(stall, ingest_error)
 		rollover_called       = false,
 		reset_ngram_ctx_calls = 0,
 		meta_exec_statements  = {},
+		timeline = {}, commits = 0, phase = "init",
 	}
 
+	local active_db = nil
+	local reset_db = recording_reset_db(observed)
+	observed.enable_db = function() active_db = reset_db end
 	local offset = 0
 	package.loaded["modules.keystats.rotation"] = {
 		init = function() end,
@@ -216,25 +274,44 @@ local function load_real_day_rollover(stall, ingest_error)
 		append_log = function() end,
 		read_new_entries = function()
 			if stall then
+				table.insert(observed.timeline, "pending")
 				-- Always reports pending data without ever advancing the offset —
 				-- the exact "persistent SQL error" shape day_rollover must detect.
 				return { { entry = { type = "typing" } } }, offset, "batch"
 			end
+			table.insert(observed.timeline, "eof")
 			return {}, offset, "eof"
 		end,
 		get_offset = function() return offset end,
 		get_date   = function() return "2099-07-01" end,
 		set_offset = function(new_offset) offset = new_offset end,
-		rollover   = function() observed.rollover_called = true end,
+		rollover = function(data_sql, eof, reset, origin)
+			helpers.assert_eq(data_sql, observed.paths.data_sql_path, "Rotation must receive the actual canonical path")
+			helpers.assert_eq(eof, "eof", "Rotation must receive the committed drain EOF")
+			helpers.assert_eq(type(reset), "function", "Rotation requires the transactional reset callback")
+			helpers.assert_eq(type(origin), "function", "Rotation requires the complete-ledger origin callback")
+			helpers.assert_eq(table.concat(observed.timeline, "|"), "eof|outbox|flush",
+				"committed EOF and settled empty outbox must precede Rotation ownership")
+			observed.rollover_called = true
+			table.insert(observed.timeline, "rotation")
+			helpers.assert_eq(reset("2099-07-01"), true, "Rotation requires literal true from the checked reset")
+			helpers.assert_eq(observed.commits, 1, "cache COMMIT must finish before reset acknowledgement")
+			helpers.assert_eq(observed.meta.today_log_offset, "0")
+			helpers.assert_eq(observed.meta.today_log_date, "2099-07-01")
+			helpers.assert_eq(observed.meta.ngram_ctx_json, "{}", "reset must persist literal empty context")
+			table.insert(observed.timeline, "reset:true")
+			table.insert(observed.timeline, "rotation:true")
+			return true
+		end,
 	}
 
 	package.loaded["modules.keystats.sqlite_writer"] = {
-		init                  = function() end,
+		init                  = function(args) observed.paths = args.paths end,
 		open_db               = function() return true end,
 		close_db              = function() end,
-		-- Returning nil makes M.ingest_once() an immediate no-op, so the stall
-		-- scenario reaches MAX_ROLLOVER_DRAIN_ITERS without a real SQLite cache.
-		get_db                = function() return nil end,
+		-- Initialization owns no DB; the observation phase attaches the explicit
+		-- live reset port after init, without polluting counters through recovery.
+		get_db                = function() return active_db end,
 		build_inserts         = function() return {} end,
 		get_next_event_id     = function() return 0 end,
 		set_next_event_id     = function() end,
@@ -250,7 +327,13 @@ local function load_real_day_rollover(stall, ingest_error)
 		flush              = function() end,
 		get_ngram_ctx      = function() return {} end,
 		set_ngram_ctx      = function() end,
-		reset_ngram_ctx    = function() observed.reset_ngram_ctx_calls = observed.reset_ngram_ctx_calls + 1 end,
+		reset_ngram_ctx = function()
+			observed.reset_ngram_ctx_calls = observed.reset_ngram_ctx_calls + 1
+			table.insert(observed.timeline, "context")
+			helpers.assert_eq(table.concat(observed.timeline, "|"),
+				"eof|outbox|flush|rotation|BEGIN|outbox|today_log_offset|today_log_date|ngram_ctx_json|COMMIT|reset:true|rotation:true|context",
+				"in-memory context resets only after the exact reset transaction and Rotation acknowledgement")
+		end,
 	}
 
 	package.loaded["modules.keystats.export"] = {
@@ -259,13 +342,31 @@ local function load_real_day_rollover(stall, ingest_error)
 		get_device_short_id     = function() return "abcd" end,
 		get_sqlite_path         = function() return "/tmp/test.sqlite" end,
 		get_db_rev              = function() return 0 end,
-		sync_foreign_data_sql   = function() end,
+		sync_foreign_data_sql   = function() return {} end,
 	}
-package.loaded["adapters.file_system"] = {
-	write = function() return true end,
-	create_if_absent = function() return true, "created" end,
-	read = function() return nil end,
-}
+	local files = {
+		write = function() return true end,
+		create_if_absent = function() return true, "created" end,
+		read = function() return nil end,
+	}
+	EmptyLedger.extend(files)
+	package.loaded["adapters.file_system"] = files
+	package.loaded["adapters.ledger_append"] = {
+		recover = function(path, outbox)
+			helpers.assert_eq(observed.phase, "init", "only absent startup receipt recovery is modeled")
+			helpers.assert_eq(path, observed.paths.data_sql_path)
+			helpers.assert_eq(outbox, "", "the modeled absent receipt has no pending outbox")
+			return true
+		end,
+		flush = function(path, outbox, clear, origin)
+			helpers.assert_eq(path, observed.paths.data_sql_path)
+			helpers.assert_eq(outbox, "", "only an explicitly empty settled outbox is modeled")
+			helpers.assert_eq(type(clear), "function")
+			helpers.assert_eq(type(origin), "function")
+			table.insert(observed.timeline, "flush")
+			return true -- an empty outbox has no publication and must not call clear()
+		end,
+	}
 
 	package.loaded["infra.i18n"] = { t = function(key) return key end }
 	package.loaded["infra.timings"] = {
@@ -276,14 +377,19 @@ package.loaded["adapters.file_system"] = {
 
 	local hs_overrides = {
 		fs = {
-			attributes = function() return nil end,
+			attributes = function(path)
+				if path:sub(-9) == "/data.sql" or path:sub(-10) == "/db.sqlite" then
+					return { mode = "file", size = 0 }
+				end
+				return nil
+			end,
 			dir        = function() return function() return nil end end,
 		},
 		execute = function() return "" end,
 	}
 
-	local lm = EmptyLedger.load(hs_overrides)
-	lm.init({
+	local lm = helpers.load_with_stubs("modules.keystats.log_manager", hs_overrides)
+	local initialized = lm.init({
 		LOG_DIR              = "/tmp/test_day_rollover",
 		buffer_events        = {},
 		buffer_text          = "",
@@ -297,13 +403,17 @@ package.loaded["adapters.file_system"] = {
 		today_idx             = {},
 		manifest              = {},
 	})
+	helpers.assert_eq(initialized, true, "the explicit day-rollover fixture must initialize successfully")
+	helpers.assert_eq(observed.reset_ngram_ctx_calls, 0, "initialization cannot pollute rollover reset observations")
+	observed.timeline = {}
+	observed.phase = "rollover"
+	if not stall then observed.enable_db() end
 	if ingest_error then
 		lm.ingest_once = function() error(ingest_error) end
 	end
 
-	-- A db present here would make M.day_rollover() write meta UPDATE statements;
-	-- since SqliteWriter.get_db() returns nil above, those writes are unreachable
-	-- and are instead exercised directly with a recording fake db, below.
+	-- Success owns a live recording DB; stalled tests may attach the same DB
+	-- explicitly to prove the no-UPDATE invariant under a live-cache premise.
 	return lm, observed
 end
 
@@ -382,17 +492,8 @@ end)
 local function load_real_day_rollover_with_db(stall)
 	local lm, observed = load_real_day_rollover(stall)
 
-	local exec_statements = {}
-	local fake_db = {
-		exec = function(_self, sql)
-			table.insert(exec_statements, sql)
-			return 0 -- sqlite3.OK stand-in; these are meta UPDATEs, not batch inserts
-		end,
-		nrows = function() return function() return nil end end,
-	}
-	package.loaded["modules.keystats.sqlite_writer"].get_db = function() return fake_db end
-
-	return lm, exec_statements
+	observed.enable_db()
+	return lm, observed.meta_exec_statements
 end
 
 helpers.describe("day_rollover: meta bookmark rows (offset/date/ngram_ctx) gate on drain success (F-HIGH-2)", function()
@@ -465,3 +566,4 @@ end)
 
 print("[PASS] test_day_rollover_drain")
 package.loaded["adapters.file_system"] = saved_file_system
+package.loaded["adapters.ledger_append"] = saved_ledger_append
