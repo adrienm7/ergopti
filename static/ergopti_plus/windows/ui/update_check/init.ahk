@@ -254,14 +254,18 @@ _UpdateCheck_NativeTexts(State) {
 ;   changelog, set_channel, report, open_log, close, refuse_paused.
 ; @param BornSuspended {Boolean} Whether the driver was paused when the click
 ;   arrived: an updater action is then refused visibly.
+; @param ActionOwner {Object} Optional exact answer captured at dispatch; direct
+;   synchronous callers capture the current answer at entry.
 ; @returns {Map} { ok, missing, closed }
-UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false) {
-	global _UC_State, _UC_Release, UC_PAGE_ACTIONS, UC_UPDATER_ACTIONS
+UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false, ActionOwner := unset) {
+	global UC_PAGE_ACTIONS, UC_UPDATER_ACTIONS
 	Outcome := Map("ok", false, "missing", false, "closed", false)
-	if !UC_PAGE_ACTIONS.Has(Name) || !(_UC_State is Map)
+	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
+	if !UC_PAGE_ACTIONS.Has(Name) || !_UpdateCheck_ActionCurrent(Owner)
 		return Outcome
+	State := Owner.state
 	Needs := UC_PAGE_ACTIONS[Name]
-	if (Needs != "" and _UC_State["state"] != Needs) {
+	if (Needs != "" and State["state"] != Needs) {
 		LoggerWarn("UpdateCheck", "Refused the update-check action '{1}' outside the '{2}' phase.", Name, Needs)
 		return Outcome
 	}
@@ -270,43 +274,83 @@ UpdateCheck_Perform(Name, Channel := "", Effects := 0, BornSuspended := false) {
 		Effect("refuse_paused", _Updater_RefuseManualWhileSuspended).Call()
 		return Outcome
 	}
+
 	switch Name {
 		case "close":
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
 			Effect("close", _UpdateCheck_CloseWindow).Call()
 			Outcome["ok"] := true, Outcome["closed"] := true
 		case "update":
-			if Effect("install", _UpdateCheck_Install).Call(_UC_Release) {
-				Effect("close", _UpdateCheck_CloseWindow).Call()
-				Outcome["ok"] := true, Outcome["closed"] := true
+			Install := Effect("install", (Release) => _UpdateCheck_Install(Release, Owner))
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			if Install.Call(Owner.release) {
+				Outcome["ok"] := true
+				; A synchronous install callback can open a new check. Its window
+				; never inherits the old action's completion/close authority.
+				if _UpdateCheck_ActionCurrent(Owner) {
+					Effect("close", _UpdateCheck_CloseWindow).Call()
+					Outcome["closed"] := true
+				}
 			}
 		case "whats_new":
-			Effect("changelog", Changelog_Open).Call(_UC_State["channel"])
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Effect("changelog", Changelog_Open).Call(State["channel"])
 			Outcome["ok"] := true
 		case "switch_channel":
-			if !_UpdateCheck_Lists(Channel) {
+			if !_UpdateCheck_Lists(Channel, State) {
 				LoggerWarn("UpdateCheck", "Refused a switch to '{1}': the answer did not list it.", Channel)
-			} else if Effect("set_channel", Updater_SetChannel).Call(Channel) {
-				; The channel owner reloads the application on the new channel
-				Effect("close", _UpdateCheck_CloseWindow).Call()
-				Outcome["ok"] := true, Outcome["closed"] := true
+			} else if _UpdateCheck_ActionCurrent(Owner) && Effect("set_channel", Updater_SetChannel).Call(Channel) {
+				Outcome["ok"] := true
+				if _UpdateCheck_ActionCurrent(Owner) {
+					; The channel owner reloads the application on the new channel.
+					Effect("close", _UpdateCheck_CloseWindow).Call()
+					Outcome["closed"] := true
+				}
 			}
 		case "report":
-			Outcome["ok"] := Effect("report", ErrorDialog_Report).Call(Map("kind", "error",
-				"module", "Updater",
-				"message", "Update check failed on channel " . _UC_State["channel"] . ": " . _UC_State["detail"],
-				"time", FormatTime(, "yyyy-MM-dd HH:mm:ss"))) ? true : false
+			Record := Map("kind", "error", "module", "Updater",
+				"message", "Update check failed on channel " . State["channel"] . ": " . State["detail"],
+				"time", FormatTime(, "yyyy-MM-dd HH:mm:ss"))
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
+			Outcome["ok"] := Effect("report", ErrorDialog_Report).Call(Record) ? true : false
 		case "open_log":
+			if !_UpdateCheck_ActionCurrent(Owner)
+				return Outcome
 			Outcome["ok"] := Effect("open_log", LogOpeners_OpenTodayLog).Call() ? true : false
 	}
 	return Outcome
 }
 
+; A native button retains the answer it displays, not whatever a timer finds
+; later. Direct synchronous callers capture the same owner at their entry.
+_UpdateCheck_CaptureActionOwner() {
+	global _UC_WindowEpoch, _UC_RequestId, _UC_State, _UC_Release, _UC_ResetDone
+	PreviousCritical := Critical("On")
+	try return {epoch: _UC_WindowEpoch, request: _UC_RequestId, state: _UC_State,
+		release: _UC_Release, reset: _UC_ResetDone}
+	finally Critical(PreviousCritical)
+}
+
+_UpdateCheck_ActionCurrent(Owner) {
+	global _UC_WindowEpoch, _UC_RequestId, _UC_State, _UC_Release, _UC_ResetDone
+	return Type(Owner) == "Object" && Owner.HasOwnProp("epoch") && Owner.HasOwnProp("request")
+		&& Owner.HasOwnProp("state") && Owner.HasOwnProp("release") && Owner.HasOwnProp("reset")
+		&& Owner.state is Map && _UC_WindowEpoch == Owner.epoch && _UC_RequestId == Owner.request
+		&& _UC_State == Owner.state && _UC_Release == Owner.release && _UC_ResetDone == Owner.reset
+}
+
 ; Whether the answer lists a channel as having a newer release.
 ; @param Channel {String}
+; @param State {Map} Optional captured answer; otherwise the current answer.
 ; @returns {Boolean}
-_UpdateCheck_Lists(Channel) {
+_UpdateCheck_Lists(Channel, State := unset) {
 	global _UC_State
-	for Entry in _UC_State.Get("others", []) {
+	Answer := IsSet(State) ? State : _UC_State
+	for Entry in Answer.Get("others", []) {
 		if (Entry["channel"] == Channel)
 			return true
 	}
@@ -316,14 +360,19 @@ _UpdateCheck_Lists(Channel) {
 ; Installs the offered release: the user's click is the consent the tray's
 ; "Update to vX" row also gives.
 ; @param Release {Object}
+; @param Owner {Object} The exact offered answer retained by the click.
 ; @returns {Boolean} started
-_UpdateCheck_Install(Release) {
+_UpdateCheck_Install(Release, Owner) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !_UpdateCheck_ActionCurrent(Owner) || Release != Owner.release
+		return false
 	if (Type(Release) != "Object") {
 		LoggerError("UpdateCheck", "Update refused: the window holds no offered release.")
 		return false
 	}
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return false
 	return _Updater_ActivateCachedRelease(Release, Request) == true
 }
 
@@ -452,6 +501,7 @@ _UpdateCheck_FallBackToNative(Epoch, HostGui, BuildFn := 0) {
 ; button centered, like the page.
 _UpdateCheck_BuildNative() {
 	global _UC_Gui, _UC_State, UC_WIDTH
+	Owner := _UpdateCheck_CaptureActionOwner()
 	Previous := IsSet(_UC_Gui) ? _UC_Gui : 0
 	Texts := _UpdateCheck_NativeTexts(_UC_State)
 	Phase := _UC_State["state"]
@@ -469,27 +519,27 @@ _UpdateCheck_BuildNative() {
 	for Other in Texts["others"] {
 		G.Add("Text", "xm y+10 w" . Width . " Center", Other.text)
 		SwitchButton := G.Add("Button", "xm y+4", t("update_check.switch_channel"))
-		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind("switch_channel", Other.channel))
+		SwitchButton.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "switch_channel", Other.channel))
 		_UpdateCheck_CenterRow([SwitchButton])
 	}
 	G.Add("Text", "xm y+10 w" . Width . " Center vStatus", "")
 	Row := []
 	if (Phase == "available") {
 		WhatsNew := G.Add("Button", "xm y+8", t("update_check.whats_new"))
-		WhatsNew.OnEvent("Click", _UpdateCheck_NativeClick.Bind("whats_new", ""))
+		WhatsNew.OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "whats_new", ""))
 		_UpdateCheck_CenterRow([WhatsNew])
 	}
 	if (Phase == "error") {
 		Row.Push(G.Add("Button", "xm y+12", t("healthcheck.toolbar.report")))
-		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind("report", ""))
+		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "report", ""))
 		Row.Push(G.Add("Button", "x+8 yp", t("update_check.open_log")))
-		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind("open_log", ""))
+		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "open_log", ""))
 	}
 	Row.Push(G.Add("Button", (Row.Length ? "x+8 yp" : "xm y+12"), t("common.close")))
-	Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind("close", ""))
+	Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "close", ""))
 	if (Phase == "available") {
 		Row.Push(G.Add("Button", "x+8 yp Default", t("update_check.update")))
-		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind("update", ""))
+		Row[Row.Length].OnEvent("Click", _UpdateCheck_NativeClick.Bind(Owner, "update", ""))
 	}
 	_UpdateCheck_CenterRow(Row)
 	G.OnEvent("Close",  (*) => _UpdateCheck_CloseWindow())
@@ -521,9 +571,10 @@ _UpdateCheck_CenterRow(Buttons) {
 
 ; A click in the native window, on its own stack like a page message. A Gui
 ; event bypasses native Suspend: whether the driver was paused is read here.
-_UpdateCheck_NativeClick(Name, Channel, *) {
-	global _UC_WindowEpoch
-	SetTimer(_UpdateCheck_Act.Bind(_UC_WindowEpoch, Name, Channel, A_IsSuspended), -1)
+_UpdateCheck_NativeClick(Owner, Name, Channel, *) {
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	SetTimer(_UpdateCheck_Act.Bind(Owner.epoch, Name, Channel, A_IsSuspended, 0, Owner), -1)
 }
 
 ; Closes the window: the controller first, while its host window lives, then
@@ -574,12 +625,15 @@ _UpdateCheck_OnWebMessage(Epoch, Handler, Args) {
 	; before the COM read can pump messages. The page still loads and closes
 	; while paused; its updater actions are refused (UpdateCheck_Perform)
 	BornSuspended := A_IsSuspended
+	Owner := _UpdateCheck_CaptureActionOwner()
 	try Raw := Args.TryGetWebMessageAsString()
 	catch as Err {
 		LoggerWarn("UpdateCheck", "An update-check message could not be read: {1}.", Err.Message)
 		return
 	}
-	SetTimer(_UpdateCheck_HandleMessage.Bind(Epoch, Raw, BornSuspended), -1)
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	SetTimer(_UpdateCheck_HandleMessage.Bind(Epoch, Raw, BornSuspended, 0, Owner), -1)
 }
 
 ; Handles one message of the page, on its own stack.
@@ -587,9 +641,13 @@ _UpdateCheck_OnWebMessage(Epoch, Handler, Args) {
 ; @param Raw {String}
 ; @param BornSuspended {Boolean} Whether the driver was paused when it arrived.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only).
-_UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0) {
+; @param ActionOwner {Object} Optional exact answer retained before the COM read.
+_UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0, ActionOwner := unset) {
 	global _UC_WindowEpoch, _UC_ResetDone, _UC_State, UC_PAGE_ACTIONS
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch) || !(_UC_State is Map)
+		return
+	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
+	if !_UpdateCheck_ActionCurrent(Owner)
 		return
 	if (Raw == "ready") {
 		_UpdateCheck_Send(Epoch, _UpdateCheck_StateJson(_UC_State))
@@ -607,7 +665,7 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0) {
 		LoggerWarn("UpdateCheck", "Refused an update-check message that is not one of its actions.")
 		return
 	}
-	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects)
+	_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended, Effects, Owner)
 }
 
 ; Performs one action and answers it, in the page or the native window.
@@ -616,17 +674,23 @@ _UpdateCheck_HandleMessage(Epoch, Raw, BornSuspended := false, Effects := 0) {
 ; @param Channel {String}
 ; @param BornSuspended {Boolean} Whether the driver was paused at the click.
 ; @param Effects {Map|Integer} Replacements of the effects (tests only).
-_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0) {
+; @param ActionOwner {Object} Optional exact answer retained by the event source.
+_UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0, ActionOwner := unset) {
 	global _UC_WindowEpoch, _UC_ResetDone, _UC_Native, _UC_Gui
 	if _UC_ResetDone || (Epoch != _UC_WindowEpoch)
 		return
+	Owner := IsSet(ActionOwner) ? ActionOwner : _UpdateCheck_CaptureActionOwner()
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
 	LoggerInfo("UpdateCheck", "Update-check window action: {1}.", Name)
-	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, BornSuspended)
+	if !_UpdateCheck_ActionCurrent(Owner)
+		return
+	try Outcome := UpdateCheck_Perform(Name, Channel, Effects, BornSuspended, Owner)
 	catch as Err {
 		LoggerError("UpdateCheck", "The update-check action '{1}' failed: {2}", Name, Err.Message)
 		Outcome := Map("ok", false, "missing", false, "closed", false)
 	}
-	if Outcome["closed"] || _UC_ResetDone || (Epoch != _UC_WindowEpoch)
+	if Outcome["closed"] || !_UpdateCheck_ActionCurrent(Owner)
 		return
 	if _UC_Native {
 		Status := ""
@@ -634,6 +698,8 @@ _UpdateCheck_Act(Epoch, Name, Channel, BornSuspended := false, Effects := 0) {
 			Status := t("healthcheck.status.failed")
 		else if (Name == "report")
 			Status := t("notify.report_bug_body")
+		if !_UpdateCheck_ActionCurrent(Owner)
+			return
 		try _UC_Gui["Status"].Text := Status
 		return
 	}
