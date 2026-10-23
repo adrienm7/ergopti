@@ -285,6 +285,7 @@ function M.build(ctx)
 				return
 			end
 			local conflict = apply_action()
+			if conflict == false then return false end
 			show_conflict(conflict)
 		end)
 	end
