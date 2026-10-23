@@ -47,6 +47,13 @@ local WORD_BYTE = "[A-Za-z0-9_]"
 -- A byte that continues a path segment after the home folder
 local PATH_BYTE = "[A-Za-z0-9_%.%-]"
 
+-- The bytes of an e-mail local part and of a domain
+local EMAIL_LOCAL = "[A-Za-z0-9%._%%%+%-]"
+local EMAIL_DOMAIN = "[A-Za-z0-9%.%-]"
+
+-- The bytes of the credential in front of the @ of a URL
+local URL_USERINFO = "[A-Za-z0-9%._~%%%+:=!%*%-]"
+
 -- The characters a bearer token is made of
 local BEARER_BYTE = "[A-Za-z0-9%._~%+/=%-]"
 
@@ -89,7 +96,9 @@ end
 --- @param text string
 --- @param needle string Non-empty literal.
 --- @param case_insensitive boolean ASCII-only folding.
---- @param accept function(text, first, last) → replacement string or nil.
+--- @param accept function(text, first, last) → replacement string or nil, then
+---   optionally the last index it consumes and the earlier index it starts at
+---   (never before the end of the previous replacement).
 --- @return string
 local function replace_occurrences(text, needle, case_insensitive, accept)
 	local haystack = case_insensitive and text:lower() or text
@@ -99,9 +108,9 @@ local function replace_occurrences(text, needle, case_insensitive, accept)
 	while true do
 		local first, last = haystack:find(target, pos, true)
 		if not first then break end
-		local replacement, consumed_last = accept(text, first, last)
+		local replacement, consumed_last, start = accept(text, first, last)
 		if replacement then
-			out[#out + 1] = text:sub(pos, first - 1)
+			out[#out + 1] = text:sub(pos, math.max(pos, start or first) - 1)
 			out[#out + 1] = replacement
 			pos = (consumed_last or last) + 1
 		else
@@ -111,6 +120,17 @@ local function replace_occurrences(text, needle, case_insensitive, accept)
 	end
 	out[#out + 1] = text:sub(pos)
 	return table.concat(out)
+end
+
+--- Returns the index of the first byte of the run of `class` that ends at `from`.
+--- @param text string
+--- @param from number The run's last index.
+--- @param class string
+--- @return number The run's first index, from + 1 when the run is empty.
+local function run_start(text, from, class)
+	local i = from
+	while byte_is(text, i, class) do i = i - 1 end
+	return i + 1
 end
 
 --- Returns the index of the last byte of the run of `class` starting at `from`.
@@ -147,6 +167,60 @@ local function redact_tokens(text, rules)
 			local stop = run_end(source, last + 1, class)
 			if stop - last < token.min_length then return nil end
 			return rules.secret_placeholder, stop
+		end)
+	end
+	return text
+end
+
+--- Replaces the credential of a URL ("scheme://user:password@host"), keeping
+--- the scheme and the host.
+--- @param text string
+--- @param rules table
+--- @return string
+local function redact_url_credentials(text, rules)
+	return replace_occurrences(text, "://", false, function(source, _, last)
+		local stop = run_end(source, last + 1, URL_USERINFO)
+		if stop <= last or not byte_is(source, stop + 1, "@") then return nil end
+		return "://" .. rules.secret_placeholder, stop
+	end)
+end
+
+--- Replaces e-mail addresses: a local part, an @, and a dotted domain ending in
+--- a top-level label of at least two letters.
+--- @param text string
+--- @param rules table
+--- @return string
+local function redact_emails(text, rules)
+	return replace_occurrences(text, "@", false, function(source, first, last)
+		local start = run_start(source, first - 1, EMAIL_LOCAL)
+		if start == first then return nil end
+		local stop = run_end(source, last + 1, EMAIL_DOMAIN)
+		-- A trailing dot or dash is the sentence's, not the domain's
+		while stop > last and byte_is(source, stop, "[%.%-]") do stop = stop - 1 end
+		local domain = source:sub(last + 1, stop)
+		local dot = domain:match("^.*()%.")
+		if not dot or dot < 2 then return nil end
+		if not domain:sub(dot + 1):match("^[A-Za-z][A-Za-z]+$") then return nil end
+		return rules.email_placeholder, stop, start
+	end)
+end
+
+--- Replaces the profile folder of any other account (a Users folder on Windows,
+--- /home/other, /Users/other) by the account placeholder, except the shared
+--- profiles every machine has.
+--- @param text string
+--- @param rules table
+--- @return string
+local function redact_foreign_homes(text, rules)
+	for _, marker in ipairs(rules.foreign_home_markers) do
+		text = replace_occurrences(text, marker, true, function(source, first, last)
+			local stop = run_end(source, last + 1, PATH_BYTE)
+			if stop <= last then return nil end
+			local name = source:sub(last + 1, stop):lower()
+			for _, shared in ipairs(rules.shared_profile_names) do
+				if shared == name then return nil end
+			end
+			return source:sub(first, last) .. rules.account_placeholder, stop
 		end)
 	end
 	return text
@@ -260,9 +334,12 @@ function M.apply(text, rules, context)
 	context = type(context) == "table" and context or {}
 	local folded = context.case_insensitive == true
 	text = redact_tokens(text, rules)
+	text = redact_url_credentials(text, rules)
 	text = redact_bearer(text, rules)
 	text = redact_key_values(text, rules)
 	text = redact_home(text, rules, context.home, folded)
+	text = redact_foreign_homes(text, rules)
+	text = redact_emails(text, rules)
 	text = redact_account(text, rules, context.user, folded)
 	return text
 end

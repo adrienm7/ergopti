@@ -35,7 +35,8 @@
 ; @param Text {String}
 ; @param Index {Integer} 1-based position.
 ; @param Class {String} "alnum", "word", "word_dash", "path", "bearer",
-;   "space", "quote", "separator" or "value_stop".
+;   "space", "quote", "separator", "value_stop", "email_local", "email_domain",
+;   "url_userinfo", "at" or "letter".
 ; @returns {Boolean}
 _Redact_CharIs(Text, Index, Class) {
 	if (Index < 1 || Index > StrLen(Text))
@@ -54,6 +55,16 @@ _Redact_CharIs(Text, Index, Class) {
 			return IsAlnum || Code = 0x5F || Code = 0x2E || Code = 0x2D
 		case "bearer":
 			return IsAlnum || InStr("._~+/=-", Chr(Code), true) > 0
+		case "email_local":
+			return IsAlnum || InStr("._%+-", Chr(Code), true) > 0
+		case "email_domain":
+			return IsAlnum || Code = 0x2E || Code = 0x2D
+		case "url_userinfo":
+			return IsAlnum || InStr("._~%+:=!*-", Chr(Code), true) > 0
+		case "at":
+			return Code = 0x40
+		case "letter":
+			return (Code >= 0x41 && Code <= 0x5A) || (Code >= 0x61 && Code <= 0x7A)
 		case "space":
 			return Code = 0x20 || Code = 0x09
 		case "quote":
@@ -68,6 +79,18 @@ _Redact_CharIs(Text, Index, Class) {
 				|| Code = 0x7D || Code = 0x26
 	}
 	throw ValueError("redact: unknown character class '" . Class . "'.")
+}
+
+; Returns the index of the first character of the run of Class that ends at From.
+; @param Text {String}
+; @param From {Integer} The run's last index.
+; @param Class {String}
+; @returns {Integer} The run's first index, From + 1 when the run is empty.
+_Redact_RunStart(Text, From, Class) {
+	Index := From
+	while _Redact_CharIs(Text, Index, Class)
+		Index -= 1
+	return Index + 1
 }
 
 ; Returns the index of the last character of the run of Class starting at From.
@@ -109,7 +132,9 @@ _Redact_CodePointCount(Text) {
 ; @param Text {String}
 ; @param Needle {String} Non-empty literal.
 ; @param CaseInsensitive {Boolean} ASCII-only folding.
-; @param Accept {Func} (Text, First, Last) → Map { text, last } or 0 to skip.
+; @param Accept {Func} (Text, First, Last) → Map { text, last, first? } or 0 to
+;   skip. The optional first is an earlier index the replacement starts at
+;   (never before the end of the previous replacement).
 ; @returns {String}
 _Redact_Replace(Text, Needle, CaseInsensitive, Accept) {
 	Out := ""
@@ -122,7 +147,8 @@ _Redact_Replace(Text, Needle, CaseInsensitive, Accept) {
 		Last := First + NeedleLen - 1
 		Result := Accept.Call(Text, First, Last)
 		if (Result is Map) {
-			Out .= SubStr(Text, Pos, First - Pos) . Result["text"]
+			From := Result.Has("first") ? Max(Pos, Result["first"]) : First
+			Out .= SubStr(Text, Pos, From - Pos) . Result["text"]
 			Pos := Result["last"] + 1
 		} else {
 			Out .= SubStr(Text, Pos, First - Pos + 1)
@@ -150,6 +176,55 @@ _Redact_AcceptToken(Rules, Token, Text, First, Last) {
 	if (Stop - Last < Token["min_length"])
 		return 0
 	return Map("text", Rules["secret_placeholder"], "last", Stop)
+}
+
+; Accepts the credential in front of the @ of a URL and keeps the scheme.
+_Redact_AcceptUrlCredential(Rules, Text, First, Last) {
+	Stop := _Redact_RunEnd(Text, Last + 1, "url_userinfo")
+	if (Stop <= Last || !_Redact_CharIs(Text, Stop + 1, "at"))
+		return 0
+	return Map("text", "://" . Rules["secret_placeholder"], "last", Stop)
+}
+
+; Accepts an e-mail address: a local part, an @, and a dotted domain ending in
+; a top-level label of at least two letters.
+_Redact_AcceptEmail(Rules, Text, First, Last) {
+	Start := _Redact_RunStart(Text, First - 1, "email_local")
+	if (Start == First)
+		return 0
+	Stop := _Redact_RunEnd(Text, Last + 1, "email_domain")
+	; A trailing dot or dash is the sentence's, not the domain's
+	while (Stop > Last && (SubStr(Text, Stop, 1) == "." || SubStr(Text, Stop, 1) == "-"))
+		Stop -= 1
+	Domain := SubStr(Text, Last + 1, Stop - Last)
+	Dot := 0
+	Loop Parse Domain {
+		if (A_LoopField == ".")
+			Dot := A_Index
+	}
+	if (Dot < 2)
+		return 0
+	Tld := SubStr(Domain, Dot + 1)
+	if (StrLen(Tld) < 2)
+		return 0
+	Loop Parse Tld {
+		if !_Redact_CharIs(A_LoopField, 1, "letter")
+			return 0
+	}
+	return Map("text", Rules["email_placeholder"], "last", Stop, "first", Start)
+}
+
+; Accepts the profile folder of another account unless it is a shared profile.
+_Redact_AcceptForeignHome(Rules, Text, First, Last) {
+	Stop := _Redact_RunEnd(Text, Last + 1, "path")
+	if (Stop <= Last)
+		return 0
+	Name := StrLower(SubStr(Text, Last + 1, Stop - Last))
+	for Shared in Rules["shared_profile_names"] {
+		if (Shared == Name)
+			return 0
+	}
+	return Map("text", SubStr(Text, First, Last - First + 1) . Rules["account_placeholder"], "last", Stop)
 }
 
 ; Accepts "Bearer <token>" and keeps the word and its spacing.
@@ -230,6 +305,7 @@ Redact_Apply(Text, Rules, Context) {
 		Text := _Redact_Replace(Text, Token["prefix"], false,
 			_Redact_AcceptToken.Bind(Rules, Token))
 	}
+	Text := _Redact_Replace(Text, "://", false, _Redact_AcceptUrlCredential.Bind(Rules))
 	Text := _Redact_Replace(Text, "bearer", true, _Redact_AcceptBearer.Bind(Rules))
 	for Key in Rules["secret_keys"]
 		Text := _Redact_Replace(Text, Key, true, _Redact_AcceptKeyValue.Bind(Rules))
@@ -244,6 +320,10 @@ Redact_Apply(Text, Rules, Context) {
 			Text := _Redact_Replace(Text, Spelling, Folded, _Redact_AcceptHome.Bind(Rules))
 		}
 	}
+
+	for Marker in Rules["foreign_home_markers"]
+		Text := _Redact_Replace(Text, Marker, true, _Redact_AcceptForeignHome.Bind(Rules))
+	Text := _Redact_Replace(Text, "@", false, _Redact_AcceptEmail.Bind(Rules))
 
 	User := Context.Get("user", "")
 	if (User != "" && _Redact_CodePointCount(User) >= Rules["min_account_name_length"])

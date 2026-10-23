@@ -14,10 +14,10 @@
 			"expected": "HOME=~ and cwd ~/"
 		},
 		{
-			"id": "a_sibling_folder_is_not_the_home",
+			"id": "a_sibling_folder_is_another_account_not_the_home",
 			"context": { "home": "/home/jdoe", "user": "jdoe", "case_insensitive": false },
 			"input": "/home/jdoe2/notes and /home/jdoe-backup and /home/jdoe.old",
-			"expected": "/home/jdoe2/notes and /home/<user>-backup and /home/<user>.old"
+			"expected": "/home/<user>/notes and /home/<user> and /home/<user>"
 		},
 		{
 			"id": "windows_home_both_slashes_any_case",
@@ -50,10 +50,10 @@
 			"expected": "al at ~/x and /srv/al"
 		},
 		{
-			"id": "no_context_keeps_text",
+			"id": "no_context_still_redacts_another_accounts_profile",
 			"context": {},
-			"input": "/Users/jdoe/file stays when nothing is known",
-			"expected": "/Users/jdoe/file stays when nothing is known"
+			"input": "/Users/jdoe/file is another account's profile when nothing is known; /opt/data stays",
+			"expected": "/Users/<user>/file is another account's profile when nothing is known; /opt/data stays"
 		},
 		{
 			"id": "token_prefixes",
@@ -96,6 +96,66 @@
 			"context": { "home": "/Users/zoé", "user": "zoé", "case_insensitive": false },
 			"input": "Préférences de zoé dans /Users/zoé/Library — ✓ 😀",
 			"expected": "Préférences de <user> dans ~/Library — ✓ 😀"
+		},
+		{
+			"id": "email_addresses",
+			"context": {},
+			"input": "mail jane.doe+tag@example.co.uk, or bob_x@sub.mail-host.org. Also (a@b.io) end.",
+			"expected": "mail <email>, or <email>. Also (<email>) end."
+		},
+		{
+			"id": "email_needs_a_dotted_domain_and_a_letter_tld",
+			"context": {},
+			"input": "user@localhost jdoe@example v@1.23 @handle a@b.c x@.com",
+			"expected": "user@localhost jdoe@example v@1.23 @handle a@b.c x@.com"
+		},
+		{
+			"id": "url_credentials",
+			"context": {},
+			"input": "git clone https://jdoe:hunter22@github.com/o/r.git and ftp://anon@host/x but https://github.com/o/r and http://localhost:11434.",
+			"expected": "git clone https://<secret>@github.com/o/r.git and ftp://<secret>@host/x but https://github.com/o/r and http://localhost:11434."
+		},
+		{
+			"id": "url_without_credentials_is_kept",
+			"context": {},
+			"input": "http://[::1]:8080/a@b and https://x.test/path?next=a@b.test",
+			"expected": "http://[::1]:8080/a@b and https://x.test/path?next=<email>"
+		},
+		{
+			"id": "another_accounts_profile_every_style",
+			"context": {},
+			"input": "C:\\Users\\Other\\AppData\\x, d:\\users\\third.party\\y, /Users/bob/z, /home/ci-runner/w",
+			"expected": "C:\\Users\\<user>\\AppData\\x, d:\\users\\<user>\\y, /Users/<user>/z, /home/<user>/w"
+		},
+		{
+			"id": "shared_profiles_are_kept",
+			"context": {},
+			"input": "C:\\Users\\Public\\Desktop and C:\\Users\\Default\\NTUSER and /Users/Shared/x and C:\\USERS\\PUBLIC",
+			"expected": "C:\\Users\\Public\\Desktop and C:\\Users\\Default\\NTUSER and /Users/Shared/x and C:\\USERS\\PUBLIC"
+		},
+		{
+			"id": "own_home_wins_over_the_foreign_rule",
+			"context": { "home": "C:\\Users\\Me", "user": "Me", "case_insensitive": true },
+			"input": "C:\\Users\\Me\\a and C:\\Users\\Other\\b",
+			"expected": "~\\a and C:\\Users\\<user>\\b"
+		},
+		{
+			"id": "log_line_temp_folder_of_the_account",
+			"context": { "home": "C:\\Users\\Jane", "user": "Jane", "case_insensitive": true },
+			"input": "2026-10-09 15:07:15:294 [INFO] [adapters.shell_runner] Removed 1 capture folder(s) that exited processes left in 'C:\\Users\\Jane\\AppData\\Local\\Temp'.",
+			"expected": "2026-10-09 15:07:15:294 [INFO] [adapters.shell_runner] Removed 1 capture folder(s) that exited processes left in '~\\AppData\\Local\\Temp'."
+		},
+		{
+			"id": "log_line_report_attachment_with_a_support_mail",
+			"context": { "home": "C:\\Users\\Jane", "user": "Jane", "case_insensitive": true },
+			"input": "Report from jane.smith@corp.example sent by Jane via https://api:s3cr3t-pass@proxy.corp.example:8080/ for C:\\Users\\Jane\\x and \\\\SRV\\home\\Jane",
+			"expected": "Report from <email> sent by <user> via https://<secret>@proxy.corp.example:8080/ for ~\\x and \\\\SRV\\home\\<user>"
+		},
+		{
+			"id": "log_line_other_profile_in_a_crash_path",
+			"context": { "home": "C:\\Users\\Jane", "user": "Jane", "case_insensitive": true },
+			"input": "[ERROR] [Updater] Cannot open C:\\Users\\svc-install\\AppData\\Local\\Ergopti\\bundle\\a.zip (copied from /home/jane-old/dl)",
+			"expected": "[ERROR] [Updater] Cannot open C:\\Users\\<user>\\AppData\\Local\\Ergopti\\bundle\\a.zip (copied from /home/<user>/dl)"
 		}
 	]
 }
