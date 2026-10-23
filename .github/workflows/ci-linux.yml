@@ -3991,8 +3991,14 @@ jobs:
               build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
           rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
               build/linux/ErgoptiPlus-linux-x86_64.rpm ".rpm"
-          rename_one "$(find build/linux -maxdepth 1 -name '*.AppImage' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-x86_64.AppImage "AppImage"
+          # The AppImage is built under its release name together with its .zsync
+          # (tools/build/build-linux-appimage.sh checks both before it returns).
+          for produced in build/linux/ErgoptiPlus-x86_64.AppImage build/linux/ErgoptiPlus-x86_64.AppImage.zsync; do
+              if [ ! -s "$produced" ]; then
+                  echo "::error::the AppImage packager produced no $produced — nothing to attach."
+                  exit 1
+              fi
+          done
 
       - name: Log the package metadata
         # dpkg-deb --info, rpm -qip and rpm -qlp put the metadata and the file
@@ -4072,6 +4078,7 @@ jobs:
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-x86_64.rpm
             build/linux/ErgoptiPlus-x86_64.AppImage
+            build/linux/ErgoptiPlus-x86_64.AppImage.zsync
 
       - name: Record mandatory package evidence
         # One record for the four subjects this job proves. It is written only

@@ -204,6 +204,7 @@ jobs:
               ErgoptiPlus-linux-amd64.deb \
               ErgoptiPlus-linux-x86_64.rpm \
               ErgoptiPlus-x86_64.AppImage \
+              ErgoptiPlus-x86_64.AppImage.zsync \
               ErgoptiPlus-linux-x86_64.flatpak \
               "$LINUX_BUNDLE_ASSET" \
               "$LINUX_BUNDLE_ASSET.sha256"; do

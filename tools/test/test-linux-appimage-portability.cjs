@@ -339,4 +339,147 @@ for (const relative of [
 }
 passed++;
 
+// Update information: the AppImage embeds it, the .zsync is published beside it
+// under the release asset name, and the verifier refuses anything else.
+const Update = require('../build/check-appimage-update.cjs');
+
+/** A minimal ELF64 little-endian image with one `.upd_info` section. */
+function elfWith(updateInformation, sectionName = Update.UPDATE_SECTION) {
+	const names = Buffer.from(`\0${sectionName}\0.shstrtab\0`, 'latin1');
+	const info = Buffer.alloc(1024);
+	info.write(updateInformation, 'utf8');
+	const header = Buffer.alloc(64);
+	Buffer.from([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1]).copy(header);
+	const namesAt = 64;
+	const infoAt = namesAt + names.length;
+	const tableAt = infoAt + info.length;
+	header.writeBigUInt64LE(BigInt(tableAt), 0x28);
+	header.writeUInt16LE(64, 0x3a);
+	header.writeUInt16LE(3, 0x3c);
+	header.writeUInt16LE(2, 0x3e);
+	const entry = (name, offset, size) => {
+		const raw = Buffer.alloc(64);
+		raw.writeUInt32LE(name, 0);
+		raw.writeBigUInt64LE(BigInt(offset), 0x18);
+		raw.writeBigUInt64LE(BigInt(size), 0x20);
+		return raw;
+	};
+	return Buffer.concat([
+		header,
+		names,
+		info,
+		entry(0, 0, 0),
+		entry(1, infoAt, info.length),
+		entry(1 + sectionName.length + 1, namesAt, names.length)
+	]);
+}
+
+/** A zsync file whose header matches an image of `length` bytes. */
+function zsyncFor(length, overrides = {}) {
+	const fields = {
+		zsync: '0.6.2',
+		Filename: Update.APPIMAGE_ASSET,
+		MTime: 'Fri, 23 Oct 2026 17:00:04 +0000',
+		Blocksize: '2048',
+		Length: String(length),
+		'Hash-Lengths': '2,2,4',
+		URL: Update.APPIMAGE_ASSET,
+		'SHA-1': '0123456789abcdef0123456789abcdef01234567',
+		...overrides
+	};
+	const text = Object.entries(fields)
+		.filter(([, value]) => value !== null)
+		.map(([key, value]) => `${key}: ${value}`)
+		.join('\n');
+	return Buffer.concat([Buffer.from(`${text}\n\n`, 'latin1'), Buffer.from([1, 2, 3, 4])]);
+}
+
+assert.equal(
+	Update.UPDATE_INFORMATION,
+	'gh-releases-zsync|adrienm7|ergopti|latest|ErgoptiPlus-*x86_64.AppImage.zsync'
+);
+assert.equal(Update.APPIMAGE_ASSET, APPIMAGE_ASSET);
+assert.ok(
+	Update.globMatches(
+		Update.parseUpdateInformation(Update.UPDATE_INFORMATION).pattern,
+		Update.ZSYNC_ASSET
+	)
+);
+assert.ok(!Update.globMatches('ErgoptiPlus-*x86_64.AppImage.zsync', 'ErgoptiPlus-linux-amd64.deb'));
+assert.throws(() => Update.parseUpdateInformation('zsync|a|b|c|d'), /gh-releases-zsync/);
+const image = elfWith(Update.UPDATE_INFORMATION);
+assert.equal(Update.readEmbeddedUpdateInformation(image), Update.UPDATE_INFORMATION);
+assert.deepEqual(Update.verify(image, zsyncFor(image.length)), []);
+for (const [what, badImage, badZsync, expected] of [
+	['an AppImage built without -u', elfWith(''), zsyncFor(image.length), /differs from/],
+	[
+		'no update section at all',
+		elfWith('x', '.other'),
+		zsyncFor(image.length),
+		/no \.upd_info section/
+	],
+	[
+		'another repository',
+		elfWith('gh-releases-zsync|someone|else|latest|*.zsync'),
+		zsyncFor(image.length),
+		/differs from/
+	],
+	[
+		'a zsync made before the rename',
+		image,
+		zsyncFor(image.length, { URL: 'Ergopti-1.0.0-x86_64.AppImage' }),
+		/URL is/
+	],
+	[
+		'a zsync for another file name',
+		image,
+		zsyncFor(image.length, { Filename: 'x.AppImage' }),
+		/Filename is/
+	],
+	['a zsync of another size', image, zsyncFor(image.length + 1), /Length/],
+	['a zsync without a hash', image, zsyncFor(image.length, { 'SHA-1': null }), /SHA-1/],
+	[
+		'a zsync with no blocks',
+		image,
+		Buffer.from(zsyncFor(image.length).subarray(0, -4)),
+		/no block checksums/
+	],
+	['a zsync with no header end', image, Buffer.from('zsync: 0.6.2\n'), /terminating blank line/],
+	['a file that is not ELF', Buffer.alloc(100), zsyncFor(100), /not an ELF64/]
+]) {
+	const problems = Update.verify(badImage, badZsync);
+	assert.ok(
+		problems.some((problem) => expected.test(problem)),
+		`${what}: ${problems.join(' | ')}`
+	);
+}
+passed++;
+
+// The packager embeds the update information through the single source, builds
+// the AppImage under its release name and refuses a missing or wrong .zsync;
+// the workflows publish the .zsync and the release refuses to go without it.
+const packager = read('tools/build/build-linux-appimage.sh');
+assert.match(packager, /--print-update-information/);
+assert.match(packager, /appimagetool -u "\$UPDATE_INFORMATION" "\$APPDIR" "\$APPIMAGE_ASSET"/);
+assert.match(packager, /node "\$APPIMAGE_CHECK" "\$APPIMAGE_FILE" "\$APPIMAGE_FILE\.zsync"/);
+assert.ok(
+	!/Ergopti-\$\{VERSION\}/.test(packager),
+	'the AppImage keeps the release name from the start'
+);
+const ZSYNC = `${APPIMAGE_ASSET}.zsync`;
+const linuxWorkflow = read('.github/workflows/ci-linux.yml');
+assert.ok(
+	linuxWorkflow.includes(`            build/linux/${ZSYNC}\n`),
+	'the assets-linux artifact uploads the .zsync'
+);
+assert.ok(
+	linuxWorkflow.includes(`build/linux/${ZSYNC}; do`),
+	'the packaging step demands the .zsync'
+);
+assert.ok(
+	read('.github/workflows/ci-release.yml').includes(`              ${ZSYNC} \\\n`),
+	'the release refuses to publish without the .zsync'
+);
+passed++;
+
 console.log(`Linux AppImage portability: ${passed} checks passed.`);
