@@ -367,7 +367,9 @@ function runBoundaryCases(verifyStartup) {
 		'[script]\r\nlocale = "en" # keep verbatim\r\n[metrics]\r\nmetrics_enabled = false\r\n' +
 		'metrics_shortcut_typing = "Ctrl+Alt+M"\r\nmetrics_shortcut_apps = "Ctrl+Alt+A"\r\n' +
 		'future_dashboard = {enabled = false, keep = 9}\r\n' +
-		'"extra key" = "日本 é <literal>" # retained unknown\r\n[unrelated]\r\nvalue = 7\r\n# final unknown';
+		'"extra key" = "日本 é <literal>" # retained unknown\r\n[unrelated]\r\nvalue = 7\r\n' +
+		// The prior release saves an extension module under a quoted key segment.
+		'[hotstrings.modules."ext:ergopti-demo:demo-phrases"]\r\nenabled = true\r\n# final unknown';
 	try {
 		const file = path.join(root, 'config.toml');
 		const nativeOutput = path.join(root, 'native.json');

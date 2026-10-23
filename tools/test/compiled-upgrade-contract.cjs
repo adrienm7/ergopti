@@ -73,7 +73,11 @@ function installedProfileRecords(bytes) {
 			comment = index;
 		}
 		if (/^\s*\[/.test(text)) {
-			const header = text.match(/^\[([A-Za-z0-9_.-]+)\]$/);
+			// A saved extension module names its table with a quoted key segment,
+			// e.g. [hotstrings.modules."ext:ergopti-demo:demo-phrases"].
+			const header = text.match(
+				/^\[((?:[A-Za-z0-9_-]+|"(?:[^"\\\r\n]|\\.)*")(?:\.(?:[A-Za-z0-9_-]+|"(?:[^"\\\r\n]|\\.)*"))*)\]$/
+			);
 			assert.ok(header, 'Unsupported installed section layout');
 			section = header[1];
 			if (section === 'metrics') {
