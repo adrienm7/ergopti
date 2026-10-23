@@ -1628,6 +1628,15 @@ local function main()
 	-- 8.7) Define the control-key callback.
 	local function handle_control(key_name, detail)
 		if user_hotstring_native then user_hotstring_native.observe_input() end
+		-- Forwarded document controls retire the AI's old caret independently of
+		-- the hotstring word-reset options. Consumed offer chords never get here;
+		-- Undo must withdraw before its early return restores the trigger.
+		if prediction_engine and (key_name == "backspace" or key_name == "escape"
+			or key_name == "home" or key_name == "end" or key_name == "pageup" or key_name == "pagedown"
+			or key_name == "up" or key_name == "down" or key_name == "left" or key_name == "right"
+			or key_name == "delete" or key_name == "insert" or key_name == "enter") then
+			pcall(function() prediction_engine.withdraw() end)
+		end
 		-- A modifier chord. Two things happen here that could not happen before,
 		-- because the hook reported the bare string "shortcut" and dropped which
 		-- key it was: the user's own binding runs, and the press is recorded.
@@ -1755,13 +1764,6 @@ local function main()
 			engine:backspace()
 		else
 			effect = WordReset.apply_control(engine, key_name, detail, _cached_app_id)
-		end
-		-- Withdraw any LLM prediction on Backspace or Escape. Withdraw, not
-		-- cancel: the buffer was just edited above, and cancel resets it.
-		if key_name == "backspace" or key_name == "escape" then
-			if prediction_engine then
-				pcall(function() prediction_engine.withdraw() end)
-			end
 		end
 		Logger.debug(LOG, "Control key '%s' — buffer %s.", key_name, effect)
 	end

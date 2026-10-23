@@ -550,6 +550,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_entries_retired_provider",
 	"tests.unit.modules.llm.remote.test_local_server_auth_policy",
 	"tests.unit.modules.llm.prediction.test_prediction_backend",
+	"tests.unit.modules.llm.prediction.test_prediction_control_retirement",
 	"tests.unit.modules.llm.prediction.test_prediction_injection_owner",
 	"tests.unit.modules.llm.ollama.test_model_download",
 	"tests.unit.modules.llm.settings.test_display_settings",
