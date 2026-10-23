@@ -217,6 +217,20 @@ Test("windows: the window factory refuses AlwaysOnTop and WS_EX_TOPMOST (ui-focu
 ; ========================================================
 ; ========================================================
 
+; A captured singleton may be presented after native callouts, but its local
+; name alone is not proof that the requested global window was retained.
+_WMPW_HasCapturedPresentation(Body, WindowGlobal, Call) {
+	Code := _DriverMaskNonCode(&Body)
+	PresentPos := InStr(Code, Call)
+	if !PresentPos
+		return false
+	BeforePresent := SubStr(Code, 1, PresentPos - 1)
+	if !RegExMatch(BeforePresent, "m)^[ \t]+Window\s*:=\s*" . WindowGlobal . "(?=\s*(?:,|$))")
+		return false
+	RegExReplace(BeforePresent, "(?<![A-Za-z0-9_.])Window\s*:=", "", &Assignments)
+	return Assignments == 1
+}
+
 _WMPW_EveryReopenPresentsThroughTheHelper() {
 	; Top-level re-open paths and the exact window each must present.
 	Sites := Map(
@@ -229,14 +243,35 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 		"_PromptEdWeb_TryOpen", "WMPresentWindow(Window)",
 		"_Onboarding_TryWeb", "WMPresentWindow(_ob_gui)",
 		"_HCWWeb_TryOpen", "WMPresentWindow(_HCWWeb_Gui)",
-		"_HsEdWeb_TryOpen", "WMPresentWindow(_HsEdWeb_Gui)",
+		"_HsEdWeb_TryOpen", "WMPresentWindow(Window)",
 		"OpenHotstringsConfigWindow", "WMPresentWindow(_HCWGui)",
 		"KLWV_Focus", 'WMPresentWindow(KLWV.windows[which]["gui"])'
 	)
+	CapturedGlobals := Map("_HsEdWeb_TryOpen", "_HsEdWeb_Gui",
+		"_PromptEdWeb_TryOpen", "_PromptEdWeb_Gui")
 	for Name, Call in Sites {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . " must exist")
 		Assert(InStr(Body, Call) > 0, Name . " must present its open window with " . Call)
+		if CapturedGlobals.Has(Name) {
+			WindowGlobal := CapturedGlobals[Name]
+			Assert(_WMPW_HasCapturedPresentation(Body, WindowGlobal, Call),
+				Name . " must present the exact singleton captured before native callouts")
+			Origin := "Window := " . WindowGlobal
+			Code := _DriverMaskNonCode(&Body)
+			Assert(!RegExMatch(Code, "\b(?:Window|" . WindowGlobal . ")\.Show\("),
+				Name . " must not bypass presentation with a raw singleton Show")
+			WithoutCapture := InStr(Body, Origin . ", ")
+				? StrReplace(Body, Origin . ", ", "") : StrReplace(Body, Origin, "")
+			AssertFalse(_WMPW_HasCapturedPresentation(WithoutCapture, WindowGlobal, Call),
+				Name . " must reject a missing singleton capture")
+			for Replacement in ["Window := Foreign", Origin . "`nWindow := Foreign"]
+				AssertFalse(_WMPW_HasCapturedPresentation(StrReplace(Body, Origin, Replacement), WindowGlobal, Call),
+					Name . " must reject a redirected or overwritten singleton capture")
+			LateCapture := StrReplace(WithoutCapture, Call, Call . "`n" . Origin)
+			AssertFalse(_WMPW_HasCapturedPresentation(LateCapture, WindowGlobal, Call),
+				Name . " must capture its singleton before presenting it")
+		}
 		Assert(!RegExMatch(Body, "WinActivate\("),
 			Name . " must not re-activate its window with a bare WinActivate: the shared helper restores it and logs a refusal")
 	}
