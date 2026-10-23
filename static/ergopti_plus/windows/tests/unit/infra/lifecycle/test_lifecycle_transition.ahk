@@ -350,3 +350,4 @@ Test("lifecycle transition: real programmable cancellation debt gates suspend ac
 #Include test_suspend_prefetch_receipt.ahk
 
 #Include test_keepawake_suspend_owner.ahk
+#Include test_uia_suspend_worker_debt.ahk
