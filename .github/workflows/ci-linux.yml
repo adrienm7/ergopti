@@ -480,7 +480,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Launch option-looking application ids through actual GTK desktop entries
@@ -506,7 +515,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace build-essential meson ninja-build liblua5.4-dev libffi-dev pkg-config
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Terminate real descendants after their process leader exits
@@ -548,7 +566,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dbus-x11 util-linux
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Derive encryption keys from the actual D-Bus machine ID
@@ -2508,7 +2535,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-tools xkb-data
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # No display server needed: `xkbcli compile-keymap --layout fr` produces the
@@ -2575,7 +2611,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-x11-0 libx11-6 libx11-xcb1 libxtst6 xvfb x11-xkb-utils
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # This fixture owns its Xvfb PID and reads actual native XKB group/map
@@ -2676,7 +2721,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # "Needs a display server" sounded like "needs a desktop", and it does not.
@@ -2749,7 +2803,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # An FFI binding is a set of NAMES — three sonames and thirteen symbols —
@@ -2782,7 +2845,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # The symbols resolving is not the icon appearing. A panel shows a tray
@@ -2836,7 +2908,16 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # The secure-field probe decides whether ANY expansion may fire (it fails
@@ -2865,7 +2946,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Launch the bounded accessibility helper with Lua interpreter options
@@ -2929,7 +3019,16 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'updater' }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # The updater a user runs, run: this tree built as an old release and
@@ -2975,7 +3074,16 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # This loopback fixture uses the actual libuv/curl adapter, including a
@@ -3002,7 +3110,16 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # This lane qualifies native runtime admission and installed helper paths.
@@ -3140,7 +3257,16 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # This prerequisite proof is independent of official runtime/model downloads.
@@ -3165,7 +3291,16 @@ jobs:
         if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # The AI a user runs locally, run: the official Ollama serving a small
@@ -3376,7 +3511,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Preserve literal desktop notification text
@@ -3523,7 +3667,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # The release list a user opens from the tray, opened: real WebKit, the
@@ -3557,7 +3710,16 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       # The typing-speed readouts, drawn: the floating pill through its real GTK
