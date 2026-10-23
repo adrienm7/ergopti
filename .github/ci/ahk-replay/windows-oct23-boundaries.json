@@ -1,0 +1,33 @@
+{
+	"expected_count": 26,
+	"filters": [
+		{
+			"contains": "hcw-early-show-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "hcw-startup-owner",
+			"expected_count": 5
+		},
+		{
+			"contains": "gesture-powershell-path-encoding",
+			"expected_count": 4
+		},
+		{
+			"contains": "updater-finalize-nonblocking",
+			"expected_count": 1
+		},
+		{
+			"contains": "layout-refresh-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "layout-refresh-completion",
+			"expected_count": 6
+		},
+		{
+			"contains": "keylogger-fire-publication-owner",
+			"expected_count": 3
+		}
+	]
+}
