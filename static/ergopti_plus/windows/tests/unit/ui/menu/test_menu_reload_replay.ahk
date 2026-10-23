@@ -491,6 +491,128 @@ _MRR_WiringBody() {
 Test("menu reload replay: OnExit publishes, boot consumes and every dispatch meets the hand-off",
 	_MRR_WiringBody)
 
+
+
+
+; =====================================================
+; =====================================================
+; ======= 4/ A Reload click joins the reload ==========
+; =====================================================
+; =====================================================
+
+; Linux and macOS decided (d8f6fbf1d2) that a Reload click made while a reload is
+; in flight joins it: logged and dropped, never held and replayed by the
+; successor, which would reload a second time. The Windows tray held it like any
+; other command, so the successor reloaded again right after it started.
+
+/** The tray root of _MRR_BuildTray plus a Reload row, as the real builder registers it. */
+_MRR_BuildWithReload(Fixture, Who) {
+	global _MenuDispatchTokens
+	Tray := _MRR_BuildTray(Fixture, Who)
+	Command := MenuStartupReloadCommand(_MRR_Command.Bind(Fixture.Runs, Who . " reload"))
+	AssertEqual(1, RegisterMenuItem(Tray.Root, "Reload", Command))
+	ItemId := _MenuItemIdAtPosition(Tray.Root, 1)
+	AssertTrue(ItemId > 0)
+	Tray.ReloadCommand := Command
+	Tray.ReloadIdentity := {ItemId: ItemId, Token: _MenuDispatchTokens[ItemId]}
+	return Tray
+}
+
+_MRR_ClickReload(Fixture, Tray) {
+	return MenuCommandRun(Tray.ReloadCommand, ["Reload", 2, Tray.Root], 0, () => false,
+		_MRR_Arm.Bind(Fixture), Tray.ReloadIdentity)
+}
+
+_MRR_JoinLog(Lines, Line) {
+	Lines.Push(Line)
+}
+
+_MRR_JoinBody(Fixture) {
+	global _MenuReloadReplayRoot, _LOGGER_INFO_ENABLED
+	Old := _MRR_BuildWithReload(Fixture, "predecessor")
+	_MenuReloadReplayRoot := Old.Root
+
+	; Not in flight: the click is an ordinary command and reloads.
+	AssertEqual("ran", _MRR_ClickReload(Fixture, Old), "with no reload in flight the click runs")
+	AssertEqual(1, Fixture.Runs.Length)
+	Fixture.Runs.Pop()
+
+	_MRR_ReloadPending()
+	Lines := []
+	SavedInfo := _LOGGER_INFO_ENABLED
+	try {
+		_LOGGER_INFO_ENABLED := true
+		LoggerSetTestSink(_MRR_JoinLog.Bind(Lines))
+		AssertEqual("", _MRR_ClickReload(Fixture, Old), "a Reload click during a reload joins it")
+	} finally {
+		LoggerClearTestSink()
+		_LOGGER_INFO_ENABLED := SavedInfo
+	}
+	AssertEqual(0, Fixture.Runs.Length, "the joined click does not reload a second time")
+	AssertEqual(0, MenuReloadReplay_HeldCount(), "it is not held for the successor to replay")
+	AssertEqual(0, Fixture.Armed.Length, "no look is scheduled for it either")
+	Joined := false
+	for Line in Lines
+		if InStr(Line, "joined the reload in flight")
+			Joined := true
+	AssertTrue(Joined, "the join is logged, so a lost click is never silent")
+
+	; A feature command clicked meanwhile is still carried to the successor.
+	AssertEqual("", MenuCommandRun(Old.Command, ["Toggle", 2, Old.Sub], 0, () => false,
+		_MRR_Arm.Bind(Fixture), Old.Identity))
+	AssertEqual(1, MenuReloadReplay_HeldCount())
+	AssertTrue(MenuReloadReplay_Publish(Fixture.File))
+
+	; The reload was accepted and its hand-off published: a late Reload click still joins.
+	AssertEqual("", _MRR_ClickReload(Fixture, Old))
+	AssertEqual(0, Fixture.Runs.Length)
+
+	_MRR_ReloadEnded()
+	New := _MRR_BuildWithReload(Fixture, "successor")
+	_MenuReloadReplayRoot := New.Root
+	Paths := MenuReloadReplay_Consume(Fixture.File, _MRR_Notify.Bind(Fixture))
+	AssertEqual(1, Paths.Length, "the successor receives the toggle, not the Reload click")
+	AssertEqual("Toggle", Paths[1][2])
+	_MRR_SuccessorDrains(Fixture, Paths)
+	AssertEqual(1, Fixture.Runs.Length)
+	AssertEqual("successor", Fixture.Runs[1].Who, "and replays only that toggle")
+	AssertEqual("Toggle", Fixture.Runs[1].Name)
+}
+Test("menu reload replay: a Reload click during a reload joins it instead of reloading again (reload-click-joins)",
+	(*) => _MRR_Run(_MRR_JoinBody))
+
+_MRR_JoinWiring() {
+	global _TrayMenuStage
+	SavedStage := _TrayMenuStage
+	try {
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageReload()
+		_MI_StageQuit()
+		AssertEqual(2, _TrayMenuStage.Length)
+		AssertTrue(_TrayMenuStage[1]["target"] is MenuStartupReloadCommand,
+			"the real Reload row carries the joining marker")
+		AssertFalse(_TrayMenuStage[2]["target"] is MenuStartupReloadCommand,
+			"Quit never joins a reload")
+	} finally _TrayMenuStage := SavedStage
+}
+Test("menu reload replay: the staged Reload row, and only it, is marked as joining (reload-click-joins)",
+	_MRR_JoinWiring)
+
+_MRR_JoinLifecycleBody(Fixture) {
+	global _MenuReloadReplayRoot, _MSC_UnexpectedLifecycleCalls
+	Saved := _MSC_UnexpectedLifecycleCalls
+	_MSC_UnexpectedLifecycleCalls := []
+	try {
+		_MRR_ReloadPending()
+		AssertEqual("", TrayStartupCommand("reload"),
+			"a retained startup Reload meets the reload already in flight")
+		AssertEqual(0, _MSC_UnexpectedLifecycleCalls.Length, "it does not ask for a second reload")
+	} finally _MSC_UnexpectedLifecycleCalls := Saved
+}
+Test("menu reload replay: a startup Reload intent joins the reload in flight too (reload-click-joins)",
+	(*) => _MRR_Run(_MRR_JoinLifecycleBody))
+
 #Include test_menu_reload_replay_identity.ahk
 
 #Include test_menu_reload_replay_hold_owner.ahk

@@ -74,17 +74,22 @@ Test("driver-control: the control folder follows the declared Windows base", _TD
 
 
 ; A genuine session over a temporary folder, with the native ports replaced.
-_TDC_World(Body, ReloadResult := 1) {
+_TDC_World(Body, ReloadResult := 1, InFlight := 0) {
 	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
 	Folder := A_Temp . "\ergopti-driver-control-" . A_TickCount . "-" . Random(1, 1000000)
-	World := {Calls: [], Refused: 0, Stage: 0, Endpoint: 0, Started: 0, Stopped: 0,
-		Successor: 4242, Result: ReloadResult, Spec: Spec, Token: Corpus["token"], Folder: Folder}
+	; InFlight: the pid of a successor an earlier reload already launched.
+	World := {Calls: [], Refused: 0, Stage: 0, Endpoint: 0, Started: 0, Stopped: 0, Launched: false,
+		Successor: 4242, Result: ReloadResult, Spec: Spec, Token: Corpus["token"], Folder: Folder,
+		InFlight: InFlight}
 	Reload(SuccessFn, Bundle, RefusedFn, StageFn) {
 		World.Calls.Push([SuccessFn, Bundle])
 		World.Refused := RefusedFn, World.Stage := StageFn
+		World.Launched := World.Result == 1
 		return World.Result
 	}
-	Pending() => World.Successor ? Map("successor", Map("pid", World.Successor)) : false
+	; The hand-off record exists from the launch of a successor until OnExit.
+	Pending() => World.InFlight ? Map("successor", Map("pid", World.InFlight))
+		: World.Launched ? Map("successor", Map("pid", World.Successor)) : false
 	Endpoint(Handler) {
 		World.Endpoint := Handler
 		return {Start: (*) => World.Started += 1, Stop: (*) => World.Stopped += 1}
@@ -166,6 +171,27 @@ _TDC_OwnerRefuses() {
 	}
 }
 Test("driver-control: a reload the owner does not start is refused", _TDC_OwnerRefuses)
+
+; Linux and macOS join a reload in flight for a menu click (d8f6fbf1d2); the
+; local control follows the same rule on Windows instead of answering "busy".
+_TDC_JoinsReloadInFlight() {
+	_TDC_World(Body, 1, 7777)
+	Body(World) {
+		World.Session.Start()
+		_TDC_Request(World, World.Token, "cli-2")
+		AssertTrue(World.Endpoint.Call(), "a request made during a reload is admitted")
+		AssertEqual(0, World.Calls.Length, "it never asks the reload owner for a second reload")
+		Requested := '{"schema":1,"request_id":"cli-2","state":"requested","driver_pid":1000,"successor_pid":7777}`n'
+		AssertEqual(Requested, _TDC_Read(World, "result"),
+			"it is reported as requested, naming the successor already launched")
+		AssertEqual('{"schema":1,"request_id":"cli-2","state":"completed","driver_pid":7777,"successor_pid":7777}`n',
+			DriverControl_Completion(World.Spec, Requested, 7777),
+			"the successor in flight completes the joined request")
+		AssertFalse(FileExist(World.Folder . "\reload.request"), "the request is consumed")
+	}
+}
+Test("driver-control: a request made during a reload joins it instead of being refused busy (reload-click-joins)",
+	_TDC_JoinsReloadInFlight)
 
 _TDC_SuccessorCompletes() {
 	_TDC_World(Body)

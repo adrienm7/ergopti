@@ -473,7 +473,7 @@ _MI_StageReload() {
 		Map("reload", MenuStartupLifecycleDispatch.Bind("reload", ActivateReload)))
 	if Row is Map && Row.Has("action") {
 		; Keep lifecycle admission explicit after the shared provider wraps its callback.
-		TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))
+		TrayMenuStage_AddAction(Row["label"], MenuStartupReloadCommand(Row["action"]))
 		if Row.Get("disabled", false)
 			TrayMenuStage_Disable(Row["label"])
 	}

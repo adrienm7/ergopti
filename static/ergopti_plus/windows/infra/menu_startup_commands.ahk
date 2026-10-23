@@ -29,6 +29,14 @@ class MenuStartupSafeCommand {
 	}
 }
 
+/**
+ * Marks the Reload row. A click on it made while a reload is already in flight
+ * joins that reload (MenuCommandRun) instead of being held and replayed by the
+ * successor as a second reload; the Linux and macOS trays follow the same rule.
+ */
+class MenuStartupReloadCommand extends MenuStartupSafeCommand {
+}
+
 /** Admits a read-only window after its cleanup owner exists, before input readiness. */
 class MenuStartupUiCommand extends MenuStartupSafeCommand {
 	__New(Callback, ReadyFn) {
