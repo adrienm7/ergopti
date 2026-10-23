@@ -1,31 +1,13 @@
---- tests/meta/regressions/test_audit_v5_fixes.lua
+--- tests/meta/runloop/test_keymap_synthetic_ledger_provenance.lua
 
 --- ==============================================================================
---- MODULE: Audit V5 Regression Guards
+--- MODULE: Keymap synthetic ledger provenance (meta)
 --- DESCRIPTION:
---- Static-source regression guards for the four bugs fixed from the expert audit
---- report RAPPORT_AUDIT_EXPERT_HAMMERSPOON.md (macOS/Hammerspoon side):
----   1. gestures/engine.lua: diagonal detection used `adx >= diagMin and ady >=
----      diagMin`, requiring ~2x the intended total distance. Fixed to `dist >= diagMin`.
----   2. modules/llm/api_mlx.lua: `_server_pgid_pending` stayed true forever if the
----      MLX server crashed before emitting its PID line. Fixed with a 15s timeout.
----   3. modules/keymap/init.lua: timing, character equality, and process identity
----      were replaced by immutable SyntheticInput user-data tags. Keymap now
----      classifies once and filters owned events before physical-input mutation.
----   4. init.lua: `grep -c .` exit-code 1 on empty input is now silenced with
----      `|| true` to protect against future `set -e` shells.
+--- The keymap classifies once and filters owned synthetic events by immutable tag before any physical-input work.
+--- Source-scan guard split out of the audit-named regression file it came from.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-
--- Takes a selector unique to one production file rather than that file's
--- path, so moving or splitting a module cannot turn these invariants into
--- path errors.
-local function read_source(selector)
-	local src = helpers.read_driver_source(selector)
-	return src
-end
-
 
 --- Reads the single production unit that owns an ordering invariant.
 --- @param selector string
@@ -196,100 +178,6 @@ local function has_no_synthetic_heuristic(source)
 	return true
 end
 
-
-
-
-
--- ===============================================================================
--- ===============================================================================
--- ======= 1/ gestures/engine.lua — diagonal uses dist (not and condition) =======
--- ===============================================================================
--- ===============================================================================
-
-helpers.describe("gestures/engine.lua: diagonal detection uses total distance (audit-v5)", function()
-
-	-- computeDir() (which owns the diagonal-distance guard) was extracted from
-	-- gestures/engine.lua into the self-contained gestures/geometry.lua. Read
-	-- both so the guard assertions survive that move (move-resilient).
-	local function read_geometry_src()
-		return (read_source("local function triggerLiveAxisIfNeeded") or "") ..
-			"\n" .. (read_source("function M.slotForDir") or "")
-	end
-
-	helpers.it("old `adx >= diagMin and ady >= diagMin` pattern is gone", function()
-		local src = read_geometry_src()
-		helpers.assert_true(
-			not src:find("adx >= diagMin and ady >= diagMin", 1, true),
-			"engine/geometry must not use `adx >= diagMin and ady >= diagMin` (requires 2x distance)")
-	end)
-
-	helpers.it("diagonal check uses `dist >= diagMin`", function()
-		local src = read_geometry_src()
-		helpers.assert_true(
-			src:find("dist >= diagMin", 1, true) ~= nil,
-			"engine/geometry diagonal check must use `dist >= diagMin` (Manhattan total distance)")
-	end)
-
-end)
-
-
-
-
-
--- ================================================================================
--- ================================================================================
--- ======= 2/ api_mlx.lua — reset_endpoints arms a 15s PGID-pending timeout =======
--- ================================================================================
--- ================================================================================
-
-helpers.describe("modules/llm/api_mlx.lua: PGID-pending safety timeout (audit-v5)", function()
-
-	helpers.it("declares _pgid_pending_timeout variable", function()
-		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
-		helpers.assert_true(
-			src:find("_pgid_pending_timeout", 1, true) ~= nil,
-			"api_mlx.lua must declare _pgid_pending_timeout for the safety-timeout handle")
-	end)
-
-	helpers.it("reset_endpoints arms the canonical 15-second PGID timeout", function()
-		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
-		helpers.assert_true(
-			src:find("local PGID_PENDING_TIMEOUT_SEC%s*=%s*15%.0", 1, false) ~= nil,
-			"api_mlx.lua must keep the canonical PGID-pending timeout at 15 seconds")
-		-- Find the reset_endpoints function body
-		local idx = src:find("function M%.reset_endpoints%(", 1, false)
-		helpers.assert_true(idx ~= nil, "reset_endpoints must exist in api_mlx.lua")
-		-- Extract up to the closing `end` of that function
-		local rest = src:sub(idx)
-		local _, stop = rest:find("\nend\n")
-		local body = stop and rest:sub(1, stop) or rest
-		helpers.assert_true(
-			body:find("TimerScheduler%.after%(PGID_PENDING_TIMEOUT_SEC", 1, false) ~= nil,
-			"reset_endpoints must arm its PGID-pending safety timeout from the canonical constant")
-	end)
-
-	helpers.it("timeout callback clears _server_pgid_pending", function()
-		local src = read_source("local function read_user_port_override") -- modules/llm/api_mlx.lua
-		local idx = src:find("function M%.reset_endpoints%(", 1, false)
-		local rest = src:sub(idx)
-		local _, stop = rest:find("\nend\n")
-		local body = stop and rest:sub(1, stop) or rest
-		helpers.assert_true(
-			body:find("_server_pgid_pending%s*=%s*false", 1, false) ~= nil,
-			"reset_endpoints timeout must set _server_pgid_pending = false on expiry")
-	end)
-
-end)
-
-
-
-
--- ================================================================================
--- ================================================================================
--- ======= 3/ keymap/init.lua — synthetic ledger uses provenance ===================
--- ================================================================================
--- ================================================================================
-
 helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated (audit-v5)", function()
 
 	helpers.it("classifies exactly once with the physical fence before every raw route", function()
@@ -378,32 +266,6 @@ helpers.describe("modules/keymap/init.lua: synthetic ledger is provenance-gated 
 			helpers.assert_true(not has_no_synthetic_heuristic(mutant),
 				"the heuristic class guard must be sensitive to: " .. marker)
 		end
-	end)
-
-end)
-
-
-
-
--- =========================================================================
--- =========================================================================
--- ======= 4/ init.lua — grep -c . uses || true for set -e safety ==========
--- =========================================================================
--- =========================================================================
-
-helpers.describe("boot_cleanup.lua: grep -c . is guarded with || true (audit-v5)", function()
-
-	helpers.it("grep -c . is followed by || true", function()
-		-- The MLX boot kill_cmd was extracted from init.lua into the
-		-- modules/llm/boot_cleanup.lua sibling; the set -e guard moved with it.
-		-- Selected by a declaration unique to modules/llm/boot_cleanup.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("function M.run_selective_cleanup")
-		helpers.assert_true(src ~= nil, "modules/llm/boot_cleanup.lua source must be locatable")
-		helpers.assert_true(
-			src:find("grep -c . || true", 1, true) ~= nil,
-			"boot_cleanup.lua kill_cmd must use `grep -c . || true` to survive set -e shells")
 	end)
 
 end)

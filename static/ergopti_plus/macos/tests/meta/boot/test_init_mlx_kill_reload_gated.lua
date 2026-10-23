@@ -37,7 +37,7 @@ helpers.assert_true(
 -- menu_llm.terminate_orphan_mlx_server() (so the shutdown and script_quit paths
 -- cannot drift). The reload GATE — the invariant this test protects — still wraps
 -- the kill: the guarded region must invoke that shared helper. The pgrep command
--- itself is asserted in test_script_quit_revokes_karabiner_lease / test_audit_senior_hs_fixes.
+-- itself is asserted in test_script_quit_revokes_karabiner_lease / test_shutdown_stops_script_watchers.
 helpers.assert_true(
 	region:find("terminate_orphan_mlx_server", 1, true) ~= nil,
 	"The reload-guarded region must invoke menu_llm.terminate_orphan_mlx_server (the MLX kill)"
