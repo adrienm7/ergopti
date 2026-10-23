@@ -365,6 +365,51 @@
 					"platforms": ["macos"]
 				},
 				{
+					"id": "key_downs",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_ups",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_ups_orphaned",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_ups_lost",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_stuck",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_long_holds",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_late",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_late_passed",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "key_lease_failures",
+					"type": "count",
+					"platforms": ["macos"]
+				},
+				{
 					"id": "kanata_running",
 					"type": "bool",
 					"platforms": ["linux"]
@@ -650,6 +695,42 @@
 										"unknown"
 									],
 									"default": "unknown"
+								},
+								"key_downs": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_ups": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_ups_orphaned": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_ups_lost": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_stuck": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_long_holds": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_late": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_late_passed": {
+									"kind": "integer",
+									"minimum": 0
+								},
+								"key_lease_failures": {
+									"kind": "integer",
+									"minimum": 0
 								}
 							}
 						},

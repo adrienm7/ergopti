@@ -4942,6 +4942,55 @@ type = "command"
 id = "healthcheck"
 i18n = "menu.debug.healthcheck"
 
+# One-click field checks of the macOS input and network chain (issue #101, item
+# 31). Each runs read-only steps, opens a result window with a Copy report
+# button and writes one compact record, with no key, path or URL, to the log.
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_lease"
+i18n = "menu.debug.field_check_lease"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_owned_runtime"
+i18n = "menu.debug.field_check_owned_runtime"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_network"
+i18n = "menu.debug.field_check_network"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_key_accounting"
+i18n = "menu.debug.field_check_key_accounting"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+# Two one-click measurements of the Windows input-hook architecture (open items
+# 49 and 50): they exercise AutoHotkey's SendInput and its keyboard hook, which
+# no other driver has. Each writes a compact record, with no typed content, to
+# today's log under the InputProbe tag.
+[[menu.debug_menu]]
+type = "command"
+id = "send_probe"
+i18n = "menu.debug.send_probe"
+platforms = ["ahk"]
+reason_key = "platform_reason.input_probe_is_autohotkey_specific"
+
+[[menu.debug_menu]]
+type = "command"
+id = "hook_probe"
+i18n = "menu.debug.hook_probe"
+platforms = ["ahk"]
+reason_key = "platform_reason.input_probe_is_autohotkey_specific"
+
 # Right under the diagnostics window (the maintainer's request of 2026-10-02):
 # it decides whether an error shows itself, which that window then explains.
 [[menu.debug_menu]]
@@ -5902,6 +5951,15 @@ platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
 
+# The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
+[[menu.layout_menu]]
+type = "choice"
+id = "virtual_keyboard"
+path = "layout.virtual_keyboard"
+i18n = "menu.layout.virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
+
 # The menubar icon, ONE row with its variants beneath it, last of the Ergopti
 # section. It was two sibling rows, one per variant, stored in hs.settings.
 [[menu.layout_menu]]
@@ -5920,15 +5978,6 @@ unavailable = "hide"
 # The input sources macOS has enabled, under a header of their own (« Sources
 # de saisie »): without it the list read as more Ergopti settings.
 [[menu.layout_menu]]
-# The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
-[[menu.layout_menu]]
-type = "choice"
-id = "virtual_keyboard"
-path = "layout.virtual_keyboard"
-i18n = "menu.layout.virtual_keyboard"
-platforms = ["hs"]
-reason_key = "platform_reason.virtual_keyboard_is_karabiner"
-
 type = "section_header"
 i18n = "menu.layout.active_layouts"
 platforms = ["hs"]
