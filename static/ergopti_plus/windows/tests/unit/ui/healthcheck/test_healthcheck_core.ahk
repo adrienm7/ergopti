@@ -651,3 +651,4 @@ Test("HealthCheck cleanup-history: immediate cancel export retains existing trut
 #Include test_healthcheck_session_owner.ahk
 #Include test_healthcheck_pac_response.ahk
 #Include test_healthcheck_pac_encoding.ahk
+#Include test_healthcheck_pac_boundaries.ahk
