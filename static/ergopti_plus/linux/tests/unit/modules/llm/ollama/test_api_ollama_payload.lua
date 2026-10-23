@@ -150,3 +150,29 @@ helpers.describe("ollama payload: endpoint composition", function()
 			"an operation path must never be appended to another operation endpoint")
 	end)
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Thinking is switched off =============================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("ollama payload: thinking models", function()
+
+	helpers.it("sends think=false at the top level like the other two drivers", function()
+		local body = captured_request({ stream = true, line_mode = true }).body
+		helpers.assert_true(body:find('"think":false', 1, true) ~= nil,
+			"without it a thinking model spends its token budget and seconds of latency on a "
+				.. "reasoning trace that is stripped afterwards; Windows and macOS disable it")
+	end)
+
+	helpers.it("sends a zero thinking budget in the options", function()
+		local body = captured_request({ stream = true, line_mode = false }).body
+		helpers.assert_true(body:find('"thinking_budget":0', 1, true) ~= nil,
+			"Windows and macOS both send options.thinking_budget=0 for servers that read it")
+	end)
+
+end)
