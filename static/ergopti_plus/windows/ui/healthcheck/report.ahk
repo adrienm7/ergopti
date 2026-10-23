@@ -397,6 +397,16 @@ _HCReport_Notify(Title, Body, Kind) {
 	return true
 }
 
+; What identifies this machine in paths: the profile folder, the account name
+; and the configuration directory, whose folder and file names are chosen by
+; the user.
+; @returns {Map} { home, user, config_dir } (config_dir is "" before boot knows it)
+_HCReport_Identity() {
+	global _ConfigDir
+	return Map("home", EnvGet("USERPROFILE"), "user", A_UserName,
+		"config_dir", IsSet(_ConfigDir) ? RTrim(_ConfigDir, "\") : "")
+}
+
 ; The production side effects; a test replaces any of them.
 ; @param Overrides {Map|Integer} Replacement effects, or 0.
 ; @returns {Map}
@@ -410,7 +420,7 @@ _HCReport_Effects(Overrides := 0) {
 		"open",     _HCReport_Open,
 		"open_url", ExternalUrl_OpenHttp,
 		"notify",   _HCReport_Notify,
-		"identity", () => Map("home", EnvGet("USERPROFILE"), "user", A_UserName))
+		"identity", _HCReport_Identity)
 	if (Overrides is Map) {
 		for Name, Fn in Overrides
 			Effects[Name] := Fn
@@ -421,14 +431,15 @@ _HCReport_Effects(Overrides := 0) {
 ; What identifies this machine in paths and text, for redaction. Windows paths
 ; compare case-insensitively.
 ; @param Overrides {Map|Integer} Replacement side effects (tests only).
-; @returns {Map} { home, user, case_insensitive }
+; @returns {Map} { home, user, config_dir, case_insensitive }
 HealthCheck_RedactionContext(Overrides := 0) {
 	Identity := _HCReport_Effects(Overrides)["identity"].Call()
 	; Without the profile folder nothing would remove it, and every path under
 	; it would be published
 	if (Identity["home"] == "")
 		throw Error("The profile folder is unknown, so nothing could be redacted.")
-	return Map("home", Identity["home"], "user", Identity["user"], "case_insensitive", true)
+	return Map("home", Identity["home"], "user", Identity["user"],
+		"config_dir", Identity.Get("config_dir", ""), "case_insensitive", true)
 }
 
 

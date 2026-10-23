@@ -95,6 +95,7 @@ local DEFAULT_EFFECTS = {
 		return {
 			home = require("infra.config_paths").home(),
 			user = os.getenv("USER") or os.getenv("LOGNAME"),
+			config_dir = require("infra.config_paths").get_config_dir(),
 		}
 	end,
 }
@@ -112,7 +113,7 @@ end
 --- What identifies this machine in paths and text, for redaction. Linux file
 --- systems compare paths case-sensitively.
 --- @param overrides table|nil Replacement side effects (tests only).
---- @return table { home, user, case_insensitive }
+--- @return table { home, user, config_dir, case_insensitive }
 function M.redaction_context(overrides)
 	local identity = effects_with(overrides).identity()
 	-- Without the home folder nothing would remove it, and every path under it
@@ -120,7 +121,7 @@ function M.redaction_context(overrides)
 	if type(identity.home) ~= "string" or identity.home == "" then
 		error("the home folder is unknown, so nothing could be redacted")
 	end
-	return { home = identity.home, user = identity.user, case_insensitive = false }
+	return { home = identity.home, user = identity.user, config_dir = identity.config_dir, case_insensitive = false }
 end
 
 

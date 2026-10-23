@@ -193,7 +193,13 @@ local DEFAULT_EFFECTS = {
 	notify = function(title, body, kind)
 		return require("adapters.application_notifier").send(title, { body = body, kind = kind })
 	end,
-	identity = function() return { home = os.getenv("HOME"), user = os.getenv("USER") } end,
+	identity = function()
+		local ConfigPaths = require("infra.config_paths")
+		return {
+			home = os.getenv("HOME"), user = os.getenv("USER"),
+			config_dir = ConfigPaths.is_initialized() and ConfigPaths.get_config_dir() or nil,
+		}
+	end,
 }
 
 --- Merges test overrides over the production effects.
@@ -208,7 +214,7 @@ end
 
 --- What identifies this machine in paths and text, for redaction.
 --- @param overrides table|nil Replacement side effects (tests only).
---- @return table { home, user, case_insensitive }
+--- @return table { home, user, config_dir, case_insensitive }
 function M.redaction_context(overrides)
 	local identity = effects_with(overrides).identity()
 	-- Without the home folder nothing would remove it, and every path under it
@@ -217,7 +223,7 @@ function M.redaction_context(overrides)
 		error("the home folder is unknown, so nothing could be redacted")
 	end
 	-- APFS is case-insensitive by default, and so is every path a user types
-	return { home = identity.home, user = identity.user, case_insensitive = true }
+	return { home = identity.home, user = identity.user, config_dir = identity.config_dir, case_insensitive = true }
 end
 
 

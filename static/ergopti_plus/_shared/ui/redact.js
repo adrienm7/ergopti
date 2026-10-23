@@ -6,8 +6,9 @@
  * DESCRIPTION:
  * Removes what must not leave the machine from diagnostic text before it is
  * copied, saved or sent to a GitHub issue: token-like secrets (URL credentials
- * included), the home folder, the account name, other accounts' profile folders
- * and e-mail addresses. The diagnostics page builds that text and shows a
+ * included), the home folder, the account name, other accounts' profile folders,
+ * the folder and file names under the configuration directory and e-mail
+ * addresses. The diagnostics page builds that text and shows a
  * preview of it, so the page redacts it; the rules are data in
  * _shared/modules/diagnostics/redaction.json, handed over by the host.
  *
@@ -26,6 +27,9 @@
  * 5. Case folding is ASCII-only, as in the other ports. toLowerCase() would
  *    also fold non-ASCII letters and change the length of some strings, which
  *    would shift every index found in the folded copy.
+ * 6. Folder and file names chosen by the user are masked whole, spaces and
+ *    non-ASCII letters included; under the configuration directory only the
+ *    names the product ships stay.
  * ==============================================================================
  */
 
@@ -51,6 +55,14 @@
 
 	// A character that continues a path segment after the home folder
 	var PATH_CHAR = /^[A-Za-z0-9_.-]$/;
+
+	// A character of a folder or file name chosen by a person: the path characters
+	// plus every non-ASCII one, so "José" is one name, not "Jos" and a leak. The
+	// ellipsis a log appends to a shortened path ends a name, so it is excluded
+	var NAME_CHAR = /^[A-Za-z0-9_.\-\u0080-‥‧-￿]$/;
+
+	// What can follow a complete name: a path separator, a quote, a line break
+	var NAME_END_CHAR = /^[\\/"'\r\n]$/;
 
 	// The characters of an e-mail local part and of a domain
 	var EMAIL_LOCAL = /^[A-Za-z0-9._%+-]$/;
@@ -244,6 +256,97 @@
 	}
 
 	/**
+	 * Returns the index of the last character of the name that starts at `from`:
+	 * a run of name characters, extended over single spaces (at most maxWords
+	 * words) when that makes the name end at a separator, a quote or the end of
+	 * the line, so "John Smith" is one folder but "jdoe and more" is the folder
+	 * "jdoe".
+	 * @param {string} source
+	 * @param {number} from 0-based.
+	 * @param {number} maxWords The most words one name may hold.
+	 * @returns {number} The name's last index, from - 1 when there is none.
+	 */
+	function nameEnd(source, from, maxWords) {
+		var firstEnd = runEnd(source, from, NAME_CHAR);
+		if (firstEnd < from) return firstEnd;
+		var stop = firstEnd;
+		var ends = function (index) {
+			return index >= source.length || charIs(source, index, NAME_END_CHAR);
+		};
+		for (var word = 1; word < maxWords; word++) {
+			if (ends(stop + 1)) return stop;
+			if (source.charAt(stop + 1) !== ' ') break;
+			var nextEnd = runEnd(source, stop + 2, NAME_CHAR);
+			if (nextEnd < stop + 2) break;
+			stop = nextEnd;
+		}
+		return ends(stop + 1) ? stop : firstEnd;
+	}
+
+	/**
+	 * Masks the folder and file names under the configuration directory: the
+	 * directory becomes its placeholder, each name below it the name placeholder
+	 * unless it is a name the product ships. Those names are chosen by the user
+	 * (a hotstring pack, a backup), so they identify a person.
+	 * @param {string} text
+	 * @param {object} rules
+	 * @param {string|undefined} dir The configuration directory as the text spells it.
+	 * @param {boolean} caseInsensitive
+	 * @returns {string}
+	 */
+	function maskConfigDir(text, rules, dir, caseInsensitive) {
+		if (typeof dir !== 'string') return text;
+		var trimmed = dir.replace(/[\/\\]+$/, '');
+		if (trimmed === '') return text;
+		var known = {};
+		rules.config_known_names.forEach(function (name) {
+			known[asciiLower(name)] = true;
+		});
+		var spellings = [];
+		[trimmed, trimmed.replace(/\\/g, '/'), trimmed.replace(/\//g, '\\')].forEach(
+			function (spelling) {
+				if (spellings.indexOf(spelling) < 0) spellings.push(spelling);
+			}
+		);
+		spellings.forEach(function (spelling) {
+			text = replaceOccurrences(text, spelling, caseInsensitive, function (source, first, last) {
+				if (charIs(source, last + 1, NAME_CHAR)) return null;
+				// A path right after a quote ends at the closing quote, spaces included
+				var quote = first > 0 ? source.charAt(first - 1) : '';
+				if (quote !== "'" && quote !== '"') quote = '';
+				var out = rules.config_placeholder;
+				var i = last + 1;
+				while (charIs(source, i, /^[\\/]$/)) {
+					var start = i + 1;
+					var stop;
+					if (quote !== '') {
+						stop = start - 1;
+						while (
+							stop + 1 < source.length &&
+							!charIs(source, stop + 1, /^[\\/\r\n]$/) &&
+							source.charAt(stop + 1) !== quote
+						)
+							stop++;
+					} else {
+						stop = nameEnd(source, start, rules.path_name_max_words);
+					}
+					var name = source.substring(start, stop + 1);
+					if (name === '') {
+						out += source.charAt(i);
+						i = start;
+					} else {
+						out +=
+							source.charAt(i) + (known[asciiLower(name)] ? name : rules.config_name_placeholder);
+						i = stop + 1;
+					}
+				}
+				return { text: out, last: i - 1 };
+			});
+		});
+		return text;
+	}
+
+	/**
 	 * Replaces the profile folder of any other account (a Users folder on
 	 * Windows, /home/other, /Users/other) by the account placeholder, except the shared
 	 * profiles every machine has.
@@ -254,7 +357,7 @@
 	function redactForeignHomes(text, rules) {
 		rules.foreign_home_markers.forEach(function (marker) {
 			text = replaceOccurrences(text, marker, true, function (source, first, last) {
-				var stop = runEnd(source, last + 1, PATH_CHAR);
+				var stop = nameEnd(source, last + 1, rules.path_name_max_words);
 				if (stop <= last) return null;
 				var name = asciiLower(source.substring(last + 1, stop + 1));
 				if (rules.shared_profile_names.indexOf(name) >= 0) return null;
@@ -379,7 +482,25 @@
 		text = redactUrlCredentials(text, rules);
 		text = redactBearer(text, rules);
 		text = redactKeyValues(text, rules);
+		if (
+			typeof rules.path_name_max_words !== 'number' ||
+			rules.path_name_max_words < 1 ||
+			typeof rules.config_placeholder !== 'string' ||
+			typeof rules.config_name_placeholder !== 'string' ||
+			!Array.isArray(rules.config_known_names)
+		)
+			throw new Error('redact: the rules lack the path name and configuration directory settings');
+		// The directory is searched as it is spelled, then as the home pass leaves
+		// it (a log written earlier already holds "~" for the home folder)
+		text = maskConfigDir(text, rules, context.config_dir, folded);
 		text = redactHome(text, rules, context.home, folded);
+		if (typeof context.config_dir === 'string')
+			text = maskConfigDir(
+				text,
+				rules,
+				redactHome(context.config_dir, rules, context.home, folded),
+				folded
+			);
 		text = redactForeignHomes(text, rules);
 		text = redactEmails(text, rules);
 		text = redactAccount(text, rules, context.user, folded);

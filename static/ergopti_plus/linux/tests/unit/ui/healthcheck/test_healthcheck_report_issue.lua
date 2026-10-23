@@ -673,3 +673,17 @@ helpers.describe("diagnostic opener late port failure", function()
 		helpers.assert_true(errors[1]:find("independent late opener failure", 1, true) ~= nil)
 	end)
 end)
+
+helpers.describe("redaction context carries the configuration directory (config-dir-masking)", function()
+	helpers.it("a hotstring pack name under the configuration directory never reaches a report (config-dir-masking)", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local dir = HOME .. "/.config/ergopti"
+		local overrides = recording({})
+		overrides.identity = function() return { home = HOME, user = "jdoe", config_dir = dir } end
+		local context = Report.redaction_context(overrides)
+		helpers.assert_eq(context.config_dir, dir)
+		helpers.assert_eq(
+			require("diagnostics.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
+			"read '<config>/hotstrings/<name>/<name>'")
+	end)
+end)

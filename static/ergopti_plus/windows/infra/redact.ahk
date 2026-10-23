@@ -6,7 +6,8 @@
 ; AHK port of _shared/lua/diagnostics/redact.lua: removes what must not leave
 ; the machine from diagnostic text before it is copied, saved or sent to a
 ; GitHub issue — token-like secrets (URL credentials included), the home folder,
-; the account name, other accounts' profile folders and e-mail addresses. The
+; the account name, other accounts' profile folders, the folder and file names
+; under the configuration directory and e-mail addresses. The
 ; rules are data in _shared/modules/diagnostics/redaction.json and both ports
 ; replay _shared/tests/corpus/diagnostics/redaction_vectors.json.
 ;
@@ -18,6 +19,9 @@
 ; 3. The account name only as a whole word of a minimum length: a one-letter
 ;    account name replaced everywhere would shred the report.
 ; 4. Case folding is ASCII-only, as in the Lua port, so the two agree.
+; 5. Folder and file names chosen by the user are masked whole, spaces and
+;    non-ASCII letters included; under the configuration directory only the
+;    names the product ships stay.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -37,7 +41,11 @@
 ; @param Index {Integer} 1-based position.
 ; @param Class {String} "alnum", "word", "word_dash", "path", "bearer",
 ;   "space", "quote", "separator", "value_stop", "email_local", "email_domain",
-;   "url_userinfo", "at" or "letter".
+;   "url_userinfo", "at", "letter", "name" (a character of a folder or file
+;   name chosen by a person: the path characters plus every non-ASCII one, the
+;   ellipsis a log appends to a shortened path excepted), "name_end" (what can
+;   follow a complete name: a path separator, a quote, a line break),
+;   "name_end_line" (a separator or a line break) or "path_separator".
 ; @returns {Boolean}
 _Redact_CharIs(Text, Index, Class) {
 	if (Index < 1 || Index > StrLen(Text))
@@ -62,6 +70,14 @@ _Redact_CharIs(Text, Index, Class) {
 			return IsAlnum || Code = 0x2E || Code = 0x2D
 		case "url_userinfo":
 			return IsAlnum || InStr("._~%+:=!*-", Chr(Code), true) > 0
+		case "name":
+			return IsAlnum || Code = 0x5F || Code = 0x2E || Code = 0x2D || (Code >= 0x80 && Code != 0x2026)
+		case "name_end":
+			return Code = 0x5C || Code = 0x2F || Code = 0x22 || Code = 0x27 || Code = 0x0D || Code = 0x0A
+		case "name_end_line":
+			return Code = 0x5C || Code = 0x2F || Code = 0x0D || Code = 0x0A
+		case "path_separator":
+			return Code = 0x5C || Code = 0x2F
 		case "at":
 			return Code = 0x40
 		case "letter":
@@ -104,6 +120,18 @@ _Redact_RunEnd(Text, From, Class) {
 	while _Redact_CharIs(Text, Index, Class)
 		Index += 1
 	return Index - 1
+}
+
+; Lower-cases A-Z only, keeping every other character, as the other ports do.
+; @param Text {String}
+; @returns {String}
+_Redact_AsciiLower(Text) {
+	Out := ""
+	Loop Parse Text {
+		Code := Ord(A_LoopField)
+		Out .= (Code >= 0x41 && Code <= 0x5A) ? Chr(Code + 32) : A_LoopField
+	}
+	return Out
 }
 
 ; Counts the code points of a string (a surrogate pair counts once).
@@ -215,12 +243,40 @@ _Redact_AcceptEmail(Rules, Text, First, Last) {
 	return Map("text", Rules["email_placeholder"], "last", Stop, "first", Start)
 }
 
+; Returns the index of the last character of the name that starts at From: a
+; run of name characters, extended over single spaces (at most MaxWords words)
+; when that makes the name end at a separator, a quote or the end of the line,
+; so "John Smith" is one folder but "jdoe and more" is the folder "jdoe".
+; @param Text {String}
+; @param From {Integer}
+; @param MaxWords {Integer} The most words one name may hold.
+; @returns {Integer} The name's last index, From - 1 when there is none.
+_Redact_NameEnd(Text, From, MaxWords) {
+	FirstEnd := _Redact_RunEnd(Text, From, "name")
+	if (FirstEnd < From)
+		return FirstEnd
+	Stop := FirstEnd
+	Loop MaxWords - 1 {
+		if (Stop + 1 > StrLen(Text) || _Redact_CharIs(Text, Stop + 1, "name_end"))
+			return Stop
+		if (SubStr(Text, Stop + 1, 1) !== " ")
+			break
+		NextEnd := _Redact_RunEnd(Text, Stop + 2, "name")
+		if (NextEnd < Stop + 2)
+			break
+		Stop := NextEnd
+	}
+	if (Stop + 1 > StrLen(Text) || _Redact_CharIs(Text, Stop + 1, "name_end"))
+		return Stop
+	return FirstEnd
+}
+
 ; Accepts the profile folder of another account unless it is a shared profile.
 _Redact_AcceptForeignHome(Rules, Text, First, Last) {
-	Stop := _Redact_RunEnd(Text, Last + 1, "path")
+	Stop := _Redact_NameEnd(Text, Last + 1, Rules["path_name_max_words"])
 	if (Stop <= Last)
 		return 0
-	Name := StrLower(SubStr(Text, Last + 1, Stop - Last))
+	Name := _Redact_AsciiLower(SubStr(Text, Last + 1, Stop - Last))
 	for Shared in Rules["shared_profile_names"] {
 		if (Shared == Name)
 			return 0
@@ -270,6 +326,83 @@ _Redact_AcceptHome(Rules, Text, First, Last) {
 	return Map("text", Rules["home_placeholder"], "last", Last)
 }
 
+; Accepts the configuration directory and masks every name below it: a name the
+; product ships stays, any other becomes the name placeholder.
+_Redact_AcceptConfigDir(Rules, Known, Text, First, Last) {
+	if _Redact_CharIs(Text, Last + 1, "name")
+		return 0
+	; A path right after a quote ends at the closing quote, spaces included
+	Quote := (First > 1) ? SubStr(Text, First - 1, 1) : ""
+	if !(Quote == "'" || Quote == Chr(34))
+		Quote := ""
+	Out := Rules["config_placeholder"]
+	Index := Last + 1
+	while _Redact_CharIs(Text, Index, "path_separator") {
+		Start := Index + 1
+		if (Quote != "") {
+			Stop := Start - 1
+			while (Stop + 1 <= StrLen(Text) && !_Redact_CharIs(Text, Stop + 1, "name_end_line")
+				&& SubStr(Text, Stop + 1, 1) !== Quote)
+				Stop += 1
+		} else {
+			Stop := _Redact_NameEnd(Text, Start, Rules["path_name_max_words"])
+		}
+		Name := SubStr(Text, Start, Stop - Start + 1)
+		if (Name == "") {
+			Out .= SubStr(Text, Index, 1)
+			Index := Start
+		} else {
+			Out .= SubStr(Text, Index, 1) . (Known.Has(_Redact_AsciiLower(Name)) ? Name : Rules["config_name_placeholder"])
+			Index := Stop + 1
+		}
+	}
+	return Map("text", Out, "last", Index - 1)
+}
+
+; Masks the folder and file names under the configuration directory, in every
+; spelling of the directory.
+; @param Text {String}
+; @param Rules {Map}
+; @param Dir {String} The directory as the text spells it.
+; @param Folded {Boolean}
+; @returns {String}
+_Redact_MaskConfigDir(Text, Rules, Dir, Folded) {
+	Dir := RegExReplace(Dir, "[/\\]+$")
+	if (Dir == "")
+		return Text
+	Known := Map()
+	for Name in Rules["config_known_names"]
+		Known[_Redact_AsciiLower(Name)] := true
+	Seen := Map()
+	for Spelling in [Dir, StrReplace(Dir, "\", "/"), StrReplace(Dir, "/", "\")] {
+		if Seen.Has(Spelling)
+			continue
+		Seen[Spelling] := true
+		Text := _Redact_Replace(Text, Spelling, Folded, _Redact_AcceptConfigDir.Bind(Rules, Known))
+	}
+	return Text
+}
+
+; Replaces the home folder, in both slash styles, by its placeholder.
+; @param Text {String}
+; @param Rules {Map}
+; @param Home {String}
+; @param Folded {Boolean}
+; @returns {String}
+_Redact_Home(Text, Rules, Home, Folded) {
+	Home := RegExReplace(Home, "[/\\]+$")
+	if (Home == "")
+		return Text
+	Seen := Map()
+	for Spelling in [Home, StrReplace(Home, "\", "/"), StrReplace(Home, "/", "\")] {
+		if Seen.Has(Spelling)
+			continue
+		Seen[Spelling] := true
+		Text := _Redact_Replace(Text, Spelling, Folded, _Redact_AcceptHome.Bind(Rules))
+	}
+	return Text
+}
+
 ; Accepts the account name only as a whole word.
 _Redact_AcceptAccount(Rules, Text, First, Last) {
 	if _Redact_CharIs(Text, First - 1, "word") || _Redact_CharIs(Text, Last + 1, "word")
@@ -290,8 +423,9 @@ _Redact_AcceptAccount(Rules, Text, First, Last) {
 ; Redacts diagnostic text before it leaves the machine.
 ; @param Text {String}
 ; @param Rules {Map} Parsed _shared/modules/diagnostics/redaction.json.
-; @param Context {Map} { home, user, case_insensitive } — the platform's home
-;   folder, account name, and whether its paths compare case-insensitively.
+; @param Context {Map} { home, user, config_dir, case_insensitive } — the
+;   platform's home folder, account name, configuration directory, and whether
+;   its paths compare case-insensitively.
 ; @returns {String}
 Redact_Apply(Text, Rules, Context) {
 	if !(Rules is Map)
@@ -311,16 +445,19 @@ Redact_Apply(Text, Rules, Context) {
 	for Key in Rules["secret_keys"]
 		Text := _Redact_Replace(Text, Key, true, _Redact_AcceptKeyValue.Bind(Rules))
 
-	Home := RegExReplace(Context.Get("home", ""), "[/\\]+$")
-	if (Home != "") {
-		Seen := Map()
-		for Spelling in [Home, StrReplace(Home, "\", "/"), StrReplace(Home, "/", "\")] {
-			if Seen.Has(Spelling)
-				continue
-			Seen[Spelling] := true
-			Text := _Redact_Replace(Text, Spelling, Folded, _Redact_AcceptHome.Bind(Rules))
-		}
+	for Setting in ["path_name_max_words", "config_placeholder", "config_name_placeholder", "config_known_names"] {
+		if !Rules.Has(Setting)
+			throw ValueError("redact: the rules lack the path name and configuration directory settings.")
 	}
+	; The directory is searched as it is spelled, then as the home pass leaves it
+	; (a log written earlier already holds "~" for the home folder)
+	ConfigDir := Context.Get("config_dir", "")
+	Home := Context.Get("home", "")
+	if (ConfigDir != "")
+		Text := _Redact_MaskConfigDir(Text, Rules, ConfigDir, Folded)
+	Text := _Redact_Home(Text, Rules, Home, Folded)
+	if (ConfigDir != "")
+		Text := _Redact_MaskConfigDir(Text, Rules, _Redact_Home(ConfigDir, Rules, Home, Folded), Folded)
 
 	for Marker in Rules["foreign_home_markers"]
 		Text := _Redact_Replace(Text, Marker, true, _Redact_AcceptForeignHome.Bind(Rules))

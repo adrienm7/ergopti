@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
@@ -82,6 +83,27 @@ if (shifted !== 'İ ~/x')
 const nbsp = Redact.apply('token=abc defghi', rules, {});
 if (nbsp !== 'token=<secret>')
 	failures.push(`a no-break space ended a secret early: ${JSON.stringify(nbsp)}`);
+// Every name the configuration-directory rule leaves readable must be one the
+// product really uses, in a driver source file: a typo would mask a shipped
+// name, and a removed name would stay readable for no reason.
+for (const name of rules.config_known_names) {
+	const search = spawnSync(
+		'git',
+		[
+			'grep',
+			'-q',
+			'-F',
+			name,
+			'--',
+			'static/ergopti_plus/*.lua',
+			'static/ergopti_plus/*.ahk',
+			':!*/tests/*'
+		],
+		{ cwd: ROOT }
+	);
+	if (search.status !== 0)
+		failures.push(`config_known_names holds "${name}", which no driver source file mentions`);
+}
 // A missing rules document is a programming error, never a silent pass-through
 let threw = false;
 try {
