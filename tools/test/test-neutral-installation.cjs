@@ -19,7 +19,9 @@
  *      [category_enabled] layout master (Windows) is off.
  *   3. Every input-altering entry of the layout section, whatever its name, is
  *      neutral in both places, so a new emulation switch cannot ship on.
- *   4. The row switches that narrow an emulation (emulate_*) stay parameters:
+ *   4. The Windows configuration example writes only those neutral [layout]
+ *      values, so documentation cannot show an activated emulation.
+ *   5. The row switches that narrow an emulation (emulate_*) stay parameters:
  *      on their own they alter no input, which is why they may default on.
  * ==============================================================================
  */
@@ -177,6 +179,51 @@ async function checkPlatform(manifest, platform, spec) {
 	}
 }
 
+/**
+ * Reads the scalar values the Windows example writes under one table. The
+ * example is a reviewable draft with deliberate duplicate scalars elsewhere, so
+ * only the table lines are parsed, never the whole document.
+ * @param {string} table Table name, for example "layout".
+ * @returns {Promise<object>} Key to parsed value.
+ */
+async function exampleTable(table) {
+	const source = fs.readFileSync(
+		paths.shared('core/config_schema/examples/ahk_config.example.toml'),
+		'utf8'
+	);
+	const values = {};
+	let current = '';
+	for (const line of source.split(/\r?\n/)) {
+		const header = line.match(/^\s*\[\[?([^\]]+)\]\]?/);
+		if (header) {
+			current = header[1].trim();
+			continue;
+		}
+		const pair = line.match(/^([A-Za-z0-9_]+)\s*=\s*(.+?)\s*(?:#.*)?$/);
+		if (current === table && pair) values[pair[1]] = (await parseToml(`x = ${pair[2]}`)).x;
+	}
+	return values;
+}
+
+/** The example must show the shipped neutral layout state, never an activated one. */
+async function checkExample() {
+	const layout = await exampleTable('layout');
+	assert(Object.keys(layout).length > 0, 'the example must carry a [layout] table');
+	for (const [id, value] of Object.entries(layout)) {
+		assert(
+			Object.hasOwn(NEUTRAL_LAYOUT.ahk.values, id),
+			`the example writes layout.${id}, which is not a declared Windows layout switch`
+		);
+		assert.deepEqual(
+			value,
+			NEUTRAL_LAYOUT.ahk.values[id],
+			`the example's layout.${id} must equal the shipped neutral default`
+		);
+	}
+	const masters = await exampleTable('category_enabled');
+	assert.notEqual(masters.layout, true, 'the example must not switch the layout master on');
+}
+
 /** Entry point. */
 async function main() {
 	const manifest = await loadManifest();
@@ -201,6 +248,7 @@ async function main() {
 	for (const [platform, spec] of Object.entries(NEUTRAL_LAYOUT)) {
 		await checkPlatform(manifest, platform, spec);
 	}
+	await checkExample();
 	console.log('test-neutral-installation: OK');
 }
 
