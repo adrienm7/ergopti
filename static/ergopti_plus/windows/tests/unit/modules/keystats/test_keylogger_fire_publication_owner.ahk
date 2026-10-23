@@ -20,8 +20,8 @@ _KFPO_ChildSource() {
 	}
 	StateOwner := _DriverProductionFileForSymbol("KL_AppendLog", _DriverDir)
 	StateSource := FileRead(StateOwner, "UTF-8")
-	AssertTrue(RegExMatch(StateSource, "ms)^class Keylogger \{.*?^\}", &StateClass) > 0,
-		"The actual Keylogger class, not a copied state mirror, must seed the child")
+	AssertTrue(RegExMatch(StateSource, "ms)^class Keystats \{.*?^\}", &StateClass) > 0,
+		"The actual Keystats class, not a copied state mirror, must seed the child")
 	Source .= StateClass[0] . "`n"
 	for Symbol in ["_HSE_QueueFireLog", "_HSE_ArmFireLogDrain", "_HSE_DrainFireLog",
 		"_HSE_RestoreFireLogSuffix", "_PrefixDeferredCanPublish", "_PrefixInvalidateDeferredEffects",
