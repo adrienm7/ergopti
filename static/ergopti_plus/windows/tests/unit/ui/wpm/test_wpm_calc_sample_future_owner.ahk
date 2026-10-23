@@ -8,7 +8,7 @@
 _WPMF_ChildSource() {
 	Code := _WPMR_ChildSource()
 	Code := StrReplace(Code, "\tests\fixtures\wpm_tick_rollover_body.ahk",
-		"\tests\fixtures\wpm_calc_sample_future_body.ahk", &Changed)
+		"\tests\fixtures\wpm_calc_sample_future_body.ahk", true, &Changed)
 	AssertEqual(1, Changed, "Exactly the canonical fixture include may change")
 	return Code
 }
