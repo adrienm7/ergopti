@@ -42,6 +42,7 @@ local focus_timer_state = {}
 --- @param handle table TimerScheduler handle.
 --- @return boolean settled True only when the native timer was released.
 local function cancel_focus_timer(handle)
+	focus_timer_state[handle] = false
 	local ok, result_or_err = xpcall(function()
 		return TimerScheduler.cancel(handle)
 	end, debug.traceback)
@@ -151,7 +152,7 @@ local function focus_hammerspoon(defer_open)
 			tostring(handle_or_err))
 		return false
 	end
-	return true
+	return true, candidate
 end
 
 --- Focus-aware wrapper around hs.dialog.blockAlert.
@@ -308,8 +309,28 @@ end
 function M.alert(...)
 	-- The only wrapper whose dialog does not park the runloop, so the only one
 	-- the deferred raise can reach in time to do what it is for.
-	focus_hammerspoon(true)
-	return hs.dialog.alert(...)
+	local _, focus_timer = focus_hammerspoon(true)
+	local args = table.pack(...)
+	local callback = args[3]
+	local function retire_focus_timer()
+		local handle = focus_timer
+		focus_timer = nil
+		if handle ~= nil then cancel_focus_timer(handle) end
+	end
+	if type(callback) == "function" then
+		args[3] = function(...)
+			-- The native wrapper deletes its alert before delivering this callback.
+			-- Revoke the delayed raise before user work can restore another app.
+			retire_focus_timer()
+			return callback(...)
+		end
+	end
+	local result = table.pack(pcall(hs.dialog.alert, table.unpack(args, 1, args.n)))
+	if not result[1] then
+		retire_focus_timer()
+		error(result[2], 0)
+	end
+	return table.unpack(result, 2, result.n)
 end
 
 return M
