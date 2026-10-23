@@ -72,8 +72,10 @@ local helpers = require("tests.helpers")
 local Privacy = require("modules.keystats.privacy_context")
 
 local function with_fixture(callback)
-	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector",
-		"adapters.physical_observation_clock", "keystats.physical_context_observation" }, function()
+	local original_lfs = rawget(_G, "lfs")
+	local values = table.pack(pcall(helpers.with_stub_scope, { "modules.keystats.context_tracker", "adapters.secure_field_detector",
+		"adapters.physical_observation_clock", "keystats.physical_context_observation",
+		"native_path", "error_description", "lfs" }, function()
 		local controls = { paused = false, no_window = false, no_focus = false, no_frontmost = false,
 			throw_property = nil, title = "Ordinary window", role = "AXTextField", subrole = nil,
 			queries = {}, clock = 1000000000, records = {}, failures = {}, decision_calls = 0, legacy = {} }
@@ -84,6 +86,7 @@ local function with_fixture(callback)
 		end
 		local element = { attributeValue = function(_, name)
 			query(name)
+			if controls.refused_property == name then return nil, "Messaging failed" end
 			if name == "AXRole" then return controls.role end
 			if name == "AXSubrole" then return controls.subrole end
 			if name == "AXValue" then return "NOT-EMITTED-FIELD-VALUE" end
@@ -150,7 +153,10 @@ local function with_fixture(callback)
 		controls.window, controls.window_app = window, window_app
 		controls.detector = require("adapters.secure_field_detector")
 		callback(tracker, state, controls)
-	end)
+	end))
+	rawset(_G, "lfs", original_lfs)
+	if not values[1] then error(values[2], 0) end
+	return table.unpack(values, 2, values.n)
 end
 
 
@@ -271,6 +277,66 @@ helpers.describe("fresh-lease physical native field sampling", function()
 				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
 				helpers.assert_eq(last(c).secure, true); helpers.assert_eq(last(c).allowed, false)
 				helpers.assert_eq(state.is_secure_field, false); helpers.assert_eq(c.detector.isSecureField(), false)
+			end)
+		end)
+	end
+	for _, attribute in ipairs({ "AXRole", "AXSubrole" }) do
+		helpers.it("denies native " .. attribute .. " errors and recovers an unchanged ordinary sample (ax-role-native-refusal)", function()
+			with_fixture(function(tracker, state, c)
+				same_app(tracker, state, c); local owner, token = bind(tracker, c)
+				local before, cache = snapshot(state), c.detector.isSecureField()
+				local queries = { "frontmost", "name", "bundleID", "path", "pid", "window", "window_application",
+					"window_pid", "title", "ax_app", "AXFocusedUIElement", "AXRole", "AXSubrole" }
+				c.queries = {}
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, true); helpers.assert_eq(last(c).complete, true)
+				helpers.assert_eq(c.queries, queries)
+				c.refused_property, c.queries = attribute, {}
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, false); helpers.assert_eq(last(c).complete, false)
+				helpers.assert_nil(last(c).secure, "Incomplete receipts do not expose a secure classification")
+				helpers.assert_eq(c.queries, queries); conserved(before, state)
+				helpers.assert_eq(c.detector.isSecureField(), cache)
+				c.refused_property, c.queries = nil, {}
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, true); helpers.assert_eq(last(c).complete, true)
+				helpers.assert_eq(last(c).secure, false); helpers.assert_eq(c.queries, queries)
+				conserved(before, state); helpers.assert_eq(c.detector.isSecureField(), cache)
+			end)
+		end)
+	end
+	for _, recipe in ipairs({ { "AXRole", "AXSecureTextField", nil }, { "AXSubrole", "AXTextField", "AXSecureTextField" } }) do
+		helpers.it("keeps the same secure sample denied through native " .. recipe[1] .. " error and recovery (ax-role-native-refusal)", function()
+			with_fixture(function(tracker, state, c)
+				same_app(tracker, state, c); local owner, token = bind(tracker, c)
+				c.role, c.subrole = recipe[2], recipe[3]
+				local before, cache = snapshot(state), c.detector.isSecureField()
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, false); helpers.assert_eq(last(c).complete, true)
+				helpers.assert_eq(last(c).secure, true)
+				c.refused_property = recipe[1]
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, false); helpers.assert_eq(last(c).complete, false)
+				helpers.assert_nil(last(c).secure, "Incomplete receipts do not expose a secure classification")
+				c.refused_property = nil
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, false); helpers.assert_eq(last(c).complete, true)
+				helpers.assert_eq(last(c).secure, true)
+				conserved(before, state); helpers.assert_eq(c.detector.isSecureField(), cache)
+			end)
+		end)
+	end
+	for _, recipe in ipairs({ { "AXRole", "AXTextField", "AXSecureTextField" }, { "AXSubrole", "AXSecureTextField", nil } }) do
+		helpers.it("retains a known secure marker when the other native axis refuses " .. recipe[1] .. " (ax-role-native-refusal)", function()
+			with_fixture(function(tracker, state, c)
+				same_app(tracker, state, c); local owner, token = bind(tracker, c)
+				c.role, c.subrole, c.refused_property = recipe[2], recipe[3], recipe[1]
+				local before, cache = snapshot(state), c.detector.isSecureField()
+				helpers.assert_eq(tracker.sample_physical_context(owner, token), true)
+				helpers.assert_eq(last(c).allowed, false); helpers.assert_eq(last(c).complete, true)
+				helpers.assert_eq(last(c).secure, true)
+				helpers.assert_eq(count(c, "AXRole"), 1); helpers.assert_eq(count(c, "AXSubrole"), 1)
+				conserved(before, state); helpers.assert_eq(c.detector.isSecureField(), cache)
 			end)
 		end)
 	end
