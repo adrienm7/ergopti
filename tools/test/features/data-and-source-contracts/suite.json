@@ -433,6 +433,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-config-template-spacing.cjs"],
 			"repro": "node tools/test/test-config-template-spacing.cjs"
+		},
+		{
+			"id": "js-0462",
+			"ordinal": 462,
+			"name": "translation audit scope (every driver, shared tree, unused-key baseline)",
+			"cmd": "node",
+			"args": ["tools/test/test-audit-translations-scope.cjs"],
+			"repro": "node tools/test/test-audit-translations-scope.cjs"
 		}
 	]
 }
