@@ -583,6 +583,9 @@ _PPH_Script(Entry, Mode) {
 	Code .= 'CB_Read() {`nglobal S`nS["reads"] += 1`nreturn S["text"]`n}`n'
 	Code .= 'CB_SaveAll() {`nglobal S`nS["saves"] += 1`nreturn S["fail_save"] ? "__CB_SAVE_ERROR__" : Map("text", S["text"], "rich", S["rich"])`n}`n'
 	Code .= 'CB_Write(Text) {`nglobal S`nS["writes"] += 1`nS["text"] := Text`nS["rich"] := false`nS["seq"] += 1`nreturn true`n}`n'
+	; This existing logical clipboard models one synchronous owned publication.
+	; Native owner/UTF-16 authentication is exercised by the separate real-CB tests.
+	Code .= 'CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {`nglobal S`nOwnedSequence := 0`nif !CB_Write(Text)`nreturn false`nOwnedSequence := S["seq"]`nreturn true`n}`n'
 	Code .= 'CB_RestoreAll(Saved) {`nglobal S`nS["restores"] += 1`nS["text"] := Saved["text"]`nS["rich"] := Saved["rich"]`nS["seq"] += 1`nreturn true`n}`n'
 	Code .= 'CB_GetSequenceNumber() {`nglobal S`nreturn S["seq"]`n}`n'
 	Code .= 'WinActive(*) {`nglobal S`nreturn S["excel"]`n}`n'

@@ -8,7 +8,17 @@
 _TSCSO_ClipboardTransactionOwnsSequence() {
 	Body := _DriverFuncBody("_TextSendClipboard")
 	Assert(Body != "", "_TextSendClipboard must exist")
-	OwnedPos := InStr(Body, "OwnedSequence := CB_GetSequenceNumber()")
+	OwnedPos := InStr(Body, "CB_WriteTextWithReceipt(Text, &OwnedSequence)")
+	Receipt := _DriverFuncBody("CB_WriteTextWithReceipt")
+	Assert(Receipt != "", "the actual receipt owner must be present")
+	BeforePos := InStr(Receipt, "BeforeMutation := CBClipboardOwner.mutation_id")
+	SetterPos := InStr(Receipt, "Published := CB_Write(Text)")
+	Assert(BeforePos > 0 and SetterPos > BeforePos,
+		"the actual setter must follow the captured mutation origin")
+	Assert(InStr(Receipt, "CBClipboardOwner.mutation_id == BeforeMutation + 1") > SetterPos
+		and InStr(Receipt, 'DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd') > SetterPos
+		and InStr(Receipt, 'StrGet(Pointer, -Length, "UTF-16") == Text') > SetterPos,
+		"receipt ownership requires the exact mutation, native owner and complete UTF-16 payload")
 	PastePos := InStr(Body, '_TextSenderSendInput("^v", "clipboard paste")')
 	Assert(OwnedPos > 0 and PastePos > OwnedPos,
 		"clipboard injection must capture an ownership sequence before Ctrl+V")
