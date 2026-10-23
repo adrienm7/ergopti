@@ -3416,6 +3416,15 @@ function M.disable()
 	_enabled = false
 	M.stop_live("AI switched off", false)
 	M.cancel()
+	-- Switching the AI off ends what the app started for it, as a pause does for
+	-- the Ollama it serves: that service and a running model download.
+	-- A refused stop keeps its cleanup debt with the owner that retries it.
+	if not stop_runtime_app() then
+		Logger.error(LOG, "AI switched off but the app-started Ollama service has not stopped yet.")
+	end
+	if not M.cancel_model_download() then
+		Logger.error(LOG, "AI switched off but the model download has not stopped yet.")
+	end
 	Logger.info(LOG, "Prediction engine disabled.")
 	return true
 end
