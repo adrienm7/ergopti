@@ -52,6 +52,8 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
     // After the proxy accepted the identity, the origin behind it challenges too.
     public bool ChallengeOriginAfterProxy;
     public int TunnelPort;
+    // When set, GET /ordered.pac answers this proxy auto-configuration script.
+    public string PacScript;
     public X509Certificate2 Certificate;
     public int SlowBodyBytes = 1000000;
     public int HugeBodyBytes = 1048576;
@@ -194,6 +196,15 @@ public sealed class ErgoptiWinHttpTestServer : IDisposable
                 int length = ContentLength(head);
                 for (int index = 0; index < length; index++) if (stream.ReadByte() < 0) return;
                 Record(head);
+                if (PacScript != null && head.StartsWith("GET /ordered.pac ", StringComparison.Ordinal))
+                {
+                    // The proxy auto-configuration file is served to anyone, unauthenticated.
+                    byte[] script = Encoding.UTF8.GetBytes(PacScript);
+                    Write(stream, "HTTP/1.1 200 OK\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nContent-Length: " + script.Length + "\r\n\r\n");
+                    stream.Write(script, 0, script.Length);
+                    stream.Flush();
+                    return;
+                }
                 switch (Mode)
                 {
                     case "static":
