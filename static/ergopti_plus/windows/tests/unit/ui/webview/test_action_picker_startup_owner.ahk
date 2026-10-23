@@ -42,6 +42,7 @@ _APST_Case(Mode) {
 	FSCreateDirectoryExclusiveStrict(Directory)
 	Script := Directory . "\subject.ahk"
 	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }, Handle := 0, Primary := 0, Retired := false
+	AtDeadline := 0, ExportFailure := 0
 	PreviousCritical := Critical("Off")
 	try {
 		FSCreateDirectoryExclusiveStrict(Directory . "\64bit")
@@ -57,13 +58,11 @@ _APST_Case(Mode) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
-		for Line in StrSplit(State.Output, "`n", "`r")
-			if InStr(Line, "RECEIPT action-picker-startup ") == 1
-				_TestPrint("# " . Line)
-		AssertEqual(1, State.Calls, "The exact picker child must settle once: " . State.ErrorText . State.Output)
-		AssertEqual("", State.ErrorText, "Parser/runtime diagnostics cannot qualify as cancellation: " . State.Output)
-		AssertEqual(0, State.Code, "The real picker violated startup ownership: " . State.Output)
-		AssertContains(State.Output, "PASS action-picker-startup " . Mode)
+		; A forced terminal callback may populate captures during cleanup. Keep
+		; the original deadline observation so termination can never turn it green.
+		AtDeadline := { Calls: State.Calls, Code: State.Code, Output: State.Output, ErrorText: State.ErrorText }
+		if State.Calls == 0
+			Primary := Error("The exact picker child did not settle within 15000 ms; calls at deadline: 0.")
 	} catch as Failure {
 		Primary := Failure
 	} finally {
@@ -83,9 +82,37 @@ _APST_Case(Mode) {
 			Critical(PreviousCritical)
 		}
 	}
+	; The native adapter merges its child's stdout/stderr into Output. ErrorText
+	; is a completion diagnostic, not an independently measured stderr stream.
+	try {
+		if Retired {
+			_TestPrint("# action-picker-startup terminal calls=" . State.Calls . " code=" . State.Code
+				. " deadline_calls=" . (IsObject(AtDeadline) ? AtDeadline.Calls : -1)
+				. " capture_delivered=" . (State.Calls == 1))
+			if State.Calls == 1 {
+				for Line in StrSplit(State.Output, "`n", "`r")
+					if Line != ""
+						_TestPrint("# action-picker-startup combined_native_capture " . Line)
+				for Line in StrSplit(State.ErrorText, "`n", "`r")
+					if Line != ""
+						_TestPrint("# action-picker-startup completion_error " . Line)
+			} else
+				_TestPrint("# action-picker-startup combined_native_capture UNKNOWN")
+		}
+	} catch as Failure {
+		ExportFailure := Failure
+	}
 	if IsObject(Primary)
 		throw Primary
 	AssertTrue(Retired, "The exact child must retire before its private source is removed")
+	AssertEqual(1, AtDeadline.Calls, "The exact picker child must settle once: " . State.ErrorText . State.Output)
+	AssertEqual("", AtDeadline.ErrorText, "Parser/runtime diagnostics cannot qualify as cancellation: " . State.Output)
+	AssertEqual(0, AtDeadline.Code, "The real picker violated startup ownership: " . State.Output)
+	AssertContains(AtDeadline.Output, "PASS action-picker-startup " . Mode)
+	; A capture-export refusal cannot hide an earlier timeout/business failure,
+	; nor can a successful child silently turn that refusal into a passing test.
+	if IsObject(ExportFailure)
+		throw ExportFailure
 }
 
 for _APST_Mode in ["current", "close-create", "close-create-reject", "reopen-create", "reopen-create-reject"]
