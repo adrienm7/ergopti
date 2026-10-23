@@ -1,0 +1,13 @@
+{
+	"expected_count": 10,
+	"filters": [
+		{
+			"contains": "tooltip-deadline-native64-owner",
+			"expected_count": 9
+		},
+		{
+			"contains": "tickcount-wrap: every audited first-party absolute deadline uses origin plus duration",
+			"expected_count": 1
+		}
+	]
+}
