@@ -310,7 +310,8 @@ LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
 	if !(Transport is Map)
 		Transport := _LayoutRegistryDefaultTransport()
 	Job := { Url: Url, Partial: Partial, Headers: Headers, TimeoutMs: TimeoutMs, Transport: Transport,
-		OnSettled: OnSettled, Settled: false, Started: Started, Request: 0 }
+		OnSettled: OnSettled, Settled: false, Started: Started, Request: 0,
+		Retiring: false, RetirementError: "" }
 	LoggerDebug("LayoutRegistry", "Fetching {1}", Url)
 	if Transport.Get("managed", false)
 		_LayoutRegistrySend(Job)
@@ -350,12 +351,41 @@ _LayoutRegistrySend(Job, Proxy := unset) {
 		if !Req.Send()
 			throw Error("The managed registry request refused dispatch.")
 	} catch as Err {
+		Failure := "cannot download " . Job.Url . ": " . Err.Message
 		if IsObject(Job.Request)
-			Job.Request.Abort()
-		_LayoutRegistrySettle(Job, 0, "", "cannot download " . Job.Url . ": " . Err.Message)
+			_LayoutRegistryRetire(Job, Job.Request, Failure)
+		else
+			_LayoutRegistrySettle(Job, 0, "", Failure)
 		return
 	}
 	_LayoutRegistryPoll(Job, Req, 0)
+}
+
+; Consumers own the response file. They may remove or replace it only after
+; the exact request confirms retirement, including a previously refused Abort.
+_LayoutRegistryRetire(Job, Req, Failure) {
+	global LAYOUT_REGISTRY_POLL_MS
+	PreviousCritical := Critical("On")
+	try {
+		if Job.Settled
+			return
+		if !Job.Retiring {
+			Job.RetirementError := Failure
+			Job.Retiring := true
+		}
+	} finally Critical(PreviousCritical)
+	Retired := false
+	try Retired := Req.Abort()
+	if Job.Settled
+		return
+	if Retired is Integer && Retired == 1 {
+		_LayoutRegistrySettle(Job, 0, "", Job.RetirementError)
+		return
+	}
+	; Keep the request, partial and single terminal callback owned while native
+	; completion or the facade's abort debt still has not proved quiescence.
+	; Scheduling failure remains visible to the caller; it never proves an ACK.
+	Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, 0), LAYOUT_REGISTRY_POLL_MS)
 }
 
 _LayoutRegistryPoll(Job, Req, Polls) {
@@ -364,17 +394,19 @@ _LayoutRegistryPoll(Job, Req, Polls) {
 		return
 	}
 	global LAYOUT_REGISTRY_POLL_MS, LAYOUT_REGISTRY_POLL_GRACE
+	if Job.Retiring {
+		_LayoutRegistryRetire(Job, Req, Job.RetirementError)
+		return
+	}
 	try {
 		Ready := Req.WaitForResponse(0)
 	} catch as Err {
-		try Req.Abort()
-		_LayoutRegistrySettle(Job, 0, "", "download of " . Job.Url . " failed: " . Err.Message)
+		_LayoutRegistryRetire(Job, Req, "download of " . Job.Url . " failed: " . Err.Message)
 		return
 	}
 	if !Ready {
 		if (Polls > Ceil(Job.TimeoutMs / LAYOUT_REGISTRY_POLL_MS) + LAYOUT_REGISTRY_POLL_GRACE) {
-			try Req.Abort()
-			_LayoutRegistrySettle(Job, 0, "", "download of " . Job.Url . " did not finish in time")
+			_LayoutRegistryRetire(Job, Req, "download of " . Job.Url . " did not finish in time")
 			return
 		}
 		Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Polls + 1), LAYOUT_REGISTRY_POLL_MS)
