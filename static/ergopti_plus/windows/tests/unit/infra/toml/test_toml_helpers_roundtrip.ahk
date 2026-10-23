@@ -282,3 +282,5 @@ _TTHRT_LiteralStringKind() {
 }
 Test("toml literal kind: single quotes retain string intent (toml-literal-string-kind)",
 	_TTHRT_LiteralStringKind)
+
+#Include test_toml_reader_publication.ahk
