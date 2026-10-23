@@ -18,7 +18,7 @@ _ESOT_ChildSource(Owners) {
 	global _DriverDir, _SharedDir
 	Seen := Map(), Includes := ""
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "TickElapsed", "KL_JsonEncode",
-		"ProgramProviderCatalogue", "_ActPickWeb_TryOpen", "_PathsEdWeb_TryOpen", "ShowActionPicker"] {
+		"ProgramProviderCatalogue", "_ActPickWeb_TryOpen", "_PathsEdWeb_TryOpen", "ShowActionPicker", "WMPresentWindow"] {
 		Root := Symbol == "ProgramProviderCatalogue" ? _SharedDir : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, Root)
 		AssertTrue(Owner != "", "The unique actual child path must resolve: " . Symbol)
@@ -31,7 +31,7 @@ _ESOT_ChildSource(Owners) {
 			Includes .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(8, Seen.Count, "The public/lifecycle/clock/codec/policy owners must be genuine whole files")
+	AssertEqual(9, Seen.Count, "The public/lifecycle/clock/codec/policy owners must be genuine whole files")
 	Fixture := _DriverDir . "\tests\fixtures\editor_early_show_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	Owners["fixture"] := Map("path", Fixture, "sha256", CryptoSha256Bytes(FSReadBytesStrict(Fixture)))
