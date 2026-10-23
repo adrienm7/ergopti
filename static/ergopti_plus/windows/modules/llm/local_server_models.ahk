@@ -293,9 +293,14 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 	}
 
 	_ReleaseSettled(Record) {
-		if !this._Owns(Record) || Record["building"]
-			return false
-		Http := Record["request"]
+		PreviousCritical := Critical("On")
+		try {
+			if !this._Owns(Record) || Record["building"]
+				return false
+			; Cleanup may reenter retirement; retain the exact callback first.
+			Callback := Record["timer"]
+			Http := Record["request"]
+		} finally Critical(PreviousCritical)
 		if Http is CurlAsyncRequest {
 			if !Http.WaitForResponse(0)
 				return false
@@ -304,12 +309,14 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 			if Http.CleanupPending
 				return false
 		}
-		this._Timer(Record["timer"], 0)
+		this._Timer(Callback, 0)
 		PreviousCritical := Critical("On")
 		try {
 			if !this._Owns(Record) || Record["building"]
 				return false
 			this.Records.Delete(Record["id"])
+			; Callback and Http stay held until after the RAM claim is released.
+			Record["timer"] := 0
 			Record["request"] := 0
 			return true
 		} finally Critical(PreviousCritical)
