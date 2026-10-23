@@ -19,10 +19,10 @@ _PPCCSO_PlainPasteRestoreOwnsSequence() {
     Assert(Shortcut != "" && ShortcutRestore != "" && Gesture != "" && GestureRestore != "",
         "both plain-paste flows and their restore workers must exist")
     for _, Body in [Shortcut, Gesture] {
-        Assert(InStr(Body, "CB_SaveAll()") > 0 && InStr(Body, "CB_Write(PlainText)") > 0,
+        Assert(InStr(Body, "CB_SaveAll()") > 0 && InStr(Body, "CB_WriteTextWithReceipt(PlainText, &OwnedSequence)") > 0,
             "plain-paste flows must use a checked all-format clipboard transaction")
-        Assert(InStr(Body, "OwnedSequence := CB_GetSequenceNumber()") > 0,
-            "plain-paste flows must capture ownership after publishing their temporary payload")
+        Assert(InStr(Body, "CB_WriteTextWithReceipt(PlainText, &OwnedSequence)") > 0,
+            "plain-paste flows must receive authenticated ownership from their temporary publication")
     }
     for _, Restore in [ShortcutRestore, GestureRestore] {
 		Assert(InStr(Restore, "CB_RestoreOwnedAllEventually(OldClip, OwnedSequence") > 0
