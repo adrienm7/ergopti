@@ -153,6 +153,111 @@ local function with_case(spec, body)
 	assert(ok, failure)
 end
 
+--- Opens the real picker and configuration writer over two private folders.
+--- @param body function Scenario using the retained native page and disk sources.
+local function with_configuration_picker(body)
+	require("tests.support.ui.menu.llm.numeric_configuration_fixture").with_configuration(function(f)
+		local suffix = "[shortcuts.keyboard]\nctrl_j = \"run_program\"\n[gesture_parameters]\n"
+			.. "keyboard__ctrl_j__run_program = " .. Json.encode(PRIOR) .. "\n"
+		for _, id in ipairs({ "a", "b" }) do
+			Sandbox.write_bytes(f.dirs[id] .. "/config.toml", f.bytes(id) .. suffix)
+		end
+		for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
+			"modules.shortcuts.script_chords", "modules.hotstrings.magic_key", "infra.program_binding_transaction",
+			"ui.action_picker.bridge" }) do package.loaded[name] = nil end
+		local seen = { logs = {}, changed = 0 }
+		local logger = {}
+		for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
+			logger[level] = function(_, message, ...) seen.logs[#seen.logs + 1] = string.format(message, ...) end
+		end
+		package.loaded["logger.shim"] = logger
+		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
+		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad" }
+		package.loaded["adapters.program_providers"] = {}
+		local gestures = require("modules.gestures.manager")
+		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })
+		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+		local bridge = require("ui.action_picker.bridge")
+		local function find(rows, predicate)
+			for _, row in ipairs(rows or {}) do
+				if predicate(row) then return row end
+				local found = find(row.menu, predicate); if found then return found end
+			end
+		end
+		function f.open_picker()
+			local rows = menu_rows(gestures, f.paths.config("config.toml"), {
+				on_menu_changed = function() seen.changed = seen.changed + 1 end,
+			})
+			local prefix = keyboard.get_slot_label("ctrl_j") .. " → "
+			local slot = assert(find(rows, function(row)
+				return type(row.title) == "string" and row.title:sub(1, #prefix) == prefix
+			end), "the actual keyboard slot is rendered")
+			local title = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local command = assert(find(slot.menu, function(row) return row.title == title and type(row.fn) == "function" end))
+			command.fn()
+			assert(bridge.is_open() and f.host.is_visible("action_picker"), "the real picker session is open")
+		end
+		function f.change_folder(id)
+			assert(f.host.show("paths_editor"))
+			local result = require("ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs[id] }, {
+				config_paths = f.paths, webview_manager = f.host, on_reload = function() return true end,
+			})
+			helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
+			helpers.assert_eq(f.paths.config("config.toml"), f.dirs[id] .. "/config.toml")
+			helpers.assert_eq(f.host.is_visible("action_picker"), true, "saving paths does not retire another page")
+		end
+		function f.pick(action, parameter)
+			bridge.on_message({ action = "confirm", id = action, parameter = parameter }, {})
+		end
+		function f.cancel() bridge.on_message({ action = "cancel" }, {}) end
+		body(f, keyboard, bridge, seen)
+	end)
+end
+
+helpers.describe("Linux action picker opening configuration", function()
+	for _, vector in ipairs({ { action = "none", identical = false }, { action = "none", identical = true },
+		{ action = "send_text", parameter = "private picked text", identical = false } }) do
+		helpers.it("(picker-opening-config) refuses " .. vector.action .. " after switching to "
+			.. (vector.identical and "byte-identical" or "different") .. " folder", function()
+			with_configuration_picker(function(f, keyboard, bridge, seen)
+				if vector.identical then Sandbox.write_bytes(f.dirs.b .. "/config.toml", f.bytes("a")) end
+				local before = { a = f.bytes("a"), b = f.bytes("b") }
+				f.open_picker()
+				f.change_folder("b")
+				f.pick(vector.action, vector.parameter)
+				local bound_logs = 0
+				for _, line in ipairs(seen.logs) do if line:find("Bound ", 1, true) then bound_logs = bound_logs + 1 end end
+				helpers.assert_eq({ source_a = f.bytes("a"), source_b = f.bytes("b"), action = keyboard.get_action("ctrl_j"),
+					changed = seen.changed, picker_open = bridge.is_open(), bound_logs = bound_logs },
+					{ source_a = before.a, source_b = before.b, action = "run_program", changed = 0, picker_open = true, bound_logs = 0 },
+					"a retained A picker must refuse B publication, runtime mutation and false success together")
+				f.cancel()
+				helpers.assert_eq(bridge.is_open(), false)
+			end)
+		end)
+	end
+	for _, folder in ipairs({ "a", "b" }) do
+		for _, action in ipairs({ "none", "send_text" }) do
+			helpers.it("(picker-opening-config) commits a fresh " .. folder .. " picker for " .. action, function()
+				with_configuration_picker(function(f, keyboard, bridge, seen)
+					local before_a = f.bytes("a")
+					if folder == "b" then f.open_picker(); f.change_folder("b"); f.cancel() end
+					f.open_picker()
+					f.pick(action, action == "send_text" and "new page text" or nil)
+					helpers.assert_eq(f.document(folder).shortcuts.keyboard.ctrl_j, action)
+					helpers.assert_eq(keyboard.get_action("ctrl_j"), action)
+					helpers.assert_eq(seen.changed, 1)
+					helpers.assert_eq(bridge.is_open(), false)
+					if action == "send_text" then
+						helpers.assert_eq(f.document(folder).gesture_parameters.keyboard__ctrl_j__send_text, "new page text")
+					end
+					if folder == "b" then helpers.assert_eq(f.bytes("a"), before_a) end
+				end)
+			end)
+		end
+	end
+end)
+
 helpers.describe("Linux program picker transaction", function()
 	helpers.it("(program-picker) owns its real renderer independently of a previous menu fixture", function()
 		with_case(CASES[2], function(_, gestures, _, controls, path, source)
