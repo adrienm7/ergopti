@@ -129,7 +129,7 @@ Test("tickcount-wrap: crash_reporter.ahk uptime division uses & 0xFFFFFFFF mask"
 _TCLW_NoFirstPartyAbsoluteDeadlines() {
 	Cases := [
 		["_TooltipLifecycleDeadlineBounds", "ExpMs := OriginMs +", "TickRemaining("],
-		["_TooltipUiaProcessIsHostile", "A_TickCount < _TooltipUiaHostileCache", "TickExpired("],
+		["_TooltipUiaProcessIsHostile", "A_TickCount < _TooltipUiaHostileCache", "TickExpired64("],
 		["_SFD_UiaProcessIsHostile", "A_TickCount < SFD_UIA_HOSTILE_CACHE", "TickExpired64("],
 		["_UIASW_Request", "Deadline := A_TickCount + UIASW_DEADLINE_MS", "SetTimer(DeadlineFn, -UIASW_DEADLINE_MS)"],
 		["GestureCaptureRegion", '"deadline", A_TickCount +', '"started_tick"'],
@@ -137,7 +137,7 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		["GestureScreenshotRegion", '"selection_deadline", A_TickCount +', '"selection_started_tick"'],
 		["GestureRegionCapturePoll", 'A_TickCount >= State["save_deadline"]', "TickExpired("],
 		["_TakeNoteQueueFinalize", '"deadline", A_TickCount +', '"started_tick"'],
-		["_TakeNoteAbortIfUnavailable", 'A_TickCount >= Job["deadline"]', "TickExpired("],
+		["_TakeNoteAbortIfUnavailable", 'A_TickCount >= Job["deadline"]', "TickExpired64("],
 		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', "_LLMRemote_ReserveRequest("],
 		["_LLMRemote_ReserveRequest", '"deadline_tick", A_TickCount +', '"start_tick"'],
 		["_LLMRemote_PollRequest", 'entry.Has("deadline_tick")', "_LLM_DeadlineExpired("],
