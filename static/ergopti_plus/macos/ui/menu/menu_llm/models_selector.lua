@@ -312,7 +312,7 @@ function M.build(ctx)
 				local name = type(body.value) == "string" and body.value:gsub("^%s+", ""):gsub("%s+$", "") or ""
 				if close_custom_model_session(session) ~= true then return false end
 				if name == "" then
-					pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
+					pcall(dialog.block_alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
 					return true
 				end
 				local mutation = add_user_model(active_backend, name)
