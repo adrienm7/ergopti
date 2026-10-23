@@ -103,6 +103,8 @@ end
 --- @return boolean
 local function view_current(ctx, held, model)
 	if not admitted(ctx) or not held or held.generation ~= remote().get_identity_generation() then return false end
+	if held.notice_context ~= nil and (ctx ~= held.notice_context or _ctx ~= ctx) then return false end
+	if held.notice_agent_owned == true and _agent_ctx ~= held.notice_agent_context then return false end
 	local current = remote().local_server_target(held.target.id)
 	if not current then return false end
 	for _, key in ipairs({ "id", "entry_id", "provider", "base_url", "token" }) do
@@ -120,6 +122,29 @@ local function view_current(ctx, held, model)
 		return found
 	end
 	return true
+end
+
+--- Binds a deferred notification action to the exact menu and native view.
+--- @param id string Original server id.
+--- @param action function Receives the originating context and view receipt.
+--- @param owns_agent boolean|nil Also retains the agent context for a model repair.
+--- @return function callback Refuses a replaced owner before acquiring any work.
+local function notice_action(id, action, owns_agent)
+	local ctx, held = _ctx, capture_view(id)
+	if held then
+		held.notice_context = ctx
+		if owns_agent == true then
+			held.notice_agent_owned = true
+			held.notice_agent_context = _agent_ctx
+		end
+	end
+	return function()
+		if not view_current(ctx, held) then
+			Logger.warn(LOG, "Local server notification action expired after its owner changed.")
+			return false
+		end
+		return action(ctx, held)
+	end
 end
 
 --- The host and port of a base URL, for a row or a notice.
@@ -241,8 +266,12 @@ function M.prompt_address(ctx, id, receipt)
 	if typed == "" then typed = server.base_url end
 	local base = remote().normalize_base_url(typed)
 	if not base then
+		if _ctx ~= ctx then
+			Logger.warn(LOG, "Local server address retry expired after its menu owner changed.")
+			return false
+		end
 		notify(server.label, i18n.format("llm.local_servers.invalid_address", server.base_url), "error",
-			function() M.prompt_address(ctx, id) end)
+			notice_action(id, function(ctx, held) return M.prompt_address(ctx, id, held) end))
 		return false
 	end
 	return ApiPanel.apply_local_server(ctx, id, { base_url = base }, function(committed)
@@ -278,13 +307,17 @@ function M.report_sweep(id)
 	elseif verdict and verdict.status == servers().STATUS_NEEDS_KEY then
 		notify(i18n.format("llm.local_servers.needs_key_title", server.label),
 			i18n.format("llm.local_servers.needs_key_body", server.label), "warning",
-			function() M.prompt_key(_ctx, id) end)
+			notice_action(id, function(ctx, held) return M.prompt_key(ctx, id, held) end))
 	elseif verdict and verdict.status == servers().STATUS_UNAVAILABLE then
 		notify(server.label, i18n.get("healthcheck.status.failed"), "error")
 	else
 		notify(i18n.format("llm.local_servers.not_running_title", server.label),
 			i18n.format("llm.local_servers.still_down_body", host_of(target.base_url)), "warning",
-			function() M.rescan(_ctx, function() M.report_sweep(id) end) end)
+			notice_action(id, function(ctx, held)
+				return M.rescan(ctx, function()
+					if view_current(ctx, held) then M.report_sweep(id) end
+				end)
+			end))
 	end
 end
 
@@ -312,18 +345,27 @@ end
 --- Searches again, then asks which of the served models replaces a missing one.
 --- @param id string Server id.
 --- @param missing string|nil The model the server refused.
-function M.prompt_model(id, missing)
-	M.rescan(_ctx, function()
+--- @param ctx table|nil Originating menu context, or the current context for a direct action.
+--- @param receipt table|nil Retained source view for a notification action.
+--- @return boolean started
+function M.prompt_model(id, missing, ctx, receipt)
+	ctx = ctx or _ctx
+	local held = receipt or capture_view(id)
+	if not view_current(ctx, held) then return false end
+	return M.rescan(ctx, function()
+		if not view_current(ctx, held) then return end
 		local server = remote().local_server_descriptor(id)
 		local verdict = servers().result(id)
 		if not verdict or verdict.status ~= servers().STATUS_UP then
 			M.report_sweep(id)
 			return
 		end
+		local prompted = capture_view(id)
 		local typed = ask(i18n.format("llm.local_servers.model_missing_title", server.label, missing or "?"),
 			i18n.format("dialog.local_servers.model_prompt", server.label, table.concat(verdict.models, ", ")),
 			verdict.models[1] or "")
-		if typed == nil or typed == "" then return end
+		if typed == nil or typed == "" or not view_current(ctx, held)
+			or not view_current(ctx, prompted) or servers().result(id) ~= verdict then return end
 		replace_model(id, missing, typed)
 	end)
 end
@@ -338,15 +380,21 @@ local function on_failure(id, kind, detail)
 	if kind == servers().FAILURE_NOT_RUNNING then
 		notify(i18n.format("llm.local_servers.not_running_title", server.label),
 			i18n.format("llm.local_servers.not_running_body", host_of(remote().local_server_target(id).base_url)),
-			"warning", function() M.rescan(_ctx, function() M.report_sweep(id) end) end)
+			"warning", notice_action(id, function(ctx, held)
+				return M.rescan(ctx, function()
+					if view_current(ctx, held) then M.report_sweep(id) end
+				end)
+			end))
 	elseif kind == servers().FAILURE_NEEDS_KEY then
 		notify(i18n.format("llm.local_servers.needs_key_title", server.label),
 			i18n.format("llm.local_servers.needs_key_body", server.label), "warning",
-			function() M.prompt_key(_ctx, id) end)
+			notice_action(id, function(ctx, held) return M.prompt_key(ctx, id, held) end))
 	elseif kind == servers().FAILURE_MODEL_MISSING then
 		notify(i18n.format("llm.local_servers.model_missing_title", server.label, detail.model or "?"),
 			i18n.get("llm.local_servers.model_missing_body"), "warning",
-			function() M.prompt_model(id, detail.model) end)
+			notice_action(id, function(ctx, held)
+				return M.prompt_model(id, detail.model, ctx, held)
+			end, true))
 	end
 end
 M.on_failure = on_failure
