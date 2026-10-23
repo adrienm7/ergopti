@@ -348,7 +348,7 @@ _TooltipDequeuePollFn(ExpectedGeneration := unset, ExpectedSurface := 0) {
     NeedDequeue := false
     for , Item in ItemsSnapshot {
         if (Item.ExpireDurationMs > 0
-            and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, Now)) {
+            and TickExpired64(Item.ExpireOriginTick, Item.ExpireDurationMs, Now)) {
             NeedDequeue := true
             break
         }
@@ -358,7 +358,7 @@ _TooltipDequeuePollFn(ExpectedGeneration := unset, ExpectedSurface := 0) {
     Remaining := []
     for , Item in ItemsSnapshot {
         if (Item.ExpireDurationMs == 0
-            or !TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, Now))
+            or !TickExpired64(Item.ExpireOriginTick, Item.ExpireDurationMs, Now))
             Remaining.Push(Item)
     }
     if (Remaining.Length == 0) {
