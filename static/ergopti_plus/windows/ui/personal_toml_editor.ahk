@@ -269,7 +269,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	CloseOnAddChk.OnEvent("Click", (*) => _EditorPrefSet("close_on_add",
 		CloseOnAddChk.Value ? "1" : "0"))
 
-	W.OnEvent("Close", (*) => _OnEditorClose(W, SessionEpoch))
+	W.OnEvent("Close", _PersonalEditorWindowClose.Bind(W, SessionEpoch))
 	W.OnEvent("Size", (*) => _ResizeEditor(W, LV, OutputEdit, StatusText))
 
 	if SessionEpoch != _PersonalEditorSessionEpoch {
@@ -805,6 +805,14 @@ _SwitchEditorSection(SectionName) {
 	OpenPersonalEditor(SectionName)
 }
 
+; The logical retirement helper also serves writer/session callers which retain
+; their controls until cleanup. Only the genuine native Close owns destruction.
+_PersonalEditorWindowClose(Window, SessionEpoch, *) {
+	if _OnEditorClose(Window, SessionEpoch)
+		Window.Destroy()
+	return true
+}
+
 _OnEditorClose(Window := 0, SessionEpoch := 0) {
 	global _PersonalEditorGui, _PersonalEditorPrioCtrl
 	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
@@ -819,6 +827,7 @@ _OnEditorClose(Window := 0, SessionEpoch := 0) {
 	_PersonalEditorGui := ""
 	; Drop the reference to the now-destroyed control so no form helper touches it
 	_PersonalEditorPrioCtrl := ""
+	return true
 }
 
 _ResizeEditor(W, LV, OutputEdit, StatusText) {
