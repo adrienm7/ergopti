@@ -822,7 +822,6 @@ ConfigMigrateBackupPath(FilePath, Version, Stamp) {
 ; Replaces FilePath with Candidate while it still holds exactly Source,
 ; through a verified same-directory stage. Returns "" on success, else why not.
 _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
-	global _ParseTomlCache
 	static Sequence := 0
 	Sequence += 1
 	StagePath := FilePath . "." . A_ScriptHwnd . "-migration-" . Sequence . ".stage"
@@ -844,8 +843,7 @@ _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 		try FSDelete(StagePath)
 		return "the atomic replace was refused"
 	}
-	if _ParseTomlCache.Has(FilePath)
-		_ParseTomlCache.Delete(FilePath)
+	_TOML_InvalidateParseCache(FilePath)
 	return ""
 }
 
