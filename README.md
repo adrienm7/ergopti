@@ -532,7 +532,7 @@ The typing metrics are off by default. Once you turn them on, the keystroke
 statistics stay on your computer (optionally encrypted); password fields,
 private browsing windows and the applications you exclude are never recorded,
 and nothing is uploaded. See the
-[metrics privacy notes](static/ergopti_plus/docs/security/keylogger_privacy.md).
+[metrics privacy notes](static/ergopti_plus/docs/security/keystats_privacy.md).
 
 ---
 

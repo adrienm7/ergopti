@@ -333,7 +333,7 @@ _required_dependency_package() {
 		pacman:openssl) echo "openssl" ;;
 		xbps:openssl) echo "openssl" ;;
 		apk:openssl) echo "openssl" ;;
-		# Typing metrics: the keylogger writes and the metrics windows read
+		# Typing metrics: the keystats writes and the metrics windows read
 		# through the sqlite3 CLI; without it both fall back to nothing useful.
 		apt:sqlite3) echo "sqlite3" ;;
 		dnf:sqlite3) echo "sqlite" ;;

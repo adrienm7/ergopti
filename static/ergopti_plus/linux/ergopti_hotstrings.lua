@@ -130,7 +130,7 @@ local RepeatKey         = require("modules.hotstrings.repeat_key")
 local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
 -- Battery, network, lock and suspend, for the metrics.
-local system_metrics = RuntimeGuard.optional_require("modules.keylogger.system_metrics")
+local system_metrics = RuntimeGuard.optional_require("modules.keystats.system_metrics")
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
 local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
@@ -147,7 +147,7 @@ local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
 local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
 local llm_overlay = RuntimeGuard.optional_require("ui.tooltip.llm")
 local dev_finder        = require("modules.hotstrings.device_finder")
-local keylogger         = require("modules.keylogger.keylogger")
+local keystats         = require("modules.keystats.keystats")
 local keyboard_hook     = require("adapters.keyboard_hook")
 local InputEvent        = require("infra.input_event")
 local Monotonic         = require("infra.monotonic")
@@ -156,7 +156,7 @@ local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
-local FocusGuard        = require("modules.keylogger.focus_guard")
+local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
 local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
@@ -187,7 +187,7 @@ local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
 
--- Window info tracker (optional — provides app_id for keylogger per-app stats).
+-- Window info tracker (optional — provides app_id for keystats per-app stats).
 local window_info = RuntimeGuard.optional_require("adapters.window_info")
 
 -- Process lifecycle tracker (optional — drives focus-change events on Linux).
@@ -370,7 +370,7 @@ local shutdown = ShutdownCoordinator.new({
 		{
 			name = "metrics SQLite flush",
 			wait_for_ack = true,
-			stop = function() return keylogger.stop() == true end,
+			stop = function() return keystats.stop() == true end,
 		},
 		{
 			name = "privacy context capture",
@@ -474,12 +474,12 @@ local shutdown = ShutdownCoordinator.new({
 -- Default hotstring data location (XDG-compliant user config).
 -- How many periodic ticks between metric flushes. The periodic callback runs
 -- four times a second (periodSec = 0.25 below), and the cross-driver ingest
--- cadence is _shared/modules/timings/constants.toml [keylogger] ingest_tick_ms —
+-- cadence is _shared/modules/timings/constants.toml [keystats] ingest_tick_ms —
 -- what Windows uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. Derived
 -- rather than written as a literal so a change to the canon moves all three.
 local PERIODIC_TICK_MS   = 250
 local FLUSH_EVERY_TICKS  = math.max(1,
-	math.floor(Timings.ms("keylogger", "ingest_tick_ms") / PERIODIC_TICK_MS))
+	math.floor(Timings.ms("keystats", "ingest_tick_ms") / PERIODIC_TICK_MS))
 
 local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
@@ -851,10 +851,10 @@ local function main()
 	BootProfiler.stage_done("config", string.format("%d mapping(s), %d parse error(s), log level %s",
 		mapping_count, hotstrings_config.parse_error_count(), ScriptSettings.current()))
 
-	-- 8.3) Initialise the full keylogger.
-	BootProfiler.stage("keylogger")
-	keylogger.init({})
-	BootProfiler.stage_done("keylogger")
+	-- 8.3) Initialise the full keystats.
+	BootProfiler.stage("keystats")
+	keystats.init({})
+	BootProfiler.stage_done("keystats")
 
 	-- 8.4) Resolve the input device.
 	BootProfiler.stage("input device")
@@ -964,7 +964,7 @@ local function main()
 		-- never sees, so the resumed caret is not known to start a word (macOS
 		-- discard_paused_text_context makes the same claim).
 		reset = function()
-			keylogger.cancel_hold_intervals()
+			keystats.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
 			engine:reset(false)
@@ -979,7 +979,7 @@ local function main()
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
-			if paused then keylogger.cancel_hold_intervals() end
+			if paused then keystats.cancel_hold_intervals() end
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
@@ -1007,7 +1007,7 @@ local function main()
 	local secure_focus_guard = FocusGuard.new({
 		watch      = privacy_owners.watch,
 		detector   = secure_field_detector,
-		keylogger  = keylogger,
+		keystats  = keystats,
 		prediction = prediction_engine,
 		now_ms     = Monotonic.now_ms,
 		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
@@ -1018,10 +1018,10 @@ local function main()
 		end,
 		publish_context = function(context)
 			_cached_app_id = context.app_id
-			keylogger.set_private_window(keylogger.is_private_window(context.title))
-			local password_app = keylogger.is_password_app(context.app_id)
-			if password_app then keylogger.suppress() else keylogger.unsuppress() end
-			return true, keylogger.is_context_protected(context.app_id, context.title)
+			keystats.set_private_window(keystats.is_private_window(context.title))
+			local password_app = keystats.is_password_app(context.app_id)
+			if password_app then keystats.suppress() else keystats.unsuppress() end
+			return true, keystats.is_context_protected(context.app_id, context.title)
 		end,
 		reset_text = function()
 			_undoable = nil
@@ -1043,7 +1043,7 @@ local function main()
 	input_capture_gate = InputCaptureGate.new({
 		on_block = function()
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
-			keylogger.cancel_hold_intervals()
+			keystats.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
 			engine:reset(false)
@@ -1061,7 +1061,7 @@ local function main()
 			engine = engine, injector = injector, magic = MagicKey,
 			detector = secure_field_detector, focus_guard = secure_focus_guard,
 			capture_gate = input_capture_gate, dynamic = dyn_hotstrings,
-			window_info = window_info, keylogger = keylogger,
+			window_info = window_info, keystats = keystats,
 			paused = script_actions.is_paused,
 			replay_input = function(queued_input)
 				for _, queued in ipairs(queued_input) do
@@ -1135,7 +1135,7 @@ local function main()
 		-- would insert a trigger in a place the user had moved on from.
 		_undoable = nil
 
-		-- Monotonic wall clock: the keylogger derives real inter-keystroke delays
+		-- Monotonic wall clock: the keystats derives real inter-keystroke delays
 		-- from this. The CPU clock barely advances between keystrokes on Linux, so
 		-- it would make every recorded delay meaningless.
 		local now_ms = math.floor(Monotonic.now_ms())
@@ -1152,7 +1152,7 @@ local function main()
 			end
 		end
 
-		-- Detect current app for per-app keylogger stats. Read from the
+		-- Detect current app for per-app keystats stats. Read from the
 		-- process_lifecycle focus cache (updated off the input path at 250 ms
 		-- intervals) so no subprocess is spawned on the keystroke thread. The
 		-- cache variable is an upvalue declared before on_char (getFocused()
@@ -1160,13 +1160,13 @@ local function main()
 		local app_id = _cached_app_id or "Unknown"
 
 		-- Check password suppression.
-		if keylogger.is_password_app(app_id) then
-			keylogger.suppress()
+		if keystats.is_password_app(app_id) then
+			keystats.suppress()
 		else
-			keylogger.unsuppress()
+			keystats.unsuppress()
 		end
 
-		keylogger.on_keydown(ch, now_ms, app_id, scancode)
+		keystats.on_keydown(ch, now_ms, app_id, scancode)
 
 		-- `is_terminator` opens the engine's end-char path, where a trigger that
 		-- did NOT opt into auto_expand is allowed to fire. Without it every entry
@@ -1268,7 +1268,7 @@ local function main()
 					-- Logical telemetry and undo are commit records: publishing either
 					-- before the last checked SYN_REPORT invents an expansion the target
 					-- application may never have received.
-					keylogger.record_hotstring(app_id, result.trigger, result.replacement,
+					keystats.record_hotstring(app_id, result.trigger, result.replacement,
 						now_ms, result.group, result.backspace_count, result.is_private)
 					_undoable = {
 						trigger     = result.trigger,
@@ -1368,7 +1368,7 @@ local function main()
 				local offered = type(top) == "table" and (top.trigger or top.key or top.label) or tostring(top)
 				if offered and offered ~= _last_offered then
 					_last_offered = offered
-					keylogger.record_suggestion(app_id, "hotstring", now_ms)
+					keystats.record_suggestion(app_id, "hotstring", now_ms)
 				end
 			end)
 			if not ok_preview then
@@ -1410,11 +1410,11 @@ local function main()
 						-- `result.is_private`; this one never did, so every @-tag
 						-- expansion — the single-letter ones included, which have
 						-- existed since this driver shipped — wrote its resolved value
-						-- into the keylogger's per-character synthetic record in full.
+						-- into the keystats's per-character synthetic record in full.
 						-- For "@i★" that is the user's IBAN, one entry per character,
 						-- persisted and replicated. Windows redacts the equivalent
 						-- record and macOS skips it; Linux was writing it.
-						keylogger.record_hotstring(app_id, dynamic_event.trigger,
+						keystats.record_hotstring(app_id, dynamic_event.trigger,
 							dynamic_event.replacement, now_ms, dynamic_event.h_type,
 							dynamic_event.backspace_count, dynamic_event.is_private)
 					end
@@ -1442,12 +1442,12 @@ local function main()
 		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
-		if keylogger.is_password_app(app_id) then
-			keylogger.suppress()
+		if keystats.is_password_app(app_id) then
+			keystats.suppress()
 		else
-			keylogger.unsuppress()
+			keystats.unsuppress()
 		end
-		keylogger.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
+		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
 	end
 	local on_physical = input_capture_gate.guard(handle_physical,
 		function(scancode, _key_name, _char, value)
@@ -1549,11 +1549,11 @@ local function main()
 			end,
 			on_offer = function(context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
-				keylogger.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))
+				keystats.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))
 			end,
 			on_output = function(text, context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
-				keylogger.record_synthetic_output(output_app, text, "llm",
+				keystats.record_synthetic_output(output_app, text, "llm",
 					math.floor(Monotonic.now_ms()), 0,
 					type(context) == "table" and context.input_chars or 0)
 			end,
@@ -1576,7 +1576,7 @@ local function main()
 			secure_focus_guard.blocks_text()
 			local chord = keyboard_shortcuts.chord_name(detail)
 			if chord then
-				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
+				keystats.record_shortcut(_cached_app_id or "Unknown", chord,
 					math.floor(Monotonic.now_ms()))
 			end
 			-- The same master switch gates CapsWord and every menu operation. It must
@@ -1625,12 +1625,12 @@ local function main()
 			end
 			if admitted then
 				local app_id = _cached_app_id or "Unknown"
-				if keylogger.is_password_app(app_id) then
-					keylogger.suppress()
+				if keystats.is_password_app(app_id) then
+					keystats.suppress()
 				else
-					keylogger.unsuppress()
+					keystats.unsuppress()
 				end
-				keylogger.record_correction(app_id, math.floor(Monotonic.now_ms()))
+				keystats.record_correction(app_id, math.floor(Monotonic.now_ms()))
 			end
 		end
 
@@ -1988,7 +1988,7 @@ local function main()
 		if not consumed then return false end
 		local chord = keyboard_shortcuts.chord_name(detail)
 		if chord then
-			keylogger.record_shortcut(_cached_app_id or "Unknown", chord, math.floor(Monotonic.now_ms()))
+			keystats.record_shortcut(_cached_app_id or "Unknown", chord, math.floor(Monotonic.now_ms()))
 		end
 		return true
 	end
@@ -2016,9 +2016,9 @@ local function main()
 		return consume_bound_chord(detail)
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
-	local hold_token = keylogger.hold_accounting_token
+	local hold_token = keystats.hold_accounting_token
 	local function hold_admission()
-		if keylogger.hold_accounting_token ~= hold_token
+		if keystats.hold_accounting_token ~= hold_token
 			or script_actions.is_paused() or input_capture_gate.blocks_text() then return nil end
 		return hold_token()
 	end
@@ -2028,7 +2028,7 @@ local function main()
 			return
 		end
 		if secure_focus_guard.blocks_text() then return end
-		keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
+		keystats.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
 	end
 	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
 		capture_owned_scancodes[scancode] = nil
@@ -2139,7 +2139,7 @@ local function main()
 					if rebuild_tray_menu then rebuild_tray_menu() end
 					Logger.success(LOG, "Layout '%s' applied.", tostring(new_layout))
 				end,
-		keylogger     = keylogger,
+		keystats     = keystats,
 		llm           = prediction_engine,
 		gestures      = gestures,
 		shortcuts     = shortcuts,
@@ -2442,11 +2442,11 @@ local function main()
 
 	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
-	-- can query/control daemon modules (keylogger, LLM, config, engine).
+	-- can query/control daemon modules (keystats, LLM, config, engine).
 	if webview_manager then
 		webview_manager.set_daemon_state({
 			engine    = engine,
-			keylogger = keylogger,
+			keystats = keystats,
 			config    = hotstrings_config,
 			llm       = prediction_engine,
 			gestures  = gestures,
@@ -2581,8 +2581,8 @@ local function main()
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			wrap_on_type.end_selection_window()
-			keylogger.observe_hold_focus(appName)
-			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
+			keystats.observe_hold_focus(appName)
+			keystats.set_private_window(keystats.is_private_window(windowTitle))
 			-- A focus change moves the caret to a different text context. The matcher
 			-- and its aligned timing history must cross that boundary together.
 			_undoable = nil
@@ -2598,12 +2598,12 @@ local function main()
 			-- editor" and "four hours across three files" — and this driver had
 			-- nothing to group by. Handed over AFTER the private-window verdict, so
 			-- a title that marks an incognito session is judged before it is stored.
-			keylogger.set_window_title(_cached_app_id, windowTitle,
+			keystats.set_window_title(_cached_app_id, windowTitle,
 				math.floor(Monotonic.now_ms()))
 			-- And the secure-field verdict, likewise. adapters/secure_field_detector
 			-- was written, tested and never called: `refresh()` had no caller
 			-- anywhere in the driver, so `isSecureField()` answered false forever and
-			-- keylogger.set_secure_field was a setter nothing set. The whole
+			-- keystats.set_secure_field was a setter nothing set. The whole
 			-- password-field filter — the reason the metrics manifest ships
 			-- secure_filter_enabled at all — was inert, and it fails in the direction
 			-- that records what it exists to suppress.
@@ -2612,26 +2612,26 @@ local function main()
 			-- query, and the focused element is what it can answer about.
 			secure_focus_guard.prime()
 			if _cached_app_id then
-				keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
+				keystats.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 			end
 		end)
 		-- start() seeds its change detector with the current window and therefore
-		-- does not emit an initial callback. Prime the keylogger explicitly so a
+		-- does not emit an initial callback. Prime the keystats explicitly so a
 		-- dashboard opened before the first application switch has an owner for
 		-- its foreground interval.
 		local foreground = process_lifecycle.getForegroundApp()
 		if not privacy_owners.startup_checkpoint() then return end
 		_cached_app_id = foreground and foreground.appId or nil
-		keylogger.observe_hold_focus(_cached_app_id)
-		keylogger.set_private_window(
-			keylogger.is_private_window(foreground and foreground.windowTitle))
+		keystats.observe_hold_focus(_cached_app_id)
+		keystats.set_private_window(
+			keystats.is_private_window(foreground and foreground.windowTitle))
 		-- Primed here too. Without it the first window of the session — which on a
 		-- login that restores a password manager is exactly the window that matters
 		-- — is recorded until the user switches away from it.
 		secure_focus_guard.prime()
 		if not privacy_owners.startup_checkpoint() then return end
 		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
-			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
+			keystats.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 		end
 		process_lifecycle.start()
 	end
@@ -2681,7 +2681,7 @@ local function main()
 		-- One bounded batch per tick, and only while a migration is in flight.
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
-		RuntimeGuard.call("keylogger migration pump", keylogger.pump_migration)
+		RuntimeGuard.call("keystats migration pump", keystats.pump_migration)
 
 		-- Persist. Until now the ONLY two flush() call sites were the SIGTERM
 		-- handler and the clean exit after the loop returns — so a SIGKILL, an OOM
@@ -2690,12 +2690,12 @@ local function main()
 		-- date because both the date and the timestamp are computed at flush time.
 		--
 		-- The cadence is the cross-driver one: _shared/modules/timings/constants
-		-- .toml [keylogger] ingest_tick_ms, which Windows already uses as its
+		-- .toml [keystats] ingest_tick_ms, which Windows already uses as its
 		-- INGEST_TICK_MS and macOS as INGEST_TICK_SEC. Counted in ticks rather than
 		-- measured against a clock, because the periodic callback's own period is
 		-- the only interval this loop can be sure of.
 		if tick_count % FLUSH_EVERY_TICKS == 0 then
-			RuntimeGuard.call("keylogger periodic flush", keylogger.flush)
+			RuntimeGuard.call("keystats periodic flush", keystats.flush)
 		end
 
 		-- The machine's own state. The sampler decides for itself whether enough
@@ -2713,7 +2713,7 @@ local function main()
 		-- stats — the speed of the text reaching the page, and its source.
 		if wpm_widget or wpm_tray_readout then
 			local now_ms = Monotonic.now_ms()
-			local live = keylogger.get_live_stats(now_ms)
+			local live = keystats.get_live_stats(now_ms)
 			if wpm_widget then
 				local owner = wpm_widget
 				RuntimeGuard.call("WPM widget tick", function()
@@ -2861,7 +2861,7 @@ local function main()
 				end)
 			end
 			privacy_owners.watch.pump()
-			RuntimeGuard.call("metrics SQLite flush acknowledgement", keylogger.pump_flush)
+			RuntimeGuard.call("metrics SQLite flush acknowledgement", keystats.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
 			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
@@ -2900,7 +2900,7 @@ local function main()
 	if process_lifecycle then process_lifecycle.stop() end
 	if tray_menu then tray_menu.destroy() end
 
-	local stats = keylogger.get_session_stats()
+	local stats = keystats.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 	-- Metrics persistence was acknowledged by the shutdown coordinator.

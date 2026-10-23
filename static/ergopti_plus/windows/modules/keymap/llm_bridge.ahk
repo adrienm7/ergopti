@@ -16,7 +16,7 @@
 ;    navigation keys (arrows, F-keys) are ignored to keep context clean.
 ; 4. PrefixWatcher integration: keystrokes are fed from the prefix watcher's
 ;    pass-through InputHook (``hotstring_prefix_watcher.ahk``). On Windows,
-;    HookDispatcher + Keylogger + PrefixWatcher each create an InputHook;
+;    HookDispatcher + Keystats + PrefixWatcher each create an InputHook;
 ;    the LLM bridge no longer registers with HookDispatcher because keystrokes
 ;    were not reaching it on some machines while the prefix hook was reliable.
 ; 5. Agent-only feed: while the bridge is inactive (the AI menu switched off,

@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(opts)
 	opts = opts or {}
 	local notifications = {}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function(text, source, deletes, variant)
 			notifications[#notifications + 1] = {
 				text = text, source = source, deletes = deletes, variant = variant,
@@ -49,7 +49,7 @@ local function load_fixture(opts)
 		notifications = notifications,
 		hs = require("hs"),
 		cleanup = function()
-			package.loaded["modules.keylogger"] = nil
+			package.loaded["modules.keystats"] = nil
 			package.loaded["modules.keymap.expander"] = nil
 			package.loaded["modules.keymap.terminator_replay"] = nil
 		end,
@@ -123,7 +123,7 @@ helpers.describe("keymap expander: repeat uses an explicit replacement transacti
 			"the raw carrier and punctuation must both leave the logical buffer")
 		helpers.assert_eq(#fixture.notifications, 1)
 		helpers.assert_eq(fixture.notifications[1].deletes, 2,
-			"keylogger reconciliation must delete the same two codepoints as the screen")
+			"keystats reconciliation must delete the same two codepoints as the screen")
 		helpers.assert_eq(fixture.notifications[1].variant, "repeat_key")
 		fixture.cleanup()
 	end)

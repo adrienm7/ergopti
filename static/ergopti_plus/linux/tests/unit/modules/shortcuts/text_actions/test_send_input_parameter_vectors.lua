@@ -40,7 +40,7 @@ local function routed_gestures()
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		layout = "adapters.keyboard_layout",
-		keylogger = "modules.keylogger.keylogger",
+		keystats = "modules.keystats.keystats",
 	}
 	local log = { codes = {}, injected = {} }
 	package.loaded[names.combo] = {
@@ -67,7 +67,7 @@ local function routed_gestures()
 		resolve = function(char) return azerty[char] end,
 		is_ready = function() return true end,
 	}
-	package.loaded[names.keylogger] = { record_shortcut = function() return true end }
+	package.loaded[names.keystats] = { record_shortcut = function() return true end }
 	package.loaded["modules.shortcuts.manager"] = nil
 
 	local Shortcuts = require("modules.shortcuts.manager")

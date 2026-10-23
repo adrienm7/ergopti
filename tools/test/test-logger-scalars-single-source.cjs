@@ -42,8 +42,8 @@
  * NOTE — duplication is still duplication:
  * These constants are not yet READ from the registry at runtime; the drivers
  * declare their own. That is tolerable only because this gate locks them to the
- * registry, exactly as test-keylogger-timings-single-source.cjs does for the
- * keylogger intervals. Wiring the reads is the follow-up, not the guarantee.
+ * registry, exactly as test-keystats-timings-single-source.cjs does for the
+ * keystats intervals. Wiring the reads is the follow-up, not the guarantee.
  * ==============================================================================
  */
 

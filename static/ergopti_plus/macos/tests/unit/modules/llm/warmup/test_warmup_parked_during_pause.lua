@@ -54,7 +54,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 }
 
 local function exercise_committed_backend_pause()
@@ -147,7 +147,7 @@ local function exercise_committed_backend_pause()
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
-		package.loaded["modules.keylogger"] = { resync_context = function() return true end }
+		package.loaded["modules.keystats"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
 		local pause_accepted = ScriptControl.pause_all()

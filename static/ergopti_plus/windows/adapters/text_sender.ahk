@@ -569,7 +569,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 	; (PrefixWatcherSuppress/KL_MarkSynthetic) that are released exactly once,
 	; by the callback, on any path where TextSend itself did not throw --  a
 	; bail-out here that never invokes Callback leaked those guards forever,
-	; permanently suppressing normal hotstring/keylogger observation.
+	; permanently suppressing normal hotstring/keystats observation.
 	if A_IsSuspended {
 		_TextSenderInvokeCallback(Callback, false, "driver suspended before clipboard injection")
 		return

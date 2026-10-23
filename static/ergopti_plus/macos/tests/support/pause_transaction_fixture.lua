@@ -25,7 +25,7 @@ local OWNERS = {
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 	"adapters.event_provenance",
 	"adapters.timer_scheduler",
 }
@@ -190,8 +190,8 @@ local function load_context(options)
 		stop = function() return true end,
 	}
 	package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
-	package.loaded["modules.keylogger"] = {
-		resync_context = record("keylogger_resync"),
+	package.loaded["modules.keystats"] = {
+		resync_context = record("keystats_resync"),
 		log_shortcut = function() end,
 	}
 	package.loaded["adapters.synthetic_input"] = {

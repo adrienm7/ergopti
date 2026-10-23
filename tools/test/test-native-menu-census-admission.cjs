@@ -31,6 +31,8 @@ const BASELINE = 'tools/test/native-menu-rows-baseline.json';
 const tool = fs.readFileSync(path.join(ROOT, TOOL), 'utf8');
 const corpusBytes = fs.readFileSync(path.join(ROOT, CORPUS));
 const legacy = JSON.parse(corpusBytes);
+// The frozen oracle keeps the pre-rename spelling; the tree under test uses the new one.
+const currentTree = JSON.parse(JSON.stringify(legacy).replace(/keylogger/g, 'keystats'));
 const registry = loadInventory(ROOT).checks;
 for (const name of ['test-native-menu-rows.cjs', 'test-native-menu-census-admission.cjs']) {
 	const entries = registry.filter((check) => check.args.includes('tools/test/' + name));
@@ -59,7 +61,7 @@ function write(rel, bytes) {
 function reset() {
 	fs.rmSync(sourceRoot, { recursive: true, force: true });
 	for (const driver of DRIVERS) {
-		for (const rel of legacy.drivers[driver].sourceFiles) {
+		for (const rel of currentTree.drivers[driver].sourceFiles) {
 			if (rel === RETIRED) continue;
 			// Independent path coverage metadata supplies stand-ins only for the
 			// traversal precondition; the real child still reads every actual file.
@@ -197,7 +199,7 @@ try {
 		refusesBoth(/source coverage .* is incomplete/);
 
 		reset();
-		const mandatory = path.join(sourceRoot, legacy.drivers[driver].sourceFiles[0]);
+		const mandatory = path.join(sourceRoot, currentTree.drivers[driver].sourceFiles[0]);
 		fs.rmSync(mandatory);
 		refusesBoth(/source coverage .* is incomplete/);
 
@@ -317,7 +319,7 @@ try {
 		refusesBoth(/retired live-menu compiled owner reappeared/);
 		for (const platform of ['macos', 'windows', 'linux']) {
 			retiredFixture();
-			const rel = legacy.drivers[platform].sourceFiles.find(
+			const rel = currentTree.drivers[platform].sourceFiles.find(
 				(p) => p.includes('/ui/menu/') && p !== retired
 			);
 			assert.ok(rel, 'real independently frozen menu path for executable control');
@@ -334,14 +336,14 @@ try {
 	]) {
 		for (const spelling of [name.toUpperCase(), name.toLowerCase()]) {
 			retiredFixture();
-			const rel = legacy.drivers.windows.sourceFiles.find((p) => p.includes('/ui/menu/'));
+			const rel = currentTree.drivers.windows.sourceFiles.find((p) => p.includes('/ui/menu/'));
 			fs.appendFileSync(path.join(sourceRoot, rel), `\n${spelling}() {\n}\n`);
 			refusesBoth(/retired live-menu executable owner reappeared/);
 		}
 	}
 	for (const platform of ['macos', 'linux']) {
 		retiredFixture();
-		const rel = legacy.drivers[platform].sourceFiles.find((p) => p !== retired);
+		const rel = currentTree.drivers[platform].sourceFiles.find((p) => p !== retired);
 		fs.appendFileSync(
 			path.join(sourceRoot, rel),
 			'\nlocal panel = require("ui/menu/menu_llm/live_mode_panel")\n'
@@ -381,13 +383,13 @@ try {
 	fs.rmSync(
 		path.join(
 			sourceRoot,
-			legacy.drivers.macos.sourceFiles.find((p) => p !== retired)
+			currentTree.drivers.macos.sourceFiles.find((p) => p !== retired)
 		)
 	);
 	refusesBoth(/source coverage .* is incomplete/);
 	retiredFixture();
 	write(features, '[menu]\nowner = "llm_live_prompt_toggle"\n# llm_live_mode is retired\n');
-	const retained = legacy.drivers.macos.sourceFiles.find((p) => p !== retired);
+	const retained = currentTree.drivers.macos.sourceFiles.find((p) => p !== retired);
 	fs.appendFileSync(
 		path.join(sourceRoot, retained),
 		'\n-- LiveModePanel is retired\nlocal action = "llm_live_prompt_toggle"\n'

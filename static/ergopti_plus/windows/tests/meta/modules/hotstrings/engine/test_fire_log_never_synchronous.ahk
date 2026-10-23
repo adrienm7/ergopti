@@ -7,7 +7,7 @@
 ; Typing "abcd" through an expansion produced "acd": a physical key vanished.
 ;
 ; ROOT CAUSE ENCODED: KL_LogHotstring is not a cheap record. It flushes the
-; keylogger buffer, appends a line to a JSONL file on disk, and pushes WPM
+; keystats buffer, appends a line to a JSONL file on disk, and pushes WPM
 ; samples. Called from a fire path it runs on the keystroke thread, inside the
 ; ~60 ms suppress window armed for the expansion's own send burst and (for the
 ; space tap-hold) under Critical("On"). A disk spike anywhere in that window —
@@ -22,7 +22,7 @@
 ; tree, and a new one has to be triaged rather than silently inheriting the bug.
 ;
 ; SCOPE: source-level. Both fire paths need a live InputHook and a registered
-; keylogger, neither of which exists in the headless runner.
+; keystats, neither of which exists in the headless runner.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

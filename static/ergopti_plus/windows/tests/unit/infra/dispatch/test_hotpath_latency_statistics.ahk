@@ -113,7 +113,7 @@ _HPLS_DashboardStagesAreDistinct() {
 		AssertContains(Open, 'KLWV_OpenTimingMark(which, "' . Phase . '", Timing)')
 	AssertContains(Mark, "BootClockCpuMs()")
 	AssertContains(Mark, "BootProfile_MenuWaitMs()")
-	AssertContains(Mark, 'LoggerInfo("Keylogger", Format(')
+	AssertContains(Mark, 'LoggerInfo("Keystats", Format(')
 	AssertContains(Mark, "HotPath_RecordLatency(")
 	Diagnostics := _DriverFuncBody("HealthCheck_ShowWindow")
 	DiagnosticsMark := _DriverFuncBody("_HC_OpenTimingMark")
@@ -134,9 +134,9 @@ _HPLS_ShutdownStagesAreDistinct() {
 	for Phase in ["prepare", "hook", "watchers", "sensors_and_timers", "flush_and_journal", "categories", "ingest_and_state", "handle"]
 		AssertContains(Stop, '_KL_StopTimingMark("' . Phase . '", Timing)')
 	AssertContains(Mark, "HotPath_RecordLatency(")
-	AssertContains(Mark, 'LoggerInfo("Keylogger", Format(')
+	AssertContains(Mark, 'LoggerInfo("Keystats", Format(')
 	AssertContains(Append, "refused by the current privacy predicate")
-	Assert(InStr(Append, "if Keylogger._shutting_down") < InStr(Append, "refused by the current privacy predicate"),
+	Assert(InStr(Append, "if Keystats._shutting_down") < InStr(Append, "refused by the current privacy predicate"),
 		"ordinary typing must not emit a privacy refusal line per keystroke")
 }
 Test("hotpath: reload shutdown attributes drains and reports privacy refusals (hotpath-latency-statistics)",

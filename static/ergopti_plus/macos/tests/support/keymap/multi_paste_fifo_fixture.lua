@@ -28,7 +28,7 @@ local OWNED = {
 	"infra.logger", "infra.paths", "infra.text_utils",
 	"infra.timings", "infra.toml.reader", "json",
 	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
-	"logger.shim", "modules.keylogger", "modules.keymap.expander",
+	"logger.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
 	"modules.keymap.utils", "tests.stubs.hs", "text_utils",
 	"toml_codec.basic_string", "toml_codec.bom", "toml_codec.key_path",
@@ -80,7 +80,7 @@ function M.with_world(options, scenario)
 				end
 			end
 			f.key_observer = observe
-			package.loaded["modules.keylogger"] = {}
+			package.loaded["modules.keystats"] = {}
 			local utils = require("modules.keymap.utils")
 			local sender = require("adapters.text_sender")
 			helpers.assert_eq(sender.terminalInputTarget() ~= nil, options.terminal == true)

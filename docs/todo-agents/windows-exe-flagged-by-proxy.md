@@ -60,7 +60,7 @@ PE comparison of v1.0.0, v1.0.3 and v1.0.4 (7-Zip PE resource listing):
 2. **Medium: first-seen reputation of a new unsigned hash.** v1.0.4 was published on 2026-10-21 at
    06:38 Paris time, and the tester tried it the same day. Every release has a new hash, and an
    unsigned "first seen" file scores worse than one that is days old.
-3. **Context (pre-existing, not the delta):** a module literally named `keylogger` (about 600 hits),
+3. **Context (pre-existing, not the delta):** a module literally named `keystats` (about 600 hits),
    `-EncodedCommand` launchers (crash report, updater), `-ExecutionPolicy Bypass`, hidden windows,
    `CopyFromScreen`. These were already present in builds that pass, but they raise the baseline,
    so a small new pattern can cross the threshold.
@@ -166,7 +166,7 @@ Static comparison (assets never executed):
 - Compiled script (`tools/ci/windows-exe-av-surface.cjs` counts): v1.0.4 alone has Add-Type 4,
   DllImport 6, TypeDefinition 1; v1.0.5 has none, like v1.0.2. Unchanged in all three:
   ExecutionPolicy Bypass 19, -EncodedCommand 3, FromBase64String 2, ScriptBlock::Create 1, \*RunAs
-  3, hidden windows 4-5, about 640 "keylogger" identifiers and about 430 more in the bundle.
+  3, hidden windows 4-5, about 640 "keystats" identifiers and about 430 more in the bundle.
 - Bundle: no new binary between v1.0.4 and v1.0.5 (`ergopti_network_pac.exe` is now reproducible,
   same hash in both; fix 3 is done by `/Brepro`). Only `vendor/ergopti_curl_attempt.ps1` changed.
 
@@ -222,7 +222,7 @@ SHA-256 and release URL, asking for an allow-list or re-scan).
   three in the script and `-EncodedCommand` in the bundle. `-ExecutionPolicy Bypass` stays on the
   `-File` launches: it is process scope only, and the default Windows client policy (Restricted)
   refuses every script file without an override.
-- "keylogger" names the typing metrics in about 1 070 shipped strings and identifiers (and 10 600
+- "keystats" names the typing metrics in about 1 070 shipped strings and identifiers (and 10 600
   repository occurrences in 1 350 files across the three drivers, config keys and locales). A
   rename to typing metrics is a cross-driver campaign of its own; the gate reports the count.
 - After the next build that contains both fixes: hash its `ErgoptiPlus.exe`

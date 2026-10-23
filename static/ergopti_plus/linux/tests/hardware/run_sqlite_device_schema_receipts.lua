@@ -10,7 +10,7 @@
 
 local uv = require("luv")
 local ffi = require("ffi")
-local Writer = require("modules.keylogger.sqlite_writer")
+local Writer = require("modules.keystats.sqlite_writer")
 ffi.cdef[[
 typedef struct sqlite3 sqlite3;
 int sqlite3_open_v2(const char *, sqlite3 **, int, const char *);

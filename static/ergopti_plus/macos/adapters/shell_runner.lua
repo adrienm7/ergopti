@@ -230,7 +230,7 @@ end
 --- loses its whole subprocess behind a generic "returned no task" line. Refuse by
 --- INDEX instead. On the Windows driver the identical defect killed the metrics
 --- worker for sixteen days, and the argument index was the only diagnostic that
---- located it (keylogger-worker-timings-must-be-strings).
+--- located it (keystats-worker-timings-must-be-strings).
 ---
 --- @param executable any Expected: a non-empty string path.
 --- @param args any Expected: a pure array of strings; nil means "no arguments".

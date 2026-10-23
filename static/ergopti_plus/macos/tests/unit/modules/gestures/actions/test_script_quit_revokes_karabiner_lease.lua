@@ -8,7 +8,7 @@
 --- fence, sibling teardown and process exit.
 ---
 --- ROOT CAUSE ENCODED: the old action called platform.remap.shutdown and then
---- scheduled os.exit without waiting for STOPPED. It also dismantled keylogger
+--- scheduled os.exit without waiting for STOPPED. It also dismantled keystats
 --- and MLX siblings inline, so managed F17 output could outlive its consumers.
 --- ==============================================================================
 

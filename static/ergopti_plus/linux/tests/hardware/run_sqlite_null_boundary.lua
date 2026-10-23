@@ -14,10 +14,10 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
 end
 
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 local Json = require("json")
-local Command = require("modules.keylogger.sqlite_command")
+local Command = require("modules.keystats.sqlite_command")
 local database, date, app = root .. "/metrics.sqlite", "2026-10-03", "owned café ' app"
 local checks, failures = 0, 0
 

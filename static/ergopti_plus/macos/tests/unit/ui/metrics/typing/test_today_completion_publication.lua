@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keylogger.today_completion_fixture")
+local Fixture = require("tests.support.modules.keystats.today_completion_fixture")
 local Json = require("json")
 local ReadLogs = require("tests.support.ui.metrics.typing.read_completion_logs")
 

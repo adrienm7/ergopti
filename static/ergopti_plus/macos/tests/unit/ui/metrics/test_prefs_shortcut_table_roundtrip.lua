@@ -61,6 +61,6 @@ helpers.describe("preferences flatten_from_disk: table-valued scalar keys", func
 		local prefs = helpers.load_with_stubs("infra.preferences")
 		helpers.assert_nil(prefs.flat_key_for("metrics.shortcut"))
 		helpers.assert_nil(prefs.flat_key_for("metrics.apps_shortcut"))
-		helpers.assert_eq(prefs.flat_key_for("metrics.enabled"), "keylogger_enabled")
+		helpers.assert_eq(prefs.flat_key_for("metrics.enabled"), "keystats_enabled")
 	end)
 end)

@@ -14,7 +14,7 @@ import time
 
 
 WORKER = r"""
-local Metrics = require("modules.keylogger.system_metrics")
+local Metrics = require("modules.keystats.system_metrics")
 local interval = Metrics._sample_interval_ms()
 local date = "2026-01-02"
 Metrics.sample(0, date)

@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Json = require("json")
 local Watch = require("adapters.atspi_focus_watch")
-local Guard = require("modules.keylogger.focus_guard")
+local Guard = require("modules.keystats.focus_guard")
 
 --- Requires a literal false admission result.
 local function assert_false(value, message) helpers.assert_eq(value, false, message) end
@@ -390,7 +390,7 @@ helpers.describe("AT-SPI focus watcher: causal input barrier", function()
 		}
 		local metric_secure = true
 		local guard = Guard.new({ watch = state.watch, detector = detector,
-			keylogger = { set_secure_field = function(value) metric_secure = value end },
+			keystats = { set_secure_field = function(value) metric_secure = value end },
 			now_ms = function() return state.now end, reset_text = function() resets = resets + 1 end })
 		state.ready()
 		state.answer = true

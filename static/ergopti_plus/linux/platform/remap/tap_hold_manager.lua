@@ -609,7 +609,7 @@ function M.init(opts)
 			error("tap-hold manager requires " .. name, 2)
 		end
 	end
-	-- Keylogger imports Manager before Hook. Select the loaded receiver at init,
+	-- Keystats imports Manager before Hook. Select the loaded receiver at init,
 	-- before callbacks; its private frame controller alone proves native rights.
 	_native_hook = package.loaded["adapters.keyboard_hook"]
 	Logger.start(LOG, "Initialising tap-holds…")

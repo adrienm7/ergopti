@@ -74,8 +74,8 @@ local LOG            = "llm.api_remote"
 local _local_probe_clients = {}
 local _retiring_local_probe_clients = setmetatable({}, { __mode = "k" })
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 
 
@@ -2039,11 +2039,11 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
 					model, req_id, tostring(status), (body or ""):sub(1, 200))
 				-- Log the failure so the audit trail shows it instead of
-				-- silently dropping. Same envelope as keylogger.log_llm
+				-- silently dropping. Same envelope as keystats.log_llm
 				-- but routed to log_llm_failed; the engine doesn't need
 				-- to know about the distinction.
-				if keylogger and type(keylogger.log_llm_failed) == "function" then
-					pcall(keylogger.log_llm_failed, full_text, nil, {
+				if keystats and type(keystats.log_llm_failed) == "function" then
+					pcall(keystats.log_llm_failed, full_text, nil, {
 						backend        = "api",
 						model          = tostring(model),
 						system_prompt  = system_prompt,
@@ -2074,8 +2074,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			local raw_text = classified.text
 			if raw_text == "" then
 				Logger.warn(LOG, "[%s] #%d empty completion (could not parse).", model, req_id)
-				if keylogger and type(keylogger.log_llm_failed) == "function" then
-					pcall(keylogger.log_llm_failed, full_text, nil, {
+				if keystats and type(keystats.log_llm_failed) == "function" then
+					pcall(keystats.log_llm_failed, full_text, nil, {
 						backend        = "api",
 						model          = tostring(model),
 						system_prompt  = system_prompt,
@@ -2108,8 +2108,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 
 			if #results == 0 then
 				Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model, req_id)
-				if keylogger and type(keylogger.log_llm_failed) == "function" then
-					pcall(keylogger.log_llm_failed, full_text, nil, {
+				if keystats and type(keystats.log_llm_failed) == "function" then
+					pcall(keystats.log_llm_failed, full_text, nil, {
 						backend        = "api",
 						model          = tostring(model),
 						system_prompt  = system_prompt,
@@ -2129,8 +2129,8 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			local usage = classified.usage
 
 			Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s) in %dms", model, req_id, #results, ms)
-			if keylogger and type(keylogger.log_llm) == "function" then
-				pcall(keylogger.log_llm, full_text, results, nil, {
+			if keystats and type(keystats.log_llm) == "function" then
+				pcall(keystats.log_llm, full_text, results, nil, {
 					backend           = "api",
 					model             = tostring(model),
 					system_prompt     = system_prompt,

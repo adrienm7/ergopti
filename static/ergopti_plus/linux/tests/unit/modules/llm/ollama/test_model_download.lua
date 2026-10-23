@@ -431,7 +431,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 		local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 		local env = setmetatable({
 			privacy_owners = {},
-			keylogger = { stop = function() return true end },
+			keystats = { stop = function() return true end },
 			ShutdownCoordinator = require("infra.shutdown_coordinator"), prediction_engine = prediction,
 			webview_manager = webviews, dyn_hotstrings = false, updater = false, file_watchers = false,
 			process_lifecycle = false, secure_field_detector = false, metrics = false,

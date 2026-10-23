@@ -19,7 +19,7 @@ local OWNED_MODULES = {
 	"infra.timings",
 	"adapters.timer_scheduler",
 	"infra.config_paths",
-	"modules.keylogger.kc_bridge",
+	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
 	"platform.remap.onboarding",
@@ -40,7 +40,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 	"adapters.synthetic_input",
 	"modules.shortcuts.script_control",
 	"platform.remap.ke_variables",
@@ -483,7 +483,7 @@ return function(run, dependencies)
 				get = function() return "missing-config.toml" end,
 				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 			}
-			package.loaded["modules.keylogger.kc_bridge"] = {
+			package.loaded["modules.keystats.kc_bridge"] = {
 				refresh_managed_set = function()
 					calls.classifier_refreshes = calls.classifier_refreshes + 1
 					if options.classifier_succeeds == false then error("classifier failed") end
@@ -800,8 +800,8 @@ return function(run, dependencies)
 				end,
 			}
 			package.loaded["ui.tooltip"] = { hide_forced = record("tooltip_hide") }
-			package.loaded["modules.keylogger"] = {
-				resync_context = record("keylogger_resync"),
+			package.loaded["modules.keystats"] = {
+				resync_context = record("keystats_resync"),
 				log_shortcut = function() end,
 			}
 

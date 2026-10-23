@@ -17,7 +17,7 @@
 local M = {}
 
 local hs         = hs
-local keylogger  = require("modules.keylogger")
+local keystats  = require("modules.keystats")
 local WPMShared  = require("ui.wpm.shared")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -219,7 +219,7 @@ end
 
 --- Actual widget-update body, wrapped by update_widget() above.
 update_widget_body = function(generation)
-	local stats = keylogger.get_live_stats()
+	local stats = keystats.get_live_stats()
 	if not is_current(generation) then return false end
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000

@@ -27,10 +27,10 @@
 #Include ../../infra/config_transition.ahk
 #Include ../../infra/config_transition_runtime.ahk
 #Include ../../infra/reload_terminal_handoff.ahk
-#Include ../../modules/keylogger/keylogger_json.ahk
-#Include ../../modules/keylogger/keylogger_walker_core.ahk
-#Include ../../modules/keylogger/keylogger_prefetch.ahk
-#Include ../../modules/keylogger/keylogger_webview.ahk
+#Include ../../modules/keystats/keystats_json.ahk
+#Include ../../modules/keystats/keystats_walker_core.ahk
+#Include ../../modules/keystats/keystats_prefetch.ahk
+#Include ../../modules/keystats/keystats_webview.ahk
 
 class _MVSP_PassiveCoreProbe {
 	Reads := 0
@@ -93,7 +93,7 @@ _MVSP_SpawnChecked(Executable, Args, Done) {
 	_MVSP_Require(KLPFWorker.jobs.Has("apps"), "The actual worker reservation was not admitted.")
 	Flag := 0
 	for Index, Arg in Args
-		if Arg == "--keylogger-prefetch-worker"
+		if Arg == "--keystats-prefetch-worker"
 			Flag := Index
 	_MVSP_Require(Flag > 0 && Args[Flag + 1] == "apps"
 		&& Args[Flag + 2] == _MVSP.Root && Args[Flag + 3] == "full",
@@ -308,7 +308,7 @@ _MVSP_Main() {
 		_MVSP_Require(RegExMatch(_MVSP.Token, "^[A-Za-z0-9_-]+$"), "The private probe token is invalid.")
 		_MVSP_Require(!FSStrictExists(_MVSP.Root), "The probe cannot adopt an existing private destination.")
 		FixtureHash := _MVSP_Hash(A_ScriptFullPath)
-		HostHash := _MVSP_Hash(A_ScriptDir . "\..\..\modules\keylogger\keylogger_webview.ahk")
+		HostHash := _MVSP_Hash(A_ScriptDir . "\..\..\modules\keystats\keystats_webview.ahk")
 		RuntimeHash := _MVSP_Hash(A_AhkPath)
 		_MVSP_Require(FixtureHash == A_Args[3] && HostHash == A_Args[4] && RuntimeHash == A_Args[5],
 			"The actual native child sources differ from the parent's launch receipt.")

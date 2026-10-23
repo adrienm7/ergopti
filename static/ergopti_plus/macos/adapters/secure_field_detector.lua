@@ -250,7 +250,7 @@ end
 --- secure marker lives: native AppKit sets AXRole = AXSecureTextField, whereas
 --- WebKit/Blink report AXRole = AXTextField and demote the marker to AXSubrole.
 --- Testing the role alone therefore fails OPEN on every Chrome/Edge/Brave/Arc
---- login form, letting the keylogger record the user's password characters.
+--- login form, letting the keystats record the user's password characters.
 --- @return boolean True when the cached element is secure or classification was incomplete.
 function M.isSecureField()
 	return _cached_secure

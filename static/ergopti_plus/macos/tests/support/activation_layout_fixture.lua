@@ -33,7 +33,7 @@ local STUB_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
-	"modules.keylogger.kc_bridge",
+	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
 	"hs.caffeinate.watcher",
@@ -367,7 +367,7 @@ local function with_remap(options, body)
 				return true
 			end,
 		}
-		package.loaded["modules.keylogger.kc_bridge"] = {
+		package.loaded["modules.keystats.kc_bridge"] = {
 			clear_managed_set = function() return true end,
 			refresh_managed_set = function()
 				calls.classifier_refreshes = calls.classifier_refreshes + 1

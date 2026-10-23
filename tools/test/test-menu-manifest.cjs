@@ -9644,7 +9644,7 @@ console.log(
 				id: 'metrics',
 				i18n: 'menu.metrics.title',
 				rows: [],
-				checked_when: ['keylogger_enabled'],
+				checked_when: ['keystats_enabled'],
 				greyed_when_paused: true
 			}
 		]
@@ -9784,7 +9784,7 @@ console.log(
 		const source = fs.readFileSync(path.join(base, file), 'utf8');
 		const native = ownerBody(source, signature);
 		const checked =
-			driver === 'hs' ? 'STATE_GETTERS' : '{ keylogger_enabled = function() return on end }';
+			driver === 'hs' ? 'STATE_GETTERS' : '{ keystats_enabled = function() return on end }';
 		const child = driver === 'hs' ? 'menu' : 'items';
 		const finish = `local projected = ManifestMenu.group_row("top_level", "metrics", ${child}, ${checked})`;
 		const chronology = [
@@ -9846,14 +9846,14 @@ console.log(
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)',
+					'sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)',
 					1
 				)
 			);
 			assert(
 				hasStatement(
 					native,
-					'sync_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget, state.keylogger_float_graph)',
+					'sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget, state.keystats_float_graph)',
 					1
 				)
 			);
@@ -9862,7 +9862,7 @@ console.log(
 			for (const statement of [
 				'local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})',
 				'local items = ManifestMenu.render_rows(status_rows, "linux_metrics_absent_rows")',
-				'local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })',
+				'local projected = ManifestMenu.group_row("top_level", "metrics", items, { keystats_enabled = function() return nil end })',
 				'current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")',
 				'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not metrics_parent_unchanged(parent, fields) then return nil end',
 				'return projected'

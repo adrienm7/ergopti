@@ -21,7 +21,7 @@ local function with_runtime(scenario)
 			end
 		end
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		local healthcheck = helpers.load_with_stubs("ui.healthcheck.helpers")
 		local live = helpers.load_with_stubs("modules.llm")
 		-- The alternate import must stay absent: creating it would give a

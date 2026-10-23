@@ -107,7 +107,7 @@ end
 --- exactly that -- six Integer timing constants spliced into a vector -- and the
 --- argument index was the only diagnostic that ever located it. Every driver
 --- therefore refuses by index at this boundary
---- (keylogger-worker-timings-must-be-strings).
+--- (keystats-worker-timings-must-be-strings).
 ---
 --- Numbers are refused rather than coerced on purpose: the caller knows the
 --- intended text (seconds? milliseconds? padded?), this function does not.

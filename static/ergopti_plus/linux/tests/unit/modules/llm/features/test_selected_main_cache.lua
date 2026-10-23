@@ -22,10 +22,10 @@ helpers.describe("Main selected payload cache boundary", function()
 			last = assert(source:find("\n\tend\n", first, true))
 			local control_source = source:sub(first, last + #"\n\tend" - 1)
 			local compile = loadstring or load
-			-- handle_control reads the privacy guard and the keylogger as main()
+			-- handle_control reads the privacy guard and the keystats as main()
 			-- upvalues: a physical Backspace is admitted and recorded as a manual
 			-- correction before the undo path this test exercises.
-			local factory = assert(compile("return function(injector,privacy_owners,opts,engine,WordReset,Monotonic,Logger,script_actions,prediction_engine,secure_focus_guard,keylogger) "
+			local factory = assert(compile("return function(injector,privacy_owners,opts,engine,WordReset,Monotonic,Logger,script_actions,prediction_engine,secure_focus_guard,keystats) "
 				.. "local _undoable={trigger='old',replacement='OLD'}; local LOG='Main cache test'; "
 				.. control_source .. "; return " .. replace_source .. ",handle_control,function() return _undoable end end"))()
 			local engine = require("modules.hotstrings.engine").new()

@@ -17,7 +17,7 @@ the code, and prefer the code's answer.
 Two verified examples from the same file:
 
 - A July plan asserted a timings accessor had "no production consumer". The
-  keylogger walker reads it.
+  keystats walker reads it.
 - The same plan asserted a set of updater menu keys did not exist, and used that
   to defer an entire i18n batch. All the keys were present in the shared locales.
 

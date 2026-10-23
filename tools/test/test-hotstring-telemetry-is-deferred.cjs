@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Hotstring Telemetry Must Not Run On The Keystroke Tap
  * DESCRIPTION:
- * `keylogger.log_hotstring_suggested` / `_dismissed` / `_accepted` perform a
+ * `keystats.log_hotstring_suggested` / `_dismissed` / `_accepted` perform a
  * file open, write and flush. Called straight from the keymap hot path they run
  * inside the keyDown eventtap — on every tooltip shown and every dismissal —
  * which is the thread that has to return before the user's keystroke reaches the
@@ -19,7 +19,7 @@
  * be a slower keystroke.
  *
  * WHY NOT MOVE IT TO THE SINK:
- * deferring inside the keylogger would change the contract for every caller,
+ * deferring inside the keystats would change the contract for every caller,
  * including the ones that legitimately expect the write to have happened when
  * they return. That is a bigger change than the risk warrants; requiring the
  * deferral at the boundary keeps the sink honest for its other callers.
@@ -84,7 +84,7 @@ for (const file of files) {
 	if (CENTRAL_DEFERRAL.test(code)) centralDeferrals += 1;
 
 	lines.forEach((line, i) => {
-		if (!/keylogger\.log_hotstring_(suggested|dismissed|accepted)/.test(line)) return;
+		if (!/keystats\.log_hotstring_(suggested|dismissed|accepted)/.test(line)) return;
 		found += 1;
 
 		// The telemetry call must be the direct payload of the central deferral.

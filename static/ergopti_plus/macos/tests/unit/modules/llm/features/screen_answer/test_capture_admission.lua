@@ -16,7 +16,7 @@ local MODULES = {
 	"modules.llm.warmup_controller", "modules.llm.streaming_handler",
 	"modules.llm.prompt_builder", "modules.llm.app_filter", "modules.llm.api_common",
 	"modules.llm.api_remote", "modules.llm.api_mlx", "modules.llm.api_ollama",
-	"modules.llm.profiles", "modules.keylogger", "modules.shortcuts.script_control",
+	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
 	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
 	"adapters.json_codec", "adapters.storage", "adapters.timer_scheduler",
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
@@ -65,7 +65,7 @@ local function with_capture(callback)
 		package.loaded["modules.llm.api_common"] = {}
 		package.loaded["modules.llm.prompt_builder"] = {}
 		package.loaded["modules.llm.app_filter"] = {}
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.llm.profiles"] = { prompt_language = function() return "en" end }
 		package.loaded["modules.shortcuts.script_control"] = {
 			is_paused = function() return f.paused end,

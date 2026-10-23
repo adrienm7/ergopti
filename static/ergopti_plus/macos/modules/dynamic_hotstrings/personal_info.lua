@@ -23,8 +23,8 @@ local LOG      = "personal_info"
 local ok_editor, ui_editor = pcall(require, "ui.personal_info_editor")
 if not ok_editor then ui_editor = nil end
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 local FileSystem = require("adapters.file_system")
 local BasicString = require("toml_codec.basic_string")
 local TomlCodec = require("toml_codec.codec")
@@ -559,7 +559,7 @@ local function do_expand(combo)
 	-- inspect physical_echo.
 	-- `echoed` is the LOGICAL text: values only, no tab. A Tab moves focus to the
 	-- next field, it inserts nothing on screen, so this is what CoreState.buffer
-	-- and the keylogger's logical record must hold.
+	-- and the keystats's logical record must hold.
 	local emitted = table.concat(parts, "\t")
 	local echoed  = table.concat(parts, "")
 
@@ -593,7 +593,7 @@ local function do_expand(combo)
 			-- personal_info.toml, which rules_engine already treats as PII in its
 			-- entirety when it registers the same data as mappings. The two paths
 			-- must agree — an @-tag expansion of the SSN is exactly as secret as
-			-- the prefix-triggered one, and only this argument tells the keylogger
+			-- the prefix-triggered one, and only this argument tells the keystats
 			-- to redact what it persists.
 			end, "personal", true)
 			assert(injected == true,
@@ -609,10 +609,10 @@ local function do_expand(combo)
 			end
 			local transaction = _keymap.arm_synthetic(n_back, "")
 			if type(_keymap.suppress_rescan) == "function" then _keymap.suppress_rescan() end
-			if keylogger and type(keylogger.notify_synthetic) == "function" then
+			if keystats and type(keystats.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path: this branch reaches
 				-- the identical sink and must carry the identical flag.
-				pcall(keylogger.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
+				pcall(keystats.notify_synthetic, emitted, "hotstring", n_back, "personal", nil, true)
 			end
 			local ok_emit, emit_err = pcall(_keymap.with_synthetic_transaction, transaction, function()
 				for _ = 1, n_back do

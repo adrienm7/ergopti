@@ -20,7 +20,7 @@
 ---
 --- USAGE:
 ---   local Timings = require("infra.timings")
----   local SESSION_TIMEOUT_MS = Timings.ms("keylogger", "session_timeout_ms")
+---   local SESSION_TIMEOUT_MS = Timings.ms("keystats", "session_timeout_ms")
 --- ==============================================================================
 
 local M = {}
@@ -51,7 +51,7 @@ local MS_PER_SEC = 1000
 --- the checkout layout as a fact. On an installed package the driver sits flat in
 --- /usr/lib/ergopti, so three levels up is /usr and the file was looked for at
 --- /usr/_shared/… — the daemon died on its first M.ms() call with a missing
---- [keylogger] section, having in reality read nothing at all.
+--- [keystats] section, having in reality read nothing at all.
 --- @return string|nil Absolute path to the TOML file, or nil when unresolvable.
 local function resolve_toml_path()
 	return Paths.shared("modules/timings/constants.toml")
@@ -89,7 +89,7 @@ Logger.info(LOG, "Shared timings registry loaded (%d section(s)).", _section_cou
 
 --- Returns the raw millisecond value for a `[section] key` pair. FAIL-FAST when
 --- the section or key is absent — every consumed timing must exist in the registry.
---- @param section string The TOML section name (e.g. "keylogger").
+--- @param section string The TOML section name (e.g. "keystats").
 --- @param key string The key within that section (e.g. "session_timeout_ms").
 --- @return number The value in milliseconds.
 function M.ms(section, key)

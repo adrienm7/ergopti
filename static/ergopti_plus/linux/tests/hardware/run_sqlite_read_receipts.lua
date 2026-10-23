@@ -11,8 +11,8 @@
 
 local uv = require("luv")
 local Shell = require("adapters.shell_runner")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 local real_sqlite = assert(Shell.exec_line("command -v sqlite3"))
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-reads-XXXXXX"))
 local database = root .. "/metrics.sqlite"

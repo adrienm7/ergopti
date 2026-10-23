@@ -8,7 +8,7 @@
 ; that still named RAlt, vk 0xA5 or "<^>!" as AltGr were wrong there: the
 ; TextSender "altgr" modifier typed Ctrl+Alt (and its array form a plain Alt on
 ; every layout), the health check reported AltGr off while it was held, a bare
-; AltGr press cancelled keep-awake, and the keylogger counted the AltGr key as
+; AltGr press cancelled keep-awake, and the keystats counted the AltGr key as
 ; a character key (kana-altgr-readers-2026-09-25).
 ; ==============================================================================
 

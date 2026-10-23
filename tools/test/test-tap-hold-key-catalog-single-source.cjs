@@ -365,8 +365,8 @@ const linuxHook = stripLineComments(
 	'.lua'
 );
 const linuxDaemon = stripLineComments(read(path.join(SP, 'linux/ergopti_hotstrings.lua')), '.lua');
-const linuxKeylogger = stripLineComments(
-	read(path.join(SP, 'linux/modules/keylogger/keylogger.lua')),
+const linuxKeystats = stripLineComments(
+	read(path.join(SP, 'linux/modules/keystats/keystats.lua')),
 	'.lua'
 );
 
@@ -391,7 +391,7 @@ function luaBody(source, declaration, successor) {
  * @returns {boolean} Bounded saved admission without public input authority.
  */
 function savedLinuxOneShotClosure(sources) {
-	const [manager, , , , hook, daemon, keylogger] = sources;
+	const [manager, , , , hook, daemon, keystats] = sources;
 	const bodies = {
 		tap: luaBody(
 			manager,
@@ -451,7 +451,7 @@ function savedLinuxOneShotClosure(sources) {
 		'refresh_capture'
 	];
 	const capture = '_native_hook = package.loaded["adapters.keyboard_hook"]';
-	const managerAt = daemon.indexOf('require("modules.keylogger.keylogger")');
+	const managerAt = daemon.indexOf('require("modules.keystats.keystats")');
 	const hookAt = daemon.indexOf('require("adapters.keyboard_hook")');
 	return (
 		assignment?.trim().replace(/\s+/g, ' ') ===
@@ -464,7 +464,7 @@ function savedLinuxOneShotClosure(sources) {
 		managerAt >= 0 &&
 		hookAt > managerAt &&
 		daemon.indexOf('TapHold.init({') > hookAt &&
-		keylogger.includes('require("platform.remap.tap_hold_manager")') &&
+		keystats.includes('require("platform.remap.tap_hold_manager")') &&
 		// CapsWord is an ordinary executor action: handing its id back to the
 		// Hook would start the engine's second, settings-less CapsWord.
 		bodies.tap.startsWith('if action == "one_shot_shift" then return action end') &&
@@ -636,7 +636,7 @@ const linuxSources = [
 	linuxMenu,
 	linuxHook,
 	linuxDaemon,
-	linuxKeylogger
+	linuxKeystats
 ];
 if (!orderedLinuxAdmission(manifest, linuxSources)) {
 	errors.push(
@@ -711,7 +711,7 @@ for (const [index, token] of [
 		'local function current() return _input_runtime_current(ctx, not ctx.used) and _input_guard_current(ctx) end'
 	],
 	[4, 'pcall(_input_ports.arm_one_shot, ctx.issuer, ctx.at_ms, current)'],
-	[5, 'require("modules.keylogger.keylogger")'],
+	[5, 'require("modules.keystats.keystats")'],
 	[5, 'TapHold.init({'],
 	[6, 'require("platform.remap.tap_hold_manager")']
 ]) {

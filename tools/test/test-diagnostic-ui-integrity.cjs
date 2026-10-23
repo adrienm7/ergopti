@@ -262,7 +262,7 @@ function rowPattern(label, value) {
 	const html = render('linux', {
 		developer: {
 			modules_ok: ['engine'],
-			modules_failed: ['keylogger (not wired)'],
+			modules_failed: ['keystats (not wired)'],
 			modules_disabled: ['llm']
 		}
 	});
@@ -270,7 +270,7 @@ function rowPattern(label, value) {
 		'Shared: module checks sit in collapsed developer details and a failure reaches the summary',
 		/<details class="section" id="section-developer">/.test(html) &&
 			html.includes(t('healthcheck.problem.modules', 1)) &&
-			html.includes('keylogger (not wired)'),
+			html.includes('keystats (not wired)'),
 		'the developer section is not collapsed or its failure is not summarised'
 	);
 }

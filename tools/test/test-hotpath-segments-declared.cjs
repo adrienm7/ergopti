@@ -59,7 +59,7 @@ const INVENTORY = {
 	'Prefix.PreviewDecisions':
 		'the canonical engine decisions collected before tooltip metadata and GUI construction',
 	'Prefix.PreviewMetadata': 'the metadata attached to accepted preview decisions before rendering',
-	'KL.Ingest': 'the keylogger ingest, which closes the per-keystroke budget with the hook fan-out',
+	'KL.Ingest': 'the keystats ingest, which closes the per-keystroke budget with the hook fan-out',
 	'KL.RoiPrune':
 		'the bounded trigger-ROI survivor selection, measured separately so pruning cost stays distinguishable from per-keystroke ingest',
 	'KLR.CandidateClone':
@@ -161,7 +161,7 @@ const BOOT_STAMPS = [
 	'Hotstring and TOML state initialised', // Bound parser and engine declarations.
 	'Manifest, updater and locale state initialised', // Attribute data-backed defaults.
 	'WebView and metrics UI state initialised', // Detect eager UI initialization.
-	'Keylogger modules initialised', // Separate sensor state from registration.
+	'Keystats modules initialised', // Separate sensor state from registration.
 	'LLM defaults loaded', // Attribute shared model defaults parsing.
 	'Module includes initialised',
 	'Paths and shared configuration loaded', // Attribute locator and shared defaults.

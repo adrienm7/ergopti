@@ -167,7 +167,7 @@ const CONTROL_KEY_LABELS = new Set([
 	'f13',
 	'f14',
 	'f15',
-	// Bracketed markers logged by the keylogger for navigation/control keys
+	// Bracketed markers logged by the keystats for navigation/control keys
 	'[bs]',
 	'[esc]',
 	'[left]',
@@ -256,7 +256,7 @@ const CONTROL_KEY_SYMBOLS = {
 	'[f13]': 'F13',
 	'[f14]': 'F14',
 	'[f15]': 'F15',
-	// Bare named forms (without brackets) — used when keylogger emits the key name directly
+	// Bare named forms (without brackets) — used when keystats emits the key name directly
 	f1: 'F1',
 	f2: 'F2',
 	f3: 'F3',
@@ -503,8 +503,8 @@ const FINGER_LABELS_FR = {
 	}
 };
 
-// Pause-threshold buckets emitted by the keylogger as cumulative cache fields.
-// MUST stay in sync with UI_PAUSE_BUCKETS_MS in modules/keylogger/log_manager.lua
+// Pause-threshold buckets emitted by the keystats as cumulative cache fields.
+// MUST stay in sync with UI_PAUSE_BUCKETS_MS in modules/keystats/log_manager.lua
 // — the JS side reads the bucket whose key matches the user-selected pause
 // threshold. Adding a new value here requires also adding it to the Lua list
 // and re-deploying so the buckets are populated for new data.
@@ -545,7 +545,7 @@ const FINGER_DISTANCE_TOOLTIP_HTML = (() => {
 })();
 
 // Standard 2–3-letter abbreviations for ASCII non-printable characters (codes 0–31 and 127).
-// These appear in the n-gram data when control characters are captured by the keylogger.
+// These appear in the n-gram data when control characters are captured by the keystats.
 const CONTROL_CHAR_NAMES = {
 	0: 'NUL',
 	1: 'SOH',

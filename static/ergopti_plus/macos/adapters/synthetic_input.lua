@@ -1222,7 +1222,7 @@ local function confirm_dispatched_after_return(batch)
 			batch.confirm_timer = nil
 			-- If listener timer allocation failed at handoff, this independent
 			-- post-return timer is already outside every eventtap callback and is a
-			-- safe no-next-key retry path for tooltip/keylogger reconciliation.
+			-- safe no-next-key retry path for tooltip/keystats reconciliation.
 			if _action_listener_pending and start_action_dispatcher then
 				start_action_dispatcher(0)
 			end

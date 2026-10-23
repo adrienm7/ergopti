@@ -308,7 +308,7 @@ local function with_daemon_layout_state(body)
 		local notices, refreshed = {}, 0
 		local layout = { refresh = function() refreshed = refreshed + 1;return true end }
 		local env = setmetatable({
-			engine = {}, keylogger = {}, hotstrings_config = {}, prediction_engine = {},
+			engine = {}, keystats = {}, hotstrings_config = {}, prediction_engine = {},
 			gestures = {}, shortcuts = {}, dyn_hotstrings = {}, MagicKey = {}, input_capture_gate = {},
 			webview_manager = manager, keyboard_layout = layout,
 			opts = { layout = "qwerty", keymap = "owned-test-keymap" },

@@ -87,11 +87,11 @@ function merge_dict(
 
 		// Normalize known control characters to their bracket-marker or space equivalents
 		// so they pass the ctrl-char filters and render with proper chip labels in all tabs.
-		// RS (0x1E) is used by some keylogger versions as a space placeholder.
+		// RS (0x1E) is used by some keystats versions as a space placeholder.
 		display_k = display_k
 			.replace(/\x08/g, '[BS]')
 			.replace(/\x09/g, '[TAB]')
-			// LF (\x0A) was used by older keylogger builds; CR (\x0D) matches
+			// LF (\x0A) was used by older keystats builds; CR (\x0D) matches
 			// some edge cases — both map to [ENTER] so historical data is handled.
 			.replace(/[\x0A\x0D]/g, '[ENTER]')
 			.replace(/\x1B/g, '[ESC]')
@@ -566,7 +566,7 @@ function compute_manifest_metrics() {
 
 /**
  * Recomputes the global speed KPI (CPM/MPM) honestly using the precise
- * cache buckets emitted by the keylogger (time_buckets, credited_buckets,
+ * cache buckets emitted by the keystats (time_buckets, credited_buckets,
  * hs_input_*_buckets, llm_input_*_buckets).
  *
  * Vocabulary
@@ -3661,7 +3661,7 @@ function receive_range_data(payload, request_id = null) {
 }
 
 /**
- * Receives a real-time live-update push from the Lua keylogger and
+ * Receives a real-time live-update push from the Lua keystats and
  * re-renders the table after a short debounce to batch rapid keystrokes.
  * @param {Object} today_idx - The current session's live n-gram data.
  */

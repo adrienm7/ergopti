@@ -5,7 +5,7 @@
 --- ui-menu-misc-3: the encrypt and decrypt toggle paths called
 --- `for file in fs.dir(log_dir)` without checking whether fs.dir returned a
 --- valid iterator. When the directory does not exist fs.dir returns nil, and
---- iterating nil crashes Lua mid-toggle — leaving state.keylogger_encrypt
+--- iterating nil crashes Lua mid-toggle — leaving state.keystats_encrypt
 --- mutated while the UI stayed unsynchronised.
 ---
 --- The guard used to be asserted by counting the `dir_iter` variable, which was

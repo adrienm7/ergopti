@@ -15,7 +15,7 @@
 ; The macOS side was fixed and guarded; the AHK sibling was never touched. This is
 ; the classic missed-sibling shape, and it lands on a security-sensitive surface:
 ; the Windows metrics menu gates its privacy toggles through this resolver, so a
-; typo'd or drifted manifest id rendered a keylogger-gated item as
+; typo'd or drifted manifest id rendered a keystats-gated item as
 ; always-enabled.
 ;
 ; The tests below pass an id that exists in no manifest array and assert the item

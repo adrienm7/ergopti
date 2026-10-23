@@ -211,7 +211,7 @@ local function render_root(manifest_text, paused, command_actions)
 			local mods = {
 				keyboard_layout = build("menu.layout.title"),
 				hotstrings      = {},
-				keylogger       = build("menu.metrics.title"),
+				keystats       = build("menu.metrics.title"),
 				shortcuts       = build("menu.shortcuts.title"),
 				tap_holds       = build("menu.tapholds.title"),
 				gestures        = build("menu.gestures.title"),
@@ -507,7 +507,7 @@ local function with_native_separator_root(body)
 		local component = function(key) return {build = function() return stub_row(key) end} end
 		local mods = {
 			keyboard_layout = component("menu.layout.title"), hotstrings = {},
-			keylogger = component("menu.metrics.title"), shortcuts = component("menu.shortcuts.title"),
+			keystats = component("menu.metrics.title"), shortcuts = component("menu.shortcuts.title"),
 			tap_holds = component("menu.tapholds.title"), gestures = component("menu.gestures.title"),
 			apps = component("menu.apps.title"), about = component("menu.about.title"),
 		}

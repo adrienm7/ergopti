@@ -389,7 +389,7 @@ helpers.describe("ui-focus-not-topmost: error window (macOS)", function()
 			local app = { activations = 0 }
 			local dialog, timers = load_error_dialog(view, app)
 			helpers.assert_true(dialog.init(), "the shipped policy must load")
-			dialog.on_error("keylogger", "Flush failed", "Flush failed")
+			dialog.on_error("keystats", "Flush failed", "Flush failed")
 			helpers.assert_eq(#timers, 1, "the window opens on its timer")
 			timers[1]()
 			helpers.assert_eq(calls.shows, 1, "the error window is shown")

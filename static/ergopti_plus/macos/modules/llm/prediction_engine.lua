@@ -42,7 +42,7 @@ local Paths            = require("infra.paths")
 local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
-local keylogger        = require("modules.keylogger")
+local keystats        = require("modules.keystats")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -1105,7 +1105,7 @@ local function compute_adaptive_debounce()
 		return inactivity_debounce_sec
 	end
 
-	local ok, stats = pcall(keylogger.get_live_stats)
+	local ok, stats = pcall(keystats.get_live_stats)
 	local wpm = (ok and type(stats) == "table") and (tonumber(stats.wpm_physical) or 0) or 0
 
 	if wpm > FAST_TYPING_WPM then
@@ -2525,7 +2525,7 @@ function M.get_live_prompt()
 end
 
 --- Clears all active predictions and fully resets the prediction pipeline state.
---- Emits a keylogger dismissal event when predictions were visible before the reset,
+--- Emits a keystats dismissal event when predictions were visible before the reset,
 --- except at a global pause boundary where no deferred capability may survive.
 --- The keymap bridge wraps this to also handle hotstring dismissal telemetry.
 --- @param options table|nil Optional { suppress_telemetry = boolean }.
@@ -2635,12 +2635,12 @@ function M.reset(options)
 	cleanup_stage("backend stream cancel", core_llm.cancel_streaming, true)
 
 	if dismissed_predictions and not suppress_telemetry and reset_is_current() then
-		-- Persistence performs an open/write/flush in the keylogger. reset() is
+		-- Persistence performs an open/write/flush in the keystats. reset() is
 		-- reached from the keyDown eventtap, so telemetry must run only after that
 		-- callback returns. Capture the immutable pool before clearing module state.
 		local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
 			return schedule_deferred_telemetry(function()
-				pcall(keylogger.log_llm_dismissed, nil, dismissed_predictions)
+				pcall(keystats.log_llm_dismissed, nil, dismissed_predictions)
 				Logger.debug(LOG, "Predictions cleared (were visible).")
 			end)
 		end, debug.traceback)
@@ -2838,7 +2838,7 @@ function M.init(core_state)
 	if StreamingHandler.init({
 		core_llm  = core_llm,
 		tooltip   = tooltip,
-		keylogger = keylogger,
+		keystats = keystats,
 	}) ~= true then
 		Logger.error(LOG, "M.init(): streaming-handler dependency initialization refused.")
 		return false

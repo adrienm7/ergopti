@@ -662,14 +662,14 @@ end)
 
 
 helpers.describe("OneShot daemon Manager bootstrap", function()
-	helpers.it("selects Hook at setup when keylogger already constructed Manager before it", function()
+	helpers.it("selects Hook at setup when keystats already constructed Manager before it", function()
 		local file = assert(io.open("ergopti_hotstrings.lua", "r")); local daemon = file:read("*a"); file:close()
-		local keylogger_at = assert(daemon:find('require("modules.keylogger.keylogger")', 1, true))
+		local keystats_at = assert(daemon:find('require("modules.keystats.keystats")', 1, true))
 		local hook_at = assert(daemon:find('require("adapters.keyboard_hook")', 1, true))
-		helpers.assert_true(keylogger_at < hook_at, "actual daemon loads keylogger before its Hook import")
-		file = assert(io.open("modules/keylogger/keylogger.lua", "r")); local source = file:read("*a"); file:close()
+		helpers.assert_true(keystats_at < hook_at, "actual daemon loads keystats before its Hook import")
+		file = assert(io.open("modules/keystats/keystats.lua", "r")); local source = file:read("*a"); file:close()
 		helpers.assert_true(source:find('require("platform.remap.tap_hold_manager")', 1, true) ~= nil,
-			"actual keylogger constructs Manager before daemon Hook setup")
+			"actual keystats constructs Manager before daemon Hook setup")
 		local options = {}
 		options.before_manager = function(s)
 			local hook = package.loaded["adapters.keyboard_hook"]

@@ -13,7 +13,7 @@ local FIXTURE_MODULES = {
 	"ui.wpm.wpm_widget",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.shared",
-	"modules.keylogger",
+	"modules.keystats",
 	"infra.logger",
 	"infra.notifications",
 	"infra.i18n",
@@ -108,7 +108,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			package.loaded["infra.paths"] = {
 				shared = function(relative_path) return helpers.shared(relative_path) end,
 			}
-			package.loaded["modules.keylogger"] = {
+			package.loaded["modules.keystats"] = {
 				get_live_stats = function()
 					observed.stats_reads = observed.stats_reads + 1
 					return { wpm = 42 }

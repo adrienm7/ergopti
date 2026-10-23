@@ -315,7 +315,7 @@
 			"i18n": "menu.metrics.title",
 			"rows": [],
 			"checked_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			],
 			"greyed_when_paused": true
 		},
@@ -1989,7 +1989,7 @@
 			"id": "metrics_toggle",
 			"i18n": "menu.metrics.enable",
 			"checked_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			],
 			"category": "Metrics"
 		},
@@ -2006,7 +2006,7 @@
 			"id": "show_typing",
 			"i18n": "menu.metrics.show_typing",
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{
@@ -2014,7 +2014,7 @@
 			"id": "show_apps",
 			"i18n": "menu.metrics.show_apps",
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{
@@ -2032,7 +2032,7 @@
 				"linux"
 			],
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			],
 			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
 		},
@@ -2048,7 +2048,7 @@
 				"linux"
 			],
 			"disabled_when": [
-				"keylogger_enabled",
+				"keystats_enabled",
 				"wpm_menubar_visible"
 			],
 			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
@@ -2061,7 +2061,7 @@
 				"wpm_widget_visible"
 			],
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{
@@ -2072,7 +2072,7 @@
 				"metrics_widget_colors"
 			],
 			"disabled_when": [
-				"keylogger_enabled",
+				"keystats_enabled",
 				"wpm_widget_visible"
 			]
 		},
@@ -2084,7 +2084,7 @@
 				"metrics_widget_graph"
 			],
 			"disabled_when": [
-				"keylogger_enabled",
+				"keystats_enabled",
 				"wpm_widget_visible"
 			]
 		},
@@ -2093,7 +2093,7 @@
 			"id": "reset_wpm_position",
 			"i18n": "menu.metrics.reset_wpm_position",
 			"disabled_when": [
-				"keylogger_enabled",
+				"keystats_enabled",
 				"wpm_widget_visible"
 			]
 		},
@@ -2112,7 +2112,7 @@
 				"metrics_filter_private"
 			],
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{
@@ -2123,7 +2123,7 @@
 				"metrics_filter_secure"
 			],
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{
@@ -2134,14 +2134,14 @@
 				"metrics_filter_sysauth"
 			],
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{
 			"type": "list",
 			"id": "exclude_apps",
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			],
 			"platforms": [
 				"ahk",
@@ -2160,7 +2160,7 @@
 				"metrics_encrypt_enabled"
 			],
 			"disabled_when": [
-				"keylogger_enabled"
+				"keystats_enabled"
 			]
 		},
 		{

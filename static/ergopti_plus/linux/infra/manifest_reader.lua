@@ -10,7 +10,7 @@
 ---
 --- WHY THIS MODULE EXISTS:
 --- Linux was the only driver with no features manifest at all — the codegen
---- emitted one for Windows and macOS and stopped there — so the Linux keylogger
+--- emitted one for Windows and macOS and stopped there — so the Linux keystats
 --- had nowhere to read the cross-driver privacy toggles from. That is why it ran
 --- unconditionally, with no off switch and no private-browsing filter, while the
 --- other two drivers read all four flags from the shared manifest.

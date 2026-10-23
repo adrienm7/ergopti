@@ -20,10 +20,10 @@ local KEYCODE_J = 38
 local KEYCODE_C = 8
 
 local RESET_MODULES = {
-	"modules.keylogger.physical_accounting_mode",
+	"modules.keystats.physical_accounting_mode",
 	"adapters.event_provenance", "adapters.synthetic_input",
 	"infra.logger", "infra.text_utils",
-	"modules.hotstrings.hotstrings_config", "modules.keylogger",
+	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",
 	"modules.keymap.llm_bridge", "modules.keymap.registry",
 	"modules.keymap.state", "modules.keymap.terminator_replay",
@@ -248,9 +248,9 @@ helpers.describe("magic key source: acknowledged tap dispatcher", function()
  helpers.it("(magic-key-source) an acknowledged tap claims the same position on mixed keyboards", function()
   -- The earlier real keymap owns an always-on KC drain. Retire that exact
   -- producer before constructing another CoreState and its bridge owner.
-  local prior_bridge = package.loaded["modules.keylogger.kc_bridge"]
+  local prior_bridge = package.loaded["modules.keystats.kc_bridge"]
   if prior_bridge then helpers.assert_true(prior_bridge.stop()) end
-  package.loaded["modules.keylogger.kc_bridge"] = nil
+  package.loaded["modules.keystats.kc_bridge"] = nil
   local keymap, keymap_tap = load_keymap()
   local Registry = require("modules.keymap.registry")
   Registry.is_group_enabled = function(name) return name == "magickey" end

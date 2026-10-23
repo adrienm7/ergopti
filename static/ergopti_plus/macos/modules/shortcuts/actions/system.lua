@@ -446,7 +446,7 @@ local function auto_disable_awake(expected_started_at)
 	if awake_started_at then
 		local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
 		if dur_ms > 0 then
-			local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+			local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
 			if ok_lm and log_manager then
 				if type(log_manager.log_passive_period) == "function" then
 					pcall(log_manager.log_passive_period, "awake", dur_ms)
@@ -485,7 +485,7 @@ function M.toggle_awake()
 		if awake_started_at then
 			local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
 			if dur_ms > 0 then
-				local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+				local ok_lm, log_manager = pcall(require, "modules.keystats.log_manager")
 				if ok_lm and log_manager then
 					if type(log_manager.log_passive_period) == "function" then
 						pcall(log_manager.log_passive_period, "awake", dur_ms)
@@ -575,7 +575,7 @@ function M.toggle_awake()
 				end
 			end
 
-			-- State teardown, keylogger I/O and logging all run after this callback has
+			-- State teardown, keystats I/O and logging all run after this callback has
 			-- handed Quartz every older fence event and the physical event itself.
 			SyntheticInput.defer_after_callback(
 				"keep-awake auto-deactivation", auto_disable_awake, awake_started_at)
@@ -1001,7 +1001,7 @@ local function post_wheel_strokes(strokes, notches)
 		for _, stroke in ipairs(strokes) do
 			if stroke.system then
 				-- NX system-defined media events are not keyDown/keyUp events, so they
-				-- do not enter keymap/keylogger keyboard callbacks and stay native here.
+				-- do not enter keymap/keystats keyboard callbacks and stay native here.
 				if post_system_key_phase(stroke.system, true) ~= true then all_posted = false end
 				if post_system_key_phase(stroke.system, false) ~= true then all_posted = false end
 			elseif SyntheticInput.emit_key_stroke(stroke.mods, stroke.keycode, KEYSTROKE_NO_DELAY_US) ~= true then

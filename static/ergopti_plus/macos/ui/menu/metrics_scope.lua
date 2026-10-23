@@ -69,18 +69,18 @@ function M.new(options)
 			for key, value in pairs(values) do state[key] = value end
 			if not enabled and core.stop() ~= true then return false end
 			local native = clone(active.core)
-			native.options.encrypt, native.cipher_enabled = state.keylogger_encrypt, state.keylogger_encrypt
-			native.options.menubar, native.options.float = state.keylogger_menubar_wpm, state.keylogger_float_wpm
-			native.options.float_graph = state.keylogger_float_graph
-			native.disabled_apps = clone(state.keylogger_disabled_apps)
-			native.private_filter_enabled = state.keylogger_private_filter_enabled
-			native.secure_field_filter_enabled = state.keylogger_secure_filter_enabled
-			native.system_auth_filter_enabled = state.keylogger_system_auth_filter_enabled
+			native.options.encrypt, native.cipher_enabled = state.keystats_encrypt, state.keystats_encrypt
+			native.options.menubar, native.options.float = state.keystats_menubar_wpm, state.keystats_float_wpm
+			native.options.float_graph = state.keystats_float_graph
+			native.disabled_apps = clone(state.keystats_disabled_apps)
+			native.private_filter_enabled = state.keystats_private_filter_enabled
+			native.secure_field_filter_enabled = state.keystats_secure_filter_enabled
+			native.system_auth_filter_enabled = state.keystats_system_auth_filter_enabled
 			if core.apply_configuration(native) ~= true then return false end
-			if menubar.apply_configuration({ running = enabled and state.keylogger_menubar_wpm,
-				colors = state.keylogger_menubar_colors }) ~= true then return false end
-			if widget.apply_configuration({ running = enabled and state.keylogger_float_wpm,
-				colors = state.keylogger_float_colors, graph = state.keylogger_float_graph }) ~= true then return false end
+			if menubar.apply_configuration({ running = enabled and state.keystats_menubar_wpm,
+				colors = state.keystats_menubar_colors }) ~= true then return false end
+			if widget.apply_configuration({ running = enabled and state.keystats_float_wpm,
+				colors = state.keystats_float_colors, graph = state.keystats_float_graph }) ~= true then return false end
 			return true
 		end,
 		restore = restore,

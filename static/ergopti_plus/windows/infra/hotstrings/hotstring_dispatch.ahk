@@ -978,7 +978,7 @@ _HSE_DispatchNotepadRawCallback(Spec, EndChar, OutputHost, DispatchState,
 ; transaction. Ok is true only after output succeeds; Bs chars are then removed
 ; from the buffer's right and Ins appended. A false Ok means either a deliberate
 ; decline or a contained send failure. We wrap it with the same prefix suppression +
-; keylogger synthetic-marking the Replacement path uses, and resync HSE_Buffer from
+; keystats synthetic-marking the Replacement path uses, and resync HSE_Buffer from
 ; the effect so the next keystroke matches the post-expansion screen. This is what
 ; lets those two former native AHK Hotstring() registrations live in the HSE — no
 ; A_InputLevel dependency remains, so they register on the normal (and live-rebuild)
@@ -1006,7 +1006,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 		} else {
 				HSE_Suppress(true)
 		}
-		; The privacy flag rides along: the keylogger's InputHook observes the
+		; The privacy flag rides along: the keystats's InputHook observes the
 		; characters this callback is about to type, and without it they land in
 		; the typing row verbatim.
 		SyntheticOwner := 0
@@ -1271,13 +1271,13 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		} else {
 				HSE_Suppress(true)
 		}
-		; Tag the backspace+replacement burst as synthetic so the keylogger keeps
+		; Tag the backspace+replacement burst as synthetic so the keystats keeps
 		; it out of the manual `chars` count and attributes the resulting n-grams
 		; to the hotstring source (esrc). Released on the same deferred timer as
 		; the suppression below so it covers the OS message-loop flush window.
 		;
 		; The second argument is not bookkeeping: the burst below is typed through
-		; the OS, the keylogger's own InputHook sees every character of it, and the
+		; the OS, the keystats's own InputHook sees every character of it, and the
 		; typing row it writes is a SECOND sink for the same secret the fire row
 		; already redacts.
 		SyntheticOwner := 0

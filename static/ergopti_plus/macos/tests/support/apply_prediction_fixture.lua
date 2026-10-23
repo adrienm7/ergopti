@@ -116,14 +116,14 @@ function M.run(options)
 
 	local accepted_count = 0
 	local notified_count = 0
-	local keylogger_buffers = {}
-	package.loaded["modules.keylogger"] = {
+	local keystats_buffers = {}
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = noop,
 		log_hotstring_dismissed = noop,
 		notify_synthetic = function() notified_count = notified_count + 1 end,
 		log_llm_accepted = function() accepted_count = accepted_count + 1 end,
 		set_buffer = function(value)
-			keylogger_buffers[#keylogger_buffers + 1] = value
+			keystats_buffers[#keystats_buffers + 1] = value
 		end,
 	}
 
@@ -318,7 +318,7 @@ function M.run(options)
 		buffer_before = buffer_before,
 		accepted_count = accepted_count,
 		notified_count = notified_count,
-		keylogger_buffers = keylogger_buffers,
+		keystats_buffers = keystats_buffers,
 		reset_count = reset_count,
 		arm_chain_count = arm_chain_count,
 		arm_chain_before_completion = arm_chain_before_completion,

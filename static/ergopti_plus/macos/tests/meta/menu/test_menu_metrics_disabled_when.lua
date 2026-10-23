@@ -18,22 +18,22 @@ local helpers = require("tests.helpers")
 
 -- id -> canonical disabled_when key array (order matches the manifest).
 local CANON = {
-	{ id = "show_typing",        keys = { "keylogger_enabled" } },
-	{ id = "show_apps",          keys = { "keylogger_enabled" } },
-	{ id = "wpm_menubar",        keys = { "keylogger_enabled" } },
-	{ id = "menubar_colors",     keys = { "keylogger_enabled", "wpm_menubar_visible" } },
-	{ id = "wpm_widget",         keys = { "keylogger_enabled" } },
-	{ id = "widget_colors",      keys = { "keylogger_enabled", "wpm_widget_visible" } },
-	{ id = "include_realtime",   keys = { "keylogger_enabled", "wpm_widget_visible" } },
-	{ id = "reset_wpm_position", keys = { "keylogger_enabled", "wpm_widget_visible" } },
-	{ id = "filter_private",     keys = { "keylogger_enabled" } },
-	{ id = "filter_secure",      keys = { "keylogger_enabled" } },
-	{ id = "filter_sysauth",     keys = { "keylogger_enabled" } },
-	{ id = "exclude_apps",       keys = { "keylogger_enabled" } },
-	{ id = "encryption",         keys = { "keylogger_enabled" } },
+	{ id = "show_typing",        keys = { "keystats_enabled" } },
+	{ id = "show_apps",          keys = { "keystats_enabled" } },
+	{ id = "wpm_menubar",        keys = { "keystats_enabled" } },
+	{ id = "menubar_colors",     keys = { "keystats_enabled", "wpm_menubar_visible" } },
+	{ id = "wpm_widget",         keys = { "keystats_enabled" } },
+	{ id = "widget_colors",      keys = { "keystats_enabled", "wpm_widget_visible" } },
+	{ id = "include_realtime",   keys = { "keystats_enabled", "wpm_widget_visible" } },
+	{ id = "reset_wpm_position", keys = { "keystats_enabled", "wpm_widget_visible" } },
+	{ id = "filter_private",     keys = { "keystats_enabled" } },
+	{ id = "filter_secure",      keys = { "keystats_enabled" } },
+	{ id = "filter_sysauth",     keys = { "keystats_enabled" } },
+	{ id = "exclude_apps",       keys = { "keystats_enabled" } },
+	{ id = "encryption",         keys = { "keystats_enabled" } },
 }
 
-local ALL_KEYS = { "keylogger_enabled", "wpm_widget_visible", "wpm_menubar_visible" }
+local ALL_KEYS = { "keystats_enabled", "wpm_widget_visible", "wpm_menubar_visible" }
 
 local function all_true_getters()
 	local g = {}
@@ -242,11 +242,11 @@ helpers.describe("menu-metrics-disabled-when (macOS): manifest + resolver agree 
 
 	helpers.it("the shared STATE_GETTERS table reads the correct Lua state", function()
 		local src = read_source("\"dialog.metrics.security_warning_title\"") -- ui/menu/menu_metrics.lua
-		helpers.assert_true(src:find("keylogger_enabled%s*=%s*function%(%) return state%.keylogger_enabled end") ~= nil,
-			"STATE_GETTERS must map keylogger_enabled to state.keylogger_enabled")
-		helpers.assert_true(src:find("wpm_widget_visible%s*=%s*function%(%) return state%.keylogger_float_wpm end") ~= nil,
-			"STATE_GETTERS must map wpm_widget_visible to state.keylogger_float_wpm")
-		helpers.assert_true(src:find("wpm_menubar_visible%s*=%s*function%(%) return state%.keylogger_menubar_wpm end") ~= nil,
-			"STATE_GETTERS must map wpm_menubar_visible to state.keylogger_menubar_wpm")
+		helpers.assert_true(src:find("keystats_enabled%s*=%s*function%(%) return state%.keystats_enabled end") ~= nil,
+			"STATE_GETTERS must map keystats_enabled to state.keystats_enabled")
+		helpers.assert_true(src:find("wpm_widget_visible%s*=%s*function%(%) return state%.keystats_float_wpm end") ~= nil,
+			"STATE_GETTERS must map wpm_widget_visible to state.keystats_float_wpm")
+		helpers.assert_true(src:find("wpm_menubar_visible%s*=%s*function%(%) return state%.keystats_menubar_wpm end") ~= nil,
+			"STATE_GETTERS must map wpm_menubar_visible to state.keystats_menubar_wpm")
 	end)
 end)

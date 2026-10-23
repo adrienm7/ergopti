@@ -406,7 +406,7 @@ end
 
 --- Refreshes the widget. Called from the daemon's periodic tick; it redraws
 --- at the shared refresh rate however often it is called.
---- @param stats table|nil From keylogger.get_live_stats().
+--- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
 --- @return table|nil The frame drawn, for tests and diagnostics.
 function M.tick(stats, now_s)

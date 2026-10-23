@@ -1,11 +1,11 @@
 -- tools/diagnostics/hs274-context.lua
 -- Native observation owner for the physical-input fixture, not production coverage admission.
-local Context = require("modules.keylogger.physical_context")
-local Privacy = require("modules.keylogger.privacy_context")
-local Timestamp = require("modules.keylogger.timestamp")
+local Context = require("modules.keystats.physical_context")
+local Privacy = require("modules.keystats.privacy_context")
+local Timestamp = require("modules.keystats.timestamp")
 local Lifecycle = require("adapters.process_lifecycle")
 local Secure = require("adapters.secure_field_detector")
-local PrivateWindow = require("keylogger.private_window")
+local PrivateWindow = require("keystats.private_window")
 local M = {}
 
 function M.new(capacity, observations, on_error)

@@ -32,7 +32,7 @@
  * both HOME and TMPDIR absent, because the fallback is the part that shipped
  * wrong: nineteen sites once derived $HOME themselves with six different answers
  * for a missing one, including `"~"` (never expanded by io.open, so it addressed
- * a literal directory named `~` beside the process — the keylogger wrote its
+ * a literal directory named `~` beside the process — the keystats wrote its
  * database there) and `"/home/user"` (a plausible path belonging to nobody, so a
  * write there looks like it worked). Those two cannot be caught by reading a
  * return value's type; they need the value.
@@ -479,7 +479,7 @@ if (LUA && !fs.existsSync(CONFIG_PATHS)) {
 			if (resolved.includes('~')) {
 				errors.push(
 					`${what} returned "${resolved}", which contains "~". io.open never expands it, so this ` +
-						'addresses a literal directory named "~" beside the process — the keylogger wrote ' +
+						'addresses a literal directory named "~" beside the process — the keystats wrote ' +
 						'its database there once.'
 				);
 			}

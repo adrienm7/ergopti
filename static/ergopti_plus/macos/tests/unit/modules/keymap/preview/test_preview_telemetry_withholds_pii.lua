@@ -17,16 +17,16 @@
 ---
 --- WHY THE EXISTING TEST COULD NOT SEE IT:
 --- It captures `Logger.set_sink`. These two sinks are not the logger — they are
---- the keylogger, reached through a deferred timer. A test watching the logger
+--- the keystats, reached through a deferred timer. A test watching the logger
 --- watches the one sink that was already fixed.
 ---
 --- WHY THIS TEST ASSERTS THE PREDICATE AND NOT THE SINK:
---- It was written end-to-end first: stub the keylogger, drive a real preview,
+--- It was written end-to-end first: stub the keystats, drive a real preview,
 --- fire the deferred timer, assert nothing was persisted. It passed — and it
 --- passed just as happily with the guard replaced by `if true then`, which
 --- means the preview never reached the recording branch at all and every
 --- assertion was measuring its own harness. Three attempts at the load order
---- (the stub is overwritten by whichever dependency pulls the real keylogger
+--- (the stub is overwritten by whichever dependency pulls the real keystats
 --- back into package.loaded) got the private cases observing something real and
 --- the control case still not, and I could not establish why without guessing.
 ---
@@ -64,25 +64,25 @@ local SECRET_PII  = "FR76 3000 4000 5000 6000 7000 123"
 -- ==============================================
 -- ==============================================
 
---- Loads the bridge over a keylogger stub that records what it is asked to
+--- Loads the bridge over a keystats stub that records what it is asked to
 --- persist, and returns both.
 ---
 --- The stub is installed after the bridge's dependencies and BEFORE the bridge
---- itself: it captures `keylogger` as an upvalue at require time, so a stub put
+--- itself: it captures `keystats` as an upvalue at require time, so a stub put
 --- in place afterwards is a table nothing calls — and one put in place too early
 --- is overwritten by whichever dependency pulls the real module back in.
 --- @return table bridge, table persisted
-local function load_bridge_with_recording_keylogger()
+local function load_bridge_with_recording_keystats()
 	local persisted = { suggested = {}, dismissed = {} }
 
 	-- Everything the bridge pulls in is loaded FIRST, then the stub is installed,
 	-- then the bridge. Order is the whole trap here: loading modules.keymap.state
-	-- pulls in the real modules.keylogger and puts it back in package.loaded, so a
+	-- pulls in the real modules.keystats and puts it back in package.loaded, so a
 	-- stub installed before that step is a table the bridge never sees — it
-	-- captures its keylogger upvalue at require time (llm_bridge.lua:36).
+	-- captures its keystats upvalue at require time (llm_bridge.lua:36).
 	require("modules.keymap.state")
 
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function(_app, trigger, replacement, h_type)
 			persisted.suggested[#persisted.suggested + 1] =
 				{ trigger = trigger, replacement = replacement, h_type = h_type }
@@ -225,10 +225,10 @@ helpers.describe("preview telemetry: both call sites consult it", function()
 		local src = helpers.read_driver_source("local function invalidate_pending_preview")
 		helpers.assert_true(src ~= nil, "modules/keymap/llm_bridge.lua source must be locatable")
 
-		helpers.assert_contains(src, "keylogger.log_hotstring_suggested",
+		helpers.assert_contains(src, "keystats.log_hotstring_suggested",
 			"the suggested sink must still be called: the dashboard's suggested and "
 			.. "dismissed metrics are built on it")
-		helpers.assert_contains(src, "keylogger.log_hotstring_dismissed",
+		helpers.assert_contains(src, "keystats.log_hotstring_dismissed",
 			"and so must the dismissed sink")
 
 		local guards = 0

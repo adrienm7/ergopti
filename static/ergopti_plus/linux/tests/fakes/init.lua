@@ -233,7 +233,7 @@ function M.shell_runner(opts)
 	-- Delegated, never re-implemented. This one is a pure predicate with no shell
 	-- contact, and a fake that answered differently from the real validator would
 	-- let a test pass on an argv that production refuses -- the exact failure the
-	-- double is supposed to rule out (keylogger-worker-timings-must-be-strings).
+	-- double is supposed to rule out (keystats-worker-timings-must-be-strings).
 	fake.validate_spawn_args = require("adapters.shell_runner").validate_spawn_args
 	function fake.run(command) fake.commands[#fake.commands + 1] = command ; return true end
 	function fake.exec(command)
@@ -648,7 +648,7 @@ end
 -- =============================================
 -- =============================================
 
---- An in-memory stand-in for the keylogger's SQLite writer.
+--- An in-memory stand-in for the keystats's SQLite writer.
 ---
 --- Every export answers plausibly and records what it was handed, so a caller
 --- can assert on what would have been persisted without a database — and, more
@@ -806,7 +806,7 @@ function M.sqlite_writer(opts)
 		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
 		if media_policy then return true end
 		local ok, store, policy = pcall(function()
-			local shared = require("keylogger.media_store")
+			local shared = require("keystats.media_store")
 			local json = require("json")
 			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
 			local file = assert(io.open(path, "rb"))

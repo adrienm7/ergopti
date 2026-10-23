@@ -9,7 +9,7 @@
 ;  - SHARED-ENV hosts (short-lived info windows) take their controller from
 ;    WebView_SharedEnvironment and create NO per-open user-data folder, so they
 ;    cannot leak by construction. Guarded by _TWTL_CheckSharedHost.
-;  - LEGACY hosts (interactive/long-lived: keylogger, ollama) still create a
+;  - LEGACY hosts (interactive/long-lived: keystats, ollama) still create a
 ;    per-launch folder; they must retain browser-exit ownership for cleanup.
 ; ==============================================================================
 
@@ -76,8 +76,8 @@ _TWTL_AllHosts() {
 	_TWTL_CheckSharedUpdaterModule()
 	_TWTL_SharedFolderIsFixed()
 	; Legacy per-launch hosts (interactive/long-lived) -- still sweep + delete.
-	_TWTL_CheckLegacyHost("modules/keylogger/keylogger_ui.ahk", "ergopti_metrics_edge_")
-	_TWTL_CheckLegacyHost("modules/keylogger/keylogger_webview.ahk", "ergopti_webview2_")
+	_TWTL_CheckLegacyHost("modules/keystats/keystats_ui.ahk", "ergopti_metrics_edge_")
+	_TWTL_CheckLegacyHost("modules/keystats/keystats_webview.ahk", "ergopti_webview2_")
 	_TWTL_CheckLegacyHost("modules/llm/ollama_webview.ahk", "ergopti_ollama_wv_")
 }
 
@@ -94,8 +94,8 @@ _TWTL_OllamaWVDeferredDelete() {
 	Assert(InStr(Close, "DirDelete(") = 0, "Ollama close must not erase a live profile")
 }
 
-_TWTL_KeyloggerWVDeferredDelete() {
-	Src := _TWTL_ReadSource("modules/keylogger/keylogger_webview.ahk")
+_TWTL_KeystatsWVDeferredDelete() {
+	Src := _TWTL_ReadSource("modules/keystats/keystats_webview.ahk")
 	Close := _DriverFuncBody("KLWV_Close")
 	Assert(Close != "", "KLWV_Close must exist")
 	Assert(InStr(Close, "WebView_RetireProfile(udir)") > 0,
@@ -103,9 +103,9 @@ _TWTL_KeyloggerWVDeferredDelete() {
 	Assert(InStr(Close, 'DirDelete(entry["udir"], true)') = 0,
 		"KLWV_Close must not recursively delete the profile inline on the UI callback")
 	Assert(InStr(Src, "WebView_WatchProfile(udir, controller.CoreWebView2)") > 0,
-		"Keylogger must retain the browser exit subscription before publishing the controller")
+		"Keystats must retain the browser exit subscription before publishing the controller")
 }
 
 Test("WebView2 hosts: sweep stale profiles and delete on close", _TWTL_AllHosts)
 Test("OllamaWV_Close: udir deletion is deferred via SetTimer to avoid Edge file lock race", _TWTL_OllamaWVDeferredDelete)
-Test("KLWV_Close: udir deletion is deferred via SetTimer to avoid Edge file lock race", _TWTL_KeyloggerWVDeferredDelete)
+Test("KLWV_Close: udir deletion is deferred via SetTimer to avoid Edge file lock race", _TWTL_KeystatsWVDeferredDelete)

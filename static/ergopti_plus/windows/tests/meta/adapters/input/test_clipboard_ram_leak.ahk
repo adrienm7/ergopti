@@ -19,9 +19,9 @@ _CRL_ReadSource(RelPath) {
 }
 
 _CRL_AssertNoAClipboardRef() {
-    Src := _CRL_ReadSource("modules/keylogger/keylogger_clipboard.ahk")
+    Src := _CRL_ReadSource("modules/keystats/keystats_clipboard.ahk")
     Body := _DriverFuncBody("KL_Clip_OnChange")
-    Assert(Body != "", "KL_Clip_OnChange must exist in keylogger_clipboard.ahk")
+    Assert(Body != "", "KL_Clip_OnChange must exist in keystats_clipboard.ahk")
     
     Assert(!InStr(Body, "A_Clipboard"), "KL_Clip_OnChange must NOT reference A_Clipboard to avoid materialising large payloads into RAM (clipboard-reads-entire-clipboard-into-ram)")
     Assert(InStr(Body, "_KL_Clip_CharCountFromBuffer"), "KL_Clip_OnChange must use the bounded UTF-16 helper instead")
@@ -60,5 +60,5 @@ _CRL_AssertCharCountLogic() {
 	AssertEqual(0, _KL_Clip_CharCountFromBuffer(Tiny.Ptr, 1), "an incomplete UTF-16 unit must report zero")
 }
 
-Test("keylogger_clipboard: KL_Clip_OnChange does not materialise A_Clipboard into RAM (clipboard-reads-entire-clipboard-into-ram)", _CRL_AssertNoAClipboardRef)
-Test("keylogger_clipboard: bounded UTF-16 scan reports text length rather than allocation capacity (ahk-042)", _CRL_AssertCharCountLogic)
+Test("keystats_clipboard: KL_Clip_OnChange does not materialise A_Clipboard into RAM (clipboard-reads-entire-clipboard-into-ram)", _CRL_AssertNoAClipboardRef)
+Test("keystats_clipboard: bounded UTF-16 scan reports text length rather than allocation capacity (ahk-042)", _CRL_AssertCharCountLogic)

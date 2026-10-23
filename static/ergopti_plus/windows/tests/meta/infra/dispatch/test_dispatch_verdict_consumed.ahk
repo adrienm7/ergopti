@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ; With Space configured as a tap-hold, typing an end-char trigger, pausing past
 ; the activation delay and tapping Space produced NOTHING: no expansion, and no
-; space either. The keylogger recorded a hotstring fire that never happened, and
+; space either. The keystats recorded a hotstring fire that never happened, and
 ; HSE_Buffer kept a space the screen did not have, so the next trigger was
 ; mis-framed.
 ;
@@ -135,7 +135,7 @@ _DVC_SpaceTapFallsThroughOnDecline() {
 	Assert(InStr(Body, "&CommittedScreenEffect", true, DispatchPos) > DispatchPos,
 		"the Space caller must consume the dispatcher's canonical screen effect")
 
-	; The keylogger fire record must live inside the fired branch. Logging it
+	; The keystats fire record must live inside the fired branch. Logging it
 	; before the verdict is what put phantom expansions in the metrics.
 	;
 	; Matched on either channel: the record is queued rather than written inline

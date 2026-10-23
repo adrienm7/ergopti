@@ -13,7 +13,7 @@ local Codec = require("toml_codec")
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.metrics_preferences", "modules.keylogger.keylogger",
+		local names = { "infra.config_paths", "infra.metrics_preferences", "modules.keystats.keystats",
 			"adapters.storage", "ui.wpm.widget", "ui.wpm.tray_readout" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -72,8 +72,8 @@ helpers.describe("canonical metrics preferences", function()
 			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["metrics.enabled"] = false, ["metrics.private_filter_enabled"] = true,
 			} })
-			package.loaded["modules.keylogger.keylogger"] = nil
-			local collector = require("modules.keylogger.keylogger")
+			package.loaded["modules.keystats.keystats"] = nil
+			local collector = require("modules.keystats.keystats")
 			collector.init({ sqlite_path = path .. ".sqlite", log_dir = path .. ".logs" })
 			helpers.assert_eq(collector.is_enabled(), true)
 			helpers.assert_eq(collector.get_privacy_state().private_filter_enabled, false)

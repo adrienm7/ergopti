@@ -700,7 +700,7 @@ const APP_SPECS = [
 		hs_factor: 1.1,
 		llm_factor: 1.4,
 		hours: [9, 10, 11, 12, 14, 15, 16, 17, 18],
-		titles: ['ergopti — data.js', 'ergopti — keylogger.ahk', 'gen-demo-metrics.cjs']
+		titles: ['ergopti — data.js', 'ergopti — keystats.ahk', 'gen-demo-metrics.cjs']
 	},
 	{
 		name: 'Firefox',

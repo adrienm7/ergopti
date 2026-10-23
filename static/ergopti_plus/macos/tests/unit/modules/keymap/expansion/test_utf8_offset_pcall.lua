@@ -410,7 +410,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			"modules.keymap.terminators",
 			"modules.llm",
 			"modules.llm.prediction_engine",
-			"modules.keylogger",
+			"modules.keystats",
 			"modules.hotstrings.hotstrings_config",
 			"infra.text_utils",
 			"infra.keycodes",
@@ -448,7 +448,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			elapsed_ms = function(_) return 0 end,
 			log_if_slow = function() end,
 		}
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			log_hotstring_suggested = function() end,
 			log_hotstring_dismissed = function() end,
 			notify_synthetic        = function() end,

@@ -59,7 +59,7 @@ _CRWT_RequiredKeys() {
 		"git_hash", "uptime_sec", "active_window_title",
 		"active_window_process", "stuck_modifiers", "adapters_ok",
 		"adapters_failed", "session_warnings", "session_errors",
-		"keylogger_initialized", "config_dir", "log_tail"
+		"keystats_initialized", "config_dir", "log_tail"
 	]
 }
 

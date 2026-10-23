@@ -153,11 +153,11 @@ _CryptoSha256Cng(Data) {
 ; ==========================================
 ; ==========================================
 
-; These back the keylogger's at-rest encryption. They live here, in the crypto
+; These back the keystats's at-rest encryption. They live here, in the crypto
 ; adapter, because the OS-purity ratchet requires every DllCall to sit inside
 ; adapters/ — and CNG is exactly the kind of OS primitive an adapter exists to
 ; wrap. The envelope format and the orchestration live in
-; modules/keylogger/keylogger_text_cipher.ahk, which calls these and holds no
+; modules/keystats/keystats_text_cipher.ahk, which calls these and holds no
 ; DllCall of its own.
 
 ; BCRYPT_ALG_HANDLE_HMAC_FLAG — the SHA-256 provider must be opened with this to

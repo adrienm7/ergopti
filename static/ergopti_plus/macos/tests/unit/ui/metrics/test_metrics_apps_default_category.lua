@@ -32,7 +32,7 @@ local helpers = require("tests.helpers")
 -- whichever file carries it, so moving the window does not silently empty the
 -- corpus (a pinned path is also rejected by the pre-commit ratchet).
 --
--- Deliberately NOT metrics_apps.general_category: modules/keylogger/export.lua
+-- Deliberately NOT metrics_apps.general_category: modules/keystats/export.lua
 -- reads that one twice, so it would pull three files into the corpus and the
 -- "is the default read from the key" count below would already be satisfied by
 -- the exporter alone. This key belongs to this window only.

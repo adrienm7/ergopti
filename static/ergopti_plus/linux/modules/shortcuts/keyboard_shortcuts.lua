@@ -13,7 +13,7 @@
 --- nowhere to store an assignment. The hook reported every modified keystroke as
 --- the bare string "shortcut" — enough to tell the engine the caret had moved,
 --- and not enough to say WHICH shortcut, so there was nothing to match and
---- nothing to record. `keylogger.record_shortcut` existed and had no caller for
+--- nothing to record. `keystats.record_shortcut` existed and had no caller for
 --- the same reason.
 ---
 --- FEATURES & RATIONALE:

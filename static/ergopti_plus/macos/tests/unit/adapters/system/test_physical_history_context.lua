@@ -3,8 +3,8 @@
 --- Portable controls: real History/Capture callsites and modeled native ports.
 --- C os.time/date exercise binding shape, not Hammerspoon/Mach qualification.
 local helpers = require("tests.helpers")
-local History = require("keylogger.physical_permission_history")
-local Accepted = require("keylogger.physical_accepted_context")
+local History = require("keystats.physical_permission_history")
+local Accepted = require("keystats.physical_accepted_context")
 local Fixture = require("tests.support.physical_capture_fixture")
 
 local function policy(capture_token, clock_token, current)
@@ -230,7 +230,7 @@ helpers.describe("accepted physical History context", function()
 	helpers.it("retains the accepted initial calendar across later calendar changes", function()
 		with_projection(function(f)
 			local Frames = require("tests.support.physical_stream_frames")
-			local Delivery = require("modules.keylogger.physical_delivery")
+			local Delivery = require("modules.keystats.physical_delivery")
 			local presses, releases = {}, {}
 			local frames = Frames.new("accepted-calendar", "8", { "41" })
 			local receiver = Delivery.new({ batch_limit = 4, admit = function() return "accepted-calendar/8" end,

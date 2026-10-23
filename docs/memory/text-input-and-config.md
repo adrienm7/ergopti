@@ -245,7 +245,7 @@ character already on screen stamps it through that owner. Never write the map
 elsewhere, and never push the ring (`_LSCPush`) from the watcher: the emulation
 has already pushed that character.
 
-### project-a-driver-that-types-also-types-into-its-own-keylogger
+### project-a-driver-that-types-also-types-into-its-own-keystats
 
 Synthetic text can re-enter metrics and preview hooks. Filter by owned provenance
 at the shared injection choke point.

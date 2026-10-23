@@ -642,8 +642,8 @@ global TEST_MODULE_GROUPS := [
 	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
 	; Keyboard remapping, layouts and gestures.
 	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
-	; Keylogger capture, storage and metrics.
-	["keylogger", "^unit/modules/keylogger/"],
+	; Keystats capture, storage and metrics.
+	["keystats", "^unit/modules/keystats/"],
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/ui/"],
 	; Adapters, platform services, shared infrastructure and the test runner.

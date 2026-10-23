@@ -90,7 +90,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("timestamps keystrokes with the monotonic wall clock, not the CPU clock", function()
-      -- The keylogger derives inter-keystroke delays (N-gram timing) from the
+      -- The keystats derives inter-keystroke delays (N-gram timing) from the
       -- per-keystroke timestamp. It was built from os.clock() * 1000 — CPU time
       -- on Linux — so every recorded delay was meaningless in the daemon. This
       -- guard is RED before the fix (the old expression is present).
@@ -171,7 +171,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local on_char_body = src:sub(on_char_start, on_physical_start - 1)
       local tab_pos = on_char_body:find('if ch == "\\t" then', 1, true)
       local invalidate_pos = on_char_body:find("secure_focus_guard.invalidate()", 1, true)
-      local metric_pos = on_char_body:find("keylogger.on_keydown", 1, true)
+      local metric_pos = on_char_body:find("keystats.on_keydown", 1, true)
       local llm_pos = on_char_body:find("prediction_engine.on_char", 1, true)
 
       helpers.assert_true(tab_pos ~= nil and invalidate_pos ~= nil,
@@ -210,18 +210,18 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local body = src:sub(control_start, control_end - 1)
       local paused = body:find("if script_actions.is_paused() then return end", 1, true)
       local branch = body:find('if key_name == "backspace" then', 1, true)
-      local record = body:find("keylogger.record_correction(app_id,", 1, true)
+      local record = body:find("keystats.record_correction(app_id,", 1, true)
       local privacy = branch and body:find("secure_focus_guard.blocks_text()", branch, true)
       local undo = body:find("injector.inject(remaining - 1", 1, true)
       helpers.assert_true(paused ~= nil and branch ~= nil and record ~= nil and undo ~= nil,
-        "the control callback must route Backspace to the keylogger")
+        "the control callback must route Backspace to the keystats")
       helpers.assert_true(paused < branch and branch < record,
         "a paused daemon records nothing, so the correction follows the pause gate")
       helpers.assert_true(privacy ~= nil and privacy < record,
         "a correction is admitted under the same privacy verdict as a character")
       helpers.assert_true(record < undo,
         "the undo returns early, and the press deleted a character whatever happens next")
-      -- Only one keylogger entry exists for a press: on_char never sees Backspace.
+      -- Only one keystats entry exists for a press: on_char never sees Backspace.
       local handle_char = src:sub(assert(src:find("local function handle_char", 1, true)),
         assert(src:find("local function handle_physical", 1, true)) - 1)
       helpers.assert_true(handle_char:find("record_correction", 1, true) == nil,
@@ -258,7 +258,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL
       -- (always nil) while the onFocusChange callback wrote a different local.
-      -- app_id reached keylogger.is_password_app() as nil, silently disabling
+      -- app_id reached keystats.is_password_app() as nil, silently disabling
       -- keystroke suppression inside password managers (a privacy regression).
       -- The declaration must PRECEDE on_char so both capture the same upvalue.
       -- RED if the declaration is moved back below on_char.
@@ -281,7 +281,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     helpers.it("primes the current foreground app before lifecycle polling starts", function()
       -- process_lifecycle.start() deliberately stores the current window as its
       -- baseline, so it does not produce an initial focus-change callback. The
-      -- keylogger must be primed explicitly or the apps dashboard remains empty
+      -- keystats must be primed explicitly or the apps dashboard remains empty
       -- until the user changes window for the first time.
       local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
       local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
@@ -295,8 +295,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(start_pos ~= nil, "daemon must start lifecycle polling")
       helpers.assert_true(prime_pos and start_pos and prime_pos < start_pos,
         "initial foreground app must be attributed before lifecycle polling starts")
-      helpers.assert_true(src:find("keylogger.on_app_focus(_cached_app_id", prime_pos, true) ~= nil,
-        "initial foreground app must be forwarded to the keylogger")
+      helpers.assert_true(src:find("keystats.on_app_focus(_cached_app_id", prime_pos, true) ~= nil,
+        "initial foreground app must be forwarded to the keystats")
     end)
   end)
 
@@ -361,7 +361,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("metrics_collector can be required", function()
-      local ok, mc = pcall(require, "modules.keylogger.metrics_collector")
+      local ok, mc = pcall(require, "modules.keystats.metrics_collector")
       helpers.assert_true(ok, "metrics_collector module loads")
       if ok then
         helpers.assert_true(type(mc.init) == "function",
@@ -421,9 +421,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       "logger.shim",
       "compat.utf8",
       "keymap.terminators",
-      "keylogger.utils",
-      "keylogger.metrics",
-      "keylogger.aggregator_helpers",
+      "keystats.utils",
+      "keystats.metrics",
+      "keystats.aggregator_helpers",
       "keycodes.evdev",
       "json",
       "tray.protocol",

@@ -51,7 +51,7 @@ local MODULE_KEYS = {
 	"ui.menu.menu_about",
 	"ui.menu.menu_llm",
 	"modules.llm",
-	"modules.keylogger",
+	"modules.keystats",
 	"modules.shortcuts",
 	"modules.dynamic_hotstrings",
 	"modules.gestures",
@@ -200,7 +200,7 @@ local function with_menu_fixture(options, callback)
 		gestures = true,
 		shortcuts = true,
 		llm_enabled = true,
-		keylogger_enabled = true,
+		keystats_enabled = true,
 		script_control_enabled = true,
 		personal_info = true,
 		update_channel = "dev",
@@ -526,7 +526,7 @@ local function with_menu_fixture(options, callback)
 	end
 	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
 	package.loaded["modules.llm"] = { set_backend = noop }
-	package.loaded["modules.keylogger"] = {}
+	package.loaded["modules.keystats"] = {}
 	package.loaded["modules.dynamic_hotstrings"] = {}
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 	package.loaded["modules.gestures"] = {

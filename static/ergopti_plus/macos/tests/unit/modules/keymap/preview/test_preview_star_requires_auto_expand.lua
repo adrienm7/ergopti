@@ -33,7 +33,7 @@ local function install_collaborators(effects)
 		get_llm_enabled = function() return false end,
 		reset = function() return true end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function() end,
 		log_hotstring_dismissed = function() end,
 		log_llm_accepted = function() end,

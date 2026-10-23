@@ -19,7 +19,7 @@ that is rule R3, and `tests/meta/architecture/test_karabiner_stock_process_isola
 enforces it.
 
 That arrangement cannot count physical keys exactly (HS-274). Karabiner rewrites
-key codes before Quartz sees them, so the keylogger's event tap credits the
+key codes before Quartz sees them, so the keystats's event tap credits the
 remapped output, and a `shell_command` ledger in each tap-hold manipulator also
 credits the physical key: every remapped tap is counted twice. Suppressing the
 managed output key codes instead loses real presses, because the shipped

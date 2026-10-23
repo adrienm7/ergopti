@@ -66,7 +66,7 @@ global TEST_RESULTS_FILE := _TestResultsPath(A_ScriptDir . "\test_results.txt")
 _TestResultsBeginRun()
 ; The shared app-context simulators publish into KLHook, just as the main
 ; runner does. Load the definition here so E2E never depends on ambient state.
-#Include ../../modules/keylogger/keylogger_hook.ahk
+#Include ../../modules/keystats/keystats_hook.ahk
 #Include ../test_stubs.ahk
 ; The stubs place the roots for tests/; this harness runs one folder deeper.
 global _StaticDir := A_ScriptDir . "\..\..\..\.."

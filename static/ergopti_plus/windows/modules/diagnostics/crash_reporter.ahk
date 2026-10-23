@@ -163,9 +163,9 @@ CrashReport_Build(ErrorObj) {
 	}
 
 	; ── Module state ──────────────────────────────────────────────────────────
-	KeyloggerInit := "unknown"
+	KeystatsInit := "unknown"
 	ConfigDir     := ""
-	try KeyloggerInit := Keylogger.initialized ? "true" : "false"
+	try KeystatsInit := Keystats.initialized ? "true" : "false"
 	try {
 		global _ConfigDir
 		ConfigDir := _ConfigDir
@@ -222,7 +222,7 @@ CrashReport_Build(ErrorObj) {
 		"session_warnings",     WarnCount,
 		"session_errors",       ErrCount,
 		; ── Module state ──
-		"keylogger_initialized", KeyloggerInit,
+		"keystats_initialized", KeystatsInit,
 		"config_dir",           ConfigDir,
 		; ── The log tail, whole; redacted only where a report is shared ──
 		"log_tail",             LogLines,
@@ -396,7 +396,7 @@ _CrashReport_CanonicalFields() {
 		"stuck_modifiers",
 		"adapters_ok", "adapters_failed",
 		"session_warnings", "session_errors",
-		"keylogger_initialized", "config_dir",
+		"keystats_initialized", "config_dir",
 		"log_tail"
 	]
 }

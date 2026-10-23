@@ -271,7 +271,7 @@ function buildAggregatedData() {
 			);
 		}
 
-		// New _system pseudo-app written by the keylogger caffeinate callbacks.
+		// New _system pseudo-app written by the keystats caffeinate callbacks.
 		// Tracks precise locked / sleeping durations so the active ratio can be
 		// computed without inflation from screen-locked time.
 		const sysEntry = dayData._system;

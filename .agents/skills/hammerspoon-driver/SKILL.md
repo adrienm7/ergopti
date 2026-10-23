@@ -148,7 +148,7 @@ particular phrasing of the code.
 ## `os.exit()` does NOT run `hs.shutdownCallback`
 
 `hs.shutdownCallback` (`init.lua:781`) is the single place that stops modules,
-restores system overrides, tears down the Karabiner bridge, flushes the keylogger
+restores system overrides, tears down the Karabiner bridge, flushes the keystats
 and kills helper processes. `os.exit()` terminates the Lua state immediately and
 **never invokes it**.
 
@@ -157,7 +157,7 @@ There are two quit paths and both `os.exit`: the menubar Quit
 (`modules/gestures/actions.lua:560`). Each therefore has to replicate the
 teardown by hand — Karabiner kill through the ownership-respecting
 `karabiner.kill()`, `menu_llm.terminate_helper_processes()` +
-`terminate_orphan_mlx_server()`, and `keylogger.stop()` for the flush.
+`terminate_orphan_mlx_server()`, and `keystats.stop()` for the flush.
 
 The failure mode is invisible at quit time and shows up later: a detached
 `mlx_lm.server` and helper daemons surviving indefinitely, or the last minutes of

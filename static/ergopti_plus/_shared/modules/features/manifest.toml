@@ -4148,7 +4148,7 @@ type = "group"
 id = "metrics"
 i18n = "menu.metrics.title"
 rows = []
-checked_when = ["keylogger_enabled"]
+checked_when = ["keystats_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
@@ -5542,7 +5542,7 @@ id = "caps_word_pointer_kinds"
 type = "toggle"
 id = "metrics_toggle"
 i18n = "menu.metrics.enable"
-checked_when = ["keylogger_enabled"]
+checked_when = ["keystats_enabled"]
 category = "Metrics"
 
 # The restore alone: the maintainer retired the Metrics clear on 2026-09-30,
@@ -5564,7 +5564,7 @@ type = "---"
 type = "command"
 id = "show_typing"
 i18n = "menu.metrics.show_typing"
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 # The two rows that open a window form one group. Each was followed, until
 # 2026-10-01, by a row that set a dedicated shortcut for it (`shortcut_typing`,
@@ -5576,7 +5576,7 @@ disabled_when = ["keylogger_enabled"]
 type = "command"
 id = "show_apps"
 i18n = "menu.metrics.show_apps"
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 [[menu.metrics_menu]]
 type = "---"
@@ -5591,7 +5591,7 @@ id = "wpm_menubar"
 i18n = "menu.metrics.show_wpm_menubar"
 checked_when = ["metrics_menubar_wpm"]
 platforms = ["hs", "linux"]
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 [[menu.metrics_menu]]
 type = "check"
@@ -5599,7 +5599,7 @@ id = "menubar_colors"
 i18n = "menu.metrics.colors_by_source"
 checked_when = ["metrics_menubar_colors"]
 platforms = ["hs", "linux"]
-disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
+disabled_when = ["keystats_enabled", "wpm_menubar_visible"]
 reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 
 # Linux joined on 2026-08-06. The restriction was accurate when written — that
@@ -5616,27 +5616,27 @@ type = "check"
 id = "wpm_widget"
 i18n = "menu.metrics.show_wpm_widget"
 checked_when = ["wpm_widget_visible"]
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 [[menu.metrics_menu]]
 type = "check"
 id = "widget_colors"
 i18n = "menu.metrics.colors_by_source"
 checked_when = ["metrics_widget_colors"]
-disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+disabled_when = ["keystats_enabled", "wpm_widget_visible"]
 
 [[menu.metrics_menu]]
 type = "check"
 id = "include_realtime"
 i18n = "menu.metrics.include_realtime"
 checked_when = ["metrics_widget_graph"]
-disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+disabled_when = ["keystats_enabled", "wpm_widget_visible"]
 # A button with a label, a greying rule and a click, also drawn by the renderer.
 [[menu.metrics_menu]]
 type = "command"
 id = "reset_wpm_position"
 i18n = "menu.metrics.reset_wpm_position"
-disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
+disabled_when = ["keystats_enabled", "wpm_widget_visible"]
 [[menu.metrics_menu]]
 type = "---"
 
@@ -5649,21 +5649,21 @@ type = "check"
 id = "filter_private"
 i18n = "menu.metrics.filter_private"
 checked_when = ["metrics_filter_private"]
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 [[menu.metrics_menu]]
 type = "check"
 id = "filter_secure"
 i18n = "menu.metrics.filter_secure"
 checked_when = ["metrics_filter_secure"]
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 [[menu.metrics_menu]]
 type = "check"
 id = "filter_sysauth"
 i18n = "menu.metrics.filter_sysauth"
 checked_when = ["metrics_filter_sysauth"]
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 # `list` since 2026-08-07, not `action`/`dynamic`: the row's label is built
 # from runtime state — the number of excluded apps — so no static i18n key can
@@ -5673,7 +5673,7 @@ disabled_when = ["keylogger_enabled"]
 [[menu.metrics_menu]]
 type = "list"
 id = "exclude_apps"
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 platforms = ["ahk", "hs"]
 reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
@@ -5693,7 +5693,7 @@ type = "check"
 id = "encryption"
 i18n = "menu.metrics.encrypt_toggle"
 checked_when = ["metrics_encrypt_enabled"]
-disabled_when = ["keylogger_enabled"]
+disabled_when = ["keystats_enabled"]
 
 # The readouts this driver answers in its log rather than in a window. They are
 # Linux's own — macOS and Windows open a metrics WINDOW for the same figures —
@@ -5713,7 +5713,7 @@ platforms = ["linux"]
 # widget toggle shows the live rate. They were removed rather than pointed at
 # those windows, which would have given this menu two rows opening one window.
 
-# Ticked from the keylogger's own suppression state. It used to glue a " ✓" onto
+# Ticked from the keystats's own suppression state. It used to glue a " ✓" onto
 # the label, which puts one platform's convention inside a string twenty other
 # languages also read — and bypasses the tray's native check item.
 [[menu.metrics_menu]]

@@ -4,7 +4,7 @@
 --- MODULE: Regression — no zero-argument log_hotstring_suggested from the expander
 --- DESCRIPTION:
 --- Audit finding G2/G4. try_terminator_expand fired
----   pcall(keylogger.log_hotstring_suggested)
+---   pcall(keystats.log_hotstring_suggested)
 --- with ZERO arguments against the real four-parameter signature
 ---   M.log_hotstring_suggested(app_name, trigger, replacement, h_type)
 --- so every terminator-fired hotstring double-counted hs_suggested, wrote
@@ -33,12 +33,12 @@ local REPLACEMENT = "REPLACEMENTVALUE"
 local TERMINATOR  = " "
 
 
---- Installs a keylogger stub recording the arity and arguments of every
+--- Installs a keystats stub recording the arity and arguments of every
 --- log_hotstring_suggested call. Must run BEFORE the expander loads.
 --- @return table Recorder with `suggested` and `accepted` lists.
-local function install_keylogger_recorder()
+local function install_keystats_recorder()
 	local rec = { suggested = {}, accepted = {} }
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function(...)
 			table.insert(rec.suggested, { argc = select("#", ...), args = { ... } })
 		end,
@@ -54,7 +54,7 @@ end
 
 helpers.describe("terminator expansion records no zero-argument suggestion event", function()
 	helpers.it("fires the expansion without any argument-less log_hotstring_suggested call", function()
-		local rec = install_keylogger_recorder()
+		local rec = install_keystats_recorder()
 
 		local State    = helpers.load_with_stubs("modules.keymap.state")
 		local Registry = helpers.load_with_stubs("modules.keymap.registry")

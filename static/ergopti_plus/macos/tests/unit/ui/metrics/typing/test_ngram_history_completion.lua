@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keylogger.ngram_completion_fixture")
+local Fixture = require("tests.support.modules.keystats.ngram_completion_fixture")
 
 local function project(state, reader, projection, today)
 	local payload, complete = projection.session(reader, "/fixture/db.sqlite", today, state.pacer)

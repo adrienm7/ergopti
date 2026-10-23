@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Metrics Privacy Filters
 ; DESCRIPTION:
-; Persists and evaluates the privacy filters that gate the keylogger hot
+; Persists and evaluates the privacy filters that gate the keystats hot
 ; path: private browsing detection, system-auth dialogs, and a per-app
 ; exclusion list. Mirrors the « FILTRES DE CONFIDENTIALITÉ » section of
 ; the Hammerspoon menu_metrics.lua.
@@ -13,8 +13,8 @@
 ;    the [filters] / [disabled_apps] sections so they survive restarts.
 ; 2. Defaults safe: private + system-auth filters default to ON. Users
 ;    have to explicitly turn them OFF, never the other way around — same
-;    contract as the global keylogger toggle.
-; 3. Single chokepoint: KL_AppendLog() in modules/keylogger.ahk calls
+;    contract as the global keystats toggle.
+; 3. Single chokepoint: KL_AppendLog() in modules/keystats.ahk calls
 ;    MF_ShouldFilter() before any disk I/O, so every event source
 ;    (typing flush, shortcuts, hotstrings, system events, …) inherits
 ;    the filter for free.
@@ -176,7 +176,7 @@ _MF_BuildEncryptionTogglePlan(Outcome, ApplyFn := 0, AvailableFn := 0) {
 	OldValue := !!MetricsFilters.encrypt
 	Target := !OldValue
 	if Target && !_MF_EncryptionCandidateAvailable(AvailableFn) {
-		try LoggerError("Keylogger", "At-rest encryption requested but no key can be derived - staying off.")
+		try LoggerError("Keystats", "At-rest encryption requested but no key can be derived - staying off.")
 		return { noop: true }
 	}
 	Outcome["accepted"] := true
@@ -270,7 +270,7 @@ MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
 ; =================================================
 
 ; One canonical focused-window snapshot feeds both the privacy predicate and
-; the keylogger’s app/title projection. The 50 ms freshness gate remains below
+; the keystats’s app/title projection. The 50 ms freshness gate remains below
 ; realistic inter-keystroke intervals. SetTimer callbacks share the same AHK
 ; thread as keyboard dispatch, so the adapter performs no target-thread message
 ; and caches process metadata behind a retained identity handle. Partial results
@@ -413,7 +413,7 @@ _MF_CommitFocusRefresh(RequestGeneration, Candidate) {
 	}
 }
 
-; Captures one stable reference for both metrics and keylogger consumers.
+; Captures one stable reference for both metrics and keystats consumers.
 MF_GetFocusSnapshot() {
 	return MetricsFocusCache.state
 }
@@ -615,7 +615,7 @@ MF_StartFocusRefresh() {
 		return false
 	}
 
-	; Seed before any keylogger callback can consume the cache. The resident path
+	; Seed before any keystats callback can consume the cache. The resident path
 	; uses only system-owned window metadata and cached process identity.
 	try MF_RefreshFocus(true)
 	catch as Err
@@ -695,7 +695,7 @@ MF_StopFocusRefresh(NativeCancelFn := 0) {
 	return true
 }
 
-; Returns true when the keylogger should DROP the current event because one of
+; Returns true when the keystats should DROP the current event because one of
 ; the privacy filters matches, or because focus could not be classified safely.
 MF_ShouldFilter() {
 		; Last window title the private-browsing pattern scan ran on, with its
@@ -723,7 +723,7 @@ MF_ShouldFilter() {
 				return true
 
 		; 2. Password field — relies on the UIA-backed detector in
-		;    modules/keylogger.ahk §13. Wrapped in try because the function
+		;    modules/keystats.ahk §13. Wrapped in try because the function
 		;    is loaded later in the include order and an early caller (e.g.
 		;    boot-time metrics) might race ahead of it.
 		if MetricsFilters.secure_field {

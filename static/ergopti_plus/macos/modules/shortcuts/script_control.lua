@@ -167,7 +167,7 @@ local _pause_rollback_debt_steps = nil
 local _resume_rollback_debt_steps = nil
 
 --- An additive observer never replaces the existing pause-change singleton.
-local _physical_pause = require("keylogger.physical_lifecycle_observation").new("pause", function()
+local _physical_pause = require("keystats.physical_lifecycle_observation").new("pause", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical pause observer retired: %s.", tostring(reason)) end)
 
@@ -881,21 +881,21 @@ local function resume_all()
 	-- pinned to whatever was frontmost when the pause began. Re-sync here rather than
 	-- weakening the pause guard, so « pause = tout éteint » still holds exactly.
 	-- Lazy require, like the two warmup drivers above: script_control is not wired to
-	-- the keylogger module and does not need to be for a one-shot resume call.
+	-- the keystats module and does not need to be for a one-shot resume call.
 	-- This one-shot refresh is deliberately best-effort: metrics OFF leaves the
-	-- keylogger uninitialized, and resync_context() then returns false even though
+	-- keystats uninitialized, and resync_context() then returns false even though
 	-- resume is otherwise valid. It activates nothing and therefore needs no inverse.
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if not ok_kl then
 		Logger.warn(LOG, "Optional resume operation failed without blocking activation: %s.",
-			"require(modules.keylogger) raised: " .. tostring(kl))
+			"require(modules.keystats) raised: " .. tostring(kl))
 		kl = nil
 	end
 	if kl and type(kl.resync_context) == "function" then
 		local ok_resync, resync_result = xpcall(kl.resync_context, debug.traceback)
 		if not ok_resync or resync_result == false then
 			Logger.warn(LOG,
-				"Optional resume operation keylogger.resync_context failed without blocking activation: %s.",
+				"Optional resume operation keystats.resync_context failed without blocking activation: %s.",
 				tostring(resync_result))
 		end
 	end
@@ -1445,10 +1445,10 @@ local function dispatch_action(action, binding)
 	return true
 end
 
---- Logs a shortcut activation via the keylogger if available.
+--- Logs a shortcut activation via the keystats if available.
 --- @param label string Human-readable shortcut label for the log.
 local function log_shortcut_if_available(label)
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		local app = hs.application.frontmostApplication()
 		Logger.callback(LOG, "Shortcut telemetry", kl.log_shortcut,
@@ -1467,7 +1467,7 @@ local function slot_runs(slot_id, paused)
 	return ScriptChords.runs(ChordCatalogue.get(), actions[slot_id], chords_on, paused)
 end
 
---- The keylogger label of a slot's chord ("Alt+Enter"), stable across the
+--- The keystats label of a slot's chord ("Alt+Enter"), stable across the
 --- slot's action so the dashboard groups every press of the chord.
 --- @param slot_id string
 --- @return string label

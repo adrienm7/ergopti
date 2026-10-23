@@ -90,7 +90,7 @@ local function load_fixture(opts)
 		gestures = true,
 		shortcuts = true,
 		llm_enabled = true,
-		keylogger_enabled = true,
+		keystats_enabled = true,
 		script_control_enabled = true,
 		personal_info = true,
 		update_channel = "dev",
@@ -174,7 +174,7 @@ local function load_fixture(opts)
 	end
 	package.loaded["ui.menu.menu_llm"] = { create = function() return {} end }
 	package.loaded["modules.llm"] = { set_backend = noop }
-	package.loaded["modules.keylogger"] = {}
+	package.loaded["modules.keystats"] = {}
 	package.loaded["modules.shortcuts"] = {
 		is_paused = function() return false end,
 		set_on_pause_change = noop,

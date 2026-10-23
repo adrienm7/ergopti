@@ -16,7 +16,7 @@ local function now()
 	assert(ffi.C.clock_gettime(1, value) == 0)
 	return tonumber(value[0].tv_sec) * 1000 + tonumber(value[0].tv_nsec) / 1000000
 end
-local reader = require('modules.keylogger.sqlite_reader')
+local reader = require('modules.keystats.sqlite_reader')
 local bridge = require('ui.metrics_typing.bridge')
 local json = require('json')
 local phases, calls = {}, 0
@@ -40,7 +40,7 @@ local function check_range(payload, selected_apps)
 	end
 end
 -- This port composes real reader methods, NOT the daemon's cache/live-delta path.
-local state = { keylogger = { get_dashboard_payload = function(options)
+local state = { keystats = { get_dashboard_payload = function(options)
 	local manifest = measure('manifest', function() return reader.read_manifest(database) end)
 	local today = os.date('%Y-%m-%d')
 	assert(manifest[today] and manifest[today]['synthetic.app.0'], 'missing seeded manifest')
@@ -64,4 +64,4 @@ measure('composed_bridge_range', function()
 	return payload
 end)
 print(json.encode({ phases = phases, cli_calls = calls, painted = false,
-	scope = 'real reader and bridge with synthetic keylogger composition; no cache or live delta' }))
+	scope = 'real reader and bridge with synthetic keystats composition; no cache or live delta' }))

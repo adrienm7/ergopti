@@ -365,11 +365,11 @@ local function full_context()
 			get_slots      = function() return {} end,
 			get_sg_names   = function() return {} end,
 		},
-		-- `keylogger`, which is what _build_metrics reads. Named `metrics` in a
+		-- `keystats`, which is what _build_metrics reads. Named `metrics` in a
 		-- first draft, and the metrics submenu then collapsed to "(métriques non
 		-- disponibles)" — three manifest rows reported missing for a reason that
 		-- was in the stub, not the driver.
-		keylogger = {
+		keystats = {
 			is_enabled        = function() return true end,
 			toggle            = noop,
 			get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end,
@@ -1626,8 +1626,8 @@ helpers.describe("actual Linux top-level boundary facade custody (declared-top-l
 					-- The real native header's existing tostring slot precedes admission.
 					ctx._version = setmetatable({}, {__tostring = function() withdraw(); return "9.9.9" end})
 				else
-					local native_read = ctx.keylogger.is_enabled
-					ctx.keylogger.is_enabled = function()
+					local native_read = ctx.keystats.is_enabled
+					ctx.keystats.is_enabled = function()
 						reads = reads + 1; local value = native_read()
 						if calls == 0 then withdraw() end
 						return value

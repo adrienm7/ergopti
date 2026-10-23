@@ -279,11 +279,11 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
 	loaded[module_name] = nil
-	-- The keylogger and its process-lifetime physical-source settlement port
+	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child
 	-- bound to the preceding CoreState; the scoped proxy restores both caches.
-	if module_name == "modules.keylogger" or module_name == "modules.keylogger.init" then
-		loaded["modules.keylogger.physical_accounting_mode"] = nil
+	if module_name == "modules.keystats" or module_name == "modules.keystats.init" then
+		loaded["modules.keystats.physical_accounting_mode"] = nil
 	end
 	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
 	-- consumes the replay module's exact commitment, and replay correctly refuses
@@ -378,9 +378,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- { sec = function() ... end }, no M.ms). lib.timings has no hs dependency
 	-- and is cheap to re-parse from constants.toml, so always reloading the real
 	-- module is safe. Without this, any later test whose require chain reaches
-	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
+	-- modules.keystats (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
-	-- (field 'ms')" the moment modules.keylogger is not already cached.
+	-- (field 'ms')" the moment modules.keystats is not already cached.
 	loaded["infra.timings"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of

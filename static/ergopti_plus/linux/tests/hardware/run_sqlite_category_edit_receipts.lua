@@ -2,7 +2,7 @@
 --- ==============================================================================
 --- MODULE: Native SQLite Category and Score Transactions (Linux)
 --- DESCRIPTION:
---- Drives the real dashboard bridge, keylogger and SQLite writer against owned
+--- Drives the real dashboard bridge, keystats and SQLite writer against owned
 --- native databases. Actual AFTER triggers raise ABORT/FAIL at each statement;
 --- unchanged rows, truthful saved replies and healthy retries are independent
 --- oracles. This covers statement-error rollback, not rollback after a successful
@@ -30,9 +30,9 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
-local Command = require("modules.keylogger.sqlite_command")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
+local Command = require("modules.keystats.sqlite_command")
 local Bridge = require("ui.metrics_apps.bridge")
 local case_index = 0
 
@@ -53,10 +53,10 @@ end
 local function setup(app)
 	case_index = case_index + 1
 	Writer.close_db()
-	package.loaded["modules.keylogger.keylogger"] = nil
-	local keylogger = require("modules.keylogger.keylogger")
-	keylogger.init({ sqlite_path = root .. "/case-" .. case_index .. ".sqlite", log_dir = root .. "/logs" })
-	assert(keylogger.is_enabled() and Writer.is_available())
+	package.loaded["modules.keystats.keystats"] = nil
+	local keystats = require("modules.keystats.keystats")
+	keystats.init({ sqlite_path = root .. "/case-" .. case_index .. ".sqlite", log_dir = root .. "/logs" })
+	assert(keystats.is_enabled() and Writer.is_available())
 	local device = assert(Writer.query_rows("SELECT device_id FROM devices;"))[1]
 	assert(device and device ~= "foreign-device")
 	Writer.upsert_app_day(device, "2000-01-01", app, { chars = 3 })
@@ -64,9 +64,9 @@ local function setup(app)
 	Writer.upsert_app_day("foreign-device", "2000-01-01", app, { chars = 7 })
 	assert(Writer.exec_sql("UPDATE agg_app_day SET category='Original';"))
 	assert(Writer.set_meta("app_score." .. app, "1"))
-	local payload = keylogger.get_dashboard_payload({ include_prefetch = false })
+	local payload = keystats.get_dashboard_payload({ include_prefetch = false })
 	assert(payload.metrics_manifest["2000-01-01"][app].category == "Original")
-	return keylogger, device
+	return keystats, device
 end
 
 local function snapshot()
@@ -87,7 +87,7 @@ end
 
 for _, owner in ipairs({ "score", "category" }) do
 	for _, action in ipairs({ "ABORT", "FAIL" }) do
-		local keylogger, device = setup("owned-app")
+		local keystats, device = setup("owned-app")
 		local before = snapshot()
 		local trigger = owner == "score"
 			and ("CREATE TRIGGER owned_refusal AFTER INSERT ON meta WHEN NEW.key='app_score.owned-app' BEGIN SELECT RAISE(" .. action .. ",'owned score refusal'); END;")
@@ -95,14 +95,14 @@ for _, owner in ipairs({ "score", "category" }) do
 				.. " BEGIN SELECT RAISE(" .. action .. ",'owned category refusal'); END;")
 		assert(Writer.exec_sql(trigger))
 		check("public " .. owner .. " AFTER " .. action .. " refuses without changing category, score or cached payload", function()
-			local reply = Bridge.on_message({ action = "edit", app = "owned-app", cat = "Updated", score = 2 }, { keylogger = keylogger })
+			local reply = Bridge.on_message({ action = "edit", app = "owned-app", cat = "Updated", score = 2 }, { keystats = keystats })
 			assert(reply.saved == false, "dashboard acknowledged an actual SQLite error as saved")
 			assert(snapshot() == before, "a refused logical edit left partially changed native rows")
 			assert(reply.metrics_manifest["2000-01-01"]["owned-app"].category == "Original", "refusal published a partial category")
 		end)
 		assert(Writer.exec_sql("DROP TRIGGER owned_refusal;"))
 		check("public " .. owner .. " AFTER " .. action .. " allows a same-owner healthy retry", function()
-			local reply = Bridge.on_message({ action = "edit", app = "owned-app", cat = "Updated", score = 1 }, { keylogger = keylogger })
+			local reply = Bridge.on_message({ action = "edit", app = "owned-app", cat = "Updated", score = 1 }, { keystats = keystats })
 			assert(reply.saved == true)
 			assert_updated(device, "owned-app", "Updated", "1")
 			assert(reply.metrics_manifest["2000-01-01"]["owned-app"].category == "Updated", "acknowledged retry retained its stale category cache")
@@ -117,9 +117,9 @@ for _, case in ipairs({
 	{ "UTF-8 and quote", 1, "1", "Updated ' été 😀" },
 	{ "literal CRLF", 1, "1", "Updated\r\nrow" },
 }) do
-	local keylogger, device = setup("owned ' été app")
+	local keystats, device = setup("owned ' été app")
 	check(case[1] .. " preserves public healthy edit values and device filtering", function()
-		local reply = Bridge.on_message({ action = "edit", app = "owned ' été app", cat = case[4], score = case[2] }, { keylogger = keylogger })
+		local reply = Bridge.on_message({ action = "edit", app = "owned ' été app", cat = case[4], score = case[2] }, { keystats = keystats })
 		assert(reply.saved == true)
 		assert_updated(device, "owned ' été app", case[4], case[3])
 		assert(reply.metrics_manifest["2000-01-01"]["owned ' été app"].category == case[4])
@@ -137,7 +137,7 @@ check("native Writer keeps a complete NUL category and score without claiming da
 		"category projection shortened the native NUL text")
 end)
 
-local keylogger, device = setup("owned-app")
+local keystats, device = setup("owned-app")
 check("existing absent-application edit behavior still stores its default score without inventing rows", function()
 	local before = assert(Writer.query_rows("SELECT count(*) FROM agg_app_day;"))[1]
 	assert(Writer.set_app_category(device, "absent-app", "Updated", nil) == true)
@@ -159,7 +159,7 @@ end)
 check("saved override projection uses local categories rather than foreign synced assignments", function()
 	assert(Writer.exec_sql("UPDATE agg_app_day SET category='zzForeign' WHERE device_id='foreign-device';"))
 	assert(Writer.set_app_category(device, "owned-app", "Productivity", -2))
-	local categories = assert(keylogger.get_dashboard_payload({ include_prefetch = false })).user_categories
+	local categories = assert(keystats.get_dashboard_payload({ include_prefetch = false })).user_categories
 	assert(categories["owned-app"].type == "Productivity" and categories["owned-app"].score == -2)
 	assert(categories["absent-app"].type == "Unknown" and categories["absent-app"].score == 0,
 		"an existing score with no local statistics needs the reader's ordinary missing-category contract")
@@ -167,9 +167,9 @@ end)
 
 check("score-only native edit reaches a dashboard with otherwise identical manifest data", function()
 	-- The preceding direct Writer controls bypassed the collector's cache owner.
-	assert(keylogger.clear_cache())
-	local before = assert(Bridge.on_message("ready", { keylogger = keylogger }))
-	local reply = assert(Bridge.on_message({ action = "edit", app = "owned-app", cat = "Productivity", score = 2 }, { keylogger = keylogger }))
+	assert(keystats.clear_cache())
+	local before = assert(Bridge.on_message("ready", { keystats = keystats }))
+	local reply = assert(Bridge.on_message({ action = "edit", app = "owned-app", cat = "Productivity", score = 2 }, { keystats = keystats }))
 	assert(reply.saved and reply.user_categories["owned-app"].score == 2)
 	assert(require("test.format").deep_equal(reply.metrics_manifest, before.metrics_manifest),
 		"the score-only fixture must not accidentally exercise manifest replacement")
@@ -179,30 +179,30 @@ check("refused native category read does not manufacture an empty successful das
 	local path = Writer.get_db_path()
 	assert(os.rename(path, path .. ".held"))
 	local categories = Reader.read_user_categories(path, device)
-	local reply, reason = keylogger.get_dashboard_payload({ include_prefetch = false })
+	local reply, reason = keystats.get_dashboard_payload({ include_prefetch = false })
 	local absent = uv.fs_stat(path) == nil
 	assert(os.rename(path .. ".held", path))
 	assert(categories == nil and reply == nil and reason == "SQLite projection unavailable" and absent)
-	assert(keylogger.get_dashboard_payload({ include_prefetch = false }).user_categories["owned-app"].score == 2)
+	assert(keystats.get_dashboard_payload({ include_prefetch = false }).user_categories["owned-app"].score == 2)
 end)
 
 check("malformed score metadata refuses the projection until the exact value is repaired", function()
 	for _, malformed in ipairs({ "not-a-score", "2\0tail", "1e999" }) do
 		assert(Writer.set_meta("app_score.owned-app", malformed))
-		assert(keylogger.get_dashboard_payload({ include_prefetch = false }) == nil)
+		assert(keystats.get_dashboard_payload({ include_prefetch = false }) == nil)
 	end
 	assert(Writer.set_meta("app_score.owned-app", "2"))
-	assert(keylogger.get_dashboard_payload({ include_prefetch = false }).user_categories["owned-app"].score == 2)
+	assert(keystats.get_dashboard_payload({ include_prefetch = false }).user_categories["owned-app"].score == 2)
 end)
 
 check("a new collector and page owner recover the durable category and score", function()
 	local path = Writer.get_db_path()
 	Writer.close_db()
-	package.loaded["modules.keylogger.keylogger"] = nil
-	keylogger = require("modules.keylogger.keylogger")
-	assert(keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" }) ~= false)
+	package.loaded["modules.keystats.keystats"] = nil
+	keystats = require("modules.keystats.keystats")
+	assert(keystats.init({ sqlite_path = path, log_dir = root .. "/logs" }) ~= false)
 	Bridge._reset()
-	local ready = assert(Bridge.on_message("ready", { keylogger = keylogger }))
+	local ready = assert(Bridge.on_message("ready", { keystats = keystats }))
 	assert(ready.user_categories["owned-app"].score == 2 and ready.user_categories["owned-app"].type == "Productivity")
 end)
 

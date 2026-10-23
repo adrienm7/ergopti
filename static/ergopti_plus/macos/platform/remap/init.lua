@@ -52,10 +52,10 @@ local NavigationInventory = { config = Config.load_user_config, save = Config.sa
 	load = NavLayer.load, observe = NavLayer.capture_configured_inputs }
 
 -- The managed-output classifier is a lease prerequisite even when the
--- keylogger feature is disabled. A load failure must keep generated rules
--- PAUSED; activating without it would let a later keylogger start classify
+-- keystats feature is disabled. A load failure must keep generated rules
+-- PAUSED; activating without it would let a later keystats start classify
 -- Karabiner output as physical input.
-local ok_kcb, KcBridge = pcall(require, "modules.keylogger.kc_bridge")
+local ok_kcb, KcBridge = pcall(require, "modules.keystats.kc_bridge")
 if not ok_kcb then KcBridge = nil end
 
 local LOG = "karabiner"
@@ -853,7 +853,7 @@ local function start_lease_bound_inputs(required_phase, retain_if_paused, recove
 	return true, "inputs-ready"
 end
 
---- Refreshes the keylogger classifier without letting a failure disappear from
+--- Refreshes the keystats classifier without letting a failure disappear from
 --- the asynchronous lease callback that owns activation.
 --- @return boolean refreshed
 --- @return any reason

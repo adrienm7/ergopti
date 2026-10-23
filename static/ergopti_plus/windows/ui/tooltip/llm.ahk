@@ -73,7 +73,7 @@ _LLM_TooltipCloneAcceptSource(Source) {
 }
 
 ; Queue only immutable payloads while the pixel transaction is Critical. The
-; actual keylogger/file work is drained later on a fresh timer thread.
+; actual keystats/file work is drained later on a fresh timer thread.
 _LLM_TooltipQueueMetricUnsafe(Kind, Lifecycle) {
 	global _LLM_TooltipMetricQueue
 	if !IsObject(Lifecycle)
