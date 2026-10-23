@@ -612,7 +612,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 			package = { loaded = { ["modules.llm.local_servers"] = {
 				shutdown = native_stop("discovery"),
 			}, ["modules.keymap.layout_registry"] = { shutdown = native_stop("layouts") } } }, require = function() return { cleanup = function() end, flush = function() end } end,
-			TimerScheduler = { cancelAll = function() end }, Logger = { warn = function() end },
+			TimerScheduler = { cancelAll = function() return true end }, Logger = { warn = function() end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		}, { __index = _G })
@@ -1348,7 +1348,7 @@ helpers.describe("actual Main layout helper retirement", function()
 					"cold shutdown must not import " .. tostring(name))
 				return { cleanup = function() end, flush = function() end }
 			end,
-			TimerScheduler = { cancelAll = function() state.timers = state.timers + 1 end },
+			TimerScheduler = { cancelAll = function() state.timers = state.timers + 1; return true end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		}, { __index = _G })
@@ -1440,7 +1440,7 @@ helpers.describe("actual Main HTTP transport retirement", function()
 					"cold shutdown must not import " .. tostring(name))
 				return { cleanup = function() end, flush = function() end }
 			end,
-			TimerScheduler = { cancelAll = function() state.timers = state.timers + 1 end },
+			TimerScheduler = { cancelAll = function() state.timers = state.timers + 1; return true end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		}, { __index = _G })
@@ -1512,7 +1512,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 
 	--- Loads all of Main and pauses at its real registry constructor, before startup.
 	--- Only imports and native boundary ports are controlled; no source is sliced.
-	local function actual_main(manager, runtime_pending)
+	local function actual_main(manager, runtime_pending, scheduler)
 		local state = { loops = 0, hooks = 0, timers = 0, cancellations = 0,
 			runtime_ack = not runtime_pending, events = {}, running = true }
 		local function record(event) state.events[#state.events + 1] = event end
@@ -1532,7 +1532,7 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		modules["infra.logger_sink"] = { install = function() return true end }
 		modules["modules.keystats.keystats"] = { stop = function() return true end }
 		modules["modules.llm.agent_learning"] = { flush = noop }
-		modules["adapters.timer_scheduler"] = { cancelAll = function() state.timers = state.timers + 1 end }
+		modules["adapters.timer_scheduler"] = scheduler or { cancelAll = function() state.timers = state.timers + 1; return true end }
 		modules["adapters.keyboard_hook"] = {
 			isRunning = function() return state.running end,
 			stop = function() state.running = false; state.hooks = state.hooks + 1; record("hook.stop") end,
@@ -1662,5 +1662,147 @@ helpers.describe("actual Main retains WebView shutdown acknowledgments", functio
 		helpers.assert_eq(coordinator.is_pending(), false)
 		helpers.assert_eq(state.loops, 1); helpers.assert_eq(state.hooks, 1)
 		helpers.assert_true(coordinator.poll()); helpers.assert_eq(state.loops, 1)
+	end)
+
+	--- Owns one actual libuv timer; only its stop/close refusal ports are controlled.
+	local function with_native_scheduler(refusal, body)
+		local uv = require("luv")
+		local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+		local state = { allocations = 0, stops = 0, closes = 0, physical_closes = 0,
+			business_calls = 0, admitted = refusal == "accepted" }
+		local function census(owned)
+			local total, exact = 0, 0
+			uv.walk(function(handle)
+				total = total + 1
+				if handle == owned then exact = exact + 1 end
+			end)
+			return total, exact
+		end
+		local foreign, foreign_calls, foreign_closes = nil, 0, 0
+		local backend = setmetatable({
+			new_timer = function()
+				state.allocations = state.allocations + 1
+				state.handle = assert(uv.new_timer())
+				return state.handle
+			end,
+			timer_stop = function(handle)
+				helpers.assert_true(handle == state.handle, "only the exact owned timer may be stopped")
+				state.stops = state.stops + 1
+				if not state.admitted and refusal == "stop-threw" then error("controlled stop refusal before native stop") end
+				return uv.timer_stop(handle)
+			end,
+			close = function(handle, callback)
+				helpers.assert_true(handle == state.handle, "only the exact owned timer may be closed")
+				state.closes = state.closes + 1
+				if not state.admitted and refusal == "close-threw" then error("controlled close refusal before native close") end
+				return uv.close(handle, function(...)
+					state.physical_closes = state.physical_closes + 1
+					if callback then callback(...) end
+				end)
+			end,
+		}, { __index = uv })
+		local scheduler = helpers.load_module_with_dependency("adapters.timer_scheduler", "luv", backend)
+		package.loaded["adapters.timer_scheduler"] = previous_scheduler
+		local token = scheduler.every(60, function() state.business_calls = state.business_calls + 1 end)
+		local cancel_all = scheduler.cancelAll
+		local ok, detail = pcall(function()
+			-- Previously accepted foreign closes may finish during the native pump.
+			-- A separate live timer proves preservation without counting that debt.
+			foreign = assert(uv.new_timer())
+			uv.update_time()
+			local started = uv.timer_start(foreign, 60000, 60000, function() foreign_calls = foreign_calls + 1 end)
+			helpers.assert_true(started ~= nil and started ~= false)
+			local _, witness = census(foreign)
+			helpers.assert_eq(witness, 1, "the independent live witness must exist by exact identity")
+			helpers.assert_true(uv.is_active(foreign) and not uv.is_closing(foreign))
+			helpers.assert_true(scheduler.HAS_ASYNC and token.armed and token.timer == state.handle)
+			local _, owned = census(state.handle)
+			helpers.assert_eq(owned, 1, "the exact real scheduler timer must have been acquired")
+			body(scheduler, token, state, uv, census)
+		end)
+		-- Accepted close and its later native callback are separate observations.
+		-- Cleanup also runs when the causal before-fix assertion fails.
+		scheduler.cancelAll, state.admitted = cancel_all, true
+		local cancelled = scheduler.cancelAll()
+		uv.run("nowait")
+		local _, owned = census(state.handle)
+		local _, witness = census(foreign)
+		local foreign_preserved = foreign ~= nil and witness == 1 and uv.is_active(foreign)
+			and not uv.is_closing(foreign) and foreign_calls == 0
+		-- Retire only the witness this fixture allocated, even after a body failure.
+		if foreign and not uv.is_closing(foreign) then
+			uv.timer_stop(foreign)
+			uv.close(foreign, function() foreign_closes = foreign_closes + 1 end)
+		end
+		uv.run("nowait")
+		local _, remaining_witness = census(foreign)
+		helpers.assert_true(cancelled, "the exact original scheduler must accept final cleanup")
+		helpers.assert_eq(state.physical_closes, 1, "the actual native close callback must run once")
+		helpers.assert_eq(owned, 0, "no owned native timer may survive the case")
+		helpers.assert_true(foreign_preserved, "scheduler cleanup must preserve the exact active nonclosing foreign timer without firing it")
+		helpers.assert_eq(foreign_closes, 1, "the fixture's separate witness close callback must run once")
+		helpers.assert_eq(remaining_witness, 0, "the fixture must retire only its own separate witness")
+		if not ok then error(detail, 0) end
+	end
+
+	for _, refusal in ipairs({ "stop-threw", "close-threw" }) do
+		helpers.it("(timer-main-shutdown-ack) retains " .. refusal .. " until exact scheduler retry", function()
+			with_native_scheduler(refusal, function(scheduler, token, state, uv, census)
+				local coordinator, main = actual_main(nil, false, scheduler)
+				local original_token, original_id = token, token.id
+				helpers.assert_true(coordinator.request("tray quit"))
+				helpers.assert_eq(scheduler.cancelAll(), false, "the real scheduler independently refuses before native closure")
+				helpers.assert_true(rawequal(token, original_token) and token.id == original_id and token.timer == state.handle)
+				helpers.assert_eq(scheduler.activeCount(), 1, "refusal retains the exact scheduler token")
+				helpers.assert_eq(uv.is_closing(state.handle), false)
+				helpers.assert_eq(state.physical_closes, 0)
+				helpers.assert_eq(main.loops, 0, "actual Main must not stop its loop while the real timer scheduler returns false")
+				helpers.assert_true(coordinator.is_pending())
+				scheduler.cancelAll = function() error("a public replacement cannot acknowledge the original scheduler") end
+				for _ = 1, 2 do
+					local previous_stops = state.stops
+					helpers.assert_eq(coordinator.poll(), false, "a repeated refusal remains the same native debt")
+					helpers.assert_true(state.stops > previous_stops, "the original scheduler must really retry its owned timer")
+					helpers.assert_true(token.timer == state.handle and token.id == original_id and token.armed)
+					helpers.assert_eq(uv.is_closing(state.handle), false)
+					local _, owned = census(state.handle)
+					helpers.assert_eq(owned, 1)
+					helpers.assert_eq(main.loops, 0)
+				end
+				state.admitted = true
+				helpers.assert_true(coordinator.poll(), "the same scheduler's true receipt admits loop stop")
+				helpers.assert_eq(main.loops, 1); helpers.assert_eq(main.hooks, 1)
+				helpers.assert_eq(coordinator.is_pending(), false)
+				helpers.assert_eq(token.timer, nil); helpers.assert_eq(scheduler.activeCount(), 0)
+				helpers.assert_true(uv.is_closing(state.handle), "successful cancellation has scheduled the actual close")
+				helpers.assert_eq(state.physical_closes, 0, "close acceptance is not the later physical close callback")
+				uv.run("nowait")
+				local _, owned = census(state.handle)
+				helpers.assert_eq(state.physical_closes, 1); helpers.assert_eq(owned, 0)
+				helpers.assert_eq(state.allocations, 1); helpers.assert_eq(state.business_calls, 0)
+				helpers.assert_true(coordinator.poll()); helpers.assert_eq(main.loops, 1)
+			end)
+		end)
+	end
+
+	helpers.it("(timer-main-shutdown-ack) accepts real cancellation before its separate physical close phase", function()
+		with_native_scheduler("accepted", function(scheduler, token, state, uv)
+			local coordinator, main = actual_main(nil, false, scheduler)
+			helpers.assert_true(coordinator.request("tray quit"))
+			helpers.assert_eq(coordinator.is_pending(), false); helpers.assert_eq(main.loops, 1)
+			helpers.assert_eq(token.timer, nil); helpers.assert_eq(scheduler.activeCount(), 0)
+			helpers.assert_true(uv.is_closing(state.handle)); helpers.assert_eq(state.physical_closes, 0)
+		end)
+	end)
+
+	helpers.it("(timer-main-shutdown-ack) an empty real scheduler adds no phantom debt", function()
+		local previous = package.loaded["adapters.timer_scheduler"]
+		local scheduler = helpers.load_module("adapters.timer_scheduler")
+		package.loaded["adapters.timer_scheduler"] = previous
+		local coordinator, main = actual_main(nil, false, scheduler)
+		helpers.assert_true(scheduler.HAS_ASYNC and scheduler.activeCount() == 0)
+		helpers.assert_true(coordinator.request("tray quit"))
+		helpers.assert_eq(coordinator.is_pending(), false); helpers.assert_eq(main.loops, 1)
+		helpers.assert_true(scheduler.cancelAll())
 	end)
 end)
