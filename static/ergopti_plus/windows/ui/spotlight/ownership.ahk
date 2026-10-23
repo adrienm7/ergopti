@@ -378,7 +378,9 @@ _SpotlightCreateOverlayWindow(Opts, DrawCallback, CreateFn := 0,
 	Transferred := false
 	try {
 		PaintFn := _SpotlightDrawWithGdiPlus.Bind(DrawCallback)
-		ResolvedDraw.Call(Hwnd, PaintFn)
+		; The Windows adapter acknowledges both upload and bitmap retirement.
+		if !ResolvedDraw.Call(Hwnd, PaintFn)
+			return 0
 		ResolvedShow.Call(Hwnd)
 		Transferred := true
 		return Hwnd
