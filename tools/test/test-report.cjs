@@ -42,6 +42,54 @@ check(
 	r.failures.length === 1 && r.failures[0] === 'beta gamma - boom expected'
 );
 
+// --- Slowest tests: AHK durations are matched to their test by index ---
+r = parseResults(
+	[
+		'ok 1 - quick',
+		'# duration_ms 1 0.500',
+		'ok 2 - slow one',
+		'# duration_ms 2 1500.250',
+		'not ok 3 - slow failure - boom',
+		'# duration_ms 3 20.000',
+		'# duration_ms 9 99999.000',
+		'# 2 passed, 1 failed'
+	].join('\n')
+);
+check(
+	'slowest tap: ranked slowest first, unknown index ignored',
+	JSON.stringify(r.slowest) ===
+		JSON.stringify([
+			{ name: 'slow one', elapsed_ms: 1500.25 },
+			{ name: 'slow failure - boom', elapsed_ms: 20 },
+			{ name: 'quick', elapsed_ms: 0.5 }
+		])
+);
+const manyTests = Array.from({ length: 14 }, (_, i) => [
+	`ok ${i + 1} - t${i + 1}`,
+	`# duration_ms ${i + 1} ${i + 1}.000`
+]).flat();
+r = parseResults([...manyTests, '# 14 passed, 0 failed'].join('\n'));
+check(
+	'slowest tap: bounded to ten',
+	r.slowest.length === 10 && r.slowest[0].name === 't14' && r.slowest[9].name === 't5'
+);
+r = parseResults(
+	[
+		'# lua_timing {"schema":1,"driver":"macos","id":1,"kind":"module","module":"m","name":"m","status":"pass","elapsed_ms":9000.0,"timing_error":""}',
+		'# lua_timing {"schema":1,"driver":"macos","id":2,"kind":"case","module":"m","name":"case a","status":"pass","elapsed_ms":12.5,"timing_error":""}',
+		'Passed tests:  1',
+		'Failed tests:  0'
+	].join('\n')
+);
+check(
+	'slowest lua: cases only, the module-load row is not a test',
+	JSON.stringify(r.slowest) === JSON.stringify([{ name: 'm: case a', elapsed_ms: 12.5 }])
+);
+check(
+	'slowest: none without timings',
+	parseResults('ok 1 - a\n# 1 passed, 0 failed').slowest.length === 0
+);
+
 // --- Lua, all green ---
 r = parseResults(
 	[
