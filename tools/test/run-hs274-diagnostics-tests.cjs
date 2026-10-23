@@ -41,8 +41,6 @@ const CXX = process.env.CXX || 'c++';
 const EXCLUDED = Object.freeze({
 	// Runs inside test-macos-remap-launchagent.cjs, in the shared lane already.
 	'hs274_helper_environment_test.py': 'run by tools/test/test-macos-remap-launchagent.cjs',
-	// A library the macOS Lua persistence tests import for run_fixture; they own the Lua fixture.
-	'hs274_persistence_test.py': 'imported by the macOS physical persistence Lua tests',
 	// Exercises sudo and process groups of the native harness on a hosted Mac only.
 	'hs274_shutdown_test.py': 'native macOS process-scope script for hs274-remap.py'
 });

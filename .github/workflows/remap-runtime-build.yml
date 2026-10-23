@@ -1,0 +1,79 @@
+# .github/workflows/remap-runtime-build.yml
+#
+# Owned remap runtime (ADR 011, TODO item 31): checks that need the pinned
+# Karabiner-Elements sources, which no other lane fetches.
+#
+# The HS-274 stream-protocol, inventory, source, clock, key-state,
+# baseline-v2 and accept tests include the nlohmann/asio/pqrs vendor headers of
+# the revision the runtime is built from, and the accept test needs the Darwin
+# socket contract, so they compile on a hosted Mac against the exact upstream
+# checkout. The portable tests run in the shared lane (run-hs274-diagnostics-
+# tests.cjs). The signed runtime artifact job (WP5) joins this workflow later.
+
+name: Remap runtime build
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - '.github/workflows/remap-runtime-build.yml'
+      - 'tools/diagnostics/hs274*'
+      - 'tools/diagnostics/fixtures/hs274*'
+      - 'tools/build/remap_runtime*'
+
+concurrency:
+  group: remap-runtime-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vendor-header-tests:
+    name: 'HS-274 tests against the pinned Karabiner-Elements headers'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Acquire the pinned upstream sources
+        uses: actions/checkout@v4
+        with:
+          repository: pqrs-org/Karabiner-Elements
+          ref: 9312593e1a3bf72b94c63c524ebabe2637442e8a
+          submodules: recursive
+          persist-credentials: false
+          path: upstream
+
+      - name: Acquire the Ergopti tests
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: ergopti
+
+      - name: Compile and run each vendor-header test
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          diagnostics=tools/diagnostics
+          vendor="$GITHUB_WORKSPACE/upstream/vendor/vendor/include"
+          build="$RUNNER_TEMP/hs274-tests"
+          mkdir -p "$build"
+          compile() {
+            c++ -std=c++17 -Wall -Wextra -Werror -pthread -I "$vendor" "$diagnostics/$1.cpp" -o "$build/$1"
+          }
+          compile hs274-stream-inventory-test
+          "$build/hs274-stream-inventory-test" "$diagnostics/fixtures/hs274-native-inventories.json"
+          compile hs274-key-state-test
+          "$build/hs274-key-state-test" "$diagnostics/fixtures/hs274-native-cookie-capture.json" "$diagnostics/fixtures/hs274-native-cookie-held.json"
+          compile hs274-stream-clock-test
+          "$build/hs274-stream-clock-test"
+          compile hs274-stream-protocol-test
+          "$build/hs274-stream-protocol-test" "$diagnostics/fixtures/hs274-native-capture.json"
+          compile hs274-stream-source-test
+          "$build/hs274-stream-source-test"
+          compile hs274-baseline-v2-test
+          "$build/hs274-baseline-v2-test"
+          c++ -std=c++17 -Wall -Wextra -Werror -pthread -DASIO_STANDALONE -I "$vendor" "$diagnostics/hs274-accept-test.cpp" -o "$build/hs274-accept-test"
+          "$build/hs274-accept-test"

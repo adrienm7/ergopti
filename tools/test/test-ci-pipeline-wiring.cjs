@@ -3934,6 +3934,48 @@ errors.push(
 	...topJobProblems(pipeline.files()),
 	...permissionProblems([...pipeline.files(), benchmarkWorkflow])
 );
+
+// The remap runtime workflow is dispatch or path-filtered, never called by ci.yml, so
+// nothing else proves it exists, reads contents only, builds the revision the runtime
+// patch set is anchored to, and covers every C++ test the shared lane cannot compile.
+{
+	const root = path.resolve(__dirname, '../..');
+	const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+	const rel = '.github/workflows/remap-runtime-build.yml';
+	const text = read(rel);
+	errors.push(...permissionProblems([{ rel, text }]));
+	const pinned = /UPSTREAM = "([0-9a-f]{40})"/.exec(
+		read('tools/build/remap_runtime_patch.py')
+	)?.[1];
+	if (!pinned || !text.includes(`ref: ${pinned}\n`))
+		errors.push(
+			`${rel} must check out the Karabiner-Elements revision ${pinned} of remap_runtime_patch.py`
+		);
+	if (!/\n {2}vendor-header-tests:\n/.test(text) || /continue-on-error|\|\| true/.test(text))
+		errors.push(`${rel} must keep one vendor-header-tests job that no step forgives`);
+	const names = fs.readdirSync(path.join(root, 'tools/diagnostics'));
+	const runner = read('tools/test/run-hs274-diagnostics-tests.cjs');
+	const pythonTests = names
+		.filter((name) => /^hs274_.+_test\.py$/.test(name))
+		.map((name) => read(`tools/diagnostics/${name}`));
+	const uncovered = (workflowText) =>
+		names
+			.filter((entry) => /^hs274-.+-test\.cpp$/.test(entry))
+			.filter(
+				(name) =>
+					!workflowText.includes(name.replace(/\.cpp$/, '')) &&
+					!runner.includes(`'${name}'`) &&
+					!pythonTests.some((source) => source.includes(name))
+			);
+	for (const name of uncovered(text))
+		errors.push(
+			`tools/diagnostics/${name} is compiled by no lane (${rel}, the runner, a Python suite)`
+		);
+	// The rule must fail when a vendor-header test leaves the workflow.
+	const dropped = text.replace(/ {10}compile hs274-baseline-v2-test\n.*\n/, '');
+	if (!uncovered(dropped).includes('hs274-baseline-v2-test.cpp'))
+		errors.push(`${rel}: the coverage rule did not report a dropped baseline-v2 test`);
+}
 for (const [what, from, to] of [
 	['if: false on the Windows caller', '  windows:\n', '  windows:\n    if: false\n'],
 	[
