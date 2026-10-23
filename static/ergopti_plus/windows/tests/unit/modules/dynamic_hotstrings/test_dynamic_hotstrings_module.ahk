@@ -194,7 +194,7 @@ Test("dynamic hotstrings: the registration call keeps its position in the boot o
 
 ; Synthetic personal values and a cached configuration receipt keep registration
 ; on its real in-memory path. Matching never invokes a keyboard/output owner.
-_DynHSTest_WithWordRegistry(Body) {
+_DynHSTest_WithWordRegistry(Body, DisabledNames := []) {
 	global Features, ScriptInformation, PersonalInformation, _HotstringRegistrar
 	global _HSResolveCache, _HSResolveGen
 	Saved := [IsSet(Features) ? Features : unset,
@@ -232,8 +232,11 @@ _DynHSTest_WithWordRegistry(Body) {
 		IsSet(_PrefixWatcherSuppressed) ? _PrefixWatcherSuppressed : unset]
 	try {
 		Features := Map("hotstrings", Map("dynamic", Map()))
+		DisabledSet := Map()
+		for Name in DisabledNames
+			DisabledSet[Name] := true
 		for Name in ["date_fr", "date_long_fr", "date", "phone_prefixes", "ssn_prefixes", "iban_prefixes"]
-			Features["hotstrings"]["dynamic"][Name] := Map("enabled", true)
+			Features["hotstrings"]["dynamic"][Name] := Map("enabled", !DisabledSet.Has(Name))
 		ScriptInformation := Map("MagicKey", Chr(0x2605))
 		PersonalInformation := Map("phone_number", "0612345678", "phone_number_clean", "06 12 34 56 78",
 			"social_security_number", "1 99 99 99 999 999 99", "iban", "FR76 1234 5678 9012 3456 789")
@@ -354,3 +357,95 @@ _DynHSTest_PersonalUnknownBoundaryBody() {
 }
 Test("dynamic hotstrings: unknown left context refuses ordinary personal prefixes (dynamic-word-boundary)",
 	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_PersonalUnknownBoundaryBody))
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 5/ Replacements and gates =======
+; =========================================
+; =========================================
+
+; The word-boundary tests above prove WHEN a candidate is admitted. These prove
+; WHAT it expands to and that each feature switch owns its own registrations:
+; a prefix that expanded to the wrong spelling, or a switch that gated the
+; wrong family, would leave every admission test green.
+
+_DynHSTest_ExpandsTo(Trigger) {
+	Match := _DynHSTest_WordFeed(Trigger)
+	AssertTrue(IsObject(Match), "the trigger '" . Trigger . "' must be admitted")
+	return Match.Replacement.Call()
+}
+
+_DynHSTest_PhoneReplacementsBody() {
+	Phone := "0612345678"
+	International := "+33612345678"
+	AssertEqual(Phone, _DynHSTest_ExpandsTo("06" . Chr(0x2605)), "the 2-digit trigger types the national number")
+	AssertEqual(International, _DynHSTest_ExpandsTo("+3306"), "+33 and the first 2 digits type the international number")
+	AssertEqual(Phone, _DynHSTest_ExpandsTo("0612"), "the 4-digit trigger types the national number")
+	AssertEqual(International, _DynHSTest_ExpandsTo("+33612"), "+33 and digits 2 to 4 type the international number")
+	AssertEqual(Phone, _DynHSTest_ExpandsTo("6123"), "digits 2 to 5 type the national number")
+	AssertEqual("06 12 34 56 78", _DynHSTest_ExpandsTo("06 12"), "the spaced trigger types the spaced number")
+}
+Test("dynamic hotstrings: every phone trigger expands to its national, international or spaced number",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_PhoneReplacementsBody))
+
+_DynHSTest_SsnAndIbanReplacementsBody() {
+	AssertEqual("199999999999999", _DynHSTest_ExpandsTo("19999"), "the raw SSN trigger types the SSN without spaces")
+	AssertEqual("1 99 99 99 999 999 99", _DynHSTest_ExpandsTo("1 99 99"), "the spaced SSN trigger types the SSN with spaces")
+	AssertEqual("FR76123456789012345" . "6789", _DynHSTest_ExpandsTo("FR7612"), "the raw IBAN trigger types the IBAN without spaces")
+	AssertEqual("FR76 1234 5678 9012 3456 789", _DynHSTest_ExpandsTo("FR76 12"), "the spaced IBAN trigger types the IBAN with spaces")
+}
+Test("dynamic hotstrings: SSN and IBAN triggers expand to the spaced or unspaced identifier they spell",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_SsnAndIbanReplacementsBody))
+
+_DynHSTest_DateReplacementsBody() {
+	Star := Chr(0x2605)
+	AssertEqual(FormatTime(, "dd/MM/yyyy"), _DynHSTest_ExpandsTo("@dt" . Star), "@dt expands to the short French date")
+	AssertEqual(FormatTime(, "yyyy_MM_dd"), _DynHSTest_ExpandsTo("@td" . Star), "@td expands to the ISO date")
+	AssertEqual(4, StrSplit(_DynHSTest_ExpandsTo("@date" . Star), " ").Length, "@date expands to the long French date")
+}
+Test("dynamic hotstrings: the three date triggers resolve through their own formatter",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_DateReplacementsBody))
+
+_DynHSTest_DatePrivacyBody() {
+	Star := Chr(0x2605)
+	for Trigger in ["@dt" . Star, "@td" . Star, "@date" . Star]
+		AssertFalse(_DynHSTest_WordFeed(Trigger).IsPrivate, "a date is not a secret and keeps its trigger loggable")
+	for Trigger in _DynHSTest_PrivatePrefixes()
+		AssertTrue(_DynHSTest_WordFeed(Trigger).IsPrivate, "a personal prefix is the secret itself and must be marked private")
+}
+Test("dynamic hotstrings: only the personal prefixes carry the privacy marker",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_DatePrivacyBody))
+
+_DynHSTest_GateRefusesBody(Triggers) {
+	for Trigger in Triggers
+		AssertFalse(IsObject(_DynHSTest_WordFeed(Trigger)), "a switched-off family must register nothing for '" . Trigger . "'")
+}
+
+_DynHSTest_GatesOwnTheirFamilies() {
+	Star := Chr(0x2605)
+	Families := [
+		Map("name", "date_fr", "off", ["@dt" . Star], "on", ["@td" . Star, "@date" . Star, "0612"]),
+		Map("name", "date_long_fr", "off", ["@date" . Star], "on", ["@dt" . Star, "@td" . Star]),
+		Map("name", "date", "off", ["@td" . Star], "on", ["@dt" . Star, "@date" . Star]),
+		Map("name", "phone_prefixes", "off", ["06" . Star, "+3306", "0612", "6123", "06 12"], "on", ["19999", "FR7612"]),
+		Map("name", "ssn_prefixes", "off", ["19999", "1 99 99"], "on", ["0612", "FR7612"]),
+		Map("name", "iban_prefixes", "off", ["FR7612", "FR76 12"], "on", ["0612", "19999"])
+	]
+	for Family in Families {
+		Off := Family["off"]
+		On := Family["on"]
+		_DynHSTest_WithWordRegistry(() => _DynHSTest_GateRefusesBody(Off), [Family["name"]])
+		_DynHSTest_WithWordRegistry(() => _DynHSTest_GateAdmitsBody(On), [Family["name"]])
+	}
+}
+Test("dynamic hotstrings: each feature switch removes exactly its own family",
+	_DynHSTest_GatesOwnTheirFamilies)
+
+_DynHSTest_GateAdmitsBody(Triggers) {
+	for Trigger in Triggers
+		AssertTrue(IsObject(_DynHSTest_WordFeed(Trigger)), "a sibling family must stay registered for '" . Trigger . "'")
+}
