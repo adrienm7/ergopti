@@ -226,7 +226,7 @@ _WMPW_EveryReopenPresentsThroughTheHelper() {
 		"_PathsEdWeb_TryOpen", "WMPresentWindow(_PathsEdWeb_Gui)",
 		"_PiEdWeb_TryOpen", "WMPresentWindow(_PiEdWeb_Gui)",
 		"LayoutManager_Open", "WMPresentWindow(_LayMgrWeb_Gui)",
-		"_PromptEdWeb_TryOpen", "WMPresentWindow(_PromptEdWeb_Gui)",
+		"_PromptEdWeb_TryOpen", "WMPresentWindow(Window)",
 		"_Onboarding_TryWeb", "WMPresentWindow(_ob_gui)",
 		"_HCWWeb_TryOpen", "WMPresentWindow(_HCWWeb_Gui)",
 		"_HsEdWeb_TryOpen", "WMPresentWindow(_HsEdWeb_Gui)",
