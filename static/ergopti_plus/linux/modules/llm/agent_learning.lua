@@ -24,6 +24,7 @@ local Json = require("json")
 local Agent = require("llm.agent")
 local NoReplaceMove = require("infra.no_replace_move")
 local RegularFileReader = require("infra.regular_file_reader")
+local RegularFileWriter = require("infra.regular_file_writer")
 
 local LOG = "modules.llm.agent_learning"
 
@@ -142,9 +143,9 @@ function M.flush()
 	end
 	local text = Json.encode({ version = VERSION, apps = _apps })
 	local temp = path .. ".tmp"
-	local fh = io.open(temp, "w")
-	if not fh or not text then
-		if fh then fh:close() end
+	local opened, fh, _, _, remove_owned = pcall(RegularFileWriter.open, temp, "wx")
+	if not opened or not fh or not text then
+		if opened and fh then pcall(fh.close, fh); remove_owned() end
 		Logger.error(LOG, "The agent's learning could not be written.")
 		return false
 	end
@@ -153,12 +154,14 @@ function M.flush()
 	local wrote, written = pcall(fh.write, fh, text)
 	local closed, flushed = pcall(fh.close, fh)
 	if not wrote or not written or not closed or flushed ~= true then
+		remove_owned()
 		Logger.error(LOG, "The agent's learning write or close was refused.")
 		return false
 	end
-	local renamed, err = os.rename(temp, path)
-	if not renamed then
-		Logger.error(LOG, "The agent's learning could not be saved: %s", tostring(err))
+	local called, renamed, err = pcall(os.rename, temp, path)
+	if not called or renamed ~= true then
+		remove_owned()
+		Logger.error(LOG, "The agent's learning could not be saved: %s", tostring(called and err or renamed))
 		return false
 	end
 	return true

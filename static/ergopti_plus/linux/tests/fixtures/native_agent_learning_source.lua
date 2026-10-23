@@ -25,20 +25,47 @@ local function read(candidate)
 	local file = assert(io.open(candidate, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 end
 local bytes = '{"version":1,"apps":{"Mail":{"used":7,"thresholds":{"calendar":0.2}}}}\r\n'
+local original = path
+local writing, foreign = mode == "flush", "foreign document\0\r\n"
+if writing then write(path, bytes); write(target, foreign); path = path .. ".tmp" end
 local regular = kind == "regular" or kind == "regular-symlink"
 if kind == "fifo" then run("mkfifo -- " .. Shell.quote(path))
 elseif kind == "fifo-symlink" then
 	run("mkfifo -- " .. Shell.quote(target)); run("ln -s -- " .. Shell.quote(target) .. " " .. Shell.quote(path))
 elseif kind == "directory" then run("mkdir -- " .. Shell.quote(path))
-elseif kind == "regular" then write(path, bytes)
+elseif kind == "regular" then write(path, writing and foreign or bytes)
 elseif kind == "regular-symlink" then
-	write(target, bytes); run("ln -s -- " .. Shell.quote(target) .. " " .. Shell.quote(path))
+	write(target, writing and foreign or bytes); run("ln -s -- " .. Shell.quote(target) .. " " .. Shell.quote(path))
+elseif writing and kind == "hardlink" then run("ln -- " .. Shell.quote(target) .. " " .. Shell.quote(path))
+elseif writing and kind == "missing" then -- The uncontended staging control starts absent.
 else error("unknown fixture kind") end
 
-Learning._reset_for_test({ path = path, scheduler = {
+Learning._reset_for_test({ path = original, scheduler = {
 	after = function() return { armed = true } end, cancel = function() return true end,
 } })
 local config = assert(Json.decode_lossless(read(root .. "/../_shared/modules/llm/agent.json")))
+if writing then
+	local learned = Learning.record(config, "Mail", "calendar", true)
+	local saved = Learning.flush()
+	if kind == "missing" then assert(saved == true, "an absent staging is acquired")
+	else
+		assert(saved == false, "a pre-existing staging is never borrowed")
+		assert(read(original) == bytes, "failed staging never replaces the committed source")
+		assert(read(target) == foreign, "a staging link never destroys another file")
+		if kind == "regular" or kind == "regular-symlink" or kind == "hardlink" then assert(read(path) == foreign) end
+		if kind == "regular-symlink" then run("test -L " .. Shell.quote(path))
+		elseif kind == "fifo" then run("test -p " .. Shell.quote(path))
+		elseif kind == "directory" then run("test -d " .. Shell.quote(path)) end
+		assert(os.remove(path), "only the fixture owner removes its pre-existing staging")
+		assert(Learning.flush(), "repair admits the retained learning without another record")
+	end
+	local stored = assert(Json.decode_lossless(read(original)))
+	assert(stored.apps.Mail.used == 8)
+	assert(stored.apps.Mail.thresholds.calendar == learned)
+	assert(read(target) == foreign)
+	write(folder .. "/complete", "complete")
+	return
+end
 local result = Learning[mode](config, "Mail", "calendar", true)
 if regular then
 	assert(result == 0.2, "regular sources keep the learned threshold")
