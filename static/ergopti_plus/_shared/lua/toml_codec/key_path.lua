@@ -19,7 +19,7 @@ function M.parse(text, canonical)
 	if type(text) ~= "string" then return nil end
 	local segments, index = {}, 1
 	local function space()
-		while text:sub(index, index):match("[ \t]") do index = index + 1 end
+		index = text:find("[^ \t]", index) or (#text + 1)
 	end
 	while true do
 		space()
@@ -28,9 +28,12 @@ function M.parse(text, canonical)
 		if char == '"' or char == "'" then
 			local start, quote = index + 1, char
 			index = start
-			while index <= #text and text:sub(index, index) ~= quote do
-				if quote == '"' and text:sub(index, index) == "\\" then index = index + 1 end
-				index = index + 1
+			local stops = quote == '"' and '[\\"]' or "'"
+			while index <= #text do
+				index = text:find(stops, index)
+				if index == nil then index = #text + 1; break end
+				if text:sub(index, index) == quote then break end
+				index = index + 2 -- a backslash escapes the next character
 			end
 			if index > #text then return nil end
 			value = text:sub(start, index - 1)
@@ -41,7 +44,7 @@ function M.parse(text, canonical)
 		else
 			local start = index
 			local pattern = canonical and "[A-Za-z0-9_:%-]" or "[A-Za-z0-9_%-]"
-			while text:sub(index, index):match(pattern) do index = index + 1 end
+			index = text:find(canonical and "[^A-Za-z0-9_:%-]" or "[^A-Za-z0-9_%-]", index) or (#text + 1)
 			if start == index then return nil end
 			value = text:sub(start, index - 1)
 		end
@@ -80,6 +83,11 @@ function M.header(text, literal_array)
 	local start = array and 3 or 2
 	local index, quote = start, nil
 	while index <= #text do
+		-- Characters no state reacts to are skipped in one jump.
+		if quote == '"' then index = text:find('[\\"]', index)
+		elseif quote == "'" then index = text:find("'", index, true)
+		else index = text:find("[%]\"']", index) end
+		if index == nil then break end
 		local char = text:sub(index, index)
 		if quote then
 			if quote == '"' and char == "\\" then index = index + 1

@@ -41,6 +41,22 @@ local function is_forbidden_raw_control(byte, allow_newlines)
 	return byte <= 0x1F or byte == 0x7F
 end
 
+-- Bytes that make the decoding pass below do any work: a backslash, a forbidden
+-- raw control, and (in a single-line body) the quote. A body with none of them
+-- decodes to itself. Built from byte values so no pattern escape is involved;
+-- the zero byte cannot sit in a Lua 5.1 pattern, so it is searched on its own.
+local function pattern_class(...)
+	local parts = { "[" }
+	for _, piece in ipairs({ ... }) do
+		parts[#parts + 1] = type(piece) == "number" and string.char(piece) or piece
+	end
+	parts[#parts + 1] = "]"
+	return table.concat(parts)
+end
+local NEEDS_PASS_SINGLE_LINE = pattern_class(1, "-", 8, 10, "-", 31, 127, 92, 34)
+local NEEDS_PASS_MULTILINE = pattern_class(1, "-", 8, 11, "-", 31, 127, 92)
+local NUL = string.char(0)
+
 --- Escapes one TOML basic-string body without adding surrounding quotes.
 --- @param value string Raw Lua string bytes.
 --- @return string|nil escaped Escaped TOML body, or nil for invalid input.
@@ -70,6 +86,10 @@ end
 --- @return string|nil decoded Decoded bytes, or nil for malformed TOML.
 function M.unescape_body(value, allow_newlines)
 	if type(value) ~= "string" then return nil end
+	if not value:find(allow_newlines == true and NEEDS_PASS_MULTILINE or NEEDS_PASS_SINGLE_LINE)
+		and not value:find(NUL, 1, true) then
+		return value
+	end
 	local out = {}
 	local index = 1
 	while index <= #value do
