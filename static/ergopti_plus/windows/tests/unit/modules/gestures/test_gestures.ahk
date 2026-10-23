@@ -714,3 +714,5 @@ TestGestures_SharedSystemRefreshDeclaration() {
 Test("Gestures: actual system refresh provider follows declaration order caption and platform", TestGestures_SharedSystemRefreshDeclaration)
 
 #Include test_gesture_keywatcher_owner.ahk
+
+#Include test_gesture_plain_clipboard_owner.ahk
