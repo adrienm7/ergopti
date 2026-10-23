@@ -606,3 +606,4 @@ Test("HealthCheck cleanup-history: cancel then refresh then export preserves unk
 Test("HealthCheck cleanup-history: immediate cancel export retains existing truthful metadata", _TestHC_CancelRefreshExportHistory.Bind(false))
 
 #Include test_healthcheck_session_owner.ahk
+#Include test_healthcheck_pac_response.ahk
