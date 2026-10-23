@@ -1,0 +1,37 @@
+{
+	"expected_count": 24,
+	"filters": [
+		{
+			"contains": "gesture-plain-clipboard-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "shortcut-plain-clipboard-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "plain-paste-snapshot-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "uri-decoded-nul",
+			"expected_count": 3
+		},
+		{
+			"contains": "local-server-record-lifetime",
+			"expected_count": 3
+		},
+		{
+			"contains": "roi-halflife-native64-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "local-server-record-retirement-after",
+			"expected_count": 2
+		},
+		{
+			"contains": "ollama-stream-nul-boundary",
+			"expected_count": 4
+		}
+	]
+}
