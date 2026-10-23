@@ -45,6 +45,7 @@ local Modal = require("ui.modal")
 local TextPrompt = require("ui.text_prompt")
 local PrivacyPolicy = require("llm.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
+local LlmConfigGuard = require("ui.menu.llm_config_guard")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
@@ -2760,10 +2761,15 @@ local function _build_llm(ctx)
 			["llm_profile_custom_rows"] = custom_rows,
 		})
 		if not rows then return end
+		-- The profile parent writes config.toml: it names the same cause as the
+		-- switch, and its retained rows recheck it at click time.
+		local blocked = LlmConfigGuard.reason()
+		LlmConfigGuard.protect(rows)
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
-			disabled = not enabled or nil,
+			disabled = not enabled or blocked ~= nil or nil,
+			disabled_reason_key = enabled and blocked or nil,
 		}, "llm_profile")
 	end
 
@@ -3000,7 +3006,7 @@ local function _build_llm(ctx)
 
 	-- Who answers: Ollama's models above, or the API entries (Cerebras, …).
 	providers["llm_models"] = function()
-		return LlmBackendRows.rows(llm, {
+		local rows = LlmBackendRows.rows(llm, {
 			prompt = prompt_text,
 			error = show_error,
 			info = show_info,
@@ -3008,6 +3014,14 @@ local function _build_llm(ctx)
 				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
 			end,
 		}, ctx.on_menu_changed, ollama_model_rows, { paused = ctx.paused, is_paused = ctx.is_paused })
+		-- These rows write config.toml: name the cause when it refuses writes and
+		-- recheck it when a retained row is clicked.
+		if type(rows) == "table" then
+			local blocked = LlmConfigGuard.reason()
+			LlmConfigGuard.protect(rows)
+			LlmConfigGuard.grey_list(rows, blocked, blocked and i18n_safe(blocked) or "")
+		end
+		return rows
 	end
 
 	--- The suggestion count row: a generation parameter, the first one on every
@@ -5428,6 +5442,7 @@ local function _build_debug(ctx)
 		["open_today_log"] = call_ctx("on_open_today_log"),
 		["open_error_log"] = call_ctx("on_open_error_log"),
 		["healthcheck"]    = call_ctx("on_healthcheck"),
+		["composer_check"] = call_ctx("on_composer_check"),
 		-- Self-contained: the report reads the daemon state the webview manager
 		-- already holds, so the daemon supplies no callback for them
 		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,
@@ -5503,6 +5518,7 @@ end
 ---   on_set_log_level function (optional) Log level change.
 ---   on_open_logs   function (optional) Open logs dir.
 ---   on_healthcheck function (optional) Launch healthcheck.
+---   on_composer_check function (optional) Run the composed layout check.
 ---   on_show_setup_wizard function (optional) Launch setup wizard.
 --- }
 --- @return table Array of { title, menu?, fn?, checked?, disabled? } items.
