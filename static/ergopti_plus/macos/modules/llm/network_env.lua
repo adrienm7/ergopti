@@ -59,9 +59,15 @@ end
 --- The shell lines, ending in "; ", that export the system network settings
 --- for the command that follows them.
 --- @param tag string Log prefix of the child, e.g. "MLX".
+--- @param opaque boolean Whether the client is admitted for an outgoing fetch.
+--- @param options table|nil { pac_probe_url = https origin the client downloads from }.
 --- @return string|nil prelude
 --- @return string|nil err Why it cannot be built.
-local function build_prelude(tag, opaque)
+local function build_prelude(tag, opaque, options)
+	local probe = options and options.pac_probe_url
+	if probe ~= nil and (type(probe) ~= "string" or not probe:match("^https://[%w%.%-]+/?$")) then
+		return nil, "the automatic-route origin is not a plain https origin"
+	end
 	local policy = M.policy_path()
 	if not policy then return nil, "the shared network policy " .. POLICY_RELATIVE .. " is missing" end
 	local activation = opaque and "apply_system_network opaque" or "apply_system_network"
@@ -79,25 +85,32 @@ local function build_prelude(tag, opaque)
 	local label = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
 	return "log_info() { printf " .. label .. " \"$1\" >&2; }; "
 		.. "log_error() { printf " .. label .. " \"$1\" >&2; }; "
+		.. (probe and ("OPAQUE_NETWORK_PAC_PROBE_URL=" .. text_utils.shell_quote(probe) .. "; ") or "")
 		.. ". " .. text_utils.shell_quote(policy) .. " && " .. activation .. "; "
 		.. status, nil
 end
 
 --- Exports static settings for local serving and native-aware commands.
+--- A client that reads only HTTPS_PROXY (the Ollama daemon) names the origin it
+--- downloads from in options.pac_probe_url: under an automatic (PAC, WPAD)
+--- configuration the launcher then resolves that origin and the first route
+--- becomes HTTPS_PROXY (see resolve_system_route_for_probe in network-retry.sh).
 --- @param tag string Child log prefix.
+--- @param options table|nil { pac_probe_url = string }.
 --- @return string|nil prelude
 --- @return string|nil err
-function M.prelude(tag)
-	return build_prelude(tag, false)
+function M.prelude(tag, options)
+	return build_prelude(tag, false, options)
 end
 
 --- Admits an actual outgoing fetch by an opaque client before child dispatch.
 --- Cached/local serving uses prelude() and does not require this capability.
 --- @param tag string Child log prefix.
+--- @param options table|nil { pac_probe_url = string }, as for prelude().
 --- @return string|nil prelude
 --- @return string|nil err
-function M.opaque_prelude(tag)
-	return build_prelude(tag, true)
+function M.opaque_prelude(tag, options)
+	return build_prelude(tag, true, options)
 end
 
 --- Emits the existing native receiver admission without observing a route.

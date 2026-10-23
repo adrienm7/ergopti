@@ -132,6 +132,43 @@ managed_bootstrap_launcher_available() {
 	[ "$identity" = "${ERGOPTI_LAUNCHER_DEVICE:-}:${ERGOPTI_LAUNCHER_INODE:-}" ]
 }
 
+# Seconds the launcher may spend naming the route of one origin (a PAC
+# download and its evaluation included).
+PAC_ROUTE_BUDGET_SEC=20
+
+# A client that reads only HTTPS_PROXY (the Ollama daemon) cannot evaluate a
+# PAC. When the caller names the origin it downloads from in
+# OPAQUE_NETWORK_PAC_PROBE_URL, the launcher resolves that origin through the
+# system (PAC, WPAD) and the first route it names becomes HTTPS_PROXY, or no
+# proxy at all when the PAC answers DIRECT. Neither the route nor the PAC is
+# ever logged: only the step that gave up, by its closed stage code.
+# Returns 0 when a route was settled, 1 otherwise (nothing is exported then).
+resolve_system_route_for_probe() {
+	local probe="${OPAQUE_NETWORK_PAC_PROBE_URL:-}" output status stage route
+	[ -n "$probe" ] || return 1
+	managed_bootstrap_launcher_available || return 1
+	output="$("$ERGOPTI_LAUNCHER_EXECUTABLE" --managed-proxy-route "$probe" "$PAC_ROUTE_BUDGET_SEC" 2>&1 </dev/null)"
+	status=$?
+	if [ "$status" -ne 0 ]; then
+		stage="$(printf '%s\n' "$output" | sed -n 's/^STAGE \(native_[a-z_]*\)$/\1/p' | head -n 1)"
+		log_info "The automatic network settings named no route (${stage:-unknown step})."
+		return 1
+	fi
+	route="$(printf '%s\n' "$output" | sed -n 's/^ROUTE \(.*\)$/\1/p' | head -n 1)"
+	case "$route" in
+		direct)
+			log_info "The automatic network settings send model downloads directly."
+			;;
+		http://*|socks5://*)
+			case "$route" in *[[:space:]]*) return 1 ;; esac
+			export HTTPS_PROXY="$route" https_proxy="$route"
+			log_info "Model downloads use the relay the automatic network settings name."
+			;;
+		*) return 1 ;;
+	esac
+	return 0
+}
+
 managed_bootstrap_download() {
 	local url="$1" output="$2" digest="$3" size="${4:-}" transfer="${5:-resumable}" replace_owner="${6:-}"
 	case "$transfer" in resilient|resumable) ;; *) return 64 ;; esac
@@ -392,6 +429,12 @@ apply_opaque_system_network() {
 			log_error "The system network configuration could not be read. No download was started."
 			return "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE"
 		fi
+		if { [ "$mode" = pac ] || [ "$mode" = wpad ]; } && resolve_system_route_for_probe; then
+			# The launcher evaluated the automatic configuration for the origin the
+			# caller downloads from; its route is exported, so the client is admitted.
+			apply_client_network_environment
+			return 0
+		fi
 		if [ "$mode" != none ]; then
 			OPAQUE_NETWORK_FAILURE_PROVENANCE=verified
 			OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS=unavailable
@@ -440,7 +483,9 @@ apply_system_network() {
 				HTTP_PROXY=*) export HTTP_PROXY="${line#HTTP_PROXY=}" http_proxy="${line#HTTP_PROXY=}" ;;
 				NO_PROXY=*) export NO_PROXY="${line#NO_PROXY=}" ;;
 				PAC_URL=*)
-					if managed_bootstrap_launcher_available; then
+					if [ -n "${OPAQUE_NETWORK_PAC_PROBE_URL:-}" ] && resolve_system_route_for_probe; then
+						:
+					elif managed_bootstrap_launcher_available; then
 						log_info "Automatic network settings will be evaluated by the native download helper."
 					else
 						log_info "Automatic network settings require the native download helper or an explicit relay."
