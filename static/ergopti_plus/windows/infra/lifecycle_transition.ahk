@@ -21,7 +21,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 	"resume", [
 		"user-programs", "navigation-event", "hotstring-prefix-watcher", "prefix-buffer",
 		"prefix-index", "llm-dependency-poll", "llm-pointer-watch",
-		"metrics-focus-refresh", "keystats-webview",
+		"metrics-focus-refresh", "keystats-webview", "webview-readiness",
 		"keystats-text-migration", "llm-menu", "updater",
 		"uia-selection-worker", "keyboard-layout"
 	],

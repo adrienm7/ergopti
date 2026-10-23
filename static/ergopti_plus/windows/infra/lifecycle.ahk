@@ -719,6 +719,11 @@ Ergopti_OnSuspendResume() {
 		if IsSet(KLWV_OnSuspendResume)
 				_LifecycleRunRequiredStep(Transition, "keystats-webview",
 					KLWV_OnSuspendResume)
+		; Only an actual pre-pause ready signal can retain host initialization.
+		; No page message or safety timeout is turned into a new ready event.
+		if IsSet(WebViewHost_OnSuspendResume)
+				_LifecycleRunRequiredStep(Transition, "webview-readiness",
+					WebViewHost_OnSuspendResume)
 		; Re-arm exactly one migration continuation (active slice, durable marker,
 		; or deferred posture sync) after all pause guards have been lifted.
 		if IsSet(KL_Mig_OnResume)
