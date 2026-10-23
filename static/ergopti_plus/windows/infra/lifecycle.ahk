@@ -606,7 +606,7 @@ Ergopti_OnSuspendEnter() {
 		_LifecycleRunRequiredStep(Transition, "keystats-text-migration",
 			KL_Mig_OnSuspend)
 	_LifecycleRunRequiredStep(Transition, "keep-awake",
-		() => StopActivitySimulation())
+		() => StopActivitySimulation(), true)
 		; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
 		; was in progress when the user pauses the driver outlives the suspend because
 		; SetTimer callbacks bypass native Suspend — the button stays logically held
