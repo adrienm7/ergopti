@@ -626,6 +626,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-open-target-vectors-shared.cjs"],
 			"repro": "npm run test:open-target-vectors-shared"
+		},
+		{
+			"id": "js-0457",
+			"ordinal": 457,
+			"name": "a fresh installation enables no layout emulation, system layout change or number-row inversion on any driver",
+			"cmd": "node",
+			"args": ["tools/test/test-neutral-installation.cjs"],
+			"repro": "npm run test:neutral-installation"
 		}
 	]
 }
