@@ -1493,7 +1493,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		Updates.Push({ Section: "metrics", Key: "secure_filter_enabled", Value: TOML_Bool(MetricsFilters.secure_field) })
 		Updates.Push({ Section: "metrics", Key: "system_auth_filter_enabled", Value: TOML_Bool(MetricsFilters.system_auth) })
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
-		Updates.Push({ Section: "metrics", Key: "metrics_disabled_apps", Value: apps })
+		Updates.Push({ Section: "metrics", Key: "disabled_apps", Value: apps })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: WPMWidget.pos_x })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: WPMWidget.pos_y })
@@ -1595,6 +1595,7 @@ _ConfigUpdateIsNeutral(Update) {
 ; Every full-state producer, including detached candidates, shares this gate.
 ConfigFullStateCanPersist() {
 	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides, ConfigurationFile
+	PerfCount("config_io.full_state_can_persist")
 	; The boot migration refused the file (a newer schema, a failed migration):
 	; the loaded tree does not describe it, so it must never be serialized over it.
 	if IsSet(ConfigurationFile) {
@@ -2645,6 +2646,7 @@ _ConfigSchemaEntrySelected(Path) {
 }
 
 _ConfigSchemaEntryAdmitted(Path) {
+	PerfCount("config_io.schema_entry_admitted")
 	return !_ConfigSchemaEntrySelected(Path) || ConfigSchemaCanPrepareWrite(Path)
 }
 

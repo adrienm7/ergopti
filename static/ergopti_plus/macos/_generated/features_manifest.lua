@@ -434,6 +434,9 @@ M.features = {
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt_toggle", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
+		path = "metrics.disabled_apps", id = "disabled_apps", section = "metrics", default = {  }, type = "array", description_key = "menu.metrics.metrics_disabled_apps", platforms = { "ahk", "hs" }, recommended = {  }, input_altering = false,
+	},
+	{
 		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = false, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
@@ -920,9 +923,6 @@ M.features = {
 		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "metrics.disabled_apps", id = "disabled_apps", section = "metrics", default = {  }, type = "array", description_key = "menu.metrics.metrics_disabled_apps", platforms = { "hs" }, recommended = {  }, input_altering = false,
-	},
-	{
 		path = "metrics.menubar_wpm", id = "menubar_wpm", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "hs" }, recommended = false, input_altering = false,
 	},
 	{
@@ -975,9 +975,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.metrics_disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "metrics.wpm_widget_visible", section = "metrics", reason_key = "", platforms = { "ahk", "linux" },

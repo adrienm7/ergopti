@@ -30,7 +30,7 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 			["secure_filter_enabled", '""'],
 			["system_auth_filter_enabled", "-1"],
 			["encrypt", '"true"'],
-			["metrics_disabled_apps", '"chrome.exe"']
+			["disabled_apps", '"chrome.exe"']
 		]
 		for Fixture in Cases {
 			_CSTT_WriteConfig(Path, Fixture[1] . " = " . Fixture[2])
@@ -112,7 +112,7 @@ _CSTT_ValidTomlPrivacySettings() {
 		_ConfigDir := TestDir
 		_AhkSubDir := ""
 		Path := CS_GetTomlPath()
-		Body := "enabled = false`nmetrics_disabled_apps = [`n"
+		Body := "enabled = false`ndisabled_apps = [`n"
 			. ' "CHROME.EXE", # excluded browser' . "`n"
 			. " 'editor#1.exe',`n] # excluded applications`n"
 		_CSTT_WriteConfig(Path, Body, "[metrics] # explicit recording opt-out")
@@ -120,7 +120,7 @@ _CSTT_ValidTomlPrivacySettings() {
 		Assert(Data.Has("metrics"), "a commented header must retain the metrics section")
 		Section := Data["metrics"]
 		AssertEqual(false, Section["enabled"], "the recording opt-out must remain a native false")
-		Apps := Section["metrics_disabled_apps"]
+		Apps := Section["disabled_apps"]
 		Assert(Apps is Array, "a multiline array must remain an array")
 		AssertEqual(2, Apps.Length, "comments must not add or discard applications")
 		AssertEqual("CHROME.EXE", Apps[1])
@@ -161,11 +161,11 @@ _CSTT_SemanticPrivacySettings(Shape, Enabled) {
 		Apps := '["CHROME.EXE", "editor#1.exe"]'
 		switch Shape {
 			case "dotted": Source := "metrics.enabled = " . Literal
-				. "`nmetrics.metrics_disabled_apps = " . Apps . "`n"
+				. "`nmetrics.disabled_apps = " . Apps . "`n"
 			case "inline": Source := "metrics = { enabled = " . Literal
-				. ", metrics_disabled_apps = " . Apps . " }`n"
+				. ", disabled_apps = " . Apps . " }`n"
 			case "quoted": Source := '["metrics"]`nenabled = ' . Literal
-				. "`nmetrics_disabled_apps = " . Apps . "`n"
+				. "`ndisabled_apps = " . Apps . "`n"
 			default: throw ValueError("Unknown metrics semantic fixture")
 		}
 		Path := CS_GetTomlPath()
@@ -173,7 +173,7 @@ _CSTT_SemanticPrivacySettings(Shape, Enabled) {
 		Data := CS_Read()
 		AssertTrue(Data.Has("metrics"), "the real metrics reader must retain the semantic namespace")
 		AssertEqual(Enabled, Data["metrics"]["enabled"])
-		AssertTrue(Data["metrics"]["metrics_disabled_apps"] is Array)
+		AssertTrue(Data["metrics"]["disabled_apps"] is Array)
 		MetricsShortcuts.enabled := !Enabled
 		CS_Load()
 		AssertEqual(Enabled, MetricsShortcuts.enabled, "authored consent must reach the live metrics owner")
