@@ -300,7 +300,7 @@ Test("LLM agent: agent-only context matches native Unicode Backspace (unicode-er
 	_LAG_UnicodePhysicalBackspace.Bind(false))
 
 
-/** Cache lifetime applies to actual enumerated tools across unsigned tick wrap. */
+/** Cache lifetime applies to actual enumerated tools across the native 64-bit clock domain. */
 _LAG_ToolsCacheLifetime(StartTick) {
 	_LAG_RunConnectors("", _Body)
 	_Body(Fx) {
@@ -316,11 +316,11 @@ _LAG_ToolsCacheLifetime(StartTick) {
 		AssertEqual(1, State.Reads, "initial force actually enumerates the folder")
 		AssertEqual("old", Initial["names"][1])
 		State.Files := ["C:\tools\new.cmd"]
-		Before := (StartTick + LLM_AGENT_TOOLS_TTL_MS - 1) & 0xFFFFFFFF
+		Before := StartTick + LLM_AGENT_TOOLS_TTL_MS - 1
 		Cached := LLM_AgentConnector_Tools(Config, false, Before)
 		AssertEqual(1, State.Reads, "strictly before expiry the cache is reused")
 		AssertEqual(ObjPtr(Initial), ObjPtr(Cached), "reuse retains the same cache owner")
-		Now := (StartTick + LLM_AGENT_TOOLS_TTL_MS) & 0xFFFFFFFF
+		Now := StartTick + LLM_AGENT_TOOLS_TTL_MS
 		Refreshed := LLM_AgentConnector_Tools(Config, false, Now)
 		AssertEqual(2, State.Reads, "at the exact TTL the folder must be enumerated again")
 		AssertEqual("new", Refreshed["names"][1], "removed tools disappear from the prompt list")
@@ -331,6 +331,9 @@ _LAG_ToolsCacheLifetime(StartTick) {
 		Forced := LLM_AgentConnector_Tools(Config, true, Now)
 		AssertEqual(3, State.Reads, "explicit force still bypasses a fresh cache")
 		AssertEqual("forced", Forced["names"][1])
+		Retained := LLM_AgentConnector_Tools(Config, false, Now - 1)
+		AssertEqual("forced", Retained["names"][1], "an older caller clock accepts the newer snapshot")
+		AssertEqual("C:\tools\forced.ahk", Retained["paths"]["forced"])
 	}
 }
 Test("LLM agent: tool cache expires at its exact ordinary TTL (tools-cache-wrap)",
