@@ -875,6 +875,7 @@ function M.generate(ctx, menu_mods, actions)
 				["field_check_lease"] = function() require("ui.field_check").run("field_check_lease") end,
 				["field_check_owned_runtime"] = function() require("ui.field_check").run("field_check_owned_runtime") end,
 				["field_check_network"] = function() require("ui.field_check").run("field_check_network") end,
+				["field_check_toolchain"] = function() require("ui.field_check").run("field_check_toolchain") end,
 				["field_check_key_accounting"] = function() require("ui.field_check").run("field_check_key_accounting") end,
 				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
 				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
