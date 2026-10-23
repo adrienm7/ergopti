@@ -29,6 +29,7 @@
 
 local M = {}
 
+local PhaseStats  = require("infra.phase_stats")
 local Logger      = require("infra.logger")
 local Timer       = require("adapters.timer_scheduler")
 local BootJournal = require("adapters.boot_journal")
@@ -57,6 +58,21 @@ M.BOOT_COMPLETE_LABEL = "Boot complete"
 -- Total boot duration captured at the BOOT_COMPLETE_LABEL mark.
 local _boot_complete_ms = nil
 
+-- Require trace: the native require, the modules first loaded since the last
+-- stage mark (name and self time), and the load stack used to subtract nested
+-- loads from their parent.
+local _native_require  = nil
+local _loaded_modules  = {}
+local _require_stack   = {}
+-- A stage reports the modules whose own load took at least this long.
+local REQUIRE_REPORT_MS = 3
+-- A stage line names at most this many modules.
+local REQUIRE_REPORT_MAX = 8
+-- Longest sub-stage the DEBUG line still calls routine; above it the line is INFO.
+local SUB_STAGE_INFO_MS = 25
+-- Timestamp of the previous sub-stage (or of the stage opening) in nanoseconds.
+local _sub_last_ns = nil
+
 
 
 
@@ -72,6 +88,74 @@ local _boot_complete_ms = nil
 --- @return number Nanoseconds from an arbitrary monotonic origin.
 local function now_ns()
 	return Timer.now_ns()
+end
+
+--- Starts timing every first-time `require` until M.complete(): each stage mark
+--- then names the modules whose own load (nested loads excluded) was slowest.
+--- Idempotent; the wrapper rethrows a load error with its original message.
+function M.trace_requires()
+	if _native_require ~= nil then return end
+	_native_require = _G.require
+	_G.require = function(module_name, ...)
+		if package.loaded[module_name] ~= nil then return _native_require(module_name, ...) end
+		local frame = { children = 0 }
+		_require_stack[#_require_stack + 1] = frame
+		local started = now_ns()
+		local ok, first, second = pcall(_native_require, module_name, ...)
+		local total = now_ns() - started
+		_require_stack[#_require_stack] = nil
+		local parent = _require_stack[#_require_stack]
+		if parent then parent.children = parent.children + total end
+		_loaded_modules[#_loaded_modules + 1] = {
+			name = tostring(module_name), ms = (total - frame.children) / NS_PER_MS }
+		if not ok then error(first, 0) end
+		return first, second
+	end
+end
+
+--- Restores the native require.
+local function untrace_requires()
+	if _native_require == nil then return end
+	_G.require = _native_require
+	_native_require = nil
+end
+
+--- Logs the modules first loaded since the previous mark, slowest first, then
+--- clears the list. Silent when the trace is off or nothing crossed the floor.
+--- @param stage_name string Stage that just closed.
+local function report_stage_requires(stage_name)
+	local loaded = _loaded_modules
+	_loaded_modules = {}
+	if #loaded == 0 then return end
+	local total = 0
+	for _, entry in ipairs(loaded) do total = total + entry.ms end
+	PhaseStats.add("boot.requires", total * NS_PER_MS)
+	table.sort(loaded, function(a, b) return a.ms > b.ms end)
+	local parts = {}
+	for _, entry in ipairs(loaded) do
+		if entry.ms < REQUIRE_REPORT_MS or #parts >= REQUIRE_REPORT_MAX then break end
+		parts[#parts + 1] = string.format("%s=%.1f ms", entry.name, entry.ms)
+	end
+	pcall(Logger.evidence, LOG, "Boot stage requires: %s loaded %d module(s) in %.1f ms (own time)%s.",
+		stage_name, #loaded, total, #parts > 0 and "; slowest: " .. table.concat(parts, ", ") or "")
+end
+
+--- Records the time since the stage opened (or since the previous sub-stage)
+--- as one named sub-stage, so a long stage explains itself. Needs an open stage.
+--- @param label string Closed sub-stage name, e.g. "hotstring groups".
+--- @return number|nil elapsed_ms Milliseconds, nil when no stage is open.
+function M.sub(label)
+	if _open_stage == nil then return nil end
+	local now = now_ns()
+	local elapsed_ms = (now - (_sub_last_ns or _stage_start_ns or now)) / NS_PER_MS
+	_sub_last_ns = now
+	PhaseStats.add("boot_sub." .. tostring(label), elapsed_ms * NS_PER_MS)
+	if elapsed_ms >= SUB_STAGE_INFO_MS then
+		pcall(Logger.evidence, LOG, "Boot sub-stage: %s / %s took %.1f ms.", _open_stage, tostring(label), elapsed_ms)
+	else
+		pcall(Logger.debug, LOG, "Boot sub-stage: %s / %s took %.1f ms.", _open_stage, tostring(label), elapsed_ms)
+	end
+	return elapsed_ms
 end
 
 --- Starts (or restarts) the boot timer. Call once, as early as the logger is
@@ -95,6 +179,7 @@ function M.stage(stage_name)
 	end
 	_open_stage = name
 	_stage_start_ns = now_ns()
+	_sub_last_ns = _stage_start_ns
 	pcall(Logger.start, LOG, "Boot stage started: %s.", name)
 	pcall(BootJournal.append, "START", "Boot stage started: " .. name .. ".")
 end
@@ -116,6 +201,7 @@ end
 --- Records the whole boot duration once every stage has completed.
 function M.complete()
 	_complete = true
+	untrace_requires()
 	local total = _start_ns and (now_ns() - _start_ns) / NS_PER_MS or 0
 	pcall(Logger.success, LOG, "Boot complete in %.0f ms.", total)
 	pcall(BootJournal.append, "SUCCESS", string.format("Boot complete in %.0f ms.", total))
@@ -144,6 +230,8 @@ function M.mark(phase_name)
 	local format = "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms)."
 	pcall(Logger.success, LOG, format, name, stage_ms, delta, total)
 	pcall(BootJournal.append, "SUCCESS", string.format(format, name, stage_ms, delta, total))
+	PhaseStats.add("boot.stage", stage_ms * NS_PER_MS)
+	report_stage_requires(name)
 	-- The boot sequence closes with a mark whose label starts with BOOT_COMPLETE_LABEL.
 	-- Freezing the total there lets the post-boot diagnostic snapshot report the
 	-- real boot duration without the boot sequence having to hand it over.

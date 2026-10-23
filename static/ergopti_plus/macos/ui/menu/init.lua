@@ -17,6 +17,7 @@ local hs               = hs
 local notifications    = require("infra.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("infra.logger")
+local PhaseStats       = require("infra.phase_stats")
 local text_utils = require("infra.text_utils")
 local i18n             = require("infra.i18n")
 local ui_restore       = require("infra.ui_restore")
@@ -1552,6 +1553,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return TrayMenu.setMenu(candidate) == true
 	end
 
+	--- Names the slowest top-level rows of the build just finished.
+	--- @param timings table|nil List of { id, ms } in build order.
+	--- @return string text ` Slowest: id=12.3 ms, …`, empty without timings.
+	local function slowest_items_text(timings)
+		if type(timings) ~= "table" or #timings == 0 then return "" end
+		local ranked = {}
+		for index, entry in ipairs(timings) do ranked[index] = entry end
+		table.sort(ranked, function(a, b) return a.ms > b.ms end)
+		local parts = {}
+		for index = 1, math.min(#ranked, 5) do
+			parts[index] = string.format("%s=%.1f ms", ranked[index].id, ranked[index].ms)
+		end
+		return " Slowest: " .. table.concat(parts, ", ") .. "."
+	end
+
 	local function rebuild_menu_cache()
 		require("ui.menu.start_at_login").request("status", function()
 			if type(updateMenu) == "function" then updateMenu() end
@@ -1574,7 +1590,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
-			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms, #items)
+			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
+			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
+				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.last_item_timings) or "")
 			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
@@ -1600,6 +1618,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		rebuild_menu_cache()
 	end
 	schedule_menu_refresh = function()
+		PhaseStats.count("menu.refresh_requested")
 		if _menu_refresh_timer then return end
 		_menu_refresh_timer = hs.timer.doAfter(MENU_REFRESH_COALESCE_SEC, function()
 			_menu_refresh_timer = nil
@@ -1617,12 +1636,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			and type(core_mods.shortcuts_mod.is_paused) == "function"
 			and core_mods.shortcuts_mod.is_paused() or false
 		if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
+			PhaseStats.count("menu.open_cold_rebuild")
 			Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
 				tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
 				tostring(paused_now ~= _cached_paused))
 			ctx.paused = paused_now
 			rebuild_menu_cache()
 		else
+			PhaseStats.count("menu.open_from_cache")
 			Logger.debug(LOG, "Menu open → served from cache (cold path).")
 		end
 		return _cached_menu_items or {}

@@ -14,4 +14,23 @@
 --- any module is required, so this shim can delegate with a plain require().
 --- ==============================================================================
 
-return require("toml_codec.reader")
+local Reader     = require("toml_codec.reader")
+local PhaseStats = require("infra.phase_stats")
+
+-- Every function but parse is the shared reader's own; parse is timed so the
+-- phase summary counts config and hotstring reads and their cost.
+local M = setmetatable({}, { __index = Reader })
+
+--- Parses one TOML file through the shared reader, recording the `toml.parse`
+--- phase. A thrown error still reaches the caller unchanged.
+--- @param path string File to parse.
+--- @return table document
+--- @return boolean committed
+function M.parse(path)
+	local started = PhaseStats.now()
+	local document, committed = Reader.parse(path)
+	PhaseStats.stop("toml.parse", started)
+	return document, committed
+end
+
+return M

@@ -56,6 +56,7 @@ local Redact = require("diagnostics.redact")
 local NativePath = require("native_path")
 local Json = require("json")
 local ErrorDescription = require("error_description")
+local PhaseStats = require("infra.phase_stats")
 local _redact_message = nil
 
 --- Captures canonical privacy rules before bootstrap permits any log output.
@@ -1793,6 +1794,7 @@ local _capture_installed = false
 -- disables an event tap that waits about a second, so a shorter hold is
 -- invisible to the user and a longer one is named in the log.
 local SLOW_TIMER_CALLBACK_REPORT_MS = 1000
+local SLOW_TIMER_CALLBACK_COUNT_MS = 250
 -- One report per callback site per minute: a callback that stalls on every
 -- tick would otherwise write a line per tick.
 local SLOW_TIMER_CALLBACK_REPEAT_SEC = 60
@@ -1865,6 +1867,12 @@ local function report_slow_timer_callback(fn, kind, started, modal_before)
 	local ok_now, now = pcall(_callback_clock)
 	if not ok_now or type(now) ~= "number" then return end
 	local held_ms = (now - started - (_modal_wait_ns - modal_before)) / NANOSECONDS_PER_MILLISECOND
+	-- Shorter holds are counted for the phase summary: 250 ms is where key
+	-- events start arriving late at the taps.
+	if held_ms >= SLOW_TIMER_CALLBACK_COUNT_MS then
+		PhaseStats.count(held_ms >= SLOW_TIMER_CALLBACK_REPORT_MS and "runtime.timer_hold_over_1000ms"
+			or "runtime.timer_hold_over_250ms")
+	end
 	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then return end
 	local ok_site, site = pcall(describe_callback_site, fn)
 	site = ok_site and site or "?"
@@ -1872,9 +1880,11 @@ local function report_slow_timer_callback(fn, kind, started, modal_before)
 	local now_sec = now / NANOSECONDS_PER_MILLISECOND / MILLISECONDS_PER_SECOND
 	if previous and now_sec - previous < SLOW_TIMER_CALLBACK_REPEAT_SEC then return end
 	_slow_callback_reported_at[site] = now_sec
+	local phases = PhaseStats.recent_since(started)
 	M.warn("runtime",
-		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.",
-		kind, site, math.floor(held_ms))
+		"An hs.timer.%s callback (%s) held the main thread for %d ms; event taps, the Karabiner lease heartbeat and typed keys waited meanwhile.%s",
+		kind, site, math.floor(held_ms),
+		phases and (" Phases inside the hold: " .. phases .. ".") or "")
 end
 
 --- Wraps a timer callback so an uncaught error is logged WITH a traceback

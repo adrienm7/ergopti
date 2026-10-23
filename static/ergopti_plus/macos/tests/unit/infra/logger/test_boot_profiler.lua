@@ -223,6 +223,63 @@ helpers.describe("infra.boot_profiler stages (boot-stage-trail)", function()
 	end)
 end)
 
+helpers.describe("infra.boot_profiler sub-stages and require trace", function()
+	helpers.it("names the slowest first-time requires of a stage with their own time", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["infra.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		package.preload["boot_trace_parent"] = function()
+			CLOCK_NS = CLOCK_NS + 10e6
+			require("boot_trace_child")
+			CLOCK_NS = CLOCK_NS + 5e6
+			return {}
+		end
+		package.preload["boot_trace_child"] = function()
+			CLOCK_NS = CLOCK_NS + 30e6
+			return {}
+		end
+		local native_require = require
+		boot.begin()
+		boot.trace_requires()
+		boot.stage("Traced stage")
+		require("boot_trace_parent")
+		boot.mark("Traced stage")
+		boot.complete()
+		helpers.assert_true(require == native_require, "complete() restores the native require")
+		local text = table.concat(lines, " | ")
+		helpers.assert_true(text:find("boot_trace_child=30.0 ms", 1, true) ~= nil, "child own time")
+		helpers.assert_true(text:find("boot_trace_parent=15.0 ms", 1, true) ~= nil,
+			"parent time excludes the nested load")
+		helpers.assert_true(text:find("loaded 2 module(s)", 1, true) ~= nil)
+		package.loaded["boot_trace_parent"], package.loaded["boot_trace_child"] = nil, nil
+		package.loaded["infra.logger"].evidence = nil
+	end)
+
+	helpers.it("sub() reports the time since the stage opened or the previous sub-stage", function()
+		configure_journal()
+		local lines = {}
+		package.loaded["infra.logger"].evidence = function(_, fmt, ...)
+			lines[#lines + 1] = string.format(fmt, ...)
+			return true
+		end
+		boot.begin()
+		helpers.assert_eq(boot.sub("orphan"), nil, "no open stage, no sub-stage")
+		boot.stage("Long stage")
+		CLOCK_NS = CLOCK_NS + 40e6
+		local first_ms = boot.sub("first part")
+		CLOCK_NS = CLOCK_NS + 5e6
+		local second_ms = boot.sub("second part")
+		helpers.assert_true(math.abs(first_ms - 40) < 0.01 and math.abs(second_ms - 5) < 0.01)
+		helpers.assert_eq(#lines, 1, "only the sub-stage over the INFO floor is evidence")
+		helpers.assert_true(lines[1]:find("Long stage / first part took 40.0 ms", 1, true) ~= nil)
+		boot.mark("Long stage")
+		package.loaded["infra.logger"].evidence = nil
+	end)
+end)
+
 -- Restore the real stub clocks, journal and logger so later test files are
 -- unaffected; drop the adapters so they re-capture the real logger on next load.
 BootJournal.configure_for_tests(nil)

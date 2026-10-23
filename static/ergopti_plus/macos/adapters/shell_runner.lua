@@ -29,6 +29,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local PhaseStats = require("infra.phase_stats")
 local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
 local RuntimeLog = require("diagnostics.runtime_log")
@@ -609,8 +610,10 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		_input_closed = true
 		_lifecycle = "completed"
 		if private ~= true then
-			_record_exit(RuntimeLog.program_name(executable), exit_code,
-				_started_ms and (now_ms() - _started_ms) or 0)
+			local program = RuntimeLog.program_name(executable)
+			local duration_ms = _started_ms and (now_ms() - _started_ms) or 0
+			_record_exit(program, exit_code, duration_ms)
+			PhaseStats.add("process." .. tostring(program), duration_ms * 1e6)
 		end
 		if _start_dispatching then
 			if _pending_completion == nil then
