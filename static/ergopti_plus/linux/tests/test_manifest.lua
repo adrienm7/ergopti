@@ -296,6 +296,7 @@ return {
 	"tests.unit.modules.hotstrings.engine.test_engine_current_buffer",
 	"tests.meta.boot.test_error_dialog_wiring",
 	"tests.unit.adapters.runtime.test_event_loop_adapter",
+	"tests.unit.adapters.atspi.test_x11_focus",
 	"tests.unit.adapters.runtime.test_event_loop_idle_wait",
 	"tests.unit.infra.test_perf_counters",
 	"tests.unit.adapters.keyboard_hook.test_evdev_reader_wait_any",

@@ -44,6 +44,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
+local X11Focus = require("adapters.x11_focus")
 
 local LOG = "adapters.window_info"
 
@@ -145,10 +146,27 @@ end
 --- title changes within one browser window and switches between identical titles.
 --- @return table|nil WindowInfo, or nil when the query produced nothing.
 local function focused_x11()
-	local win_id = Shell.exec_line("xdotool getactivewindow 2>/dev/null")
-	if not win_id then return nil end
-	local title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
-	if not title then return nil end
+	local win_id, title, native_pid
+	local native_reason
+	if X11Focus.has_transport() then
+		win_id, title, native_pid, native_reason = X11Focus.query()
+		if native_reason == nil then
+			-- The server answered, in this process: no window, or an untitled
+			-- one, is no answer, exactly as an empty xdotool line was.
+			if not win_id or not title then return nil end
+		else
+			-- Transport trouble (server unreachable): ask the tools this once,
+			-- so a flaky connection degrades to the old route, not to silence.
+			Logger.debug(LOG, "Native X11 focus query unavailable (%s) — using xdotool.", native_reason)
+		end
+	end
+	if native_reason ~= nil or not X11Focus.has_transport() then
+		win_id = Shell.exec_line("xdotool getactivewindow 2>/dev/null")
+		if not win_id then return nil end
+		title = Shell.exec_line("xdotool getwindowname " .. Shell.quote(win_id) .. " 2>/dev/null")
+		if not title then return nil end
+		native_pid = nil
+	end
 
 	local info = empty_info()
 	info.windowTitle = title
@@ -162,7 +180,10 @@ local function focused_x11()
 	-- what this driver has always reported, what the keystroke metrics are
 	-- already attributed to, and what the other two drivers report; WM_CLASS
 	-- would be a nicer identity and a silent break of every stored attribution.
-	local pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
+	local pid = native_pid
+	if pid == nil and (native_reason ~= nil or not X11Focus.has_transport()) then
+		pid = Shell.exec_line("xdotool getwindowpid " .. Shell.quote(win_id) .. " 2>/dev/null")
+	end
 	info.appId = comm_of(pid)
 
 	_x11_cache.id = win_id
@@ -342,6 +363,20 @@ local function query_focused()
 	end
 	if DisplayServer.is_x11() then return focused_x11() end
 	return nil
+end
+
+--- Binds the in-process X11 focus query for this daemon (instead of forking
+--- xdotool four times a second). Called once at startup; a runtime without
+--- libxcb keeps the xdotool route and says so.
+--- @return boolean bound
+function M.use_native_x11()
+	local bound, reason = X11Focus.use_xcb()
+	if bound then
+		Logger.info(LOG, "Focus queries on X11 use libxcb in this process (no xdotool forks).")
+	else
+		Logger.warn(LOG, "libxcb focus queries unavailable (%s) — X11 focus keeps using xdotool.", tostring(reason))
+	end
+	return bound
 end
 
 --- Returns the identity of the currently focused window.
