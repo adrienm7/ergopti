@@ -4,7 +4,9 @@
 --- MODULE: Magic-Key Repeat
 --- DESCRIPTION:
 --- Doubles the character before the magic key when nothing else matched: typing
---- `po★` gives `poo`, `a★` gives `aa`.
+--- `po★` gives `poo`. A word's first letter is never doubled (`a★` stays for the
+--- text expansions), the same rule as the Windows and macOS drivers; the shared
+--- repeat_key_vectors.json corpus pins the three.
 ---
 --- WHY IT IS HERE AND NOT ONLY ON THE OTHER TWO DRIVERS:
 --- The manifest declared `hotstrings.repeat_key_enabled` and the `repeat_key`
@@ -34,6 +36,7 @@ local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 local Preferences = require("infra.hotstring_preferences")
 local ConfigOutdated = require("config_outdated")
+local TextUtils = require("text_utils")
 
 local LOG = "hotstrings.repeat_key"
 
@@ -214,6 +217,17 @@ function M.resolve(buffer, magic_key)
 	-- The magic key repeating itself is not a repeat, it is a second trigger, and
 	-- doubling it would let a user type an unbounded run of them by holding one key.
 	if previous == magic_key then return nil end
+
+	-- Only the second letter of a word or later repeats, as on Windows and macOS:
+	-- the character repeated must be a word character (a space or a newline is
+	-- never repeated) and so must the one before it. Without a word character
+	-- before it, `c★` is the start of a word, where the user typed the key to ask
+	-- for a text expansion and doubling the letter replaces it with `cc`.
+	if not TextUtils.is_hotstring_word_char(previous) then return nil end
+	local before_previous = last_codepoint(before:sub(1, #before - #previous))
+	if not before_previous or not TextUtils.is_hotstring_word_char(before_previous) then
+		return nil
+	end
 
 	return {
 		-- Erase the magic key only; the character before it stays and is joined by

@@ -1,0 +1,68 @@
+{
+	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
+	"description": "Cross-driver idle word-reset vectors (PAR-2): whether the pause before a keystroke starts a new word. Replayed by the Windows rule (HSE_IdleResetsWord) and by the shared Lua rule (hotstring_engine.idle_resets_word) that macOS and Linux both call. The clock is exact (resolution 0) on every driver that replays these.",
+	"field_semantics": {
+		"last_ms": "Monotonic time of the previous keystroke in milliseconds, null before any keystroke.",
+		"now_ms": "Monotonic time of the current keystroke in milliseconds.",
+		"idle_seconds": "hotstrings.idle_reset_seconds; 0 disables the reset.",
+		"resets": "Whether the pause starts a new word."
+	},
+	"vectors": [
+		{
+			"id": "pause_equal_to_delay_resets",
+			"description": "A gap exactly equal to the delay resets (the comparison is greater-or-equal).",
+			"last_ms": 0,
+			"now_ms": 2000,
+			"idle_seconds": 2,
+			"resets": true
+		},
+		{
+			"id": "one_millisecond_short_does_not_reset",
+			"description": "One millisecond below the delay keeps the word.",
+			"last_ms": 0,
+			"now_ms": 1999,
+			"idle_seconds": 2,
+			"resets": false
+		},
+		{
+			"id": "long_pause_resets",
+			"description": "A pause far beyond the delay resets.",
+			"last_ms": 5000,
+			"now_ms": 65000,
+			"idle_seconds": 2,
+			"resets": true
+		},
+		{
+			"id": "zero_delay_disables_the_reset",
+			"description": "A delay of 0 disables the idle reset whatever the pause.",
+			"last_ms": 0,
+			"now_ms": 600000,
+			"idle_seconds": 0,
+			"resets": false
+		},
+		{
+			"id": "no_previous_keystroke_never_resets",
+			"description": "Before any keystroke there is nothing to be idle since.",
+			"last_ms": null,
+			"now_ms": 600000,
+			"idle_seconds": 2,
+			"resets": false
+		},
+		{
+			"id": "fractional_delay_deadline_resets",
+			"description": "A fractional delay is compared in whole milliseconds: 500 ms of a 0.5 s delay resets.",
+			"last_ms": 1000,
+			"now_ms": 1500,
+			"idle_seconds": 0.5,
+			"resets": true
+		},
+		{
+			"id": "fractional_delay_one_millisecond_short",
+			"description": "499 ms of a 0.5 s delay keeps the word.",
+			"last_ms": 1000,
+			"now_ms": 1499,
+			"idle_seconds": 0.5,
+			"resets": false
+		}
+	]
+}

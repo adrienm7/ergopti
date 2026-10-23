@@ -303,3 +303,53 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 		end)
 	end)
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ The shared corpus ====================================
+-- =================================================================
+-- =================================================================
+
+--- Decodes one shared hotstrings corpus file.
+--- @param name string File name under _shared/tests/corpus/hotstrings.
+--- @return table vectors
+local function corpus_vectors(name)
+	local path = helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/" .. name
+	local file = assert(io.open(path, "rb"))
+	local raw = file:read("*a")
+	file:close()
+	local corpus = assert(require("json").decode(raw), name .. " must be valid JSON")
+	assert(#corpus.vectors > 0, name .. " must hold vectors")
+	return corpus.vectors
+end
+
+helpers.describe("magic-key repeat: the shared repeat_key_vectors.json corpus", function()
+	for _, vector in ipairs(corpus_vectors("repeat_key_vectors.json")) do
+		helpers.it(vector.id .. " (repeat-key-corpus)", function()
+			local out = RepeatKey.resolve(vector.buffer, vector.magic_key)
+			if vector.fires then
+				helpers.assert_true(out ~= nil, vector.description)
+				helpers.assert_eq(out.replacement, vector.replacement, vector.description)
+				helpers.assert_eq(out.backspace_count, 1)
+			else
+				helpers.assert_nil(out, vector.description)
+			end
+		end)
+	end
+end)
+
+helpers.describe("idle word reset: the shared idle_reset_vectors.json corpus", function()
+	local Engine = require("hotstring_engine")
+	for _, vector in ipairs(corpus_vectors("idle_reset_vectors.json")) do
+		helpers.it(vector.id .. " (idle-reset-corpus)", function()
+			-- A JSON null decodes to a sentinel table: only a number is a keystroke time.
+			local last = type(vector.last_ms) == "number" and vector.last_ms or nil
+			helpers.assert_eq(
+				Engine.idle_resets_word(last, vector.now_ms, vector.idle_seconds, 0),
+				vector.resets, vector.description)
+		end)
+	end
+end)
