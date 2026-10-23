@@ -53,3 +53,11 @@ answer once, then move the answered line below.
   application implications to be listed before deciding; Linux aligned on Windows and macOS (`[BS]x`, recommended settings);
   Ollama redirect policy: best design even if long; no review screen for bug reports; NTLM: WinHTTP system stack; HS-274
   tools: delete or put in CI; Hammerspoon coexistence. Details in the checklist.
+- **Hotstring cascading (asked 2026-10-24):** you asked that a hotstring's output can trigger another hotstring
+  while keeping SendInput. The real engine shows that no driver cascades today (the retired native engine did, via
+  SendEvent). Building it is a new feature (an in-engine re-feed with a depth bound and a same-spec guard). Caveat:
+  124 of the 2786 shared replacements end with their own trigger (case aside) and 131 end with another trigger, so
+  the shipped pack's output would change. Do you want cascading, for which hotstrings (personal only, the pack too),
+  and with which guards? Until you answer, nothing changes.
+- **Space tap-hold and end-character triggers (asked 2026-10-24):** `_SpaceTap` resets both buffers, so a trigger
+  ending with the space cannot complete from the Space tap-hold. Is that expected with the tap-hold on?
