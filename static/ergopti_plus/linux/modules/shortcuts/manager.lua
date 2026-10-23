@@ -648,13 +648,15 @@ end
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Plain-text paste refused: no retained text destination."); return false end
 	record("paste_plain")
 	local ok, text, reason = Clipboard.read_checked()
 	if not ok or text == "" then
 		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
 		return false
 	end
-	local result = Injector.inject(0, text, false)
+	local result = Injector.inject(0, text, false, nil, publication)
 	return type(result) == "table" and result.ok == true
 end
 
