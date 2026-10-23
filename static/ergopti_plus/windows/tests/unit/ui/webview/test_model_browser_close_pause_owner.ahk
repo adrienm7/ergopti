@@ -38,8 +38,86 @@ _MBPT_GeneratedOwner(Symbol) {
 		return Owner
 }
 
-_MBPT_ChildSource() {
+; Resolve the actual include identity before redirecting its private copy. The
+; authored-source resolver deliberately rejects lexical tests/../ paths.
+_MBPT_AbsoluteFile(Path) {
+	BufferPath := Buffer(65536, 0)
+	Length := DllCall("kernel32\GetFullPathNameW", "Str", Path, "UInt", 32768,
+		"Ptr", BufferPath.Ptr, "Ptr", 0, "UInt")
+	AssertTrue(Length > 0 && Length < 32768 && FileExist(Path) != "",
+		"The diagnostic dependency must have an actual canonical file")
+	return StrGet(BufferPath)
+}
+
+; Keep the real writer and its caught exception. Only a private whole owner
+; gains one diagnostic call; inverse reconstruction authenticates every edit.
+_MBPT_WriterDiagnosticOwner(Directory) {
+	global _DriverDir
+	Owner := _DriverProductionFileForSymbol("_ConfigInvokeCommitWriter", _DriverDir)
+	AssertTrue(Owner != "", "The actual configuration writer owner must exist")
+	Original := FSReadStrict(Owner), Masked := _DriverMaskNonCode(&Original)
+	AssertEqual(1, _DriverTopLevelDefinitionCount(&Masked, "_ConfigInvokeCommitWriter"))
+	Definition := _DriverFindFunctionDefinition(&Original, "_ConfigInvokeCommitWriter")
+	AssertTrue(IsObject(Definition), "The real writer definition must be locatable in RAW source")
+	Depth := 1, Cursor := Definition.OpenPos + 1
+	while Cursor <= StrLen(Masked) && Depth {
+		Character := SubStr(Masked, Cursor, 1)
+		if Character == "{"
+			Depth += 1
+		else if Character == "}"
+			Depth -= 1
+		Cursor += 1
+	}
+	AssertEqual(0, Depth, "The actual RAW writer body must close exactly")
+	RawFunction := SubStr(Original, Definition.Idx, Cursor - Definition.Idx)
+	RegExReplace(RawFunction, "m)^`t} catch as Err \{", "", &Catches)
+	AssertEqual(1, Catches, "The actual writer must retain its one original caught exception")
+	Anchor := "} catch as Err {`n`t`tFailureDetail .="
+	Insertion := "} catch as Err {`n`t`t_MBWD_Caught(Err, Stage)`n`t`tFailureDetail .="
+	ChangedFunction := StrReplace(RawFunction, Anchor, Insertion, true, &Insertions)
+	AssertEqual(1, Insertions, "Only the actual writer catch may gain diagnostic observation")
+	Changed := SubStr(Original, 1, Definition.Idx - 1) . ChangedFunction . SubStr(Original, Cursor)
+	SplitPath(Owner, , &OwnerDir)
+	Rewrites := [], Private := ""
+	for Index, Line in StrSplit(Changed, "`n") {
+		OriginalLine := Line
+		if RegExMatch(Line, "^#Include\s+(.+)$", &Include) {
+			AssertTrue(FileExist(OwnerDir . "\" . Include[1]) != "",
+				"Each private owner include must retain its genuine original sibling")
+			Line := "#Include " . _MBPT_AbsoluteFile(OwnerDir . "\" . Include[1])
+			Rewrites.Push({ Original: OriginalLine, Private: Line })
+		}
+		Private .= (Index > 1 ? "`n" : "") . Line
+	}
+	AssertEqual(2, Rewrites.Length, "The real configuration owner has exactly two sibling imports")
+	Inverse := Private
+	for Rewrite in Rewrites {
+		Inverse := StrReplace(Inverse, Rewrite.Private, Rewrite.Original, true, &Count)
+		AssertEqual(1, Count, "Each private include must reverse to its original directive once")
+	}
+	Inverse := StrReplace(Inverse, Insertion, Anchor, true, &Undone)
+	AssertEqual(1, Undone)
+	AssertEqual(0, StrCompare(Original, Inverse, true), "The diagnostic insertion must be exactly reversible")
+	RawHash := CryptoSha256Bytes(FSReadBytesStrict(Owner))
+	AssertTrue(RawHash != "")
+	AssertEqual(RawHash, CryptoSha256(Chr(0xFEFF) . Inverse), "Inverse reconstruction must preserve the complete RAW owner")
+	Target := Directory . "\writer_diagnostic_config_io.ahk"
+	AssertTrue(FSWriteCreateDurable(Target, Chr(0xFEFF) . Private) != 0)
+	PrivateHash := CryptoSha256Bytes(FSReadBytesStrict(Target))
+	AssertTrue(PrivateHash != "")
+	Helper := _DriverDir . "\tests\fixtures\model_browser_writer_exception_diagnostics.ahk"
+	HelperHash := CryptoSha256Bytes(FSReadBytesStrict(Helper))
+	AssertTrue(HelperHash != "")
+	_TestPrint("# model-browser-writer-diagnostic source_owner=" . Owner . " original_raw_sha256=" . RawHash
+		. " private_raw_sha256=" . PrivateHash . " helper_raw_sha256=" . HelperHash
+		. " raw_function_sha256=" . CryptoSha256(RawFunction)
+		. " insertions=" . Insertions . " include_rewrites=" . Rewrites.Length)
+	return { Original: _MBPT_AbsoluteFile(Owner), Private: Target, Helper: Helper }
+}
+
+_MBPT_ChildSource(Directory) {
 	global _DriverDir, _SharedDir
+	Diagnostic := _MBPT_WriterDiagnosticOwner(Directory)
 	Support := _DriverDir . "\tests\support\feature_state_boot_smoke.ahk"
 	Source := FSReadStrict(Support)
 	Boundary := InStr(Source, "`ntry {`n    if (A_Args.Length", true)
@@ -53,11 +131,21 @@ _MBPT_ChildSource() {
 	SplitPath(Support, , &SupportDir)
 	; The real registry reader must never consult another process's parse cache.
 	Code := 'EnvSet("LOCALAPPDATA", A_Args[2] . "\local-app-data")' . "`n"
+	Code .= "#Include " . Diagnostic.Helper . "`n"
+	Routes := 0
 	for Line in StrSplit(Prefix, "`n") {
-		if RegExMatch(Line, "^#Include\s+(.+)$", &Include)
-			Line := "#Include " . SupportDir . "\" . Include[1]
+		if RegExMatch(Line, "^#Include\s+(.+)$", &Include) {
+			Path := _MBPT_AbsoluteFile(SupportDir . "\" . Include[1])
+			if StrCompare(Path, Diagnostic.Original, false) == 0 {
+				Path := Diagnostic.Private
+				Routes += 1
+			}
+			Line := "#Include " . Path
+		}
 		Code .= Line . "`n"
 	}
+	AssertEqual(1, Routes, "Only the genuine support prefix may redirect the actual writer owner")
+	_TestPrint("# model-browser-writer-diagnostic subject_routes=" . Routes . " kind=PrivateChildCatchInstrumentation")
 	for GeneratedSymbol in ["LocaleTableData", "UpdateChannelRegistryData", "UpdateScheduleData"]
 		Code .= "#Include " . _MBPT_GeneratedOwner(GeneratedSymbol) . "`n"
 	Owners := Map()
@@ -121,7 +209,7 @@ _MBPT_Case(Mode) {
 	PreviousCritical := Critical("Off")
 	try {
 		_MBPT_StageAssets(Directory)
-		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MBPT_ChildSource()) != 0)
+		AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _MBPT_ChildSource(Directory)) != 0)
 		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath,
 			["/ErrorStdOut=UTF-8", Script, Mode, Directory], _MBPT_Complete.Bind(State))
 		AssertTrue(Handle.start(), "The genuine public model browser child must start")
