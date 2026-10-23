@@ -96,6 +96,31 @@ helpers.describe("managed-network-children", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("(route-plan) names every origin of a client, redirect hosts included", function()
+		local NetworkEnv = require("modules.llm.network_env")
+		local origins = assert(NetworkEnv.route_origins("ollama"))
+		helpers.assert_true(#origins >= 2, "the registry and its blob host are both looked up")
+		local original_path = NetworkEnv.policy_path
+		NetworkEnv.policy_path = function() return "/fixture/network-retry.sh" end
+		local ok, err = pcall(function()
+			for _, build in ipairs({ NetworkEnv.prelude, NetworkEnv.opaque_prelude }) do
+				local prelude = assert(build("TEST", { pac_probe_client = "ollama" }))
+				local assigned = prelude:find("OPAQUE_NETWORK_PAC_PROBE_URLS='" .. table.concat(origins, " ") .. "'; ", 1, true)
+				local source_at = prelude:find(". '/fixture/network-retry.sh' && ", 1, true)
+				helpers.assert_true(assigned ~= nil and source_at ~= nil and assigned < source_at,
+					"the origins are assigned before the policy is sourced: " .. prelude)
+				helpers.assert_true(not prelude:find("PAC_PROBE_URL=", 1, true), "one variable names the origins")
+			end
+			local unknown, reason = NetworkEnv.prelude("TEST", { pac_probe_client = "nobody" })
+			helpers.assert_nil(unknown)
+			helpers.assert_true(type(reason) == "string" and not reason:find("https://", 1, true), tostring(reason))
+			local twice = NetworkEnv.prelude("TEST", { pac_probe_client = "ollama", pac_probe_url = "https://registry.ollama.ai" })
+			helpers.assert_nil(twice, "a client and a single origin are never both named")
+		end)
+		NetworkEnv.policy_path = original_path
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("starts the Ollama service with the system network settings", function()
 		package.loaded["modules.llm.ollama_server_command"] = nil
 		local Builder = require("modules.llm.ollama_server_command")

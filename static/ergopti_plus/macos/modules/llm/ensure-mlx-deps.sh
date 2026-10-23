@@ -188,6 +188,18 @@ clear_quarantine() {
 # The system relay and trust store reach every child from here on.
 apply_system_network
 
+# uv reads only environment relay variables, so under a company PAC the origins
+# it contacts (the package index, its file host and the interpreter release
+# with its redirect host) are named to the route lookup before the opaque
+# admission. Only the opaque admissions use them: the native download helpers
+# resolve each request and redirect themselves and must keep the system route.
+use_uv_route_origins() {
+	if ! OPAQUE_NETWORK_PAC_PROBE_URLS="$(route_origins_for_client uv)"; then
+		OPAQUE_NETWORK_PAC_PROBE_URLS=""
+		log_info "The shared origin inventory of the package installer is unreadable."
+	fi
+}
+
 # The processor the app runs on, as the Lua caller names it
 # (adapters/python_interpreter.lua); uname answers when run by hand.
 NATIVE_ARCH="${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}"
@@ -435,7 +447,7 @@ else
 	# 'uv python find' returns non-zero when no managed interpreter matching
 	# the request is available. In that case we ask uv to download one.
 	if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
-		if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+		if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 		emit_marker "PYTHON_INSTALLING"
 		log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 		# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
@@ -519,7 +531,7 @@ if [ "$REPAIR_MODE" = "1" ]; then
 	if ! venv_is_removable; then
 		exit 5
 	fi
-	if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+	if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
 		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
 			continue
@@ -579,7 +591,7 @@ fi
 
 # Admission precedes uv venv (which may fetch Python) and uv sync. A verified
 # cached environment returned above requires no opaque network capability.
-if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
+if ! native_offline_bootstrap; then use_uv_route_origins; apply_system_network opaque || exit $?; fi
 
 # Slow path: real work is about to happen. Emit VENV_SYNC_RAN FIRST so the
 # Hammerspoon caller surfaces a "patientez" notification immediately, then

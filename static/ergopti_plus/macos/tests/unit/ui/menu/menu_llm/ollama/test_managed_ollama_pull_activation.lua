@@ -166,9 +166,9 @@ helpers.describe("Managed Ollama original pull activation", function()
 			helpers.assert_eq(f.calls.prepare, 0)
 			helpers.assert_eq(f.calls.bind, 0)
 			helpers.assert_eq(f.calls.opaque, 1, "a daemon of unknown origin keeps the fail-closed admission")
-			helpers.assert_eq(f.calls.opaque_options and f.calls.opaque_options.pac_probe_url,
-				"https://registry.ollama.ai",
-				"the pull names the registry whose automatic route the launcher resolves (ollama-pac-route)")
+			helpers.assert_eq(f.calls.opaque_options and f.calls.opaque_options.pac_probe_client,
+				"ollama",
+				"the pull names every origin of the Ollama download, redirect hosts included (ollama-pac-route)")
 			helpers.assert_eq(f.pulls[1].executable, "/bin/bash")
 			helpers.assert_eq(f.pulls[1].args[1], "-c")
 			helpers.assert_true(f.pulls[1].args[2]:find("fixture opaque; exec", 1, true) ~= nil)
