@@ -193,18 +193,26 @@ GestureStopKeyboardWatcher() {
 
 ; Callback fired on any key press while a click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
-	if A_IsSuspended {
+	global GestureKeyboardHook
+	PreviousCritical := Critical("On")
+	try {
+		; A queued callback from a retired watcher cannot release its successor.
+		; A naturally ended current hook still owns its pending Button Up debt.
+		if ih != GestureKeyboardHook
+			return
+		if A_IsSuspended {
+			GestureReleaseLeftClick()
+			GestureReleaseRightClick()
+			return
+		}
+
+		; Any keystroke releases whichever button(s) are currently held. The release
+		; transaction stops the shared observer only after every native Button Up
+		; succeeds. Stopping it here first loses the keyboard retry path if Windows
+		; refuses either release.
 		GestureReleaseLeftClick()
 		GestureReleaseRightClick()
-		return
-	}
-
-	; Any keystroke releases whichever button(s) are currently held. The release
-	; transaction stops the shared observer only after every native Button Up
-	; succeeds. Stopping it here first loses the keyboard retry path if Windows
-	; refuses either release.
-	GestureReleaseLeftClick()
-	GestureReleaseRightClick()
+	} finally Critical(PreviousCritical)
 }
 
 ; NOTE: the ~RButton / ~LButton cross-release hotkeys are registered
