@@ -52,32 +52,51 @@ _PPCO_RequestCopy(Phase) {
 	_PPCO.WriterSequence := Identity.Sequence
 }
 
-; Decorate only the complete genuine publisher. The native bool and every
-; value remain unchanged; this exposes its unlocked return to the real copier.
+; Decorate the real unlocked publisher selected by source shape. The same
+; assertions and independent writer run before the genuine receipt acquisition.
+_PPCO_ObservePublished() {
+	global _PPCO
+	_PPCO_Require(A_IsCritical == _PPCO.CallerCritical,
+		"The genuine setter boundary must preserve the calling frame's Critical state.")
+	_PPCO_Require(CB_Read() == _PPCO.Payload && CB_GetSequenceNumber() > 0
+		&& DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd,
+		"The genuine setter must first publish its exact payload under the subject HWND.")
+	_PPCO_Require(DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+		&& !DllCall("User32\IsClipboardFormatAvailable", "UInt", _PPCO.Format, "Int"),
+		"The setter must release its native lease and replace the original custom format.")
+	_PPCO.Token := CBClipboardOwner.paste_transaction
+	_PPCO_Require(_PPCO.Token > 0 && CBClipboardOwner.active.Count == 1
+		&& CBClipboardOwner.active.Has(_PPCO.Token)
+		&& CBClipboardOwner.active[_PPCO.Token]["source"] == _PPCO.Source,
+		"The genuine public client must own its exact admitted paste transaction.")
+	_PPCO.SetterCalls += 1
+	if _PPCO.Mode != "current"
+		_PPCO_RequestCopy("after-real-setter-before-receipt")
+	else
+		_PPCO.Armed := false
+	FileAppend("PUBLISHER_FIRED native=" . (_PPCO_UsesNativeMutation ? 1 : 0) . " calls=" . _PPCO.SetterCalls . "`n", "*", "UTF-8-RAW")
+}
+
+_CB_PlainNativeMutationCAS(Record, Text) {
+	global _PPCO
+	try {
+		Result := _PPCO_ActualNativeMutationCAS(Record, Text)
+		if IsSet(_PPCO) && _PPCO.Armed && Record["published"] && !Record["lease_unknown"]
+			_PPCO_ObservePublished()
+		return Result
+	} catch Any as Failure {
+		if IsSet(_PPCO) && !IsObject(_PPCO.Failure)
+			_PPCO.Failure := Failure
+		throw Failure
+	}
+}
+
 CB_Write(Text) {
 	global _PPCO
 	try {
 		Published := _PPCO_ActualWrite(Text)
-		if Published && IsSet(_PPCO) && _PPCO.Armed {
-			_PPCO_Require(A_IsCritical == _PPCO.CallerCritical,
-				"The genuine setter boundary must preserve the calling frame's Critical state.")
-			_PPCO_Require(CB_Read() == _PPCO.Payload && CB_GetSequenceNumber() > 0
-				&& DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd,
-				"The genuine setter must first publish its exact payload under the subject HWND.")
-			_PPCO_Require(DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
-				&& !DllCall("User32\IsClipboardFormatAvailable", "UInt", _PPCO.Format, "Int"),
-				"The setter must release its native lease and replace the original custom format.")
-			_PPCO.Token := CBClipboardOwner.paste_transaction
-			_PPCO_Require(_PPCO.Token > 0 && CBClipboardOwner.active.Count == 1
-				&& CBClipboardOwner.active.Has(_PPCO.Token)
-				&& CBClipboardOwner.active[_PPCO.Token]["source"] == _PPCO.Source,
-				"The genuine public client must own its exact admitted paste transaction.")
-			_PPCO.SetterCalls += 1
-			if _PPCO.Mode != "current"
-				_PPCO_RequestCopy("after-real-setter-before-receipt")
-			else
-				_PPCO.Armed := false
-		}
+		if Published && !_PPCO_UsesNativeMutation && IsSet(_PPCO) && _PPCO.Armed
+			_PPCO_ObservePublished()
 		return Published
 	} catch Any as Failure {
 		if IsSet(_PPCO) && !IsObject(_PPCO.Failure)
