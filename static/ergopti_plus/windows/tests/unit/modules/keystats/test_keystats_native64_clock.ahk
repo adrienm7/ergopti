@@ -433,7 +433,7 @@ _KLSCR_Native64SourceOrder(Body, Periodic) {
 		AssertEqual(0, RegExMatch(SubStr(Body, Clock.Pos), "i)KLHook\.last_tick"),
 			"publication cannot retarget a new physical origin after sampling")
 		_KLSCR_Native64SourceMatch(Body,
-			"im)^\h*_KL_Watchers_CommitIdleStart\.Bind\(" . Capture[1] . "\)\)\h*$",
+			"im)^\h*_KL_Watchers_CommitIdleStart\.Bind\(" . Capture[1] . "\)\h*,\h*,\h*$",
 			"idle publication must use the same captured origin")
 		_KLSCR_Native64SourceMatch(Body,
 			"im)^\h*return\h+_KL_Watchers_CloseSession\(" . Capture[1] . ",\h*" . Clock[1] . "\)\h*$",
