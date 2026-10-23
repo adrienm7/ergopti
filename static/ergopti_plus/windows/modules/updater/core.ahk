@@ -2562,6 +2562,8 @@ Updater_FetchLatestJson(Channel) {
 			throw Error("The exact managed updater request refused completion.")
 		if _Updater_RequestPolicy(RequestOwner) != UPDATER_REQUEST_POLICY_ALLOW
 			return ""
+		if !Req.ResponseEncodingValid
+			throw Error("The managed latest-release response bytes are not valid UTF-8.")
 		Etag := ""
 		try Etag := Req.GetResponseHeader("ETag")
 		Json := _Updater_InterpretResponse(Req.Status, Req.ResponseText, Etag, Channel, Url, RequestOwner,
