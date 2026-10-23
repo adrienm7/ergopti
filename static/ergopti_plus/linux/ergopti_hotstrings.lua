@@ -422,7 +422,7 @@ local shutdown = ShutdownCoordinator.new({
 				-- The known download session must publish cancellation and retire
 				-- before its native host disappears during pending HTTP cleanup.
 				if not runtime_shutdown_ack then return false end
-				if type(shutdown_webviews) == "function" then shutdown_webviews() end
+				if type(shutdown_webviews) == "function" then return shutdown_webviews() == true end
 				return true
 			end,
 		},
