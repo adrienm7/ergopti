@@ -350,7 +350,7 @@ local function with_main(connector, body)
 		keystats = { stop = function() return true end }, privacy_owners = {}, prediction_engine = false,
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 		webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
-		TimerScheduler = { cancelAll = function() end },
+		TimerScheduler = { cancelAll = function() return true end },
 		require = function(name)
 			if name == "modules.llm.agent_connectors" then observed.imports = observed.imports + 1; error("cold connector import") end
 			assert(name == "modules.llm.agent_learning", "unexpected Main dependency")

@@ -452,6 +452,7 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "timer scheduler",
+			wait_for_ack = true,
 			stop = TimerScheduler.cancelAll,
 		},
 	},
