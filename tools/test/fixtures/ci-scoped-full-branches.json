@@ -239,7 +239,19 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Launch option-looking application ids through actual GTK desktop entries",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Launch option-looking application ids through actual GTK desktop entries",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for Terminate real descendants after their process leader exits",
 			"protocol": 10
 		},
 		{
@@ -252,6 +264,12 @@
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
 			"step": "Reject real ENOSPC write and buffered-close failures",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for Derive encryption keys from the actual D-Bus machine ID",
 			"protocol": 10
 		},
 		{
@@ -893,6 +911,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Resolve real system keymaps",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Resolve real system keymaps",
 			"protocol": 10
 		},
@@ -906,6 +930,12 @@
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
 			"step": "Refuse malformed UTF-8 inverse plans before and after layout load",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for Qualify actual X11 physical shortcut sources",
 			"protocol": 10
 		},
 		{
@@ -929,7 +959,19 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Detect and read the keymap on a real X11 and a real Wayland",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for The tray binding names libraries and symbols that exist",
 			"protocol": 10
 		},
 		{
@@ -941,14 +983,32 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for The tray icon registers with a StatusNotifier host",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "The tray icon registers with a StatusNotifier host",
 			"protocol": 10
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for The secure-field probe on a real accessibility bus",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "The secure-field probe on a real accessibility bus",
 			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
+			"protocol": 10
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",
@@ -965,13 +1025,31 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Update to the newest release and restart",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Update to the newest release and restart",
 			"protocol": 9
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Qualify native HTTP streaming receipts",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Qualify native HTTP streaming receipts",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for Qualify native managed network runtime",
 			"protocol": 9
 		},
 		{
@@ -1013,7 +1091,19 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Qualify native runtime prerequisites",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Qualify native runtime prerequisites",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for AI predictions against a real Ollama",
 			"protocol": 9
 		},
 		{
@@ -1067,6 +1157,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for Preserve literal desktop notification text",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Preserve literal desktop notification text",
 			"protocol": 10
 		},
@@ -1103,7 +1199,19 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install prerequisites for The release list window lists GitHub's releases in real WebKit",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "The release list window lists GitHub's releases in real WebKit",
+			"protocol": 10
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
+			"step": "Install prerequisites for The WPM widget and tray readout draw on a real display",
 			"protocol": 10
 		},
 		{

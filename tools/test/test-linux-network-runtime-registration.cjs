@@ -190,10 +190,19 @@ function validateRuntimeCI(workflow, coverage) {
 		'set -euo pipefail',
 		'npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"'
 	]);
-	assert.deepEqual(Pipeline.runOf(steps[at - 1].body), [
-		'set -euo pipefail',
-		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
-	]);
+	// The install keeps the scoped full branch: a deferred scope installs nothing.
+	const install = Pipeline.runOf(steps[at - 1].body);
+	assert.ok(install.includes('elif [ "$mode" = full ]; then'));
+	assert.ok(
+		install.includes(
+			'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
+		)
+	);
+	assert.ok(
+		install.indexOf('elif [ "$mode" = full ]; then') <
+			install.findIndex((line) => line.includes('ubuntu_apt.py')),
+		'the install runs only in the full scope'
+	);
 	const record = Pipeline.runOf(Pipeline.step(e2e[0].body, 'Record mandatory E2E evidence'));
 	assert.equal(record.filter((line) => line === COUNT_LINE).length, 1);
 	assert.equal(
@@ -256,8 +265,8 @@ for (const [before, after] of [
 	['- name: ' + NATIVE_STEP, '- name: omitted native runtime'],
 	['npm run test:linux:network-runtime | tee', 'npm run test:linux-network-runtime | tee'],
 	[
-		'run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
-		'run: |\n          set -eu\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
+		'elif [ "$mode" = full ]; then\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
+		'elif false; then\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
 	],
 	[COUNT_LINE, 'network_runtime_assertions=4'],
 	[COUNT_LINE, COUNT_LINE + '\n          ' + COUNT_LINE],
