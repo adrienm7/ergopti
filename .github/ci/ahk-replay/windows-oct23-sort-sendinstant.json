@@ -1,0 +1,13 @@
+{
+	"expected_count": 6,
+	"filters": [
+		{
+			"contains": "model-browser-sort-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "sendinstant-clipboard-owner",
+			"expected_count": 3
+		}
+	]
+}
