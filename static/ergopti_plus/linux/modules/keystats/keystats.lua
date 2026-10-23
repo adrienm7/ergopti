@@ -2072,14 +2072,17 @@ local function flush_json()
 
 	local path = _log_dir .. "/keystrokes_" .. date .. ".json"
 
-	local fh = io.open(path, "w")
-	if not fh then
-		Logger.error(LOG, "flush(): cannot write to '%s'.", path)
+	local FileSystem = require("adapters.file_system")
+	local previous, status, read_err = FileSystem.read_with_status(path)
+	if status ~= "ok" and status ~= "absent" then
+		Logger.error(LOG, "flush(): cannot read the previous summary at '%s' — %s.", path, tostring(read_err or status))
 		return false
 	end
-	local written = fh:write(M.export_json(), "\n")
-	local closed = fh:close()
-	if not written or not closed then return false end
+	local written, write_err = FileSystem.write_if_unchanged(path, M.export_json() .. "\n", { status = status, content = previous })
+	if written ~= true then
+		Logger.error(LOG, "flush(): cannot publish the summary at '%s' — %s.", path, tostring(write_err))
+		return false
+	end
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 
