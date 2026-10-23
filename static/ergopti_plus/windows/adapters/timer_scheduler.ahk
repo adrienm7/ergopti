@@ -84,7 +84,8 @@ _TimerAdapterCommitNative(Handle, BoundFn, IntervalMs, NativeSetFn := 0) {
 		catch as CancelErr
 			RollbackFailure := CancelErr
 		if IsObject(RollbackFailure) {
-			Handle["Fired"] := false
+			; Keep cancellation debt reachable without authorizing rejected work.
+			Handle["Fired"] := true
 			_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
 		} else {
 			Handle["Fired"] := true
