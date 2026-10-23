@@ -29,6 +29,7 @@ local Logger        = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
 local SyntheticInput = require("adapters.synthetic_input")
 local KeyEventHealth = require("infra.key_event_health")
+local ControlSentinels = require("modules.keymap.control_sentinels")
 
 local LOG = "adapters.modifier_injector"
 
@@ -163,6 +164,9 @@ function M.arm(flags, on_applied)
 		-- application: mutating it is useless and would spend the one-shot
 		-- modifier. It passes untouched and the arm stays for the next key.
 		if KeyEventHealth.passes_late_event(event) then return false, fence_events end
+		-- Reserved remap signals carry exact modifier tags for their sole owner.
+		-- Spending the sticky arm here could turn one-shot Shift into CapsWord.
+		if ControlSentinels.is_sentinel(event:getKeyCode()) then return false, fence_events end
 		local applied = _on_applied
 		local committed = false
 		if applied then
