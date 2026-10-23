@@ -46,12 +46,7 @@ local WINDOWS_PATH_PARSERS = {
 
 -- Unconverted sites, each owned by a concurrent change and converted next:
 -- path = { count, reason }. The goal is an empty table.
-local BASELINE = {
-	["_shared/lua/config_migrate.lua"] = { 2, "config migration owner: split the backup path through NativePath" },
-	["_shared/lua/config_unused_keys.lua"] = { 2, "unused-key owner: split the backup path through NativePath" },
-	["_shared/lua/llm/profile_selector.lua"] = { 2, "LLM owner: resolve the profiles file through NativePath" },
-	["linux/modules/keystats/sqlite_writer.lua"] = { 1, "keystats owner: take the database folder through NativePath" },
-}
+local BASELINE = {}
 
 -- The separator class in each spelling, as raw Lua source text. The last two
 -- are the escaped form "[\\\\/]" that the first four do not contain.

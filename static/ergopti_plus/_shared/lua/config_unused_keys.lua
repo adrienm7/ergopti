@@ -42,6 +42,7 @@ local _ok_log, Logger = pcall(require, "infra.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
+local NativePath    = require("native_path")
 local TomlCodec     = require("toml_codec")
 local TomlWriter    = require("toml_codec.writer")
 local RecordScanner = require("toml_codec.record_scanner")
@@ -466,8 +467,9 @@ end
 --- @param stamp string
 --- @return string
 function M.backup_path(path, stamp)
-	local dir, name = path:match("^(.*[/\\])([^/\\]+)$")
-	if not dir then dir, name = "", path end
+	local dir = NativePath.directory_prefix(path)
+	local name = dir and path:sub(#dir + 1)
+	if not name or name == "" then dir, name = "", path end
 	local stem, ext = name:match("^(.+)(%.[^%.]+)$")
 	if not stem then stem, ext = name, "" end
 	return dir .. stem .. ".backup-" .. stamp .. ext

@@ -68,6 +68,15 @@ function M.register(helpers)
 					"the checkout folder keeps its trailing backslash")
 			end)
 		end)
+
+		helpers.it("posix-backslash-separator-owner: a backup path keeps a backslash in its folder and file name", function()
+			on_posix(function()
+				local migrate = require("config_migrate")
+				local unused = require("config_unused_keys")
+				helpers.assert_eq(migrate.backup_path("/cfg/a\\b/c\\d.toml", 3, "S"), "/cfg/a\\b/c\\d.pre-v3-S.toml")
+				helpers.assert_eq(unused.backup_path("/cfg/a\\b/c\\d.toml", "S"), "/cfg/a\\b/c\\d.backup-S.toml")
+			end)
+		end)
 	end)
 end
 

@@ -38,6 +38,7 @@ local SqliteCommand = require("modules.keystats.sqlite_command")
 local TextCipher    = require("modules.keystats.text_cipher")
 local EventIdPolicy = require("sqlite.event_id_policy")
 local Json          = require("json")
+local NativePath    = require("native_path")
 local MediaStore    = require("keystats.media_store")
 
 -- How many session durations one application-day keeps. Read from the shared
@@ -371,7 +372,7 @@ function M.open_db(db_path)
 	_db_path = db_path
 
 	-- Ensure the parent directory exists.
-	local dir = db_path:match("^(.*)[/\\]") or "."
+	local dir = NativePath.dirname(db_path) or "."
 	os.execute(string.format("mkdir -p '%s' 2>/dev/null", dir:gsub("'", "'\\''")))
 
 	-- Bootstrap schema on first open.
