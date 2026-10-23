@@ -248,3 +248,5 @@ _IPT_EveryShownTextExists() {
 	}
 }
 Test("input probe: every text the checks show exists in English", _IPT_EveryShownTextExists)
+
+#Include test_input_probe_rival_owner.ahk
