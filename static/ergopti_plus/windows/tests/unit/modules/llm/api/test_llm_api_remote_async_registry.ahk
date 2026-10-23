@@ -122,6 +122,7 @@ _RemoteCancelPublication_CurlPort(State, RunFn) {
 		"schedule_orphan_sweep", (*) => true,
 		"open_process", _RemoteCancelPublication_Open.Bind(State),
 		"terminate_process", _RemoteCancelPublication_Terminate.Bind(State),
+		"wait_process", (*) => 0,
 		"close_process", _RemoteCancelPublication_Close.Bind(State))
 }
 
