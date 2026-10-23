@@ -598,6 +598,12 @@ const STEP_CONDITIONS = [
 	],
 	[
 		LINUX_BOX,
+		'package-flatpak',
+		'Save the Flatpak runtimes',
+		"steps.flatpak-cache.outputs.cache-hit != 'true'"
+	],
+	[
+		LINUX_BOX,
 		'test-linux',
 		'Emit Configuration assertion from failed unit log',
 		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
