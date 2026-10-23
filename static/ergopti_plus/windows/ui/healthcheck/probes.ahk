@@ -166,6 +166,8 @@ _HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Port := 0) {
 		CreateFn := Port is Map ? Port.Get("create_http", 0) : 0
 		Request := IsObject(CreateFn) ? CreateFn.Call() : CurlAsyncRequest()
 		Run.Requests.Push(Request)
+		if Id == "proxy_pac"
+			Interpret := _HC_PacBindRequest(Request, Interpret)
 		Request.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => _HC_ManagedRunCurrent(Run))
 		Request.SetDeadline(Started, TimeoutMs)
 		Request.Open("GET", Url, true)
@@ -279,8 +281,8 @@ _HC_PacUrl() {
 	return ""
 }
 
-; Judges a PAC answer like the managed downloader: status 200, a bounded size,
-; UTF-8 (a U+FFFD means the bytes were not) and a FindProxyForURL function.
+; Judges normalized PAC text after its request has admitted the actual bytes.
+; A String alone cannot prove encoding validity or the original byte count.
 ; @param Status {Integer}
 ; @param Body {String}
 ; @returns {Map} { result, sections? }
@@ -289,14 +291,122 @@ _HC_PacAnswer(Status, Body) {
 		return Map("result", Map("state", "error", "detail", Status > 0 ? "PAC download: HTTP " . Status : "PAC download failed"))
 	if (Body == "")
 		return Map("result", Map("state", "error", "detail", "PAC is empty"))
-	if (StrLen(Body) > 1048576)
-		return Map("result", Map("state", "error", "detail", "PAC is over the 1048576 byte limit"))
-	if InStr(Body, Chr(0xFFFD))
-		return Map("result", Map("state", "error", "detail", "PAC is not UTF-8 (the managed download refuses it)"))
 	if !InStr(Body, "FindProxyForURL")
 		return Map("result", Map("state", "error", "detail", "PAC does not define FindProxyForURL"))
-	Value := "HTTP 200, " . StrLen(Body) . " characters, UTF-8, FindProxyForURL found"
+	Value := "HTTP 200, " . StrLen(Body) . " characters, FindProxyForURL found"
 	return Map("result", Map("state", "ok"), "sections", Map("network", Map("proxy_pac", Value)))
+}
+
+; Adapt only the real PAC request, including one created by an existing test
+; factory. Other HTTP probes retain their two-argument interpreter and transport.
+_HC_PacBindRequest(Request, Interpret) {
+	if !(Request is CurlAsyncRequest) || Request.HasOwnProp("_HC_PacSource")
+		|| Request.HasOwnProp("_OnManagedDone")
+		throw Error("The PAC request completion already has another owner.")
+	Request._HC_PacSource := 0
+	Request.DefineProp("_OnManagedDone", {Call: _HC_PacManagedDone})
+	return _HC_PacInterpret.Bind(Request, Interpret)
+}
+
+; The exact Job has settled before this callback. Capture its private RAW image
+; before the superclass deletes it, then always delegate real settlement once.
+; No transport prototype, decoding policy, response property or port is changed.
+_HC_PacManagedDone(Request, ExitCode, Stdout, Stderr) {
+	if ExitCode == 0 && Stderr == "" && !Request.Completed && !Request.Aborted
+		&& Request.ManagedTransport && Request.OutputPath == "" {
+		try Source := _HC_PacReadSource(Request.BodyPath)
+		catch
+			Source := Map("error", "PAC source bytes could not be read")
+		if !Request.Completed && !Request.Aborted
+			Request._HC_PacSource := Source
+	}
+	return CurlAsyncRequest.Prototype._OnManagedDone.Call(Request, ExitCode, Stdout, Stderr)
+}
+
+_HC_PacInterpret(Request, Interpret, Status, Body) {
+	if Status != 200
+		return Interpret.Call(Status, Body)
+	Source := Request._HC_PacSource
+	if !Request.Completed || Request.Aborted || !(Source is Map)
+		return Map("result", Map("state", "error", "detail", "PAC source bytes were not admitted"))
+	if Source.Has("error")
+		return Map("result", Map("state", "error", "detail", Source["error"]))
+	Answer := Interpret.Call(Status, Source["body"])
+	if Answer["result"].Get("state", "") == "ok" {
+		Value := "HTTP 200, " . Source["raw_bytes"] . " source bytes, " . Source["encoding"]
+			. ", " . Source["normalized_bytes"] . " UTF-8 bytes, FindProxyForURL found"
+		Answer["sections"]["network"]["proxy_pac"] := Value
+	}
+	return Answer
+}
+
+; The existing PAC limit counts source bytes including BOM, not UTF16 units.
+; The source worker also bounds the UTF8 normalization of a UTF16 script.
+_HC_PacReadSource(Path) {
+	Maximum := 1048576
+	Size := FileGetSize(Path)
+	if Size > Maximum
+		return Map("error", "PAC is over the 1048576 byte limit")
+	Raw := FSReadBytesStrict(Path)
+	if Raw.Size != Size
+		return Map("error", "PAC source changed during validation")
+	return _HC_PacDecodeSource(Raw, Maximum)
+}
+
+; Match Fetch's strict BOM handling on this same bounded RAW image. Generic
+; ResponseEncodingValid remains a UTF8-only fact, including for valid UTF16 PAC.
+_HC_PacDecodeSource(Raw, Maximum) {
+	Count := Raw.Size
+	if Count == 0
+		return Map("error", "PAC is empty")
+	if Count > Maximum
+		return Map("error", "PAC is over the 1048576 byte limit")
+	Offset := 0, Encoding := "UTF-8", BigEndian := false
+	if Count >= 3 && NumGet(Raw, 0, "UChar") == 0xEF
+		&& NumGet(Raw, 1, "UChar") == 0xBB && NumGet(Raw, 2, "UChar") == 0xBF
+		Offset := 3
+	else if Count >= 2 {
+		First := NumGet(Raw, 0, "UChar"), Second := NumGet(Raw, 1, "UChar")
+		if (First == 0xFF && Second == 0xFE) || (First == 0xFE && Second == 0xFF) {
+			Offset := 2, BigEndian := First == 0xFE
+			Encoding := BigEndian ? "UTF-16BE" : "UTF-16LE"
+		}
+	}
+	Bytes := Count - Offset
+	if Bytes == 0
+		return Map("error", "PAC is empty")
+	if Encoding == "UTF-8" {
+		if !HTTPIsValidUtf8(Raw.Ptr + Offset, Bytes)
+			return Map("error", "PAC encoding is invalid")
+		Body := StrGet(Raw.Ptr + Offset, -Bytes, "UTF-8")
+		NormalizedBytes := Bytes
+	} else {
+		if Mod(Bytes, 2)
+			return Map("error", "PAC UTF-16 has an incomplete code unit")
+		Units := Bytes // 2
+		WidePtr := Raw.Ptr + Offset
+		if BigEndian {
+			Wide := Buffer(Bytes, 0)
+			Loop Units {
+				At := (A_Index - 1) * 2
+				Unit := (NumGet(Raw, Offset + At, "UChar") << 8) | NumGet(Raw, Offset + At + 1, "UChar")
+				NumPut("UShort", Unit, Wide, At)
+			}
+			WidePtr := Wide.Ptr
+		}
+		; Explicit UTF16 unit count and WC_ERR_INVALID_CHARS reject unpaired
+		; surrogates before StrGet, which otherwise copies them unchanged.
+		NormalizedBytes := DllCall("Kernel32\WideCharToMultiByte", "UInt", 65001, "UInt", 0x80,
+			"Ptr", WidePtr, "Int", Units, "Ptr", 0, "Int", 0, "Ptr", 0, "Ptr", 0, "Int")
+		if NormalizedBytes == 0
+			return Map("error", "PAC encoding is invalid")
+		if NormalizedBytes > Maximum
+			return Map("error", "PAC is over the 1048576 byte limit")
+		Body := StrGet(WidePtr, -Units, "UTF-16")
+	}
+	if RegExMatch(Body, "\x00")
+		return Map("error", "PAC contains a null character")
+	return Map("body", Body, "raw_bytes", Count, "normalized_bytes", NormalizedBytes, "encoding", Encoding)
 }
 
 ; The local AI backend answers its version endpoint.
