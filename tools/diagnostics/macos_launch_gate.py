@@ -534,7 +534,8 @@ def quit_evidence_detail(evidence):
         f"{name} left after {seconds} s" for name, seconds in evidence["exits"].items()
     )
     still = ", ".join(evidence["survivors"]) or "none by the final check"
-    return f" (still running: {still}" + (f"; {gone}" if gone else "") + ")"
+    answer = "; the Quit AppleEvent was never answered" if evidence.get("unanswered") else ""
+    return f" (still running: {still}" + (f"; {gone}" if gone else "") + answer + ")"
 
 
 def check_state(scenario, state, home):
@@ -608,12 +609,18 @@ def quit_application(bundle_id, executables, evidence=None):
     exits = {}
     if evidence is not None:
         evidence["exits"] = exits
-    subprocess.run(
-        ["osascript", "-e", f'tell application id "{bundle_id}" to quit'],
-        capture_output=True,
-        text=True,
-        timeout=QUIT_TIMEOUT_SECONDS,
-    )
+    try:
+        subprocess.run(
+            ["osascript", "-e", f'tell application id "{bundle_id}" to quit'],
+            capture_output=True,
+            text=True,
+            timeout=QUIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        # An application that never answers the AppleEvent is a different failure from
+        # one that answers and then lingers; record which, and keep timing the exits.
+        if evidence is not None:
+            evidence["unanswered"] = True
     while time.monotonic() - started < QUIT_TIMEOUT_SECONDS:
         alive = [executable for executable in executables if processes(executable)]
         for executable in executables:

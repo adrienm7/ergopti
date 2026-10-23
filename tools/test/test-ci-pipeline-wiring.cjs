@@ -763,6 +763,7 @@ const STEP_CONDITIONS = [
 	[MACOS_BOX, 'package-macos', 'Generate Sparkle appcast', 'inputs.release'],
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
+	[MACOS_BOX, 'launch', 'Retain failed launch evidence of this attempt', 'failure()'],
 	[
 		MACOS_BOX,
 		'launch',
