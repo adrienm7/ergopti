@@ -66,7 +66,7 @@ local function make_fixture()
 	reads.count = 0
 	return {
 		tracker = tracker, state = state, reads = reads, logged = logged,
-		changed = function() callback(element, "AXValueChanged", observer, nil) end,
+		changed = function() callback(observer, element, "AXValueChanged", nil) end,
 	}
 end
 
