@@ -1,21 +1,15 @@
 ﻿; tests/meta/infra/dispatch/test_tickcount_lib_wrap.ahk
 
 ; ==============================================================================
-; MODULE: A_TickCount Wrap Guard — infra/ files meta test
+; MODULE: Historical Tick Arithmetic Guards
 ; DESCRIPTION:
-; Static source guard for the A_TickCount 49-day wrap-around fix applied to
-; four infra/ files: tooltip.ahk, metrics/metrics_filters.ahk, healthcheck.ahk,
-; and crash_reporter.ahk.
+; The pinned AHK v2 runtime reads A_TickCount through GetTickCount64. A process
+; uptime therefore retains its full elapsed seconds instead of a DWORD remainder.
+; The two uptime registration names remain historical labels for replay identity.
 ;
-; ROOT CAUSE ENCODED:
-; A_TickCount is a 32-bit unsigned counter (~49.7 days). AHK v2 evaluates
-; subtraction in 64-bit signed arithmetic, so (now - past) after a wrap yields
-; a large negative number. Any comparison against a positive threshold then
-; always evaluates as false: grace timers never expire, uptime reports negative
-; values, and focus-cache TTLs are never honoured.
-;
-; The fix applies `& 0xFFFFFFFF` to every raw subtraction before comparing,
-; extracting the unsigned 32-bit remainder and making the delta wrap-safe.
+; The other five historical guards are unchanged. Their short-lived timing
+; contracts do not establish a 32-bit native clock or a full-session uptime cap.
+; Native source-derived uptime units exercise both ordinary and long durations.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -90,14 +84,28 @@ Test("tickcount-wrap: metrics_filters.ahk focus TTL comparison uses & 0xFFFFFFFF
 ; ================================================================
 
 _TCLW_HealthCheckWrapSafe() {
-	Src := _DriverDirConcat("ui/healthcheck")
-	Assert(Src != "", "the ui/healthcheck module must be readable")
-
-	Assert(!InStr(Src, "UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000"),
-		"healthcheck.ahk must not use bare subtraction without & 0xFFFFFFFF mask (tickcount-wrap)")
-
-	Assert(InStr(Src, "(_HealthCheckStartMs) & 0xFFFFFFFF) // 1000") > 0,
-		"healthcheck.ahk must mask the uptime delta with & 0xFFFFFFFF (tickcount-wrap)")
+	; Keep the historical registration name while enforcing the native64 domain.
+	global _DriverDir
+	Owner := _DriverProductionFileForSymbol("HealthCheck_Run", _DriverDir)
+	Src := FSReadStrict(Owner), Code := _DriverMaskNonCode(&Src)
+	Origin := "m)^global[ `t]+_HealthCheckStartMs[ `t]*:=[ `t]*A_TickCount[ `t]*$"
+	Position := RegExMatch(Code, Origin, &Found)
+	Assert(Position > 0 && !RegExMatch(Code, Origin, , Position + Found.Len[0]),
+		"The session uptime must retain exactly one genuine native clock origin at module load")
+	Body := _DriverFuncBody("HealthCheck_Run")
+	Assert(Body != "", "The actual healthcheck uptime consumer must resolve")
+	Code := _DriverMaskNonCode(&Body)
+	Pattern := "m)^[ `t]*UptimeSec[ `t]*:=[^`r`n]*\b_HealthCheckStartMs\b[^`r`n]*$"
+	Position := RegExMatch(Code, Pattern, &Found)
+	Assert(Position > 0 && !RegExMatch(Code, Pattern, , Position + Found.Len[0]),
+		"HealthCheck_Run must have exactly one real uptime assignment reading its origin")
+	Statement := Found[0]
+	for Token in ["A_TickCount", "_HealthCheckStartMs"]
+		Assert(RegExMatch(Statement, "\b" . Token . "\b") && _TCLW_CountOccurrences(Statement, Token) == 1,
+			"The healthcheck assignment must use each genuine clock operand once: " . Token)
+	Assert(RegExMatch(Statement, "//[ `t]*1000[ `t]*$"), "The healthcheck reports elapsed seconds")
+	Assert(!RegExMatch(Statement, "[&|^]|\b(?:Mod|TickElapsed)\s*\(|\b(?:0x[fF]{8}|429496729[56])\b"),
+		"Healthcheck uptime must not narrow the native64 elapsed duration")
 }
 Test("tickcount-wrap: healthcheck.ahk uptime division uses & 0xFFFFFFFF mask", _TCLW_HealthCheckWrapSafe)
 
@@ -111,14 +119,23 @@ Test("tickcount-wrap: healthcheck.ahk uptime division uses & 0xFFFFFFFF mask", _
 ; ================================================================
 
 _TCLW_CrashReporterWrapSafe() {
-	Src := _TCLW_ReadSource("modules/diagnostics/crash_reporter.ahk")
-	Assert(Src != "", "modules/diagnostics/crash_reporter.ahk must be readable")
-
-	Assert(!InStr(Src, "UptimeSec := (A_TickCount - _HealthCheckStartMs) // 1000"),
-		"crash_reporter.ahk must not use bare subtraction without & 0xFFFFFFFF mask (tickcount-wrap)")
-
-	Assert(InStr(Src, "(_HealthCheckStartMs) & 0xFFFFFFFF) // 1000") > 0,
-		"crash_reporter.ahk must mask the uptime delta with & 0xFFFFFFFF (tickcount-wrap)")
+	; Both real report paths share the full-session uptime contract.
+	for Name in ["CrashReport_Build", "_CrashReport_CheapSnapshot"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", "The actual crash uptime consumer must resolve: " . Name)
+		Code := _DriverMaskNonCode(&Body)
+		Pattern := "m)^[ `t]*UptimeSec[ `t]*:=[^`r`n]*\b_HealthCheckStartMs\b[^`r`n]*$"
+		Position := RegExMatch(Code, Pattern, &Found)
+		Assert(Position > 0 && !RegExMatch(Code, Pattern, , Position + Found.Len[0]),
+			"Each report must have exactly one real uptime assignment reading its origin: " . Name)
+		Statement := Found[0]
+		for Token in ["A_TickCount", "_HealthCheckStartMs"]
+			Assert(RegExMatch(Statement, "\b" . Token . "\b") && _TCLW_CountOccurrences(Statement, Token) == 1,
+				"Each report assignment must use each genuine clock operand once: " . Name . "/" . Token)
+		Assert(RegExMatch(Statement, "//[ `t]*1000[ `t]*$"), "The report publishes elapsed seconds: " . Name)
+		Assert(!RegExMatch(Statement, "[&|^]|\b(?:Mod|TickElapsed)\s*\(|\b(?:0x[fF]{8}|429496729[56])\b"),
+			"Crash report uptime must not narrow the native64 elapsed duration: " . Name)
+	}
 }
 Test("tickcount-wrap: crash_reporter.ahk uptime division uses & 0xFFFFFFFF mask", _TCLW_CrashReporterWrapSafe)
 
