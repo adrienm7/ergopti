@@ -653,3 +653,34 @@ helpers.describe("registry workflows lose publication authority at terminal shut
 		end)
 	end)
 end)
+
+helpers.describe("native installed-layout record publication", function()
+	local cases = { "healthy", "stage_fifo", "stage_symlink", "stage_hardlink", "stage_regular", "stage_directory" }
+	for _, boundary in ipairs({ "write", "close", "read", "read_close", "rename" }) do
+		for _, refusal in ipairs({ "nil", "false", "throw" }) do cases[#cases + 1] = boundary .. "_" .. refusal end
+	end
+	for _, kind in ipairs(cases) do
+		helpers.it("(layout-record-publication) preserves the production registry on " .. kind, function()
+			local Shell = require("adapters.shell_runner")
+			local folder = os.tmpname()
+			assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
+			local okay, detail = xpcall(function()
+				local environment, directories = { "env" }, {}
+				for _, pair in ipairs({ { "XDG_CONFIG_HOME", "config" }, { "XDG_DATA_HOME", "data" },
+					{ "XDG_CACHE_HOME", "cache" }, { "XDG_STATE_HOME", "state" }, { "XDG_RUNTIME_DIR", "runtime" } }) do
+					directories[#directories + 1] = Shell.quote(folder .. "/" .. pair[2])
+					environment[#environment + 1] = pair[1] .. "=" .. Shell.quote(folder .. "/" .. pair[2])
+				end
+				assert(Shell.run("mkdir -m 700 -- " .. table.concat(directories, " ")))
+				local fixture = helpers.driver_root() .. "/tests/fixtures/native_layout_registry_record.lua"
+				helpers.assert_true(Shell.run(table.concat(environment, " ") .. " timeout --kill-after=2 10 "
+					.. Shell.quote(assert(arg[-1])) .. " " .. Shell.quote(fixture) .. " " .. Shell.quote(folder) .. " " .. Shell.quote(kind)),
+					"the actual public uninstall must retain other installed layouts across native failures")
+				local file = assert(io.open(folder .. "/complete", "rb"))
+				helpers.assert_eq(file:read("*a"), "complete"); assert(file:close())
+			end, debug.traceback)
+			assert(Shell.run("rm -rf -- " .. Shell.quote(folder)))
+			if not okay then error(detail, 0) end
+		end)
+	end
+end)

@@ -292,6 +292,14 @@ end
 local function default_deps(settings)
 	local local_dir = ConfigPaths.config(settings.local_folder) .. "/"
 	local driver_root = Paths.driver_root()
+	local installed_path = local_dir .. settings.installed_file
+	local function write(path, content)
+		if path ~= installed_path then return FileSystem.write(path, content) end
+		-- A refused buffered overwrite must not sacrifice every installed layout.
+		local source, status, detail = FileSystem.read_with_status(path)
+		if status ~= "ok" and status ~= "absent" then return false, detail or status end
+		return FileSystem.write_if_unchanged(path, content, { status = status, content = source })
+	end
 	-- curl records the response ETag in this file (--etag-save); the transport
 	-- reads it back so the shared refresh sees a header like on every driver.
 	local etag_capture = local_dir .. ".index.etag.download"
@@ -326,7 +334,7 @@ local function default_deps(settings)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = FileSystem.read,
-		write = FileSystem.write,
+		write = write,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
 		ensure_dir = ensure_dir,
