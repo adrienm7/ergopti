@@ -90,3 +90,5 @@ _ROIP_TransactionPublishesBoundedSurvivors() {
 }
 Test("keystats ROI: prune transaction swaps bounded survivors (roi-prune-bounded)",
 	_ROIP_TransactionPublishesBoundedSurvivors)
+
+#Include test_roi_halflife_native64_owner.ahk
