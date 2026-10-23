@@ -33,10 +33,12 @@ final class ManagedLookupStageTests: XCTestCase {
 	}
 
 	func testMoreRoutesThanTheBoundNameTheRoutesStage() {
+		// CFNetwork lists the PAC entry beside its own fallback, so the bound must
+		// admit those initial entries and only the script's routes may exceed it.
 		let settings: [String: Any] = [kCFNetworkProxiesProxyAutoConfigEnable as String: 1,
 			kCFNetworkProxiesProxyAutoConfigJavaScript as String:
-				"function FindProxyForURL(url, host) { return 'PROXY selected.example:3111; DIRECT'; }"]
-		let result = ManagedProxyLookup.resolve(url: origin, budget: 20, maximumSelections: 1,
+				"function FindProxyForURL(url, host) { return 'PROXY a.example:3111; PROXY b.example:3112; PROXY c.example:3113; DIRECT'; }"]
+		let result = ManagedProxyLookup.resolve(url: origin, budget: 20, maximumSelections: 2,
 			settingsProvider: { settings as CFDictionary })
 		XCTAssertEqual(stage(of: result), .proxyRoutes)
 	}
