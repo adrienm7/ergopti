@@ -1,0 +1,13 @@
+{
+	"expected_count": 5,
+	"filters": [
+		{
+			"contains": "wpm-empty-source-hold-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "diagnostics-pac-byte-boundary",
+			"expected_count": 3
+		}
+	]
+}
