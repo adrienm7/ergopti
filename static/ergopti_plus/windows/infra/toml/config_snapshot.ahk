@@ -302,8 +302,10 @@ ParseConfigTomlFile(Path) {
 	try {
 		_TOML_InvalidateParseCache(Path)
 		_ParseTomlCache[Path] := Snapshot.Cache
-		if IsSet(_TomlFileCache)
+		if IsSet(_TomlFileCache) {
+			_TomlLoaderInvalidateCacheRead(Path)
 			_TomlFileCache[Path] := Snapshot.Source
+		}
 		_ConfigTomlSnapshots[Path] := Snapshot
 	} finally Critical(PreviousCritical)
 	return Snapshot.Cache
