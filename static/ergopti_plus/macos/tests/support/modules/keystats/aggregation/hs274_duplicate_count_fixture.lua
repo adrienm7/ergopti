@@ -472,7 +472,7 @@ local function with_private_window_callback(vector, body)
 				controls.ax = function(is_secure)
 					helpers.assert_eq(controls.unsubscribes, 0, "The native window subscription must remain active during AX overlap")
 					local roles, subroles = controls.role_reads, controls.subrole_reads
-					controls.ax_callback(is_secure and secure or ordinary, "AXFocusedUIElementChanged", observer)
+					controls.ax_callback(observer, is_secure and secure or ordinary, "AXFocusedUIElementChanged", {})
 					helpers.assert_eq(controls.role_reads, roles + 1)
 					helpers.assert_eq(controls.subrole_reads, subroles + 1)
 					controls.expected_secure = is_secure

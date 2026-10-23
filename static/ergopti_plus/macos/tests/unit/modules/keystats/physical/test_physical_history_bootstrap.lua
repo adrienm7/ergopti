@@ -148,7 +148,7 @@ local function with_fixture(callback)
 				end)
 		end
 		controls.activate = function() return tracker.app_watcher_cb("Editor", 1, app) end
-		controls.focus = function(focused) return controls.ax_callback(focused, "AXFocusedUIElementChanged", observer) end
+		controls.focus = function(focused) return controls.ax_callback(observer, focused, "AXFocusedUIElementChanged", {}) end
 		controls.element, controls.app, controls.observer = element, app, observer
 		controls.window, controls.window_app = window, window_app
 		controls.detector = require("adapters.secure_field_detector")
