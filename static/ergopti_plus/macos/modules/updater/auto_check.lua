@@ -46,7 +46,8 @@ local Paths     = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec = require("adapters.json_codec")
 local Schedule  = require("updater.schedule")
-local Parser    = require("updater.release_parser")
+local ListCache = require("updater.list_cache")
+local Parser   = require("updater.release_parser")
 local CheckResult = require("updater.check_result")
 local RateLimit = require("updater.rate_limit")
 local ReleaseSources = require("updater.release_sources")
@@ -251,12 +252,12 @@ function M.new(opts)
 	local function load_list_cache()
 		local stored = opts.storage.get(config.list_key, nil)
 		if stored == nil then return nil end
-		if type(stored) ~= "table" or stored.url ~= config.releases_url or type(stored.etag) ~= "string"
-			or stored.etag == "" or type(stored.body) ~= "string" or not stored.body:match("^%s*%[") then
-			Logger.warn(LOG, "Dropped the unusable stored copy of the release list.")
+		local copy, reason = ListCache.validate(stored, config.releases_url)
+		if not copy then
+			Logger.warn(LOG, "Dropped the unusable stored copy of the release list: %s.", reason)
 			return nil
 		end
-		return stored
+		return copy
 	end
 	list_cache = load_list_cache()
 

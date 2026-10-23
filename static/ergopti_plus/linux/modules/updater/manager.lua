@@ -19,9 +19,11 @@
 ---    through libuv. Release checks therefore never block keyboard processing.
 --- 2. ETag caching: stores the GitHub ETag header per channel in a temp file
 ---    so background checks that return 304 Not Modified do not count against
----    the API rate limit. A 304 has no body: it reuses the list this process
----    read, and a request is conditional only while that list is held, so the
----    first request after a start is a full one.
+---    the API rate limit. A 304 has no body: it reuses the list held for that
+---    ETag, and a request is conditional only while that list is held. The
+---    lists are kept in the Storage port (_shared/lua/updater/list_cache.lua
+---    validates them), so the first request after a start is conditional too,
+---    provided the ETag file still names the stored list.
 --- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
 ---    which requires no full JSON decoder.
 --- 4. Shared channels: every channel reads the same release list and keeps its
@@ -54,6 +56,7 @@ local CheckResult = require("updater.check_result")
 local RateLimit = require("updater.rate_limit")
 local Channels  = require("updater.channels")
 local Schedule  = require("updater.schedule")
+local ListCache = require("updater.list_cache")
 local Installer = require("modules.updater.installer")
 local Json      = require("json")
 local TomlCodec = require("toml_codec")
@@ -204,6 +207,21 @@ end
 
 local CHECK_STATE_KEY = require_state_key(_defs)
 M.CHECK_STATE_KEY = CHECK_STATE_KEY
+
+--- Resolves the Storage key of the release-list copies, distinct from the check record.
+--- @param defs table Parsed updater defaults.
+--- @return string key
+local function require_list_key(defs)
+	local section = type(defs) == "table" and defs.check_state or nil
+	local key = type(section) == "table" and section.list_storage_key or nil
+	if type(key) ~= "string" or key == "" or key == CHECK_STATE_KEY then
+		error("updater defaults do not declare a distinct check_state.list_storage_key", 0)
+	end
+	return key
+end
+
+local LIST_CACHE_KEY = require_list_key(_defs)
+M.LIST_CACHE_KEY = LIST_CACHE_KEY
 
 -- Wall clock in epoch seconds; a test seam.
 M._now = os.time
@@ -415,6 +433,65 @@ end
 
 M._load_check_state = _load_check_state
 
+-- The release-list copies a 304 is answered from, kept in the Storage port so
+-- the first request after a restart is conditional too (the anonymous API
+-- quota is 60 requests per hour and a full list spends one per page).
+local _list_cache_loaded = false
+local _list_cache_saved  = ""   -- signature of the copies the Storage port holds
+
+--- A comparable signature of the copies in memory: a copy changes when its
+--- validator, its endpoint or its page set does.
+--- @return string
+local function _list_cache_signature()
+	local parts = {}
+	for key, entry in pairs(_list_cache) do
+		parts[#parts + 1] = key .. "\0" .. entry.validator .. "\0" .. entry.effective_url
+	end
+	table.sort(parts)
+	return table.concat(parts, "\n")
+end
+
+--- Reads the stored copies once, dropping the ones that are not whole copies.
+--- A restored copy is marked: its validator must still name the ETag file
+--- curl saved, which is checked when a request is built.
+local function _load_list_cache()
+	if _list_cache_loaded then return end
+	_list_cache_loaded = true
+	local stored = _storage_get(LIST_CACHE_KEY, nil)
+	if stored == nil then return end
+	if type(stored) ~= "table" then
+		Logger.warn(LOG, "Dropped the unusable stored copy of the release list.")
+		return
+	end
+	for key, raw in pairs(stored) do
+		local copy, reason = ListCache.validate(raw)
+		if copy and type(key) == "string" and _list_cache[key] == nil then
+			_list_cache[key] = { body = copy.body, validator = copy.etag, effective_url = copy.url, restored = true }
+		else
+			Logger.warn(LOG, "Dropped a stored release-list copy: %s.", tostring(reason or "its key is not a text"))
+		end
+	end
+	_list_cache_saved = _list_cache_signature()
+	Logger.debug(LOG, "Release-list copies restored from storage.")
+end
+
+--- Writes the copies held now, only when they changed since the last write.
+--- A refused write leaves this session's copies; the next start sends a full request.
+local function _persist_list_cache()
+	local signature = _list_cache_signature()
+	if signature == _list_cache_saved then return end
+	local entries = {}
+	for key, entry in pairs(_list_cache) do
+		local copy = ListCache.entry(entry.effective_url, entry.validator, entry.body)
+		if copy then entries[key] = copy end
+	end
+	if _storage_set(LIST_CACHE_KEY, next(entries) ~= nil and entries or nil) then
+		_list_cache_saved = signature
+	else
+		Logger.error(LOG, "The release-list copies could not be saved; this session keeps them.")
+	end
+end
+
 local function _load_persisted()
 	local persisted = _read_persisted_channel(_config_path)
 	_channel_persisted = persisted ~= nil
@@ -468,6 +545,7 @@ end
 --- @return table headers
 --- @return table options
 local function _build_fetch_request(channel, page)
+	_load_list_cache()
 	local cache_key = page and (channel .. "-page-" .. page .. "-size-" .. RELEASE_PAGE_SIZE) or channel
 	local etag_file = etag_cache_path(cache_key)
 	local parent = etag_file:match("^(.*)/[^/]+$")
@@ -488,6 +566,15 @@ local function _build_fetch_request(channel, page)
 		options.etag_affinity = true
 		options.etag_save = etag_file
 		local cached = _list_cache[cache_key]
+		-- A copy from an earlier run is paired with the ETag file only when that
+		-- file still names the copy's validator; otherwise the request is a full one.
+		if type(cached) == "table" and cached.restored == true then
+			local saved = Fs.read(etag_file)
+			if type(saved) ~= "string" or saved:gsub("[\r\n]", "") ~= cached.validator then
+				Logger.info(LOG, "The stored release list no longer matches the saved ETag; the request is a full one.")
+				_list_cache[cache_key], cached = nil, nil
+			end
+		end
 		if type(cached) == "table" and type(cached.validator) == "string"
 			and type(cached.effective_url) == "string" and Fs.exists(etag_file) then
 			options.etag_compare = etag_file
@@ -531,6 +618,7 @@ local function _fetch_releases(channel, callback)
 		-- older cached body. Successfully accepted pages retain their association.
 		if body == nil and active_key then _list_cache[active_key] = nil end
 		if _release_fetch_cancel == cancel then _release_fetch_cancel = nil end
+		_persist_list_cache()
 		callback(body, status, err, reason)
 	end
 	local function page_current(work)
