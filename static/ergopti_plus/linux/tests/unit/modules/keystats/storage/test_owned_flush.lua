@@ -49,6 +49,79 @@ local function with_collector(body, launch)
 end
 
 helpers.describe("owned SQLite collector flush", function()
+	for _, phase in ipairs({ "pending", "rollback", "stopping", "healthy" }) do
+		it("rendered session reset preserves its real " .. phase .. " acknowledgement", function()
+			with_collector(function(k, ops)
+				local Logger, I18n = require("logger.shim"), require("infra.i18n")
+				local startup, menu_name = "ui.menu.start_at_login", "ui.menu.menu_builder"
+				local old_startup, old_menu = package.loaded[startup], package.loaded[menu_name]
+				package.loaded[startup] = { command_available = function() return false end,
+					enabled = function() return false end }
+				local info, failure = Logger.info, Logger.error
+				local successes, refusals = 0, 0
+				Logger.info = function(tag, message, ...)
+					if message == "Metrics session reset." then successes = successes + 1 end
+					return info(tag, message, ...)
+				end
+				Logger.error = function(tag, message, ...)
+					if message == "Metrics session reset was refused; the session is unchanged." then refusals = refusals + 1 end
+					return failure(tag, message, ...)
+				end
+				local ok, err = xpcall(function()
+					k.on_keydown("a", 1000, "owned")
+					if phase ~= "healthy" then
+						assert_false(k.flush())
+						if phase == "rollback" then
+							ops[1].outcome, ops[1].physical = "abort", true
+							assert_false(k.pump_flush())
+						elseif phase == "stopping" then assert_false(k.stop()) end
+						helpers.assert_true(k.has_flush_debt())
+					end
+					local menu = helpers.load_module("ui.menu.menu_builder").build({ keystats = k })
+					local reset
+					for _, parent in ipairs(menu) do
+						if parent.title == I18n.get("menu.metrics.title") then
+							for _, row in ipairs(parent.menu or {}) do
+								if row.title == I18n.get("menu.metrics.reset_session") then reset = row end
+							end
+						end
+					end
+					helpers.assert_true(type(reset) == "table" and type(reset.fn) == "function")
+					helpers.assert_eq(reset.disabled == true, false)
+					local generation = k.get_flush_status().generation
+					local result = reset.fn()
+					if phase == "healthy" then
+						helpers.assert_eq(k._pending_buffer_count_for_test(), 0)
+						helpers.assert_true(k.get_flush_status().generation > generation)
+						helpers.assert_eq(successes, 1)
+						helpers.assert_eq(refusals, 0)
+						helpers.assert_true(result)
+					else
+						helpers.assert_eq(k._pending_buffer_count_for_test(), 1)
+						helpers.assert_eq(k.get_flush_status().generation, generation)
+						helpers.assert_true(k.has_flush_debt())
+						helpers.assert_eq(successes, 0, "A refused reset must not announce success")
+						helpers.assert_eq(refusals, 1)
+						assert_false(result)
+						if phase ~= "stopping" then
+							ops[1].outcome, ops[1].physical = "commit", true
+							helpers.assert_true(k.pump_flush())
+							assert_false(k.has_flush_debt())
+							k.on_keydown("b", 1100, "owned")
+							helpers.assert_true(reset.fn(), "The same public action must work after the real ACK")
+							helpers.assert_eq(k._pending_buffer_count_for_test(), 0)
+							helpers.assert_eq(successes, 1)
+							helpers.assert_eq(refusals, 1)
+						end
+					end
+				end, debug.traceback)
+				Logger.info, Logger.error = info, failure
+				package.loaded[startup], package.loaded[menu_name] = old_startup, old_menu
+				if not ok then error(err, 0) end
+			end)
+		end)
+	end
+
 	it("never publishes staged COMMIT before exact physical ACK", function()
 		with_collector(function(k, ops)
 			k.on_keydown("a", 1000, "owned")

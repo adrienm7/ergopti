@@ -3618,10 +3618,14 @@ local function _manifest_metrics_rows(ctx, k)
 		["metrics_reset_session"] = function()
 			if type(k.reset_session) ~= "function" then
 				Logger.error(LOG, "Keystats exposes no reset_session — the row does nothing.")
-				return
+				return false
 			end
-			k.reset_session()
+			if k.reset_session() ~= true then
+				Logger.error(LOG, "Metrics session reset was refused; the session is unchanged.")
+				return false
+			end
 			Logger.info(LOG, "Metrics session reset.")
+			return true
 		end,
 	}
 
