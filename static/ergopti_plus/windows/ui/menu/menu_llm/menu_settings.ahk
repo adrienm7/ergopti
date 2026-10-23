@@ -125,7 +125,7 @@ _LLM_Menu_PrivacySnapshot(Key) {
 		return Snapshot
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
-		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
 		Snapshot["blocked"] := !IsSet(_LLM_Engine) || !(_LLM_Engine is Map)
 			|| !_LLM_Engine.Has("enabled") || !_LLM_Engine.Has("backend") || !_LLM_Engine.Has(Key)
 			|| !ManifestValuesEqual(_LLM_Engine["enabled"], Snapshot["enabled"])
@@ -416,7 +416,7 @@ _LLM_Menu_InfoBarSnapshot() {
 			|| _LLM_Engine["show_info_bar"] != _LLM_Menu["show_info_bar"])
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
-		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
 		for Field, Path in Map("enabled", "llm.enabled", "info_bar", "llm.display.show_info_bar",
 				"backend", "llm.models.selected") {
 			Read := _TOML_DocumentLookup(Document, StrSplit(Path, "."))
@@ -465,7 +465,7 @@ _LLM_Menu_IndentSnapshot() {
 			|| _LLM_Engine["show_all_at_once"] != _LLM_Menu["show_all_at_once"])
 	try {
 		Snapshot["source"] := _LLM_Menu_EnableReadSource()
-		Document := TOML_ParseDocument(FSReadUtf8Exact(ConfigurationFile))
+		Document := TOML_ParseDocumentShared(FSReadUtf8Exact(ConfigurationFile))
 		for Field, Path in Map("enabled", "llm.enabled", "count", "llm.profiles.num_predictions",
 				"indentation", "llm.display.pred_indent", "progressive", "llm.display.streaming_multi",
 				"backend", "llm.models.selected") {

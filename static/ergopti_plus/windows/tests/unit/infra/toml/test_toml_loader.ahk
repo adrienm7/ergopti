@@ -1060,3 +1060,74 @@ _TAOT_LoaderRecordNamespaces() {
 		AssertEqual("", TomlConfigSectionSkipKind(Header), "literal dots and unrelated namespaces must not inherit the exemption")
 }
 Test("toml-aot-sibling: exact record namespaces retain metadata without excusing unrelated configuration", _TAOT_LoaderRecordNamespaces)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 5/ Shared read-only source parses =======
+; =================================================
+; =================================================
+
+_SHP_SameSourceIsParsedOnce() {
+	Source := "[shared_probe_a]`nvalue = 1`n"
+	Before := _TOML_DocumentParses
+	First := TOML_ParseDocumentShared(Source, &Records, &Physical)
+	Second := TOML_ParseDocumentShared(Source "", &Records2, &Physical2)
+	AssertEqual(Before + 1, _TOML_DocumentParses, "an equal source text is parsed exactly once")
+	Assert(First == Second, "equal text yields the same shared document")
+	Assert(Records == Records2 && Physical == Physical2, "the records are shared with the document")
+	AssertEqual(1, First["shared_probe_a"]["value"])
+}
+Test("toml shared parse: equal source text is parsed once (shared-source-parse)", _SHP_SameSourceIsParsedOnce)
+
+_SHP_ChangedSourceIsNeverServedStale() {
+	Before := _TOML_DocumentParses
+	First := TOML_ParseDocumentShared("[shared_probe_b]`nvalue = 1`n")
+	Second := TOML_ParseDocumentShared("[shared_probe_b]`nvalue = 2`n")
+	AssertEqual(Before + 2, _TOML_DocumentParses, "different text is parsed again")
+	AssertEqual(1, First["shared_probe_b"]["value"])
+	AssertEqual(2, Second["shared_probe_b"]["value"], "a changed file never reads the old document")
+}
+Test("toml shared parse: a changed source is never served stale (shared-source-parse)", _SHP_ChangedSourceIsNeverServedStale)
+
+_SHP_MalformedSourceThrowsAndIsNotRemembered() {
+	Bad := "[shared_probe_c`nvalue = 1`n"
+	AssertThrows(() => TOML_ParseDocumentShared(Bad))
+	Before := _TOML_DocumentParses
+	AssertThrows(() => TOML_ParseDocumentShared(Bad))
+	AssertEqual(Before + 1, _TOML_DocumentParses, "a refused source is parsed and refused again")
+	AssertThrows(() => TOML_ParseDocumentShared(123))
+}
+Test("toml shared parse: malformed input keeps throwing and is not remembered (shared-source-parse)",
+	_SHP_MalformedSourceThrowsAndIsNotRemembered)
+
+_SHP_MemoIsBounded() {
+	Before := _TOML_DocumentParses
+	loop 6
+		TOML_ParseDocumentShared("[shared_probe_d]`nvalue = " A_Index "`n")
+	AssertEqual(Before + 6, _TOML_DocumentParses)
+	; The newest four are remembered, the oldest was dropped.
+	TOML_ParseDocumentShared("[shared_probe_d]`nvalue = 6`n")
+	AssertEqual(Before + 6, _TOML_DocumentParses, "the newest source is still remembered")
+	TOML_ParseDocumentShared("[shared_probe_d]`nvalue = 1`n")
+	AssertEqual(Before + 7, _TOML_DocumentParses, "the oldest source was evicted")
+}
+Test("toml shared parse: the memo keeps a bounded number of sources (shared-source-parse)", _SHP_MemoIsBounded)
+
+_SHP_DecodeSnapshotSharesOnlyEqualText() {
+	Source := "[shared_probe_e]`nvalue = 1`n"
+	Before := _TOML_DocumentParses
+	First := ConfigTomlDecodeSnapshotShared(Source)
+	Second := ConfigTomlDecodeSnapshotShared(Source)
+	Independent := ConfigTomlDecodeSnapshot(Source)
+	Assert(First == Second, "equal text shares one decoded snapshot")
+	Assert(First != Independent, "the private decode of the snapshot reader stays independent")
+	AssertEqual(Before + 2, _TOML_DocumentParses, "one shared decode plus one independent decode")
+	Other := ConfigTomlDecodeSnapshotShared("[shared_probe_e]`nvalue = 2`n")
+	Assert(Other != First, "a changed text decodes afresh")
+}
+Test("toml shared parse: the shared snapshot decode is keyed by text and leaves the private decode alone (shared-source-parse)",
+	_SHP_DecodeSnapshotSharesOnlyEqualText)

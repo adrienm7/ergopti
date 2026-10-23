@@ -43,7 +43,7 @@ _EditorPrefGet(Key, Default) {
 		return Default
 	}
 	; Preference keys can be owned by dotted assignments or an inline namespace.
-	Cache := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigurationFile)).Cache
+	Cache := ConfigTomlDecodeSnapshotShared(FSReadStrict(ConfigurationFile)).Cache
 	Val := IniCacheGet(Cache, "personal_editor", Key, "_MISSING_")
 	return (Val == "_MISSING_") ? Default : Val
 }

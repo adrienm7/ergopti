@@ -125,7 +125,7 @@ _LAY_NumberRowSnapshot() {
 			throw TypeError("Number-row source is not readable.")
 		Snapshot["content"] := Content
 		Snapshot["presence"] := Presence
-		Document := TOML_ParseDocument(Content)
+		Document := TOML_ParseDocumentShared(Content)
 		Desired := MasterGateDesiredFeatures(Features)
 		for Path, Expected in Map("layout.direct_access_digits", Snapshot["mode"],
 			"layout.emulated_layout", Desired["layout"].Get("emulated_layout", ""),

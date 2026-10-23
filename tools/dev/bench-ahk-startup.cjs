@@ -124,7 +124,7 @@ async function main() {
 				cache_events: lines.filter((line) =>
 					/Registry parse cache|Active locale.*cache retained/.test(line)
 				),
-				timing: lines.filter((line) => line.includes('[BootProfile]'))
+				timing: lines.filter((line) => /\[(BootProfile|Perf)\]/.test(line))
 			};
 			results.push(result);
 			console.log(JSON.stringify(result));
