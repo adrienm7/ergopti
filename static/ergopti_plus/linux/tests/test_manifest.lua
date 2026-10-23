@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.modules.llm.agent.test_agent_file_receipts",
 	"tests.unit.ui.downloads.test_model_browser_inventory_owner",
 	"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner",
 	"tests.unit.ui.editors.numeric_prompt.test_request_lifetime",
