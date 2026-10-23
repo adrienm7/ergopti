@@ -1,5 +1,5 @@
 {
-	"_comment": "Expansion-delay vectors replayed by the Windows engine (tests/unit/modules/hotstrings/engine/test_time_gate_corpus.ahk) and the macOS delay gate (tests/unit/modules/keymap/test_time_gate_corpus.lua). Definition: the expansion delay is the time between the LAST LETTER OF THE INPUT and the EXPANDER, to decide whether to give the output. The expander is the magic key when the trigger ends with it (the last input letter is then the one just before it), and otherwise the end character that completes the trigger (Space, punctuation...; for the Space tap-hold, the press, not the release). So the reference character is always the character typed immediately before the expander, the reference time is its key-down tick and the end time is the expander's key-down tick. Times are milliseconds on one clock; the gate fires when the elapsed time is below the delay (the exact-equality instant is not a vector: the drivers differ there).",
+	"_comment": "Expansion-delay vectors replayed by the Windows engine (tests/unit/modules/hotstrings/engine/test_time_gate_corpus.ahk) and the macOS delay gate (tests/unit/modules/keymap/test_time_gate_corpus.lua). Definition: the expansion delay is the time between the LAST LETTER OF THE INPUT and the EXPANDER, to decide whether to give the output. The expander is the magic key when the trigger ends with it (the last input letter is then the one just before it), and otherwise the end character that completes the trigger (Space, punctuation...; for the Space tap-hold, the press, not the release). So the reference character is always the character typed immediately before the expander, the reference time is its key-down tick and the end time is the expander's key-down tick. Times are milliseconds on one clock; the configured seconds are rounded to whole milliseconds and compared with the elapsed whole milliseconds; the gate fires when elapsed <= delay (the exact deadline instant fires, one millisecond later does not); a delay of 0 means no gate; a missing reference time fails closed.",
 	"vectors": [
 		{
 			"id": "end_char_within_delay_from_last_letter",
@@ -8,10 +8,19 @@
 			"ends_with_magic": false,
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "p", "down_ms": 0 },
-				{ "char": "r", "down_ms": 250 }
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 250
+				}
 			],
-			"expander": { "char": " ", "down_ms": 550 },
+			"expander": {
+				"char": " ",
+				"down_ms": 550
+			},
 			"reference_char": "r",
 			"elapsed_ms": 300,
 			"fires": true
@@ -23,10 +32,19 @@
 			"ends_with_magic": false,
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "p", "down_ms": 0 },
-				{ "char": "r", "down_ms": 100 }
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
 			],
-			"expander": { "char": " ", "down_ms": 700 },
+			"expander": {
+				"char": " ",
+				"down_ms": 700
+			},
 			"reference_char": "r",
 			"elapsed_ms": 600,
 			"fires": false
@@ -37,8 +55,16 @@
 			"trigger": "r",
 			"ends_with_magic": false,
 			"delay_s": 0.5,
-			"typed": [{ "char": "r", "down_ms": 0 }],
-			"expander": { "char": " ", "down_ms": 400 },
+			"typed": [
+				{
+					"char": "r",
+					"down_ms": 0
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 400
+			},
 			"reference_char": "r",
 			"elapsed_ms": 400,
 			"fires": true
@@ -50,10 +76,19 @@
 			"ends_with_magic": true,
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "a", "down_ms": 0 },
-				{ "char": "t", "down_ms": 100 }
+				{
+					"char": "a",
+					"down_ms": 0
+				},
+				{
+					"char": "t",
+					"down_ms": 100
+				}
 			],
-			"expander": { "char": "★", "down_ms": 400 },
+			"expander": {
+				"char": "★",
+				"down_ms": 400
+			},
 			"reference_char": "t",
 			"elapsed_ms": 300,
 			"fires": true
@@ -65,10 +100,19 @@
 			"ends_with_magic": true,
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "a", "down_ms": 0 },
-				{ "char": "t", "down_ms": 100 }
+				{
+					"char": "a",
+					"down_ms": 0
+				},
+				{
+					"char": "t",
+					"down_ms": 100
+				}
 			],
-			"expander": { "char": "★", "down_ms": 700 },
+			"expander": {
+				"char": "★",
+				"down_ms": 700
+			},
 			"reference_char": "t",
 			"elapsed_ms": 600,
 			"fires": false
@@ -80,10 +124,19 @@
 			"ends_with_magic": true,
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "a", "down_ms": 0 },
-				{ "char": "t", "down_ms": 450 }
+				{
+					"char": "a",
+					"down_ms": 0
+				},
+				{
+					"char": "t",
+					"down_ms": 450
+				}
 			],
-			"expander": { "char": "★", "down_ms": 800 },
+			"expander": {
+				"char": "★",
+				"down_ms": 800
+			},
 			"reference_char": "t",
 			"elapsed_ms": 350,
 			"fires": true
@@ -97,10 +150,19 @@
 			"typed_text": "AT★",
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "A", "down_ms": 0 },
-				{ "char": "T", "down_ms": 100 }
+				{
+					"char": "A",
+					"down_ms": 0
+				},
+				{
+					"char": "T",
+					"down_ms": 100
+				}
 			],
-			"expander": { "char": "★", "down_ms": 400 },
+			"expander": {
+				"char": "★",
+				"down_ms": 400
+			},
 			"reference_char": "T",
 			"elapsed_ms": 300,
 			"fires": true
@@ -112,14 +174,167 @@
 			"ends_with_magic": false,
 			"delay_s": 0.5,
 			"typed": [
-				{ "char": "p", "down_ms": 0 },
-				{ "char": "r", "down_ms": 100 }
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
 			],
-			"expander": { "char": " ", "down_ms": 350 },
+			"expander": {
+				"char": " ",
+				"down_ms": 350
+			},
 			"decided_ms": 750,
 			"reference_char": "r",
 			"elapsed_ms": 250,
 			"fires": true
+		},
+		{
+			"id": "deadline_instant_fires",
+			"description": "pr + Space with r->Space exactly equal to the 0.5 s delay: the exact deadline instant still fires, on every driver.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 600
+			},
+			"reference_char": "r",
+			"elapsed_ms": 500,
+			"fires": true
+		},
+		{
+			"id": "one_millisecond_past_deadline_expires",
+			"description": "The same with r->Space one millisecond longer (501 ms): expired.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 601
+			},
+			"reference_char": "r",
+			"elapsed_ms": 501,
+			"fires": false
+		},
+		{
+			"id": "configured_seconds_round_to_milliseconds",
+			"description": "A delay of 1.005 s is 1005 ms (1.005 * 1000 is 1004.9999999999999 as a float): r->Space of 1005 ms fires.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 1.005,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 50
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 1055
+			},
+			"reference_char": "r",
+			"elapsed_ms": 1005,
+			"fires": true
+		},
+		{
+			"id": "configured_seconds_round_then_expire",
+			"description": "A delay of 1.005 s with r->Space of 1006 ms: expired.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 1.005,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 50
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 1056
+			},
+			"reference_char": "r",
+			"elapsed_ms": 1006,
+			"fires": false
+		},
+		{
+			"id": "zero_delay_has_no_gate",
+			"description": "A delay of 0 means always active, however long the wait.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 5100
+			},
+			"reference_char": "r",
+			"elapsed_ms": 5000,
+			"fires": true
+		},
+		{
+			"id": "missing_reference_time_fails_closed",
+			"description": "No timestamp is known for the reference character: the gate cannot prove the letter was typed recently, so it refuses.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{
+					"char": "p",
+					"down_ms": 0
+				},
+				{
+					"char": "r",
+					"down_ms": 100
+				}
+			],
+			"expander": {
+				"char": " ",
+				"down_ms": 300
+			},
+			"reference_char": "r",
+			"reference_time_missing": true,
+			"fires": false
 		}
 	]
 }

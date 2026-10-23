@@ -773,7 +773,8 @@ helpers.describe("shared hotstring engine — time-gate corpus (time-gate-corpus
 			engine:load_mappings({ mapping })
 			local result
 			for _, key in ipairs(vector.typed) do
-				result = engine:on_char(key.char, { typed_at_ms = key.down_ms })
+				local untimed = vector.reference_time_missing and key.char == vector.reference_char
+				result = engine:on_char(key.char, { typed_at_ms = (not untimed) and key.down_ms or nil })
 			end
 			result = engine:on_char(vector.expander.char, {
 				typed_at_ms = vector.expander.down_ms,
@@ -781,8 +782,12 @@ helpers.describe("shared hotstring engine — time-gate corpus (time-gate-corpus
 				terminator_consumed = false,
 			})
 			helpers.assert_not_nil(result, "the typed text must complete the trigger")
-			helpers.assert_eq(result.expander_gap_ms, vector.elapsed_ms,
-				"the interval is the reference character to the expander")
+			if vector.reference_time_missing then
+				helpers.assert_nil(result.expander_gap_ms, "no reference time, no interval")
+			else
+				helpers.assert_eq(result.expander_gap_ms, vector.elapsed_ms,
+					"the interval is the reference character to the expander")
+			end
 			helpers.assert_eq(engine_mod.within_expansion_delay(result, vector.delay_s, 0), vector.fires,
 				"the delay gate verdict")
 		end)

@@ -123,8 +123,12 @@ Windows builds it with `HSE_TimeGateReferenceChar` and passes the press tick
 (`TapHoldRollTapDownTick`); macOS measures the preceding-key interval; Linux
 reports `expander_gap_ms`. The vectors in
 `_shared/tests/corpus/hotstrings/time_gate_vectors.json` are replayed by all
-three drivers. The exact-equality instant is deliberately not a vector (Windows
-and Linux fire at it, macOS expires there).
+three drivers. Parity pinned by those vectors: the configured seconds are rounded
+to whole milliseconds and compared with the elapsed whole milliseconds, the exact
+deadline instant fires and one millisecond later does not, a delay of 0 is no
+gate, and a missing reference time fails closed. Known difference kept on
+purpose: macOS widens the window for Shift/Alt-complex keystrokes
+(`COMPLEX_DELAY_MULT`), the other drivers have no such multiplier.
 
 ### project-hotstring-case-flags-are-orthogonal
 

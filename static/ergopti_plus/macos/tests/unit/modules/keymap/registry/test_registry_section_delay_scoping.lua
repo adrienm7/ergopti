@@ -182,7 +182,9 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 			helpers.assert_not_nil(mapping)
 			helpers.assert_eq(state.resolve_mapping_delay(mapping), 2)
 			helpers.assert_true(state.mapping_delay_remaining(mapping, 1.9))
-			helpers.assert_eq(state.mapping_delay_remaining(mapping, 2), false)
+			helpers.assert_eq(state.mapping_delay_remaining(mapping, 2), true,
+				"the exact deadline instant fires")
+			helpers.assert_eq(state.mapping_delay_remaining(mapping, 2.001), false)
 		end)
 	end)
 

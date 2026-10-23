@@ -232,7 +232,12 @@ function M.new(defaults, delays_default)
 	--- comparison; the caller supplies elapsed time so no consumer reads another
 	--- consumer's transient clock state.
 	--- @param m table Registry mapping.
-	--- @param elapsed number Seconds since the preceding physical key.
+	--- The comparison is in whole milliseconds, as on Windows (the configured seconds
+	--- rounded to milliseconds against the elapsed milliseconds) and Linux: the exact
+	--- deadline instant still fires, one millisecond later does not. A missing elapsed
+	--- time fails closed, as there. The tooltip never promises a zero-length window
+	--- (see literal_preview_allowed in llm_bridge.lua).
+	--- @param elapsed number|nil Seconds since the preceding physical key.
 	--- @param complex_mult number|nil Modifier timing multiplier (defaults to 1).
 	--- @return boolean allowed
 	--- @return number|nil remaining Nil means the mapping has no deadline.
@@ -243,12 +248,12 @@ function M.new(defaults, delays_default)
 		-- on letter combos, not modifier+letter sequences).
 		local allowed_delay = m and m.group == "autocorrection"
 			and specific_delay or (specific_delay * multiplier)
-		if allowed_delay == 0 then return true, nil end
-		local remaining = allowed_delay - math.max(0, tonumber(elapsed) or 0)
-		-- Deadlines are half-open. Tooltip dequeue expires a row when now >=
-		-- expire_at; accepting the mapping at equality would let callback order
-		-- decide whether the same timestamp still owns a visible promise.
-		return remaining > 0, math.max(0, remaining)
+		local allowed_ms = math.floor(allowed_delay * 1000 + 0.5)
+		if allowed_ms <= 0 then return true, nil end
+		if type(elapsed) ~= "number" or elapsed ~= elapsed then return false, 0 end
+		local elapsed_ms = math.floor(math.max(0, elapsed) * 1000 + 0.5)
+		local remaining_ms = allowed_ms - elapsed_ms
+		return remaining_ms >= 0, math.max(0, remaining_ms) / 1000
 	end
 
 	s.suppress_rescan_keep_buffer = function(duration)
