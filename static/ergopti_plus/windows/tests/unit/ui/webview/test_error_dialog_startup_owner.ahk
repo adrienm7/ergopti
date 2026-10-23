@@ -32,6 +32,7 @@ _EDOT_Generated(Symbol) {
 _EDOT_Source(Root) {
 	global _DriverDir, _SharedDir
 	Source := "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
+		. "OnError(_EDOS_BootError)`n" . '_EDOS_Phase("autoexecute-entry")' . "`n"
 		. "global _EDOS_Root := " . _EDOT_Quote(Root) . "`n"
 		. "global _SharedDir := " . _EDOT_Quote(Root . "\shared") . "`n"
 		. "global _VendorDir := " . _EDOT_Quote(Root . "\vendor") . "`n"
@@ -39,10 +40,14 @@ _EDOT_Source(Root) {
 		. "global _LogsDir := " . _EDOT_Quote(Root . "\logs\") . "`n"
 		. "global ConfigurationFile := " . _EDOT_Quote(Root . "\config\absent.toml") . "`n"
 		. 'global _AhkSubDir := "autohotkey\", _ALTGR_KANA_FIXUP := false' . "`n"
-	for Vendor in ["Promise.ahk", "ComVar.ahk", "WebView2.ahk"]
+	for Vendor in ["Promise.ahk", "ComVar.ahk", "WebView2.ahk"] {
 		Source .= "#Include " . _DriverDir . "\vendor\" . Vendor . "`n"
-	for Symbol in ["AppDirsFolderName", "WindowTitle", "LoggerSubFilesData", "UpdateChannelRegistryData", "UpdateScheduleData"]
+		Source .= "_EDOS_Phase(" . _EDOT_Quote("included vendor " . Vendor) . ")`n"
+	}
+	for Symbol in ["AppDirsFolderName", "WindowTitle", "LoggerSubFilesData", "UpdateChannelRegistryData", "UpdateScheduleData"] {
 		Source .= "#Include " . _EDOT_Generated(Symbol) . "`n"
+		Source .= "_EDOS_Phase(" . _EDOT_Quote("included generated " . Symbol) . ")`n"
+	}
 	Owners := Map()
 	for Symbol in ["JsonStringLiteral", "CryptoSha256Bytes", "FSReadBytesStrict", "HTTPIsValidUtf8", "WallClockTimestamp", "TickElapsed64",
 		"_LoggerPrivacyConfig", "ErrorPolicy_Decide", "ManifestFindEntryByPath", "ConfigBindingIdentityTapPublication", "TapKeyBindingId",
@@ -55,9 +60,11 @@ _EDOT_Source(Root) {
 		if !Owners.Has(Owner) {
 			Owners[Owner] := true
 			Source .= "#Include " . Owner . "`n"
+			Source .= "_EDOS_Phase(" . _EDOT_Quote("included owner " . Symbol) . ")`n"
 		}
 	}
 	Source .= "#Include " . _DriverDir . "\infra\bundle.ahk`n"
+	Source .= '_EDOS_Phase("included bundle; before fixture body")' . "`n"
 	return Chr(0xFEFF) . Source . "#Include " . _DriverDir . "\tests\fixtures\error_dialog_startup_owner_body.ahk`n"
 }
 
