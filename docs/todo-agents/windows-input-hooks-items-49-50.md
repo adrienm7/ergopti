@@ -2,11 +2,13 @@
 
 # Windows input hooks: items 49 (hook order) and 50 (SendEvent against SendInput)
 
-Status on 2026-10-23. Two Debug menu rows now measure these questions on the
-real machine. Nothing here changes a default; the native DLL
-(`ergopti_nav_owner.dll`) and its manifest are NOT regenerated (this checkout
-has no MSVC generator), so every native-contract change listed under "Left" waits
-for a build on a machine that has one.
+Status on 2026-10-23. Two Debug menu rows measure these questions on the real
+machine. The native DLL (`ergopti_nav_owner.dll`) and its manifest are now
+regenerated through the official builder on a machine with Visual Studio Build
+Tools 2019 (MSVC 14.29.30133): the recipe pins no compiler version, only the
+exact flags and the source fingerprint, and that toolchain reproduces the DLL
+tracked before this change byte for byte, so a rebuild here is legitimate. See
+"Native hook-order reassertion" below.
 
 ## The two checks
 
@@ -128,6 +130,47 @@ paused, per `project-a-pause-guard-is-not-a-shutdown-debt`); a reload waits on
 `terminal_debt`. What the table cannot say from reading is the user-visible
 result per row: that needs the physical run below.
 
+### Measured with the real hook (2026-10-23)
+
+`windows/tests/hardware/replay_marker_consumers.ahk` injects raw key edges with
+SendInput, with and without `ERGOPTI_NAV_TERMINAL_REPLAY_MARKER` in
+`dwExtraInfo`, next to AutoHotkey's own `SendEvent` at levels 0 and 3, against
+hotkeys on F13 to F16 at `#InputLevel` 0 to 3. The gate
+`tools/test/test-windows-replay-consumers.cjs` runs it and pins the result:
+
+| Source of the edge         | Hotkey levels that fired | Physical read at fire |
+| -------------------------- | ------------------------ | --------------------- |
+| raw SendInput, replay mark | 0, 1, 2, 3               | false                 |
+| raw SendInput, no marker   | 0, 1, 2, 3               | false                 |
+| AutoHotkey Send, level 0   | none                     | false                 |
+| AutoHotkey Send, level 3   | 0, 1, 2                  | false                 |
+
+So rules 1 and 2 above are measured, not read: a replayed edge reaches every
+hotkey of every `#InputLevel` and is never physical. Two more facts, same run:
+an injected Shift is `GetKeyState("LShift")` true and `GetKeyState("LShift",
+"P")` false (the KLE shift read at line 725 sees an unshifted layer when the
+Shift was replayed), and `A_TimeIdlePhysical` is not restarted by an injected
+edge. AutoHotkey exposes no way to read `dwExtraInfo` from a hotkey, so no
+consumer can recognize a replayed edge as physical by itself; the only holder of
+that fact is the native owner, which already reclassifies the replay as
+physical for its own routing. A consumer that must treat a replayed edge as
+physical (the AltGr prefix, the KLE shift read, the tap-hold roll) needs a
+native physical-state query; that is a new ABI and stays open (see "Left").
+
+### Lifecycle claims and the native tests that pin them
+
+The claims below are pinned by the hook-free native suite
+(`nav_event_owner_test.c`, `terminal_capture_owned_test.c`); the gate checks
+that every named case still exists, so a rename cannot orphan a claim.
+
+| Event                   | Native claim                                                            | Cases that pin it                                                                                                                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| down and up             | one balancing UP per consumed DOWN, in order, never a stranded key      | `digit keyup latch`; `unmatched down latches pass across modifiers`; `terminal capture replays exact physical edges`                                                                                 |
+| repeat                  | a repeat keeps the latch of its DOWN and is a separate FIFO edge        | `menu mask survives multiple Win holds`; `terminal route snapshots retain exact suffix (todo49-route-fifo)`                                                                                          |
+| owner change while held | the owner that took the DOWN keeps the UP; a swap never splits a hold   | `A7 receipt survives B swap`; `acceptance claim linearizes navigation`; `terminal replay hands off held modifier (todo49-replay-modifiers)`                                                          |
+| pause                   | a suspended owner passes every edge and keeps its holds balanced        | `suspend is fail-open`; `transition fence passes`                                                                                                                                                    |
+| reload and stop         | Stop drains holds and capture debt before it returns; one release owner | `stop drain balances consumed holds`; `terminal release has one owner`; `capture-owned same-token legacy successor and Stop`; `terminal output custody preserves fault debt (todo49-output-custody)` |
+
 ## Manual list for the maintainer's PC
 
 1. Reload the driver from the working tree, open the tray, Debug.
@@ -141,13 +184,53 @@ result per row: that needs the physical run below.
    which characters came out wrong and paste the `HSE`/`NavOwner` lines around
    them.
 
-## Left (needs a build host or more hardware)
+## Native hook-order reassertion (2026-10-23)
 
-- Event-specific capture and replay, modifier ownership, source pin, authenticated
-  event stream, non-hook handler conversion, chained and repeat semantics: native
-  contract changes, `ergopti_nav_owner.dll` and its manifest through the official
-  MSVC generator only; compare `docs/handovers/2026-10-12-dev-consolidation/`
-  against the tree first.
+Windows calls the newest low-level keyboard hook first, and AutoHotkey reinstalls
+its hook around every SendInput, so after the first text output AutoHotkey's
+hotkeys decide before the native owner. The owner no longer depends on that
+order: when its hook sees an injected edge stamped with an AutoHotkey Send
+marker (`0xFFC3D44D - level`, the physical-ignore and all-except-modifier
+markers up to `0xFFC3D44F`), it arms a high-resolution timer; 8 ms after the last
+edge of the burst it installs a fresh hook (so it is first again) and removes
+the old one, and it repeats once 64 ms later in case the sending thread was
+descheduled before AutoHotkey's rehook. The owner's own replay carries another
+marker and arms nothing. Nothing is polled and no AutoHotkey code changes.
+`ErgoptiNav_GetHookOrderStats` exposes the counters (keys seen, bursts armed,
+reinstalls, failures, last error, timer kind); the adapter logs them once per
+native session under `KeyboardArbiter` (`stage=hook_order`).
+
+Evidence: `tools/test/test-windows-native-hook-front.cjs` loads the tracked DLL in
+a standalone host with a foreign hook installed after it, which swallows F24 and
+stands for AutoHotkey after a rehook. Before any burst the owner counts 0 edges of
+F24 (the foreign hook is first); one AutoHotkey-stamped F23 burst gives two
+reinstalls and no failure; afterwards the owner counts both F24 edges and the
+foreign hook still receives them (the owner is first and passes them on).
+
+Residual window: between the end of a burst and the first reinstall (about 8 ms,
+plus up to 64 ms if the settle pass is the one that matters), a physical key
+reaches AutoHotkey's hook first. A reinstall is not seen by a callback in flight:
+both hooks live only inside one non-pumping stretch of the hook thread.
+
+## Handover patches (checked against the tree, 2026-10-23)
+
+The four pending patches of `docs/handovers/2026-10-12-dev-consolidation/` no
+longer apply because their effect is already in the tree: the half-range clock
+test (`>= 0x80000000u`), the owned Win32 payload serializer
+(`OutputWin32UnitValid`, `ErgoptiNav_SerializeTerminalOutputAttempt`), the
+effective-bit modifier planner and the zero-unit modifier consumer
+(`terminal_output_custody.ahk`, "Match the immutable native planner receipt").
+Do not re-apply them.
+
+## Left (needs more hardware or a design decision)
+
+- A native physical-state query (a new ABI) so that a consumer which must treat
+  a replayed edge as physical (AltGr prefix, KLE shift read, tap-hold roll) can
+  ask the only component that knows: AutoHotkey cannot read `dwExtraInfo`.
+  Event-specific capture, source pin, authenticated event stream, non-hook
+  handler conversion and chained/repeat semantics build on it.
+- Physical runs of the terminal capture list (below, item 4) on the
+  maintainer's keyboard.
 - A second-process rival injector for a true OS-level interleave measurement.
 
 ## Hotstring output and chaining (2026-10-23, real-engine evidence)
