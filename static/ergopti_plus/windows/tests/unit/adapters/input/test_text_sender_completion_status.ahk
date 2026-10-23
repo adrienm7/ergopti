@@ -613,3 +613,5 @@ for Mode in ["matching", "foreign", "unavailable", "unavailable-foreign", "throw
 	Test("TextSender: restore handles " . Mode . " clipboard sequence (text-sender-restore-unavailable)",
 		_TSRO_ClipboardRestoreObservation.Bind(Mode))
 }
+
+#Include test_text_sender_clipboard_owner.ahk
