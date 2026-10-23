@@ -1516,7 +1516,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A press already consumed before PAUSE still owns its repeats and release.
 	-- Ordinary paused keys retain the no-decode fast path below.
 	if provenance == nil and provenance_status == EventProvenance.STATUS_FOREIGN
-		and _one_shot_shift and _one_shot_shift.claim_repeat(e) then return true end
+		and _one_shot_shift then
+		if _key_down_context.stale and not FAST_EXIT_KEYCODES[_key_down_context.keycode]
+			and CoreState.processing_paused ~= true and SyntheticInput.admission_open() then
+			-- This press can already belong to the application, including a repeat
+			-- of an earlier consumed press. Its release must pass with it.
+			_one_shot_shift.forget_passed_key(_key_down_context.keycode)
+		elseif _one_shot_shift.claim_repeat(e) then
+			return true
+		end
+	end
 
 	-- The pause transaction closes new synthetic admission immediately after the
 	-- global drain reaches idle and keeps it closed through PAUSED/rollback. Raw
@@ -1569,6 +1578,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- no application ever receives one, and publish the signal in-process.
 	if ControlSentinels.is_sentinel(keyCode)
 		and ControlSentinels.claim_key(keyCode, true, e:getFlags()) then return true end
+	-- A key that waited behind the main thread may already be in the application
+	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
+	-- it now would delete or retype text the user never saw that way. It passes
+	-- untouched and the buffer starts over.
+	if _key_down_context.stale and not FAST_EXIT_KEYCODES[keyCode] then
+		invalidate_observed_context()
+		pcall(KeyEventHealth.note_stale_pass)
+		return false
+	end
+
 	-- The physical magic key: a plain press of the chosen key types the magic key.
 	-- The event itself carries it from here, so the one-shot Shift, the buffer and
 	-- the application all see the magic key, in ignored and secure windows too,
@@ -1585,16 +1604,6 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
 	-- 9-branch `or` chain further down, saving ~10 comparisons per keystroke.
 	if FAST_EXIT_KEYCODES[keyCode] then return false end
-
-	-- A key that waited behind the main thread may already be in the application
-	-- (SyntheticInput.STALE_PHYSICAL_EVENT_MS): an expansion or a repeat built on
-	-- it now would delete or retype text the user never saw that way. It passes
-	-- untouched and the buffer starts over.
-	if _key_down_context.stale then
-		invalidate_observed_context()
-		pcall(KeyEventHealth.note_stale_pass)
-		return false
-	end
 
 	-- Fast-exit when a Hammerspoon webview has focus. The is_ignored_window cache
 	-- makes this nearly free on repeated keystrokes; it already treats the HS app
