@@ -5,7 +5,8 @@
 ; DESCRIPTION:
 ; AHK port of _shared/lua/diagnostics/redact.lua: removes what must not leave
 ; the machine from diagnostic text before it is copied, saved or sent to a
-; GitHub issue — token-like secrets, the home folder and the account name. The
+; GitHub issue — token-like secrets (URL credentials included), the home folder,
+; the account name, other accounts' profile folders and e-mail addresses. The
 ; rules are data in _shared/modules/diagnostics/redaction.json and both ports
 ; replay _shared/tests/corpus/diagnostics/redaction_vectors.json.
 ;

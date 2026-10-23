@@ -5,8 +5,9 @@
  * MODULE: Diagnostics Redaction (Shared Page Port)
  * DESCRIPTION:
  * Removes what must not leave the machine from diagnostic text before it is
- * copied, saved or sent to a GitHub issue: token-like secrets, the home folder
- * and the account name. The diagnostics page builds that text and shows a
+ * copied, saved or sent to a GitHub issue: token-like secrets (URL credentials
+ * included), the home folder, the account name, other accounts' profile folders
+ * and e-mail addresses. The diagnostics page builds that text and shows a
  * preview of it, so the page redacts it; the rules are data in
  * _shared/modules/diagnostics/redaction.json, handed over by the host.
  *
