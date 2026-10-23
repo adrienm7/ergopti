@@ -1506,3 +1506,161 @@ helpers.describe("actual Main HTTP transport retirement", function()
 		end)
 	end
 end)
+
+helpers.describe("actual Main retains WebView shutdown acknowledgments", function()
+	local DocumentFixture = require("tests.support.document_fixture")
+
+	--- Loads all of Main and pauses at its real registry constructor, before startup.
+	--- Only imports and native boundary ports are controlled; no source is sliced.
+	local function actual_main(manager, runtime_pending)
+		local state = { loops = 0, hooks = 0, timers = 0, cancellations = 0,
+			runtime_ack = not runtime_pending, events = {}, running = true }
+		local function record(event) state.events[#state.events + 1] = event end
+		local noop = function() end
+		local modules = {}
+		for _, name in ipairs({ "infra.version", "modules.hotstrings.engine", "modules.hotstrings.hotstrings_config",
+			"modules.hotstrings.injector", "adapters.keyboard_layout", "modules.hotstrings.magic_key",
+			"modules.hotstrings.magic_key_source", "modules.hotstrings.repeat_key", "modules.shortcuts.keyboard_shortcuts",
+			"modules.hotstrings.device_finder", "infra.input_event", "infra.monotonic", "infra.manifest_reader",
+			"infra.script_settings", "infra.timings", "modules.shortcuts.script_actions", "modules.diagnostics.crash_reporter",
+			"modules.keystats.focus_guard", "infra.input_capture_gate", "infra.boot_profiler", "infra.diagnostic_snapshot" }) do
+			modules[name] = {}
+		end
+		modules["infra.session_lock"] = { protect = function() return true end }
+		modules["compat.utf8"] = { install = function() return false end }
+		modules["logger.shim"] = { info = noop, error = noop, warn = noop, debug = noop, success = noop }
+		modules["infra.logger_sink"] = { install = function() return true end }
+		modules["modules.keystats.keystats"] = { stop = function() return true end }
+		modules["modules.llm.agent_learning"] = { flush = noop }
+		modules["adapters.timer_scheduler"] = { cancelAll = function() state.timers = state.timers + 1 end }
+		modules["adapters.keyboard_hook"] = {
+			isRunning = function() return state.running end,
+			stop = function() state.running = false; state.hooks = state.hooks + 1; record("hook.stop") end,
+			emergency_stop = function() error("ordinary quit must not borrow emergency cleanup") end,
+		}
+		modules["adapters.event_loop"] = { stop = function() state.loops = state.loops + 1; record("loop.stop") end }
+		local runtime = runtime_pending and {
+			shutdown_runtime = function() record("runtime.stop"); return state.runtime_ack end,
+			cancel = function() state.cancellations = state.cancellations + 1 end,
+		} or nil
+		modules["infra.runtime_guard"] = { optional_require = function(name)
+			if name == "ui.webview_manager" then return manager end
+			if name == "modules.llm.prediction_engine" then return runtime end
+		end }
+		modules["infra.shutdown_coordinator"] = { new = function(options)
+			local coordinator = ShutdownCoordinator.new(options)
+			coroutine.yield(coordinator)
+			error("the isolated Main constructor must remain suspended")
+		end }
+		local environment = setmetatable({ package = { path = package.path, loaded = {} }, require = function(name)
+			return assert(modules[name], "unexpected actual Main import: " .. tostring(name))
+		end, os = setmetatable({ exit = function() error("isolated Main must not exit the test process") end }, { __index = os }) }, { __index = _G })
+		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
+		local chunk = assert(loadfile(path))
+		if setfenv then setfenv(chunk, environment) else chunk = assert(loadfile(path, "t", environment)) end
+		state.thread = coroutine.create(chunk)
+		local resumed, coordinator = coroutine.resume(state.thread)
+		helpers.assert_true(resumed, tostring(coordinator))
+		helpers.assert_eq(coroutine.status(state.thread), "suspended", "all of Main must reach its actual registry constructor")
+		helpers.assert_type(coordinator.request, "function")
+		return coordinator, state
+	end
+
+	for _, mode in ipairs({ "deadline", "native-refused", "native-threw", "signal-refused", "input-refused", "runtime-first" }) do
+		helpers.it("(webview-main-shutdown-ack) retains " .. mode .. " until original native ACK", function()
+			local c = DocumentFixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, {})
+			local view = c.start_load()
+			local epoch, timer = c.manager.current_epoch("changelog"), c.timers[1]
+			local destroy, native_shutdown = view.destroy, c.manager.shutdown
+			local gobject = package.loaded.lgi.GObject
+			local disconnect = gobject.signal_handler_disconnect
+			local admitted, cancels = false, 0
+			local coordinator, state
+			local ok, detail = pcall(function()
+				coordinator, state = actual_main(c.manager, mode == "runtime-first")
+				c.on_cancel = function() cancels = cancels + 1; state.events[#state.events + 1] = "document.cancel" end
+				if mode == "native-refused" or mode == "native-threw" then
+					view.destroy = function()
+						if not admitted then
+							if mode == "native-threw" then error("controlled exact native close refusal") end
+							return false
+						end
+						return destroy(view)
+					end
+				elseif mode == "signal-refused" then
+					gobject.signal_handler_disconnect = function(...)
+						if not admitted then return false end
+						return disconnect(...)
+					end
+				elseif mode == "input-refused" then
+					c.state.input_capture_gate = { release = function(app, supplied_epoch)
+						helpers.assert_eq(app, "changelog"); helpers.assert_eq(supplied_epoch, epoch)
+						return admitted
+					end }
+				end
+				helpers.assert_true(coordinator.request("tray quit"))
+				if mode == "runtime-first" then
+					helpers.assert_true(coordinator.is_pending())
+					helpers.assert_eq(state.loops, 0)
+					helpers.assert_nil(view.destroyed, "runtime shutdown must acknowledge before the document host disappears")
+					helpers.assert_eq(cancels, 0, "runtime debt cannot retire the document deadline early")
+					state.runtime_ack = true
+					coordinator.poll()
+				end
+				helpers.assert_eq(native_shutdown(), false, "the actual manager independently retains its original cleanup debt")
+				helpers.assert_eq(timer.settled, false, "no original timer close ACK has arrived")
+				helpers.assert_eq(state.loops, 0, "actual Main must not stop its loop while the real WebView manager returns false")
+				helpers.assert_true(coordinator.is_pending())
+				if mode ~= "deadline" and mode ~= "runtime-first" then
+					helpers.assert_eq(c.manager.current_epoch("changelog"), epoch, "refused native/input cleanup retains its exact page")
+					helpers.assert_eq(cancels, 0, "native/input retirement must precede timer retirement")
+				end
+				c.manager.shutdown = function() error("a replacement export cannot acknowledge the captured original manager") end
+				helpers.assert_eq(coordinator.poll(), false, "the original refusal must be retried, not discarded")
+				helpers.assert_eq(state.loops, 0)
+				admitted = true
+				helpers.assert_eq(coordinator.poll(), false, "native/input ACK cannot stand in for the original deadline close ACK")
+				helpers.assert_true(view.destroyed)
+				helpers.assert_nil(c.manager.current_epoch("changelog"))
+				helpers.assert_true(cancels > 0, "the actual document owner must request its own timer retirement")
+				helpers.assert_eq(state.loops, 0)
+				timer:ack_close()
+				helpers.assert_true(coordinator.poll())
+				helpers.assert_eq(coordinator.is_pending(), false)
+				helpers.assert_eq(state.loops, 1)
+				helpers.assert_eq(state.hooks, 1, "the keyboard is handed back once while native cleanup remains pending")
+				helpers.assert_eq(state.timers, 1, "ordinary cleanup is never replayed while the manager retries")
+				helpers.assert_eq(state.cancellations, mode == "runtime-first" and 1 or 0)
+				helpers.assert_true(coordinator.poll()); helpers.assert_eq(state.loops, 1)
+			end)
+			view.destroy, gobject.signal_handler_disconnect, c.manager.shutdown = destroy, disconnect, native_shutdown
+			c.state.input_capture_gate = nil
+			local closed, cleanup = pcall(c.close)
+			if not ok then error(detail, 0) end
+			helpers.assert_true(closed and cleanup == true, "the actual captured fixture must acknowledge final cleanup")
+		end)
+	end
+
+	helpers.it("(webview-main-shutdown-ack) an acknowledged document retires without phantom debt", function()
+		local c = DocumentFixture.new("changelog", { bridge_name = "changelog_bridge", on_message = function() return {} end }, {})
+		local ok, detail = pcall(function()
+			c.handshake()
+			local coordinator, state = actual_main(c.manager)
+			helpers.assert_true(coordinator.request("tray quit"))
+			helpers.assert_eq(coordinator.is_pending(), false)
+			helpers.assert_eq(state.loops, 1); helpers.assert_eq(state.hooks, 1)
+			helpers.assert_true(c.manager.shutdown())
+		end)
+		local closed, cleanup = pcall(c.close)
+		if not ok then error(detail, 0) end
+		helpers.assert_true(closed and cleanup == true)
+	end)
+
+	helpers.it("(webview-main-shutdown-ack) an absent optional manager needs no native ACK", function()
+		local coordinator, state = actual_main(nil)
+		helpers.assert_true(coordinator.request("tray quit"))
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(state.loops, 1); helpers.assert_eq(state.hooks, 1)
+		helpers.assert_true(coordinator.poll()); helpers.assert_eq(state.loops, 1)
+	end)
+end)
