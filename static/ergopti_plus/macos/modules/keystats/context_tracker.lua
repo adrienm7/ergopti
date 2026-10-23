@@ -23,6 +23,7 @@ local hs     = hs
 local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG    = "keystats.context_tracker"
 local M      = {}
 
@@ -498,6 +499,45 @@ local function update_secure_field_state(element, app_pid)
 	end
 end
 
+-- A value change this close to a keystroke is typing, not a native substitution.
+local AX_TYPING_WINDOW_MS = 100
+
+-- The pending one-shot read that refreshes the autocorrect baseline, or nil.
+local _baseline_refresh = nil
+
+--- Cancels the pending baseline read, if any.
+local function cancel_baseline_refresh()
+	local handle = _baseline_refresh
+	_baseline_refresh = nil
+	if handle ~= nil then TimerScheduler.cancel(handle) end
+end
+
+--- Reads the whole value of the watched element once typing has paused, so a
+--- burst of keystrokes costs one Accessibility read instead of one per key.
+--- @param element table The AX element whose value is watched.
+local schedule_baseline_refresh
+schedule_baseline_refresh = function(element)
+	if _baseline_refresh ~= nil then return end
+	local handle, committed
+	handle, committed = TimerScheduler.after(AX_TYPING_WINDOW_MS / 1000, function()
+		if _baseline_refresh ~= handle then return end
+		_baseline_refresh = nil
+		if _ax_value_watch_committed ~= true or not rawequal(element, _last_focused_element)
+			or _is_paused() then return end
+		if (hs.timer.absoluteTime() / 1000000 - _state.last_time) <= AX_TYPING_WINDOW_MS then
+			schedule_baseline_refresh(element)
+			return
+		end
+		local ok, val = pcall(function() return element:attributeValue("AXValue") end)
+		if ok and type(val) == "string" then _last_ax_value = val end
+	end)
+	if committed ~= true then
+		Logger.warn(LOG, "The autocorrect baseline refresh could not be scheduled.")
+		return
+	end
+	_baseline_refresh = handle
+end
+
 --- Handles AXValueChanged events to detect macOS native autocorrect substitutions.
 --- A sudden large delta in the field’s text value (without matching keystrokes)
 --- signals a native substitution; we flush the buffer and log the event.
@@ -507,6 +547,17 @@ local function handle_ax_value_changed(element)
 	-- (project-suspend-pause-invariant). The AX observer survives pause because
 	-- only keystats.M.stop() tears it down, so the gate has to live here.
 	if _is_paused() then return end
+
+	-- While the user types, every keystroke changes the value, and reading the
+	-- whole AXValue (a message, a document) is a synchronous call into the
+	-- typing application on the main thread that also serves the event taps.
+	-- A change next to a keystroke is typing, never an autocorrect: the read
+	-- that refreshes the baseline waits for the pause that ends the burst.
+	if (hs.timer.absoluteTime() / 1000000 - _state.last_time) <= AX_TYPING_WINDOW_MS then
+		schedule_baseline_refresh(element)
+		return
+	end
+	cancel_baseline_refresh()
 
 	local ok, val = pcall(function() return element:attributeValue("AXValue") end)
 	if not (ok and type(val) == "string") then return end
@@ -519,7 +570,7 @@ local function handle_ax_value_changed(element)
 	-- utf8.len returns nil on malformed sequences; fall back to byte length.
 	local val_chars      = utf8.len(val)           or #val
 	local last_val_chars = utf8.len(_last_ax_value) or #_last_ax_value
-	if (now - _state.last_time) > 100
+	if (now - _state.last_time) > AX_TYPING_WINDOW_MS
 	and val_chars > 0
 	and last_val_chars > 0
 	and math.abs(val_chars - last_val_chars) > 1
@@ -544,6 +595,7 @@ local function stop_ax_observer(label)
 	local observer = _state and _state.ax_observer or nil
 	_ax_observer_committed = false
 	_ax_value_watch_committed = false
+	cancel_baseline_refresh()
 	if not observer then return true end
 	if type(observer.stop) ~= "function" then
 		Logger.error(LOG, "%s failed: observer does not implement stop().", label)
@@ -689,6 +741,7 @@ function M.update_ax_observer(app_pid)
 					-- The exact old element remains retained until removal commits, so a
 					-- later focus notification can retry it without overlapping successors.
 					_ax_value_watch_committed = false
+					cancel_baseline_refresh()
 					if _last_focused_element then
 						if not mutate_ax_value_watcher(watcher, "removeWatcher",
 							_last_focused_element, "Previous AXValueChanged watcher cleanup") then
