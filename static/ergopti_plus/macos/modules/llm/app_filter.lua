@@ -79,12 +79,15 @@ end
 --- AXFocusedUIElement from the application-level accessibility element.
 --- @param front userdata The frontmost hs.application.
 --- @return userdata|nil The focused AX element, or nil on failure.
+--- @return boolean|nil read_failed True only for a failed focused-element read.
+--- @return any error_detail Native focus-read refusal or Lua exception, if any.
 local function get_focused_element(front)
 	if not front then return nil end
 	local ok_ax, ax = pcall(hs.axuielement.applicationElementForPID, front:pid())
 	if not ok_ax or not ax then return nil end
-	local ok_fe, focused = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
-	return (ok_fe and focused) or nil
+	local ok_fe, focused, focus_error = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
+	if not ok_fe then return nil, true, focused end
+	return focused, focused == nil and focus_error ~= nil, focus_error
 end
 
 --- Returns true when the currently focused element is a secure text field.
@@ -210,11 +213,11 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 	-- keystroke — and this runs inside the keyDown eventtap, where cumulative AX
 	-- latency is what gets the tap disabled. Resolve at most once per call, and
 	-- lazily, so the combinations that pay nothing today still pay nothing.
-	local focused_cache, focused_resolved = nil, false
+	local focused_cache, focused_failed, focused_error, focused_resolved = nil, false, nil, false
 	local function resolve_focused()
 		if not focused_resolved then
 			focused_resolved = true
-			focused_cache    = get_focused_element(front)
+			focused_cache, focused_failed, focused_error = get_focused_element(front)
 		end
 		return focused_cache
 	end
@@ -225,6 +228,12 @@ function M.is_blocked(state, excluded_apps, url_bar_filter_enabled, secure_field
 	end
 	if url_bar_filter_enabled and is_url_bar_focused(front, resolve_focused) then
 		Logger.debug(LOG, "URL bar focused — LLM request skipped.")
+		return true
+	end
+	-- A nil-only focus result remains a valid absence. A failed native read
+	-- cannot establish that either requested AX exclusion permits this field.
+	if focused_failed then
+		Logger.debug(LOG, "Focused Accessibility read failed — LLM request skipped: %s.", tostring(focused_error))
 		return true
 	end
 	if not front then return false end
