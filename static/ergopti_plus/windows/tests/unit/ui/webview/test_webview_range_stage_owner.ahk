@@ -97,3 +97,5 @@ for Mode in ["consume", "stale-ack", "stale-native", "invalid", "wrong-sender", 
 #Include test_webview_core_identity.ahk
 
 #Include ../../modules/keystats/metrics/test_metrics_clear_cache_owner.ahk
+
+#Include test_editor_early_show_owner.ahk
