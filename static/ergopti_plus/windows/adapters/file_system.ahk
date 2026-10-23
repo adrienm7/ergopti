@@ -603,7 +603,6 @@ FSReadBounded(Path, MaxBytes) {
 ; replacement characters. FILE_SHARE_READ excludes concurrent writers while
 ; the snapshot handle is open.
 FSReadUtf8Exact(Path) {
-	PerfCount("fs.read_utf8_exact")
 	return _FSReadUtf8ExactImpl(Path, 0, false)
 }
 
