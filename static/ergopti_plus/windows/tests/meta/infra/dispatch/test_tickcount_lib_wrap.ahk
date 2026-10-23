@@ -128,7 +128,7 @@ Test("tickcount-wrap: crash_reporter.ahk uptime division uses & 0xFFFFFFFF mask"
 ; fixing one function cannot leave another rollover bug behind.
 _TCLW_NoFirstPartyAbsoluteDeadlines() {
 	Cases := [
-		["_TooltipLifecycleDeadlineBounds", "ExpMs := OriginMs +", "TickRemaining("],
+		["_TooltipLifecycleDeadlineBounds", "ExpMs := OriginMs +", "TickRemaining64("],
 		["_TooltipUiaProcessIsHostile", "A_TickCount < _TooltipUiaHostileCache", "TickExpired64("],
 		["_SFD_UiaProcessIsHostile", "A_TickCount < SFD_UIA_HOSTILE_CACHE", "TickExpired64("],
 		["_UIASW_Request", "Deadline := A_TickCount + UIASW_DEADLINE_MS", "SetTimer(DeadlineFn, -UIASW_DEADLINE_MS)"],
