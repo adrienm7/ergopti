@@ -800,7 +800,8 @@ GestureRestartTouchpadDevice(OnDone := 0) {
 		}
 		FSDelete(ResultPath)
 		FSDelete(ResultPath . ".stage")
-		if !FSWrite(ScriptPath, _GestureRestartBuildPsScript(ResultPath)) {
+		; Windows PowerShell 5.1 otherwise decodes a BOMless source with the ANSI code page.
+		if !FSWrite(ScriptPath, Chr(0xFEFF) . _GestureRestartBuildPsScript(ResultPath)) {
 				_GestureRestartAbortReservation(Epoch)
 				LoggerError("gestures", "Could not write touchpad restart worker.")
 				return False
