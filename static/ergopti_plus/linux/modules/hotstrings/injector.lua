@@ -1009,11 +1009,11 @@ function M.inject_fields(backspace_count, values, is_private)
 	if #values == 1 then
 		return M.inject(backspace_count, values[1], is_private)
 	end
+	local owner = capture_replacement_owner()
 	if not retire_clipboard() then
 		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
 
-	local owner = capture_replacement_owner()
 	if is_private then
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
 			backspace_count, #values)
