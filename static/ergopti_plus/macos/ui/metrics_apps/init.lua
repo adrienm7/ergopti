@@ -591,7 +591,7 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 	if btn ~= i18n.get("button.ok") then return end
 	local score = tonumber(score_str)
 	if not score or score < -2 or score > 2 then
-		dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
+		dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
 		return
 	end
 	local cats, _, source_snapshot = load_categories()
@@ -689,7 +689,7 @@ local function prompt_pick_app(generation, webview)
 			return
 		end
 		if type(choices) ~= "table" or #choices == 0 then
-			dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
+			dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
 			return
 		end
 		present_owned_chooser("Application metrics chooser", function(choice)

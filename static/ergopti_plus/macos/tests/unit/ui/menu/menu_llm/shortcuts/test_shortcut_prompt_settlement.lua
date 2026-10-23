@@ -12,6 +12,22 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local WarningContract = require("tests.support.dialog_warning_contract")
+local SHORTCUT_OWNERS = {
+	"infra.dialog_util",
+	"infra.i18n",
+	"infra.logger",
+	"ui.menu.shortcut_utils",
+	"send_input",
+	"infra.native_presentation",
+	"window_titles",
+	"native_presentation",
+	"infra.locale",
+	"locale.core",
+	"adapters.json_codec",
+	"infra.paths",
+	"native_path",
+}
 
 local Fixture = require("tests.support.profile_delete_fixture")
 local with_delete_fixture = Fixture.with_delete_fixture
@@ -19,7 +35,7 @@ local with_delete_fixture = Fixture.with_delete_fixture
 --- Loads the real shared shortcut prompt around a deterministic dialog result.
 --- @param raw string Prompt input.
 --- @param body function Test callback receiving the real utility.
-local function with_real_shortcut_prompt(raw, body)
+local function with_real_shortcut_prompt_owned(raw, body)
 	local saved_dialog = package.loaded["infra.dialog_util"]
 	local saved_i18n = package.loaded["infra.i18n"]
 	local saved_logger = package.loaded["infra.logger"]
@@ -29,16 +45,26 @@ local function with_real_shortcut_prompt(raw, body)
 			text_prompt = function() return "OK", raw end,
 			alert = function() return true end,
 		}
+		local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
 		package.loaded["infra.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.shortcut_utils"] = nil
-		body(require("ui.menu.shortcut_utils"))
+		body(require("ui.menu.shortcut_utils"), warnings)
 	end, debug.traceback)
 	package.loaded["infra.dialog_util"] = saved_dialog
 	package.loaded["infra.i18n"] = saved_i18n
 	package.loaded["infra.logger"] = saved_logger
 	package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
 	if not ok then error(err, 0) end
+end
+
+--- Restores the local real utility's transitive imports, including native title state.
+--- @param raw string Input returned by the native prompt boundary.
+--- @param body function Existing scenario callback.
+local function with_real_shortcut_prompt(raw, body)
+	return helpers.with_stub_scope(SHORTCUT_OWNERS, function()
+		return with_real_shortcut_prompt_owned(raw, body)
+	end)
 end
 
 helpers.describe("HS-033 shortcut prompt settlement propagation", function()
@@ -131,6 +157,21 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
 		package.loaded["ui.menu.menu_llm.trigger_panel"] = saved_panel
 		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("shortcut warning native signature", function()
+	helpers.it("presents the invalid shortcut warning without applying an update", function()
+		with_real_shortcut_prompt("invalid+a", function(shortcuts, warnings)
+			local applied = 0
+			helpers.assert_eq(shortcuts.prompt_shortcut({ on_apply = function() applied = applied + 1; return true end }), false)
+			helpers.assert_eq(warnings.shown, {
+				{ "shortcut_utils.format_invalid", "shortcut_utils.format_hint", "button.ok" },
+			}, "Invalid shortcut input must display its acknowledgement warning")
+			helpers.assert_eq(warnings.refused, 0)
+			helpers.assert_eq(applied, 0)
+		end)
 	end)
 end)
 
