@@ -558,11 +558,12 @@ SendInstant(Text, Prefix := "") {
 		; callback before doing the cleanup inline so ownership is ended once.
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
-		if IsSet(OwnedSequence) && OwnedSequence
+		if IsSet(OwnedSequence) && OwnedSequence {
 			try CB_RestoreOwnedAllEventually(OldClipboard, OwnedSequence, OwnerToken,
 				"hotstring_send_instant_rollback")
-		else
+		} else {
 			CB_EndOwnedTransaction(OwnerToken)
+		}
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
