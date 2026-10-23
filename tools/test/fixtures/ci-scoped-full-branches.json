@@ -917,6 +917,12 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
+			"step": "Install window-switch prerequisites",
+			"protocol": 9
+		},
+		{
+			"file": ".github/workflows/ci-linux.yml",
+			"job": "e2e-linux",
 			"step": "Qualify actual cursor-display window switching",
 			"protocol": 9
 		},

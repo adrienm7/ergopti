@@ -23,6 +23,7 @@
 			"Qualify actual X11 physical shortcut sources",
 			"Qualify three actual XI2 property cookies",
 			"Retain actual XI2 property-cookie evidence",
+			"Install window-switch prerequisites",
 			"Qualify actual cursor-display window switching",
 			"Detect and read the keymap on a real X11 and a real Wayland",
 			"A virtual touchpad, described by the kernel and read back",
@@ -257,6 +258,7 @@
 		"What each page raises while loading": ["Install WebKit2GTK and lgi"],
 		"Successful native model pulls retire stale retries": [
 			"Install the model pull window prerequisites"
-		]
+		],
+		"Qualify actual cursor-display window switching": ["Install window-switch prerequisites"]
 	}
 }

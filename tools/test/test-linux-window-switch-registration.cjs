@@ -126,9 +126,20 @@ function validate(root) {
 	assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '4', 'native step is bounded');
 	const command = Pipeline.stepField(step, 'run');
 	assert.match(command, /set -euo pipefail/);
-	const acquisitions = Pipeline.runOf(step).filter((line) =>
-		/^sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" /.test(line)
+	const apt = (line) => /^sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" /.test(line);
+	assert.equal(
+		Pipeline.runOf(step).filter(apt).length,
+		0,
+		'the native step spends its budget on the test, not on downloads'
 	);
+	const install = Pipeline.step(job, 'Install window-switch prerequisites');
+	assert.equal(
+		Pipeline.stepField(install, 'if'),
+		LinuxE2E.condition('Install window-switch prerequisites', '${{ !cancelled() }}'),
+		'the prerequisites install unless cancelled'
+	);
+	assert.equal(Pipeline.stepField(install, 'timeout-minutes'), '20', 'the install is bounded');
+	const acquisitions = Pipeline.runOf(install).filter(apt);
 	assert.equal(acquisitions.length, 1, 'the native prerequisites use one signed archive owner');
 	const packages = acquisitions[0];
 	for (const prerequisite of [

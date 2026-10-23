@@ -2594,6 +2594,25 @@ jobs:
 
       # A real X server and WM qualify logical RandR placement and input focus.
       # Physical displays and evdev source-generation receipts remain separate.
+      # The window-switch prerequisites (fonts included) once took longer than
+      # the test's 4-minute budget to download (run 39876412279), so they
+      # install in their own step, as WebKit and the model pull window do.
+      - name: Install window-switch prerequisites
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base
+          else
+              exit 1
+          fi
+        timeout-minutes: 20
+
       - name: Qualify actual cursor-display window switching
         if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         env:
@@ -2611,7 +2630,6 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base
           npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"
           else
               exit 1
