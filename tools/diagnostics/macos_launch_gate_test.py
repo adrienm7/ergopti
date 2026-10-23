@@ -1033,6 +1033,22 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("still running: Hammerspoon; ErgoptiPlus left after", failures[0])
 
+    def test_unanswered_quit_appleevent_is_recorded_and_exits_are_still_timed(self):
+        launcher, child = Path("/app/ErgoptiPlus"), Path("/app/Hammerspoon")
+        evidence = {}
+        timeout = gate.subprocess.TimeoutExpired(["osascript"], 10)
+        with (
+            mock.patch.object(gate, "QUIT_TIMEOUT_SECONDS", 0.3),
+            mock.patch.object(gate.subprocess, "run", side_effect=timeout),
+            mock.patch.object(gate.time, "sleep"),
+            mock.patch.object(gate, "processes", return_value=[7]),
+        ):
+            self.assertIsNone(gate.quit_application("bundle", (launcher, child), evidence))
+        self.assertTrue(evidence["unanswered"])
+        self.assertEqual(evidence["survivors"], ["ErgoptiPlus", "Hammerspoon"])
+        failures = gate.evaluate("clean", observe(quit_seconds=None, quit_evidence=evidence))
+        self.assertIn("never answered", failures[0])
+
     def test_quit_that_ends_both_processes_records_each_exit(self):
         launcher, child = Path("/app/ErgoptiPlus"), Path("/app/Hammerspoon")
         evidence = {}

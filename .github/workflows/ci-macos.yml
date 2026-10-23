@@ -2828,6 +2828,18 @@ jobs:
           path: ${{ runner.temp }}/launch-gate
           if-no-files-found: warn
 
+      # The artifact above is overwritten by a rerun, so the evidence of the failing attempt
+      # (samples, unified log, driver logs) would be lost exactly when a rerun passes. This
+      # copy is named per attempt and is never read by a verdict.
+      - name: Retain failed launch evidence of this attempt
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (failure()) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-gate-failed-${{ inputs.release && 'release' || 'ci' }}-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}-attempt-${{ github.run_attempt }}
+          retention-days: 7
+          path: ${{ runner.temp }}/launch-gate
+          if-no-files-found: warn
+
       # Test-build acceptance follows the mandatory package gate. A fresh signed
       # app receives the cold runtime; this job never publishes a release.
       # Retained original role: cold-bootstrap-native
