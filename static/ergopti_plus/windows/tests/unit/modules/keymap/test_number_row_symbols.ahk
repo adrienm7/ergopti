@@ -570,6 +570,61 @@ _NRP_EdgeKeysFollowTheChoice() {
 Test("number row: the edge keys keep their levels unless the choice reorders them where it can (number-row-edge-keys)",
 	_KLT_WithEmulation.Bind(_NRP_EdgeKeysFollowTheChoice))
 
+; While the layout is off its master gate empties the live boolean choices, but the
+; ordering choice keeps its tick (a parameter keeps its value) and says it is not
+; applied. The edge-keys checkbox read the emptied live value, so the same stored
+; choice showed ticked in one row and unticked in the next
+; (number-row-edges-row-intent, seen by the live check number-row-inert-choice).
+_NRP_EdgesRowReadsTheIntentView() {
+	global Features, CategoryEnabled, LayerEnabled, ConfigurationFile, _NumberRowEdgesLogged
+	global _NumberRowForegroundLayout, _DigitRowProfiles, KS_DIGIT_ROW_KEYS
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, State.Clone(), _NumberRowEdgesLogged,
+		_NumberRowForegroundLayout, _DigitRowProfiles]
+	Azerty := 0x7E57040C
+	AzPlain := Map(), AzShift := Map()
+	for Index, Key in KS_DIGIT_ROW_KEYS {
+		AzPlain[Key[2]] := Chr(0x26)
+		AzShift[Key[2]] := Mod(Index, 10) . ""
+	}
+	try {
+		_DigitRowProfiles := Map(Azerty, Map("shifted", true, "symbols", AzPlain, "shift_symbols", AzShift,
+			"edges", _NRP_EdgeProfile([[Chr(0xB2), ""], [")", Chr(0xB0)], ["=", "+"]])))
+		_NumberRowEdgesLogged := ""
+		Layout := Map("emulated_layout", "", "ergopti_base", false, "ergopti_alt_gr", false,
+			"ergopti_variant", "none", "direct_access_digits", "digits", "number_row_reorder_edges", true)
+		Features := Map("layout", Layout)
+		CategoryEnabled := Map("Layout", false)
+		LayerEnabled := false
+		State := MasterGateState()
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
+		AssertFalse(Features["layout"]["number_row_reorder_edges"] == true,
+			"the closed master gate empties the live boolean, which is the premise")
+		_NumberRowForegroundLayout := Azerty
+		Rows := _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)
+		AssertEqual(2, Rows.Length, "the ordering choice and the edge-key checkbox")
+		AssertTrue(Rows[1]["items"][2]["checked"], "the ordering choice keeps its tick while the layout is off")
+		Edge := Rows[2]
+		AssertTrue(Edge["checked"], "the stored edge-keys choice keeps its tick while the layout is off")
+		AssertEqual(t("menu.layout.number_row_edges") . t("menu.layout.number_row_not_applied"), Edge["label"],
+			"and says it is not applied")
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		State := MasterGateState()
+		State.Clear()
+		for Key, Value in Saved[4]
+			State[Key] := Value
+		_NumberRowEdgesLogged := Saved[5]
+		_NumberRowForegroundLayout := Saved[6]
+		_DigitRowProfiles := Saved[7]
+	}
+}
+Test("number row: the edge-keys checkbox shows the stored choice while the layout is off (number-row-edges-row-intent)",
+	_KLT_WithEmulation.Bind(_NRP_EdgesRowReadsTheIntentView))
+
 ; No driver source keeps a table of edge-key characters any more: every edge
 ; key is read from the effective layout (number-row-edge-keys).
 _NRP_NoHardcodedEdgeTable() {
