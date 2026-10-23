@@ -241,7 +241,7 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 			if Http.WaitForResponse(0) {
 				if A_IsSuspended
 					return
-				Receipt := Map("ok", Http.Status == 200, "status", Http.Status, "body", Http.ResponseText)
+				Receipt := Map("ok", Http.Status == 200 && Http.ResponseEncodingValid, "status", Http.Status, "body", Http.ResponseText)
 				if Http.Status == 0 && Http.HasOwnProp("NativeDispatchRefused") && Http.NativeDispatchRefused == true
 					Receipt["probe_error"] := true
 				Models := LocalServerAuthModelsReceipt(Receipt)

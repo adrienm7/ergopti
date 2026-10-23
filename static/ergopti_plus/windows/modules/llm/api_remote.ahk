@@ -1505,6 +1505,12 @@ _LLMRemote_PollReady(Http, on_result, start_tick, timeout_ms, Owner := 0) {
     status := 0
     try status := Http.Status
     if (Owner is Map) && Owner.Get("local_server", false) {
+        ; Managed JSON must reject malformed source bytes before parsing the
+        ; generic facade's repaired text. Legacy readiness adapters stay typed.
+        if Http is CurlAsyncRequest && !Http.ResponseEncodingValid {
+            _LLMRemote_CompleteReady(Owner, on_result, false)
+            return
+        }
         Body := ""
         try Body := Http.ResponseText
         Models := LocalServerAuthModelsReceipt(Map("ok", status == 200, "status", status, "body", Body))
