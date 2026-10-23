@@ -718,3 +718,5 @@ Test("Gestures: actual system refresh provider follows declaration order caption
 #Include test_gesture_plain_clipboard_owner.ahk
 
 #Include test_plain_paste_foreign_text_owner.ahk
+
+#Include test_take_note_native64_deadline.ahk
