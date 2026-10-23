@@ -157,7 +157,9 @@ _CurlCaptureNativeCancellation(Contract) {
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterInstallObserver, _UpdaterManagedFailureOwner, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	global _UpdaterInstallObserverEpoch
 	AssertFalse(_UpdaterDownloadInProgress, "native receiving cannot borrow a foreign updater transaction")
+	SavedObserverEpoch := _UpdaterInstallObserverEpoch
 	Saved := [_UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterDownloadRequest,
 		_UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch,
 		_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
@@ -187,6 +189,9 @@ _CurlCaptureNativeCancellation(Contract) {
 			_UpdaterExitInvocation := 0
 			_UpdaterManagedFailureOwner := 0
 			_UpdaterInstallObserver := (Phase, Reason) => Phases.Push(Phase)
+			; Match the receipt retained by the real reservation before worker publication.
+			_UpdaterDownloadArtifacts.InstallObservation := {
+				Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}
 			Start := A_TickCount
 			First := 0
 			Second := 0
@@ -243,6 +248,7 @@ _CurlCaptureNativeCancellation(Contract) {
 			_UpdaterExitIntent := Saved[8]
 			_UpdaterExitInvocation := Saved[9]
 			_UpdaterInstallObserver := Saved[10]
+			_UpdaterInstallObserverEpoch := SavedObserverEpoch
 			_UpdaterManagedFailureOwner := Saved[11]
 			UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := Saved[12]
 		}

@@ -785,8 +785,10 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterInstallObserver, _UpdaterManagedFailureOwner, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	global _UpdaterInstallObserverEpoch
 	AssertTrue(!_UpdaterDownloadInProgress && !IsObject(_UpdaterDownloadWorker)
 		&& !(_UpdaterSwapOwner is Map), "native qualification cannot borrow a foreign live updater transaction")
+	SavedObserverEpoch := _UpdaterInstallObserverEpoch
 	Saved := [_UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterDownloadRequest,
 		_UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch,
 		_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
@@ -819,6 +821,9 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 				_UpdaterExitInvocation := 0
 				_UpdaterManagedFailureOwner := 0
 				_UpdaterInstallObserver := (Phase, Reason) => Phases.Push(Phase)
+				; Match the receipt retained by the real reservation before worker publication.
+				_UpdaterDownloadArtifacts.InstallObservation := {
+					Observer: _UpdaterInstallObserver, Epoch: _UpdaterInstallObserverEpoch}
 			} finally Critical(PreviousCritical)
 			WaitStart := A_TickCount
 			while !FileExist(Run.NewExe) && Run.Results.Length == 0 && !TickExpired64(WaitStart, 10000) {
@@ -879,6 +884,7 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 			_UpdaterExitIntent := Saved[8]
 			_UpdaterExitInvocation := Saved[9]
 			_UpdaterInstallObserver := Saved[10]
+			_UpdaterInstallObserverEpoch := SavedObserverEpoch
 			_UpdaterManagedFailureOwner := Saved[11]
 			UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := Saved[12]
 		}
