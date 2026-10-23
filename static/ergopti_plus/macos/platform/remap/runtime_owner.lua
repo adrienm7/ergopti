@@ -490,6 +490,8 @@ end
 --- @return boolean settled
 --- @return string|nil pending Which part is still pending.
 finish_stop = function()
+	-- A synchronous exit report may already have completed this very stop.
+	if state == STATE.STOPPED then return true end
 	if state ~= STATE.STOPPING then return false, "not_stopping" end
 	if capture_started and not capture_settled then return false, "capture_pending" end
 	if peer and not peer.exited and not (peer.handle.isSettled() == true) then return false, "peer_pending" end
@@ -503,6 +505,19 @@ finish_stop = function()
 		if not ok then Logger.error(LOG, "Owned runtime stop observer failed: %s.", tostring(failure)) end
 	end
 	return true
+end
+
+--- Terminates the process once the capture is settled, then completes the stop
+--- if both parts are observed gone.
+--- @return boolean settled
+--- @return string|nil pending
+local function advance_stop()
+	if state ~= STATE.STOPPING then return finish_stop() end
+	if capture_settled and peer and not peer.exited then
+		local ok, failure = pcall(peer.handle.terminate)
+		if not ok then Logger.error(LOG, "Owned runtime user-side process termination failed: %s.", tostring(failure)) end
+	end
+	return finish_stop()
 end
 
 --- Stops the capture, then the user-side process. Safe to call again while a
@@ -527,15 +542,11 @@ function M.stop(on_stopped)
 	if capture_started and not capture_settled then
 		local settled = ports.capture.stop(function()
 			capture_settled = true
-			finish_stop()
+			advance_stop()
 		end)
 		if settled == true then capture_settled = true end
 	end
-	if capture_settled and peer and not peer.exited then
-		local ok, failure = pcall(peer.handle.terminate)
-		if not ok then Logger.error(LOG, "Owned runtime user-side process termination failed: %s.", tostring(failure)) end
-	end
-	return finish_stop()
+	return advance_stop()
 end
 
 --- Stops, then admits again, on an explicit request. There is no automatic
