@@ -375,7 +375,8 @@ _TNAJ_WrapSafeTimeoutCancelsBeforeLaunch() {
 	StartTick := 0xFFFFFFF0
 	_TNAJ_Reset(StartTick)
 	JobId := TakeNoteRequest(false, "C:\Notes", true, _TakeNoteFakeOps)
-	_TakeNoteFakeOps.now_tick := (StartTick + TAKE_NOTE_LAUNCH_TIMEOUT_MS) & 0xFFFFFFFF
+	; Native A_TickCount crosses the DWORD boundary without wrapping.
+	_TakeNoteFakeOps.now_tick := StartTick + TAKE_NOTE_LAUNCH_TIMEOUT_MS
 	_TakeNoteFakeOps.RunNext()
 	Assert(!_TakeNotePending.Has(JobId),
 		"the exact wrap-safe deadline must retire the job")
