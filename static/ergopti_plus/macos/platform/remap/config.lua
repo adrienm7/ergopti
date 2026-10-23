@@ -297,9 +297,11 @@ local _cached_actions = nil
 --- resolution can be re-run on its own, against the list already in memory.
 ---
 --- @param list table The action list to re-resolve IN PLACE.
+--- @param product string|nil Virtual keyboard product the names are written for; nil only for
+---   the first load, which every deploy re-resolves with the user's choice before it generates.
 --- @return number How many actions were resolved.
 --- @return string The captured layout keycode convention (the keycodes keys arrive as).
-function M.resolve_layout_actions(list)
+function M.resolve_layout_actions(list, product)
 	if type(list) ~= "table" then
 		Logger.error(LOG, "resolve_layout_actions(): expected a table — nothing resolved.")
 		return 0
@@ -308,10 +310,11 @@ function M.resolve_layout_actions(list)
 	-- the keycodes keys arrive as; the names are written for the deployed
 	-- virtual keyboard product, which passes the ISO pair through unswapped.
 	local form = Layout.keyboard_form()
+	product = product or Layout.default_virtual_keyboard_product()
 	local resolved = 0
 	for _, action in ipairs(list) do
 		if action.logical_char then
-			local key_code = Layout.key_code_for_char(action.logical_char, Layout.VIRTUAL_KEYBOARD_PRODUCT)
+			local key_code = Layout.key_code_for_char(action.logical_char, product)
 			local mods     = action.karabiner_modifiers
 			local entry    = { key_code = key_code }
 			if type(mods) == "table" and #mods > 0 then

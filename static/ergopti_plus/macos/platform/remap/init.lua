@@ -1230,22 +1230,64 @@ local function is_current_lifecycle(epoch)
 	return _running and _lifecycle_epoch == epoch and _state ~= nil
 end
 
---- Resolves the current action list without silently swallowing malformed layout data.
---- @param label string Diagnostic context.
---- @return boolean ok
---- @return number|nil resolved_count
-local function resolve_current_layout_actions(label)
-	if M.AVAILABLE_ACTIONS == nil then return true, 0 end
-	return run_async_step(label, function()
-		local count, form = Config.resolve_layout_actions(M.AVAILABLE_ACTIONS)
-		if form ~= "ansi" and form ~= "iso" then
-			error("The resolved action list has no valid virtual keyboard convention.")
+-- The user's virtual keyboard choice and its resolver share one block scope: the
+-- source the boot registered stays out of this file's crowded top-level locals.
+local resolve_current_layout_actions
+do
+	local Layout = require("modules.keymap.layout")
+	local registered_source = nil -- The user's virtual keyboard choice the boot registered, or nil
+
+	--- Registers the owner of the user's virtual keyboard choice (config.toml
+	--- [layout] virtual_keyboard), which each regeneration reads: the menu persists
+	--- a new choice and then asks for a regeneration.
+	--- @param source function Returns "auto", "iso" or "ansi"; raises when the configuration is unreadable.
+	--- @return boolean registered False when a source is already registered.
+	function M.set_virtual_keyboard_source(source)
+		if type(source) ~= "function" then
+			error("platform.remap.set_virtual_keyboard_source(): source must be a function", 2)
 		end
-		-- The generator must consume the convention that resolved these actions,
-		-- rather than rereading a changed layout registry for the virtual HID.
-		if _state then _state.virtual_keyboard_type = form end
-		return count
-	end)
+		if registered_source ~= nil then
+			Logger.error(LOG, "The virtual keyboard choice's source is already registered; keeping the first one.")
+			return false
+		end
+		registered_source = source
+		Logger.debug(LOG, "Virtual keyboard choice's source registered.")
+		return true
+	end
+
+	--- The virtual keyboard product to deploy: the user's choice, read at the moment a
+	--- generation resolves its actions so one generation uses one product. Before
+	--- the boot registered the choice's owner (M.set_virtual_keyboard_source) the
+	--- shipped default applies. A refused read raises instead of guessing.
+	--- @return string product "ansi" or "iso".
+	local function current_virtual_keyboard_product()
+		if registered_source == nil then return Layout.default_virtual_keyboard_product() end
+		return Layout.virtual_keyboard_product(registered_source())
+	end
+
+	--- Resolves the current action list without silently swallowing malformed layout data.
+	--- @param label string Diagnostic context.
+	--- @return boolean ok
+	--- @return number|nil resolved_count
+	function resolve_current_layout_actions(label)
+		if M.AVAILABLE_ACTIONS == nil then return true, 0 end
+		return run_async_step(label, function()
+			-- The user's choice names the product; the layout only tells which keycode
+			-- convention keys arrive in, and never overrides an explicit choice.
+			local product = current_virtual_keyboard_product()
+			local count, form = Config.resolve_layout_actions(M.AVAILABLE_ACTIONS, product)
+			if form ~= "ansi" and form ~= "iso" then
+				error("The resolved action list has no valid virtual keyboard convention.")
+			end
+			-- The generator must consume the convention that resolved these actions,
+			-- rather than rereading a changed layout registry for the virtual HID.
+			if _state then
+				_state.virtual_keyboard_type = form
+				_state.virtual_keyboard_product = product
+			end
+			return count
+		end)
+	end
 end
 
 --- Reads the pause state fail-closed and returns the same module for rebind.
@@ -3572,12 +3614,16 @@ function M.get_enabled()
 end
 
 --- The keycode convention keys arrive in while the integration is on: the
---- active layout's, which the deployed ANSI virtual keyboard passes through
---- (issue #99). Read from memory: input callbacks resolve the ISO pair with it.
+--- active layout's, which the ANSI virtual keyboard passes through (issue #99)
+--- and the ISO one swaps for the ISO pair. Read from memory: input callbacks
+--- resolve the ISO pair with it.
 --- @return string|nil form "ansi" or "iso"; nil when off or not yet resolved.
 function M.virtual_keyboard_form()
 	if not _state or _state.enabled ~= true then return nil end
-	return _state.virtual_keyboard_type
+	if _state.virtual_keyboard_type == nil then return nil end
+	local Layout = require("modules.keymap.layout")
+	return Layout.arrival_form(_state.virtual_keyboard_type,
+		_state.virtual_keyboard_product or Layout.default_virtual_keyboard_product())
 end
 
 --- The remap guardian's state for the diagnostics permissions table, read

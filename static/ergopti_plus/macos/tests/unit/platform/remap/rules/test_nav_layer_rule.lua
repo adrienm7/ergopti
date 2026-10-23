@@ -165,7 +165,7 @@ helpers.describe("Karabiner navigation layer generated from layers.toml", functi
 				expected[key] = change
 			end
 		end
-		local actual = normalise(NavLayer.build_rule(bindings_of(recommended), ctx.registry))
+		local actual = normalise(NavLayer.build_rule(bindings_of(recommended), ctx.registry, "ansi"))
 		for key, value in pairs(expected) do helpers.assert_eq(actual[key], value, "manipulator " .. key) end
 		for key, value in pairs(actual) do
 			helpers.assert_not_nil(expected[key], "unexpected manipulator " .. key .. " (" .. value .. ")")
@@ -175,8 +175,8 @@ helpers.describe("Karabiner navigation layer generated from layers.toml", functi
 	helpers.it("editing one key of layers.toml changes that key only (nav-layer-generated)", function()
 		local edited, replaced = recommended:gsub('"KeyT" = "keystroke:F2"', '"KeyT" = "keystroke:F3"')
 		helpers.assert_eq(replaced, 1, "the preset must bind KeyT to F2 exactly once for this edit to mean anything")
-		local before = normalise(NavLayer.build_rule(bindings_of(recommended), ctx.registry))
-		local after = normalise(NavLayer.build_rule(bindings_of(edited), ctx.registry))
+		local before = normalise(NavLayer.build_rule(bindings_of(recommended), ctx.registry, "ansi"))
+		local after = normalise(NavLayer.build_rule(bindings_of(edited), ctx.registry, "ansi"))
 		local changed = {}
 		for key, value in pairs(before) do
 			if after[key] ~= value then changed[#changed + 1] = key end
@@ -203,11 +203,11 @@ end)
 
 helpers.describe("Karabiner navigation layer contracts", function()
 	helpers.it("binds nothing without a binding", function()
-		helpers.assert_nil(NavLayer.build_rule({}, ctx.registry), "Karabiner refuses a rule with no manipulator")
+		helpers.assert_nil(NavLayer.build_rule({}, ctx.registry, "ansi"), "Karabiner refuses a rule with no manipulator")
 	end)
 
 	helpers.it("(navigation-native-case) leaves every unbound key and its case outside the layer rule", function()
-		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyB" = "none"\n'), ctx.registry)
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyB" = "none"\n'), ctx.registry, "ansi")
 		local actual, count = normalise(rule)
 		helpers.assert_eq(count, 1, "only the explicitly bound key may acquire a layer manipulator")
 		helpers.assert_eq(actual.b, "to=vk_none")
@@ -230,7 +230,7 @@ helpers.describe("Karabiner navigation layer contracts", function()
 
 	helpers.it("swallows a key bound to none and takes a mouse button as a layer key", function()
 		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
-			.. '"KeyB" = "none"\n"MouseBack" = "keystroke:alt+ArrowLeft"\n'), ctx.registry)
+			.. '"KeyB" = "none"\n"MouseBack" = "keystroke:alt+ArrowLeft"\n'), ctx.registry, "ansi")
 		local actual = normalise(rule)
 		helpers.assert_eq(actual.b, "to=vk_none")
 		helpers.assert_eq(actual.button4, "to=left_arrow[option]")
@@ -239,10 +239,10 @@ helpers.describe("Karabiner navigation layer contracts", function()
 	helpers.it("the wheel and a repeat count have no Karabiner form", function()
 		local wheel_only = bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"WheelUp" = "vol_up"\n')
 		helpers.assert_not_nil(wheel_only.WheelUp, "the loader takes the wheel as a macOS layer key (layer-wheel-slots)")
-		helpers.assert_nil(NavLayer.build_rule(wheel_only, ctx.registry),
+		helpers.assert_nil(NavLayer.build_rule(wheel_only, ctx.registry, "ansi"),
 			"the wheel is Hammerspoon's to run: Karabiner gets no manipulator for it")
 		helpers.assert_throws(function()
-			NavLayer.build_rule({ Digit1 = { kind = "repeat_count", count = 1 } }, ctx.registry)
+			NavLayer.build_rule({ Digit1 = { kind = "repeat_count", count = 1 } }, ctx.registry, "ansi")
 		end, "a repeat count does not exist on macOS")
 	end)
 
@@ -273,7 +273,7 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		local slots = NavLayer.wheel_slots(bindings, ctx.registry)
 		helpers.assert_eq(slots.vertical[1].strokes, { { system = "BRIGHTNESS_UP" } })
 		helpers.assert_eq(slots.vertical[-1].strokes, { { system = "BRIGHTNESS_DOWN" } })
-		local rule = NavLayer.build_rule(bindings, ctx.registry)
+		local rule = NavLayer.build_rule(bindings, ctx.registry, "ansi")
 		helpers.assert_eq(#rule.manipulators, 1)
 		helpers.assert_eq(rule.manipulators[1].to, { { consumer_key_code = "display_brightness_increment" } })
 		helpers.assert_eq(rule.manipulators[1].conditions,
@@ -288,7 +288,7 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		end
 		local actual = normalise(NavLayer.build_rule({ MetaRight = { kind = "call",
 			handler = "tap_escape_hold_option_shift", repeatable = true, action = "escape_or_option_shift" } },
-			ctx.registry))
+			ctx.registry, "ansi"))
 		helpers.assert_eq(actual.right_command, "to=left_shift[left_option] to_if_alone=escape")
 	end)
 
@@ -360,13 +360,13 @@ helpers.describe("the recommended layer comes with the key that enters it", func
 	helpers.it("(nav-layer-fresh-install-default) a folder without layers.toml gets the preset, which generates the layer", function()
 		with_folder(function(dir)
 			helpers.assert_nil(NavLayer.build_rule(NavLayer.load({ shared_root = helpers.shared(), config_dir = dir }).bindings,
-				ctx.registry), "before the import the folder binds no key")
+				ctx.registry, "ansi"), "before the import the folder binds no key")
 			local import = NavLayer.import_recommended({ shared_root = helpers.shared(), config_dir = dir })
 			helpers.assert_not_nil(import, "the import succeeds")
 			helpers.assert_eq(import.status, "imported")
 			helpers.assert_eq(content(dir .. "/layers.toml"), recommended, "the preset's exact bytes")
 			local layer = NavLayer.load({ shared_root = helpers.shared(), config_dir = dir })
-			local rule = NavLayer.build_rule(layer.bindings, layer.registry)
+			local rule = NavLayer.build_rule(layer.bindings, layer.registry, "ansi")
 			helpers.assert_true(rule ~= nil and #rule.manipulators >= MIN_ENTRIES,
 				"the imported layer generates the navigation rule")
 		end)
@@ -414,7 +414,7 @@ helpers.describe("navigation physical inputs and virtual outputs (iso-typing-con
 	helpers.it("names inputs and outputs in the one physical ISO domain the ANSI product passes through (iso-key-99)", function()
 		local bindings = bindings_of('[_meta]\nschema_version = 1\n[layers.nav.all]\n'
 			.. '"IntlBackslash" = "keystroke:Backquote"\n"Backquote" = "keystroke:IntlBackslash"\n')
-		local rule = NavLayer.build_rule(bindings, ctx.registry)
+		local rule = NavLayer.build_rule(bindings, ctx.registry, "ansi")
 		local actual = normalise(rule)
 		-- The ISO extra key reports 0x35 and the key left of 1 reports 0x64; the
 		-- ANSI product sends 0x64 as keycode 10 (left of 1) and 0x35 as 50.
@@ -555,7 +555,7 @@ helpers.describe("navigation source close acknowledgement", function()
 		assert_real_stream_closed(outcome)
 		helpers.assert_eq(outcome.loaded, true, "a user source failure retains the existing isolated-load contract")
 		helpers.assert_nil(next(outcome.result.bindings), "unacknowledged bytes cannot bind a key")
-		helpers.assert_nil(NavLayer.build_rule(outcome.result.bindings, outcome.result.registry))
+		helpers.assert_nil(NavLayer.build_rule(outcome.result.bindings, outcome.result.registry, "ansi"))
 		helpers.assert_nil(next(outcome.result.wheel.vertical))
 		helpers.assert_nil(next(outcome.result.wheel.horizontal))
 		helpers.assert_eq(table.concat(outcome.levels, " "), "start warn error", "the failed load cannot log SUCCESS")
@@ -689,7 +689,7 @@ helpers.describe("navigation configured input observations", function()
 				local entry = layer.registry.keys.KeyJ
 				if override then entry.macos_iso = { hs = 38, karabiner = { key_code = "g" } }
 				else entry.karabiner.key_code = "g" end
-				local actual = subject.build_rule(layer.bindings, layer.registry)
+				local actual = subject.build_rule(layer.bindings, layer.registry, "ansi")
 				helpers.assert_eq(actual.manipulators[1].from.key_code, "g", "the real compiler consumes the changed input")
 				helpers.assert_eq(entry.hs, 38, "HS input alone cannot authenticate the compiled map")
 				helpers.assert_nil(subject.capture_configured_inputs(layer, observation))

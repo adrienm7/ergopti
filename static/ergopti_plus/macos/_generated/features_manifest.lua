@@ -839,6 +839,9 @@ M.features = {
 		path = "layout.direct_access_digits", id = "direct_access_digits", section = "layout", default = "native", type = "enum", description_key = "menu.layout.number_row", platforms = { "ahk", "hs", "linux" }, recommended = "native", input_altering = true, enum_values = { "native", "digits", "symbols" },
 	},
 	{
+		path = "layout.virtual_keyboard", id = "virtual_keyboard", section = "layout", default = "auto", type = "enum", description_key = "menu.layout.virtual_keyboard", platforms = { "hs" }, recommended = "auto", input_altering = false, enum_values = { "auto", "iso", "ansi" },
+	},
+	{
 		path = "layout.number_row_reorder_edges", id = "number_row_reorder_edges", section = "layout", default = false, type = "boolean", description_key = "menu.layout.number_row_edges", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = true,
 	},
 	{

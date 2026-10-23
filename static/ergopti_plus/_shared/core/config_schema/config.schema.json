@@ -371,6 +371,7 @@
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
 				"number_row_reorder_edges": { "type": "boolean" },
+				"virtual_keyboard": { "type": "string", "enum": ["auto", "iso", "ansi"] },
 				"emulate_number_row": { "type": "boolean" },
 				"emulate_top_row": { "type": "boolean" },
 				"emulate_home_row": { "type": "boolean" },

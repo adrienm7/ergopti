@@ -683,6 +683,7 @@ swipe_5_horiz = 3.5
 
 [layout]
 direct_access_digits = "native"
+virtual_keyboard = "auto"
 number_row_reorder_edges = false
 pause_switch_enabled = false
 on_pause = false

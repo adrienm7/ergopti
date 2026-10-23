@@ -11,7 +11,7 @@
 ---    a given character on the current input source.
 --- 2. HID translation: ordinary Carbon positions are fixed; the ISO pair
 ---    follows the virtual keyboard product the name is sent through
----    (VIRTUAL_KEYBOARD_PRODUCT), never the layout's keycode convention, which
+---    (virtual_keyboard_product), never the layout's keycode convention, which
 ---    the registry declares and keyboard_form() reads. Never
 ---    infer that convention from a variant's name or a different keyboard.
 ---    Character legends cannot translate HID names: they would loop back to
@@ -30,6 +30,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "layout"
 
@@ -43,7 +44,7 @@ local LOG = "layout"
 -- ====================================
 -- ====================================
 
---- The virtual keyboard product Ergopti deploys (karabiner.json
+--- The virtual keyboard product Ergopti deploys by default (karabiner.json
 --- `virtual_hid_keyboard.keyboard_type_v2`) and the form every generated
 --- Karabiner name is written for. An Apple ISO keyboard already reports the key
 --- left of 1 as non_us_backslash (0x64) and the key left of Z as
@@ -54,7 +55,44 @@ local LOG = "layout"
 --- "Karabiner on ANSI gives ISO behaviour"). The product is therefore never the
 --- layout's keycode convention; that convention only tells which keycode a
 --- physical key arrives as.
-M.VIRTUAL_KEYBOARD_PRODUCT = "ansi"
+---
+--- The product is the user's choice (config.toml [layout] virtual_keyboard:
+--- "auto", "iso" or "ansi", declared once in the shared features manifest).
+--- "auto" resolves to the product below; an explicit choice is deployed as
+--- written and is never replaced by anything read from the active layout.
+M.AUTOMATIC_VIRTUAL_KEYBOARD_PRODUCT = "ansi"
+
+local CHOICE_AUTOMATIC = "auto"
+
+--- Resolves the user's virtual keyboard choice to the product to deploy.
+--- @param choice string "auto", "iso" or "ansi".
+--- @return string product "ansi" or "iso".
+function M.virtual_keyboard_product(choice)
+	if choice == "ansi" or choice == "iso" then return choice end
+	if choice == CHOICE_AUTOMATIC then return M.AUTOMATIC_VIRTUAL_KEYBOARD_PRODUCT end
+	error("the virtual keyboard choice must be auto, iso or ansi, got " .. tostring(choice), 2)
+end
+
+--- The product the shipped default choice resolves to, for callers that run
+--- before the user's choice is registered.
+--- @return string product "ansi" or "iso".
+function M.default_virtual_keyboard_product()
+	return M.virtual_keyboard_product(Manifest.default_for("layout.virtual_keyboard"))
+end
+
+--- The keycode convention a key arrives in once Karabiner delivered it through
+--- the deployed product. The ANSI product passes the ISO pair through, so a key
+--- keeps the convention of the keyboard layout; the ISO product swaps the pair,
+--- so each of the two keys arrives with the other convention's keycode.
+--- @param convention string The active layout's keycode convention, "ansi" or "iso".
+--- @param product string The deployed virtual keyboard product, "ansi" or "iso".
+--- @return string form "ansi" or "iso".
+function M.arrival_form(convention, product)
+	assert(convention == "ansi" or convention == "iso", "the layout keycode convention must be ansi or iso")
+	assert(product == "ansi" or product == "iso", "the virtual keyboard product must be ansi or iso")
+	if product == "ansi" then return convention end
+	return convention == "ansi" and "iso" or "ansi"
+end
 
 --- Fixed mapping from Carbon virtual keycode numbers to Karabiner key_code
 --- names (USB HID QWERTY physical key names).
@@ -202,9 +240,18 @@ end
 --- @param form string Virtual keyboard form.
 --- @return string|nil name Karabiner HID key name.
 local function virtual_name(keycode, form)
-	assert(form == "ansi" or form == "iso", "virtual keyboard form must be ansi or iso")
-	local name = KEYCODE_TO_QWERTY_NAME[keycode]
-	if form == "iso" then
+	return M.product_key_name(KEYCODE_TO_QWERTY_NAME[keycode], form)
+end
+
+--- Names a Karabiner output key for the selected virtual keyboard: the ISO
+--- product swaps the two ISO-pair usages, so the key that must reach a given
+--- keycode is named as the other one.
+--- @param name string|nil Karabiner key_code name as the ANSI product receives it.
+--- @param product string Virtual keyboard product, "ansi" or "iso".
+--- @return string|nil name The name to send through that product.
+function M.product_key_name(name, product)
+	assert(product == "ansi" or product == "iso", "virtual keyboard form must be ansi or iso")
+	if product == "iso" then
 		if name == "non_us_backslash" then return "grave_accent_and_tilde" end
 		if name == "grave_accent_and_tilde" then return "non_us_backslash" end
 	end
@@ -268,7 +315,7 @@ function M.key_code_for_char(char, form)
 
 	-- Resolve keycode → QWERTY name via the fixed table
 	-- (NOT via hs.keycodes.map, which would loop back to the layout character)
-	local qwerty_name = virtual_name(target_keycode, form or M.VIRTUAL_KEYBOARD_PRODUCT)
+	local qwerty_name = virtual_name(target_keycode, form or M.default_virtual_keyboard_product())
 	if not qwerty_name then
 		Logger.warn(LOG, "Keycode %d has no QWERTY name — falling back to char '%s'.",
 			target_keycode, tostring(char))
@@ -292,7 +339,7 @@ function M.char_for_key_code(qwerty_name, form)
 
 	-- Find the keycode number whose QWERTY name matches the input
 	local target_keycode = nil
-	form = form or M.VIRTUAL_KEYBOARD_PRODUCT
+	form = form or M.default_virtual_keyboard_product()
 	for kc in pairs(KEYCODE_TO_QWERTY_NAME) do
 		if virtual_name(kc, form) == qwerty_name then
 			target_keycode = kc

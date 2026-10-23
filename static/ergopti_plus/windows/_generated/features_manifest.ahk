@@ -398,6 +398,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "gestures.sensitivities.swipe_3_horiz", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.sensitivities.swipe_4_horiz", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.sensitivities.swipe_5_horiz", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
+        Map("path", "layout.virtual_keyboard", "section", "layout", "reason_key", "platform_reason.virtual_keyboard_is_karabiner", "platforms", ["hs"]),
         Map("path", "ui.menubar_icon", "section", "ui", "reason_key", "", "platforms", ["hs"]),
         Map("path", "tap_holds.enabled", "section", "tap_holds", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "shortcuts.keys.wrap_text_if_selected", "section", "shortcuts.keys", "reason_key", "", "platforms", ["hs"]),

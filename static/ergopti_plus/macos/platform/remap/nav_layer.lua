@@ -15,9 +15,10 @@
 ---    the layer variable is 1, whatever modifier is held, and the generator
 ---    scopes the variable to the lease like every other rule.
 --- 2. Inputs and outputs both use the registry's ISO projection
----    (KEYBOARD_FORM): the deployed ANSI virtual keyboard passes the ISO pair
----    through unswapped (modules/keymap/layout.lua VIRTUAL_KEYBOARD_PRODUCT), so
----    an output reaches the keycode the physical key itself produces (#99).
+---    (KEYBOARD_FORM): the ANSI virtual keyboard (the Automatic choice) passes
+---    the ISO pair through unswapped, so an output reaches the keycode the
+---    physical key itself produces (#99). The ISO product swaps the pair, so
+---    outputs are renamed for it (modules/keymap/layout.lua product_key_name).
 --- 3. F1-F12 reach the function keys in either top-row mode: sent plain while
 ---    macOS uses them as standard keys, with Fn added while it treats the row as
 ---    media keys (Karabiner's system.use_fkeys_as_standard_function_keys).
@@ -166,11 +167,14 @@ end
 --- The `to` events of a keystroke, with Fn added to every function key when asked.
 --- @param chords table Resolved chords { mods, key }.
 --- @param add_fn boolean Whether F1-F12 are sent with Fn.
+--- @param product string Deployed virtual keyboard product, "ansi" or "iso".
 --- @return table events
-local function keystroke_events(chords, registry, add_fn)
+local function keystroke_events(chords, registry, add_fn, product)
 	local events = {}
 	for _, chord in ipairs(chords) do
 		local event = karabiner_event(chord.key, registry)
+		-- The virtual keyboard product renames the ISO pair it receives.
+		if event.key_code ~= nil then event.key_code = Layout.product_key_name(event.key_code, product) end
 		local mods, has_fn = {}, false
 		for _, mod in ipairs(chord.mods) do
 			local name = KARABINER_MODIFIERS[mod]
@@ -257,20 +261,20 @@ end
 
 --- The manipulators of one bound key.
 --- @return table manipulators
-local function manipulators_for(code, resolution, registry)
+local function manipulators_for(code, resolution, registry, product)
 	local label = "Navigation layer: " .. code .. " — " .. resolution_label(resolution)
 	if resolution.kind == "keystroke" then
 		if not sends_function_key(resolution.chords, registry) then
 			local manipulator = base_manipulator(code, registry, label)
-			manipulator.to = keystroke_events(resolution.chords, registry, false)
+			manipulator.to = keystroke_events(resolution.chords, registry, false, product)
 			return { manipulator }
 		end
 		local media = base_manipulator(code, registry, label .. " (Fn added: the top row is media keys)",
 			{ type = "variable_unless", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		media.to = keystroke_events(resolution.chords, registry, true)
+		media.to = keystroke_events(resolution.chords, registry, true, product)
 		local standard = base_manipulator(code, registry, label .. " (the top row is standard function keys)",
 			{ type = "variable_if", name = FKEYS_STANDARD_VAR_NAME, value = true })
-		standard.to = keystroke_events(resolution.chords, registry, false)
+		standard.to = keystroke_events(resolution.chords, registry, false, product)
 		return { media, standard }
 	end
 	if resolution.kind == "none" then
@@ -291,10 +295,15 @@ end
 --- Builds the Karabiner rule of the navigation layer.
 --- @param bindings table Key code -> resolution, resolved for macOS.
 --- @param registry table Decoded physical_keys.json.
+--- @param product string Deployed virtual keyboard product, "ansi" or "iso": the outputs name the
+---   ISO pair for it (inputs are the physical device's usages, whatever the product).
 --- @return table|nil rule { description, manipulators }, nil when nothing is bound.
-function M.build_rule(bindings, registry)
+function M.build_rule(bindings, registry, product)
 	if type(bindings) ~= "table" or type(registry) ~= "table" or type(registry.keys) ~= "table" then
 		error("nav_layer.build_rule needs the bindings and the physical-key registry", 2)
+	end
+	if product ~= "ansi" and product ~= "iso" then
+		error("nav_layer.build_rule needs the virtual keyboard product, ansi or iso, got " .. tostring(product), 2)
 	end
 	local codes = {}
 	for code in pairs(bindings) do
@@ -308,7 +317,7 @@ function M.build_rule(bindings, registry)
 	table.sort(codes)
 	local manipulators = {}
 	for _, code in ipairs(codes) do
-		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry)) do
+		for _, manipulator in ipairs(manipulators_for(code, bindings[code], registry, product)) do
 			manipulators[#manipulators + 1] = manipulator
 		end
 	end
@@ -483,7 +492,8 @@ local function project_configured_inputs(layer)
 			native = type(override) == "table" and rawget(override, "hs") or rawget(entry, "hs")
 			if type(native) ~= "number" or native ~= native or native % 1 ~= 0 or native < 0 then return nil end
 			-- The real rule compiler validates this exact input and its resolution.
-			compiled = compiled_input(original_build({ [code] = resolution }, layer.registry))
+			-- Only the input is read back, and the product never changes an input.
+			compiled = compiled_input(original_build({ [code] = resolution }, layer.registry, "ansi"))
 			if compiled == nil then return nil end
 			if not seen[native] then codes[#codes + 1] = native; seen[native] = true end
 		end

@@ -44,6 +44,8 @@ M.DEFAULT_STATE = {
 	layout_on_resume            = Manifest.default_for("layout.on_resume"),
 	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
 	menubar_icon                = Manifest.default_for("ui.menubar_icon"),
+	-- config.toml [layout] virtual_keyboard: the Karabiner virtual keyboard type.
+	layout_virtual_keyboard     = Manifest.default_for("layout.virtual_keyboard"),
 }
 
 
@@ -688,6 +690,32 @@ function M.build(ctx)
 		-- refresh_icon comes from ui.menu.init through ctx: a require() round-trip
 		-- could re-enter that module while it is still initialising.
 		if type(refresh_icon) == "function" then pcall(refresh_icon) end
+		if type(update_menu) == "function" then pcall(update_menu) end
+		return true
+	end
+	render_ctx.state_getters["layout.virtual_keyboard"] = function() return state and state.layout_virtual_keyboard end
+	render_ctx.commands["virtual_keyboard"] = function(choice)
+		if not state then return false end
+		local previous = state.layout_virtual_keyboard
+		state.layout_virtual_keyboard = choice
+		if type(save_prefs) ~= "function" or save_prefs() ~= true then
+			state.layout_virtual_keyboard = previous
+			return false
+		end
+		Logger.info(LOG, "Karabiner virtual keyboard set to %s.", tostring(choice))
+		-- The deployed karabiner.json names its keys for this product, so it is
+		-- regenerated now rather than at the next unrelated change.
+		local karabiner = ctx and ctx.karabiner
+		if type(karabiner) == "table" and type(karabiner.regenerate) == "function" then
+			local called, accepted = pcall(karabiner.regenerate, function(ok, reason)
+				if ok ~= true then
+					Logger.warn(LOG, "The Karabiner virtual keyboard is not redeployed yet: %s.", tostring(reason))
+				end
+			end)
+			if not called then
+				Logger.error(LOG, "The Karabiner virtual keyboard redeploy raised: %s.", tostring(accepted))
+			end
+		end
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end

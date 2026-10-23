@@ -277,7 +277,7 @@ helpers.describe("macOS navigation layer editor host", function()
 
 			local NavLayer = helpers.load_with_stubs("platform.remap.nav_layer")
 			local layer = NavLayer.load({ shared_root = helpers.shared(), config_dir = world.dir })
-			local rule = NavLayer.build_rule(layer.bindings, layer.registry)
+			local rule = NavLayer.build_rule(layer.bindings, layer.registry, "ansi")
 			local sent = {}
 			for _, m in ipairs(rule.manipulators) do
 				local to = m.to and m.to[1]

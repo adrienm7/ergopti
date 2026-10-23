@@ -1782,14 +1782,23 @@ function M.build_karabiner_json(
 		return nil, err
 	end
 	-- The layout convention the actions were resolved under must be known, or the
-	-- generation fails closed. It no longer chooses the deployed virtual
-	-- keyboard: Layout.VIRTUAL_KEYBOARD_PRODUCT does (issue #99).
+	-- generation fails closed. It does not choose the deployed virtual keyboard:
+	-- the user's choice does, as state.virtual_keyboard_product (issue #99).
 	local form_ok, keycode_form = pcall(function()
 		if state.virtual_keyboard_type ~= nil then return state.virtual_keyboard_type end
 		return Layout.keyboard_form()
 	end)
 	if not form_ok or (keycode_form ~= "ansi" and keycode_form ~= "iso") then
 		local err = "the active layout virtual keyboard convention is unavailable: " .. tostring(keycode_form)
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+		return nil, err
+	end
+	-- An explicit product is deployed as chosen. Only a state that never met the
+	-- choice (no source registered yet) gets the product of the shipped default.
+	local product = state.virtual_keyboard_product
+	if product == nil then product = Layout.default_virtual_keyboard_product() end
+	if product ~= "ansi" and product ~= "iso" then
+		local err = "the virtual keyboard product must be ansi or iso, got " .. tostring(product)
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
@@ -1938,7 +1947,7 @@ function M.build_karabiner_json(
 	local nav_layer_position = #all_rules
 	local nav_rule = nil
 	if state.nav_layer ~= nil then
-		local nav_ok, built = pcall(NavLayer.build_rule, state.nav_layer.bindings, state.nav_layer.registry)
+		local nav_ok, built = pcall(NavLayer.build_rule, state.nav_layer.bindings, state.nav_layer.registry, product)
 		if not nav_ok then
 			local err = "navigation layer: " .. tostring(built)
 			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
@@ -2143,7 +2152,7 @@ function M.build_karabiner_json(
 				devices              = { { identifiers = { is_keyboard = true }, simple_modifications = {} } },
 				name                 = "Default profile",
 				selected             = true,
-				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = Layout.VIRTUAL_KEYBOARD_PRODUCT },
+				virtual_hid_keyboard = { country_code = 0, keyboard_type_v2 = product },
 			}
 		}
 	}
