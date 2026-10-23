@@ -88,6 +88,45 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(captured.hidden, 1)
 			helpers.assert_eq(captured.reloaded, 1)
 		end)
+
+		for _, outcome in ipairs({ "false", "nil", "truthy", "throw", "missing" }) do
+			helpers.it("paths reload: keeps a saved editor open after " .. outcome .. " acknowledgement and permits retry", function()
+				local state, values, captured = paths_state()
+				local calls = 0
+				state.on_reload = function()
+					calls = calls + 1
+					if outcome == "throw" then error("controlled reload refusal") end
+					if outcome == "false" then return false end
+					if outcome == "truthy" then return 1 end
+				end
+				if outcome == "missing" then state.on_reload = nil end
+				local result = handler.on_message({ action = "save", configDir = "/tmp/ergopti-saved/" }, state)
+				helpers.assert_eq(result, { saved = true, hidden = false, reloaded = false })
+				helpers.assert_eq(values.config_dir, "/tmp/ergopti-saved", "persisted paths remain honest after refused application")
+				helpers.assert_eq(captured.hidden, 0, "the draft remains visible for retry")
+				helpers.assert_eq(calls, outcome == "missing" and 0 or 1)
+				state.on_reload = function() calls = calls + 1; return true end
+				local retried = handler.on_message({ action = "save", configDir = "/tmp/ergopti-saved/" }, state)
+				helpers.assert_eq(retried, { saved = true, hidden = true, reloaded = true })
+				helpers.assert_eq(captured.hidden, 1)
+				helpers.assert_eq(calls, outcome == "missing" and 1 or 2)
+			end)
+		end
+
+		helpers.it("paths reload: closes only after the daemon acknowledges application", function()
+			local state, _, captured = paths_state()
+			local order, close = {}, state.webview_manager.hide
+			state.webview_manager.hide = function(...) order[#order + 1] = "hide"; return close(...) end
+			state.on_reload = function()
+				helpers.assert_eq(captured.hidden, 0, "the daemon sees the still-open editor")
+				order[#order + 1] = "reload"
+				return true
+			end
+			local result = handler.on_message({ action = "save", configDir = "/tmp/ergopti-saved/" }, state)
+			helpers.assert_eq({ result.saved, result.hidden, result.reloaded }, { true, true, true })
+			helpers.assert_eq(order, { "reload", "hide" })
+		end)
+
 		helpers.it("closes without persistence on cancel", function()
 			local state, values, captured = paths_state()
 			local result = handler.on_message({ action = "cancel" }, state)
