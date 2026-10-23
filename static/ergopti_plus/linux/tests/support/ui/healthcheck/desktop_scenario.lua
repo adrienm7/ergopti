@@ -27,7 +27,7 @@ function M.shutdown(options)
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 		tooltip_preview = false, gestures = false, input_capture_gate = false, prediction_engine = false,
 		webview_manager = options.webview_shutdown and { shutdown = options.webview_shutdown } or false,
-		TimerScheduler = { cancelAll = function() observed.timers = observed.timers + 1 end },
+		TimerScheduler = { cancelAll = function() observed.timers = observed.timers + 1; return true end },
 		require = function(name)
 			assert(name == "modules.llm.agent_learning", "unexpected cold dependency: " .. name)
 			return { flush = function() observed.flushes = observed.flushes + 1 end }
