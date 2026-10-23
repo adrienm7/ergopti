@@ -92,98 +92,186 @@ _ParseEntryPriority(Line, Fallback) {
 		return Fallback
 }
 
-; Return the cached content of a TOML file, reading it from disk on first access.
-ReadTomlFile(FilePath) {
-		global _TomlFileCache, _TomlUnreadableFiles
+; Active raw/derived reads share one admission per file. Nested activity and
+; invalidation revoke an older read even when both cache entries are absent.
+_TomlLoaderCacheReads() {
+	static Reads := Map()
+	return Reads
+}
+
+_TomlLoaderBeginCacheRead(FilePath) {
+	global _TomlFileCache
+	Key := _TOML_WriteRefusalKey(FilePath)
+	Reads := _TomlLoaderCacheReads()
+	PreviousCritical := Critical("On")
+	try {
+		Owner := {key: Key, raw: _TomlFileCache, readable: false}
+		Reads[Key] := Owner
+		return Owner
+	} finally Critical(PreviousCritical)
+}
+
+_TomlLoaderCacheReadCurrent(Owner) {
+	global _TomlFileCache
+	return _TomlLoaderCacheReads().Get(Owner.key, 0) == Owner && _TomlFileCache == Owner.raw
+}
+
+_TomlLoaderEndCacheRead(Owner) {
+	Reads := _TomlLoaderCacheReads()
+	PreviousCritical := Critical("On")
+	try {
+		if Reads.Get(Owner.key, 0) == Owner
+			Reads.Delete(Owner.key)
+	} finally Critical(PreviousCritical)
+}
+
+; Also used by the admitted config snapshot's raw-cache publication.
+_TomlLoaderInvalidateCacheRead(FilePath) {
+	Key := _TOML_WriteRefusalKey(FilePath)
+	Reads := _TomlLoaderCacheReads()
+	PreviousCritical := Critical("On")
+	try {
+		if Reads.Has(Key)
+			Reads.Delete(Key)
+	} finally Critical(PreviousCritical)
+}
+
+; Publish only to the same derived Map captured before native reads or logs.
+_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache) {
+	global _TomlFileSectionCounts
+	PreviousCritical := Critical("On")
+	try {
+		if _TomlLoaderCacheReadCurrent(Owner) && _TomlFileSectionCounts == Cache
+			_TomlFileSectionCounts[FilePath] := Counts
+	} finally Critical(PreviousCritical)
+}
+
+_TomlLoaderPublishGroup(Owner, CacheKey, Config, Cache) {
+	global HotstringGroupConfig
+	PreviousCritical := Critical("On")
+	try {
+		if _TomlLoaderCacheReadCurrent(Owner) && HotstringGroupConfig == Cache
+			HotstringGroupConfig[CacheKey] := Config
+	} finally Critical(PreviousCritical)
+}
+
+; Return cached UTF-8 content, reading on first access. A derived consumer lends
+; its exact admission so a failed read cannot borrow a later read's cleared latch.
+ReadTomlFile(FilePath, ReadOwner := 0) {
+	global _TomlFileCache, _TomlUnreadableFiles
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(ReadOwner) && !_TomlLoaderCacheReadCurrent(ReadOwner)
+			return ""
 		if _TomlFileCache.Has(FilePath) {
-				return _TomlFileCache[FilePath]
+			if IsObject(ReadOwner)
+				ReadOwner.readable := true
+			return _TomlFileCache[FilePath]
 		}
+	} finally Critical(PreviousCritical)
+	OwnsRead := !IsObject(ReadOwner)
+	if OwnsRead
+		ReadOwner := _TomlLoaderBeginCacheRead(FilePath)
+	try {
 		Content := ""
-		try {
-				Content := FileRead(FilePath, "UTF-8")
-		} catch as Err {
-				; Do NOT cache a failed read. Caching it made one transient lock at
-				; boot — a sync client, the personal TOML editor, a backup scanner —
-				; hide a whole hotstring file for the entire session: every consumer
-				; saw zero entries and the load was still logged as done. Leaving the
-				; path uncached lets the next caller retry.
-				if FileExist(FilePath) {
-						; Record the failure so writers can tell "unreadable" from "empty".
-						; Only for an existing file: a missing one legitimately reads empty,
-						; and flagging it would block the first save of a fresh install.
-						_TomlUnreadableFiles[FilePath] := true
-						try LoggerError("TomlLoader", "Cannot read '{1}': {2}. Treated as empty for this call; not cached so a later read retries, and flagged unreadable so writers refuse to rebuild from it.", FilePath, Err.Message)
+		try Content := FileRead(FilePath, "UTF-8")
+		catch as Err {
+			; Existing missing files remain an admitted empty first-use source.
+			Exists := FileExist(FilePath)
+			LogFailure := false
+			PreviousCritical := Critical("On")
+			try {
+				if Exists && _TomlLoaderCacheReadCurrent(ReadOwner) {
+					_TomlUnreadableFiles[FilePath] := true
+					LogFailure := true
 				}
-				return ""
+			} finally Critical(PreviousCritical)
+			if LogFailure
+				try LoggerError("TomlLoader", "Cannot read '{1}': {2}. Treated as empty for this call; not cached so a later read retries, and flagged unreadable so writers refuse to rebuild from it.", FilePath, Err.Message)
+			return ""
 		}
-		; A successful read clears the sticky flag: the content below is now the
-		; real file, so anything derived from it is safe to persist again.
-		if _TomlUnreadableFiles.Has(FilePath)
-				_TomlUnreadableFiles.Delete(FilePath)
-		_TomlFileCache[FilePath] := Content
+		PreviousCritical := Critical("On")
+		try {
+			if _TomlLoaderCacheReadCurrent(ReadOwner) {
+				if _TomlUnreadableFiles.Has(FilePath)
+					_TomlUnreadableFiles.Delete(FilePath)
+				_TomlFileCache[FilePath] := Content
+				ReadOwner.readable := true
+			}
+		} finally Critical(PreviousCritical)
 		return Content
+	} finally {
+		if OwnsRead
+			_TomlLoaderEndCacheRead(ReadOwner)
+	}
 }
 
 ; Helper to warm the section counts cache for a specific file.
 _TomlWarmFileCounts(FilePath) {
 		global _TomlFileSectionCounts, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
-		if _TomlFileSectionCounts.Has(FilePath)
-				return _TomlFileSectionCounts[FilePath]
+		PreviousCritical := Critical("On")
+		try {
+				if _TomlFileSectionCounts.Has(FilePath)
+						return _TomlFileSectionCounts[FilePath]
+				Cache := _TomlFileSectionCounts
+		} finally Critical(PreviousCritical)
+		Owner := _TomlLoaderBeginCacheRead(FilePath)
+		try {
+			Counts := Map()
+			if !FileExist(FilePath) {
+					_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache)
+					return Counts
+			}
 
-		Counts := Map()
-		if !FileExist(FilePath) {
-				_TomlFileSectionCounts[FilePath] := Counts
-				return Counts
-		}
-
-		CurrentSec := ""
-		loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-				Line := Trim(A_LoopField, " `t")
-				if (Line == "" or SubStr(Line, 1, 1) == "#")
-						continue
+			CurrentSec := ""
+			loop parse, ReadTomlFile(FilePath, Owner), "`n", "`r" {
+					Line := Trim(A_LoopField, " `t")
+					if (Line == "" or SubStr(Line, 1, 1) == "#")
+							continue
 						
-				; [[section]] or [section] header.
-				; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
-				; a header carrying a trailing comment simply fails to match: the line
-				; then falls through to the entry parser, fails that too, and continues —
-				; leaving CurrentSec on the PREVIOUS section, so every entry below is
-				; counted against the wrong one. That is why the menu's hotstring count
-				; could disagree with the number of entries actually registered.
-				if (SubStr(Line, 1, 1) == "["
-				and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
-						CurrentSec := StrLower(Trim(SectionMatch[1]))
-						if !Counts.Has(CurrentSec)
-								Counts[CurrentSec] := 0
-						continue
-				}
+					; [[section]] or [section] header.
+					; Stripped like LoadHotstringsSection does. This pattern is ANCHORED, so
+					; a header carrying a trailing comment simply fails to match: the line
+					; then falls through to the entry parser, fails that too, and continues —
+					; leaving CurrentSec on the PREVIOUS section, so every entry below is
+					; counted against the wrong one. That is why the menu's hotstring count
+					; could disagree with the number of entries actually registered.
+					if (SubStr(Line, 1, 1) == "["
+					and RegExMatch(TOML_StripInlineComment(Line), "^\[+([^\[\]]+)\]+$", &SectionMatch)) {
+							CurrentSec := StrLower(Trim(SectionMatch[1]))
+							if !Counts.Has(CurrentSec)
+									Counts[CurrentSec] := 0
+							continue
+					}
 				
-				; Match hotstring entry: key = value or key = { ... }
-				; Skip every metadata block, not just the two flat forms: equality checks
-				; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
-				; written by the config window slip through, so its delay/color/priority lines
-				; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
-				; Count a line only when it matches one of the two shapes the loaders
-				; actually register: the full inline-table entry (LoadHotstringsSection /
-				; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
-				; fallback). A looser `key =` test over-counted non-entry lines, so the
-				; displayed count could exceed the registered/cached row count.
-				if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
-						if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
-						or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
-								Counts[CurrentSec] := Counts[CurrentSec] + 1
-						}
-				}
-		}
+					; Match hotstring entry: key = value or key = { ... }
+					; Skip every metadata block, not just the two flat forms: equality checks
+					; let the dotted per-section form ([_meta.sections.<x>], [_meta.section_delays])
+					; written by the config window slip through, so its delay/color/priority lines
+					; were miscounted as hotstrings. Mirror _HotstringsCacheBuildRows' convention.
+					; Count a line only when it matches one of the two shapes the loaders
+					; actually register: the full inline-table entry (LoadHotstringsSection /
+					; LoadExtTomlFile) or the simple key="value" entry (LoadExtTomlFile
+					; fallback). A looser `key =` test over-counted non-entry lines, so the
+					; displayed count could exceed the registered/cached row count.
+					if (CurrentSec != "" and CurrentSec != "_meta" and !InStr(CurrentSec, "_meta.")) {
+							if (RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN)
+							or RegExMatch(TOML_StripInlineComment(Line), _HOTSTRING_SIMPLE_ENTRY_PATTERN)) {
+									Counts[CurrentSec] := Counts[CurrentSec] + 1
+							}
+					}
+			}
 
-		; Never memoise a count derived from a read that failed. ReadTomlFile
-		; deliberately leaves an unreadable path uncached so the next caller retries;
-		; caching the zero it produced here reinstated the very bug that rule removed,
-		; one call level up — the menu showed the category as empty for the whole
-		; session and no later successful read could reach this consumer again.
-		if TOML_UnreadableFile(FilePath)
-				return Counts
-		_TomlFileSectionCounts[FilePath] := Counts
-		return Counts
+			; Never memoise a count derived from a read that failed. ReadTomlFile
+			; deliberately leaves an unreadable path uncached so the next caller retries;
+			; caching the zero it produced here reinstated the very bug that rule removed,
+			; one call level up — the menu showed the category as empty for the whole
+			; session and no later successful read could reach this consumer again.
+			if !Owner.readable || TOML_UnreadableFile(FilePath)
+					return Counts
+			_TomlLoaderPublishCounts(Owner, FilePath, Counts, Cache)
+			return Counts
+		} finally _TomlLoaderEndCacheRead(Owner)
 }
 
 ; Count hotstring entries inside a specific [[section]] of a TOML category file.
@@ -268,9 +356,14 @@ _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath := "") {
 ; _HCW_PatchTomlMeta writes changes to a personal TOML file.
 _ParseTomlGroupConfig_InvalidatePath(FilePath) {
 		global _TomlFileCache, HotstringGroupConfig, _TomlCountCache, _TomlFileSectionCounts
-		if _TomlFileCache.Has(FilePath) {
-				_TomlFileCache.Delete(FilePath)
-		}
+		PreviousCritical := Critical("On")
+		try {
+				_TomlLoaderInvalidateCacheRead(FilePath)
+				if _TomlFileCache.Has(FilePath)
+						_TomlFileCache.Delete(FilePath)
+				if _TomlFileSectionCounts.Has(FilePath)
+						_TomlFileSectionCounts.Delete(FilePath)
+		} finally Critical(PreviousCritical)
 		; One file is cached under more than one key: the engine/tooltip resolver
 		; reaches personal_hotstrings.toml as the bare category "personal" while the
 		; config window reaches it by absolute path. Deleting only the path left the
@@ -292,10 +385,6 @@ _ParseTomlGroupConfig_InvalidatePath(FilePath) {
 		; The resolved hotstring delay/color for this group may now differ, so drop
 		; the memoised HotstringsResolve results too (defined in hotstrings_config.ahk).
 		try HotstringsResolveBumpGen()
-		; Also invalidate the section counts cache for this file
-		if _TomlFileSectionCounts.Has(FilePath) {
-				_TomlFileSectionCounts.Delete(FilePath)
-		}
 		; Legacy count cache invalidation
 		for Key, _ in _TomlCountCache.Clone() {
 				if InStr(Key, FilePath) {
@@ -675,114 +764,120 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 		global ScriptInformation, HotstringGroupConfig, _SharedDir
 		LowerCat := StrLower(CategoryName)
 		CacheKey := (FilePath != "") ? FilePath : LowerCat
-		if HotstringGroupConfig.Has(CacheKey) {
-				return HotstringGroupConfig[CacheKey]
-		}
+		PreviousCritical := Critical("On")
+		try {
+				if HotstringGroupConfig.Has(CacheKey)
+						return HotstringGroupConfig[CacheKey]
+				Cache := HotstringGroupConfig
+		} finally Critical(PreviousCritical)
 
 		; Resolved through the shared helper so _ParseTomlGroupConfig_InvalidatePath
 		; recognises exactly the same file for a bare-category key as for a path one.
 		FilePath := _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath)
 
-		Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
-		if !FileExist(FilePath) {
-				; Cache the missing-file result under CacheKey (the same key the lookup at
-				; the top of this function checks and that _ParseTomlGroupConfig_InvalidatePath
-				; deletes). Keying it under LowerCat instead made explicit-path calls never
-				; cache-hit and left a stale empty Config unreachable by invalidation.
-				HotstringGroupConfig[CacheKey] := Config
-				return Config
-		}
+		Owner := _TomlLoaderBeginCacheRead(FilePath)
+		try {
+			Config := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Sections: Map() }
+			if !FileExist(FilePath) {
+					; Cache the missing-file result under CacheKey (the same key the lookup at
+					; the top of this function checks and that _ParseTomlGroupConfig_InvalidatePath
+					; deletes). Keying it under LowerCat instead made explicit-path calls never
+					; cache-hit and left a stale empty Config unreachable by invalidation.
+					_TomlLoaderPublishGroup(Owner, CacheKey, Config, Cache)
+					return Config
+			}
 
-		Mode := ""
-		CurrentSec := ""
+			Mode := ""
+			CurrentSec := ""
 
-		FileContent := ReadTomlFile(FilePath)
-		loop parse, FileContent, "`n", "`r" {
-				Line := Trim(A_LoopField, " `t")
-				if (Line == "" or SubStr(Line, 1, 1) == "#") {
-						continue
-				}
-				Line := Trim(TOML_StripInlineComment(Line), " `t")
-				if (Line == "")
-						continue
-				if (SubStr(Line, 1, 2) == "[[") {
-						break
-				}
-				if RegExMatch(Line, "^\[_meta\.sections\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
-						Mode := "meta_section"
-						CurrentSec := StrLower(SecMatch[1])
-						if !Config.Sections.Has(CurrentSec) {
-								Config.Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
-						}
-						continue
-				}
-				if RegExMatch(Line, "^\[_meta\.section_delays\]$") {
-						Mode := "meta_section_delays"
-						CurrentSec := ""
-						continue
-				}
-				if (Line == "[_meta]") {
-						Mode := "meta"
-						continue
-				}
-				if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
-						Mode := ""
-						CurrentSec := ""
-						continue
-				}
+			FileContent := ReadTomlFile(FilePath, Owner)
+			loop parse, FileContent, "`n", "`r" {
+					Line := Trim(A_LoopField, " `t")
+					if (Line == "" or SubStr(Line, 1, 1) == "#") {
+							continue
+					}
+					Line := Trim(TOML_StripInlineComment(Line), " `t")
+					if (Line == "")
+							continue
+					if (SubStr(Line, 1, 2) == "[[") {
+							break
+					}
+					if RegExMatch(Line, "^\[_meta\.sections\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
+							Mode := "meta_section"
+							CurrentSec := StrLower(SecMatch[1])
+							if !Config.Sections.Has(CurrentSec) {
+									Config.Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
+							}
+							continue
+					}
+					if RegExMatch(Line, "^\[_meta\.section_delays\]$") {
+							Mode := "meta_section_delays"
+							CurrentSec := ""
+							continue
+					}
+					if (Line == "[_meta]") {
+							Mode := "meta"
+							continue
+					}
+					if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
+							Mode := ""
+							CurrentSec := ""
+							continue
+					}
 
-				if (Mode == "meta") {
-						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-						if TOML_TryParseNumber(NumMatch[1], &Delay)
-								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
-								Config.Delay := Delay
-						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
-								Config.Color := UnescapeTomlString(ColMatch[1])
-						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
-								Config.ShowTooltip := (BoolMatch[1] == "true")
-						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-						if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
-								and HotstringsTryPriority(ParsedPriority, &Priority)
-								Config.Priority := Priority
-						}
-				} else if (Mode == "meta_section" and CurrentSec != "") {
-						Sec := Config.Sections[CurrentSec]
-						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-								if TOML_TryParseNumber(NumMatch[1], &Delay)
-										and TickTryDurationMsFromSeconds(Delay, &DelayMs)
-										Sec.Delay := Delay
-						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
-								Sec.Color := UnescapeTomlString(ColMatch[1])
-						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
-								Sec.ShowTooltip := (BoolMatch[1] == "true")
-						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-								if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
-										and HotstringsTryPriority(ParsedPriority, &Priority)
-										Sec.Priority := Priority
-						} else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
-								Sec.Description := UnescapeTomlString(DescMatch[1])
-						}
-				} else if (Mode == "meta_section_delays") {
-						if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &SDMatch) {
-								SDKey := StrLower(SDMatch[1])
-								if !Config.Sections.Has(SDKey) {
-										Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
-								}
-								if TOML_TryParseNumber(SDMatch[2], &Delay)
-										and TickTryDurationMsFromSeconds(Delay, &DelayMs)
-										Config.Sections[SDKey].Delay := Delay
-						}
-				}
-		}
+					if (Mode == "meta") {
+							if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
+							if TOML_TryParseNumber(NumMatch[1], &Delay)
+									and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+									Config.Delay := Delay
+							} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
+									Config.Color := UnescapeTomlString(ColMatch[1])
+							} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
+									Config.ShowTooltip := (BoolMatch[1] == "true")
+							} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
+							if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+									and HotstringsTryPriority(ParsedPriority, &Priority)
+									Config.Priority := Priority
+							}
+					} else if (Mode == "meta_section" and CurrentSec != "") {
+							Sec := Config.Sections[CurrentSec]
+							if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
+									if TOML_TryParseNumber(NumMatch[1], &Delay)
+											and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+											Sec.Delay := Delay
+							} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
+									Sec.Color := UnescapeTomlString(ColMatch[1])
+							} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
+									Sec.ShowTooltip := (BoolMatch[1] == "true")
+							} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
+									if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+											and HotstringsTryPriority(ParsedPriority, &Priority)
+											Sec.Priority := Priority
+							} else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
+									Sec.Description := UnescapeTomlString(DescMatch[1])
+							}
+					} else if (Mode == "meta_section_delays") {
+							if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &SDMatch) {
+									SDKey := StrLower(SDMatch[1])
+									if !Config.Sections.Has(SDKey) {
+											Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
+									}
+									if TOML_TryParseNumber(SDMatch[2], &Delay)
+											and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+											Config.Sections[SDKey].Delay := Delay
+							}
+					}
+			}
 
-		; Same rule as _TomlWarmFileCounts: an all-empty Config produced by a read
-		; that never saw the file must not become permanent. Memoising it froze the
-		; group's [_meta] delay/colour/priority at the global fallback for the whole
-		; session, and the cache hit precedes the read so no retry could correct it.
-		if TOML_UnreadableFile(FilePath)
-				return Config
-		HotstringGroupConfig[CacheKey] := Config
-		return Config
+			; Same rule as _TomlWarmFileCounts: an all-empty Config produced by a read
+			; that never saw the file must not become permanent. Memoising it froze the
+			; group's [_meta] delay/colour/priority at the global fallback for the whole
+			; session, and the cache hit precedes the read so no retry could correct it.
+			if !Owner.readable || TOML_UnreadableFile(FilePath)
+					return Config
+			_TomlLoaderPublishGroup(Owner, CacheKey, Config, Cache)
+			return Config
+		} finally _TomlLoaderEndCacheRead(Owner)
 }
 
 ; Read sections_order array from [_meta] block.
