@@ -6,7 +6,8 @@ local Privacy = require("modules.keystats.privacy_context")
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector",
-		"adapters.physical_observation_clock", "keystats.physical_context_observation" }, function()
+		"adapters.physical_observation_clock", "keystats.physical_context_observation",
+		"native_path", "error_description" }, function()
 		local controls = { paused = false, no_window = false, no_focus = false, no_frontmost = false,
 			throw_property = nil, title = "Ordinary window", role = "AXTextField", subrole = nil,
 			queries = {}, clock = 100, records = {}, failures = {}, decision_calls = 0 }
@@ -73,7 +74,7 @@ local function with_fixture(callback)
 				end)
 		end
 		controls.activate = function() return tracker.app_watcher_cb("Editor", 1, app) end
-		controls.focus = function(focused) return controls.ax_callback(focused, "AXFocusedUIElementChanged", observer) end
+		controls.focus = function(focused) return controls.ax_callback(observer, focused, "AXFocusedUIElementChanged", {}) end
 		controls.element, controls.app, controls.observer = element, app, observer
 		callback(tracker, state, controls)
 	end)

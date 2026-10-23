@@ -736,9 +736,11 @@ function M.update_ax_observer(app_pid)
 	end
 
 	local callback_ok, callback_result = xpcall(function()
-		return observer:callback(function(element, event, watcher, _)
+		-- Native callbacks put the observer first and wrap it anew for each
+		-- notification; native equality compares the retained AXObserverRef.
+		return observer:callback(function(watcher, element, event, _)
 			if _physical_context_binding and (not _state or not rawequal(_state.ax_observer, observer)
-				or not rawequal(watcher, observer)) then return end
+				or watcher ~= observer) then return end
 			if not _state or _state.ax_observer ~= observer
 				or _ax_observer_committed ~= true or _state.is_enabled == false
 				or watcher ~= observer then return end
