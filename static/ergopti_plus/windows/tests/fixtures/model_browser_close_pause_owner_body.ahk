@@ -150,21 +150,6 @@ _MBPO_Prepare() {
 		&& _LLM_Menu["model"] == _MBPO.ModelA && !_LLM_Menu["auto_profile_for_model"],
 		"The private disabled/API state must avoid backend bootstrap without replacing mutation or persistence.")
 	_MBPO_Require(!_LLM_Menu_Loaded, "Candidate collection must use its real explicit menu source, not a fabricated loaded flag.")
-	; This real candidate-A precondition is diagnostic, not the later candidate-B
-	; exception or a cold-path witness. It may warm genuine collector caches.
-	try Preflight := _ConfigCollectFullSaveUpdates(Features, _LLM_Menu)
-	catch Error as Failure {
-		try FileAppend("DIAGNOSTIC model-browser-collector-preflight {" . '"status":"error","type":'
-			. JsonStringLiteral(Type(Failure)) . ',"message":' . JsonStringLiteral(Failure.Message)
-			. ',"what":' . JsonStringLiteral(Failure.What) . ',"file":' . JsonStringLiteral(Failure.File)
-			. ',"line":' . Failure.Line . ',"stack":' . JsonStringLiteral(SubStr(Failure.Stack, 1, 8192))
-			. ',"stack_units":' . StrLen(Failure.Stack) . "}`n", "*", "UTF-8-RAW")
-		; Export failure must not replace the original collector exception.
-		finally throw Failure
-	}
-	FileAppend("DIAGNOSTIC model-browser-collector-preflight {" . '"status":"returned","return_type":'
-		. JsonStringLiteral(Type(Preflight)) . ',"update_count":' . (Preflight is Array ? Preflight.Length : -1)
-		. "}`n", "*", "UTF-8-RAW")
 	_MBPO.Original := FSReadBytesStrict(ConfigurationFile)
 	_MBPO.OriginalHash := CryptoSha256Bytes(_MBPO.Original)
 	_MBPO_Require(_MBPO.OriginalHash != "", "The independent original RAW image must be measurable.")
