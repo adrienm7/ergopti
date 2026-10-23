@@ -54,7 +54,12 @@ _ESOW_Record(Phase, Record) {
 			"exists", DllCall("User32\IsWindow", "Ptr", Record.Hwnd, "Int"),
 			"visible", DllCall("User32\IsWindowVisible", "Ptr", Record.Hwnd, "Int"),
 			"constructors", _ESOW.Controllers.Length, "environments", _ESOW.Environments,
-			"public_returned", _ESOW.PublicReturned, "critical", A_IsCritical))
+			"public_returned", _ESOW.PublicReturned, "critical", A_IsCritical,
+			"state_window_record", _ESOW_IdentityRecord(State.Window, "window"),
+			"state_controller_record", _ESOW_IdentityRecord(State.Controller, "controller"),
+			"state_view_record", _ESOW_IdentityRecord(State.View, "view"),
+			"reset", State.Reset, "message_sub_set", State.Message, "navigation_sub_set", State.Navigation,
+			"close_return_instrumented", false))
 }
 
 Gui_Create(Options := "", Title := "") {
@@ -114,10 +119,9 @@ _ESOW_CloseObserved(Record, Window) {
 			"The actual Close event must precede browser startup, not run during await.")
 		Record.CloseCount += 1
 		_ESOW_Record("actual-close-before-production", Record)
-		; Only this newly admitted GUI-event thread becomes Critical. Its original
-		; Close handler runs next without a nested reopen; thread retirement restores
-		; the caller's eligibility. The high private message cannot be an emergency
-		; OnMessage interruption and is delivered by the same native Show pump later.
+		; Critical applies only to this GUI-event thread; native Destroy may pump.
+		; The high private signal observes retirement of the epoch, not the return
+		; of the original Close callback. Its actual state stays in the trace.
 		Critical("On")
 		_ESOW_Require(DllCall("User32\PostMessageW", "Ptr", A_ScriptHwnd, "UInt", _ESOW.Signal,
 			"UPtr", Record.Hwnd, "Ptr", 0, "Int"), "The private after-Close signal must queue.")
@@ -138,6 +142,8 @@ _ESOW_AfterClose(WParam, LParam, Message, Hwnd) {
 			&& !_ESOW.PublicReturned && _ESOW.Controllers.Length == 0 && _ESOW.Environments == 0,
 			"The original production Close must revoke its epoch before the native Show pump resumes.")
 		Record.ExistsAfterClose := DllCall("User32\IsWindow", "Ptr", Record.Hwnd, "Int")
+		; Keep the historical marker label, while explicitly recording that this
+		; is an epoch observation and does not acknowledge Close callback return.
 		_ESOW_Record("production-close-completed-before-browser", Record)
 		if _ESOW.Mode == "reopen" {
 			_ESOW_Open()
@@ -216,6 +222,61 @@ class _ESOW_Controller {
 	Fill() {
 		this.Fills += 1
 	}
+}
+
+; These stable fixture ordinals identify the actual retained object references.
+; No GUI property, native call, object address or browser getter is needed here.
+_ESOW_IdentityRecord(Value, Kind) {
+	global _ESOW
+	if !IsObject(Value)
+		return 0
+	if Kind == "window" {
+		for Record in _ESOW.Windows
+			if Record.Window == Value
+				return Record.Index
+		return -1
+	}
+	for Index, Controller in _ESOW.Controllers {
+		Candidate := Kind == "view" ? Controller.CoreWebView2 : Controller
+		if Candidate == Value
+			return Index
+	}
+	return -1
+}
+
+_ESOW_FinalDiagnostic() {
+	global _ESOW
+	State := _ESOW_State(), Successor := _ESOW.Successor
+	HasSuccessor := IsObject(Successor)
+	Target := _ESOW.Windows.Length >= 2 ? _ESOW.Windows[2] : _ESOW.Windows[1]
+	Controller := Target.Controller
+	View := IsObject(Controller) ? Controller.CoreWebView2 : 0
+	; Capture each conjunct separately without replacing either original oracle.
+	Diagnostic := Map("owner", _ESOW.Owner, "mode", _ESOW.Mode,
+		"window_count_two", _ESOW.Windows.Length == 2, "successor_available", HasSuccessor,
+		"epoch_match", HasSuccessor && State.Epoch == Successor.Epoch,
+		"window_match", HasSuccessor && State.Window == Successor.Window,
+		"controller_match", HasSuccessor && State.Controller == Successor.Controller,
+		"view_match", HasSuccessor && State.View == Successor.View,
+		"current_ready", _ESOW_CurrentReady(Target),
+		"final_epoch", State.Epoch, "successor_epoch", HasSuccessor ? Successor.Epoch : -1,
+		"final_window_record", _ESOW_IdentityRecord(State.Window, "window"),
+		"successor_window_record", HasSuccessor ? _ESOW_IdentityRecord(Successor.Window, "window") : -1,
+		"final_controller_record", _ESOW_IdentityRecord(State.Controller, "controller"),
+		"successor_controller_record", HasSuccessor ? _ESOW_IdentityRecord(Successor.Controller, "controller") : -1,
+		"final_view_record", _ESOW_IdentityRecord(State.View, "view"),
+		"successor_view_record", HasSuccessor ? _ESOW_IdentityRecord(Successor.View, "view") : -1,
+		"ready_window_match", State.Window == Target.Window, "ready_epoch_match", State.Epoch == Target.Epoch,
+		"ready_reset_clear", !State.Reset, "ready_controller_present", IsObject(Controller),
+		"ready_controller_match", State.Controller == Controller, "ready_view_match", State.View == View,
+		"ready_message_sub_set", State.Message, "ready_navigation_sub_set", State.Navigation,
+		"ready_closed", IsObject(Controller) ? Controller.Closed : -1,
+		"ready_fills", IsObject(Controller) ? Controller.Fills : -1,
+		"ready_subscriptions", IsObject(View) ? View.Subscriptions : -1,
+		"ready_navigations", IsObject(View) ? View.Navigations : -1,
+		"ready_native_visible", DllCall("User32\IsWindowVisible", "Ptr", Target.Hwnd, "Int"),
+		"target_window_record", Target.Index, "source_sha256", A_Args[4], "runtime_sha256", A_Args[5])
+	FileAppend("DIAGNOSTIC editor-early-show " . KL_JsonEncode(Diagnostic) . "`n", "*", "UTF-8")
 }
 
 _ESOW_CurrentReady(Record) {
@@ -300,6 +361,7 @@ _ESOW_Main() {
 			"after_close_signals", _ESOW.Signals, "old_exists", DllCall("User32\IsWindow", "Ptr", _ESOW.Windows[1].Hwnd, "Int"),
 			"old_published", _ESOW_State().Window == _ESOW.Windows[1].Window,
 			"epoch", _ESOW_State().Epoch, "source_sha256", A_Args[4], "runtime_sha256", A_Args[5])) . "`n", "*", "UTF-8")
+		_ESOW_FinalDiagnostic()
 		_ESOW_Check()
 	} catch Any as Failure {
 		Primary := Failure
