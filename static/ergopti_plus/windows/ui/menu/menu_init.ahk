@@ -648,6 +648,7 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
 		"send_probe",     InputProbe_SendComparisonCommand,
 		"hook_probe",     InputProbe_HookOrderCommand,
+		"composer_check", ComposerCheck_Command,
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
