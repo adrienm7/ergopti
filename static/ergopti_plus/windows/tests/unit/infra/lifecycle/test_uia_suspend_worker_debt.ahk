@@ -38,9 +38,21 @@ _USWD_Source() {
 	; This definition is nested in its real feature container, so authenticate
 	; the whole authored owner without pretending it is a top-level free function.
 	SplitPath(A_ScriptDir, , &CanonicalRoot)
-	WinOwner := CanonicalRoot . "\modules\shortcuts\win.ahk"
-	AssertTrue(_DriverIsProductionSource(WinOwner) && FileExist(WinOwner) != "")
-	Text := FileRead(WinOwner, "UTF-8")
+	WinOwners := []
+	Loop Files, CanonicalRoot . "\*.ahk", "FR" {
+		Path := A_LoopFileFullPath
+		if !_DriverIsProductionSource(Path)
+			continue
+		Candidate := FileRead(Path, "UTF-8")
+		Definition := _DriverFindFunctionDefinition(&Candidate, "StopActivitySimulation")
+		if !IsObject(Definition)
+			continue
+		AssertFalse(IsObject(_DriverFindFunctionDefinition(&Candidate,
+			"StopActivitySimulation", Definition.OpenPos + 1)), "the subsystem port owner cannot contain duplicate definitions")
+		WinOwners.Push(Path)
+	}
+	AssertEqual(1, WinOwners.Length, "the conditional subsystem port must have exactly one authored owner")
+	Text := FileRead(WinOwners[1], "UTF-8")
 	AssertTrue(_DriverExtractFunctionBody(&Text, "StopActivitySimulation") != "")
 	Source := '#Requires AutoHotkey v2.0' . "`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n"
 	Source .= 'global Features := Map("shortcuts", Map())' . "`n"
