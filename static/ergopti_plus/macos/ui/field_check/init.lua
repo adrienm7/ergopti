@@ -29,6 +29,7 @@ local LOG = "ui.field_check"
 M.ROWS = {
 	field_check_lease = { check = "lease", title = "menu.debug.field_check_lease" },
 	field_check_owned_runtime = { check = "owned_runtime", title = "menu.debug.field_check_owned_runtime" },
+	field_check_network = { check = "network", title = "menu.debug.field_check_network" },
 	field_check_key_accounting = { check = "key_accounting", title = "menu.debug.field_check_key_accounting", watches_keys = true },
 }
 
