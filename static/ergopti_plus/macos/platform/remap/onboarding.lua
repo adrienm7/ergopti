@@ -232,11 +232,42 @@ function M.is_sysext_activated()
 	return false
 end
 
+--- Health of the owned runtime (ADR 011): its files, its two launchd jobs and
+--- the VirtualHIDDevice extension. It needs no Karabiner-Elements application,
+--- so none of the shared checks apply; read-only like the shared check.
+--- @return table { runtime_installed, jobs_loaded, sysext_activated, all_ok }
+local function owned_health_check()
+	local owned = KePaths.OWNED
+	local installed = true
+	for _, path in ipairs({ owned.CLI, owned.CORE_SERVICE, owned.CONSOLE, owned.CORE_JOB_FILE }) do
+		if not file_exists(path) then installed = false end
+	end
+	local jobs_loaded = true
+	for _, label in ipairs({ owned.VIRTUAL_HID_LABEL, owned.CORE_LABEL }) do
+		local _, ok = hs.execute("/bin/launchctl print system/" .. label .. " >/dev/null 2>&1")
+		if ok ~= true then jobs_loaded = false end
+	end
+	local report = {
+		runtime_installed = installed,
+		jobs_loaded       = jobs_loaded,
+		sysext_activated  = M.is_sysext_activated(),
+	}
+	report.all_ok = report.runtime_installed and report.jobs_loaded and report.sysext_activated
+	Logger.debug(LOG, "Owned health check: installed=%s jobs=%s sysext=%s all_ok=%s.",
+		tostring(report.runtime_installed), tostring(report.jobs_loaded),
+		tostring(report.sysext_activated), tostring(report.all_ok))
+	return report
+end
+
 --- Returns a snapshot of every dependency in the KE stack with one boolean per
 --- check. Caller can render a checklist or choose which step of the wizard to
 --- launch. all_ok is true only when every dependency is satisfied.
+--- @param runtime string|nil `shared` (default, the official application) or `owned`.
 --- @return table { ke_installed, grabber_present, grabber_running, sysext_activated, all_ok }
-function M.health_check()
+---   for shared; { runtime_installed, jobs_loaded, sysext_activated, all_ok } for owned.
+function M.health_check(runtime)
+	if runtime == KePaths.RUNTIME_OWNED then return owned_health_check() end
+	assert(runtime == nil or runtime == KePaths.RUNTIME_SHARED, "unknown Karabiner runtime: " .. tostring(runtime))
 	local report = {
 		ke_installed     = M.is_ke_app_installed(),
 		grabber_present  = M.is_grabber_binary_present(),
