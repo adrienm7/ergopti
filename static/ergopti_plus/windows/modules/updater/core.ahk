@@ -3501,6 +3501,8 @@ _Updater_PollReleasesListAsync(id) {
 			}
 		} else {
 			Status := Req.Status
+			if (Req is CurlAsyncRequest) && !Req.ResponseEncodingValid
+				throw Error("The managed async releases-list response bytes are not valid UTF-8.")
 			Body := Req.ResponseText
 		}
 	} catch as Err {
