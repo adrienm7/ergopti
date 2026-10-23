@@ -2,7 +2,11 @@
 
 local helpers = require("tests.helpers")
 
+-- Second line, fourth column: the 100 free gigabytes `df -g /` reports.
+local DF_OUTPUT = "Filesystem 512-blocks Used Available Capacity Mounted\n/dev/disk3s1 976 300 100 75% /\n"
+
 local MODULES = {
+	"adapters.shell_runner",
 	"adapters.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
@@ -24,8 +28,8 @@ local function with_fixture(callback)
 			downloads = 0,
 			cancels = 0,
 			executes = {},
+			runs = {},
 			authorized = true,
-			reentrant_pause_on_first_execute = false,
 			reentrant_pause_on_focus = false,
 			reentrant_pause_on_dialog = false,
 			download_mode = "success",
@@ -66,18 +70,11 @@ local function with_fixture(callback)
 		-- this focused test with the real Ollama maintenance prewarm.
 		helpers.load_with_stubs("adapters.timer_scheduler", {
 			timer = timer_stub,
+			-- The system probes are asynchronous tasks now; a blocking hs.execute
+			-- would hold the main thread (issue #101) and is recorded as a failure.
 			execute = function(command)
 				fixture.executes[#fixture.executes + 1] = command
-				if fixture.reentrant_pause_on_first_execute
-					and #fixture.executes == 1 then
-					fixture.child_present_during_execute =
-						fixture.children[fixture.child] ~= nil
-					fixture.execute_pause_result = fixture.pause()
-				end
-				if command:find("hw.memsize", 1, true) then
-					return tostring(64 * 1024 * 1024 * 1024)
-				end
-				return "100"
+				return ""
 			end,
 			-- The check finds its own process by PID (adapters.running_application),
 			-- never by a name lookup that can fall back to reading every window.
@@ -105,6 +102,17 @@ local function with_fixture(callback)
 		})
 
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["adapters.shell_runner"] = {
+			run = function(executable, args, on_done)
+				local run = { executable = executable, args = args, on_done = on_done, terminated = 0 }
+				run.handle = { terminate = function()
+					run.terminated = run.terminated + 1
+					return true
+				end }
+				fixture.runs[#fixture.runs + 1] = run
+				return true, run.handle
+			end,
+		}
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function()
 				fixture.dialogs = fixture.dialogs + 1
@@ -164,7 +172,23 @@ local function with_fixture(callback)
 				return true
 			end,
 		}
-		function fixture.arm()
+		--- Completes every pending probe task the way the native task would.
+		function fixture.finish_probes()
+			for _, run in ipairs(fixture.runs) do
+				if not run.done then
+					run.done = true
+					if run.terminated > 0 then
+						run.on_done(false, nil)
+					elseif run.executable:find("sysctl", 1, true) then
+						run.on_done(true, tostring(64 * 1024 * 1024 * 1024))
+					else
+						run.on_done(true, DF_OUTPUT)
+					end
+				end
+			end
+		end
+		--- Starts the check and leaves its probe tasks pending.
+		function fixture.arm_start()
 			return fixture.system_check("fixture-model", "MLX", "org/model",
 				function()
 					fixture.downloads = fixture.downloads + 1
@@ -198,6 +222,12 @@ local function with_fixture(callback)
 						return fixture.authorized
 					end,
 				})
+		end
+		--- Starts the check, completes its probes and reports whether it armed.
+		function fixture.arm()
+			local started = fixture.arm_start()
+			fixture.finish_probes()
+			return started == true and fixture.cancels == 0 and #fixture.timers > 0
 		end
 		function fixture.pause()
 			fixture.authorized = false
@@ -273,21 +303,48 @@ helpers.describe("shared system-check exact timer requirement ownership", functi
 		end)
 	end)
 
-	helpers.it("publishes provenance before a system probe re-enters PAUSE", function()
+	helpers.it("runs the system probes as tasks, never through a blocking hs.execute", function()
 		with_fixture(function(fixture)
-			fixture.reentrant_pause_on_first_execute = true
-			helpers.assert_eq(fixture.arm(), false)
-			helpers.assert_true(fixture.child_present_during_execute,
-				"the first native probe must already have an adopted callback owner")
-			helpers.assert_eq(fixture.execute_pause_result, false,
-				"PAUSE cannot publish while the exact system probe remains on-stack")
-			helpers.assert_eq(#fixture.executes, 1,
-				"the revoked first probe must fence the sibling disk probe")
-			helpers.assert_eq(fixture.dialogs, 0)
-			helpers.assert_eq(fixture.downloads, 0)
+			helpers.assert_true(fixture.arm_start())
+			helpers.assert_eq(#fixture.executes, 0,
+				"a blocking probe holds the main thread (issue #101)")
+			helpers.assert_eq(#fixture.runs, 2, "memory and disk are probed by one task each")
+			helpers.assert_eq(fixture.runs[1].executable, "/usr/sbin/sysctl")
+			helpers.assert_eq(fixture.runs[2].executable, "/bin/df")
+			helpers.assert_eq(#fixture.timers, 0, "no timer is armed before both probes finish")
+			fixture.finish_probes()
+			helpers.assert_eq(#fixture.timers, 1)
+			fixture.timers[1]:deliver()
+			helpers.assert_eq(fixture.dialogs, 1)
+			helpers.assert_eq(fixture.downloads, 1)
+		end)
+	end)
+
+	helpers.it("keeps the adopted owner and stops the probe tasks when PAUSE arrives mid-probe", function()
+		with_fixture(function(fixture)
+			helpers.assert_true(fixture.arm_start())
+			helpers.assert_not_nil(fixture.children[fixture.child],
+				"the probe tasks already have an adopted callback owner")
+			helpers.assert_eq(fixture.pause(), false,
+				"PAUSE cannot publish while the exact system probes are pending")
+			helpers.assert_eq(fixture.runs[1].terminated, 1)
+			helpers.assert_eq(fixture.runs[2].terminated, 1)
+			helpers.assert_nil(fixture.settles, "the owner settles only after the tasks report")
+			fixture.finish_probes()
 			helpers.assert_eq(fixture.settles, 1)
 			helpers.assert_nil(fixture.children[fixture.child])
+			helpers.assert_eq(#fixture.timers, 0, "a revoked check arms no timer")
+			helpers.assert_eq(fixture.dialogs, 0)
+			helpers.assert_eq(fixture.downloads, 0)
 		end)
+	end)
+
+	helpers.it("reads free gigabytes from df output exactly as awk NR==2 column 4 did", function()
+		local Manager = require("ui.menu.menu_llm.models_manager")
+		helpers.assert_eq(Manager.parse_df_available_gb(DF_OUTPUT), 100)
+		helpers.assert_eq(Manager.parse_df_available_gb("header only\n"), 0)
+		helpers.assert_eq(Manager.parse_df_available_gb(nil), 0)
+		helpers.assert_eq(Manager.parse_df_available_gb("h\n/dev/x 1 2\n"), 0)
 	end)
 
 	helpers.it("revalidates owner identity after freshness re-enters PAUSE", function()
@@ -296,7 +353,7 @@ helpers.describe("shared system-check exact timer requirement ownership", functi
 			helpers.assert_eq(fixture.arm(), false)
 			helpers.assert_true(fixture.child_present_during_freshness)
 			helpers.assert_eq(fixture.freshness_pause_result, false)
-			helpers.assert_eq(#fixture.executes, 0,
+			helpers.assert_eq(#fixture.runs, 0,
 				"a truthy stale freshness callback cannot authorize the first probe")
 			helpers.assert_eq(fixture.focus_calls or 0, 0)
 			helpers.assert_eq(fixture.dialogs, 0)

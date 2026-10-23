@@ -544,7 +544,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
-			"hs", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
+			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
 			"infra.dialog_util", "infra.paths",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
@@ -583,6 +583,7 @@ helpers.describe("model manager generation fences", function()
 		with_fixture(modules, hs_fixture, function()
 			install_common_stubs()
 			local prompts, downloads, cancellations = 0, 0, 0
+			require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
 			package.loaded["infra.dialog_util"] = {block_alert = function()
 				prompts = prompts + 1
 				return "menu.llm.btn_download"
