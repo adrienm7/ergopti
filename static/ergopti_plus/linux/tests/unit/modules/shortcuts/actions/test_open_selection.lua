@@ -55,6 +55,7 @@ local function record(existing)
 		notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return "" end,
+		active_frame_app = function() return nil end,
 	})
 	return world, Subject
 end
@@ -64,8 +65,9 @@ end
 --- @param read table|nil { ok, uri_list, reason } the clipboard answers.
 --- @return table world { opened, notices, successes, written, copies, primary_reads }
 --- @return table Subject
-local function record_in(app, read)
-	local world = { opened = {}, notices = {}, successes = {}, written = {}, copies = 0, primary_reads = 0 }
+local function record_in(app, read, frame_app)
+	local world = { opened = {}, notices = {}, successes = {}, written = {}, copies = 0, primary_reads = 0,
+		frame_queries = 0 }
 	local Subject = require("modules.shortcuts.open_selection")
 	Subject._set_deps_for_test({
 		open = function(target, on_done)
@@ -79,6 +81,10 @@ local function record_in(app, read)
 		message = function(key) return key == "shortcuts.copy_path_notif" and "Path copied: %s" or key end,
 		getenv = function(name) return ({ HOME = "/home/ada" })[name] end,
 		focused_app = function() return app end,
+		active_frame_app = function()
+			world.frame_queries = world.frame_queries + 1
+			return frame_app
+		end,
 		read_uri_list = function()
 			world.copies = world.copies + 1
 			return read.ok, read.uri_list or "", read.reason
@@ -207,6 +213,36 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 			helpers.assert_eq(world.copies, 0, "Ctrl+C would interrupt a terminal's program in '" .. app .. "'")
 			helpers.assert_eq(world.opened, { "https://example.com" })
 		end
+	end)
+
+	helpers.it("(linux-copy-path-wayland-frame) names the file manager through the AT-SPI active frame when the compositor names none", function()
+		for _, frame in ipairs({ "nautilus", "dolphin" }) do
+			local world, Subject, primary = record_in("", { ok = true, uri_list = "file:///tmp/a%20b\n" }, frame)
+			local done = Subject.copy_selected_path(primary)
+			Subject._set_deps_for_test(nil)
+			helpers.assert_true(done)
+			helpers.assert_eq(world.frame_queries, 1)
+			helpers.assert_eq(world.written, { "/tmp/a b" }, frame .. " selection is copied, not opened")
+			helpers.assert_eq(world.opened, {})
+		end
+	end)
+
+	helpers.it("(linux-copy-path-wayland-frame) keeps opening when the frame is unknown or not a file manager", function()
+		for _, frame in ipairs({ false, "gnome-terminal-", "firefox" }) do
+			local world, Subject, primary = record_in("", { ok = true, uri_list = "file:///tmp/a\n" }, frame or nil)
+			Subject.copy_selected_path(primary)
+			Subject._set_deps_for_test(nil)
+			helpers.assert_eq(world.copies, 0, "no Ctrl+C is sent when the frame is not a file manager")
+			helpers.assert_eq(world.opened, { "https://example.com" })
+		end
+	end)
+
+	helpers.it("(linux-copy-path-wayland-frame) does not query AT-SPI when the compositor names the application", function()
+		local world, Subject, primary = record_in("firefox", { ok = true, uri_list = "file:///tmp/a\n" }, "nautilus")
+		Subject.copy_selected_path(primary)
+		Subject._set_deps_for_test(nil)
+		helpers.assert_eq(world.frame_queries, 0)
+		helpers.assert_eq(world.copies, 0)
 	end)
 
 	helpers.it("(linux-copy-path-file-manager) opens the primary selection when no file is selected", function()
