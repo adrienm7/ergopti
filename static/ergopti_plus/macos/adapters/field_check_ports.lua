@@ -184,6 +184,23 @@ local function login_startup_status(callback)
 	end, environment)
 end
 
+--- Facts about the pieces of the owned runtime that are not installed yet:
+--- whether the artifact manifest is pinned, whether the installed-source module
+--- can be reached (it is loaded, never acquired), and what a close of the official
+--- Karabiner would meet. Nothing is started, closed or changed.
+--- @param callback function fn({ unpinned = integer|nil, source = boolean, helper_present = boolean, active = integer|nil }).
+local function owned_readiness(callback)
+	local source_available = require("adapters.installed_physical_source").new().available()
+	require("adapters.karabiner_coexistence").new().describe(function(facts)
+		callback({
+			unpinned = require("adapters.runtime_owner_ports").unpinned_count(),
+			source = source_available == true,
+			helper_present = facts.helper_present,
+			active = facts.active_processes,
+		})
+	end)
+end
+
 --- The bounded command runner, shared with adapters/runtime_owner_ports.lua.
 M.exec = exec
 
@@ -201,6 +218,7 @@ function M.new()
 		fetch_pac = fetch_pac,
 		network_chain = network_chain,
 		timer_probe = timer_probe,
+		owned_readiness = owned_readiness,
 		app_path = app_path,
 		login_startup_status = login_startup_status,
 	}

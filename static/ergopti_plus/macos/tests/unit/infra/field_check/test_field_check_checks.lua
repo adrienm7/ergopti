@@ -38,6 +38,9 @@ local function make_ports(overrides)
 		end,
 		health_counts = function() return { lease = {}, ups_without_down = 0, downs_without_up = 0, stuck = 0 } end,
 		count_keys = function(_, callback) callback({ tap_running = true, presses = 10 }) end,
+		owned_readiness = function(callback)
+			callback({ unpinned = 6, source = false, helper_present = false, active = 0 })
+		end,
 	}
 	for name, value in pairs(overrides or {}) do ports[name] = value end
 	return ports, world
@@ -131,6 +134,35 @@ helpers.describe("owned runtime check", function()
 		helpers.assert_eq(steps.stock_running.value, "2")
 		helpers.assert_eq(steps.owned_running.value, "0")
 		helpers.assert_eq(steps.runtime_installed.state, "info")
+	end)
+
+	helpers.it("reports the artifact pin, the installed source and what closing another Karabiner would meet", function()
+		local ports = make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = 6, source = false, helper_present = true, active = 2 })
+		end })
+		local steps, result = run("owned_runtime", ports)
+		helpers.assert_true(result.passed, "readiness facts are information, never a failure")
+		helpers.assert_eq(steps.artifact_pin.value, "unpinned_6")
+		helpers.assert_eq(steps.installed_source.value, "unavailable")
+		helpers.assert_eq(steps.other_karabiner_helper.value, "yes")
+		helpers.assert_eq(steps.other_karabiner_active.value, "2")
+		for _, id in ipairs({ "artifact_pin", "installed_source", "other_karabiner_helper", "other_karabiner_active" }) do
+			helpers.assert_eq(steps[id].state, "info", id)
+		end
+	end)
+
+	helpers.it("names a pinned artifact, a reachable source and an unreadable process list", function()
+		local ports = make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = 0, source = true, helper_present = false, active = nil })
+		end })
+		local steps = run("owned_runtime", ports)
+		helpers.assert_eq(steps.artifact_pin.value, "pinned")
+		helpers.assert_eq(steps.installed_source.value, "reachable")
+		helpers.assert_eq(steps.other_karabiner_active.value, "unknown")
+		local unreadable = run("owned_runtime", make_ports({ owned_readiness = function(callback)
+			callback({ unpinned = nil, source = false, helper_present = false, active = 0 })
+		end }))
+		helpers.assert_eq(unreadable.artifact_pin.value, "unreadable")
 	end)
 
 	helpers.it("fails when the stream source is selected at default startup", function()
