@@ -355,7 +355,7 @@ function loadActionGroups() {
 			currentGroup = { title: headerLabel(item.slice(1)), sections: [] };
 			currentSection = null;
 			groups.push(currentGroup);
-		} else if (doc.sg_actions?.[item]) {
+		} else if (doc.sg_actions?.[item] && !doc.sg_actions[item].is_header) {
 			if (!currentSection) {
 				currentSection = { title: '', actions: [] };
 				currentGroup?.sections.push(currentSection);
