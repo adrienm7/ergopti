@@ -2,8 +2,8 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-22. Latest stable: [v1.0.5](https://github.com/adrienm7/ergopti/releases/tag/v1.0.5)
-(tag 17d4a3f421, 2026-10-22). Open work only: a finished item is removed, its lessons go to
+Updated: 2026-10-23. Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
+(tag 950979d19c, 2026-10-23). **Next step: the keylogger to `keystats` rename (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
 questions are in [questions-for-maintainer.md](questions-for-maintainer.md); per-work handoff files
@@ -239,12 +239,11 @@ Not started:
 
 Added October 22 (from the agents' reports; details in their commits):
 
-- [ ] **Release 1.0.6 with the macOS swallowed-keys fixes.** [CI] Order: the running agents
-      finish, rename keylogger to `keystats`, full CI green, then publish. The macOS fixes (03a2c2fa4b,
-      d026f3e024, a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) need a Mac
-      day of typing with the `key_event_health` counters; handoff in
+- [ ] **macOS swallowed-keys check on v1.0.6.** [PHYS-M] The fixes (03a2c2fa4b, d026f3e024,
+      a414e83fb7, 19fa9fa872, 89cbcae90b, 9b500a9e8c, c21e920d7e, bb6fcc2cc2) shipped in v1.0.6;
+      they need a Mac day of typing with the `key_event_health` counters; handoff in
       [issue99-karabiner-input.md](todo-agents/issue99-karabiner-input.md).
-- [ ] **Rename keylogger to `keystats` and make renames cheap.** [CODE] 12 191 occurrences in
+- [ ] **NEXT STEP: rename keylogger to `keystats` and make renames cheap.** [CODE] 12 191 occurrences in
       1 360 files (953 tests, 579 paths). Declare each persisted name once (database, config
       namespace, log tag, data file names), make tests read names from that source instead of
       pinning spellings, regenerate seals and generated files through their owners, keep the
