@@ -318,6 +318,64 @@ mustNotDeclare(
 	}
 }
 
+// ── repeat collapsing: which variants are keyed, and the evidence exemption ──
+//
+// The AutoHotkey logger and the shared core each hold the key-by table of
+// spec 4.2. They must collapse exactly the same variants the same way, and the
+// evidence record of spec 4.3 must stay outside both: it is an INFO line that
+// neither layer may withhold, so it can only be exempt by an explicit flag,
+// never by a table entry that someone later "fixes" to match info.
+{
+	const ahkSrc = read('windows/infra/logger.ahk');
+	const ahkMatch = /LOGGER_REPEAT_KEY_BY\s*:=\s*Map\(([\s\S]*?)\)\s*\n/.exec(ahkSrc);
+	const coreSrc = read('_shared/lua/logger/init.lua');
+	const coreMatch = /local REPEAT_KEY_BY\s*=\s*\{([\s\S]*?)\}/.exec(coreSrc);
+	if (!ahkMatch || !coreMatch) {
+		errors.push('could not locate LOGGER_REPEAT_KEY_BY (AHK) or REPEAT_KEY_BY (shared core).');
+	} else {
+		const ahkTable = {};
+		for (const m of ahkMatch[1].matchAll(/"(\w+)"\s*,\s*"(\w+)"/g)) {
+			ahkTable[m[1] === 'WARNING' ? 'warn' : m[1].toLowerCase()] = m[2];
+		}
+		const coreTable = {};
+		for (const m of coreMatch[1].matchAll(/(\w+)\s*=\s*"(\w+)"/g)) coreTable[m[1]] = m[2];
+		if (
+			JSON.stringify(Object.entries(ahkTable).sort()) !==
+			JSON.stringify(Object.entries(coreTable).sort())
+		) {
+			errors.push(
+				`the AHK repeat key table ${JSON.stringify(ahkTable)} and the shared core's ` +
+					`${JSON.stringify(coreTable)} disagree: the two drivers would collapse different lines.`
+			);
+		}
+		if ('evidence' in ahkTable || 'evidence' in coreTable) {
+			errors.push(
+				'evidence must not appear in a repeat key table: it is exempt by flag (spec 4.3).'
+			);
+		}
+	}
+	if (!/_LoggerEmitBody\("INFO", Tag, Msg, _LoggerFormatBody\(Msg, Args\), true\)/.test(ahkSrc)) {
+		errors.push(
+			'LoggerEvidence must emit through _LoggerEmitBody with the exempt flag set (spec 4.3).'
+		);
+	}
+	if (!/emit_record\(true, "info", module_name, msg, \.\.\.\)/.test(coreSrc)) {
+		errors.push(
+			'the shared core M.evidence must emit through emit_record with the exempt flag set (spec 4.3).'
+		);
+	}
+	const corpus = JSON.parse(read('_shared/tests/corpus/logger/behaviour_vectors.json'));
+	const ids = new Set(((corpus.repeat || {}).cases || []).map((c) => c.id));
+	for (const id of [
+		'evidence_burst_with_one_template_is_never_collapsed',
+		'evidence_identical_to_the_previous_record_is_not_deduplicated',
+		'evidence_rerun_later_is_delivered_again',
+		'ordinary_lines_sharing_a_template_with_evidence_still_collapse'
+	]) {
+		if (!ids.has(id)) errors.push(`the logger behaviour corpus lost the evidence case '${id}'.`);
+	}
+}
+
 // ── flush_interval_ms ───────────────────────────────────────────────────────
 
 check(

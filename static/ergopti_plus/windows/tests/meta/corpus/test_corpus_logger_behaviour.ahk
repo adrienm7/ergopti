@@ -141,6 +141,9 @@ _LogCorpus_EmitTemplate(Variant, Tag, Template, Args*) {
 		case "success": LoggerSuccess(Tag, Template, Args*)
 		case "warn":    LoggerWarn(Tag, Template, Args*)
 		case "error":   LoggerError(Tag, Template, Args*)
+		; Not a ninth variant: an INFO line the suppression layers never withhold
+		; (spec section 4.3), named here for the repeat cases that exercise it.
+		case "evidence": LoggerEvidence(Tag, Template, Args*)
 		default:        throw Error("unknown variant in corpus: " . Variant)
 	}
 }
@@ -152,6 +155,10 @@ _LogCorpus_ExpandRepeatSteps(Steps) {
 	for _, Step in Steps {
 		if Step.Has("flush") {
 			Actions.Push(Map("at", Step["at"], "flush", Step["flush"]))
+		} else if Step.Has("args") {
+			for _, Value in Step["args"]
+				Actions.Push(Map("at", Step["at"], "variant", Step["variant"],
+					"module", Step["module"], "template", Step["template"], "arg", Value))
 		} else if Step.Has("range") {
 			From := Step["range"][1]
 			loop Step["range"][2] - From + 1 {

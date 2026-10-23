@@ -189,7 +189,7 @@ function M.run(check_id, ports, on_done)
 		settled = true
 		_running = nil
 		local result = report.result()
-		Logger.info(LOG, "Field check result: %s", M.format_log_line(result))
+		Logger.evidence(LOG, "Field check result: %s", M.format_log_line(result))
 		Logger.done(LOG, "Field check '%s' finished: %s.", check_id, result.passed and "pass" or "fail")
 		on_done(result)
 	end

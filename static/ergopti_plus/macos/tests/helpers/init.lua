@@ -793,7 +793,7 @@ function M.make_logger_stub()
 	local noop = function() end
 	return {
 		debug   = noop, trace   = noop, done    = noop,
-		info    = noop, start   = noop, success = noop,
+		info    = noop, start   = noop, success = noop, evidence = noop,
 		warn    = noop, error   = noop,
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
 		ring_buffer_snapshot = function() return {} end,

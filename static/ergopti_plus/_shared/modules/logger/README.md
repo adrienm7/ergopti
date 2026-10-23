@@ -20,6 +20,8 @@ still to be written.
 
 The 8 variants are organised on two axes — importance (`DEBUG`/`INFO`/`WARNING`/`ERROR`) and lifecycle role (`Misc`/`Start`/`End`) — giving `debug`, `trace`, `done`, `info`, `start`, `success`, `warn`, `error`.
 
+Beside them, one evidence entry point (`LoggerEvidence` / `Logger.evidence`, SPEC § 4.3) writes an INFO line that the dedup and repeat-collapsing layers never withhold. Use it only for result records a person is asked to send back (field checks, probes).
+
 ## Key files
 
 | File                | Description                                                                                     |

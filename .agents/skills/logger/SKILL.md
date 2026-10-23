@@ -34,6 +34,19 @@ Practical consequence: if a function can return early between `start` and
 `success`, every early-return path needs its own terminal log — usually an
 `error` or `warn`, not a `success`.
 
+## Evidence records are never collapsed
+
+`info` and `debug` lines are keyed by their unformatted template, so the
+repeat collapser (SPEC § 4.2) folds N lines that share a template into the
+first plus a summary that may never reach the file. That is right for status
+noise and wrong for data a person is asked to send back (one-click field
+checks, probes): use `LoggerEvidence(Tag, Msg, Args*)` / `Logger.evidence(module,
+msg, ...)` for those result records (SPEC § 4.3). It renders as `[INFO]`, is
+never deduplicated or collapsed, and exists in the AHK logger, the shared Lua
+core, the macOS logger and `logger.shim`. Do not use it for ordinary status
+lines, in a loop, or in place of `start`/`success`; do not "fix" a flood by
+switching it back to `info` without moving the data elsewhere.
+
 ## Common mistakes
 
 - **Swallowing an error and logging nothing.** Violates the fail-fast contract

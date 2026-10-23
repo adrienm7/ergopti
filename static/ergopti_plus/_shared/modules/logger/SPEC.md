@@ -82,6 +82,9 @@ LoggerError(Tag,   Msg, Args*)
 - `Msg` — format string using AHK `{N}` placeholders (e.g. `"Loaded {1} key(s)."`).
 - `Args` — variadic arguments substituted into `Msg`.
 
+Beside the eight variants, `LoggerEvidence(Tag, Msg, Args*)` writes an evidence
+record that is never collapsed or deduplicated (§ 4.3).
+
 ### 2.2 Hammerspoon / Lua
 
 ```lua
@@ -99,6 +102,9 @@ Logger.error(module_name,   msg, ...)
 - `msg` — format string using Lua `string.format` `%` syntax
   (e.g. `"Loaded %d key(s)."` ).
 - `...` — variadic arguments substituted into `msg`.
+
+Beside the eight variants, `Logger.evidence(module_name, msg, ...)` writes an
+evidence record that is never collapsed or deduplicated (§ 4.3).
 
 ---
 
@@ -244,6 +250,42 @@ in between, or one whose arguments change. Repeat collapsing does.
   - Linux: armed by `infra/logger_sink.install()`; periodic flush in the
     daemon's periodic callback; terminal flush on the daemon's exit and crash
     paths.
+
+### 4.3 Evidence records
+
+Both layers above assume that a repeated line is noise. A result line of a
+field check or a diagnostics probe is the opposite: the maintainer is asked to
+send it back, a check writes several records through one template that differ
+only by arguments, and the same check may run again a minute later. Folded by
+§ 4.2 they would reach the screen and never the file.
+
+- **API.** One entry point per language, next to the eight variants and not a
+  ninth one:
+
+  ```
+  AHK:      LoggerEvidence(Tag, Msg, Args*)
+  Lua:      Logger.evidence(module_name, msg, ...)
+  ```
+
+  The shared core owns it (`M.evidence`); the macOS logger and `logger.shim`
+  expose it; Windows mirrors it.
+
+- **Rendering.** An INFO line: severity 20, label `[INFO]`, sink variant
+  `info`. It is filtered by the level threshold exactly like `info`, and it
+  reaches the same files, ring buffer and topical sub-files.
+- **Exemption.** It is never withheld by § 4.1 (not even when identical to the
+  previous line) and never opens or joins a § 4.2 streak. It is accepted like
+  any other line, so it closes an open § 4.1 streak first; the lines around it
+  keep collapsing as before, and an `info` line sharing its template still
+  opens its own streak.
+- **Scope.** Only the data a person is asked to send back. It is not a
+  lifecycle half (the `start`/`success` pair around a check stays as it is),
+  not a way to bypass collapsing for ordinary status lines, and a producer
+  that logs the same result in a loop must not use it.
+- **Pinned by** the `evidence_*` and `ordinary_lines_sharing_a_template_with_evidence_still_collapse`
+  cases of the `repeat` section of
+  `_shared/tests/corpus/logger/behaviour_vectors.json` (variant name
+  `evidence`, expected sink variant `info`), replayed by all three drivers.
 
 ---
 

@@ -1225,6 +1225,20 @@ LoggerInfo(Tag, Msg, Args*) {
 		_LoggerEmit("INFO", Tag, Msg, Args*)
 }
 
+; Evidence record (spec section 4.3): an INFO line, rendered [INFO], that neither
+; the consecutive dedup nor the repeat collapser ever withholds. For the result
+; lines of a field check or a diagnostics probe that a person is asked to send
+; back, where records share one template and differ by arguments and the same
+; check may run again minutes later. Not a lifecycle half and not a substitute
+; for LoggerInfo: use it only for data meant to be read back.
+LoggerEvidence(Tag, Msg, Args*) {
+		global _LOGGER_INFO_ENABLED
+		if !_LOGGER_INFO_ENABLED {
+				return
+		}
+		_LoggerEmitBody("INFO", Tag, Msg, _LoggerFormatBody(Msg, Args), true)
+}
+
 ; Start of a significant action (init, HTTP request, user-triggered op).
 ; Pair with Success — a missing Success in the logs flags a silent failure.
 LoggerStart(Tag, Msg, Args*) {
@@ -1314,15 +1328,22 @@ LoggerRingBufferSnapshot() {
 ; Format and emit a log line if the current level allows it. Best-effort —
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
-		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
-		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
-		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
+		global LOGGER_SEVERITY
 		; Safety net for unknown levels — the public wrappers already short-circuit
 		; on the per-level fast-path flags, so a severity comparison here would be
 		; a redundant second filter. Only guard against a completely unrecognised Level.
 		if !LOGGER_SEVERITY.Has(Level) {
 				return
 		}
+		_LoggerEmitBody(Level, Tag, Msg, _LoggerFormatBody(Msg, Args), false)
+}
+
+; Substitutes Args into the {N} template Msg. A bad format string must not
+; break the driver, and the failure is recorded on the returned text itself.
+; @param Msg {String} Template.
+; @param Args {Array} Values; an empty array returns Msg unchanged.
+; @returns {String} The formatted body.
+_LoggerFormatBody(Msg, Args) {
 		Body := Msg
 		if Args.Length > 0 {
 				try {
@@ -1339,6 +1360,21 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 								. " — " . Args.Length . " arg(s) not substituted]"
 				}
 		}
+		return Body
+}
+
+; Writes one already formatted line through both suppression layers, the ring,
+; the sinks and the fan-out. Best-effort — never raises. Hot-path-safe.
+; @param Level {String} Key of LOGGER_SEVERITY.
+; @param Tag {String} Module tag.
+; @param Msg {String} The unformatted template (the INFO/DEBUG repeat key).
+; @param Body {String} The formatted body.
+; @param Exempt {Boolean} True for an evidence record (spec section 4.3): neither
+;   the consecutive dedup nor the repeat collapser may withhold it.
+_LoggerEmitBody(Level, Tag, Msg, Body, Exempt) {
+		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
+		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
 		; The shared wall-clock helper caches the second-resolution text while
 		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
 		; The test clock face, when installed, replaces that one sample.
@@ -1360,14 +1396,17 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		; An evidence record is accepted like any line (it ends an open dedup streak
+		; below) but is never itself withheld: it is the data a person was asked to
+		; send back, so a shared template or an immediate rerun must not fold it.
+		if (!Exempt and MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}
 		; ── Repeat collapsing ──
 		; Only what the dedup let through reaches this layer, so a burst is reported
 		; once, promptly, by the dedup summary and never counted twice.
-		if (_LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
+		if (!Exempt and _LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
 				return
 		if (_LOGGER_DEDUP_COUNT > 0) {
 				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
