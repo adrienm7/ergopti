@@ -932,7 +932,10 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 		; bytes first so repaired text cannot become a successful prediction.
 		if !HTTPIsValidUtf8(Raw, ConsumeBytes)
 			throw Error("Ollama stream output contains invalid UTF-8.")
-		Text := StrGet(Raw.Ptr, ConsumeBytes, "UTF-8")
+		; A raw NUL is valid UTF-8 but invalid JSON. Never hide its suffix.
+		Text := StrGet(Raw.Ptr, -ConsumeBytes, "UTF-8")
+		if RegExMatch(Text, "\x00")
+			throw Error("Ollama stream output contains a raw NUL byte.")
 		State["last_pos"] := Offset + ConsumeBytes
 		State["stream_bytes_pending"] := Available > ConsumeBytes
 		return Text
