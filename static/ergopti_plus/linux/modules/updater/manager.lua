@@ -57,6 +57,7 @@ local RateLimit = require("updater.rate_limit")
 local Channels  = require("updater.channels")
 local Schedule  = require("updater.schedule")
 local ListCache = require("updater.list_cache")
+local ReleaseSources = require("updater.release_sources")
 local Installer = require("modules.updater.installer")
 local Json      = require("json")
 local TomlCodec = require("toml_codec")
@@ -773,6 +774,115 @@ end
 
 M._fetch_releases = _fetch_releases
 
+local _release_sources = nil
+
+--- The release sources of the shared defaults, resolved once.
+--- @return table|nil sources
+--- @return string|nil reason
+local function _resolve_release_sources()
+	if _release_sources then return _release_sources, nil end
+	local sources, reason = ReleaseSources.resolve(_defs)
+	_release_sources = sources
+	return sources, reason
+end
+
+--- Reads the public releases Atom feed on github.com, the alternate source a
+--- check falls back on when api.github.com is blocked or its anonymous quota is
+--- spent. The feed names tags only, so the list it gives serves a check-only
+--- answer: no asset and no digest, hence no install.
+--- @param callback function Receives list (JSON array text) or nil, then the reason.
+--- @return boolean Whether the request was admitted.
+local function _fetch_feed(callback)
+	local sources, sources_error = _resolve_release_sources()
+	if not sources then
+		callback(nil, tostring(sources_error))
+		return false
+	end
+	local terminal, cancelled = false, false
+	local work = { constructing = true }
+	local cancel
+	local function finish(list, reason)
+		if terminal or _release_fetch_cancel ~= cancel then return end
+		terminal = true
+		_release_fetch_cancel = nil
+		callback(list, reason)
+	end
+	local function signal()
+		if not cancelled or work.signalled or not work.methods then return end
+		work.signalled = true
+		pcall(work.methods.cancel, work.operation)
+	end
+	local function publish()
+		if terminal or work.constructing or work.publishing or work.delivered
+			or work.uncertain or not work.methods then return end
+		work.publishing = true
+		local called, settled = pcall(work.methods.is_settled, work.operation)
+		if terminal or work.delivered or not called or settled ~= true then
+			work.publishing = false; return
+		end
+		local received, result = pcall(work.methods.settled_result, work.operation)
+		if terminal or work.delivered then work.publishing = false; return end
+		if not received or type(result) ~= "table" then
+			work.uncertain = true; work.publishing = false; return
+		end
+		work.delivered = true
+		if cancelled then
+			finish(nil, "cancelled")
+		elseif work.sent ~= true and not work.answered then
+			finish(nil, "feed request dispatch refused")
+		else
+			local usable, reason = ReleaseSources.classify_feed(result.status, result.body, result.error)
+			if not usable then
+				finish(nil, reason)
+			else
+				finish(ReleaseSources.feed_release_list(result.body, GH_OWNER, GH_REPO))
+			end
+		end
+		work.publishing = false
+	end
+	cancel = function()
+		if terminal or _release_fetch_cancel ~= cancel then return end
+		cancelled = true
+		signal()
+		publish()
+	end
+	_release_fetch_cancel = cancel
+	local get = type(M._http_client) == "table" and rawget(M._http_client, "get") or nil
+	local called, sent, operation = pcall(function()
+		if type(get) ~= "function" then error("feed HTTP operation unavailable") end
+		return get(sources.feed_url, { Accept = "application/atom+xml", ["User-Agent"] = USER_AGENT }, {
+			owner = REQUEST_OWNER,
+			timeout_ms = RELEASE_TIMEOUT_MS,
+			max_body_bytes = MAX_RELEASE_BODY_BYTES,
+			follow_redirects = true,
+			https_only = true,
+		}, function()
+			if terminal or work.answered then return end
+			work.answered = true
+			publish()
+		end)
+	end)
+	work.sent, work.operation = sent, operation
+	if called and type(operation) == "table" then
+		local methods = { is_settled = rawget(operation, "is_settled"),
+			on_settled = rawget(operation, "on_settled"), cancel = rawget(operation, "cancel"),
+			settled_result = rawget(operation, "settled_result") }
+		if type(methods.is_settled) == "function" and type(methods.on_settled) == "function"
+			and type(methods.cancel) == "function" and type(methods.settled_result) == "function" then
+			work.methods = methods
+			local registered, accepted = pcall(methods.on_settled, operation, publish)
+			if not registered or accepted ~= true then work.uncertain = true end
+		else work.uncertain = true end
+	else work.uncertain = true end
+	work.constructing = false
+	if terminal then return sent == true end
+	signal()
+	publish()
+	return sent == true or (not terminal and not work.delivered)
+end
+
+M._fetch_feed = _fetch_feed
+
 --- Returns the JSON object of a channel's latest release in the release list,
 --- chosen by the registry's tag rule and semver order (GitHub lists by publish
 --- date, so a later stable must not hide a higher dev build or the reverse).
@@ -860,7 +970,7 @@ end
 --- @return boolean Whether a newer canonical Linux release is available.
 --- @return string|nil refusal "no_asset" when the offered release lacks the
 ---   canonical Linux bundle or its checksum.
-local function _process_release_response(body, channel)
+local function _process_release_response(body, channel, check_only)
 	local release = _select_channel_release(body, channel)
 	if not release then
 		Logger.info(LOG, "Update check result: no release on channel '%s' yet.", channel)
@@ -890,6 +1000,7 @@ local function _process_release_response(body, channel)
 			checksum_url = _select_checksum_asset(body),
 			published_at = Parser.parse_published_at(body),
 			prerelease   = Parser.parse_prerelease_flag(body),
+			check_only   = check_only == true or nil,
 		}
 		_state = "available"
 		return true
@@ -909,6 +1020,21 @@ local function _process_release_response(body, channel)
 
 	local asset_url = _select_update_asset(body)
 	local checksum_url = _select_checksum_asset(body)
+	if check_only == true then
+		-- The Atom feed names tags only: the release is announced, never installed.
+		_cached_release = {
+			tag          = latest_tag,
+			notes        = "",
+			download_url = "",
+			checksum_url = "",
+			published_at = Parser.parse_published_at(body),
+			prerelease   = false,
+			check_only   = true,
+		}
+		_state = "available"
+		Logger.info(LOG, "New release available (public feed, check only): %s (current: %s).", latest_tag, current)
+		return true
+	end
 	if asset_url == "" or checksum_url == "" then
 		Logger.error(LOG, "Release %s lacks the canonical Linux bundle or checksum (%s, %s).",
 			latest_tag, LINUX_ASSET_NAME, LINUX_CHECKSUM_ASSET_NAME)
@@ -969,36 +1095,67 @@ function M.check_for_updates(channel, callback)
 	local known = channel == _channel and _cached_release or nil
 	_state = "checking"
 	local published = false
+	--- Publishes a check that gave no list.
+	local function publish_failure(status, fetch_error, reason)
+		_cached_release = known
+		_state = known and "available" or "idle"
+		Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
+			tostring(fetch_error or "empty body"))
+		-- A failure the fetch did not classify is not claimed as a network one
+		if reason == nil then
+			Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
+		end
+		publish_check(callback, known ~= nil, known, fetch_error or "empty body",
+			CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
+	end
+	--- Publishes a list: the API's, or the public feed's when check_only.
+	local function publish_list(body, check_only)
+		_cached_release = nil
+		local available, refusal = M._process_release_response(body, channel, check_only)
+		local result = CheckResult.classify(body, {
+			registry = CHANNELS, channel = channel, check_only = check_only,
+			current = base.current, installed = M.installed_channel(),
+		})
+		if available then
+			-- A source checkout is offered the channel's latest release too.
+			result.state, result.latest = "available", _cached_release.tag
+			if check_only == true then result.check_only = true end
+		elseif refusal == "no_asset" then
+			result = CheckResult.failure({ channel = channel, current = base.current, latest = result.latest },
+				"no_asset", "the release lacks the canonical Linux bundle or its checksum")
+		end
+		publish_check(callback, available, _cached_release, nil, result)
+	end
 	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
 		function(body, status, fetch_error, reason)
 			published = true
-			if not body then
-				_cached_release = known
-				_state = known and "available" or "idle"
-				Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
-					tostring(fetch_error or "empty body"))
-				-- A failure the fetch did not classify is not claimed as a network one
-				if reason == nil then
-					Logger.error(LOG, "The release fetch failed without a reason; the check reports it as unexpected.")
-				end
-				publish_check(callback, known ~= nil, known, fetch_error or "empty body",
-					CheckResult.failure(base, reason or "unexpected", fetch_error or "empty body"))
+			if body then
+				publish_list(body, false)
 				return
 			end
-			_cached_release = nil
-			local available, refusal = M._process_release_response(body, channel)
-			local result = CheckResult.classify(body, {
-				registry = CHANNELS, channel = channel,
-				current = base.current, installed = M.installed_channel(),
-			})
-			if available then
-				-- A source checkout is offered the channel's latest release too.
-				result.state, result.latest = "available", _cached_release.tag
-			elseif refusal == "no_asset" then
-				result = CheckResult.failure({ channel = channel, current = base.current, latest = result.latest },
-					"no_asset", "the release lacks the canonical Linux bundle or its checksum")
+			if reason ~= "no_connection" then
+				publish_failure(status, fetch_error, reason)
+				return
 			end
-			publish_check(callback, available, _cached_release, nil, result)
+			-- api.github.com gave no list (blocked, throttled, rate-limited): the
+			-- public Atom feed on github.com still tells whether a newer release
+			-- exists. Installing keeps needing the API's asset list and digests.
+			Logger.info(LOG, "The GitHub API gave no release list (%s); reading the public Atom feed.",
+				tostring(fetch_error))
+			local feed_published = false
+			local started, admitted = pcall(_fetch_feed, function(list, feed_reason)
+				if feed_published then return end
+				feed_published = true
+				if list then
+					publish_list(list, true)
+				else
+					publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(feed_reason), reason)
+				end
+			end)
+			if not started and not feed_published then
+				feed_published = true
+				publish_failure(status, tostring(fetch_error) .. "; Atom feed: " .. tostring(admitted), reason)
+			end
 		end)
 	if not ok then
 		_state = known and "available" or "idle"

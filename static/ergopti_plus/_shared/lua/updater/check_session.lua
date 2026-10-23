@@ -122,6 +122,8 @@ function M.new(opts)
 			latest  = answer.latest,
 			others  = answer.others or {},
 		}
+		-- An offer read from the Atom feed: the page shows no Update button for it
+		if answer.state == "available" and answer.check_only == true then page.check_only = true end
 		if answer.state == "error" then
 			page.reason_key = answer.reason_key
 			local ok, path = pcall(opts.log_path)

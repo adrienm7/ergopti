@@ -325,6 +325,48 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		helpers.assert_eq(calls.checks, 0, "no check ran")
 	end)
 
+	-- A release found through the public feed (the API was blocked) names no asset
+	-- and no digest: its Update row is greyed with the check-only reason and the
+	-- bridge starts no download for it.
+	helpers.it("check-only: a feed-only release greys the update row and starts no download", function()
+		local i18n = require("infra.i18n")
+		local up = fake_updater("dev")
+		up.get_state = function() return "available" end
+		local release = { tag = "v9.9.9", notes = "", download_url = "", checksum_url = "", check_only = true }
+		up.get_cached_release = function() return release end
+		local rows = submenu_of(build(up), "menu.about.title")
+		local reason = i18n.get("update_check.check_only")
+		local head = reason:match("^(.-)%s*[:：]") or reason
+		local update_now = i18n.get("menu.about.update_now"):gsub("{tag}", "v9.9.9")
+		local found = nil
+		for _, row in ipairs(rows) do
+			if type(row.title) == "string" and row.title:find(update_now, 1, true) == 1 then found = row end
+		end
+		helpers.assert_true(found ~= nil, "the update row is drawn")
+		helpers.assert_eq(found.disabled, true)
+		helpers.assert_true(found.title:find(head, 1, true) ~= nil, "it names the check-only reason: " .. found.title)
+		helpers.assert_nil(found.fn, "and runs nothing")
+
+		local touched = 0
+		local manager = {
+			get_cached_release = function() return release end,
+			get_state = function() return "available" end,
+			get_channel = function() return "dev" end,
+			download_update = function() touched = touched + 1 return true end,
+			install_update_async = function() touched = touched + 1 return true end,
+		}
+		local Installation = require("infra.installation")
+		local real_is_source_run = Installation.is_source_run
+		Installation.is_source_run = function() return false end
+		local ok, started = pcall(function()
+			return helpers.load_module("ui.update_check.bridge").download_offered(manager, release, {})
+		end)
+		Installation.is_source_run = real_is_source_run
+		helpers.assert_true(ok, tostring(started))
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(touched, 0, "nothing was downloaded")
+	end)
+
 	helpers.it("a system package is offered no download by the update-check bridge", function()
 		local Installation = require("infra.installation")
 		local real_is_source_run = Installation.is_source_run

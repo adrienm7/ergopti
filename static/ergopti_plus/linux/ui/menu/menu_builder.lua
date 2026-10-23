@@ -5095,7 +5095,14 @@ local function _about_update_rows(ctx)
 	-- "download" row that does nothing is indistinguishable from a broken one.
 	if up.get_state() == "available" then
 		local rel = up.get_cached_release()
-		if rel and update_blocked_reason then
+		if rel and rel.check_only == true then
+			-- Read from the public feed because the API was unreachable: announced, not installable.
+			out[#out + 1] = {
+				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
+				disabled = true,
+				disabled_reason_key = "update_check.check_only",
+			}
+		elseif rel and update_blocked_reason then
 			-- A source run offers the latest release to look at, but has no
 			-- installation to replace; a system package is updated by its
 			-- package manager: the row stays, greyed, and the renderer names why

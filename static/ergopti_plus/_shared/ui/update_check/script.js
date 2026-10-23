@@ -164,7 +164,10 @@
 		document.body.className = 'state-' + phase;
 
 		show('spinner', phase === 'loading' || phase === 'checking');
-		show('btn-update', phase === 'available');
+		// A release read from the public feed is announced, not installable: the
+		// install needs the asset list and digests of the API, which was unreachable.
+		var checkOnly = phase === 'available' && isTrue(state.check_only);
+		show('btn-update', phase === 'available' && !checkOnly);
 		show('btn-whats-new', phase === 'available');
 		show('btn-report', phase === 'error');
 		show('btn-open-log', phase === 'error' && text(state.log_path) !== '');
@@ -202,6 +205,7 @@
 				});
 				break;
 		}
+		if (checkOnly) setStatus(t('update_check.check_only'), 'info');
 		var listsOthers = phase === 'up_to_date' || phase === 'available' || phase === 'no_release';
 		renderOthers(listsOthers ? state.others : []);
 	}

@@ -85,6 +85,11 @@ end
 function M.download_offered(updater, release, ctx)
 	if type(release) ~= "table" or updater.get_cached_release() ~= release
 		or Installation.is_source_run() then return false end
+	-- A release read from the public Atom feed names no asset and no digest.
+	if release.check_only == true then
+		Logger.info(LOG, "Update refused: the release was found through the public feed, which names no installable asset.")
+		return false
+	end
 	-- A system package is updated by its package manager: downloading a release
 	-- the updater will then refuse to install only ends in an ERROR.
 	if type(updater.installation_kind) == "function" and updater.installation_kind() == "package" then
