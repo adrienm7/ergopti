@@ -773,7 +773,7 @@ _KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
 		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
 		return false
 	}
-	Accepted := KL_AppendLog(entry, &RejectedBySuspend)
+	Accepted := KL_AppendLog(entry, &RejectedBySuspend, PublishGuard?)
 	; Only an explicit lifecycle refusal restores the buffer. A false return can
 	; also mean a privacy/validation drop; replaying that text after resume under a
 	; different foreground window would defeat the filter that rejected it.
