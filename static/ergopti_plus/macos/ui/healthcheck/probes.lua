@@ -46,6 +46,9 @@ local DF = "/bin/df"
 -- ps prints this process's processor share (100 = one core) and resident memory (KiB)
 local PS = "/bin/ps"
 
+-- scutil prints the system proxy settings, among them the PAC URL
+local SCUTIL = "/usr/sbin/scutil"
+
 -- system_profiler lists the Bluetooth devices hs.usb cannot see
 local SYSTEM_PROFILER = "/usr/sbin/system_profiler"
 
@@ -248,6 +251,34 @@ local function run_task(executable, args, on_cancel, on_output, on_failure)
 	end)
 	on_cancel(function() handle.terminate() end)
 	if not handle.start() then on_failure(executable .. " could not start") end
+end
+
+--- The system proxy auto-config (PAC): configured, downloadable and usable by the
+--- managed downloader. The URL is read and fetched here but never reported.
+--- @return function Probe body.
+local function proxy_pac()
+	return function(done, on_cancel)
+		local PacCheck = require("network.pac_check")
+		run_task(SCUTIL, { "--proxy" }, on_cancel, function(stdout)
+			local url = PacCheck.url_from_scutil(stdout)
+			if not url then
+				done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } })
+				return
+			end
+			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+			on_cancel(function() client.cancel() end)
+			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
+				local state, text = PacCheck.judge(result.status, result.body)
+				if state == "ok" then
+					done({ state = "ok" }, { network = { proxy_pac = text } })
+				else
+					done({ state = "error", detail = text })
+				end
+			end)
+		end, function(detail)
+			done({ state = "error", detail = detail })
+		end)
+	end
 end
 
 --- The model, processor and cores from sysctl, and the logs volume's free
@@ -474,6 +505,7 @@ function M.start(schema, snapshot, publish, options)
 		return run
 	end
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
+	start_probe(run, "proxy_pac", config.proxy_pac.timeout_ms, proxy_pac())
 	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
 	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(sections.paths.logs_dir))
 	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))

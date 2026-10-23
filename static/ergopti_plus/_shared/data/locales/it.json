@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "Profilo",
 	"healthcheck.field.ai_health": "Il backend risponde",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "Configurazione automatica del proxy (PAC)",
 	"healthcheck.field.wifi_signal": "Segnale Wi-Fi",
 	"healthcheck.field.warn_count": "Avvisi in questa sessione",
 	"healthcheck.field.err_count": "Errori in questa sessione",

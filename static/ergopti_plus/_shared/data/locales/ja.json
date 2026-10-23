@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "プロファイル",
 	"healthcheck.field.ai_health": "バックエンドの応答",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "プロキシ自動構成 (PAC)",
 	"healthcheck.field.wifi_signal": "Wi-Fi 信号",
 	"healthcheck.field.warn_count": "このセッションの警告",
 	"healthcheck.field.err_count": "このセッションのエラー",

@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "Профиль",
 	"healthcheck.field.ai_health": "Бэкенд отвечает",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "Автонастройка прокси (PAC)",
 	"healthcheck.field.wifi_signal": "Сигнал Wi-Fi",
 	"healthcheck.field.warn_count": "Предупреждения за сеанс",
 	"healthcheck.field.err_count": "Ошибки за сеанс",

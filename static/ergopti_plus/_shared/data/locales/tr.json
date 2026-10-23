@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "Profil",
 	"healthcheck.field.ai_health": "Arka uç yanıt veriyor",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "Otomatik proxy yapılandırması (PAC)",
 	"healthcheck.field.wifi_signal": "Wi-Fi sinyali",
 	"healthcheck.field.warn_count": "Bu oturumdaki uyarılar",
 	"healthcheck.field.err_count": "Bu oturumdaki hatalar",

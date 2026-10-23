@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "פרופיל",
 	"healthcheck.field.ai_health": "המנוע מגיב",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "תצורת פרוקסי אוטומטית (PAC)",
 	"healthcheck.field.wifi_signal": "אות Wi-Fi",
 	"healthcheck.field.warn_count": "אזהרות בהפעלה זו",
 	"healthcheck.field.err_count": "שגיאות בהפעלה זו",

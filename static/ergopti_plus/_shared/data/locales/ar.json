@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "الملف الشخصي",
 	"healthcheck.field.ai_health": "استجابة الخلفية",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "الإعداد التلقائي للوكيل (PAC)",
 	"healthcheck.field.wifi_signal": "إشارة Wi-Fi",
 	"healthcheck.field.warn_count": "التحذيرات في هذه الجلسة",
 	"healthcheck.field.err_count": "الأخطاء في هذه الجلسة",

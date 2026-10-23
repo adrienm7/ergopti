@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "प्रोफ़ाइल",
 	"healthcheck.field.ai_health": "बैकएंड जवाब देता है",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "प्रॉक्सी ऑटो-कॉन्फ़िग (PAC)",
 	"healthcheck.field.wifi_signal": "Wi-Fi सिग्नल",
 	"healthcheck.field.warn_count": "इस सत्र की चेतावनियाँ",
 	"healthcheck.field.err_count": "इस सत्र की त्रुटियाँ",

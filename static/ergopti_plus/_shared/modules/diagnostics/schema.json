@@ -60,6 +60,9 @@
 			"timeout_ms": 8000,
 			"url": "https://api.github.com/rate_limit"
 		},
+		"proxy_pac": {
+			"timeout_ms": 8000
+		},
 		"ai_health": {
 			"timeout_ms": 4000,
 			"paths": {
@@ -431,6 +434,12 @@
 					"id": "github_api",
 					"type": "text",
 					"probe": "github_api",
+					"show_ms": true
+				},
+				{
+					"id": "proxy_pac",
+					"type": "text",
+					"probe": "proxy_pac",
 					"show_ms": true
 				},
 				{
@@ -832,6 +841,81 @@
 					"kind": "object",
 					"fields": {
 						"github_api": {
+							"kind": "object",
+							"fields": {
+								"state": {
+									"kind": "enum",
+									"values": [
+										"pending",
+										"ok",
+										"error",
+										"timeout",
+										"disabled",
+										"unsupported",
+										"not_run",
+										"cancelled",
+										"unknown"
+									],
+									"default": "unknown"
+								},
+								"cleanup": {
+									"kind": "enum",
+									"values": ["pending", "settled", "unknown"],
+									"default": "unknown"
+								},
+								"ms": {
+									"kind": "number"
+								},
+								"native_status": {
+									"kind": "integer",
+									"minimum": -2147483648,
+									"maximum": 2147483647
+								},
+								"source_sha256": {
+									"kind": "hash"
+								},
+								"runtime_source_sha256": {
+									"kind": "hash"
+								},
+								"receiver_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_source_sha256": {
+									"kind": "hash"
+								},
+								"sender_context": {
+									"kind": "enum",
+									"values": ["driver_spawned_osascript"]
+								},
+								"qualification_scope": {
+									"kind": "enum",
+									"values": ["local_runtime_nonce"]
+								},
+								"detail": {
+									"kind": "enum",
+									"values": [
+										"probe_busy",
+										"cleanup_debt",
+										"clock_refused",
+										"deadline_expired",
+										"unsupported",
+										"opt_in_required",
+										"not_embedded",
+										"isolated_environment_required",
+										"cancelled",
+										"native_refused",
+										"invalid_frame",
+										"transport_refused"
+									]
+								},
+								"runtime_pid": {
+									"kind": "integer",
+									"minimum": 1,
+									"maximum": 2147483647
+								}
+							}
+						},
+						"proxy_pac": {
 							"kind": "object",
 							"fields": {
 								"state": {
@@ -1367,6 +1451,81 @@
 								"kind": "object",
 								"fields": {
 									"github_api": {
+										"kind": "object",
+										"fields": {
+											"state": {
+												"kind": "enum",
+												"values": [
+													"pending",
+													"ok",
+													"error",
+													"timeout",
+													"disabled",
+													"unsupported",
+													"not_run",
+													"cancelled",
+													"unknown"
+												],
+												"default": "unknown"
+											},
+											"cleanup": {
+												"kind": "enum",
+												"values": ["pending", "settled", "unknown"],
+												"default": "unknown"
+											},
+											"ms": {
+												"kind": "number"
+											},
+											"native_status": {
+												"kind": "integer",
+												"minimum": -2147483648,
+												"maximum": 2147483647
+											},
+											"source_sha256": {
+												"kind": "hash"
+											},
+											"runtime_source_sha256": {
+												"kind": "hash"
+											},
+											"receiver_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_source_sha256": {
+												"kind": "hash"
+											},
+											"sender_context": {
+												"kind": "enum",
+												"values": ["driver_spawned_osascript"]
+											},
+											"qualification_scope": {
+												"kind": "enum",
+												"values": ["local_runtime_nonce"]
+											},
+											"detail": {
+												"kind": "enum",
+												"values": [
+													"probe_busy",
+													"cleanup_debt",
+													"clock_refused",
+													"deadline_expired",
+													"unsupported",
+													"opt_in_required",
+													"not_embedded",
+													"isolated_environment_required",
+													"cancelled",
+													"native_refused",
+													"invalid_frame",
+													"transport_refused"
+												]
+											},
+											"runtime_pid": {
+												"kind": "integer",
+												"minimum": 1,
+												"maximum": 2147483647
+											}
+										}
+									},
+									"proxy_pac": {
 										"kind": "object",
 										"fields": {
 											"state": {

@@ -668,6 +668,7 @@
 	"healthcheck.field.ai_profile": "프로필",
 	"healthcheck.field.ai_health": "백엔드 응답",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "프록시 자동 구성 (PAC)",
 	"healthcheck.field.wifi_signal": "Wi-Fi 신호",
 	"healthcheck.field.warn_count": "이번 세션의 경고",
 	"healthcheck.field.err_count": "이번 세션의 오류",

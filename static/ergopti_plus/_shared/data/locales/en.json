@@ -663,6 +663,7 @@
 	"healthcheck.field.ai_profile": "Profile",
 	"healthcheck.field.ai_health": "Backend answers",
 	"healthcheck.field.github_api": "GitHub (api.github.com)",
+	"healthcheck.field.proxy_pac": "Proxy auto-config (PAC)",
 	"healthcheck.field.wifi_signal": "Wi-Fi signal",
 	"healthcheck.field.warn_count": "Warnings this session",
 	"healthcheck.field.err_count": "Errors this session",
