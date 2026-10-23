@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The asynchronous half of the diagnostics snapshot: the facts that need the
 ; network, and the processor load, which needs two samples. Each network probe
-; is a curl child owned by the process tree (CurlAsyncRequest), reached
+; is a native child owned by the process tree (CurlAsyncRequest, WinHTTP), reached
 ; through the Windows proxy the browser uses, harvested by a SetTimer poll and
 ; bounded by its timeout in _shared/modules/diagnostics/schema.json; every
 ; probe answers exactly once.
@@ -28,7 +28,7 @@
 ; The User-Agent GitHub requires on every API request
 global HC_PROBE_USER_AGENT := "ErgoptiPlus-Diagnostics"
 
-; How often a probe asks its curl child whether it answered
+; How often a probe asks its native child whether it answered
 global HC_PROBE_POLL_MS := 100
 
 ; The current run: { Epoch, Cancelled, Requests, Publish } (0 when none)
@@ -81,7 +81,7 @@ HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides :=
 	return true
 }
 
-; Cancels the current run: its curl children are stopped, its answers dropped.
+; Cancels the current run: its native children are stopped, its answers dropped.
 ; @param CurrentFn {Func|Integer} Optional pure predicate for the requesting page.
 HealthCheck_CancelProbes(CurrentFn := 0) {
 	HasOwner := !(CurrentFn is Integer && CurrentFn == 0)
@@ -103,7 +103,7 @@ HealthCheck_CancelProbes(CurrentFn := 0) {
 	} finally Critical(PreviousCritical)
 	for Request in Run.Requests {
 		if !Request.Abort()
-			LoggerError("Healthcheck", "A diagnostics probe's curl child refused to stop; its cleanup is retained.")
+			LoggerError("Healthcheck", "A diagnostics probe child refused to stop; its cleanup is retained.")
 	}
 	return true
 }
@@ -142,7 +142,7 @@ _HC_ProbeFinish(Run, Id, Started, Result, Sections := 0, NowTick := unset) {
 ; ==============================
 ; ==============================
 
-; Starts one HTTP GET probe: resolves the proxy, then hands the request to curl.
+; Starts one HTTP GET probe: the managed transport resolves the route, then sends it.
 ; @param Run {Object}
 ; @param Id {String}
 ; @param Url {String}
@@ -155,7 +155,7 @@ _HC_ProbeHttp(Run, Id, Url, Headers, TimeoutMs, Interpret) {
 	_HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started)
 }
 
-; Sends the request of an HTTP probe through curl and arms its poll.
+; Sends the request of an HTTP probe through the managed transport and arms its poll.
 _HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Port := 0) {
 	Request := 0
 	if Run.Cancelled {
@@ -197,7 +197,7 @@ _HC_ManagedRunCurrent(Run) {
 	return IsObject(_HC_ProbeRun) && IsObject(Run) && ObjPtr(_HC_ProbeRun) == ObjPtr(Run) && !Run.Cancelled
 }
 
-; Asks an HTTP probe's curl child again after one poll interval.
+; Asks an HTTP probe's native child again after one poll interval.
 _HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs) {
 	SetTimer(_HC_ProbePoll.Bind(Run, Id, Request, Interpret, Started, TimeoutMs), -HC_PROBE_POLL_MS)
 }
@@ -221,7 +221,7 @@ _HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs, NowTick := unset,
 		_HC_ProbeFinish(Run, Id, Started, Answer["result"], Answer.Get("sections", 0), NowTick?)
 		return
 	}
-	; curl's own max-time ends the child first; this bound only covers a child
+	; the worker's own original budget ends the child first; this bound only covers a child
 	; that never reports back
 	if (TickElapsed64(Started, NowTick?) > TimeoutMs + 1000) {
 		if !Request.Abort()

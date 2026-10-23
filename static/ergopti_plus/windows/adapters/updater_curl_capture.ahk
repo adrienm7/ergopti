@@ -39,7 +39,7 @@ class _UpdaterCurlCaptureLedger {
 			this.Directory["handle"] := this.Open(Candidate, 0, 3, true)
 			if !this.Directory["handle"]
 				throw OSError(A_LastError, "Curl capture directory identity refused.")
-			for Name in ["artifact.bin", "headers.bin", "capability.json", "transport.conf"] {
+			for Name in ["artifact.bin", "headers.bin"] {
 				Path := Candidate . "\" . Name
 				Handle := this.Open(Path, 0, 1, false)
 				if !Handle
@@ -81,7 +81,7 @@ class _UpdaterCurlCaptureLedger {
 		}
 	}
 	ValidatePaths() {
-		if this.Retired || this.Acquiring || this.Files.Count != 4
+		if this.Retired || this.Acquiring || this.Files.Count != 2
 			return false
 		Lease := this.AcquireDirectoryLease()
 		if !Lease

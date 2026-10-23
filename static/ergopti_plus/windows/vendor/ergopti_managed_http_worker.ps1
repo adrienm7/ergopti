@@ -1,10 +1,10 @@
-# vendor/ergopti_managed_curl_worker.ps1
-# One request-owned Job contains discovery, capability observation and transport.
+# vendor/ergopti_managed_http_worker.ps1
+# One request-owned Job contains route discovery and the WinHTTP transport.
 param([Parameter(Mandatory=$true)][string]$InputPath)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Answer = @{ schema_version = 1; ok = $false; status = 0; child_quiesced = $false;
-    receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'unknown' } }
+    receipt = @{ backend = 'winhttp'; stage = 'connect'; failure_provenance = 'unknown' } }
 $AttemptEngine = $null
 
 function Test-ErgoptiManagedInt32 {
@@ -15,7 +15,6 @@ function Test-ErgoptiManagedInt32 {
 }
 
 function Get-RemainingBudget { return $AttemptEngine.GetRemainingBudget() }
-function Get-NativeRemainingBudget { return $AttemptEngine.GetNativeRemainingBudget() }
 
 try {
     $InputValue = Get-Content -LiteralPath $InputPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -30,7 +29,7 @@ try {
         $InputValue.connect_timeout_ms -lt 1 -or $InputValue.revocation_best_effort -isnot [bool]) {
         throw 'The private managed HTTP input was refused.'
     }
-    foreach ($Name in @('policy_path', 'defaults_path', 'route_path', 'capability_path', 'response_path', 'header_path')) {
+    foreach ($Name in @('policy_path', 'defaults_path', 'route_path', 'response_path', 'header_path')) {
         if ($InputValue.$Name -isnot [string] -or $InputValue.$Name -eq '' -or
             $InputValue.$Name -match '[\x00-\x1f\x7f"]' -or -not [IO.Path]::IsPathRooted($InputValue.$Name)) {
             throw 'A required explicit private path was refused.'
@@ -43,12 +42,9 @@ try {
         }
     }
     $Directory = [IO.Path]::GetDirectoryName($InputPath)
-    $CapabilityInput = Join-Path $Directory 'capability.json'
-    $PayloadPath = Join-Path $Directory 'payload.bin'
-    $CurlConfig = Join-Path $Directory 'transport.conf'
     . $InputValue.route_path
-    . (Join-Path $PSScriptRoot 'ergopti_curl_attempt.ps1')
-    $AttemptEngine = New-ErgoptiCurlAttemptEngine $InputValue $Answer $CapabilityInput $PayloadPath $CurlConfig
+    . (Join-Path $PSScriptRoot 'ergopti_winhttp_transport.ps1')
+    $AttemptEngine = New-ErgoptiWinHttpAttemptEngine $InputValue $Answer
     $null = Get-RemainingBudget
     $Policy = Get-ErgoptiNetworkPolicy $InputValue.policy_path
     $Destination = Get-ErgoptiDestination $InputValue.url
@@ -74,7 +70,7 @@ try {
         }
         if ($Selection.Routes.Count -lt 1 -or $Selection.Routes.Count -gt $Selection.MaxRoutes) { throw 'Native route count was refused.' }
         # The current shared policy preserves environment bypass for selected
-        # system relays too. An explicit curl proxy must not erase no_proxy.
+        # system relays too. An explicit proxy must not erase no_proxy.
         if ($Policy.selected_proxy_bypass -cne 'environment') { throw 'Canonical selected-proxy bypass policy was refused.' }
         $Bypass = ''
         foreach ($Name in $Policy.environment_bypass_precedence) {
@@ -95,22 +91,21 @@ try {
     $TransportAdmitted = $false
     $Redirects = 0
     while ($true) {
-        $Answer.receipt = @{ backend = 'curl'; stage = 'proxy_resolve'; failure_provenance = 'unknown' }
+        $Answer.receipt = @{ backend = 'winhttp'; stage = 'proxy_resolve'; failure_provenance = 'unknown' }
         $Selection = Resolve-ErgoptiManagedFreshSelection $Destination
         $Metrics = $null
         if ($null -eq $Capability) {
-            # OS trust belongs to DIRECT requests too. SSPI/SPNEGO admission is
-            # required separately only when a proxy route is actually attempted.
+            # The system HTTP stack and the installed security providers are
+            # observed before any request secret is staged.
             $Capability = $AttemptEngine.ObserveCapability()
-            if ([version]$Capability.version -lt [version]'8.7.0') { throw 'Native proxy-use provenance is unavailable.' }
             # Observation can outlast a settings revision; reroute before staging
-            # the first credential/body transport config under the same budget.
+            # the first credential/body under the same budget.
             if ($InputValue.fixed_proxy -isnot [string]) { continue }
         }
         if (-not $TransportAdmitted) {
             foreach ($Route in $Selection.Routes) {
-                if ($Route.Kind -ceq 'proxy' -and (-not $Capability.sspi -or -not $Capability.spnego)) {
-                    throw 'Missing native proxy features refuse before secret staging.'
+                if ($Route.Kind -ceq 'proxy' -and -not $Capability.sspi) {
+                    throw 'Missing integrated proxy authentication refuses before secret staging.'
                 }
             }
             $Ack = @{ schema_version = 1; request_id = $InputValue.request_id;
@@ -137,50 +132,28 @@ try {
             }
             $InputValue.body = $TransportInput.body
             $InputValue.headers = $TransportInput.headers
-            [IO.File]::WriteAllText($PayloadPath, $InputValue.body, [Text.UTF8Encoding]::new($false))
             $TransportAdmitted = $true
             # Consent and filesystem publication can outlast a settings change.
             # Route the exact complete URL again before the first transport.
             if ($InputValue.fixed_proxy -isnot [string]) { continue }
         }
-        for ($DiscoveryOrdinal = 0; $DiscoveryOrdinal -lt $Selection.Routes.Count; $DiscoveryOrdinal++) {
-            $Route = $Selection.Routes[$DiscoveryOrdinal]
+        for ($RouteOrdinal = 0; $RouteOrdinal -lt $Selection.Routes.Count; $RouteOrdinal++) {
+            $Route = $Selection.Routes[$RouteOrdinal]
             if ($Route.Kind -cnotin @('direct', 'proxy')) { throw 'A native route kind was refused.' }
-            if ($Route.Kind -ceq 'proxy') {
-                if (-not $Capability.sspi -or -not $Capability.spnego -or
-                    $Route.Authentication -cne 'current_user_proxy_only') { throw 'Sole Negotiate native proxy admission was refused.' }
+            if ($Route.Kind -ceq 'proxy' -and
+                ($Route.Authentication -cne 'current_user_proxy_only' -or -not $Capability.sspi)) {
+                throw 'Integrated native proxy admission was refused.'
             }
-            $Answer.receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'verified'; tls_verification = 'enforced' }
-            if ($Route.Kind -ceq 'proxy' -and $Destination.Scheme -ceq 'https') {
-                $Discovery = $AttemptEngine.DiscoverProxy($Destination, $Route, $Capability, $Selection, $DiscoveryOrdinal)
-                if ($Discovery.ready) {
-                    # Re-evaluate the complete original URL after the anonymous
-                    # child's actual EOF/reap, before current-user credentials.
-                    $FreshSelection = Resolve-ErgoptiManagedFreshSelection $Destination
-                    $Metrics = $AttemptEngine.InvokeDiscoveredRoute($Destination, $Route, $Method, $SendBody, $SendHeaders, $FreshSelection)
-                } else { $Metrics = $Discovery.metrics }
-            } else {
-                $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, 'negotiate', $Method, $SendBody, $SendHeaders)
-                if ($AttemptEngine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
-                    $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, 'ntlm', $Method, $SendBody, $SendHeaders)
-                }
-            }
-            if ($Metrics.exit -eq 0) { break }
-            $Answer.receipt.curl_exit = [int]$Metrics.exit
-            $Answer.receipt.http_status = $Metrics.status
-            $Answer.receipt.proxy_connect_status = $Metrics.connect
-            $Answer.receipt.proxy_mode = $(if ($Metrics.proxy_used) { 'selected' } else { 'direct' })
-            $Answer.receipt.http_response_source = $(if ($Metrics.connect -eq 407 -and $Metrics.status -eq 0) { 'proxy' } else { 'unavailable' })
-            if ($Metrics.connect -ge 400 -and $Metrics.connect -le 599 -and $Metrics.status -eq 0 -and $Metrics.proxy_used) { $Answer.receipt.stage = 'proxy_connect' }
-            if ($Metrics.exit -eq 5) { $Answer.receipt.stage = 'proxy_resolve' }
-            if ($Metrics.exit -eq 60) { $Answer.receipt.stage = 'tls' }
-            $Retry = $Route.Kind -ceq 'proxy' -and $Metrics.proxy_used -and $Metrics.child_quiesced -and
-                $Metrics.status -eq 0 -and $Metrics.connect -eq 0 -and $Metrics.delivered -eq 0 -and
-                ($Policy.failover.proxy_name_resolution_exits -contains $Metrics.exit -or $Policy.failover.proxy_connect_exits -contains $Metrics.exit)
-            if (-not $Retry) { throw 'Native transport refused this request.' }
+            $Answer.receipt = @{ backend = 'winhttp'; stage = 'connect'; failure_provenance = 'verified'; tls_verification = 'enforced' }
+            $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, $Method, $SendBody, $SendHeaders)
+            # A complete response is the origin's unless the proxy produced it (a
+            # refused tunnel or an unanswered proxy challenge).
+            if ($Metrics.completed -and -not $Metrics.proxy_answered) { break }
+            $Answer.receipt = $AttemptEngine.GetFailureReceipt($Metrics, $Destination)
+            if (-not $AttemptEngine.TestFailover($Metrics, $Route)) { throw 'Native transport refused this request.' }
         }
         if ($null -eq $Metrics) { continue }
-        if ($Metrics.exit -ne 0) { throw 'Every admitted route was refused.' }
+        if (-not $Metrics.completed -or $Metrics.proxy_answered) { throw 'Every admitted route was refused.' }
         if ($Metrics.status -in @(301, 302, 303, 307, 308)) {
             if (-not $Metrics.headers.headers.ContainsKey('location') -or $Redirects -ge $Selection.MaxRedirects) { throw 'Native redirect admission was refused.' }
             $Next = [Uri]::new($Destination, $Metrics.headers.headers.location)

@@ -687,13 +687,10 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_remote.ahk
 #Include unit/modules/llm/api/test_llm_api_remote_async_registry.ahk
 #Include unit/modules/llm/api/test_llm_api_remote_requests.ahk
-#Include unit/platform/network/test_curl_proxy_auth_integration.ahk
-#Include unit/platform/network/test_curl_proxy_discovery.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
 #Include unit/platform/network/test_managed_curl_empty_header.ahk
 #Include unit/platform/network/test_http_post_replacement_validation.ahk
 #Include unit/platform/network/test_managed_curl_callers.ahk
-#Include unit/platform/network/test_curl_proxy_auth_policy.ahk
 #Include unit/modules/llm/servers/test_local_server_auth.ahk
 #Include unit/modules/llm/servers/test_local_server_discovery_policy.ahk
 #Include unit/modules/llm/servers/test_local_server_models.ahk
@@ -1275,11 +1272,10 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/updater/test_updater_curl_capture.ahk
 #Include unit/modules/updater/test_updater_curl_capture_namespace.ahk
 #Include unit/modules/updater/test_updater_curl_capture_move_graph.ahk
-#Include fixtures/host_curl_capability.ahk
-#Include unit/platform/network/test_host_curl_capability.ahk
 #Include unit/platform/network/test_managed_remote_sspi.ahk
-#Include meta/modules/llm/servers/test_remote_connect_timeout_bounded.ahk
 #Include unit/platform/network/test_winhttp_transport.ahk
+#Include unit/modules/updater/test_updater_artifact_winhttp.ahk
+#Include meta/modules/llm/servers/test_remote_connect_timeout_bounded.ahk
 #Include meta/modules/keystats/test_keystats_json_64bit_decode.ahk
 #Include meta/adapters/crash_report/test_crash_build_offthread.ahk
 #Include meta/suite/test_assertions_are_case_sensitive.ahk

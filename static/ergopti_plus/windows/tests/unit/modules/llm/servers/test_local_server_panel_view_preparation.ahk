@@ -285,7 +285,7 @@ class _LSCF_ConfiguredChild extends _LSPN_ReadyChild {
 		_LSM_ChildReceipt.Prototype.start.Call(this)
 		Fixture := this.Fixture
 		Request := Fixture.Requests[Fixture.Requests.Length]
-		Config := FSReadUtf8Exact(Request.ConfigPath)
+		Config := _LSM_RequestImage(Request)
 		Configured := InStr(Config, ":19423/custom/v1/models", true) > 0
 		this.ResponseStatus := Configured ? Fixture.ConfiguredStatus : 200
 		this.ResponseBody := Configured ? Fixture.ConfiguredBody

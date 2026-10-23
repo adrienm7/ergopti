@@ -11,7 +11,7 @@ function New-OllamaOwnedCurlCapture($Wal, [string]$Stage, $Directories) {
 	$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($path, $false)
 	$Directories.Add($relative, $handle)
 	Add-OllamaCreationRecord $Wal 'directory-owned' $relative ([Ergopti.Ollama.ManagedNative]::Identity($handle))
-	foreach ($name in @('artifact.bin', 'headers.bin', 'capability.json', 'transport.conf', 'payload.bin')) {
+	foreach ($name in @('artifact.bin', 'headers.bin')) {
 		$owned = New-OllamaExtractedFile $Wal $Stage ($relative + '/' + $name)
 		try { $owned.stream.Flush($true) } finally { $owned.stream.Dispose() }
 	}
@@ -65,7 +65,7 @@ function Invoke-OllamaManagedArchiveDownload {
 			param($DestinationUrl, $RemainingMs)
 			return Resolve-ErgoptiNativeNetworkRoutes $DestinationUrl $RemainingMs $ReadConfig $ReadEnvironment $PolicyPath $DefaultsPath
 		}
-		$bytes = Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Source.url) $destination $ConnectTimeoutMs $state $resolver $DeadlineMs $StartedTick $Source.pin.bytes $PolicyPath $DefaultsPath $ReadEnvironment $factory
+		$bytes = Invoke-ErgoptiUpdaterArtifactDownload ([Uri]$Source.url) $destination $ConnectTimeoutMs $state $resolver $DeadlineMs $StartedTick $Source.pin.bytes $PolicyPath $DefaultsPath $ReadEnvironment $factory
 		# The native copy owner has closed its output. Reacquire the exact file,
 		# reject a replaced object, and consume all bytes under the read lease.
 		$read = Open-OllamaReadFile $destination

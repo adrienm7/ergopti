@@ -456,20 +456,23 @@ public static class ErgoptiWinHttpTransport
             if (host.StartsWith("[") && host.EndsWith("]")) host = host.Substring(1, host.Length - 2);
             op.Connect = WinHttpConnect(op.Session, host, (ushort)destination.Port, 0);
             if (op.Connect == IntPtr.Zero) { Classify(result, spec, op, Marshal.GetLastWin32Error(), "connect"); return; }
-            bool revocation = secure && spec.RevocationBestEffort;
+            // Revocation is always checked on HTTPS; best-effort only forgives an
+            // unreachable revocation source, never a revoked certificate.
+            bool revocation = secure;
             for (int pass = 0; pass < 2; pass++)
             {
                 op.SecureFlags = 0;
                 result.SecureFlags = 0;
                 CloseOwned(op, ref op.Request);
                 uint openFlags = (secure ? FlagSecure : 0) | FlagEscapeDisable | FlagEscapeDisableQuery;
-                op.Request = WinHttpOpenRequest(op.Connect, spec.Method, destination.PathAndQuery,
+                op.Request = WinHttpOpenRequest(op.Connect, spec.Method,
+                    destination.GetComponents(UriComponents.PathAndQuery, UriFormat.UriEscaped),
                     null, null, IntPtr.Zero, openFlags);
                 if (op.Request == IntPtr.Zero) { Classify(result, spec, op, Marshal.GetLastWin32Error(), "connect"); return; }
                 ConfigureRequest(op, spec, secure, revocation);
                 int error = Exchange(op, spec, result);
                 if (error == 0) break;
-                if (secure && pass == 0 && revocation && error == ErrorSecureFailure && op.SecureFlags == SecureRevFailed)
+                if (secure && pass == 0 && revocation && spec.RevocationBestEffort && error == ErrorSecureFailure && op.SecureFlags == SecureRevFailed)
                 {
                     // WinHTTP could not reach the revocation source; every other
                     // verification passed. Retry once without that single check.
@@ -496,7 +499,7 @@ public static class ErgoptiWinHttpTransport
             }
             try
             {
-                output = new FileStream(spec.ResponsePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                output = new FileStream(spec.ResponsePath, FileMode.Create, FileAccess.Write, FileShare.Read);
             }
             catch (Exception) { result.Completed = false; result.Failure = "file_write"; result.Stage = "file_write"; return; }
             byte[] chunk = new byte[65536];
@@ -621,7 +624,6 @@ function New-ErgoptiWinHttpAttemptEngine {
     $Module = New-Module -AsCustomObject -ArgumentList @($InputValue, $Answer) -ScriptBlock {
         param($InputValue, $Answer)
         $script:Quiesced = $true
-        $script:BodyBytes = [Text.UTF8Encoding]::new($false).GetBytes([string]$InputValue.body)
 
         function Get-NativeRemainingBudget {
             $Now = [ErgoptiWinHttpTransport]::CurrentTick()
@@ -684,7 +686,9 @@ function New-ErgoptiWinHttpAttemptEngine {
                 $Spec.HeaderNames = [string[]]@($Sent | ForEach-Object { $_.name })
                 $Spec.HeaderValues = [string[]]@($Sent | ForEach-Object { $_.value })
             }
-            if ($SendBody -and $script:BodyBytes.Length -gt 0) { $Spec.Body = $script:BodyBytes }
+            # The body and headers are read now: a managed worker receives them only after admission.
+            $BodyBytes = [Text.UTF8Encoding]::new($false).GetBytes([string]$InputValue.body)
+            if ($SendBody -and $BodyBytes.Length -gt 0) { $Spec.Body = $BodyBytes }
             $Spec.ResponsePath = $InputValue.response_path
             $Spec.HeaderPath = $InputValue.header_path
             $Spec.ConnectTimeoutMs = [int]$InputValue.connect_timeout_ms

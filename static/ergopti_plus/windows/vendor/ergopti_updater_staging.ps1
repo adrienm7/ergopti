@@ -47,7 +47,7 @@ try {
   $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}
   $Request=[System.Net.HttpWebRequest]::Create($Url)
   $Request.ReadWriteTimeout = $TimeoutMs
-  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}
+  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterArtifactDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}
   $State.Stage="file_read"
   $ActualSize=(Get-Item -LiteralPath $NewExe).Length
   if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }

@@ -1,35 +1,6 @@
 ﻿; tests/unit/modules/updater/test_updater_curl_artifact.ahk
 ; Actual packaged artifact staging over Schannel and an owned SSPI NTLM relay.
-; Literal factory controls remain distinct from genuine authenticated wire tests.
-
-_ArtifactCurlFactoryControls() {
-	global _DriverDir, _VendorDir
-	Observed := []
-	Handle := 0
-	try {
-		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
-			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
-				_DriverDir . "\tests\fixtures\curl_attempt_controls.ps1", "-EnginePath",
-				_VendorDir . "\ergopti_curl_attempt.ps1"],
-			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
-		AssertTrue(Handle.start(), "actual factory helper model process starts")
-		Started := A_TickCount
-		while Observed.Length == 0 && !TickExpired64(Started, 15000) {
-			_SR_TreePoll()
-			Sleep(10)
-		}
-		AssertEqual(1, Observed.Length)
-		; The fixture names its failing control on stdout/stderr; carry it into
-		; the job log instead of a bare exit status.
-		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
-		AssertEqual("CURL_ATTEMPT_MODEL_CONTROLS:29", Trim(Observed[1]["stdout"], "`r`n "))
-		AssertEqual("", Observed[1]["stderr"])
-	} finally {
-		if IsObject(Handle)
-			AssertTrue(Handle.terminate(), "model helper's actual process Job retires")
-	}
-}
-Test("artifact curl: independent factory namespace and causal fallback model controls", _ArtifactCurlFactoryControls)
+; The engine itself is covered by winhttp_transport_controls.ps1.
 
 class _ArtifactNtlmProxyOwner {
 	__New(Tls, Mode, ServeRemotePac := false) {
@@ -222,9 +193,8 @@ class _ArtifactCurlDownloadRun extends _UpdaterNativeDownloadRun {
 }
 
 _ArtifactCurlActualSspiAndStaging() {
-	; Its first proxy offers NTLM alone, so staging needs a curl that lists
-	; NTLM. A curl that lists it, or an unknown one, runs the case.
-	TestRequireHostCurlNtlm()
+	; WinHTTP authenticates an NTLM-only proxy on every Windows image, so this
+	; case never depends on the optional features of the host's curl.exe.
 	Tls := _UpdaterNativeTransportOwner()
 	Proxy := 0
 	try {
@@ -258,7 +228,7 @@ _ArtifactCurlActualSspiAndStaging() {
 					AssertTrue(!FileExist(Run.NewExe) && !FileExist(Run.SwapPath), "auth refusal publishes no executable or swap")
 				}
 			} finally Proxy.Close()
-			AssertTrue(Proxy.State.Get("bare", 0) >= 1, "actual first Negotiate-only curl received a bare CONNECT challenge")
+			AssertTrue(Proxy.State.Get("bare", 0) >= 1, "the actual WinHTTP client received a bare CONNECT challenge first")
 			if Mode == "NtlmOnly" {
 				AssertEqual(2, Proxy.State.Get("type_one", -1), "each operation has one causal NTLM successor with one native Type1")
 				AssertEqual(2, Proxy.State.Get("type_three", -1), "each native Type2 causes one actual SSPI Type3")
@@ -311,7 +281,7 @@ _ArtifactCurlProductionDispatchJoin() {
 	Assert(IsObject(Asset), "the actual parser accepts independently supplied release metadata")
 	AssertEqual(524288, Asset.Size, "the parser retains the independent byte bound")
 	Script := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
-	AssertContains(Script, 'if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload',
+	AssertContains(Script, 'if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterArtifactDownload',
 		"the real produced worker selects curl for authenticated release assets")
 	AssertContains(Script, '$DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment}',
 		"curl receives the original clock, independent size and canonical policy paths")

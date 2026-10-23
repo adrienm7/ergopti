@@ -8,7 +8,9 @@
 _WinHttpTransport_ExpectedControls() {
 	return [
 		"direct_get_exact_target_headers_and_body",
+		"non_ascii_target_is_sent_as_percent_encoded_utf8",
 		"post_sends_exact_utf8_body_length",
+		"response_file_is_the_wire_byte_for_byte",
 		"redirects_are_surfaced_never_followed",
 		"declared_oversize_refused_before_reading",
 		"undeclared_oversize_stops_the_stream_at_the_bound",

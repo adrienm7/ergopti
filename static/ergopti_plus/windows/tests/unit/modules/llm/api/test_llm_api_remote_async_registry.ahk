@@ -111,7 +111,6 @@ _RemoteCancelPublication_Poll(State, ReqId) {
 _RemoteCancelPublication_CurlPort(State, RunFn) {
 	return Map(
 		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
-		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,

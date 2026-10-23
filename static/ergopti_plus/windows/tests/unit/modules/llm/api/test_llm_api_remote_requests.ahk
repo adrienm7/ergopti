@@ -225,22 +225,23 @@ _RemoteProxy_DeferredGeneration(ProbeCase := "success") {
 			_LLM_Remote_Async[ReqId] := Map("transport", "pending", "cancelled", false)
 		else if ProbeCase == "timeout"
 			State["tick"] += 1000
-		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", "http://managed.corp:3128"))
+		; The fixed-route seam serves an explicit DIRECT selection only: it has no
+		; proxy authentication, which belongs to the managed WinHTTP transport.
+		Selected := ProbeCase == "proxy" ? "http://managed.corp:3128" : ""
+		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", Selected))
 		State["continue"].Call(Map("ok", true, "inherit", false, "proxy", "http://late.corp:80"))
 		if ProbeCase != "success" {
-			AssertEqual(0, State["writes"].Length, "stale or cancelled admission must not stage private data")
-			AssertEqual(0, State["runs"], "stale or expired admission must launch no child")
-			AssertEqual((ProbeCase == "timeout" || ProbeCase == "reject") ? 1 : 0, State["fail_calls"], "timeout fails once; cancellation stays silent")
+			AssertEqual(0, State["writes"].Length, "stale, cancelled or unauthenticatable admission must not stage private data")
+			AssertEqual(0, State["runs"], "stale, expired or unauthenticatable admission must launch no child")
+			AssertEqual((ProbeCase == "timeout" || ProbeCase == "reject" || ProbeCase == "proxy") ? 1 : 0, State["fail_calls"], "timeout, rejection and a proxy fail once; cancellation stays silent")
 			if ProbeCase == "replace"
 				AssertEqual("pending", _LLM_Remote_Async[ReqId]["transport"], "old completion must preserve successor")
 			return
 		}
 		AssertEqual(1, State["runs"], "duplicate resolver completion must launch exactly once")
 		AssertEqual(2, State["writes"].Length, "one payload and one private config are staged")
-		AssertContains(State["writes"][2]["text"], 'proxy = "http://managed.corp:3128"')
-		AssertContains(State["writes"][2]["text"], "proxy-negotiate")
-		AssertFalse(InStr(State["writes"][2]["text"], "proxy-anyauth"), "the negotiated native scheme must not allow Basic/Digest downgrade")
-		AssertContains(State["writes"][2]["text"], 'proxy-user = ":"')
+		AssertContains(State["writes"][2]["text"], 'proxy = ""', "an explicit DIRECT selection reaches the private config")
+		AssertFalse(InStr(State["writes"][2]["text"], "proxy-"), "the fixed-route seam never carries proxy authentication")
 		AssertFalse(InStr(State["command"]["command_line"], "private-api-key") > 0, "API credentials must remain outside argv")
 		AssertFalse(InStr(State["command"]["command_line"], "private-context") > 0, "typed text must remain outside argv")
 	} finally {
@@ -258,6 +259,7 @@ Test("remote proxy: cancelled admission cannot stage or launch", _RemoteProxy_De
 Test("remote proxy: late admission cannot consume a successor", _RemoteProxy_DeferredGeneration.Bind("replace"))
 Test("remote proxy: resolution consumes the request timeout", _RemoteProxy_DeferredGeneration.Bind("timeout"))
 Test("remote proxy: unresolved receipt cannot become direct generation", _RemoteProxy_DeferredGeneration.Bind("reject"))
+Test("remote proxy: the fixed-route seam refuses a proxy it cannot authenticate", _RemoteProxy_DeferredGeneration.Bind("proxy"))
 
 class _RemoteProxy_ReadyHttp {
 	__New(State) {

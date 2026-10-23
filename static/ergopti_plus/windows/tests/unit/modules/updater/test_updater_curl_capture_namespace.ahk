@@ -419,7 +419,7 @@ _CurlCaptureMoveProbeAllocatedNamespace(Phase, LiveBody := false, HeldLease := f
 	try {
 		AssertTrue(Phase == "allocated" || Phase == "live_body" || Phase == "held_lease")
 		Capture.Acquire(Parent)
-		AssertEqual(4, Capture.Files.Count, "the probe uses the actual four-file production ledger")
+		AssertEqual(2, Capture.Files.Count, "the probe uses the actual two-file production ledger")
 		AssertTrue(Capture.ValidatePaths(), "all exact production references precede the native setup attempt")
 		AssertEqual(0, Capture.ProbeCloseDebt.Length)
 		if LiveBody {
@@ -663,7 +663,7 @@ _CurlCaptureHandleRenameCase(InformationClass, Flags, FourFiles) {
 	try {
 		if FourFiles {
 			Capture.Acquire(Parent)
-			AssertEqual(4, Capture.Files.Count)
+			AssertEqual(2, Capture.Files.Count)
 			AssertTrue(Capture.ValidatePaths(), "the exact original four-file ledger precedes handle-based receiving")
 		} else {
 			; Independent empty positive control; it never stands in for four files.

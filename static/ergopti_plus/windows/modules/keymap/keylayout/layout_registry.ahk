@@ -21,7 +21,7 @@
 ;    instead of emulating something else.
 ; 3. A download lands under a temporary name; the catalogue publishes it only
 ;    once the layout matches its index entry.
-; 4. The transfer runs in a curl child (CurlAsyncRequest) polled from a timer,
+; 4. The transfer runs in a native WinHTTP child (CurlAsyncRequest) polled from a timer,
 ;    so the keyboard thread never waits on the network. Every collaborator is
 ;    injectable so tests replay a download without a network.
 ; 5. The physical magic key follows one order: the user's configured key, the
@@ -55,11 +55,11 @@ global LAYOUT_REGISTRY_PARTIAL_SUFFIX := ".download"
 global LAYOUT_REGISTRY_USER_AGENT := "ErgoptiPlus-Layouts/1.0"
 
 ; How often a running download is polled. Short enough that a layout is ready a
-; tenth of a second after curl exits, long enough to cost nothing while it runs.
+; tenth of a second after the child exits, long enough to cost nothing while it runs.
 global LAYOUT_REGISTRY_POLL_MS := 100
 
-; Extra polls allowed past the transfer budget before a download that curl
-; never reported finished is abandoned (curl enforces the budget itself).
+; Extra polls allowed past the transfer budget before a download that the child
+; never reported finished is abandoned (the worker enforces the budget itself).
 global LAYOUT_REGISTRY_POLL_GRACE := 20
 
 
@@ -315,7 +315,7 @@ _LayoutRegistryDefaultTransport() {
 }
 
 /**
- * Downloads one URL of the registry into ``Partial`` in a curl child polled
+ * Downloads one URL of the registry into ``Partial`` in a native WinHTTP child polled
  * from a timer, never on the keyboard thread, and calls
  * OnSettled(Status, Etag, Error) exactly once: Status 0 when no HTTP response
  * arrived, Error then saying why; Etag is the response's, "" when none.
@@ -325,7 +325,7 @@ _LayoutRegistryDefaultTransport() {
  * @param {Integer} TimeoutMs - Budget of the whole transfer, connection included.
  * @param {Map} Transport - "request" (a CurlAsyncRequest-like object),
  *   "resolve_proxy" (SystemProxy_ResolveAsync) and "schedule" (Fn, DelayMs);
- *   the curl transport when 0.
+ *   the managed transport when 0.
  * @param {Func} OnSettled
  */
 LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
