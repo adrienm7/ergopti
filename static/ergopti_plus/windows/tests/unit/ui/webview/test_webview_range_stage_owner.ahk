@@ -99,3 +99,5 @@ for Mode in ["consume", "stale-ack", "stale-native", "invalid", "wrong-sender", 
 #Include ../../modules/keystats/metrics/test_metrics_clear_cache_owner.ahk
 
 #Include test_editor_early_show_owner.ahk
+
+#Include test_hcw_early_show_owner.ahk
