@@ -314,9 +314,9 @@ function M.sample_physical_context(owner, token)
 		local function current() return (native_probe == nil or native_probe.current()) and fence() and binding.channel.owns(ticket) end
 		local function read(operation)
 			if not current() then return false end
-			local ok, value = pcall(operation)
+			local ok, value, detail = pcall(operation)
 			if not current() then return false end
-			return ok, value
+			return ok, value, detail
 		end
 		local function finish(observed, paused, permission)
 			if not current() then return false end
@@ -390,9 +390,9 @@ function M.sample_physical_context(owner, token)
 				if ok_focus and focused ~= nil then
 					local complete = false
 					local proxy = { attributeValue = function(_, attribute)
-						local ok, value = read(function() return focused:attributeValue(attribute) end)
+						local ok, value, detail = read(function() return focused:attributeValue(attribute) end)
 						if not ok then error("Physical context AX observation refused", 0) end
-						return value
+						return value, detail
 					end }
 					local ok_secure, secure = read(function()
 						return SecureFieldDetector.isElementSecure(proxy, function(known) if current() then complete = known == true end end)
