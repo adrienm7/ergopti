@@ -21,8 +21,10 @@
 //    every possible signal is complete, preventing PID-reuse collateral damage.
 // 5. Event-Driven Idle: Hammerspoon is the sole heartbeat authority; the outer
 //    sleeps in poll until public input while inner silence triggers revocation.
-// 6. Canonical CLI Boundary: argv validation accepts only the stable PKG
-//    karabiner_cli path, never a shared UI, service, agent, or helper binary.
+// 6. Canonical CLI Boundary: argv validation accepts only the two fixed
+//    command line tools of the selected runtime (the stable PKG karabiner_cli
+//    of the shared runtime, or the root-owned CLI of the Ergopti-owned runtime),
+//    never a shared UI, service, agent, or helper binary.
 // 7. Orphan Confinement: every inner leads a private process group inherited by
 //    its CLI children; inner/supervision loss kills that exact group before reap.
 // 8. Descriptor Reservation: socket endpoints are duplicated above stdio/fd 3
@@ -57,9 +59,38 @@ let kLeaseModeOff = 0
 let kLeaseModeActive = 1
 let kLeaseModePaused = 2
 
-/// The sole PKG-installed executable this guardian may create as a CLI child.
+/// The PKG-installed executable of the shared runtime (the official application).
 let kCanonicalKarabinerCLIPath =
 	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
+
+/// The command line tool of the Ergopti-owned runtime (ADR 011). It lives in the
+/// root-owned runtime directory the owned installer publishes, never in the
+/// user-writable application bundle.
+let kOwnedKarabinerCLIPath =
+	"/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli"
+
+/// The Karabiner runtime a lease writes its variables through. A lease is bound
+/// to exactly one runtime for its whole life: the Lua side selects it once per
+/// Lua VM and passes the matching endpoint as argv[2], so a generation can never
+/// straddle two runtimes.
+enum LeaseRuntime: String, CaseIterable {
+	case shared
+	case owned
+
+	/// The fixed endpoint of the runtime. These two paths are the only
+	/// executables a lease may create as CLI children.
+	var cliPath: String {
+		switch self {
+		case .shared: return kCanonicalKarabinerCLIPath
+		case .owned: return kOwnedKarabinerCLIPath
+		}
+	}
+
+	/// The runtime whose endpoint is exactly `cliPath`, or nil for any other path.
+	static func named(by cliPath: String) -> LeaseRuntime? {
+		return allCases.first(where: { $0.cliPath == cliPath })
+	}
+}
 
 let kInnerControlDescriptor: Int32 = 3
 private let kFirstReservedSocketDescriptor: Int32 = 4
@@ -192,6 +223,10 @@ struct LeaseIdentity: Equatable {
 	let initialMode: Int
 	let heartbeatSeconds: TimeInterval
 
+	/// The runtime this identity writes through. Identities admitted by `parse`
+	/// always have one; only a test fixture naming a stand-in executable does not.
+	var runtime: LeaseRuntime? { return LeaseRuntime.named(by: cliPath) }
+
 	/// Parses one public worker, detached revoker, or private inner invocation.
 	/// - Parameters:
 	///   - arguments: Complete process argv including the executable at index zero.
@@ -220,7 +255,7 @@ struct LeaseIdentity: Equatable {
 		let modeName = arguments[3]
 		let revokedName = arguments[4]
 		let modePrefix = "ergopti_mode_"
-		guard cliPath == kCanonicalKarabinerCLIPath, !cliPath.utf8.contains(0),
+		guard LeaseRuntime.named(by: cliPath) != nil, !cliPath.utf8.contains(0),
 			modeName.hasPrefix(modePrefix)
 		else { return nil }
 
@@ -2950,11 +2985,13 @@ final class KarabinerLeaseOuterRuntime {
 	///
 	/// This fallback is intentionally narrower than inner recovery: it cannot
 	/// execute the replaced launcher path, enumerate shared processes, or signal
-	/// anything except a direct karabiner_cli child it created and still owns.
+	/// anything except a direct CLI child of the runtime the lease was admitted
+	/// for (`identity.cliPath` is one of the two fixed endpoints) that it created
+	/// and still owns.
 	private func fenceDirectlyWithinWorkerBudget() -> Bool {
 		let fenced = transportLeaseFenceUntilRepeatedSuccess(
 			identity: identity,
-			cliPath: kCanonicalKarabinerCLIPath,
+			cliPath: identity.cliPath,
 			executor: recoveryExecutor,
 			cliTimeout: kCLITimeoutSeconds,
 			fenceConfirmationGrace: kFenceConfirmationGraceSeconds,

@@ -329,7 +329,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 	/// Creates one unlocked durable record as if every private worker was killed.
 	private func makeAbandonedGuardianRecord(
-		token: String
+		token: String,
+		runtime: LeaseRuntime = .shared
 	) throws -> (home: URL, paths: LeaseGuardianPaths, record: LeaseGuardianRecord) {
 		let home = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
 			.appendingPathComponent("ergopti-guardian-\(UUID().uuidString)", isDirectory: true)
@@ -348,7 +349,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			token: token,
 			nonce: "ffeeddccbbaa99887766554433221100",
 			ownerPID: getpid(),
-			state: .live
+			state: .live,
+			runtime: runtime
 		)
 		try XCTUnwrap(record.encoded).write(
 			to: URL(fileURLWithPath: paths.recordPath(token: token))
@@ -2939,6 +2941,137 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 				role: .inner
 			))
 		}
+	}
+
+	/// Proves every lease role also admits the owned runtime's command line tool.
+	func testEveryRoleAdmitsTheOwnedRuntimeEndpointAndNamesItsRuntime() {
+		XCTAssertEqual(
+			kOwnedKarabinerCLIPath,
+			"/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
+			"the Lua owner (ke_paths.lua) must name this exact tool"
+		)
+		let roles: [(LeaseInvocationRole, String, [String])] = [
+			(.worker, kKarabinerLeaseWorkerFlag, ["1", "5"]),
+			(.revoke, kKarabinerLeaseRevokeFlag, []),
+			(.inner, kKarabinerLeaseInnerFlag, ["5", "123", "456"]),
+		]
+		for (role, flag, suffix) in roles {
+			for runtime in LeaseRuntime.allCases {
+				let arguments = [
+					"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					flag,
+					runtime.cliPath,
+					"ergopti_mode_\(token)",
+					"ergopti_revoked_\(token)",
+				] + suffix
+				let identity = LeaseIdentity.parse(arguments: arguments, role: role)
+				XCTAssertEqual(identity?.cliPath, runtime.cliPath)
+				XCTAssertEqual(
+					identity?.runtime,
+					runtime,
+					"\(flag) must bind the lease to the runtime its endpoint names"
+				)
+			}
+		}
+	}
+
+	/// Proves the owned runtime's other binaries and look-alike paths are refused.
+	func testIdentityRejectsEveryOwnedRuntimeExecutableExceptItsCLI() {
+		let runtimeDirectory = "/Library/Application Support/ErgoptiPlus/Runtime/"
+		let forbiddenPaths = [
+			runtimeDirectory + "ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+			runtimeDirectory
+				+ "ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
+			runtimeDirectory + "bin/ergoptiplus_remap_cli ",
+			runtimeDirectory + "bin/../bin/ergoptiplus_remap_cli",
+			runtimeDirectory + "bin/ergoptiplus_remap_cli\u{0}",
+			"/Library/Application Support/ErgoptiPlus/bin/ergoptiplus_remap_cli",
+			"~/Library/Application Support/ErgoptiPlus/Runtime/bin/ergoptiplus_remap_cli",
+			"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+		]
+		for forbiddenPath in forbiddenPaths {
+			let arguments = [
+				"/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+				kKarabinerLeaseWorkerFlag,
+				forbiddenPath,
+				"ergopti_mode_\(token)",
+				"ergopti_revoked_\(token)",
+				"1",
+				"5",
+			]
+			XCTAssertNil(
+				LeaseIdentity.parse(arguments: arguments, role: .worker),
+				"\(forbiddenPath) must not become a lease CLI child"
+			)
+		}
+		XCTAssertNil(LeaseRuntime.named(by: "/usr/bin/true"))
+	}
+
+	/// Proves the guardian record names its runtime and nothing else.
+	func testGuardianRecordRoundTripsItsRuntimeAndRefusesAnyOtherText() throws {
+		let nonce = "ffeeddccbbaa99887766554433221100"
+		for runtime in LeaseRuntime.allCases {
+			let record = LeaseGuardianRecord(
+				token: token,
+				nonce: nonce,
+				ownerPID: 4242,
+				state: .live,
+				runtime: runtime
+			)
+			let encoded = try XCTUnwrap(record.encoded)
+			XCTAssertEqual(LeaseGuardianRecord.parse(encoded), record)
+			XCTAssertEqual(LeaseGuardianRecord.parse(encoded)?.runtime, runtime)
+		}
+		XCTAssertEqual(
+			LeaseGuardianRecord(token: token, nonce: nonce, ownerPID: 4242, state: .live).runtime,
+			.shared,
+			"a record created without a runtime keeps the shared one"
+		)
+		let valid = try XCTUnwrap(LeaseGuardianRecord(
+			token: token,
+			nonce: nonce,
+			ownerPID: 4242,
+			state: .live,
+			runtime: .owned
+		).encoded)
+		let text = try XCTUnwrap(String(data: valid, encoding: .utf8))
+		for replacement in ["/tmp/karabiner_cli", "", "Owned", "shared owned"] {
+			let forged = text.replacingOccurrences(of: "\nowned\n", with: "\n\(replacement)\n")
+			XCTAssertNil(
+				LeaseGuardianRecord.parse(Data(forged.utf8)),
+				"a record may name only a runtime, never \(replacement.isEmpty ? "nothing" : replacement)"
+			)
+		}
+		let legacy = text.replacingOccurrences(of: "\nowned\n", with: "\n")
+		XCTAssertNil(
+			LeaseGuardianRecord.parse(Data(legacy.utf8)),
+			"a record without its runtime line is not canonical"
+		)
+	}
+
+	/// Proves an abandoned owned-runtime lease is fenced through the owned tool,
+	/// never through the shared one, which may not even be installed.
+	func testGuardianFencesAnAbandonedOwnedRuntimeRecordThroughTheOwnedEndpoint() throws {
+		let fixture = try makeAbandonedGuardianRecord(token: token, runtime: .owned)
+		defer { try? FileManager.default.removeItem(at: fixture.home) }
+		let executor = GuardianRecordingLeaseCLIExecutor()
+		var runtime: RemapLeaseGuardianRuntime? = RemapLeaseGuardianRuntime(
+			paths: fixture.paths,
+			executor: executor,
+			cliPath: "/shared/stand-in/karabiner_cli",
+			ownedCLIPath: "/owned/stand-in/ergoptiplus_remap_cli",
+			terminateProcess: failUnexpectedGuardianTermination
+		)
+		XCTAssertTrue(runtime?.processRecordsOnceForTesting() == true)
+		XCTAssertTrue(executor.waitForRepeatedFence(timeout: 2))
+
+		let snapshot = executor.snapshot()
+		XCTAssertEqual(
+			snapshot.paths,
+			["/owned/stand-in/ergoptiplus_remap_cli", "/owned/stand-in/ergoptiplus_remap_cli"],
+			"an owned-runtime lease must never be revoked through the shared tool"
+		)
+		runtime = nil
 	}
 
 	/// Proves no shared stock Karabiner executable can cross the CLI boundary.
