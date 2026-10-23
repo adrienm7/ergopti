@@ -3297,6 +3297,8 @@ _Updater_PollAsync(id) {
 			try Etag := http.GetResponseHeader("ETag")
 			RateLimit := _Updater_ReadRateLimit(http)
 			Status := http.Status
+			if (http is CurlAsyncRequest) && !http.ResponseEncodingValid
+				throw Error("The managed async latest-release response bytes are not valid UTF-8.")
 			Body := http.ResponseText
 		}
 	} catch as Err {
