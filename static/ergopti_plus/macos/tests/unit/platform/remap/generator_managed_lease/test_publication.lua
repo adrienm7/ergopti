@@ -366,6 +366,8 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 			helpers.assert_eq(#fixture.file_writes, 2, "identical content is never written")
 			helpers.assert_eq(#decisions, 3, "every decision is one INFO line")
 			helpers.assert_true(decisions[1]:find("deployed", 1, true) ~= nil)
+			helpers.assert_true(decisions[1]:find("bytes; written in ", 1, true) ~= nil,
+				"the deploy line carries the synchronous write duration")
 			helpers.assert_true(decisions[2]:find("skipped-identical", 1, true) ~= nil)
 			helpers.assert_true(decisions[3]:find("deployed", 1, true) ~= nil)
 		end)

@@ -31,6 +31,7 @@ local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
+local TokenReuse     = require("platform.remap.token_reuse")
 local LeaseHelper    = require("platform.remap.lease_helper")
 local TaskOutputTurn = require("adapters.task_output_turn")
 local KeystrokeIntegrity = require("infra.keystroke_integrity")
@@ -292,6 +293,20 @@ local function create_generation()
 				generation.phase = "prepared"
 				generation.stdout_buffer = ""
 				generation.start_callbacks = {}
+				-- Evidence, not content: why this allocation changes every
+				-- token-scoped variable name and so rewrites karabiner.json.
+				local unaccounted = 0
+				for _, retiring in pairs(_state.retiring) do
+					if not retiring.safe then unaccounted = unaccounted + 1 end
+				end
+				local verdict, reason = TokenReuse.decide({
+					previous_token = _state.last_token,
+					unaccounted_writers = unaccounted,
+				})
+				Logger.evidence(LOG,
+					"Lease token decision=%s reason=%s unaccounted_writers=%d ledger_size=%d",
+					verdict, reason, unaccounted, #_state.used_token_order)
+				_state.last_token = token
 				return generation
 			end
 		end
@@ -1908,6 +1923,7 @@ function M.init(phase_listener)
 		used_token_order = used_token_order or {},
 		token_ledger_ready = token_ledger_ready,
 		token_ledger_error = token_ledger_error,
+		last_token = nil, -- Token of the newest allocation, for the reuse evidence.
 		guardian_status = initial_guardian_status(),
 		guardian_registration_settled = false,
 		guardian_observation_serial = 0,

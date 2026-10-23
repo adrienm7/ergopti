@@ -42,6 +42,7 @@ local KeyEventHealth = require("infra.key_event_health")
 local NativePath = require("native_path")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
+local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec  = require("adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
@@ -3414,22 +3415,26 @@ function M.merge_and_deploy_config(
 		return skip_identical("the encoded file equals the bytes on disk")
 	end
 
+	local write_started = TimerScheduler.awake_time()
 	local call_ok, deployed, deploy_detail = pcall(
 		M.deploy_string,
 		content,
 		karabiner_out,
 		source_snapshot
 	)
+	local write_ms = (TimerScheduler.awake_time() - write_started) * 1000
 	if not call_ok or deployed ~= true then
 		local detail = "write failed: " .. tostring(call_ok and deploy_detail or deployed)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
 	end
 
+	-- The write is synchronous on the Hammerspoon main thread: its duration is
+	-- the stall a typist can feel, so the log carries it next to the size.
 	Logger.info(LOG,
-		"Karabiner deploy decision: deployed (%s; %d bytes; Karabiner reloads every rule).",
+		"Karabiner deploy decision: deployed (%s; %d bytes; written in %.0f ms; Karabiner reloads every rule).",
 		source_snapshot.status == "absent" and "no karabiner.json yet"
-			or "the managed rules on disk differ", #content)
+			or "the managed rules on disk differ", #content, write_ms)
 	-- A key held across the reload is the one most likely to lose its key-up.
 	pcall(KeyEventHealth.note_transition, "a karabiner.json reload")
 	return true, deploy_detail or "ok", 1
