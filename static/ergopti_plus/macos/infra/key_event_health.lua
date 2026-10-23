@@ -260,6 +260,19 @@ function M.note_stale_pass()
 	queue("warn", "Key events that waited behind the main thread passed untouched: no replay, no expansion")
 end
 
+--- Judges one physical key event for a tap that would act on it (run an action,
+--- mutate it, answer it): a key that waited behind the main thread may already
+--- be in the application, so the tap must let it pass untouched. The event is
+--- counted when it is late. Safe inside a tap: table writes only.
+--- @param event userdata|table Physical keyDown event.
+--- @return boolean pass True when the tap must leave the event alone.
+function M.passes_late_event(event)
+	local ok, stale = pcall(EventClock.is_stale, event)
+	if not ok or stale ~= true then return false end
+	M.note_stale_pass()
+	return true
+end
+
 --- Classifies a lease failure reason without keeping its text.
 --- @param reason string Lease failure reason.
 --- @return string kind
