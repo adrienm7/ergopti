@@ -20,10 +20,11 @@
  * the other driver ignores, and both are valid TOML.
  *
  * WHY A RANGE AND NOT AN EQUALITY:
- * macOS has ONE global where the others have one value per key, so they cannot
- * be equal until the per-key wiring lands (the generator already supports a
- * per-manipulator override; the blocker is that the two namespaces spell the
- * same keys differently — left_ctrl/left_control, left_alt/left_option).
+ * macOS ships one global threshold where the others ship one value per key; a
+ * per-key override exists there (the menu's per-key delay row and its
+ * "use global" reset), but the shipped default is the global. The two
+ * namespaces also spell the same keys differently (left_ctrl/left_control,
+ * left_alt/left_option), so the shipped values cannot be compared key by key.
  * Requiring equality today would fail on arrival and be deleted. Requiring that
  * the global sits INSIDE the per-key range is true now, is what "the same
  * keyboard feels the same" actually means, and still fails on a 1000.

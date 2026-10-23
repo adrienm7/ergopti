@@ -465,8 +465,9 @@ combo rules as Tap-Holds feature rules again, and never make that default off.
 
 A key combination is an ordered pair of keys of `[tap_hold.catalog]`, the key
 held first then the key struck under it, on macOS (Karabiner, `mod_combos`)
-and on Windows (`infra/key_combinations.ahk`, since 2026-10-02; Linux has
-none yet). Windows keys a pair `first_then_second` and stores its two slots in
+on Windows (`infra/key_combinations.ahk`, since 2026-10-02) and on Linux
+(`modules/shortcuts/key_combinations.lua`, sharing the Windows config sections).
+Windows keys a pair `first_then_second` and stores its two slots in
 `config.toml`: `[shortcuts.key_combination_taps]` (a catalogue action) and
 `[shortcuts.key_combination_holds]` (a hold-picker value). Only the pairs that
 ship a recommendation are manifest features; every other pair is an owned key

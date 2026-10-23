@@ -5,70 +5,44 @@ This folder describes the target user-configuration schema after the Scope C ref
 ## Overview
 
 ```
-config/ergopti_plus/
-├── personal_info.toml              # Universal, read by AHK + HS
-├── hotstrings_config.toml          # Universal, delay/colour overrides per group
-├── ahk/
-│  ├── config.toml                  # v2 schema (universal sections + [ahk.*])
-│  ├── tap_hold.toml                # AHK tap-hold overrides (merged OVER the shared defaults)
+<config dir>/                        # Windows/macOS: the user config folder; Linux: $XDG_CONFIG_HOME/ergopti
+├── personal_info.toml               # Universal, read by all three drivers
+├── hotstrings_config.toml           # Universal, delay/colour overrides per group
+├── autohotkey/                      # Windows only
+│  ├── config.toml                   # v2 schema (universal sections)
+│  ├── tap_hold.toml                 # Windows tap-hold overrides (merged OVER the shared defaults, key by key)
 │  └── logs/
-└── hammerspoon/
-   ├── config.toml                  # v2 schema (universal sections + [hs.*])
-   ├── tap_hold.toml                # HS tap-hold config ([hs_*] always read from the shared file)
-   └── config_karabiner.toml        # HS-only, managed by the karabiner module
+└── hammerspoon/                     # macOS only
+   ├── config.toml                   # v2 schema (universal sections)
+   ├── tap_hold.toml                 # macOS tap-hold config ([hs_*] always read from the shared file)
+   └── config_karabiner.toml         # managed by the karabiner module
 ```
+
+Linux keeps `config.toml` and `tap_hold.toml` directly in its configuration
+folder (`linux/infra/config_paths.lua` owns the location).
 
 And on the repo's shared-resources side:
 
 ```
 static/ergopti_plus/_shared/
-├── config_schema/                  # THIS FOLDER
-│  ├── config.schema.json           # Strict JSON Schema (draft 2020-12)
-│  ├── tap_hold.schema.json         # Sub-schema for tap-hold
-│  ├── SCHEMA.md                    # This documentation
-│  └── examples/
-│     ├── ahk_config.example.toml
-│     ├── hs_config.example.toml
-│     ├── ahk_tap_hold.example.toml
-│     └── hs_tap_hold.example.toml
+├── core/
+│  ├── config_schema/               # THIS FOLDER
+│  │  ├── config.schema.json        # Strict JSON Schema (draft 2020-12); the metrics definition is generated
+│  │  ├── tap_hold.schema.json      # Sub-schema for tap-hold
+│  │  ├── SCHEMA.md                 # This documentation
+│  │  └── examples/
+│  ├── ports/                       # OS-facing port contracts (SPEC.md + *.spec.js)
+│  └── domain/                      # Pure domain modules (SPEC.md + *.spec.js)
 ├── tap_hold/
-│  └── defaults.toml                # Canonical defaults — used only as the
-│                                   # one-shot generation source at first boot
-├── logger/
-│  ├── SPEC.md                      # Cross-driver logger contract (8 variants, format, ring buffer, fan-out)
-│  ├── sub_files.toml               # Pattern → topical sub-file routing rules (ahk + hs)
-│  └── test_vectors.json            # (variant, module, message, args) → expected line pairs
-├── tooltip/
-│  ├── SPEC.md                      # Cross-driver tooltip contract (draw_calls IR, tint, layout, constants)
-│  ├── constants.toml               # Single source of truth for all visual constants (colors, fonts, layout, timing)
-│  ├── tint.js                      # Pure HSL tint-mixing algorithm + cross-driver test vectors
-│  ├── layout.js                    # Pure position resolution + canvas geometry + test vectors
-├── ports/
-│  ├── SPEC.md                      # Hexagonal architecture step 1: 7 OS-facing port contracts
-│  ├── KeyboardHook.spec.js         # Keyboard event subscription contract + test vectors
-│  ├── TextSender.spec.js           # Text/keystroke injection contract + test vectors
-│  ├── TooltipRenderer.spec.js      # Tooltip show/hide/updateElement contract + test vectors
-│  ├── HttpClient.spec.js           # HTTP POST / cancel / isActive contract + test vectors
-│  ├── TimerScheduler.spec.js       # after / every / cancel / cancelAll contract + test vectors
-│  ├── Notifier.spec.js             # System notification contract (4 severity levels)
-│  └── TrayMenu.spec.js             # Tray icon + declarative menu contract + test vectors
-├── domain/
-│  ├── SPEC.md                      # Hexagonal architecture step 2: 7 pure domain modules
-│  ├── Registry.spec.js             # Hotstring data model + O(1) tail-char bucket lookup contract
-│  ├── Expander.spec.js             # Expansion decision engine contract + test vectors
-│  ├── Terminators.spec.js          # Terminator catalogue + enable/disable contract + TERMINATOR_DEFS
-│  ├── PromptBuilder.js             # Reference impl: context truncation + token budget + temperature
-│  ├── ProfileSelector.js           # Reference impl: profile resolve + template variable injection
-│  └── GestureRecognizer.spec.js    # Gesture slot catalogue + THRESHOLDS + recognizer contract
-├── features/
-│  └── manifest.toml                # Single source of features (Scope C2)
-├── llm/
-│  ├── defaults.json
-│  ├── profiles.json
-│  ├── models.json
-│  └── inference.json
-├── schema/                          # SQLite keystats (unchanged)
-└── ui/                              # Shared WebView HTML/JS (unchanged)
+│  └── defaults.toml                # Canonical tap-hold defaults, read at runtime (see Tap-hold)
+├── modules/
+│  ├── features/manifest.toml       # Single source of features
+│  ├── actions/actions.toml         # Action catalogue
+│  ├── logger/                      # SPEC.md, sub_files.toml, test_vectors.json
+│  ├── tooltip/                     # SPEC.md and the visual constants
+│  └── llm/                         # defaults, profiles, models, inference
+├── data/locales/                    # One JSON per language
+└── ui/                              # Shared WebView HTML/JS
 ```
 
 ## Conventions
@@ -79,18 +53,24 @@ All TOML keys are `snake_case`. That is the standard TOML convention.
 
 ### Universal vs. platform-specific sections
 
-| Section        | Read by                  | Schema                 |
-| -------------- | ------------------------ | ---------------------- |
-| `[script]`     | AHK + HS                 | `$defs.script`         |
-| `[hotstrings]` | AHK + HS                 | `$defs.hotstrings`     |
-| `[llm]`        | AHK + HS                 | `$defs.llm`            |
-| `[metrics]`    | AHK + HS                 | `$defs.metrics`        |
-| `[shortcuts]`  | AHK + HS                 | `$defs.shortcuts`      |
-| `[ahk.*]`      | AHK only                 | `$defs.ahk_specific`   |
-| `[hs.*]`       | HS only                  | `$defs.hs_specific`    |
-| `[tap_hold.*]` | AHK + HS (via Karabiner) | `tap_hold.schema.json` |
+Which driver reads a section is declared once, in `[sections.*]` and the
+per-entry `platforms` of `_shared/modules/features/manifest.toml`; the generated
+`config_template.toml` of each driver carries exactly its own sections and keys.
+A key that only one driver writes is declared once in the manifest, never in a
+driver-prefixed section.
 
-If a `[hs.*]` section appears in the AHK config, the driver emits a **warn** at boot (or crashes in dev mode). Same for `[ahk.*]` on the HS side.
+| Section        | Read by                          | Schema                 |
+| -------------- | -------------------------------- | ---------------------- |
+| `[script]`     | Windows + macOS                  | `$defs.script`         |
+| `[hotstrings]` | all three drivers                | `$defs.hotstrings`     |
+| `[llm]`        | all three drivers                | `$defs.llm`            |
+| `[metrics]`    | all three drivers                | `$defs.metrics`        |
+| `[shortcuts]`  | all three drivers                | `$defs.shortcuts`      |
+| `[tap_hold.*]` | all three drivers (own tap-hold) | `tap_hold.schema.json` |
+
+`$defs.metrics` is generated from the manifest by
+`npm run codegen:config-schema-metrics`; `test-config-schema.cjs` fails when it
+drifts and rejects a metrics key the manifest does not declare.
 
 ### Feature toggles with a delay
 
@@ -117,30 +97,22 @@ Caps = true
 Caps_TimeActivationSeconds = true   # bool or number? ambiguous!
 ```
 
-### `ahk.` and `hs.` prefixes
-
-For strictly platform-specific sections:
-
-```toml
-[ahk.layout]                  # AHK only — the layout layer is handled by Karabiner on Mac
-ergopti_base = true
-
-[hs.gestures.modes]           # HS only — Mac trackpad gesture vocabulary
-swipe_3_left = "incremental"
-```
-
 ## Validation
 
 ### At boot
 
-Each driver loads its own `config.toml`, parses it, then validates against `config.schema.json`.
-
-- **Dev mode** (`ERGOPTI_DEV=1` in the env): any validation error = **crash** with a stack trace pointing at the offending TOML line.
-- **Production mode** (default): **warn** in the logs with the offending line; the driver continues with the default from the features manifest for the invalid key.
+The drivers do not load `config.schema.json`. Each one checks the values it reads
+against the feature manifest's own declarations (type, enum, range) and reports an
+outdated or malformed entry once, naming the file; the manifest default applies to
+an invalid key.
 
 ### In CI
 
-Config schema validation against `examples/*.toml` is not automated, apart from the neutral `[layout]` values of the Windows example (`tools/test/test-neutral-installation.cjs`).
+`tools/test/test-config-schema.cjs` validates the generated `config_template.toml`
+of every driver against `config.schema.json`, and requires each driver to carry
+the sections the manifest gives it. Validation of `examples/*.toml` is not
+automated, apart from the neutral `[layout]` values of the Windows example
+(`tools/test/test-neutral-installation.cjs`).
 
 A companion `tools/lint/audit-banner-alignment.js` enforces the CLAUDE.md banner-comment alignment in every `*.toml`. Run it manually with `--fix` to auto-correct, or in pre-commit without it to detect regressions.
 
@@ -157,27 +129,27 @@ It calls [`tools/build/build-features-manifest.js`](../../../../tools/build/buil
 1. Pre-processes the manifest source — every `[[features.X.Y.Z]]` header is rewritten in memory to `[[entries]]` with a synthetic `path_prefix = "X.Y.Z"` field, so the TOML parser sees a single flat array-of-tables instead of nested AoTs (which TOML would otherwise interpret as sub-arrays of the parent entry).
 2. Flattens features, inherits `platforms` from ancestor sections when absent, resolves `default_per_platform` to the active platform.
 3. Validates entries (id pattern, exactly one of `default` / `default_per_platform`, `enum_values` required when `type = "enum"`).
-4. Emits four artifacts into the gitignored `_generated/` folders:
-   - `autohotkey/_generated/features_manifest.ahk` — AHK Map literal consumed at boot.
-   - `autohotkey/_generated/config_template.toml` — default user config copied at first boot.
-   - `hammerspoon/_generated/features_manifest.lua` — Lua table consumed at boot.
-   - `hammerspoon/_generated/config_template.toml` — same purpose, HS-filtered.
+4. Emits the per-driver artifacts into the tracked `_generated/` folders:
+   - `windows/_generated/features_manifest.ahk` — AHK Map literal consumed at boot.
+   - `windows/_generated/config_template.toml` — default user config copied at first boot.
+   - `macos/_generated/features_manifest.lua` and `linux/_generated/features_manifest.lua` — Lua tables consumed at boot.
+   - `macos/_generated/config_template.toml` and `linux/_generated/config_template.toml` — same purpose, filtered per driver.
 
    The tap-hold template is **not** generated: `first_boot.ahk` reads
    `static/ergopti_plus/_shared/tap_hold/defaults.toml` directly, eliminating the
    redundant generated copy.
 
-`_generated/` is gitignored on both driver sides; consumers must run `npm run build:manifest` after editing the manifest. CI runs it as a prebuild step.
+`_generated/` is tracked; never hand-edit it. Run `npm run build:manifest` after editing the manifest, and `npm run gen:check` proves the committed output is current.
 
 ## Initial generation at first boot
 
-If `config/ergopti_plus/<driver>/config.toml` does not exist at first boot:
+If the driver's `config.toml` does not exist at first boot:
 
 1. The driver reads `static/ergopti_plus/_shared/modules/features/manifest.toml` (the single source of truth).
 2. It filters entries whose `platforms` includes the current driver.
 3. It renders a clean `config.toml` with:
    - Section banners (CLAUDE.md `# =====` format).
-   - Description comments resolved via `description_key` from the manifest against `static/locales/<locale>.json`.
+   - Description comments resolved via `description_key` from the manifest against `static/ergopti_plus/_shared/data/locales/<locale>.json`.
    - Explicit defaults for every feature.
 4. It writes the file and continues its normal boot.
 
@@ -194,11 +166,11 @@ output is thereafter complete — "the shared file is never read again at runtim
 — and that was wrong in three separate places. The three loaders do not even
 agree with each other, and each one's own comments claim it matches the others:
 
-| Driver  | Sections read                                   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                |
-| ------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Windows | `[tap_hold.*]`                                  | Parses the shared defaults **first**, then merges the user file **on top, per key**. A key absent from the user file inherits the shared default, so editing `defaults.toml` changes existing installs on the next reload. `lib/tap_hold/tap_hold_loader.ahk` says so explicitly: "editing `defaults.toml` takes effect on every reload even when the user file exists". |
-| Linux   | `[tap_hold.*]`                                  | The user file, **when present, fully replaces** the defaults — no per-key merge. Editing `defaults.toml` has **no** effect on an install that has a user file. `platform/remap/manager.lua` describes this as "mirroring the other drivers", which is the opposite of what Windows does.                                                                                 |
-| macOS   | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `platform/remap/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies.                                                                                                                                                                               |
+| Driver  | Sections read                                   | Lifecycle                                                                                                                                                                                                                                                                                                                                                                              |
+| ------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | `[tap_hold.*]`                                  | Parses the shared defaults **first**, then merges the user file **on top, per key**. A key absent from the user file inherits the shared default, so editing `defaults.toml` changes existing installs on the next reload. `lib/tap_hold/tap_hold_loader.ahk` says so explicitly: "editing `defaults.toml` takes effect on every reload even when the user file exists".               |
+| Linux   | `[tap_hold.*]`                                  | `platform/remap/tap_hold_loader.lua` applies the Windows rules to the same files, with one switch: with `[tap_hold] inherit_defaults = true` the user file is laid over the shared defaults key by key and field by field; without it the user file starts from no shipped key at all (an empty file is the keyboard's own behaviour). The scope restore writes the preset explicitly. |
+| macOS   | `[hs_timeouts]`, `[hs_tap_hold]`, `[hs_combos]` | `platform/remap/defaults.lua` reads the shared file in its **module body**, at require time, unconditionally — there is no user file for these sections at all, so an edit always applies.                                                                                                                                                                                             |
 
 The two namespaces in that one file describe the **same seven physical keys**
 under different ids (`left_ctrl`/`left_control`, `left_alt`/`left_option`), with
@@ -210,21 +182,21 @@ install.
 
 This means:
 
-- There is no per-key fallback to the shared defaults — if a key is missing from the per-driver file, that key simply has no tap-hold behaviour.
-- The two drivers' `tap_hold.toml` files can diverge entirely.
-- Editing `_shared/tap_hold/defaults.toml` only affects **new installs** (or users who delete their per-driver file and let it regenerate).
+- On Windows a key missing from the per-driver file inherits the shared default; on Linux that inheritance applies only when the user file sets `[tap_hold] inherit_defaults = true`.
+- On macOS the `[hs_*]` sections are not user-editable: an edit of `defaults.toml` always applies.
+- The hold thresholds differ on purpose between the namespaces (per key 0.20-0.35 s on Windows and Linux, a global value plus a per-key override on macOS).
 
 ### Semantics of a tap-hold key
 
 Each `[tap_hold.keys.<name>]` entry may declare:
 
-| Field                     | Type   | Required | Description                                                           |
-| ------------------------- | ------ | -------- | --------------------------------------------------------------------- |
-| `time_activation_seconds` | number | yes      | Tap vs hold threshold                                                 |
-| `tap_action`              | string | no       | Action emitted on short tap (ref `_shared/actions.toml`)              |
-| `hold_layer`              | string | no       | Layer activated on hold (an id from `[tap_hold.hold_picker].layers`)  |
-| `hold_modifier`           | enum   | no       | Modifier emitted on hold (mutex with `hold_layer`)                    |
-| `enabled`                 | bool   | no       | Default `true`. Set `false` to disable this entry without deleting it |
+| Field                     | Type   | Required | Description                                                              |
+| ------------------------- | ------ | -------- | ------------------------------------------------------------------------ |
+| `time_activation_seconds` | number | yes      | Tap vs hold threshold                                                    |
+| `tap_action`              | string | no       | Action emitted on short tap (ref `_shared/modules/actions/actions.toml`) |
+| `hold_layer`              | string | no       | Layer activated on hold (an id from `[tap_hold.hold_picker].layers`)     |
+| `hold_modifier`           | enum   | no       | Modifier emitted on hold (mutex with `hold_layer`)                       |
+| `enabled`                 | bool   | no       | Default `true`. Set `false` to disable this entry without deleting it    |
 
 `hold_layer` and `hold_modifier` are **mutually exclusive** (the schema enforces it).
 
@@ -253,5 +225,5 @@ Since we're going clean-state with no backward compatibility, this mapping is **
 
 - [JSON Schema draft 2020-12](https://json-schema.org/draft/2020-12)
 - [TOML 1.0 spec](https://toml.io/en/v1.0.0)
-- [examples/](./examples/) — Concrete AHK and HS examples
-- [\_shared/tap_hold/defaults.toml](../../tap_hold/defaults.toml) — AHK driver tap-hold seed template
+- [examples/](./examples/) — Concrete Windows and macOS examples
+- [\_shared/tap_hold/defaults.toml](../../tap_hold/defaults.toml) — shared tap-hold defaults
