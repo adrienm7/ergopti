@@ -187,16 +187,19 @@ function M.on_message(payload, state)
 			end
 			Logger.info(LOG, "Logs now written to %s.", config_paths.get_logs_dir())
 		end
-		local hidden = hide(state)
 		local reloaded = false
 		if type(state.on_reload) == "function" then
 			local ok, accepted = pcall(state.on_reload)
-			reloaded = ok and accepted ~= false
+			reloaded = ok and accepted == true
 			if not reloaded then Logger.error(LOG, "Configuration reload was refused after save.") end
 		else
 			Logger.warn(LOG, "Configuration directory saved; daemon reload is unavailable.")
 		end
-		Logger.success(LOG, "Configuration directory persisted: %s", config_paths.get_config_dir())
+		local hidden = false
+		if reloaded then
+			hidden = hide(state)
+			Logger.success(LOG, "Configuration directory persisted: %s", config_paths.get_config_dir())
+		end
 		return { saved = true, hidden = hidden, reloaded = reloaded }
 	elseif action == "cancel" then
 		return { cancelled = true, hidden = hide(state) }

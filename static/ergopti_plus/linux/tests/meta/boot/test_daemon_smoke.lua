@@ -57,6 +57,89 @@ local function check_shortcut_gate(control_body)
   end
 end
 
+
+--- Compiles the daemon's actual Reload owner and the callback installed for the paths page.
+--- @param environment table Independent native-debt and restart ports.
+--- @return function on_reload Exact daemon-wired callback.
+local function paths_reload_callback(environment)
+  local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+  local source = assert(handle:read("*a")); assert(handle:close())
+  local owner = assert(source:match('\n(local perform_reload = require%("infra%.reload_restart"%)%.new%b())'),
+    "the Reload command must be built by the restart owner")
+  local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
+  local callback = assert(source:sub(wiring):match(
+    'on_reload%s*=%s*(function%(%)%s*[^\n]-perform_reload%("the paths editor"%)%s*end)'),
+    "the paths page must use the actual daemon reload callback")
+  local text, chunk = owner .. "\nreturn " .. callback
+  environment = setmetatable(environment, { __index = _G })
+  if setfenv then chunk = assert(loadstring(text)); setfenv(chunk, environment)
+  else chunk = assert(load(text, "actual paths reload callback", "t", environment)) end
+  return chunk()
+end
+
+helpers.describe("daemon paths reload acknowledgement", function()
+  local function world()
+    local state = { restarts = 0, answer = true }
+    local environment = {}
+    environment.gestures = {
+      stop_window_switches = function() return state.window_allowed ~= false end,
+      stop_programs = function() return state.program_allowed ~= false end,
+    }
+    environment.restart_daemon = function(reason)
+      state.restarts, state.reason = state.restarts + 1, reason
+      if state.raise then error("controlled restart refusal") end
+      return state.answer
+    end
+    return state, environment
+  end
+
+  for _, boundary in ipairs({ "window", "program" }) do
+    helpers.it("paths daemon reload: retains " .. boundary .. " debt refusal through the installed callback", function()
+      local state, environment = world()
+      state[boundary .. "_allowed"] = false
+      local callback = paths_reload_callback(environment)
+      local ok, reason = callback()
+      helpers.assert_eq({ ok, reason }, { false, "postponed" })
+      helpers.assert_eq(state.restarts, 0)
+      state[boundary .. "_allowed"] = true
+      helpers.assert_eq(callback(), true, "a new attempt can apply after native cleanup acknowledges")
+      helpers.assert_eq({ state.restarts, state.reason }, { 1, "reload" })
+    end)
+  end
+
+  for _, outcome in ipairs({ "false", "nil", "truthy", "throw" }) do
+    helpers.it("paths daemon reload: refuses restart acknowledgement " .. outcome, function()
+      local state, environment = world()
+      state.answer = nil
+      if outcome == "false" then state.answer = false end
+      if outcome == "truthy" then state.answer = 1 end
+      state.raise = outcome == "throw"
+      local callback = paths_reload_callback(environment)
+      local ok, reason = callback()
+      helpers.assert_eq({ ok, reason }, { false, "failed" })
+      helpers.assert_eq(state.restarts, 1)
+      state.answer, state.raise = true, false
+      helpers.assert_eq(callback(), true)
+      helpers.assert_eq(state.restarts, 2)
+    end)
+  end
+
+  helpers.it("paths daemon reload: acknowledges a save that joins the restart in flight", function()
+    local state, environment = world()
+    local callback = paths_reload_callback(environment)
+    helpers.assert_eq(callback(), true)
+    helpers.assert_eq(callback(), true, "the successor applies both saves")
+    helpers.assert_eq(state.restarts, 1)
+  end)
+
+  helpers.it("paths daemon reload: admits a healthy driver without optional gestures", function()
+    local state, environment = world()
+    environment.gestures = nil
+    helpers.assert_eq(paths_reload_callback(environment)(), true)
+    helpers.assert_eq(state.restarts, 1)
+  end)
+end)
+
 -- We test the argument parser and module structure by loading the daemon
 -- module. The daemon has a main() call at the bottom, so we must be careful
 -- to only test individual functions or the --help path.
