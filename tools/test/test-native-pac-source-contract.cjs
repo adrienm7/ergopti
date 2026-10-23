@@ -715,6 +715,30 @@ if (process.platform !== 'win32') {
 	assert.doesNotMatch(result.stderr, /skipped=/);
 	process.stdout.write(result.stdout + result.stderr);
 }
+// The policy admits an http PAC, but App Transport Security refuses plain http
+// from the launcher bundle unless its generated Info.plist opts out (issue #101).
+check('the launcher Info.plist lets URLSession fetch an http PAC', () => {
+	const build = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+	const policy = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				root,
+				'static',
+				'ergopti_plus',
+				'_shared',
+				'modules',
+				'network',
+				'proxy_policy.json'
+			),
+			'utf8'
+		)
+	);
+	assert.ok(policy.native_pac.source_acquisition.allowed_schemes.includes('http'));
+	assert.match(
+		build,
+		/<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/
+	);
+});
 console.log(
 	`Native PAC source contract: ${passed} portable controls passed; native Swift/SSPI not executed.`
 );
