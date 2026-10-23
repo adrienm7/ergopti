@@ -1,0 +1,29 @@
+{
+	"expected_count": 26,
+	"filters": [
+		{
+			"contains": "uia-suspend-worker-debt",
+			"expected_count": 3
+		},
+		{
+			"contains": "editor-early-show-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "action-picker-startup-owner",
+			"expected_count": 5
+		},
+		{
+			"contains": "updater-install-phase-owner",
+			"expected_count": 6
+		},
+		{
+			"contains": "updater-schedule-publication",
+			"expected_count": 3
+		},
+		{
+			"contains": "layer-editor-save-admission",
+			"expected_count": 3
+		}
+	]
+}
