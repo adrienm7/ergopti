@@ -22,6 +22,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Json = require("json")
 local Agent = require("llm.agent")
+local NoReplaceMove = require("infra.no_replace_move")
 
 local LOG = "modules.llm.agent_learning"
 
@@ -33,6 +34,7 @@ M.MAX_APPS = 200
 local SAVE_DEBOUNCE_SEC = 2
 -- The file's format
 local VERSION = 1
+local ENOENT = 2 -- Linux reports genuine absence separately from read refusal.
 
 -- { [app] = { used = integer, thresholds = { [intent] = number } } }
 local _apps = nil
@@ -43,6 +45,8 @@ local _save_timer = nil
 -- Boundaries, replaced by the tests: { path, scheduler }
 local _path = nil
 local _scheduler = nil
+-- A rejected source stays authoritative until its preservation is acknowledged.
+local _load_blocked = false
 
 
 
@@ -60,23 +64,49 @@ local function state_path()
 	return require("infra.config_paths").state_home() .. "/" .. STATE_FILE
 end
 
+--- Preserves the rejected source without replacing an older recovery file.
+--- @param path string
+--- @return boolean preserved
+local function preserve_corrupt(path)
+	local candidate, suffix = path .. ".corrupt", 0
+	while true do
+		local called, moved, reason = pcall(NoReplaceMove.move, path, candidate)
+		if called and moved == true then return true end
+		if not called or reason ~= "EEXIST" then return false end
+		suffix = suffix + 1
+		candidate = path .. ".corrupt." .. suffix
+	end
+end
+
 --- Reads the file into memory once.
 local function load()
-	if _apps then return end
+	if _apps and not _load_blocked then return end
 	_apps, _sequence = {}, 0
 	local path = state_path()
-	local fh = io.open(path, "r")
-	if not fh then return end
-	local text = fh:read("*a")
-	fh:close()
+	local fh, _, errno = io.open(path, "r")
+	if not fh then
+		_load_blocked = errno ~= ENOENT
+		if _load_blocked then Logger.error(LOG, "The agent's learning source could not be read; mutations are blocked.") end
+		return
+	end
+	local read_ok, text = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	if not read_ok or type(text) ~= "string" or not close_ok or closed ~= true then
+		_load_blocked = true
+		Logger.error(LOG, "The agent's learning read or close was refused; mutations are blocked.")
+		return
+	end
 	-- An overflowing persisted sequence becomes infinity in the legacy decoder,
 	-- leaving LRU eviction without any oldest entry. Admit exact JSON instead.
 	local root = Json.decode_lossless(text or "")
 	if type(root) ~= "table" or root.version ~= VERSION or type(root.apps) ~= "table" then
-		Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.")
-		os.rename(path, path .. ".corrupt")
+		_load_blocked = not preserve_corrupt(path)
+		if _load_blocked then
+			Logger.error(LOG, "The agent's learning source could not be preserved; mutations are blocked.")
+		else Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.") end
 		return
 	end
+	_load_blocked = false
 	for app, entry in pairs(root.apps) do
 		if type(app) == "string" and type(entry) == "table" and type(entry.used) == "number"
 			and type(entry.thresholds) == "table" then
@@ -100,6 +130,7 @@ function M.flush()
 		(_scheduler or require("adapters.timer_scheduler")).cancel(_save_timer)
 		_save_timer = nil
 	end
+	if _load_blocked then return false end
 	if not _apps then return true end
 	local path = state_path()
 	local dir = path:match("^(.*)/[^/]+$")
@@ -175,6 +206,7 @@ end
 --- @return number threshold The new threshold.
 function M.record(config, app, intent, accepted)
 	load()
+	if _load_blocked then return config.system1.threshold end
 	if type(app) ~= "string" or app == "" then app = "?" end
 	local before = M.threshold(config, app, intent)
 	local after = Agent.learn(config, before, accepted == true)
@@ -208,7 +240,7 @@ end
 function M._reset_for_test(opts)
 	opts = opts or {}
 	_path, _scheduler = opts.path, opts.scheduler
-	_apps, _sequence, _save_timer = nil, 0, nil
+	_apps, _sequence, _save_timer, _load_blocked = nil, 0, nil, false
 end
 
 return M
