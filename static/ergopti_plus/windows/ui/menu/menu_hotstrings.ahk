@@ -15,6 +15,7 @@
 
 
 global _HS_GrandTotalCache := -1
+global _HS_GrandTotalReadOwner := 0
 
 ; The hotstrings_menu scope rows, bound to the compensated scope owner.
 _HS_ScopeCommands(Options := unset) {
@@ -27,58 +28,78 @@ _HS_ScopeCommands(Options := unset) {
 ; Compute the grand total count used in the tray menu title label.
 ; Sums enabled standard, ergopti, dynamic, personal and extension entries.
 _HS_ComputeGrandTotal() {
-global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
-global ScriptInformation, _ExtTotalPersonalCounterGlobal, _HS_GrandTotalCache, _HotstringExtensionPacks
-if (_HS_GrandTotalCache != -1)
-	return _HS_GrandTotalCache
-
-; Count only ACTIVE hotstrings: sum each category's enabled-section count,
-; then zero the whole total when the Hotstrings master gate is off — a
-; disabled menu shows 0, never the full "what would reactivate" count.
-Total := 0
-for _, Cat in HotstringCategoriesStd
-	Total += _CountEnabledForCategory(Cat)
-for _, Cat in HotstringCategoriesErgopti
-	Total += _CountEnabledForCategory(Cat)
-for _, Pack in HotstringsLanguageCategories() {
-	for _, LangCat in Pack["categories"]
-		Total += _CountEnabledForCategory(LangCat["v1"])
-}
-if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
-	for DKey, DCfg in Features["hotstrings"]["dynamic"] {
-		if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
-			Total += CountDynamicSection(DKey)
+	global Features, HotstringCategoriesStd, HotstringCategoriesErgopti
+	global ScriptInformation, _HS_GrandTotalCache, _HS_GrandTotalReadOwner, _HotstringExtensionPacks
+	PreviousCritical := Critical("On")
+	try {
+		if (_HS_GrandTotalCache != -1)
+			return _HS_GrandTotalCache
+		; A nested calculation or invalidation revokes this exact publication.
+		ReadOwner := {}, _HS_GrandTotalReadOwner := ReadOwner
+	} finally Critical(PreviousCritical)
+	try {
+		; Count only ACTIVE hotstrings: sum each category's enabled-section count,
+		; then zero the whole total when the Hotstrings master gate is off — a
+		; disabled menu shows 0, never the full "what would reactivate" count.
+		Total := 0
+		for _, Cat in HotstringCategoriesStd
+			Total += _CountEnabledForCategory(Cat)
+		for _, Cat in HotstringCategoriesErgopti
+			Total += _CountEnabledForCategory(Cat)
+		for _, Pack in HotstringsLanguageCategories() {
+			for _, LangCat in Pack["categories"]
+				Total += _CountEnabledForCategory(LangCat["v1"])
+		}
+		if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
+			for DKey, DCfg in Features["hotstrings"]["dynamic"] {
+				if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])
+					Total += CountDynamicSection(DKey)
+			}
+		}
+		; ── Personal hotstrings (standard file + extensions)
+		PersonalActiveCount := 0
+		PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
+		if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
+			PersonalTomlData := ReadPersonalToml()
+			for _, SecName2 in PersonalTomlData["sections_order"] {
+				if (SecName2 == "-" or !PersonalTomlData["sections"].Has(SecName2))
+					continue
+				PV2Id    := StrLower(SecName2)
+				PEnabled := Features["hotstrings"].Has("personal")
+					and Features["hotstrings"]["personal"].Has(PV2Id)
+					and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
+				if PEnabled
+					PersonalActiveCount += PersonalTomlData["sections"][SecName2]["entries"].Length
+			}
+		}
+		Total += PersonalActiveCount
+		Total += PersonalFileControls.ActiveCount()
+		Total += HotstringExtensions_Count(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings"))
+		GrandTotal := _HS_GatedCount(IsCategoryGated("Hotstrings"), Total)
+		PreviousCritical := Critical("On")
+		try {
+			if _HS_GrandTotalReadOwner == ReadOwner
+				_HS_GrandTotalCache := GrandTotal
+		} finally Critical(PreviousCritical)
+		return GrandTotal
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			if _HS_GrandTotalReadOwner == ReadOwner
+				_HS_GrandTotalReadOwner := 0
+		} finally Critical(PreviousCritical)
 	}
 }
-; ── Personal hotstrings (standard file + extensions)
-PersonalActiveCount := 0
-PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
-	PersonalTomlData := ReadPersonalToml()
-	for _, SecName2 in PersonalTomlData["sections_order"] {
-		if (SecName2 == "-" or !PersonalTomlData["sections"].Has(SecName2))
-			continue
-		PV2Id    := StrLower(SecName2)
-		PEnabled := Features["hotstrings"].Has("personal")
-			and Features["hotstrings"]["personal"].Has(PV2Id)
-			and (Features["hotstrings"]["personal"][PV2Id] is Map) and Features["hotstrings"]["personal"][PV2Id].Has("enabled") and Features["hotstrings"]["personal"][PV2Id]["enabled"]
-		if PEnabled
-			PersonalActiveCount += PersonalTomlData["sections"][SecName2]["entries"].Length
-	}
-}
-Total += PersonalActiveCount
-Total += PersonalFileControls.ActiveCount()
-Total += HotstringExtensions_Count(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings"))
-GrandTotal := _HS_GatedCount(IsCategoryGated("Hotstrings"), Total)
-_HS_GrandTotalCache := GrandTotal
-return GrandTotal
-}
 
-; Invalidates hotstring-related caches.
+; Invalidates hotstring-related caches, including an uncached calculation.
 _HS_InvalidateCaches() {
-	global _HS_GrandTotalCache, _TomlCountCache
-	_HS_GrandTotalCache := -1
-	_TomlCountCache := Map()
+	global _HS_GrandTotalCache, _HS_GrandTotalReadOwner, _TomlCountCache
+	PreviousCritical := Critical("On")
+	try {
+		_HS_GrandTotalReadOwner := 0
+		_HS_GrandTotalCache := -1
+		_TomlCountCache := Map()
+	} finally Critical(PreviousCritical)
 }
 
 ; Dynamic handler: magic key config entry (prefix + current char + editor).
