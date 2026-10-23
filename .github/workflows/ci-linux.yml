@@ -4312,15 +4312,49 @@ jobs:
           test -f build/linux/linux/ergopti_hotstrings.lua
           bash tools/build/write_build_stamp.sh verify build/linux/_shared
 
+      # The runtime version is read from the packager that pins it, so the cache key and
+      # the install can never name a runtime the manifest does not use.
+      - name: Read the Flatpak runtime version
+        id: flatpak-runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n "s/^runtime-version: '\([0-9][0-9.]*\)'$/\1/p" tools/build/build-linux-flatpak.sh)"
+          test -n "$version"
+          test "$(printf '%s\n' "$version" | wc -l)" = 1
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # Downloading the two runtimes from Flathub took 34 to 45 minutes in three of the five
+      # CI runs measured on 2026-10-23 and under two minutes in the others, which made this
+      # job the end of the Linux lane. They are cached before anything of Ergopti is
+      # installed; the save below runs right after the download so the cache never holds
+      # the application, whose fresh installation the later steps must prove.
+      - name: Restore the Flatpak runtimes
+        id: flatpak-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.local/share/flatpak
+          key: flatpak-runtimes-${{ steps.flatpak-runtime.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
       - name: Install the Flatpak toolchain
         shell: bash
+        # A stalled Flathub download must fail the job, not hold the lane for 45 minutes.
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y flatpak flatpak-builder
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
               echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+          version='${{ steps.flatpak-runtime.outputs.version }}'
+          flatpak install --user -y flathub "org.freedesktop.Platform//$version" "org.freedesktop.Sdk//$version"
+
+      - name: Save the Flatpak runtimes
+        if: steps.flatpak-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.local/share/flatpak
+          key: ${{ steps.flatpak-cache.outputs.cache-primary-key }}
 
       - name: Build the Flatpak
         # No --skip-flatpak: that flag returns before flatpak-builder. The
