@@ -75,6 +75,11 @@ local BACKSPACE_MARKER = "[BS]"
 -- one ends every family ("[BS]x" up to the heptagrams).
 local CORRECTION_MAX_LENGTH = 3
 
+-- How many typed entries a Backspace can erase one by one (the Windows
+-- HIST_CAP): each holds the n-gram tokens it added, so erasing it credits the
+-- error flag to those very tokens.
+local ERASE_HISTORY_CAP = 8
+
 -- A run of at least this many consecutive backspaces is one cascade rather than
 -- N separate corrections — the shared constant, so the three drivers agree on
 -- what counts as having to go back and fix a whole word.
@@ -168,15 +173,16 @@ local function synthetic_of(event)
 end
 
 --- Records a finished word and its bigram with the word before it.
+--- @param word_err boolean|nil Whether a Backspace touched the word while it was typed.
 --- @return string|nil previous_word The word the next one pairs with.
 --- @return string word The open word afterwards (empty).
-local function end_word(batch, date_str, app, previous_word, word)
+local function end_word(batch, date_str, app, previous_word, word, word_err)
 	if word == "" then return previous_word, word end
 	if previous_word then
 		Helpers.push_ngram(batch, "ngram_word_bigrams", date_str, app,
-			previous_word .. " " .. word, 0, false, "none")
+			previous_word .. " " .. word, 0, word_err == true, "none")
 	end
-	Helpers.push_ngram(batch, "ngram_words", date_str, app, word, 0, false, "none")
+	Helpers.push_ngram(batch, "ngram_words", date_str, app, word, 0, word_err == true, "none")
 	return word, ""
 end
 
@@ -243,10 +249,15 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	-- The tail of the current run, newest last, Backspace markers included as on
 	-- Windows and macOS: a correction ends "e[BS]" and "he[BS]", and what follows
 	-- continues from it ("[BS]x", "e[BS]x"), which is the sequence the hands
-	-- made. Cleared by a pause or a switch to synthetic output, because each of
-	-- those means the next character does not follow the previous one.
+	-- made. Cleared by a pause, because that means the next character does not
+	-- follow the previous one. A synthetic character chains like a typed one;
+	-- its rows carry their source.
 	local run = carried.run or {}
+	-- What each recent entry added, newest last, so a Backspace flags the
+	-- n-grams of the character it erases (Windows and macOS do the same).
+	local history = carried.history or {}
 	local word, previous_word = carried.word or "", carried.previous_word
+	local word_err = carried.word_err == true
 	-- The monotonic stamp of the last manual keystroke. The buffered delays are
 	-- capped at the pause threshold, so only the stamps can tell a session gap.
 	local last_time = carried.last_time
@@ -424,7 +435,45 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 
 	--- Ends the current word, if there is one.
 	local function flush_word()
-		previous_word, word = end_word(batch, date_str, app, previous_word, word)
+		previous_word, word = end_word(batch, date_str, app, previous_word, word, word_err)
+		word_err = false
+	end
+
+	--- Keeps the newest erasable entries only.
+	--- @param entry table { marker = boolean, tokens = { [length] = token } }
+	local function remember(entry)
+		history[#history + 1] = entry
+		if #history > ERASE_HISTORY_CAP then table.remove(history, 1) end
+	end
+
+	--- Chains one character into every family the run supports, typed or
+	--- synthetic alike, and extends the open word.
+	--- @param char string
+	--- @param ngram_delay number Bounded delay of this keystroke.
+	--- @param source string "none" for the user, else the synthetic source.
+	local function chain_character(char, ngram_delay, source)
+		run[#run + 1] = char
+		-- Only the last seven matter, and holding more would grow without bound
+		-- on a long session.
+		if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
+		local entry = { marker = false, tokens = {} }
+		for length, family in ipairs(FAMILY_FOR_LENGTH) do
+			if #run >= length then
+				local token = table.concat(run, "", #run - length + 1, #run)
+				-- The bounded delay belongs to the LAST keystroke of the token, which is
+				-- what the dashboard means by an n-gram's cost: how long the hand
+				-- took to complete the sequence. A gap that broke continuity still
+				-- counts its character unigram, but contributes no timing sample.
+				Helpers.push_ngram(batch, family, date_str, app, token, ngram_delay, false, source)
+				entry.tokens[length] = token
+			end
+		end
+		remember(entry)
+		if WORD_SEPARATORS[char] then
+			flush_word()
+		else
+			word = word .. char
+		end
 	end
 
 	for index, event in ipairs(events) do
@@ -439,19 +488,40 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 			last_time = stamp
 		end
 
+		-- Long enough that the next keystroke is a new movement, not the
+		-- continuation of one: two characters either side of a coffee break are
+		-- not a bigram, and a Backspace after one erases nothing typed before it.
+		if not is_synthetic and delay >= MAX_KEYSTROKE_DELAY_MS then
+			flush_word()
+			run, history = {}, {}
+			previous_word = nil
+		end
+
 		if char == BACKSPACE_MARKER then
-			-- After a real pause the correction does not continue what came before.
-			if not is_synthetic and delay >= MAX_KEYSTROKE_DELAY_MS then run = {} end
-			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
-			for length = 2, math.min(CORRECTION_MAX_LENGTH, #run + 1) do
-				Helpers.push_ngram(batch, FAMILY_FOR_LENGTH[length], date_str, app,
-					table.concat(run, "", #run - length + 2, #run) .. char, delay, false, source)
+			-- The entry this Backspace erases, if it is still known: its n-grams
+			-- get the error flag, as on Windows and macOS.
+			local erased = table.remove(history)
+			if erased and not erased.marker then
+				for length, family in ipairs(FAMILY_FOR_LENGTH) do
+					if erased.tokens[length] then
+						Helpers.push_ngram(batch, family, date_str, app, erased.tokens[length], 0, true, source)
+					end
+				end
 			end
+			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, delay, false, source)
+			local marker_entry = { marker = true, tokens = { char } }
+			for length = 2, math.min(CORRECTION_MAX_LENGTH, #run + 1) do
+				local token = table.concat(run, "", #run - length + 2, #run) .. char
+				Helpers.push_ngram(batch, FAMILY_FOR_LENGTH[length], date_str, app, token, delay, false, source)
+				marker_entry.tokens[length] = token
+			end
+			remember(marker_entry)
 			run[#run + 1] = char
 			if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
-			-- A correction. The partial word is abandoned rather than recorded —
-			-- the user was not writing it.
-			word = ""
+			-- A correction. The open word loses its last character and is flagged,
+			-- so the word list can tell a word the user had to repair.
+			word = Utils.pop_utf8(word)
+			word_err = true
 			-- A correction breaks the finger runs too: what follows continues from
 			-- a different character than it appears to, so the two keystrokes
 			-- either side of it were never consecutive under one finger.
@@ -466,13 +536,10 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 				bump_time_of_day(index, delay)
 			end
 		elseif is_synthetic then
-			-- Counted so the source histogram stays honest about how much of the
-			-- day's text the driver produced, but NOT chained: an expansion is not
-			-- something the user's hands did, and letting it join the bigram counts
-			-- would make the layout look better the more expansions they use.
-			Helpers.push_ngram(batch, "ngram_chars", date_str, app, char, 0, false, source)
-			run = {}
-			word = ""
+			-- Chained like typed text, as Windows and macOS do: the rows carry the
+			-- synthetic source, so the dashboard can still tell what the driver
+			-- produced from what the hands typed.
+			chain_character(char, delay < MAX_KEYSTROKE_DELAY_MS and delay or 0, source)
 			-- An expansion is not something the hands did, so it cannot extend a
 			-- same-finger run. Counting it would make the layout look worse the
 			-- more the driver types for the user, which is backwards.
@@ -493,38 +560,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 			-- bucket and expects a total, not a slice.
 			Helpers.bucket_add(buckets.time, delay, delay)
 			Helpers.bucket_add(buckets.credited, delay, 1)
-			local ngram_delay = delay < MAX_KEYSTROKE_DELAY_MS and delay or 0
-
-			if delay >= MAX_KEYSTROKE_DELAY_MS then
-				-- Long enough that the next keystroke is a new movement, not the
-				-- continuation of one. Two characters either side of a coffee break
-				-- are not a bigram.
-				flush_word()
-				run = {}
-				previous_word = nil
-			end
-
-			run[#run + 1] = char
-			-- Only the last seven matter, and holding more would grow without bound
-			-- on a long session.
-			if #run > #FAMILY_FOR_LENGTH then table.remove(run, 1) end
-
-			for length, family in ipairs(FAMILY_FOR_LENGTH) do
-				if #run >= length then
-					local token = table.concat(run, "", #run - length + 1, #run)
-					-- The bounded delay belongs to the LAST keystroke of the token, which is
-					-- what the dashboard means by an n-gram's cost: how long the hand
-					-- took to complete the sequence. A gap that broke continuity still
-					-- counts its character unigram, but contributes no timing sample.
-					Helpers.push_ngram(batch, family, date_str, app, token, ngram_delay, false, "none")
-				end
-			end
-
-			if WORD_SEPARATORS[char] then
-				flush_word()
-			else
-				word = word .. char
-			end
+			chain_character(char, delay < MAX_KEYSTROKE_DELAY_MS and delay or 0, source)
 		end
 	end
 
@@ -536,6 +572,7 @@ function M.walk(events, date_str, app, batch, clock, ctx)
 	if ctx then
 		ctx.date, ctx.app = date_str, app
 		ctx.run, ctx.word, ctx.previous_word = run, word, previous_word
+		ctx.history, ctx.word_err = history, word_err
 		ctx.last_time = last_time
 		ctx.backspace_run = backspace_run
 		ctx.last_finger, ctx.finger_run = last_finger, finger_run
@@ -587,9 +624,9 @@ function M.settle(ctx, now_ms, batch, force)
 		if (ctx.backspace_run or 0) > 0 then
 			ctx.backspace_run = end_correction(target(), date_str, app, ctx.backspace_run, nil)
 		end
-		if (ctx.word or "") ~= "" then end_word(target(), date_str, app, ctx.previous_word, ctx.word) end
-		ctx.word, ctx.previous_word = "", nil
-		ctx.run = {}
+		if (ctx.word or "") ~= "" then end_word(target(), date_str, app, ctx.previous_word, ctx.word, ctx.word_err) end
+		ctx.word, ctx.previous_word, ctx.word_err = "", nil, false
+		ctx.run, ctx.history = {}, {}
 	end
 	if ctx.burst and ended(BURST_GAP_MS) then
 		Helpers.finalize_burst(target(), date_str, app, ctx.burst)
