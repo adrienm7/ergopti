@@ -229,6 +229,7 @@ return {
 	"tests.unit.modules.gestures.actions.test_brightness_actions",
 	"tests.unit.modules.llm.runtime.test_enable_admission_policy",
 	"tests.unit.modules.llm.runtime.test_enable_admission",
+	"tests.unit.modules.llm.runtime.test_managed_ollama_proxy",
 	"tests.unit.modules.llm.runtime.test_runtime_bootstrap_budget",
 	"tests.unit.modules.llm.runtime.test_runtime_composition",
 	"tests.unit.modules.llm.runtime.test_runtime_engine_acquisition_reserves_actual_teardown",
