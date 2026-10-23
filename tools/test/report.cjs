@@ -149,6 +149,7 @@ function parseResults(out, timingOutput = out) {
 
 	// Terminal counts support this auxiliary summary; they do not qualify the native suite.
 	const counts_available = Boolean(tapPlan || (luaPassed && luaFailed));
+	const slowest = slowestTests(lines, timings);
 	return {
 		failures: uniqueFailures,
 		passed: counts_available ? passed : null,
@@ -159,8 +160,43 @@ function parseResults(out, timingOutput = out) {
 		format,
 		counts_available,
 		timings,
-		timing_errors
+		timing_errors,
+		slowest
 	};
+}
+
+/** How many of the slowest tests the log, the step summary and the JSON keep. */
+const SLOWEST_LIMIT = 10;
+
+/**
+ * Ranks the slowest individual tests of either format. AHK TAP gives each test a
+ * "# duration_ms <index> <ms>" line that follows its "ok <index> - <name>" line;
+ * the Lua runner gives case records in "# lua_timing" rows. Module-load rows are
+ * excluded: a module is a group of cases, not a test.
+ * @param {string[]} lines The runner output split into lines.
+ * @param {Array<{kind: string, module: string, name: string, elapsed_ms: number|null}>} timings Parsed Lua rows.
+ * @returns {Array<{name: string, elapsed_ms: number}>} At most SLOWEST_LIMIT entries, slowest first.
+ */
+function slowestTests(lines, timings) {
+	const names = new Map();
+	const ranked = [];
+	for (const line of lines) {
+		const named = line.match(/^(?:not )?ok\s+(\d+)\s+-\s+(.+)$/);
+		if (named) {
+			names.set(named[1], named[2].replace(NOT_EXECUTED_MARKER, ': ').trim());
+			continue;
+		}
+		const timed = line.match(/^# duration_ms (\d+) (\d+(?:\.\d+)?)$/);
+		if (timed && names.has(timed[1]))
+			ranked.push({ name: names.get(timed[1]), elapsed_ms: Number(timed[2]) });
+	}
+	for (const row of timings)
+		if (row.kind === 'case' && row.elapsed_ms !== null)
+			ranked.push({
+				name: row.module ? row.module + ': ' + row.name : row.name,
+				elapsed_ms: row.elapsed_ms
+			});
+	return ranked.sort((a, b) => b.elapsed_ms - a.elapsed_ms).slice(0, SLOWEST_LIMIT);
 }
 
 // =====================================
@@ -267,6 +303,11 @@ function emit(opts, res, code, signal = null) {
 				(res.failures.length
 					? `\n<details><summary>Failures</summary>\n\n${res.failures.map((f) => `- ${f}`).join('\n')}\n</details>\n`
 					: '') +
+				(res.slowest.length
+					? `\n<details><summary>Slowest ${res.slowest.length} test(s)</summary>\n\n| ms | test |\n| ---: | --- |\n${res.slowest
+							.map((row) => `| ${row.elapsed_ms.toFixed(1)} | ${row.name.replace(/\|/g, '\\|')} |`)
+							.join('\n')}\n</details>\n`
+					: '') +
 				(timingDetails ? `\n${timingDetails}\n` : '');
 			try {
 				fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
@@ -288,6 +329,7 @@ function emit(opts, res, code, signal = null) {
 			exit_code: code,
 			...(signal ? { signal } : {}),
 			failures: res.failures,
+			...(res.slowest.length ? { slowest: res.slowest } : {}),
 			...(res.timings.length || res.timing_errors.length
 				? { timings: res.timings, timing_errors: res.timing_errors }
 				: {})
@@ -310,6 +352,14 @@ function emit(opts, res, code, signal = null) {
 	process.stdout.write(
 		`\n[report:${opts.name}] ${tag} — ${counts} (exit ${code}, format ${res.format}).\n`
 	);
+	if (res.slowest.length > 0) {
+		const rows = res.slowest.map(
+			(row) => '  ' + row.elapsed_ms.toFixed(1).padStart(10) + ' ms  ' + row.name
+		);
+		process.stdout.write(
+			`[report:${opts.name}] slowest ${res.slowest.length} test(s):\n${rows.join('\n')}\n`
+		);
+	}
 }
 
 // =====================================
@@ -381,4 +431,4 @@ function main() {
 // self-test) must expose parseResults without spawning anything.
 if (require.main === module) main();
 
-module.exports = { parseResults, formatCount };
+module.exports = { parseResults, formatCount, slowestTests };
