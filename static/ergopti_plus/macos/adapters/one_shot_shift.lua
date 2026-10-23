@@ -85,6 +85,13 @@ function M.new(deps)
 		return owner.absorbed[code] == true and settle_claim(event, code)
 	end
 
+	--- Retires only the release claim of a physical press passed to the app.
+	--- A late callback may already have delivered a repeat of a consumed press.
+	--- @param code number|nil Already-read physical keycode; nil is unreadable.
+	function adapter.forget_passed_key(code)
+		if code ~= nil then owner:forget(code) end
+	end
+
 	--- Changes or consumes one proven physical key-down inside the serializer.
 	function adapter.key_down(event, code)
 		assert(pending == nil, "one-shot callback ownership was not settled")
