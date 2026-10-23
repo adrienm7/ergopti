@@ -124,13 +124,13 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", categ
 		; field above and forgets this marker leaves the value in the log in
 		; full, one column to the right.
 		"tag",             "<hotstring>" . logged_replacement . "</hotstring>"
-	), &FireRejectedBySuspend)
-	; Native Suspend may win after the pre-call generation check but before the
-	; append's own guard. That is the sole retryable rejection: validation and
-	; privacy drops are terminal and must not be replayed in a later app context.
+	), &FireRejectedBySuspend, publish_guard?)
+	; A pause or owner revocation may win after the pre-call generation check.
+	; The append reports that exact lifecycle refusal so the drain preserves its
+	; fire and untouched suffix. Privacy/validation drops remain terminal.
 	if FireRejectedBySuspend
 		return false
-	; A native-Suspend refusal remains queued for resume; an accepted row or a
+	; A lifecycle refusal remains queued for a fresh owner; an accepted row or a
 	; terminal privacy/validation drop must never be duplicated in a later context.
 	if IsSet(publish_guard) && !publish_guard.Call()
 		return true
