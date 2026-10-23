@@ -374,6 +374,23 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset, GuardFn := unset) {
 	return true
 }
 
+; One periodic observation cannot mark a newer activity owner idle. The
+; central guard runs before publication; the post-append check accepts only
+; this observation's own committed idle generation before any session close.
+_KL_Watchers_IdleObservationCurrent(Owner, IdlePublished := false) {
+	return Keystats.initialized && !Keystats._shutting_down && !A_IsSuspended
+		&& Keystats.lifecycle_generation == Owner.LifecycleGeneration
+		&& KLHook.capture_generation == Owner.CaptureGeneration
+		&& KLHook.last_tick == Owner.LastTick
+		&& KLWatch.last_authorized_tick == Owner.AuthorizedTick
+		&& KLWatch.session_generation == Owner.SessionGeneration
+		&& KLWatch.is_session_active && !KLWatch.privacy_interrupted
+		&& KLWatch.is_idle == IdlePublished
+		&& KLWatch.idle_generation == Owner.IdleGeneration + (IdlePublished ? 1 : 0)
+		&& !KLWatch.session_close_draining && !IsObject(KLWatch.session_close)
+		&& !IsObject(KLWatch.idle_close) && !KL_Hook_HasPendingInput()
+}
+
 ; Periodic check (~10 s) for « user has been silent for a while ». The
 ; only producer for idle_start and the in-time path for session_end —
 ; the keystroke producer above only handles retroactive session_end.
@@ -391,7 +408,15 @@ KL_Watchers_IdleTick(Now := unset) {
 		_KL_Watchers_SystemDrain()
 		if !KLHook.HasOwnProp("last_tick")
 				return
-		LastTick := KLHook.last_tick
+		ObservationCritical := Critical("On")
+		try {
+			LastTick := KLHook.last_tick
+			IdleOwner := {LastTick: LastTick, AuthorizedTick: KLWatch.last_authorized_tick,
+				LifecycleGeneration: Keystats.lifecycle_generation,
+				CaptureGeneration: KLHook.capture_generation,
+				SessionGeneration: KLWatch.session_generation,
+				IdleGeneration: KLWatch.idle_generation}
+		} finally Critical(ObservationCritical)
 		if LastTick = 0
 				return
 		now := IsSet(Now) ? Now : A_TickCount
@@ -406,8 +431,11 @@ KL_Watchers_IdleTick(Now := unset) {
 
 		if (!KLWatch.is_idle and KLWatch.is_session_active
 						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
-				KL_LogSession("idle_start", unset,
-						_KL_Watchers_CommitIdleStart.Bind(LastTick))
+				IdlePublished := KL_LogSession("idle_start", unset,
+						_KL_Watchers_CommitIdleStart.Bind(LastTick), ,
+						_KL_Watchers_IdleObservationCurrent.Bind(IdleOwner))
+				if !_KL_Watchers_IdleObservationCurrent(IdleOwner, IdlePublished)
+						return false
 		}
 
 		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
