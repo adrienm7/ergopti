@@ -126,3 +126,5 @@ _KAV_SelectionRequiresOptIn() {
 }
 Test("keep-awake: interactive selection is explicit (keepawake-interactive-policy)",
 	_KAV_SelectionRequiresOptIn)
+
+#Include test_keepawake_timer_owner.ahk
