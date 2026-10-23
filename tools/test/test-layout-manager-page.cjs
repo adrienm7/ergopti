@@ -312,6 +312,17 @@ check('every status is decided from the host state, per platform', () => {
 // ========================================
 // ========================================
 
+check('a built-in layout is recognised when the Windows host sends its flag as 1', () => {
+	const { context } = loadPage();
+	const rows = context.layoutRows({
+		platform: 'windows',
+		index,
+		installed: {},
+		builtin: { ergopti: 1 }
+	});
+	assert.equal(rows.find((row) => row.id === 'ergopti').status, 'builtin');
+});
+
 check('extension updates remain visible when the layout bytes did not change', () => {
 	const { context } = loadPage();
 	const entry = { ...index.layouts[1], extension: { sha256: 'new-content', files: [] } };

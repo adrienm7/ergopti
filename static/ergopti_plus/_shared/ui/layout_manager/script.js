@@ -179,7 +179,8 @@ function layoutRows(state) {
 				entry,
 				installed[entry.id],
 				Boolean(provided[entry.id]),
-				builtin[entry.id] === true,
+				// The AutoHotkey host's JSON writer sends a boolean as 1.
+				builtin[entry.id] === true || builtin[entry.id] === 1,
 				active,
 				state.platform
 			)
