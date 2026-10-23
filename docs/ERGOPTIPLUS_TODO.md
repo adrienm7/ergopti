@@ -249,15 +249,14 @@ Added October 22 (from the agents' reports; details in their commits):
       pinning spellings, regenerate seals and generated files through their owners, keep the
       maintainer's existing data readable, and end with a repository grep that finds no
       `keystats` outside history.
-- [ ] **Issue #101: managed network refuses at `native_proxy_lookup`.** [PHYS-M] On the reporter's Mac
-      every managed download (MLX `uv sync`, Ollama install) ends `native_proxy_lookup` /
-      `unavailable` / status 78, and the shell retries it 6 times (about 2.5 min of backoff) though
-      it is deterministic. Suspect: "Auto Proxy Discovery" on with no DHCP option 252 and no search
-      domain, so `ManagedProxyLookup.discover` returns no endpoint and `routes` returns nil instead
-      of the initial DIRECT. Confirm with that setting off, then decide whether "discovery enabled,
-      nothing to discover" may fall back to DIRECT (strict by design, Swift tests pin it). Also:
-      local server probes (oMLX, Jan) all answer "Network request failed"; the main thread stalls
-      1 to 4.5 s in `log_manager.lua:1552`, `models_manager.lua:554`, `mlx_repair_offer.lua:358`.
+- [ ] **Issue #101: managed network follow-ups.** [PHYS-M] Root cause of the reporter's `native_proxy_lookup`
+      failures: the launcher Info.plist had no App Transport Security key, so the URLSession PAC fetch
+      refused their `http://` company PAC (fixed; confirm on the Mac with the next release). Left: (1) split
+      `ManagedHTTPFailureStage.proxyLookup` into PAC fetch, certificate, script and route so the log names
+      the step (Swift enum, Python allowlist in `native_http.py`, tests); (2) an explicit proxy override
+      field in the config for a PAC the helper cannot use; (3) local server probes (oMLX, Jan) all answer
+      "Network request failed"; (4) main thread stalls of 1 to 4.5 s in `log_manager.lua:1552`,
+      `models_manager.lua:554`, `mlx_repair_offer.lua:358`.
 - [ ] **macOS input follow-ups (swallowed keys).** [CODE] Each lease recovery rewrites the 743 KB
       karabiner.json while typing (reuse the token once its writers retire);
       `context_tracker.handle_ax_value_changed` reads the whole AXValue on the main thread at each

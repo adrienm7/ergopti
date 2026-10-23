@@ -41,6 +41,11 @@ retry_network() {
 		else
 			rc=$?
 		fi
+		if [ "$rc" -eq "$OPAQUE_NETWORK_REFUSAL_EXIT_CODE" ]; then
+			# The same settings would be refused again: retrying only delays the error.
+			log_error "Network attempt $attempt/$NETWORK_MAX_RETRIES refused by the configured network route (code $rc) -- not retrying."
+			return "$rc"
+		fi
 		if [ "$attempt" -ge "$NETWORK_MAX_RETRIES" ]; then
 			log_error "Network attempt $attempt/$NETWORK_MAX_RETRIES failed (code $rc) -- giving up."
 			return "$rc"

@@ -402,6 +402,21 @@ test(
 		ollamaSource.includes('network-retry.sh') &&
 		mlxSource.includes('network-retry.sh')
 );
+{
+	// A refused native route (status 78) is deterministic: a retry only delays the error (issue #101).
+	const probe =
+		'source "$1"; log_info(){ :; }; log_error(){ :; }; NETWORK_BASE_BACKOFF_SEC=0; calls=0; ' +
+		'refused(){ calls=$((calls+1)); return 78; }; transient(){ calls=$((calls+1)); return 74; }; ' +
+		'retry_network refused; first=$?; refused_calls=$calls; calls=0; ' +
+		'retry_network transient; echo "$first $refused_calls $calls"';
+	const run = spawnSync(bash, ['-c', probe, 'probe', toBashPath(SOURCE_NETWORK)], {
+		encoding: 'utf8'
+	});
+	test(
+		'a refused network route is not retried while a transient failure still is',
+		run.status === 0 && run.stdout.trim() === '78 1 6'
+	);
+}
 test(
 	'only the on-demand install sources the pinned Ollama release; the app build no longer bundles it',
 	releaseSource.includes('OLLAMA_RELEASE_VERSION="0.40.4"') &&

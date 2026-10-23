@@ -736,7 +736,7 @@ class BootstrapFailureObservationTests(unittest.TestCase):
                         "sys": SimpleNamespace(stderr=output, exit=exit),
                     },
                 )
-        self.assertEqual(refused.exception.code, 74)
+        self.exit_code = refused.exception.code
         lines = output.getvalue().splitlines()
         self.assertEqual(lines[-1], "Managed bootstrap request failed: unavailable.")
         self.assertTrue(lines[0].startswith("# managed_bootstrap_failure "))
@@ -887,6 +887,8 @@ class BootstrapFailureObservationTests(unittest.TestCase):
                 )
                 self.assertEqual(fact["native_child_pid"], None if failed_cleanup else 4711)
                 self.assertEqual(fact["native_child_status"], None if failed_cleanup else 78)
+                # A confirmed status 78 is a refused route the shell must not retry.
+                self.assertEqual(self.exit_code, 74 if failed_cleanup else 78)
                 self.assertEqual(
                     fact["native_receipt_reason"], None if failed_cleanup else "unavailable"
                 )
