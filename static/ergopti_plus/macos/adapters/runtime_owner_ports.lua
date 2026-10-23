@@ -49,6 +49,15 @@ local function pinned_artifact()
 	return require("platform.remap.runtime_manifest").pinned(manifest)
 end
 
+--- How many pin fields of the shipped runtime manifest are still unpinned.
+--- @return integer|nil count Nil when the manifest cannot be read.
+function M.unpinned_count()
+	local directory = NativePath.directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./"
+	local loaded, manifest = pcall(dofile, directory .. MANIFEST_RELATIVE)
+	if not loaded or type(manifest) ~= "table" then return nil end
+	return #require("platform.remap.runtime_manifest").unpinned(manifest)
+end
+
 --- The ports of the real Mac.
 --- @return table ports For platform.remap.runtime_owner.init.
 function M.new()
