@@ -93,7 +93,9 @@ UriDecode(s) {
 			Pos += LiteralLength
 		}
 	}
-	return StrGet(Buf, ByteLen, "UTF-8")
+	; Retain decoded NULs so path validation can reject the complete value
+	; instead of silently accepting a different prefix before the control.
+	return StrGet(Buf, -ByteLen, "UTF-8")
 }
 
 
