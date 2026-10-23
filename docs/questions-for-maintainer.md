@@ -61,3 +61,13 @@ answer once, then move the answered line below.
   and with which guards? Until you answer, nothing changes.
 - **Space tap-hold and end-character triggers (asked 2026-10-24):** `_SpaceTap` resets both buffers, so a trigger
   ending with the space cannot complete from the Space tap-hold. Is that expected with the tap-hold on?
+- **Redacted full-day log as an attachment (asked 2026-10-24, item 138):** the report is a closed projection that
+  excludes free text. May a redacted full-day log ever be an opt-in attachment? If yes, one shared collector with three
+  thin drivers; GitHub field editability still needs a real draft.
+- **Config-directory names in logs (asked 2026-10-24, item 139):** folder and file names under the config directory
+  (for example hotstring pack names) appear in thousands of log lines; they are user-chosen identifiers that the
+  account-name rule only catches when they contain the account name. Reduce those paths to a placeholder?
+- **Legacy ownership (asked 2026-10-24, item 131):** what should "legacy ownership" cover for SMAppService: a login item
+  left by an older Ergopti copy at another path, or something else?
+- **Items 46, 47, 48 (asked 2026-10-24):** the original audit context cannot be found; only the macOS Ollama
+  process-termination debt (120) is known. Re-state them or retire them?
