@@ -135,7 +135,7 @@ _AHK04M_NormalDispatchCommitsAfterOutput() {
 	Assert(!RegExMatch(BranchCode, "i)\b(?:HSE_ApplyExpansion|_HSE_QueueFireLog|_HSE_SendWithAltGrUp)\s*\("),
 		"native scheduling cannot publish a fire or lift a keyboard modifier")
 	HookVerdict := InStr(Body, 'return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))')
-	AtomicSend := InStr(Body, "SendInput(Burst)")
+	AtomicSend := InStr(Body, "_AHK_SendInput.Bind(Burst)")
 	DirectVerdict := InStr(Body, "return true", , AtomicSend)
 	DirectCommit := InStr(Body, "Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)", , DirectVerdict)
 	Apply := InStr(Body, "HSE_ApplyExpansion")
