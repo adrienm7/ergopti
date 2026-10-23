@@ -63,7 +63,7 @@ h.describe('native number-row producer retains original positions and callback o
    local dead = assert(Native.select(view.levels, 'symbols', 6, false, false))
    h.assert_eq(dead.native_action.keysym, 0xfe52)
    h.assert_eq(dead.native_action.dead, true)
-   h.assert_eq(capture.capture_chord_output(receipt), nil)
+   h.assert_nil(capture.capture_chord_output, "no caller-less chord output receiver")
    h.assert_eq(state.transitions, 0)
    h.assert_eq(state.compose, 0)
   end)
