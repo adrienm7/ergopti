@@ -96,7 +96,7 @@ _KL_ScanEventIdChunk(Text, DeviceLiteral, &Carry, Final := false) {
 ; the exceptional recovery pass while excluding source writers/replacements.
 KL_RecoverSqlEventId(Path, DeviceLiteral, ChunkChars := unset) {
 	if !IsSet(ChunkChars)
-		ChunkChars := KeylogConst.DATA_SQL_SCAN_TAIL_BYTES
+		ChunkChars := KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES
 	if !(ChunkChars is Integer) || ChunkChars <= 0
 		throw ValueError("SQL identity recovery requires a positive chunk size")
 	if !FileExist(Path)
@@ -183,7 +183,7 @@ _KL_ReadRecoveryText(Path, Offset := 0, TailBytes := 0) {
 _KL_RecoverJournalEventId(Path, Offset) {
 	MaxId := 0
 	loop {
-		Read := _KL_JournalReadLines(Path, Offset, KeylogConst.INGEST_BATCH_LINES, KL_JsonDecode)
+		Read := _KL_JournalReadLines(Path, Offset, KeystatsConst.INGEST_BATCH_LINES, KL_JsonDecode)
 		if !Read["ok"]
 			throw Error("Cannot read journal event identities")
 		for Entry in Read["entries"] {

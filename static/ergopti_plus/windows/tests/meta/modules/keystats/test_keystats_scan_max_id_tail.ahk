@@ -14,10 +14,10 @@
 ;
 ; The fix reads only the TAIL of the file (64 KB) using FileOpen + Seek from
 ; the end, reducing startup I/O to O(1) regardless of total file size.
-; DATA_SQL_SCAN_TAIL_BYTES in KeylogConst is the single source of truth.
+; DATA_SQL_SCAN_TAIL_BYTES in KeystatsConst is the single source of truth.
 ;
 ; This test verifies:
-;   1. DATA_SQL_SCAN_TAIL_BYTES is declared in KeylogConst.
+;   1. DATA_SQL_SCAN_TAIL_BYTES is declared in KeystatsConst.
 ;   2. KL_Init no longer uses FileRead for scanning data.sql.
 ;   3. KL_Init uses FileOpen + fh.Seek for the tail-read pattern.
 ;   4. KL_ScanMaxEventId remains a pure function with no disk I/O.
@@ -39,13 +39,13 @@ _KLSM_ConstantDeclared() {
 	Src := _DriverDirConcat("modules/keystats")
 
 	Assert(InStr(Src, "DATA_SQL_SCAN_TAIL_BYTES") > 0,
-		"KeylogConst must declare DATA_SQL_SCAN_TAIL_BYTES (keystats-scan-max-id-performance)")
+		"KeystatsConst must declare DATA_SQL_SCAN_TAIL_BYTES (keystats-scan-max-id-performance)")
 
 	; Constant must be at least 32 KB — smaller values risk missing recent events
 	Assert(RegExMatch(Src, "DATA_SQL_SCAN_TAIL_BYTES\s*:=\s*(\d+)", &m) && Integer(m[1]) >= 32768,
 		"DATA_SQL_SCAN_TAIL_BYTES must be at least 32768 bytes (keystats-scan-max-id-performance)")
 }
-Test("keystats: KeylogConst.DATA_SQL_SCAN_TAIL_BYTES is declared and >= 32 KB (keystats-scan-max-id-performance)", _KLSM_ConstantDeclared)
+Test("keystats: KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES is declared and >= 32 KB (keystats-scan-max-id-performance)", _KLSM_ConstantDeclared)
 
 
 

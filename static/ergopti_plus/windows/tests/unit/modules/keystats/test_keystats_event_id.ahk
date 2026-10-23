@@ -139,7 +139,7 @@ _KLEI_SqlRecoveryAfterNul() {
 		Fh := 0
 		FileAppend("INSERT INTO events_typing VALUES ('device-a', 204, 'synthetic');`n", Path, "UTF-8-RAW")
 		Before := KLR_LedgerSnapshot(Path)
-		Text := _KL_ReadRecoveryText(Path, 0, KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+		Text := _KL_ReadRecoveryText(Path, 0, KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES)
 		AssertEqual(204, KL_ScanMaxEventId(Text, "'device-a'"),
 			"a NUL hole must not hide the next durable SQL identity")
 		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
@@ -166,7 +166,7 @@ _KLEI_RecoveryEmptyBoundaries(Mode) {
 		AssertEqual("", _KL_ReadRecoveryText(Path, Offset),
 			"an empty recovery range is valid: " . Mode)
 		if Mode != "eof"
-			AssertEqual("", _KL_ReadRecoveryText(Path, 0, KeylogConst.DATA_SQL_SCAN_TAIL_BYTES))
+			AssertEqual("", _KL_ReadRecoveryText(Path, 0, KeystatsConst.DATA_SQL_SCAN_TAIL_BYTES))
 	} finally {
 		if FileExist(Path)
 			FileDelete(Path)
@@ -182,7 +182,7 @@ _KLEI_RecoveryAcrossBatches() {
 		AssertEqual(0, _KL_RecoverJournalEventId(Path, 0))
 		First := '{"type":"typing","_event_id":204}' . "`n"
 		Blank := ""
-		loop KeylogConst.INGEST_BATCH_LINES
+		loop KeystatsConst.INGEST_BATCH_LINES
 			Blank .= "`n"
 		FileAppend(First . Blank . '{"type":"typing","_event_id":203}' . "`n"
 			. '{"type":"typing","_event_id":999', Path, "UTF-8")

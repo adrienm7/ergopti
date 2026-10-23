@@ -304,15 +304,15 @@ _KLTO_KeystatsIngestWrapSafe() {
 	Assert(Src != "", "modules/keystats sources must be readable")
 
 	; Ingest idle guard must be masked
-	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick < KeylogConst\.INGEST_IDLE_MS"),
+	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick < KeystatsConst\.INGEST_IDLE_MS"),
 		"keystats.ahk must not use bare A_TickCount - KLHook.last_tick < INGEST_IDLE_MS without mask (tickcount-wrap)")
-	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS") > 0,
+	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF < KeystatsConst.INGEST_IDLE_MS") > 0,
 		"keystats.ahk must mask ingest idle guard with & 0xFFFFFFFF (tickcount-wrap)")
 
 	; Live-push idle guard must be masked
-	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick >= KeylogConst\.INGEST_LIVE_PUSH_IDLE_MS"),
+	Assert(!RegExMatch(Src, "A_TickCount - KLHook\.last_tick >= KeystatsConst\.INGEST_LIVE_PUSH_IDLE_MS"),
 		"keystats.ahk must not use bare A_TickCount - KLHook.last_tick >= INGEST_LIVE_PUSH_IDLE_MS without mask (tickcount-wrap)")
-	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS") > 0,
+	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF >= KeystatsConst.INGEST_LIVE_PUSH_IDLE_MS") > 0,
 		"keystats.ahk must mask live-push idle guard with & 0xFFFFFFFF (tickcount-wrap)")
 
 	; Preserve the historical ingest guards above, but native password origins

@@ -44,7 +44,7 @@ _IOBL_ReaderIsBoundedAndReportsEof() {
 	JournalBody := _DriverFuncBody("_KL_JournalReadLines")
 	Assert(Body != "", "KL_ReadNewTodayLog must exist")
 	Assert(JournalBody != "", "_KL_JournalReadLines must exist")
-	Assert(InStr(Body, "KeylogConst.INGEST_BATCH_LINES") > 0,
+	Assert(InStr(Body, "KeystatsConst.INGEST_BATCH_LINES") > 0,
 		"prerequisite: the reader still caps each pass at INGEST_BATCH_LINES, which is what "
 		. "makes its returned offset a MID-FILE bookmark rather than EOF")
 	Assert(InStr(JournalBody, "Lines < MaxLines") > 0

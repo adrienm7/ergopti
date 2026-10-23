@@ -246,7 +246,7 @@ _KLDR_Fresh(Mode, State) {
 	AssertEqual(State.Modern, Obj["device_id"], "a proven fresh identity uses the real GUID formatter")
 	AssertEqual(State.Host, Obj["host_signature"])
 	AssertEqual("windows", Obj["os"])
-	AssertEqual(KeylogConst.SCHEMA_VERSION, Obj["schema_version"])
+	AssertEqual(KeystatsConst.SCHEMA_VERSION, Obj["schema_version"])
 	AssertEqual(1, State.MintCalls, "only a completely resolved scan may mint once")
 	AssertEqual(1, State.HostCalls)
 }

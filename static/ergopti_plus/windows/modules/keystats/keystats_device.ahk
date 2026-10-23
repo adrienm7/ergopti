@@ -120,7 +120,7 @@ KL_ResolveDevice(metrics_dir, HostSignatureFn := unset, CreateGuidFn := unset) {
 				"os_version", A_OSVersion,
 				"host_signature", current_host,
 				"created_at", KL_NowTimestamp(),
-				"schema_version", KeylogConst.SCHEMA_VERSION
+				"schema_version", KeystatsConst.SCHEMA_VERSION
 		)
 }
 
