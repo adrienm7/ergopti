@@ -448,9 +448,71 @@ _IP_SendThroughFunnel(Keys, Mode) {
 
 ; Sends the simulated rival key from a timer, the way another thread of the
 ; driver would while an interruptible burst is still being typed.
-_IP_RivalFire() {
+_IP_RivalFire(Work := unset) {
 	global INPUT_PROBE_RIVAL_CHAR
-	SendEvent("{Text}" . INPUT_PROBE_RIVAL_CHAR)
+	if !IsSet(Work)
+		return false
+	try {
+		if _IP_RepAdmission(Work) != ""
+			return false
+		SendEvent("{Text}" . INPUT_PROBE_RIVAL_CHAR)
+		return true
+	} catch Any as Failure {
+		; A timer failure is not quiet evidence: the repetition rethrows it
+		; before it can classify or publish an affirmative measurement.
+		if !IsObject(Work.Failure)
+			Work.Failure := Failure
+		return false
+	}
+}
+
+; One native timer site arms and retires only the callback of this repetition.
+_IP_RepTimer(Callback, Period) {
+	SetTimer(Callback, Period)
+}
+
+; Pure local authority is rechecked after every yielding focus observation.
+_IP_RepAuthority(Work) {
+	if IsObject(Work.Failure)
+		throw Work.Failure
+	if Work.Refusal != ""
+		return Work.Refusal
+	Reason := ""
+	if A_IsSuspended
+		Reason := "paused"
+	else if !Work.Active
+		Reason := "foreground"
+	else if Work.HasParent {
+		Owner := Work.Parent
+		if !IsObject(Owner) || !Owner.HasOwnProp("Active") || !Owner.HasOwnProp("Retired")
+				|| !Owner.HasOwnProp("Gui") || !Owner.HasOwnProp("Edit") || !Owner.HasOwnProp("Hwnd")
+			Reason := "foreground"
+		else if !_IP_TargetOwnerCurrent(Owner) || Owner.Gui != Work.Target["gui"]
+				|| Owner.Edit != Work.Target["edit"] || Owner.Hwnd != Work.Hwnd
+			Reason := "foreground"
+	}
+	if Reason != ""
+		Work.Refusal := Reason
+	return Reason
+}
+
+_IP_RepAdmission(Work) {
+	Reason := _IP_RepAuthority(Work)
+	if Reason != ""
+		return Reason
+	Reason := Work.HasParent ? _IP_TargetAdmission(Work.Target)
+		: (Work.Hwnd == Work.Target["gui"].Hwnd && Work.EditHwnd == Work.Target["edit"].Hwnd
+			&& _IP_TargetReady(Work.Target) ? "" : "foreground")
+	After := _IP_RepAuthority(Work)
+	if After != ""
+		return After
+	if Reason != ""
+		Work.Refusal := Reason
+	return Reason
+}
+
+_IP_RepAbort(Reason) {
+	return Map("kind", Reason, "lost", 0, "ret_us", 0, "settle_us", -1)
 }
 
 ; Ticks to microseconds.
@@ -466,37 +528,70 @@ _IP_Micros(Ticks, Frequency) {
 ; @param Spec {Map} prefill, expected, rival, atomic, send (callable taking Mode).
 ; @param Mode {String}
 ; @param Frequency {Integer} QPC frequency.
-; @returns {Map} kind, lost, ret_us, settle_us; kind "foreground" = abort.
-_IP_RunRep(Target, Spec, Mode, Frequency) {
+; @param ParentOwner {Object|unset} Explicit factory authority for public calls.
+; @returns {Map} kind, lost, ret_us, settle_us; paused/foreground mean abort.
+_IP_RunRep(Target, Spec, Mode, Frequency, ParentOwner := unset) {
 	global INPUT_PROBE_SETTLE_TIMEOUT_MS, INPUT_PROBE_RIVAL_WAIT_MS
-	_IP_Reset(Target, Spec["prefill"])
-	if !_IP_TargetReady(Target)
-		return Map("kind", "foreground", "lost", 0, "ret_us", 0, "settle_us", -1)
-	Expected := Spec["expected"]
-	Rival := Spec["rival"]
-	Start := HotPath_Now()
-	if (Rival != "")
-		SetTimer(_IP_RivalFire, -1)
-	Spec["send"].Call(Mode)
-	ReturnTicks := HotPath_Now() - Start
-	SettleTicks := -1
-	if (Rival == "") {
-		Deadline := Start + Frequency * INPUT_PROBE_SETTLE_TIMEOUT_MS // 1000
-		while (HotPath_Now() < Deadline) {
-			if (Target["edit"].Value == Expected) {
-				SettleTicks := HotPath_Now() - Start
-				break
-			}
-			Sleep(-1)
+	Work := {Active: true, HasParent: IsSet(ParentOwner), Parent: IsSet(ParentOwner) ? ParentOwner : 0,
+		Target: Map("gui", Target["gui"], "edit", Target["edit"]), Hwnd: Target["gui"].Hwnd,
+		EditHwnd: Target["edit"].Hwnd, Callback: 0, Refusal: "", Failure: 0}
+	if Work.HasParent
+		Work.Target["owner"] := ParentOwner
+	try {
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		_IP_Reset(Work.Target, Spec["prefill"])
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		Expected := Spec["expected"]
+		Rival := Spec["rival"]
+		Start := HotPath_Now()
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		if (Rival != "") {
+			Work.Callback := _IP_RivalFire.Bind(Work)
+			_IP_RepTimer(Work.Callback, -1)
 		}
-	} else {
-		Sleep(INPUT_PROBE_RIVAL_WAIT_MS)
-		SettleTicks := HotPath_Now() - Start
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		Spec["send"].Call(Mode)
+		ReturnTicks := HotPath_Now() - Start
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		SettleTicks := -1
+		if (Rival == "") {
+			Deadline := Start + Frequency * INPUT_PROBE_SETTLE_TIMEOUT_MS // 1000
+			while (HotPath_Now() < Deadline) {
+				if (Reason := _IP_RepAdmission(Work)) != ""
+					return _IP_RepAbort(Reason)
+				if (Work.Target["edit"].Value == Expected) {
+					SettleTicks := HotPath_Now() - Start
+					break
+				}
+				Sleep(-1)
+			}
+		} else {
+			Sleep(INPUT_PROBE_RIVAL_WAIT_MS)
+			SettleTicks := HotPath_Now() - Start
+		}
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		Actual := Work.Target["edit"].Value
+		if (Reason := _IP_RepAdmission(Work)) != ""
+			return _IP_RepAbort(Reason)
+		Judged := InputProbe_ClassifyText(Expected, Actual, Rival)
+		return Map("kind", Judged["kind"], "lost", Judged["lost"],
+			"ret_us", _IP_Micros(ReturnTicks, Frequency),
+			"settle_us", SettleTicks < 0 ? -1 : _IP_Micros(SettleTicks, Frequency))
+	} finally {
+		; Invalidate before cancellation can yield. A late callback sees only its
+		; retired Work; it cannot act on or cancel a successor's unique callback.
+		Work.Active := false
+		Callback := Work.Callback
+		Work.Callback := 0
+		if IsObject(Callback)
+			_IP_RepTimer(Callback, 0)
 	}
-	Judged := InputProbe_ClassifyText(Expected, Target["edit"].Value, Rival)
-	return Map("kind", Judged["kind"], "lost", Judged["lost"],
-		"ret_us", _IP_Micros(ReturnTicks, Frequency),
-		"settle_us", SettleTicks < 0 ? -1 : _IP_Micros(SettleTicks, Frequency))
 }
 
 ; The scenarios of the send comparison. Payloads are synthetic and mix ASCII,
@@ -562,6 +657,11 @@ InputProbe_RunSendComparison(Reps := 0) {
 		try LoggerInfo(INPUT_PROBE_TAG, "send_compare context ahk={1} os={2} key_delay={3} send_level={4} reps={5}",
 			A_AhkVersion, A_OSVersion, A_KeyDelay, A_SendLevel, Reps)
 		for Scenario in _IP_Scenarios() {
+			Reason := _IP_TargetAdmission(Target)
+			if Reason != "" {
+				Result["reason"] := Reason
+				return Result
+			}
 			Spec := Scenario["spec"]
 			Held := _IP_HoldClipboard(Spec)
 			if (Held is String && Held == "skipped") {
@@ -573,12 +673,16 @@ InputProbe_RunSendComparison(Reps := 0) {
 					Collected := []
 					; One unmeasured warm-up repetition: the first send of a primitive
 					; pays one-off costs that would hide its steady-state latency.
-					_IP_RunRep(Target, Spec, Mode, Frequency)
+					Warmup := _IP_RunRep(Target, Spec, Mode, Frequency, Target["owner"])
+					if (Warmup["kind"] == "foreground" || Warmup["kind"] == "paused") {
+						Result["reason"] := Warmup["kind"]
+						return Result
+					}
 					Loop Reps {
-						Rep := _IP_RunRep(Target, Spec, Mode, Frequency)
-						if (Rep["kind"] == "foreground") {
-							Result["reason"] := "foreground"
-							try LoggerWarn(INPUT_PROBE_TAG, "Send comparison aborted: the check window lost the focus.")
+						Rep := _IP_RunRep(Target, Spec, Mode, Frequency, Target["owner"])
+						if (Rep["kind"] == "foreground" || Rep["kind"] == "paused") {
+							Result["reason"] := Rep["kind"]
+							try LoggerWarn(INPUT_PROBE_TAG, "Send comparison aborted: {1}.", Rep["kind"])
 							return Result
 						}
 						Collected.Push(Rep)
