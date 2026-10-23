@@ -676,8 +676,11 @@ end
 --- The Reload command, as on the other drivers: the daemon restarts, so every
 --- module reads config.toml again (infra/reload_restart.lua). The restart
 --- cannot name its successor, so the local control writes a pending record
---- that the successor claims (infra/driver_control.lua).
-local perform_reload = require("infra.reload_restart").new({ gestures = gestures, restart = restart_daemon })
+--- that the successor claims (infra/driver_control.lua). The successor also
+--- inherits the live pause (infra/restart_pause.lua): main() installs its
+--- script controller before any Reload trigger can fire.
+local perform_reload = require("infra.reload_restart").new({ gestures = gestures,
+	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end })
 
 
 --- Emits facts prepared before capture only after actual driver readiness.
@@ -1055,6 +1058,8 @@ local function main()
 			return remapper_paused == true
 		end,
 	})
+	-- Every Reload trigger restarts with this live pause (perform_reload).
+	privacy_owners.script_actions = script_actions
 
 	local pause_restored, pause_detail = require("infra.restart_pause").restore(script_actions)
 	if not pause_restored then
