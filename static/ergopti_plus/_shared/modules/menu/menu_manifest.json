@@ -1290,6 +1290,60 @@
 			"i18n": "menu.debug.healthcheck"
 		},
 		{
+			"type": "command",
+			"id": "field_check_lease",
+			"i18n": "menu.debug.field_check_lease",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "field_check_owned_runtime",
+			"i18n": "menu.debug.field_check_owned_runtime",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "field_check_network",
+			"i18n": "menu.debug.field_check_network",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "field_check_key_accounting",
+			"i18n": "menu.debug.field_check_key_accounting",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "send_probe",
+			"i18n": "menu.debug.send_probe",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.input_probe_is_autohotkey_specific"
+		},
+		{
+			"type": "command",
+			"id": "hook_probe",
+			"i18n": "menu.debug.hook_probe",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.input_probe_is_autohotkey_specific"
+		},
+		{
 			"type": "check",
 			"id": "show_error_dialog",
 			"i18n": "menu.debug.show_error_dialog",
@@ -2336,6 +2390,30 @@
 			],
 			"unavailable": "grey",
 			"reason_key": "platform_reason.layout_emulation_is_windows_only"
+		},
+		{
+			"type": "choice",
+			"id": "virtual_keyboard",
+			"path": "layout.virtual_keyboard",
+			"i18n": "menu.layout.virtual_keyboard",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.virtual_keyboard_is_karabiner",
+			"choices": [
+				{
+					"value": "auto",
+					"i18n": "menu.layout.virtual_keyboard.auto"
+				},
+				{
+					"value": "iso",
+					"i18n": "menu.layout.virtual_keyboard.iso"
+				},
+				{
+					"value": "ansi",
+					"i18n": "menu.layout.virtual_keyboard.ansi"
+				}
+			]
 		},
 		{
 			"type": "choice",
