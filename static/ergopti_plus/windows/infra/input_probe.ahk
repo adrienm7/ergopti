@@ -291,18 +291,103 @@ _IP_Admission() {
 }
 
 ; Opens the window the check types into and makes it the foreground window.
-; @returns {Map|Integer} { gui, edit }, 0 when it could not take the focus.
+; @returns {Map|Integer} { gui, edit, owner }, 0 when native target admission failed.
 _IP_OpenTarget() {
+	if A_IsSuspended
+		return 0
 	Window := Gui("+AlwaysOnTop", WindowTitle(t("input_probe.title")))
 	Field := Window.AddEdit("w560 r6")
-	Window.Show("w600")
-	WinActivate("ahk_id " . Window.Hwnd)
-	if !WinWaitActive("ahk_id " . Window.Hwnd, , 3) {
-		Window.Destroy()
-		return 0
+	Owner := { Active: true, Retired: false, Gui: Window, Edit: Field, Hwnd: Window.Hwnd, CloseCallback: 0 }
+	Target := Map("gui", Window, "edit", Field, "owner", Owner)
+	Owner.CloseCallback := _IP_TargetClose.Bind(Owner)
+	Accepted := false
+	try {
+		Window.OnEvent("Close", Owner.CloseCallback)
+		if A_IsSuspended || !_IP_TargetOwnerCurrent(Owner)
+			return 0
+		Window.Show("w600")
+		if A_IsSuspended || !_IP_TargetOwnerCurrent(Owner)
+			return 0
+		WinActivate("ahk_id " . Window.Hwnd)
+		if A_IsSuspended || !_IP_TargetOwnerCurrent(Owner)
+			return 0
+		if !WinWaitActive("ahk_id " . Window.Hwnd, , 3)
+			return 0
+		if A_IsSuspended || !_IP_TargetOwnerCurrent(Owner)
+			return 0
+		Field.Focus()
+		if _IP_TargetAdmission(Target) != ""
+			return 0
+		Accepted := true
+		return Target
+	} finally {
+		if !Accepted
+			_IP_DestroyTarget(Target)
 	}
-	Field.Focus()
-	return Map("gui", Window, "edit", Field)
+}
+
+; Pure authority is separate from the geometric predicate, which is also used
+; to prove a private destination while the driver is paused.
+; @param Owner {Object} The exact factory-owned native target.
+; @returns {Boolean}
+_IP_TargetOwnerCurrent(Owner) {
+	return Owner.Active && !Owner.Retired
+}
+
+; Preserve native Close-as-Hide while retiring its input authority first.
+; @param Owner {Object}
+; @param GuiObj {Gui} The actual native event owner.
+_IP_TargetClose(Owner, GuiObj, *) {
+	PreviousCritical := Critical("On")
+	try {
+		if !Owner.Active || Owner.Gui != GuiObj
+			return false
+		Owner.Retired := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	GuiObj.Hide()
+	return true
+}
+
+; Break the event/owner cycle before disposing only the retained native target.
+; @param Target {Map}
+_IP_DestroyTarget(Target) {
+	Owner := Target["owner"]
+	Owner.Active := false
+	CloseCallback := Owner.CloseCallback
+	Owner.CloseCallback := 0
+	try {
+		if IsObject(CloseCallback)
+			Target["gui"].OnEvent("Close", CloseCallback, 0)
+	} finally {
+		Target["gui"].Destroy()
+	}
+}
+
+; A focus query can yield; recheck RAM authority and native pause afterwards.
+; @param Target {Map}
+; @returns {String} Empty when admitted, otherwise an existing abort reason.
+_IP_TargetAdmission(Target) {
+	if A_IsSuspended
+		return "paused"
+	Owner := Target["owner"]
+	if !_IP_TargetOwnerCurrent(Owner) || Owner.Gui != Target["gui"] || Owner.Edit != Target["edit"]
+		return "foreground"
+	try Ready := Owner.Hwnd == Target["gui"].Hwnd && _IP_TargetReady(Target)
+	catch Any as Failure {
+		if A_IsSuspended
+			return "paused"
+		if !_IP_TargetOwnerCurrent(Owner)
+			return "foreground"
+		throw Failure
+	}
+	if A_IsSuspended
+		return "paused"
+	if !Ready || !_IP_TargetOwnerCurrent(Owner)
+			|| Owner.Gui != Target["gui"] || Owner.Edit != Target["edit"]
+		return "foreground"
+	return ""
 }
 
 ; Whether the target still owns the keyboard.
@@ -515,7 +600,7 @@ InputProbe_RunSendComparison(Reps := 0) {
 		return Result
 	} finally {
 		if IsObject(Target)
-			Target["gui"].Destroy()
+			_IP_DestroyTarget(Target)
 		_InputProbeBusy := false
 	}
 }
@@ -589,17 +674,24 @@ _IP_HookInstall(Callback) {
 }
 
 ; Injects the probe key once and reports what each side saw.
+; @param Target {Map} The exact factory-owned target.
 ; @param Mode {String} SendEvent | SendInput
-; @returns {Map} seen, fired.
-_IP_HookInject(Mode) {
+; @returns {Map} seen, fired, reason (empty when completed).
+_IP_HookInject(Target, Mode) {
 	global _InputProbeHookSeen, _InputProbeHookFired
 	global INPUT_PROBE_HOOK_KEYS, INPUT_PROBE_HOOK_WAIT_MS
 	_InputProbeHookSeen := 0
 	_InputProbeHookFired := 0
+	Reason := _IP_TargetAdmission(Target)
+	if Reason != ""
+		return Map("seen", 0, "fired", 0, "reason", Reason)
 	PreviousLevel := A_SendLevel
 	; Level 1 is above the probe hotkey's level 0, so the hotkey may fire on it.
 	SendLevel(1)
 	try {
+		Reason := _IP_TargetAdmission(Target)
+		if Reason != ""
+			return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 		if (Mode == "SendInput")
 			SendInput(INPUT_PROBE_HOOK_KEYS)
 		else
@@ -607,12 +699,20 @@ _IP_HookInject(Mode) {
 	} finally
 		SendLevel(PreviousLevel)
 	Deadline := A_TickCount + INPUT_PROBE_HOOK_WAIT_MS
-	while (_InputProbeHookFired < 1 && A_TickCount < Deadline)
+	while (_InputProbeHookFired < 1 && A_TickCount < Deadline) {
+		Reason := _IP_TargetAdmission(Target)
+		if Reason != ""
+			return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 		Sleep(10)
+	}
+	Reason := _IP_TargetAdmission(Target)
+	if Reason != ""
+		return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 	; A key that AutoHotkey let through reaches the test hook within the same
 	; send; the extra pause only lets a late callback land.
 	Sleep(40)
-	return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired)
+	Reason := _IP_TargetAdmission(Target)
+	return Map("seen", _InputProbeHookSeen, "fired", _InputProbeHookFired, "reason", Reason)
 }
 
 ; Records which hook runs first before and after a SendInput.
@@ -633,9 +733,13 @@ InputProbe_RunHookOrder() {
 	HotkeyOn := false
 	try {
 		try LoggerStart(INPUT_PROBE_TAG, "Hook order check started.")
+		if A_IsSuspended {
+			Result["reason"] := "paused"
+			return Result
+		}
 		Target := _IP_OpenTarget()
 		if !Target {
-			Result["reason"] := "foreground"
+			Result["reason"] := A_IsSuspended ? "paused" : "foreground"
 			try LoggerWarn(INPUT_PROBE_TAG, "Hook order check aborted: the check window could not take the focus.")
 			return Result
 		}
@@ -646,24 +750,61 @@ InputProbe_RunHookOrder() {
 		Hotkey(INPUT_PROBE_HOOK_HOTKEY, _IP_HookHotkey, "On I0")
 		HotkeyOn := true
 		Callback := CallbackCreate(_IP_HookProc, "Fast", 3)
+		Reason := _IP_TargetAdmission(Target)
+		if Reason != "" {
+			Result["reason"] := Reason
+			return Result
+		}
 		Hook := _IP_HookInstall(Callback)
-		Before := _IP_HookInject("SendEvent")
+		Before := _IP_HookInject(Target, "SendEvent")
+		if Before["reason"] != "" {
+			Result["reason"] := Before["reason"]
+			return Result
+		}
 		; Real SendInput: AutoHotkey removes its hook for the send and installs it
 		; again, newest, afterwards. The hotkey cannot fire during it.
-		During := _IP_HookInject("SendInput")
-		After := _IP_HookInject("SendEvent")
+		During := _IP_HookInject(Target, "SendInput")
+		if During["reason"] != "" {
+			Result["reason"] := During["reason"]
+			return Result
+		}
+		After := _IP_HookInject(Target, "SendEvent")
+		if After["reason"] != "" {
+			Result["reason"] := After["reason"]
+			return Result
+		}
 		; Control: the test hook installed again is the newest and must run first,
 		; or the whole method (suppression seen from a newer hook) is unsound.
 		DllCall("UnhookWindowsHookEx", "Ptr", Hook)
+		Reason := _IP_TargetAdmission(Target)
+		if Reason != "" {
+			Result["reason"] := Reason
+			return Result
+		}
 		Hook := _IP_HookInstall(Callback)
-		Control := _IP_HookInject("SendEvent")
+		Control := _IP_HookInject(Target, "SendEvent")
+		if Control["reason"] != "" {
+			Result["reason"] := Control["reason"]
+			return Result
+		}
 		Verdict := InputProbe_HookVerdict(Before, During, After, Control)
 		Result["verdict"] := Verdict
 		Result["record"] := InputProbe_HookRecord(Before, During, After, Control, Verdict)
 		try LoggerEvidence(INPUT_PROBE_TAG, "{1}", Result["record"])
+		Reason := _IP_TargetAdmission(Target)
+		if Reason != "" {
+			Result["reason"] := Reason
+			return Result
+		}
 		Result["state"] := "done"
 		Result["pass"] := Verdict["conclusive"]
 		try LoggerSuccess(INPUT_PROBE_TAG, "Hook order check finished (conclusive={1}).", Verdict["conclusive"] ? 1 : 0)
+		Reason := _IP_TargetAdmission(Target)
+		if Reason != "" {
+			Result["state"] := "aborted"
+			Result["reason"] := Reason
+			Result["pass"] := false
+		}
 		return Result
 	} finally {
 		if Hook
@@ -675,7 +816,7 @@ InputProbe_RunHookOrder() {
 			Hotkey(INPUT_PROBE_HOOK_HOTKEY, "Off")
 		}
 		if IsObject(Target)
-			Target["gui"].Destroy()
+			_IP_DestroyTarget(Target)
 		_InputProbeBusy := false
 	}
 }
