@@ -42,6 +42,7 @@ local Registry      = require("layouts.registry")
 local Catalogue     = require("layouts.catalogue")
 local Outdated      = require("config_outdated")
 local Extension     = require("layouts.extension")
+local Composer      = require("layouts.composer")
 
 local M = {}
 
@@ -99,6 +100,7 @@ M.FAILURE_CONVERSION = "conversion_failed"
 M.FAILURE_INSTALLER = "installer_failed"
 M.FAILURE_FOREIGN_FILE = "foreign_file"
 M.FAILURE_SELECT = "select_failed"
+M.FAILURE_INVALID = "invalid"
 
 
 
@@ -889,6 +891,196 @@ function M.select(id, on_done, deps)
 		on_done(true, { id = id })
 	end)
 	return true
+end
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 8/ Composed layout =========
+-- ====================================
+-- ====================================
+
+--- Installs the layout the user composed (docs/layout-composer.md) in the user
+--- XKB tree: no catalogue and no download, the caller built the entry from the
+--- compiled file. The converter reads the entry's hints from a one-layout
+--- index written next to the copy.
+--- on_done(true, { entry, source }) or on_done(false, failure_code, detail,
+--- user_message) runs once unless terminal shutdown cancels its delivery.
+--- @param entry table Record entry of the composition.
+--- @param text string The compiled .keylayout.
+--- @param on_done function
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.install_local(entry, text, on_done, deps)
+	if _stopping then return false end
+	local epoch, receive = _epoch, on_done
+	on_done = function(...) if current(epoch) and receive then return receive(...) end end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		on_done(false, M.FAILURE_WRITE, deps_err, nil)
+		return false
+	end
+	deps = resolved
+	local id = type(entry) == "table" and entry.id or nil
+	if not Registry.is_valid_id(id) then
+		on_done(false, M.FAILURE_UNKNOWN_LAYOUT, "'" .. tostring(id) .. "' is not a layout id", nil)
+		return false
+	end
+	if not acquire_slot(id, "install", on_done) then return false end
+	local function finish(ok, code_or_detail, detail)
+		if not current(epoch) then return end
+		_busy = nil
+		if ok then
+			Logger.success(LOG, "Installed the composed '%s' layout.", id)
+			on_done(true, code_or_detail)
+			return
+		end
+		Logger.error(LOG, "The composed '%s' layout was not installed (%s): %s.", id, tostring(code_or_detail),
+			tostring(detail))
+		on_done(false, code_or_detail, detail, user_message(deps, code_or_detail))
+	end
+	Logger.start(LOG, "Installing the composed '%s' layout…", id)
+	local _, record_problem = read_installed(deps)
+	if record_problem ~= nil then
+		finish(false, M.FAILURE_RECORD, record_problem)
+		return false
+	end
+	deps.transport.sha256(text, function(digest, digest_err)
+		if not current(epoch) then return end
+		local verified, reason = Registry.verify(entry, text, digest)
+		if not verified then
+			finish(false, M.FAILURE_INVALID, reason or digest_err)
+			return
+		end
+		local layout_path = deps.local_dir .. id .. ".keylayout"
+		local index_path = deps.local_dir .. id .. ".index.json"
+		for _, step in ipairs({ { layout_path, text }, { index_path, deps.encode_json({ layouts = { entry } }) } }) do
+			local written, write_err = write_file(deps, step[1], step[2])
+			if not written then
+				finish(false, M.FAILURE_WRITE, write_err)
+				return
+			end
+		end
+		convert(deps, entry, layout_path, index_path, function(converted, code, convert_err)
+			if not current(epoch) then return end
+			if not converted then
+				finish(false, code, convert_err)
+				return
+			end
+			run_installer(deps, { "install", "--layout-id", id, "--display-name", entry.name,
+				"--source-dir", deps.local_dir .. id }, function(installed, report, install_err)
+				if not current(epoch) then return end
+				if not installed then
+					finish(false, report, install_err)
+					return
+				end
+				local record, record_err = read_installed(deps)
+				local saved, save_err = false, record_err
+				if record then saved, save_err = write_installed(deps, Catalogue.with_installed(record, entry)) end
+				if not saved then
+					finish(false, M.FAILURE_RECORD, save_err)
+					return
+				end
+				finish(true, { entry = entry, source = "composer", verified = report.verified })
+			end)
+		end)
+	end)
+	return true
+end
+
+--- The composer's ports over this module (see layouts/composer.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function composer_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = Composer.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	local function installed()
+		local record = read_installed(deps)
+		return record and record.layouts or {}
+	end
+	return Composer.new({
+		settings = settings,
+		max_file_bytes = deps.settings.max_file_bytes,
+		platform = PLATFORM,
+		-- XKB has one level for every chord modifier: Ctrl, Alt and Win share it.
+		shortcuts = "single",
+		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
+		decode_json = deps.decode_json,
+		read = deps.read,
+		exists = deps.exists,
+		delete = deps.delete,
+		write = function(path, content) return write_file(deps, path, content) end,
+		sha256 = deps.transport.sha256,
+		installed = installed,
+		active_id = function() return _active end,
+		sources_env = function()
+			return {
+				platform = PLATFORM,
+				composer_id = settings.id,
+				bundled_index = bundled_index(deps),
+				bundled_dir = deps.bundled_dir,
+				local_dir = deps.local_dir,
+				installed = installed(),
+				read = deps.read,
+				sha256 = deps.transport.sha256,
+				log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+			}
+		end,
+		install = function(entry, text, on_done) return M.install_local(entry, text, on_done, deps) end,
+		uninstall = function(id, on_done) return M.uninstall(id, on_done, deps) end,
+		select = function(id, on_done) return M.select(id, on_done, deps) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Runs one composer operation over the resolved collaborators.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_composer(deps, run, refuse)
+	if _stopping then return false end
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout composer is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Sends the composer page its sources and stored composition.
+--- @param on_done function on_done(data)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_open(on_done, deps)
+	return with_composer(deps, function(operations) operations.open(on_done) end, function() end)
+end
+
+--- Stores a composition and installs its layout.
+--- @param payload table { declaration, keylayout, use }
+--- @param on_done function on_done(ok, code, detail, used)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_save(payload, on_done, deps)
+	return with_composer(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, false) end)
+end
+
+--- Removes the composition.
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_remove(on_done, deps)
+	return with_composer(deps, function(operations) operations.remove(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
 --- Revokes every registry workflow before cancelling its external transports.

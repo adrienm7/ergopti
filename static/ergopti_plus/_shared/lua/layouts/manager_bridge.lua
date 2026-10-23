@@ -34,6 +34,9 @@ M.ACTIONS = {
 	select = true,
 	open_homepage = true,
 	close = true,
+	composer_open = true,
+	composer_save = true,
+	composer_remove = true,
 }
 
 -- A registry id: the rule of tools/build/build-layouts-index.cjs.
@@ -90,9 +93,48 @@ end
 -- =============================
 -- =============================
 
+--- Handles the three composer messages of the page.
+--- @param deps table The controller's collaborators.
+--- @param controller table
+--- @param action string
+--- @param payload table
+--- @param push_state function
+--- @return boolean handled
+function M.handle_composer(deps, controller, action, payload, push_state)
+	local registry = deps.registry
+	local operation = registry[action]
+	if type(operation) ~= "function" then
+		deps.log("warn", "Refused a layout composer message: the registry has no '%s' operation.", action)
+		return false
+	end
+	local function report(ok, code, detail, used)
+		deps.push("composerResult", { action = action, ok = ok == true, code = code, detail = detail and tostring(detail),
+			used = used == true })
+		push_state()
+	end
+	if action == "composer_open" then
+		operation(function(data) deps.push("composerData", data) end)
+		return true
+	end
+	if action == "composer_remove" then
+		operation(report)
+		return true
+	end
+	if type(payload.declaration) ~= "string" or type(payload.keylayout) ~= "string" then
+		deps.log("warn", "Refused a layout composer save without its declaration and layout.")
+		return false
+	end
+	operation({ declaration = payload.declaration, keylayout = payload.keylayout, use = payload.use == true }, report)
+	return true
+end
+
 --- Creates the controller of one page.
 --- deps.registry: { refresh(on_done), snapshot(), install(id, on_done),
 ---   uninstall(id, on_done), select(id, on_done) }; on_done(ok, detail_or_code, detail).
+--- deps.registry also offers the composer (docs/layout-composer.md) as
+---   composer_open(on_done), composer_save(payload, on_done) and
+---   composer_remove(on_done) (_shared/lua/layouts/composer.lua); a registry
+---   without them refuses the three composer messages.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
@@ -142,6 +184,9 @@ function M.new(deps)
 		if action == "close" then
 			deps.close()
 			return true
+		end
+		if action == "composer_open" or action == "composer_save" or action == "composer_remove" then
+			return M.handle_composer(deps, controller, action, payload, push_state)
 		end
 		if type(id) ~= "string" or not id:match(ID_PATTERN) then
 			deps.log("warn", "Refused a layout manager '%s' without a valid layout id.", action)

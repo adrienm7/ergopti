@@ -35,6 +35,7 @@ local Registry     = require("layouts.registry")
 local Catalogue    = require("layouts.catalogue")
 local Outdated     = require("config_outdated")
 local Extension    = require("layouts.extension")
+local Composer     = require("layouts.composer")
 
 local M = {}
 
@@ -54,6 +55,7 @@ M.FAILURE_DOWNLOAD = "download_failed"
 M.FAILURE_WRITE = "write_failed"
 M.FAILURE_RECORD = "record_failed"
 M.FAILURE_SELECT = "select_failed"
+M.FAILURE_INVALID = Composer.FAILURE_INVALID
 
 -- The platform name registry entries list when macOS can install them.
 local PLATFORM = "macos"
@@ -670,6 +672,180 @@ function M.select(id, on_done, deps)
 		Logger.success(LOG, "Selected the '%s' layout.", id)
 		on_done(true, { id = id })
 	end)
+end
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 6/ Composed layout =========
+-- ====================================
+-- ====================================
+
+--- Installs the layout the user composed (docs/layout-composer.md): no catalogue
+--- and no download, the caller built the entry from the compiled file. The copy
+--- is published and enabled exactly like a registry layout's.
+--- on_done(true, { entry, path, source, enabled }) or
+--- on_done(false, failure_code, detail) is called exactly once.
+--- @param entry table Record entry of the composition.
+--- @param text string The compiled .keylayout.
+--- @param on_done function
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.install_local(entry, text, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then
+		on_done(false, M.FAILURE_WRITE, deps_err)
+		return false
+	end
+	deps = resolved
+	local id = type(entry) == "table" and entry.id or nil
+	if not Registry.is_valid_id(id) then
+		on_done(false, M.FAILURE_UNKNOWN_LAYOUT, "'" .. tostring(id) .. "' is not a layout id")
+		return false
+	end
+	if not acquire_slot(id, "install", on_done) then return false end
+	local function finish(ok, code_or_detail, detail)
+		_busy = nil
+		if ok then
+			Logger.success(LOG, "Installed the composed '%s' layout.", id)
+		else
+			Logger.error(LOG, "The composed '%s' layout was not installed (%s): %s.", id, tostring(code_or_detail),
+				tostring(detail))
+		end
+		on_done(ok, code_or_detail, detail)
+	end
+	Logger.start(LOG, "Installing the composed '%s' layout…", id)
+	local record, record_err = read_installed(deps)
+	if not record then
+		finish(false, M.FAILURE_RECORD, record_err)
+		return false
+	end
+	if deps.exists(deps.layouts_dir .. id .. ".keylayout") and not record.layouts[id] then
+		finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
+		return false
+	end
+	if type(entry.keyboard_name) == "string" and bundle_names(deps)[entry.keyboard_name] then
+		finish(false, M.FAILURE_PROVIDED_BY_BUNDLE, "an installed Ergopti bundle already provides "
+			.. entry.keyboard_name)
+		return false
+	end
+	deps.transport.sha256(text, function(digest, digest_err)
+		local verified, reason = Registry.verify(entry, text, digest)
+		if not verified then
+			finish(false, M.FAILURE_INVALID, reason or digest_err)
+			return
+		end
+		local path, code, publish_err = publish(deps, entry, text)
+		if not path then
+			finish(false, code, publish_err)
+			return
+		end
+		deps.enable_source(path, entry.name, function(enabled, _output, enable_reason)
+			if not enabled then
+				Logger.warn(LOG, "The composed '%s' layout is installed but not enabled: %s.", id, tostring(enable_reason))
+			end
+			finish(true, { entry = entry, path = path, source = "composer", enabled = enabled == true })
+		end)
+	end)
+	return true
+end
+
+--- The composer's ports over this module (see layouts/composer.lua).
+--- @param deps table
+--- @return table|nil operations
+--- @return string|nil error
+local function composer_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = Composer.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	local function installed()
+		local record = read_installed(deps)
+		return record and record.layouts or {}
+	end
+	return Composer.new({
+		settings = settings,
+		max_file_bytes = deps.settings.max_file_bytes,
+		platform = PLATFORM,
+		shortcuts = "full",
+		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
+		decode_json = deps.decode_json,
+		read = deps.read,
+		exists = deps.exists,
+		delete = deps.delete,
+		write = function(path, content) return write_file(deps, path, content) end,
+		sha256 = deps.transport.sha256,
+		installed = installed,
+		active_id = function() return M.snapshot(deps).active end,
+		sources_env = function()
+			return {
+				platform = PLATFORM,
+				composer_id = settings.id,
+				bundled_index = bundled_index(deps),
+				bundled_dir = deps.bundled_dir,
+				local_dir = deps.local_dir,
+				installed = installed(),
+				read = deps.read,
+				sha256 = deps.transport.sha256,
+				log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+			}
+		end,
+		install = function(entry, text, on_done) return M.install_local(entry, text, on_done, deps) end,
+		uninstall = function(id, on_done) return M.uninstall(id, on_done, deps) end,
+		select = function(id, on_done) return M.select(id, on_done, deps) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Sends the composer page its sources and stored composition.
+--- @param on_done function on_done(data)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_open(on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout composer is unusable: %s.", tostring(deps_err or operations_err))
+		return false
+	end
+	operations.open(on_done)
+	return true
+end
+
+--- Stores a composition and installs its layout.
+--- @param payload table { declaration, keylayout, use }
+--- @param on_done function on_done(ok, code, detail, used)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_save(payload, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		on_done(false, M.FAILURE_WRITE, deps_err or operations_err, false)
+		return false
+	end
+	operations.save(payload, on_done)
+	return true
+end
+
+--- Removes the composition.
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_remove(on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		on_done(false, M.FAILURE_WRITE, deps_err or operations_err)
+		return false
+	end
+	operations.remove(on_done)
+	return true
 end
 
 --- Test seam: forgets the catalogue, the operation slot and the shipped index.
