@@ -69,7 +69,9 @@ local function load()
 	if not fh then return end
 	local text = fh:read("*a")
 	fh:close()
-	local root = Json.decode(text or "")
+	-- An overflowing persisted sequence becomes infinity in the legacy decoder,
+	-- leaving LRU eviction without any oldest entry. Admit exact JSON instead.
+	local root = Json.decode_lossless(text or "")
 	if type(root) ~= "table" or root.version ~= VERSION or type(root.apps) ~= "table" then
 		Logger.warn(LOG, "The agent's learning file is unreadable — it is kept aside and learning restarts.")
 		os.rename(path, path .. ".corrupt")
