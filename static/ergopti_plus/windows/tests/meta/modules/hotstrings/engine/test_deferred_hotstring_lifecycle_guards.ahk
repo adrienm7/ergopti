@@ -95,9 +95,9 @@ _DHLC_AllFireSinksGuardBeforeMutation() {
 	ClaimPos := InStr(FlushBody, "Keystats._flush_in_progress := true")
 	Assert(LatchPos > 0 && ClaimPos > LatchPos && LatchPos < SnapshotPos,
 		"AHK-22: detached snapshots must be serialised before the destructive swap so rejected restores cannot reverse typing order")
-	Assert(InStr(PublishBody, "KL_AppendLog(entry, &RejectedBySuspend)") > 0
+	Assert(InStr(PublishBody, "KL_AppendLog(entry, &RejectedBySuspend, PublishGuard?)") > 0
 		&& InStr(PublishBody, "if RejectedBySuspend") > 0,
-		"AHK-22: typing restoration must depend on the append's explicit suspend outcome, never on an ambiguous false shared with privacy filtering")
+		"AHK-22: typing publication must carry its exact lifecycle guard into the append; restoration uses its explicit receipt, never an ambiguous false shared with privacy filtering")
 
 	AppendBody := _DriverFuncBody("KL_AppendLog")
 	Assert(AppendBody != "", "KL_AppendLog() must exist in the driver source")
