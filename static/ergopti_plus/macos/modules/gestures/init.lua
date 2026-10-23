@@ -234,6 +234,7 @@ local gesture_primer_committed = false
 local engine_needs_init = not initial_engine_committed
 local gesture_lifecycle_epoch = 0
 local gesture_start_attempt = nil
+-- One existing replay intent covers interrupted startup and wake recovery deferred by PAUSE.
 local gesture_resume_start_required = false
 local teardown_gesture_runtime
 local release_native_runtime
@@ -878,12 +879,12 @@ function M.resume()
 		return true
 	end
 	if gesture_resume_start_required == true then
-		-- A PAUSE that arrived inside start() forced exact rollback of partially
-		-- acquired native owners. Settle any refused inverse first, then rebuild
-		-- the complete previously-ON posture as one fresh guarded start attempt.
+		-- An interrupted start or a wake observed under PAUSE requires a fresh
+		-- native runtime. Settle every exact prior owner before one guarded
+		-- restart; a refusal keeps the resume intent and suspension intact.
 		if teardown_gesture_runtime(true) ~= true then
 			Logger.error(LOG,
-				"Gesture resume cannot rebuild while startup rollback debt remains.")
+				"Gesture resume cannot rebuild while native cleanup remains pending.")
 			return false
 		end
 		CoreState.suspended = false
@@ -901,7 +902,7 @@ function M.resume()
 			end
 			return false
 		end
-		Logger.debug(LOG, "Gestures resumed by rebuilding the interrupted native startup.")
+		Logger.debug(LOG, "Gestures resumed by rebuilding the required native runtime.")
 		return true
 	end
 	local ok_resume, resume_result = xpcall(
@@ -1508,6 +1509,10 @@ function M.start()
 		wake_candidate = cw_module.new(function(event)
 			if sleep_watcher ~= wake_candidate or sleep_watcher_committed ~= true then return end
 			if event == cw_module.systemDidWake or event == cw_module.screensDidUnlock then
+				if CoreState.enabled and CoreState.suspended then
+					gesture_resume_start_required = true
+					Logger.debug(LOG, "Wake recovery deferred until gestures resume.")
+				end
 				if not CoreState.enabled or CoreState.suspended then return end
 				Logger.info(LOG, "Wake-from-sleep detected (event=%d) — recycling watchers", event)
 				kickstart_hid()
