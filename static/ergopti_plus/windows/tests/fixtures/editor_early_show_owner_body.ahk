@@ -21,6 +21,7 @@ LLM_Translate_ShippedChoices() => []
 GestureClearPickedParameter() => 0
 LoggerSuccess(*) => 0
 LoggerError(*) => 0
+LoggerWarn(*) => 0
 
 _ESOW_Require(Value, Message) {
 	if !Value
