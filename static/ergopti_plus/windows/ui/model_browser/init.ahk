@@ -707,8 +707,14 @@ _LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
 	global _LLM_MBW_SessionEpoch
 	if A_IsSuspended or (ExpectedEpoch != _LLM_MBW_SessionEpoch)
 		return
-	_LLM_MBW_OnClose()
-	try LLM_Menu_SetModel(Name)
+	; Teardown can pump a pause or a new browser session. Commit the selection
+	; before those callouts, and close only the session which requested it.
+	try Applied := LLM_Menu_SetModel(Name)
+	catch
+		return
+	if (Applied is Integer) && Applied == 1
+			&& ExpectedEpoch == _LLM_MBW_SessionEpoch
+		_LLM_MBW_OnClose()
 }
 
 /**
