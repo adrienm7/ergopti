@@ -94,6 +94,7 @@ Test("hsedweb_reset: _HsEdWeb_Reset checks the guard and returns before unsubscr
 
 _HSEDRI_ResetSetsFlagTrue() {
 	Body := _HSEDRI_ResetBody()
+	Assert(Body != "", "The real reset owner must be nonempty")
 	Assert(InStr(Body, "_HsEdWeb_ResetDone := true") > 0,
 		"_HsEdWeb_Reset must set _HsEdWeb_ResetDone := true once it proceeds past the guard, so any LATER re-entrant call (from the sibling close path) short-circuits instead of reaching remove_WebMessageReceived a second time (hsedweb-reset-idempotent)")
 }
@@ -123,8 +124,24 @@ _HSEDRI_DoubleCloseReachesReset() {
 		'_HsEdWeb_Close must still exist as the shared teardown entry point for both the JS "close" message and the native Gui Close event (hsedweb-reset-idempotent)')
 
 	CloseBody := _DriverFuncBody("_HsEdWeb_Close")
-	Assert(InStr(CloseBody, "_HsEdWeb_Reset()") > 0,
-		"_HsEdWeb_Close must call _HsEdWeb_Reset() — both the JS-triggered and native-Close-triggered paths funnel through here, which is exactly why _HsEdWeb_Reset() itself must be idempotent (hsedweb-reset-idempotent)")
+	Assert(CloseBody != "", "The shared exact-window close owner must be nonempty")
+	Assert(InStr(CloseBody, "_HsEdWeb_Reset(SessionEpoch, Window)") > 0,
+		"Both close routes must invoke the real idempotent reset with their exact captured native owner (hsedweb-reset-idempotent)")
+	Assert(InStr(CloseBody, "_HsEdWeb_Reset(SessionEpoch, Window)") < InStr(CloseBody, "Window.Destroy()"),
+		"The exact owner must retire before native Destroy can dispatch another close (hsedweb-reset-idempotent)")
+
+	ResetBody := _HSEDRI_ResetBody()
+	Assert(ResetBody != "", "The shared reset owner must be nonempty")
+	MsgCapture := InStr(ResetBody, "RetiredMsgSub := _HsEdWeb_MsgSub")
+	MsgDetach := InStr(ResetBody, "_HsEdWeb_MsgSub := unset")
+	Guard := InStr(ResetBody, "if _HsEdWeb_ResetDone")
+	Restore := InStr(ResetBody, "finally Critical(PreviousCritical)")
+	MsgRelease := InStr(ResetBody, "try RetiredMsgSub := unset")
+	NavRelease := InStr(ResetBody, "try RetiredNavSub := unset")
+	ControllerClose := InStr(ResetBody, "try RetiredController.Close()")
+	Assert(Guard > 0 && MsgCapture > Guard && MsgDetach > MsgCapture
+		&& Restore > MsgDetach && MsgRelease > Restore && NavRelease > MsgRelease && ControllerClose > NavRelease,
+		"Idempotent reset must retain old subscriptions before detaching globals, then unsubscribe outside RAM Critical before closing their own controller (hsedweb-reset-idempotent)")
 }
 
 Test("hsedweb_reset: _HsEdWeb_Close (shared by both close paths) calls _HsEdWeb_Reset (hsedweb-reset-idempotent)",
