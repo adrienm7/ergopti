@@ -194,3 +194,5 @@ _CALC_Run(Held) {
 
 Test("ClipboardAll lock: ordinary setter preserves both native formats (clipboardall-external-lock)", _CALC_Run.Bind(false))
 Test("ClipboardAll lock: same-HWND external open excludes another process through the real setter (clipboardall-external-lock)", _CALC_Run.Bind(true))
+
+#Include test_plain_paste_snapshot_owner.ahk
