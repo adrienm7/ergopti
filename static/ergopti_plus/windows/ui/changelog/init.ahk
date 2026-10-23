@@ -800,7 +800,9 @@ _CLW_PollFetch(Req, Context, Polls) {
 		try {
 			Status := Req.Status
 			Body := Req.ResponseText
-			Reason := _CLW_ClassifySource(Context.Stage, Status, Body)
+			Reason := Req.ResponseEncodingValid
+				? _CLW_ClassifySource(Context.Stage, Status, Body)
+				: "response bytes are not valid UTF-8"
 			if (Reason == "")
 				Json := Body
 		} catch as Err {
