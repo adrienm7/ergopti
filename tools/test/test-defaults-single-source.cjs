@@ -118,6 +118,30 @@ async function main() {
 		shippedDelay,
 		'the recommended base delay is the shipped one'
 	);
+	// PAR-18: the prediction debounce is ONE value on every driver. macOS used
+	// to declare 200 ms with no stated reason while the shared LLM defaults and the
+	// two other drivers ran 500 ms; a per-platform value needs a reason_key.
+	const debounceEntry = manifest.entries.find(
+		(entry) => entry.section === 'llm.trigger' && entry.id === 'debounce_ms'
+	);
+	const shippedDebounce = JSON.parse(
+		fs.readFileSync(paths.shared('modules/llm/defaults.json'), 'utf8')
+	).llm_debounce_ms;
+	assert.equal(
+		debounceEntry.default,
+		shippedDebounce,
+		'llm.trigger.debounce_ms must equal llm_debounce_ms'
+	);
+	assert.equal(
+		debounceEntry.recommended,
+		shippedDebounce,
+		'the recommended debounce is the shipped one'
+	);
+	assert.equal(
+		debounceEntry.default_per_platform ?? debounceEntry.recommended_per_platform,
+		undefined,
+		'the debounce has no per-platform value: a difference needs a reason_key declared with it'
+	);
 	assert(
 		!/^hotstring_expansion_ms\s*=/m.test(
 			fs.readFileSync(paths.shared('modules/timings/constants.toml'), 'utf8')

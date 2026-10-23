@@ -154,7 +154,7 @@ num_predictions = 3
 # =======================
 
 [llm.trigger]
-debounce_ms = 200
+debounce_ms = 500
 instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
