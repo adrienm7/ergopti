@@ -103,3 +103,5 @@ for Mode in ["consume", "stale-ack", "stale-native", "invalid", "wrong-sender", 
 #Include test_hcw_early_show_owner.ahk
 
 #Include test_prompt_startup_owner.ahk
+
+#Include test_paths_close_request.ahk
