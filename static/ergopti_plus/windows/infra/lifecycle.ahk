@@ -589,11 +589,11 @@ Ergopti_OnSuspendEnter() {
 		; Suspend only disarms hotkeys, so explicitly kill its process tree rather
 		; than letting SQLite/JSON work continue throughout a paused driver.
 	_LifecycleRunRequiredStep(Transition, "keystats-prefetch-typing",
-		() => KLPF_CancelBuild("typing"))
+		() => KLPF_CancelBuild("typing"), true)
 	_LifecycleRunRequiredStep(Transition, "keystats-prefetch-apps",
-		() => KLPF_CancelBuild("apps"))
+		() => KLPF_CancelBuild("apps"), true)
 	_LifecycleRunRequiredStep(Transition, "keystats-prefetch-range",
-		() => KLPF_CancelBuild("range:typing"))
+		() => KLPF_CancelBuild("range:typing"), true)
 		; The selection probe is a persistent detached AHK process. Native Suspend
 		; cannot stop it, so retire request ownership and its process tree before
 		; entering the paused state.
