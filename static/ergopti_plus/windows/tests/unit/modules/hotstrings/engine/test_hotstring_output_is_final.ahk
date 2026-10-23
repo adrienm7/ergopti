@@ -265,6 +265,31 @@ Test("hotstring output: a native Notepad edit injects no key (hotstring-output-i
 Test("hotstring output: the ellipsis and dead key callbacks send one SendInput at level 0 (hotstring-output-is-final)",
 	_HOF_RawCallbacksAreAtomicAtLevelZero)
 
+; The Space tap-hold puts its space on screen with the TextSender, then feeds
+; it to the engine itself. The send must not also declare the space as a caret
+; edit, which empties both buffers before the feed and so completes nothing.
+_HOF_SpaceTapImpl() {
+	global _HOF_Sends, HSE_LastEndChar
+	CreateHotstring("", "qzx", "final", Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON))
+	for Char in StrSplit("qzx")
+		HSE_FeedChar(Char, true)
+	AssertEqual("qzx", HSE_Buffer, "the typed trigger must be in the engine buffer")
+	AssertTrue(TextPressKeyFed("Space"), "the space must be sent")
+	AssertEqual("{Space}", _HOF_Sends[1].Keys, "the tap must send one space")
+	AssertEqual("qzx", HSE_Buffer, "sending the space must not declare an edit that empties the buffer")
+	Match := HSE_FeedChar(" ", true)
+	AssertTrue(IsObject(Match), "an end-character trigger must complete from the Space tap")
+	Effect := 0
+	AssertTrue(HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect), "the completed trigger must dispatch")
+}
+
+_HOF_SpaceTapCompletesEndCharTrigger() {
+	_HOF_Run(_HOF_SpaceTapImpl)
+}
+
+Test("hotstring output: an end-character trigger completes from the Space tap (hotstring-output-is-final)",
+	_HOF_SpaceTapCompletesEndCharTrigger)
+
 
 
 

@@ -11,7 +11,7 @@ _ST_AssertSpaceTapAtomic() {
 	CritOnIdx := InStr(Body, 'Critical("On")')
 	Assert(CritOnIdx > 0, "_SpaceTap must use Critical('On') to prevent mid-dispatch races (space-tap-dispatch-not-critical)")
 
-	PressIdx := InStr(Body, 'TextPressKey("Space"')
+	PressIdx := InStr(Body, 'TextPressKeyFed("Space"')
 	FeedIdx := InStr(Body, 'HSE_FeedChar(" ", true)')
 	LlmIdx := InStr(Body, '_HSE_MirrorLiteralEditToLlm(0, " ")')
 	DispatchIdx := InStr(Body, "HSE_DispatchMatch")
