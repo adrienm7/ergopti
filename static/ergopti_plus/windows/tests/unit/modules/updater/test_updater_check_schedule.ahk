@@ -241,3 +241,5 @@ _UCSch_PowerBroadcastFiltersResume() {
 	AssertEqual(2, Calls.Count, "both resume notices defer one re-evaluation")
 }
 Test("Updater schedule: only a resume broadcast defers a re-evaluation", _UCSch_PowerBroadcastFiltersResume)
+
+#Include test_updater_schedule_publication.ahk
