@@ -106,20 +106,24 @@ function M.isElementSecure(element, observe)
 		if observe then observe(false) end
 		return false
 	end
-	local ok_role, role    = pcall(function() return element:attributeValue("AXRole") end)
-	local ok_sub,  subrole = pcall(function() return element:attributeValue("AXSubrole") end)
+	local ok_role, role, role_error = pcall(function() return element:attributeValue("AXRole") end)
+	local ok_sub, subrole, subrole_error = pcall(function() return element:attributeValue("AXSubrole") end)
+	-- Native AX failures return nil plus an error without raising a Lua exception.
+	-- Optional nil-only subroles remain valid; a transport refusal is unknown.
+	local role_read = ok_role and not (role == nil and role_error ~= nil)
+	local subrole_read = ok_sub and not (subrole == nil and subrole_error ~= nil)
 	if observe then
-		local confirmed_secure = (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE)
-		observe(confirmed_secure or (ok_role and ok_sub and type(role) == "string" and role ~= ""
+		local confirmed_secure = (role_read and role == SECURE_ROLE) or (subrole_read and subrole == SECURE_ROLE)
+		observe(confirmed_secure or (role_read and subrole_read and type(role) == "string" and role ~= ""
 			and (subrole == nil or type(subrole) == "string")))
 	end
-	if (ok_role and role == SECURE_ROLE) or (ok_sub and subrole == SECURE_ROLE) then
+	if (role_read and role == SECURE_ROLE) or (subrole_read and subrole == SECURE_ROLE) then
 		return true
 	end
-	if not ok_role or not ok_sub then
+	if not role_read or not subrole_read then
 		Logger.debug(LOG,
 			"AX secure-field classification incomplete (role_read=%s, subrole_read=%s); suppressing input.",
-			tostring(ok_role), tostring(ok_sub))
+			tostring(role_read), tostring(subrole_read))
 		return true
 	end
 	return false

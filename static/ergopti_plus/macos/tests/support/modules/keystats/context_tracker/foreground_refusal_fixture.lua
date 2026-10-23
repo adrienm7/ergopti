@@ -9,6 +9,11 @@ local OWNERS = {
 	"adapters.physical_observation_clock",
 	"hs",
 	"tests.stubs.hs",
+	"lfs",
+	"native_path",
+	"error_description",
+	"number_policy",
+	"toml_codec.source_open",
 	"infra.logger",
 	"infra.manifest_reader",
 	"infra.config_paths",
@@ -129,7 +134,9 @@ local OWNERS = {
 ---@param callback function Receives the real public runtime and native controls.
 ---@return ... results Original callback results.
 function M.with_runtime(callback)
-	return helpers.with_stub_scope(OWNERS, function()
+	-- The optional native filesystem module can publish a global during startup.
+	local original_lfs = rawget(_G, "lfs")
+	local values = table.pack(pcall(helpers.with_stub_scope, OWNERS, function()
 		local fixture = ProvenanceFixture.load_keystats()
 		local engine, hs = fixture.keystats, fixture.hs
 		local driver = helpers.driver_root():gsub("/$", "")
@@ -355,7 +362,10 @@ function M.with_runtime(callback)
 		assert(stopped_control and stopped_engine, "Both exact public runtimes must retire")
 		assert(obs.caffeinate.created == 1 and obs.caffeinate.stopped == 1)
 		return table.unpack(outcome, 2, outcome.n)
-	end)
+	end))
+	rawset(_G, "lfs", original_lfs)
+	if not values[1] then error(values[2], 0) end
+	return table.unpack(values, 2, values.n)
 end
 
 return M
