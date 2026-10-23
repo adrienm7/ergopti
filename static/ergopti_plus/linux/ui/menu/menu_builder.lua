@@ -5294,7 +5294,7 @@ end
 --- The daemon owns the reload; the menu asks it to, exactly as the quit item
 --- asks via on_quit. No signal, no subprocess, no PID to get wrong.
 local function _build_reload(ctx)
-	return ManifestMenu.command_row("top_level", "reload", {
+	local row = ManifestMenu.command_row("top_level", "reload", {
 		reload = function()
 			if type(ctx.on_reload) ~= "function" then
 				-- Loudly, not silently: a Reload item that cannot reload is the
@@ -5309,6 +5309,10 @@ local function _build_reload(ctx)
 			end
 		end,
 	})
+	-- Read by ui/menu/rebuild_owner: a click on a stale Reload row joins the
+	-- reload that already ran instead of replaying a second one.
+	if type(row) == "table" then row.joins_reload = true end
+	return row
 end
 
 --- Builds the quit item.

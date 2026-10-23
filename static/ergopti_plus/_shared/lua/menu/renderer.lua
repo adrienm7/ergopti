@@ -635,6 +635,9 @@ function M.new(deps)
 				-- adapter that carried label, tick and greying and silently left the
 				-- app icons behind, so every row in that menu rendered blank-faced.
 				if row.image ~= nil then entry.image = row.image end
+				-- Read by the tray click owners: a click on this row during a reload
+				-- joins the reload in flight (menu/click_intent.lua).
+				if row.joins_reload == true then entry.joins_reload = true end
 				if type(row.items) == "table" then
 					entry.menu = render_rows(row.items, list_id, depth + 1)
 				elseif type(row.submenu) == "table" then
@@ -700,10 +703,12 @@ function M.new(deps)
 				if type(child) ~= "table" or getmetatable(child) ~= nil then return nil end
 				for field in next, child do
 					if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "checked"
-						and field ~= "disabled" and field ~= "image" then return nil end
+						and field ~= "disabled" and field ~= "image" and field ~= "joins_reload" then return nil end
 				end
 				local title, action, subtree = rawget(child, "title"), rawget(child, "fn"), rawget(child, "menu")
 				local checked, disabled, image = rawget(child, "checked"), rawget(child, "disabled"), rawget(child, "image")
+				local joins_reload = rawget(child, "joins_reload")
+				if joins_reload ~= nil and joins_reload ~= true then return nil end
 				if type(title) ~= "string" or title == "" or (action ~= nil and type(action) ~= "function")
 					or (subtree ~= nil and type(subtree) ~= "table") or (action ~= nil and subtree ~= nil)
 					or (checked ~= nil and type(checked) ~= "boolean")
@@ -714,7 +719,8 @@ function M.new(deps)
 					if action ~= nil or subtree ~= nil or checked ~= nil or disabled ~= nil or image ~= nil then return nil end
 					row = { separator = true }
 				else
-					row = { label = title, action = action, checked = checked, disabled = disabled, image = image }
+					row = { label = title, action = action, checked = checked, disabled = disabled, image = image,
+						joins_reload = joins_reload }
 					if subtree ~= nil then
 						row.items = convert(subtree, depth + 1)
 						if row.items == nil then return nil end
@@ -832,8 +838,9 @@ function M.new(deps)
 					if type(row) ~= "table" or getmetatable(row) ~= nil then return false end
 					for field in next, row do
 						if field ~= "title" and field ~= "fn" and field ~= "menu" and field ~= "image"
-							and field ~= "checked" and field ~= "disabled" then return false end
+							and field ~= "checked" and field ~= "disabled" and field ~= "joins_reload" then return false end
 					end
+					if rawget(row, "joins_reload") ~= nil and rawget(row, "joins_reload") ~= true then return false end
 					local title, action, menu = rawget(row, "title"), rawget(row, "fn"), rawget(row, "menu")
 					local image, checked, disabled = rawget(row, "image"), rawget(row, "checked"), rawget(row, "disabled")
 					if type(title) ~= "string" or (title == "" and image == nil)
