@@ -55,6 +55,32 @@ helpers.describe("input_access: telling the user", function()
 		helpers.assert_eq(status, 78, "EX_CONFIG, the status the unit refuses to retry")
 	end)
 
+	helpers.it("(input-access-no-device) names no input group when no keyboard exists", function()
+		local Access = helpers.load_module("infra.input_access")
+		local sent = {}
+		local status = Access.report({
+			i18n = { init = function() end, get = function(key) return "<" .. key .. ">" end },
+			notifier = { send = function(body) sent[#sent + 1] = body end },
+			print = function() end,
+			body_key = Access.NO_DEVICE_BODY_KEY,
+		}, "no keyboard device detected")
+		helpers.assert_eq(sent, { "<startup.linux_input_access_no_device_body>" })
+		helpers.assert_eq(status, 78)
+	end)
+
+	helpers.it("(input-access-no-device) the daemon passes the no-device body and the English text names no group", function()
+		local src = read("ergopti_hotstrings.lua")
+		helpers.assert_true(src:find("body_key = InputAccess.NO_DEVICE_BODY_KEY", 1, true) ~= nil,
+			"the absent-keyboard report must use the no-device body")
+		local Paths = helpers.load_module("infra.paths")
+		local fh = assert(io.open(Paths.shared("data/locales/en.json"), "r"))
+		local text = fh:read("*a")
+		fh:close()
+		local body = text:match("\"startup.linux_input_access_no_device_body\": \"([^\"]*)\"")
+		helpers.assert_true(body ~= nil and not body:find("group", 1, true) and not body:find("uinput", 1, true),
+			"the no-device notice must not blame the input groups")
+	end)
+
 	helpers.it("ships the message in every locale", function()
 		-- A missing key renders as the raw key on screen, in the one message a
 		-- new user reads first.
@@ -65,7 +91,7 @@ helpers.describe("input_access: telling the user", function()
 			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
 			local text = fh:read("*a")
 			fh:close()
-			for _, key in ipairs({ "startup.linux_input_access_title", "startup.linux_input_access_body", "startup.linux_input_access_label" }) do
+			for _, key in ipairs({ "startup.linux_input_access_title", "startup.linux_input_access_body", "startup.linux_input_access_label", "startup.linux_input_access_no_device_body" }) do
 				helpers.assert_true(text:find('"' .. key .. '": "', 1, true) ~= nil,
 					code .. ".json lacks " .. key)
 			end

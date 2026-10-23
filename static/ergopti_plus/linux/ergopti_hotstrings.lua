@@ -878,7 +878,7 @@ local function main()
 		-- still names the problem instead of the app vanishing.
 		if opts.tray and tray_menu then
 			InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
-				tray = tray_menu }, "no keyboard device detected")
+				tray = tray_menu, body_key = InputAccess.NO_DEVICE_BODY_KEY }, "no keyboard device detected")
 		end
 		os.exit(1)
 	end
