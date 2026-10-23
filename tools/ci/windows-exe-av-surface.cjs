@@ -16,12 +16,18 @@
  *    Ahk2Exe embedded (comments stripped), not the source tree.
  * 2. Forbidden patterns fail on a single occurrence; ceilings fail when
  *    exceeded and ask for a lower ceiling when the count drops.
- * 3. Reported counts (the keylog wording) are printed without gating,
- *    so the rename can be measured on every build.
+ * 3. Reported counts (naming and API wording that is not yet capped) are
+ *    printed without gating, so they can be measured on every build.
+ * 4. Every count of every pattern family is also returned and can be recorded
+ *    as JSON (--record) together with the exe hash, and broken down by bundle
+ *    member or by source file (--breakdown, --sources) for report-only
+ *    triage. The ceilings in the policy are these counts at the last
+ *    measurement, so any growth of the string surface fails the build.
  * ==============================================================================
  */
 
 'use strict';
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
@@ -149,6 +155,76 @@ function count(text, pattern) {
 }
 
 /**
+ * Lists every pattern of a policy section with its id, in report order.
+ * @param {object} section A policy section.
+ * @returns {Array<[string, string]>} Pairs of id and pattern.
+ */
+function sectionPatterns(section) {
+	return [
+		...Object.entries(section.forbidden ?? {}),
+		...Object.entries(section.ceilings ?? {}).map(([id, ceiling]) => [id, ceiling.pattern]),
+		...Object.entries(section.reported ?? {})
+	];
+}
+
+/**
+ * Counts every pattern of a policy section in one text.
+ * @param {string} text The scanned text.
+ * @param {object} section Its policy section.
+ * @returns {Object<string, number>} Count per pattern id.
+ */
+function countSection(text, section) {
+	return Object.fromEntries(
+		sectionPatterns(section).map(([id, pattern]) => [id, count(text, pattern)])
+	);
+}
+
+/**
+ * Breaks the counts of a policy section down by file, largest first.
+ * @param {Array<{name: string, text: string}>} files The scanned files.
+ * @param {object} section Its policy section.
+ * @param {number} [top] How many files to keep per pattern id.
+ * @returns {Object<string, Array<[string, number]>>} Files with a hit per id.
+ */
+function breakdownFiles(files, section, top = 8) {
+	const result = {};
+	for (const [id, pattern] of sectionPatterns(section)) {
+		const hits = files
+			.map((file) => [file.name, count(file.text, pattern)])
+			.filter(([, found]) => found > 0)
+			.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+		if (hits.length > 0) result[id] = hits.slice(0, top);
+	}
+	return result;
+}
+
+/**
+ * Reads the shipped AutoHotkey sources of a Windows driver folder for the
+ * script breakdown. The compiled script drops file boundaries, so this is a
+ * source-side approximation; the tests folders are skipped.
+ * @param {string} directory The windows driver folder.
+ * @returns {Array<{name: string, text: string}>}
+ */
+function readSourceFiles(directory) {
+	const files = [];
+	const walk = (current) => {
+		for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+			const full = path.join(current, entry.name);
+			if (entry.isDirectory()) {
+				if (entry.name !== 'tests') walk(full);
+			} else if (entry.name.toLowerCase().endsWith('.ahk')) {
+				files.push({
+					name: path.relative(directory, full).split(path.sep).join('/'),
+					text: fs.readFileSync(full, 'utf8')
+				});
+			}
+		}
+	};
+	walk(directory);
+	return files;
+}
+
+/**
  * Checks one scanned text against a policy section.
  * @param {string} label "script" or "bundle".
  * @param {string} text The scanned text.
@@ -213,13 +289,20 @@ function scanExecutable(image, policy = JSON.parse(fs.readFileSync(POLICY_PATH, 
 	const bundle = resources.get(`${RT_RCDATA}/${BUNDLE_RESOURCE}`);
 	if (!script) throw new Error('The exe has no compiled script resource (RCDATA 1).');
 	if (!bundle) throw new Error(`The exe has no ${BUNDLE_RESOURCE} resource.`);
-	const bundleText = readZip(bundle)
+	const members = readZip(bundle)
 		.filter((member) => TEXT_MEMBER.test(member.name))
-		.map((member) => member.data.toString('utf8'))
-		.join('\n');
-	const scriptResult = checkSection('script', script.toString('utf8'), policy.script);
+		.map((member) => ({ name: member.name, text: member.data.toString('utf8') }));
+	const bundleText = members.map((member) => member.text).join('\n');
+	const scriptText = script.toString('utf8');
+	const scriptResult = checkSection('script', scriptText, policy.script);
 	const bundleResult = checkSection('bundle', bundleText, policy.bundle);
 	return {
+		counts: {
+			script: countSection(scriptText, policy.script),
+			bundle: countSection(bundleText, policy.bundle)
+		},
+		bundleBreakdown: breakdownFiles(members, policy.bundle),
+		signed,
 		errors: [...scriptResult.errors, ...bundleResult.errors],
 		notes: [
 			`authenticode: ${signed ? 'present' : 'absent'}`,
@@ -229,16 +312,75 @@ function scanExecutable(image, policy = JSON.parse(fs.readFileSync(POLICY_PATH, 
 	};
 }
 
-module.exports = { parsePe, readZip, checkSection, validatePolicy, scanExecutable, POLICY_PATH };
+module.exports = {
+	parsePe,
+	readZip,
+	checkSection,
+	countSection,
+	breakdownFiles,
+	readSourceFiles,
+	validatePolicy,
+	scanExecutable,
+	POLICY_PATH
+};
+
+/**
+ * Formats a per-file breakdown for the console.
+ * @param {string} label "bundle" or "sources".
+ * @param {Object<string, Array<[string, number]>>} breakdown Files per id.
+ * @returns {string[]} Output lines.
+ */
+function formatBreakdown(label, breakdown) {
+	return Object.entries(breakdown).flatMap(([id, files]) => [
+		`${label} breakdown ${id}:`,
+		...files.map(([name, found]) => `  ${String(found).padStart(5)}  ${name}`)
+	]);
+}
 
 if (require.main === module) {
 	const args = process.argv.slice(2);
-	if (args.length !== 1) {
-		process.stderr.write('Usage: node tools/ci/windows-exe-av-surface.cjs <ErgoptiPlus.exe>\n');
+	const option = (name) => {
+		const at = args.indexOf(name);
+		if (at < 0) return undefined;
+		const [, value] = args.splice(at, 2);
+		if (value === undefined) throw new Error(`${name} needs a value.`);
+		return value;
+	};
+	const recordPath = option('--record');
+	const sourcesPath = option('--sources');
+	const breakdown = args.includes('--breakdown');
+	const positional = args.filter((arg) => arg !== '--breakdown');
+	if (positional.length !== 1) {
+		process.stderr.write(
+			'Usage: node tools/ci/windows-exe-av-surface.cjs [--breakdown] [--sources <windows dir>] ' +
+				'[--record <counts.json>] <ErgoptiPlus.exe>\n'
+		);
 		process.exit(2);
 	}
-	const { errors, notes } = scanExecutable(fs.readFileSync(args[0]));
-	for (const note of notes) process.stdout.write(`${note}\n`);
-	for (const error of errors) process.stderr.write(`ERROR ${error}\n`);
-	process.exit(errors.length === 0 ? 0 : 1);
+	const image = fs.readFileSync(positional[0]);
+	const result = scanExecutable(image);
+	for (const note of result.notes) process.stdout.write(`${note}\n`);
+	if (breakdown) {
+		for (const line of formatBreakdown('bundle', result.bundleBreakdown))
+			process.stdout.write(`${line}\n`);
+		if (sourcesPath) {
+			const policy = JSON.parse(fs.readFileSync(POLICY_PATH, 'utf8'));
+			const files = readSourceFiles(sourcesPath);
+			for (const line of formatBreakdown('sources', breakdownFiles(files, policy.script)))
+				process.stdout.write(`${line}\n`);
+		}
+	}
+	if (recordPath) {
+		const record = {
+			schema: 1,
+			sha256: crypto.createHash('sha256').update(image).digest('hex'),
+			bytes: image.length,
+			authenticode: result.signed,
+			script: result.counts.script,
+			bundle: result.counts.bundle
+		};
+		fs.writeFileSync(recordPath, `${JSON.stringify(record, null, '\t')}\n`);
+	}
+	for (const error of result.errors) process.stderr.write(`ERROR ${error}\n`);
+	process.exit(result.errors.length === 0 ? 0 : 1);
 }
