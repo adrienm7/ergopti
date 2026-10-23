@@ -9,6 +9,29 @@
 
 #Requires AutoHotkey v2.0
 
+; Introspection bodies strip full-line comments and cannot match the raw owner.
+; Keep raw offsets from the code mask so only actual clock tokens change.
+_RHL_RawBody(Source, Name) {
+	Code := _DriverMaskNonCode(&Source)
+	Definition := _DriverFindFunctionDefinition(&Code, Name, 1, true)
+	AssertTrue(IsObject(Definition), "The raw owner must define " . Name)
+	AssertFalse(IsObject(_DriverFindFunctionDefinition(&Code, Name, Definition.Idx + 1, true)),
+		"The raw owner must contain exactly one definition of " . Name)
+	Depth := 0, Position := Definition.OpenPos
+	while Position <= StrLen(Code) {
+		Character := SubStr(Code, Position, 1)
+		if Character == "{"
+			Depth += 1
+		else if Character == "}" {
+			Depth -= 1
+			if Depth == 0
+				return SubStr(Source, Definition.Idx, Position - Definition.Idx + 1)
+		}
+		Position += 1
+	}
+	Assert(false, "The raw producer definition must have a complete balanced body: " . Name)
+}
+
 _RHL_ReplaceClock(Body, Name) {
 	Code := _DriverMaskNonCode(&Body)
 	Position := RegExMatch(Code, "\bA_TickCount\b", &Token)
@@ -33,7 +56,7 @@ _RHL_ChildSource() {
 	RoiOwner := _DriverProductionFileForSymbol("KL_Roi_OnHotstring", _DriverDir)
 	RoiSource := FileRead(RoiOwner, "UTF-8")
 	for Name in ["KL_Roi_OnHotstring", "KL_Roi_HalflifeTick"] {
-		Body := _DriverFuncBody(Name)
+		Body := _RHL_RawBody(RoiSource, Name)
 		AssertTrue(Body != "")
 		Changed := 0
 		RoiSource := StrReplace(RoiSource, Body, _RHL_ReplaceClock(Body, Name), true, &Changed)
