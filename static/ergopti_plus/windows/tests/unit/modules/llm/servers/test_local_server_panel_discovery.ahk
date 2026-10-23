@@ -353,6 +353,7 @@ _LSPD_CoalescenceSource() {
 		_LSPV_DiscoveryRows(Fixture)
 		Prior := Fixture.Panel.Discovery
 		AssertTrue(Prior is Map)
+		PriorCallback := Prior["timer"]
 		AssertTrue(Fixture.Panel._QueueDiscovery(Prior["source"]))
 		AssertTrue(Fixture.Panel.Discovery == Prior, "unchanged source coalesces the exact retained callback")
 		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
@@ -363,7 +364,7 @@ _LSPD_CoalescenceSource() {
 		AssertTrue(Next is Map && Next != Prior, "new admitted image replaces an obsolete source intent")
 		AssertTrue(Next["source"] == Fresh)
 		AssertFalse(Fixture.Panel.RepairRecords.Has(ObjPtr(Prior)))
-		AssertFalse(Fixture.RepairTimers.Has(ObjPtr(Prior["timer"])))
+		AssertFalse(Fixture.RepairTimers.Has(ObjPtr(PriorCallback)))
 		Fixture.Panel._RepairTick(Prior)
 		AssertTrue(Fixture.Panel.Discovery == Next, "old callback cannot retire its replacement")
 		AssertEqual(0, Fixture.RescanCalls)
@@ -416,3 +417,147 @@ _LSPD_DisabledAiIsInert() {
 }
 Test("local nonblocking discovery: a disabled AI queues no view preparation or sweep (ai-disabled-no-discovery-2026-10-20)",
 	_LSPD_DisabledAiIsInert)
+
+
+; ==================================================
+; ==================================================
+; ======= 6/ Callback Retirement Controls ===========
+; ==================================================
+; ==================================================
+
+; AFTER-only component controls: the existing timer port stores callbacks in
+; an observed ledger. No native scheduler, process or network is substituted
+; with a successful effect; the real panel owns every record and transition.
+class _LSPRA_Fixture extends _LSPD_Fixture {
+	__New(RefuseLateStop) {
+		super.__New()
+		this.LateArm := true
+		this.RefuseLateStop := RefuseLateStop
+		this.FinalCancelReady := false
+		this.FinalCancelCalls := 0
+		this.BoundaryFailure := 0
+		this.RetirementReturned := false
+		this.LateArmedAfterRetire := false
+		this.OldRecord := 0
+		this.OldCallback := 0
+		this.Successor := 0
+		this.SuccessorCallback := 0
+	}
+
+	RepairTimer(Callback, Period) {
+		try {
+			if Period < 0 && this.LateArm {
+				this.LateArm := false
+				this.OldRecord := this.Panel.Discovery
+				this.OldCallback := Callback
+				AssertTrue(this.OldRecord is Map && this.OldRecord["timer"] == Callback)
+				AssertTrue(this.Panel.Retire(false))
+				this.RetirementReturned := true
+				AssertEqual(0, this.Panel.RepairRecords.Count)
+				AssertEqual(0, this.OldRecord["timer"], "terminal retirement must detach the old bound edge")
+				AssertFalse(this.RepairTimers.Has(ObjPtr(Callback)))
+				AssertTrue(this.Panel._QueueDiscovery(this.World.Owner.Capture()))
+				this.Successor := this.Panel.Discovery
+				AssertTrue(this.Successor is Map && this.Successor != this.OldRecord)
+				this.SuccessorCallback := this.Successor["timer"]
+				AssertTrue(this.RepairTimers.Has(ObjPtr(this.SuccessorCallback)))
+				; The old arm occurs only AFTER retirement returned and B was admitted.
+				Accepted := super.RepairTimer(Callback, Period)
+				AssertTrue(Accepted && this.RepairTimers.Has(ObjPtr(Callback)))
+				this.LateArmedAfterRetire := true
+				this.FinalCancelReady := true
+				return Accepted
+			}
+			if Period == 0 && this.FinalCancelReady && Callback == this.OldCallback {
+				this.FinalCancelCalls += 1
+				if this.RefuseLateStop
+					return false
+			}
+			return super.RepairTimer(Callback, Period)
+		} catch as Failure {
+			if !IsObject(this.BoundaryFailure)
+				this.BoundaryFailure := Failure
+			throw Failure
+		}
+	}
+
+	Dispose() {
+		try {
+			this.LateArm := false
+			this.FinalCancelReady := false
+			this.RefuseLateStop := false
+			super.Dispose()
+		} finally {
+			this.OldRecord := 0
+			this.OldCallback := 0
+			this.Successor := 0
+			this.SuccessorCallback := 0
+		}
+	}
+}
+
+_LSPRA_Run(RefuseLateStop) {
+	Fixture := _LSPRA_Fixture(RefuseLateStop)
+	Primary := 0
+	try {
+		Refusal := 0
+		try Accepted := Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture())
+		catch as Failure
+			Refusal := Failure
+		if IsObject(Fixture.BoundaryFailure)
+			throw Fixture.BoundaryFailure
+		AssertTrue(Fixture.RetirementReturned && Fixture.LateArmedAfterRetire,
+			"the real retirement must return before the controlled old arm")
+		AssertEqual(1, Fixture.FinalCancelCalls, "the late old capability needs one final cancellation")
+		Old := Fixture.OldRecord, OldCallback := Fixture.OldCallback
+		Next := Fixture.Successor, NextCallback := Fixture.SuccessorCallback
+		AssertTrue(Fixture.Panel.Discovery == Next && Next["timer"] == NextCallback)
+		AssertTrue(Fixture.Panel.RepairRecords.Get(ObjPtr(Next), 0) == Next)
+		AssertTrue(Fixture.RepairTimers.Has(ObjPtr(NextCallback)))
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		if RefuseLateStop {
+			AssertTrue(Refusal is Error)
+			AssertEqual("Local server panel repair timer was refused.", Refusal.Message)
+			AssertTrue(Fixture.Panel.RepairRecords.Get(ObjPtr(Old), 0) == Old,
+				"refused final cancellation must retain the exact old debt")
+			AssertTrue(Old["timer"] == OldCallback && Fixture.RepairTimers.Has(ObjPtr(OldCallback)))
+			AssertEqual(2, Fixture.Panel.RepairRecords.Count)
+			Fixture.RefuseLateStop := false
+			AssertTrue(Fixture.Panel._DropRepair(Old))
+			AssertEqual(2, Fixture.FinalCancelCalls)
+		} else {
+			if IsObject(Refusal)
+				throw Refusal
+			AssertTrue(Accepted)
+		}
+		AssertEqual(0, Old["timer"])
+		AssertFalse(Fixture.Panel.RepairRecords.Has(ObjPtr(Old)))
+		AssertFalse(Fixture.RepairTimers.Has(ObjPtr(OldCallback)))
+		AssertEqual(1, Fixture.Panel.RepairRecords.Count)
+		AssertTrue(Fixture.Panel.Discovery == Next && Next["timer"] == NextCallback)
+		OldCallback.Call()
+		AssertTrue(Fixture.Panel.Discovery == Next, "a captured retired callback cannot consume B")
+		AssertTrue(Fixture.RepairTimers.Has(ObjPtr(NextCallback)))
+		global _DriverReady
+		_DriverReady := true
+		Fixture.Panel._RepairTick(Next)
+		AssertEqual(1, Fixture.RescanCalls, "the fresh successor must still reach genuine discovery")
+		AssertEqual(1, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		Fixture.AssertObserverBoundaries()
+	} catch as Failure {
+		Primary := Failure
+	}
+	try Fixture.Dispose()
+	catch as Failure {
+		if !IsObject(Primary)
+			Primary := Failure
+	}
+	if IsObject(Primary)
+		throw Primary
+}
+
+Test("Local server record release: late arm after retirement cancels only the old callback (local-server-record-retirement-after)", _LSPRA_Run.Bind(false))
+Test("Local server record release: refused late cancellation preserves debt and successor (local-server-record-retirement-after)", _LSPRA_Run.Bind(true))
