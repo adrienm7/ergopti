@@ -1,0 +1,143 @@
+# Throwaway validation workflow, pushed only to tmp/ci-validate-* refs.
+name: Tmp CI validate
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ["tmp/ci-validate-**"]
+
+jobs:
+  swift:
+    if: ${{ contains(github.ref_name, '-swift-') }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build launcher and tests
+        run: swift build --build-tests --package-path static/ergopti_plus/macos/launcher
+      - name: Run XCTest filter
+        run: |
+          set -o pipefail
+          swift test --skip-build --package-path static/ergopti_plus/macos/launcher --filter "ManagedLookupStageTests" 2>&1 | tee "$RUNNER_TEMP/xctest.log"
+
+  go:
+    if: ${{ contains(github.ref_name, '-go-') }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Resolve inputs
+        id: toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, platform, tempfile
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          architecture = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
+          identity = official['assets'][contract['official_asset_key']]
+          root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
+          values = {
+              'ERGOPTI_OLLAMA_BUILD_ROOT': str(root),
+              'ERGOPTI_OLLAMA_SOURCE': str(root / 'source'),
+              'ERGOPTI_OLLAMA_SOURCE_COMMIT': contract['source_commit'],
+              'ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE': str(root / identity['filename']),
+              'ERGOPTI_OLLAMA_OFFICIAL_URL': 'https://github.com/ollama/ollama/releases/download/v' + official['version'] + '/' + identity['filename'],
+              'ERGOPTI_OLLAMA_ASSET': str(root / 'assets' / contract['assets']['macos-' + architecture]['filename']),
+          }
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as s:
+              s.write('version=' + contract['go_version'][2:] + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as s:
+              for k, v in values.items():
+                  s.write(k + '=' + v + '\n')
+          PY
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.toolchain.outputs.version }}
+          check-latest: false
+          cache: false
+      - name: Fetch pinned upstream and official archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$ERGOPTI_OLLAMA_SOURCE"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" remote add origin https://github.com/ollama/ollama.git
+          git -C "$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" checkout --detach FETCH_HEAD
+          curl --proto '=https' --fail --location --retry 3 --max-time 600 --output "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" "$ERGOPTI_OLLAMA_OFFICIAL_URL"
+      - name: go vet and go test of _shared/go/native_http
+        shell: bash
+        working-directory: static/ergopti_plus/_shared/go/native_http
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          go vet ./...
+          go test -count=1 ./...
+      - name: Build (applies the patches, runs go vet and go test)
+        shell: bash
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          python3 tools/build/build-macos-managed-ollama.py \
+            --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
+            --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+            --go "$(command -v go)" --output "$ERGOPTI_OLLAMA_BUILD_ROOT/assets" 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+  remap:
+    if: ${{ contains(github.ref_name, '-remap-') }}
+    name: 'HS-274 tests against the pinned Karabiner-Elements headers'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Acquire the pinned upstream sources
+        uses: actions/checkout@v4
+        with:
+          repository: pqrs-org/Karabiner-Elements
+          ref: 9312593e1a3bf72b94c63c524ebabe2637442e8a
+          submodules: recursive
+          persist-credentials: false
+          path: upstream
+
+      - name: Acquire the Ergopti tests
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          path: ergopti
+
+      - name: Compile and run each vendor-header test
+        working-directory: ergopti
+        run: |
+          set -euo pipefail
+          diagnostics=tools/diagnostics
+          vendor="$GITHUB_WORKSPACE/upstream/vendor/vendor/include"
+          build="$RUNNER_TEMP/hs274-tests"
+          mkdir -p "$build"
+          compile() {
+            c++ -std=c++17 -Wall -Wextra -Werror -pthread -I "$vendor" "$diagnostics/$1.cpp" -o "$build/$1"
+          }
+          compile hs274-stream-inventory-test
+          "$build/hs274-stream-inventory-test" "$diagnostics/fixtures/hs274-native-inventories.json"
+          compile hs274-key-state-test
+          "$build/hs274-key-state-test" "$diagnostics/fixtures/hs274-native-cookie-capture.json" "$diagnostics/fixtures/hs274-native-cookie-held.json"
+          compile hs274-stream-clock-test
+          "$build/hs274-stream-clock-test"
+          compile hs274-stream-protocol-test
+          "$build/hs274-stream-protocol-test" "$diagnostics/fixtures/hs274-native-capture.json"
+          compile hs274-stream-source-test
+          "$build/hs274-stream-source-test"
+          compile hs274-baseline-v2-test
+          "$build/hs274-baseline-v2-test"
+          c++ -std=c++17 -Wall -Wextra -Werror -pthread -DASIO_STANDALONE -I "$vendor" "$diagnostics/hs274-accept-test.cpp" -o "$build/hs274-accept-test"
+          "$build/hs274-accept-test"
