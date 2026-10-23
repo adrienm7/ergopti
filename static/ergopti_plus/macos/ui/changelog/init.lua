@@ -10,8 +10,9 @@
 --- duplication.
 ---
 --- FEATURES & RATIONALE:
---- 1. Native fetch proxy: hs.http.asyncGet (NSURLSession, which applies the
----    system proxy and PAC settings) is used instead of the WebKit fetch() API.
+--- 1. Native fetch proxy: adapters.http_client (hs.http over NSURLSession, which
+---    applies the system proxy and PAC settings, with the adapter's own redirect
+---    policy) is used instead of the WebKit fetch() API.
 ---    The Lua backend injects the result via evaluateJavaScript("injectReleases(…)")
 ---    so the JS never touches the network directly.
 --- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
@@ -57,6 +58,7 @@ local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
+local HttpClient = require("adapters.http_client")
 local Json       = require("json")
 local JsonCodec  = require("adapters.json_codec")
 local ReleaseSources = require("updater.release_sources")
@@ -119,14 +121,18 @@ local function registry_channel(channel, purpose)
 	return nil
 end
 
---- Bounded GET over hs.http. NSURLSession honours the system proxy; the
---- deadline guarantees one terminal answer even when a proxy holds the socket.
+--- Bounded GET through the HttpClient adapter. NSURLSession still honours the
+--- system proxy, but the adapter, not the opaque native auto-follow, owns the
+--- redirects: an HTTPS response never downgrades to HTTP and every hop stays
+--- inside one request. The outer deadline guarantees one terminal answer even
+--- when a proxy holds the socket.
 --- @param url string
 --- @param headers table
 --- @param timeout_ms number
 --- @param callback function Receives status, body, err exactly once.
 local function http_get(url, headers, timeout_ms, callback)
 	local settled = false
+	local client = HttpClient.new({ timeout_ms = timeout_ms })
 	local function settle(status, body, err)
 		if settled then return end
 		settled = true
@@ -134,21 +140,22 @@ local function http_get(url, headers, timeout_ms, callback)
 	end
 	-- The deadline is armed before the request so a request that raises or never
 	-- answers still ends; an unarmed deadline is itself a terminal failure.
-	if not DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
-		"changelog.fetch_deadline")
+	if not DeferredWork.after(timeout_ms / 1000, function()
+		settle(0, "", "timeout")
+		client.cancel()
+	end, "changelog.fetch_deadline")
 	then
 		settle(0, "", "deadline unavailable")
 		return
 	end
-	local ok = pcall(hs.http.asyncGet, url, headers, function(status, body, _)
-		status = tonumber(status) or 0
-		if status < 0 then
-			settle(0, "", "network error " .. tostring(status))
+	local ok, accepted = pcall(client.get, url, headers, function(result)
+		if result.status == 0 then
+			settle(0, "", "network error: " .. tostring(result.error))
 		else
-			settle(status, body, nil)
+			settle(result.status, result.body, nil)
 		end
 	end)
-	if not ok then settle(0, "", "request refused") end
+	if not ok or accepted == false then settle(0, "", "request refused") end
 end
 
 M._http_get = http_get
