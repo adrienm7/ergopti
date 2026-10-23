@@ -234,3 +234,5 @@ _KCP_PasteChordsKeepTheirExactModifiers() {
 }
 Test("keystats clipboard: the paste observer keeps the exact Ctrl+V and Shift+Insert chords",
 	_KCP_PasteChordsKeepTheirExactModifiers)
+
+#Include test_clipboard_provenance_owner.ahk
