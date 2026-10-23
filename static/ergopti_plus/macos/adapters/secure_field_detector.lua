@@ -126,6 +126,33 @@ function M.isElementSecure(element, observe)
 end
 
 
+--- Shares exact inspection reads while retaining confirmed native refusal for refresh.
+--- @param application_or_pid table|userdata|number Application object or PID.
+--- @param observe function|nil Optional callback receiving completeness and inspected PID.
+--- @return boolean|nil secure
+--- @return any error_detail
+--- @return boolean|nil focus_refused True only for AXFocusedUIElement nil plus error.
+local function inspect_focused_element(application_or_pid, observe)
+	local pid = resolve_pid(application_or_pid)
+	if pid == nil then return nil, "application PID is unavailable" end
+	if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
+		return nil, "Accessibility element API is unavailable"
+	end
+
+	local ok, result, focus_refused = pcall(function()
+		local app_element = hs.axuielement.applicationElementForPID(pid)
+		if not app_element then return nil end
+		local focused, focused_error = app_element:attributeValue("AXFocusedUIElement")
+		if not focused then return nil, focused == nil and focused_error ~= nil end
+		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
+	end)
+	if not ok then return nil, result end
+	if type(result) ~= "boolean" then
+		return nil, "focused Accessibility element is unavailable", focus_refused == true
+	end
+	return result, nil
+end
+
 --- Classifies the focused element for one exact application.
 --- Unlike refresh(), this does not consult frontmostApplication(), so a focused
 --- floating panel cannot accidentally inherit the previous application's answer.
@@ -133,23 +160,10 @@ end
 --- @param observe function|nil Optional callback receiving completeness and inspected PID.
 --- @return boolean|nil secure Nil means the focused element could not be read.
 --- @return any error_detail
+--- The private refusal bit never changes this public two-return contract.
 function M.inspectFocusedElement(application_or_pid, observe)
-	local pid = resolve_pid(application_or_pid)
-	if pid == nil then return nil, "application PID is unavailable" end
-	if not (hs.axuielement and hs.axuielement.applicationElementForPID) then
-		return nil, "Accessibility element API is unavailable"
-	end
-
-	local ok, result = pcall(function()
-		local app_element = hs.axuielement.applicationElementForPID(pid)
-		if not app_element then return nil end
-		local focused = app_element:attributeValue("AXFocusedUIElement")
-		if not focused then return nil end
-		return M.isElementSecure(focused, observe and function(complete) observe(complete, pid) end)
-	end)
-	if not ok then return nil, result end
-	if type(result) ~= "boolean" then return nil, "focused Accessibility element is unavailable" end
-	return result, nil
+	local secure, detail = inspect_focused_element(application_or_pid, observe)
+	return secure, detail
 end
 
 
@@ -228,10 +242,14 @@ function M.refresh(observe)
 	local ok, err = pcall(function()
 		local app = hs.application.frontmostApplication()
 		if not app then clear_cache(); return end
-		local secure = M.inspectFocusedElement(app, observe and function(known, pid)
+		local secure, _, focus_refused = inspect_focused_element(app, observe and function(known, pid)
 			complete, inspected_pid = known, pid
 		end)
-		if secure == nil then clear_cache(); return end
+		if secure == nil then
+			-- Native AX errors return nil plus an error; nil alone means no focus.
+			_cached_secure = focus_refused == true
+			return
+		end
 		_cached_secure = secure
 	end)
 

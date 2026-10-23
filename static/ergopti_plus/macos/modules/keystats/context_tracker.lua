@@ -461,7 +461,9 @@ end
 --- Called whenever the focused element changes so the engine can stop logging
 --- immediately when a password field receives focus.
 --- @param element table The newly focused AX element (may be nil).
-local function update_secure_field_state(element, app_pid)
+--- @param app_pid number|nil PID from the existing native observer owner.
+--- @param focus_refused boolean|nil True only for a confirmed native focus-read refusal.
+local function update_secure_field_state(element, app_pid, focus_refused)
 	-- The app-level guard must be OR-ed into EVERY assignment of is_secure_field.
 	-- The activation path (handle_app_switch) sets the flag to the union
 	-- isSecureField() or isSecureApp(), but this AX callback recomputed it from the
@@ -475,11 +477,14 @@ local function update_secure_field_state(element, app_pid)
 
 	if not element then
 		mark_context("secure", false)
-		_state.is_secure_field = in_secure_app
-		require_modifier_settlement()
-		return
+		if focus_refused ~= true then
+			_state.is_secure_field = in_secure_app
+			require_modifier_settlement()
+			return
+		end
 	end
-	local is_secure = SecureFieldDetector.isElementSecure(element, secure_element_observer(app_pid)) or in_secure_app
+	local is_secure = focus_refused == true
+		or SecureFieldDetector.isElementSecure(element, secure_element_observer(app_pid)) or in_secure_app
 	if is_secure ~= _state.is_secure_field then
 		_state.is_secure_field = is_secure
 		if is_secure then
@@ -711,7 +716,7 @@ function M.update_ax_observer(app_pid)
 	-- function (which reports errors only to the HS Console) and silently leave the
 	-- new app's observer unattached, even though `observer` and `app_element` were
 	-- already created successfully.
-	local ok_focused, focused = pcall(function() return app_element:attributeValue("AXFocusedUIElement") end)
+	local ok_focused, focused, focused_error = pcall(function() return app_element:attributeValue("AXFocusedUIElement") end)
 	if not ok_focused then
 		Logger.warn(LOG, "Failed to read AXFocusedUIElement for PID %s.", tostring(app_pid))
 		focused = nil
@@ -725,6 +730,9 @@ function M.update_ax_observer(app_pid)
 			if ok_val and type(val) == "string" then _last_ax_value = val end
 		end
 		update_secure_field_state(focused, app_pid)
+	elseif ok_focused and focused == nil and focused_error ~= nil then
+		-- A confirmed native refusal is not the legitimate no-focused-element case.
+		update_secure_field_state(nil, app_pid, true)
 	end
 
 	local callback_ok, callback_result = xpcall(function()
