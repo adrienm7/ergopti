@@ -1070,11 +1070,18 @@ _LLM_Engine_FinalizeRequest(state) {
 	if !_LLM_Engine_IsCurrent(state)
 		return
 	if (state["slots"].Length == 0) {
+		; Capture the presentation before logging can admit another request.
+		Origin := LLM_Tooltip_GetPresentedToken()
+		if !_LLM_Engine_IsCurrent(state)
+			return
 		; Every variant failed — log a single ``llm_generation_failed`` so
 		; the audit trail captures the failure instead of silently
 		; dropping. The tooltip auto-dismisses via its own timer.
 		try LoggerWarn("LLM", "All variants failed for model {1} — no tooltip rendered.", state["model"])
-		try LLM_Tooltip_Hide()
+		; The request check rejects a logger reentry; the exact presentation
+		; fence also protects a replacement admitted inside the hide path.
+		if (_LLM_Engine_IsCurrent(state) and IsObject(Origin))
+			try LLM_Tooltip_HideExact(Origin)
 		try {
 			app_name := ""
 			try app_name := WIGetFocused()["appId"]
