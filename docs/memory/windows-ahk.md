@@ -44,6 +44,20 @@ runners, and AHK v2's default `#Warn VarUnset, MsgBox` raises a hidden load-time
 dialog: the child never exits and the suite hangs at the probe test with no
 error. Put such helpers in a test file that `run_all.ahk` includes.
 
+### project-ahk-source-owner-paths-must-be-canonical
+
+`_DriverIsProductionSource` rejects excluded path components lexically, before
+filesystem resolution. A `_DriverDir`-derived path retaining `tests/../../../`
+can therefore reject a genuine production file. Follow the framework's census:
+derive the Windows root from `A_ScriptDir`, enumerate files and filter canonical
+`A_LoopFileFullPath` values before inspecting their code.
+
+`_DriverProductionFileForSymbol` resolves free functions, not classes. For a
+class-only owner, mask comments and strings with the genuine source masker,
+require one top-level class definition across the authored census, then include
+the entire unique owner. Do not invent a free export, relax the production
+filter or substitute a test class to make the child composition pass.
+
 ### project-ahk-v2-semicolon-in-string
 
 In AHK v2, a space followed by `;` can start a comment even inside a quoted
