@@ -934,3 +934,5 @@ for Mode in ["web-resolve", "web-reject"]
 	Test("personal-opening-source: actual Web init Promise " . Mode . " cannot bypass session consent",
 		_PT102_WithCase.Bind(Mode, _PT102_WebInitCase))
 
+
+#Include test_personal_editor_window_retirement.ahk
