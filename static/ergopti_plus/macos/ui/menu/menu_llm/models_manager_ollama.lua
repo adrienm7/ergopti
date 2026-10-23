@@ -1636,7 +1636,7 @@ function M.new(deps, presets, ram_getter)
 		local start_in_progress = true
 		local pending_completion = nil
 		local pending_chunks = {}
-		local function finish_pull(code, _stdout, stderr)
+		local function finish_pull(code, stdout, stderr)
 			if owner.completion_dispatching == true or owner.receipt_joining == true then return false end
 			if owner.completion_seen and (owner.task_settled == true
 				or owner.callback_status ~= code) then return false end
@@ -1692,6 +1692,9 @@ function M.new(deps, presets, ram_getter)
 				settle_cancel("terminated")
 				return finish_result(false)
 			else
+				-- The CLI prints its refusal (e.g. the 412 "newer version of Ollama") on
+				-- the final stderr, which the stream callback may never have seen (#101).
+				pull_output = pull_output .. sanitize_terminal_stream((stdout or "") .. (stderr or ""))
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				
