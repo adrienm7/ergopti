@@ -361,9 +361,9 @@ local function new(options)
 	local inst = {}
 
 	-- Per-instance state
-	local _active_task     = nil
-	local _active_task_generation = nil
-	local _active_task_hop = nil
+	-- A logical request may supersede a native call which supplies no handle.
+	-- Keep its exact terminal receipt independently of the current generation.
+	local _native_requests = {}
 	local _timeout_timer   = nil
 	local _timeout_cleanup = {}
 	local _observed_timeout_handles = {}
@@ -383,7 +383,7 @@ local function new(options)
 	--- @return boolean settled
 	local function _fully_settled()
 		return _request_active ~= true
-			and _active_task == nil
+			and next(_native_requests) == nil
 			and _timeout_timer == nil
 			and #_timeout_cleanup == 0
 	end
@@ -486,32 +486,75 @@ local function new(options)
 		return false
 	end
 
-	--- Cancels the optional native HTTP task after the generation was fenced.
-	--- The exact handle remains owned until its cancel method returns literal true.
-	--- @return boolean settled True only after exact native settlement.
-	local function _cancel_active_task()
-		local task = _active_task
-		if not task then return true end
+	--- Retires one optional task only after cancel acknowledgement or its callback.
+	--- A nil handle cannot acknowledge native settlement.
+	--- @param receipt table Exact native dispatch receipt.
+	--- @return boolean settled
+	local function _cancel_native_request(receipt)
+		if not _native_requests[receipt] then return true end
+		local task = receipt.task
+		if task == nil then return false end
 		local ok, result_or_err = xpcall(function()
-			if type(task.cancel) ~= "function" then return true end
+			if type(task.cancel) ~= "function" then return false end
 			return task:cancel()
 		end, debug.traceback)
-		-- Some cancellable transports report their terminal callback synchronously
-		-- from cancel(). That callback is stronger settlement proof than the method's
-		-- later false/nil/throw result; never keep a capability already retired by its
-		-- exact generation callback.
-		if _active_task ~= task then return true end
+		-- A synchronous terminal callback is stronger than the later cancel result.
+		if not _native_requests[receipt] then return true end
 		if not ok or result_or_err ~= true then
 			Logger.error(LOG, "HTTP task cancellation failed after logical revocation: %s.",
 				tostring(result_or_err))
 			return false
 		end
-		if _active_task == task then
-			_active_task = nil
-			_active_task_generation = nil
-			_active_task_hop = nil
-		end
+		_native_requests[receipt] = nil
 		return true
+	end
+
+	--- Cancels exact returned tasks; taskless native requests remain receipt-owned.
+	--- @return boolean settled Whether every returned task settled.
+	local function _cancel_native_tasks()
+		local snapshot = {}
+		for receipt in pairs(_native_requests) do snapshot[#snapshot + 1] = receipt end
+		local settled = true
+		for _, receipt in ipairs(snapshot) do
+			if receipt.task ~= nil and not _cancel_native_request(receipt) then settled = false end
+		end
+		return settled
+	end
+
+	--- Reports task cleanup debt which must block immediate logical supersession.
+	--- @return boolean pending
+	local function _has_pending_tasks()
+		for receipt in pairs(_native_requests) do
+			if receipt.task ~= nil then return true end
+		end
+		return false
+	end
+
+	--- Wraps one native completion before acquisition, including synchronous calls.
+	--- Terminal entry proves this exchange finished; upstream releases its callback
+	--- reference after returning from Lua. Duplicate delivery cannot retire a sibling.
+	--- @param receipt table Exact native dispatch receipt.
+	--- @param callback function Terminal handler for this request or redirect hop.
+	--- @return function completion
+	local function _native_completion(receipt, callback)
+		_native_requests[receipt] = true
+		return function(...)
+			if not _native_requests[receipt] then return end
+			_native_requests[receipt] = nil
+			return callback(...)
+		end
+	end
+
+	--- Publishes an optional task without resurrecting a synchronously completed call.
+	--- @param receipt table Exact native dispatch receipt.
+	--- @param task any Optional native cancellation capability.
+	local function _record_native_return(receipt, task)
+		if not _native_requests[receipt] then return end
+		receipt.task = task
+		if receipt.generation ~= _generation or _cancelled or not _request_active then
+			_cancel_native_request(receipt)
+			_notify_settlement_observers()
+		end
 	end
 
 	--- Arms the timeout transaction before any network request can be dispatched.
@@ -535,7 +578,7 @@ local function new(options)
 				_retain_timeout_cleanup(timeout_handle)
 				_cancelled = true
 				_request_active = false
-				_cancel_active_task()
+				_cancel_native_tasks()
 				Logger.warn(LOG, "Request timed out after %dms.", timeout_ms)
 				invoke_callback(callback, {
 					ok = false,
@@ -572,14 +615,6 @@ local function new(options)
 
 	local function _make_cb(callback, my_generation)
 		return function(status, response_body, response_headers)
-			-- A native task callback is terminal proof for that exact task even
-			-- after logical revocation. Clear only the matching generation so a
-			-- stale completion cannot consume a successor's capability.
-			if _active_task_generation == my_generation then
-				_active_task = nil
-				_active_task_generation = nil
-				_active_task_hop = nil
-			end
 			-- Discard a stale callback from a superseded request: cancel() cannot
 			-- guarantee the underlying OS request has not already queued its
 			-- completion, so the generation check is the only reliable guard.
@@ -594,9 +629,6 @@ local function new(options)
 			end
 			_cancelled = true
 			_request_active = false
-			_active_task = nil
-			_active_task_generation = nil
-			_active_task_hop = nil
 			_stop_timeout()
 			local native_status = type(status) == "number" and status or 0
 			local public_status = native_status >= 0 and native_status or 0
@@ -625,13 +657,16 @@ local function new(options)
 	--- @return integer|nil generation New request generation, or nil on refusal.
 	local function _prepare_request(callback)
 		local admission_generation = _generation
-		if _request_active or _timeout_timer or _active_task then
+		if _request_active or _timeout_timer or next(_native_requests) ~= nil then
 			local cancelled = inst.cancel()
 			admission_generation = admission_generation + 1
 			-- cancel() notifies real settlement observers after its mutation.
 			-- Their newer request/cancel intent supersedes this outer admission.
 			if admission_generation ~= _generation then return nil end
-			if cancelled ~= true then
+			-- Taskless predecessors may overlap a replacement, as the public API
+			-- already permits. They still prevent physical settlement. Returned-task
+			-- and timer cleanup debt continue to block every successor.
+			if cancelled ~= true and (_has_pending_tasks() or #_timeout_cleanup > 0) then
 				Logger.error(LOG, "HTTP request refused while native cancellation remains pending.")
 				if admission_generation ~= _generation then return nil end
 				invoke_callback(callback, {
@@ -701,28 +736,29 @@ local function new(options)
 		local my_generation = _prepare_request(callback)
 		if not my_generation then return false end
 
+		local receipt = { generation = my_generation }
+		local native_callback = _native_completion(receipt, _make_cb(callback, my_generation))
 		local ok, task_or_err = pcall(function()
 			if follow_redirects == false or cache_policy ~= nil then
 				return _native_request(method, url, headers, body,
-					_make_cb(callback, my_generation), follow_redirects)
+					native_callback, follow_redirects)
 			end
 			if method == "post" then
-				return hs.http.asyncPost(url, body, headers, _make_cb(callback, my_generation))
+				return hs.http.asyncPost(url, body, headers, native_callback)
 			end
-			return hs.http.asyncGet(url, headers, _make_cb(callback, my_generation))
+			return hs.http.asyncGet(url, headers, native_callback)
 		end)
 		if not ok or task_or_err == false then
+			_native_requests[receipt] = nil
 			if my_generation ~= _generation or not _request_active then
 				Logger.error(LOG,
 					"%s(): native HTTP dispatch failed after terminal completion — %s. "
 						.. "Duplicate result suppressed.", method, tostring(task_or_err))
+				_notify_settlement_observers()
 				return false
 			end
 			_cancelled = true
 			_request_active = false
-			_active_task = nil
-			_active_task_generation = nil
-			_active_task_hop = nil
 			_stop_timeout()
 			Logger.error(LOG, "%s(): native HTTP dispatch failed — %s.", method, tostring(task_or_err))
 			invoke_callback(callback, {
@@ -736,13 +772,7 @@ local function new(options)
 			return false
 		end
 
-		-- A faithful Hammerspoon call returns nil. Activity is therefore tracked
-		-- independently, and a synchronous test completion cannot resurrect it
-		if my_generation == _generation and _request_active then
-			_active_task = task_or_err
-			_active_task_generation = task_or_err ~= nil and my_generation or nil
-			_active_task_hop = nil
-		end
+		_record_native_return(receipt, task_or_err)
 		return true
 	end
 
@@ -758,7 +788,6 @@ local function new(options)
 		local my_generation = _prepare_request(callback)
 		if not my_generation then return false end
 		local redirects = 0
-		local current_hop = 0
 		local terminal_callback = _make_cb(callback, my_generation)
 		-- Hop identities without fragment, as the shared redirect law keys them:
 		-- a chain that returns to an exact earlier URL can never terminate.
@@ -768,21 +797,14 @@ local function new(options)
 
 		local dispatch_hop
 		dispatch_hop = function(hop_method, hop_url, hop_headers, hop_body)
-			current_hop = current_hop + 1
-			local my_hop = current_hop
+			local receipt = { generation = my_generation }
 			local ok, result_or_err = pcall(function()
 				return _native_request(
 					hop_method,
 					hop_url,
 					hop_headers,
 					hop_body,
-					function(status, response_body, response_headers)
-						if _active_task_generation == my_generation
-							and _active_task_hop == my_hop then
-							_active_task = nil
-							_active_task_generation = nil
-							_active_task_hop = nil
-						end
+					_native_completion(receipt, function(status, response_body, response_headers)
 						if my_generation ~= _generation or _cancelled or not _request_active then
 							_notify_settlement_observers()
 							return
@@ -834,24 +856,19 @@ local function new(options)
 						end
 
 						terminal_callback(status, response_body, response_headers)
-					end, false)
+					end), false)
 			end)
 
 			if not ok or result_or_err == false then
+				_native_requests[receipt] = nil
 				if my_generation == _generation and _request_active then
 					Logger.error(LOG, "%s(): redirect-aware HTTP dispatch failed: %s.",
 						hop_method, tostring(result_or_err))
 				end
+				_notify_settlement_observers()
 				return false
 			end
-			-- Hammerspoon returns nil, but retain a cancellable handle when another
-			-- conforming native transport supplies one. The hop identity prevents a
-			-- synchronous redirect callback from resurrecting its predecessor.
-			if my_generation == _generation and _request_active and current_hop == my_hop then
-				_active_task = result_or_err
-				_active_task_generation = result_or_err ~= nil and my_generation or nil
-				_active_task_hop = result_or_err ~= nil and my_hop or nil
-			end
+			_record_native_return(receipt, result_or_err)
 			return true
 		end
 
@@ -917,22 +934,28 @@ local function new(options)
 	--- "Aborts" means the RESULT is discarded, not that the socket is torn down.
 	--- hs.http.asyncGet/asyncPost normally return nothing, so request activity is
 	--- tracked independently and the OS completion self-discards on the generation
-	--- check. Native task cancellation remains opportunistic for an implementation
-	--- that does return a cancellable handle.
+	--- check. A taskless request remains physically pending until terminal delivery.
+	--- Native task cancellation remains opportunistic for an implementation that
+	--- does return a cancellable handle. False reports pending physical settlement;
+	--- logical cancellation still fences the result synchronously.
 	function inst.cancel()
 		_lifecycle_depth = _lifecycle_depth + 1
 		_cancelled  = true
 		_request_active = false
 		_generation = _generation + 1
-		local task_settled = _cancel_active_task() == true
+		local task_settled = _cancel_native_tasks() == true
 		_stop_timeout()
 		-- _stop_timeout retains an uncertain timer in the exact cleanup ledger.
 		-- Retry that ledger now and expose the final settlement to lifecycle owners;
 		-- legacy nil made pause publish success while native timeout debt survived.
 		local timers_settled = _retry_timeout_cleanup() == true
+		-- A settlement observer may acquire a newer generation. Preserve the
+		-- physical receipt for the revoked set before invoking that continuation;
+		-- isSettled() still reports any newly acquired request as pending.
+		local receipt_settled = task_settled and timers_settled and next(_native_requests) == nil
 		_lifecycle_depth = _lifecycle_depth - 1
 		_notify_settlement_observers()
-		return task_settled and timers_settled
+		return receipt_settled
 	end
 
 	--- Registers a continuation for exact native settlement of this instance.
