@@ -484,3 +484,5 @@ _RemoteTrimRegistry_DetachesBeforeReentrantCallback() {
 }
 Test("api_remote: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
 	_RemoteTrimRegistry_DetachesBeforeReentrantCallback)
+
+#Include test_llm_backboard_exchange_after.ahk
