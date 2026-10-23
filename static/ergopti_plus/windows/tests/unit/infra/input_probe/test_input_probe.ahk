@@ -252,3 +252,5 @@ Test("input probe: every text the checks show exists in English", _IPT_EveryShow
 #Include test_input_probe_rival_owner.ahk
 
 #Include test_input_probe_entry_owner.ahk
+
+#Include test_input_probe_clipboard_owner.ahk
