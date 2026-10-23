@@ -89,77 +89,171 @@ _HCWWeb_TryOpen() {
 	if !_HCWWeb_Available()
 		return false
 
-	; Singleton — bring the existing editor to the front.
+	; Refresh only the captured singleton. Any data/page callout may close it.
 	if (_HCWWeb_Gui != 0) {
+		Window := _HCWWeb_Gui, SessionEpoch := _HCWWeb_SessionEpoch
 		_HCW_InitLocaleStrings()
+		if !_HCWWeb_StartupCurrent(SessionEpoch, Window)
+			return true
 		_HCW_BuildCategoryList()
+		if !_HCWWeb_StartupCurrent(SessionEpoch, Window)
+			return true
 		_HCW_BuildGroupList()
+		if !_HCWWeb_StartupCurrent(SessionEpoch, Window)
+			return true
 		_HCWWeb_PushState()
-		WMPresentWindow(_HCWWeb_Gui)
+		if _HCWWeb_StartupCurrent(SessionEpoch, Window)
+			WMPresentWindow(_HCWWeb_Gui)
 		return true
 	}
-	_HCWWeb_SessionEpoch += 1
-	SessionEpoch := _HCWWeb_SessionEpoch
-	_HCWWeb_ResetDone := false
+	PreviousCritical := Critical("On")
+	try {
+		if _HCWWeb_Gui != 0
+			return true
+		_HCWWeb_SessionEpoch += 1
+		SessionEpoch := _HCWWeb_SessionEpoch
+		_HCWWeb_ResetDone := false
+	} finally Critical(PreviousCritical)
 
-	; Build the canonical data model up front so the first push has content and
-	; the locale-dependent labels / color presets are populated.
+	; Keep the delivered data builders, but stop a retired opening before it
+	; acquires a native window or publishes resources into a replacement.
 	_HCW_InitLocaleStrings()
+	if !_HCWWeb_OpeningCurrent(SessionEpoch)
+		return true
 	_HCW_BuildCategoryList()
+	if !_HCWWeb_OpeningCurrent(SessionEpoch)
+		return true
 	_HCW_BuildGroupList()
+	if !_HCWWeb_OpeningCurrent(SessionEpoch)
+		return true
 
 	g := Gui_Create("+Resize +MinSize560x320", t("hs_config.window_title"))
-	g.BackColor := "0x1e1e1e"
-	g.MarginX   := 0
-	g.MarginY   := 0
-	Placeholder := g.Add("Text", "x0 y0 w" . HCWWEB_WIDTH . " h" . HCWWEB_HEIGHT, "")
-	g.OnEvent("Close", _HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_OnClose))
-	g.OnEvent("Size",  _HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_OnResize))
-
-	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
-	; the control lays out blank and never recovers.
-	g.Show("w" . HCWWEB_WIDTH . " h" . HCWWEB_HEIGHT . " Center")
-	_HCWWeb_Gui := g
-
-	loader := _VendorDir . "\64bit\WebView2Loader.dll"
+	Installed := false, FactoryFailed := false, ResetForFallback := false
 	try {
-		_HCWWeb_Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
-	} catch as Err {
-		try LoggerError("HotstringsConfigWindow", "WebView2 create failed: {1} — falling back to native Gui.", Err.Message)
-		try g.Destroy()
-		_HCWWeb_Reset()
-		_HCWWeb_Gui := 0
-		return false
+		if !_HCWWeb_OpeningCurrent(SessionEpoch)
+			return true
+		g.BackColor := "0x1e1e1e"
+		g.MarginX := 0
+		g.MarginY := 0
+		Placeholder := g.Add("Text", "x0 y0 w" . HCWWEB_WIDTH . " h" . HCWWEB_HEIGHT, "")
+		g.OnEvent("Close", _HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_OnClose))
+		g.OnEvent("Size", _HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_OnResize))
+
+		; Native Show can dispatch Close. Publish the exact GUI first; a retired
+		; Show frame must never re-publish it after that native pump returns.
+		Published := false
+		PreviousCritical := Critical("On")
+		try {
+			if _HCWWeb_OpeningCurrent(SessionEpoch) {
+				_HCWWeb_Gui := g
+				Published := true
+			}
+		} finally Critical(PreviousCritical)
+		if !Published || !_HCWWeb_StartupCurrent(SessionEpoch, g)
+			return true
+		g.Show("w" . HCWWEB_WIDTH . " h" . HCWWEB_HEIGHT . " Center")
+		if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+			return true
+
+		loader := _VendorDir . "\64bit\WebView2Loader.dll"
+		try {
+			Environment := WebView_SharedEnvironment(loader)
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			Controller := WebView2.create(Placeholder.Hwnd, , Environment)
+		} catch as Err {
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try LoggerError("HotstringsConfigWindow", "WebView2 create failed: {1} — falling back to native Gui.", Err.Message)
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			FactoryFailed := true
+		}
+		if !FactoryFailed {
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			View := Controller.CoreWebView2
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+
+			try {
+				s := View.Settings
+				if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.AreDevToolsEnabled := false
+				if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.AreDefaultContextMenusEnabled := false
+				if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.IsStatusBarEnabled := false
+				if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.AreBrowserAcceleratorKeysEnabled := false
+				if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+					return true
+				s.IsSwipeNavigationEnabled := false
+			}
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+
+			MsgSub := View.WebMessageReceived(_HCWWeb_OnWebMessage.Bind(SessionEpoch))
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			NavSub := View.NavigationCompleted(_HCWWeb_OnNavigationCompleted.Bind(SessionEpoch))
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try View.SetVirtualHostNameToFolderMapping(HCWWEB_VHOST, _SharedDir, HCWWEB_HOST_ACCESS_ALLOW)
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			Seed := _HCWWeb_I18nSeed()
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try View.AddScriptToExecuteOnDocumentCreated(Seed)
+
+			; Globals retain subscription references before the aliases leave this
+			; RAM-only transaction; no COM call or final reference release occurs inside it.
+			PreviousCritical := Critical("On")
+			try {
+				if _HCWWeb_StartupCurrent(SessionEpoch, g) {
+					_HCWWeb_Controller := Controller
+					_HCWWeb_WebView := View
+					_HCWWeb_MsgSub := MsgSub
+					_HCWWeb_NavSub := NavSub
+					MsgSub := unset
+					NavSub := unset
+					Installed := true
+				}
+			} finally Critical(PreviousCritical)
+			if !Installed || !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+
+			try View.Navigate(_HCWWeb_HtmlUrl())
+			if !_HCWWeb_StartupCurrent(SessionEpoch, g)
+				return true
+			try Controller.Fill()
+			if _HCWWeb_StartupCurrent(SessionEpoch, g)
+				try LoggerSuccess("HotstringsConfigWindow", "Hotstrings config window shown via WebView2.")
+			return true
+		}
+	} finally {
+		if !Installed {
+			; Revoke only this opening before private unsubscribe/Close/Destroy
+			; can pump callbacks. A stale frame never Reset()s its successor.
+			ResetForFallback := _HCWWeb_Reset(SessionEpoch, g)
+			try MsgSub := unset
+			try NavSub := unset
+			if IsSet(Controller) {
+				try Controller.Close()
+				catch as Err
+					try LoggerError("HotstringsConfigWindow", "Retired browser cleanup failed: {1}.", Err.Message)
+			}
+			try g.Destroy()
+		}
 	}
-
-	_HCWWeb_WebView := _HCWWeb_Controller.CoreWebView2
-	; This controller/webview pair is fresh — re-arm the Reset() guard so this
-	; session's close actually tears it down instead of short-circuiting on a
-	; flag left behind by an earlier _HCWWeb_Reset() call.
-
-	try {
-		s := _HCWWeb_WebView.Settings
-		s.AreDevToolsEnabled               := false
-		s.AreDefaultContextMenusEnabled    := false
-		s.IsStatusBarEnabled               := false
-		s.AreBrowserAcceleratorKeysEnabled := false
-		s.IsSwipeNavigationEnabled         := false
-	}
-
-	; Store the subscription handles in persistent globals (see header note).
-	global _HCWWeb_MsgSub := _HCWWeb_WebView.WebMessageReceived(_HCWWeb_OnWebMessage.Bind(SessionEpoch))
-	global _HCWWeb_NavSub := _HCWWeb_WebView.NavigationCompleted(_HCWWeb_OnNavigationCompleted.Bind(SessionEpoch))
-
-	; Map the virtual host BEFORE navigating so the document and every relative
-	; asset resolve through it; seed the i18n base + active locale before page
-	; scripts run so the shared i18n.js fetches the right locale JSON.
-	try _HCWWeb_WebView.SetVirtualHostNameToFolderMapping(HCWWEB_VHOST, _SharedDir, HCWWEB_HOST_ACCESS_ALLOW)
-	try _HCWWeb_WebView.AddScriptToExecuteOnDocumentCreated(_HCWWeb_I18nSeed())
-	try _HCWWeb_WebView.Navigate(_HCWWeb_HtmlUrl())
-	try _HCWWeb_Controller.Fill()
-
-	try LoggerSuccess("HotstringsConfigWindow", "Hotstrings config window shown via WebView2.")
-	return true
+	; Only now have all private cleanup callouts completed. A later session
+	; cannot lend its authority to this failed opening's native fallback.
+	return !(FactoryFailed && ResetForFallback && _HCWWeb_FallbackCurrent(SessionEpoch + 1))
 }
 
 
@@ -210,6 +304,24 @@ _HCWWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
 _HCWWeb_SessionCurrent(SessionEpoch) {
 	global _HCWWeb_SessionEpoch
 	return SessionEpoch == _HCWWeb_SessionEpoch
+}
+
+; An opening without a published native owner cannot borrow another session.
+_HCWWeb_OpeningCurrent(SessionEpoch) {
+	global _HCWWeb_Gui, _HCWWeb_ResetDone
+	return _HCWWeb_SessionCurrent(SessionEpoch) && !_HCWWeb_ResetDone && _HCWWeb_Gui == 0
+}
+
+; Every yielding startup operation must retain the exact native session owner.
+_HCWWeb_StartupCurrent(SessionEpoch, Window) {
+	global _HCWWeb_Gui, _HCWWeb_ResetDone
+	return _HCWWeb_SessionCurrent(SessionEpoch) && !_HCWWeb_ResetDone && _HCWWeb_Gui == Window
+}
+
+; Only a failed opening's exact retired epoch may admit the native fallback.
+_HCWWeb_FallbackCurrent(SessionEpoch) {
+	global _HCWWeb_Gui, _HCWWeb_ResetDone
+	return _HCWWeb_SessionCurrent(SessionEpoch) && _HCWWeb_ResetDone && _HCWWeb_Gui == 0
 }
 
 _HCWWeb_SessionCall(SessionEpoch, Callback, Params*) {
@@ -531,55 +643,66 @@ _HCWWeb_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 ; Window-close (X / Alt+F4) and the frontend "close" button both land here.
-_HCWWeb_OnClose(*) {
-	_HCWWeb_Close()
+_HCWWeb_OnClose(Window, *) {
+	_HCWWeb_Close(0, Window)
 }
 
-_HCWWeb_Close() {
-	global _HCWWeb_Gui
-	saved := (_HCWWeb_Gui != 0) ? _HCWWeb_Gui : 0
-	_HCWWeb_Reset()
+_HCWWeb_Close(ExpectedEpoch := 0, Window := 0) {
+	global _HCWWeb_Gui, _HCWWeb_SessionEpoch
+	PreviousCritical := Critical("On")
 	try {
-		if saved
-			saved.Destroy()
-	}
-	_HCWWeb_Gui := 0
+		if Window && _HCWWeb_Gui != Window
+			return false
+		if ExpectedEpoch && ExpectedEpoch != _HCWWeb_SessionEpoch
+			return false
+		Window := _HCWWeb_Gui
+		ExpectedEpoch := _HCWWeb_SessionEpoch
+	} finally Critical(PreviousCritical)
+	if !_HCWWeb_Reset(ExpectedEpoch, Window)
+		return false
+	; Reset detached every global before any unsubscribe/controller callout.
+	; Destroy may open a successor, so nothing writes the globals afterwards.
+	if IsObject(Window)
+		try Window.Destroy()
+	return true
 }
 
-; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
-; whether to destroy the window). Idempotent: a second call (e.g. the frontend
-; "close" message and the native Gui Close event both firing for the same
-; teardown) is a true no-op instead of touching the globals again.
-_HCWWeb_Reset() {
-	global _HCWWeb_Controller, _HCWWeb_WebView, _HCWWeb_MsgSub, _HCWWeb_NavSub
+; Detaches the exact current host, then releases only its captured resources.
+; The native GUI is not destroyed here; its owner decides whether to destroy it.
+_HCWWeb_Reset(ExpectedEpoch := 0, Window := 0) {
+	global _HCWWeb_Gui, _HCWWeb_Controller, _HCWWeb_WebView, _HCWWeb_MsgSub, _HCWWeb_NavSub
 	global _HCWWeb_ResetDone, _HCWWeb_SessionEpoch
-
-	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
-	; Completed against this controller. Re-running the unset lines below would
-	; call __Delete's bound ComCall a SECOND time against a COM pointer WebView2
-	; has already torn down (Controller.Close() releases CoreWebView2's underlying
-	; interfaces) — a genuine SEH access violation that no try/catch can intercept.
-	if _HCWWeb_ResetDone
-		return
-	_HCWWeb_ResetDone := true
-	_HCWWeb_SessionEpoch += 1
-
-	; The whole teardown runs under one try: a hard COM access violation can
-	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
-	; exceptions — it does NOT catch that class of failure, but wrapping the
-	; sequence still protects the *other* lines from a preceding non-fatal COM
-	; error so the globals below are always cleared even when the unsubscribe
-	; itself fails.
+	PreviousCritical := Critical("On")
 	try {
-		; Release the subscriptions FIRST, while the controller is still alive. Their
-		; __Delete unsubscribes via remove_X on the live controller; doing it AFTER
-		; Controller.Close() raises a COM error that — uncaught in the window's
-		; Close-event thread — terminates the entire AHK script.
+		if ExpectedEpoch && !_HCWWeb_StartupCurrent(ExpectedEpoch, Window)
+			return false
+		if _HCWWeb_ResetDone
+			return false
+		; Keep all references alive across Critical restoration. Clearing globals
+		; cannot invoke COM/GUI finalizers while the retirement is only partial.
+		RetiredWindow := _HCWWeb_Gui
+		if IsSet(_HCWWeb_Controller)
+			RetiredController := _HCWWeb_Controller
+		if IsSet(_HCWWeb_WebView)
+			RetiredView := _HCWWeb_WebView
+		if IsSet(_HCWWeb_MsgSub)
+			RetiredMsgSub := _HCWWeb_MsgSub
+		if IsSet(_HCWWeb_NavSub)
+			RetiredNavSub := _HCWWeb_NavSub
+		_HCWWeb_ResetDone := true
+		_HCWWeb_SessionEpoch += 1
+		_HCWWeb_Gui := 0
 		_HCWWeb_MsgSub := unset
 		_HCWWeb_NavSub := unset
-		if IsSet(_HCWWeb_Controller)
-			_HCWWeb_Controller.Close()
-	}
-	_HCWWeb_Controller := unset
-	_HCWWeb_WebView    := unset
+		_HCWWeb_Controller := unset
+		_HCWWeb_WebView := unset
+	} finally Critical(PreviousCritical)
+
+	; Actual unsubscribe precedes Controller.Close after restoring the caller's
+	; Critical state. These references remain owned if a callout opens a successor.
+	try RetiredMsgSub := unset
+	try RetiredNavSub := unset
+	if IsSet(RetiredController)
+		try RetiredController.Close()
+	return true
 }
