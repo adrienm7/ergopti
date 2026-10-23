@@ -313,8 +313,9 @@ end
 --- level and falls back to the clipboard.
 --- @param kind string "key" or "shortcut".
 --- @param parsed table A parse from parse_send_input.
+--- @param publication table|nil Retained destination for a printable key.
 --- @return boolean True when the input was sent.
-local function send_keystroke(kind, parsed)
+local function send_keystroke(kind, parsed, publication)
 	local vocabulary = M.send_vocabulary()
 	local mod_codes, held = {}, {}
 	local function hold(code)
@@ -331,7 +332,7 @@ local function send_keystroke(kind, parsed)
 			{ SendInput.entry(vocabulary, "keys", parsed.named).linux }, parsed.canonical)
 	end
 	if kind == "key" then
-		local result = Injector.inject(0, parsed.char, false)
+		local result = Injector.inject(0, parsed.char, false, nil, publication)
 		return type(result) == "table" and result.ok == true
 	end
 	local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
@@ -671,6 +672,9 @@ end
 --- of a second copy in the gesture layer.
 --- @return table { [action_id] = function(binding, parameter): boolean }
 function M.action_handlers()
+	-- Resolve the strict vocabulary at construction, before a live key asks
+	-- the pure parser whether this is text or an intentional named command.
+	local key_vocabulary = M.send_vocabulary()
 	return {
 		-- A key, a key combination, a tap-hold or a gesture bound to CapsWord
 		-- toggles the session the tray row shows, as Windows' ToggleCapsWord.
@@ -686,16 +690,23 @@ function M.action_handlers()
 		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
 		-- The value is the binding's own parameter, validated by the executor.
 		["send_text"] = function(_, parameter)
+			local publication = capture_text_destination()
 			record("send_text")
+			if not publication then Logger.warn(LOG, "Text insertion refused: no retained text destination."); return false end
 			local parsed = M.parse_send_input("text", parameter)
 			if not parsed then return false end
-			local result = Injector.inject(0, parsed.text, false)
+			local result = Injector.inject(0, parsed.text, false, nil, publication)
 			return type(result) == "table" and result.ok == true
 		end,
 		["send_key"] = function(_, parameter)
+			local parsed = SendInput.parse_key(parameter, key_vocabulary)
+			local publication
+			if parsed and not parsed.named then publication = capture_text_destination() end
 			record("send_key")
-			local parsed = M.parse_send_input("key", parameter)
-			return parsed ~= nil and send_keystroke("key", parsed)
+			if parsed and not parsed.named and not publication then
+				Logger.warn(LOG, "Character insertion refused: no retained text destination."); return false
+			end
+			return parsed ~= nil and send_keystroke("key", parsed, publication)
 		end,
 		["send_shortcut"] = function(_, parameter)
 			record("send_shortcut")
