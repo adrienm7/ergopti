@@ -580,11 +580,17 @@ _PathsEdWeb_Close() {
 	global _PathsEdWeb_Gui
 	saved := (_PathsEdWeb_Gui != 0) ? _PathsEdWeb_Gui : 0
 	_PathsEdWeb_Reset()
+	; Native destruction can dispatch another public open. Retire only this
+	; captured slot after controller teardown, before that request can reenter.
+	PreviousCritical := Critical("On")
+	try {
+		if _PathsEdWeb_Gui == saved
+			_PathsEdWeb_Gui := 0
+	} finally Critical(PreviousCritical)
 	try {
 		if saved
 			saved.Destroy()
 	}
-	_PathsEdWeb_Gui := 0
 }
 
 ; Tears down the WebView2 controller + host state (NOT the Gui — callers decide
