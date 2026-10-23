@@ -188,3 +188,5 @@ _KLSO_RefusalAfterPause() {
 }
 Test("system owner: refusal during pause remains a terminal privacy drop (system-paused-delivery-debt)",
 	_KLSO_RefusalAfterPause)
+
+#Include test_system_committed_retirement.ahk
