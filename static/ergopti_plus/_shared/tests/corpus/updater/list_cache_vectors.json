@@ -1,0 +1,77 @@
+{
+	"_comment": "Vectors of _shared/lua/updater/list_cache.lua: which stored release-list copies a restart may send as a conditional request again. Replayed by the Linux and macOS Lua suites. valid is whether validate accepts the value; reason_contains is a fragment of the refusal.",
+	"max_body_bytes": 2097152,
+	"cases": [
+		{
+			"id": "complete-copy",
+			"stored": { "url": "https://api.github.com/repos/o/r/releases?per_page=20&page=1", "etag": "W/\"abc\"", "body": "[{\"tag_name\":\"v1.0.0\"}]" },
+			"valid": true
+		},
+		{
+			"id": "leading-whitespace-array",
+			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body": "\n  [{\"tag_name\":\"v1\"}]" },
+			"valid": true
+		},
+		{
+			"id": "other-url",
+			"stored": { "url": "https://api.github.com/other", "etag": "\"e\"", "body": "[]" },
+			"expected_url": "https://api.github.com/x",
+			"valid": false,
+			"reason_contains": "another URL"
+		},
+		{
+			"id": "same-url-passes-expected",
+			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body": "[{}]" },
+			"expected_url": "https://api.github.com/x",
+			"valid": true
+		},
+		{
+			"id": "not-a-table",
+			"stored": "text",
+			"valid": false,
+			"reason_contains": "not a table"
+		},
+		{
+			"id": "no-url",
+			"stored": { "etag": "\"e\"", "body": "[{}]" },
+			"valid": false,
+			"reason_contains": "no URL"
+		},
+		{
+			"id": "empty-url",
+			"stored": { "url": "", "etag": "\"e\"", "body": "[{}]" },
+			"valid": false,
+			"reason_contains": "no URL"
+		},
+		{
+			"id": "no-etag",
+			"stored": { "url": "https://api.github.com/x", "body": "[{}]" },
+			"valid": false,
+			"reason_contains": "no ETag"
+		},
+		{
+			"id": "empty-etag",
+			"stored": { "url": "https://api.github.com/x", "etag": "", "body": "[{}]" },
+			"valid": false,
+			"reason_contains": "no ETag"
+		},
+		{
+			"id": "object-body",
+			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body": "{\"message\":\"rate limited\"}" },
+			"valid": false,
+			"reason_contains": "not a release array"
+		},
+		{
+			"id": "non-string-body",
+			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body": 12 },
+			"valid": false,
+			"reason_contains": "not a release array"
+		},
+		{
+			"id": "oversized-body",
+			"stored": { "url": "https://api.github.com/x", "etag": "\"e\"", "body_repeat": { "prefix": "[", "unit": "x", "count": 2097152 } },
+			"valid": false,
+			"reason_contains": "exceeds"
+		}
+	]
+}
