@@ -589,7 +589,12 @@ class WebViewHost {
 						return
 				this.ReadyFired := true
 				if this.Opts.Has("OnReady")
-						SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
+						this._ScheduleReady()
+		}
+
+		; Initial delivery and resume share one exact native timer boundary.
+		_ScheduleReady() {
+				SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
 		}
 
 		; Admission and the native one-shot arm are bounded; no COM or I/O runs
@@ -602,7 +607,7 @@ class WebViewHost {
 								|| WebViewHost._PendingReady.Get(this, 0) != Pending
 								return false
 						Pending.Scheduled := true
-						try SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
+						try this._ScheduleReady()
 						catch as Err {
 								Pending.Scheduled := false
 								throw Err
