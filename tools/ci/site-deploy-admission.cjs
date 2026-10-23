@@ -159,6 +159,22 @@ async function readCurrentRun(env, readApi) {
 	};
 }
 
+/**
+ * GitHub lists a job that a partial rerun (gh run rerun --failed) did not execute again as a
+ * copy under the new attempt number, with the original start and completion times. Its
+ * receipt was written by the attempt that really ran it, which is the lowest attempt among
+ * the rows sharing those times. A genuine rerun has fresh times and keeps its own number.
+ */
+function producingAttempt(job, matches) {
+	const attempt = Number(number(job.run_attempt));
+	if (typeof job.started_at !== 'string' || typeof job.completed_at !== 'string')
+		return String(attempt);
+	const copies = matches.filter(
+		(row) => row.job.started_at === job.started_at && row.job.completed_at === job.completed_at
+	);
+	return String(Math.min(...copies.map((row) => Number(number(row.job.run_attempt)))));
+}
+
 /** Select the exact successful receipt writers for both targets across all actual attempts. */
 async function selectSiteJobs(identity, readApi) {
 	closed(identity, ['head_sha', 'run_id', 'run_attempt']);
@@ -236,7 +252,7 @@ async function selectSiteJobs(identity, readApi) {
 				writer.status === 'completed' && writer.conclusion === 'success',
 				'selected stage receipt writer is not successful.'
 			);
-			return { job_id: number(job.id), run_attempt: number(job.run_attempt) };
+			return { job_id: number(job.id), run_attempt: producingAttempt(job, matches) };
 		});
 		refuse(
 			Number(number(selected[0].run_attempt)) <= Number(number(selected[1].run_attempt)),

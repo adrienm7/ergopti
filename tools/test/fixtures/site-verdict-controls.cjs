@@ -166,7 +166,29 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		older.steps[1].conclusion = 'failure';
 		v.model.jobs.push(older);
 	});
+	await control('partial rerun lists the carried-over Build under the new attempt', (v) => {
+		const times = { started_at: '2026-10-23T01:21:12Z', completed_at: '2026-10-23T01:25:00Z' };
+		Object.assign(v.model.jobs[0], times);
+		v.model.jobs.push({ ...structuredClone(v.model.jobs[0]), id: 298, run_attempt: 2 });
+	});
 	const mutations = [
+		[
+			'genuine Build rerun with fresh times does not match an older receipt',
+			(v) => {
+				Object.assign(v.model.jobs[0], {
+					started_at: '2026-10-23T01:21:12Z',
+					completed_at: '2026-10-23T01:25:00Z'
+				});
+				v.model.jobs.push({
+					...structuredClone(v.model.jobs[0]),
+					id: 298,
+					run_attempt: 2,
+					started_at: '2026-10-23T01:59:00Z',
+					completed_at: '2026-10-23T02:03:00Z'
+				});
+			},
+			/Build receipt differs/
+		],
 		[
 			'missing target',
 			(v) => fs.rmSync(path.join(v.files.bundleRoot, 'dev'), { recursive: true }),
@@ -451,7 +473,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 			/actual repository CI/
 		]
 	];
-	assert.equal(mutations.length, 40, 'every declared proof and current-run refusal is present');
+	assert.equal(mutations.length, 41, 'every declared proof and current-run refusal is present');
 	for (const [label, mutate, reason] of mutations) await control(label, mutate, reason);
 	for (const name of ['CNAME', 'version.json', 'index.html']) {
 		await control(
@@ -483,7 +505,7 @@ async function run(owner = subject, artifact = require('../../ci/site-artifact.c
 		/source\/run/,
 		{ event: 'pull_request', source: 'c'.repeat(40) }
 	);
-	assert.equal(controls, 49, 'all two-target, attempt, source and PR identity controls execute');
+	assert.equal(controls, 51, 'all two-target, attempt, source and PR identity controls execute');
 	return {
 		controls,
 		scope:
