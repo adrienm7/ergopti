@@ -189,6 +189,14 @@ _MBPO_Receipt(Hash) {
 		. " pause_sha256=" . _MBPO.PauseHash . " final_sha256=" . Hash
 		. " boundary_failure=" . IsObject(_MBPO.Failure) . " errors=" . _MBPO.Errors.Length
 		. " browser_com=absent repaint_port=refusal`n", "*", "UTF-8-RAW")
+	; Export retained causes outside the logger sink before the unchanged guard.
+	for Index, Line in _MBPO.Errors
+		FileAppend("DIAGNOSTIC model-browser-close-pause-owner error_index=" . Index
+			. " logger_error=" . JsonStringLiteral(Line) . "`n", "*", "UTF-8-RAW")
+	if IsObject(_MBPO.Failure)
+		FileAppend("DIAGNOSTIC model-browser-close-pause-owner boundary_message=" . JsonStringLiteral(_MBPO.Failure.Message)
+			. " boundary_file=" . JsonStringLiteral(_MBPO.Failure.File)
+			. " boundary_line=" . _MBPO.Failure.Line . "`n", "*", "UTF-8-RAW")
 }
 
 _MBPO_Run() {
