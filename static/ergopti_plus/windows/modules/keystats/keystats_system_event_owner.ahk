@@ -9,6 +9,9 @@
 #Include keystats_system_intervals.ahk
 
 class KLSystemEventOwner {
+	; Unlike terminal false, this append result retains the exact pending head.
+	static APPEND_RETRY := 2
+
 	__New(ClockFn, AppendFn, AllowedFn) {
 		for Port in [ClockFn, AppendFn, AllowedFn]
 			if !HasMethod(Port, "Call")
@@ -100,7 +103,8 @@ class KLSystemEventOwner {
 	}
 
 	; The append port must pair queue mutation and Commit under its own guard.
-	; False means privacy/validation refusal, which must never be replayed later.
+	; False is terminal privacy/validation refusal; APPEND_RETRY is an exact
+	; lifecycle refusal before commit and retains the original pending record.
 	Drain() {
 		PreviousCritical := Critical("On")
 		try {
@@ -137,10 +141,15 @@ class KLSystemEventOwner {
 				}
 				if Record["committed"]
 					this.RemoveHead(Record)
-				if !(Accepted is Integer) || (Accepted != 0 && Accepted != 1)
+				Retryable := (Accepted is Integer) && Accepted = KLSystemEventOwner.APPEND_RETRY
+				if !(Accepted is Integer) || (Accepted != 0 && Accepted != 1 && !Retryable)
 					|| (Accepted = 1 && !Record["committed"])
-					|| (Accepted = 0 && Record["committed"]) {
+					|| (Accepted != 1 && Record["committed"]) {
 					this.LastFailure := "append-contract"
+					return false
+				}
+				if Retryable {
+					this.LastFailure := "publication-invalidated"
 					return false
 				}
 				if !Accepted
