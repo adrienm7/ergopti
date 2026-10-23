@@ -40,7 +40,30 @@ local helpers, Sandbox, Codec, load_over_config, drop_config, chord =
 -- =================================================================
 -- =================================================================
 
+--- Runs `body` with every translation answering `<key>`, so a label that
+--- hard-codes a language shows up as text without the marker.
+--- @param body function
+--- @return any The body's result.
+local function with_marked_translations(body)
+	local saved = package.loaded["infra.i18n"]
+	package.loaded["infra.i18n"] = { get = function(key) return "<" .. key .. ">" end }
+	local ok, result = pcall(body)
+	package.loaded["infra.i18n"] = saved
+	if not ok then error(result, 0) end
+	return result
+end
+
 helpers.describe("keyboard shortcuts: which slots exist", function()
+
+	helpers.it("names the modifiers and the special keys of a label through the catalogue", function()
+		local shortcuts = load_over_config()
+		local space = with_marked_translations(function() return shortcuts.get_slot_label("ctrl_space") end)
+		local enter = with_marked_translations(function() return shortcuts.get_slot_label("alt_enter") end)
+		drop_config()
+		helpers.assert_eq(space, "<layer_editor.key.ctrl> <layer_editor.key.space>",
+			"a French literal here would show Espace to every language")
+		helpers.assert_eq(enter, "<layer_editor.key.alt> <layer_editor.key.enter>")
+	end)
 
 	helpers.it("offers a slot per key from the shared catalogue", function()
 		local shortcuts = load_over_config()
@@ -54,19 +77,19 @@ helpers.describe("keyboard shortcuts: which slots exist", function()
 
 	helpers.it("labels a chord in words the user can read", function()
 		local shortcuts = load_over_config()
-		local label = shortcuts.get_slot_label("ctrl_shift_p")
+		local label = with_marked_translations(function() return shortcuts.get_slot_label("ctrl_shift_p") end)
 		drop_config()
-		helpers.assert_true(label:find("Ctrl", 1, true) ~= nil, "the label must name the modifier")
-		helpers.assert_true(label:find("Maj", 1, true) ~= nil,
+		helpers.assert_true(label:find("<layer_editor.key.ctrl>", 1, true) ~= nil, "the label must name the modifier")
+		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
 			"and both of them: a label that shows only the first modifier describes "
 				.. "a different chord from the one that fires")
 	end)
 
 	helpers.it("resolves the longer prefix first", function()
 		local shortcuts = load_over_config()
-		local label = shortcuts.get_slot_label("ctrl_shift_a")
+		local label = with_marked_translations(function() return shortcuts.get_slot_label("ctrl_shift_a") end)
 		drop_config()
-		helpers.assert_true(label:find("Maj", 1, true) ~= nil,
+		helpers.assert_true(label:find("<layer_editor.key.shift>", 1, true) ~= nil,
 			"'ctrl_shift_a' also starts with 'ctrl_', so a shorter prefix reached "
 				.. "first resolves the wrong chord — which is why the prefix list is "
 				.. "ordered and walked with ipairs")

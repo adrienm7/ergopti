@@ -441,6 +441,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-audit-translations-scope.cjs"],
 			"repro": "node tools/test/test-audit-translations-scope.cjs"
+		},
+		{
+			"id": "js-0463",
+			"ordinal": 463,
+			"name": "visible text is localized (Windows notices, macOS field labels, Linux key names)",
+			"cmd": "node",
+			"args": ["tools/test/test-visible-text-is-localized.cjs"],
+			"repro": "node tools/test/test-visible-text-is-localized.cjs"
 		}
 	]
 }

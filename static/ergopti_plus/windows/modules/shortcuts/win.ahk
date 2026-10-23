@@ -59,7 +59,7 @@ if Features["shortcuts"]["gpt"]["enabled"] {
 						Run(Link)
 				} catch as Err {
 						LoggerError("shortcuts", "LaunchGptShortcut failed: {1}", Err.Message)
-						try TrayTip("Could not open the configured GPT link.", "ErgoptiPlus", "Iconx Mute")
+						try TrayTip(t("notify.open_gpt_failed"), "ErgoptiPlus", "Iconx Mute")
 				}
 		}
 }
@@ -80,7 +80,7 @@ if Features["shortcuts"]["get_hex_value"] {
 						TrayTip(HexColor, "ErgoptiPlus", "Iconi Mute")
 				} catch as Err {
 						LoggerError("shortcuts", "GetHexValue failed: {1}", Err.Message)
-						TrayTip("Color copy failed.", "ErgoptiPlus", "Iconx Mute")
+						TrayTip(t("notify.color_copy_failed"), "ErgoptiPlus", "Iconx Mute")
 				}
 		}
 }
@@ -653,7 +653,7 @@ if Features["shortcuts"]["open_downloads"] {
 						return _OpenDownloadsWith(GetKnownFolderDownloads, Run)
 				} catch as Err {
 						LoggerError("Shortcuts", "OpenDownloads failed: {1}", Err.Message)
-						try TrayTip("Could not open Downloads.", "ErgoptiPlus", "Iconx Mute")
+						try TrayTip(t("notify.open_downloads_failed"), "ErgoptiPlus", "Iconx Mute")
 						return false
 				}
 		}
