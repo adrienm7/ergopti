@@ -268,7 +268,7 @@ local function _typing_values_start(line)
 	if not upper:match("^%s*INSERT%s") then return nil, false end
 	local target = upper:match("^%s*INSERT.-%s+INTO%s+([^%s%(]+)")
 	if not target then return nil, true end
-	local normalized = target:gsub('[`"%[%]]', "")
+	local normalized = target:gsub("[`\"%[%]]", "")
 	if normalized ~= "EVENTS_TYPING" and not normalized:match("%.EVENTS_TYPING$") then return nil, false end
 	local verb, columns, opening = upper:match(
 		"^%s*(INSERT.-)%s+INTO%s+EVENTS_TYPING%s*%((.-)%)%s*VALUES%s*()%(")
