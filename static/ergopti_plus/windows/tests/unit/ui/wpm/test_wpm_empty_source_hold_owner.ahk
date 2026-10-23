@@ -49,7 +49,7 @@ _WPMZ_ChildSource(Canon) {
 		AssertEqual(0, RegExMatch(Source, Pattern, , State.Pos + State.Len), "The actual state class is unique")
 		Code .= State[0] . "`n"
 	}
-	for Symbol in ["_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
+	for Symbol in ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
 		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex"] {
 		Body := Symbol == "_WPMWidget_TickDelta" ? _WPMZ_DeltaSource(Source) : _DriverFuncBody(Symbol)
