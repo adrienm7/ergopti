@@ -410,7 +410,7 @@ HealthCheck_Run(Detailed := false, Extensive := false) {
 	; session (about 30 ms on the first opening), before the clock starts
 	Schema := HealthCheck_Config()["schema"]
 	Started := _HealthCheck_NowMs()
-	UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+	UptimeSec := (A_TickCount - (_HealthCheckStartMs)) // 1000
 	ReportSubdir := Schema["report"]["subdir"]
 
 	; Every collector is hoisted out of the Map(...) constructor and run through
