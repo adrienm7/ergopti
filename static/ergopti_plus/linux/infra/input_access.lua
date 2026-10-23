@@ -39,6 +39,9 @@ M.EXIT_ACCESS = 78
 M.TITLE_KEY = "startup.linux_input_access_title"
 M.NOTIFICATION_LABEL_KEY = "startup.linux_input_access_label"
 M.BODY_KEY = "startup.linux_input_access_body"
+-- No keyboard device at all (a sandbox hides /dev/input): the input groups are
+-- not the cause, so this body does not name them.
+M.NO_DEVICE_BODY_KEY = "startup.linux_input_access_no_device_body"
 
 -- errno for a node that exists but this user may not open.
 local EACCES = 13
@@ -67,12 +70,13 @@ end
 function M.report(deps, detail)
 	deps = type(deps) == "table" and deps or {}
 	local i18n = deps.i18n
-	local title, body = M.TITLE_KEY, M.BODY_KEY
+	local body_key = deps.body_key or M.BODY_KEY
+	local title, body = M.TITLE_KEY, body_key
 	local notification_label = M.NOTIFICATION_LABEL_KEY
 	if i18n then
 		pcall(i18n.init)
 		local ok_title, translated_title = pcall(i18n.get, M.TITLE_KEY)
-		local ok_body, translated_body = pcall(i18n.get, M.BODY_KEY)
+		local ok_body, translated_body = pcall(i18n.get, body_key)
 		local ok_label, translated_label = pcall(i18n.get, M.NOTIFICATION_LABEL_KEY)
 		if ok_title and type(translated_title) == "string" then title = translated_title end
 		if ok_body and type(translated_body) == "string" then body = translated_body end
