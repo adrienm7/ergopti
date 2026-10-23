@@ -123,10 +123,14 @@ _TSRA_Exercise(State) {
 _TSRA_ArmPort(State, Callback, Period) {
 	AssertTrue(Callback == State["callback"], "rollback must address the exact admitted callback")
 	State["periods"].Push(Period)
-	if Period != 0
+	if Period != 0 {
+		; Fault injection follows a real native admission of this exact wrapper.
+		_TimerAdapterSetNative(Callback, Period)
 		throw State["first"]
+	}
 	if State["refuse"]
 		throw Error("logical rollback refusal")
+	_TimerAdapterCancelNative(Callback)
 }
 
 _TSRA_CancelPort(State, Callback) {
@@ -135,34 +139,42 @@ _TSRA_CancelPort(State, Callback) {
 
 _TSRA_Rollback(State) {
 	global _TIMER_ADAPTER_REGISTRY
-	for Refuse in [false, true] {
-		Port := Map("periods", [], "first", Error("logical admission refusal"), "refuse", Refuse)
-		Callback := (*) => 0
-		Port["callback"] := Callback
-		Handle := Map("Id", _TimerAdapterNextId(), "Fn", Callback, "Fired", false)
-		Failure := 0
-		try _TimerAdapterCommitNative(Handle, Callback, -60000, _TSRA_ArmPort.Bind(Port))
-		catch as Caught
-			Failure := Caught
-		try {
-			AssertTrue(Failure == Port["first"], "rollback must preserve the exact original failure")
-			AssertEqual(2, Port["periods"].Length)
-			AssertEqual(-60000, Port["periods"][1])
-			AssertEqual(0, Port["periods"][2], "throwing admission still needs an exact cancellation attempt")
-			if Refuse {
-				AssertTrue(_TIMER_ADAPTER_REGISTRY[Handle["Id"]] == Handle)
-				AssertTrue(Handle["Fn"] == Callback && !Handle["Fired"],
-					"unknown cancellation keeps callback and owner reachable for retry")
+	for Kind in ["after", "every"] {
+		for Refuse in [false, true] {
+			Port := Map("periods", [], "first", Error("logical admission refusal"), "refuse", Refuse)
+			Handle := Kind == "after" ? TimerAfter(60, _TSRA_Callback.Bind(State)) : TimerEvery(60, _TSRA_Callback.Bind(State))
+			Callback := Handle["Fn"]
+			Port["callback"] := Callback
+			BeforeCalls := State["calls"], Failure := 0
+			try {
+				try _TimerAdapterCommitNative(Handle, Callback, Handle["Interval"], _TSRA_ArmPort.Bind(Port))
+				catch as Caught
+					Failure := Caught
+				AssertTrue(Failure == Port["first"], "rollback must preserve the exact original failure")
+				AssertEqual(2, Port["periods"].Length)
+				AssertEqual(Handle["Interval"], Port["periods"][1])
+				AssertEqual(0, Port["periods"][2], "throwing admission still needs an exact cancellation attempt")
+				; Consume the real native timer before modeling its retained delivery.
+				; This is not an acknowledgment from the fault-injected rollback port.
+				_TimerAdapterCancelNative(Callback)
+				Callback.Call()
+				AssertEqual(BeforeCalls, State["calls"],
+					"failed admission cannot authorize user work while rollback acknowledgment is unknown")
+				if Refuse {
+					AssertTrue(_TIMER_ADAPTER_REGISTRY[Handle["Id"]] == Handle)
+					AssertTrue(Handle["Fn"] == Callback && Handle["Fired"],
+						"rejected work stays inactive while its exact cancellation capability remains reachable")
+					Port["refuse"] := false
+					AssertTrue(TimerCancel(Handle, _TSRA_CancelPort.Bind(Port)),
+						"the same logical capability can be retired by an acknowledged retry")
+				} else {
+					AssertFalse(_TIMER_ADAPTER_REGISTRY.Has(Handle["Id"]))
+					AssertTrue(Handle["Fired"] && Handle["Fn"] == 0)
+				}
+			} finally {
 				Port["refuse"] := false
-				AssertTrue(TimerCancel(Handle, _TSRA_CancelPort.Bind(Port)),
-					"the same logical capability can be retired by an acknowledged retry")
-			} else {
-				AssertFalse(_TIMER_ADAPTER_REGISTRY.Has(Handle["Id"]))
-				AssertTrue(Handle["Fired"] && Handle["Fn"] == 0)
+				AssertTrue(TimerCancel(Handle, _TSRA_CancelPort.Bind(Port)))
 			}
-		} finally {
-			Port["refuse"] := false
-			AssertTrue(TimerCancel(Handle, _TSRA_CancelPort.Bind(Port)))
 		}
 	}
 }
