@@ -90,7 +90,20 @@ _LSRL_Queue(Ledger) {
 		AssertEqual(0, Ledger["retired"], "An actual waiting queue job must retain its observation.")
 		Ledger["active_retained"] := 1
 		Fixture.Children[1].TerminateAllowed := true
-		AssertTrue(Fixture.Native.Cancel(true))
+		; Cancel can revisit an already-retired Models record in its snapshot.
+		; Join through the real retry boundary rather than equating its boolean
+		; with physical settlement of the exact earlier request.
+		Fixture.Native.Cancel(true)
+		AssertTrue(Fixture.Native.RetryPending(),
+			"The genuine retry boundary must join cancelled jobs and their exact request debt.")
+		Request := Fixture.Requests[1]
+		AssertTrue(Request.Aborted && Request.WaitForResponse(0))
+		AssertEqual(0, Request.Handle)
+		AssertFalse(Request.CleanupPending)
+		global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_CLEANUP_DEBTS
+		AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId))
+		AssertFalse(_HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId))
+		AssertEqual(0, Fixture.Timers.Count)
 		AssertEqual(0, Fixture.Native.Jobs.Count)
 		AssertEqual(0, Fixture.QueueTimers.Count)
 		AssertFalse(Fixture.Transport.HasPending("lmstudio"))
