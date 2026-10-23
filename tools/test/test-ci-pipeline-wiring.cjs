@@ -7251,7 +7251,7 @@ for (const [what, from, to] of [
 	[
 		'shared audio setup/native clock',
 		linuxAudioSetupBody,
-		linuxAudioSetupBody.replace('timeout-minutes: 10', 'timeout-minutes: 2')
+		linuxAudioSetupBody.replace('timeout-minutes: 20', 'timeout-minutes: 2')
 	],
 	[
 		'APT returned to native audio clock',
