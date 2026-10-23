@@ -586,8 +586,13 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 		; Async producers may do privacy/context preparation above, then discover
 		; that their immutable UI owner was replaced. Recheck at the exact queue
 		; mutation; the optional commit is memory-only and shares that transaction.
-		if IsSet(PublishGuard) && !PublishGuard.Call()
+		if IsSet(PublishGuard) && !PublishGuard.Call() {
+			; Preserve the historical output name for callers: native pause and
+			; owner revocation are retryable lifecycle refusals. Privacy and
+			; validation drops above leave it false and must never be replayed.
+			RejectedBySuspend := true
 			return false
+		}
 		; A supplied guard may synchronously reenter, replace an owner, or alter
 		; the row. Check its immutable preimage after that call, before allocating.
 		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?)
