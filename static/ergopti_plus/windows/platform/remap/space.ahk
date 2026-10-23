@@ -99,8 +99,11 @@ _SpaceTap() {
 				HSEMatch := HSE_FeedChar(" ", true)
 				_HSE_MirrorLiteralEditToLlm(0, " ")
 				CommittedScreenEffect := 0
+				; The user pressed Space when the key went down, not when the tap was
+				; decided: measure a trigger's time gate there.
 				Fired := HSEMatch != "" and HSE_DispatchMatch(
-						HSEMatch, HSE_LastEndChar, &CommittedScreenEffect)
+						HSEMatch, HSE_LastEndChar, &CommittedScreenEffect, false, unset,
+						TapHoldRollTapDownTick())
 				if (Fired is Map) && Fired.Has("Pending")
 						return true
 				if Fired {

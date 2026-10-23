@@ -25,6 +25,8 @@ _ST_AssertSpaceTapAtomic() {
 		"the intercepted Space must reach the screen before HSE models it, so dispatch never backspaces an absent end character")
 	Assert(LlmIdx > FeedIdx and DispatchIdx > LlmIdx and EffectIdx > DispatchIdx,
 		"the same Space must join HSE and LLM state before dispatch publishes one canonical effect")
+	Assert(InStr(Body, "TapHoldRollTapDownTick()", true, DispatchIdx) > DispatchIdx,
+		"the dispatch must measure a trigger's time gate at the Space press, not at the tap decision (space-tap-gate-at-press)")
 	Assert(FinalizeIdx > DispatchIdx,
 		"a fired Space completion must finalize the prefix watcher from the dispatcher's canonical effect")
 	Assert(RingIdx > FinalizeIdx and SecondRingIdx == 0,

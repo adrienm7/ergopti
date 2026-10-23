@@ -109,6 +109,26 @@ _THR_RollIsATap() {
 Test("tap-hold roll: a key rolled over the next one types its tap, then the next key (tap-hold-roll-is-a-tap-2026-10-01)",
 	_THR_RollIsATap)
 
+; The tap is typed when the key comes up, and its text may be gated on time
+; (a hotstring's delay): the tap must be able to read when the key went down.
+_THR_TapReadsItsPressTick() {
+	World := _THR_World()
+	Seen := []
+	World.Down[0x39] := true
+	Wait(KeyName, Seconds) {
+		World.Now += 120
+		return true
+	}
+	Ports := Map("wait_release", Wait, "tick", () => World.Now)
+	TapHoldOwnRoll("space", "SC039", 0.2, () => Seen.Push(TapHoldRollTapDownTick()),
+		() => true, (Pressed) => 0, Ports)
+	AssertEqual(1, Seen.Length)
+	AssertEqual(1000, Seen[1], "the tap reads the tick of the press, not of the release")
+	AssertEqual(0, TapHoldRollTapDownTick(), "outside a tap there is no press tick")
+}
+Test("tap-hold roll: the tap reads the tick its key went down (space-tap-gate-at-press)",
+	_THR_TapReadsItsPressTick)
+
 ; Space down, a down, a up, Space up: a quick chord stays a chord.
 _THR_NestedIsAHold() {
 	World := _THR_World()

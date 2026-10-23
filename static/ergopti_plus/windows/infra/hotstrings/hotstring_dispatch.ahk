@@ -1186,8 +1186,12 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 ; conform verdict). Callers use this to decide whether a fire really happened: logging
 ; a fire — or stripping the preview buffer — for a decline reports an expansion the
 ; user never saw.
+; @param GateNowTick {Integer} The A_TickCount the time-activation gate is measured
+;   at; 0 means now. A completion typed later than the user pressed its end
+;   character (a tap-hold Space is typed when it comes up) passes the press tick,
+;   so the time the key stayed down is not held against the typist.
 HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
-		ForceConsumeEndChar := false, NativeSendFn := unset) {
+		ForceConsumeEndChar := false, NativeSendFn := unset, GateNowTick := 0) {
 		global HSE_SUPPRESS_RELEASE_DELAY_MS, _SendHook, HSE_TypoNbspStripped, HSE_Buffer
 		global _HSE_TerminalOwnerSerial, HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 		global _PrefixInputContextGeneration, _PrefixDeferredGeneration
@@ -1230,11 +1234,12 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		if IsSet(HotstringPrefixWatcherClaimVisibleDecision)
 				try VisibleDecision := HotstringPrefixWatcherClaimVisibleDecision(
 						Spec, EndChar, HSE_Buffer)
+		GateTick := GateNowTick > 0 ? GateNowTick : A_TickCount
 		Prepared := IsObject(VisibleDecision)
 				? _HSE_PrepareDispatchDecision(Spec, HSE_Buffer, EndChar,
-						HSE_TypoNbspStripped, VisibleDecision.ResolvedBase)
+						HSE_TypoNbspStripped, VisibleDecision.ResolvedBase, GateTick)
 				: _HSE_PrepareDispatchDecision(
-						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped)
+						Spec, HSE_Buffer, EndChar, HSE_TypoNbspStripped, , GateTick)
 		HotPath_LogIfSlow("HSE.Preflight", PreflightStarted, "")
 		if !IsObject(Prepared)
 				return false

@@ -290,6 +290,42 @@ _HOF_SpaceTapCompletesEndCharTrigger() {
 Test("hotstring output: an end-character trigger completes from the Space tap (hotstring-output-is-final)",
 	_HOF_SpaceTapCompletesEndCharTrigger)
 
+; The maintainer's example: `pr` + Space gives `PR` while the section's delay is
+; 0.5 s. The gate runs from the previous letter to the end character the user
+; PRESSED. A tap-hold Space is typed when it comes up, so its press tick is the
+; moment to measure; measured at the release, the time the key stayed down was
+; held against the typist and a normal-speed press missed the delay.
+; @param PressedMsAgo {Integer} How long ago Space went down; 0 dispatches at once.
+_HOF_PrGateImpl(PressedMsAgo) {
+	global _HOF_Sends, HSE_LastEndChar, LastSentCharacterKeyTime
+	CreateHotstring("", "pr", "PR", Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON,
+		"TimeActivationSeconds", 0.5))
+	; `p` was sent 560 ms ago: past the 0.5 s delay now, inside it 100 ms ago.
+	LastSentCharacterKeyTime := Map("p", A_TickCount - 560)
+	for Char in StrSplit("pr")
+		HSE_FeedChar(Char, true)
+	Match := HSE_FeedChar(" ", true)
+	AssertTrue(IsObject(Match), "pr + Space must complete the trigger")
+	Effect := 0
+	GateTick := PressedMsAgo > 0 ? A_TickCount - PressedMsAgo : 0
+	if (PressedMsAgo > 0) {
+		AssertTrue(HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect, false, unset, GateTick),
+			"a Space pressed inside the delay must expand pr to PR although it is typed later")
+		AssertEqual("{BackSpace 3}{Text}PR ", _HOF_Sends[1].Keys)
+	} else {
+		AssertFalse(HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect),
+			"a Space typed past the delay does not expand")
+	}
+}
+
+_HOF_PrGateAtThePress() {
+	_HOF_Run(_HOF_PrGateImpl.Bind(100))
+	_HOF_Run(_HOF_PrGateImpl.Bind(0))
+}
+
+Test("hotstring output: the delay gate of a tap-hold Space is measured at its press (space-tap-gate-at-press)",
+	_HOF_PrGateAtThePress)
+
 
 
 
