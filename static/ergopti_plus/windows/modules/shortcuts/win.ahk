@@ -183,6 +183,8 @@ if Features["shortcuts"]["move"] {
 				; notification even when it was never turned on.
 				WasActive := ActivitySimulation
 				ActivitySimulation := False
+				; Retire this session's queued cancellation before a successor starts.
+				SetTimer(StopActivitySimulation, 0)
 				SetTimer(SimulateActivity, 0)
 				SetTimer(AwakeCheckMouseMoved, 0)
 				SetTimer(AwakeReturnToOrigin, 0)
