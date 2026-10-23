@@ -147,4 +147,19 @@ helpers.describe("menubar click gate", function()
 		f.gate.wrap(items)
 		helpers.assert_true(items[1].menu[1].fn == guarded, "a cached subtree is not wrapped twice")
 	end)
+
+	helpers.it("(menu-click-reload-joins) a Reload click during a reload joins it instead of replaying a second reload", function()
+		local f = fixture()
+		local reloads = 0
+		local tree = f.gate.wrap({ { title = "Reload", joins_reload = true, fn = function() reloads = reloads + 1 end } })
+		f.terminal = true; f.reloading = true
+		tree[1].fn()
+		helpers.assert_eq(reloads, 0, "the reload in flight is not run again")
+		helpers.assert_eq(#f.timers, 0, "nothing is held")
+		helpers.assert_true(f.gate.handoff())
+		helpers.assert_eq(f.store[KEY], nil, "nothing is handed to the successor")
+		f.terminal = false; f.reloading = false
+		tree[1].fn()
+		helpers.assert_eq(reloads, 1, "with no reload in flight the row reloads")
+	end)
 end)

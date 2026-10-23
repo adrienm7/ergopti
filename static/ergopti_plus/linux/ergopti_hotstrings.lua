@@ -616,13 +616,13 @@ local function perform_reload(trigger)
 	end
 	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
-	local ok, count = pcall(function() return hotstrings_config.reload() end)
-	if ok then
-		Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
-		return true
+	local reloaded, why = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
+	if reloaded then
+		-- A Reload click on an older tray tree now joins this reload.
+		local rebuild = privacy_owners.menu_rebuild
+		if rebuild then rebuild.note_reload() end
 	end
-	Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
-	return false, "failed"
+	return reloaded, why
 end
 
 --- Starts the release the updater just installed in place of this daemon: an
@@ -2565,12 +2565,8 @@ local function main()
 			personal_dir   = config_path,  -- personal TOMLs live alongside bundled ones
 			on_reload      = function()
 				Logger.info(LOG, "Config change detected — reloading hotstrings…")
-				local ok, count = pcall(function() return hotstrings_config.reload() end)
-				if ok then
-					Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
-				else
-					Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
-				end
+				local reloaded = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
+				if reloaded and privacy_owners.menu_rebuild then privacy_owners.menu_rebuild.note_reload() end
 			end,
 		})
 		Logger.info(LOG, "File watchers armed (%s).",

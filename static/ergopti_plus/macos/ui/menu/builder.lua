@@ -844,6 +844,8 @@ function M.generate(ctx, menu_mods, actions)
 		["reload"]          = function()
 			local row = ManifestMenu.command_row("top_level", "reload", { reload = actions.reload })
 			if not row then return {} end
+			-- Read by ui.menu.click_gate: a click during a reload joins it.
+			row.joins_reload = true
 			return { row }
 		end,
 		["quit"]            = function()

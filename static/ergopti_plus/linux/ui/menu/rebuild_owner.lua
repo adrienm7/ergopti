@@ -16,7 +16,10 @@
 --- 3. The click carries the state it asks for, the opposite of the checkmark
 ---    the user saw. A replayed row that already shows that state is skipped
 ---    and logged: running it would toggle the row back.
---- 4. A held click whose row the next tree no longer has is logged and
+--- 4. A click on the Reload row that arrives after a reload already ran since
+---    the clicked tree was built joins that reload: it is logged and dropped,
+---    never replayed as a second reload (macOS and Linux share this rule).
+--- 5. A held click whose row the next tree no longer has is logged and
 ---    reported once with a localized notice; a click dropped at shutdown or
 ---    past the hold limit is logged. None is ever silent.
 --- ==============================================================================
@@ -60,6 +63,7 @@ function M.new(options)
 	local generation, published, dirty, stopped, pumping = 0, nil, false, false, false
 	local published_rows = nil
 	local held = {}
+	local reloads = 0
 	local reported_generation, reported_reason
 	local owner = {}
 
@@ -141,9 +145,17 @@ function M.new(options)
 			local path = ClickIntent.child_path(prefix, row.title)
 			if type(row.menu) == "table" then row.menu = bind(row.menu, epoch, ancestors, path) end
 			local action, checked = row.fn, row.checked
+			local joins_reload, reloads_seen = row.joins_reload == true, reloads
 			if type(action) == "function" then
 				row.fn = function(...)
-					if pumping or published ~= epoch or not live(epoch) then return hold(path, checked, ...) end
+					if pumping or published ~= epoch or not live(epoch) then
+						if joins_reload and reloads > reloads_seen then
+							Logger.info(LOG, "Menu click on '%s' joined the reload that already ran; no second reload.",
+								ClickIntent.describe(path))
+							return false
+						end
+						return hold(path, checked, ...)
+					end
 					return action(...)
 				end
 			end
@@ -193,6 +205,11 @@ function M.new(options)
 		if not retained then return false, "retired" end
 		if #held > 0 then replay() end
 		return true
+	end
+
+	--- Records that a reload ran, so a Reload click made on an older tree joins it.
+	function owner.note_reload()
+		reloads = reloads + 1
 	end
 
 	--- Permanently retires queued work and every action without touching GTK.

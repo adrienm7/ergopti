@@ -36,6 +36,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_pointer_focus_privacy",
 	"tests.unit.infra.lifecycle.test_session_lock",
 	"tests.unit.infra.control.test_driver_control",
+	"tests.unit.infra.control.test_reload_outcome",
 	"tests.unit.modules.updater.install.test_production_dispatch_refusal",
 	"tests.unit.modules.updater.install.test_production_manager_owners",
 	"tests.unit.infra.native_artifacts.test_ollama_pinned_artifact",

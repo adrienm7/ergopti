@@ -100,6 +100,14 @@ helpers.describe("menu_builder: the Reload item reloads this daemon", function()
 		)
 	end)
 
+	helpers.it("marks the built Reload row so a stale click joins a finished reload", function()
+		local mb = helpers.load_module("ui.menu.menu_builder")
+		local items = mb.build({ config = make_config(), _version = "9.9.9", on_reload = function() end })
+		local reload = find_item(items, "recharg") or find_item(items, "reload")
+		helpers.assert_true(reload ~= nil, "the menu must contain a Reload item")
+		helpers.assert_eq(reload.joins_reload, true, "ui/menu/rebuild_owner reads this marker")
+	end)
+
 	helpers.it("never shells out — os.execute must not be reached at all", function()
 		-- This is the assertion the original could never have failed: os.execute
 		-- neither raises nor reports anything useful for a command that runs

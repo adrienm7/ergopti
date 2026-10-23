@@ -219,6 +219,41 @@ helpers.describe("menu rebuild: clicks during a refresh", function()
 		helpers.assert_eq(state.runs, 1); helpers.assert_eq(state.on, true)
 	end)
 
+	helpers.it("(menu-click-reload-joins) a stale Reload click joins the reload that already ran", function()
+		local reloads, visible = 0, nil
+		local owner = Factory.new({
+			current = function() return true end,
+			build = function()
+				return { { title = "Reload", joins_reload = true, fn = function() reloads = reloads + 1 end } }
+			end,
+			publish = function(items) visible = items; return true end,
+		})
+		owner.request(); helpers.assert_true(owner.pump())
+		local old = visible[1].fn
+		helpers.assert_eq(old(), nil, "the first click on the live row reloads")
+		helpers.assert_eq(reloads, 1)
+		owner.note_reload(); owner.request()
+		helpers.assert_eq(old(), false, "a second click on the retired row joins")
+		helpers.assert_true(owner.pump())
+		helpers.assert_eq(reloads, 1, "no second reload is replayed on the refreshed menu")
+		helpers.assert_eq(visible[1].fn(), nil)
+		helpers.assert_eq(reloads, 2, "a fresh click on the new tree reloads again")
+	end)
+
+	helpers.it("(menu-click-reload-stale-no-reload) a stale Reload click with no reload since still runs", function()
+		local reloads, visible = 0, nil
+		local owner = Factory.new({
+			current = function() return true end,
+			build = function() return { { title = "Reload", joins_reload = true, fn = function() reloads = reloads + 1 end } } end,
+			publish = function(items) visible = items; return true end,
+		})
+		owner.request(); helpers.assert_true(owner.pump())
+		local old = visible[1].fn
+		owner.request(); old()
+		helpers.assert_true(owner.pump())
+		helpers.assert_eq(reloads, 1, "a refresh not caused by a reload does not swallow the click")
+	end)
+
 	helpers.it("(menu-click-lost-notice) reports a held click whose row the refreshed menu lacks", function()
 		local state = fixture(); local owner = Factory.new(state.options)
 		owner.request(); helpers.assert_true(owner.pump())
