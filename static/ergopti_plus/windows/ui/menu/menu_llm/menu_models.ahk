@@ -136,7 +136,7 @@ _LLM_Menu_BackendRows() {
 		return []
 	LocalRows := LLM_Menu_LocalServersRows()
 	Rows := _LLM_Menu_BackendChildFrameRows(ChoiceRows, PortRows, LocalRows)
-	return Rows is Array ? Rows : []
+	return Rows is Array ? _LLM_Menu_GuardConfigRows(Rows) : []
 }
 
 
