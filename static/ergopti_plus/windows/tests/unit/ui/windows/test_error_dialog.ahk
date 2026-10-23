@@ -336,3 +336,5 @@ _TED_RealSharingSink() {
 	}
 }
 Test("error window: actual sharing caller retains snapshot and excludes private details", _TED_RealSharingSink)
+
+#Include ../webview/test_error_dialog_startup_owner.ahk
