@@ -67,9 +67,26 @@ local function with_world(body)
 		local old_logging = { info = Logger.info, debug = Logger.debug, error = Logger.error, warn = Logger.warn }
 		local ok, failure = xpcall(function() body(world) end, debug.traceback)
 		for level, original in pairs(old_logging) do Logger[level] = original end
-		helpers.assert_true(world.client.cancel())
-		helpers.assert_true(world.listing.cancel())
-		if not ok then error(failure, 0) end
+		local cleanup_errors = {}
+		if not ok then cleanup_errors[#cleanup_errors + 1] = tostring(failure) end
+		local function cleanup(action)
+			local cleaned, cleanup_error = xpcall(action, debug.traceback)
+			if not cleaned then cleanup_errors[#cleanup_errors + 1] = tostring(cleanup_error) end
+		end
+		-- Fence both owners before draining their exact retained native callbacks.
+		-- A body failure must remain the first diagnostic, even if cleanup fails.
+		cleanup(function() world.client.cancel() end)
+		cleanup(function() world.listing.cancel() end)
+		for _, requests in ipairs({ world.gets, world.posts }) do
+			for _, request in ipairs(requests) do
+				cleanup(function() request.callback(-1, "owned endpoint fixture cleanup", {}) end)
+			end
+		end
+		cleanup(function() helpers.assert_true(world.client.cancel()) end)
+		cleanup(function() helpers.assert_true(world.listing.cancel()) end)
+		cleanup(function() helpers.assert_true(world.client.isSettled()) end)
+		cleanup(function() helpers.assert_true(world.listing.isSettled()) end)
+		if #cleanup_errors > 0 then error(table.concat(cleanup_errors, "\n"), 0) end
 	end)
 end
 
@@ -149,8 +166,12 @@ helpers.describe("Ollama inventory endpoint receipts", function()
 
 	test("preserves the adapter's exact cancelled-generation suppression", function(world)
 		world.request()
-		helpers.assert_true(world.client.cancel())
+		helpers.assert_eq(world.client.cancel(), false,
+			"logical revocation cannot settle the held taskless native GET")
+		helpers.assert_eq(world.client.isSettled(), false)
 		world.listed(1, { MODEL })
+		helpers.assert_true(world.client.cancel())
+		helpers.assert_true(world.client.isSettled())
 		helpers.assert_eq(#world.posts, 0)
 		helpers.assert_eq(#world.failures, 0)
 		helpers.assert_nil(world.api.local_model_installed(MODEL))
