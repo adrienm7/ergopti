@@ -1,0 +1,17 @@
+{
+	"expected_count": 15,
+	"filters": [
+		{
+			"contains": "diagnostics-pac-native-decode",
+			"expected_count": 10
+		},
+		{
+			"contains": "model-browser-close-pause-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "wpm-calc-sampled-future-owner",
+			"expected_count": 2
+		}
+	]
+}
