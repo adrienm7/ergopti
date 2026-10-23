@@ -354,6 +354,7 @@ InstallHotstringHooks()
 #Include ../adapters/http_client.ahk
 #Include ../adapters/secure_field_detector.ahk
 #Include ../adapters/clipboard.ahk
+#Include ../infra/input_probe.ahk
 #Include ../adapters/storage.ahk
 #Include ../adapters/process_lifecycle.ahk
 #Include ../adapters/key_state.ahk
@@ -444,6 +445,7 @@ InstallSendNoOps()
 #Include unit/ui/healthcheck/test_diagnostics_collection.ahk
 #Include unit/ui/healthcheck/test_diagnostics_window_control.ahk
 #Include unit/ui/healthcheck/test_healthcheck_owner_snapshots.ahk
+#Include unit/infra/input_probe/test_input_probe.ahk
 #Include unit/ui/tooltip/test_tooltip_tint_contract.ahk
 #Include unit/ui/tooltip/test_tooltip_border_alpha.ahk
 #Include unit/ui/tooltip/test_tooltip_border_pool.ahk

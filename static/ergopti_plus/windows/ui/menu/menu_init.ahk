@@ -646,6 +646,8 @@ _MI_BuildDebuggingMenu(LogLevelCommand := 0) {
 		"open_today_log", OpenTodayLog,
 		"open_error_log", OpenErrorLog,
 		"healthcheck",    MenuStartupUiCommand(ShowHealthCheck, MenuStartupDiagnosticsReady),
+		"send_probe",     InputProbe_SendComparisonCommand,
+		"hook_probe",     InputProbe_HookOrderCommand,
 		"report_bug",      (*) => HealthCheck_ReportBug(),
 		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
 		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled()),
