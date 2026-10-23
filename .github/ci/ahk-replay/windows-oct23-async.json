@@ -1,0 +1,25 @@
+{
+	"expected_count": 14,
+	"filters": [
+		{
+			"contains": "idle-activity-publication-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "prompt-startup-repoint-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "clipboard-provenance-owner",
+			"expected_count": 4
+		},
+		{
+			"contains": "layer-editor-ready-delivery-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "ollama-process-exit-ack",
+			"expected_count": 3
+		}
+	]
+}
