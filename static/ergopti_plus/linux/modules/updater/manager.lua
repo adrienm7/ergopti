@@ -1095,6 +1095,12 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		Logger.debug(LOG, "Local source — background checks disabled.")
 		return true
 	end
+	-- A system package owns its own update path: install_archive() refuses to
+	-- replace it, so a background check would only offer what cannot be installed.
+	if M.installation_kind() == "package" then
+		Logger.info(LOG, "Package installation: no automatic update check, the package manager updates it.")
+		return true
+	end
 
 	_schedule_active = true
 	_started_at = _started_at or M._now()

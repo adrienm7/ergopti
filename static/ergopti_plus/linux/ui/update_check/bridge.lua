@@ -85,6 +85,12 @@ end
 function M.download_offered(updater, release, ctx)
 	if type(release) ~= "table" or updater.get_cached_release() ~= release
 		or Installation.is_source_run() then return false end
+	-- A system package is updated by its package manager: downloading a release
+	-- the updater will then refuse to install only ends in an ERROR.
+	if type(updater.installation_kind) == "function" and updater.installation_kind() == "package" then
+		Logger.info(LOG, "Update refused: a system package is updated by its package manager.")
+		return false
+	end
 	local state = updater.get_state()
 	if state == "checking" or state == "downloading" or state == "installing" then return false end
 	ctx = type(ctx) == "table" and ctx or {}

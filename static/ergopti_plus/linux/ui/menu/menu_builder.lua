@@ -5042,6 +5042,12 @@ local function _about_update_rows(ctx)
 	-- frequency row are still drawn, greyed with the reason: left out, nobody
 	-- could tell whether the automatic update exists.
 	local source_run = Installation.is_source_run()
+	-- A system package never self-updates either, so it gets the same greyed rows
+	-- with its own reason (the key the Versions window already shows).
+	local update_blocked_reason = source_run and "menu.about.source_run_reason" or nil
+	if not source_run and type(up.installation_kind) == "function" and up.installation_kind() == "package" then
+		update_blocked_reason = "changelog_window.install_blocked_package"
+	end
 	local frequency_row = _frequency_picker(ctx, up)
 
 	-- A check discovers releases; installation needs the separately named row.
@@ -5089,15 +5095,16 @@ local function _about_update_rows(ctx)
 	-- "download" row that does nothing is indistinguishable from a broken one.
 	if up.get_state() == "available" then
 		local rel = up.get_cached_release()
-		if rel and source_run then
+		if rel and update_blocked_reason then
 			-- A source run offers the latest release to look at, but has no
-			-- installation to replace: the row stays, greyed, and the renderer
-			-- names why as on every greyed row with a reason, with no action a
-			-- click could start.
+			-- installation to replace; a system package is updated by its
+			-- package manager: the row stays, greyed, and the renderer names why
+			-- as on every greyed row with a reason, with no action a click could
+			-- start.
 			out[#out + 1] = {
 				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
 				disabled = true,
-				disabled_reason_key = "menu.about.source_run_reason",
+				disabled_reason_key = update_blocked_reason,
 			}
 		elseif rel then
 			out[#out + 1] = {
@@ -5112,10 +5119,10 @@ local function _about_update_rows(ctx)
 	end
 
 
-	if source_run then
+	if update_blocked_reason then
 		frequency_row.items = nil
 		frequency_row.disabled = true
-		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
+		frequency_row.disabled_reason_key = update_blocked_reason
 		out[#out + 1] = frequency_row
 		return out
 	end
