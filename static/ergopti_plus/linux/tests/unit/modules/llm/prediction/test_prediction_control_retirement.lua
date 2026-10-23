@@ -103,6 +103,12 @@ local function scenario(options, body)
 			a = { keycode = 30, mods = {} }, b = { keycode = 48, mods = {} }, [" "] = { keycode = 57, mods = {} } })
 		local characters = { [24] = "o", [37] = "k", [30] = "a", [48] = "b", [57] = " " }
 		local function edit(deletes, text)
+			if state.selection then
+				local first, last = state.selection[1], state.selection[2]
+				state.text = state.text:sub(1, first) .. text .. state.text:sub(last + 1)
+				state.caret, state.selection = first + #text, nil
+				return
+			end
 			local start = math.max(0, state.caret - deletes)
 			state.text = state.text:sub(1, start) .. text .. state.text:sub(state.caret + 1)
 			state.caret = start + #text
@@ -121,10 +127,14 @@ local function scenario(options, body)
 		local WordReset = require("modules.hotstrings.word_reset")
 		local settings = WordReset.snapshot(); settings.idle_seconds = 0
 		settings.arrow_resets_word = options.arrow_resets_word ~= false
+		if options.shortcut_resets_word ~= nil then settings.shortcut_resets_word = options.shortcut_resets_word end
 		assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
 		local gate = require("infra.input_capture_gate").new()
+		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
 		local environment = setmetatable({ engine = matcher, engine_mod = require("modules.hotstrings.engine"),
 			prediction_engine = prediction, injector = injector, secure_focus_guard = guard,
+			shortcuts = options.restart_prediction and { is_enabled = function() return true end,
+				is_caps_word_active = function() return false end } or nil,
 			script_actions = require("modules.shortcuts.script_actions").new({ reset = function() end,
 				reload = function() end, quit = function() end }),
 			keystats = policy, WordReset = WordReset, InputEvent = require("infra.input_event"),
@@ -134,7 +144,11 @@ local function scenario(options, body)
 			input_capture_gate = gate, MagicKeySource = { on_key = function() return false end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
 			wrap_on_type = { on_key = function() return false end }, consume_bound_chord = function() return false end,
-			keyboard_shortcuts = { chord_name = function() return nil end, dispatch = function() return false end },
+			keyboard_shortcuts = { collision_identity = keyboard_identity, chord_name = function() return nil end,
+				dispatch = function()
+					if options.restart_prediction then return prediction.trigger_now() end
+					return false
+				end },
 		}, { __index = _G })
 		local callbacks = main_callbacks(environment)
 		local overlay = { show = function(rows)
@@ -165,6 +179,56 @@ local function scenario(options, body)
 			elseif name == "delete" then state.text = state.text:sub(1, state.caret) .. state.text:sub(state.caret + 2) end
 			state.controls = state.controls + 1; callbacks.control(name, { mods = mods or {} })
 			return false
+		end
+		function state.shortcut(vector)
+			local original_hook = package.loaded["adapters.keyboard_hook"]
+			local hook = helpers.load_module("adapters.keyboard_hook")
+			local events, modifiers, raw_held = {}, {}, {}
+			for _, pair in ipairs({ { "ctrl", 29 }, { "shift", 42 }, { "alt", 56 }, { "meta", 125 }, { "altgr", 100 } }) do
+				if vector.mods[pair[1]] then modifiers[#modifiers + 1] = pair[2] end
+			end
+			local function event(code, value) events[#events + 1] = { type = 1, code = code, value = value } end
+			for _, code in ipairs(modifiers) do event(code, 1) end
+			event(vector.code, 1); event(vector.code, 0)
+			for index = #modifiers, 1, -1 do event(modifiers[index], 0) end
+			local forwarded, semantic, chars = false, nil, 0
+			local driven, problem = pcall(hook._test_drive, events, {
+				onPhysical = callbacks.physical, onConsume = callbacks.consume,
+				captureEvent = function(code, value)
+					if code ~= vector.code or value == 0 then return nil, nil, nil end
+					local identity = vector.mods.shift and vector.key:upper() or vector.key
+					return identity, identity, nil
+				end,
+				onChar = function() chars = chars + 1 end,
+				onEmitRaw = function(code, value)
+					raw_held[code] = value == 1 or nil
+					if code == vector.code and value == 1 then
+						forwarded = true
+						if vector.effect == "paste" then edit(0, "PASTED")
+						elseif vector.effect == "cut" then state.selection = { 3, 5 }; edit(0, "")
+						elseif vector.effect == "undo" then state.text, state.caret = "hell", 4
+						elseif vector.effect == "redo" then state.text, state.caret = "hello!", 6
+						elseif vector.effect == "select" then state.selection = { 0, #state.text }; state.caret = #state.text end
+					end
+					return true
+				end,
+				onKey = function(name, detail)
+					helpers.assert_true(forwarded, "the receiver edits before the actual semantic callback")
+					semantic = { name = name, detail = detail }
+					state.controls = state.controls + 1
+					callbacks.control(name, detail)
+				end,
+			}, true)
+			package.loaded["adapters.keyboard_hook"] = original_hook
+			if not driven then error(problem, 0) end
+			helpers.assert_true(forwarded, "the actual Hook must forward the unbound editing chord")
+			helpers.assert_eq(raw_held, {}, "all physical forwarded modifiers and keys must be released")
+			helpers.assert_eq(chars, 0, "pasted or undone text must not become invented on_char input")
+			helpers.assert_true(semantic ~= nil)
+			helpers.assert_eq(semantic.name, "shortcut")
+			helpers.assert_eq(semantic.detail.key, vector.mods.shift and vector.key:upper() or vector.key)
+			helpers.assert_eq(semantic.detail.mods, vector.mods, "Main receives the actual named modifier map")
+			return { state.text, state.caret, state.selection }
 		end
 		function state.respond(index, text)
 			local request = assert(state.requests[index], "the real prediction engine must dispatch before completion")
@@ -293,6 +357,89 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 			s.respond(1, RESPONSE)
 			helpers.assert_eq(s.prediction.has_suggestions(), false)
 			helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.text, "ab")
+		end)
+	end)
+end)
+
+helpers.describe("Main retires AI at forwarded standard editing chords", function()
+	local vectors = {
+		{ label = "Ctrl+V", key = "v", code = 47, mods = { ctrl = true }, effect = "paste" },
+		{ label = "Ctrl+Shift+V", key = "v", code = 47, mods = { ctrl = true, shift = true }, effect = "paste" },
+		{ label = "Ctrl+X", key = "x", code = 45, mods = { ctrl = true }, effect = "cut" },
+		{ label = "Ctrl+Z", key = "z", code = 44, mods = { ctrl = true }, effect = "undo" },
+		{ label = "Ctrl+Shift+Z", key = "z", code = 44, mods = { ctrl = true, shift = true }, effect = "redo" },
+		{ label = "Ctrl+Y", key = "y", code = 21, mods = { ctrl = true }, effect = "redo" },
+		{ label = "Ctrl+A", key = "a", code = 30, mods = { ctrl = true }, effect = "select" },
+	}
+	for _, vector in ipairs(vectors) do
+		for _, phase in ipairs({ "debounce", "late", "visible" }) do
+			helpers.it("editing-chord-owner retires " .. phase .. " through " .. vector.label, function()
+				scenario({}, function(s)
+					s.type("hello")
+					if phase ~= "debounce" then s.scheduler.test.advance(.5); helpers.assert_eq(#s.requests, 1) end
+					if phase == "visible" then
+						s.respond(1, RESPONSE)
+						helpers.assert_true(s.prediction.has_suggestions() and s.overlay_showing)
+					end
+					local received = s.shortcut(vector)
+					local expected = vector.effect == "paste" and { "helloPASTED", 11 }
+						or vector.effect == "cut" and { "hel", 3 }
+						or vector.effect == "undo" and { "hell", 4 }
+						or vector.effect == "redo" and { "hello!", 6 } or { "hello", 5, { 0, 5 } }
+					helpers.assert_eq(received, expected, "the forwarded chord must actually edit the independent receiver")
+					if phase == "debounce" then s.scheduler.test.advance(.5) end
+					if phase ~= "visible" and #s.requests > 0 then s.respond(1, RESPONSE) end
+					local offered, visible = s.prediction.has_suggestions(), s.overlay_showing
+					local accepted = s.prediction.accept(1)
+					if phase == "debounce" then helpers.assert_eq(#s.requests, 0, "editing must retire the original pending prompt") end
+					helpers.assert_eq(offered, false, "a standard edit cannot retain its old AI offer; accepted=" .. tostring(accepted))
+					helpers.assert_eq(visible, false); helpers.assert_eq(accepted, false)
+					helpers.assert_eq({ s.text, s.caret, s.selection }, received, "obsolete acceptance must not mutate the independently edited document")
+					helpers.assert_eq(s.outputs, 0)
+				end)
+			end)
+		end
+	end
+
+	helpers.it("editing-chord-owner retires paste even when shortcut word reset is off", function()
+		scenario({ shortcut_resets_word = false }, function(s)
+			s.type("hello"); s.scheduler.test.advance(.5)
+			local received = s.shortcut(vectors[1])
+			helpers.assert_eq(s.matcher:current_buffer(), "hello", "the matcher preference remains independent of AI caret retirement")
+			s.respond(1, RESPONSE)
+			helpers.assert_eq(s.prediction.has_suggestions(), false)
+			helpers.assert_eq(s.prediction.accept(1), false)
+			helpers.assert_eq({ s.text, s.caret, s.selection }, received)
+		end)
+	end)
+
+	for _, vector in ipairs({
+		{ label = "Ctrl+C", key = "c", code = 46, mods = { ctrl = true } },
+		{ label = "Ctrl+S", key = "s", code = 31, mods = { ctrl = true } },
+		{ label = "Ctrl+Alt+V", key = "v", code = 47, mods = { ctrl = true, alt = true } },
+		{ label = "Ctrl+Meta+V", key = "v", code = 47, mods = { ctrl = true, meta = true } },
+		{ label = "Ctrl+AltGr+V", key = "v", code = 47, mods = { ctrl = true, altgr = true } },
+	}) do
+		helpers.it("editing-chord-owner preserves unclassified " .. vector.label, function()
+			scenario({}, function(s)
+				s.type("hello"); s.scheduler.test.advance(.5)
+				s.shortcut(vector); s.respond(1, RESPONSE)
+				helpers.assert_true(s.prediction.has_suggestions())
+				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.text, "hello" .. RESPONSE)
+			end)
+		end)
+	end
+
+	helpers.it("editing-chord-owner retires before the dispatch port starts a successor request", function()
+		scenario({ restart_prediction = true }, function(s)
+			s.type("hello"); s.scheduler.test.advance(.5)
+			s.shortcut(vectors[1])
+			s.respond(1, RESPONSE); helpers.assert_eq(s.prediction.has_suggestions(), false)
+			-- The actual rate limiter delays a same-tick successor; it must survive
+			-- the remaining control callback before its transport is dispatched.
+			s.scheduler.test.advance(1)
+			helpers.assert_eq(#s.requests, 2, "the bound action must actually start its new request")
+			s.respond(2, RESPONSE); helpers.assert_true(s.prediction.has_suggestions(), "the later action's own request must survive")
 		end)
 	end)
 end)
