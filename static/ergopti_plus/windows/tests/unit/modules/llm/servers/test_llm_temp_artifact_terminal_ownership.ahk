@@ -261,6 +261,7 @@ _LTATO_OllamaPort(State, RunFn, PollFn := 0, WriteFn := 0) {
 		"delete", FSDelete,
 		"run", RunFn,
 		"terminate_process", (*) => true,
+		"wait_process", (*) => 0,
 		"close_process", (*) => true,
 		"tick", (*) => 62006)
 	if PollFn
