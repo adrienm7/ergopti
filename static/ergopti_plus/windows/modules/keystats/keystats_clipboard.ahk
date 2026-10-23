@@ -90,6 +90,9 @@ class KLClip {
 		static last_copy_len    := 0
 		static last_copy_app    := ""
 
+		; An in-flight classification owns only its exact clipboard notification.
+		static change_generation := 0
+
 		; Paste burst accumulator
 		static paste_ticks      := []   ; ring of recent paste A_TickCounts
 
@@ -114,18 +117,56 @@ _KL_Clip_ShouldFilter() {
 	}
 }
 
-; The three fields describe one clipboard generation and must never be observed
-; half-updated by the paste hotkey.  Keep only the in-memory swap Critical; OS
-; clipboard probes and the deferred log sink stay outside it.
-_KL_Clip_InvalidateProvenance() {
+; An invalidation without an owner also retires in-flight classifications.
+_KL_Clip_InvalidateProvenance(ExpectedGeneration := unset) {
 	PreviousCritical := Critical("On")
 	try {
+		if IsSet(ExpectedGeneration) {
+			if KLClip.change_generation != ExpectedGeneration
+				return false
+		} else {
+			KLClip.change_generation += 1
+		}
 		KLClip.last_copy_tick := 0
 		KLClip.last_copy_len := 0
 		KLClip.last_copy_app := ""
+		return true
 	} finally {
 		Critical(PreviousCritical)
 	}
+}
+
+_KL_Clip_BeginChange(&OwnedKind) {
+	PreviousCritical := Critical("On")
+	try {
+		; The adapter FIFO consumer is RAM-only; pair its classification with
+		; the notification claim before releasing this short transaction.
+		OwnedKind := CB_ConsumeOwnedChange()
+		KLClip.change_generation += 1
+		return KLClip.change_generation
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Capture before any privacy/OS callout. The final append guard reads RAM only;
+; an accepted old copy is not tied to the lifecycle of a later paste attempt.
+_KL_Clip_CaptureContext() {
+	return {app: Keystats.session_app, title: Keystats.session_title,
+		lifecycle: Keystats.lifecycle_generation, generation: KLClip.change_generation}
+}
+
+_KL_Clip_ContextCurrent(Context) {
+	return Keystats.initialized && !A_IsSuspended
+		&& KLClip.change_generation == Context.generation
+		&& Keystats.lifecycle_generation == Context.lifecycle
+		&& Keystats.session_app == Context.app && Keystats.session_title == Context.title
+}
+
+_KL_Clip_CommitCopy(Now, Count, App) {
+	KLClip.last_copy_tick := Now
+	KLClip.last_copy_len := Count
+	KLClip.last_copy_app := App
 }
 
 
@@ -139,41 +180,23 @@ _KL_Clip_InvalidateProvenance() {
 ; ===========================================
 
 KL_Clip_OnChange(data_type) {
-		; Consume ownership before every lifecycle/privacy return. Otherwise a
-		; callback delivered while suspended leaves its FIFO record behind and the
-		; next genuine user copy is mistaken for driver traffic after resume.
-		OwnedKind := CB_ConsumeOwnedChange()
-		if OwnedKind is String {
-				; A persistent driver write (copy path, colour value, health report)
-				; replaces the clipboard but is not a user copy. Suppress its row and
-				; make the next paste provenance unknown. Temporary transport mutations
-				; preserve the genuine snapshot which their restore puts back.
-				if (OwnedKind == "replace")
-						_KL_Clip_InvalidateProvenance()
-				return
-		}
-		if !Keystats.initialized
-				return
-		filtered := _KL_Clip_ShouldFilter()
-		if filtered {
-				; The callback still proves the clipboard generation changed. Keeping
-				; public metadata A here attributes a later paste of private B to A.
-				_KL_Clip_InvalidateProvenance()
-				return
-		}
-
-		; data_type: 1 = text, 2 = image, 0 = clipboard cleared
-		if (data_type = 0) {
-				_KL_Clip_InvalidateProvenance()
-				return
-		}
-		; Pause suppresses telemetry but not Windows clipboard notifications. A
-		; change made while paused must still retire pre-pause provenance so resume
-		; cannot publish a stale source/length on the next physical paste.
-		if A_IsSuspended {
-				_KL_Clip_InvalidateProvenance()
-				return
-		}
+	Generation := _KL_Clip_BeginChange(&OwnedKind)
+	; Consume the FIFO before every lifecycle/privacy return. Temporary
+	; transport preserves an accepted public copy across its restore.
+	if OwnedKind is String {
+		if OwnedKind == "replace"
+			_KL_Clip_InvalidateProvenance(Generation)
+		return
+	}
+	if !_KL_Clip_InvalidateProvenance(Generation)
+		return
+	PreviousCritical := Critical("On")
+	try Context := _KL_Clip_CaptureContext()
+	finally Critical(PreviousCritical)
+	if Context.generation != Generation || !Keystats.initialized
+		return
+	if _KL_Clip_ShouldFilter() || data_type == 0 || A_IsSuspended
+		return
 
 		content_type := (data_type = 1) ? "text" : "other"
 		char_count   := 0
@@ -193,23 +216,15 @@ KL_Clip_OnChange(data_type) {
 				}
 		}
 
-		Now := A_TickCount
-		App := Keystats.session_app
-		PreviousCritical := Critical("On")
-		try {
-				KLClip.last_copy_tick := Now
-				KLClip.last_copy_len  := char_count
-				KLClip.last_copy_app  := App
-		} finally {
-				Critical(PreviousCritical)
-		}
-
-		KL_AppendLog(Map(
-				"type",         "clipboard_copy",
-				"app",          App,
-				"content_type", content_type,
-				"char_count",   char_count
-		))
+	Now := A_TickCount
+	RejectedBySuspend := false
+	; Provenance belongs to the same acceptance transaction as the actual row.
+	; A refused old handler cannot publish or erase a successor's metadata.
+	KL_AppendLog(Map(
+		"type", "clipboard_copy", "app", Context.app,
+		"content_type", content_type, "char_count", char_count
+	), &RejectedBySuspend, _KL_Clip_ContextCurrent.Bind(Context),
+		_KL_Clip_CommitCopy.Bind(Now, char_count, Context.app))
 }
 
 
