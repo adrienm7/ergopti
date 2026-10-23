@@ -285,6 +285,8 @@ local function open_action_picker(title, current, binding, on_confirm, selected_
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
+	local Paths = require("infra.config_paths")
+	local path = Paths.config("config.toml")
 	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
 	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
@@ -298,7 +300,13 @@ local function open_action_picker(title, current, binding, on_confirm, selected_
 		language_choices = editor.language_choices,
 		default_count = editor.default_count,
 		edit_current_label = editor.edit_current_label,
-	}, function(option, _state, picked) return on_confirm(option, picked) end)
+	}, function(option, _state, picked)
+		if Paths.config("config.toml") ~= path then
+			Logger.warn(LOG, "Action picker confirmation refused after its configuration folder changed.")
+			return false
+		end
+		return on_confirm(option, picked)
+	end)
 end
 
 --- The rows under one bindable slot: the searchable picker and, when the slot
