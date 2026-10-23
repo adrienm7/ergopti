@@ -1,0 +1,9 @@
+{
+	"expected_count": 6,
+	"filters": [
+		{
+			"contains": "gesture-cycle-pause-owner",
+			"expected_count": 6
+		}
+	]
+}
