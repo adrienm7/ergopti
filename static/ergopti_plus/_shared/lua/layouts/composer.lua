@@ -320,7 +320,8 @@ function M.new(env)
 
 	--- Stores a composition and installs its layout.
 	--- @param payload table { declaration, keylayout, use }
-	--- @param on_done function on_done(ok, code, detail, used)
+	--- @param on_done function on_done(ok, code, detail, used, installed): installed is what the
+	---   driver's install reported (the macOS and Linux install results), for the Debug check.
 	function operations.save(payload, on_done)
 		local checked, code, detail = M.check(settings, env.max_file_bytes, payload.declaration, payload.keylayout,
 			env.decode_json)
@@ -347,7 +348,7 @@ function M.new(env)
 					return
 				end
 				if payload.use ~= true and env.active_id() ~= settings.id then
-					on_done(true, nil, nil, false)
+					on_done(true, nil, nil, false, install_code)
 					return
 				end
 				env.select(settings.id, function(selected, select_code, select_detail)
@@ -355,7 +356,7 @@ function M.new(env)
 						on_done(false, M.FAILURE_USE, select_detail or select_code, false)
 						return
 					end
-					on_done(true, nil, nil, true)
+					on_done(true, nil, nil, true, install_code)
 				end)
 			end)
 		end)
