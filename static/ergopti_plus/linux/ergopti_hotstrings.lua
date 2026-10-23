@@ -2475,7 +2475,7 @@ local function main()
 			input_capture_gate = input_capture_gate,
 			is_paused = script_actions.is_paused,
 			layout    = opts.layout,
-			on_reload = function() return perform_reload("the paths editor") end,
+			on_reload = function() return restart_daemon("the paths editor", script_actions.is_paused()) end,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,

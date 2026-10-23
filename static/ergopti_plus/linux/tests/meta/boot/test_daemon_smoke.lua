@@ -58,28 +58,24 @@ local function check_shortcut_gate(control_body)
 end
 
 
---- Executes the actual daemon helper and the callback installed for the paths page.
+--- Executes the actual hotstring-only daemon helper independently of restart callers.
 --- @param environment table Independent reload, native-debt and logger ports.
---- @return function on_reload Exact daemon-wired callback.
-local function paths_reload_callback(environment)
+--- @return function reload Actual hotstring reload helper.
+local function hotstring_reload_callback(environment)
   local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
   local source = assert(handle:read("*a")); assert(handle:close())
   local first = assert(source:find("local function perform_reload(trigger)", 1, true))
   local last = assert(source:find("\n--- Starts the release", first, true))
-  local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
-  local callback = assert(source:sub(wiring):match(
-    'on_reload%s*=%s*(function%(%)%s*[^\n]-perform_reload%("the paths editor"%)%s*end)'),
-    "the paths page must use the actual daemon reload callback")
   local body = source:sub(first, last - 1)
   assert(#body > 500, "the complete native-debt and reload body must be present")
-  local text, chunk = body .. "\nreturn " .. callback
+  local text, chunk = body .. "\nreturn perform_reload"
   environment = setmetatable(environment, { __index = _G })
   if setfenv then chunk = assert(loadstring(text)); setfenv(chunk, environment)
   else chunk = assert(load(text, "actual paths reload callback", "t", environment)) end
   return chunk()
 end
 
-helpers.describe("daemon paths reload acknowledgement", function()
+helpers.describe("daemon hotstring reload acknowledgement", function()
   local function world()
     local state = { calls = 0, successes = 0, releases = 0, allowed = true }
     local environment = { LOG = "test.paths_reload", Logger = setmetatable({
@@ -101,51 +97,205 @@ helpers.describe("daemon paths reload acknowledgement", function()
   end
 
   for _, boundary in ipairs({ "window", "program" }) do
-    helpers.it("paths daemon reload: retains " .. boundary .. " debt refusal through the installed callback", function()
+    helpers.it("daemon hotstring reload: retains " .. boundary .. " debt refusal through the actual helper", function()
       local state, environment = world()
       state[boundary .. "_allowed"] = false
-      local callback = paths_reload_callback(environment)
-      local ok, reason = callback()
+      local callback = hotstring_reload_callback(environment)
+      local ok, reason = callback("the test")
       helpers.assert_eq({ ok, reason }, { false, "postponed" })
       helpers.assert_eq({ state.calls, state.successes, state.releases }, { 0, 0, 0 })
       state[boundary .. "_allowed"] = true
-      helpers.assert_eq(callback(), true, "a new attempt can apply after native cleanup acknowledges")
+      helpers.assert_eq(callback("the test"), true, "a new attempt can apply after native cleanup acknowledges")
       helpers.assert_eq({ state.calls, state.successes, state.releases }, { 1, 1, 2 })
     end)
   end
 
   for _, outcome in ipairs({ "false", "nil", "truthy", "throw" }) do
-    helpers.it("paths daemon reload: refuses canonical publication acknowledgement " .. outcome, function()
+    helpers.it("daemon hotstring reload: refuses canonical publication acknowledgement " .. outcome, function()
       local state, environment = world()
       state.ack = nil
       if outcome == "false" then state.ack = false end
       if outcome == "truthy" then state.ack = 1 end
       state.raise = outcome == "throw"
-      local callback = paths_reload_callback(environment)
-      local ok, reason = callback()
+      local callback = hotstring_reload_callback(environment)
+      local ok, reason = callback("the test")
       helpers.assert_eq({ ok, reason }, { false, "failed" })
       helpers.assert_eq({ state.calls, state.successes }, { 1, 0 })
       state.ack, state.raise = true, false
-      helpers.assert_eq(callback(), true)
+      helpers.assert_eq(callback("the test"), true)
       helpers.assert_eq({ state.calls, state.successes }, { 2, 1 })
     end)
   end
 
   for _, count in ipairs({ 0, 5 }) do
-    helpers.it("paths daemon reload: preserves acknowledged catalogue count " .. count, function()
+    helpers.it("daemon hotstring reload: preserves acknowledged catalogue count " .. count, function()
       local state, environment = world()
       state.count = count
-      helpers.assert_eq(paths_reload_callback(environment)(), true)
+      helpers.assert_eq(hotstring_reload_callback(environment)("the test"), true)
       helpers.assert_eq({ state.calls, state.successes }, { 1, 1 })
     end)
   end
 
-  helpers.it("paths daemon reload: admits a healthy driver without optional gestures", function()
+  helpers.it("daemon hotstring reload: admits a healthy driver without optional gestures", function()
     local state, environment = world()
     environment.gestures = nil
-    helpers.assert_eq(paths_reload_callback(environment)(), true)
+    helpers.assert_eq(hotstring_reload_callback(environment)("the test"), true)
     helpers.assert_eq({ state.calls, state.successes }, { 1, 1 })
   end)
+end)
+
+--- Compiles the actual paths callback and both lifecycle helpers without booting Main.
+--- @param environment table Independent native installation and shutdown ports.
+--- @return function on_reload Actual daemon-state callback.
+local function daemon_paths_callback(environment)
+  local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+  local source = assert(file:read("*a")); assert(file:close())
+  local reload_first = assert(source:find("local function perform_reload(trigger)", 1, true))
+  local reload_last = assert(source:find("\n--- Starts the release", reload_first, true))
+  local restart_first = assert(source:find("local function restart_daemon(reason, paused)", reload_last, true))
+  local restart_last = assert(source:find("\n\n\n--- Emits facts", restart_first, true))
+  local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
+  local callback = assert(source:sub(wiring):match(
+    'on_reload%s*=%s*(function%(%)%s*return%s+[%w_]+%("the paths editor"[^\n]-%)%s*end)'),
+    "the real paths callback must be present and executable")
+  local text = source:sub(reload_first, reload_last - 1) .. "\n"
+    .. source:sub(restart_first, restart_last - 1) .. "\nreturn " .. callback
+  local chunk
+  environment = setmetatable(environment, { __index = _G })
+  if setfenv then chunk = assert(loadstring(text)); setfenv(chunk, environment)
+  else chunk = assert(load(text, "actual paths lifecycle callback", "t", environment)) end
+  return chunk()
+end
+
+--- Keeps real A owners alive while the public paths editor persists B.
+--- @param mode string Native restart boundary outcome.
+--- @param body function Receives disk, owner and native-dispatch observations.
+local function with_paths_restart(mode, body)
+  require("tests.support.ui.menu.llm.numeric_configuration_fixture").with_configuration(function(f)
+    local function write(path, bytes)
+      local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
+    end
+    for _, id in ipairs({ "a", "b" }) do
+      write(f.dirs[id] .. "/config.toml", "# owner " .. id .. "\n[shortcuts]\nenabled = "
+        .. tostring(id == "a") .. "\n[shortcuts.keyboard]\nctrl_j = \""
+        .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
+    end
+    for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.manager",
+      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "infra.restart_pause" }) do package.loaded[name] = nil end
+    local gestures = require("modules.gestures.manager")
+    gestures.init({ persist = true, enabled = false })
+    local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
+    local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+    helpers.assert_eq(keyboard.get_action("ctrl_j"), "copy")
+    helpers.assert_true(shortcuts.is_enabled())
+    local hotstrings = require("modules.hotstrings.hotstrings_config")
+    local engine = require("modules.hotstrings.engine").new()
+    helpers.assert_true(hotstrings.init(engine, f.dirs.a))
+    local _, committed = hotstrings.load_all(nil, true)
+    helpers.assert_true(committed, "real initial hotstring catalogue is acknowledged")
+    local prior = { f.bytes("a"), f.bytes("b") }
+    local state = { mode = mode, commands = {}, restart_calls = 0, shutdowns = 0, engine = engine,
+      args = { "--tray", "--layout", "value with ' spaces" }, resolved = 0 }
+    state.controller = require("modules.shortcuts.script_actions").new({ reset = function() end,
+      reload = function() end, quit = function() end })
+    local actual_require = require
+    local restart = require("infra.daemon_restart")
+    local restarter = require("modules.updater.restarter")
+    local environment = {
+      LOG = "test.paths_restart", gestures = gestures, hotstrings_config = hotstrings,
+      script_actions = state.controller,
+      Logger = require("logger.shim"), arg = state.args,
+      shutdown = { request = function(reason) state.shutdowns = state.shutdowns + 1; state.reason = reason; return true end },
+      require = function(name)
+        if name ~= "infra.daemon_restart" then return actual_require(name) end
+        return { restart = function(options)
+          state.restart_calls = state.restart_calls + 1
+          state.request_reason, state.request_args = options.reason, options.args
+          state.request_paused = options.paused
+          options.cgroup = state.mode == "systemd" and ("0::/user.slice/" .. restarter.UNIT .. "\n")
+            or "0::/user.slice/session-2.scope\n"
+          options.installation = function()
+            state.resolved = state.resolved + 1
+            if state.mode == "unavailable" then return { kind = "package", reason = "owned package" } end
+            return { kind = "standalone", wrapper = state.launcher or "/private/owned-launcher" }
+          end
+          options.run = state.run or function(command)
+            state.commands[#state.commands + 1] = command
+            if state.mode == "throw" then error("controlled restart dispatch exception") end
+            return state.mode ~= "refused"
+          end
+          return restart.restart(options)
+        end }
+      end,
+    }
+    function state.set_controller(controller)
+      state.controller, environment.script_actions = controller, controller
+    end
+    local callback = daemon_paths_callback(environment)
+    local function save()
+      assert(f.host.show("paths_editor"))
+      return require("ui.paths_editor.bridge").on_message({ action = "save", configDir = f.dirs.b },
+        { config_paths = f.paths, webview_manager = f.host, on_reload = callback })
+    end
+    body(f, state, save, keyboard, shortcuts)
+    helpers.assert_eq({ f.bytes("a"), f.bytes("b") }, prior, "restart dispatch never rewrites either configuration")
+  end)
+end
+
+helpers.describe("paths editor complete daemon restart", function()
+  for _, mode in ipairs({ "relay", "systemd" }) do
+    helpers.it("(paths-restart-owner) requests " .. mode .. " before acknowledging a changed root", function()
+      with_paths_restart(mode, function(f, state, save, keyboard, shortcuts)
+        local result = save()
+        helpers.assert_eq(state.restart_calls, 1, "the real callback must request a complete restart")
+        helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
+        helpers.assert_eq(f.paths.get_config_dir(), f.dirs.b)
+        helpers.assert_eq(state.request_reason, "the paths editor")
+        helpers.assert_eq(state.request_args, state.args, "all original argument bytes are retained")
+        helpers.assert_eq(state.shutdowns, mode == "relay" and 1 or 0)
+        helpers.assert_eq(#state.commands, 1)
+        helpers.assert_contains(state.commands[1], mode == "relay" and "setsid sh -c" or "systemctl --user --no-block restart")
+        helpers.assert_eq(keyboard.get_action("ctrl_j"), "copy", "old A generation remains A until exit")
+        helpers.assert_true(shortcuts.is_enabled(), "request acknowledgement is not synchronous reinitialization")
+      end)
+    end)
+  end
+  for _, mode in ipairs({ "unavailable", "refused", "throw" }) do
+    helpers.it("(paths-restart-owner) retains saved editor after " .. mode .. " restart and permits retry", function()
+      with_paths_restart(mode, function(f, state, save)
+        local result = save()
+        helpers.assert_eq(state.restart_calls, 1, "refusal must come from the actual restart owner")
+        helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, false, false })
+        helpers.assert_true(f.host.is_visible("paths_editor"))
+        helpers.assert_eq(state.shutdowns, 0)
+        state.mode = "relay"
+        result = save()
+        helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
+        helpers.assert_eq({ state.restart_calls, state.shutdowns }, { 2, 1 })
+      end)
+    end)
+  end
+end)
+
+helpers.describe("paths restart live pause", function()
+  for _, mode in ipairs({ "relay", "systemd" }) do
+    for _, paused in ipairs({ true, false }) do
+      helpers.it("(paths-restart-pause) carries " .. tostring(paused) .. " through " .. mode, function()
+        with_paths_restart(mode, function(f, state, save)
+          helpers.assert_true(state.controller.toggle_pause())
+          if not paused then helpers.assert_true(state.controller.toggle_pause()) end
+          helpers.assert_eq(state.controller.is_paused(), paused)
+          local result = save()
+          helpers.assert_eq(state.request_paused, paused, "the callback must sample the live controller")
+          helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
+          local file = assert(io.open(require("adapters.storage").path() .. ".restart-pause", "rb"))
+          local marker = assert(file:read("*a")); assert(file:close())
+          helpers.assert_contains(marker, "paused=" .. tostring(paused) .. "\n")
+          helpers.assert_eq(f.paths.get_config_dir(), f.dirs.b)
+        end)
+      end)
+    end
+  end
 end)
 
 -- We test the argument parser and module structure by loading the daemon
