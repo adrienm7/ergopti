@@ -54,6 +54,7 @@ local LOG     = "keystats.log_manager"
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Aggregator   = require("modules.keystats.aggregator")
 local Rotation     = require("modules.keystats.rotation")
+local IngestTrace  = require("modules.keystats.ingest_trace")
 local Export       = require("modules.keystats.export")
 local Metrics      = require("keystats.metrics")
 
@@ -1333,32 +1334,42 @@ end
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
+	local trace = IngestTrace.begin(function() return timer.absoluteTime() end, function(line)
+		Logger.warn(LOG, "%s", line)
+	end)
 	-- A failed timer allocation still leaves the ordered outbox intact. The
 	-- recurring ingest tick is the independent retry path that guarantees an
 	-- action with no following key cannot strand its detached typing run.
 	if _has_deferred_logs() then _drain_deferred_logs() end
 	local db = SqliteWriter.get_db()
+	trace.mark("drain")
 	if not db then return end
 
 	local foreign_devices = _sync_foreign_data_sql(function(device_id)
 		if not _rebuild_aggregates_from_raw(db, { device_id }) then return false end
 		return _mark_aggregate_cache_rebuilt(db)
 	end)
+	trace.mark("foreign")
 	-- A previous cache transaction may have committed while data.sql was locked.
 	-- Drain that exact source batch first so a tmp-cache loss can never make it
 	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
 	if not _flush_local_data_sql_outbox(db) then
 		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		trace.finish()
 		return
 	end
+	trace.mark("outbox")
 
 	local entries, new_offset, read_status = Rotation.read_new_entries()
+	trace.mark("read")
 	if read_status == "failed" then
 		Logger.warn(LOG, "Ingest skipped because today.log tail read did not commit.")
+		trace.finish()
 		return false
 	end
 	if #entries == 0 then
 		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		trace.finish()
 		return
 	end
 
@@ -1381,9 +1392,13 @@ function M.ingest_once()
 			table.insert(statements, sql)
 		end
 	end
+	trace.mark("build")
+	trace.count("entries", #entries)
+	trace.count("statements", #statements)
 	if #statements == 0 then
 		Rotation.set_offset(new_offset, Rotation.get_date())
 		if #foreign_devices > 0 then _notify_ingest_listeners() end
+		trace.finish()
 		return
 	end
 
@@ -1448,7 +1463,9 @@ function M.ingest_once()
 			"UPDATE meta SET value=%s WHERE key=%s;",
 			_sq(batch_text), _sq(DATA_SQL_OUTBOX_KEY)),
 			"cannot persist data.sql outbox")
+		trace.mark("apply")
 		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit ingest transaction")
+		trace.mark("commit")
 	end)
 	if not ok then
 		Logger.error(LOG, "Ingest batch rolled back: %s.", tostring(exec_err))
@@ -1467,6 +1484,7 @@ function M.ingest_once()
 		else
 			Aggregator.reset_ngram_ctx()
 		end
+		trace.finish()
 		return
 	end
 
@@ -1475,17 +1493,21 @@ function M.ingest_once()
 	-- ensures data.sql never contains statements that were not persisted.
 	Rotation.set_offset(new_offset, Rotation.get_date())
 	if not _flush_local_data_sql_outbox(db) then
+		trace.mark("append")
 		-- The in-memory cursor must still advance: the committed outbox owns this
 		-- exact batch, while replaying today.log here would allocate new ids and
 		-- duplicate metrics in the cache.
 		Logger.warn(LOG, "Ingest committed but data.sql append is pending retry.")
+		trace.finish()
 		return
 	end
+	trace.mark("append")
 	Logger.debug(LOG, "Ingest cycle: %d entry(ies), offset now %d.", #entries, new_offset)
 
 	-- Notify live-update listeners — dashboard UIs use this to invalidate
 	-- their caches immediately rather than waiting for the next JS poll.
 	_notify_ingest_listeners()
+	trace.finish()
 end
 
 
