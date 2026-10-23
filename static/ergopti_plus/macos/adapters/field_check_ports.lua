@@ -42,7 +42,8 @@ local LOG = "adapters.field_check_ports"
 --- @param args table Argument array.
 --- @param timeout_s number Seconds before the child is terminated.
 --- @param callback function fn(exit_code|nil, stdout).
-local function exec(executable, args, timeout_s, callback)
+--- @param environment table|nil Explicit child environment (the launcher's identity).
+local function exec(executable, args, timeout_s, callback, environment)
 	local settled, timer, handle = false, nil, nil
 	local function settle(code, stdout)
 		if settled then return end
@@ -52,7 +53,7 @@ local function exec(executable, args, timeout_s, callback)
 	end
 	handle = ShellRunner.spawn(executable, args, function(code, stdout)
 		settle(code, stdout)
-	end)
+	end, nil, environment)
 	if handle.isSettled() or not handle.start() then
 		Logger.warn(LOG, "Could not start %s.", executable:match("[^/]+$") or "a command")
 		settle(nil, "")
@@ -159,6 +160,30 @@ local function timer_probe(seconds, callback)
 	end)
 end
 
+--- Path of the running application bundle, or nil when the driver does not run
+--- from a bundled application (a source checkout).
+--- @return string|nil path
+local function app_path()
+	local launcher = require("platform.remap.lease_helper").resolve()
+	if not launcher then return nil end
+	return (launcher:gsub("/Contents/MacOS/ErgoptiPlus$", ""))
+end
+
+--- Reads the login item state of the application from its own launcher, which is
+--- the only process that may query it (the same read-only role the menu uses).
+--- @param callback function fn(state|nil) with enabled, disabled, approval or unavailable.
+local function login_startup_status(callback)
+	local launcher, _, environment = require("platform.remap.lease_helper").resolve()
+	if not launcher then return callback(nil) end
+	exec(launcher, { "--login-startup", "status" }, 5, function(code, output)
+		local state = code == 0 and tostring(output):match("^(%a+)%s*$") or nil
+		if state ~= "enabled" and state ~= "disabled" and state ~= "approval" and state ~= "unavailable" then
+			state = nil
+		end
+		callback(state)
+	end, environment)
+end
+
 --- The bounded command runner, shared with adapters/runtime_owner_ports.lua.
 M.exec = exec
 
@@ -176,6 +201,8 @@ function M.new()
 		fetch_pac = fetch_pac,
 		network_chain = network_chain,
 		timer_probe = timer_probe,
+		app_path = app_path,
+		login_startup_status = login_startup_status,
 	}
 end
 

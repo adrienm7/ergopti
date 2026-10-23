@@ -14,6 +14,9 @@
 ---    which source is allowed to credit?
 --- 4. toolchain: do the timer service, the Apple Shortcuts tool, Homebrew and the
 ---    installed Karabiner-Elements package behave as the driver assumes?
+--- 5. login_items: what starts Ergopti or Hammerspoon at login (login item state,
+---    background items, launch agents), and does each entry belong to the
+---    running copy or to another one?
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only: no step starts, stops or reconfigures Karabiner, writes a file
@@ -340,6 +343,260 @@ function M.toolchain(ports, report, finish)
 	end)
 end
 
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 5/ Login items scan =======
+-- ===================================
+-- ===================================
+
+local SFLTOOL = "/usr/bin/sfltool"
+local GREP = "/usr/bin/grep"
+local PLUTIL = "/usr/bin/plutil"
+local ID_TOOL = "/usr/bin/id"
+
+--- Entries a family lists one by one; the counts above them cover all.
+M.LOGIN_ITEMS_LISTED = 3
+
+-- The dump can be long on a Mac with many apps.
+local BTM_TIMEOUT = 20
+
+-- Longest identifier a listed entry carries, so that "<id>:other:off" fits the report grammar.
+local LISTED_ID_LENGTH = 36
+
+--- True when text names Ergopti or Hammerspoon.
+--- @param text any Text.
+--- @return boolean
+local function mentions_ours(text)
+	local lower = tostring(text or ""):lower()
+	return lower:find("ergopti", 1, true) ~= nil or lower:find("hammerspoon", 1, true) ~= nil
+end
+
+--- Turns a `file://` address or a plain path into a path, undoing percent escapes.
+--- @param value any Address or path.
+--- @return string|nil path Absolute path, nil when there is none.
+function M.decode_location(value)
+	if type(value) ~= "string" then return nil end
+	local path = value:gsub("^file://[^/]*", "")
+	path = path:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
+	if path:sub(1, 1) ~= "/" then return nil end
+	return path
+end
+
+--- Says whether a location belongs to the running application bundle.
+--- @param location any Address or path of an entry.
+--- @param app_path string|nil Path of the running application bundle.
+--- @return string verdict "this", "other", or "unknown" when either side is not known.
+function M.classify_copy(location, app_path)
+	local path = M.decode_location(location)
+	if not path or type(app_path) ~= "string" or app_path == "" then return "unknown" end
+	local root = app_path:gsub("/+$", "")
+	local trimmed = path:gsub("/+$", "")
+	if trimmed == root or trimmed:sub(1, #root + 1) == root .. "/" then return "this" end
+	return "other"
+end
+
+--- Reads the entries of `sfltool dumpbtm` that concern Ergopti or Hammerspoon.
+---
+--- Assumptions about the format (macOS 13 and later; written from knowledge of the
+--- tool, not from a Mac in this session, and to be confirmed by the first real run):
+--- * each user has a section headed `Records for UID <n>`;
+--- * each entry starts with a line `#<n>:` and continues with `Key: value` lines;
+--- * the keys used are `Name`, `Identifier` (often prefixed `<digit>.`), `URL`,
+---   `Executable Path` and `Disposition`, a bracketed list that contains the word
+---   `enabled` for an enabled entry.
+--- An entry that does not match the assumptions is simply not listed; the check
+--- then reports a count of zero rather than a guess.
+--- @param output any Command output.
+--- @param uid string|nil Current user id; other users' sections are ignored when given.
+--- @return table entries { identifier, enabled (true, false or nil), location (string|nil) }.
+function M.parse_btm(output, uid)
+	local entries, current, section_ok = {}, nil, uid == nil
+	local function close()
+		if not current then return end
+		local fields = current
+		current = nil
+		local text = (fields.name or "") .. " " .. (fields.identifier or "") .. " "
+			.. (fields.url or "") .. " " .. (fields["executable path"] or "")
+		if not mentions_ours(text) then return end
+		local identifier = (fields.identifier or ""):gsub("^%d+%.", "")
+		if identifier == "" then identifier = "unnamed" end
+		local enabled
+		if fields.disposition then
+			enabled = fields.disposition:find("%f[%a]enabled%f[%A]") ~= nil
+		end
+		entries[#entries + 1] = {
+			identifier = identifier,
+			enabled = enabled,
+			location = fields.url or fields["executable path"],
+		}
+	end
+	for line in tostring(output or ""):gmatch("[^\r\n]+") do
+		local section = line:match("Records for UID (%d+)")
+		if section then
+			close()
+			section_ok = uid == nil or section == tostring(uid)
+		elseif line:match("^%s*#%d+:%s*$") then
+			close()
+			if section_ok then current = {} end
+		elseif current then
+			local key, value = line:match("^%s*([%a ]+):%s*(.-)%s*$")
+			if key then current[key:lower()] = value end
+		end
+	end
+	close()
+	return entries
+end
+
+--- Compacts one entry for a report value: `<identifier>:<this|other|unk>:<on|off|unk>`.
+--- @param identifier string Bundle identifier or label.
+--- @param verdict string Copy verdict.
+--- @param enabled boolean|nil Whether the entry is enabled, nil when not known.
+--- @return string value
+local function listed_value(identifier, verdict, enabled)
+	local state = enabled == nil and "unk" or (enabled and "on" or "off")
+	local copy = verdict == "unknown" and "unk" or verdict
+	return identifier:sub(1, LISTED_ID_LENGTH) .. ":" .. copy .. ":" .. state
+end
+
+--- Reports the counts of one family and lists its first entries.
+--- @param report table Report.
+--- @param prefix string Step prefix of the listed entries ("btm" or "agent").
+--- @param counts string Step prefix of the counts ("btm" or "agents").
+--- @param rows table Rows { identifier, verdict, enabled }.
+local function report_family(report, prefix, counts, rows)
+	local this_count, other_count = 0, 0
+	for _, row in ipairs(rows) do
+		if row.verdict == "this" then this_count = this_count + 1 end
+		if row.verdict == "other" then other_count = other_count + 1 end
+	end
+	report.step(counts .. "_this_copy", STATE.info, this_count)
+	report.step(counts .. "_other_copy", STATE.info, other_count)
+	for index = 1, M.LOGIN_ITEMS_LISTED do
+		local row = rows[index]
+		if row then
+			report.step(prefix .. "_item_" .. index, STATE.info, listed_value(row.identifier, row.verdict, row.enabled))
+		end
+	end
+end
+
+--- Applies `step` to each item in order, then `done`.
+--- @param items table Array.
+--- @param step function fn(item, next).
+--- @param done function fn().
+local function each_in_turn(items, step, done)
+	local function run(index)
+		if index > #items then return done() end
+		step(items[index], function() run(index + 1) end)
+	end
+	run(1)
+end
+
+--- Trims a command output to one value.
+--- @param text any Output.
+--- @return string value
+local function trimmed(text)
+	return (tostring(text or ""):match("^%s*(.-)%s*$"))
+end
+
+--- Reads a launch agent's label and program with plutil.
+--- @param ports table Ports.
+--- @param file string Property list path (never reported).
+--- @param callback function fn(label|nil, program|nil).
+local function read_agent(ports, file, callback)
+	ports.exec(PLUTIL, { "-extract", "Label", "raw", "-o", "-", "--", file }, COMMAND_TIMEOUT, function(code, label)
+		local text = code == 0 and trimmed(label) or nil
+		ports.exec(PLUTIL, { "-extract", "ProgramArguments.0", "raw", "-o", "-", "--", file }, COMMAND_TIMEOUT,
+			function(args_code, program)
+				if args_code == 0 then return callback(text, trimmed(program)) end
+				ports.exec(PLUTIL, { "-extract", "Program", "raw", "-o", "-", "--", file }, COMMAND_TIMEOUT,
+					function(program_code, plain)
+						callback(text, program_code == 0 and trimmed(plain) or nil)
+					end)
+			end)
+	end)
+end
+
+--- Finds the launch agent files that mention Ergopti or Hammerspoon.
+--- @param ports table Ports.
+--- @param callback function fn(files) with the paths found; never reported.
+local function find_agent_files(ports, callback)
+	local home = ports.home()
+	local directories = { "/Library/LaunchAgents" }
+	if home then table.insert(directories, 1, home .. "/Library/LaunchAgents") end
+	local files = {}
+	each_in_turn(directories, function(directory, next_directory)
+		if not ports.path_exists(directory) then return next_directory() end
+		ports.exec(GREP, { "-rlisaE", "--", "ergopti|hammerspoon", directory }, COMMAND_TIMEOUT, function(code, output)
+			if code == 0 then
+				for file in tostring(output):gmatch("[^\r\n]+") do files[#files + 1] = file end
+			end
+			next_directory()
+		end)
+	end, function() callback(files) end)
+end
+
+--- What starts Ergopti or Hammerspoon at login. Read-only: nothing is removed,
+--- written or unregistered. It names states, bundle identifiers and labels, and
+--- counts entries as belonging to the running copy or to another one.
+function M.login_items(ports, report, finish)
+	local app_path = ports.app_path()
+	report.step("this_copy_known", STATE.info, yes_no(app_path ~= nil))
+
+	local function agents_stage()
+		find_agent_files(ports, function(files)
+			local rows = {}
+			each_in_turn(files, function(file, next_file)
+				read_agent(ports, file, function(label, program)
+					rows[#rows + 1] = {
+						identifier = (label and label ~= "") and label or "unnamed",
+						verdict = M.classify_copy(program, app_path),
+					}
+					next_file()
+				end)
+			end, function()
+				report_family(report, "agent", "agents", rows)
+				finish()
+			end)
+		end)
+	end
+
+	local function btm_stage()
+		if not ports.path_exists(SFLTOOL) then
+			report.step("btm_state", STATE.skip, "no_tool")
+			return agents_stage()
+		end
+		ports.exec(ID_TOOL, { "-u" }, COMMAND_TIMEOUT, function(id_code, id_output)
+			local uid = id_code == 0 and tostring(id_output):match("^%s*(%d+)%s*$") or nil
+			ports.exec(SFLTOOL, { "dumpbtm" }, BTM_TIMEOUT, function(code, output)
+				if code ~= 0 then
+					report.step("btm_state", STATE.info, code == nil and "timeout" or "unreadable")
+					return agents_stage()
+				end
+				local rows = {}
+				for _, entry in ipairs(M.parse_btm(output, uid)) do
+					rows[#rows + 1] = {
+						identifier = entry.identifier,
+						enabled = entry.enabled,
+						verdict = M.classify_copy(entry.location, app_path),
+					}
+				end
+				report.step("btm_state", STATE.info, uid and "readable" or "readable_all_users")
+				report_family(report, "btm", "btm", rows)
+				agents_stage()
+			end)
+		end)
+	end
+
+	ports.login_startup_status(function(state)
+		report.step("main_app_login_item", STATE.info, state or "unreadable")
+		btm_stage()
+	end)
+end
+
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
 	network = M.network,
@@ -347,6 +604,7 @@ M.checks = {
 	owned_runtime = M.owned_runtime,
 	key_accounting = M.key_accounting,
 	toolchain = M.toolchain,
+	login_items = M.login_items,
 }
 
 return M
