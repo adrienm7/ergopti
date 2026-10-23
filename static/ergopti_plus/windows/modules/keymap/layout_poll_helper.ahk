@@ -146,6 +146,8 @@ LayoutPollTick(Hkl, Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleM
 		return false
 	}
 	PreviousHkl := _LAST_KEYBOARD_HKL
+	if Suspended || A_IsSuspended
+		return _LayoutPollRestore(PreviousHkl)
 	if !_ShouldReloadForHkl(Hkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL,
 			Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleMs, InputBusy)
 		return false
@@ -182,29 +184,42 @@ _LayoutPollNewRetry(Hkl) {
 _LayoutPollReload(Hkl, PreviousHkl, Port) {
 	global _LayoutPollRetry, LAYOUT_POLL_RELOAD_MAX_ATTEMPTS
 	Retry := _LayoutPollRetry
+	; The caller's pause snapshot can predate a menu refresh or another callout.
+	; Automatic reloads need fresh admission; manual reloads retain their own
+	; suspend-preserving lifecycle contract.
+	if A_IsSuspended
+		return _LayoutPollRestore(PreviousHkl)
 	; A reload someone else launched restarts on whatever layout its successor
 	; boots on. Joining it would count as this switch's reload, and nothing would
 	; tell the poll if it were refused: wait for it to end either way.
-	if (Port["pending"].Call() is Map)
+	if (Port["pending"].Call() is Map) || A_IsSuspended
 		return _LayoutPollRestore(PreviousHkl)
 	if Retry["gave_up"]
 		return _LayoutPollRestore(PreviousHkl)
 	; Capture the refused attempt before the clock port can dispatch a callback.
 	RefusedAt := Retry["refused_at"]
 	WaitMs := Retry["wait_ms"]
-	if TickElapsed64(RefusedAt, Port["now"].Call()) < WaitMs
+	if TickElapsed64(RefusedAt, Port["now"].Call()) < WaitMs || A_IsSuspended
 		return _LayoutPollRestore(PreviousHkl)
 	; Past the last honored veto, OnExit lets the exit through whatever gate
 	; refuses it. A user's quit may cross it; an automatic reload never does.
-	if !Port["veto_honored"].Call()
+	VetoHonored := Port["veto_honored"].Call()
+	if A_IsSuspended
+		return _LayoutPollRestore(PreviousHkl)
+	if !VetoHonored
 		return _LayoutPollGiveUp(Retry, PreviousHkl, Port,
 			"one more refusal would exhaust the shutdown veto budget")
-	Retry["attempts"] += 1
+	Attempt := Retry["attempts"] + 1
 	; The one reload nobody clicks: without this line a layout switch looked like
 	; a spontaneous restart in the log.
 	try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}, which types the magic key's source character on another key; reloading to register it again (attempt {2}/{3}).",
-		Hkl, Retry["attempts"], LAYOUT_POLL_RELOAD_MAX_ATTEMPTS)
+		Hkl, Attempt, LAYOUT_POLL_RELOAD_MAX_ATTEMPTS)
 	Refused := _LayoutPollRefused.Bind(Retry, PreviousHkl, Port)
+	; Logging can dispatch a native pause timer. Do not spend a retry or leave a
+	; deferred request to replay on resume when pause wins before the hand-off.
+	if A_IsSuspended
+		return _LayoutPollRestore(PreviousHkl)
+	Retry["attempts"] := Attempt
 	if Port["reload"].Call(Refused)
 		return true
 	Refused.Call("the reload could not start")
