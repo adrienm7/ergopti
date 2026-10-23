@@ -3435,6 +3435,80 @@ function M.merge_and_deploy_config(
 	return true, deploy_detail or "ok", 1
 end
 
+--- Publishes the complete generated configuration to the file the owned
+--- runtime reads (ADR 011). Ergopti is that file's only writer, so there is
+--- nothing to merge: no personal rule, no legacy signature and no stock UI
+--- preference exists there, and the generated document is the whole file. The
+--- same validation as the shared merge applies, and bytes already on disk are
+--- never rewritten (each publication makes Karabiner reload every rule).
+--- @param hs_config table Valid generated configuration from build_karabiner_json.
+--- @param owned_out string Absolute path of the owned karabiner.json.
+--- @return boolean deployed Whether the file now holds the generated document.
+--- @return string detail Human-readable result or failure.
+--- @return integer attempts Number of publication attempts made.
+function M.deploy_owned_config(hs_config, owned_out)
+	if type(owned_out) ~= "string" or owned_out == "" then
+		local detail = "owned karabiner output path must be a non-empty string"
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local generated_profile, index_or_err = find_unique_selected_profile(hs_config, "generated")
+	if not generated_profile then
+		Logger.error(LOG, "Owned deploy aborted: %s.", index_or_err)
+		return false, index_or_err, 0
+	end
+	local complex = generated_profile.complex_modifications
+	if type(complex) ~= "table" or type(complex.rules) ~= "table" then
+		local detail = "generated selected profile must contain complex_modifications.rules"
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local valid_rules, rules_err = validate_incoming_managed_rules(complex.rules)
+	if not valid_rules then
+		Logger.error(LOG, "Owned deploy aborted: %s.", rules_err)
+		return false, rules_err, 0
+	end
+	local prepare_parent = FileSystem.prepare_parent_for_create
+	if type(prepare_parent) ~= "function" then
+		local detail = "parent preparation failed: filesystem capability is unavailable"
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local prepare_ok, prepared, prepare_detail = pcall(prepare_parent, owned_out)
+	if not prepare_ok or prepared ~= true then
+		local detail = "parent preparation failed: " .. tostring(prepare_ok and prepare_detail or prepared)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local encode_ok, content = pcall(hs.json.encode, hs_config, true)
+	if not encode_ok or type(content) ~= "string" then
+		local detail = "JSON encode failed: " .. tostring(content)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	local read_ok, raw, read_status, read_detail = pcall(FileSystem.read_with_status, owned_out)
+	if not read_ok or (read_status ~= "ok" and read_status ~= "absent") then
+		local detail = "owned karabiner.json could not be read: "
+			.. tostring(read_ok and (read_detail or read_status) or raw)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 0
+	end
+	if read_status == "ok" and raw == content then
+		Logger.info(LOG, "Owned Karabiner deploy decision: skipped-identical (no reload).")
+		return true, "unchanged", 0
+	end
+	local snapshot = read_status == "ok" and { status = "ok", content = raw } or { status = "absent" }
+	local deploy_ok, deployed, deploy_detail = pcall(M.deploy_string, content, owned_out, snapshot)
+	if not deploy_ok or deployed ~= true then
+		local detail = "write failed: " .. tostring(deploy_ok and deploy_detail or deployed)
+		Logger.error(LOG, "Owned deploy aborted: %s.", detail)
+		return false, detail, 1
+	end
+	Logger.info(LOG, "Owned Karabiner deploy decision: deployed (%d bytes).", #content)
+	pcall(KeyEventHealth.note_transition, "a karabiner.json reload")
+	return true, deploy_detail or "ok", 1
+end
+
 --- Deploys a file to its destination using two strategies.
 ---
 --- S1 — direct io.open: works for regular paths and Unix symlinks.
