@@ -32,23 +32,21 @@ filesystem staging.
 
 ### macOS Hotstrings category/section/order authority
 
-- **Not implemented.** Confirmed by reading only. macOS checks the type of
+- **Done on 2026-10-23** (80c18d9cc2). macOS checked the type of
   `hotstrings.groups`, `hotstrings.modules` and `hotstrings.order_overrides`
-  entries, never the name, so an entry for a removed category is marked read
-  and never offered. That is the safe "no catalogue" policy, not data loss.
-- **Next steps:**
-  - Publish a catalogue from `modules/keymap/registry_index.lua` once a
-    complete load has finished.
-  - Judge only bundled ids. Leave `ext:*`, `personal-file:*` and dynamic ids
-    unjudged.
-  - Consume it in `infra/preferences.lua` (`boolean_choice`,
-    `partition_section_choices`, `section_order_fits`), using the same pattern
-    as `delay_fits`.
-  - Mirror Linux `choice_is_retired` and `sections_are_the_builds`, ideally
-    through a new shared `_shared/lua` owner.
-- **Unconfirmed risk:** a save with an empty hotstring inventory may emit a
-  whole-table `hotstrings.groups = {}` row (`sparse_updates`). A fixture with
-  write stubs should test that first.
+  entries, never the name. Boot now publishes a catalogue once every bundled
+  hotstring source loaded (`infra/hotstring_choice_catalogue.lua`, called from
+  `init.lua`), and `infra/preferences.lua` reports a choice for a category or
+  section the build no longer ships, so the cleanup offers it.
+- The rule is shared with Linux (`_shared/lua/hotstrings/choice_catalogue.lua`,
+  contract `hotstring_choice_catalogue_contract.lua`); Linux
+  `choice_is_retired` delegates to it.
+- Personal files, `ext:` packs and the dynamic group are never judged. The
+  first `Preferences.load` runs before the sources load, so it judges types
+  only; the cleanup scan, three seconds after boot, judges names.
+- The suspected whole-table `hotstrings.groups = {}` row on an empty inventory
+  was already prevented by `reset_keeping_outdated`; a test now pins it.
+- **Open:** native macOS qualification of the boot publication.
 
 ### Linux retired API-provider reader (with ai)
 
@@ -88,19 +86,24 @@ filesystem staging.
 
 ## 42. config.toml batch writer follow-ups
 
-### Ancestor admission and external symlink-target replacement (`--config FILE.toml`)
+### Explicit `--config FILE.toml` watcher admission
 
-- **Not reproducible here.** The 16 explicit-file watcher tests skip without
-  native luv, and the host can create no symlinks.
-- **Code reading** (`linux/infra/file_watchers.lua`) shows four gaps:
-  - A parent or ancestor renamed away is never seen on the inotify backend
-    (the anchor filter at :576 drops IN_MOVE_SELF).
-  - The polling backend ignores dev/ino.
-  - A symlinked `--config` is refused with luaposix present (lstat), with no
-    log.
-  - A file absent at start is never retried.
-- **Needs** a Linux host or CI: add the T1-T7 cases (proposal in this
-  session's report) to `test_file_watchers_single_selected_toml.lua`.
+- **Done on 2026-10-23** (3dd420292d), verified under WSL Debian, which ships
+  `luv` for LuaJIT (the 16 explicit-file cases and the new ones run there as
+  root, so the EACCES case is still skipped).
+- Fixed in `linux/infra/file_watchers.lua`:
+  - a parent renamed away is reported under the parent's own name and was
+    dropped by the anchor filter;
+  - an ancestor replaced, a symlink retargeted from another directory, or (mtime
+    polling) another file with the same timestamp raised no event: the selected
+    path is now resolved again every second and rebound on a changed device and
+    inode;
+  - a file absent at start is waited for; a symlink is followed to its target;
+    an unusable path is refused in the log; refusals repeat at debug level only.
+- Cases: `(linux-watch-selected-topology)` in
+  `test_file_watchers_single_selected_toml.lua`.
+- **Open:** a real luaposix build was not available, so the production
+  `posix.stat` flavour of the symlink case is covered through the luv path only.
 
 ### Windows full-save comment preservation and table-array boundaries (native qualification)
 
@@ -108,5 +111,7 @@ filesystem staging.
   snapshot, TOML writer and table-array cohorts, including
   `full-snapshot-obsolete-parent` (comments, foreign `[[...]]` generations,
   scalar and array namespaces) and `test_toml_table_array_writer`.
-- **Gap:** no case has a table array under a namespace the full save writes
-  (for example `[[layout."x"]]` after `[layout]`).
+- **Closed:** `(full-snapshot-layout-table-array)` in
+  `test_config_snapshot_obsolete_parent.ahk` already pins a foreign
+  `[[layout."future.rows"]]` generation inside the `[layout]` namespace the full
+  save writes; it passes natively, so no writer defect exists.
