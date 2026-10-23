@@ -269,6 +269,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.field_check_ports",
+		contract = { "new" },
+		-- The Debug menu's field checks build their ports on click.
+		wired    = true,
+	},
+	{
 		id       = "adapters.system_switcher_sampler",
 		contract = { "new" },
 		wired    = true,
