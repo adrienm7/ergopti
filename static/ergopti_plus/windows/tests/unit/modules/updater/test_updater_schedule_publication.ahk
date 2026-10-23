@@ -178,6 +178,7 @@ class _USP_Fixture {
 }
 
 _USP_Case(Mode) {
+	global BUNDLE_CHANNEL, UPDATER_CHANNEL
 	global _UpdaterAsyncRequests, _UpdaterActiveSendLeaseCount, _UpdaterActiveAsyncTerminalDeliveryCount
 	global _UpdaterAsyncActionLeases, _UpdaterBackgroundOwner, _UpdaterBackgroundFn
 	global _UpdaterFetchCache, _UpdaterListDiskLoaded, _UpdaterListDiskEntry
@@ -210,12 +211,20 @@ _USP_Case(Mode) {
 		Saved.ErrorCount := _HealthCheckErrCount
 	if Saved.HadPolicy
 		Saved.Policy := _ED_Policy
+	HadBundleChannel := IsSet(BUNDLE_CHANNEL)
+	if HadBundleChannel
+		SavedBundleChannel := BUNDLE_CHANNEL
 	HadCall := CurlAsyncRequest.HasOwnProp("Call")
 	SavedCall := HadCall ? CurlAsyncRequest.GetOwnPropDesc("Call") : 0
 	F := _USP_Fixture(Mode), Primary := 0, CleanupFailure := 0
 	PreviousCritical := A_IsCritical
 	try {
 		_UpdaterTest_ResetRequestState()
+		; This fixture observes one success record, not a cross-channel offer.
+		BUNDLE_CHANNEL := UPDATER_CHANNEL
+		AssertEqual("main", _Updater_InstalledChannel(), "the seeded installed channel must match the selected main channel")
+		AssertFalse(UpdateChannels_ShouldOffer("v1.0.0", "9.9.9", UPDATER_CHANNEL, _Updater_InstalledChannel()),
+			"the successor must not persist an unrelated channel-switch notification")
 		_UpdaterFetchCache := Map(), _UpdaterListDiskLoaded := true, _UpdaterListDiskEntry := 0
 		_ED_Policy := 0
 		_ResetLogger()
@@ -242,6 +251,7 @@ _USP_Case(Mode) {
 			CleanupFailure := Failure
 		} finally {
 			_UpdaterTest_RestoreRequestState(SavedRequest)
+			BUNDLE_CHANNEL := HadBundleChannel ? SavedBundleChannel : unset
 			_UpdaterFetchCache := Saved.Cache, _UpdaterListDiskLoaded := Saved.Loaded, _UpdaterListDiskEntry := Saved.Disk
 			_LOGGER_TEST_SINK := 0
 			_LOGGER_REPEAT_ENABLED := Saved.Repeat, _LOGGER_PATH_DATE := Saved.PathDate
