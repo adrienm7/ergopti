@@ -30,6 +30,16 @@ UTF-8 receipt and read it with an explicit encoding; retain an ASCII completion
 acknowledgement, the exact exit status and strict error checks. Do not change
 the general process port's decoding contract to repair one fixture.
 
+### project-ahk-listview-modify-suppresses-selection-events
+
+On AutoHotkey v2.0.26, `Gui.ListView.Modify` deliberately suppresses the
+`ItemSelect` script event, even when it selects a real row. A fixture that uses
+it to stand in for a user click can leave selection-dependent editor fields
+untouched. Integration tests that need the event should use the owned common
+control's native state-message boundary and require both a notification receipt
+and the expected editor fields. Keep direct handler tests explicit about their
+narrower boundary.
+
 ### feedback-ahk-ui-syntax-validation
 
 Some UI modules are outside the headless unit include graph. Validate the real
