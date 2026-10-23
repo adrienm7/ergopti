@@ -878,3 +878,5 @@ _BFS_TransientFocusLossIsInfo() {
 }
 Test("metrics focus: an ordinary focus transition is logged at INFO (focus-transient-info)",
 	_BFS_TransientFocusLossIsInfo)
+
+#Include ../../modules/keystats/test_switch_destination_privacy_owner.ahk
