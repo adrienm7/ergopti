@@ -279,55 +279,59 @@ KL_Clip_OnKeyDown(ih, vk, sc) {
 				KL_Clip_OnPaste()
 }
 
+; The ring is replaced only by the same accepted queue transaction as its row.
+; Identity fences an older paste against a reentrant paste or lifecycle reset.
+_KL_Clip_PasteCurrent(Context, ExpectedTicks) {
+	return _KL_Clip_ContextCurrent(Context) && KLClip.paste_ticks == ExpectedTicks
+}
+
+_KL_Clip_CommitPaste(Ticks) {
+	KLClip.paste_ticks := Ticks
+}
+
 KL_Clip_OnPaste() {
-		; Synthetic Ctrl+V can arrive while the clipboard's deferred restore is
-		; still pending. The shared transaction token, not keyboard timing, owns it.
-		if CB_IsDriverPasteActive()
-				return
-		if !Keystats.initialized
-				return
-		if A_IsSuspended
-				return
-		filtered := _KL_Clip_ShouldFilter()
-		if filtered
-				return
+	; Synthetic Ctrl+V can arrive while the clipboard's deferred restore is
+	; still pending. The shared transaction token, not keyboard timing, owns it.
+	if CB_IsDriverPasteActive()
+		return
+	if !Keystats.initialized || A_IsSuspended
+		return
+	PreviousCritical := Critical("On")
+	try {
+		Context := _KL_Clip_CaptureContext()
+		PreviousTicks := KLClip.paste_ticks
+		CopyTick := KLClip.last_copy_tick
+		CopyLen := KLClip.last_copy_len
+		CopyApp := KLClip.last_copy_app
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if _KL_Clip_ShouldFilter()
+		return
 
-		now := A_TickCount
-		App := Keystats.session_app
-		PreviousCritical := Critical("On")
-		try {
-				CopyTick := KLClip.last_copy_tick
-				CopyLen := KLClip.last_copy_len
-				CopyApp := KLClip.last_copy_app
-				copy_lag := (CopyTick > 0) ? ((now - CopyTick) & 0xFFFFFFFF) : -1
-				KLClip.paste_ticks.Push(now)
-				fresh := []
-				for _, PasteTick in KLClip.paste_ticks {
-						if (((now - PasteTick) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
-								fresh.Push(PasteTick)
-				}
-				EmitBurst := fresh.Length >= KLClipConst.PASTE_BURST_THRESHOLD
-				KLClip.paste_ticks := EmitBurst ? [] : fresh
-		} finally {
-				Critical(PreviousCritical)
-		}
+	Now := A_TickCount
+	CopyLag := (CopyTick > 0) ? ((Now - CopyTick) & 0xFFFFFFFF) : -1
+	Fresh := []
+	for PasteTick in PreviousTicks {
+		if (((Now - PasteTick) & 0xFFFFFFFF) <= KLClipConst.PASTE_BURST_WINDOW_MS)
+			Fresh.Push(PasteTick)
+	}
+	Fresh.Push(Now)
+	EmitBurst := Fresh.Length >= KLClipConst.PASTE_BURST_THRESHOLD
+	NextTicks := EmitBurst ? [] : Fresh
+	RejectedBySuspend := false
+	Accepted := KL_AppendLog(Map(
+		"type", "clipboard_paste", "app", Context.app,
+		"char_count", CopyLen, "copy_lag_ms", CopyLag, "source_app", CopyApp
+	), &RejectedBySuspend, _KL_Clip_PasteCurrent.Bind(Context, PreviousTicks),
+		_KL_Clip_CommitPaste.Bind(NextTicks))
 
+	if Accepted && EmitBurst {
 		KL_AppendLog(Map(
-				"type",         "clipboard_paste",
-				"app",          App,
-				"char_count",   CopyLen,
-				"copy_lag_ms",  copy_lag,
-				"source_app",   CopyApp
-		))
-
-		if EmitBurst {
-				KL_AppendLog(Map(
-						"type",   "paste_burst",
-						"app",    App,
-						"count",  fresh.Length,
-						"window_ms", KLClipConst.PASTE_BURST_WINDOW_MS
-				))
-		}
+			"type", "paste_burst", "app", Context.app,
+			"count", Fresh.Length, "window_ms", KLClipConst.PASTE_BURST_WINDOW_MS
+		), &RejectedBySuspend, _KL_Clip_PasteCurrent.Bind(Context, NextTicks))
+	}
 }
 
 
