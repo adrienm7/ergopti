@@ -30,7 +30,13 @@ helpers.describe("file watchers single selected TOML", function()
 		return
 	end
 
-	local function selected_file_session(backend_name, run)
+	--- Runs one selected-file session over private files.
+	--- @param backend_name string "native" (inotify) or "pump" (mtime polling).
+	--- @param run function Receives the session state.
+	--- @param options table|nil `nested` directory levels above the file, `absent`
+	---   to leave the file uncreated, `prepare(state)` to build the layout itself.
+	local function selected_file_session(backend_name, run, options)
+		options = options or {}
 		local root = assert(native_luv.fs_mkdtemp("/var/tmp/eg-single-XXXXXX"))
 		local files, records, directories = {}, {}, { root }
 		local previous_watch = package.loaded["infra.file_watchers"]
@@ -126,11 +132,33 @@ helpers.describe("file watchers single selected TOML", function()
 		function state.directory(path)
 			assert(native_luv.fs_mkdir(path, 448)); directories[#directories + 1] = path
 		end
+		function state.symlink(target, link)
+			assert(native_luv.fs_symlink(target, link)); files[link] = true
+		end
+		--- Renames a directory and keeps every tracked path below it consistent.
+		function state.rename_directory(from, to)
+			assert(native_luv.fs_rename(from, to))
+			local function moved(path)
+				if path == from then return to end
+				if path:sub(1, #from + 1) == from .. "/" then return to .. path:sub(#from + 1) end
+				return path
+			end
+			local renamed = {}
+			for path in pairs(files) do renamed[moved(path)] = true end
+			files = renamed
+			for index, path in ipairs(directories) do directories[index] = moved(path) end
+		end
 		function state.remove_directory(path)
 			assert(native_luv.fs_rmdir(path))
 			for index, value in ipairs(directories) do if value == path then table.remove(directories, index); break end end
 		end
-		state.write(state.path)
+		for _ = 1, options.nested or 0 do
+			local level = state.path:match("^(.*)/[^/]+$") .. "/d" .. tostring(#directories)
+			state.directory(level)
+			state.path = level .. "/selected.toml"
+		end
+		state.parent = state.path:match("^(.*)/[^/]+$")
+		if options.prepare then options.prepare(state) elseif not options.absent then state.write(state.path) end
 		local called, primary = xpcall(function() run(state) end, debug.traceback)
 		local cleanup = {}
 		for path in pairs(files) do native_luv.fs_chmod(path, 384) end
@@ -243,6 +271,98 @@ helpers.describe("file watchers single selected TOML", function()
 			s.write(s.path); s.settle(1)
 		end)
 	end)
+	-- The selected file's location is part of its identity: a parent or an
+	-- ancestor that is renamed away and replaced, a symlink retargeted, or a file
+	-- that is absent at start must all reach the reload and the rebinding.
+	helpers.it("(linux-watch-selected-topology) native rebinds when the parent directory is renamed away and replaced", function()
+		selected_file_session("native", function(s)
+			s.start(); local old = s.active(s.path)[1]
+			helpers.assert_true(old ~= nil, "capture the original file binding")
+			s.rename_directory(s.parent, s.parent .. ".old")
+			s.directory(s.parent); s.write(s.path)
+			-- One settle only: the identity check of the next second is not what is tested here.
+			s.settle(1)
+			helpers.assert_true(old.retired, "the moved file's binding is retired")
+			helpers.assert_eq(#s.active(s.path), 1, "the replacement file is bound exactly once")
+			s.write(s.path); s.settle(1)
+		end, { nested = 1 })
+	end)
+
+	for _, backend_name in ipairs({ "native", "pump" }) do
+		helpers.it("(linux-watch-selected-topology) " .. backend_name .. " rebinds when an ancestor directory is renamed away and replaced", function()
+			selected_file_session(backend_name, function(s)
+				s.start()
+				local ancestor = s.parent:match("^(.*)/[^/]+$")
+				s.rename_directory(ancestor, ancestor .. ".old")
+				s.directory(ancestor); s.directory(s.parent); s.write(s.path)
+				s.now = s.now + 1100
+				s.settle(1)
+				s.write(s.path); s.settle(1); s.settle(0)
+			end, { nested = 2 })
+		end)
+
+		helpers.it("(linux-watch-selected-topology) " .. backend_name .. " waits for a file that is absent at start", function()
+			selected_file_session(backend_name, function(s)
+				s.start()
+				s.settle(0)
+				s.write(s.path)
+				s.now = s.now + 1100
+				s.settle(1)
+				s.write(s.path); s.settle(1); s.settle(0)
+			end, { absent = true })
+		end)
+
+		helpers.it("(linux-watch-selected-topology) " .. backend_name .. " follows a symlinked selected file and its replaced target", function()
+			selected_file_session(backend_name, function(s)
+				s.start()
+				s.write(s.target); s.settle(1)
+				-- An external tool replaces the real file by rename, from another directory.
+				local replacement = s.write(s.real .. "/replacement.tmp")
+				s.rename(replacement, s.target); s.now = s.now + 1100; s.settle(1)
+				s.write(s.target); s.settle(1); s.settle(0)
+				-- ln -sfn: a new link takes the selected name and points elsewhere.
+				local other = s.write(s.real .. "/other.toml")
+				local link = s.root .. "/relink.tmp"
+				s.symlink(other, link); s.rename(link, s.path); s.now = s.now + 1100; s.settle(1)
+				s.write(other); s.settle(1); s.settle(0)
+			end, { prepare = function(s)
+				s.real = s.root .. "/real"; s.directory(s.real)
+				s.target = s.write(s.real .. "/target.toml")
+				s.symlink(s.target, s.path)
+			end })
+		end)
+	end
+
+	helpers.it("(linux-watch-selected-topology) pump sees another file with the same timestamp take the name", function()
+		selected_file_session("pump", function(s)
+			s.start()
+			local stamp = assert(native_luv.fs_stat(s.path)).mtime
+			local replacement = s.write(s.root .. "/replacement.tmp")
+			assert(native_luv.fs_utime(replacement, stamp.sec, stamp.sec))
+			assert(native_luv.fs_utime(s.path, stamp.sec, stamp.sec))
+			s.rename(replacement, s.path)
+			helpers.assert_eq(assert(native_luv.fs_stat(s.path)).mtime.sec, stamp.sec, "the replacement keeps the timestamp")
+			s.now = s.now + 1100
+			s.settle(1)
+		end)
+	end)
+
+	helpers.it("(linux-watch-selected-topology) a selected path that is not a regular file is refused in the log", function()
+		selected_file_session("native", function(s)
+			local logger = require("logger.shim")
+			local held, refusals = logger.warn, {}
+			logger.warn = function(tag, format, ...)
+				if type(format) == "string" and format:find("not a regular file", 1, true) then refusals[#refusals + 1] = format end
+				return held(tag, format, ...)
+			end
+			local started, detail = pcall(s.start)
+			logger.warn = held
+			if not started then error(detail, 0) end
+			helpers.assert_eq(#refusals, 1, "the unusable selected path is named once")
+			helpers.assert_eq(#s.active(s.path), 0, "nothing is bound to an unusable path")
+		end, { prepare = function(s) s.symlink("/dev/null", s.path) end })
+	end)
+
 	if native_luv.getuid() ~= 0 then
 		helpers.it("(linux-watch-selected-file) native actual EACCES admission remains repairable", function()
 			selected_file_session("native", function(s)
