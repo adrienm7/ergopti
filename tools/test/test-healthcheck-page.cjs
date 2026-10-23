@@ -987,6 +987,17 @@ for (const driver of ['linux', 'macos', 'windows']) {
 		fail('a failed worker with native cleanup pending enabled a replacement collection');
 }
 
+// The deep-test output sits in the fixed toolbar: it must scroll in a bounded box
+// or it pushes the report tables out of view (issue #101).
+const pageCss = fs.readFileSync(path.join(PAGE, 'style.css'), 'utf8');
+const deepResultsRule = /#deep-results\s*\{[^}]*\}/.exec(pageCss);
+if (
+	!deepResultsRule ||
+	!/max-height:/.test(deepResultsRule[0]) ||
+	!/overflow-y:\s*auto/.test(deepResultsRule[0])
+)
+	fail('#deep-results must have a max-height and scroll inside the toolbar');
+
 if (failures.length > 0) {
 	console.error(`[FAIL] diagnostics page behaviour: ${failures.length} failure(s)`);
 	for (const failure of failures) console.error(`  - ${failure}`);
