@@ -889,3 +889,5 @@ _LCT_RecordValueStringIdentity() {
 }
 Test("layout catalogue: raw preservation compares exact JSON string identities (config-outdated-installed)",
 	_LCT_RecordValueStringIdentity)
+
+#Include test_layout_catalogue_refresh_owner.ahk
