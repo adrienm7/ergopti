@@ -142,16 +142,19 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 			"the correction itself is what the next character follows, as on Windows and macOS")
 	end)
 
-	it("counts a hotstring's output without chaining it", function()
+	it("chains a hotstring's output and keeps its source", function()
 		local batch = Walker.walk({
 			key("b", 100), key("t", 100), key("w", 100),
 			key("b", 0, "hotstring"), key("y", 0, "hotstring"),
 		}, "2026-08-06", "app")
 
-		helpers.assert_eq(count_of(batch, "ngram_bigrams", "by"), 0,
-			"an expansion is text the user did not type. Folding it into the bigram "
-				.. "counts makes the layout look better the more expansions they use, "
-				.. "which is backwards for a tool that measures typing effort.")
+		-- Windows and macOS chain generated text like typed text; the rows carry
+		-- the source, so a view of typing effort alone filters on it.
+		local bigram = batch.ngram.ngram_bigrams["2026-08-06\1app\1by"]
+		helpers.assert_not_nil(bigram, "the expansion chains as it does on Windows")
+		helpers.assert_true((bigram.esrc.hotstring or 0) > 0, "and keeps its source")
+		helpers.assert_not_nil(batch.ngram.ngram_bigrams["2026-08-06\1app\1wb"],
+			"it also chains with the typed text before it")
 
 		local rows = batch.ngram.ngram_chars["2026-08-06\1app\1b"]
 		helpers.assert_not_nil(rows, "the character itself is still counted")
@@ -169,6 +172,30 @@ helpers.describe("ngram walker: what must not become a sequence", function()
 		helpers.assert_eq(count_of(batch, "ngram_words", "chat"), 0,
 			"the user typed 'cha', deleted, then 't' — 'chat' is a word the walk "
 				.. "would have invented")
+		-- Backspace pops the last character of the open word (Windows and macOS)
+		-- and flags it, instead of dropping what was typed so far.
+		local word = batch.ngram.ngram_words["2026-08-06\1app\1cht"]
+		helpers.assert_not_nil(word, "the word continues from what survived the Backspace")
+		helpers.assert_eq(word.c, 0)
+		helpers.assert_eq(word.e, 1)
+	end)
+
+	it("flags the n-grams of the character a Backspace erases", function()
+		local batch = Walker.walk({
+			key("a", 100), key("b", 100), key("c", 100), key("[BS]", 100),
+		}, "2026-08-06", "app")
+		local prefix = "2026-08-06\1app\1"
+		for family, token in pairs({ ngram_chars = "c", ngram_bigrams = "bc", ngram_trigrams = "abc" }) do
+			local row = batch.ngram[family][prefix .. token]
+			helpers.assert_eq(row.c, 1, family .. " " .. token .. " was typed")
+			helpers.assert_eq(row.e, 1, family .. " " .. token .. " was erased")
+		end
+		helpers.assert_eq(batch.ngram.ngram_chars[prefix .. "b"].e, 0, "what survived is not flagged")
+	end)
+
+	it("erases nothing typed before a long pause", function()
+		local batch = Walker.walk({ key("a", 100), key("b", 100), key("[BS]", PAUSE_MS) }, "2026-08-06", "app")
+		helpers.assert_eq(batch.ngram.ngram_chars["2026-08-06\1app\1b"].e, 0)
 	end)
 
 end)
