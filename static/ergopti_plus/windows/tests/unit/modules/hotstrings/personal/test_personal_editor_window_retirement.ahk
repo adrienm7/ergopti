@@ -22,13 +22,52 @@ _PENR_Open(State) {
 	Trigger := GuiCtrlFromHwnd(ControlGetHwnd("Edit1", "ahk_id " . Hwnd))
 	Output := GuiCtrlFromHwnd(ControlGetHwnd("Edit2", "ahk_id " . Hwnd))
 	AssertEqual(1, List.GetCount(), "the real native list must show the private parsed entry")
-	List.Modify(1, "Select Focus")
-	Started := A_TickCount
-	while Trigger.Value != "private_alpha" && A_TickCount - Started < 1000
-		Sleep(10)
-	AssertEqual("private_alpha", Trigger.Value, "actual native selection must populate the trigger")
-	AssertEqual("Private output", Output.Value, "the real selection callback must populate the result")
+	AssertEqual("private_alpha", List.GetText(1, 1), "the genuine parser must populate the expected native row")
+	_PENR_SelectNative(List, Trigger, Output)
 	return Owned
+}
+
+_PENR_SelectionObserved(Seen, Control, Row, Selected) {
+	Seen.Calls += 1, Seen.Hwnd := Control.Hwnd
+	Seen.Row := Row, Seen.Selected := Selected
+}
+
+_PENR_SelectNative(List, Trigger, Output) {
+	static LVM_SETITEMSTATE := 0x102B, LVIS_FOCUSED := 0x1, LVIS_SELECTED := 0x2
+	Seen := { Calls: 0, Hwnd: 0, Row: 0, Selected: false }
+	Observer := _PENR_SelectionObserved.Bind(Seen)
+	List.OnEvent("ItemSelect", Observer)
+	try {
+		; Gui.ListView.Modify intentionally suppresses its own ItemSelect event.
+		; Send the native state request instead: the real common control emits
+		; LVN_ITEMCHANGED and AHK dispatches the existing production callback.
+		; LVITEMW is 88/60 bytes on Win64/Win32; state and stateMask are DWORDs
+		; at offsets 12 and 16 on both architectures.
+		Item := Buffer(A_PtrSize == 8 ? 88 : 60, 0)
+		Flags := LVIS_FOCUSED | LVIS_SELECTED
+		NumPut("UInt", Flags, Item, 16)
+		AssertTrue(DllCall("User32\SendMessageW", "Ptr", List.Hwnd, "UInt", LVM_SETITEMSTATE,
+			"Ptr", -1, "Ptr", Item.Ptr, "Int"), "the real ListView must accept clearing prior selection")
+		AssertEqual(0, List.GetNext(0), "the native precondition must leave no selected row")
+		NumPut("UInt", Flags, Item, 12)
+		AssertTrue(DllCall("User32\SendMessageW", "Ptr", List.Hwnd, "UInt", LVM_SETITEMSTATE,
+			"Ptr", 0, "Ptr", Item.Ptr, "Int"), "the real ListView must accept selecting its first row")
+		Started := A_TickCount
+		while (Seen.Calls == 0 || Seen.Hwnd != List.Hwnd || Seen.Row != 1 || !Seen.Selected
+				|| Trigger.Value != "private_alpha" || Output.Value != "Private output")
+				&& A_TickCount - Started < 1000
+			Sleep(10)
+		_TestPrint("# personal-editor-native-selection selected=" . List.GetNext(0)
+			. " events=" . Seen.Calls . " event_hwnd=" . Seen.Hwnd
+			. " event_row=" . Seen.Row . " event_selected=" . Seen.Selected
+			. " trigger_match=" . (Trigger.Value == "private_alpha")
+			. " output_match=" . (Output.Value == "Private output"))
+		AssertEqual(1, List.GetNext(0), "the genuine native control must retain its selected row")
+		AssertTrue(Seen.Calls > 0 && Seen.Hwnd == List.Hwnd && Seen.Row == 1 && Seen.Selected,
+			"the actual ItemSelect event must observe this native selection")
+		AssertEqual("private_alpha", Trigger.Value, "actual native selection must populate the trigger")
+		AssertEqual("Private output", Output.Value, "the real selection callback must populate the result")
+	} finally List.OnEvent("ItemSelect", Observer, 0)
 }
 
 _PENR_Close(Owned) {
