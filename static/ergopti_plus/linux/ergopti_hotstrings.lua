@@ -1300,7 +1300,7 @@ local function main()
 					-- before the last checked SYN_REPORT invents an expansion the target
 					-- application may never have received.
 					keystats.record_hotstring(app_id, result.trigger, result.replacement,
-						now_ms, result.group, result.backspace_count, result.is_private)
+							now_ms, result.group, result.backspace_count, result.is_private, replay_terminator)
 					_undoable = {
 						trigger     = result.trigger,
 						replacement = result.replacement,
