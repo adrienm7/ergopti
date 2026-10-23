@@ -19,7 +19,7 @@
  *     file carried the same wrong depth for the display-order file, so the two
  *     survivors also sorted alphabetically instead of canonically.
  *
- *   * modules/keylogger/sqlite_writer.lua walked "../../../" for
+ *   * modules/keystats/sqlite_writer.lua walked "../../../" for
  *     _shared/data/db/schema.sql — two levels too high — and fell back to a BARE
  *     RELATIVE path, making schema loading depend on the process's current
  *     directory rather than on where the driver is installed.

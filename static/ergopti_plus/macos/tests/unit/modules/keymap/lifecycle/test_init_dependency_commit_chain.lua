@@ -187,7 +187,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 				end,
 			},
 			["modules.keymap.terminators"] = {},
-			["modules.keylogger"] = {},
+			["modules.keystats"] = {},
 		}, function(expander)
 			helpers.assert_eq(expander.init({}, {}, {}), false)
 			helpers.assert_eq(replay_calls, 1)
@@ -210,7 +210,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["modules.llm"] = { DEFAULT_STATE = {} },
 			["infra.logger"] = LOGGER_STUB,
 			["infra.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
-			["modules.keylogger"] = {},
+			["modules.keystats"] = {},
 			["ui.tooltip"] = {
 				set_runtime_guard = function() tooltip_guard_calls = tooltip_guard_calls + 1 end,
 			},
@@ -289,21 +289,21 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 			local core = {}
 			local tooltip1 = {}
 			local tooltip2 = {}
-			local keylogger = {}
+			local keystats = {}
 			helpers.assert_eq(streaming.init({
 				core_llm = core,
 				tooltip = tooltip1,
-				keylogger = keylogger,
+				keystats = keystats,
 			}), true)
 			helpers.assert_eq(streaming.init({
 				core_llm = core,
 				tooltip = tooltip1,
-				keylogger = keylogger,
+				keystats = keystats,
 			}), true)
 			helpers.assert_eq(streaming.init({
 				core_llm = core,
 				tooltip = tooltip2,
-				keylogger = keylogger,
+				keystats = keystats,
 			}), false)
 		end)
 	end)
@@ -351,7 +351,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 			set_navigate_callback = noop,
 			set_enter_validates = noop,
 		},
-		["modules.keylogger"] = {},
+		["modules.keystats"] = {},
 	}, function(engine)
 		callback(engine, calls)
 	end)

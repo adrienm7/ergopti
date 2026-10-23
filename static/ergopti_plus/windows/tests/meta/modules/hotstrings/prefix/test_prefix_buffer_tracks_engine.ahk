@@ -178,7 +178,7 @@ _PBT_AppendGrowsAndBoundaryResets() {
 
 		; A single character before the boundary, deliberately: the reset path
 		; runs deferred near-miss analytics for buffers of 2+ chars, and that
-		; touches the Keylogger singleton, which this harness stubs as a bare
+		; touches the Keystats singleton, which this harness stubs as a bare
 		; class. One char short-circuits that branch and still proves the reset.
 		_PrefixBuffer := "a"
 		_PrefixAppendTypedChar(" ")

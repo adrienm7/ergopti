@@ -15,7 +15,7 @@
 # Tests on each driver fail when a key is read nowhere or restated in code.
 #
 # Timings (refresh rates, idle hide, colour hold) live in
-# _shared/modules/timings/constants.toml [ui] and [keylogger].
+# _shared/modules/timings/constants.toml [ui] and [keystats].
 #
 # COLOR FORMAT:
 #   Colors are "#RRGGBB" hex strings. Alphas are 0.0-1.0 unless the key name

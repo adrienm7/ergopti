@@ -25,7 +25,7 @@ local OWNERS = {
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
 	"ui.tooltip",
-	"modules.keylogger",
+	"modules.keystats",
 	"adapters.event_provenance",
 	"adapters.timer_scheduler",
 	"hs", "tests.stubs.hs", "hs.timer",

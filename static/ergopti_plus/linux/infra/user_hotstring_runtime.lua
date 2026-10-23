@@ -49,8 +49,8 @@ function M.new(options)
 			or capture.magic ~= options.magic.get()
 			or capture.focus_epoch ~= options.detector.currentEpoch() then return false end
 		local foreground = options.window_info and options.window_info.getFocused()
-		if not foreground or foreground.appId == "" or options.keylogger.is_password_app(foreground.appId)
-			or options.keylogger.is_private_window(foreground.windowTitle) then return false end
+		if not foreground or foreground.appId == "" or options.keystats.is_password_app(foreground.appId)
+			or options.keystats.is_private_window(foreground.windowTitle) then return false end
 		return Destination.current(capture.destination) == true
 	end
 
@@ -70,8 +70,8 @@ function M.new(options)
 	function native.publication_current(capture)
 		if native.publication_cached(capture) ~= true then return false end
 		local foreground = options.window_info and options.window_info.getFocused()
-		if not foreground or foreground.appId == "" or options.keylogger.is_password_app(foreground.appId)
-			or options.keylogger.is_private_window(foreground.windowTitle) then return false end
+		if not foreground or foreground.appId == "" or options.keystats.is_password_app(foreground.appId)
+			or options.keystats.is_private_window(foreground.windowTitle) then return false end
 		return Destination.current(capture.destination) == true and native.publication_cached(capture) == true
 	end
 

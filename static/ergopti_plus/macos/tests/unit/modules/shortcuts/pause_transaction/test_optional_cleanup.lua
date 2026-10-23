@@ -52,10 +52,10 @@ helpers.describe("script-control resume transaction is atomic", function()
 		end
 	end)
 
-	helpers.it("keeps optional keylogger resync failures outside the activation transaction", function()
+	helpers.it("keeps optional keystats resync failures outside the activation transaction", function()
 		for _, mode in ipairs({ "false", "throw" }) do
 			with_context({
-				resume_failure = { step = "keylogger_resync", mode = mode },
+				resume_failure = { step = "keystats_resync", mode = mode },
 			}, function(script_control, ctx)
 				script_control.pause_all()
 				ctx.fire_deferred()
@@ -65,16 +65,16 @@ helpers.describe("script-control resume transaction is atomic", function()
 				ctx.fire_deferred()
 				ctx.resume_callback(true, "resumed")
 
-				helpers.assert_eq(ctx.calls.keylogger_resync, 1,
+				helpers.assert_eq(ctx.calls.keystats_resync, 1,
 					"resume must still attempt the optional context refresh")
 				helpers.assert_eq(script_control.is_paused(), false,
-					"metrics OFF/uninitialized keylogger must not block an otherwise complete resume")
+					"metrics OFF/uninitialized keystats must not block an otherwise complete resume")
 				helpers.assert_eq(ctx.calls.karabiner_pause, 1,
 					"a non-activating optional failure must not roll native remapping back")
 				helpers.assert_eq(count_notifications(ctx, "script_control.resumed", "success"), 1)
 				helpers.assert_eq(count_notifications(ctx, "script_control.resume_failed", "error"), 0)
 				helpers.assert_true(helpers.deep_equal(ctx.pause_listener, { true, false }))
-				helpers.assert_true(has_warning_containing(ctx, "keylogger.resync_context"),
+				helpers.assert_true(has_warning_containing(ctx, "keystats.resync_context"),
 					"the optional failure must remain visible in the file logger")
 				script_control.stop()
 			end)

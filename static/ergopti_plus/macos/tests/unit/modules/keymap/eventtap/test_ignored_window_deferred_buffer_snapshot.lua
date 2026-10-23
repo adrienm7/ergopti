@@ -47,16 +47,16 @@ local function install_collaborators(effects)
 		handle_chain_signal = function() effects.llm_calls = effects.llm_calls + 1; return false end,
 		is_visible = function() return false end,
 	}
-	package.loaded["modules.keylogger"] = {
-		log_hotstring_suggested = function() effects.keylogger_calls = effects.keylogger_calls + 1 end,
-		log_hotstring_dismissed = function() effects.keylogger_calls = effects.keylogger_calls + 1 end,
-		log_llm_accepted = function() effects.keylogger_calls = effects.keylogger_calls + 1 end,
-		log_hotstring = function() effects.keylogger_calls = effects.keylogger_calls + 1 end,
+	package.loaded["modules.keystats"] = {
+		log_hotstring_suggested = function() effects.keystats_calls = effects.keystats_calls + 1 end,
+		log_hotstring_dismissed = function() effects.keystats_calls = effects.keystats_calls + 1 end,
+		log_llm_accepted = function() effects.keystats_calls = effects.keystats_calls + 1 end,
+		log_hotstring = function() effects.keystats_calls = effects.keystats_calls + 1 end,
 		notify_synthetic = function(text, source)
-			effects.keylogger_calls = effects.keylogger_calls + 1
+			effects.keystats_calls = effects.keystats_calls + 1
 			if source == "hotstring" then effects.emitted[#effects.emitted + 1] = text end
 		end,
-		set_buffer = function() effects.keylogger_calls = effects.keylogger_calls + 1 end,
+		set_buffer = function() effects.keystats_calls = effects.keystats_calls + 1 end,
 	}
 	package.loaded["ui.tooltip"] = {
 		set_runtime_guard = function() end,
@@ -152,7 +152,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 			interceptor_buffers = {},
 			preview_calls = 0,
 			tooltip_calls = 0,
-			keylogger_calls = 0,
+			keystats_calls = 0,
 			llm_calls = 0,
 			emitted = {},
 		}
@@ -242,7 +242,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 			"unknown input must not reset the LLM engine inside CGEventTap")
 		helpers.assert_eq(effects.tooltip_calls, 1,
 			"off-tap ownership cleanup must revoke any surface before ignored state settles")
-		helpers.assert_eq(effects.keylogger_calls, 0, "ignored input must not reach keylogger sinks")
+		helpers.assert_eq(effects.keystats_calls, 0, "ignored input must not reach keystats sinks")
 		helpers.assert_eq(effects.llm_calls, 1,
 			"off-tap ownership cleanup must reset, but never reopen, the LLM runtime")
 		helpers.assert_eq(scheduled, 2,
@@ -265,7 +265,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 			interceptor_buffers = {},
 			preview_calls = 0,
 			tooltip_calls = 0,
-			keylogger_calls = 0,
+			keystats_calls = 0,
 			llm_calls = 0,
 			emitted = {},
 		}
@@ -375,7 +375,7 @@ helpers.describe("ignored-window eventtap boundary", function()
 			tooltip_shows = 0,
 			tooltip_hides = 0,
 			tooltip_visible = false,
-			keylogger_calls = 0,
+			keystats_calls = 0,
 			llm_calls = 0,
 			emitted = {},
 		}

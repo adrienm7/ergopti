@@ -10,9 +10,9 @@ local uv = require("luv")
 require("compat.utf8").install()
 local Json = require("json")
 local Clock = require("infra.monotonic")
-local K = require("modules.keylogger.keylogger")
-local Metrics = require("modules.keylogger.system_metrics")
-local W = require("modules.keylogger.sqlite_writer")
+local K = require("modules.keystats.keystats")
+local Metrics = require("modules.keystats.system_metrics")
+local W = require("modules.keystats.sqlite_writer")
 -- Metrics flushes are asynchronous owned SQLite batches: a read must wait for
 -- the physical acknowledgement, as every native SQLite fixture does.
 local Drain = require("tests.support.sqlite_flush_native")

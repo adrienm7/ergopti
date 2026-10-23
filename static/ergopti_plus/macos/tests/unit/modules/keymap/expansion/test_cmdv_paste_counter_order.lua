@@ -49,7 +49,7 @@ local function load_fixture()
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name:match("^modules%.llm")
-			or name:match("^modules%.keylogger")
+			or name:match("^modules%.keystats")
 			or name:match("^ui%.tooltip")
 			or name:match("^adapters%.")
 			or name:match("^infra%.")

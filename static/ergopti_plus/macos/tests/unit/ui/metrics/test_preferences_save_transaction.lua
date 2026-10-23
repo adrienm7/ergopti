@@ -276,7 +276,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 				hotstrings = {},
 				keymap = false,
 				preview_star_enabled = false,
-				keylogger_enabled = false,
+				keystats_enabled = false,
 			}, {}, false, {
 				keymap = {
 					set_llm_model = function() return true end,
@@ -318,7 +318,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 			hotstrings = {},
 			keymap = false,
 			preview_star_enabled = false,
-			keylogger_enabled = false,
+			keystats_enabled = false,
 		}
 		local rollback_successes = 0
 		local save = transaction.bind({ save = function() return false end }, {
@@ -378,18 +378,18 @@ helpers.describe("menu preferences: first-click rollback", function()
 		helpers.assert_eq(state.nested, { enabled = true, values = { 1, 2 } })
 	end)
 
-	helpers.it("restores the keylogger cipher posture without starting migration", function()
+	helpers.it("restores the keystats cipher posture without starting migration", function()
 		helpers.load_with_stubs("infra.logger")
 		local cipher_values = {}
-		package.loaded["modules.keylogger.text_cipher"] = {
+		package.loaded["modules.keystats.text_cipher"] = {
 			set_enabled = function(value) cipher_values[#cipher_values + 1] = value end,
 		}
 		package.loaded["ui.menu.menu_state"] = nil
 		local MenuState = require("ui.menu.menu_state")
 		local result = MenuState.sync_state_to_modules({
 			hotstrings = {},
-			keylogger_encrypt = false,
-			keylogger_enabled = false,
+			keystats_encrypt = false,
+			keystats_enabled = false,
 		}, {}, false, {
 			keymap = { set_llm_model = function() return true end },
 			hotstring_editor = {},

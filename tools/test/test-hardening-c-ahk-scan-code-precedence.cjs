@@ -28,7 +28,7 @@
  * neutral defaults (tap-holds off) exposed it, and Tab went to the application
  * instead of accepting the prediction (45704357d). The same class hid the
  * AltGr tap-hold behind `RAlt::` (altgr-single-identity-2026-09-25), and the
- * keylogger's `~^v` paste hotkey never fired, the layout's `^SC02F` and the
+ * keystats's `~^v` paste hotkey never fired, the layout's `^SC02F` and the
  * AltGr layer holding every V key: the paste is now observed on the
  * HookDispatcher InputHook, which no hotkey precedence reaches.
  *

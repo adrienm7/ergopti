@@ -9,7 +9,7 @@
 --- a live macOS + MLX/Ollama environment and is deferred to integration testing.
 ---
 --- FEATURES & RATIONALE:
---- 1. Dependency Isolation: Heavy dependencies (modules.llm, modules.keylogger,
+--- 1. Dependency Isolation: Heavy dependencies (modules.llm, modules.keystats,
 ---    ui.tooltip, WarmupController, etc.) are stubbed via package.loaded before
 ---    the engine loads.
 --- 2. Pure-Function Coverage: normalize_mods, is_visible, is_chain_pending,
@@ -196,9 +196,9 @@ package.loaded["ui.tooltip"] = {
 	tint                  = function(_) return nil end,
 }
 
--- Stub modules.keylogger — get_live_stats() returns wpm_physical (the field the
+-- Stub modules.keystats — get_live_stats() returns wpm_physical (the field the
 -- adaptive debounce reads); log_llm_dismissed() is called on reset.
-package.loaded["modules.keylogger"] = {
+package.loaded["modules.keystats"] = {
 	get_live_stats      = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed   = function(_, _preds) end,
 }
@@ -223,7 +223,7 @@ local function load_real_setting_bridge()
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name = function() return "f16" end,
 		},
-		["modules.keylogger"] = {},
+		["modules.keystats"] = {},
 		["ui.tooltip"] = {},
 		["modules.keymap.registry"] = {},
 		["modules.hotstrings.hotstrings_config"] = {},
@@ -972,11 +972,11 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 	helpers.it("clears visible state synchronously but defers dismissal persistence", function()
 		local core = package.loaded["modules.llm"]
 		local streaming = package.loaded["modules.llm.streaming_handler"]
-		local keylogger = package.loaded["modules.keylogger"]
+		local keystats = package.loaded["modules.keystats"]
 		local scheduler = require("adapters.timer_scheduler")
 		local previous_fetch = core.fetch_llm_prediction
 		local previous_build = streaming.build_callbacks
-		local previous_log = keylogger.log_llm_dismissed
+		local previous_log = keystats.log_llm_dismissed
 		local previous_after = scheduler.after
 		local previous_cancel = scheduler.cancel
 		local previous_on_settled = scheduler.onSettled
@@ -1007,7 +1007,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 			handle.observers[#handle.observers + 1] = observer
 			return true
 		end
-		keylogger.log_llm_dismissed = function()
+		keystats.log_llm_dismissed = function()
 			dismissal_calls = dismissal_calls + 1
 		end
 		streaming.build_callbacks = function(config)
@@ -1055,7 +1055,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 
 		core.fetch_llm_prediction = previous_fetch
 		streaming.build_callbacks = previous_build
-		keylogger.log_llm_dismissed = previous_log
+		keystats.log_llm_dismissed = previous_log
 		scheduler.after = previous_after
 		scheduler.cancel = previous_cancel
 		scheduler.onSettled = previous_on_settled

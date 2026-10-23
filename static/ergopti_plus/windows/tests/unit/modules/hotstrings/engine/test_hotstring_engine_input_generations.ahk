@@ -33,9 +33,9 @@ TestHSE_InputContextGenerationGuardsRelocation() {
     PrevToken := _PrefixFocusedControlToken
     PrevGeneration := _PrefixInputContextGeneration
     PrevSuggestion := _KLLastShownSuggestion
-    PrevKeyloggerInit := Keylogger.initialized
+    PrevKeystatsInit := Keystats.initialized
     ResetHotstringRecorders()
-    Keylogger.initialized := false
+    Keystats.initialized := false
     try {
         ; Exact AHK-06 reproductions: both genuine Ctrl chords invalidate before
         ; their target control exists, then Space arrives after the token changes.
@@ -113,7 +113,7 @@ TestHSE_InputContextGenerationGuardsRelocation() {
                 "AltGr must not advance the focused-control generation")
         }
     } finally {
-        Keylogger.initialized := PrevKeyloggerInit
+        Keystats.initialized := PrevKeystatsInit
         ResetHotstringRecorders()
         HSE_TestReset()
         _PrefixBuffer := PrevPrefix

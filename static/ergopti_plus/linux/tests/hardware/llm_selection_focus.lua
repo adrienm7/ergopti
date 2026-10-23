@@ -74,12 +74,12 @@ package.loaded["modules.llm.api_remote"] = {
 }
 local Engine = require("modules.llm.prediction_engine")
 local Tone = require("llm.tone")
-local Keylogger = require("modules.keylogger.keylogger")
-local Guard = require("modules.keylogger.focus_guard").new({
-	watch = Watch, detector = Detector, keylogger = Keylogger, prediction = Engine,
+local Keystats = require("modules.keystats.keystats")
+local Guard = require("modules.keystats.focus_guard").new({
+	watch = Watch, detector = Detector, keystats = Keystats, prediction = Engine,
 	now_ms = Clock.now_ms, retry_ms = Timings.ms("privacy", "context_retry_ms"),
 	capture_context_async = Window.start_privacy_context,
-	publish_context = function(context) return true, Keylogger.is_context_protected(context.app_id, context.title) end,
+	publish_context = function(context) return true, Keystats.is_context_protected(context.app_id, context.title) end,
 })
 local focus_id = focus_factory(Window, Guard)
 assert(type(focus_id) == "function", "the real daemon must inject a text destination reader")

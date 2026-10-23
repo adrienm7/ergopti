@@ -31,7 +31,7 @@
 ; ===============================
 
 class MetricsShortcuts {
-		; OFF by default. The keylogger captures every keystroke, so we never
+		; OFF by default. The keystats captures every keystroke, so we never
 		; auto-enable it: the user must tick it on once and confirm the
 		; warning dialog. The choice persists across reloads via INI.
 		static enabled           := false

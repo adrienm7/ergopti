@@ -22,7 +22,7 @@
 ; rather than skipped.
 ;
 ; The guard is written as an enumeration over the EMITTERS rather than a check
-; of the one type that was found, so the next event class added to the keylogger
+; of the one type that was found, so the next event class added to the keystats
 ; cannot inherit the same silent drop.
 ;
 ; SCOPE: behavioural — KL_BuildInserts is a pure function of the event Map and
@@ -49,10 +49,10 @@ global _BICE_NOT_EVENT_TYPES := ["llm_", "shortcut"]
 ; ==================================================================
 ; ==================================================================
 
-; Event type literals as the keylogger actually emits them.
+; Event type literals as the keystats actually emits them.
 _BICE_EmittedTypes() {
 	global _BICE_NOT_EVENT_TYPES
-	Src := _StripFullLineComments(_DriverDirConcat("modules/keylogger"))
+	Src := _StripFullLineComments(_DriverDirConcat("modules/keystats"))
 	Types := Map()
 	Pos := 1
 	while (F := RegExMatch(Src, '"type",\s*"([a-z_]+)"', &M, Pos)) {
@@ -85,10 +85,10 @@ _BICE_EveryEmittedTypeIsIngested() {
 	Count := 0
 	for _, _ in Types
 		Count++
-	; Non-vacuity floor: the keylogger emits well over half a dozen distinct
+	; Non-vacuity floor: the keystats emits well over half a dozen distinct
 	; classes. A scan that matched nothing would pass every assertion below.
 	Assert(Count >= 6,
-		"the scan must reach the keylogger's real event emitters (found only " . Count . " type(s)) — a scan that matches nothing cannot fail")
+		"the scan must reach the keystats's real event emitters (found only " . Count . " type(s)) — a scan that matches nothing cannot fail")
 
 	for EventType, _ in Types {
 		Inserts := ""
@@ -99,7 +99,7 @@ _BICE_EveryEmittedTypeIsIngested() {
 				"KL_BuildInserts threw on the emitted type '" . EventType . "': " . Err.Message)
 		}
 		Assert(IsObject(Inserts) and Inserts.Length >= 1,
-			"the keylogger emits '" . EventType . "' but KL_BuildInserts produces no row for it, so it reaches today.log and then vanishes: never in data.sql, never on the dashboard. The default branch is deliberately permissive for forward-compatible replay, which is exactly why a missing case is indistinguishable from a deliberate skip and fails silently")
+			"the keystats emits '" . EventType . "' but KL_BuildInserts produces no row for it, so it reaches today.log and then vanishes: never in data.sql, never on the dashboard. The default branch is deliberately permissive for forward-compatible replay, which is exactly why a missing case is indistinguishable from a deliberate skip and fails silently")
 	}
 }
 

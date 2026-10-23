@@ -13,12 +13,12 @@ local load_dashboard = require("tests.support.metrics_typing_fixture")
 helpers.describe("typing dashboard identity (typing-dashboard-single-owner)", function()
 	for _, opened_first in ipairs({ false, true }) do
 		helpers.it("shares the restored owner when direct opening comes " .. (opened_first and "first" or "last"), function()
-			helpers.with_stub_scope({ "adapters.file_system", "modules.keylogger.sqlite_reader",
-				"modules.keylogger.log_manager", "ui.ui_builder", "hs.fs", "hs.json" }, function()
+			helpers.with_stub_scope({ "adapters.file_system", "modules.keystats.sqlite_reader",
+				"modules.keystats.log_manager", "ui.ui_builder", "hs.fs", "hs.json" }, function()
 				Restore.with_fixture({ settings = { ["ergopti.ui_restore_state"] = { "metrics_typing" } } },
 					function(restore, scheduler)
 						package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
-						package.loaded["modules.keylogger.sqlite_reader"] = {}
+						package.loaded["modules.keystats.sqlite_reader"] = {}
 						local subscriptions = 0
 						local dashboard, context = load_dashboard(scheduler, function()
 							subscriptions = subscriptions + 1

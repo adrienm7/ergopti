@@ -31,7 +31,7 @@ async function main() {
 			wrapper,
 			'\uFEFF#Requires AutoHotkey v2.0\n' +
 				`#Include ${windows}/infra/json.ahk\n` +
-				`#Include ${windows}/modules/keylogger/keylogger_webview_range_script.ahk\n` +
+				`#Include ${windows}/modules/keystats/keystats_webview_range_script.ahk\n` +
 				'FileAppend(KLWV_BuildRangeScript(A_Args[1], 42, A_Args[2]), "*", "UTF-8-RAW")\n'
 		);
 		const url = 'file:///C:/synthetic%20range.json';

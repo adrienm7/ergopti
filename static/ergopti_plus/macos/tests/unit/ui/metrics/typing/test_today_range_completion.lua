@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keylogger.today_completion_fixture")
+local Fixture = require("tests.support.modules.keystats.today_completion_fixture")
 
 local function range(state, reader, projection, first, last)
 	local raw, complete = projection.session(reader, "/fixture/db.sqlite", Fixture.TODAY, state.pacer)

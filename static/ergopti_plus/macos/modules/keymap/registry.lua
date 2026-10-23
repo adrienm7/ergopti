@@ -642,7 +642,7 @@ function M.add(trigger, replacement, opts)
 	local is_final          = opts.final_result       == true
 	-- Marks a mapping whose trigger AND replacement are user secrets (the
 	-- personal_info.toml phone / SSN / IBAN prefixes). The expander reads this
-	-- to suppress the keylogger call and the plaintext DEBUG line that would
+	-- to suppress the keystats call and the plaintext DEBUG line that would
 	-- otherwise copy both into the 14-day log and the exported metrics store
 	local is_private        = opts.is_private         == true
 	-- The personal_info.toml field this replacement was built from, when it has

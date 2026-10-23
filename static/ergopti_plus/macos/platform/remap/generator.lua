@@ -162,7 +162,7 @@ local LAYER_EXIT_SENTINEL_NAME = Keycodes.to_name(Keycodes.F19_LAYER_NAV_EXITED)
 -- Command under every chord of the layer (J gives Cmd+Left).
 local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 
--- Append-only log file consumed by modules/keylogger/kc_bridge.lua.
+-- Append-only log file consumed by modules/keystats/kc_bridge.lua.
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
 -- so Hammerspoon can map the name back to a numeric kc and record true
 -- physical key frequency — bypassing the Karabiner remap layer.
@@ -172,7 +172,7 @@ local KE_PHYSICAL_KC_LOG
 do
 	local mp = require("infra.config_paths")
 	KE_PHYSICAL_KC_LOG = NativePath.with_trailing_separator(mp.get_config_dir()) .. "metrics/karabiner_kc.log"
-	-- Parent dir created lazily by deploy_json_file() or when keylogger starts;
+	-- Parent dir created lazily by deploy_json_file() or when keystats starts;
 	-- no mkdir here to avoid creating metrics/ when the feature is off
 end
 

@@ -51,13 +51,13 @@ _FKL_NoForegroundWindowIsZero() {
 Test("foreground layout: no foreground window gives 0 (focused-thread-hkl-2026-09-26)",
 	_FKL_NoForegroundWindowIsZero)
 
-_FKL_KeyloggerUsesTheOneResolver() {
+_FKL_KeystatsUsesTheOneResolver() {
 	Body := _DriverFuncBody("KLPF_KeycodeLayout")
 	Assert(Body != "", "KLPF_KeycodeLayout must exist")
 	AssertTrue(InStr(Body, "KS_ResolveKeyboardLayout()") > 0,
-		"the keylogger heatmap must resolve its layout through the driver's one resolver")
+		"the keystats heatmap must resolve its layout through the driver's one resolver")
 	AssertFalse(InStr(Body, "GetForegroundWindow") > 0,
-		"the keylogger heatmap must not keep its own foreground-thread lookup")
+		"the keystats heatmap must not keep its own foreground-thread lookup")
 }
-Test("foreground layout: the keylogger heatmap reads the one resolver (focused-thread-hkl-2026-09-26)",
-	_FKL_KeyloggerUsesTheOneResolver)
+Test("foreground layout: the keystats heatmap reads the one resolver (focused-thread-hkl-2026-09-26)",
+	_FKL_KeystatsUsesTheOneResolver)

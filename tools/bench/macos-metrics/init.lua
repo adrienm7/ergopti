@@ -24,13 +24,13 @@ local function run()
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.paths"] = { shared = function(relative) return shared .. "/" .. relative end }
 	-- Aggregate-only fixture never invokes typed-text encryption or hardware IDs.
-	package.loaded["modules.keylogger.text_cipher"] = setmetatable({}, {
+	package.loaded["modules.keystats.text_cipher"] = setmetatable({}, {
 		__index = function() error("unexpected text-cipher use in aggregate benchmark") end,
 	})
 	local sqlite = require("hs.sqlite3")
 	local db_path = config.output_dir .. "/synthetic.sqlite"
 	assert(not hs.fs.attributes(db_path), "refusing to reuse an existing database")
-	writer = require("modules.keylogger.sqlite_writer")
+	writer = require("modules.keystats.sqlite_writer")
 	writer.init({ paths = { sqlite_path = db_path }, device_id = "benchmark-device",
 		device_obj = { device_id = "benchmark-device", name = "Synthetic", os = "macos",
 			os_version = "synthetic", host_signature = "synthetic", created_at = "2026-01-01T00:00:00Z" } })
@@ -47,7 +47,7 @@ local function run()
 	end
 	sql("COMMIT")
 	assert(writer.close_db(), "writer close refused")
-	local reader = require("modules.keylogger.sqlite_reader")
+	local reader = require("modules.keystats.sqlite_reader")
 	local samples = {}
 	for iteration = 1, 11 do
 		local started = hs.timer.absoluteTime()

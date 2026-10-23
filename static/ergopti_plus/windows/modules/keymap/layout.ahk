@@ -757,7 +757,7 @@ try {
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
-; .keylayout) so the keylogger heatmap reads the same source of truth without drifting.
+; .keylayout) so the keystats heatmap reads the same source of truth without drifting.
 if Features["layout"]["ergopti_base"] {
 	; A row switched off types what the OS layout types there: its keys pass
 	; through, through variants created before every built-in layer below.
@@ -1024,7 +1024,7 @@ _RegisterRollsAltGrHotkeys()
 
 ; Ctrl on the QWERTY V position pastes, like Ctrl on Ergopti's own V (RemapKey).
 ; Both emit through _RemapEmit: a SendEvent at this hotkey's SendLevel 2 that the
-; keylogger's paste observer (level 1 and above) sees. SendInput removes the
+; keystats's paste observer (level 1 and above) sees. SendInput removes the
 ; script's own hook while it sends, so the paste it typed was never observed.
 ; These static contexts precede the dynamic row passthrough: each must stand
 ; down itself when its row belongs to the OS, including modified zoom chords.

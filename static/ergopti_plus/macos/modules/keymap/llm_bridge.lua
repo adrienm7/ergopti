@@ -32,7 +32,7 @@ local text_utils       = require("infra.text_utils")
 local core_llm         = require("modules.llm")
 local Logger           = require("infra.logger")
 local Keycodes         = require("infra.keycodes")
-local keylogger        = require("modules.keylogger")
+local keystats        = require("modules.keystats")
 local tooltip          = require("ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local ToneRewrite      = require("modules.llm.tone_rewrite")
@@ -1114,7 +1114,7 @@ function M.update_preview(buf)
 				local t_key, t_repl, t_type = trigger_key, primary_match.repl, type_str
 				local schedule_ok, telemetry_handle, telemetry_committed = xpcall(function()
 					return schedule_prediction_deferred("hotstring suggestion telemetry", function()
-						pcall(keylogger.log_hotstring_suggested, nil, t_key, t_repl, t_type)
+						pcall(keystats.log_hotstring_suggested, nil, t_key, t_repl, t_type)
 					end)
 				end, debug.traceback)
 				if not schedule_ok or telemetry_committed ~= true then
@@ -1454,7 +1454,7 @@ local function reset_predictions_impl(keep_hotstring_log, force_full, suppress_t
 		if may_persist_preview(dismissed) and suppress_telemetry ~= true then
 			local schedule_ok, handle_or_err, telemetry_committed = xpcall(function()
 				return schedule_prediction_deferred("hotstring dismissal telemetry", function()
-					pcall(keylogger.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
+					pcall(keystats.log_hotstring_dismissed, nil, d_trigger, d_repl, d_type)
 				end)
 			end, debug.traceback)
 			if not schedule_ok or telemetry_committed ~= true then
@@ -1715,7 +1715,7 @@ function M.apply_prediction(idx)
 		return false
 	end
 	local telemetry_ok, telemetry_err = xpcall(function()
-		keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
+		keystats.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
 	end, debug.traceback)
 	if not telemetry_ok then
 		Logger.error(LOG, "Prediction acceptance telemetry raised after text commit: %s", tostring(telemetry_err))

@@ -310,7 +310,7 @@ local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
 	-- for as long as the dialog stays up.
 	local quiet_ok, quiet_err = pcall(function()
 		if TimerScheduler.cancelAll() ~= true then error("a native timer refused to stop") end
-		local kc_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		local kc_bridge = package.loaded["modules.keystats.kc_bridge"]
 		if type(kc_bridge) == "table" and kc_bridge.stop() ~= true then
 			error("the KC ledger bridge did not stop")
 		end
@@ -339,7 +339,7 @@ Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 -- ===================================
 -- ===================================
 
--- Initialize the paths module EARLY (before karabiner/keylogger modules load)
+-- Initialize the paths module EARLY (before karabiner/keystats modules load)
 -- so they can access the user-configured config_dir instead of using fallbacks
 local script_path = debug.getinfo(1, "S").source
 if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
@@ -651,7 +651,7 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 	-- are still live. This port never loads or initializes the dormant module.
 	local physical = _local_teardown_state.physical
 	if physical == nil then
-		local owner = rawget(package.loaded, "modules.keylogger.physical_history_session")
+		local owner = rawget(package.loaded, "modules.keystats.physical_history_session")
 		if owner == nil then
 			physical = { settled = true }
 		else
@@ -670,7 +670,7 @@ local function settle_loaded_physical_owner(on_teardown_ready)
 		_local_teardown_state.physical = physical
 	end
 	local function current()
-		local owner = rawget(package.loaded, "modules.keylogger.physical_history_session")
+		local owner = rawget(package.loaded, "modules.keystats.physical_history_session")
 		if physical.owner == nil then return owner == nil end
 		return rawequal(owner, physical.owner)
 			and rawequal(rawget(physical.owner, "stop"), physical.stop)
@@ -890,12 +890,12 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 			end,
 		},
 		{
-			name = "keylogger",
+			name = "keystats",
 			run = function()
-				local module = package.loaded["modules.keylogger"]
+				local module = package.loaded["modules.keystats"]
 				if module == nil then return true end
 				if type(module) ~= "table" or type(module.shutdown) ~= "function" then
-					error("modules.keylogger.shutdown is unavailable")
+					error("modules.keystats.shutdown is unavailable")
 				end
 				return module.shutdown()
 			end,

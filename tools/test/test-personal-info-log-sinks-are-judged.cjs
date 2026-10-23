@@ -220,31 +220,31 @@ const JUDGED = [
 		why: 'the interpolated value is the fixed config-directory overrides filename plus an OS error code, never a trigger or replacement.'
 	},
 	{
-		file: 'modules/keylogger/keylogger_hotstring_log.ahk',
+		file: 'modules/keystats/keystats_hotstring_log.ahk',
 		match: 'private mapping cat=',
 		verdict: 'not-personal',
 		why: 'the private branch itself: prints category and section, and says the trigger is withheld.'
 	},
 	{
-		file: 'modules/keylogger/keylogger_hotstring_log.ahk',
+		file: 'modules/keystats/keystats_hotstring_log.ahk',
 		match: "KL_LogHotstring: trigger='{1}'",
 		verdict: 'withheld-by-caller',
 		why: 'the else of the branch above — is_private already returned.'
 	},
 	{
-		file: 'modules/keylogger/keylogger_trigger_roi.ahk',
+		file: 'modules/keystats/keystats_trigger_roi.ahk',
 		match: '"type", "trigger_halflife"',
 		verdict: 'withheld-by-caller',
 		why: 'trig is a key of KLRoi.trigger_last_use, and KL_Roi_OnHotstring skips that map entirely when is_private.'
 	},
 	{
-		file: 'modules/keylogger/keylogger.ahk',
+		file: 'modules/keystats/keystats.ahk',
 		match: '"hotstring_suggested"',
 		verdict: 'withheld-by-caller',
 		why: '_NotifySuggestionShown returns before calling it when IsPrivate — the pair is withheld whole because the replacement IS the secret.'
 	},
 	{
-		file: 'modules/keylogger/keylogger.ahk',
+		file: 'modules/keystats/keystats.ahk',
 		match: '"hotstring_dismissed"',
 		verdict: 'withheld-by-caller',
 		why: '_KLEmitSuggestionDismissed returns on Rec.IsPrivate; writing only the second half of the pair would leak by the back door.'

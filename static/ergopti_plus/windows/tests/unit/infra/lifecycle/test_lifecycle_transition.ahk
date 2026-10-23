@@ -117,8 +117,8 @@ _LT_SystemIntervalsOwnerIsAdmitted() {
 		_LifecycleTransitionsByPhase := Map()
 		State := { calls: [] }
 		Transaction := LifecycleTransitionBegin("suspend")
-		AssertTrue(_LifecycleRunRequiredStep(Transaction, "keylogger-system-intervals",
-			_LT_Succeed.Bind(State, "keylogger-system-intervals")))
+		AssertTrue(_LifecycleRunRequiredStep(Transaction, "keystats-system-intervals",
+			_LT_Succeed.Bind(State, "keystats-system-intervals")))
 		AssertEqual(1, State.calls.Length, "the system interval suspension action must actually run")
 		AssertTrue(LifecycleTransitionFinish(Transaction))
 	} finally {

@@ -18,9 +18,9 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
-local Reader = require("modules.keylogger.sqlite_reader")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
+local Reader = require("modules.keystats.sqlite_reader")
 local database = root .. "/metrics.sqlite"
 local today = os.date("%Y-%m-%d")
 -- An elapsed 24 hours can still be today on a 25-hour local calendar day.
@@ -28,8 +28,8 @@ local today = os.date("%Y-%m-%d")
 local historical_day = "2000-01-01"
 assert(historical_day < today, "native fixture needs a distinct historical day")
 local checks, failures = 0, 0
-Keylogger.init({ sqlite_path = database, log_dir = root .. "/logs" })
-assert(Keylogger.is_enabled(), "owned configuration must grant collection consent")
+Keystats.init({ sqlite_path = database, log_dir = root .. "/logs" })
+assert(Keystats.is_enabled(), "owned configuration must grant collection consent")
 
 local function check(name, test)
 	checks = checks + 1
@@ -41,11 +41,11 @@ local function check(name, test)
 end
 
 check("real synthetic output survives flush and the public range payload", function()
-	Keylogger.record_synthetic_output("owned-synthetic-app", "a\0b", "other", 1000)
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	Keystats.record_synthetic_output("owned-synthetic-app", "a\0b", "other", 1000)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	local rows = assert(Writer.query_rows("SELECT hex(token),c FROM ngram_chars WHERE app='owned-synthetic-app' ORDER BY hex(token);"))
 	assert(table.concat(rows, ",") == "00|1,61|1,62|1", "real flush did not persist the exact original characters")
-	local payload = Keylogger.get_range_payload(today, today, { "owned-synthetic-app" })
+	local payload = Keystats.get_range_payload(today, today, { "owned-synthetic-app" })
 	local chars = assert(payload.today["owned-synthetic-app"]).c
 	assert(chars["\0"] and chars["\0"].c == 1 and chars["\0"].o == 1,
 		"range projection dropped the actual persisted synthetic NUL")

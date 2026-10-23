@@ -18,8 +18,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
 local checks, failures = 0, 0
 local serial = 0
 local function check(name, test)
@@ -33,9 +33,9 @@ end
 local function fresh(cursor)
 	Writer.close_db()
 	serial = serial + 1
-	Keylogger.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
-	assert(Keylogger.is_enabled())
-	Keylogger.reset_session()
+	Keystats.init({ sqlite_path = root .. "/metrics-" .. serial .. ".sqlite", log_dir = root .. "/logs" })
+	assert(Keystats.is_enabled())
+	Keystats.reset_session()
 	assert(Writer.set_meta("linux_next_event_id", cursor))
 end
 local function number(sql)
@@ -55,9 +55,9 @@ local invalid = {
 }
 for _, item in ipairs(invalid) do
 	fresh(item[2])
-	Keylogger.on_keydown("a", 1000, "owned-cursor-app")
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	Keystats.on_keydown("a", 1000, "owned-cursor-app")
+	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor refuses without mutation", function()
 		assert(assert(Writer.query_rows("SELECT hex(value) FROM meta WHERE key='linux_next_event_id';"))[1] == hex(item[2]),
 			"invalid or exhausted cursor was rewritten")
@@ -65,8 +65,8 @@ for _, item in ipairs(invalid) do
 		assert(number("SELECT count(*) FROM ngram_chars;") == 0, "refused raw stream acquired derived metrics")
 	end)
 	assert(require("tests.support.sqlite_flush_native").control(Writer, "UPDATE meta SET value='41' WHERE key='linux_next_event_id';"))
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
-	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
+	require("tests.support.sqlite_flush_native").flush(Keystats)
 	check("native " .. item[1] .. " cursor recovery retains pending typing once", function()
 		local rows = assert(Writer.query_rows("SELECT id,text FROM events_typing ORDER BY id;"))
 		assert(#rows == 1 and rows[1] == "41|a", "refusal consumed pending typing or acknowledged an unusable ID")

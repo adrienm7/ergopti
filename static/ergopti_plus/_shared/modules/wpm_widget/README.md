@@ -9,7 +9,7 @@ from `constants.toml`: each reads it at runtime and refuses to draw when a key
 is missing.
 
 Refresh rates, the colour hold and the idle hide are timings, and live in
-`_shared/modules/timings/constants.toml` (`[ui]` and `[keylogger]`).
+`_shared/modules/timings/constants.toml` (`[ui]` and `[keystats]`).
 
 ## Key files
 
@@ -28,5 +28,5 @@ Refresh rates, the colour hold and the idle hide are timings, and live in
 The two Lua drivers also share every decision the readouts make — colours per
 source, the graph's curve, when to show, the default place — in
 `_shared/lua/wpm_widget/model.lua`, and the live speed in
-`_shared/lua/keylogger/live_wpm.lua` (Linux; macOS keeps its keylogger's own
+`_shared/lua/keystats/live_wpm.lua` (Linux; macOS keeps its keystats's own
 buffers over the same timings).

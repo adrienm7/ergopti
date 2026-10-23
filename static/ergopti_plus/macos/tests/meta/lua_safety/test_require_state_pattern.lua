@@ -25,8 +25,8 @@ local KNOWN_VIOLATIONS = {
 	["modules/dynamic_hotstrings/personal_info.lua"] = true,
 	["modules/gestures/actions.lua"]                 = true,
 	["modules/gestures/engine.lua"]                  = true,
-	["modules/keylogger/init.lua"]                   = true,
-	["modules/keylogger/rotation.lua"]               = true,
+	["modules/keystats/init.lua"]                   = true,
+	["modules/keystats/rotation.lua"]               = true,
 
 	-- Pause invariant is enforced at call sites (script_control + eventtap guards), not always inside every module's require_state.
 	-- See test_script_control.lua and gestures engine for explicit pause regression tests.

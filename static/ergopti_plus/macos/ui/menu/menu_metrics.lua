@@ -1,9 +1,9 @@
 --- ui/menu/menu_metrics.lua
 
 --- ==============================================================================
---- MODULE: Keylogger Menu UI
+--- MODULE: Keystats Menu UI
 --- DESCRIPTION:
---- This module constructs and manages the "Metrics & Keylogger" submenu within
+--- This module constructs and manages the "Metrics & Keystats" submenu within
 --- the global Hammerspoon menubar. It acts as the primary user interface for
 --- toggling privacy settings, encryption, and real-time visualization widgets.
 ---
@@ -26,7 +26,7 @@ local text_utils = require("infra.text_utils")
 
 local AppPickerLib  = require("infra.app_picker")
 local dialog        = require("infra.dialog_util")
-local kl_mod        = require("modules.keylogger")
+local kl_mod        = require("modules.keystats")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local Manifest      = require("infra.manifest_reader")
@@ -45,17 +45,17 @@ local LOG = "menu_metrics"
 -- ================================
 
 M.DEFAULT_STATE = {
-	keylogger_enabled                = kl_mod.DEFAULT_STATE.keylogger_enabled,
-	keylogger_disabled_apps          = kl_mod.DEFAULT_STATE.keylogger_disabled_apps,
-	keylogger_encrypt                = kl_mod.DEFAULT_STATE.keylogger_encrypt,
-	keylogger_menubar_wpm            = kl_mod.DEFAULT_STATE.keylogger_menubar_wpm,
-	keylogger_menubar_colors         = kl_mod.DEFAULT_STATE.keylogger_menubar_colors,
-	keylogger_float_wpm              = kl_mod.DEFAULT_STATE.keylogger_float_wpm,
-	keylogger_float_graph            = kl_mod.DEFAULT_STATE.keylogger_float_graph,
-	keylogger_float_colors           = kl_mod.DEFAULT_STATE.keylogger_float_colors,
-	keylogger_private_filter_enabled     = kl_mod.DEFAULT_STATE.keylogger_private_filter_enabled,
-	keylogger_secure_filter_enabled      = kl_mod.DEFAULT_STATE.keylogger_secure_filter_enabled,
-	keylogger_system_auth_filter_enabled = kl_mod.DEFAULT_STATE.keylogger_system_auth_filter_enabled,
+	keystats_enabled                = kl_mod.DEFAULT_STATE.keystats_enabled,
+	keystats_disabled_apps          = kl_mod.DEFAULT_STATE.keystats_disabled_apps,
+	keystats_encrypt                = kl_mod.DEFAULT_STATE.keystats_encrypt,
+	keystats_menubar_wpm            = kl_mod.DEFAULT_STATE.keystats_menubar_wpm,
+	keystats_menubar_colors         = kl_mod.DEFAULT_STATE.keystats_menubar_colors,
+	keystats_float_wpm              = kl_mod.DEFAULT_STATE.keystats_float_wpm,
+	keystats_float_graph            = kl_mod.DEFAULT_STATE.keystats_float_graph,
+	keystats_float_colors           = kl_mod.DEFAULT_STATE.keystats_float_colors,
+	keystats_private_filter_enabled     = kl_mod.DEFAULT_STATE.keystats_private_filter_enabled,
+	keystats_secure_filter_enabled      = kl_mod.DEFAULT_STATE.keystats_secure_filter_enabled,
+	keystats_system_auth_filter_enabled = kl_mod.DEFAULT_STATE.keystats_system_auth_filter_enabled,
 }
 
 
@@ -145,7 +145,7 @@ local function metrics_parent_unchanged(parent, fields)
 end
 
 
---- Builds the Keylogger menu item and defines callbacks.
+--- Builds the Keystats menu item and defines callbacks.
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
 --- @return table The menu definition table.
 function M.build(ctx)
@@ -157,7 +157,7 @@ function M.build(ctx)
 	local script_control = ctx.script_control
 
 	-- Sync widget visibility on every build so a reload restores the saved state.
-	-- Keylogger start/stop is handled by sync_state_to_modules in init.lua.
+	-- Keystats start/stop is handled by sync_state_to_modules in init.lua.
 	-- Gate the WPM UIs on pause too: pause_all() never tears them down, but the
 	-- pause-change listener calls updateMenu() (this build), so honouring the pause
 	-- state HERE is what stops the widget's 0.2 s timer + mouse eventtap and the
@@ -271,7 +271,7 @@ function M.build(ctx)
 	--- Runtime changes first so an unavailable filter can never be persisted as
 	--- active. Every later failure compensates the exact prior runtime value.
 	--- @param state_key string Menu-state field.
-	--- @param setter_name string Keylogger runtime setter.
+	--- @param setter_name string Keystats runtime setter.
 	--- @param label string Diagnostic filter label.
 	--- @return boolean committed True only when runtime and persistence agree.
 	local function toggle_metrics_filter(state_key, setter_name, label)
@@ -313,19 +313,19 @@ function M.build(ctx)
 		return true
 	end
 
-	if state.keylogger_enabled then
+	if state.keystats_enabled then
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
-			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
-		sync_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)
+		sync_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)
 
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
-			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		sync_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget,
-			state.keylogger_float_graph)
+		sync_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget,
+			state.keystats_float_graph)
 	end
 
 
@@ -344,26 +344,26 @@ function M.build(ctx)
 	-- resolved the same three through the manifest, so the drivers already
 	-- disagreed about where the truth lived.
 	local STATE_GETTERS = {
-		keylogger_enabled      = function() return state.keylogger_enabled end,
-		wpm_widget_visible     = function() return state.keylogger_float_wpm end,
-		metrics_widget_colors  = function() return state.keylogger_float_colors end,
-		metrics_widget_graph   = function() return state.keylogger_float_graph end,
-		wpm_menubar_visible    = function() return state.keylogger_menubar_wpm end,
-		metrics_filter_private = function() return state.keylogger_private_filter_enabled end,
-		metrics_filter_secure  = function() return state.keylogger_secure_filter_enabled end,
-		metrics_filter_sysauth = function() return state.keylogger_system_auth_filter_enabled end,
+		keystats_enabled      = function() return state.keystats_enabled end,
+		wpm_widget_visible     = function() return state.keystats_float_wpm end,
+		metrics_widget_colors  = function() return state.keystats_float_colors end,
+		metrics_widget_graph   = function() return state.keystats_float_graph end,
+		wpm_menubar_visible    = function() return state.keystats_menubar_wpm end,
+		metrics_filter_private = function() return state.keystats_private_filter_enabled end,
+		metrics_filter_secure  = function() return state.keystats_secure_filter_enabled end,
+		metrics_filter_sysauth = function() return state.keystats_system_auth_filter_enabled end,
 		-- The two menubar rows became `check` on 2026-08-07: the renderer reads
 		-- the tick through these instead of the handler setting it.
-		metrics_menubar_wpm    = function() return state.keylogger_menubar_wpm end,
-		metrics_menubar_colors = function() return state.keylogger_menubar_colors end,
-		metrics_encrypt_enabled = function() return state.keylogger_encrypt end,
+		metrics_menubar_wpm    = function() return state.keystats_menubar_wpm end,
+		metrics_menubar_colors = function() return state.keystats_menubar_colors end,
+		metrics_encrypt_enabled = function() return state.keystats_encrypt end,
 	}
 
 	-- `command` rows since 2026-08-07: the label and the greying are the
 	-- manifest's, so these supply only the click.
 	local function cmd_show_typing()
-		local Keylogger = require("modules.keylogger")
-		Keylogger.show_metrics()
+		local Keystats = require("modules.keystats")
+		Keystats.show_metrics()
 	end
 
 	local function cmd_show_apps()
@@ -376,36 +376,36 @@ function M.build(ctx)
 	--- Flips the private filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_private()
-		return toggle_metrics_filter("keylogger_private_filter_enabled",
+		return toggle_metrics_filter("keystats_private_filter_enabled",
 			"set_private_filter_enabled", "Private filter")
 	end
 
 	--- Flips the secure filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_secure()
-		return toggle_metrics_filter("keylogger_secure_filter_enabled",
+		return toggle_metrics_filter("keystats_secure_filter_enabled",
 			"set_secure_field_filter_enabled", "Secure-field filter")
 	end
 
 	--- Flips the sysauth filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_sysauth()
-		return toggle_metrics_filter("keylogger_system_auth_filter_enabled",
+		return toggle_metrics_filter("keystats_system_auth_filter_enabled",
 			"set_system_auth_filter_enabled", "System-auth filter")
 	end
 
 	local function rows_exclude_apps(_ctx)
-		local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
+		local disabled_count = #(type(state.keystats_disabled_apps) == "table" and state.keystats_disabled_apps or {})
 		local label = disabled_count > 0
 			and string.format(i18n.get("menu.metrics.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
 			or i18n.get("menu.metrics.exclude_apps")
 		local exclusion_menu = AppPickerLib.build_menu(
-			state.keylogger_disabled_apps,
+			state.keystats_disabled_apps,
 			function(new_list)
-				state.keylogger_disabled_apps = new_list
-				local Keylogger = require("modules.keylogger")
-				if type(Keylogger.set_disabled_apps) == "function" then
-					pcall(Keylogger.set_disabled_apps, new_list)
+				state.keystats_disabled_apps = new_list
+				local Keystats = require("modules.keystats")
+				if type(Keystats.set_disabled_apps) == "function" then
+					pcall(Keystats.set_disabled_apps, new_list)
 				end
 				if save_prefs() ~= true then return false end
 				pcall(updateMenu)
@@ -425,23 +425,23 @@ function M.build(ctx)
 	local function cmd_wpm_menubar()
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
-			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
-		return toggle_wpm_visibility("keylogger_menubar_wpm", "WPM menubar", WpmMenubar)
+		return toggle_wpm_visibility("keystats_menubar_wpm", "WPM menubar", WpmMenubar)
 	end
 
 	local function cmd_menubar_colors()
-		state.keylogger_menubar_colors = not state.keylogger_menubar_colors
+		state.keystats_menubar_colors = not state.keystats_menubar_colors
 		if save_prefs() ~= true then return false end
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
-			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+			WpmMenubar.set_use_source_colors(state.keystats_menubar_colors)
 		end
 		-- Only restart when the readout is actually shown: colouring a menubar
 		-- item that is not there would start it as a side effect.
-		if state.keylogger_menubar_wpm and not paused_now()
+		if state.keystats_menubar_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-			compensate_rejected_wpm_start("keylogger_menubar_wpm", "WPM menubar")
+			compensate_rejected_wpm_start("keystats_menubar_wpm", "WPM menubar")
 		end
 		updateMenu()
 	end
@@ -449,38 +449,38 @@ function M.build(ctx)
 	local function cmd_wpm_widget()
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
-			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		return toggle_wpm_visibility("keylogger_float_wpm", "WPM widget", WpmWidget,
-			state.keylogger_float_graph)
+		return toggle_wpm_visibility("keystats_float_wpm", "WPM widget", WpmWidget,
+			state.keystats_float_graph)
 	end
 
 	local function cmd_widget_colors()
-		state.keylogger_float_colors = not state.keylogger_float_colors
+		state.keystats_float_colors = not state.keystats_float_colors
 		if save_prefs() ~= true then return false end
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
-			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		if state.keylogger_float_wpm and not paused_now()
+		if state.keystats_float_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-				state.keylogger_float_graph) then
-			compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+				state.keystats_float_graph) then
+			compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
 		end
 		updateMenu()
 	end
 
 	local function cmd_include_realtime()
-		state.keylogger_float_graph = not state.keylogger_float_graph
+		state.keystats_float_graph = not state.keystats_float_graph
 		if save_prefs() ~= true then return false end
 		local WpmWidget = require("ui.wpm.wpm_widget")
 		if type(WpmWidget.set_use_source_colors) == "function" then
-			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+			WpmWidget.set_use_source_colors(state.keystats_float_colors)
 		end
-		if state.keylogger_float_wpm and not paused_now()
+		if state.keystats_float_wpm and not paused_now()
 			and not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-				state.keylogger_float_graph) then
-			compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+				state.keystats_float_graph) then
+			compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
 		end
 		updateMenu()
 	end
@@ -496,8 +496,8 @@ function M.build(ctx)
 		-- enable it. It also collected *.log.gz files — a storage format retired
 		-- when persistence moved to SQLite. It is now a plain toggle over the
 		-- real backend, and it refuses to tick when no key can be derived.
-		local TextCipher = require("modules.keylogger.text_cipher")
-		local want = not state.keylogger_encrypt
+		local TextCipher = require("modules.keystats.text_cipher")
+		local want = not state.keystats_encrypt
 		if want and not TextCipher.is_available() then
 			-- Existing keys, already translated in all 21 locales: the only
 			-- way the key derivation fails on a Mac is a missing openssl,
@@ -509,18 +509,18 @@ function M.build(ctx)
 			return
 		end
 		TextCipher.set_enabled(want)
-		state.keylogger_encrypt = want
+		state.keystats_encrypt = want
 		if save_prefs() ~= true then return false end
-		local Keylogger = require("modules.keylogger")
-		if type(Keylogger.set_options) == "function" then
-			Keylogger.set_options({ encrypt = want })
+		local Keystats = require("modules.keystats")
+		if type(Keystats.set_options) == "function" then
+			Keystats.set_options({ encrypt = want })
 		end
 		-- The rows already stored predate this click, and the setting is
 		-- worthless to a user with a year of logs unless they are converted
 		-- too. The cipher is flipped FIRST: encrypt() returns the plaintext
 		-- untouched while the toggle is off, so a pass started before it
 		-- would convert nothing and report success.
-		require("modules.keylogger.text_migration").start_for_posture(want)
+		require("modules.keystats.text_migration").start_for_posture(want)
 		updateMenu()
 	end
 
@@ -542,7 +542,7 @@ function M.build(ctx)
 	--- from the menu bar at all.
 	--- @return boolean|nil committed
 	local function toggle_metrics()
-		if not state.keylogger_enabled then
+		if not state.keystats_enabled then
 			local res = dialog.block_alert(
 				i18n.get("dialog.metrics.security_warning_title"),
 				i18n.get("dialog.metrics.security_warning_body"),
@@ -550,11 +550,11 @@ function M.build(ctx)
 			if res ~= i18n.get("button.activate") then return end
 		end
 
-		local desired_enabled = not state.keylogger_enabled
-		local ok_kl, Keylogger = pcall(require, "modules.keylogger")
-		if not ok_kl then Keylogger = nil end
+		local desired_enabled = not state.keystats_enabled
+		local ok_kl, Keystats = pcall(require, "modules.keystats")
+		if not ok_kl then Keystats = nil end
 		local lifecycle_method = desired_enabled and "start" or "stop"
-		if type(Keylogger) ~= "table" or type(Keylogger[lifecycle_method]) ~= "function" then
+		if type(Keystats) ~= "table" or type(Keystats[lifecycle_method]) ~= "function" then
 			-- Validate the security lifecycle capability before publishing either
 			-- memory or disk. In particular, OFF without a stop boundary would leave
 			-- key capture active behind an unchecked menu item.
@@ -564,7 +564,7 @@ function M.build(ctx)
 			return false
 		end
 
-		state.keylogger_enabled = desired_enabled
+		state.keystats_enabled = desired_enabled
 		if save_prefs() ~= true then return false end
 
 		local ok_wm, WpmMenubar = pcall(require, "ui.wpm.wpm_menubar")
@@ -572,21 +572,21 @@ function M.build(ctx)
 		local ok_ww, WpmWidget = pcall(require, "ui.wpm.wpm_widget")
 		if not ok_ww then WpmWidget = nil end
 
-		if state.keylogger_enabled then
-			if Keylogger and type(Keylogger.set_options) == "function" then
-				pcall(Keylogger.set_options, { encrypt = state.keylogger_encrypt })
+		if state.keystats_enabled then
+			if Keystats and type(Keystats.set_options) == "function" then
+				pcall(Keystats.set_options, { encrypt = state.keystats_encrypt })
 			end
-			if Keylogger and type(Keylogger.set_disabled_apps) == "function" then
-				pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
+			if Keystats and type(Keystats.set_disabled_apps) == "function" then
+				pcall(Keystats.set_disabled_apps, state.keystats_disabled_apps or {})
 			end
-			local start_ok, started = pcall(Keylogger.start, script_control)
+			local start_ok, started = pcall(Keystats.start, script_control)
 			if not start_ok or started ~= true then
 				-- The preference was published before runtime activation. Compensate
 				-- transactionally so the checkmark cannot claim Metrics is active while
 				-- its security-context watcher (and therefore the engine) is absent.
-				state.keylogger_enabled = false
+				state.keystats_enabled = false
 				local rollback_saved = save_prefs() == true
-				state.keylogger_enabled = false
+				state.keystats_enabled = false
 				Logger.error(LOG, "Metrics activation was rejected; disabled rollback persisted=%s.",
 					tostring(rollback_saved))
 				if WpmMenubar then
@@ -597,10 +597,10 @@ function M.build(ctx)
 				return false
 			end
 			if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
-				pcall(WpmMenubar.set_use_source_colors, state.keylogger_menubar_colors)
+				pcall(WpmMenubar.set_use_source_colors, state.keystats_menubar_colors)
 			end
 			if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
-				pcall(WpmWidget.set_use_source_colors, state.keylogger_float_colors)
+				pcall(WpmWidget.set_use_source_colors, state.keystats_float_colors)
 			end
 			-- Gate on pause exactly like the 5 sibling per-feature toggles above
 			-- (dyn_wpm_menubar, dyn_menubar_colors, dyn_wpm_widget, dyn_widget_colors,
@@ -610,16 +610,16 @@ function M.build(ctx)
 			-- (« pause = tout éteint », F-L10) — this call site was the one place
 			-- that still started both unconditionally on re-enable (F-LOW-13).
 			local wpm_committed = true
-			if state.keylogger_menubar_wpm and not paused_now() then
+			if state.keystats_menubar_wpm and not paused_now() then
 				if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "start") then
-					compensate_rejected_wpm_start("keylogger_menubar_wpm", "WPM menubar")
+					compensate_rejected_wpm_start("keystats_menubar_wpm", "WPM menubar")
 					wpm_committed = false
 				end
 			end
-			if state.keylogger_float_wpm and not paused_now() then
+			if state.keystats_float_wpm and not paused_now() then
 				if not call_wpm_lifecycle("WPM widget", WpmWidget, "start",
-					state.keylogger_float_graph) then
-					compensate_rejected_wpm_start("keylogger_float_wpm", "WPM widget")
+					state.keystats_float_graph) then
+					compensate_rejected_wpm_start("keystats_float_wpm", "WPM widget")
 					wpm_committed = false
 				end
 			end
@@ -629,9 +629,9 @@ function M.build(ctx)
 			end
 		else
 			local runtime_settled = true
-			local stop_ok, stopped = pcall(Keylogger.stop)
+			local stop_ok, stopped = pcall(Keystats.stop)
 			if not stop_ok or stopped ~= true then
-				Logger.error(LOG, "Metrics is disabled, but native keylogger cleanup remains pending.")
+				Logger.error(LOG, "Metrics is disabled, but native keystats cleanup remains pending.")
 				runtime_settled = false
 			end
 			if not call_wpm_lifecycle("WPM menubar", WpmMenubar, "stop") then

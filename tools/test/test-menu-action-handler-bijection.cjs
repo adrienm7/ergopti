@@ -79,7 +79,7 @@ const MANIFEST = path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json
 // lists features.shortcuts.script_control, all four ahk. extensions_shortcuts
 // walks a Windows extensions directory. And seven metrics rows configure the WPM
 // widget, the two window shortcuts and the app-exclusion list — none of which
-// exists on Linux, where ui/wpm is absent and the keylogger exposes no
+// exists on Linux, where ui/wpm is absent and the keystats exposes no
 // disabled-apps setter. A row declared for a driver that cannot draw it is not a
 // gap in the driver; it is the manifest making a promise on the driver's behalf.
 // hs 5 → 4 on 2026-08-06: `hotstring_bulk_actions` was one row that expanded

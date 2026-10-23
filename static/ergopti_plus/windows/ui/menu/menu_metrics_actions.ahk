@@ -188,8 +188,8 @@ _MetricsSetEnabledAndReload(Target, WriterFn := 0, NotifyFn := 0,
 		NotifyFn, ReloadFn)
 }
 
-; Flip the global keylogger feature with a warning dialog before enabling.
-; Persisted via metrics_shortcuts.ini and applied on Reload (the keylogger
+; Flip the global keystats feature with a warning dialog before enabling.
+; Persisted via metrics_shortcuts.ini and applied on Reload (the keystats
 ; can only initialise its file IO at boot, not mid-session, mirroring the
 ; Hammerspoon behaviour where toggling the feature triggers HS reload).
 ToggleMetricsEnabled() {

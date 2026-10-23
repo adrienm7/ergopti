@@ -187,7 +187,7 @@ local function load_fixture()
 		OLLAMA_KEEP_ALIVE = "5m",
 		get_retry_policy = function() return 1, 0, 0 end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() return true end,
 	}

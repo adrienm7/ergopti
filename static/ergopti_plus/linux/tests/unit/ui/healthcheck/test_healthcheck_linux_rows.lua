@@ -81,27 +81,27 @@ helpers.describe("healthcheck (linux): optional modules that are off", function(
 	-- (developer-details).
 	helpers.it("reports an AI engine the user switched off as disabled, not failed (developer-details)", function()
 		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
-			engine = {}, keylogger = {}, config = {},
+			engine = {}, keystats = {}, config = {},
 			llm = { is_enabled = function() return false end },
 		}, false).sections.developer
 		helpers.assert_eq(developer.modules_failed, {})
 		helpers.assert_eq(developer.modules_disabled, { "llm" })
-		helpers.assert_eq(developer.modules_ok, { "engine", "keylogger", "config" })
+		helpers.assert_eq(developer.modules_ok, { "engine", "keystats", "config" })
 	end)
 
 	helpers.it("counts an AI engine that is switched on as loaded (developer-details)", function()
 		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
-			engine = {}, keylogger = {}, config = {},
+			engine = {}, keystats = {}, config = {},
 			llm = { is_enabled = function() return true end },
 		}, false).sections.developer
 		helpers.assert_eq(developer.modules_failed, {})
 		helpers.assert_eq(developer.modules_disabled, {})
-		helpers.assert_eq(developer.modules_ok, { "engine", "keylogger", "config", "llm" })
+		helpers.assert_eq(developer.modules_ok, { "engine", "keystats", "config", "llm" })
 	end)
 
 	helpers.it("fails an AI engine that did not load instead of calling it disabled (developer-details)", function()
 		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
-			engine = {}, keylogger = {}, config = {},
+			engine = {}, keystats = {}, config = {},
 		}, false).sections.developer
 		helpers.assert_eq(developer.modules_failed, { "llm (not loaded)" })
 		helpers.assert_eq(developer.modules_disabled, {})
@@ -109,7 +109,7 @@ helpers.describe("healthcheck (linux): optional modules that are off", function(
 
 	helpers.it("still fails a missing required module (developer-details)", function()
 		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
-			keylogger = {}, config = {}, llm = {},
+			keystats = {}, config = {}, llm = {},
 		}, false).sections.developer
 		helpers.assert_eq(developer.modules_failed, { "engine (not wired)" })
 		helpers.assert_eq(developer.modules_disabled, {})
@@ -192,7 +192,7 @@ helpers.describe("healthcheck (linux): the features the page lists", function()
 			shortcuts = { is_enabled = function() return true end },
 			gestures  = { is_enabled = function() return false end },
 			llm       = { is_enabled = function() return false end },
-			keylogger = { is_enabled = function() return true end },
+			keystats = { is_enabled = function() return true end },
 		})
 		helpers.assert_eq(features.hotstrings, true, "one enabled group is hotstrings on")
 		helpers.assert_eq(features.shortcuts, true)

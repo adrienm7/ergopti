@@ -250,9 +250,9 @@ helpers.describe("menu_state: gesture boot restore requires an exact lifecycle c
 	end
 end)
 
-helpers.describe("menu_state: keylogger start is deferred off the boot path", function()
-	helpers.it("does NOT start the keylogger synchronously during sync", function()
-		-- ROOT CAUSE ENCODED: keylogger.start (~1.3 s of SQLite + rotation work) ran
+helpers.describe("menu_state: keystats start is deferred off the boot path", function()
+	helpers.it("does NOT start the keystats synchronously during sync", function()
+		-- ROOT CAUSE ENCODED: keystats.start (~1.3 s of SQLite + rotation work) ran
 		-- inline during sync_state_to_modules and dominated boot. It must be deferred
 		-- through retained deferred work; a synchronous regression fails the count below.
 		local started = { count = 0 }
@@ -270,14 +270,14 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		end
 
 		MenuState.sync_state_to_modules(
-			{ hotstrings = {}, keylogger_enabled = true },
+			{ hotstrings = {}, keystats_enabled = true },
 			{}, false,
-			{ keymap = {}, hotstring_editor = {}, core_mods = { keylogger = fake_kl }, save_prefs = function() return true end }
+			{ keymap = {}, hotstring_editor = {}, core_mods = { keystats = fake_kl }, save_prefs = function() return true end }
 		)
 
 		helpers.assert_eq(started.count, 0)        -- not started inline
 		helpers.assert_true(#deferred >= 1,
-			"keylogger start must be scheduled through the retained owner")
+			"keystats start must be scheduled through the retained owner")
 
 		-- Firing the deferred callbacks must then actually start it.
 		for _, fn in ipairs(deferred) do pcall(fn) end
@@ -295,18 +295,18 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			keymap = {}, hotstring_editor = {}, save_prefs = function() return true end,
 			apply_metrics_shortcut = function() return true end,
 			apply_apps_time_shortcut = function() return true end,
-			core_mods = { keylogger = {
+			core_mods = { keystats = {
 				set_options = function() end,
 				set_disabled_apps = function() end,
 				start = function() started = started + 1; return true end,
 				stop = function() return true end,
 			} },
 		}
-		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = true }, {}, false, deps)
-		MenuState.sync_state_to_modules({ hotstrings = {}, keylogger_enabled = false }, {}, false, deps)
+		MenuState.sync_state_to_modules({ hotstrings = {}, keystats_enabled = true }, {}, false, deps)
+		MenuState.sync_state_to_modules({ hotstrings = {}, keystats_enabled = false }, {}, false, deps)
 		deferred[1]()
 		helpers.assert_eq(started, 0,
-			"a failed enable rolled back to disabled must fence its deferred keylogger start")
+			"a failed enable rolled back to disabled must fence its deferred keystats start")
 	end)
 
 	helpers.it("demotes Metrics in memory only when deferred start is rejected", function()
@@ -317,12 +317,12 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			deferred[#deferred + 1] = callback
 			return true
 		end
-		local state = { hotstrings = {}, keylogger_enabled = true }
+		local state = { hotstrings = {}, keystats_enabled = true }
 		MenuState.sync_state_to_modules(state, {}, false, {
 			keymap = {}, hotstring_editor = {},
 			save_prefs = function() save_calls = save_calls + 1; return true end,
 			on_runtime_demotion = function(record) demotions[#demotions + 1] = record end,
-			core_mods = { keylogger = {
+			core_mods = { keystats = {
 				set_options = function() end,
 				set_disabled_apps = function() end,
 				start = function() return false end,
@@ -330,12 +330,12 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		})
 
 		for _, fn in ipairs(deferred) do fn() end
-		helpers.assert_eq(false, state.keylogger_enabled,
+		helpers.assert_eq(false, state.keystats_enabled,
 			"a rejected deferred start must not leave the restored checkmark enabled")
 		helpers.assert_eq(0, save_calls,
 			"a missing permission must not rewrite the saved Metrics ON")
 		helpers.assert_eq(#demotions, 1, "the late demotion must reach its session owner")
-		helpers.assert_eq(demotions[1].key, "keylogger_enabled")
+		helpers.assert_eq(demotions[1].key, "keystats_enabled")
 		helpers.assert_eq(demotions[1].persisted, true)
 		helpers.assert_eq(demotions[1].demoted, false)
 	end)
@@ -349,7 +349,7 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 				deferred[#deferred + 1] = callback
 				return true
 			end
-			local state = { hotstrings = {}, keylogger_enabled = true }
+			local state = { hotstrings = {}, keystats_enabled = true }
 			MenuState.sync_state_to_modules(state, {}, false, {
 				keymap = {}, hotstring_editor = {},
 				save_prefs = function() save_calls = save_calls + 1; return true end,
@@ -357,7 +357,7 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 					recorder_calls = recorder_calls + 1
 					error("injected demotion owner failure")
 				end,
-				core_mods = { keylogger = {
+				core_mods = { keystats = {
 					set_options = function() end,
 					set_disabled_apps = function() end,
 					start = function()
@@ -375,7 +375,7 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			helpers.assert_eq(true, callback_ok,
 				"a " .. outcome .. " demotion must remain inside the guarded timer callback: "
 					.. tostring(callback_err))
-			helpers.assert_eq(false, state.keylogger_enabled)
+			helpers.assert_eq(false, state.keystats_enabled)
 			helpers.assert_eq(1, recorder_calls)
 			helpers.assert_eq(0, save_calls)
 		end

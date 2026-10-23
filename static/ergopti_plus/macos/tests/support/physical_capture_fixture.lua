@@ -9,16 +9,16 @@ local M = {}
 ---@param callback function Receives owner, observation log and control ports.
 function M.run(callback)
 	helpers.with_stub_scope({
-		"infra.logger", "modules.keylogger.physical_capture",
-		"modules.keylogger.physical_accounting_mode",
+		"infra.logger", "modules.keystats.physical_capture",
+		"modules.keystats.physical_accounting_mode",
 	}, function()
 		local observed = { tasks = {}, spawns = {}, warnings = {}, errors = {}, credits = {}, releases = {}, writes = {}, clocks = {} }
 		local logger = helpers.make_logger_stub()
 		function logger.warn(_, message, ...) observed.warnings[#observed.warnings + 1] = string.format(message, ...) end
 		function logger.error(_, message, ...) observed.errors[#observed.errors + 1] = string.format(message, ...) end
 		package.loaded["infra.logger"] = logger
-		local mode = require("modules.keylogger.physical_accounting_mode")
-		local capture = require("modules.keylogger.physical_capture")
+		local mode = require("modules.keystats.physical_accounting_mode")
+		local capture = require("modules.keystats.physical_capture")
 		local frames = Frames.new("production-fixture", "7", { "41" })
 		for _, frame in pairs(frames) do frame.coverage = "complete" end
 		frames.clock = { version = 1, domain = "mach_absolute_time", numer = 125, denom = 3 }

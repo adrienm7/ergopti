@@ -22,7 +22,7 @@
 ;   3. LLM_Engine_StopGeneration increments request_id so callbacks self-discard.
 ;
 ; SCOPE: source introspection of modules/keymap/llm_bridge.ahk and
-;        modules/llm/prediction_keylogger.ahk.
+;        modules/llm/prediction_keystats.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

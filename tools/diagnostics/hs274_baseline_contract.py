@@ -15,7 +15,7 @@ import argparse
 import re
 import sys
 
-CONSUMER = "static/ergopti_plus/macos/modules/keylogger/physical_baseline.lua"
+CONSUMER = "static/ergopti_plus/macos/modules/keystats/physical_baseline.lua"
 PRODUCER = "tools/diagnostics/hs274-stream-source.hpp"
 READER = "tools/diagnostics/hs274_baseline_frames.py"
 CLI = "tools/diagnostics/hs274-stream-baseline-client.hpp"

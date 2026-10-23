@@ -131,7 +131,7 @@ print('tool-finished',flush=True)
 	local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 	local stops = 0
 	local env = setmetatable({ ShutdownCoordinator = Coordinator,
-		package = { loaded = { ["modules.llm.agent_connectors"] = Connectors } }, keylogger = { stop = function() return true end }, privacy_owners = {},
+		package = { loaded = { ["modules.llm.agent_connectors"] = Connectors } }, keystats = { stop = function() return true end }, privacy_owners = {},
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false, webview_manager = false,
 		tooltip_preview = false, gestures = false, input_capture_gate = false, prediction_engine = false,
 		TimerScheduler = require("adapters.timer_scheduler"),

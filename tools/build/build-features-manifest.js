@@ -747,7 +747,7 @@ function main() {
 		renderConfigTemplate(manifest, sections, features, 'hs')
 	);
 	// Linux outputs. The driver went without a features manifest for a long
-	// time, which is why its keylogger had none of the privacy toggles the
+	// time, which is why its keystats had none of the privacy toggles the
 	// other two read from the shared source — it had nowhere to read them from.
 	writeOutput(
 		resolve(OUT_LINUX_DIR, 'features_manifest.lua'),

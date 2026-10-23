@@ -1,7 +1,7 @@
 --- tests/unit/adapters/processes/test_spawn_args_are_strings.lua
 
 --- ==============================================================================
---- MODULE: Spawn argument typing (keylogger-worker-timings-must-be-strings)
+--- MODULE: Spawn argument typing (keystats-worker-timings-must-be-strings)
 --- DESCRIPTION:
 --- quote() composes a SHELL STRING, where tostring() is a meaningful conversion,
 --- so it is deliberately forgiving. An argv array is a different boundary: libuv
@@ -165,7 +165,7 @@ helpers.describe("ShellRunner: argv typing", function()
 				.. "is vacuous")
 			helpers.assert_true(validate_at < spawn_at,
 				site.file .. " must validate BEFORE luv.spawn, so a refusal costs no "
-				.. "process (keylogger-worker-timings-must-be-strings)")
+				.. "process (keystats-worker-timings-must-be-strings)")
 		end
 		helpers.assert_eq(checked, 5, "every native spawn and its delegated runner must have been inspected")
 	end)

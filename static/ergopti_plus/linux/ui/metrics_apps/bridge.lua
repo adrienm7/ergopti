@@ -27,12 +27,12 @@ local Requests = Flush.new("metrics_apps", function(...) return M._push(...) end
 --- @param state table Daemon state.
 --- @return table
 local function _build_initial_payload(state, include_prefetch)
-	local keylogger = state.keylogger
-	if keylogger then
-		local status = Flush.status(keylogger)
+	local keystats = state.keystats
+	if keystats then
+		local status = Flush.status(keystats)
 		if not status or not status.read_safe or status.stopping
-			or type(keylogger.get_dashboard_payload) ~= "function" then return nil end
-		return keylogger.get_dashboard_payload({ include_prefetch = include_prefetch ~= false })
+			or type(keystats.get_dashboard_payload) ~= "function" then return nil end
+		return keystats.get_dashboard_payload({ include_prefetch = include_prefetch ~= false })
 	end
 	return {
 		metrics_manifest = {},
@@ -51,7 +51,7 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state  table Daemon state { engine, keystats, config, llm, layout }.
 --- @return any|nil  Response to send back to JS.
 local function handle(payload, state, request)
 	if type(payload) == "string" then
@@ -84,7 +84,7 @@ local function handle(payload, state, request)
 	end
 
 	-- These four are not sent by the shared page today. They are kept because
-	-- each calls a keylogger function that exists and does what its name says,
+	-- each calls a keystats function that exists and does what its name says,
 	-- and because the bridge is also the daemon's programmatic entry point —
 	-- unlike `app_detail`, which was removed: it called `get_app_detail`, a
 	-- function that has never existed on this driver, behind a
@@ -93,8 +93,8 @@ local function handle(payload, state, request)
 	-- permanently unreachable and wrong.
 	if action == "reset" then
 		local reset = false
-		if state.keylogger and type(state.keylogger.reset_session) == "function" then
-			local ok, accepted = pcall(state.keylogger.reset_session)
+		if state.keystats and type(state.keystats.reset_session) == "function" then
+			local ok, accepted = pcall(state.keystats.reset_session)
 			reset = ok and accepted == true
 			if reset and not request.accept_reset() then return nil end
 		end
@@ -105,23 +105,23 @@ local function handle(payload, state, request)
 	end
 
 	if action == "export" then
-		if state.keylogger and type(state.keylogger.export_json) == "function" then
-			local ok, json = pcall(state.keylogger.export_json)
+		if state.keystats and type(state.keystats.export_json) == "function" then
+			local ok, json = pcall(state.keystats.export_json)
 			return with_payload({ exported = ok, json = ok and json or nil })
 		end
 		return with_payload({ exported = false })
 	end
 
 	if action == "pause" then
-		if state.keylogger and type(state.keylogger.suppress) == "function" then
-			state.keylogger.suppress()
+		if state.keystats and type(state.keystats.suppress) == "function" then
+			state.keystats.suppress()
 		end
 		return with_payload({ suppressed = true })
 	end
 
 	if action == "resume" then
-		if state.keylogger and type(state.keylogger.unsuppress) == "function" then
-			state.keylogger.unsuppress()
+		if state.keystats and type(state.keystats.unsuppress) == "function" then
+			state.keystats.unsuppress()
 		end
 		return with_payload({ suppressed = false })
 	end
@@ -134,11 +134,11 @@ local function handle(payload, state, request)
 	if action == "edit" then
 		local app_name = tostring(payload.app or "")
 		local category = tostring(payload.cat or "")
-		if state.keylogger and type(state.keylogger.set_app_category) == "function" then
-			local ok = state.keylogger.set_app_category(app_name, category, tonumber(payload.score) or 0)
+		if state.keystats and type(state.keystats.set_app_category) == "function" then
+			local ok = state.keystats.set_app_category(app_name, category, tonumber(payload.score) or 0)
 			return with_payload({ saved = ok == true })
 		end
-		Logger.error(LOG, "Category edit for '%s' arrived but the keylogger cannot store it.", app_name)
+		Logger.error(LOG, "Category edit for '%s' arrived but the keystats cannot store it.", app_name)
 		return with_payload({ saved = false })
 	end
 

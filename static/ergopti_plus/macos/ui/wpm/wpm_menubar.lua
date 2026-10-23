@@ -8,14 +8,14 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Unobtrusive: Only appears when the user is actively typing.
---- 2. Decoupled: Polls the core keylogger engine autonomously.
+--- 2. Decoupled: Polls the core keystats engine autonomously.
 --- 3. Dynamic Styling: Matches widget coloring dynamically with a background.
 --- ==============================================================================
 
 local M = {}
 
 local hs        = hs
-local keylogger = require("modules.keylogger")
+local keystats = require("modules.keystats")
 local WPMShared = require("ui.wpm.shared")
 local Logger    = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -75,7 +75,7 @@ end
 
 --- Actual menubar-update body, wrapped by update_menubar() above.
 update_menubar_body = function(generation)
-	local stats = keylogger.get_live_stats()
+	local stats = keystats.get_live_stats()
 	if not is_current(generation) then return false end
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000

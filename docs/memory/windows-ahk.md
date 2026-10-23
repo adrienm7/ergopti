@@ -490,7 +490,7 @@ mouse-downs and wheels, never releases; its InputHook callback runs before the
 hotkey thread, so the initiating key-down is already counted), and send any
 synthetic chord such a capture needs through `_TextSenderAtSendLevel`: the Win
 broker hotkeys run at #InputLevel 2, and a Ctrl+C sent at that level reaches the
-driver's "I1" InputHooks as if typed (the keylogger recorded it as "Win+C") and
+driver's "I1" InputHooks as if typed (the keystats recorded it as "Win+C") and
 advances the very generation the capture is judged by.
 
 ### project-ahk-sendinput-falls-back-to-sendevent
@@ -547,7 +547,7 @@ keys on the VK axis, so a user chord on Tab is exposed to the same shadow.
 Any SC hotkey counts, whatever its modifiers or criterion (`^SC02F`, a combo
 suffix `SC138 & SC017`), and the AltGr layer declares every character key, so
 a hook hotkey named by a character (`~^v`, `$^x`, one under #HotIf or a
-nonzero #InputLevel) is dead on every layout: the keylogger's paste hotkey
+nonzero #InputLevel) is dead on every layout: the keystats's paste hotkey
 never fired. A plain global `^!+i::` at #InputLevel 0 is a RegisterHotKey
 hotkey, matched by the OS on its VK once the hook passes the key, and works.
 Action: observe a chord through the HookDispatcher InputHook, which runs after
@@ -982,7 +982,7 @@ flushes even during cold replay: cold/warm equality alone can compare two equall
 truncated distributions, so pin conservation across batch boundaries as well.
 
 When the cold build is unavoidable on a store above 32 MB, a worker rebuilds
-newest day first (`keylogger_reader_rebuild.ahk`): it reads ledgers backward
+newest day first (`keystats_reader_rebuild.ahk`): it reads ledgers backward
 from `-- === ingest batch` boundaries, keeps first-copy-wins for reused keys
 with temporary BEFORE INSERT triggers, and rolls up a day once every batch
 ingested on or after it has run. Rounds use the warm-refresh date-scoped
@@ -1020,7 +1020,7 @@ obsolete-image rejection, and failed publication recovery.
 `KL_AllocEventId` and `KL_AssignStableEventId` preserve reserved screen order for
 typing, accepted output and shortcuts. Wall-clock correction may move timestamps
 backward; changing logical replay or latest category selection to timestamp
-order breaks that contract. `test_keylogger_llm_accepted_metrics.ahk` covers
+order breaks that contract. `test_keystats_llm_accepted_metrics.ahk` covers
 cross-boundary input order; `test_klr_category_order.ahk` covers category retention
 through cold replay and resident SQL refresh. This does not make IDs a journal
 offset: delayed or imported tail rows can have IDs below the stored maximum.

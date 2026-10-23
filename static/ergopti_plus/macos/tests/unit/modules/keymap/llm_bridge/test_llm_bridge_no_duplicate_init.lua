@@ -34,7 +34,7 @@ local STUB_MODULES = {
 	"infra.text_utils",
 	"modules.llm",
 	"infra.keycodes",
-	"modules.keylogger",
+	"modules.keystats",
 	"ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
@@ -94,8 +94,8 @@ package.loaded["infra.keycodes"] = {
 	to_name            = function(_) return "f16" end,
 }
 
--- modules.keylogger: no-op stub.
-package.loaded["modules.keylogger"] = {
+-- modules.keystats: no-op stub.
+package.loaded["modules.keystats"] = {
 	log_hotstring_suggested = function() end,
 	log_hotstring_dismissed = function() end,
 	log_llm_accepted        = function() end,

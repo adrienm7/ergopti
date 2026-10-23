@@ -297,9 +297,9 @@ _HealthCheck_Input() {
 
 ; The feature switches this driver can answer, as { id, enabled } items.
 ; @param LlmSnapshotFn {Func|Integer} LLM owner snapshot (tests replace it).
-; @param KeyloggerSnapshotFn {Func|Integer} Keylogger owner snapshot.
+; @param KeystatsSnapshotFn {Func|Integer} Keystats owner snapshot.
 ; @returns {Map} { items: Array }
-_HealthCheck_Features(LlmSnapshotFn := 0, KeyloggerSnapshotFn := 0) {
+_HealthCheck_Features(LlmSnapshotFn := 0, KeystatsSnapshotFn := 0) {
 	global Features
 	Items := []
 	for Id, Category in Map("hotstrings", "Hotstrings", "shortcuts", "Shortcuts", "tapholds", "TapHolds",
@@ -310,10 +310,10 @@ _HealthCheck_Features(LlmSnapshotFn := 0, KeyloggerSnapshotFn := 0) {
 	Llm := _HealthCheck_LlmOwner(LlmSnapshotFn)
 	if (Llm is Map)
 		Items.Push(Map("id", "llm", "enabled", Llm["enabled"] ? true : false))
-	if !HasMethod(KeyloggerSnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
-		KeyloggerSnapshotFn := KL_HealthSnapshot
-	if HasMethod(KeyloggerSnapshotFn, "Call") {
-		Owner := KeyloggerSnapshotFn.Call()
+	if !HasMethod(KeystatsSnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
+		KeystatsSnapshotFn := KL_HealthSnapshot
+	if HasMethod(KeystatsSnapshotFn, "Call") {
+		Owner := KeystatsSnapshotFn.Call()
 		if (Owner is Map && Owner.Has("enabled"))
 			Items.Push(Map("id", "metrics", "enabled", Owner["enabled"] ? true : false))
 	}

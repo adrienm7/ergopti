@@ -19,7 +19,7 @@
 ; the active layout, but the AltGr layer declares every one of them by scan code
 ; ("SC138 & SCnnn", whatever the emulation state), so a hotkey the hook owns
 ; that names a character ("~^v", "$^x", "^y" under #HotIf or #InputLevel 2)
-; never fires either: the keylogger's "~^v" paste hotkey never did. A plain,
+; never fires either: the keystats's "~^v" paste hotkey never did. A plain,
 ; global "^!+i::" at #InputLevel 0 is a RegisterHotKey hotkey instead, matched
 ; by the OS on its virtual key once the hook lets the key through, so it stays
 ; legal. #InputLevel, #HotIf and #UseHook carry across #Include, so each static

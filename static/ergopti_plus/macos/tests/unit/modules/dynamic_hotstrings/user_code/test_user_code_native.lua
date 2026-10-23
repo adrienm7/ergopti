@@ -11,7 +11,7 @@ local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 local OWNED = {
 	"modules.keymap", "modules.keymap.state", "modules.keymap.expander", "modules.keymap.llm_bridge",
-	"modules.keylogger", "modules.llm", "modules.llm.prediction_engine", "ui.tooltip",
+	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "ui.tooltip",
 	"modules.dynamic_hotstrings.user_code", "modules.dynamic_hotstrings.rules_engine",
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
 	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "adapters.shell_runner",
@@ -57,7 +57,7 @@ local function with_native(body)
 			fixture.state = CoreState.new(...)
 			return fixture.state
 		end }
-		package.loaded["modules.keylogger"] = setmetatable({}, { __index = function() return function() end end })
+		package.loaded["modules.keystats"] = setmetatable({}, { __index = function() return function() end end })
 		package.loaded["modules.llm"] = { DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 			check_modifiers = function() return false end }
 		package.loaded["modules.llm.prediction_engine"] = setmetatable({

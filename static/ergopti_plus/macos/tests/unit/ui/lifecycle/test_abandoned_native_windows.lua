@@ -22,7 +22,7 @@ local function with_window(module_name, scenario)
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
-		"modules.keylogger.log_manager", "tests.support.native_webview_close_fixture",
+		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, timers = {} }
 		local construct = require("tests.support.native_webview_close_fixture")(h)
@@ -35,7 +35,7 @@ local function with_window(module_name, scenario)
 			end
 			return view
 		end
-		package.loaded["modules.keylogger.log_manager"] = { on_ingest_done = function() return true end }
+		package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 		local window = helpers.load_with_stubs(module_name, {
 			webview = { new = new_window, windowMasks = { titled = 1, closable = 2, resizable = 8 },
 				usercontent = { new = function()

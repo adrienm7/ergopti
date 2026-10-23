@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fixture = require("tests.support.modules.keylogger.ngram_completion_fixture")
+local Fixture = require("tests.support.modules.keystats.ngram_completion_fixture")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 local ReadLogs = require("tests.support.ui.metrics.typing.read_completion_logs")
 
@@ -25,9 +25,9 @@ local function with_sql_delivery(callback)
 				if path == "/fixture/db.sqlite" then return { mode = "file" } end
 			end
 			package.loaded["hs.sqlite3"] = state.sqlite
-			package.loaded["modules.keylogger.sqlite_reader"] = nil
-			local reader = require("modules.keylogger.sqlite_reader")
-			package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
+			package.loaded["modules.keystats.sqlite_reader"] = nil
+			local reader = require("modules.keystats.sqlite_reader")
+			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
 			dashboard._app_icon_cache.Editor = false
 			local Snapshot = package.loaded["ui.metrics_typing.snapshot"]
 			local original_save = Snapshot.save

@@ -115,7 +115,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			gestures = true,
 			shortcuts = true,
 			llm_enabled = false,
-			keylogger_enabled = false,
+			keystats_enabled = false,
 			script_control_enabled = true,
 			personal_info = false,
 			update_channel = "dev",
@@ -238,7 +238,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			end,
 		}
 		package.loaded["modules.llm"] = { set_backend = function() return true end }
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.shortcuts"] = shortcuts
 		package.loaded["modules.dynamic_hotstrings"] = {}
 		package.loaded["modules.gestures"] = { SINGLE_SLOTS = {}, DEFAULT_GESTURES = {} }

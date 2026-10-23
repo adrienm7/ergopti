@@ -46,7 +46,7 @@ local _started_at = os.time()
 -- RuntimeGuard.optional_require, but the user can switch them off: switched
 -- off is a neutral "disabled"; absent means the module failed to load (logged
 -- by the guard), which is a failure.
-local REQUIRED_PARTS = { "engine", "keylogger", "config" }
+local REQUIRED_PARTS = { "engine", "keystats", "config" }
 local OPTIONAL_PARTS = { "llm" }
 
 -- The evdev bus numbers of /proc/bus/input/devices, as schema buses
@@ -310,7 +310,7 @@ local function collect_features(state)
 	local ok_manager, Manager = pcall(require, "platform.remap.manager")
 	if ok_manager then add("tapholds", Manager.tap_holds_enabled()) end
 	add("llm", module_enabled(state.llm))
-	add("metrics", module_enabled(state.keylogger))
+	add("metrics", module_enabled(state.keystats))
 	return { items = items }
 end
 
@@ -758,7 +758,7 @@ end
 
 --- Handles an incoming page message.
 --- @param payload any String or table from host_bridge.js.
---- @param state table Daemon state { engine, keylogger, config, llm, gestures, shortcuts, layout, … }.
+--- @param state table Daemon state { engine, keystats, config, llm, gestures, shortcuts, layout, … }.
 --- @param context table|nil { app_name, epoch, close_owned_window } from the webview manager.
 --- @return table|nil The answer the page receives.
 function M.on_message(payload, state, context)

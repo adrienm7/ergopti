@@ -283,7 +283,9 @@ function inventory(driver) {
 			`${driver}: retired production source must remain absent: ${rel}`
 		);
 	}
-	const required = LEGACY.drivers[driver].sourceFiles.filter((rel) => !retired.includes(rel));
+	const required = LEGACY.drivers[driver].sourceFiles
+		.filter((rel) => !retired.includes(rel))
+		.map((rel) => rel.replace(CURRENT_SOURCE_RENAME.from, CURRENT_SOURCE_RENAME.to));
 	assert.ok(
 		traversed.size >= required.length,
 		`${driver}: source coverage ${traversed.size}/${required.length} is incomplete`
@@ -356,6 +358,9 @@ const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
 const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 	macos: Object.freeze(['macos/ui/menu/menu_llm/live_mode_panel.lua'])
 });
+
+// The frozen oracle keeps the pre-rename spelling; the current tree uses the new one.
+const CURRENT_SOURCE_RENAME = Object.freeze({ from: /keylogger/g, to: 'keystats' });
 
 const SOURCE_COUNTS = {};
 const errors = [];

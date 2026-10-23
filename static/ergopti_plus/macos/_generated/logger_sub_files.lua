@@ -28,7 +28,7 @@ return {
 	-- Keymap processing, dynamic hotstrings, personal info, TOML reader.
 	{ name = "ErgoptiPlus_hotstrings.log", patterns = { "[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring" } },
 	-- Keystroke logging, SQLite writes, rotation, export.
-	{ name = "ErgoptiPlus_keylogger.log", patterns = { "[keylogger" } },
+	{ name = "ErgoptiPlus_keystats.log", patterns = { "[keystats" } },
 	-- Karabiner-Elements config generation and reload.
 	{ name = "ErgoptiPlus_karabiner.log", patterns = { "[karabiner" } },
 	-- Menu builder, UI components, app picker, download window.

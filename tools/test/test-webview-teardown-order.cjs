@@ -139,7 +139,7 @@ for (const abs of walk(WINDOWS_DIR)) {
 	hostsSeen++;
 
 	// A host with no subscription handles has no ordering to get wrong — the
-	// keylogger's abort path closes a controller it was handed and subscribes to
+	// keystats's abort path closes a controller it was handed and subscribes to
 	// nothing.
 	const declaresSubs = lines.some((l) => !l.trim().startsWith(';') && /\w*Sub\s*:=/.test(l));
 	if (!declaresSubs) {

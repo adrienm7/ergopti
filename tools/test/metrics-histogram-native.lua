@@ -15,7 +15,7 @@ logger.error = logger.warn
 package.loaded['logger.shim'] = logger
 package.loaded['infra.logger'] = logger
 package.loaded['hs.json'] = json
-local command = require('modules.keylogger.sqlite_command')
+local command = require('modules.keystats.sqlite_command')
 
 local original_popen = io.popen
 io.popen = function(...)
@@ -65,7 +65,7 @@ end
 local codes = { 'c', 'bg', 'tg', 'qg', 'pg', 'hx', 'hp', 'w', 'w_bg' }
 local today = os.date('%Y-%m-%d')
 for _, driver in ipairs({ 'linux', 'macos' }) do
-	local reader = assert(loadfile(readers_root .. '/static/ergopti_plus/' .. driver .. '/modules/keylogger/sqlite_reader.lua'))()
+	local reader = assert(loadfile(readers_root .. '/static/ergopti_plus/' .. driver .. '/modules/keystats/sqlite_reader.lua'))()
 	local manifest = reader.read_manifest(database, '2020-01-01', today)
 	for _, day in ipairs({ '2020-01-01', today }) do
 		for _, app in ipairs({ 'app-a', 'app-b' }) do

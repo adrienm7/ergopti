@@ -4,7 +4,7 @@
 --- MODULE: Apps Time Dashboard UI
 --- DESCRIPTION:
 --- Hosts the WebView for the per-app time dashboard. Reads from the new
---- `db.sqlite` cache via `modules.keylogger.sqlite_reader` and projects the
+--- `db.sqlite` cache via `modules.keystats.sqlite_reader` and projects the
 --- result into the JSON shape consumed by the (unchanged) frontend JS.
 ---
 --- FEATURES & RATIONALE:
@@ -387,7 +387,7 @@ end
 local function ensure_ingest_listener()
 	if M._ingest_listener_registered then return true end
 	local ok, registered_or_err = xpcall(function()
-		_log_manager = _log_manager or require("modules.keylogger.log_manager")
+		_log_manager = _log_manager or require("modules.keystats.log_manager")
 		if type(_log_manager) ~= "table" or type(_log_manager.on_ingest_done) ~= "function" then
 			error("LogManager.on_ingest_done is unavailable")
 		end
@@ -809,7 +809,7 @@ end
 --- @param manifest table SQLite projection keyed by date then application.
 --- @return table Projection safe to send to the dashboard.
 local function with_live_active_app_duration(manifest)
-	local ok_tracker, tracker = pcall(require, "modules.keylogger.context_tracker")
+	local ok_tracker, tracker = pcall(require, "modules.keystats.context_tracker")
 	if not ok_tracker or type(tracker.get_active_app_snapshot) ~= "function" then return manifest end
 	local ok_snapshot, snapshot = pcall(tracker.get_active_app_snapshot)
 	if not ok_snapshot or type(snapshot) ~= "table"
@@ -926,8 +926,8 @@ local function load_and_inject(generation, webview)
 	local manifest_revision = next_publication_revision(_focus_owner, "manifest_revision")
 	local categories_revision = next_publication_revision(_focus_owner, "categories_revision")
 
-	local log_manager   = require("modules.keylogger.log_manager")
-	local sqlite_reader = require("modules.keylogger.sqlite_reader")
+	local log_manager   = require("modules.keystats.log_manager")
+	local sqlite_reader = require("modules.keystats.sqlite_reader")
 	local sqlite_path   = log_manager.get_sqlite_path()
 	if not sqlite_path or not fs.attributes(sqlite_path) then
 		Logger.warn(LOG, "db.sqlite not available — dashboard will display empty.")

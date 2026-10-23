@@ -14,7 +14,7 @@
 ---    runtime by itself (a session restore after a restart or an update
 ---    relaunch reopens every app that was running, the nested one included),
 ---    without the launcher's environment. On 2026-10-21 and 2026-10-22 such an
----    instance started beside the launcher's own, armed its keylogger timers,
+---    instance started beside the launcher's own, armed its keystats timers,
 ---    then sat behind a blocking fatal dialog while those timers kept writing
 ---    to the shared daily log. It now exits before arming anything, with no
 ---    dialog: the launcher's instance is the one the user sees.

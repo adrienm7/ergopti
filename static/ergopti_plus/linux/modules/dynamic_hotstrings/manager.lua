@@ -442,7 +442,7 @@ local function _fire_combo(prefix, trigger)
 	return true, {
 		trigger = "@" .. tag .. trigger,
 		-- The LOGICAL text: values only, no tab. A Tab moves focus and inserts
-		-- nothing on screen, so this is what the buffer and the keylogger's record
+		-- nothing on screen, so this is what the buffer and the keystats's record
 		-- must hold — the same split macOS documents at its own injection seam.
 		replacement = table.concat(values),
 		h_type = "dynamic",

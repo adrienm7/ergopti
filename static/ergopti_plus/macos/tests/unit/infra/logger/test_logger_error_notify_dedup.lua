@@ -86,13 +86,13 @@ helpers.describe("logger: error notifications respect dedup (no toast storm)", f
 			calls[#calls + 1] = { module_name, message, template }
 			return true
 		end)
-		Logger.error("keylogger", "Flush failed: %s (%d)", "disk full", 3)
-		Logger.error("keylogger", "Plain failure")
+		Logger.error("keystats", "Flush failed: %s (%d)", "disk full", 3)
+		Logger.error("keystats", "Plain failure")
 		Logger.set_error_notification_handler(nil)
 
 		helpers.assert_eq(calls, {
-			{ "keylogger", "Flush failed: disk full (3)", "Flush failed: %s (%d)" },
-			{ "keylogger", "Plain failure", "Plain failure" },
+			{ "keystats", "Flush failed: disk full (3)", "Flush failed: %s (%d)" },
+			{ "keystats", "Plain failure", "Plain failure" },
 		})
 	end)
 end)

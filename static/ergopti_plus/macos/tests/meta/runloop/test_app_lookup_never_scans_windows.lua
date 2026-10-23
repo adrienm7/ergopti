@@ -10,7 +10,7 @@
 --- thread, macOS allowing each application six seconds to answer.
 ---
 --- ROOT CAUSE ENCODED (app-lookup-no-window-scan):
---- The keylogger's ingest flush resolved each batched application's category
+--- The keystats's ingest flush resolved each batched application's category
 --- with hs.application.get(name). One of them had quit; Hammerspoon printed its
 --- Spotlight hint (emitted inside find() just before the window fallback) and
 --- froze for 13.4 s. The event taps were disabled, the logger stalled and the

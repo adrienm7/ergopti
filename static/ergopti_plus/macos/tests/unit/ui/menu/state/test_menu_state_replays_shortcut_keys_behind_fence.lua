@@ -45,7 +45,7 @@ local MENU_STATE_MODULES = {
 	"ui.menu.keymap_lifecycle",
 	"adapters.storage",
 	"infra.deferred_work",
-	"modules.keylogger.text_cipher",
+	"modules.keystats.text_cipher",
 }
 
 --- Runs the real sync_state_to_modules against the real Bindings registry.

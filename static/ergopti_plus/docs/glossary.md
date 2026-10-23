@@ -13,7 +13,7 @@ within each group. Cross-references appear as **→ Term**.
 3. [Tap-Hold & Layers](#3-tap-hold--layers)
 4. [LLM Prediction](#4-llm-prediction)
 5. [Gestures](#5-gestures)
-6. [Keylogger & Metrics](#6-keylogger--metrics)
+6. [Keystats & Metrics](#6-keystats--metrics)
 7. [Architecture & Infrastructure](#7-architecture--infrastructure)
 
 ---
@@ -373,10 +373,10 @@ file `project_gestures_startup_design.md`.
 
 ---
 
-## 6. Keylogger & Metrics
+## 6. Keystats & Metrics
 
 **Aggregator**
-The keylogger sub-module (`modules/keylogger/aggregator.lua`) that walks
+The keystats sub-module (`modules/keystats/aggregator.lua`) that walks
 accumulated keystroke events and flushes computed N-gram statistics, burst
 metrics, and session summaries to the SQLite cache in batches.
 
@@ -385,7 +385,7 @@ The append-only plain-text SQL file that is the canonical on-disk source of
 truth for keystroke metrics. Located at
 `<config_dir>/metrics/by_device/<device_id>/data.sql`. Written as batches of
 `INSERT OR IGNORE` statements, it is Git-friendly and human-readable without
-any helper tool. See `KEYLOGGER_SPEC.md` §1.6.
+any helper tool. See `KEYSTATS_SPEC.md` §1.6.
 
 **device.json**
 A small JSON file (`~200 bytes`) that records the UUID, human-readable name,
@@ -394,7 +394,7 @@ The device UUID is generated once at first boot and never changes.
 
 **N-gram**
 A sequence of N consecutive characters (or words) recorded from the user's
-typing stream. The keylogger stores character unigrams through heptagrams and
+typing stream. The keystats stores character unigrams through heptagrams and
 word unigrams/bigrams in separate SQLite tables (`ngram_chars`,
 `ngram_bigrams`, etc.) for typing-pattern analysis.
 
@@ -405,7 +405,7 @@ fast UI queries. It is a transparent cache — if deleted or corrupted, it is
 fully reconstructed from the `data.sql` files. Never synced to Git.
 
 **Synthetic Typing**
-The keylogger differentiates between human keystrokes and keys injected by the
+The keystats differentiates between human keystrokes and keys injected by the
 **→ Expander** (hotstring expansions). Synthetic events are tagged via
 `M.notify_synthetic()` and excluded from N-gram stats so profiling reflects
 actual human typing patterns.
@@ -414,7 +414,7 @@ actual human typing patterns.
 A JSONL (JSON Lines) append-only file that absorbs keystroke events on the hot
 path without touching SQLite. One line per event. Ingested in batches by the
 **→ Aggregator**. Deleted at day rollover after all data is flushed. Never
-synced (listed in the auto-generated `.gitignore`). See `KEYLOGGER_SPEC.md`
+synced (listed in the auto-generated `.gitignore`). See `KEYSTATS_SPEC.md`
 §1.5.
 
 ---

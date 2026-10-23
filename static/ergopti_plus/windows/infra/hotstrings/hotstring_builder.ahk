@@ -222,13 +222,13 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				try PrefixWatcherSuppress(true)
 		}
 
-		; Tag the backspace+replacement burst as synthetic so the keylogger keeps
+		; Tag the backspace+replacement burst as synthetic so the keystats keeps
 		; it out of the manual `chars` count and attributes the resulting n-grams
 		; to the hotstring source (esrc). Released on the same deferred timer as
 		; the prefix-watcher suppression so it covers the OS message-loop flush.
 		;
 		; IsPrivate travels with it: the sends below are observed by the
-		; keylogger's InputHook character by character, so without the flag the
+		; keystats's InputHook character by character, so without the flag the
 		; typing row keeps the replacement this path redacts from the fire row.
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("hotstring", IsPrivate)

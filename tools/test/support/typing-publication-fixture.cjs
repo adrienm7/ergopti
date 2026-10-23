@@ -39,7 +39,7 @@ end
 package.loaded['hs.json'].decode=json.decode
 package.loaded['hs.fs'].attributes=function()return {}end
 package.loaded['adapters.file_system'].read_with_status=function()return nil,'absent'end
-local manager=package.loaded['modules.keylogger.log_manager']
+local manager=package.loaded['modules.keystats.log_manager']
 manager.get_sqlite_path=function()return '/virtual/db'end
 -- The paced projection is private; the publications around it are under test
 package.loaded['ui.metrics_typing.projection'].session=function()
@@ -116,7 +116,7 @@ package.loaded['adapters.file_system'].read_with_status=function()
  return 'ERGOPTI_TYPING_METRICS_SNAPSHOT 2 1790000000 '..#payload..'\\n'..payload,'ok'
 end
 package.loaded['hs.fs'].attributes=function()return {}end
-local manager=package.loaded['modules.keylogger.log_manager'];manager.get_sqlite_path=function()return '/virtual/db'end
+local manager=package.loaded['modules.keystats.log_manager'];manager.get_sqlite_path=function()return '/virtual/db'end
 package.loaded['ui.metrics_typing.projection'].session=function()
  return {
   manifest=function()local manifest={['2026-09-01']={Fresh={chars=2}}};return manifest,json.encode(manifest),true end,

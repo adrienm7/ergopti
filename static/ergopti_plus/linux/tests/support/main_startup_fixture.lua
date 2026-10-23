@@ -145,7 +145,7 @@ function M.run(options)
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
 	env.TapHold = { is_active = function() return true end }
 	env.MagicKey = { get = function() return "★" end, init = noop }
-	env.keylogger = { hold_accounting_token = noop, pump_flush = noop, get_categories = function() return {} end,
+	env.keystats = { hold_accounting_token = noop, pump_flush = noop, get_categories = function() return {} end,
 		get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end }
 	env.capture_owned_scancodes = {}
 	env.script_actions = { is_paused = function() return false end }

@@ -84,7 +84,7 @@ local function with_model_readout_owner(scenario)
 		helpers.assert_not_nil(receipt)
 		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
 		local manager = require("ui.menu.menu_llm.models_manager").new({ trigger_reload = function() end })
-		fresh_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		fresh_bridge = package.loaded["modules.keystats.kc_bridge"]
 		local calls = {}
 		local ctx = {
 			state = { llm_backend = "ollama", llm_model = "", llm_user_models = {} },
@@ -102,8 +102,8 @@ local function with_model_readout_owner(scenario)
 	if acquired then released = native.scope_release(owner) == true end
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleanup_ok, cleanup_error = pcall(function()
-		fresh_bridge = fresh_bridge or package.loaded["modules.keylogger.kc_bridge"]
-		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keylogger.kc_bridge"]) then fresh_bridge.stop() end
+		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
+		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
 		local scheduler = package.loaded["adapters.timer_scheduler"]
 		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true)
@@ -177,7 +177,7 @@ local function with_complete_model_locale(locale, scenario)
 		helpers.assert_not_nil(receipt)
 		helpers.assert_eq(native.scope_apply(owner, receipt, locale), true)
 		local manager = require("ui.menu.menu_llm.models_manager").new({ trigger_reload = function() end })
-		fresh_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		fresh_bridge = package.loaded["modules.keystats.kc_bridge"]
 		local calls = {}
 		local ctx = {
 			state = { llm_backend = "ollama", llm_model = "", llm_user_models = {} },
@@ -195,8 +195,8 @@ local function with_complete_model_locale(locale, scenario)
 	if acquired then released = native.scope_release(owner) == true end
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleanup_ok, cleanup_error = pcall(function()
-		fresh_bridge = fresh_bridge or package.loaded["modules.keylogger.kc_bridge"]
-		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keylogger.kc_bridge"]) then fresh_bridge.stop() end
+		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
+		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
 		local scheduler = package.loaded["adapters.timer_scheduler"]
 		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true)

@@ -85,7 +85,7 @@ jobs:
     #   config-updater: configuration storage, TOML and the updater
     #   hotstrings-shortcuts: hotstrings, dynamic hotstrings and shortcuts
     #   keymap-gestures: keyboard remapping, layouts and gestures
-    #   keylogger: keylogger capture, storage and metrics
+    #   keystats: keystats capture, storage and metrics
     #   ui: menus, windows, onboarding, tooltips and healthcheck
     #   core: adapters, platform services, shared infrastructure and the runner
     strategy:
@@ -104,7 +104,7 @@ jobs:
             config-updater,
             hotstrings-shortcuts,
             keymap-gestures,
-            keylogger,
+            keystats,
             ui,
             core
           ]

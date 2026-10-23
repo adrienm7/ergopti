@@ -10,12 +10,12 @@ const path = require('path');
 
 const root = path.join(__dirname, '../..');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
-const reader = read('static/ergopti_plus/linux/modules/keylogger/sqlite_reader.lua');
+const reader = read('static/ergopti_plus/linux/modules/keystats/sqlite_reader.lua');
 const bridge = read('static/ergopti_plus/linux/ui/metrics_typing/bridge.lua');
 const data = read('static/ergopti_plus/_shared/ui/metrics_typing/data.js');
 const html = read('static/ergopti_plus/_shared/ui/metrics_typing/index.html');
 
-// The sqlite3 invocation is composed by modules/keylogger/sqlite_command.lua
+// The sqlite3 invocation is composed by modules/keystats/sqlite_command.lua
 // now, so the SQL script travels on stdin instead of through a file staged in
 // the world-writable /tmp. The assertion follows the mechanism rather than the
 // literal command: the reader must still ask sqlite3 for JSON, and must still

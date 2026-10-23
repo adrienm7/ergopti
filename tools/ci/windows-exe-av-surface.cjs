@@ -16,7 +16,7 @@
  *    Ahk2Exe embedded (comments stripped), not the source tree.
  * 2. Forbidden patterns fail on a single occurrence; ceilings fail when
  *    exceeded and ask for a lower ceiling when the count drops.
- * 3. Reported counts (the keylogger wording) are printed without gating,
+ * 3. Reported counts (the keylog wording) are printed without gating,
  *    so the rename can be measured on every build.
  * ==============================================================================
  */

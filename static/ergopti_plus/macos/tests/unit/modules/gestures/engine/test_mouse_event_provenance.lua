@@ -127,7 +127,7 @@ local function assert_owned(fixture, event, phase, owner)
 	local first_metadata, first_status = fixture.provenance.classify_with_fence(
 		event, "keymap.mouse")
 	local second_metadata, second_status = fixture.provenance.classify_with_fence(
-		event, "keylogger")
+		event, "keystats")
 	helpers.assert_eq(first_status, fixture.provenance.STATUS_OWNED)
 	helpers.assert_eq(second_status, fixture.provenance.STATUS_OWNED)
 	helpers.assert_eq(first_metadata.owner, owner or "gestures")
@@ -162,16 +162,16 @@ helpers.describe("gestures.actions: mouse events have exact provenance", functio
 		for index, event in ipairs(fixture.posted) do
 			local keymap_metadata, keymap_status = fixture.provenance.classify_with_fence(
 				event, "keymap.mouse")
-			local keylogger_metadata, keylogger_status = fixture.provenance.classify_with_fence(
-				event, "keylogger")
+			local keystats_metadata, keystats_status = fixture.provenance.classify_with_fence(
+				event, "keystats")
 			helpers.assert_eq(keymap_status, fixture.provenance.STATUS_OWNED,
 				"gesture mouse event must not enter keymap's physical-click path")
-			helpers.assert_eq(keylogger_status, fixture.provenance.STATUS_OWNED,
+			helpers.assert_eq(keystats_status, fixture.provenance.STATUS_OWNED,
 				"gesture mouse event must not increment physical click metrics")
 			helpers.assert_eq(keymap_metadata.owner, "gestures")
 			helpers.assert_eq(keymap_metadata.effect, "action")
 			helpers.assert_eq(keymap_metadata.phase, index == 1 and "down" or "up")
-			helpers.assert_eq(keylogger_metadata.tag, keymap_metadata.tag)
+			helpers.assert_eq(keystats_metadata.tag, keymap_metadata.tag)
 			tags[index] = keymap_metadata.tag
 		end
 		helpers.assert_true(tags[1] ~= tags[2],

@@ -24,7 +24,7 @@ _WVSO_LocaleOutcome(Reject, View, Lines, Unhandled, Failure) {
 	AssertEqual(0, Before, "submitting a native call is not its successful completion")
 	AssertEqual(1, Lines.Length, "one native outcome must produce one local diagnostic")
 	AssertContains(Lines[1], Reject ? "[ERROR]" : "[DEBUG]")
-	AssertContains(Lines[1], "Keylogger.locale")
+	AssertContains(Lines[1], "Keystats.locale")
 	AssertFalse(InStr(Lines[1], "PRIVATE-SCRIPT"), "neither script nor rejected payload may enter logs")
 }
 Test("WebView script: locale native success is observed only after completion (webview-script-outcome)",

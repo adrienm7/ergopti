@@ -76,7 +76,7 @@ local function with_personal_frame(body, options)
 		}
 		if options.empty then context.state.custom_default_section = false end
 		local menu_owner = require("ui.menu.menu_hotstrings_custom")
-		fresh_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		fresh_bridge = package.loaded["modules.keystats.kc_bridge"]
 		return body({ build = function() return menu_owner.build_custom(context, { group_counts = { personal = 5 } }) end,
 			root = renderer.get_root(), renderer = renderer, context = context, calls = calls,
 			translate = native.get, corpus = corpus, locale = native.get_locale() })
@@ -86,8 +86,8 @@ local function with_personal_frame(body, options)
 	if acquired then released = native.scope_release(owner) == true end
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleaned, cleanup_error = pcall(function()
-		fresh_bridge = fresh_bridge or package.loaded["modules.keylogger.kc_bridge"]
-		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keylogger.kc_bridge"]) then fresh_bridge.stop() end
+		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
+		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
 		local scheduler = package.loaded["adapters.timer_scheduler"]
 		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
 			assert(scheduler.cancelAll() == true); assert(scheduler.activeCount() == 0)

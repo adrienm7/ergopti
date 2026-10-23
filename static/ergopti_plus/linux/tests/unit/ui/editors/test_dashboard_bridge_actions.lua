@@ -4,7 +4,7 @@
 --- MODULE: Every Action The Page Sends Has A Handler That Can Run
 --- DESCRIPTION:
 --- Two invariants over the dashboard bridges: they answer the actions the shared
---- pages actually send, and every keylogger function they name exists.
+--- pages actually send, and every keystats function they name exists.
 ---
 --- THE THREE DEFECTS THIS PINS:
 --- The typing bridge had no `clear_cache` branch. That message is what the
@@ -19,7 +19,7 @@
 --- the choice went nowhere. `category` is a real column on agg_app_day and the
 --- dashboard groups by it.
 ---
---- And its `app_detail` branch called `keylogger.get_app_detail`, a function
+--- And its `app_detail` branch called `keystats.get_app_detail`, a function
 --- that has never existed on this driver, behind a `type(…) == "function"`
 --- guard. The guard read as defensive while making the branch permanently
 --- unreachable — the same shape as the forty-one bridge calls that passed the
@@ -130,23 +130,23 @@ end)
 
 helpers.describe("dashboard bridges: no call to a function that is not there", function()
 
-	local Keylogger = helpers.load_module("modules.keylogger.keylogger")
+	local Keystats = helpers.load_module("modules.keystats.keystats")
 
 	for _, relative in ipairs({ "ui/metrics_apps/bridge.lua", "ui/metrics_typing/bridge.lua" }) do
-		helpers.it(relative .. " names only keylogger functions that exist", function()
+		helpers.it(relative .. " names only keystats functions that exist", function()
 			local source = bridge_source(relative)
 			local checked = 0
-			for name in source:gmatch("state%.keylogger%.([%a_]+)") do
+			for name in source:gmatch("state%.keystats%.([%a_]+)") do
 				checked = checked + 1
-				helpers.assert_eq(type(Keylogger[name]), "function",
-					"'" .. name .. "' is called on the keylogger and does not exist. Behind "
+				helpers.assert_eq(type(Keystats[name]), "function",
+					"'" .. name .. "' is called on the keystats and does not exist. Behind "
 						.. "a `type(…) == \"function\"` guard that reads as defensive, a "
 						.. "missing function becomes a silent nil and the branch is "
 						.. "permanently unreachable — which is exactly how get_app_detail "
 						.. "survived, and how forty-one bridge calls before it did.")
 			end
 			helpers.assert_true(checked > 0,
-				"no keylogger calls were found in " .. relative .. " — the pattern broke, "
+				"no keystats calls were found in " .. relative .. " — the pattern broke, "
 					.. "and a scan that matches nothing passes for any source at all")
 		end)
 	end
@@ -164,11 +164,11 @@ end)
 
 helpers.describe("dashboard bridges: the typing window answers from its cache", function()
 
-	--- A keylogger double counting the full-history reads.
-	--- @return table keylogger, table counts
-	local function counting_keylogger()
+	--- A keystats double counting the full-history reads.
+	--- @return table keystats, table counts
+	local function counting_keystats()
 		local counts = { full = 0, manifest_only = 0 }
-		local keylogger = {
+		local keystats = {
 			get_dashboard_payload = function(opts)
 				if opts.include_prefetch then
 					counts.full = counts.full + 1
@@ -179,7 +179,7 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 			end,
 			clear_cache = function() return true end,
 		}
-		return require("tests.fakes.metrics_keylogger").synchronous(keylogger), counts
+		return require("tests.fakes.metrics_keystats").synchronous(keystats), counts
 	end
 
 	--- The bridge with recording deferral and push channels.
@@ -198,8 +198,8 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 
 	helpers.it("reopening answers the cached payload without reading the history", function()
 		local Bridge, deferred, pushed = bridge_with_seams()
-		local keylogger, counts = counting_keylogger()
-		local state = { keylogger = keylogger }
+		local keystats, counts = counting_keystats()
+		local state = { keystats = keystats }
 		local first = Bridge.on_message("ready", state)
 		helpers.assert_eq(counts.full, 1, "the first opening of a session must read once")
 		helpers.assert_eq(#deferred, 0, "nothing to refresh after a fresh read")
@@ -222,8 +222,8 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 
 	helpers.it("a superseded refresh does not read or push", function()
 		local Bridge, deferred, pushed = bridge_with_seams()
-		local keylogger, counts = counting_keylogger()
-		local state = { keylogger = keylogger }
+		local keystats, counts = counting_keystats()
+		local state = { keystats = keystats }
 		Bridge.on_message("ready", state)
 		Bridge.on_message("ready", state)
 		Bridge.on_message("ready", state)
@@ -237,8 +237,8 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 
 	helpers.it("a reset drops the cached payload so the next opening rebuilds", function()
 		local Bridge, deferred = bridge_with_seams()
-		local keylogger, counts = counting_keylogger()
-		local state = { keylogger = keylogger }
+		local keystats, counts = counting_keystats()
+		local state = { keystats = keystats }
 		local first = Bridge.on_message("ready", state)
 		local reset = Bridge.on_message({ action = "clear_cache" }, state)
 		helpers.assert_eq(counts.full, 2, "the reset answers with a rebuilt payload")
@@ -252,7 +252,7 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 	helpers.it("(incomplete-history-partial) an incomplete read is shown but never kept", function()
 		local Bridge, deferred = bridge_with_seams()
 		local reads, incomplete = 0, true
-		local keylogger = require("tests.fakes.metrics_keylogger").synchronous({
+		local keystats = require("tests.fakes.metrics_keystats").synchronous({
 			get_dashboard_payload = function()
 				reads = reads + 1
 				return { metrics_manifest = {}, metrics_manifest_incomplete = incomplete or nil,
@@ -260,7 +260,7 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 			end,
 			clear_cache = function() return true end,
 		})
-		local state = { keylogger = keylogger }
+		local state = { keystats = keystats }
 		local partial = Bridge.on_message("ready", state)
 		helpers.assert_true(partial._prefetch_data.incomplete == true and partial.metrics_manifest_incomplete == true,
 			"the partial counts reach the page with their incomplete flags")
@@ -294,7 +294,7 @@ helpers.describe("metrics apps bridge: every reply is dashboard data", function(
 
 	helpers.it("answers a category edit, the picker and a pause with the manifest", function()
 		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
-		local state = { keylogger = require("tests.fakes.metrics_keylogger").synchronous({
+		local state = { keystats = require("tests.fakes.metrics_keystats").synchronous({
 			get_dashboard_payload = function() return { metrics_manifest = { ["2026-09-24"] = {} } } end,
 			set_app_category = function() return true end,
 			suppress = function() end,

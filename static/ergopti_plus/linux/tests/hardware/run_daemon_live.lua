@@ -200,7 +200,7 @@ local function dump_log()
 		lines[#lines + 1] = line
 		local lower = line:lower()
 		if lower:find("secure") or lower:find("focus") or lower:find("at%-spi") or lower:find("withheld")
-			or lower:find("match") or lower:find("inject") or lower:find("capture") or lower:find("keylogger")
+			or lower:find("match") or lower:find("inject") or lower:find("capture") or lower:find("keystats")
 			or lower:find("error") or lower:find("predict") or lower:find("llm") or lower:find("api") then
 			print("  " .. line)
 		end

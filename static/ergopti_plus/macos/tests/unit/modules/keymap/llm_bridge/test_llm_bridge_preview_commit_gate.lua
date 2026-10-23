@@ -197,7 +197,7 @@ local function load_fixture(render_result, previews_enabled, options)
 			return true
 		end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring_suggested = function() fixture.suggested = fixture.suggested + 1 end,
 		log_hotstring_dismissed = function() fixture.dismissed = fixture.dismissed + 1 end,
 	}

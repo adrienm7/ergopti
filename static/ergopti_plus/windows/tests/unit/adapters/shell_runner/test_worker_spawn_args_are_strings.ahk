@@ -1,7 +1,7 @@
 ﻿; tests/unit/adapters/shell_runner/test_worker_spawn_args_are_strings.ahk
 
 ; ==============================================================================
-; MODULE: Worker Spawn Argument Typing (keylogger-worker-timings-must-be-strings)
+; MODULE: Worker Spawn Argument Typing (keystats-worker-timings-must-be-strings)
 ; DESCRIPTION:
 ; KLPF_RequestBuild and KLPF_RequestRange each built the metrics worker's
 ; argument vector from a literal that spliced KLWConst.MAX_KEYSTROKE_DELAY_MS and
@@ -68,7 +68,7 @@ _WSAS_TimingArgsAreReversibleDecimalStrings() {
 	Args := KLPF_WorkerTimingArgs()
 	AssertEqual(6, Args.Length,
 		"KLPF_WorkerMain reads six timing arguments (A_Args[7]..A_Args[12]); the owner "
-		. "must produce exactly that many (keylogger-worker-timings-must-be-strings)")
+		. "must produce exactly that many (keystats-worker-timings-must-be-strings)")
 
 	Expected := [KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS,
 		KLWConst.BURST_GAP_MS, KLWConst.SESSION_GAP_MS,
@@ -77,14 +77,14 @@ _WSAS_TimingArgsAreReversibleDecimalStrings() {
 		Assert(Type(Arg) = "String",
 			"timing argument " . Index . " must be a String, not " . Type(Arg)
 			. ": the spawn boundary refuses every other type before any process exists "
-			. "(keylogger-worker-timings-must-be-strings)")
+			. "(keystats-worker-timings-must-be-strings)")
 		AssertEqual(Expected[Index], Integer(Arg),
 			"timing argument " . Index . " must round-trip through Integer() unchanged -- "
 			. "KLPF_WorkerMain reconstitutes KLWConst from exactly these strings")
 	}
 }
 
-Test("worker spawn: the timing arguments are reversible decimal strings (keylogger-worker-timings-must-be-strings)",
+Test("worker spawn: the timing arguments are reversible decimal strings (keystats-worker-timings-must-be-strings)",
 	_WSAS_TimingArgsAreReversibleDecimalStrings)
 
 
@@ -104,7 +104,7 @@ _WSAS_TheSpawnBoundaryRefusesANonStringArgument() {
 	Refused := ShellRunner_ValidateSpawnArgs("C:\bin\worker.exe", ["--flag", 1500])
 	Assert(InStr(Refused["error"], "Argument 2") > 0,
 		"an Integer argument must be refused by index; got '" . Refused["error"] . "' "
-		. "(keylogger-worker-timings-must-be-strings)")
+		. "(keystats-worker-timings-must-be-strings)")
 
 	Accepted := ShellRunner_ValidateSpawnArgs("C:\bin\worker.exe", ["--flag", "1500"])
 	AssertEqual("", Accepted["error"],
@@ -112,7 +112,7 @@ _WSAS_TheSpawnBoundaryRefusesANonStringArgument() {
 		. "unreachable and this whole guard vacuous")
 }
 
-Test("worker spawn: the boundary refuses a non-String argument by index (keylogger-worker-timings-must-be-strings)",
+Test("worker spawn: the boundary refuses a non-String argument by index (keystats-worker-timings-must-be-strings)",
 	_WSAS_TheSpawnBoundaryRefusesANonStringArgument)
 
 
@@ -153,7 +153,7 @@ _WSAS_EveryRequestPathSpawnsAdmissibleVectors() {
 
 	AssertEqual(2, _WSAS_Captured.Length,
 		"both request paths must have spawned exactly once -- a zero here would make "
-		. "every assertion below vacuous (keylogger-worker-timings-must-be-strings)")
+		. "every assertion below vacuous (keystats-worker-timings-must-be-strings)")
 	for Capture in _WSAS_Captured {
 		Args := Capture["args"]
 		Assert(Args is Array && Args.Length > 0,
@@ -162,7 +162,7 @@ _WSAS_EveryRequestPathSpawnsAdmissibleVectors() {
 			Assert(Type(Arg) = "String",
 				"argument " . Index . " of the spawned vector is " . Type(Arg)
 				. ", so the worker would be refused before launch and the dashboard "
-				. "would never paint (keylogger-worker-timings-must-be-strings)")
+				. "would never paint (keystats-worker-timings-must-be-strings)")
 		}
 		Verdict := ShellRunner_ValidateSpawnArgs(Capture["executable"], Args)
 		AssertEqual("", Verdict["error"],
@@ -171,7 +171,7 @@ _WSAS_EveryRequestPathSpawnsAdmissibleVectors() {
 	}
 }
 
-Test("worker spawn: every request path spawns an admissible vector (keylogger-worker-timings-must-be-strings)",
+Test("worker spawn: every request path spawns an admissible vector (keystats-worker-timings-must-be-strings)",
 	_WSAS_EveryRequestPathSpawnsAdmissibleVectors)
 
 
@@ -201,7 +201,7 @@ _WSAS_RangeRefusesNonStringDates() {
 		Assert(!KLPF_RequestRange("typing", A_Temp . "\metrics",
 			_WSAS_RangeQuery(20260801, "2026-08-08")),
 			"a non-String start_date must be refused at the request boundary "
-			. "(keylogger-worker-timings-must-be-strings)")
+			. "(keystats-worker-timings-must-be-strings)")
 		Assert(!KLPF_RequestRange("typing", A_Temp . "\metrics",
 			_WSAS_RangeQuery("2026-08-01", 20260808)),
 			"a non-String end_date must be refused at the request boundary")
@@ -214,7 +214,7 @@ _WSAS_RangeRefusesNonStringDates() {
 		"a refused range request must never reach the spawn seam")
 }
 
-Test("worker spawn: the range path refuses non-String dates (keylogger-worker-timings-must-be-strings)",
+Test("worker spawn: the range path refuses non-String dates (keystats-worker-timings-must-be-strings)",
 	_WSAS_RangeRefusesNonStringDates)
 
 
@@ -239,7 +239,7 @@ _WSAS_NeitherRequestPathInlinesTheTimings() {
 		Checked += 1
 		Assert(InStr(Body, "KLWConst.") = 0,
 			Name . " must not name KLWConst directly: those values are Integers and land "
-			. "unconverted in the argument vector (keylogger-worker-timings-must-be-strings)")
+			. "unconverted in the argument vector (keystats-worker-timings-must-be-strings)")
 		Assert(InStr(Body, "KLPF_WorkerTimingArgs()") > 0,
 			Name . " must obtain the timing arguments from KLPF_WorkerTimingArgs, so only "
 			. "one answer to their wire format can exist")
@@ -247,5 +247,5 @@ _WSAS_NeitherRequestPathInlinesTheTimings() {
 	AssertEqual(2, Checked, "both request paths must have been inspected")
 }
 
-Test("worker spawn: neither request path inlines the timing vector (keylogger-worker-timings-must-be-strings)",
+Test("worker spawn: neither request path inlines the timing vector (keystats-worker-timings-must-be-strings)",
 	_WSAS_NeitherRequestPathInlinesTheTimings)

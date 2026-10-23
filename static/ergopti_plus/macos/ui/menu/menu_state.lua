@@ -20,16 +20,16 @@ local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG    = "menu_state"
 
--- Delay before starting the keylogger engine. Its start (~1.3 s of SQLite +
+-- Delay before starting the keystats engine. Its start (~1.3 s of SQLite +
 -- log-rotation work) only feeds typing metrics, so it is deferred off the boot
 -- critical path; a sub-second gap of unlogged keystrokes after boot is harmless.
-local KEYLOGGER_START_DELAY_SEC = 0.5
-local _keylogger_start_generation = 0
-local _keylogger_start_pending = false
+local KEYSTATS_START_DELAY_SEC = 0.5
+local _keystats_start_generation = 0
+local _keystats_start_pending = false
 
 --- Reports boot activation that has not reached the native lifecycle owner.
 --- @return boolean pending True until the current deferred start settles.
-function M.metrics_start_pending() return _keylogger_start_pending end
+function M.metrics_start_pending() return _keystats_start_pending end
 
 
 
@@ -476,55 +476,55 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	end
 
 
-	local kl = core_mods.keylogger
+	local kl = core_mods.keystats
 	if kl then
-		_keylogger_start_generation = _keylogger_start_generation + 1
-		local keylogger_generation = _keylogger_start_generation
-		_keylogger_start_pending = false
+		_keystats_start_generation = _keystats_start_generation + 1
+		local keystats_generation = _keystats_start_generation
+		_keystats_start_pending = false
 		if type(kl.set_options) == "function" then
-			try("metrics", "keylogger.set_options", kl.set_options, {
-				encrypt     = state.keylogger_encrypt,
-				menubar     = state.keylogger_menubar_wpm,
-				float       = state.keylogger_float_wpm,
-				float_graph = state.keylogger_float_graph,
+			try("metrics", "keystats.set_options", kl.set_options, {
+				encrypt     = state.keystats_encrypt,
+				menubar     = state.keystats_menubar_wpm,
+				float       = state.keystats_float_wpm,
+				float_graph = state.keystats_float_graph,
 			})
 		end
-		if type(kl.set_disabled_apps) == "function" then try("metrics", "keylogger.set_disabled_apps", kl.set_disabled_apps, state.keylogger_disabled_apps or {}) end
+		if type(kl.set_disabled_apps) == "function" then try("metrics", "keystats.set_disabled_apps", kl.set_disabled_apps, state.keystats_disabled_apps or {}) end
 		if type(kl.set_private_filter_enabled) == "function" then
-			try("metrics", "keylogger.set_private_filter_enabled", kl.set_private_filter_enabled,
-				state.keylogger_private_filter_enabled)
+			try("metrics", "keystats.set_private_filter_enabled", kl.set_private_filter_enabled,
+				state.keystats_private_filter_enabled)
 		end
 		if type(kl.set_secure_field_filter_enabled) == "function" then
-			try("metrics", "keylogger.set_secure_field_filter_enabled", kl.set_secure_field_filter_enabled,
-				state.keylogger_secure_filter_enabled)
+			try("metrics", "keystats.set_secure_field_filter_enabled", kl.set_secure_field_filter_enabled,
+				state.keystats_secure_filter_enabled)
 		end
 		if type(kl.set_system_auth_filter_enabled) == "function" then
-			try("metrics", "keylogger.set_system_auth_filter_enabled", kl.set_system_auth_filter_enabled,
-				state.keylogger_system_auth_filter_enabled)
+			try("metrics", "keystats.set_system_auth_filter_enabled", kl.set_system_auth_filter_enabled,
+				state.keystats_system_auth_filter_enabled)
 		end
-		if state.keylogger_enabled then
-			-- Keylogger start is the single biggest boot cost (~1.3 s: SQLite open,
+		if state.keystats_enabled then
+			-- Keystats start is the single biggest boot cost (~1.3 s: SQLite open,
 			-- log-rotation offset replay, export setup). It only feeds typing
 			-- METRICS, so missing the first fraction of a second of keystrokes is
 			-- harmless — defer it off the boot critical path so the menubar/UI become
 			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
 			local _shortcuts_ref = core_mods.shortcuts_mod
-			_keylogger_start_pending = true
+			_keystats_start_pending = true
 			local scheduling, fired = true, false
 			local function activate()
-				if keylogger_generation ~= _keylogger_start_generation then return end
+				if keystats_generation ~= _keystats_start_generation then return end
 				if scheduling then fired = true; return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
-				local start_ok, started = try("metrics", "keylogger.start", kl.start, _shortcuts_ref)
+				local start_ok, started = try("metrics", "keystats.start", kl.start, _shortcuts_ref)
 				if start_ok and started ~= true then
-					record_failure("metrics", "keylogger.start", started)
+					record_failure("metrics", "keystats.start", started)
 				end
 				if not start_ok or started ~= true then
 					-- In memory only: persisting OFF here rewrote config.toml whenever
 					-- the engine lacked a permission, so Metrics stayed off for good.
-					local record = demote("metrics", "keylogger_enabled", false,
-						"the deferred keylogger start was refused")
+					local record = demote("metrics", "keystats_enabled", false,
+						"the deferred keystats start was refused")
 					if type(deps.on_runtime_demotion) == "function" then
 						local notified, notify_err = pcall(deps.on_runtime_demotion, record)
 						if not notified then
@@ -533,28 +533,28 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 						end
 					end
 				end
-				_keylogger_start_pending = false
-				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
+				_keystats_start_pending = false
+				Logger.info(LOG, "Keystats engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
 			end
-			local scheduled = DeferredWork.after(KEYLOGGER_START_DELAY_SEC, activate, "menu_state.keylogger_start")
+			local scheduled = DeferredWork.after(KEYSTATS_START_DELAY_SEC, activate, "menu_state.keystats_start")
 			scheduling = false
 			if scheduled ~= true then
-				_keylogger_start_generation = _keylogger_start_generation + 1
-				_keylogger_start_pending = false
+				_keystats_start_generation = _keystats_start_generation + 1
+				_keystats_start_pending = false
 			elseif fired then activate() end
 		else
 			if type(kl.stop) == "function" then
-				local stop_ok, stopped = try("metrics", "keylogger.stop", kl.stop)
+				local stop_ok, stopped = try("metrics", "keystats.stop", kl.stop)
 				if not stop_ok or stopped ~= true then
-					Logger.error(LOG, "Keylogger is disabled, but native lifecycle cleanup remains pending.")
+					Logger.error(LOG, "Keystats is disabled, but native lifecycle cleanup remains pending.")
 				end
 			end
 		end
 	end
-	local cipher_ok, TextCipher = pcall(require, "modules.keylogger.text_cipher")
+	local cipher_ok, TextCipher = pcall(require, "modules.keystats.text_cipher")
 	if cipher_ok and type(TextCipher) == "table" and type(TextCipher.set_enabled) == "function" then
-		try("metrics", "keylogger.text_cipher.set_enabled", TextCipher.set_enabled, state.keylogger_encrypt)
+		try("metrics", "keystats.text_cipher.set_enabled", TextCipher.set_enabled, state.keystats_encrypt)
 	end
 
 	-- Start/stop engines

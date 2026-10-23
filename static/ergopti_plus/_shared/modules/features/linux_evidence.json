@@ -361,10 +361,10 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/modules/keylogger/keylogger.lua",
-				"static/ergopti_plus/linux/modules/keylogger/metrics_collector.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keylogger/privacy/test_keylogger_privacy_filters.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keylogger/core/test_metrics_toggles_persist.lua",
+				"static/ergopti_plus/linux/modules/keystats/keystats.lua",
+				"static/ergopti_plus/linux/modules/keystats/metrics_collector.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keystats/privacy/test_keystats_privacy_filters.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keystats/core/test_metrics_toggles_persist.lua",
 				"static/ergopti_plus/linux/tests/unit/ui/metrics/test_wpm_readouts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
 			]

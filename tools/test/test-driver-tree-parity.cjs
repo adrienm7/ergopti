@@ -310,7 +310,7 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // `tree` field was written to make for ten other features.
 // 2026-08-04, second pass: 16 → 17. Same correction a third time. Of the four
 // entries the list still called absent from every driver, only two really are.
-// `metrics` is modules/keylogger, shared by all three; `download` is
+// `metrics` is modules/keystats, shared by all three; `download` is
 // ui/download_window, which two drivers ship — it was filed under modules/ in
 // contradiction of this file's own tree rule, so a window was being counted as
 // a missing module. Raised the same day it was measured: leaving it at 16 would

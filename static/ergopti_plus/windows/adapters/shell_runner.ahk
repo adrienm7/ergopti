@@ -1202,7 +1202,7 @@ _SR_QuoteArgument(Arg) {
  * the exact refusal the spawn boundary applies. Every argument must already be
  * a String: a command line has no other type, and a caller that hands over an
  * Integer (a timing constant, a byte budget) is refused before any process is
- * created (keylogger-worker-timings-must-be-strings).
+ * created (keystats-worker-timings-must-be-strings).
  *
  * @param Executable {String} Absolute path to the child executable.
  * @param Args {Array} Argument vector; every element must be a String.

@@ -10,7 +10,7 @@ local SOURCE = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nwpm_w
 local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
 		local names = { "infra.config_paths", "infra.metrics_preferences", "infra.metrics_scope",
-			"modules.keylogger.keylogger", "modules.keylogger.text_cipher", "modules.keylogger.text_migration",
+			"modules.keystats.keystats", "modules.keystats.text_cipher", "modules.keystats.text_migration",
 			"ui.wpm.widget", "ui.wpm.tray_readout" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -18,15 +18,15 @@ local function with_scope(body)
 		local backup = path .. ".scope-backup"
 		local ok, err = pcall(function()
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["modules.keylogger.text_cipher"] = {
+			package.loaded["modules.keystats.text_cipher"] = {
 				is_enabled = function() return controls.cipher end, is_available = function() return true end,
 				set_enabled = function(value) controls.cipher = value; return true end,
 			}
-			package.loaded["modules.keylogger.text_migration"] = {
+			package.loaded["modules.keystats.text_migration"] = {
 				is_running = function() return controls.migrating == true end,
 				start = function() controls.migrations = controls.migrations + 1 end,
 			}
-			local collector = require("modules.keylogger.keylogger")
+			local collector = require("modules.keystats.keystats")
 			local widget, readout = require("ui.wpm.widget"), require("ui.wpm.tray_readout")
 			local surface = { hide = function() if controls.hide then return controls.hide() end; return true end }
 			widget._set_surface(surface)
@@ -194,7 +194,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 				local i18n = require("infra.i18n")
 				package.loaded["ui.menu.menu_builder"] = nil
 				local passed, detail = pcall(function()
-					local rows = require("ui.menu.menu_builder").build({ keylogger = collector,
+					local rows = require("ui.menu.menu_builder").build({ keystats = collector,
 						paused = false, is_paused = function() return false end })
 					local submenu
 					for _, row in ipairs(rows) do
@@ -254,7 +254,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 							return execute(command)
 						end
 						package.loaded["ui.menu.menu_builder"] = nil
-						local rows = require("ui.menu.menu_builder").build({ keylogger = collector,
+						local rows = require("ui.menu.menu_builder").build({ keystats = collector,
 							paused = false, is_paused = function() return paused end,
 							on_menu_changed = function() changed = changed + 1 end })
 						local action

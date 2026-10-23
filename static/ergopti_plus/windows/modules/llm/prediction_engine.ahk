@@ -495,6 +495,6 @@ LLM_Engine_SetEnabled(state) {
 
 
 
-#Include prediction_keylogger.ahk
+#Include prediction_keystats.ahk
 #Include prediction_exec.ahk
 #Include prediction_live.ahk

@@ -100,7 +100,7 @@ local menu_mods = {
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
-	keylogger       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
+	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
@@ -109,7 +109,7 @@ local menu_mods = {
 -- Load core modules
 local core_mods = {
 	llm           = safe_require("modules.llm", "AI engine"),
-	keylogger     = safe_require("modules.keylogger", "metrics engine"),
+	keystats     = safe_require("modules.keystats", "metrics engine"),
 	shortcuts_mod = safe_require("modules.shortcuts", "shortcuts engine"),
 	dyn_hot_mod   = safe_require("modules.dynamic_hotstrings", "dynamic hotstrings engine"),
 	capsword_auto_off = safe_require("infra.capsword_auto_off", "CapsWord auto-off settings"),
@@ -488,7 +488,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			hotstring_editor         = hotstring_editor,
 			core_mods                = rollback_modules or core_mods,
 			restoring                 = restoring == true,
-			-- A deferred engine refusal (keylogger start) lands after this sync
+			-- A deferred engine refusal (keystats start) lands after this sync
 			-- returned; it keeps the acknowledged value on disk like a boot one.
 			on_runtime_demotion      = session_demotions.record,
 		})
@@ -954,7 +954,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local closed = close_loaded_dashboard(
 					"ui.metrics_typing", "Typing dashboard")
 				if closed ~= nil then return closed end
-				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
+				if core_mods.keystats and type(core_mods.keystats.show_metrics) == "function" then pcall(core_mods.keystats.show_metrics) end
 			end,
 			show_apps_time = function()
 				-- Toggle: close if open and focused, otherwise open or present it
@@ -1264,7 +1264,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				metrics_scope = require("ui.menu.metrics_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
-					demotions = session_demotions, core = core_mods.keylogger,
+					demotions = session_demotions, core = core_mods.keystats,
 					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
 					script_control = core_mods.shortcuts_mod,
 					activation_pending = MenuState.metrics_start_pending,

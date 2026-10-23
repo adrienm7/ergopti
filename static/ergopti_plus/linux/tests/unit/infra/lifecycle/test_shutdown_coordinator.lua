@@ -596,7 +596,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 			end
 		end
 		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
-			keylogger = { stop = function() return state.metrics_closed end },
+			keystats = { stop = function() return state.metrics_closed end },
 			privacy_owners = {
 				context = { stop = function() return state.context_closed end },
 				watch = { stop = function() return state.watch_closed end },
@@ -955,7 +955,7 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 				shutdown = { request = function() end, is_pending = function() return false end },
 				injector = injector, tooltip_preview = false, llm_overlay = false,
 				file_watchers = false, process_lifecycle = false, tray_menu = false,
-				keylogger = { get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end },
+				keystats = { get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end },
 				Logger = { flush_repeats = function() end, info = function() calls.success = calls.success + 1 end },
 			}, { __index = _G })
 			local chunk, err
@@ -1338,7 +1338,7 @@ helpers.describe("actual Main layout helper retirement", function()
 			return state.receipt
 		end }
 		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
-			keylogger = { stop = function() return true end }, privacy_owners = {},
+			keystats = { stop = function() return true end }, privacy_owners = {},
 			dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
 			prediction_engine = false,
@@ -1430,7 +1430,7 @@ helpers.describe("actual Main HTTP transport retirement", function()
 			return state.receipt
 		end }
 		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
-			keylogger = { stop = function() return true end }, privacy_owners = {},
+			keystats = { stop = function() return true end }, privacy_owners = {},
 			dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
 			prediction_engine = false,

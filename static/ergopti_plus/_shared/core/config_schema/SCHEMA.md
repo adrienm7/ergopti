@@ -67,7 +67,7 @@ static/ergopti_plus/_shared/
 │  ├── profiles.json
 │  ├── models.json
 │  └── inference.json
-├── schema/                          # SQLite keylogger (unchanged)
+├── schema/                          # SQLite keystats (unchanged)
 └── ui/                              # Shared WebView HTML/JS (unchanged)
 ```
 

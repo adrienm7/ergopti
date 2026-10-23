@@ -15,7 +15,7 @@
 #NoTrayIcon
 
 ; The driver re-runs this entry (or its compiled executable) with a worker flag
-; for the detached keylogger-prefetch and UIA-selection workers. AutoHotkey
+; for the detached keystats-prefetch and UIA-selection workers. AutoHotkey
 ; creates a script's tray icon, main window and load-time hotkeys BEFORE its
 ; first statement runs, so each worker looked like a second driver: an
 ; "ErgoptiPlus" tray icon (the default green H in source mode), the driver's
@@ -111,7 +111,7 @@ if A_IsCompiled {
 ; acquired handle is intentionally never closed: the OS releases the mutex when
 ; this process exits, so a successor's wait unblocks the instant we die.
 ;
-; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
+; EXEMPT: detached keystats-prefetch and UIA-selection workers. The driver
 ; deliberately re-runs this entry with /force and a worker flag; those workers
 ; register no hook and no log owner, and hide their tray icon first thing,
 ; so it is not what this gate exists to prevent. But the gate is the FIRST
@@ -328,7 +328,7 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 ; AHK silently DROPS new pseudo-threads (hotkey callbacks, tray-menu items,
 ; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
 ; threads are already active. The default ceiling of 10 is easy to hit
-; with the keylogger's ~6 background timers + mouse/keyboard hooks. The
+; with the keystats's ~6 background timers + mouse/keyboard hooks. The
 ; menu-dispatcher bypass in infra/menu_dispatcher.ahk also relies on a free
 ; slot for its retry SetTimer, so the headroom matters even more there.
 A_MaxThreads := 64
@@ -369,7 +369,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 
 ; Port adapters — thin OS wrappers that isolate every DllCall, Send*, and
 ; WinGet* from the domain modules. Loaded before any infra/ or module/ file
-; that references adapter functions (e.g. NI_GetSsidHash in keylogger_network).
+; that references adapter functions (e.g. NI_GetSsidHash in keystats_network).
 #Include adapters/crypto.ahk
 #Include adapters/clipboard.ahk
 #Include adapters/timer_scheduler.ahk
@@ -415,7 +415,7 @@ SFD_ConfigureUiaWorker(
 	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
 
 ; Compiled workers reuse this executable. Exit into the minimal worker loop as
-; soon as its UIA/window dependencies exist, before loading keylogger/WebView
+; soon as its UIA/window dependencies exist, before loading keystats/WebView
 ; modules or running any normal-driver initialiser.
 if UIASW_IsWorkerInvocation()
 	UIASW_WorkerMain()
@@ -564,21 +564,21 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 #Include ui/download_window/session.ahk
 #Include ui/download_window/init.ahk
 #Include ui/console_window.ahk
-#Include modules/keylogger/keylogger_app_categories.ahk
-#Include modules/keylogger/keylogger.ahk
-#Include modules/keylogger/keylogger_hotstring_log.ahk
-#Include modules/keylogger/keylogger_walker.ahk
-#Include modules/keylogger/keylogger_hook.ahk
-#Include modules/keylogger/keylogger_watchers.ahk
-#Include modules/keylogger/keylogger_mouse.ahk
-#Include modules/keylogger/keylogger_sensors.ahk
-#Include modules/keylogger/keylogger_ergonomics.ahk
-#Include modules/keylogger/keylogger_window_topology.ahk
-#Include modules/keylogger/keylogger_av_state.ahk
-#Include modules/keylogger/keylogger_network.ahk
-#Include modules/keylogger/keylogger_clipboard.ahk
-#Include modules/keylogger/keylogger_roi_prune.ahk
-#Include modules/keylogger/keylogger_trigger_roi.ahk
+#Include modules/keystats/keystats_app_categories.ahk
+#Include modules/keystats/keystats.ahk
+#Include modules/keystats/keystats_hotstring_log.ahk
+#Include modules/keystats/keystats_walker.ahk
+#Include modules/keystats/keystats_hook.ahk
+#Include modules/keystats/keystats_watchers.ahk
+#Include modules/keystats/keystats_mouse.ahk
+#Include modules/keystats/keystats_sensors.ahk
+#Include modules/keystats/keystats_ergonomics.ahk
+#Include modules/keystats/keystats_window_topology.ahk
+#Include modules/keystats/keystats_av_state.ahk
+#Include modules/keystats/keystats_network.ahk
+#Include modules/keystats/keystats_clipboard.ahk
+#Include modules/keystats/keystats_roi_prune.ahk
+#Include modules/keystats/keystats_trigger_roi.ahk
 
 ; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
 ; ``*i`` keeps the driver runnable if an extension is removed without
@@ -589,11 +589,11 @@ BootProfile_Stamp("WebView and metrics UI state initialised")
 ; BuildExtMenu_ergopti_demo() was never defined and the extensions submenu never
 ; rendered.
 #Include *i ..\extensions\ergopti-demo\shortcuts\menu.ahk
-#Include modules/keylogger/keylogger_reader.ahk
-#Include modules/keylogger/keylogger_prefetch.ahk
-#Include modules/keylogger/keylogger_webview.ahk
-#Include modules/keylogger/keylogger_ui.ahk
-BootProfile_Stamp("Keylogger modules initialised")
+#Include modules/keystats/keystats_reader.ahk
+#Include modules/keystats/keystats_prefetch.ahk
+#Include modules/keystats/keystats_webview.ahk
+#Include modules/keystats/keystats_ui.ahk
+BootProfile_Stamp("Keystats modules initialised")
 
 ; A detached prefetch worker shares these projection modules but must never run
 ; the normal driver boot: no hooks, timers, tray, WebView, or config mutation.
@@ -1290,7 +1290,7 @@ if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {
 ; HookDispatcher owns the process-wide mouse Hotkeys consumed by four independent
 ; features (hotstring prefix-watcher click-reset, CapsWord cancel, gesture
 ; click-toggle cross-release, LLM tooltip dismiss-on-click). None of those are
-; gated by the keylogger/metrics flag, so Start() must be unconditional here.
+; gated by the keystats/metrics flag, so Start() must be unconditional here.
 ; Start() is idempotent (guarded by _started), so a stray second call is harmless.
 ; HookDispatcher.Stop() is called by Ergopti_OnShutdown (already registered via
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
@@ -1323,13 +1323,13 @@ if MetricsShortcuts.enabled {
 		; dragged back onto the critical path, AND the interruption pumps the message
 		; queue, painting a tray click queued during boot against a half-built menu.
 		; See the deferred-task block after LoggerSuccess("…ready").)
-		KeyloggerReady := false
-		try KeyloggerReady := KL_Init(KL_MetricsDirFor(_ConfigDir))
+		KeystatsReady := false
+		try KeystatsReady := KL_Init(KL_MetricsDirFor(_ConfigDir))
 		catch as Err
-			try LoggerError("Keylogger", "Initialization failed: {1}.", Err.Message)
-		if !KeyloggerReady {
+			try LoggerError("Keystats", "Initialization failed: {1}.", Err.Message)
+		if !KeystatsReady {
 			LoggerError("ErgoptiPlus",
-				"Startup aborted because keylogger persistence is unavailable.")
+				"Startup aborted because keystats persistence is unavailable.")
 			ExitApp(1)
 		}
 		; HookDispatcher is already started unconditionally above.
@@ -1344,8 +1344,8 @@ if MetricsShortcuts.enabled {
 		KL_Roi_Start()
 }
 
-BootProfile_StageEnd("metrics", MetricsShortcuts.enabled ? "keylogger and sensors started" : "metrics disabled")
-BootProfile_Mark("Metrics/keylogger started")
+BootProfile_StageEnd("metrics", MetricsShortcuts.enabled ? "keystats and sensors started" : "metrics disabled")
+BootProfile_Mark("Metrics/keystats started")
 
 
 
@@ -1610,7 +1610,7 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 }
 ; Publish the metrics dashboards' sidecars in a background worker once boot has
 ; settled, so the first open paints from disk at once instead of waiting for a
-; cold projection (keylogger_webview.ahk, background sidecar warm-up).
+; cold projection (keystats_webview.ahk, background sidecar warm-up).
 if MetricsShortcuts.enabled
 	KLWV_WarmSchedule(KL_MetricsDirFor(_ConfigDir), KLWV.WARM_START_DELAY_MS)
 

@@ -38,12 +38,12 @@ local root = assert(arg[1], "private native fixture directory required")
 package.loaded["infra.metrics_preferences"] = require("tests.support.metrics_preferences_fixture").new({ initial = {
 	["metrics.enabled"] = true, ["metrics.secure_filter_enabled"] = true, ["metrics.encrypt"] = false,
 } })
-local Keylogger = require("modules.keylogger.keylogger")
-assert(Keylogger.init({ log_dir = root, sqlite_path = root .. "/metrics.sqlite3" }) ~= false)
+local Keystats = require("modules.keystats.keystats")
+assert(Keystats.init({ log_dir = root, sqlite_path = root .. "/metrics.sqlite3" }) ~= false)
 local engine = require("modules.hotstrings.engine").new()
 local resets, focus_changes = 0, 0
-local Guard = require("modules.keylogger.focus_guard").new({
-	watch = Watch, detector = Detector, keylogger = Keylogger, now_ms = Clock.now_ms,
+local Guard = require("modules.keystats.focus_guard").new({
+	watch = Watch, detector = Detector, keystats = Keystats, now_ms = Clock.now_ms,
 	settle_ms = Timings.ms("privacy", "focus_settle_ms"),
 	reset_text = function() resets = resets + 1; engine:reset(false) end,
 })
@@ -90,7 +90,7 @@ local function report(fields)
 	fields.bus = snapshot and snapshot.bus or nil
 	fields.path = snapshot and snapshot.path or nil
 	fields.verdict = Detector.getVerdict()
-	fields.metric_secure = Keylogger.get_privacy_state().secure_field
+	fields.metric_secure = Keystats.get_privacy_state().secure_field
 	fields.buffer = engine:current_buffer()
 	fields.focus_changes = focus_changes
 	fields.resets = resets
@@ -120,7 +120,7 @@ local ok, error_message = xpcall(function()
 		lease_ms = Timings.ms("privacy", "atspi_probe_timeout_ms") })
 	for command in io.lines() do
 		if command == "reset" then
-			Keylogger.reset_session()
+			Keystats.reset_session()
 			engine:reset(false)
 			report({ primed = Guard.prime() })
 		elseif command == "normal" or command == "password" then
@@ -128,17 +128,17 @@ local ok, error_message = xpcall(function()
 			Guard.blocks_text()
 			report({ established = true })
 		elseif command == "sample" then
-			local before = Keylogger._pending_buffer_count_for_test()
+			local before = Keystats._pending_buffer_count_for_test()
 			local allowed = 0
 			for character in ("DUMMY"):gmatch(".") do
 				if not Guard.blocks_text() then
 					allowed = allowed + 1
-					Keylogger.on_keydown(character, Clock.now_ms(), "OwnedFixture", 30)
+					Keystats.on_keydown(character, Clock.now_ms(), "OwnedFixture", 30)
 					engine:on_char(character)
 				end
 			end
 			Lifecycle.tick(1)
-			report({ allowed = allowed, raw_delta = Keylogger._pending_buffer_count_for_test() - before })
+			report({ allowed = allowed, raw_delta = Keystats._pending_buffer_count_for_test() - before })
 		elseif command == "restart" then
 			retire()
 			assert(Watch.start(), "resident focus restart refused after physical settlement")

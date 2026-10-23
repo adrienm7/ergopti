@@ -59,10 +59,10 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 		local work_frame = { x = 0, y = 0, w = 2000, h = 1160 }  -- 40px dock/menu bar
 
 		-- Must be installed BEFORE load_with_stubs — wpm_widget.lua captures
-		-- `local keylogger = require("modules.keylogger")` at its own require
+		-- `local keystats = require("modules.keystats")` at its own require
 		-- time, which happens INSIDE load_with_stubs (it returns require(name)
 		-- at the end). Setting package.loaded afterwards would be too late.
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			-- A non-zero wpm keeps update_widget_body's "show" branch active on
 			-- every cycle, regardless of the idle-timer bookkeeping.
 			get_live_stats = function() return { wpm = 42 } end,

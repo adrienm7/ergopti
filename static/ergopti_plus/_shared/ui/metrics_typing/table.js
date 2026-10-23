@@ -442,7 +442,7 @@ function render_current_tab() {
 	const is_text_tab = ![...SC_TABS, 'kc'].includes(app_state.current_tab);
 
 	// ── Characters tab: expand multi-token keys into individual entries ───────
-	// The keylogger sometimes records multi-char sequences (e.g. NBSP+?) in the
+	// The keystats sometimes records multi-char sequences (e.g. NBSP+?) in the
 	// character dict. We decompose each multi-token key so that NBSP, NNBSP, and
 	// every other char that only appeared in a combination is surfaced individually.
 	// Bracket markers such as [TAB], [F1] count as one token and are kept as-is.
@@ -537,7 +537,7 @@ function render_current_tab() {
 		});
 
 		// Fallback pull from the kc (keycode) dict for control keys missing from sc.
-		// Some keylogger versions only populate kc for bare navigation/function keys,
+		// Some keystats versions only populate kc for bare navigation/function keys,
 		// never sc. Checking after sc ensures no double-counting.
 		const kc_for_chars = app_state.data.kc || {};
 		const kc_name_map =
@@ -1869,7 +1869,7 @@ function render_table() {
 			.map((item, row_idx) => {
 				const raw_lower = item.key.toLowerCase();
 
-				// Detect standalone non-printable ASCII characters (e.g. RS = 0x1E logged by the keylogger)
+				// Detect standalone non-printable ASCII characters (e.g. RS = 0x1E logged by the keystats)
 				const single_code = item.key.length === 1 ? item.key.charCodeAt(0) : -1;
 				const is_nonprint = single_code >= 0 && (single_code < 32 || single_code === 127);
 

@@ -154,7 +154,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 	helpers.it("keeps the saved leaf across other changes and failed publication", function()
 		helpers.with_fresh_modules({
 			"ui.menu.menu_state", "ui.menu.keymap_lifecycle", "adapters.storage",
-			"infra.deferred_work", "modules.keylogger.text_cipher",
+			"infra.deferred_work", "modules.keystats.text_cipher",
 			"ui.menu.session_demotions", "ui.menu.preferences_transaction",
 		}, function()
 			with_preferences(function(preferences, disk, control)

@@ -15,7 +15,7 @@
 ; shipping Windows. So the only code path producing usage metadata was dead on
 ; every host, and the engine's `if (meta is Map)` gate left prompt_tokens /
 ; completion_tokens / total_tokens / est_cost_usd at zero. Because the finalizer
-; only writes those fields when they are > 0, the keylogger event came out
+; only writes those fields when they are > 0, the keystats event came out
 ; well-formed rather than truncated: nothing logged, nothing missing, just a cost
 ; report that is silently always zero.
 ;

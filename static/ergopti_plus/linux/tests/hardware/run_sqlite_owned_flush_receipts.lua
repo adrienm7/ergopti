@@ -16,8 +16,8 @@ if arg[1] == "--no-luv" then
 	package.loaded.luv = nil
 	package.preload.luv = function() error("deliberately absent native dependency") end
 	require("compat.utf8").install()
-	local K = require("modules.keylogger.keylogger")
-	local W = require("modules.keylogger.sqlite_writer")
+	local K = require("modules.keystats.keystats")
+	local W = require("modules.keystats.sqlite_writer")
 	assert(K.init({ sqlite_path = arg[2] .. "/minimal.sqlite", log_dir = arg[2] .. "/logs" }) ~= false)
 	assert(K.is_enabled() and W.is_available() and not W.flush_transport_available())
 	local revision = W.get_revision()
@@ -46,7 +46,7 @@ end
 
 local uv = require("luv")
 if arg[1] == "--stale-clock" then
-	local timeout = require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms")
+	local timeout = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local cached = uv.now()
 	uv.sleep(timeout + 50) -- Deliberately leave libuv's cached loop time stale.
 	assert(uv.now() == cached, "fixture must not refresh the loop before dispatch")
@@ -68,7 +68,7 @@ if arg[1] == "--parent-death" then
 	end
 	local request = assert(require("infra.sqlite_batch_process").start(arg[2] .. "/parent.sqlite",
 		"WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<100000000) SELECT sum(x) FROM n;",
-		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms") }))
+		{ owner = "native-sqlite-parent-death", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	assert(child_pid)
 	io.stdout:write(string.format("READY %d %d\n", uv.os_getpid(), child_pid)); io.stdout:flush()
 	uv.run()
@@ -85,8 +85,8 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled=true\n") and config:close())
-local K = require("modules.keylogger.keylogger")
-local W = require("modules.keylogger.sqlite_writer")
+local K = require("modules.keystats.keystats")
+local W = require("modules.keystats.sqlite_writer")
 local Process = require("infra.sqlite_batch_process")
 local Drain = require("tests.support.sqlite_flush_native")
 local Logger = require("logger")
@@ -272,7 +272,7 @@ pass("selected-app character and physical-key totals are identical before and af
 
 -- Inclusive historical/future intervals must exclude both today's persisted
 -- data and the newer RAM delta; committing the latter cannot widen the range.
-local Reader = require("modules.keylogger.sqlite_reader")
+local Reader = require("modules.keystats.sqlite_reader")
 local selected_app = "org.example.selected"
 local today = os.date("%Y-%m-%d")
 assert(W.upsert_ngrams("owned-range-history", "2020-01-01", selected_app, { h = { c = 3 } }, "ngram_chars"))

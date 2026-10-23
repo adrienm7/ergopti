@@ -29,9 +29,9 @@ end
 local function run()
 	local ShellRunner = require("adapters.shell_runner")
 	local JsonCodec = require("adapters.json_codec")
-	local Delivery = require("modules.keylogger.physical_delivery")
-	local Transport = require("modules.keylogger.physical_transport")
-	local convert_ticks = require("modules.keylogger.physical_clock").new(config.clock)
+	local Delivery = require("modules.keystats.physical_delivery")
+	local Transport = require("modules.keystats.physical_transport")
+	local convert_ticks = require("modules.keystats.physical_clock").new(config.clock)
 	result.clock, result.clock_samples = config.clock, {}
 	result.capture_started_ns = tostring(hs.timer.absoluteTime())
 	result.context_observations = {}
@@ -41,9 +41,9 @@ local function run()
 		if owner.transport then owner.transport.stop() end
 	end)
 	owner.context.start()
-	local state = require("modules.keylogger.aggregator.state")
-	local core = require("modules.keylogger.aggregator.core")
-	local events = require("modules.keylogger.aggregator.events")
+	local state = require("modules.keystats.aggregator.state")
+	local core = require("modules.keystats.aggregator.core")
+	local events = require("modules.keystats.aggregator.events")
 	state.initialized, state.device_id = true, "hs274-native-fixture"
 	core.reset_batch()
 	core.reset_ngram_ctx()

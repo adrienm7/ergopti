@@ -2,10 +2,10 @@
 
 /**
  * ==============================================================================
- * MODULE: Keylogger Walker Constants — Single Source
+ * MODULE: Keystats Walker Constants — Single Source
  * DESCRIPTION:
- * The two keylogger walkers are the clearest surviving case of §5.2 being
- * declared and not held. `_shared/lua/keylogger/aggregator_helpers.lua` holds the
+ * The two keystats walkers are the clearest surviving case of §5.2 being
+ * declared and not held. `_shared/lua/keystats/aggregator_helpers.lua` holds the
  * bucket edges and caps the aggregation is defined by; the AutoHotkey walker
  * re-declares the same names as `static` literals inside its class, and the macOS
  * aggregator has its own copies too. Three declarations of one number.
@@ -26,8 +26,8 @@
  *    hit before.
  *
  * WHAT IT DELIBERATELY DOES NOT CHECK: the constants the AHK walker initialises
- * to 0 with a `<- keylogger.<key>` comment. Those are placeholders filled at boot
- * from the timing registry, and `test-keylogger-timings-single-source.cjs`
+ * to 0 with a `<- keystats.<key>` comment. Those are placeholders filled at boot
+ * from the timing registry, and `test-keystats-timings-single-source.cjs`
  * already holds that path. Asserting 0 == the registry value here would be
  * asserting the placeholder.
  * ==============================================================================
@@ -41,13 +41,13 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const P = (rel) => path.join(ROOT, 'static/ergopti_plus', rel);
 
-const SHARED = '_shared/lua/keylogger/aggregator_helpers.lua';
-const AHK_WALKER = 'windows/modules/keylogger/keylogger_walker_core.ahk';
+const SHARED = '_shared/lua/keystats/aggregator_helpers.lua';
+const AHK_WALKER = 'windows/modules/keystats/keystats_walker_core.ahk';
 const HS_AGGREGATOR = [
-	'macos/modules/keylogger/aggregator/core.lua',
-	'macos/modules/keylogger/aggregator/events.lua',
-	'macos/modules/keylogger/aggregator/sql.lua',
-	'macos/modules/keylogger/aggregator/state.lua'
+	'macos/modules/keystats/aggregator/core.lua',
+	'macos/modules/keystats/aggregator/events.lua',
+	'macos/modules/keystats/aggregator/sql.lua',
+	'macos/modules/keystats/aggregator/state.lua'
 ];
 
 const errors = [];
@@ -101,13 +101,13 @@ if (shared.size < 5) {
 
 const ahkSrc = read(AHK_WALKER);
 // `static NAME := <literal>`, ignoring the boot-filled placeholders which carry a
-// "<- keylogger.<key>" comment and are gated by the timings single-source test.
+// "<- keystats.<key>" comment and are gated by the timings single-source test.
 const ahk = new Map();
 let ahkPlaceholders = 0;
 for (const m of ahkSrc.matchAll(
 	/^\s*static\s+([A-Z][A-Z0-9_]+)\s*:=\s*(\[[^\]]*\]|-?[\d.]+)\s*(;.*)?$/gm
 )) {
-	if (m[3] && m[3].includes('<- keylogger.')) {
+	if (m[3] && m[3].includes('<- keystats.')) {
 		ahkPlaceholders++;
 		continue;
 	}
@@ -120,7 +120,7 @@ if (ahk.size < 5) {
 }
 if (ahkPlaceholders === 0) {
 	errors.push(
-		`parsed 0 boot-filled placeholder(s) in ${AHK_WALKER} — the "<- keylogger.<key>" convention this ` +
+		`parsed 0 boot-filled placeholder(s) in ${AHK_WALKER} — the "<- keystats.<key>" convention this ` +
 			'gate skips has gone, so the exclusion above may now be hiding real comparisons'
 	);
 }
@@ -178,7 +178,7 @@ for (const [name, value] of shared) {
 
 if (errors.length > 0) {
 	console.error(
-		'\x1b[31m[FAIL] the keylogger walkers disagree with the shared aggregation constants:\x1b[0m'
+		'\x1b[31m[FAIL] the keystats walkers disagree with the shared aggregation constants:\x1b[0m'
 	);
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);

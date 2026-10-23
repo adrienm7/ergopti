@@ -6,7 +6,7 @@
 --- Proves that Hammerspoon suppresses event-tap keycodes only while an exact
 --- Ergopti Karabiner lease is live. A disabled, starting, failed or stopped
 --- integration must treat identically shaped personal Karabiner output as user
---- input instead of silently dropping it from keylogger metrics.
+--- input instead of silently dropping it from keystats metrics.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -165,7 +165,7 @@ local function load_remap(initially_enabled, options)
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
-	package.loaded["modules.keylogger.kc_bridge"] = {
+	package.loaded["modules.keystats.kc_bridge"] = {
 		refresh_managed_set = function(tap_hold_config)
 			ctx.suppresses_personal_output = next(tap_hold_config) ~= nil
 			return true

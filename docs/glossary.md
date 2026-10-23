@@ -26,7 +26,7 @@
 
 ## D
 
-**data.sql** — Fichier SQL append-only par device dans le dossier métriques du keylogger. Source de vérité canonique sur disque pour les événements clavier ; `db.sqlite` en est un cache reconstruisable.
+**data.sql** — Fichier SQL append-only par device dans le dossier métriques du keystats. Source de vérité canonique sur disque pour les événements clavier ; `db.sqlite` en est un cache reconstruisable.
 
 **Dead key** — Touche combinatoire (chapeau `^`, tréma `¨`, accent grave `` ` ``…) qui ne produit pas de caractère immédiatement mais modifie le caractère suivant pour former un caractère composé (ex. `^` + `a` → `â`).
 
@@ -44,7 +44,7 @@
 
 **Eventtap** — Objet `hs.eventtap` qui intercepte les événements clavier et/ou souris au niveau OS, globalement, avant qu'ils atteignent les applications. Équivalent macOS du hook clavier AHK.
 
-**Expander** — Sous-module de `modules/keymap/` qui injecte le texte de remplacement dans l'OS après qu'un déclencheur a été reconnu. Marque les keystrokes injectés comme synthétiques pour que le keylogger ne les comptabilise pas.
+**Expander** — Sous-module de `modules/keymap/` qui injecte le texte de remplacement dans l'OS après qu'un déclencheur a été reconnu. Marque les keystrokes injectés comme synthétiques pour que le keystats ne les comptabilise pas.
 
 ---
 
@@ -72,7 +72,7 @@
 
 **InputHook** (AHK) — Objet AHK v2 `InputHook()` qui intercepte les caractères de façon transparente, sans les consommer du flux d'événements OS. Utilisé par le prefix watcher et le LLM bridge.
 
-**Ingest tick** — Timer périodique qui lit `today.log`, écrit les événements dans `db.sqlite`, et vide le buffer mémoire. Fréquence configurable dans `_shared/modules/timings/constants.toml [keylogger]`.
+**Ingest tick** — Timer périodique qui lit `today.log`, écrit les événements dans `db.sqlite`, et vide le buffer mémoire. Fréquence configurable dans `_shared/modules/timings/constants.toml [keystats]`.
 
 ---
 
@@ -80,7 +80,7 @@
 
 **Karabiner-Elements (KE)** — Outil macOS de remapping clavier bas niveau fonctionnant au niveau kernel. ErgoptiPlus génère entièrement son `karabiner.json` en Lua et le déploie dans le répertoire de config KE pour gérer les remappings que Hammerspoon ne peut pas intercepter.
 
-**Keylogger** — Démon bas niveau qui intercepte, horodate et stocke chaque frappe humaine globalement. Ne loggue pas les frappes synthétiques (injectées par l'expander). Persiste en SQLite + JSONL ; partage le schéma disque entre les trois drivers pour les dossiers cloud partagés.
+**Keystats** — Démon bas niveau qui intercepte, horodate et stocke chaque frappe humaine globalement. Ne loggue pas les frappes synthétiques (injectées par l'expander). Persiste en SQLite + JSONL ; partage le schéma disque entre les trois drivers pour les dossiers cloud partagés.
 
 ---
 
@@ -108,7 +108,7 @@
 
 **Navigation layer** — Couche virtuelle activée par le maintien d'une touche tap-hold (ex. LAlt), mappant les touches de lettres/chiffres à des actions de navigation (flèches, mot/ligne/document, gestion de fenêtres, volume). Ses touches sont des données : le préréglage d'Ergopti dans `_shared/keymap/layers.recommended.toml` et le `layers.toml` de l'utilisateur dans le dossier de configuration, écrits dans le vocabulaire `_shared/keymap/layer_actions.toml` et identifiés par `KeyboardEvent.code` (`_shared/data/keycodes/physical_keys.json`). Il n'existe plus de table `[tap_hold.layers.*]` : `defaults.toml` ne fait que nommer la couche qu'une touche active.
 
-**N-gram** — Séquence de N frappes consécutives analysée par le keylogger pour les statistiques ergonomiques (fréquence de bigrammes, SFBs, vitesse par finger).
+**N-gram** — Séquence de N frappes consécutives analysée par le keystats pour les statistiques ergonomiques (fréquence de bigrammes, SFBs, vitesse par finger).
 
 ---
 
@@ -152,7 +152,7 @@
 
 **SSoT (Single Source of Truth)** — Principe imposant qu'une valeur partagée (constante, default, catalogue) soit définie en un seul endroit et lue partout ailleurs. Toute duplication est une violation et crée un risque de drift.
 
-**Suspend / Pause invariant** — Règle architecturale : suspendre ErgoptiPlus doit faire taire **toutes** les fonctionnalités (tooltip, LLM, keylogger, widget). AHK `Suspend` ne désarme que les hotkeys ; les `InputHook`, timers, et `OnMessage` le contournent et nécessitent des guards `A_IsSuspended` explicites.
+**Suspend / Pause invariant** — Règle architecturale : suspendre ErgoptiPlus doit faire taire **toutes** les fonctionnalités (tooltip, LLM, keystats, widget). AHK `Suspend` ne désarme que les hotkeys ; les `InputHook`, timers, et `OnMessage` le contournent et nécessitent des guards `A_IsSuspended` explicites.
 
 ---
 
@@ -162,7 +162,7 @@
 
 **Tap-hold** — Technique de double rôle sur une touche physique : pression courte (tap) → une action, maintien (hold) → une autre action (couche ou modificateur). Implémenté dans `platform/remap/`.
 
-**today.log** — Fichier JSONL hot-path écrit par le keylogger à chaque flush. Évite d'ouvrir SQLite sur le chemin critique par frappe (latence) ; ingéré dans `db.sqlite` par le walker au prochain tick.
+**today.log** — Fichier JSONL hot-path écrit par le keystats à chaque flush. Évite d'ouvrir SQLite sur le chemin critique par frappe (latence) ; ingéré dans `db.sqlite` par le walker au prochain tick.
 
 **Touchdevice** — API macOS non documentée (`hs._asm.undocumented.touchdevice`) permettant de recevoir les frames tactiles brutes du trackpad. Le device est dormant jusqu'au premier contact physique ; aucune sonde logicielle ne peut le réveiller plus tôt.
 

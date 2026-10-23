@@ -244,13 +244,13 @@ _NEC_GenericMirrorRecovery(ZeroHook := false) {
 		AssertFalse(IsObject(_TEXT_NATIVE_OWNER), "generic recovery fixture needs idle native ownership")
 		Saved := { Owner: _TEXT_NATIVE_OWNER, Serial: _TEXT_NATIVE_SERIAL,
 			Engine: _LLM_Engine, Observer: _LLM_Bridge_PrefixObserver,
-			Logging: Keylogger.initialized }
+			Logging: Keystats.initialized }
 		State := _NEC_Fixture()
 		State.Opts.Delete("commit_failure")
 		if ZeroHook
 			State.Opts["commit_failure"] := 0
 		try {
-			Keylogger.initialized := false
+			Keystats.initialized := false
 			_LLM_Bridge_PrefixObserver := 0
 			_LLM_Engine := Map("inline_last_typed", "obsolete inline")
 			_LLM_Bridge_Buffer := "obsolete llm"
@@ -284,7 +284,7 @@ _NEC_GenericMirrorRecovery(ZeroHook := false) {
 			_TEXT_NATIVE_SERIAL := Saved.Serial
 			_LLM_Engine := Saved.Engine
 			_LLM_Bridge_PrefixObserver := Saved.Observer
-			Keylogger.initialized := Saved.Logging
+			Keystats.initialized := Saved.Logging
 		}
 	}
 }

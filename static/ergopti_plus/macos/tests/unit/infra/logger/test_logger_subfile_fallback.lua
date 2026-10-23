@@ -12,7 +12,7 @@
 --- BARE pcall whose every early exit — source not "@"-prefixed, path pattern
 --- miss, any throw — discarded the error with no Logger call at all. On any of
 --- those paths the table stayed `{}`, so the fan-out loop iterated nothing and
---- ALL TEN topical logs (mlx, ollama, llm, hotstrings, keylogger, karabiner,
+--- ALL TEN topical logs (mlx, ollama, llm, hotstrings, keystats, karabiner,
 --- gestures, menu, notify, boot) silently stopped existing, with no warning
 --- anywhere to explain why.
 ---

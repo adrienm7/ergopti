@@ -551,7 +551,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	end
 
 	-- Timing surfaced so the boot log shows the cost of each exclusion-menu build
-	-- (built once per picker per menu tree rebuild — keylogger + LLM = two per tree).
+	-- (built once per picker per menu tree rebuild — keystats + LLM = two per tree).
 	Logger.info(LOG, "Application exclusion menu built successfully (%d excluded app(s), %.1f ms).",
 		#sorted_apps, (hs.timer.absoluteTime() - _build_t0) / 1e6)
 	-- PROVIDER rows, not an hs.menubar tree. They used to be `title`/`fn`/`image`

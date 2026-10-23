@@ -85,9 +85,9 @@ local dashboard,context=require('tests.support.metrics_typing_fixture')({
  cancel=function(handle) handle.timer=nil;return true end})
 package.loaded['hs.json'].decode=json.decode
 package.loaded['hs.json'].encode=json.encode
-package.loaded['modules.keylogger.sqlite_reader']={}
+package.loaded['modules.keystats.sqlite_reader']={}
 local reads,errors,removes=0,0,0
-package.loaded['modules.keylogger.log_manager'].get_sqlite_path=function() reads=reads+1;return nil end
+package.loaded['modules.keystats.log_manager'].get_sqlite_path=function() reads=reads+1;return nil end
 package.loaded['infra.logger'].error=function() errors=errors+1 end
 os.remove=function() removes=removes+1;return true end
 -- A completed projection saves its snapshot; keep that write off the real disk

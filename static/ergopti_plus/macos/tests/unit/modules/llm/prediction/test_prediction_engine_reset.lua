@@ -146,8 +146,8 @@ package.loaded["ui.tooltip"] = {
 	tint                  = function(_) return nil end,
 }
 
--- Stub modules.keylogger.
-package.loaded["modules.keylogger"] = {
+-- Stub modules.keystats.
+package.loaded["modules.keystats"] = {
 	get_live_stats    = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed = function(_, _preds) end,
 }

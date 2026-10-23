@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Completion = require("tests.support.modules.keylogger.ngram_completion_fixture")
-local Today = require("tests.support.modules.keylogger.today_completion_fixture")
+local Completion = require("tests.support.modules.keystats.ngram_completion_fixture")
+local Today = require("tests.support.modules.keystats.today_completion_fixture")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 local Json = require("json")
 local M = {}
@@ -129,10 +129,10 @@ function M.with_publication(options, callback)
 					if path == "/fixture/db.sqlite" then return { mode = "file" } end
 				end
 				package.loaded["hs.sqlite3"] = state.sqlite
-				package.loaded["modules.keylogger.sqlite_reader"] = nil
-				local reader = require("modules.keylogger.sqlite_reader")
+				package.loaded["modules.keystats.sqlite_reader"] = nil
+				local reader = require("modules.keystats.sqlite_reader")
 				observe_manifest(state, reader)
-				package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
+				package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fixture/db.sqlite" end
 				dashboard._app_icon_cache.Editor = false
 				state.saves, state.disk_files = {}, {}
 				local Snapshot = package.loaded["ui.metrics_typing.snapshot"]

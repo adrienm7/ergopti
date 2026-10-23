@@ -174,7 +174,7 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  local cached=evaluations[2].code
  package.loaded['hs.json'].encode=json.encode
  dashboard._app_icon_cache={Editor=false}
- package.loaded['modules.keylogger.sqlite_reader'].read_manifest=function()
+ package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()
   return {['2026-01-01']={Editor={app_time_ms=10}}},true
  end
  assert(dashboard.push_live_update())
@@ -239,10 +239,10 @@ require('tests.support.metrics_delivery_fixture')(true,function(dashboard,state,
  package.loaded['hs.json'].encode=json.encode
  dashboard._app_icon_cache={Editor=false}
  local duration=10
- package.loaded['modules.keylogger.sqlite_reader'].read_manifest=function()
+ package.loaded['modules.keystats.sqlite_reader'].read_manifest=function()
   return {['2026-01-01']={Editor={app_time_ms=duration}}},true
  end
- package.loaded['modules.keylogger.log_manager'].get_db_rev=function() return duration end
+ package.loaded['modules.keystats.log_manager'].get_db_rev=function() return duration end
  local function fresh()
   assert(dashboard.push_live_update())
   pending[#pending]()

@@ -85,15 +85,15 @@ _WBSG_CheckChangelogGuard() {
 Test("changelog: _CLW_OnWebMessage guards captured pause provenance before fetch mutation (webview-bridge-suspend-guard)",
 	_WBSG_CheckChangelogGuard)
 
-_WBSG_CheckKeyloggerGuard() {
+_WBSG_CheckKeystatsGuard() {
 	Body := _DriverFuncBody("KLWV_OnWebMessage")
-	Assert(Body != "", "KLWV_OnWebMessage must exist in modules/keylogger/keylogger_webview.ahk")
+	Assert(Body != "", "KLWV_OnWebMessage must exist in modules/keystats/keystats_webview.ahk")
 	SuspendPos := InStr(Body, "A_IsSuspended")
 	BuildPos := InStr(Body, "KLPF_RequestBuild(")
 	Assert(SuspendPos > 0 && BuildPos > SuspendPos,
-		"KLWV_OnWebMessage must reject suspended WebMessages before Refresh/Clear can launch keylogger projection workers")
+		"KLWV_OnWebMessage must reject suspended WebMessages before Refresh/Clear can launch keystats projection workers")
 }
-Test("keylogger WebView: paused messages cannot rebuild metrics", _WBSG_CheckKeyloggerGuard)
+Test("keystats WebView: paused messages cannot rebuild metrics", _WBSG_CheckKeystatsGuard)
 
 ; The whole cluster has ONE mechanism behind it: infra/webview_utils.ahk defines a
 ; WebViewHost factory that handles every documented gotcha correctly — and has

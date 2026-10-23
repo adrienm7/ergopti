@@ -21,7 +21,7 @@
 ---    reload afterwards is the caller's business, which is the actual
 ---    difference between those two.
 --- 3. Resolution works BEFORE init(). Modules requiring this during their own
----    load — keylogger's init IIFE among them — must still get the
+---    load — keystats's init IIFE among them — must still get the
 ---    user-configured directory, so the default is computed at module load and
 ---    paths.toml is lazy-read on first use. A packaged launch exports its stable
 ---    user-writable bootstrap path; source-tree launches retain the adjacent
@@ -788,7 +788,7 @@ function M.set_config_dir(new_dir)
 end
 
 --- Metrics store directory of a configuration directory. The single rule shared
---- by the keylogger (where keystrokes are written) and the onboarding consent
+--- by the keystats (where keystrokes are written) and the onboarding consent
 --- text (where the user is told they will be written).
 --- @param dir string|nil Configuration directory; nil means the current one.
 --- @return string <dir>/metrics, without trailing slash.

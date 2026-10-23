@@ -121,12 +121,12 @@ function label(key, ...args) {
 }
 
 const REPORT =
-	'# ErgoptiPlus diagnostics\n\n| Field | Value |\n```text\nerror:\n  module: keylogger\n```\n';
+	'# ErgoptiPlus diagnostics\n\n| Field | Value |\n```text\nerror:\n  module: keystats\n```\n';
 const ERROR = {
 	type: 'init',
 	kind: 'error',
-	module: 'keylogger',
-	message: 'Flush failed: disk full\nstack traceback:\n\tkeylogger.lua:12',
+	module: 'keystats',
+	message: 'Flush failed: disk full\nstack traceback:\n\tkeystats.lua:12',
 	log_path: '~/.local/state/ergopti_plus/logs/ErgoptiPlus_errors_2026-09-24.log',
 	text: REPORT,
 	more: 0
@@ -154,7 +154,7 @@ const ERROR = {
 	}
 	if (el.heading.textContent !== en['error_dialog.heading'])
 		fail(`the heading reads "${el.heading.textContent}"`);
-	if (el.module.textContent !== 'keylogger') fail('the module is not shown');
+	if (el.module.textContent !== 'keystats') fail('the module is not shown');
 	if (el.message.textContent !== ERROR.message) fail('the message is not shown whole');
 	if (el['details-text'].textContent !== REPORT)
 		fail('the details block is not the report the host sent');

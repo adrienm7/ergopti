@@ -4,7 +4,7 @@
 --- MODULE: Typing Metrics Dashboard UI
 --- DESCRIPTION:
 --- Hosts the typing-metrics WebView. Reads from `db.sqlite` (the tmpdir cache
---- rebuildable from `data.sql`) via `modules.keylogger.sqlite_reader` and
+--- rebuildable from `data.sql`) via `modules.keystats.sqlite_reader` and
 --- projects the result into the JSON shape consumed by the (unchanged)
 --- frontend JS.
 ---
@@ -53,7 +53,7 @@ local LOG = "metrics_typing"
 local _log_manager = nil
 local function _get_log_manager()
 	if not _log_manager then
-		_log_manager = require("modules.keylogger.log_manager")
+		_log_manager = require("modules.keystats.log_manager")
 	end
 	return _log_manager
 end
@@ -460,7 +460,7 @@ local function compute_full(pacer)
 	local session = nil
 	local sqlite_path = readable_sqlite_path()
 	if sqlite_path then
-		session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path, today, pacer)
+		session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path, today, pacer)
 		manifest, manifest_json, manifest_complete = session.manifest()
 	end
 
@@ -527,7 +527,7 @@ end
 local function compute_live(pacer)
 	local sqlite_path = readable_sqlite_path()
 	if not sqlite_path then return { payload = '{"manifest":{}}', complete = true } end
-	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
 	local _, manifest_json, manifest_complete = session.manifest()
 	return {
@@ -545,7 +545,7 @@ local function compute_range(query, pacer)
 	local sqlite_path = readable_sqlite_path()
 	if not sqlite_path then return { payload = '{"historical":[],"today":[]}', complete = true } end
 	local apps = type(query.apps) == "table" and query.apps or nil
-	local session = Projection.session(require("modules.keylogger.sqlite_reader"), sqlite_path,
+	local session = Projection.session(require("modules.keystats.sqlite_reader"), sqlite_path,
 		os.date("%Y-%m-%d"), pacer)
 	local payload, range_complete = session.range(query.start_date, query.end_date, apps)
 	return { payload = payload, complete = range_complete == true }

@@ -16,7 +16,7 @@ require("logger")
 
 local function with_remote(callback)
 	helpers.with_stub_scope({
-		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keylogger",
+		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
 		"modules.shortcuts.script_control", "adapters.http_client",
 		"modules.llm.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
@@ -39,7 +39,7 @@ local function with_remote(callback)
 			pcall = function(_, callback, ...) return pcall(callback, ...) end,
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
-		package.loaded["modules.keylogger"] = {}
+		package.loaded["modules.keystats"] = {}
 		package.loaded["modules.shortcuts.script_control"] = {
 			is_paused = function() return false end,
 			get_pause_epoch = function() return 0 end,

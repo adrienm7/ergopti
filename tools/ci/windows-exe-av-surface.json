@@ -22,7 +22,7 @@
 			"elevated_run": { "pattern": "\\*RunAs", "max": 3 }
 		},
 		"reported": {
-			"keylogger_wording": "keylog",
+			"keylog_wording": "keylog",
 			"powershell_mentions": "powershell"
 		}
 	},
@@ -39,7 +39,7 @@
 			"base64_decode": { "pattern": "FromBase64String", "max": 1 }
 		},
 		"reported": {
-			"keylogger_wording": "keylog"
+			"keylog_wording": "keylog"
 		}
 	}
 }

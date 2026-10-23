@@ -102,7 +102,7 @@ local function with_category_store(spec, callback)
 		alert = noop,
 	}
 	local previous_modules = {}
-	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keylogger.log_manager",
+	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keystats.log_manager",
 			"infra.config_paths" }) do
 		previous_modules[name] = { value = package.loaded[name] }
 	end
@@ -112,7 +112,7 @@ local function with_category_store(spec, callback)
 		after = function() return { timer = {} }, true end,
 		cancel = function(handle) handle.timer = nil; return true end,
 	}
-	package.loaded["modules.keylogger.log_manager"] = { on_ingest_done = function() return true end }
+	package.loaded["modules.keystats.log_manager"] = { on_ingest_done = function() return true end }
 	package.loaded["ui.ui_builder"] = {
 		show_webview = function()
 			return {

@@ -142,7 +142,7 @@ package.loaded["ui.tooltip"] = {
 	tint                  = function(_) return nil end,
 }
 
-package.loaded["modules.keylogger"] = {
+package.loaded["modules.keystats"] = {
 	get_live_stats    = function() return { wpm_physical = 0 } end,
 	log_llm_dismissed = function(_, _preds) end,
 }

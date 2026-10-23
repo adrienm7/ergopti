@@ -122,13 +122,13 @@ end)
 --- =======================================================
 --- =======================================================
 
--- The A2 follow-up wired more macOS modules to the manifest: keylogger (the
+-- The A2 follow-up wired more macOS modules to the manifest: keystats (the
 -- cross-driver metrics filter/encrypt flags), dynamic_hotstrings (per-category
 -- toggles, read via the feature toggle's `.enabled`).
 -- A drift in manifest.toml would silently change those runtime defaults — these
 -- pin the wired source values so it turns red first.
 helpers.describe("manifest_reader: extended module wiring parity", function()
-	helpers.it("keylogger metrics filter / encrypt defaults", function()
+	helpers.it("keystats metrics filter / encrypt defaults", function()
 		helpers.assert_eq(Manifest.default_for("metrics.private_filter_enabled"), true, "private filter")
 		helpers.assert_eq(Manifest.default_for("metrics.secure_filter_enabled"), true, "secure filter")
 		helpers.assert_eq(Manifest.default_for("metrics.system_auth_filter_enabled"), true, "system-auth filter")

@@ -237,10 +237,10 @@ package.preload["adapters.event_loop"] = function()
 	-- The real deferred queue: start-up schedules work on it.
 	local adapter = dofile("adapters/event_loop.lua")
 	local function settle_metrics()
-		local uv, collector = require("luv"), require("modules.keylogger.keylogger")
+		local uv, collector = require("luv"), require("modules.keystats.keystats")
 		if not collector.has_flush_debt() then return end
 		record("FACT", "metrics_pending_before_pump=" .. tostring(collector.is_flush_pending()))
-		local deadline = uv.hrtime() + require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms") * 1e6
+		local deadline = uv.hrtime() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1e6
 		-- Virtual seconds must not age a real SQLite child before its stdin and
 		-- COMMIT callbacks have had a native loop turn. Its deadline is unchanged.
 		repeat

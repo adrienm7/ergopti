@@ -67,8 +67,8 @@ function M.get_port()
 	return resolve_ollama_port()
 end
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 local _req_counter = 0
 local _ollama_started = false
@@ -1534,8 +1534,8 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
 				if not status or status ~= 200 then
 					Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d: %s", model_name, req_id, status or -1, (body or ""):sub(1, 200))
-					if keylogger and type(keylogger.log_llm_failed) == "function" then
-						pcall(keylogger.log_llm_failed, full_text, nil, {
+					if keystats and type(keystats.log_llm_failed) == "function" then
+						pcall(keystats.log_llm_failed, full_text, nil, {
 							backend        = "ollama",
 							model          = tostring(model_name),
 							system_prompt  = system_prompt,
@@ -1604,8 +1604,8 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                     if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end return
                 end
                 Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
-                if keylogger and type(keylogger.log_llm) == "function" then
-                    pcall(keylogger.log_llm, full_text, results, nil, {
+                if keystats and type(keystats.log_llm) == "function" then
+                    pcall(keystats.log_llm, full_text, results, nil, {
                         backend       = "ollama",
                         model         = tostring(model_name),
                         system_prompt = system_prompt,
@@ -1808,8 +1808,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
-		if keylogger and type(keylogger.log_llm) == "function" then
-			pcall(keylogger.log_llm, full_text, results, nil, {
+		if keystats and type(keystats.log_llm) == "function" then
+			pcall(keystats.log_llm, full_text, results, nil, {
 				backend       = "ollama",
 				model         = tostring(model_name),
 				system_prompt = system_prompt,

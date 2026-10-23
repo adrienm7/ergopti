@@ -226,7 +226,7 @@ helpers.describe("terminal macOS shortcut scopes", function()
 		helpers.it("settles only shortcut demotions, publication refused=" .. tostring(refused), function()
 			Fixture.run(function(f)
 				f.demotions.record({ feature = "shortcuts", key = "shortcuts", persisted = true, demoted = false })
-				f.demotions.record({ feature = "metrics", key = "keylogger_enabled", persisted = true, demoted = false })
+				f.demotions.record({ feature = "metrics", key = "keystats_enabled", persisted = true, demoted = false })
 				f.controls.refuse_write = refused
 				helpers.assert_eq(f.owner.apply("clear"), not refused)
 				local remaining = f.demotions.list()

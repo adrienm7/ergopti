@@ -328,13 +328,13 @@ return_delay_ms = 200
 
 
 # ──────────────────────────────────────────────────────────────────────
-# Keylogger
+# Keystats
 # ──────────────────────────────────────────────────────────────────────
 
-[keylogger]
+[keystats]
 
 # Background ingest tick — how often buffered events are flushed to disk.
-# AHK: keylogger.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
+# AHK: keystats.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
 ingest_tick_ms = 5000
 
 # Hard deadline for one private SQLite child, including its stdin feed.
@@ -343,65 +343,65 @@ ingest_tick_ms = 5000
 sqlite_operation_timeout_ms = 1000
 
 # Keystroke delay above this value is treated as a "thinking pause".
-# AHK: keylogger.ahk / keylogger_walker.ahk THINK_PAUSE_MS.
+# AHK: keystats.ahk / keystats_walker.ahk THINK_PAUSE_MS.
 # HS: aggregator.lua THINK_PAUSE_THRESHOLD_MS.
 think_pause_ms = 2000
 
 # Cap for inter-keystroke delay used in WPM bucketing / n-gram analysis.
-# AHK: keylogger.ahk / keylogger_walker.ahk WPM_MAX_DELAY_MS.
+# AHK: keystats.ahk / keystats_walker.ahk WPM_MAX_DELAY_MS.
 # HS: aggregator.lua MAX_KEYSTROKE_DELAY_MS / log_manager.lua WPM_MAX_EVENT_DELAY_MS.
 max_keystroke_delay_ms = 5000
 
 # Day-rollover midnight check cadence.
-# AHK: keylogger.ahk MIDNIGHT_CHECK_TICK_MS.
+# AHK: keystats.ahk MIDNIGHT_CHECK_TICK_MS.
 midnight_check_tick_ms = 60000
 
 # Gap between keystrokes that marks a burst boundary.
-# AHK: keylogger_walker.ahk BURST_GAP_MS. HS: aggregator.lua BURST_GAP_MS.
+# AHK: keystats_walker.ahk BURST_GAP_MS. HS: aggregator.lua BURST_GAP_MS.
 burst_gap_ms = 1000
 
 # Inactivity gap that starts a new typing session.
-# AHK: keylogger_walker.ahk SESSION_GAP_MS. HS: aggregator.lua SESSION_GAP_MS.
+# AHK: keystats_walker.ahk SESSION_GAP_MS. HS: aggregator.lua SESSION_GAP_MS.
 session_gap_ms = 300000
 
 # Maximum delay that is still classified as auto-repeat (key held down).
-# AHK: keylogger_walker.ahk AUTO_REPEAT_MAX_DELAY_MS. HS: aggregator.lua.
+# AHK: keystats_walker.ahk AUTO_REPEAT_MAX_DELAY_MS. HS: aggregator.lua.
 auto_repeat_max_delay_ms = 50
 
 # Minimum hold duration to classify a key event as a deliberate hold.
-# AHK: keylogger_walker.ahk HOLD_THRESHOLD_MS. HS: aggregator.lua.
+# AHK: keystats_walker.ahk HOLD_THRESHOLD_MS. HS: aggregator.lua.
 hold_threshold_ms = 250
 
 # Micro-idle timeout: user is considered briefly idle after this silence.
-# AHK: keylogger_watchers.ahk MICRO_IDLE_TIMEOUT_MS. HS: keylogger/init.lua.
+# AHK: keystats_watchers.ahk MICRO_IDLE_TIMEOUT_MS. HS: keystats/init.lua.
 micro_idle_timeout_ms = 30000
 
 # Full session timeout: user is considered absent after this silence.
-# AHK: keylogger_watchers.ahk SESSION_TIMEOUT_MS. HS: keylogger/init.lua.
+# AHK: keystats_watchers.ahk SESSION_TIMEOUT_MS. HS: keystats/init.lua.
 session_timeout_ms = 300000
 
 # Idle-check poll interval (how often the watcher tests for inactivity).
-# AHK: keylogger_watchers.ahk IDLE_CHECK_INTERVAL_MS. HS: keylogger/init.lua.
+# AHK: keystats_watchers.ahk IDLE_CHECK_INTERVAL_MS. HS: keystats/init.lua.
 idle_check_interval_ms = 10000
 
 # Maintenance pass interval (log rotation, cache cleanup, etc.).
-# HS: keylogger/init.lua MAINTENANCE_INTERVAL_SEC.
+# HS: keystats/init.lua MAINTENANCE_INTERVAL_SEC.
 maintenance_interval_ms = 5000
 
 # WPM sliding window duration.
-# HS: keylogger/init.lua WPM_WINDOW_MS.
+# HS: keystats/init.lua WPM_WINDOW_MS.
 wpm_window_ms = 15000
 
 # Minimum typing duration before a WPM sample is considered valid.
-# HS: keylogger/init.lua WPM_MIN_DURATION_MS.
+# HS: keystats/init.lua WPM_MIN_DURATION_MS.
 wpm_min_duration_ms = 2000
 
 # Silence after which the live WPM reads 0 rather than the speed of the last
-# burst. HS: keylogger/init.lua get_live_stats(); Linux: keylogger.lua.
+# burst. HS: keystats/init.lua get_live_stats(); Linux: keystats.lua.
 wpm_idle_reset_ms = 5000
 
 # System load poll interval (CPU / RAM sampling).
-# HS: keylogger/init.lua SYSTEM_LOAD_POLL_INTERVAL_MS.
+# HS: keystats/init.lua SYSTEM_LOAD_POLL_INTERVAL_MS.
 system_load_poll_ms = 300000
 
 # Legacy registry value retained for shared schema and test-vector compatibility.
@@ -409,71 +409,71 @@ system_load_poll_ms = 300000
 synth_match_delay_ms = 3
 
 # Auto-flush trigger: flush buffer when typing has been idle this long.
-# HS: keylogger/watchers.lua AUTO_FLUSH_IDLE_MS.
+# HS: keystats/watchers.lua AUTO_FLUSH_IDLE_MS.
 auto_flush_idle_ms = 120000
 
 # Hook flush period — how often the low-level hook drains its buffer.
-# AHK: keylogger_hook.ahk FLUSH_PERIOD_MS.
+# AHK: keystats_hook.ahk FLUSH_PERIOD_MS.
 hook_flush_period_ms = 200
 
 # Hook context TTL — how long a context entry is kept before expiry.
-# AHK: keylogger_hook.ahk CONTEXT_TTL_MS (drift-gated to this value).
+# AHK: keystats_hook.ahk CONTEXT_TTL_MS (drift-gated to this value).
 hook_context_ttl_ms = 1000
 
-# Keylogger bridge poll fallback interval (HS kc_bridge without inotify).
+# Keystats bridge poll fallback interval (HS kc_bridge without inotify).
 # HS: kc_bridge.lua POLL_FALLBACK_SEC.
 kc_bridge_poll_ms = 500
 
 # Window topology tick interval.
-# AHK: keylogger_window_topology.ahk TOPO_TICK_MS (drift-gated to this value).
+# AHK: keystats_window_topology.ahk TOPO_TICK_MS (drift-gated to this value).
 topo_tick_ms = 1500
 
 # AV-state fast-poll tick.
-# AHK: keylogger_av_state.ahk AVSTATE_TICK_MS.
+# AHK: keystats_av_state.ahk AVSTATE_TICK_MS.
 av_state_fast_tick_ms = 1000
 
 # AV-state slow-poll tick (media player / volume sampling).
-# AHK: keylogger_av_state.ahk SLOW_TICK_MS.
+# AHK: keystats_av_state.ahk SLOW_TICK_MS.
 av_state_slow_tick_ms = 30000
 
 # Network: Wi-Fi / SSID poll interval.
-# AHK: keylogger_network.ahk NETWORK_TICK_MS.
+# AHK: keystats_network.ahk NETWORK_TICK_MS.
 network_wifi_tick_ms = 15000
 
 # Network: internet reachability check interval.
-# AHK: keylogger_network.ahk REACH_TICK_MS.
+# AHK: keystats_network.ahk REACH_TICK_MS.
 network_reach_tick_ms = 30000
 
 # Network: VPN adapter poll interval.
-# AHK: keylogger_network.ahk VPN_TICK_MS.
+# AHK: keystats_network.ahk VPN_TICK_MS.
 network_vpn_tick_ms = 20000
 
 # Sensor (CPU/GPU temp, fan) sampling tick.
-# AHK: keylogger_sensors.ahk SENSOR_TICK_MS.
+# AHK: keystats_sensors.ahk SENSOR_TICK_MS.
 sensor_tick_ms = 60000
 
 # Mouse: gap between scroll events that flushes the burst accumulator.
-# AHK: keylogger_mouse.ahk SCROLL_BURST_GAP_MS.
+# AHK: keystats_mouse.ahk SCROLL_BURST_GAP_MS.
 mouse_scroll_burst_gap_ms = 400
 
 # Mouse: park-position check interval.
-# AHK: keylogger_mouse.ahk PARK_CHECK_MS (drift-gated to this value).
+# AHK: keystats_mouse.ahk PARK_CHECK_MS (drift-gated to this value).
 mouse_park_check_ms = 250
 
 # Mouse: idle duration before the cursor is considered "parked".
-# AHK: keylogger_mouse.ahk PARK_IDLE_MS.
+# AHK: keystats_mouse.ahk PARK_IDLE_MS.
 mouse_park_idle_ms = 3000
 
 # ROI half-life check interval (trigger decay recalculation).
-# AHK: keylogger_trigger_roi.ahk HALFLIFE_CHECK_MS.
+# AHK: keystats_trigger_roi.ahk HALFLIFE_CHECK_MS.
 roi_halflife_check_ms = 3600000
 
 # Paste burst detection window (clipboard activity grouping).
-# AHK: keylogger_clipboard.ahk PASTE_BURST_WINDOW_MS.
+# AHK: keystats_clipboard.ahk PASTE_BURST_WINDOW_MS.
 paste_burst_window_ms = 10000
 
 # Category auto-save debounce after a classification change.
-# AHK: keylogger_app_categories.ahk -5000 SetTimer.
+# AHK: keystats_app_categories.ahk -5000 SetTimer.
 app_category_save_debounce_ms = 5000
 
 
@@ -529,23 +529,23 @@ one_shot_shift_timeout_ms = 2000
 [ergonomics]
 
 # Minimum continuous typing block before a micro-break is suggested.
-# AHK: keylogger_ergonomics.ahk BLOCK_BREAK_MS.
+# AHK: keystats_ergonomics.ahk BLOCK_BREAK_MS.
 block_break_ms = 10000
 
 # Continuous typing block that triggers a full break warning.
-# AHK: keylogger_ergonomics.ahk BLOCK_WARN_MS (20 minutes).
+# AHK: keystats_ergonomics.ahk BLOCK_WARN_MS (20 minutes).
 block_warn_ms = 1200000
 
 # Flow-state detection window (sustained high-WPM period).
-# AHK: keylogger_ergonomics.ahk FLOW_WINDOW_MS (5 minutes).
+# AHK: keystats_ergonomics.ahk FLOW_WINDOW_MS (5 minutes).
 flow_window_ms = 300000
 
 # Pause duration above which a keystroke gap is classed as hesitation.
-# AHK: keylogger_ergonomics.ahk HESITATION_MS.
+# AHK: keystats_ergonomics.ahk HESITATION_MS.
 hesitation_ms = 2000
 
 # Cooldown after a hesitation event before a new one can be registered.
-# AHK: keylogger_ergonomics.ahk HESITATION_COOLDOWN_MS.
+# AHK: keystats_ergonomics.ahk HESITATION_COOLDOWN_MS.
 hesitation_cooldown_ms = 10000
 
 

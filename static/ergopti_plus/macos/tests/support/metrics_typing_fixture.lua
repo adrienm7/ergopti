@@ -50,7 +50,7 @@ local function load_dashboard(scheduler, subscribe, controls)
 			return webview
 		end,
 	}
-	package.loaded["modules.keylogger.log_manager"] = {
+	package.loaded["modules.keystats.log_manager"] = {
 		on_ingest_done = subscribe or function(callback)
 			context.on_ingest = callback
 			return true

@@ -42,10 +42,10 @@ helpers.describe("metrics disk cache reads", function()
 	for _, mode in ipairs({ "absent", "inspect", "open", "read", "close", "path_changed",
 		"identity_changed", "dependency", "unreported_error", "decode_refused", "decode_throw", "success" }) do
 		helpers.it("(metrics-cache-read) executes fresh data after " .. mode, function()
-			helpers.with_fresh_modules({ "adapters.file_system", "modules.keylogger.sqlite_reader" }, function()
+			helpers.with_fresh_modules({ "adapters.file_system", "modules.keystats.sqlite_reader" }, function()
 				local adapter = {}
 				package.loaded["adapters.file_system"] = adapter
-				package.loaded["modules.keylogger.sqlite_reader"] = {}
+				package.loaded["modules.keystats.sqlite_reader"] = {}
 				with_window("ui.metrics_apps", function(dashboard)
 					local pending, warnings, reads = {}, {}, 0
 					package.loaded["infra.logger"].warn = function(_, message, ...)
@@ -86,7 +86,7 @@ helpers.describe("metrics disk cache reads", function()
 						helpers.assert_eq(warnings[1]:find("PRIVATE_CACHE", 1, true), nil)
 					end
 					local fresh_reads = 0
-					package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function()
+					package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
 						fresh_reads = fresh_reads + 1
 						return nil
 					end

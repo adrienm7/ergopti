@@ -117,7 +117,7 @@ CB_IsPasteTransactionActive() {
 
 ; Tries to start an out-of-order-safe clipboard transaction. PreserveProvenance is
 ; true for temporary save/write/paste/restore dances: their intermediate
-; payloads must not replace the keylogger's last genuine user-copy metadata.
+; payloads must not replace the keystats's last genuine user-copy metadata.
 ; SuppressPaste is restricted to transactions which inject Ctrl+V; selection
 ; capture and screenshots do not hide unrelated physical paste actions merely
 ; because they also happen to own a clipboard snapshot. All snapshot-owning
@@ -391,7 +391,7 @@ CB_PrepareShutdown() {
 }
 
 ; True only while a clipboard transaction which actually emits Ctrl+V is live.
-; The keylogger's pass-through hotkey uses this to discard the driver's paste
+; The keystats's pass-through hotkey uses this to discard the driver's paste
 ; without silencing physical pastes during non-paste clipboard jobs.
 CB_IsDriverPasteActive() {
 	PreviousCritical := Critical("On")
@@ -473,14 +473,14 @@ CB_ConsumeOwnedChange() {
 
 ; Drop notifications which predate observer registration.  Active transaction
 ; tokens deliberately survive: a deferred restore still owns its synthetic
-; paste even if the keylogger observer is restarted in the middle.
+; paste even if the keystats observer is restarted in the middle.
 CB_DiscardOwnedNotifications() {
 	PreviousCritical := Critical("On")
 	try CBClipboardOwner.pending := []
 	finally Critical(PreviousCritical)
 }
 
-; Clipboard mutation receipts exist only for the keylogger observer. When that
+; Clipboard mutation receipts exist only for the keystats observer. When that
 ; optional consumer is stopped, retaining one record per adapter assignment
 ; would grow a FIFO which no callback can ever drain.
 CB_SetOwnershipObserverActive(Active) {

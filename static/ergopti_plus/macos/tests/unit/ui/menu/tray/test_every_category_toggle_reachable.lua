@@ -26,7 +26,7 @@ local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture"
 local MENU_MODULES = {
 	keyboard_layout = "ui.menu.menu_keyboard_layout",
 	hotstrings      = "ui.menu.menu_hotstrings",
-	keylogger       = "ui.menu.menu_metrics",
+	keystats       = "ui.menu.menu_metrics",
 	shortcuts       = "ui.menu.menu_shortcuts",
 	tap_holds       = "ui.menu.menu_tap_holds",
 	gestures        = "ui.menu.menu_gestures",
@@ -169,7 +169,7 @@ local function build_tray(on, extra)
 		config     = { log_level = 2 },
 		base_dir   = helpers.driver_root(),
 		-- `keymap` is hotstrings.enabled, the typing engine the Hotstrings switch runs.
-		state      = { shortcuts = on, gestures = on, keylogger_enabled = on, keymap = on, hotstrings = {} },
+		state      = { shortcuts = on, gestures = on, keystats_enabled = on, keymap = on, hotstrings = {} },
 		hotfiles   = groups,
 		get_group_name = function(name) return name end,
 		keymap     = {

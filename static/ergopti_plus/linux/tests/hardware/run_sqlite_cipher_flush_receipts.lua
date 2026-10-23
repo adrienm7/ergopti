@@ -17,10 +17,10 @@ end
 assert(uv.fs_mkdir(root .. "/config", 448)); assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local file = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(file:write("[metrics]\nenabled=true\nencrypt=true\n") and file:close())
-local Cipher = require("modules.keylogger.text_cipher")
+local Cipher = require("modules.keystats.text_cipher")
 local AES = require("infra.openssl_cipher")
-local K = require("modules.keylogger.keylogger")
-local W = require("modules.keylogger.sqlite_writer")
+local K = require("modules.keystats.keystats")
+local W = require("modules.keystats.sqlite_writer")
 local Drain = require("tests.support.sqlite_flush_native")
 local checks = 0
 local function pass(name) checks = checks + 1; print("PASS " .. name) end
@@ -46,7 +46,7 @@ if rawget(_G, "jit") then
 	assert(AES.available and Cipher.is_available(), "the native LuaJIT fixture requires real EVP AES")
 	assert(Drain.flush(K))
 	local rows = assert(W.query_rows("SELECT text FROM events_typing WHERE app='cipher-refusal';"))
-	assert(#rows == 1 and require("keylogger.text_crypto").is_encrypted(rows[1]))
+	assert(#rows == 1 and require("keystats.text_crypto").is_encrypted(rows[1]))
 	assert(Cipher.decrypt(rows[1]) == "owned-secret")
 	assert(scalar("SELECT SUM(c) FROM ngram_chars WHERE app='cipher-refusal';") == 12)
 	assert(W.get_meta("linux_next_event_id") == cursor, "retry must reuse the original reserved IDs")

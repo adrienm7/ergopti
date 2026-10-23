@@ -20,7 +20,7 @@
 ---    operations work without leaking resources.
 --- 3. Shared HTML loading: delegates to webkit_host.build_app_html() for
 ---    asset inlining and i18n injection.
---- 4. Daemon state injection: passes engine, keylogger, hotstrings_config, and
+--- 4. Daemon state injection: passes engine, keystats, hotstrings_config, and
 ---    LLM references to bridge handlers so UIs can query/control daemon state.
 --- ==============================================================================
 
@@ -674,7 +674,7 @@ end
 
 --- Registers daemon state that bridge handlers can access to query/control
 --- the running daemon.
---- @param state table { engine, keylogger, config, llm, layout }
+--- @param state table { engine, keystats, config, llm, layout }
 function M.set_daemon_state(state)
 	_daemon_state = type(state) == "table" and state or {}
 	Logger.debug(LOG, "Daemon state registered for bridge handlers.")

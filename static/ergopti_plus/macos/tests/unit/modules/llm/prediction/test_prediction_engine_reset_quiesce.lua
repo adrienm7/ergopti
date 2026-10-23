@@ -70,7 +70,7 @@ local function load_fixture(cancel_result)
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
 	package.loaded["modules.llm.api_common"] = { get_rate_limit_min_interval_s = function() return 0 end }
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}

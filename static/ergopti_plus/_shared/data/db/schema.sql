@@ -3,8 +3,8 @@
 -- ============================================================================
 -- ERGOPTI METRICS — CANONICAL SQLITE SCHEMA
 --
--- Single source of truth for the keylogger database structure. The Hammerspoon
--- driver (lib/keylogger/log_manager.lua) and the AHK driver (lib/keylogger/)
+-- Single source of truth for the keystats database structure. The Hammerspoon
+-- driver (lib/keystats/log_manager.lua) and the AHK driver (lib/keystats/)
 -- both load this file at startup to ensure the on-disk shape stays bit-
 -- identical between operating systems.
 --
@@ -14,7 +14,7 @@
 --
 -- Source-of-truth model: the user-visible artefact is `data.sql` (append-only
 -- text). The `db.sqlite` produced from this schema lives in `<tmpdir>/` and is
--- transparently rebuilt from `data.sql` on demand. See KEYLOGGER_SPEC.md §1.
+-- transparently rebuilt from `data.sql` on demand. See KEYSTATS_SPEC.md §1.
 -- ============================================================================
 
 PRAGMA foreign_keys = OFF;
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS meta (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
 );
--- Bootstrapped keys (managed by the keylogger ingest path):
+-- Bootstrapped keys (managed by the keystats ingest path):
 --   schema_version            → current schema version (integer as text).
 --   last_applied_data_sql_off → byte offset up to which the LOCAL device's
 --                               data.sql has been ingested into db.sqlite.
@@ -640,7 +640,7 @@ CREATE TABLE IF NOT EXISTS ngram_scancodes (
 --
 -- Precomputed JSON projections for the dashboard. Invalidated on each ingest
 -- batch (entries depending on today) or at day rollover (everything).
--- See KEYLOGGER_SPEC.md §18.
+-- See KEYSTATS_SPEC.md §18.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS view_cache (
@@ -656,7 +656,7 @@ CREATE INDEX IF NOT EXISTS idx_view_cache_size  ON view_cache(size_bytes DESC);
 
 
 -- ============================================================================
--- Initial bootstrap of the meta table. The keylogger updates these values
+-- Initial bootstrap of the meta table. The keystats updates these values
 -- after applying migrations and on each ingest batch.
 -- ============================================================================
 

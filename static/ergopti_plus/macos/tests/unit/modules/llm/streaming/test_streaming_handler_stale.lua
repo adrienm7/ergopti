@@ -80,9 +80,9 @@ local function make_core_llm_stub(backend)
 	}
 end
 
---- Builds a minimal keylogger stub.
+--- Builds a minimal keystats stub.
 --- @return table stub
-local function make_keylogger_stub()
+local function make_keystats_stub()
 	return {
 		log_llm           = function() end,
 		log_llm_suggested = function() end,
@@ -158,8 +158,8 @@ local function load_fresh_handler(backend)
 
 	local tooltip   = make_tooltip_stub()
 	local core_llm  = make_core_llm_stub(backend)
-	local keylogger = make_keylogger_stub()
-	Handler.init({ core_llm = core_llm, tooltip = tooltip, keylogger = keylogger })
+	local keystats = make_keystats_stub()
+	Handler.init({ core_llm = core_llm, tooltip = tooltip, keystats = keystats })
 	Handler.reset_failure_count()
 
 	return Handler, tooltip, notify_calls

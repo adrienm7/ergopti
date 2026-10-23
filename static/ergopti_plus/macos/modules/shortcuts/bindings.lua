@@ -225,12 +225,12 @@ local function get_frontmost_app_name()
 	return name or "Unknown"
 end
 
---- Logs a shortcut invocation via the keylogger module when it is available.
---- Uses a lazy require so the keylogger is optional and need not be pre-wired.
+--- Logs a shortcut invocation via the keystats module when it is available.
+--- Uses a lazy require so the keystats is optional and need not be pre-wired.
 --- @param label string The canonical shortcut label (e.g. "Ctrl+T").
 --- @param app_name string The name of the app in which the shortcut fired.
 local function log_shortcut(label, app_name)
-	local ok_kl, kl = pcall(require, "modules.keylogger")
+	local ok_kl, kl = pcall(require, "modules.keystats")
 	if ok_kl and kl and type(kl.log_shortcut) == "function" then
 		pcall(kl.log_shortcut, label, app_name)
 	end

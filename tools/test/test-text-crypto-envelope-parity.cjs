@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: At-Rest Encryption Envelope Parity Gate
  * DESCRIPTION:
- * The three drivers encrypt the keylogger's typed-text columns. A row written on
+ * The three drivers encrypt the keystats's typed-text columns. A row written on
  * one machine is only decryptable on that machine (the key derives from the
  * machine id), but the ENVELOPE FORMAT and the crypto parameters must be
  * identical across drivers — otherwise the shared codec and the "same bytes
@@ -12,9 +12,9 @@
  * back garbage instead of failing cleanly.
  *
  * ROOT CAUSE ENCODED:
- * The Lua codec (_shared/lua/keylogger/text_crypto.lua) is the single source of
+ * The Lua codec (_shared/lua/keystats/text_crypto.lua) is the single source of
  * truth. The Windows driver re-implements the same constants in AutoHotkey
- * (keylogger_text_cipher.ahk) because it uses CNG instead of openssl. Two copies
+ * (keystats_text_cipher.ahk) because it uses CNG instead of openssl. Two copies
  * of a wire format is two places for it to drift; this gate pins the AHK copy to
  * the Lua original: marker, separator, cipher, PBKDF2 iterations, salt, and the
  * key/IV sizes must all match.
@@ -42,7 +42,7 @@ function read(rel) {
 
 // ── The canonical values, parsed from the shared Lua codec ───────────────────
 
-const lua = read('_shared/lua/keylogger/text_crypto.lua');
+const lua = read('_shared/lua/keystats/text_crypto.lua');
 
 /** Pulls `M.NAME = "value"` or `M.NAME = number` out of the Lua source. */
 function luaConst(src, name) {
@@ -78,7 +78,7 @@ if (lua) {
 
 // ── The AutoHotkey copy must mirror every one of them ────────────────────────
 
-const ahk = read('windows/modules/keylogger/keylogger_text_cipher.ahk');
+const ahk = read('windows/modules/keystats/keystats_text_cipher.ahk');
 if (ahk && lua) {
 	/** Pulls `global KL_ENC_NAME := "value"` / `:= number` out of the AHK source. */
 	function ahkConst(name) {
@@ -96,10 +96,10 @@ if (ahk && lua) {
 	for (const [name, expected] of checks) {
 		const got = ahkConst(name);
 		if (got === undefined) {
-			errors.push(`keylogger_text_cipher.ahk: KL_ENC_${name} not found.`);
+			errors.push(`keystats_text_cipher.ahk: KL_ENC_${name} not found.`);
 		} else if (String(got) !== String(expected)) {
 			errors.push(
-				`keylogger_text_cipher.ahk: KL_ENC_${name} = "${got}" but the shared codec says "${expected}". ` +
+				`keystats_text_cipher.ahk: KL_ENC_${name} = "${got}" but the shared codec says "${expected}". ` +
 					'The stored envelope would no longer be portable in form across drivers.'
 			);
 		}
@@ -110,13 +110,13 @@ if (ahk && lua) {
 	const ivBytes = ahkConst('IV_BYTES');
 	if (keyBytes !== undefined && Number(keyBytes) * 2 !== Number(canonical.keyHex)) {
 		errors.push(
-			`keylogger_text_cipher.ahk: KL_ENC_KEY_BYTES=${keyBytes} (=${keyBytes * 2} hex) ` +
+			`keystats_text_cipher.ahk: KL_ENC_KEY_BYTES=${keyBytes} (=${keyBytes * 2} hex) ` +
 				`disagrees with text_crypto KEY_HEX_LENGTH=${canonical.keyHex}.`
 		);
 	}
 	if (ivBytes !== undefined && Number(ivBytes) * 2 !== Number(canonical.ivHex)) {
 		errors.push(
-			`keylogger_text_cipher.ahk: KL_ENC_IV_BYTES=${ivBytes} (=${ivBytes * 2} hex) ` +
+			`keystats_text_cipher.ahk: KL_ENC_IV_BYTES=${ivBytes} (=${ivBytes * 2} hex) ` +
 				`disagrees with text_crypto IV_HEX_LENGTH=${canonical.ivHex}.`
 		);
 	}
@@ -124,7 +124,7 @@ if (ahk && lua) {
 	// The AHK driver uses CNG, not openssl, but must speak the same cipher.
 	if (canonical.cipher && !ahk.toLowerCase().includes(canonical.cipher.toLowerCase())) {
 		errors.push(
-			`keylogger_text_cipher.ahk: does not mention the shared cipher "${canonical.cipher}" — ` +
+			`keystats_text_cipher.ahk: does not mention the shared cipher "${canonical.cipher}" — ` +
 				'AES-256-CBC with PKCS7 is what openssl writes and CNG must match it.'
 		);
 	}
@@ -133,13 +133,13 @@ if (ahk && lua) {
 // ── Both Lua ciphers must consume the shared codec, not re-type the format ────
 
 for (const rel of [
-	'linux/modules/keylogger/text_cipher.lua',
-	'macos/modules/keylogger/text_cipher.lua'
+	'linux/modules/keystats/text_cipher.lua',
+	'macos/modules/keystats/text_cipher.lua'
 ]) {
 	const src = read(rel);
-	if (src && !src.includes('keylogger.text_crypto')) {
+	if (src && !src.includes('keystats.text_crypto')) {
 		errors.push(
-			`${rel}: must build on the shared codec require("keylogger.text_crypto"), not re-type the format.`
+			`${rel}: must build on the shared codec require("keystats.text_crypto"), not re-type the format.`
 		);
 	}
 }

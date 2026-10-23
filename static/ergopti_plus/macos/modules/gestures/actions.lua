@@ -159,7 +159,7 @@ end
 
 --- Sends a system-level media or hardware key event.
 --- NX system-defined events are deliberately outside SyntheticInput: they are
---- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
+--- not keyDown/keyUp events and never enter keymap/keystats keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
 	local function post_phase(is_down)
@@ -2265,7 +2265,7 @@ sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
 	-- Leave the gesture/eventtap stack before starting the lifecycle transaction.
 	-- The coordinator keeps every F17 consumer and classifier live until the exact
-	-- token reports STOPPED, then the root teardown owns keylogger/MLX/helpers and
+	-- token reports STOPPED, then the root teardown owns keystats/MLX/helpers and
 	-- finally calls os.exit. Shared stock/personal Karabiner remains untouched.
 	local exit_requested = false
 	local function request_controlled_exit()

@@ -109,7 +109,7 @@ _THTO_PortRelease(State, Committed, Token) {
 		"committed", Committed, "buffer", HSE_Buffer,
 		"owner_cleared", !(_HSE_TerminalOwner is Map),
 		"prefix_depth", _PrefixWatcherSuppressed,
-		"synthetic_depth", Keylogger.synth_active))
+		"synthetic_depth", Keystats.synth_active))
 	OnRelease := State["OnRelease"]
 	if HasMethod(OnRelease, "Call")
 		OnRelease.Call()
@@ -177,10 +177,10 @@ _THTO_Reset() {
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := true
 	_PrefixWatcherSuppressed := 1
-	Keylogger.synth_active := 0
-	Keylogger.synth_type := "none"
-	Keylogger.synth_owners := []
-	Keylogger.synth_private := false
+	Keystats.synth_active := 0
+	Keystats.synth_type := "none"
+	Keystats.synth_owners := []
+	Keystats.synth_private := false
 	_LLM_NavEventOwnerStarted := true
 	_LLM_NavEventOwnerQuarantined := false
 	_LLM_NavEventOwnerStarting := false
@@ -283,7 +283,7 @@ _THTO_FailuresAbortWithoutLeakingOwnership() {
 		AssertEqual(1, _THTO_NativeState["AbortCalls"].Length)
 		AssertFalse(_HSE_TerminalOwner is Map)
 		AssertEqual(0, _PrefixWatcherSuppressed)
-		AssertEqual(0, Keylogger.synth_active)
+		AssertEqual(0, Keystats.synth_active)
 	}
 }
 Test("terminal transaction: sender and scheduler failures abort exactly once (ahk2-01)",
@@ -298,7 +298,7 @@ _THTO_CommitFailureCannotWedgeOwner() {
 	AssertFalse(_THTO_Runner.Call())
 	AssertFalse(_HSE_TerminalOwner is Map)
 	AssertEqual(0, _PrefixWatcherSuppressed)
-	AssertEqual(0, Keylogger.synth_active)
+	AssertEqual(0, Keystats.synth_active)
 	AssertEqual(1, _THTO_NativeState["AbortCalls"].Length)
 }
 Test("terminal transaction: fallible canonical commit cannot wedge owner (ahk2-02)",
@@ -363,7 +363,7 @@ _THTO_InlineSchedulerTerminalVerdictIsIdempotent() {
 		AssertEqual(0, _THTO_NativeState["AbortCalls"].Length,
 			"a scheduler verdict after inline completion cannot abort the commit")
 		AssertEqual(0, _PrefixWatcherSuppressed)
-		AssertEqual(0, Keylogger.synth_active)
+		AssertEqual(0, Keystats.synth_active)
 	}
 }
 Test("terminal transaction: inline false throw and duplicate callbacks stay terminal (ahk2-02)",
@@ -392,7 +392,7 @@ _THTO_EachOwnershipGenerationAbortsBeforeOutput() {
 			"a stale generation must abort native capture exactly once")
 		AssertEqual(0, _PrefixWatcherSuppressed,
 			"a stale generation must balance prefix suppression before replay")
-		AssertEqual(0, Keylogger.synth_active,
+		AssertEqual(0, Keystats.synth_active,
 			"a stale generation must balance synthetic ownership before replay")
 	}
 }

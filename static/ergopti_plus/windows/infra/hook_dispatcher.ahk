@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Central singleton that owns every low-level input hook in the process and
 ; fan-outs to registered subscriber callbacks. Before this module existed
-; each feature (keylogger, adapter contract, future modules) registered its
+; each feature (keystats, adapter contract, future modules) registered its
 ; own InputHook or Hotkey independently, which meant the OS received multiple
 ; overlapping hook requests and event ordering was undefined. Now a single
 ; InputHook and a single set of mouse Hotkeys are created once; all other
@@ -235,7 +235,7 @@ class HookDispatcher {
 	static Dispatch(event_type, args*) {
 		static _err_cache := Map()  ; Cap: .Count >= 256 triggers .Clear() before each .Has(sig) de-dup
 		; Native Suspend only disarms hotkeys/hotstrings — this InputHook fan-out
-		; keeps firing while paused, driving the LLM bridge and keylogger. Gate the
+		; keeps firing while paused, driving the LLM bridge and keystats. Gate the
 		; whole shared pipeline here so « pause = tout éteint » in one place.
 		if A_IsSuspended
 			return
@@ -525,7 +525,7 @@ class HookDispatcher {
 			; transient OS resource exhaustion) can throw here; the bare call from
 			; ErgoptiPlus.ahk would otherwise only be caught by the global error
 			; handler, leaving every hook-dependent feature (remap, hotstrings,
-			; keylogger, CapsWord cancel, gestures, LLM dismiss-on-click) silently
+			; keystats, CapsWord cancel, gestures, LLM dismiss-on-click) silently
 			; dead for the rest of the session with no dispatcher-specific signal.
 			try {
 				ih := InputHook(HookDispatcherConst.INPUT_HOOK_OPTS)

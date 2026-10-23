@@ -183,7 +183,7 @@ local function retitle(owner, view, title)
 end
 
 --- Metrics store path for the folder typed on the config step, from the same
---- rule the keylogger uses to place the store. An empty field keeps the current
+--- rule the keystats uses to place the store. An empty field keeps the current
 --- folder, because commit() persists no override for it.
 --- @param config_dir string|nil Folder from the wizard field.
 --- @return string Absolute metrics directory.

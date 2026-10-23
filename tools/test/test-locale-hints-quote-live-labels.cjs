@@ -30,7 +30,7 @@ const MIN_LOCALES = 21;
 // Each hint and the menu labels, in click order, it must quote verbatim.
 const HINTS = [
 	{
-		hint: 'keylogger_ui.metrics_disabled_body',
+		hint: 'keystats_ui.metrics_disabled_body',
 		labels: ['menu.metrics.title', 'menu.metrics.enable']
 	}
 ];

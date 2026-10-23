@@ -296,7 +296,7 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 			Logger = { error = function() error("unexpected publication error") end }, LOG = "test",
 			keyboard_hook = { isRunning = function() return true end, isRecovering = function() return false end,
 				pump = function() order[#order + 1] = "keyboard" end },
-			keylogger = { pump_flush = function() end },
+			keystats = { pump_flush = function() end },
 			secure_focus_guard = { has_context_operation = function() return false end },
 			RuntimeGuard = { call = function(_, callback) callback(); return true end },
 			event_loop = { run = function(options) options.onIdle() end },

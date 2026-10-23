@@ -10,7 +10,7 @@ desktop environments.
 │  Ergopti Linux — architecture overview                           │
 │                                                                  │
 │  Key remapping + tap-hold  →  platform/remap/ (in the daemon)    │
-│  Hotstrings + keylogger    →  ergopti_hotstrings.lua (LuaJIT)    │
+│  Hotstrings + keystats    →  ergopti_hotstrings.lua (LuaJIT)    │
 │    ├─ input_reader.lua     →  /dev/input/eventN (raw evdev)      │
 │    ├─ engine.lua           →  trigger matching (pure Lua)        │
 │    ├─ injector.lua         →  ydotool / uinput injection         │
@@ -88,7 +88,7 @@ linux/
 > `app_launcher`, `crypto`. They are implemented and unit-tested but no Linux feature
 > calls them, so there is currently no tooltip surface, no notification, no clipboard
 > action and no window management on Linux. The `secure_field_detector` case is
-> **deliberate** — see the comment at `modules/keylogger/keylogger.lua:90-98`:
+> **deliberate** — see the comment at `modules/keystats/keystats.lua:90-98`:
 > delegating to it would _narrow_ password-app coverage and leak keystrokes.
 
 ## Running the daemon

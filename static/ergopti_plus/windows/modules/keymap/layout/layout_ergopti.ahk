@@ -9,7 +9,7 @@
 ; modules/keymap/layout.ahk, the Shift and CapsLock layers
 ; (layout_shift_caps.ahk), the AltGr layers (layout_altgr.ahk) and the
 ; dead-key tables (DeadKey, and the circumflex hotstrings). No Windows copy of
-; the layout exists; the keylogger heatmap labels its keys from the same data.
+; the layout exists; the keystats heatmap labels its keys from the same data.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Read once at boot (ErgoptiLayout_Init), never on the typing path, from

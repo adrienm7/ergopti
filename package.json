@@ -496,7 +496,7 @@
 		"test:gesture-slots-single-source": "node ./tools/test/test-gesture-slots-single-source.cjs",
 		"test:gesture-defaults-single-source": "node ./tools/test/test-gesture-defaults-single-source.cjs",
 		"test:sqlite-event-id-single-source": "node ./tools/test/test-sqlite-event-id-single-source.cjs",
-		"test:keylogger-timings-single-source": "node ./tools/test/test-keylogger-timings-single-source.cjs",
+		"test:keystats-timings-single-source": "node ./tools/test/test-keystats-timings-single-source.cjs",
 		"test:no-plan-refs-in-source": "node ./tools/test/test-no-plan-refs-in-source.cjs",
 		"test:wpm-constants-single-source": "node ./tools/test/test-wpm-constants-single-source.cjs",
 		"test:wpm-color-normalisation-single-source": "node ./tools/test/test-wpm-color-normalisation-single-source.cjs",

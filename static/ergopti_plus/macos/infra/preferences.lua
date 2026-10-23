@@ -88,7 +88,7 @@ local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "lay
 ---   sec:  top-level TOML section
 ---   path: optional sub-section within sec (dot-separated, e.g. "dynamic")
 ---   key:  disk key name — defaults to the flat key when absent
---- This layer lets the TOML be clean (no ``llm_``, ``keylogger_`` prefixes,
+--- This layer lets the TOML be clean (no ``llm_``, ``keystats_`` prefixes,
 --- consistent ``enabled`` flags) while the in-memory state stays unchanged.
 local KEY_MAP = {
 	-- ── Gestures ──────────────────────────────────────────────────────────
@@ -127,17 +127,17 @@ local KEY_MAP = {
 	custom_close_on_add                  = { sec = "hotstrings", path = "editor", key = "close_on_add"   },
 	custom_default_section               = { sec = "hotstrings", path = "editor", key = "default_section" },
 
-	-- ── Metrics (formerly Keylogger) ───────────────────────────────────────
-	keylogger_enabled                    = { sec = "metrics", key = "enabled"                       },
-	keylogger_encrypt                    = { sec = "metrics", key = "encrypt"                       },
-	keylogger_float_colors               = { sec = "metrics", key = "float_colors"                  },
-	keylogger_float_graph                = { sec = "metrics", key = "float_graph"                   },
-	keylogger_float_wpm                  = { sec = "metrics", key = "float_wpm"                     },
-	keylogger_menubar_colors             = { sec = "metrics", key = "menubar_colors"                 },
-	keylogger_menubar_wpm                = { sec = "metrics", key = "menubar_wpm"                    },
-	keylogger_private_filter_enabled     = { sec = "metrics", key = "private_filter_enabled"        },
-	keylogger_secure_filter_enabled      = { sec = "metrics", key = "secure_filter_enabled"         },
-	keylogger_system_auth_filter_enabled = { sec = "metrics", key = "system_auth_filter_enabled"   },
+	-- ── Metrics (formerly Keystats) ───────────────────────────────────────
+	keystats_enabled                    = { sec = "metrics", key = "enabled"                       },
+	keystats_encrypt                    = { sec = "metrics", key = "encrypt"                       },
+	keystats_float_colors               = { sec = "metrics", key = "float_colors"                  },
+	keystats_float_graph                = { sec = "metrics", key = "float_graph"                   },
+	keystats_float_wpm                  = { sec = "metrics", key = "float_wpm"                     },
+	keystats_menubar_colors             = { sec = "metrics", key = "menubar_colors"                 },
+	keystats_menubar_wpm                = { sec = "metrics", key = "menubar_wpm"                    },
+	keystats_private_filter_enabled     = { sec = "metrics", key = "private_filter_enabled"        },
+	keystats_secure_filter_enabled      = { sec = "metrics", key = "secure_filter_enabled"         },
+	keystats_system_auth_filter_enabled = { sec = "metrics", key = "system_auth_filter_enabled"   },
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
@@ -220,7 +220,7 @@ local NESTED_KEY_MAP = {
 	custom_terminators       = { sec = "hotstrings", key = "terminators"                },
 	custom_delimiters        = { sec = "hotstrings", key = "delimiters"                 },
 	-- Metrics nested tables
-	keylogger_disabled_apps  = { sec = "metrics",    key = "disabled_apps"              },
+	keystats_disabled_apps  = { sec = "metrics",    key = "disabled_apps"              },
 	-- LLM nested tables
 	llm_disabled_apps        = { sec = "llm",        key = "trigger.disabled_apps"      },
 	llm_nav_modifiers        = { sec = "llm",        key = "navigation.nav_modifiers"   },

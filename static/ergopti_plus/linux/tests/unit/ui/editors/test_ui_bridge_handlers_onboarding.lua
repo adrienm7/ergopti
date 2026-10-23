@@ -245,7 +245,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(#captured.titles, 0)
 		end)
 
-		helpers.it("(onboarding-metrics-path) initData carries the keylogger's metrics store", function()
+		helpers.it("(onboarding-metrics-path) initData carries the keystats's metrics store", function()
 			local state = onboarding_state()
 			local result = handler.on_message({ action = "ready" }, state)
 			helpers.assert_eq(result.data.metrics_path, "/tmp/data/metrics.sqlite")
@@ -272,7 +272,7 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(#captured.pushes, 0)
 		end)
 
-		helpers.it("(onboarding-metrics-path) the real resolver names the keylogger store", function()
+		helpers.it("(onboarding-metrics-path) the real resolver names the keystats store", function()
 			local previous = package.loaded["infra.config_paths"]
 			with_real_config_paths(function(ConfigPaths)
 				helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))

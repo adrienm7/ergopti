@@ -4,7 +4,7 @@
 ; MODULE: Detached Worker Tray Icon Regression Test
 ; DESCRIPTION:
 ; The driver re-runs its own entry point (or its compiled executable) with a
-; worker flag for the keylogger prefetch and UIA selection workers. That process
+; worker flag for the keystats prefetch and UIA selection workers. That process
 ; used to keep the tray icon AutoHotkey creates for every script, so a second
 ; "ErgoptiPlus" entry with the default green H icon appeared beside the real
 ; driver for as long as the worker lived (worker-tray-icon-2026-09-25).
@@ -217,7 +217,7 @@ _WTIH_ShortWorkerNeverShowsDriverIdentity() {
 	LastTitle := ""
 	try {
 		Probe := _WTIH_NewOwnedWorker(["/force", "/ErrorStdOut", Entry,
-			"--keylogger-prefetch-worker"])
+			"--keystats-prefetch-worker"])
 		Started := Probe.Handle.start()
 		Probe.Pid := Probe.Handle.processId()
 		Assert(Started = true, "the short worker's exact native launch must commit"

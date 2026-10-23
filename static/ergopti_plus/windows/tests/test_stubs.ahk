@@ -569,7 +569,7 @@ UninstallHotstringHooks() {
 ; ── Active-app cache simulators — bypass WinGet* calls so the
 ; ── Notepad / Office branches of HotstringHandler can be exercised in tests.
 ;
-; These write to the REAL KLHook class (modules/keylogger/keylogger_hook.ahk is
+; These write to the REAL KLHook class (modules/keystats/keystats_hook.ahk is
 ; included by the runner so the typing-row privacy test can drive its callbacks).
 ; The old `if !IsSet(KLHook) KLHook := {}` fallback is gone and must stay gone:
 ; assigning to the name makes AHK treat KLHook as a global variable, and the
@@ -657,7 +657,7 @@ InstallSendNoOps() {
 
 ; These functions are called by modules/llm/prediction_engine.ahk at
 ; runtime. In production they live in ui/tooltip/tooltip_llm.ahk and
-; modules/keylogger/keylogger.ahk (which register hotkeys or OS hooks
+; modules/keystats/keystats.ahk (which register hotkeys or OS hooks
 ; and therefore cannot be #Included by the test runner). The stubs
 ; below record calls so individual tests can assert on them.
 
@@ -834,7 +834,7 @@ KL_LogLlmSuggested(app_name, count) {
     _Stub_LlmSuggestedCalls.Push({ app_name: app_name, count: count })
 }
 
-; The hotstring preview's own telemetry pair, from modules/keylogger/keylogger.ahk.
+; The hotstring preview's own telemetry pair, from modules/keystats/keystats.ahk.
 ; The prefix watcher calls both inside a ``try``, so before these existed the
 ; calls simply failed and no test could observe whether the sink was reached —
 ; which is exactly what a privacy guard on that sink has to assert.
@@ -854,8 +854,8 @@ KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := 
 }
 
 ; ── The persisted-row sink and the counters KL_LogHotstring drives ────────────
-; modules/keylogger/keylogger_hotstring_log.ahk is included by the runner (the
-; rest of keylogger.ahk installs OS hooks at load and cannot be), so these four
+; modules/keystats/keystats_hotstring_log.ahk is included by the runner (the
+; rest of keystats.ahk installs OS hooks at load and cannot be), so these four
 ; are what stands between it and the disk. Recording rather than no-op: the
 ; privacy contract is about the CONTENT of the row that reaches KL_AppendLog, so
 ; a test has to be able to read that row back — asserting on a copy of the row
@@ -901,12 +901,12 @@ KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
 		return false
 	_Stub_FlushBufferCalls += 1
 	if _Stub_FlushBufferMutates {
-		Keylogger.buffer_events := []
-		Keylogger.buffer_text := ""
-		Keylogger.rich_chunks := []
-		Keylogger.session_clicks := 0
-		Keylogger.session_scrolls := 0
-		Keylogger.mouse_distance := 0
+		Keystats.buffer_events := []
+		Keystats.buffer_text := ""
+		Keystats.rich_chunks := []
+		Keystats.session_clicks := 0
+		Keystats.session_scrolls := 0
+		Keystats.mouse_distance := 0
 	}
 	return true
 }
@@ -926,7 +926,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
         category: category, section: section })
 }
 
-class Keylogger {
+class Keystats {
     static rollover_pending := 0
     static synth_active := 0
     static synth_type   := "none"
@@ -949,7 +949,7 @@ class Keylogger {
     static session_url    := ""
     static session_layout := ""
     static session_field_role := ""
-    ; Needed by KL_BuildInserts / KL_AllocEventId (modules/keylogger/keylogger_sql.ahk)
+    ; Needed by KL_BuildInserts / KL_AllocEventId (modules/keystats/keystats_sql.ahk)
     ; when that pure builder module is exercised directly from unit tests.
     static _device_id_lit := "'test-device'"
     ; Raw (unquoted) id, used by KL_BuildInsertTyping to derive the at-rest
@@ -962,8 +962,8 @@ class Keylogger {
 	static health_privacy_hits := 0
 	static _retry_snapshots := []
 	static _flush_in_progress := false
-    ; Ledger location + lifecycle flag, read by modules/keylogger/
-    ; keylogger_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
+    ; Ledger location + lifecycle flag, read by modules/keystats/
+    ; keystats_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
     ; missing field here is a crash in the migration test rather than a skip.
     static initialized    := false
     ; Mirrors the production terminal lease read by KL_LogHotstring. Tests leave
@@ -972,32 +972,32 @@ class Keylogger {
     static by_device_dir  := ""
     static data_sql_path  := ""
 	static today_log_path   := ""
-    ; Read by KL_LogHotstring (modules/keylogger/keylogger_hotstring_log.ahk):
+    ; Read by KL_LogHotstring (modules/keystats/keystats_hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"
     static last_flush_time := 0
 }
 
-; Synthetic keystroke tagging. In production this lives in keylogger.ahk.
+; Synthetic keystroke tagging. In production this lives in keystats.ahk.
 ; The test stub mirrors the depth-counter logic so test_suppress_refcount.ahk
 ; can verify the refcounting behaviour.
 KL_MarkSynthetic(source, is_private := false) {
     Owner := Map("source", source, "private", is_private ? true : false)
-    Keylogger.synth_owners.Push(Owner)
-    Keylogger.synth_active := Keylogger.synth_owners.Length
-    Keylogger.synth_type := source
+    Keystats.synth_owners.Push(Owner)
+    Keystats.synth_active := Keystats.synth_owners.Length
+    Keystats.synth_type := source
     if is_private
-        Keylogger.synth_private := true
+        Keystats.synth_private := true
     return Owner
 }
 
 ; Clears the synthetic-keystroke flag after a hotstring burst. In production
-; this lives in keylogger.ahk (not included by the test runner). The variadic
+; this lives in keystats.ahk (not included by the test runner). The variadic
 ; signature matches the real function so SetTimer can pass it directly.
 KL_ClearSynthetic(Owner, *) {
     OwnerIndex := 0
     if Owner is Map {
-        for Index, Candidate in Keylogger.synth_owners {
+        for Index, Candidate in Keystats.synth_owners {
             if ObjPtr(Candidate) == ObjPtr(Owner) {
                 OwnerIndex := Index
                 break
@@ -1006,18 +1006,18 @@ KL_ClearSynthetic(Owner, *) {
     }
     if !OwnerIndex
         return false
-    Keylogger.synth_owners.RemoveAt(OwnerIndex)
-    Keylogger.synth_active := Keylogger.synth_owners.Length
-    if Keylogger.synth_active {
-        Keylogger.synth_type := Keylogger.synth_owners[-1]["source"]
+    Keystats.synth_owners.RemoveAt(OwnerIndex)
+    Keystats.synth_active := Keystats.synth_owners.Length
+    if Keystats.synth_active {
+        Keystats.synth_type := Keystats.synth_owners[-1]["source"]
     } else {
-        Keylogger.synth_type := "none"
-        Keylogger.synth_private := false
+        Keystats.synth_type := "none"
+        Keystats.synth_private := false
     }
     return true
 }
 
-; Atomic file write — in production lives in keylogger.ahk (not included by
+; Atomic file write — in production lives in keystats.ahk (not included by
 ; the test runner). The test stub does a direct write without the rename dance;
 ; atomicity is not required in a single-process test environment.
 KL_WriteAtomic(path, content) {

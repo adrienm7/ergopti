@@ -49,7 +49,7 @@ local function parent_fixture()
 		start_process = function() return operation end,
 		pause = function() worker.now = worker.now + 1; worker.publish() end,
 	})
-	local guard = require("modules.keylogger.focus_guard").new({ watch = watch,
+	local guard = require("modules.keystats.focus_guard").new({ watch = watch,
 		now_ms = function() return worker.now end,
 		detector = {
 			invalidateFocus = function() epoch = epoch + 1; secure = true; return epoch end,
@@ -59,7 +59,7 @@ local function parent_fixture()
 			end,
 			isSecureField = function() return secure end,
 		},
-		keylogger = { set_secure_field = function(value) secure = value end, is_context_protected = function() return false end },
+		keystats = { set_secure_field = function(value) secure = value end, is_context_protected = function() return false end },
 		capture_context = function() return { app_id = "editor", title = "same-frame", native_identity = "frame:1" } end,
 		publish_context = function() return true, false end,
 	})

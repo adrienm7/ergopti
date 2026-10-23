@@ -28,7 +28,7 @@ assert.equal((policy.match(/M\.MAX_EXACT_LUA_CURSOR\s*=/g) || []).length, 1);
 let scanned = 0;
 for (const driver of ['linux', 'macos']) {
 	const source = fs.readFileSync(
-		path.join(root, driver, 'modules/keylogger/sqlite_writer.lua'),
+		path.join(root, driver, 'modules/keystats/sqlite_writer.lua'),
 		'utf8'
 	);
 	const code = scriptTokens(source, '.lua')

@@ -103,7 +103,7 @@ const WINDOWS_MECHANICS = {
 	'infra/startup_smoke.ahk':
 		'the startup receipt identity owner reports its executable and compiled flag',
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
-	'modules/keylogger/keylogger_prefetch.ahk': 'how a worker process is spawned',
+	'modules/keystats/keystats_prefetch.ahk': 'how a worker process is spawned',
 	'modules/dynamic_hotstrings/user_code.ahk':
 		'launch an owned personal-code worker with the bundled interpreter /script mode',
 	'adapters/program_providers.ahk':

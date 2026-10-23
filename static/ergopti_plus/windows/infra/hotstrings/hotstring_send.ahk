@@ -824,7 +824,7 @@ _SelectionCaptureForeground() {
 ; The copy chord is driver output, not a stand-in for a physical key, so it goes
 ; out at TEXT_SENDER_SEND_LEVEL. From the #InputLevel 2 Win broker it used to
 ; be sent at level 2, where the driver's own "I1" InputHooks took it for the
-; user's typing: the keylogger recorded a "Win+C", and the physical-input
+; user's typing: the keystats recorded a "Win+C", and the physical-input
 ; generation this capture is judged by advanced on its own Ctrl+C.
 _SelectionSendCopy(SendFn := SendEvent.Bind("^c")) {
 		_TextSenderAtSendLevel(SendFn)

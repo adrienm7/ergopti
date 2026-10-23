@@ -116,7 +116,7 @@ local OWNED = {
 	"modules.gestures.engine",
 	"modules.gestures.geometry",
 	"modules.gestures.sticky_modifiers",
-	"modules.keylogger",
+	"modules.keystats",
 	"modules.keymap",
 	"modules.keymap.utils",
 	"modules.llm",

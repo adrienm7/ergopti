@@ -29,7 +29,7 @@ local function routed_gestures()
 		event_loop = "adapters.event_loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
-		keylogger = "modules.keylogger.keylogger",
+		keystats = "modules.keystats.keystats",
 	}
 	local log = { presses = {}, injected = {}, transformed = {} }
 	package.loaded[names.clipboard] = {
@@ -52,7 +52,7 @@ local function routed_gestures()
 			return { ok = true }
 		end,
 	}
-	package.loaded[names.keylogger] = { record_shortcut = function() return true end }
+	package.loaded[names.keystats] = { record_shortcut = function() return true end }
 	package.loaded["modules.shortcuts.manager"] = nil
 
 	local Shortcuts = require("modules.shortcuts.manager")

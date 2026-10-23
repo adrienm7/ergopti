@@ -5,7 +5,7 @@
  * MODULE: Location-Pinned Source-Read Ratchet (AHK tests)
  * DESCRIPTION:
  * Freezes the count of AHK test files that read a driver SOURCE file by a
- * hardcoded path (e.g. FileRead of "modules/keylogger/keylogger_av_state.ahk")
+ * hardcoded path (e.g. FileRead of "modules/keystats/keystats_av_state.ahk")
  * instead of the move-resilient framework helpers (_DriverSourceConcat /
  * _DriverFuncBody / _DriverDirConcat). These location-pinned introspection tests
  * are the #1 refactor pain: they break on a simple file move (a path I/O error,
@@ -94,7 +94,7 @@ const READ_BASELINE = 380;
 
 const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.
-// "modules/keylogger/x.ahk" or "..\\lib\\layout\\layout_altgr.ahk", plus the
+// "modules/keystats/x.ahk" or "..\\lib\\layout\\layout_altgr.ahk", plus the
 // driver entry point, which belongs to no sub-tree. `lib` is dead since the
 // rename to infra/ and is kept only so a stray lib/ path cannot slip back in
 // unseen; `platform` is listed before it exists so Lot 3 cannot land unseen.

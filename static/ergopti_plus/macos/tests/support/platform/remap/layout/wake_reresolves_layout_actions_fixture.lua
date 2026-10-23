@@ -278,7 +278,7 @@ local function load_remap(options)
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
-	package.loaded["modules.keylogger.kc_bridge"] = {
+	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function()
 			calls.managed_clear = calls.managed_clear + 1
 			append("managed-clear")

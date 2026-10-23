@@ -22,7 +22,7 @@ function M.run(config, done)
   [UI.show_webview] = '/macos/ui/ui_builder.lua', [Scheduler.after] = '/macos/adapters/timer_scheduler.lua' }) do
   assert(debug.getinfo(fn, 'S').source == '@' .. root .. suffix, 'foreign production owner')
  end
- assert(package.loaded['modules.keylogger.physical_capture'] == nil, 'capture owner already present')
+ assert(package.loaded['modules.keystats.physical_capture'] == nil, 'capture owner already present')
  assert(hs.screen.mainScreen(), 'native GUI unavailable')
  -- Native object metatables exist only after the lazy modules register them.
  assert(rawequal(require('hs.webview'), hs.webview), 'native WebView module identity differs')
@@ -231,7 +231,7 @@ function M.run(config, done)
      state.phase = 'public_close.request_public_close'
      receipt.public_close_initial_return = Host.close()
      verify_retirement(explicit, function()
-      assert(package.loaded['modules.keylogger.physical_capture'] == nil, 'probe created a capture owner')
+      assert(package.loaded['modules.keystats.physical_capture'] == nil, 'probe created a capture owner')
       finish()
      end)
     end)

@@ -323,7 +323,7 @@ local function load_fixture(options)
 		package.loaded["ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
-		package.loaded["modules.keylogger"] = {
+		package.loaded["modules.keystats"] = {
 			resync_context = function() return true end,
 			log_shortcut = function() return true end,
 		}

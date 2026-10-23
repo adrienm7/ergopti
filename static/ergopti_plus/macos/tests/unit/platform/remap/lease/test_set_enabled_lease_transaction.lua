@@ -193,7 +193,7 @@ helpers.describe("karabiner enable state is committed only after READY", functio
 			helpers.assert_eq(remap.get_enabled(), true)
 			helpers.assert_true(result == true)
 			helpers.assert_eq(calls.lease_bound_starts, 0,
-				"paused READY must not start lease-bound gesture or keylogger resources")
+				"paused READY must not start lease-bound gesture or keystats resources")
 			helpers.assert_eq(calls.classifier_refreshes, 0)
 			helpers.assert_eq(calls.resume_prepared or 0, 0)
 		end)

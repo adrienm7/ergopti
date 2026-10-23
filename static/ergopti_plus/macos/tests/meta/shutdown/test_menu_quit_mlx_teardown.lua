@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Menubar Quit Shares the Root Teardown
 --- DESCRIPTION:
---- The menu formerly duplicated MLX/keylogger cleanup before an unconditional
+--- The menu formerly duplicated MLX/keystats cleanup before an unconditional
 --- os.exit. It now delegates to the exact-fence coordinator; one root teardown
 --- owns every sibling and therefore cannot drift between quit entry points.
 --- ==============================================================================

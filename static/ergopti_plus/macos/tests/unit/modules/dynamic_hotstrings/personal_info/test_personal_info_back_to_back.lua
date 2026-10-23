@@ -26,7 +26,7 @@ end
 local function boot(outcomes)
 	package.loaded[TARGET] = nil
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.keylogger"] = {}
+	package.loaded["modules.keystats"] = {}
 	package.loaded["ui.personal_info_editor"] = {}
 
 	local record = { attempts = {}, synthetic = {} }

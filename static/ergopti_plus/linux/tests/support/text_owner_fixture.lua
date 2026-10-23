@@ -11,12 +11,12 @@ local M = {}
 --- Runs an isolated real guard against controlled resident focus observations.
 --- @param body function Receives guard, state, detector, policy and watch.
 function M.with(body)
-	local names = { "modules.keylogger.focus_guard", "adapters.secure_field_detector", "modules.keylogger.keylogger" }
+	local names = { "modules.keystats.focus_guard", "adapters.secure_field_detector", "modules.keystats.keystats" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local guard
 	local ok, detail = pcall(function()
-		local policy = require("modules.keylogger.keylogger")
+		local policy = require("modules.keystats.keystats")
 		local detector = require("adapters.secure_field_detector")
 		local configuration = assert(policy.configuration_snapshot())
 		configuration.private_filter_enabled = false
@@ -40,8 +40,8 @@ function M.with(body)
 			snapshot = function() return state.receipt end,
 			invalidate = function() state.receipt = nil; listener(nil) end,
 		}
-		guard = require("modules.keylogger.focus_guard").new({
-			watch = watch, detector = detector, keylogger = policy, now_ms = function() return state.now end,
+		guard = require("modules.keystats.focus_guard").new({
+			watch = watch, detector = detector, keystats = policy, now_ms = function() return state.now end,
 			capture_context = function()
 				return { app_id = "owned-editor", title = "Private Browsing", native_identity = "owned-window" }
 			end,

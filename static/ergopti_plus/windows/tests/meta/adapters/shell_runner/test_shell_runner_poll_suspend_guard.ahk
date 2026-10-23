@@ -6,7 +6,7 @@
 ; Regression guard for the "native Suspend() never disarms a SetTimer
 ; callback" gap-class as it applies to ShellRunner's async completion poller.
 ; _SR_Poll is a periodic SetTimer that fires OnDone callbacks for completed
-; async subprocesses; native Suspend() has no effect on it. Legacy keylogger
+; async subprocesses; native Suspend() has no effect on it. Legacy keystats
 ; and UIA workers still use this poller, so its suspend ordering is live.
 ;
 ; SCOPE: source introspection of adapters/shell_runner.ahk.

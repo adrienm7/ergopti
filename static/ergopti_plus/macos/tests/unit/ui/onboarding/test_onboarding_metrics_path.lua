@@ -4,7 +4,7 @@
 --- MODULE: Onboarding Metrics Path
 --- DESCRIPTION:
 --- Proves the step-4 consent warning names the metrics store of the folder the
---- user chose, resolved through the keylogger's own path rule. The wizard used
+--- user chose, resolved through the keystats's own path rule. The wizard used
 --- to pre-format the warning once, from the config path captured at open (and
 --- one level too deep, under hammerspoon/), so a different folder chosen on the
 --- config step never reached the text.

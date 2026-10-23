@@ -9,20 +9,20 @@
 --- refuses to log its result ("the result may contain private data whose
 --- plaintext must never reach the log"), but the expander path had no such
 --- guard: try_auto_expand ended unconditionally with
----   pcall(keylogger.log_hotstring, trigger, repl_text)
+---   pcall(keystats.log_hotstring, trigger, repl_text)
 ---   Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", typed, repl_text)
 --- DEBUG is the driver's default level, so the full SSN / IBAN / phone number was
---- written in plaintext into a log retained 14 days — whether or not the keylogger
+--- written in plaintext into a log retained 14 days — whether or not the keystats
 --- was enabled — and log_hotstring copied it into today.log, which ingest lifts
 --- into events_hotstring in data.sql and the export replicates to every device.
 ---
 --- Fix: rules_engine tags both PII option tables with is_private, the registry
 --- carries the flag onto the mapping entry, and both expander sinks (auto and
---- terminator) skip the keylogger call and log a content-free line instead.
+--- terminator) skip the keystats call and log a content-free line instead.
 ---
 --- This test is BEHAVIOURAL, not a grep: it drives the real registration path
 --- with a sentinel SSN, fires the REAL Expander.try_auto_expand, and inspects
---- what the REAL logger and a capturing keylogger stub actually received. The
+--- what the REAL logger and a capturing keystats stub actually received. The
 --- final case pins a NON-private mapping as still logged, so a future "fix" that
 --- mutes the expander wholesale fails here instead of silently destroying the
 --- hotstring telemetry.
@@ -31,7 +31,7 @@
 local helpers = require("tests.helpers")
 
 -- The sentinel stands in for the user's real SSN. It must never appear in ANY
--- log line or reach the keylogger.
+-- log line or reach the keystats.
 local SENTINEL_SSN    = "9SENTINEL9"
 local SENTINEL_PREFIX = "9SENT"  -- rules_engine registers ssn_raw:sub(1, 5)
 
@@ -39,12 +39,12 @@ package.loaded["infra.logger"] = nil
 local Logger = helpers.load_with_stubs("infra.logger")
 
 
---- Installs a keylogger stub that records every log_hotstring invocation.
+--- Installs a keystats stub that records every log_hotstring invocation.
 --- Must run BEFORE the expander is loaded: it captures the module at require time.
 --- @return table The recorder table with a `calls` list.
-local function install_keylogger_recorder()
+local function install_keystats_recorder()
 	local rec = { calls = {} }
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		log_hotstring = function(trigger, replacement)
 			table.insert(rec.calls, { trigger = trigger, replacement = replacement })
 		end,
@@ -68,9 +68,9 @@ end
 --- rules_engine registration path with the supplied personal data, and returns
 --- everything the assertions need.
 --- @param personal_data table Personal-info payload passed to inject_data.
---- @return table state, table Registry, table Expander, table keylogger_recorder
+--- @return table state, table Registry, table Expander, table keystats_recorder
 local function build_engine(personal_data)
-	local rec = install_keylogger_recorder()
+	local rec = install_keystats_recorder()
 
 	local State    = helpers.load_with_stubs("modules.keymap.state")
 	local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -169,7 +169,7 @@ helpers.describe("personal-info prefix expansions never log their PII", function
 		-- The metrics sink: log_hotstring writes replacement + tag verbatim into
 		-- today.log, which the export replicates to every other device.
 		helpers.assert_eq(#rec.calls, 0,
-			"keylogger.log_hotstring must NOT be called for a private mapping")
+			"keystats.log_hotstring must NOT be called for a private mapping")
 
 		-- The log sink: DEBUG is the production default, so any plaintext here
 		-- lands in a log retained 14 days.
@@ -197,7 +197,7 @@ helpers.describe("personal-info prefix expansions never log their PII", function
 
 		helpers.assert_eq(fired, true, "the ordinary mapping must expand")
 		helpers.assert_eq(#rec.calls, 1,
-			"a non-private mapping must STILL be reported to the keylogger — muting the expander wholesale is not the fix")
+			"a non-private mapping must STILL be reported to the keystats — muting the expander wholesale is not the fix")
 		helpers.assert_eq(rec.calls[1].trigger, "zqxtrig")
 		helpers.assert_eq(rec.calls[1].replacement, "ZQXREPLACEMENT")
 

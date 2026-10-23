@@ -323,7 +323,7 @@ _KLEmitSuggestionDismissed(Rec) {
 	if (Rec.HasOwnProp("IsPrivate") and Rec.IsPrivate) {
 		return
 	}
-	; A token-aware post-present callback may be invalidated while the keylogger
+	; A token-aware post-present callback may be invalidated while the keystats
 	; performs privacy checks. In that case no suggested row reached the queue, so
 	; emitting its dismissed half would corrupt the lifecycle pair.
 	if (Rec.HasOwnProp("SuggestedPublished") and !Rec.SuggestedPublished)
@@ -409,7 +409,7 @@ _PrefixSuggestionMarkPublished(Record) {
 }
 
 ; A same-text surface may reuse a metric record only after its suggested row
-; actually reached the keylogger queue. An unpublished record is still owned by
+; actually reached the keystats queue. An unpublished record is still owned by
 ; the yielded publisher that created it; lending it to another surface creates
 ; an ABA cleanup race when the first publisher resumes.
 _PrefixSuggestionRecordIsPublished(Record) {
@@ -451,8 +451,8 @@ _PrefixLogSuggestionPublishFailure(Err) {
 }
 
 ; Atomically bind the metric state to the surface that actually won the pixel
-; commit, while leaving privacy checks and keylogger work outside Critical. The
-; keylogger's final queue mutation rechecks the same token and marks the record
+; commit, while leaving privacy checks and keystats work outside Critical. The
+; keystats's final queue mutation rechecks the same token and marks the record
 ; published in that transaction, preserving suggested/dismissed pairing even if
 ; OnChar invalidates the surface during privacy filtering.
 _NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
@@ -495,7 +495,7 @@ _NotifySuggestionShownForSurface(Trigger, Output, Category, IsPrivate,
 		catch as Err
 			_PrefixLogSuggestionPublishFailure(Err)
 	} else if TooltipSurfaceTokenIsCurrent(SurfaceToken) {
-		; Headless unit harnesses do not include the production keylogger. Preserve
+		; Headless unit harnesses do not include the production keystats. Preserve
 		; their recording stub while production always uses the guarded queue path.
 		try {
 			KL_LogHotstringSuggested(Trigger, Output, Category)
@@ -666,7 +666,7 @@ _PrefixInvalidateDeferredEffects() {
 
 ; Lifecycle hooks called by infra/lifecycle.ahk. Suspend retains the fire batch;
 ; resume re-arms it exactly once; shutdown drains it before KL_Stop closes the
-; durable keylogger sinks and then invalidates every remaining timer owner.
+; durable keystats sinks and then invalidates every remaining timer owner.
 HotstringPrefixWatcherOnSuspend() {
 	_PrefixRevokeIncompleteFragments()
 	_PrefixInvalidateDeferredEffects()
@@ -713,7 +713,7 @@ HotstringPrefixWatcherOnShutdown() {
 	_HSE_FireLogScheduled := true
 	_HSE_FireLogScheduledGeneration := _PrefixDeferredGeneration
 	; The process is already terminating, so there is no future idle tick. The
-	; keylogger shutdown lease permits durable pre-pause rows, while its realtime
+	; keystats shutdown lease permits durable pre-pause rows, while its realtime
 	; ROI/WPM sinks remain pause-gated.
 	return _HSE_DrainFireLog(_PrefixDeferredGeneration, false)
 }
@@ -2082,13 +2082,13 @@ _ResetPrefixBuffer(ConsumedByFire := false, AlreadyClearedBuffer := unset) {
 	} else {
 		TooltipHide("ResetBuf", true)
 		_NotifySuggestionDismissed()
-		; Near-miss / manual-trigger detection is pure keylogger analytics with no
-		; ordering requirement, so (a) skip it entirely when the keylogger is inactive
+		; Near-miss / manual-trigger detection is pure keystats analytics with no
+		; ordering requirement, so (a) skip it entirely when the keystats is inactive
 		; — the default case pays zero — and (b) defer the O(n) trigger-set scan off the
 		; synchronous, Critical keystroke thread to the next idle tick, so a logging
 		; session never pays it on the typing path (near-miss-on-hotpath-scan). Buf is a
 		; value copy, so the deferred scan sees the buffer as it was at reset time.
-		if (StrLen(Buf) >= 2 and Keylogger.initialized)
+		if (StrLen(Buf) >= 2 and Keystats.initialized)
 			SetTimer(_CheckNearMiss.Bind(Buf, _PrefixDeferredGeneration), -1)
 	}
 }
@@ -2271,7 +2271,7 @@ HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken) {
 		HotPath_RecordLatency("Prefix.InputToVisible",
 			BootClockWallMs() - PrimaryItem.PreviewStartedWallMs, 50)
 	; This callback is deliberately outside the renderer Critical span. The metric
-	; helper binds its state + final keylogger queue push to SurfaceToken without
+	; helper binds its state + final keystats queue push to SurfaceToken without
 	; running privacy work under Critical.
 	if !_NotifySuggestionShownForSurface(PrimaryItem.Trigger, PrimaryItem.Text,
 		PrimaryItem.Category, PrimaryItem.IsPrivate, SurfaceToken)
@@ -2376,10 +2376,10 @@ _CheckNearMiss(Buf, Generation := unset, PausedOverride := unset) {
 	if !CanPublish
 		return
 	; Defense in depth: the sole consumer (KL_LogHotstringNearMiss) is inert when the
-	; keylogger is off, so the whole O(n) scan is dead work then. _ResetPrefixBuffer
-	; already gates + defers this, but guard here too in case the keylogger stopped
+	; keystats is off, so the whole O(n) scan is dead work then. _ResetPrefixBuffer
+	; already gates + defers this, but guard here too in case the keystats stopped
 	; between the deferred schedule and this firing (near-miss-on-hotpath-scan).
-	if !Keylogger.initialized
+	if !Keystats.initialized
 		return
 	; Compare the last WORD, not the whole buffer. Since the star-fire path
 	; re-seeds the preview from HSE_Buffer, this buffer can hold several words
@@ -2466,11 +2466,11 @@ _EditDistance1(a, b) {
 }
 
 KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
-	if !Keylogger.initialized
+	if !Keystats.initialized
 		return
 	KL_AppendLog(Map(
 		"type",        kind,
-		"app",         Keylogger.session_app,
+		"app",         Keystats.session_app,
 		"trigger",     trigger,
 		"replacement", replacement,
 		"h_type",      h_type

@@ -66,7 +66,7 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	"modules/llm/api_remote.ahk", true,
 	"modules/llm/models.ahk", true,
 	"modules/llm/profiles.ahk", true,
-	"modules/keylogger/keylogger_hook.ahk", true,
+	"modules/keystats/keystats_hook.ahk", true,
 	"platform/remap/tap_hold_loader.ahk", true,
 	"modules/keymap/llm_bridge.ahk", true,
 	"ui/tray_menu.ahk", true,

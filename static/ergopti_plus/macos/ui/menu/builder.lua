@@ -743,7 +743,7 @@ function M.generate(ctx, menu_mods, actions)
 			end
 			return agent_item and { agent_item } or {}
 		end,
-		["metrics"]         = function() return module_rows("keylogger") end,
+		["metrics"]         = function() return module_rows("keystats") end,
 		-- The shortcuts submodule surfaces the edit-shortcuts callback, so it gets
 		-- the actions on top of the context.
 		["shortcuts"]       = function()

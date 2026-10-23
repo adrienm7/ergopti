@@ -90,7 +90,7 @@ local function with_empty_server_owner(scenario)
 			applied[#applied + 1] = options; state[options.key] = options.value; return true
 		end }, update_menu = function() observations.refreshes = observations.refreshes + 1 end, observations = observations }
 		local panel = require("ui.menu.menu_llm.agent_panel")
-		fresh_bridge = package.loaded["modules.keylogger.kc_bridge"]
+		fresh_bridge = package.loaded["modules.keystats.kc_bridge"]
 		scenario(function() return panel.build(ctx) end, ctx, require("infra.manifest_menu"), native, applied, corpus, servers)
 	end)
 	local restored, released, forgotten = true, true, true
@@ -98,8 +98,8 @@ local function with_empty_server_owner(scenario)
 	if acquired then released = native.scope_release(owner) == true end
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleanup_ok, cleanup_error = pcall(function()
-		fresh_bridge = fresh_bridge or package.loaded["modules.keylogger.kc_bridge"]
-		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keylogger.kc_bridge"]) then fresh_bridge.stop() end
+		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
+		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
 		local scheduler = package.loaded["adapters.timer_scheduler"]
 		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true)

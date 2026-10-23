@@ -22,7 +22,7 @@
 ; 4. KL_Mouse_Stop: `scroll_flush_fn := unset` must appear after the timer
 ;    cancellation so re-entry cannot re-arm a stale timer reference.
 ;
-; This is a meta-static test (scans source text) because keylogger_mouse.ahk
+; This is a meta-static test (scans source text) because keystats_mouse.ahk
 ; registers top-level HookDispatcher subscribers and cannot be #Included by the
 ; headless runner without pulling in the full driver.
 ; ==============================================================================
@@ -56,9 +56,9 @@ _MMSG_ReadSource(RelPath) {
 ; ====================================================
 
 _MMSG_LUpGuardBeforeBump() {
-	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_OnLUp")
-	Assert(Body != "", "KL_Mouse_OnLUp must exist in keylogger_mouse.ahk")
+	Assert(Body != "", "KL_Mouse_OnLUp must exist in keystats_mouse.ahk")
 	PosGuard := InStr(Body, "A_IsSuspended")
 	PosBump  := InStr(Body, "KL_BumpMouseClick")
 	Assert(PosGuard > 0,
@@ -72,9 +72,9 @@ Test("mouse: KL_Mouse_OnLUp has A_IsSuspended guard before KL_BumpMouseClick", _
 
 
 _MMSG_RUpGuardBeforeBump() {
-	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_OnRUp")
-	Assert(Body != "", "KL_Mouse_OnRUp must exist in keylogger_mouse.ahk")
+	Assert(Body != "", "KL_Mouse_OnRUp must exist in keystats_mouse.ahk")
 	PosGuard := InStr(Body, "A_IsSuspended")
 	PosBump  := InStr(Body, "KL_BumpMouseClick")
 	Assert(PosGuard > 0,
@@ -88,9 +88,9 @@ Test("mouse: KL_Mouse_OnRUp has A_IsSuspended guard before KL_BumpMouseClick", _
 
 
 _MMSG_AccumScrollHasSuspendGuard() {
-	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_AccumScroll")
-	Assert(Body != "", "KL_Mouse_AccumScroll must exist in keylogger_mouse.ahk")
+	Assert(Body != "", "KL_Mouse_AccumScroll must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"KL_Mouse_AccumScroll must check A_IsSuspended — SetTimer-backed scroll accumulation bypasses Suspend; without this guard ticks are counted and a flush timer is armed while paused")
 }
@@ -98,16 +98,16 @@ Test("mouse: KL_Mouse_AccumScroll has A_IsSuspended guard", _MMSG_AccumScrollHas
 
 
 _MMSG_FlushScrollHasSuspendGuard() {
-	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
-	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keylogger_mouse.ahk")
+	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "A_IsSuspended") > 0,
 		"KL_Mouse_FlushScroll must check A_IsSuspended — a one-shot timer armed before pause fires after Suspend is set; without this guard stale scroll data is flushed to the log while paused")
 }
 Test("mouse: KL_Mouse_FlushScroll has A_IsSuspended guard", _MMSG_FlushScrollHasSuspendGuard)
 
 
-; keylogger-mouse-scroll-suspend-reset: unlike KL_Mouse_ParkTick (which resets
+; keystats-mouse-scroll-suspend-reset: unlike KL_Mouse_ParkTick (which resets
 ; prev_x/prev_y/park_last_x on its suspended path), KL_Mouse_FlushScroll's
 ; A_IsSuspended branch used to return without clearing scroll_start/scroll_last.
 ; A one-shot flush timer armed just before a Suspend, then firing WHILE
@@ -116,7 +116,7 @@ Test("mouse: KL_Mouse_FlushScroll has A_IsSuspended guard", _MMSG_FlushScrollHas
 ; instead of just the burst that actually occurred.
 _MMSG_FlushScrollResetsAccumulatorWhenSuspended() {
 	Body := _DriverFuncBody("KL_Mouse_FlushScroll")
-	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keylogger_mouse.ahk")
+	Assert(Body != "", "KL_Mouse_FlushScroll must exist in keystats_mouse.ahk")
 
 	GuardPos := InStr(Body, "A_IsSuspended")
 	Assert(GuardPos > 0, "KL_Mouse_FlushScroll must check A_IsSuspended")
@@ -136,16 +136,16 @@ _MMSG_FlushScrollResetsAccumulatorWhenSuspended() {
 			"KL_Mouse_FlushScroll's A_IsSuspended branch must reset KLMouse." . Field
 			. " := 0 before returning — mirroring KL_Mouse_ParkTick's own suspended-path "
 			. "reset — otherwise stale pre-suspend timestamps corrupt the next post-resume "
-			. "flush's duration/velocity (keylogger-mouse-scroll-suspend-reset)")
+			. "flush's duration/velocity (keystats-mouse-scroll-suspend-reset)")
 }
-Test("mouse: KL_Mouse_FlushScroll resets the scroll accumulator on its suspended path (keylogger-mouse-scroll-suspend-reset)",
+Test("mouse: KL_Mouse_FlushScroll resets the scroll accumulator on its suspended path (keystats-mouse-scroll-suspend-reset)",
 	_MMSG_FlushScrollResetsAccumulatorWhenSuspended)
 
 
 _MMSG_StopClearsScrollFlushFn() {
-	Src := _MMSG_ReadSource("modules/keylogger/keylogger_mouse.ahk")
+	Src := _MMSG_ReadSource("modules/keystats/keystats_mouse.ahk")
 	Body := _DriverFuncBody("KL_Mouse_Stop")
-	Assert(Body != "", "KL_Mouse_Stop must exist in keylogger_mouse.ahk")
+	Assert(Body != "", "KL_Mouse_Stop must exist in keystats_mouse.ahk")
 	Assert(InStr(Body, "scroll_flush_fn := unset") > 0,
 		"KL_Mouse_Stop must set scroll_flush_fn := unset after cancelling the timer so re-entry cannot re-arm the stale bound reference")
 }

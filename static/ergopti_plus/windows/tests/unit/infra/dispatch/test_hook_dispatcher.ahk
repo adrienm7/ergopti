@@ -10,7 +10,7 @@
 ; BoundFunc (what every caller passes) has NO .Ptr property. The access threw
 ; "has no property named Ptr", the bare try swallowed it, and the .Push() that
 ; followed was skipped — so every subscriber AFTER the first for a given event
-; type was silently dropped and a whole feature (keylogger / LLM bridge / prefix
+; type was silently dropped and a whole feature (keystats / LLM bridge / prefix
 ; watcher) went deaf to the keyboard depending on registration order. The fix is
 ; object-identity comparison (`existing == callback_fn`), which never throws.
 ;

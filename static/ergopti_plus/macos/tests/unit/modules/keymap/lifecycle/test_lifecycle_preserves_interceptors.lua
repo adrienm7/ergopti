@@ -64,7 +64,7 @@ local function load_keymap_capturing_taps()
 		"ui.tooltip",
 		"infra.text_utils",
 		"infra.logger",
-		"modules.keylogger",
+		"modules.keystats",
 		"modules.hotstrings.hotstrings_config",
 	}
 	for _, name in ipairs(to_wipe) do

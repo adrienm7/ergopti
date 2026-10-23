@@ -576,7 +576,7 @@ function M.on_message(payload, state)
 		return pick_config_dir(state, payload.current)
 	elseif action == "resolveMetricsPath" then
 		-- The store lives in the data directory and does not follow the chosen
-		-- configuration folder; answering keeps the page on the keylogger's path.
+		-- configuration folder; answering keeps the page on the keystats's path.
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		if type(payload.request) ~= "number" or not config_paths then
 			Logger.error(LOG, "resolveMetricsPath refused — request number or path authority missing.")

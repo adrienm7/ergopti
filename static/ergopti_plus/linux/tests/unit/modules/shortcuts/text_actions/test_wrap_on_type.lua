@@ -703,7 +703,7 @@ local function with_daemon_wrap(body, options)
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
 			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
-			keylogger = { cancel_hold_intervals = noop, set_private_window = noop,
+			keystats = { cancel_hold_intervals = noop, set_private_window = noop,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
 				observe_hold_focus = function()
 					if state.on_focus_observe then state.on_focus_observe() end

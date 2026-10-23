@@ -7,7 +7,7 @@
 --- previous projection that covers past days. Only days after the cached
 --- watermark are read again; a changed past-data fingerprint discards the
 --- cache and rebuilds from scratch. All reads go through
---- `modules.keylogger.sqlite_reader`, the single owner of the aggregation.
+--- `modules.keystats.sqlite_reader`, the single owner of the aggregation.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact increments: manifest cells belong to one day, and every n-gram
@@ -139,7 +139,7 @@ end
 
 --- Opens one projection session. A session memoizes fingerprints so the
 --- manifest and range reads of one job validate against the same values.
---- @param reader table `modules.keylogger.sqlite_reader`.
+--- @param reader table `modules.keystats.sqlite_reader`.
 --- @param sqlite_path string Path to db.sqlite.
 --- @param today string Current day (YYYY-MM-DD), fixed for the whole job.
 --- @param pacer table|nil Pacer from `infra.paced_job`.

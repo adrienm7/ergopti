@@ -11,10 +11,10 @@
 local uv = require("luv")
 require("compat.utf8").install()
 if arg[1] == "--owned-startup" then
-	local Keylogger = require("modules.keylogger.keylogger")
-	Keylogger.init({ sqlite_path = assert(arg[2]), log_dir = assert(arg[3]) })
-	assert(Keylogger.is_enabled())
-	require("modules.keylogger.sqlite_writer").close_db()
+	local Keystats = require("modules.keystats.keystats")
+	Keystats.init({ sqlite_path = assert(arg[2]), log_dir = assert(arg[3]) })
+	assert(Keystats.is_enabled())
+	require("modules.keystats.sqlite_writer").close_db()
 	os.exit(0)
 end
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-registration-receipts-XXXXXX"))
@@ -25,12 +25,12 @@ assert(uv.fs_mkdir(root .. "/config", 448))
 assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
-local Keylogger = require("modules.keylogger.keylogger")
-local Writer = require("modules.keylogger.sqlite_writer")
+local Keystats = require("modules.keystats.keystats")
+local Writer = require("modules.keystats.sqlite_writer")
 local database = root .. "/metrics.sqlite"
 local checks, failures = 0, 0
-Keylogger.init({ sqlite_path = database, log_dir = root .. "/logs" })
-assert(Keylogger.is_enabled())
+Keystats.init({ sqlite_path = database, log_dir = root .. "/logs" })
+assert(Keystats.is_enabled())
 local device = assert(assert(Writer.query_rows("SELECT device_id FROM devices;"))[1])
 local function check(name, test)
 	checks = checks + 1

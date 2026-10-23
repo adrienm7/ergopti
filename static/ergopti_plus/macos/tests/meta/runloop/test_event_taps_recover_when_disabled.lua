@@ -73,7 +73,7 @@ helpers.describe("event taps: persistent watchdog backstops", function()
 		helpers.assert_contains(source, "start_eventtap(name, t)")
 	end)
 
-	helpers.it("retains keylogger hook-state polling and restart", function()
+	helpers.it("retains keystats hook-state polling and restart", function()
 		local source = production_unit("local TAP_WATCHDOG_INTERVAL_SEC = 5")
 
 		helpers.assert_contains(source,

@@ -203,7 +203,7 @@ end
 --- The LENGTH does survive — one mask character per character — because the
 --- arithmetic downstream is computed from it and dropping it would trade a
 --- privacy bug for a metrics bug. This is the same contract as the Linux
---- keylogger's `recorded_char` and the Windows `PersonalInfoRedactForLog`; it
+--- keystats's `recorded_char` and the Windows `PersonalInfoRedactForLog`; it
 --- lives here so the three drivers cannot answer it differently.
 ---
 --- @param value string The complete value, as it would be typed.

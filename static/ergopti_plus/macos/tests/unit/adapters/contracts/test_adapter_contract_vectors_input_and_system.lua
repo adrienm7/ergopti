@@ -104,7 +104,7 @@ helpers.describe("Adapter contract vectors: KeyboardHook", function()
 		)
 	end)
 
-	helpers.it("refreshContext leaves a context the keylogger can write", function()
+	helpers.it("refreshContext leaves a context the keystats can write", function()
 		adapter.refreshContext()
 		local ctx = adapter.getContext()
 		if ctx ~= nil then

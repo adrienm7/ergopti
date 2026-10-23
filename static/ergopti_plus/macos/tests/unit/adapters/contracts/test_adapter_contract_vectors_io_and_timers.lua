@@ -598,7 +598,7 @@ helpers.describe("Adapter contract vectors: WindowInfo", function()
 	helpers.it("getFocused with no focused window still returns the full shape", function()
 		local info = adapter.getFocused()
 		helpers.assert_eq(type(info), "table",
-			"there is always an answer — the keylogger writes this into every row")
+			"there is always an answer — the keystats writes this into every row")
 		helpers.assert_eq(type(info.appId), "string",
 			"appId must be a string even with nothing focused: it keys the privacy "
 				.. "filters, and a nil there would compare unequal to every rule")

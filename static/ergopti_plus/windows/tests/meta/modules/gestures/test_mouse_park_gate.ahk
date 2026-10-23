@@ -16,4 +16,4 @@ _MPG_AssertMouseParkGate() {
 	Assert(ReturnIdx < DistanceIdx, "KL_Mouse_ParkTick must return early when suspended/filtered BEFORE accumulating distance (mouse-park-distance-no-gate)")
 }
 
-Test("keylogger_mouse: KL_Mouse_ParkTick gates distance accumulation (mouse-park-distance-no-gate)", _MPG_AssertMouseParkGate)
+Test("keystats_mouse: KL_Mouse_ParkTick gates distance accumulation (mouse-park-distance-no-gate)", _MPG_AssertMouseParkGate)

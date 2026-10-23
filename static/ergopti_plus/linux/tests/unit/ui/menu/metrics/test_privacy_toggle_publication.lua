@@ -43,7 +43,7 @@ local function with_private_config(body)
 	local config = ConfigPaths.config
 	ConfigPaths.config = function(name) return directory .. "/" .. name end
 	local ok, err = xpcall(function()
-		local collector = assert(loadfile(helpers.driver_root() .. "/modules/keylogger/keylogger.lua"))()
+		local collector = assert(loadfile(helpers.driver_root() .. "/modules/keystats/keystats.lua"))()
 		local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/menu_builder.lua"))()
 		assert(collector.set_enabled(true))
 		body(collector, menu)
@@ -74,7 +74,7 @@ helpers.describe("metrics privacy menu publication", function()
 							if refused then assert(Preferences.acquire(scope)); acquired = true end
 							local expected, rebuilds = initial, 0
 							if not refused then expected = not initial end
-							local context = { keylogger = collector }
+							local context = { keystats = collector }
 							context.on_menu_changed = function()
 								rebuilds = rebuilds + 1
 								helpers.assert_eq(collector.get_privacy_state()[spec.path], expected,
@@ -109,7 +109,7 @@ helpers.describe("metrics privacy menu publication", function()
 				.. " refused=" .. tostring(refused), function()
 				local value, rebuilds, writes = initial, 0, 0
 				local menu = assert(loadfile(helpers.driver_root() .. "/ui/menu/menu_builder.lua"))()
-				local context = { keylogger = {
+				local context = { keystats = {
 					is_enabled = function() return true end,
 					get_privacy_state = function() return { encrypt = value } end,
 					-- The real encryption setter returns its posture, not a write ACK.
@@ -138,7 +138,7 @@ helpers.describe("metrics privacy menu publication", function()
 		helpers.it("(metrics-privacy-publication) " .. spec.id .. " without optional observer", function()
 			with_private_config(function(collector, menu)
 				assert(collector[spec.setter](true))
-				local result = find_row(menu.build({ keylogger = collector }), spec.id).fn()
+				local result = find_row(menu.build({ keystats = collector }), spec.id).fn()
 				helpers.assert_eq(collector.get_privacy_state()[spec.path], false)
 				helpers.assert_eq(Preferences.get("metrics." .. spec.path), false)
 				helpers.assert_eq(result, true)

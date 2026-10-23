@@ -97,9 +97,9 @@ helpers.describe("session demotions keep config.toml values", function()
 
 	helpers.it("keeps the first saved value when the same key is demoted again", function()
 		local registry = load_subject().new()
-		registry.record({ feature = "metrics", key = "keylogger_enabled", persisted = true, demoted = false })
-		registry.record({ feature = "metrics", key = "keylogger_enabled", persisted = false, demoted = false })
-		helpers.assert_eq(registry.persisted_view({ keylogger_enabled = false }).keylogger_enabled, true)
+		registry.record({ feature = "metrics", key = "keystats_enabled", persisted = true, demoted = false })
+		registry.record({ feature = "metrics", key = "keystats_enabled", persisted = false, demoted = false })
+		helpers.assert_eq(registry.persisted_view({ keystats_enabled = false }).keystats_enabled, true)
 
 		registry.record({ feature = "hotstrings", key = "keymap", persisted = false, demoted = true })
 		registry.record({ feature = "hotstrings", key = "keymap", persisted = true, demoted = true })

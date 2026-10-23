@@ -783,7 +783,7 @@ _Onboarding_ConfigDirFor(Chosen) {
 }
 
 ; Metrics store shown in the keystroke-logging consent text for a wizard field
-; value, through the keylogger's own rule (KL_MetricsDirFor). Forward slashes
+; value, through the keystats's own rule (KL_MetricsDirFor). Forward slashes
 ; match the cross-driver locale text.
 ; @param Chosen string Wizard field value.
 ; @return string

@@ -24,7 +24,7 @@ local CAPTURED_STACK = {
 
 
 --- Loads a subject and the real SyntheticInput adapter under the same fresh hs.
---- Deliberately does not clear optional collaborators such as modules.keylogger:
+--- Deliberately does not clear optional collaborators such as modules.keystats:
 --- callers may have installed a dependency double before reaching this seam.
 --- @param module_name string Subject module name.
 --- @param hs_overrides table|nil Optional Hammerspoon stub overrides.

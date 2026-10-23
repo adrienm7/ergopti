@@ -11,7 +11,7 @@
 --- SIX different answers for what to do when it is unset:
 ---
 ---     os.getenv("HOME") or "/tmp"          -- crash reporter, updater
----     os.getenv("HOME") or "~"             -- hotstrings, kanata, keylogger…
+---     os.getenv("HOME") or "~"             -- hotstrings, kanata, keystats…
 ---     os.getenv("HOME") or ""              -- gestures
 ---     os.getenv("HOME") or "."             -- logger sink
 ---     os.getenv("HOME") or "/home/user"    -- five webview bridges
@@ -197,9 +197,9 @@ function M.data(rel)
 	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
 
---- The keylogger's metrics store. It lives in the data directory, so it does not
+--- The keystats's metrics store. It lives in the data directory, so it does not
 --- move with the configuration directory; the onboarding consent text and the
---- keylogger both read it here so they cannot name different files.
+--- keystats both read it here so they cannot name different files.
 --- @return string Absolute path of metrics.sqlite.
 function M.metrics_path()
 	return M.data("metrics.sqlite")

@@ -39,7 +39,7 @@ helpers.describe("typing metrics cache reads", function()
 							return content, status, detail
 						end,
 					}
-					package.loaded["modules.keylogger.sqlite_reader"] = {}
+					package.loaded["modules.keystats.sqlite_reader"] = {}
 					local pending, warnings, closes, fresh_reads, unlinks = {}, {}, 0, 0, 0
 					local codes = {}
 					local dashboard, state = load_dashboard({
@@ -56,7 +56,7 @@ helpers.describe("typing metrics cache reads", function()
 						codes[#codes + 1] = code
 						return self
 					end
-					package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function()
+					package.loaded["modules.keystats.log_manager"].get_sqlite_path = function()
 						fresh_reads = fresh_reads + 1
 						return nil
 					end

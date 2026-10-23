@@ -26,7 +26,7 @@ implemented today.
   application. Ergopti runs its own background runtime: the unmodified pqrs
   VirtualHIDDevice plus a self-signed headless fork of Karabiner-Elements
   16.3.0 (Core-Service, Console-User-Server, `karabiner_cli`) that also streams
-  the physical keys to the keylogger. It runs only while Tap-Hold is on, reads a
+  the physical keys to the keystats. It runs only while Tap-Hold is on, reads a
   complete configuration owned by Ergopti instead of the user's
   `~/.config/karabiner`, and, through the menu option « close other Karabiner
   instances » (on by default), quits any other active Karabiner while it runs.
@@ -121,7 +121,7 @@ its rule from the user's `layers.toml` on every regeneration (no file, no rule).
 release before that appended verbatim; it is never deployed, only compared, to
 prove and remove an older unleased ErgoptiPlus block.
 
-The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`. It is diagnostic only: the keylogger never suppresses a credit because a keycode is a managed output, since the same keycode is also a real key (HS-274).
+The module optionally supplies its live managed output keycodes to `modules.keystats.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`. It is diagnostic only: the keystats never suppresses a credit because a keycode is a managed output, since the same keycode is also a real key (HS-274).
 
 ## Lifecycle API
 

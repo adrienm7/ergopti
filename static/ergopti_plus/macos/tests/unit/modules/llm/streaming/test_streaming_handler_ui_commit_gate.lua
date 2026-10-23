@@ -179,11 +179,11 @@ local function load_fixture(render_result, reset_result, mark_result, timer_new)
 			return fixture.backend or "ollama"
 		end,
 	}
-	local keylogger = {
+	local keystats = {
 		log_llm = function() fixture.raw_logs = fixture.raw_logs + 1 end,
 		log_llm_suggested = function() fixture.suggested = fixture.suggested + 1 end,
 	}
-	Handler.init({ core_llm = core, tooltip = tooltip, keylogger = keylogger })
+	Handler.init({ core_llm = core, tooltip = tooltip, keystats = keystats })
 	fixture.tooltip = tooltip
 
 	fixture.pending = { value = {} }
@@ -799,7 +799,7 @@ helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", 
 			"the negative control must cross the real app lookup boundary")
 		helpers.assert_eq(fixture.live_id, 2)
 		helpers.assert_eq(fixture.raw_logs, 0,
-			"frontmost-app supersession must fence durable keylogger output")
+			"frontmost-app supersession must fence durable keystats output")
 		helpers.assert_eq(fixture.renders, 0)
 		helpers.assert_eq(fixture.suggested, 0)
 	end)

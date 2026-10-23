@@ -35,10 +35,10 @@ local function with_store(callback)
 		-- The dashboard captured these hs.fs and hs.json doubles when it loaded
 		package.loaded["hs.fs"].attributes = function() return { mode = "file" } end
 		local dashboard_json = package.loaded["hs.json"]
-		local reader = helpers.load_with_stubs("modules.keylogger.sqlite_reader", { sqlite3 = sqlite })
-		package.loaded["modules.keylogger.sqlite_reader"] = reader
-		package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function() return "/fake/db.sqlite" end
-		package.loaded["modules.keylogger.log_manager"].get_db_rev = function() return 1 end
+		local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
+		package.loaded["modules.keystats.sqlite_reader"] = reader
+		package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return "/fake/db.sqlite" end
+		package.loaded["modules.keystats.log_manager"].get_db_rev = function() return 1 end
 		local function statements()
 			local total = 0
 			for _, count in pairs(sqlite.statements) do total = total + count end

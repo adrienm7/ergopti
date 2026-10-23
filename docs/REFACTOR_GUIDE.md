@@ -30,8 +30,8 @@ manquant celui qui a doublé.
 | `macos/ui/menu/menu_llm/models_manager_mlx.lua` | ~1 790 | 346         | −1 444   |
 | `macos/modules/llm/api_mlx.lua`                 | ~1 799 | 829         | −970     |
 | `macos/ui/menu/menu_keyboard_layout.lua`        | ~1 647 | 721         | −926     |
-| `windows/modules/keylogger/keylogger.ahk`       | ~1 867 | 1 494       | −373     |
-| `macos/modules/keylogger/init.lua`              | ~1 583 | **1 674**   | **+91**  |
+| `windows/modules/keystats/keystats.ahk`         | ~1 867 | 1 494       | −373     |
+| `macos/modules/keystats/init.lua`               | ~1 583 | **1 674**   | **+91**  |
 
 Cinq des six ont fondu ou disparu. **Un seul a grossi**, et c'est le seul qui
 reste à traiter au titre de cette douleur.
@@ -114,13 +114,13 @@ Test de régression : le gate lui-même, prouvé rouge en retirant une raison.
 en un chiffre sur lequel un ratchet peut mordre. Toutes les suivantes se mesurent
 contre lui.
 
-### Étape 2 — `macos/modules/keylogger/init.lua` (1 674 l.)
+### Étape 2 — `macos/modules/keystats/init.lua` (1 674 l.)
 
 Le seul fichier de la liste d'origine qui a **grossi**. Ses voisins montrent la
 découpe : `log_manager.lua` (1 292) en est déjà sorti, donc le module sait être
 découpé — il a simplement continué à accumuler.
 
-Test de régression : les tests comportementaux existants du keylogger doivent
+Test de régression : les tests comportementaux existants du keystats doivent
 rester verts sans être touchés. **Si un test doit être modifié pour que la
 découpe passe, c'est un test d'introspection** — étape 1 l'aura déjà classé.
 

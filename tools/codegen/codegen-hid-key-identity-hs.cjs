@@ -15,7 +15,7 @@
  *    (`hs`) and its ISO override (`macos_iso.hs`); hid_usages.json owns each
  *    key's HID usage, by registry key id. The HID data stays out of the
  *    registry because every driver parses the registry and only macOS needs it.
- *    A hand-written usage table in the keylogger would be a sixth copy of
+ *    A hand-written usage table in the keystats would be a sixth copy of
  *    physical-key identity, the drift the registry was created to end.
  * 2. Form only where it matters: a record whose keycode is the same on every
  *    registry form is emitted as `kc`; only a record whose keycode differs by
@@ -28,7 +28,7 @@
  * 4. Refuses instead of guessing: a key without a HID usage, a usage for an
  *    unknown key, an unregistered key the registry does know, a duplicate usage
  *    or a usage outside its page's range fails the generation.
- * 5. Pure data, no runtime JSON: the Hammerspoon keylogger requires a Lua table
+ * 5. Pure data, no runtime JSON: the Hammerspoon keystats requires a Lua table
  *    and never parses the registry on the capture path.
  *
  * USAGE:  node tools/codegen/codegen-hid-key-identity-hs.cjs
@@ -125,7 +125,7 @@ lines.push('--- Every key by HID usage page and usage (registry keys, their alia
 lines.push('--- the keys no layer can bind), with the macOS virtual keycode the metrics');
 lines.push('--- store for it. `kc` is the same on every registry form;');
 lines.push('--- a key whose keycode depends on the keyboard type carries one keycode per');
-lines.push('--- form instead. modules/keylogger/physical_key_identity.lua owns the policy');
+lines.push('--- form instead. modules/keystats/physical_key_identity.lua owns the policy');
 lines.push('--- that reads it.');
 lines.push('--- ==============================================================================');
 lines.push('');

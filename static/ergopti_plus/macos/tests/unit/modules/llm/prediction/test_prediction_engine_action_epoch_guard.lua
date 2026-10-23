@@ -44,7 +44,7 @@ local function load_fixture(streaming)
 		renders = 0,
 		hides = 0,
 		timing_paints = 0,
-		keylogger_writes = 0,
+		keystats_writes = 0,
 	}
 	local fetches = 0
 	local captured = {}
@@ -144,11 +144,11 @@ local function load_fixture(streaming)
 		tint = function() return nil end,
 	}
 	package.loaded["ui.tooltip"] = tooltip
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
-		log_llm = function() effects.keylogger_writes = effects.keylogger_writes + 1 end,
-		log_llm_suggested = function() effects.keylogger_writes = effects.keylogger_writes + 1 end,
-		log_llm_dismissed = function() effects.keylogger_writes = effects.keylogger_writes + 1 end,
+		log_llm = function() effects.keystats_writes = effects.keystats_writes + 1 end,
+		log_llm_suggested = function() effects.keystats_writes = effects.keystats_writes + 1 end,
+		log_llm_dismissed = function() effects.keystats_writes = effects.keystats_writes + 1 end,
 	}
 
 	package.loaded["modules.llm.streaming_handler"] = nil
@@ -193,15 +193,15 @@ end
 
 local function effect_total(effects)
 	return effects.logs + effects.renders + effects.hides
-		+ effects.timing_paints + effects.keylogger_writes
+		+ effects.timing_paints + effects.keystats_writes
 end
 
 
 local function effect_summary(effects)
 	return string.format(
-		"logs=%d renders=%d hides=%d timing=%d keylogger=%d",
+		"logs=%d renders=%d hides=%d timing=%d keystats=%d",
 		effects.logs, effects.renders, effects.hides,
-		effects.timing_paints, effects.keylogger_writes
+		effects.timing_paints, effects.keystats_writes
 	)
 end
 

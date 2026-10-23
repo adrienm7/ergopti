@@ -758,7 +758,7 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 
 ## 13. Audit de parité Linux ↔ macOS/Windows (2026-08-06)
 
-> Cinq relevés parallèles — métriques/keylogger, fenêtres webview, LLM,
+> Cinq relevés parallèles — métriques/keystats, fenêtres webview, LLM,
 > keymap/raccourcis, cycle de vie — fusionnés en une liste ordonnée par
 > (impact visible) × (1 / coût). Chaque écart porte ses preuves `fichier:ligne`
 > des deux côtés. Ce qui suit est ce qui **reste**.
@@ -836,7 +836,7 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 > que rien ne surveille encore ; `agg_system_day` est un sous-système entier
 > (wifi, batterie, verrouillage, veille).
 
-- [x] **Lier `_shared/lua/keylogger/aggregator_helpers.lua`.** Ce module existe,
+- [x] **Lier `_shared/lua/keystats/aggregator_helpers.lua`.** Ce module existe,
       se déclare « ZERO driver dependencies », nomme déjà les neuf tables n-grammes
       manquantes et les finaliseurs de rafale et de session — et n est requis que
       par macOS. Linux écrit 8 tables sur 25.
@@ -861,7 +861,7 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
       `default_per_platform` plutôt que tranché.
 - [x] **Slots clavier configurables (P2).** Le hook rapportait toute frappe
       modifiée comme la chaîne « shortcut » sans dire laquelle. Deux choses
-      étaient bloquées dessus : `keylogger.record_shortcut` n avait aucun appelant
+      étaient bloquées dessus : `keystats.record_shortcut` n avait aucun appelant
       — donc toute action qui ne tape pas de texte était absente des métriques — et
       `keyboard_slots` était restreint aux deux autres drivers. Les deux sont
       levées. Un slot exige ses modificateurs EXACTEMENT ; AltGr est exclu, parce

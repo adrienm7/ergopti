@@ -29,7 +29,7 @@
 ;
 ; SCOPE: source introspection of the atomic writers, plus one behavioural
 ; KLPF_WriteAtomic round-trip. KL_WriteAtomic cannot be called here because
-; run_all.ahk deliberately loads keylogger_prefetch.ahk WITHOUT keylogger.ahk.
+; run_all.ahk deliberately loads keystats_prefetch.ahk WITHOUT keystats.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -123,7 +123,7 @@ _AWU_StaleScratchIsReaped() {
 ; make a later restart replay or skip journal records. Keep the completeness
 ; proof in the writer itself, before MoveFileExW gets permission to replace the
 ; last known-good state file.
-_AWU_KeyloggerStateStageIsDurableAndExact() {
+_AWU_KeystatsStateStageIsDurableAndExact() {
 	Body := _DriverFuncBody("KL_WriteAtomic")
 	Assert(Body != "", "KL_WriteAtomic() must exist in the driver source")
 	WritePos := InStr(Body, "FSWriteDurable(tmp, content)")
@@ -202,8 +202,8 @@ Test("atomic-write: sleep-retrying writers use a per-invocation scratch name",
 	_AWU_ScratchNamesAreUnique)
 Test("atomic-write: each writer reaps stale scratch files by age",
 	_AWU_StaleScratchIsReaped)
-Test("atomic-write: keylogger state stages are complete before publication",
-	_AWU_KeyloggerStateStageIsDurableAndExact)
+Test("atomic-write: keystats state stages are complete before publication",
+	_AWU_KeystatsStateStageIsDurableAndExact)
 Test("atomic-write: prefetch stages are complete before publication",
 	_AWU_PrefetchStageIsDurableAndExact)
 Test("atomic-write: KLPF_WriteAtomic publishes and leaves no scratch behind",

@@ -256,7 +256,7 @@ end
 --- It lived inside `on_char`, capturing the engine instance's own codepoint
 --- buffer. That made the matcher inseparable from buffer OWNERSHIP, which is the
 --- single reason macOS could not adopt this core: its buffer belongs to the
---- keymap core state and is read by the keylogger, the LLM preview, the tooltip
+--- keymap core state and is read by the keystats, the LLM preview, the tooltip
 --- and script control.
 ---
 --- @param buf_cps table Array of UTF-8 codepoint strings (the rolling buffer).

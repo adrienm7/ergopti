@@ -228,7 +228,7 @@ for (const file of [
 }
 const mixedAhk = selectGates([
 	'docs/audits/performance/ahk/report.md',
-	'static/ergopti_plus/windows/modules/keylogger/keylogger_reader_db.ahk'
+	'static/ergopti_plus/windows/modules/keystats/keystats_reader_db.ahk'
 ]);
 for (const gate of ['report-style', 'ahk-encoding', 'ahk-suite', 'ahk-parse', 'ahk-e2e']) {
 	assert(mixedAhk.has(gate), `mixed report and production AHK must retain ${gate}`);

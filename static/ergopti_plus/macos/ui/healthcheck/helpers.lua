@@ -298,7 +298,7 @@ function H.collect_features(state)
 		add("layout", state.keymap)
 		add("shortcuts", state.shortcuts)
 		add("gestures", state.gestures)
-		add("metrics", state.keylogger_enabled)
+		add("metrics", state.keystats_enabled)
 	end
 	add("llm", read("the AI switch", function()
 		return require("modules.llm").get_runtime_llm_enabled() == true

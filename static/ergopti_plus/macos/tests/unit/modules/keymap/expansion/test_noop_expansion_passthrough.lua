@@ -60,7 +60,7 @@ local function load_fixture(buffer)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name == "modules.keylogger"
+			or name == "modules.keystats"
 			or name:match("^adapters%.")
 			or name == "infra.logger"
 			or name == "infra.timings"
@@ -79,7 +79,7 @@ local function load_fixture(buffer)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
 	}
-	package.loaded["modules.keylogger"] = {
+	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer = function() end,
 		log_hotstring = function() end,

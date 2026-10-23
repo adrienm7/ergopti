@@ -20,8 +20,8 @@ local hs = hs
 local ok_utils, km_utils = pcall(require, "modules.keymap.utils")
 if not ok_utils then km_utils = nil end
 
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
+local ok_kl, keystats = pcall(require, "modules.keystats")
+if not ok_kl then keystats = nil end
 
 local SharedEngine = require("dynamic_hotstrings")
 local Terminators = require("keymap.terminators")
@@ -275,7 +275,7 @@ local function interceptor(event, km_buffer, ctx)
 
 	-- inject_dynamic routes the whole replacement through one immutable-tagged
 	-- keymap transaction; the fallback below must preserve that same ownership.
-	-- We do NOT call keylogger.log_hotstring here: the result may contain private
+	-- We do NOT call keystats.log_hotstring here: the result may contain private
 	-- data (phone number, SSN, IBAN) whose plaintext must never reach the log.
 	_is_injecting = true
 
@@ -310,10 +310,10 @@ local function interceptor(event, km_buffer, ctx)
 			end
 			if type(_km.suppress_rescan) == "function" then _km.suppress_rescan() end
 			local transaction = _km.arm_synthetic(n_back, result)
-			if keylogger and type(keylogger.notify_synthetic) == "function" then
+			if keystats and type(keystats.notify_synthetic) == "function" then
 				-- Same privacy contract as the primary path above — this branch
 				-- reaches the identical sink, so it needs the identical flag.
-				pcall(keylogger.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
+				pcall(keystats.notify_synthetic, result, "hotstring", n_back, "dynamic", nil, true)
 			end
 			local ok_emit, emit_err = pcall(_km.with_synthetic_transaction, transaction, function()
 				for _ = 1, n_back do

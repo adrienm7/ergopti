@@ -8,10 +8,10 @@ require("test.dynamic_word_boundary_contract")(helpers)
 local MAGIC = "★"
 local function with_rules_engine(body, personal)
     helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "dynamic_hotstrings",
-        "modules.dynamic_hotstrings.user_code", "modules.keylogger", "modules.keylogger.init" }, function()
-        local closed_keylogger = {}
-        package.loaded["modules.keylogger"] = closed_keylogger
-        package.loaded["modules.keylogger.init"] = closed_keylogger
+        "modules.dynamic_hotstrings.user_code", "modules.keystats", "modules.keystats.init" }, function()
+        local closed_keystats = {}
+        package.loaded["modules.keystats"] = closed_keystats
+        package.loaded["modules.keystats.init"] = closed_keystats
         local Rules = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
         package.loaded["modules.dynamic_hotstrings.user_code"] = {
             preview = function() return nil end,

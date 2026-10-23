@@ -68,7 +68,7 @@ function M.participants(ctx)
 			{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	end
 	if ctx.llm then registry.llm = require("infra.llm_scope").participant(is_paused) end
-	if ctx.keylogger then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
+	if ctx.keystats then registry.metrics = require("infra.metrics_scope").participant(is_paused) end
 	return registry
 end
 

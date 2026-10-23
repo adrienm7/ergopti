@@ -36,7 +36,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 		&& BeginPos > FullSavePos && FlushReadyPos > BeginPos
 		&& DrainPos > FlushReadyPos,
 		"accepted saves must settle before the reversible terminal fire drain")
-	FlushFailurePos := InStr(ShutdownBody, "if !KeyloggerFlushReady", true)
+	FlushFailurePos := InStr(ShutdownBody, "if !KeystatsFlushReady", true)
 	FlushFailureTail := SubStr(ShutdownBody, FlushFailurePos,
 		DrainPos - FlushFailurePos)
 	Assert(FlushFailurePos > FlushReadyPos
@@ -76,7 +76,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 	RegExReplace(ReversibleSegment, _SHUTDOWN_REFUSAL_PATTERN, "", &RefusalCount)
 	RegExReplace(ReversibleSegment, "KL_CancelShutdown\(\)", "", &CancelCount)
 	Assert(RefusalCount == CancelCount && RefusalCount > 0,
-		"every refusal after the reversible keylogger lease must withdraw it")
+		"every refusal after the reversible keystats lease must withdraw it")
 	FinishPos := InStr(ShutdownBody, "ReloadTerminalHandoffFinish(", true)
 	Assert(FinishPos > FirstIrreversiblePos
 		&& InStr(ShutdownBody, "TerminalHandoff, _GestureUnhook", true,

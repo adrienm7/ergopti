@@ -345,7 +345,7 @@ ensure_item = function(icon)
 end
 
 --- Refreshes the readout. Called from the daemon's periodic tick.
---- @param stats table|nil From keylogger.get_live_stats().
+--- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
 --- @return table|nil The frame shown, or nil when hidden.
 function M.tick(stats, now_s)

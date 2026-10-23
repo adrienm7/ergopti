@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Metrics Reach the Disk Before the Daemon Dies
 --- DESCRIPTION:
---- That the keylogger is flushed periodically, and not only on the way out.
+--- That the keystats is flushed periodically, and not only on the way out.
 ---
 --- THE DEFECT THIS PINS:
 --- `flush()` had exactly two call sites, both at shutdown: the SIGTERM handler
@@ -19,7 +19,7 @@
 --- bounds it to the flush interval instead of the session length.
 ---
 --- WHY THE CADENCE IS NOT A LITERAL:
---- `_shared/modules/timings/constants.toml [keylogger] ingest_tick_ms` is what
+--- `_shared/modules/timings/constants.toml [keystats] ingest_tick_ms` is what
 --- Windows already uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. A fourth
 --- number written by hand here would be a fourth thing to drift, and the drift
 --- would be invisible — three drivers persisting at three cadences look
@@ -61,7 +61,7 @@ helpers.describe("metrics persistence: not only at shutdown", function()
 		helpers.assert_not_nil(periodic,
 			"the periodic callback must be findable, or the assertion below is about "
 				.. "the whole file rather than about that callback")
-		helpers.assert_true(periodic:find("keylogger.flush", 1, true) ~= nil,
+		helpers.assert_true(periodic:find("keystats.flush", 1, true) ~= nil,
 			"a daemon that persists only on the way out loses everything to a SIGKILL, "
 				.. "an OOM kill or a power loss — and those are how a long-running user "
 				.. "daemon usually ends")
@@ -73,7 +73,7 @@ helpers.describe("metrics persistence: not only at shutdown", function()
 		helpers.assert_true(type(owner) == "string" and owner ~= "", "the final metrics owner must exist")
 		helpers.assert_true(owner:find("wait_for_ack = true", 1, true) ~= nil,
 			"shutdown must wait for physical SQLite cleanup, including a failed business write")
-		helpers.assert_true(owner:find("return keylogger.stop() == true", 1, true) ~= nil,
+		helpers.assert_true(owner:find("return keystats.stop() == true", 1, true) ~= nil,
 			"the last input snapshot belongs to the acknowledged metrics shutdown owner")
 		local signal = code:match("local function on_term%(sig%)(.-)\n\tend")
 		helpers.assert_true(type(signal) == "string" and signal:find("shutdown.request", 1, true) ~= nil,
@@ -97,7 +97,7 @@ helpers.describe("metrics persistence: the interval", function()
 
 	helpers.it("derives the period from the shared timing canon", function()
 		local code = daemon_source()
-		helpers.assert_true(code:find('Timings.ms("keylogger", "ingest_tick_ms")', 1, true) ~= nil,
+		helpers.assert_true(code:find('Timings.ms("keystats", "ingest_tick_ms")', 1, true) ~= nil,
 			"Windows reads the same key as INGEST_TICK_MS and macOS as "
 				.. "INGEST_TICK_SEC; a literal here would be a fourth number to drift, "
 				.. "and three drivers persisting at three cadences look identical until "
@@ -106,7 +106,7 @@ helpers.describe("metrics persistence: the interval", function()
 
 	helpers.it("flushes at least once a minute at the shipped values", function()
 		local Timings = helpers.load_module("infra.timings")
-		local ingest_ms = Timings.ms("keylogger", "ingest_tick_ms")
+		local ingest_ms = Timings.ms("keystats", "ingest_tick_ms")
 		helpers.assert_true(type(ingest_ms) == "number" and ingest_ms > 0,
 			"the canon must actually carry the value")
 		helpers.assert_true(ingest_ms <= 60000,

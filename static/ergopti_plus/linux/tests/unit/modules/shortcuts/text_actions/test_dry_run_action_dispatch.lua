@@ -99,7 +99,7 @@ local function with_action(route, mode, action, body)
 			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "adapters.event_loop",
 				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
-				keyboard_hook = "adapters.keyboard_hook", keylogger = "modules.keylogger.keylogger", Monotonic = "infra.monotonic",
+				keyboard_hook = "adapters.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "infra.monotonic",
 				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",
 				MagicKey = "modules.hotstrings.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
