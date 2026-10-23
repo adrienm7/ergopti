@@ -155,6 +155,146 @@ helpers.describe("agent file completion receipts", function()
 	end
 end)
 
+--- Restores native reader exports and closes every controlled real image stream.
+--- @param backend string Native branch exercised by the scope.
+--- @param body function Receives writer, reader, private path and observations.
+local function with_staging_image(backend, body)
+	with_files("modules.llm.agent_learning", function(_, dir, state)
+		local Writer, Reader = require("infra.regular_file_writer"), require("infra.regular_file_reader")
+		local previous_uv, previous_ffi, reader_open = package.loaded.luv, package.loaded.ffi, Reader.open
+		if backend == "ffi" then package.loaded.luv = {} end
+		local okay, detail = xpcall(function() body(Writer, Reader, dir .. "/image", state) end, debug.traceback)
+		Reader.open = reader_open
+		package.loaded.luv, package.loaded.ffi = previous_uv, previous_ffi
+		for _, record in ipairs(state.handles) do if not record.closed then pcall(record.stream.close, record.stream); record.closed = true end end
+		if not okay then error(detail, 0) end
+	end)
+end
+
+helpers.describe("native staging image receipts", function()
+	for _, backend in ipairs(jit and { "luv", "ffi" } or { "luv" }) do
+		for _, kind in ipairs({ "symlink", "directory", "fifo", "missing" }) do
+			helpers.it("(native-staging-image) refuses " .. backend .. " " .. kind .. " path", function()
+				with_staging_image(backend, function(Writer, _, path, state)
+					local stream, _, _, _, current = Writer.open(path, "wx")
+					assert(stream:write("same bytes")); assert(stream:close())
+					helpers.assert_eq(type(current), "function")
+					assert(os.rename(path, path .. ".retained"))
+					if kind == "symlink" then assert(Shell.run("ln -s -- " .. Shell.quote(path .. ".retained") .. " " .. Shell.quote(path)))
+					elseif kind == "directory" then assert(Shell.run("mkdir -- " .. Shell.quote(path)))
+					elseif kind == "fifo" then assert(Shell.run("mkfifo -- " .. Shell.quote(path))) end
+					helpers.assert_eq(current("same bytes"), false, "a regular target does not make a symbolic link a regular staging pathname")
+					helpers.assert_eq(state.read(path .. ".retained"), "same bytes")
+				end)
+			end)
+		end
+		for _, payload in ipairs({ "", "binary\0\255\nété" }) do
+			helpers.it("(native-staging-image) proves " .. backend .. " bytes of length " .. #payload, function()
+				with_staging_image(backend, function(Writer, _, path, state)
+					local stream, _, _, cleanup, current = Writer.open(path, "wx")
+					assert(stream:write(payload)); assert(stream:close())
+					helpers.assert_eq(type(current), "function")
+					helpers.assert_true(current(payload))
+					helpers.assert_eq(current(payload .. "x"), false)
+					helpers.assert_eq(current(false), false)
+					helpers.assert_eq(state.read(path), payload)
+					helpers.assert_true(cleanup())
+				end)
+			end)
+		end
+		for _, boundary in ipairs({ "open", "read", "close" }) do
+			for _, refusal in ipairs({ "nil", "false", "throw" }) do
+				helpers.it("(native-staging-image) refuses " .. backend .. " " .. boundary .. " " .. refusal, function()
+					with_staging_image(backend, function(Writer, Reader, path, state)
+						local open, fault, acquired, closed = Reader.open, true, 0, 0
+						local function refuse()
+							if refusal == "throw" then error("controlled image receipt exception") end
+							if refusal == "false" then return false, "controlled image receipt" end
+							return nil, "controlled image receipt"
+						end
+						Reader.open = function(candidate)
+							helpers.assert_eq(candidate, path)
+							if fault and boundary == "open" then return refuse() end
+							local stream = assert(open(candidate))
+							local record = { stream = stream, closed = false }
+							state.handles[#state.handles + 1] = record; acquired = acquired + 1
+							return {
+								read = function(_, mode)
+									local bytes = stream:read(mode)
+									if fault and boundary == "read" then return refuse() end
+									return bytes
+								end,
+								close = function()
+									assert(stream:close()); record.closed = true; closed = closed + 1
+									if fault and boundary == "close" then return refuse() end
+									return true
+								end,
+							}
+						end
+						local stream, _, _, _, current = Writer.open(path, "wx")
+						assert(stream:write("exact image")); assert(stream:close())
+						Reader.open = open
+						helpers.assert_eq(type(current), "function")
+						local called, proven = pcall(current, "exact image")
+						helpers.assert_true(called); helpers.assert_eq(proven, false)
+						helpers.assert_eq(closed, acquired, "a thrown read still closes the acquired image")
+						helpers.assert_eq(state.read(path), "exact image")
+						fault = false
+						helpers.assert_true(current("exact image"), "the captured reader can recover after an explicit refusal")
+						helpers.assert_eq(closed, acquired)
+					end)
+				end)
+			end
+		end
+	end
+	for _, refusal in ipairs({ "nil", "false", "throw", "missing-type" }) do
+		helpers.it("(native-staging-image) keeps an unclassified luv path on " .. refusal, function()
+			with_staging_image("luv", function(Writer, Reader, path, state)
+				local uv, open, fault, reads = require("luv"), Reader.open, true, 0
+				package.loaded.luv = setmetatable({ fs_lstat = function(candidate)
+					if not fault then return uv.fs_lstat(candidate) end
+					if refusal == "throw" then error("controlled path metadata exception") end
+					if refusal == "false" then return false end
+					if refusal == "missing-type" then return {} end
+					return nil
+				end }, { __index = uv })
+				Reader.open = function(candidate) reads = reads + 1; return open(candidate) end
+				local stream, _, _, _, current = Writer.open(path, "wx")
+				assert(stream:write("exact image")); assert(stream:close())
+				helpers.assert_eq(type(current), "function")
+				local called, proven = pcall(current, "exact image")
+				helpers.assert_true(called); helpers.assert_eq(proven, false)
+				helpers.assert_eq(reads, 0, "an unproven path never reaches the reader")
+				helpers.assert_eq(state.read(path), "exact image")
+				fault = false
+				helpers.assert_true(current("exact image")); helpers.assert_eq(reads, 1)
+			end)
+		end)
+	end
+	for _, id in ipairs({ 2 ^ 53, -2 ^ 63, -1, 0.5 }) do
+		helpers.it("(native-staging-image) permits exact bytes without cleanup identity " .. tostring(id), function()
+			with_staging_image("luv", function(Writer, _, path, state)
+				local uv = require("luv")
+				local function metadata(port, candidate)
+					local record = assert(port(candidate))
+					record.ino, record.dev = id, id
+					return record
+				end
+				package.loaded.luv = setmetatable({
+					fs_fstat = function(fd) return metadata(uv.fs_fstat, fd) end,
+					fs_lstat = function(candidate) return metadata(uv.fs_lstat, candidate) end,
+				}, { __index = uv })
+				local stream, _, _, cleanup, current = Writer.open(path, "wx")
+				assert(stream:write("exact image")); assert(stream:close())
+				helpers.assert_eq(type(current), "function")
+				helpers.assert_true(current("exact image"), "image proof depends on bytes and type, not representable IDs")
+				helpers.assert_eq(cleanup(), false, "unprovable identity never authorizes unlink")
+				helpers.assert_eq(state.read(path), "exact image")
+			end)
+		end)
+	end
+end)
+
 helpers.describe("exclusive staging native cleanup", function()
 	for _, field in ipairs({ "dev", "ino" }) do
 		for _, value in ipairs({ -2 ^ 63, -1, 0.5 }) do
