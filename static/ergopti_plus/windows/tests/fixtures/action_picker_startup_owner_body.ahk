@@ -136,6 +136,26 @@ _APSO_Confirm(Which, Id) {
 		_APSO.OldConfirmed += 1
 }
 
+; An asynchronous exception cannot cross the suspended Main try/catch. Suppress
+; its modal only after retaining it as a mandatory failure, never as success.
+_APSO_OnError(Failure, Mode) {
+	global _APSO
+	OwnerFile := "UNKNOWN", OwnerLine := 0
+	if Failure is Error {
+		SplitPath(Failure.File, &OwnerFile)
+		OwnerLine := Failure.Line
+	}
+	if !IsObject(_APSO.Failure)
+		_APSO.Failure := Failure is Error ? Failure
+			: Error("An asynchronous child failure was observed: " . Type(Failure))
+	try FileAppend("DIAG action-picker-startup async type=" . Type(Failure)
+		. " file=" . OwnerFile . " line=" . OwnerLine . " mode=" . Mode . "`n", "*", "UTF-8")
+	Stack := Error("Observer frame").Stack
+	for Line in StrSplit(SubStr(Stack, 1, 2048), "`n", "`r")
+		try FileAppend("DIAG action-picker-startup observer-stack " . Line . "`n", "*", "UTF-8")
+	return true
+}
+
 _APSO_Observe() {
 	global _APSO, _ActPickWeb_Gui, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
@@ -206,6 +226,7 @@ _APSO_Main() {
 	global _LLM_Menu := Map("n_predictions", 3)
 	_ActPickWeb_ProgramCapturing := true
 	Primary := 0
+	OnError(_APSO_OnError)
 	try {
 		ShowActionPicker("Private original picker", "none", _APSO_Confirm.Bind("old"))
 		_APSO_Observe()
@@ -230,7 +251,10 @@ _APSO_Main() {
 				Primary := Failure
 		}
 		_APSO.Pending := 0, _APSO.Boundary := 0
+		OnError(_APSO_OnError, 0)
 	}
+	if !IsObject(Primary) && IsObject(_APSO.Failure)
+		Primary := _APSO.Failure
 	if IsObject(Primary) {
 		FileAppend("FAIL " . Primary.Message . " [" . Primary.File . ":" . Primary.Line . "]`n", "*", "UTF-8")
 		ExitApp(1)
