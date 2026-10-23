@@ -893,3 +893,176 @@ helpers.describe("live-source-projection", function()
 		for _ = 1, 3 do assert_tuple(keystats.get_range_payload(), "owned-live", 7, 0, 0, 7) end
 	end)
 end)
+
+-- Replayed terminators belong to the physical output journal, independently of
+-- the logical replacement used for hotstring counters and its event row.
+local function with_replayed_hotstring(options, callback)
+  local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "adapters.storage",
+    "modules.hotstrings.injector", "adapters.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
+  local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
+  local Monotonic = require("infra.monotonic")
+  local previous_now, now = Monotonic.now_ms, 10000
+  local world = { typing = {}, hotstrings = {}, groups = {}, app_days = {}, document = "", wire = {} }
+  local injector
+  local passed, failure = xpcall(function()
+    local writer = Fakes.sqlite_writer()
+    writer.insert_typing_events = function(_, rows)
+      for _, row in ipairs(rows) do world.typing[#world.typing + 1] = row end
+      return true
+    end
+    writer.insert_hotstring_events = function(_, rows)
+      for _, row in ipairs(rows) do world.hotstrings[#world.hotstrings + 1] = row end
+      return true
+    end
+    writer.upsert_ngrams = function(_, date, app, rows, family)
+      world.groups[#world.groups + 1] = { date = date, app = app, rows = rows, family = family }
+      return true
+    end
+    writer.upsert_app_day = function(_, _, _, fields) world.app_days[#world.app_days + 1] = fields; return true end
+    require("tests.support.sqlite_flush_fake").attach(writer)
+    package.loaded["modules.keystats.sqlite_writer"] = writer
+    package.loaded["adapters.storage"] = Fakes.storage()
+    package.loaded["modules.keystats.keystats"] = nil
+    Monotonic.now_ms = function() return now end
+    local collector = require("modules.keystats.keystats")
+    assert(collector.init({ sqlite_path = "/controlled/replayed-hotstring.sqlite" }) ~= false)
+    require("tests.support.metrics_consent_fixture").enable(collector)
+    collector.reset_session()
+    package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
+      held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
+      emergency_stop = function() world.stopped = true end }
+    package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
+    local layout = helpers.load_module("adapters.keyboard_layout")
+    local codes = { A = 30, D = 32, N = 49, [" "] = 57, ["."] = 52 }
+    local keys, text_of = {}, { [28] = "\n", [15] = "\t" }
+    for char, code in pairs(codes) do keys[char] = { keycode = code, mods = {} }; text_of[code] = char end
+    layout._set_table_for_test(keys)
+    injector = helpers.load_module("modules.hotstrings.injector")
+    injector._set_nanosleep_for_test(function() end)
+    injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
+      world.wire[#world.wire + 1] = { code, value }
+      if options.refuse then return false end
+      if value == 1 then
+        if code == 14 then world.document = world.document:sub(1, -2)
+        elseif text_of[code] then world.document = world.document .. text_of[code] end
+      end
+      return true
+    end })
+    local engine = require("hotstring_engine").new()
+    assert(engine:load_mappings({ { trigger = "adn", replacement = "ADN", is_word = true,
+      auto_expand = options.auto == true, is_private = options.private == true } }))
+    local destination = { current = function() return true end, cached = function() return true end }
+    local env = setmetatable({ injector = injector, engine = engine, keystats = collector,
+      opts = { dry_run = false }, Logger = setmetatable({}, { __index = function() return function() end end }),
+      Monotonic = Monotonic, _cached_app_id = "tail-editor",
+      script_actions = { is_paused = function() return false end },
+      secure_focus_guard = { capture_text_owner = function() return destination end,
+        blocks_text = function() return false end, invalidate = function() world.invalidated = true end },
+      WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
+      RepeatKey = { is_enabled = function() return false end },
+      terminators_mod = { is_terminator = function(char) return char == options.tail end,
+        terminator_is_consumed = function() return options.consumed == true end },
+    }, { __index = _G })
+    local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+    local source = assert(file:read("*a")); assert(file:close())
+    local first = assert(source:find("\tlocal function handle_char(", 1, true))
+    local last = assert(source:find("\n\ton_char = input_capture_gate.guard(handle_char)", first, true))
+    local body = "local on_char; " .. source:sub(first, last - 1) .. "\non_char=handle_char; return on_char"
+    local chunk
+    if loadstring then chunk = assert(loadstring(body)); setfenv(chunk, env)
+    else chunk = assert(load(body, "actual daemon hotstring character callback", "t", env)) end
+    local character = chunk()
+    local text = "adn" .. (options.auto and "" or options.tail) .. "ami "
+    for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+      world.document = world.document .. char; now = now + 100; character(char, 30)
+    end
+    assert(collector.flush(), "the real collector must commit its actual journal and derived walk")
+    world.events = {}
+    for _, row in ipairs(world.typing) do
+      for _, event in ipairs(require("json").decode(row.events_json)) do world.events[#world.events + 1] = event end
+    end
+    world.collector = collector
+    callback(world)
+  end, debug.traceback)
+  if injector then injector._set_uinput(nil); injector._set_nanosleep_for_test(nil) end
+  Monotonic.now_ms = previous_now
+  for _, name in ipairs(names) do package.loaded[name] = old[name] end
+  if not passed then error(failure, 0) end
+end
+-- End of the isolated actual-daemon/collector replay fixture.
+
+helpers.describe("hotstring journal retains the replayed terminator", function()
+  for _, tail in ipairs({ " ", ".", "\n" }) do
+    it("records the emitted separator " .. string.byte(tail) .. " before the next manual word", function()
+      with_replayed_hotstring({ tail = tail }, function(world)
+        helpers.assert_eq(world.document, "ADN" .. tail .. "ami ", "the actual Injector must deliver both phases")
+        local manual, synthetic, erased = 0, 0, 0
+        for _, event in ipairs(world.events) do
+          if event[1] == tail then
+            if event[3] and event[3].s then synthetic = synthetic + 1 else manual = manual + 1 end
+          end
+          if event[1] == "[BS]" then
+            helpers.assert_eq(event[3].st, "hotstring")
+            helpers.assert_true(event[3].s == 1)
+            erased = erased + 1
+          end
+        end
+        helpers.assert_eq(erased, 4, "the original physical endchar was erased with the trigger")
+        helpers.assert_true(manual >= 1, "the original physical delimiter must already be recorded")
+        helpers.assert_eq(synthetic, 1, "the actual replay must also reach the canonical journal")
+        local words = {}
+        for _, group in ipairs(world.groups) do
+          if group.family == "ngram_words" then for token, row in pairs(group.rows) do words[token] = row end end
+        end
+        helpers.assert_nil(words.ADNami, "a missing replay separator must not invent a concatenated word")
+        helpers.assert_not_nil(words[tail == "." and "ADN.ami" or "ami"], "the walk retains its existing word-separator policy")
+        helpers.assert_eq(world.hotstrings[1].replacement, "ADN", "the logical replacement excludes its replay")
+        helpers.assert_eq(world.app_days[1].hs_chars, 3, "replay must not inflate generated replacement counts")
+      end)
+    end)
+  end
+  for _, options in ipairs({ { tail = " ", consumed = true }, { tail = " ", auto = true }, { tail = " ", refuse = true } }) do
+    it("does not invent a replay for consumed=" .. tostring(options.consumed) .. " auto=" .. tostring(options.auto)
+      .. " refused=" .. tostring(options.refuse), function()
+      with_replayed_hotstring(options, function(world)
+        local tails = 0
+        for _, event in ipairs(world.events) do if event[1] == " " and event[3] and event[3].s then tails = tails + 1 end end
+        helpers.assert_eq(tails, 0)
+        helpers.assert_eq(#world.hotstrings, options.refuse and 0 or 1)
+      end)
+    end)
+  end
+  it("keeps private replacement bytes redacted while replaying its already public delimiter", function()
+    with_replayed_hotstring({ tail = " ", private = true }, function(world)
+      helpers.assert_eq(world.document, "ADN ami ")
+      local tail, private_chars = 0, 0
+      for _, event in ipairs(world.events) do
+        if event[3] and event[3].s and event[1] ~= "[BS]" then
+          if event[1] == " " then tail = tail + 1
+          else helpers.assert_eq(event[1], "•"); private_chars = private_chars + 1 end
+        end
+      end
+      helpers.assert_eq({ tail, private_chars }, { 1, 3 })
+      helpers.assert_eq(#world.hotstrings, 0, "private logical events remain excluded")
+      helpers.assert_eq(world.app_days[1].hs_chars, 3)
+    end)
+  end)
+  for _, tail in ipairs({ false, "\t" }) do
+    it("preserves dynamic logical counters with an optional journal tail=" .. tostring(tail), function()
+      with_replayed_hotstring({ tail = " ", consumed = true }, function(world)
+        world.collector.record_hotstring("tail-editor", "tag", "ADN", 20000, "dynamic", 3, false, tail or nil)
+        helpers.assert_true(world.collector.flush())
+        local events = require("json").decode(world.typing[#world.typing].events_json)
+        helpers.assert_eq(#events, tail and 7 or 6)
+        if tail then
+          helpers.assert_eq(events[#events][1], tail)
+          helpers.assert_eq(events[#events][3], { s = 1, st = "hotstring" })
+        end
+        helpers.assert_eq(world.hotstrings[#world.hotstrings].replacement, "ADN")
+        helpers.assert_eq(world.hotstrings[#world.hotstrings].net_saved_chars, 0)
+        helpers.assert_eq(world.app_days[#world.app_days].hs_chars, 3)
+        helpers.assert_eq(world.app_days[#world.app_days].hs_input_chars, 3)
+      end)
+    end)
+  end
+end)

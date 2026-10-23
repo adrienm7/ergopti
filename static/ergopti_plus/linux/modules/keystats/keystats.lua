@@ -753,7 +753,8 @@ function M.record_suggestion(app_id, kind, timestamp_ms)
 	Logger.debug(LOG, "Suggestion offered (%s).", field)
 end
 
-function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private)
+--- @param replay_terminator string|nil Already typed delimiter erased and replayed after the replacement.
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private, replay_terminator)
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
 	if type(replacement) ~= "string" or replacement == "" then return end
 	local app = ensure_app_stats(app_id, timestamp_ms)
@@ -763,6 +764,11 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	append_synthetic_events(app_id, replacement, "hotstring",
 		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
 		is_private)
+	-- This public delimiter already exists in the physical input journal. Keep
+	-- its replay in the ordered stream without changing the logical replacement.
+	if type(replay_terminator) == "string" and replay_terminator ~= "" then
+		append_synthetic_events(app_id, replay_terminator, "hotstring", 0, false)
+	end
 	if type(timestamp_ms) == "number" then
 		-- The group names the colour the readouts take; a private expansion
 		-- still colours them — the colour says a hotstring fired, not what it typed.
