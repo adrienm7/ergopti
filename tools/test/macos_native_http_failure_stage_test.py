@@ -393,5 +393,35 @@ class NativeRouteFallback(unittest.TestCase):
         self.assertNotIn("private-company", text)
 
 
+class NetworkCheckHelper(unittest.TestCase):
+    """The Debug menu's network check prints closed step lines, never an address."""
+
+    def setUp(self):
+        self.helper = load("network_check_helper", MACOS / "modules/llm/managed_network_check.py")
+
+    def lines(self, function, *arguments):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            function(*arguments)
+        return captured.getvalue().splitlines()
+
+    def test_a_value_outside_the_closed_grammar_is_redacted(self):
+        for value in ("https://pac.private-company.invalid/x.pac", "a b", "", "x" * 49):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self.lines(self.helper.emit, "transfer", "fail", value),
+                    ["step transfer fail redacted"],
+                )
+
+    def test_route_step_names_the_stage_that_made_the_transfer_go_direct(self):
+        self.assertEqual(
+            self.lines(self.helper.route_step, None), ["step route_lookup pass selected"]
+        )
+        self.assertEqual(
+            self.lines(self.helper.route_step, "native_pac_download"),
+            ["step route_lookup fail direct_pac_download"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
