@@ -1,6 +1,6 @@
 ﻿; tests/fixtures/wpm_tick_rollover_body.ahk
 
-; Actual WPM producers and calculation share one controlled DWORD clock. This
+; Actual WPM producers and calculation share one controlled native-width uptime clock. This
 ; does not wait for an OS rollover or create a widget, keyboard hook or timer.
 #Requires AutoHotkey v2.0
 
@@ -11,14 +11,15 @@ _WPMR_Require(Condition, Message) {
 
 _WPMR_Now() {
 	global _WPMR
-	_WPMR_Require(_WPMR.Now is Integer && _WPMR.Now >= 0 && _WPMR.Now <= 0xFFFFFFFF,
-		"The explicit clock must remain a DWORD tick value.")
+	_WPMR_Require(_WPMR.Now is Integer && _WPMR.Now >= 0,
+		"The explicit clock must remain a nonnegative native-width integer.")
 	_WPMR.Reads += 1
 	return _WPMR.Now
 }
 
 _WPMR_Push(Tick, Ai := false, Ac := false) {
 	global _WPMR
+	_WPMR_Require(Tick is Integer && Tick >= _WPMR.Now, "The real producer clock must be monotone, without a DWORD reset.")
 	_WPMR.Now := Tick
 	Before := WPMWidget._ring.Length
 	WPMWidget_Push(false, Ai, Ac)
@@ -43,15 +44,15 @@ _WPMR_Main() {
 			"A fresh genuine state class must own an empty ring.")
 		WPMWidget.visible := true
 		switch _WPMR.Mode {
-			case "translated-current":
-				_WPMR_Push(10000, true)
-				_WPMR_Push(17500, false, true)
-				_WPMR.Now := 20000
-				Expected := 2, ExpectedAi := true, ExpectedAc := true, ExpectedRows := 2
-			case "dword-rollover":
-				_WPMR_Push(4294962296, true)
-				_WPMR_Push(2500, false, true)
-				_WPMR.Now := 5000
+			case "full64-expired-after-dword-period":
+				_WPMR_Push(1000, true)
+				_WPMR_Push(1500, false, true)
+				_WPMR.Now := 0x100000000 + 2500
+				Expected := 0, ExpectedAi := false, ExpectedAc := false, ExpectedRows := 2
+			case "full64-across-dword-boundary":
+				_WPMR_Push(0x100000000 - 5000, true)
+				_WPMR_Push(0x100000000 + 2500, false, true)
+				_WPMR.Now := 0x100000000 + 5000
 				Expected := 2, ExpectedAi := true, ExpectedAc := true, ExpectedRows := 2
 			case "expired-and-minimum":
 				_WPMR_Push(4999, true)
@@ -64,25 +65,35 @@ _WPMR_Main() {
 		}
 		_WPMR_Require(WPMWidget._ring.Length == ExpectedRows && _WPMR.Reads == ExpectedRows,
 			"Every ring row must come from the genuine producer before calculation.")
-		FirstAge := _WPMWidget_TickDelta(_WPMR.Now, WPMWidget._ring[1]["t"])
-		if _WPMR.Mode == "expired-and-minimum"
-			_WPMR_Require(FirstAge == WPMWidgetConst.WINDOW_MS + 1,
+		_WPMR_Require(_WPMR.Now >= WPMWidget._last_tick,
+			"Calculation must follow the last producer on the same monotone native-width clock.")
+		FirstRawAge := _WPMR.Now - WPMWidget._ring[1]["t"]
+		SecondRawAge := _WPMR.Now - WPMWidget._ring[2]["t"]
+		; The true age prerequisite must not call or copy the SUT's masked helper.
+		; Its result below is diagnostic only, permitting a valid full-width fix.
+		FirstReportedAge := _WPMWidget_TickDelta(_WPMR.Now, WPMWidget._ring[1]["t"])
+		if _WPMR.Mode == "full64-expired-after-dword-period"
+			_WPMR_Require(FirstRawAge == 0x100000000 + 1500 && SecondRawAge == 0x100000000 + 1000
+				&& FirstRawAge > WPMWidgetConst.WINDOW_MS && SecondRawAge > WPMWidgetConst.WINDOW_MS,
+				"Both retained real producer rows must genuinely be older than the rolling window.")
+		else if _WPMR.Mode == "expired-and-minimum"
+			_WPMR_Require(FirstRawAge == WPMWidgetConst.WINDOW_MS + 1,
 				"The AI-only first row must really lie outside the shared rolling window.")
 		else
-			_WPMR_Require(FirstAge == 10000
-				&& _WPMWidget_TickDelta(_WPMR.Now, WPMWidget._ring[2]["t"]) == 2500,
-				"Both current rows must have the same legitimate ages on either side of rollover.")
+			_WPMR_Require(_WPMR.Now > 0xFFFFFFFF && FirstRawAge == 10000 && SecondRawAge == 2500,
+				"Full-width timestamps across the DWORD boundary must retain two legitimate current ages.")
 		Result := WPMWidget_Calc()
 		_WPMR_Require(Result is Map && Result.Has("wpm") && Result.Has("has_hs")
 			&& Result.Has("has_ai") && Result.Has("has_ac") && _WPMR.Reads == ExpectedRows + 1,
 			"The actual calculation must read the same clock and return its complete contract.")
 		FileAppend("RECEIPT wpm-tick-rollover mode=" . _WPMR.Mode . " now=" . _WPMR.Now
-			. " first_age=" . FirstAge . " rows=" . WPMWidget._ring.Length . " clock_reads=" . _WPMR.Reads
+			. " first_raw_age=" . FirstRawAge . " second_raw_age=" . SecondRawAge
+			. " first_reported_age=" . FirstReportedAge . " rows=" . WPMWidget._ring.Length . " clock_reads=" . _WPMR.Reads
 			. " window_ms=" . WPMWidgetConst.WINDOW_MS . " minimum_ms=" . WPMWidgetConst.WPM_MIN_DURATION_MS
 			. " actual_wpm=" . Result["wpm"] . " expected_wpm=" . Expected
 			. " has_ai=" . Result["has_ai"] . " has_ac=" . Result["has_ac"] . "`n", "*", "UTF-8-RAW")
 		_WPMR_Require(Result["wpm"] == Expected,
-			"The real WPM calculation must use the oldest admitted age, not raw timestamp ordering.")
+			"The real WPM calculation must count only rows whose actual native-width age is inside its window.")
 		_WPMR_Require(Result["has_hs"] == false && Result["has_ai"] == ExpectedAi && Result["has_ac"] == ExpectedAc,
 			"Only rows inside the rolling window may contribute source flags.")
 		_WPMR_Require(WPMWidget._ring.Length == ExpectedRows,
