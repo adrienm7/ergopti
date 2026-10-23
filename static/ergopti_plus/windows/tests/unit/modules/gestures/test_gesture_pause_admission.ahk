@@ -240,3 +240,5 @@ _GPO_Case(Mode) {
 
 for _GPO_Mode in ["paused-left", "paused-right", "current-both", "admin-paused-quit"]
 	Test("Gesture pause admission: " . _GPO_Mode . " (gesture-click-pause-admission)", _GPO_Case.Bind(_GPO_Mode))
+
+#Include test_gesture_cycle_pause_owner.ahk
