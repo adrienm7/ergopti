@@ -89,6 +89,14 @@ a sealed Windows updater source, reseal with
       explanation. Plan: [ADR 011](../static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md).
       Estimate 30-40 agent-days plus hardware time. The owned runtime stays dormant at default
       startup.
+      Status 2026-10-24: WP3 largely done and dormant; WP6 Lua owner (`runtime_owner.lua`,
+      `runtime_vhid.lua`, read-only ports) and WP7 owned deploy done, dormant behind the hidden
+      `[karabiner] runtime = "owned"`; one-click Debug field checks shipped (lease, owned runtime
+      dormancy, network, 30 s key accounting). Left: WP5 artifact manifest (hosted macOS run), a
+      closer for another running Karabiner, the production capture owner, the Swift lease worker's
+      owned CLI path, who starts the Console (Lua or `InstalledPhysicalSourceBridge`: duplicates
+      otherwise), `UninstallWorker.swift`, the karabiner_model diff 16.0.0 to 9312593e, WP8-WP10.
+      Next: the maintainer sends the `Field check result:` log lines from the Mac.
 
 ## Big item 3: Windows input-hook architecture (items 49, 91, 50)
 
@@ -100,12 +108,22 @@ a sealed Windows updater source, reseal with
       authenticated event stream, non-hook handler conversion, chained/repeat semantics). Regenerate
       the DLL and manifest only through the official MSVC generator; check the patches in
       `docs/handovers/2026-10-12-dev-consolidation/` against the tree first.
+      Status 2026-10-24: Debug > Record keyboard hook order (`windows/infra/input_probe.ahk`) and the
+      terminal-capture consumer audit in
+      [windows-input-hooks-items-49-50.md](todo-agents/windows-input-hooks-items-49-50.md) are in;
+      left: the maintainer's run (`rehook=yes` needs the driver as the only AutoHotkey hook), the
+      terminal-capture hardware list, and the MSVC-dependent native work. Decide whether the
+      `SetWindowsHookExW` string in the exe is acceptable for antivirus (the AV-surface gate allows it).
 - [ ] **91. Simultaneous and first-key hold arbitration.** [CODE] Integrate with the
       single-hook/RawInput source (needs a genuine MSVC DLL and manifest pair); [PHYS-W]
       held-alone-then-joined order, AltGr hook provenance.
 - [ ] **50. SendEvent against SendInput.** [PHYS-W] `SendMode("Event")` is set, yet the hotstring
       send/dispatch, text sender and config I/O still call SendInput. Measure expansions, pastes and
       predictions (latency, lost or interleaved keys) before choosing.
+      Status 2026-10-24: Debug > Measure SendEvent vs SendInput is in; first measurement here: all
+      repetitions exact, expansion 152 ms (SendInput) vs 262 ms (SendEvent), prediction 198 vs 386 ms,
+      paste 16 vs 9 ms. Left: the run on the maintainer's PC with the driver as the only hook, and the
+      interleave test against a second process.
 
 ## Big item 4: layout composed from layers, all three OS (October 13 request)
 
@@ -158,9 +176,6 @@ In progress (agent), October 22:
 - [ ] **Versions window with a feed-only list (macOS, decided 2026-10-22).** [CODE] When the API
       gives no list, a click on the channel's newest release is handed to Sparkle (a page phase and
       21 locale strings); older releases stay refused with the warning. **In progress (agent).**
-- [ ] **macOS webview-open freeze (decided 2026-10-22).** [CODE] Opening a webview window freezes
-      the main thread 2.8-3.2 s because `wv:hswindow()` scans every window of every application;
-      look only among Hammerspoon's own windows. **In progress (agent).**
 - [ ] **Tap-hold hold rows open the shared picker on Windows and Linux (decided 2026-10-22).**
       [CODE] Replace the seven-option « Hold → … » submenu (and a pair's hold: submenu on Windows,
       list dialog on Linux) with the shared action picker listing holdable actions only, as on
@@ -168,11 +183,6 @@ In progress (agent), October 22:
 
 Not started:
 
-- [ ] **macOS ISO/ANSI selector (decision 2).** [CODE] Configuration choice Automatic, ISO, ANSI for
-      the Karabiner virtual keyboard type, in config, declared once in the shared manifest, 21
-      locales, four-combination table test. Automatic resolves to ANSI (356d14a3f3, confirmed on
-      the maintainer's Mac on 2026-10-22: an action assigned to the key left of "1" lands on that
-      key, no longer on the ISO 105th key); an explicit choice is never overridden.
 - [ ] **Ollama redirect policy and Go compile (decision 5).** [CODE] [CI] When a proxy or the
       native worker carries the request, an unresolved download host is left to it; literal
       private, loopback, link-local and CGNAT addresses stay refused, as do names that resolve
@@ -180,10 +190,6 @@ Not started:
       and reverse the assertion in `address_policy_test.go`. Every driver pins Ollama 0.40.4
       (662ed3714b, `OLLAMA_NO_CLOUD=1` b06c421923), but its Go side was never compiled: validate in
       the macOS Managed Ollama CI cells on a `tmp/*` branch.
-- [ ] **Linux recommendations equal Windows (decision 6).** [CODE] The recommended LAlt then
-      CapsLock action (`caps_word`) and every other recommended value identical on both, with a
-      parity test over the manifest. With it: Linux chord slots refuse `caps_word`; the engine's
-      unused per-letter CapsWord mode can be removed.
 - [x] **54/81. Last three native Windows menu rows.** Done in 02b63912f1 (local): census Windows
       0, macOS 0, Linux 0. The default-section, file and folder submenus are renderer template
       children (`MenuRenderer_TemplateChild` reserves, `MenuRenderer_FillTemplateChild` fills,
@@ -198,8 +204,6 @@ Not started:
       (Ollama.app, Homebrew, PATH) is covered by 2353a72eed. The maintainer's Mac uses a corporate
       PAC URL with Auto Proxy Discovery off and every static proxy (HTTP, HTTPS, SOCKS) off, so the
       PAC is the only proxy source: there is no static fallback to use.
-- [ ] **AI off must be inert on macOS.** [CODE] Profile shortcuts are still bound, `ollama list`
-      still runs and the MLX download still resumes with the AI off (Windows and Linux are inert).
 - [x] **Menu clicks during a reload on macOS and Linux.** Done (b0fb0f585b, c280aa4eaf,
       8c4314524a, local): macOS holds a click during a reload, hands it to the new instance and
       replays it with the intended state; a stale menu resolves on a fresh tree. Linux replays a
@@ -227,13 +231,6 @@ Not started:
       `/proc/<pid>/comm`, fcb0168fb5) is covered by unit tests only (the WSLg WM publishes no
       `_NET_CLIENT_LIST`): add it to the Openbox e2e, and add wmctrl to the RPM and Flatpak
       dependencies.
-- [ ] **Linux single instance outside `launch.sh`.** [CODE] `launch.sh` locks every daemon launch
-      (35dd2d262e), but the AppImage AppRun, the Nix wrapper and a manual
-      `luajit ergopti_hotstrings.lua` still start without the flock: take the lock in Lua
-      (`infra/session_lock.lua`) when no marker is present, without breaking the tests that load
-      the entry several times in one process.
-- [ ] **Linux test manifest lists four deleted caps_word modules.** [CODE] They fail at load in
-      `--only` passes since fa965e42f2 removed them.
 
 ## Backlog (one line each)
 
@@ -247,29 +244,29 @@ Added October 22 (from the agents' reports; details in their commits):
       the comment in `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt` (a compiled
       script: recompile on a Mac); declare each persisted name once and make tests read it instead
       of pinning spellings, so the next rename is cheap.
-- [ ] **Issue #101: managed network follow-ups.** [PHYS-M] Root cause of the reporter's `native_proxy_lookup`
-      failures: the launcher Info.plist had no App Transport Security key, so the URLSession PAC fetch
-      refused their `http://` company PAC (fixed; confirm on the Mac with the next release). Left: (1) split
-      `ManagedHTTPFailureStage.proxyLookup` into PAC fetch, certificate, script and route so the log names
-      the step (Swift enum, Python allowlist in `native_http.py`, tests); (2) an explicit proxy override
-      field in the config for a PAC the helper cannot use; (3) local server probes (oMLX, Jan) all answer
-      "Network request failed"; (4) main thread stalls of 1 to 4.5 s in `log_manager.lua:1552`,
-      `models_manager.lua:554`, `mlx_repair_offer.lua:358`.
-- [ ] **macOS input follow-ups (swallowed keys).** [CODE] Each lease recovery rewrites the 743 KB
-      karabiner.json while typing (reuse the token once its writers retire);
-      `context_tracker.handle_ax_value_changed` reads the whole AXValue on the main thread at each
-      keystroke (coalesce or defer); apply "a late key passes through" to tap_keys, script_control
-      and modifier_injector; add the `key_event_health` counters to the Markdown diagnostics; no
-      error window for a lease failure that recovered by itself.
-- [ ] **Last path-separator sites.** [CODE] macOS, `_shared/lua` and Linux go through
-      `native_path.lua` (6c317ffd43), guarded by `test_posix_path_separator_owner.lua`. Four sites
-      remain in its BASELINE: `config_migrate.lua` (2), `config_unused_keys.lua` (2),
-      `llm/profile_selector.lua` (2), `linux/modules/keystats/sqlite_writer.lua` (1). No-FFI
-      injector sleeps refuse the ceiling (e73fadfa84); left: the periodic clock diagnostic without
-      luv.
-- [ ] **Linux correction parity remainders.** [CODE] On Backspace the word is dropped instead of
-      popped, erased n-grams get no `e`, and synthetic output breaks the chain (Windows chains
-      through it). `[BS]x` pairs are aligned (aa1ca02f18).
+- [ ] **Issue #101: Mac follow-ups.** [PHYS-M] Fixed, to confirm on the Mac with the next release:
+      ATS key so the URLSession can fetch an `http://` company PAC (c0c29cd8ab); direct route when the
+      PAC lookup names no route (719c7fcd76); no retry of a refused route (ace928dc1c); the lookup now
+      names its failing step (363a63f79d: `native_proxy_budget`, `native_pac_download`, ...); lease
+      line cap judged per line (5deb892d58); Ollama 412 upgrade request shown (08aaeaf3c2);
+      diagnostics PAC probe on the three OS (f798aae1f9); one-click Debug checks (lease, owned
+      runtime, network, 30 s key accounting). Left: (1) read the Mac's next log lines `Slow ingest
+    tick`, `Slow preferences save` and `Field check result:` to name the dominant main-thread
+      phase before slicing it; (2) an explicit proxy override field; (3) local server probes (oMLX,
+      Jan) all answer "Network request failed"; (4) `keymap/utils.lua` ignored-window TTL probe
+      (1 s): bound it only after measuring the AX call time (secure-field cache); (5) rebuild the
+      inverse oracle of `macos_native_http_receiving_facts_test` (red since 719c7fcd76), compile the
+      Swift on macOS CI, add Go table cases for the new stages; (6) the network check's digest step
+      is skipped (HEAD only).
+- [ ] **macOS input follow-ups (swallowed keys).** [CODE] Done: late keys pass through in tap*keys,
+      script_control and modifier_injector (ed2d9fe65c); AXValue read once per typing burst
+      (34765cde7c); no error window for a lease failure that recovered within 60 s (fcf4af85dc);
+      `key*\*` counters in the Markdown diagnostics (6f2daed2e5). Left: reuse the lease token on
+      recovery so the 743 KB karabiner.json is not rewritten each time (needs the token ledger
+      redesigned and checked on a Mac).
+- [ ] **Linux correction parity remainders.** [CODE] Done (06bbbe5985): Backspace pops the word, erased
+      n-grams get `e`, synthetic output chains. Left: erased and synthetic vectors in the shared corpus
+      (needs the AHK and macOS replayers); Windows word separators are wider than Linux's three.
 - [ ] **Windows typing dashboard partial history remainders.** [CODE] Done for Typing (0010418934,
       reader NUL keys a6a4274a8d); left: the mention on the Apps dashboard and the Edge fallback
       (no WebView2), which does not open on an incomplete read.
@@ -281,10 +278,6 @@ Added October 22 (from the agents' reports; details in their commits):
       Windows `api_entries` per-row validation; 42: the `--config FILE.toml` watcher (needs a
       Linux host). Parse cost: the schema journal still parses the candidate on its own; profile
       the tokenizer.
-- [ ] **Linux xkb capture receivers without callers.** [CODE] `capture_chord_output`,
-      `chord_output_current`, `with_chord_output` in `linux/adapters/xkb_capture.lua` lost their
-      only caller with the per-letter CapsWord mode (fa965e42f2): delete them with
-      `test_caps_word_output_custody.lua` and the xkb tests that exercise them.
 - [ ] **Linux AI off remainders.** [CODE] The menu switch-off does not stop an app-started
       `ollama serve` nor a running model download, as pause does (the agent auto mode and bound
       `llm_*` chords are a maintainer question).
