@@ -1075,6 +1075,8 @@ _LLM_Menu_ApiEntryFieldsAreSafe(Entry) {
 ; Parses and validates the complete persisted image before any row becomes
 ; visible. A malformed sibling invalidates the whole authority: publishing a
 ; prefix would make selection and credential identity depend on parser order.
+; A well-formed row naming a provider this build no longer lists is the one
+; exception: it is returned in "retired", never usable, and written back as is.
 ; Name stays a required field so a file this build writes still loads in the
 ; builds before 2026-10; its value, a name the user typed in those builds, is
 ; never read: every row shows the automatic name.
@@ -1082,7 +1084,7 @@ _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 	global LLM_API_PROVIDERS
 	if !IsSet(Providers)
 		Providers := LLM_API_PROVIDERS
-	Result := Map("ok", false, "entries", [], "reason", "")
+	Result := Map("ok", false, "entries", [], "retired", [], "reason", "")
 	try Parsed := JsonParse(Raw)
 	catch as Err {
 		Result["reason"] := "invalid JSON: " . Err.Message
@@ -1125,10 +1127,20 @@ _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers := unset, DecryptFn := 0) {
 			return Result
 		}
 		ProviderId := Entry["Provider"]
-		if Trim(ProviderId) == "" || !Providers.Has(ProviderId) {
-			Result["reason"] := "entry " . Index
-				. " names unknown provider '" . ProviderId . "'"
+		if Trim(ProviderId) == "" {
+			Result["reason"] := "entry " . Index . " has an empty provider"
 			return Result
+		}
+		if !Providers.Has(ProviderId) {
+			; A provider this build no longer lists is outdated, not corrupt:
+			; the row is kept as stored (token still encrypted) so the next save
+			; writes it back, and the rest of the file stays usable.
+			Retired := Map()
+			for Field in RequiredFields
+				Retired[Field] := Entry[Field]
+			SeenIds[EntryId] := true
+			Result["retired"].Push(Retired)
+			continue
 		}
 		Candidate := Map()
 		for Field in RequiredFields
@@ -1193,6 +1205,10 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	if !Parsed["ok"]
 		return _LLM_Menu_ReportApiEntriesLoadFailure(Parsed["reason"], ReportFn)
 	entries := Parsed["entries"]
+	if Parsed["retired"].Length
+		try LoggerWarn("LLM",
+			"Kept {1} API entries whose provider this build no longer lists; they are not usable and are written back unchanged.",
+			Parsed["retired"].Length)
 	; Re-anchor the active id only if it still exists; otherwise pick the
 	; first entry so a corrupted ``api_entry_id`` does not leave the user
 	; with "no active entry" while entries exist on disk.
@@ -1217,6 +1233,7 @@ _LLM_Menu_LoadApiEntries(ReadFn := 0, ReportFn := 0, DecryptFn := 0,
 	PreviousCritical := Critical("On")
 	try {
 		_LLM_Menu["api_entries"] := entries
+		_LLM_Menu["api_entries_retired"] := Parsed["retired"]
 		_LLM_Menu["api_entry_id"] := active
 		_LLM_Menu_ApiPrivateAuthorityGeneration += 1
 	} finally Critical(PreviousCritical)
@@ -1236,7 +1253,6 @@ _LLM_Menu_ApiEntriesFieldsOwned(Entry) {
 }
 
 _LLM_Menu_ApiSourceOwned(Raw) {
-	global LLM_API_PROVIDERS
 	try Entries := JsonParse(Raw)
 	catch
 		return false
@@ -1244,7 +1260,6 @@ _LLM_Menu_ApiSourceOwned(Raw) {
 		return false
 	for Entry in Entries {
 		if !_LLM_Menu_ApiEntriesFieldsOwned(Entry)
-				|| !LLM_API_PROVIDERS.Has(Entry["Provider"])
 			return false
 	}
 	return true
@@ -1282,6 +1297,22 @@ _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
 			}
 			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(val) . '"')
 		}
+		lines.Push("{" . _LLM_MenuJoin(fields, ",") . "}")
+	}
+	; Retired rows follow the live ones byte-for-byte as loaded (token still
+	; encrypted); a live id that collides with one would make the image ambiguous.
+	Retired := MenuState.Get("api_entries_retired", [])
+	if !(Retired is Array)
+		return false
+	LiveIds := Map()
+	for e in entries
+		LiveIds[_LLM_MenuApiEntryGet(e, "Id", "")] := true
+	for e in Retired {
+		if !_LLM_Menu_ApiEntriesFieldsOwned(e) || LiveIds.Has(e["Id"])
+			return false
+		fields := []
+		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(e[field]) . '"')
 		lines.Push("{" . _LLM_MenuJoin(fields, ",") . "}")
 	}
 	return "[" . _LLM_MenuJoin(lines, ",`n  ") . "]"

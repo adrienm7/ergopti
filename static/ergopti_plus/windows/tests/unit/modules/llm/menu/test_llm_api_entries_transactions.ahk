@@ -486,8 +486,8 @@ _LMT_ApiLoaderRejectsMalformedSchemaAsOneImage() {
 			_LMT_AssertApiImageRejected(_LMT_ApiImageWithFieldValue(Field, "42"),
 				"non-string required field " . Field)
 		_LMT_AssertApiImageRejected('[{"Id":"one","Name":"One",'
-			. '"Provider":"unknown","BaseUrl":"https://one.invalid",'
-			. '"Token":"secret","Model":"m1"}]', "unknown provider")
+			. '"Provider":"","BaseUrl":"https://one.invalid",'
+			. '"Token":"secret","Model":"m1"}]', "empty provider")
 		_LMT_AssertApiImageRejected('[{"Id":"one","Name":"One",'
 			. '"Provider":"openai","BaseUrl":"https://one.invalid",'
 			. '"Token":"secret"}]', "missing required field")
@@ -514,6 +514,49 @@ _LMT_ApiParserPreservesEscapedStrings() {
 	AssertEqual("https://one.invalid/{path}", Parsed["entries"][1]["BaseUrl"])
 	AssertEqual("brace{token}\tail", Parsed["entries"][1]["Token"])
 }
+_LMT_RetiredProviderRowIsKeptNotFatal() {
+	Providers := Map("openai", Map())
+	Raw := '[{"Id":"old","Name":"Old","Provider":"gone",'
+		. '"BaseUrl":"https://old.invalid","Token":"opaque-token","Model":"m0"},'
+		. '{"Id":"one","Name":"One","Provider":"openai",'
+		. '"BaseUrl":"https://one.invalid","Token":"secret","Model":"m1"}]'
+	Decrypted := []
+	Parsed := _LLM_Menu_ParseAndValidateApiEntries(Raw, Providers,
+		(Token) => (Decrypted.Push(Token), Token))
+	AssertTrue(Parsed["ok"],
+		"a row naming a retired provider must not reject the rest of the file")
+	AssertEqual(1, Parsed["entries"].Length)
+	AssertEqual("one", Parsed["entries"][1]["Id"])
+	AssertEqual(1, Parsed["retired"].Length)
+	AssertEqual("old", Parsed["retired"][1]["Id"])
+	AssertEqual(1, Decrypted.Length,
+		"a retired row must never reach token decryption")
+
+	; The retired row is written back as stored behind the live rows.
+	State := Map("api_entries", Parsed["entries"],
+		"api_entries_retired", Parsed["retired"], "api_entry_id", "one")
+	Image := _LLM_Menu_SerializeApiEntries(State, _LMT_StableEncryptToken)
+	AssertTrue(Image is String, "a state with a retired row must serialize")
+	AssertContains(Image, '"Id":"old","Name":"Old","Provider":"gone"')
+	AssertContains(Image, '"Token":"opaque-token"',
+		"the retired token must be written back unchanged, not re-encrypted")
+	Reread := _LLM_Menu_ParseAndValidateApiEntries(Image, Providers,
+		(Token) => Token)
+	AssertEqual(1, Reread["retired"].Length)
+
+	; A live id equal to a retired id would make the image ambiguous.
+	Clash := Map("api_entries", [_LMT_ApiEntry("old", "New")],
+		"api_entries_retired", Parsed["retired"], "api_entry_id", "old")
+	AssertFalse(_LLM_Menu_SerializeApiEntries(Clash, _LMT_StableEncryptToken),
+		"a live entry must not reuse a retired row's id")
+	AssertTrue(_LLM_Menu_ApiSourceOwned(Raw),
+		"a retired row is owned by the writer, so the file stays writable")
+}
+Test("LLM API entries: a retired provider row is kept and written back "
+	. "(api-entry-retired-provider-row)",
+	_LMT_RetiredProviderRowIsKeptNotFatal)
+
+
 Test("LLM API entries: strict parser preserves escaped strings and braces "
 	. "(api-entry-identity-cardinality)",
 	_LMT_ApiParserPreservesEscapedStrings)
