@@ -159,7 +159,7 @@ end
 --- @return string The text of the button that was clicked.
 function M.block_alert(...)
 	focus_hammerspoon()
-	return hs.dialog.blockAlert(...)
+	return Logger.run_modal(hs.dialog.blockAlert, ...)
 end
 
 --- Focus-aware wrapper around hs.dialog.textPrompt.
@@ -168,7 +168,7 @@ end
 --- @return string The text entered by the user.
 function M.text_prompt(...)
 	focus_hammerspoon()
-	return hs.dialog.textPrompt(...)
+	return Logger.run_modal(hs.dialog.textPrompt, ...)
 end
 
 -- An AppleScript alert holds three buttons: the cancel one and two choices
@@ -244,7 +244,7 @@ function M.choose(title, message, choices, cancel_label, ok_label)
 		end
 	end
 	focus_hammerspoon()
-	local ok, answer, raw = hs.osascript.applescript(
+	local ok, answer, raw = Logger.run_modal(hs.osascript.applescript,
 		M.choose_script(title, message, choices, cancel_label, ok_label))
 	if ok ~= true or type(answer) ~= "string" then
 		error("dialog_util.choose: the dialog failed: " .. tostring(raw), 2)
@@ -294,7 +294,8 @@ end
 --- @return string|nil path The chosen .app path, nil when cancelled.
 function M.choose_application(message, title)
 	focus_hammerspoon()
-	local ok, path = hs.osascript.applescript(M.application_picker_script(message, title))
+	local ok, path = Logger.run_modal(hs.osascript.applescript,
+		M.application_picker_script(message, title))
 	if ok ~= true then
 		error("dialog_util.choose_application: the native application picker failed", 2)
 	end

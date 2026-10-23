@@ -1789,6 +1789,37 @@ local MILLISECONDS_PER_SECOND = 1000
 -- Monotonic nanosecond clock captured at install; nil without hs.timer.
 local _callback_clock = nil
 local _slow_callback_reported_at = {}
+-- Total nanoseconds spent waiting for a person inside a modal dialog since
+-- install. A callback that opens a dialog is not stalled by the time the user
+-- takes to answer it, so the slow-callback report subtracts this wait.
+local _modal_wait_ns = 0
+
+--- Runs a call that waits for a person (a modal dialog) and records how long
+--- it waited, so a timer callback that merely hosts the dialog is not reported
+--- as a main-thread stall (issue #101 named three dialog callbacks as 1.7 s to
+--- 4.5 s holds). Errors propagate after the wait is recorded.
+--- @param fn function The blocking call.
+--- @param ... any Arguments for fn.
+--- @return any ... Whatever fn returns.
+function M.run_modal(fn, ...)
+	if type(fn) ~= "function" then error("Logger.run_modal: a function is required", 2) end
+	local started = nil
+	if _callback_clock then
+		local ok_start, value = pcall(_callback_clock)
+		if ok_start and type(value) == "number" then started = value end
+	end
+	local function settle(ok, ...)
+		if started then
+			local ok_end, finished = pcall(_callback_clock)
+			if ok_end and type(finished) == "number" and finished > started then
+				_modal_wait_ns = _modal_wait_ns + (finished - started)
+			end
+		end
+		if not ok then error((...), 0) end
+		return ...
+	end
+	return settle(pcall(fn, ...))
+end
 
 --- Names the source line of the function a timer callback runs.
 --- adapters/timer_scheduler.lua wraps every owner's callback in a closure of
@@ -1817,10 +1848,11 @@ end
 --- @param fn function The callback that ran.
 --- @param kind string Timer family label.
 --- @param started integer Monotonic start, nanoseconds.
-local function report_slow_timer_callback(fn, kind, started)
+--- @param modal_before integer Modal wait total when the callback started.
+local function report_slow_timer_callback(fn, kind, started, modal_before)
 	local ok_now, now = pcall(_callback_clock)
 	if not ok_now or type(now) ~= "number" then return end
-	local held_ms = (now - started) / NANOSECONDS_PER_MILLISECOND
+	local held_ms = (now - started - (_modal_wait_ns - modal_before)) / NANOSECONDS_PER_MILLISECOND
 	if held_ms < SLOW_TIMER_CALLBACK_REPORT_MS then return end
 	local ok_site, site = pcall(describe_callback_site, fn)
 	site = ok_site and site or "?"
@@ -1855,6 +1887,7 @@ local function _guard_timer_cb(fn, kind)
 	if type(fn) ~= "function" then return fn end
 	return function(...)
 		local started = nil
+		local modal_before = _modal_wait_ns
 		if _callback_clock then
 			local ok_start, value = pcall(_callback_clock)
 			if ok_start and type(value) == "number" then started = value end
@@ -1868,7 +1901,7 @@ local function _guard_timer_cb(fn, kind)
 		-- event taps and cost the Karabiner lease in issue #99 (13.4 s inside one
 		-- ingest flush). Naming the callback makes the next log say which one.
 		if started then
-			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started)
+			local reported, report_err = pcall(report_slow_timer_callback, fn, kind, started, modal_before)
 			if not reported then
 				M.error("runtime", "Slow timer callback report failed: %s", ErrorDescription.describe(report_err))
 			end
