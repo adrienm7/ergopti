@@ -221,6 +221,7 @@ function M.new()
 		owned_readiness = owned_readiness,
 		app_path = app_path,
 		login_startup_status = login_startup_status,
+		composer_env = function() return (require("modules.keymap.composer_check").env()) end,
 	}
 end
 
