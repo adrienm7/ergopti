@@ -70,9 +70,11 @@ helpers.describe("delay resolution: the engine and the preview share one chain",
 		helpers.assert_eq(live, true)
 		helpers.assert_eq(remaining, 0.3)
 		local at_deadline, zero_remaining = s.mapping_delay_remaining({}, 0.5, 1)
-		helpers.assert_eq(at_deadline, false,
-			"the engine must expire at the same >= boundary as tooltip dequeue")
+		helpers.assert_eq(at_deadline, true,
+			"the exact deadline instant fires, as on Windows and Linux")
 		helpers.assert_eq(zero_remaining, 0)
+		local past_deadline = s.mapping_delay_remaining({}, 0.501, 1)
+		helpers.assert_eq(past_deadline, false, "one millisecond later does not")
 		local complex_live, complex_remaining = s.mapping_delay_remaining({}, 0.5, 2)
 		helpers.assert_eq(complex_live, true,
 			"the shared policy must still expose the wider complex-key window")

@@ -116,14 +116,19 @@ _TGC_Replay(Vector) {
 	Base := A_TickCount
 	Typed := Vector["typed"]
 	LastSentCharacterKeyTime := Map()
-	for Key in Typed
+	Missing := Vector.Has("reference_time_missing") && Vector["reference_time_missing"]
+	Reference := Vector["reference_char"]
+	for Key in Typed {
+		if (Missing && Key["char"] == Reference)
+			continue
 		LastSentCharacterKeyTime[Key["char"]] := Base + Key["down_ms"]
+	}
 	Expander := Vector["expander"]
 	GateTick := Base + Expander["down_ms"]
 
-	Reference := Vector["reference_char"]
-	AssertEqual(Vector["elapsed_ms"], Expander["down_ms"] - (LastSentCharacterKeyTime[Reference] - Base),
-		Vector["id"] . ": the vector's elapsed time is expander minus reference character")
+	if !Missing
+		AssertEqual(Vector["elapsed_ms"], Expander["down_ms"] - (LastSentCharacterKeyTime[Reference] - Base),
+			Vector["id"] . ": the vector's elapsed time is expander minus reference character")
 	AssertEqual(Reference, Typed[Typed.Length]["char"],
 		Vector["id"] . ": the reference is the character typed immediately before the expander")
 	AssertEqual(StrLower(Reference), StrLower(HSE_TimeGateReferenceChar(Trigger, Vector["ends_with_magic"])),

@@ -380,7 +380,9 @@ function M.within_expansion_delay(result, delay_sec, resolution_ms)
 	if not limit or limit <= 0 then return true end
 	if type(result) ~= "table" then return false end
 	local gap_ms = tonumber(result.expander_gap_ms)
-	return gap_ms ~= nil and gap_ms - resolution_ms <= limit * 1000
+	-- Whole milliseconds, as Windows (Round(seconds * 1000)) and macOS: 1.005 s is
+	-- 1005 ms, not 1004.9999999999999, so the exact deadline instant fires.
+	return gap_ms ~= nil and gap_ms - resolution_ms <= math.floor(limit * 1000 + 0.5)
 end
 
 --- Whether a value is a valid `hotstrings.idle_reset_seconds`: a finite

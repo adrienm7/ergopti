@@ -32,10 +32,14 @@ helpers.describe("expansion delay: the shared time-gate corpus", function()
 			local before_expander = vector.typed[#vector.typed]
 			helpers.assert_eq(before_expander.char, vector.reference_char,
 				"the reference is the character typed immediately before the expander")
-			local elapsed_ms = vector.expander.down_ms - before_expander.down_ms
-			helpers.assert_eq(elapsed_ms, vector.elapsed_ms,
-				"the preceding-key interval is the vector's elapsed time")
-			local allowed = s.mapping_delay_remaining({ has_magic = vector.ends_with_magic }, elapsed_ms / 1000, 1)
+			local elapsed_s = nil
+			if not vector.reference_time_missing then
+				local elapsed_ms = vector.expander.down_ms - before_expander.down_ms
+				helpers.assert_eq(elapsed_ms, vector.elapsed_ms,
+					"the preceding-key interval is the vector's elapsed time")
+				elapsed_s = elapsed_ms / 1000
+			end
+			local allowed = s.mapping_delay_remaining({ has_magic = vector.ends_with_magic }, elapsed_s, 1)
 			helpers.assert_eq(allowed, vector.fires, "the delay gate verdict")
 		end)
 	end

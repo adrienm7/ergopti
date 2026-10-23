@@ -829,8 +829,12 @@ local function update_preview_body(buf)
 		-- eventtap's maximum accepted window here; while the row is visibly
 		-- committed its exact lease is the action-path authority. Without this,
 		-- Shift+magic could still expand after the row had disappeared.
-		return _state.mapping_delay_remaining(
+		local allowed, remaining = _state.mapping_delay_remaining(
 			mapping, elapsed, tonumber(_state.COMPLEX_DELAY_MULT) or 1)
+		-- The exact deadline instant still fires, but a row with no time left is
+		-- never advertised (Windows refuses RemainingMs == 0 the same way).
+		if allowed and remaining == 0 then return false, 0 end
+		return allowed, remaining
 	end
 	PhaseStats.stop("preview.providers", providers_started)
 	local resolve_started = PhaseStats.now()
