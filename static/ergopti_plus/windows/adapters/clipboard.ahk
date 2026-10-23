@@ -532,6 +532,76 @@ CB_Write(Text) {
 	}
 }
 
+; Windows-only publication receipt; the shared write port remains Boolean-only.
+; A successful setter may already have been replaced when it returns. Authenticate
+; this exact mutation under a new native read lease before lending its sequence.
+; Empty/truncated text, native failures and lost ownership have no receipt; the
+; Boolean still reports the genuine setter result, never a promise of rollback.
+CB_WriteTextWithReceipt(Text, &OwnedSequence := 0) {
+	OwnedSequence := 0
+	PreviousCritical := Critical("On")
+	try BeforeMutation := CBClipboardOwner.mutation_id
+	finally Critical(PreviousCritical)
+	Published := CB_Write(Text)
+	if !Published
+		return false
+	Length := StrLen(Text)
+	if !Length
+		return true
+	Opened := false
+	try {
+		Opened := CB_OpenClipboardWithin(A_ScriptHwnd)
+		if !Opened || DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return true
+		Data := DllCall("User32\GetClipboardData", "UInt", 13, "Ptr")
+		if !Data || DllCall("Kernel32\GlobalSize", "Ptr", Data, "UPtr") < (Length + 1) * 2
+			return true
+		Pointer := DllCall("Kernel32\GlobalLock", "Ptr", Data, "Ptr")
+		if !Pointer
+			return true
+		try {
+			; An AHK reader may close the raw lease without changing the mutation.
+			; These HWND-only queries cannot render data; acquisition stays outside
+			; Critical. Refuse the lost lease before touching its retained pointer.
+			PreviousCritical := Critical("On")
+			try {
+				Matches := CBClipboardOwner.mutation_id == BeforeMutation + 1
+					&& DllCall("User32\GetOpenClipboardWindow", "Ptr") == A_ScriptHwnd
+					&& DllCall("User32\GetClipboardOwner", "Ptr") == A_ScriptHwnd
+					&& NumGet(Pointer, Length * 2, "UShort") == 0
+					&& StrLen(StrGet(Pointer, Length, "UTF-16")) == Length
+					&& StrGet(Pointer, -Length, "UTF-16") == Text
+			} finally Critical(PreviousCritical)
+		} finally DllCall("Kernel32\GlobalUnlock", "Ptr", Data)
+		if !Matches
+			return true
+		Sequence := CB_GetSequenceNumber()
+		if !Sequence || DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+				|| DllCall("User32\GetClipboardOwner", "Ptr") != A_ScriptHwnd
+			return true
+		; Only RAM is inspected in this transaction. The still-open native lease
+		; excludes external writes; an extra driver mutation also invalidates it.
+		PreviousCritical := Critical("On")
+		try {
+			if CBClipboardOwner.mutation_id == BeforeMutation + 1
+				OwnedSequence := Sequence
+		} finally Critical(PreviousCritical)
+	} catch {
+		OwnedSequence := 0
+	} finally {
+		if Opened {
+			try {
+				if DllCall("User32\GetOpenClipboardWindow", "Ptr") != A_ScriptHwnd
+						|| !DllCall("User32\CloseClipboard", "Int")
+					OwnedSequence := 0
+			} catch {
+				OwnedSequence := 0
+			}
+		}
+	}
+	return true
+}
+
 ; Snapshots the current clipboard and returns it for later restoration.
 ; Returns "__CB_SAVE_ERROR__" when the clipboard is locked so callers can
 ; distinguish a read failure from a legitimately empty clipboard.
