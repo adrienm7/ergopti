@@ -293,3 +293,5 @@ _KLSCR_ShutdownCloseNativeChain() {
 }
 Test("keystats session: actual focus teardown retains only certified closes (keystats-shutdown-close-chain)",
 	_KLRDC_CheckTeardown.Bind(_KLSCR_ShutdownCloseNativeChain))
+
+#Include test_idle_activity_publication_owner.ahk
