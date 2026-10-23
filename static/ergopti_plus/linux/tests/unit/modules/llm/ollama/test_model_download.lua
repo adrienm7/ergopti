@@ -459,6 +459,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 				state.hosts = state.hosts + 1
 				state.completed, state.retired = #window.completions, window.retired_session
 				window.host_closed = true
+				return true
 			end }
 			local coordinator = daemon_registry({ shutdown_runtime = Download.shutdown, cancel = function() end }, webviews, state)
 			helpers.assert_true(coordinator.request("terminal model shutdown"))
@@ -483,7 +484,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 
 	helpers.it("actual daemon without an AI owner retains its ordinary host teardown", function()
 		local state = { loops = 0, hosts = 0 }
-		local coordinator = daemon_registry(false, { shutdown = function() state.hosts = state.hosts + 1 end }, state)
+		local coordinator = daemon_registry(false, { shutdown = function() state.hosts = state.hosts + 1; return true end }, state)
 		helpers.assert_true(coordinator.request("no optional AI module"))
 		helpers.assert_eq(state.hosts, 1)
 		helpers.assert_eq(state.loops, 1)
