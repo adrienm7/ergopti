@@ -236,18 +236,19 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		messages = messages,
 		stream = stream,
 		keep_alive = OLLAMA_KEEP_ALIVE,
+		-- Windows and macOS disable thinking in the request; stripping the trace
+		-- afterwards would still pay its tokens and latency.
+		think = false,
+		options = { thinking_budget = 0 },
 	}
 	if type(options.temperature) == "number" then
-		payload.options = payload.options or {}
 		payload.options.temperature = options.temperature
 	end
 	if type(options.max_tokens) == "number" then
-		payload.options = payload.options or {}
 		payload.options.num_predict = options.max_tokens
 	end
 	local stop = stop_for(options.line_mode)
 	if stop then
-		payload.options = payload.options or {}
 		payload.options.stop = stop
 	end
 
