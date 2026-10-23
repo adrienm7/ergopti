@@ -497,6 +497,14 @@ generate_info_plist() {
 			<key>NSHighResolutionCapable</key>        <true/>
 			<key>NSSupportsAutomaticGraphicsSwitching</key> <true/>
 			<key>NSPrincipalClass</key>               <string>NSApplication</string>
+			<!-- The native PAC fetch is a URLSession in this bundle, and a company PAC is
+			     often served over plain http. Without this key App Transport Security
+			     refuses the request, the whole proxy lookup fails and every managed
+			     download stops (issue #101). Downloads themselves stay https and pinned. -->
+			<key>NSAppTransportSecurity</key>
+			<dict>
+				<key>NSAllowsArbitraryLoads</key>     <true/>
+			</dict>
 			<key>CFBundleURLTypes</key>
 			<array>
 				<dict>
