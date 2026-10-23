@@ -252,6 +252,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-tooltip-corpus-parity.cjs"],
 			"repro": "node tools/test/test-tooltip-corpus-parity.cjs"
+		},
+		{
+			"id": "js-0455",
+			"ordinal": 455,
+			"name": "layout composer model composes four layers and a shortcuts layer from registry layouts into one .keylayout the shared vectors read back",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-composer-model.cjs"],
+			"repro": "npm run test:layout-composer-model"
 		}
 	]
 }

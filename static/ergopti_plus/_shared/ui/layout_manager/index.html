@@ -5,36 +5,115 @@
 		<meta charset="utf-8" />
 		<title data-i18n="layout_manager.window_title"></title>
 		<link rel="stylesheet" href="style.css" />
+		<link rel="stylesheet" href="../layout_composer/composer.css" />
 		<script src="../host_bridge.js"></script>
+		<script src="../layout_composer/_generated/composer_data.js"></script>
+		<script src="../layout_composer/reference_layouts.js"></script>
+		<script src="../layout_composer/composer_model.js"></script>
 	</head>
 	<body>
-		<h1 data-i18n="layout_manager.window_title"></h1>
-		<p class="subtitle" data-i18n="layout_manager.subtitle"></p>
+		<div id="layout-view">
+			<h1 data-i18n="layout_manager.window_title"></h1>
+			<p class="subtitle" data-i18n="layout_manager.subtitle"></p>
 
-		<div class="toolbar">
-			<p id="catalogue-status" class="catalogue-status" role="status"></p>
-			<button
-				type="button"
-				id="btn-refresh"
-				class="secondary"
-				data-i18n="layout_manager.btn_refresh"
-			></button>
+			<div class="toolbar">
+				<p id="catalogue-status" class="catalogue-status" role="status"></p>
+				<button
+					type="button"
+					id="btn-compose"
+					class="secondary"
+					data-i18n="layout_composer.btn_open"
+				></button>
+				<button
+					type="button"
+					id="btn-refresh"
+					class="secondary"
+					data-i18n="layout_manager.btn_refresh"
+				></button>
+			</div>
+
+			<p id="result" class="result" role="alert" hidden></p>
+
+			<ul id="layout-list" class="layout-list"></ul>
+			<p id="empty" class="empty" data-i18n="layout_manager.empty" hidden></p>
+
+			<div class="btns">
+				<button
+					type="button"
+					id="btn-close"
+					class="secondary"
+					data-i18n="layout_manager.btn_close"
+				></button>
+			</div>
 		</div>
 
-		<p id="result" class="result" role="alert" hidden></p>
+		<section id="composer" class="composer" hidden>
+			<h1 data-i18n="layout_composer.title"></h1>
+			<p class="subtitle" data-i18n="layout_composer.subtitle"></p>
 
-		<ul id="layout-list" class="layout-list"></ul>
-		<p id="empty" class="empty" data-i18n="layout_manager.empty" hidden></p>
+			<div class="composer-row">
+				<label class="composer-label" for="composer-name" data-i18n="layout_composer.name"></label>
+				<input type="text" id="composer-name" maxlength="64" />
+				<select id="composer-form">
+					<option value="iso" data-i18n="layout_composer.keyboard_iso"></option>
+					<option value="ansi" data-i18n="layout_composer.keyboard_ansi"></option>
+				</select>
+				<span
+					id="composer-active"
+					class="badge badge-active"
+					hidden
+					data-i18n="layout_composer.active"
+				></span>
+			</div>
 
-		<div class="btns">
-			<button
-				type="button"
-				id="btn-close"
-				class="secondary"
-				data-i18n="layout_manager.btn_close"
-			></button>
-		</div>
+			<h2 data-i18n="layout_composer.section_layers"></h2>
+			<div id="composer-layers"></div>
+
+			<h2 data-i18n="layout_composer.section_shortcuts"></h2>
+			<p
+				id="composer-shortcuts-note"
+				class="note"
+				hidden
+				data-i18n="layout_composer.shortcuts_unsupported"
+			></p>
+			<div id="composer-shortcuts"></div>
+
+			<h2 data-i18n="layout_composer.section_keys"></h2>
+			<div id="composer-tabs" class="composer-tabs"></div>
+			<div id="composer-board" class="composer-board"></div>
+			<div id="composer-key-editor" class="composer-key-editor" hidden></div>
+
+			<ul id="composer-problems" class="composer-problems" hidden></ul>
+			<p id="composer-result" class="result" role="alert" hidden></p>
+
+			<div class="btns">
+				<button
+					type="button"
+					id="composer-back"
+					class="secondary"
+					data-i18n="layout_composer.btn_back"
+				></button>
+				<button
+					type="button"
+					id="composer-remove"
+					class="danger"
+					data-i18n="layout_composer.btn_remove"
+				></button>
+				<button
+					type="button"
+					id="composer-save"
+					class="secondary"
+					data-i18n="layout_composer.btn_save"
+				></button>
+				<button
+					type="button"
+					id="composer-save-use"
+					data-i18n="layout_composer.btn_save_use"
+				></button>
+			</div>
+		</section>
 
 		<script src="script.js"></script>
+		<script src="../layout_composer/composer_page.js"></script>
 	</body>
 </html>

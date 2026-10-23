@@ -74,6 +74,7 @@ global LAYOUT_REGISTRY_POLL_GRACE := 20
 
 ; Parsed shared files, loaded on first use (they never change while running).
 global _LayoutRegistryDefaults := 0
+global _LayoutRegistryComposer := 0
 global _LayoutRegistryKeycodes := 0
 global _LayoutRegistryGithub := 0
 
@@ -104,6 +105,19 @@ LayoutRegistry_Settings() {
 	if !IsObject(_LayoutRegistryDefaults)
 		_LayoutRegistryDefaults := _LayoutRegistryReadJson("modules\layouts\defaults.json")["registry"]
 	return _LayoutRegistryDefaults
+}
+
+/**
+ * The [composer] table of _shared/modules/layouts/defaults.json: the reserved
+ * id the per-layer composer's layout is installed under, the folder that keeps
+ * the user's composition and its bounds (docs/layout-composer.md).
+ * @returns {Map}
+ */
+LayoutRegistry_Composer() {
+	global _LayoutRegistryComposer
+	if !IsObject(_LayoutRegistryComposer)
+		_LayoutRegistryComposer := _LayoutRegistryReadJson("moduleslayoutsdefaults.json")["composer"]
+	return _LayoutRegistryComposer
 }
 
 /** Reads a fresh canonical keycode table without adopting the public cache. */
@@ -164,6 +178,15 @@ LayoutRegistry_RawUrl(RelativePath) {
  */
 LayoutRegistry_LocalDir(ConfigDir) {
 	return ConfigDir . LayoutRegistry_Settings()["local_folder"] . "\"
+}
+
+/**
+ * Folder keeping the user's composition (declaration and compiled layout).
+ * @param {string} ConfigDir - Configuration folder, with its trailing backslash.
+ * @returns {string} Folder path with a trailing backslash.
+ */
+LayoutRegistry_ComposerDir(ConfigDir) {
+	return ConfigDir . LayoutRegistry_Composer()["folder"] . "\"
 }
 
 /**

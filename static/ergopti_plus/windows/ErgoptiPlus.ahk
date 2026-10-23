@@ -334,8 +334,10 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 A_MaxThreads := 64
 
 SetKeyDelay(0) ; No delay between key presses
-SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
-; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
+SendMode("Event") ; Mode of the calls that do not name a primitive: Send, Click and MouseMove. The gestures hold
+; buttons with Click, and SendInput would remove the mouse hook around them. Nothing of the hotstring layer
+; depends on it: an expansion is one SendInput at TEXT_SENDER_SEND_LEVEL, and its output is final, so it
+; completes no other hotstring (hotstring-output-is-final). The layout types with SendEvent by name.
 
 ; Logger pulled in first so every other infra/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
@@ -1364,6 +1366,7 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
 #Include ui/layout_manager/init.ahk
+#Include ui/layout_manager/composer.ahk
 #Include ui/personal_info_editor/init.ahk
 #Include ui/layer_editor/init.ahk
 

@@ -58,6 +58,10 @@ global LAYOUT_CATALOGUE_FAILURE_UNSUPPORTED := "unsupported_platform"
 global LAYOUT_CATALOGUE_FAILURE_DOWNLOAD := "download_failed"
 global LAYOUT_CATALOGUE_FAILURE_WRITE := "write_failed"
 global LAYOUT_CATALOGUE_FAILURE_RECORD := "record_failed"
+global LAYOUT_CATALOGUE_FAILURE_INVALID := "invalid"
+
+; Where a layout the user composed comes from (the composer, not the registry).
+global LAYOUT_CATALOGUE_SOURCE_COMPOSER := "composer"
 
 ; Version of the installed record this module reads and writes.
 global LAYOUT_CATALOGUE_INSTALLED_SCHEMA := 1
@@ -751,6 +755,45 @@ _LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, Source, Finish) {
 		return
 	}
 	Finish.Call(true, Map("entry", Installed[Id], "source", Source))
+}
+
+/**
+ * Installs the layout the user composed (docs/layout-composer.md): no catalogue
+ * and no download, the caller built the entry from the compiled file. The copy
+ * must still match the entry it is recorded with, so it is read back like any
+ * other installed layout.
+ * @param {Map} Entry - Record entry (id, name, version, file, size, sha256, keycode_convention...).
+ * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir.
+ * @param {string} Text - The compiled .keylayout.
+ * @param {Func} OnDone - OnDone(true, Map("entry", Entry, "source", Source)) or
+ *   OnDone(false, FailureCode, Detail); called exactly once.
+ */
+LayoutCatalogue_InstallLocal(Entry, LocalDir, Text, OnDone) {
+	global LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, LAYOUT_CATALOGUE_FAILURE_BUSY
+	global LAYOUT_CATALOGUE_FAILURE_RECORD, LAYOUT_CATALOGUE_FAILURE_INVALID, LAYOUT_CATALOGUE_SOURCE_COMPOSER
+	Id := (Entry is Map) && Entry.Has("id") ? Entry["id"] : ""
+	if !LayoutRegistry_IsValidId(Id) {
+		OnDone.Call(false, LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, "'" . Id . "' is not a layout id")
+		return
+	}
+	if !_LayoutCatalogueAcquire(Id, "install") {
+		OnDone.Call(false, LAYOUT_CATALOGUE_FAILURE_BUSY, "another layout operation is still running")
+		return
+	}
+	LoggerStart("LayoutCatalogue", "Installing the '{1}' layout…", Id)
+	Finish := _LayoutCatalogueFinishInstall.Bind(Id, OnDone)
+	try LayoutRegistry_Verify(Entry, Text)
+	catch as Err {
+		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_INVALID, Err.Message)
+		return
+	}
+	; The record is read before anything is written, like a registry install.
+	try LayoutCatalogue_ReadInstalled(LocalDir)
+	catch as Err {
+		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_RECORD, Err.Message)
+		return
+	}
+	_LayoutCataloguePublishVerified(Id, LocalDir, Entry, Text, LAYOUT_CATALOGUE_SOURCE_COMPOSER, Finish)
 }
 
 /**

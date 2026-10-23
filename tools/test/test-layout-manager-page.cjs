@@ -573,9 +573,35 @@ check(
 		}
 		for (const origin of ['network', 'cache', 'bundled', 'none'])
 			keys.add('layout_manager.source_' + origin);
+		// The composer view (layout_composer/composer_page.js) is part of this page.
+		const composerSource = fs.readFileSync(
+			path.join(SHARED, 'ui/layout_composer/composer_page.js'),
+			'utf8'
+		);
+		for (const match of composerSource.matchAll(/'(layout_composer.[a-z_]+)'/g)) keys.add(match[1]);
+		for (const level of [
+			'base',
+			'shift',
+			'altgr',
+			'shift_altgr',
+			'caps',
+			'meta',
+			'ctrl',
+			'alt',
+			'command'
+		])
+			keys.add('layout_composer.level_' + level);
+		for (const code of ['invalid', 'write_failed', 'use_failed', 'busy', 'unsupported', 'other'])
+			keys.add('layout_composer.failure_' + code);
+		// The storage key of the remembered keyboard form is not a string.
+		keys.delete('layout_composer.form');
+		// The composer's problem codes are the model's (test-layout-composer-page.cjs
+		// checks the model emits no other).
+		for (const entry of JSON.parse(fs.readFileSync(path.join(PAGE, 'strings.json'), 'utf8')).keys)
+			if (entry.startsWith('layout_composer.problem_')) keys.add(entry);
 		// A literal ending in _ is the prefix of a composed key (status_, source_).
 		const literal = [...keys].filter((key) => !key.endsWith('_')).sort();
-		assert.ok(literal.length >= 35, `only ${literal.length} keys found`);
+		assert.ok(literal.length >= 100, `only ${literal.length} keys found`);
 		const declared = JSON.parse(fs.readFileSync(path.join(PAGE, 'strings.json'), 'utf8')).keys;
 		assert.deepEqual(
 			[...declared].sort(),

@@ -167,6 +167,14 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/layer_editor/_generated/layer_data.js']
 	},
 	{
+		script: 'codegen/codegen-layout-composer-data-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_composer/_generated/composer_data.js']
+	},
+	{
+		script: 'codegen/codegen-layout-composer-corpus.cjs',
+		outputs: ['static/ergopti_plus/_shared/tests/corpus/layouts/composer/composed.keylayout']
+	},
+	{
 		script: 'codegen/codegen-onboarding-catalogue.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/ui/_generated/onboarding_catalogue.js',

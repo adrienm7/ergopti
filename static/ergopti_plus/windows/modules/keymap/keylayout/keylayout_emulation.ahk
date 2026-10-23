@@ -95,7 +95,8 @@ global KLE_Id := ""
 global KLE_State := KEYLAYOUT_NEUTRAL_STATE
 ; AHK scan code ("SC010") -> macOS key code, for the loaded layout.
 global KLE_KeyCodes := Map()
-; "s|c|o" flags (Shift, CapsLock, Option) -> keyMap index, plus "command".
+; "s|c|o" flags (Shift, CapsLock, Option) -> keyMap index, plus "command" and the
+; "ctrl", "alt" and "win" shortcut levels (the composed layout's own, else "command").
 global KLE_LevelIndex := Map()
 ; Dead-key state -> native character -> resolved transition, built at load.
 global KLE_Compositions := Map()
@@ -396,6 +397,24 @@ KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
 	return _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
 }
 
+; The shortcut levels of a loaded layout. A registry layout types every Ctrl, Alt
+; and Win chord from its Command level; the layout the composer built
+; (docs/layout-composer.md) selects a keyMap of its own for each of the three, so
+; its chords follow the modifier held. A modifier the layout selects no keyMap
+; for falls back to the Command level.
+_KLE_ShortcutLevels(Model, Id, LevelIndex) {
+	LevelIndex["win"] := LevelIndex["command"]
+	LevelIndex["ctrl"] := LevelIndex["command"]
+	LevelIndex["alt"] := LevelIndex["command"]
+	if Id != LayoutRegistry_Composer()["id"]
+		return
+	for Name, Pressed in Map("ctrl", Map("control", true), "alt", Map("option", true, "command", true)) {
+		Index := Keylayout_KeyMapIndex(Model, Pressed)
+		if Index != Model["DefaultIndex"]
+			LevelIndex[Name] := Index
+	}
+}
+
 ; Native base characters address the layout's actions by their neutral output,
 ; never by the physical position of the selected layout's different base layer.
 _KLE_BuildCompositions(Model) {
@@ -534,16 +553,20 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 }
 
 /**
- * Character a shortcut chord sends for ``Sc``: the layout's Command level.
+ * Character a shortcut chord sends for ``Sc``: the layout's Command level, or,
+ * for the layout the composer built, the level of the held modifier.
  * @param {string} Sc - AHK scan code.
+ * @param {string} Mods - The chord's AutoHotkey modifier prefix ("^", "!+", "#"...);
+ *   its first character names the modifier. Win (the Command level) by default.
  * @returns {string} One character, or "" when the layout types nothing there
  *   or a dead key (the chord then stays on the physical key).
  */
-KeylayoutEmulation_ShortcutChar(Sc) {
+KeylayoutEmulation_ShortcutChar(Sc, Mods := "#") {
 	global KLE_Model, KLE_KeyCodes, KLE_LevelIndex
 	if !IsObject(KLE_Model) || !KLE_KeyCodes.Has(Sc)
 		return ""
-	Resolved := Keylayout_Resolve(KLE_Model, KLE_LevelIndex["command"], KLE_KeyCodes[Sc])
+	Level := Map("^", "ctrl", "!", "alt").Get(SubStr(Mods, 1, 1), "win")
+	Resolved := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[Level], KLE_KeyCodes[Sc])
 	if (Resolved["Kind"] != "text")
 		return ""
 	Text := Resolved["Text"]
@@ -726,7 +749,7 @@ _KLE_OnAltGr(Sc, *) {
 }
 
 _KLE_OnShortcut(Sc, Mods, *) {
-	Char := KeylayoutEmulation_ShortcutChar(Sc)
+	Char := KeylayoutEmulation_ShortcutChar(Sc, Mods)
 	_AtCrit := Critical("On")
 	try {
 		KeylayoutEmulation_ResetDeadKey()
@@ -1155,6 +1178,11 @@ KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
 	try {
 		LocalCopy := Deps["read_local"].Call(Id, LocalDir)
 	} catch as Err {
+		if Id == LayoutRegistry_Composer()["id"] {
+			; The composition exists only on this machine: there is nothing to download.
+			LoggerError("LayoutEmulation", "The composed layout is not usable ({1}); save it again in the layout manager.", Err.Message)
+			return false
+		}
 		LoggerInfo("LayoutEmulation", "The '{1}' layout is not usable locally ({2}); installing it.", Id, Err.Message)
 		Deps["install"].Call(Id, LocalDir, _KLE_OnInstalled.Bind(Id, LocalDir, KeycodeTable, Deps))
 		return false
@@ -1635,6 +1663,7 @@ _KLE_CanonicalSourceOwner(Request, Args*) {
 				}
 			}
 			LevelIndex["command"] := Keylayout_KeyMapIndex(Model, Map("command", true))
+			_KLE_ShortcutLevels(Model, Id, LevelIndex)
 			for _, Index in LevelIndex
 				for _, Code in KeyCodes
 					Keylayout_Resolve(Model, Index, Code)
