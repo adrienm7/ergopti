@@ -3564,6 +3564,8 @@ Updater_FetchReleasesListJson(Channel := "") {
 			throw Error("The exact managed updater request refused completion.")
 		if _Updater_RequestPolicy(RequestOwner) != UPDATER_REQUEST_POLICY_ALLOW
 			return ""
+		if !Req.ResponseEncodingValid
+			throw Error("The managed releases-list response bytes are not valid UTF-8.")
 		if (Req.Status == 200) {
 			Json := Req.ResponseText
 		} else {
