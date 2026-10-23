@@ -41,6 +41,14 @@ the TAP file lands under the prefix's `drive_c/users/<user>/Temp`. Loading all
 14,500 tests takes about 20 s. This is portable evidence for pure AHK logic
 only: hooks, SendInput, WebView2, PowerShell workers and real desktop timing
 still need a Windows runner or the maintainer's PC.
+### project-ahk-listview-modify-suppresses-selection-events
+On AutoHotkey v2.0.26, `Gui.ListView.Modify` deliberately suppresses the
+`ItemSelect` script event, even when it selects a real row. A fixture that uses
+it to stand in for a user click can leave selection-dependent editor fields
+untouched. Integration tests that need the event should use the owned common
+control's native state-message boundary and require both a notification receipt
+and the expected editor fields. Keep direct handler tests explicit about their
+narrower boundary.
 
 ### feedback-ahk-ui-syntax-validation
 
