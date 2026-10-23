@@ -314,6 +314,8 @@ helpers.describe("hotstring override leaf ownership", function()
 		assert(assert(io.open(choices, "w")):close())
 		local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local old_open, old_rename, old_remove = io.open, os.rename, os.remove
+		local NativeWriter = require("infra.regular_file_writer")
+		local old_stage = NativeWriter.open
 		local old_shell = package.loaded["adapters.shell_runner"]
 		local ok, failure = xpcall(function()
 			package.loaded["adapters.shell_runner"] = nil
@@ -326,7 +328,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			assert(config.init(nil, "/fixture/catalogue.toml", function() changes = changes + 1 end))
 			action(config, path, read, write, function() return changes end)
 		end, debug.traceback)
-		io.open, os.rename, os.remove = old_open, old_rename, old_remove
+		io.open, os.rename, os.remove, NativeWriter.open = old_open, old_rename, old_remove, old_stage
 		package.loaded["modules.hotstrings.hotstrings_config"] = old_config
 		package.loaded["adapters.shell_runner"] = old_shell
 		os.remove(path .. ".tmp")
@@ -391,22 +393,29 @@ helpers.describe("hotstring override leaf ownership", function()
 	helpers.it("rechecks source after staging before acknowledging a public change", function()
 		with_owner(source, function(config, path, read, write, changes)
 			local cached = config.resolve("ext:future:pack", "literal.section")
-			local old_open = io.open
+			local NativeWriter = require("infra.regular_file_writer")
+			local old_stage, staged = NativeWriter.open, 0
 			local foreign = source .. "# Edit after staging.\n"
-			io.open = function(name, mode)
-				local handle, detail, code = old_open(name, mode)
-				if name ~= path .. ".tmp" or mode ~= "w" or not handle then return handle, detail, code end
-				return {
-					write = function(_, value) return handle:write(value) end,
-					close = function()
-						local closed = handle:close()
-						write(foreign)
-						return closed
-					end,
-				}
+			NativeWriter.open = function(name, mode)
+				if name ~= path .. ".tmp" or mode ~= "wx" then return old_stage(name, mode) end
+				local function opened(handle, ...)
+					if not handle then return handle, ... end
+					return {
+						write = function(_, value) return handle:write(value) end,
+						close = function()
+							local function closed(...)
+								staged = staged + 1; write(foreign)
+								return ...
+							end
+							return closed(handle:close())
+						end,
+					}, ...
+				end
+				return opened(old_stage(name, mode))
 			end
 			local committed = config.set_override("ext:future:pack", "literal.section", "delay", 4)
-			io.open = old_open
+			NativeWriter.open = old_stage
+			helpers.assert_eq(staged, 1, "the real native stage close must publish the competing edit")
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(read(), foreign)
 			helpers.assert_true(config.resolve("ext:future:pack", "literal.section") == cached)
@@ -485,35 +494,47 @@ helpers.describe("hotstring override leaf ownership", function()
 		for _, fault in ipairs({ "open", "write_nil", "write_false", "write_throw", "close", "rename" }) do
 			with_owner(source, function(config, path, read, _, changes)
 				local cached = config.resolve("ext:future:pack", "literal.section")
-				local old_open, old_rename = io.open, os.rename
-				io.open = function(name, mode)
-					if name ~= path .. ".tmp" or mode ~= "w" then return old_open(name, mode) end
-					if fault == "open" then return nil, "owned open refusal" end
-					local handle = assert(old_open(name, mode))
-					return {
-						write = function(_, value)
-							if fault == "write_nil" then return nil end
-							if fault == "write_false" then return false end
-							if fault == "write_throw" then error("owned write refusal") end
-							return handle:write(value)
-						end,
-						close = function()
-							local closed = handle:close()
-							if fault == "close" then return false end
-							return closed
-						end,
-					}
+				local NativeWriter = require("infra.regular_file_writer")
+				local old_stage, old_rename, faults = NativeWriter.open, os.rename, 0
+				NativeWriter.open = function(name, mode)
+					if name ~= path .. ".tmp" or mode ~= "wx" then return old_stage(name, mode) end
+					if fault == "open" then faults = faults + 1; return nil, "owned open refusal" end
+					local function opened(handle, ...)
+						if not handle then return handle, ... end
+						return {
+							write = function(_, value)
+								if fault:match("^write_") then faults = faults + 1 end
+								if fault == "write_nil" then return nil end
+								if fault == "write_false" then return false end
+								if fault == "write_throw" then error("owned write refusal") end
+								return handle:write(value)
+							end,
+							close = function()
+								local function closed(...)
+									if fault == "close" then faults = faults + 1; return false end
+									return ...
+								end
+								return closed(handle:close())
+							end,
+						}, ...
+					end
+					return opened(old_stage(name, mode))
 				end
 				os.rename = function(from, to)
-					if to == path and fault == "rename" then return false, "owned rename refusal" end
+					if to == path and fault == "rename" then faults = faults + 1; return false, "owned rename refusal" end
 					return old_rename(from, to)
 				end
 				local committed = config.set_override("ext:future:pack", "literal.section", "delay", 4)
-				io.open, os.rename = old_open, old_rename
+				NativeWriter.open, os.rename = old_stage, old_rename
+				helpers.assert_true(faults > 0, "the selected native refusal must actually execute: " .. fault)
 				helpers.assert_eq(committed, false, fault)
 				helpers.assert_eq(read(), source, fault)
 				helpers.assert_true(config.resolve("ext:future:pack", "literal.section") == cached, fault)
 				helpers.assert_eq(changes(), 0, fault)
+				helpers.assert_true(config.set_override("ext:future:pack", "literal.section", "delay", 4),
+					"the same owner can retry once the refusal is removed: " .. fault)
+				helpers.assert_eq(read(), source:gsub("delay = 1.25", "delay = 4"), fault)
+				helpers.assert_eq(changes(), 1, fault)
 			end)
 		end
 	end)
