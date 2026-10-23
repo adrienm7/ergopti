@@ -6,16 +6,15 @@ $ErrorActionPreference='Stop'
 $t=$null;$e=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($Module,[ref]$t,[ref]$e)
 if ($e.Count) {throw 'Invalid module source.'}
-foreach($name in @('Invoke-ErgoptiUpdaterCurlDownload','Open-ErgoptiOwnedArtifactOutput','Assert-ErgoptiOwnedArtifactOutputCurrent')) {
+foreach($name in @('Invoke-ErgoptiUpdaterArtifactDownload','Open-ErgoptiOwnedArtifactOutput','Assert-ErgoptiOwnedArtifactOutputCurrent')) {
  $nodes=@($ast.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq $name},$false))
- if ($nodes.Count -eq 0 -and $name -ne 'Invoke-ErgoptiUpdaterCurlDownload') {continue}
+ if ($nodes.Count -eq 0 -and $name -ne 'Invoke-ErgoptiUpdaterArtifactDownload') {continue}
  if ($nodes.Count -ne 1) {throw 'Exact source body missing.'}
  $body=$nodes[0].Extent.Text
  $body=$body.Replace('[IO.Directory]::CreateDirectory($Parent)','(New-RecordedDirectory $Parent)')
  $body=$body.Replace('[IO.Directory]::Exists($CaptureCandidate)','(Test-RecordedCapture $CaptureCandidate)')
  $body=$body.Replace('[IO.File]::Exists((Join-Path $CaptureCandidate $Name))','(Test-RecordedCaptureFile (Join-Path $CaptureCandidate $Name))')
- $body=$body.Replace('        . (Join-Path $PSScriptRoot ''ergopti_curl_attempt.ps1'')','        # explicitly recording engine boundary, no native module load')
- $body=$body.Replace("(Join-Path `$PSScriptRoot 'ergopti_curl_capabilities_worker.ps1')", "'D:\closed-recording\capability.ps1'")
+ $body=$body.Replace('        . (Join-Path $PSScriptRoot ''ergopti_winhttp_transport.ps1'')','        # explicitly recording engine boundary, no native module load')
  $body=$body.Replace('$Defaults = Get-Content -LiteralPath $DefaultsPath -Raw -Encoding UTF8 | ConvertFrom-Json','$Defaults = Get-RecordedDefaults $DefaultsPath')
  $body=$body.Replace('$Input = [IO.File]::Open($Parameters.response_path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)','$Input = Open-RecordedInput $Parameters.response_path')
  $body=$body.Replace('$Output = [IO.File]::Open($NewExe, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)','$Output = Open-RecordedDefaultOutput $NewExe')
@@ -44,14 +43,15 @@ function Open-RecordedDefaultOutput($Path) {
  if ($script:ownedMode) {throw 'Path-based output creation cannot replace the captured WAL capability.'}
  $script:output=[RecordedMemory]::new();return $script:output
 }
-function New-ErgoptiCurlAttemptEngine($Parameters,$Answer,$CapabilityPath,$PayloadPath,$ConfPath) {
+function New-ErgoptiWinHttpAttemptEngine($Parameters,$Answer) {
  $engine=New-Object PSObject
  $engine | Add-Member ScriptMethod GetRemainingBudget {return 1000}
  $engine | Add-Member ScriptMethod GetNativeRemainingBudget {return 1000}
- $engine | Add-Member ScriptMethod ObserveCapability {return @{version='8.7.0';sspi=$true;spnego=$true}}
+ $engine | Add-Member ScriptMethod ObserveCapability {return @{tls_backend='schannel';version='winhttp';sspi=$true;spnego=$true;ntlm=$true}}
  $engine | Add-Member ScriptMethod ChildQuiesced {return $true}
- $engine | Add-Member ScriptMethod InvokeRoute {param($Destination,$Route,$Auth,$Method,$Body,$Secrets) if($Method -cne 'GET' -or $Body -or $Secrets) {throw 'Changed request intent.'};return @{exit=0;status=200;delivered=3;child_quiesced=$true;proxy_used=$false}}
- $engine | Add-Member ScriptMethod TestNtlmChallenge {return $false}
+ $engine | Add-Member ScriptMethod InvokeRoute {param($Destination,$Route,$Method,$Body,$Secrets) if($Method -cne 'GET' -or $Body -or $Secrets) {throw 'Changed request intent.'};return @{completed=$true;proxy_answered=$false;failure='none';status=200;delivered=[int64]3;child_quiesced=$true;proxy_used=$false;headers=@{status=200;headers=@{}}}}
+ $engine | Add-Member ScriptMethod GetFailureReceipt {param($Metrics,$Destination) return @{backend='winhttp'}}
+ $engine | Add-Member ScriptMethod TestFailover {param($Metrics,$Route) return $false}
  return $engine
 }
 function Invoke-Case([string]$Mode) {
@@ -65,8 +65,8 @@ function Invoke-Case([string]$Mode) {
   $identity=if($script:caseMode -eq 'bad-identity') {'foreign'} else {'11111111:0000000000000001'}
   return @{stream=$script:output;identity=$identity;is_current={param($Owner) $script:currentCalls++;if($script:caseMode -eq 'withdrawn') {return $false};if($script:caseMode -eq 'withdraw-before-copy' -and $script:currentCalls -gt 1) {return $false};return $true}}
  }
- if($Mode -eq 'default') {return Invoke-ErgoptiUpdaterCurlDownload ([Uri]'https://example.invalid/archive.zip') 'D:\owned\archive.zip' 1000 $state $resolver 1000 1 3 'policy' 'defaults' {param($Name)return ''}}
- return Invoke-ErgoptiUpdaterCurlDownload ([Uri]'https://example.invalid/archive.zip') 'D:\owned\archive.zip' 1000 $state $resolver 1000 1 3 'policy' 'defaults' {param($Name)return ''} $factory
+ if($Mode -eq 'default') {return Invoke-ErgoptiUpdaterArtifactDownload ([Uri]'https://example.invalid/archive.zip') 'D:\owned\archive.zip' 1000 $state $resolver 1000 1 3 'policy' 'defaults' {param($Name)return ''}}
+ return Invoke-ErgoptiUpdaterArtifactDownload ([Uri]'https://example.invalid/archive.zip') 'D:\owned\archive.zip' 1000 $state $resolver 1000 1 3 'policy' 'defaults' {param($Name)return ''} $factory
 }
 $passed=0;$failed=0
 foreach($mode in @('default','owned','bad-identity','withdrawn','withdraw-before-copy','route-refused')) {

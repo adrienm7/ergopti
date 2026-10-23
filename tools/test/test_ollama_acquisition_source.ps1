@@ -45,7 +45,7 @@ foreach($case in @('context','source-pin','vendor-pin','vendor-held')) {
 		if($case -eq 'source-pin') {
 			Require-Refusal {Read-OllamaCapturedSource $path ('0'*64)} 'Captured acquisition source changed.'
 		}
-		$names=@('ergopti_updater_download.ps1','ergopti_network_routes.ps1','ergopti_windows_proxy_config.ps1','ergopti_native_proxy_ex.ps1','ergopti_network_pac.ps1','ergopti_curl_attempt.ps1','ergopti_curl_capabilities_worker.ps1')
+		$names=@('ergopti_updater_download.ps1','ergopti_network_routes.ps1','ergopti_windows_proxy_config.ps1','ergopti_native_proxy_ex.ps1','ergopti_network_pac.ps1','ergopti_winhttp_transport.ps1')
 		$inventory=''
 		foreach($name in $names){$inventory+=$name+"`n"+(Hash-Bytes ([IO.File]::ReadAllBytes((Join-Path $FixtureRoot $name))))+"`n"}
 		$digest=Hash-Bytes ([Text.Encoding]::UTF8.GetBytes($inventory))
@@ -55,7 +55,7 @@ foreach($case in @('context','source-pin','vendor-pin','vendor-held')) {
 		if($case -eq 'vendor-held') {
 			$owners=Open-OllamaCapturedVendor $FixtureRoot $digest
 			try {
-				Require ($owners.Count -eq 7) 'All seven exact dependencies are retained.'
+				Require ($owners.Count -eq 6) 'All six exact dependencies are retained.'
 				foreach($name in $names) {
 					Require $owners.Contains($name) 'No dependency is omitted.'
 					Require $owners[$name].stream.CanRead 'Original source stream remains held.'

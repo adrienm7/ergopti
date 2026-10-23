@@ -12,7 +12,7 @@ _CurlCaptureNativeIdentityControls() {
 	try {
 		Capture.Acquire(Parent)
 		AssertTrue(Capture.ValidatePaths(), "all five retained native identities match their exact allocated paths")
-		AssertEqual(4, Capture.Files.Count, "the parent owns only the four declared curl captures")
+		AssertEqual(2, Capture.Files.Count, "the parent owns only the two declared transfer captures")
 		Body := Capture.Files["artifact.bin"]
 		Exclusive := DllCall("kernel32\CreateFileW", "Str", Body["path"], "UInt", 0x80000000,
 			"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
@@ -283,7 +283,7 @@ class _CurlCaptureDirectoryMoveFixture {
 			this.Identities[Name] := Capture.Snapshot(Entry["handle"])
 			this.Locations[Name] := Source . "\" . Name
 		}
-		if Capture.Files.Count != 4 || Capture.ProbeCloseDebt.Length || Capture.Running || Capture.Retired
+		if Capture.Files.Count != 2 || Capture.ProbeCloseDebt.Length || Capture.Running || Capture.Retired
 			throw Error("Exact directory move fixture admission was refused.")
 		; Retain fixture transition debt separately from production process and
 		; retirement state. Fixture finally must settle this exact owner first.

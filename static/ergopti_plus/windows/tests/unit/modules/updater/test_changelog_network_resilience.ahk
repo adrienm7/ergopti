@@ -236,55 +236,26 @@ Test("system proxy: static settings answer without a child", _CNR_NoPacAnswersSy
 
 ; ===========================================
 ; ===========================================
-; ======= 3/ Curl Proxy Configuration =======
+; ======= 3/ Fixed Proxy Admission ==========
 ; ===========================================
 ; ===========================================
 
-_CNR_CurlConfig(Proxy) {
-	Captured := Map("config", "")
-	Capture(Request) {
-		Captured["config"] := FileRead(Request.ConfigPath, "UTF-8")
-		Request.Abort()
-	}
-	Req := CurlAsyncRequest(Map("before_launch", Capture,
-		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
-		"spawn", (*) => Assert(false, "the captured request must not launch")))
-	try {
-		Req.Open("GET", "https://github.com/adrienm7/ergopti/releases.atom", true)
-		if (Proxy != "")
-			Req.SetProxy(Proxy)
-		Req.Send()
-	} finally {
-		Req.Abort()
-	}
-	return Captured["config"]
-}
-
-_CNR_CurlUsesProxyAndBestEffortRevocation() {
-	Config := _CNR_CurlConfig("http://proxy.corp:8080")
-	AssertContains(Config, 'proxy = "http://proxy.corp:8080"', "curl must use the selected proxy")
-	AssertContains(Config, "proxy-negotiate", "proxy authentication must use the native integrated scheme")
-	AssertFalse(InStr(Config, "proxy-anyauth"), "native authentication must not permit Basic/Digest downgrade")
-	AssertContains(Config, 'proxy-user = ":"', "the signed-in Windows account must authenticate (SSPI)")
-	AssertContains(Config, "ssl-revoke-best-effort",
-		"an unreachable revocation server of an inspection CA must not fail TLS")
-	Direct := _CNR_CurlConfig("")
-	AssertFalse(InStr(Direct, "proxy =") > 0, "a direct request must not name a proxy")
-	AssertContains(Direct, "ssl-revoke-best-effort")
+_CNR_SetProxyAdmitsOnlyProxyUrls() {
 	Req := CurlAsyncRequest()
+	Req.SetProxy("http://proxy.corp:8080")
+	Req.SetProxy("")
 	AssertThrows(() => Req.SetProxy("javascript:alert(1)"), "a non-proxy URL must be refused")
 	AssertThrows(() => Req.SetProxy("http://proxy corp:80"), "whitespace must be refused")
 	AssertThrows(() => Req.SetProxy(0), "a non-string proxy must be refused")
 }
-Test("HTTP transport: curl routes through the Windows proxy with SSPI auth",
-	_CNR_CurlUsesProxyAndBestEffortRevocation)
+Test("HTTP transport: an explicit fixed proxy admits only a proxy URL", _CNR_SetProxyAdmitsOnlyProxyUrls)
 
 _CNR_UpdaterChecksUseProxy() {
 	for Name in ["_Updater_PrepareLatestAsyncTransport", "_Updater_PrepareReleasesListAsyncTransport"] {
 		Body := _DriverFuncBody(Name)
 		AssertContains(Body, 'SystemProxy_ForUrl(Record["url"])', Name . " must select the Windows proxy")
 		Assert(InStr(Body, "Req.SetProxy(Proxy)") > InStr(Body, "SystemProxy_ForUrl("),
-			Name . " must apply the selected proxy to its curl request")
+			Name . " must apply the selected proxy to its request")
 	}
 }
 Test("updater: background release checks honour the Windows proxy", _CNR_UpdaterChecksUseProxy)

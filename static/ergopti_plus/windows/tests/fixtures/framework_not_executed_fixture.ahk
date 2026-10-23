@@ -11,17 +11,17 @@
 #Warn All, StdOut
 #Warn VarUnset, Off
 #Include ../test_framework.ahk
-#Include host_curl_capability.ahk
+#Include host_capability_gate.ahk
 
-_FNEF_Receipt(State) => Map("state", State, "version", "8.21.0")
+_FNEF_Receipt(State) => Map("state", State, "name", "example", "why", "the fixture probe reports it missing")
 
 _FNEF_GatedFailure(State) {
-	TestRequireHostCurlNtlm(_FNEF_Receipt.Bind(State))
+	TestRequireHostCapability(_FNEF_Receipt.Bind(State))
 	throw Error("intentional gated fixture failure")
 }
 
 Test("not-executed fixture pass", () => 0)
-Test("not-executed fixture host lacks NTLM", _FNEF_GatedFailure.Bind("no_ntlm"))
-Test("not-executed fixture capable host still fails", _FNEF_GatedFailure.Bind("ntlm"))
+Test("not-executed fixture host lacks the capability", _FNEF_GatedFailure.Bind("absent"))
+Test("not-executed fixture capable host still fails", _FNEF_GatedFailure.Bind("present"))
 Test("not-executed fixture unknown capability still runs", _FNEF_GatedFailure.Bind("unknown"))
 RunTests()

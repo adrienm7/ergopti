@@ -262,8 +262,7 @@ try {
 		'ergopti_windows_proxy_config.ps1',
 		'ergopti_native_proxy_ex.ps1',
 		'ergopti_network_pac.ps1',
-		'ergopti_curl_attempt.ps1',
-		'ergopti_curl_capabilities_worker.ps1'
+		'ergopti_winhttp_transport.ps1'
 	]) {
 		fs.writeFileSync(
 			path.join(ollamaSourceFixture, name),

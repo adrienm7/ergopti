@@ -47,7 +47,7 @@ function Resolve-ErgoptiNativeNetworkRoutes($Url,$Budget,$ReadConfig,$ReadEnviro
  if($Policy -cne 'policy' -or $Defaults -cne 'defaults') {throw 'Canonical policy routing changed.'}
  return @{Ok=$true}
 }
-function Invoke-ErgoptiUpdaterCurlDownload($Uri,$Path,$Connect,$State,$Resolver,$Budget,$Start,$Size,$Policy,$Defaults,$ReadEnvironment,$Factory) {
+function Invoke-ErgoptiUpdaterArtifactDownload($Uri,$Path,$Connect,$State,$Resolver,$Budget,$Start,$Size,$Policy,$Defaults,$ReadEnvironment,$Factory) {
  if($Start -ne 11 -or $Budget -ne 1000 -or $Connect -ne 200 -or $Size -ne 3) {throw 'Transport original timing or pin changed.'}
  if($State.OwnedCaptureDirectory -notmatch 'curl\.[0-9a-f]{32}$'){throw 'Parent-owned capture not supplied.'}
  $selection=&$Resolver $Uri.AbsoluteUri 1000

@@ -58,7 +58,7 @@ function Open-OllamaCapturedVendor([string]$Directory, [string]$ExpectedHash) {
 	# The native PAC executable and manifest remain checked by their existing owner.
 	$names = @('ergopti_updater_download.ps1', 'ergopti_network_routes.ps1',
 		'ergopti_windows_proxy_config.ps1', 'ergopti_native_proxy_ex.ps1',
-		'ergopti_network_pac.ps1', 'ergopti_curl_attempt.ps1', 'ergopti_curl_capabilities_worker.ps1')
+		'ergopti_network_pac.ps1', 'ergopti_winhttp_transport.ps1')
 	$sources = [ordered]@{}
 	try {
 		$inventory = ''

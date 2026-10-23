@@ -240,7 +240,7 @@ class OllamaManagedBootstrap {
 		Inventory := ""
 		for Name in ["ergopti_updater_download.ps1", "ergopti_network_routes.ps1",
 			"ergopti_windows_proxy_config.ps1", "ergopti_native_proxy_ex.ps1",
-			"ergopti_network_pac.ps1", "ergopti_curl_attempt.ps1", "ergopti_curl_capabilities_worker.ps1"] {
+			"ergopti_network_pac.ps1", "ergopti_winhttp_transport.ps1"] {
 			Path := Vendor . "\" . Name
 			this.Sources[Path] := this._Hash(Path)
 			Inventory .= Name . "`n" . this.Sources[Path] . "`n"

@@ -17,7 +17,7 @@ const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 const { parseResults } = require('./report.cjs');
 
-const REASON = 'host curl 8.21.0 lists no NTLM; needs the owned SSPI curl (TODO item 62)';
+const REASON = 'host capability example is absent: the fixture probe reports it missing';
 const skippedLine = (index, name) => `ok ${index} - ${name} # SKIP NOT EXECUTED: ${REASON}`;
 
 function transcript(footer, second = skippedLine(2, 'gated case')) {
@@ -119,7 +119,7 @@ try {
 	assert.equal(run.status, 0, run.stdout + run.stderr);
 	assert.match(
 		run.stdout,
-		/::warning title=windows-ahk test NOT EXECUTED::gated case: host curl 8\.21\.0/
+		/::warning title=windows-ahk test NOT EXECUTED::gated case: host capability example/
 	);
 	assert.match(run.stdout, /NOT EXECUTED\x1b\[0m — 1 passed, 0 failed, 1 NOT EXECUTED/);
 	assert.doesNotMatch(
@@ -152,7 +152,7 @@ function nativeRun() {
 	try {
 		const fixtures = path.join(temporary, 'fixtures');
 		fs.mkdirSync(fixtures);
-		for (const name of ['framework_not_executed_fixture.ahk', 'host_curl_capability.ahk'])
+		for (const name of ['framework_not_executed_fixture.ahk', 'host_capability_gate.ahk'])
 			fs.copyFileSync(path.join(tests, 'fixtures', name), path.join(fixtures, name));
 		fs.copyFileSync(
 			path.join(tests, 'test_framework.ahk'),
@@ -179,7 +179,7 @@ function nativeRun() {
 		assert.match(tap, /^ok 1 - not-executed fixture pass\r?$/m);
 		assert.match(
 			tap,
-			/^ok 2 - not-executed fixture host lacks NTLM # SKIP NOT EXECUTED: host curl 8\.21\.0 lists no NTLM; needs the owned SSPI curl \(TODO item 62\)\r?$/m
+			/^ok 2 - not-executed fixture host lacks the capability # SKIP NOT EXECUTED: host capability example is absent: the fixture probe reports it missing\r?$/m
 		);
 		assert.match(
 			tap,
