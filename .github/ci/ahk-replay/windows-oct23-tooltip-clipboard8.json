@@ -1,0 +1,13 @@
+{
+	"expected_count": 8,
+	"filters": [
+		{
+			"contains": "tooltip-hostile-native64-owner",
+			"expected_count": 5
+		},
+		{
+			"contains": "clipboard-native-open-owner",
+			"expected_count": 3
+		}
+	]
+}
