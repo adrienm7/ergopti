@@ -516,3 +516,5 @@ _TSTest_NativeCallbackKeepsIdentity() {
 }
 Test("TimerScheduler: native callback identity survives cancel and rearm (prefix-char-admission)",
 	_TSTest_NativeCallbackKeepsIdentity)
+
+#Include test_timer_scheduler_lifetime.ahk
