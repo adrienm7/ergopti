@@ -106,7 +106,7 @@ _TSSuspTest_RequeuedFnClearedOnNormalFire() {
 	; re-queue itself was never armed (simulates partial lifecycle).
 	H["RequeuedFn"] := () => 0
 	; Simulate normal OS fire -- _OneShot runs without A_IsSuspended.
-	H["Fn"]()
+	_TSTest_DeliverOneShot(H)
 	AssertTrue(Fired, "callback must have fired on normal invocation")
 	AssertTrue(H["Fired"], "handle.Fired must be true after normal fire")
 	; RequeuedFn must have been removed by the firing path.

@@ -46,6 +46,28 @@ _TS_ResetRegistry() {
 
 
 
+; Consume the exact native one-shot before modeling its OS delivery. A direct
+; function call alone would leave the real timer armed after logical retirement.
+_TSTest_DeliverOneShot(Handle) {
+	static RetirementDebt := 0
+	AssertFalse(IsObject(RetirementDebt), "an earlier native delivery capability remains unresolved")
+	PreviousCritical := Critical("On")
+	try {
+		Callback := Handle["Fn"]
+		RequeuedFn := Handle.Get("RequeuedFn", 0)
+		try {
+			_TimerAdapterCancelNative(Callback)
+			if RequeuedFn != 0
+				_TimerAdapterCancelNative(RequeuedFn)
+		} catch as Failure {
+			RetirementDebt := {Handle: Handle, Callback: Callback, RequeuedFn: RequeuedFn}
+			throw Failure
+		}
+	} finally Critical(PreviousCritical)
+	Callback.Call()
+}
+
+
 ; ===================================================
 ; ===================================================
 ; ======= 1/ TimerAfter — basic lifecycle ===========
@@ -65,7 +87,7 @@ _TSTest_AfterCallbackFiresOnInvoke() {
 	Fired := false
 	H := TimerAfter(0.001, () => (Fired := true))
 	; Simulate the OS firing the timer by invoking BoundFn directly
-	H["Fn"]()
+	_TSTest_DeliverOneShot(H)
 	AssertTrue(Fired, "callback must have fired after invoking BoundFn")
 	AssertTrue(H["Fired"], "handle.Fired must be true after callback")
 }
@@ -84,7 +106,7 @@ _TSTest_AfterActiveCountDecrementsAfterFire() {
 	_TS_ResetRegistry()
 	H := TimerAfter(1, () => 0)
 	AssertEqual(1, TimerActiveCount())
-	H["Fn"]()  ; simulate OS firing
+	_TSTest_DeliverOneShot(H)  ; simulate OS firing
 	AssertEqual(0, TimerActiveCount(), "fired handle must be removed from registry")
 }
 Test("TimerScheduler — after(): activeCount decrements after callback fires", _TSTest_AfterActiveCountDecrementsAfterFire)
@@ -100,7 +122,7 @@ _TSTest_RestartAfterPreservesOwnerIdentity() {
 	AssertFalse(H["Fired"], "AHK-22: restarted one-shot must be live")
 	AssertEqual(-20000, H["Interval"], "AHK-22: restart must publish the new delay")
 	AssertEqual(1, TimerActiveCount(), "AHK-22: restart must own exactly one registry slot")
-	H["Fn"]()
+	_TSTest_DeliverOneShot(H)
 	AssertEqual(1, Calls, "AHK-22: the restarted owner must publish exactly once")
 	AssertEqual(0, TimerActiveCount(), "AHK-22: firing must retire the restarted owner")
 }
@@ -402,9 +424,10 @@ _TSTest_EveryDoesNotFireAfterCancel() {
 	_TS_ResetRegistry()
 	Count := 0
 	H := TimerEvery(1, () => (Count += 1))
+	OldFn := H["Fn"]
 	TimerCancel(H)
-	; Simulate OS tick arriving after cancel — wrapper must detect Fired = true
-	H["Fn"]()
+	; Deliver the exact formerly armed callback after acknowledged cancellation.
+	OldFn()
 	AssertEqual(0, Count, "cancelled repeating timer must not invoke callback")
 }
 Test("TimerScheduler — every(): callback skipped after cancel()", _TSTest_EveryDoesNotFireAfterCancel)
