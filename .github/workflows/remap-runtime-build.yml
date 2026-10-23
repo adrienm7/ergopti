@@ -75,5 +75,16 @@ jobs:
           "$build/hs274-stream-source-test"
           compile hs274-baseline-v2-test
           "$build/hs274-baseline-v2-test"
-          c++ -std=c++17 -Wall -Wextra -Werror -pthread -DASIO_STANDALONE -I "$vendor" "$diagnostics/hs274-accept-test.cpp" -o "$build/hs274-accept-test"
+          # The accept test is a regression for a defect of the pinned asio: it
+          # must fail on the pristine headers (exit 17) and pass once the exact
+          # source repair of hs274_stream_patch.py is applied.
+          compile hs274-accept-test
+          baseline=0
+          "$build/hs274-accept-test" || baseline=$?
+          if [ "$baseline" != 17 ]; then
+            echo "::error::the pristine asio headers must reproduce the accepted-peer defect (exit 17), got $baseline"
+            exit 1
+          fi
+          python3 "$diagnostics/hs274_raw_patch.py" "$GITHUB_WORKSPACE/upstream" --stream
+          compile hs274-accept-test
           "$build/hs274-accept-test"
