@@ -2581,6 +2581,19 @@ _Updater_AdmitStagingCompletion(StagingEpoch) {
 	}
 }
 
+; Complete only the still-current staging owner's notification state. No I/O,
+; diagnostics, callbacks or native handoff belong in this short RAM transaction.
+_Updater_ClearNotifiedTagForStaging(StagingEpoch) {
+	global UPDATER_LAST_NOTIFIED_TAG
+	PreviousCritical := Critical("On")
+	try {
+		if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+			return false
+		UPDATER_LAST_NOTIFIED_TAG := ""
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ; The only staging completion callback running in AHK. The worker's READY
 ; token means it has already persisted and verified the executable plus the
 ; UTF-8 PowerShell swap worker.
@@ -2637,12 +2650,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return
 	_Updater_NotifyInstallPhase("restarting", "", 0, Observation.Observer, Observation.Epoch)
-	global UPDATER_LAST_NOTIFIED_TAG
-	PreviousCritical := Critical("On")
-	try {
-		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
-			UPDATER_LAST_NOTIFIED_TAG := ""
-	} finally Critical(PreviousCritical)
+	_Updater_ClearNotifiedTagForStaging(StagingEpoch)
 }
 
 _Updater_QuoteCreateProcessArg(Value) {
