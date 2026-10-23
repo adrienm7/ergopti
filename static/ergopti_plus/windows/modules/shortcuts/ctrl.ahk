@@ -69,17 +69,17 @@ if Features["shortcuts"]["paste_without_formatting"] {
 						PlainText := CB_Read()
 						OwnedSequence := 0
 						try {
-								if !CB_Write(PlainText)
+								if !CB_WriteTextWithReceipt(PlainText, &OwnedSequence)
 										throw Error("clipboard write failed")
-								OwnedSequence := CB_GetSequenceNumber()
 								if !OwnedSequence
 										throw Error("clipboard sequence unavailable")
 								SendFinalResult("^v")
 								SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 								RestoreTimerArmed := true
 						} catch as Err {
-								try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
-										OwnerToken, "paste_without_formatting_rollback", true, !OwnedSequence)
+								if OwnedSequence
+									try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+										OwnerToken, "paste_without_formatting_rollback")
 								try LoggerError("shortcuts", "PasteWithoutFormatting clipboard rollback retained: {1}.", Err.Message)
 						}
 				} finally {

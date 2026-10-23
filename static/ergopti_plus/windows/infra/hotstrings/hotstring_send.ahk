@@ -548,9 +548,8 @@ SendInstant(Text, Prefix := "") {
 	RestoreCallback := false
 	RestoreTimerArmed := false
 	try {
-		if !CB_Write(Text)
+		if !CB_WriteTextWithReceipt(Text, &OwnedSequence)
 			throw Error("clipboard write failed")
-		OwnedSequence := CB_GetSequenceNumber()
 		if !OwnedSequence
 			throw Error("clipboard sequence unavailable")
 		; Arm every fallible post-paste stage before the irreversible injection. If
@@ -569,9 +568,11 @@ SendInstant(Text, Prefix := "") {
 		; callback before doing the cleanup inline so ownership is ended once.
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
-		try CB_RestoreOwnedAllEventually(OldClipboard,
-			IsSet(OwnedSequence) ? OwnedSequence : 0, OwnerToken,
-			"hotstring_send_instant_rollback", true, true)
+		if IsSet(OwnedSequence) && OwnedSequence
+			try CB_RestoreOwnedAllEventually(OldClipboard, OwnedSequence, OwnerToken,
+				"hotstring_send_instant_rollback")
+		else
+			CB_EndOwnedTransaction(OwnerToken)
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
