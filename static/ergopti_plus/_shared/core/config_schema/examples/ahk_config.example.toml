@@ -1,6 +1,9 @@
 # _shared/core/config_schema/examples/ahk_config.example.toml
 # Example AHK v2 configuration — target schema after the Scope C refactor.
-# Generated at first boot by the AHK driver from _shared/modules/features/manifest.toml.
+# A hand-written illustration of a configured file, NOT the first-boot render: the
+# neutral first-run file is windows/_generated/config_template.toml, built from
+# _shared/modules/features/manifest.toml. The [layout] values below are the shipped
+# neutral defaults and tools/test/test-neutral-installation.cjs fails on drift.
 # The user edits this file freely; any unknown key triggers a warn at boot
 # (strict in dev mode via the ERGOPTI_DEV=1 environment variable).
 #
@@ -528,10 +531,11 @@ letter = "z"
 # ======================
 
 [layout]
-ergopti_base = true
-direct_access_digits = true
-ergopti_alt_gr = true
-ergopti_plus = true
+ergopti_base = false
+direct_access_digits = "native"
+ergopti_alt_gr = false
+ergopti_variant = "none"
+emulated_layout = ""
 # ==============================================
 # ===== 6.3 shortcuts.key_combination_taps =====
 # ==============================================

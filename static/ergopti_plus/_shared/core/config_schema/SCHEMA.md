@@ -1,6 +1,6 @@
 # Ergopti+ — unified configuration schema (v2)
 
-This folder describes the target user-configuration schema after the Scope C refactor. The files under `examples/*.toml` are **reviewable drafts** — no driver reads them yet.
+This folder describes the target user-configuration schema after the Scope C refactor. The files under `examples/*.toml` are **reviewable drafts** — no driver reads them. They illustrate a configured file; the neutral first-run state is each driver's generated `config_template.toml`, and the `[layout]` values of the Windows example are held equal to the manifest defaults by `tools/test/test-neutral-installation.cjs`.
 
 ## Overview
 
@@ -140,7 +140,7 @@ Each driver loads its own `config.toml`, parses it, then validates against `conf
 
 ### In CI
 
-Config schema validation against `examples/*.toml` is not yet automated — TODO.
+Config schema validation against `examples/*.toml` is not automated, apart from the neutral `[layout]` values of the Windows example (`tools/test/test-neutral-installation.cjs`).
 
 A companion `tools/lint/audit-banner-alignment.js` enforces the CLAUDE.md banner-comment alignment in every `*.toml`. Run it manually with `--fix` to auto-correct, or in pre-commit without it to detect regressions.
 
