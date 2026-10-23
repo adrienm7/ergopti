@@ -76,10 +76,12 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		; ":flags:B0O:abbrev" string — both pure boot-time waste. The ternaries
 		; short-circuit, so neither is constructed unless a recorder is present.
 		Rec := _HotstringRegistrar
+		EndsWithMagic := InStr(Flags, "*") > 0
 		Meta := _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult,
 				TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 				(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
-				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset,
+				EndsWithMagic)
 		; Personal-info previews must render the value snapshot carried by the
 		; registered Spec, not re-read the mutable PersonalInformation Map.  The
 		; editor publishes that Map before its terminal Reload, so a second read in
@@ -97,7 +99,7 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 		_RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags), Abbreviation,
 				Rec ? (":" Flags "B0O:" Abbreviation) : "",
-				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+				Rec ? _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, EndsWithMagic) : 0,
 				Meta
 		)
 }
@@ -120,7 +122,7 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 		; The callback IS the dispatch here (HSE_DispatchMatch routes RawCallback specs
 		; to it), so it is always passed; only the recorder string is gated on Rec.
 		Rec := _HotstringRegistrar
-		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: _TextPenultimateCodepoint(Abbreviation), Category: Category, Section: Section, Priority: Priority }
+		Meta := { RawCallback: true, TimeActivationSeconds: TimeActivationSeconds, PrevCharKey: HSE_TimeGateReferenceChar(Abbreviation, InStr(Flags, "*") > 0), Category: Category, Section: Section, Priority: Priority }
 		if IsSet(options) && options.Has("SupportsPreparation") {
 			SupportsPreparation := options["SupportsPreparation"]
 			if !(SupportsPreparation is Integer) || (SupportsPreparation != false && SupportsPreparation != true)
@@ -152,7 +154,7 @@ CreateRawCallbackHotstring(Flags, Abbreviation, Callback, options := unset) {
 ; field the value came from, so a sink that tried to decide for itself would be
 ; guessing from the text. HSE_Register copies every Meta field onto the Spec, so
 ; the flag reaches HSEMatch.IsPrivate at each of the three fire paths.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false, Group := unset, PersonalSource := unset) {
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "", Priority := 10, IsPrivate := false, Group := unset, PersonalSource := unset, EndsWithMagic := false) {
 		Meta := {
 				Replacement: Replacement,
 				Trigger: Abbreviation,
@@ -160,7 +162,7 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 				OnlyText: OnlyText,
 				FinalResult: FinalResult,
 				TimeActivationSeconds: TimeActivationSeconds,
-				PrevCharKey: _TextPenultimateCodepoint(Abbreviation),
+				PrevCharKey: HSE_TimeGateReferenceChar(Abbreviation, EndsWithMagic),
 				IsRepeat: IsRepeat,
 				Category: Category,
 				Section: Section,
@@ -180,10 +182,10 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 ; ``BackSpaceSeq`` / ``PrevCharKey`` once at registration time and closes
 ; over both plus the positional option booleans. Each call produces a fresh
 ; closure with its own captures — safe to call in a loop over variants.
-_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false) {
+_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, Category := "", Section := "", IsPrivate := false, EndsWithMagic := false) {
 		BackSpaceSeq := "{BackSpace " . _TextCodepointLength(Abbreviation) . "}"
 		AbbreviationLen := StrLen(Abbreviation)
-		PrevCharKey := _TextPenultimateCodepoint(Abbreviation)
+		PrevCharKey := HSE_TimeGateReferenceChar(Abbreviation, EndsWithMagic)
 		return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
 				TimeActivationSeconds, AbbreviationLen, Abbreviation, Category, Section, IsPrivate)
 }
@@ -411,13 +413,13 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 				ConformMeta := _MakeHotstringMeta(Replacement, AbbreviationLowerCase, OnlyText,
 						FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
-				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset, true)
 				ConformMeta.CaseConform := true
 				ConformMeta.ConformOneChar := ConformOneChar
 				_RegisterHotstringFast(
 						Rec, _HseFlagSubset(ConformFlags), AbbreviationLowerCase,
 						Rec ? (":" ConformFlags "B0O:" AbbreviationLowerCase) : "",
-						Rec ? _MakeHotstringCallback(Replacement, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+						Rec ? _MakeHotstringCallback(Replacement, AbbreviationLowerCase, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, true) : 0,
 						ConformMeta
 				)
 				return
@@ -443,10 +445,11 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 		RegisterVariant := (Abbr, Repl) => _RegisterHotstringFast(
 				Rec, _HseFlagSubset(Flags "C"), Abbr,
 				Rec ? (FlagsPortion Abbr) : "",
-				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate) : 0,
+				Rec ? _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, Category, Section, IsPrivate, InStr(Flags, "*") > 0) : 0,
 				_MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section, Priority, IsPrivate,
 						(IsSet(options) and options.Has("Group")) ? options["Group"] : unset,
-				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset)
+				(IsSet(options) and options.Has("PersonalSource")) ? options["PersonalSource"] : unset,
+				InStr(Flags, "*") > 0)
 		)
 
 		RegisterVariant(AbbreviationLowerCase, Replacement)

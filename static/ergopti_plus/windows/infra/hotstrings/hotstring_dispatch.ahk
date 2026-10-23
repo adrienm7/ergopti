@@ -1119,7 +1119,8 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						TriggerStart := StrLen(BufferAfterCompletion)
 								- CompletionStripLen - Spec.Length + 1
 						TypedPrev := TriggerStart >= 1
-								? _TextPenultimateCodepoint(SubStr(BufferAfterCompletion, TriggerStart, Spec.Length))
+								? HSE_TimeGateReferenceChar(SubStr(BufferAfterCompletion, TriggerStart, Spec.Length),
+										Spec.HasOwnProp("Star") and Spec.Star)
 								: ""
 						if (TypedPrev != "")
 								PrevKey := TypedPrev

@@ -300,8 +300,9 @@ _HOF_PrGateImpl(PressedMsAgo) {
 	global _HOF_Sends, HSE_LastEndChar, LastSentCharacterKeyTime
 	CreateHotstring("", "pr", "PR", Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON,
 		"TimeActivationSeconds", 0.5))
-	; `p` was sent 560 ms ago: past the 0.5 s delay now, inside it 100 ms ago.
-	LastSentCharacterKeyTime := Map("p", A_TickCount - 560)
+	; The last letter, `r`, was sent 560 ms ago: past the 0.5 s delay now, inside it
+	; 100 ms ago (the delay runs from the last letter to the expander).
+	LastSentCharacterKeyTime := Map("r", A_TickCount - 560)
 	for Char in StrSplit("pr")
 		HSE_FeedChar(Char, true)
 	Match := HSE_FeedChar(" ", true)

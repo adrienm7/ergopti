@@ -262,6 +262,32 @@ _TextTailWithinUnits(Text, MaxUnits) {
 }
 
 
+/** Returns the final complete scalar of Text, or empty. */
+_TextLastCodepoint(Text) {
+	if !(Text is String)
+		throw TypeError("_TextLastCodepoint expects a string.")
+	Units := StrLen(Text)
+	if Units == 0
+		return ""
+	return SubStr(Text, _TextCodepointStart(Text, Units))
+}
+
+/**
+ * The character a hotstring's expansion delay is measured from.
+ * The delay is the time between the LAST LETTER OF THE INPUT and the EXPANDER,
+ * which decides whether to give the output. The expander is the magic key when
+ * the trigger ends with it (then the last input letter is the one just before
+ * it), and otherwise the end character that completes the trigger (Space,
+ * punctuation...; for the Space tap-hold, its press). The reference is thus
+ * always the character typed immediately before the expander.
+ * @param Trigger {String} The trigger as written, magic key included.
+ * @param EndsWithMagic {Boolean} Whether the trigger ends with the magic key.
+ * @returns {String} The reference character, empty when the trigger has none.
+ */
+HSE_TimeGateReferenceChar(Trigger, EndsWithMagic) {
+	return EndsWithMagic ? _TextPenultimateCodepoint(Trigger) : _TextLastCodepoint(Trigger)
+}
+
 /** Returns the complete scalar immediately before the final scalar, or empty. */
 _TextPenultimateCodepoint(Text) {
 	if !(Text is String)

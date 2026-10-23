@@ -1,0 +1,125 @@
+{
+	"_comment": "Expansion-delay vectors replayed by the Windows engine (tests/unit/modules/hotstrings/engine/test_time_gate_corpus.ahk) and the macOS delay gate (tests/unit/modules/keymap/test_time_gate_corpus.lua). Definition: the expansion delay is the time between the LAST LETTER OF THE INPUT and the EXPANDER, to decide whether to give the output. The expander is the magic key when the trigger ends with it (the last input letter is then the one just before it), and otherwise the end character that completes the trigger (Space, punctuation...; for the Space tap-hold, the press, not the release). So the reference character is always the character typed immediately before the expander, the reference time is its key-down tick and the end time is the expander's key-down tick. Times are milliseconds on one clock; the gate fires when the elapsed time is below the delay (the exact-equality instant is not a vector: the drivers differ there).",
+	"vectors": [
+		{
+			"id": "end_char_within_delay_from_last_letter",
+			"description": "pr + Space: r->Space is 300 ms, p->r 250 ms, delay 0.5 s. Measured from the last letter it expands; measured from the penultimate letter (550 ms) it did not.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "p", "down_ms": 0 },
+				{ "char": "r", "down_ms": 250 }
+			],
+			"expander": { "char": " ", "down_ms": 550 },
+			"reference_char": "r",
+			"elapsed_ms": 300,
+			"fires": true
+		},
+		{
+			"id": "end_char_past_delay_from_last_letter",
+			"description": "pr + Space: r->Space is 600 ms, past the 0.5 s delay.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "p", "down_ms": 0 },
+				{ "char": "r", "down_ms": 100 }
+			],
+			"expander": { "char": " ", "down_ms": 700 },
+			"reference_char": "r",
+			"elapsed_ms": 600,
+			"fires": false
+		},
+		{
+			"id": "single_letter_end_char",
+			"description": "r + Space has a one-letter input: the reference is that letter.",
+			"trigger": "r",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [{ "char": "r", "down_ms": 0 }],
+			"expander": { "char": " ", "down_ms": 400 },
+			"reference_char": "r",
+			"elapsed_ms": 400,
+			"fires": true
+		},
+		{
+			"id": "magic_key_within_delay_from_letter_before_it",
+			"description": "at★: the expander is the ★, the last input letter is t. a->★ is 400 ms and t->★ 300 ms.",
+			"trigger": "at★",
+			"ends_with_magic": true,
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "a", "down_ms": 0 },
+				{ "char": "t", "down_ms": 100 }
+			],
+			"expander": { "char": "★", "down_ms": 400 },
+			"reference_char": "t",
+			"elapsed_ms": 300,
+			"fires": true
+		},
+		{
+			"id": "magic_key_past_delay_from_letter_before_it",
+			"description": "at★ with t->★ of 600 ms.",
+			"trigger": "at★",
+			"ends_with_magic": true,
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "a", "down_ms": 0 },
+				{ "char": "t", "down_ms": 100 }
+			],
+			"expander": { "char": "★", "down_ms": 700 },
+			"reference_char": "t",
+			"elapsed_ms": 600,
+			"fires": false
+		},
+		{
+			"id": "magic_key_ignores_earlier_letters",
+			"description": "at★ typed slowly (a->★ 800 ms) but t->★ only 350 ms: only the letter before the ★ counts.",
+			"trigger": "at★",
+			"ends_with_magic": true,
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "a", "down_ms": 0 },
+				{ "char": "t", "down_ms": 450 }
+			],
+			"expander": { "char": "★", "down_ms": 800 },
+			"reference_char": "t",
+			"elapsed_ms": 350,
+			"fires": true
+		},
+		{
+			"id": "case_conform_magic_key_within_delay",
+			"description": "A case-conforming star trigger typed in capitals (AT★) is gated like at★, from the T.",
+			"trigger": "at★",
+			"ends_with_magic": true,
+			"case_conform": true,
+			"typed_text": "AT★",
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "A", "down_ms": 0 },
+				{ "char": "T", "down_ms": 100 }
+			],
+			"expander": { "char": "★", "down_ms": 400 },
+			"reference_char": "T",
+			"elapsed_ms": 300,
+			"fires": true
+		},
+		{
+			"id": "tap_hold_space_measured_at_the_press",
+			"description": "pr + the Space tap-hold: Space goes down 250 ms after r and the tap is decided 650 ms after r (the key stayed down 400 ms). The expander is the press, so the elapsed time is 250 ms and it expands.",
+			"trigger": "pr",
+			"ends_with_magic": false,
+			"delay_s": 0.5,
+			"typed": [
+				{ "char": "p", "down_ms": 0 },
+				{ "char": "r", "down_ms": 100 }
+			],
+			"expander": { "char": " ", "down_ms": 350 },
+			"decided_ms": 750,
+			"reference_char": "r",
+			"elapsed_ms": 250,
+			"fires": true
+		}
+	]
+}

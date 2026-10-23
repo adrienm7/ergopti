@@ -81,3 +81,77 @@ _TimeActFailClosed_UnrepresentableDurationExpires() {
 }
 Test("hotstring_engine: activation duration must fit the elapsed-tick domain",
 	_TimeActFailClosed_UnrepresentableDurationExpires)
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= Expansion-delay corpus (time-gate-corpus) =======
+; =========================================================
+; =========================================================
+
+; Replays _shared/tests/corpus/hotstrings/time_gate_vectors.json through the real
+; engine. The expansion delay is the time between the LAST LETTER OF THE INPUT
+; and the EXPANDER: the magic key when the trigger ends with it, else the end
+; character that completes the trigger (the press, for the Space tap-hold). The
+; reference is therefore the character typed immediately before the expander.
+; Measured from the penultimate letter, `pr` + Space was gated on the p -> r gap
+; as well and a normal-speed press missed a 0.5 s delay. macOS replays the same
+; vectors in tests/unit/modules/keymap/test_time_gate_corpus.lua and Linux in
+; test_shared_hotstring_engine.lua.
+
+_TGC_Vectors() {
+	global _SharedDir
+	Path := _SharedDir . "\tests\corpus\hotstrings\time_gate_vectors.json"
+	return JsonParse(FileRead(Path, "UTF-8"))["vectors"]
+}
+
+_TGC_Replay(Vector) {
+	global LastSentCharacterKeyTime, HSE_LastEndChar, ScriptInformation
+	Delay := Vector["delay_s"]
+	Opts := Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON, "TimeActivationSeconds", Delay)
+	Trigger := Vector["trigger"]
+	Base := A_TickCount
+	Typed := Vector["typed"]
+	LastSentCharacterKeyTime := Map()
+	for Key in Typed
+		LastSentCharacterKeyTime[Key["char"]] := Base + Key["down_ms"]
+	Expander := Vector["expander"]
+	GateTick := Base + Expander["down_ms"]
+
+	Reference := Vector["reference_char"]
+	AssertEqual(Vector["elapsed_ms"], Expander["down_ms"] - (LastSentCharacterKeyTime[Reference] - Base),
+		Vector["id"] . ": the vector's elapsed time is expander minus reference character")
+	AssertEqual(Reference, Typed[Typed.Length]["char"],
+		Vector["id"] . ": the reference is the character typed immediately before the expander")
+	AssertEqual(StrLower(Reference), StrLower(HSE_TimeGateReferenceChar(Trigger, Vector["ends_with_magic"])),
+		Vector["id"] . ": the engine picks the same reference character")
+
+	if Vector.Has("case_conform") && Vector["case_conform"]
+		CreateCaseSensitiveHotstrings("*", Trigger, "out", Opts)
+	else
+		CreateHotstring(Vector["ends_with_magic"] ? "*" : "", Trigger, "out", Opts)
+	Text := Vector.Has("typed_text") ? Vector["typed_text"] : ""
+	if (Text == "") {
+		for Key in Typed
+			Text .= Key["char"]
+		Text .= Expander["char"]
+	}
+	Match := ""
+	for Char in StrSplit(Text)
+		Match := HSE_FeedChar(Char, true)
+	AssertTrue(IsObject(Match), Vector["id"] . ": the typed text must complete the trigger")
+	Effect := 0
+	Fired := HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect, false, unset, GateTick)
+	AssertEqual(Vector["fires"] ? true : false, Fired ? true : false,
+		Vector["id"] . ": the delay gate verdict")
+}
+
+_TGC_Run(Vector) {
+	_HOF_Run(_TGC_Replay.Bind(Vector))
+}
+
+for _TGC_Vector in _TGC_Vectors()
+	Test("time gate corpus: " . _TGC_Vector["id"] . " (time-gate-corpus)", _TGC_Run.Bind(_TGC_Vector))
