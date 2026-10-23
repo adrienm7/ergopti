@@ -496,12 +496,17 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 	}
 
 	_DropJob(Job) {
-		if !this._OwnsJob(Job) || Job["busy"]
+		PreviousCritical := Critical("On")
+		try {
+			if !this._OwnsJob(Job) || Job["busy"]
+				return false
+			Callback := Job["timer"]
+			NativeRecord := this.Models.Records.Get(Job["id"], 0)
+		} finally Critical(PreviousCritical)
+		; Queue retirement acknowledges the captured exact physical request first.
+		if !this._CancelExact(NativeRecord)
 			return false
-		; Queue retirement acknowledges the same exact physical request first.
-		if !this._CancelExact(this.Models.Records.Get(Job["id"], 0))
-			return false
-		if !this._Timer(Job["timer"], 0)
+		if !this._Timer(Callback, 0)
 			return false
 		Successor := 0
 		PreviousCritical := Critical("On")
@@ -509,6 +514,8 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 			if !this._OwnsJob(Job) || Job["busy"]
 				return false
 			this.Jobs.Delete(Job["id"])
+			; Keep the old callback alive outside Critical, not on its own job.
+			Job["timer"] := 0
 			Successor := Job["successor"]
 			Job["successor"] := 0
 			if Successor is Map && !this.Closed && !Successor["sweep"]["accepted"]
