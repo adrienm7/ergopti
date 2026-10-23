@@ -14,6 +14,32 @@ _GKO_Quote(Text) {
 	return Chr(34) . StrReplace(StrReplace(Text, Chr(96), Chr(96) . Chr(96)), Chr(34), Chr(96) . Chr(34)) . Chr(34)
 }
 
+; The suite's _DriverDir retains tests/.. segments, which the authored-source
+; predicate must reject. Census actual absolute file names, as the canonical
+; function resolver does, while retaining the complete real class owner.
+_GKO_DispatcherOwner() {
+	SplitPath(A_ScriptDir, , &Root)
+	Owners := []
+	Loop Files, Root . "\*.ahk", "FR" {
+		Path := A_LoopFileFullPath
+		if !_DriverIsProductionSource(Path)
+			continue
+		Source := FSReadStrict(Path)
+		Code := _DriverMaskNonCode(&Source)
+		SearchFrom := 1
+		while RegExMatch(Code, "im)^class\s+HookDispatcher\s*\{", &Definition, SearchFrom) {
+			Prefix := SubStr(Code, 1, Definition.Pos - 1)
+			StrReplace(Prefix, "{", , , &Opens)
+			StrReplace(Prefix, "}", , , &Closes)
+			if Opens == Closes
+				Owners.Push(Path)
+			SearchFrom := Definition.Pos + Definition.Len
+		}
+	}
+	AssertEqual(1, Owners.Length, "the actual top-level dispatcher class must have one authored owner")
+	return Owners[1]
+}
+
 _GKO_Source(OwnerReceipt) {
 	global _DriverDir
 	Owner := _DriverProductionFileForSymbol("GestureOnKeyDown")
@@ -41,9 +67,10 @@ _GKO_Source(OwnerReceipt) {
 	Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Source .= "global _GKO_ActualOwnerHash := " . _GKO_Quote(OwnerReceipt["click_owner_sha256"]) . "`n"
 	Seen := Map()
-	Dispatcher := _DriverDir . "\infra\hook_dispatcher.ahk"
+	Dispatcher := _GKO_DispatcherOwner()
 	AssertTrue(_DriverIsProductionSource(Dispatcher), "the real dispatcher owner must be authored production")
 	AssertTrue(InStr(FSReadStrict(Dispatcher), "class HookDispatcher {", true) > 0, "the actual dispatcher class must exist")
+	OwnerReceipt["dispatcher_owner"] := Dispatcher
 	OwnerReceipt["dispatcher_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(Dispatcher))
 	; The encoder delegates string escaping to the separate canonical JSON owner.
 	JsonOwner := _DriverProductionFileForSymbol("JsonStringLiteral")

@@ -86,7 +86,7 @@ _GPO_Source(Owners) {
 	Source .= "global _GPO_SourceShared := " . _GPO_Quote(_DriverDir . "\..\_shared") . "`n"
 	Seen := Map()
 	Imports := []
-	Dispatcher := _DriverDir . "\infra\hook_dispatcher.ahk"
+	Dispatcher := _GKO_DispatcherOwner()
 	AssertTrue(_DriverIsProductionSource(Dispatcher) && InStr(FSReadStrict(Dispatcher), "class HookDispatcher {", true), "the complete real dispatcher must exist")
 	Imports.Push(Dispatcher, _GPO_MetadataOwner())
 	for Symbol in ["WallClockTimestamp", "CryptoSha256Bytes", "KL_JsonEncode", "JsonStringLiteral", "HotPath_Now", "GestureInvokeAction"] {
