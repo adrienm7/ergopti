@@ -575,9 +575,12 @@ class WebViewHost {
 
 		; ── NavigationCompleted callback ─────────────────────────────────────────
 		_OnNavigationCompleted(Handler, Args) {
-				if A_IsSuspended || this.ResetDone || this.CloseRequested
+				if this.ResetDone || this.CloseRequested
 						return
-				this._FlushQueue()
+				; Navigation authorizes init even while paused. User scripts stay
+				; queued; only the admitted ready callback can resume later.
+				if !A_IsSuspended
+						this._FlushQueue()
 				this._FireOnReady()
 		}
 
@@ -643,6 +646,9 @@ class WebViewHost {
 								Callback := Pending.Callback
 						} else
 								Callback := this.Opts["OnReady"]
+						; A navigation admitted under pause did not flush user Queue.
+						; Permit its init callback to submit fresh scripts after resume.
+						this.Ready := true
 				} finally Critical(PreviousCritical)
 				Callback.Call(this)
 		}
