@@ -1067,6 +1067,9 @@ M.unavailable = {
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
+		path = "layout.virtual_keyboard", section = "layout", reason_key = "platform_reason.virtual_keyboard_is_karabiner", platforms = { "hs" },
+	},
+	{
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{

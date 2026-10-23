@@ -552,7 +552,11 @@ lateness: age minus the smallest age of the last 32 events, so a constant clock
 offset cancels) is never consumed, replayed or answered: macOS stops waiting
 for a tap that holds an event too long and delivers it without the tap, and a
 copy would type it twice. The keymap passes such a key-down untouched and
-restarts its buffer. Action: a new fence or emission path must keep both rules
+restarts its buffer; the tap-key, script-control and modifier-injector taps pass
+it too (`KeyEventHealth.passes_late_event`, threshold
+`EventClock.STALE_PHYSICAL_EVENT_MS`), so no action runs on a key the
+application already has. Action: a new fence, emission path or physical-key tap
+must keep both rules
 (`key-up-fence-pairing`, `stale-physical-event`).
 
 ### project-hs-key-taps-never-ask-accessibility
@@ -576,7 +580,12 @@ keys passed untouched and lease failures by kind. Every line carries the
 session totals and no key code or character. Read those lines first in a
 macOS report of swallowed keys or an unasked accent popup: a long hold of
 macOS's own stamps with no late callback points upstream (Karabiner), a late
-key-up points at the main thread.
+key-up points at the main thread. The same totals are the `key_*` counts of
+the diagnostics report's input section (`collect_input`; schema, projection and
+`healthcheck.field.key_*` labels). A Karabiner lease failure is also held by the
+error window for `RECOVERY_GRACE_SEC` (`ui/error_dialog`) and dropped when the
+lease controller reports a running (`active`) generation at its end: an ERROR
+that the driver fixed by itself opens no window, it stays in the log.
 
 ### project-hs-native-eventtap-disable-recovery
 

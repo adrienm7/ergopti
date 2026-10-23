@@ -172,18 +172,21 @@ check('source-does-not-claim-logical-cancel-as-physical-settlement', () => {
 });
 check('original-clock-includes-settings-preparation', () => {
 	const method = worker.slice(
-		worker.indexOf('static func routes('),
+		worker.indexOf('static func resolve('),
 		worker.indexOf('static func discoveryURLs')
 	);
 	assert.ok(method.indexOf('let deadline =') < method.indexOf('settingsProvider()'));
 	assert.equal((method.match(/let deadline =/g) || []).length, 1);
-	assert.match(method, /ProcessInfo\.processInfo\.systemUptime < deadline else \{ return nil \}/);
+	assert.match(
+		method,
+		/ProcessInfo\.processInfo\.systemUptime < deadline else \{ return \.failure/
+	);
 });
 check('fullURL-binding-uses-public-script-boundary', () => {
 	assert.match(worker, /let bound = try\? ManagedPACSource\.bind\(source, url: url\)/);
 	assert.match(
 		worker,
-		/return evaluateNative\(url: url, pacURL: nil, script: bound, deadline: deadline\)/
+		/let evaluated = evaluateNative\(url: url, pacURL: nil, script: bound, deadline: deadline\)/
 	);
 	assert.match(worker, /CFNetworkExecuteProxyAutoConfigurationScript/);
 	assert.doesNotMatch(source, /JavaScriptCore|JSContext|dlopen|URLProtocol\.registerClass/);
@@ -715,6 +718,30 @@ if (process.platform !== 'win32') {
 	assert.doesNotMatch(result.stderr, /skipped=/);
 	process.stdout.write(result.stdout + result.stderr);
 }
+// The policy admits an http PAC, but App Transport Security refuses plain http
+// from the launcher bundle unless its generated Info.plist opts out (issue #101).
+check('the launcher Info.plist lets URLSession fetch an http PAC', () => {
+	const build = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+	const policy = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				root,
+				'static',
+				'ergopti_plus',
+				'_shared',
+				'modules',
+				'network',
+				'proxy_policy.json'
+			),
+			'utf8'
+		)
+	);
+	assert.ok(policy.native_pac.source_acquisition.allowed_schemes.includes('http'));
+	assert.match(
+		build,
+		/<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/
+	);
+});
 console.log(
 	`Native PAC source contract: ${passed} portable controls passed; native Swift/SSPI not executed.`
 );

@@ -32,6 +32,7 @@ local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local KeyState      = require("adapters.key_state")
+local KeyEventHealth = require("infra.key_event_health")
 local KeyboardGeometry = require("adapters.keyboard_geometry")
 local Logger        = require("infra.logger")
 local text_utils = require("infra.text_utils")
@@ -884,6 +885,9 @@ function M.bind_tap_keys(admission_guard, decide)
 		end
 		local run = decide(keycode, KeyboardGeometry.event_type(e))
 		if type(run) ~= "function" then return finish_tap(false, fence_events) end
+		-- A press this late may already be in the application (the tap waited behind
+		-- the main thread): consuming it and running the action would do both.
+		if KeyEventHealth.passes_late_event(e) then return finish_tap(false, fence_events) end
 
 		local ok_repeat, repeat_flag = pcall(function()
 			return e:getProperty(eventtap.event.properties.keyboardEventAutorepeat)

@@ -235,7 +235,10 @@ helpers.describe("aggregate walker: backspace unigram retention", function()
 		helpers.assert_eq(batch.chars_class["2026-08-06\1app"].letter, 2)
 		helpers.assert_eq(count_of(batch, "ngram_bigrams", "ab"), 0)
 		helpers.assert_eq(count_of(batch, "ngram_words", "a"), 0)
-		helpers.assert_eq(count_of(batch, "ngram_words", "b"), 1)
+		-- The Backspace popped "a" and flagged the word: an erased word, not a typed one.
+		local word = batch.ngram.ngram_words["2026-08-06\1app\1b"]
+		helpers.assert_eq(word.c, 0)
+		helpers.assert_eq(word.e, 1)
 	end)
 	it("linux-backspace-unigrams: synthetic deletions keep HS and LLM source counts", function()
 		local batch = Walker.walk({ key("a", 100), key("[BS]", 0, "hotstring"),
@@ -364,7 +367,7 @@ helpers.describe("aggregate walker: backspace sequences", function()
 		helpers.assert_eq(count_of(batch, "ngram_trigrams", "ab[BS]"), 0,
 			"two characters either side of a pause are not one sequence")
 	end)
-	it("linux-backspace-sequences: synthetic deletions keep their source and skip the output", function()
+	it("linux-backspace-sequences: synthetic deletions keep their source and chain through the output", function()
 		local batch = Walker.walk({ key("b", 100), key("t", 100), key("w", 100),
 			key("[BS]", 0, "hotstring"), key("[BS]", 0, "hotstring"),
 			key("x", 0, "hotstring"), key("[BS]", 0, "llm") }, "2026-08-06", "app")
@@ -373,8 +376,8 @@ helpers.describe("aggregate walker: backspace sequences", function()
 		helpers.assert_eq(erase.esrc.hotstring, 1)
 		helpers.assert_eq(item(batch, "ngram_trigrams", "tw[BS]").esrc.hotstring, 1)
 		helpers.assert_eq(item(batch, "ngram_trigrams", "w[BS][BS]").esrc.hotstring, 1)
-		helpers.assert_eq(count_of(batch, "ngram_bigrams", "x[BS]"), 0,
-			"generated text is not a typed sequence, so nothing chains through it")
+		helpers.assert_eq(item(batch, "ngram_bigrams", "x[BS]").esrc.llm, 1,
+			"generated text chains like typed text, as on Windows, and keeps its source")
 		helpers.assert_eq(batch.errors["2026-08-06\1app"].bs_total, 0)
 	end)
 	it("linux-backspace-sequences: the writer receives the correction sequences", function()

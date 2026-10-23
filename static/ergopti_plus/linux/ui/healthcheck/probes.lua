@@ -41,6 +41,7 @@ local USER_AGENT = "ErgoptiPlus-Diagnostics"
 -- request of the updater or the AI engine
 local GITHUB_OWNER = "diagnostics.github"
 local AI_OWNER = "diagnostics.ai"
+local PAC_OWNER = "diagnostics.pac"
 
 -- The Ollama port when the engine names no base URL
 local AI_BACKEND = "ollama"
@@ -147,6 +148,51 @@ local function github_api(config, run)
 				end
 				done({ state = "ok" }, { network = { github_api = value } })
 			end)
+	end
+end
+
+--- The desktop's proxy auto-config (PAC): configured, downloadable and usable by
+--- the managed downloader. The URL is read and fetched here but never reported.
+--- @param config table { timeout_ms }
+--- @param run table
+--- @return function
+local function proxy_pac(config, run)
+	return function(done)
+		local Shell = require("adapters.shell_runner")
+		local HttpClient = require("adapters.http_client")
+		if not Shell.HAS_ASYNC or not HttpClient.HAS_ASYNC then
+			done({ state = "unsupported" })
+			return
+		end
+		local PacCheck = require("network.pac_check")
+		local function none() done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } }) end
+		local function fetch(url)
+			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
+			HttpClient.get(url, { ["User-Agent"] = USER_AGENT },
+				{ timeout_ms = config.timeout_ms, owner = PAC_OWNER }, function(result)
+					local state, text = PacCheck.judge(result.status, result.body)
+					if state == "ok" then
+						done({ state = "ok" }, { network = { proxy_pac = text } })
+					else
+						done({ state = "error", detail = text })
+					end
+				end)
+		end
+		local function ask(key, on_output)
+			local handle = Shell.run_async("gsettings", { "get", "org.gnome.system.proxy", key },
+				{ timeout_ms = config.timeout_ms }, function(result)
+					on_output(result.ok and result.stdout or nil)
+				end)
+			if not handle then on_output(nil) return end
+			run.cancellers[#run.cancellers + 1] = function() handle.cancel() end
+		end
+		ask("mode", function(mode)
+			if not (mode and mode:find("'auto'", 1, true)) then none() return end
+			ask("autoconfig-url", function(value)
+				local url = value and value:match("'([^']+)'")
+				if url and url ~= "" then fetch(url) else none() end
+			end)
+		end)
 	end
 end
 
@@ -365,6 +411,7 @@ function M.start(schema, paths, state, publish, options)
 	start_probe(run, "ai_health", ai_health(config.ai_health, state, run))
 	start_probe(run, "system_details", system_details(config.system_details, paths.logs_dir, run))
 	start_probe(run, "cpu_load", cpu_load(config.cpu_load, run))
+	start_probe(run, "proxy_pac", proxy_pac(config.proxy_pac, run))
 	run.cancel = stop
 	return run
 end

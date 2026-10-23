@@ -36,6 +36,7 @@
 --- ==============================================================================
 
 local M = {}
+local NativePath = require("native_path")
 local SourceIdentity = require("module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
 local source_directory = require("module_source_directory").capture()
@@ -1225,8 +1226,9 @@ end
 --- @param stamp string
 --- @return string
 function M.backup_path(path, version, stamp)
-	local dir, name = path:match("^(.*[/\\])([^/\\]+)$")
-	if not dir then dir, name = "", path end
+	local dir = NativePath.directory_prefix(path)
+	local name = dir and path:sub(#dir + 1)
+	if not name or name == "" then dir, name = "", path end
 	local stem, ext = name:match("^(.+)(%.[^%.]+)$")
 	if not stem then stem, ext = name, "" end
 	return dir .. stem .. ".pre-v" .. version_text(version) .. "-" .. stamp .. ext

@@ -32,6 +32,21 @@ implemented today.
   instances » (on by default), quits any other active Karabiner while it runs.
   The HS-274 delivery plan lists the work packages that build it.
 
+  Dormant Lua side (WP6 and WP7): `runtime_owner.lua` admits the runtime (pinned
+  artifact, install, VirtualHIDDevice version through `runtime_vhid.lua`,
+  launchd jobs, other running Karabiner) and names every refusal, then starts
+  the user-side Console with `XDG_CONFIG_HOME` and the owner PID and stops it
+  with the physical capture. It is reached only when `config_karabiner.toml`
+  holds the hidden `[karabiner] runtime = "owned"`; the absent default is
+  `shared` and changes nothing. `ke_paths.lua` selects the command line tool of
+  the runtime once, `Generator.deploy_owned_config` writes the complete file
+  under `~/Library/Application Support/ErgoptiPlus/karabiner/`, and
+  `onboarding.health_check("owned")` checks the owned install. The real ports
+  (`adapters/runtime_owner_ports.lua`) are read-only and bind no closer for
+  another Karabiner and no artifact manifest, so an opted-in boot reports
+  `unavailable` today. The Swift lease worker still accepts only the shared
+  `karabiner_cli` path.
+
 ## « Ergopti uses Karabiner »
 
 `[karabiner] integration_enabled` in `config_karabiner.toml` is the switch
@@ -48,6 +63,21 @@ document it cannot prove. Turning the switch off removes the rules only after
 the exact lease reported `STOPPED` and the off decision was persisted. The
 Configuration menu's « Remove Ergopti from Karabiner » runs the same path, or
 only the cleanup when the switch is already off.
+
+## Virtual keyboard type
+
+`[layout] virtual_keyboard` in `config.toml` (Automatic, ISO or ANSI; declared
+once in the shared features manifest as `layout.virtual_keyboard`, tray row in
+the Keyboard layout menu) sets Karabiner's
+`virtual_hid_keyboard.keyboard_type_v2`. Automatic resolves to ANSI
+(`Layout.AUTOMATIC_VIRTUAL_KEYBOARD_PRODUCT`), which passes an Apple ISO
+keyboard's ISO key pair through unswapped (issue #99); an explicit choice is
+deployed as written and is never replaced by the active layout's keycode
+convention, which only tells which keycode a key arrives as. Every regeneration
+reads the choice through the source the boot registers
+(`set_virtual_keyboard_source`) and names the generated outputs for that
+product (`Layout.product_key_name`); choosing a value in the menu persists it
+and requests a regeneration.
 
 ## Exact-lease lifecycle
 

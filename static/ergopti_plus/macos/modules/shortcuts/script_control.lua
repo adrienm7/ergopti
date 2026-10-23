@@ -41,6 +41,7 @@ local i18n          = require("infra.i18n")
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
 local KeyState  = require("adapters.key_state")
+local KeyEventHealth = require("infra.key_event_health")
 local ScriptChords = require("script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 
@@ -1541,6 +1542,8 @@ local function handle_key(e)
 			defer_rejected_sentinel(sentinel_slot, code)
 			return finish(false)
 		end
+		-- A chord seen after the main thread held the tap is not acted on late.
+		if KeyEventHealth.passes_late_event(e) then return finish(false) end
 		return finish(defer_dispatch("Script chord sentinel (" .. sentinel_slot .. ") — dispatching '%s'.",
 			sentinel_slot))
 	end
@@ -1549,6 +1552,7 @@ local function handle_key(e)
 	if not is_right_cmd_only(e) then return finish(false) end
 	local physical_slot = physical_slots[code]
 	if physical_slot == nil or not slot_runs(physical_slot) then return finish(false) end
+	if KeyEventHealth.passes_late_event(e) then return finish(false) end
 	return finish(defer_dispatch(
 		"Right-cmd + " .. physical_slot .. " (KE-paused fallback) — dispatching '%s'.", physical_slot))
 end

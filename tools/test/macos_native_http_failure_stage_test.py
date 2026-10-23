@@ -25,6 +25,12 @@ CASES = (
     ("native_policy_load", "unavailable", 78),
     ("native_selection_bound", "unavailable", 78),
     ("native_proxy_lookup", "unavailable", 78),
+    ("native_proxy_budget", "unavailable", 78),
+    ("native_proxy_candidates", "unavailable", 78),
+    ("native_pac_download", "unavailable", 78),
+    ("native_pac_evaluation", "unavailable", 78),
+    ("native_proxy_routes", "unavailable", 78),
+    ("native_wpad_discovery", "unavailable", 78),
     ("native_proxy_dictionary", "proxy", 78),
     ("native_route_empty", "unavailable", 78),
     ("native_certificate_load", "certificate", 74),
@@ -71,7 +77,9 @@ class NativeFailureStages(unittest.TestCase):
         real_popen = subprocess.Popen
 
         def spawn(arguments, **kwargs):
-            self.assertEqual(kwargs["stderr"], subprocess.DEVNULL)
+            self.assertTrue(
+                hasattr(kwargs["stderr"], "fileno"), "stderr must be the private marker file"
+            )
             self.assertTrue(kwargs["close_fds"])
             child = real_popen(
                 [
@@ -285,6 +293,134 @@ class NativeFailureStages(unittest.TestCase):
         self.assertEqual(failure.reason, "unavailable")
         self.assertEqual(failure.native_diagnostic["stage"], "native_policy_load")
         self.assert_retired(failure, 91)
+
+
+FALLBACK_PEER = """
+import os, struct, sys
+sys.stdin.buffer.read()
+sys.stderr.write(sys.argv[1] + "\\n")
+sys.stderr.flush()
+if sys.argv[2] == "ok":
+    head = b'H' + b'{"version":1,"status":200,"headers":[["Content-Length","0"]]}'
+    sys.stdout.buffer.write(struct.pack('>I', len(head)) + head)
+    payload = b'C{"version":1,"success":true,"reason":"complete"}'
+    status = 0
+else:
+    payload = b'C{"version":1,"success":false,"reason":"connect","native_refusal_stage":"native_session_terminal"}'
+    status = 74
+sys.stdout.buffer.write(struct.pack('>I', len(payload)) + payload)
+sys.stdout.buffer.flush()
+os._exit(status)
+"""
+
+
+class NativeRouteFallback(unittest.TestCase):
+    """The worker's direct-fallback marker reaches the log as a closed stage only."""
+
+    def setUp(self):
+        self.engine = load("route_fallback_engine", MACOS / "platform/network/native_http.py")
+        self.reporter = load(
+            "route_fallback_reporter", MACOS / "modules/llm/managed_bootstrap_http.py"
+        )
+        self.directory = tempfile.TemporaryDirectory(prefix="native-route-fallback-")
+        self.addCleanup(self.directory.cleanup)
+        self.peer = Path(self.directory.name) / "fallback_peer.py"
+        self.peer.write_text(FALLBACK_PEER, encoding="utf-8")
+
+    def open(self, marker, mode):
+        real_popen = subprocess.Popen
+
+        def spawn(arguments, **kwargs):
+            return real_popen(
+                [sys.executable, "-B", str(self.peer), marker, mode, *arguments[1:]], **kwargs
+            )
+
+        with (
+            mock.patch.object(self.engine, "_resolve_worker", return_value="owned-native-edge"),
+            mock.patch.object(self.engine.subprocess, "Popen", side_effect=spawn),
+            mock.patch.dict(sys.modules, {"_ergopti_native_http": self.engine}),
+        ):
+            return self.engine.NativeHTTPResponse(
+                "https://private-company.invalid/model?private=payload",
+                [],
+                timeout=3,
+                idle_timeout=3,
+            )
+
+    def report(self, function, *arguments):
+        captured = io.StringIO()
+        with (
+            mock.patch.dict(sys.modules, {"_ergopti_native_http": self.engine}),
+            contextlib.redirect_stderr(captured),
+        ):
+            function(*arguments)
+        return captured.getvalue()
+
+    def test_successful_transfer_names_the_step_that_gave_up(self):
+        marker = "# native_http_proxy_fallback route=direct reason=native_pac_download"
+        with self.open(marker, "ok") as response:
+            self.assertEqual(response.route_fallback, "native_pac_download")
+            self.assertEqual(response.read(), b"")
+        self.assertEqual(response.route_fallback, "native_pac_download")
+        self.assertEqual(
+            self.report(self.reporter._report_route_fallback, response.route_fallback),
+            "# managed_bootstrap_route direct_fallback=native_pac_download\n",
+        )
+
+    def test_unknown_or_private_marker_text_is_never_reported(self):
+        for marker in (
+            "# native_http_proxy_fallback route=direct reason=native_unapproved_stage",
+            "# native_http_proxy_fallback route=direct reason=http://wpad.private-company.invalid/wpad.dat",
+            "native_http_proxy_fallback route=direct reason=native_pac_download",
+        ):
+            with self.subTest(marker=marker):
+                with self.open(marker, "ok") as response:
+                    self.assertIsNone(response.route_fallback)
+                    response.read()
+                self.assertEqual(
+                    self.report(self.reporter._report_route_fallback, response.route_fallback), ""
+                )
+
+    def test_refusal_after_a_fallback_keeps_the_step_in_the_failure_report(self):
+        marker = "# native_http_proxy_fallback route=direct reason=native_pac_evaluation"
+        with self.assertRaises(self.engine.NativeHTTPError) as raised:
+            with self.open(marker, "fail") as response:
+                response.read()
+        failure = raised.exception
+        self.assertEqual(failure.native_route_fallback, "native_pac_evaluation")
+        text = self.report(self.reporter._report_failure, failure, failure.reason)
+        self.assertIn("# managed_bootstrap_route direct_fallback=native_pac_evaluation\n", text)
+        self.assertNotIn("private-company", text)
+
+
+class NetworkCheckHelper(unittest.TestCase):
+    """The Debug menu's network check prints closed step lines, never an address."""
+
+    def setUp(self):
+        self.helper = load("network_check_helper", MACOS / "modules/llm/managed_network_check.py")
+
+    def lines(self, function, *arguments):
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            function(*arguments)
+        return captured.getvalue().splitlines()
+
+    def test_a_value_outside_the_closed_grammar_is_redacted(self):
+        for value in ("https://pac.private-company.invalid/x.pac", "a b", "", "x" * 49):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self.lines(self.helper.emit, "transfer", "fail", value),
+                    ["step transfer fail redacted"],
+                )
+
+    def test_route_step_names_the_stage_that_made_the_transfer_go_direct(self):
+        self.assertEqual(
+            self.lines(self.helper.route_step, None), ["step route_lookup pass selected"]
+        )
+        self.assertEqual(
+            self.lines(self.helper.route_step, "native_pac_download"),
+            ["step route_lookup fail direct_pac_download"],
+        )
 
 
 if __name__ == "__main__":

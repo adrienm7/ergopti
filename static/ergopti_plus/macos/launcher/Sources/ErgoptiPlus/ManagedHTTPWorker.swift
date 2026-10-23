@@ -18,6 +18,12 @@ enum ManagedHTTPFailureStage: String, CaseIterable {
 	case policyLoad = "native_policy_load"
 	case selectionBound = "native_selection_bound"
 	case proxyLookup = "native_proxy_lookup"
+	case proxyBudget = "native_proxy_budget"
+	case proxyCandidates = "native_proxy_candidates"
+	case pacDownload = "native_pac_download"
+	case pacEvaluation = "native_pac_evaluation"
+	case proxyRoutes = "native_proxy_routes"
+	case wpadDiscovery = "native_wpad_discovery"
 	case proxyDictionary = "native_proxy_dictionary"
 	case routeEmpty = "native_route_empty"
 	case certificateLoad = "native_certificate_load"
@@ -30,6 +36,12 @@ enum ManagedHTTPFailureStage: String, CaseIterable {
 		case .policyLoad: return ["unavailable"].contains(reason)
 		case .selectionBound: return ["unavailable"].contains(reason)
 		case .proxyLookup: return ["unavailable"].contains(reason)
+		case .proxyBudget: return ["unavailable"].contains(reason)
+		case .proxyCandidates: return ["unavailable"].contains(reason)
+		case .pacDownload: return ["unavailable"].contains(reason)
+		case .pacEvaluation: return ["unavailable"].contains(reason)
+		case .proxyRoutes: return ["unavailable"].contains(reason)
+		case .wpadDiscovery: return ["unavailable"].contains(reason)
 		case .proxyDictionary: return ["proxy"].contains(reason)
 		case .routeEmpty: return ["unavailable"].contains(reason)
 		case .certificateLoad: return ["certificate"].contains(reason)
@@ -129,17 +141,36 @@ struct ManagedWPADMetadata {
 	let searchDomains: [String]
 }
 
+/// The step of the route lookup that named no usable route. Only the closed
+/// stage is kept: the PAC address names the company intranet and is never read
+/// back into a log or a refusal.
+struct ManagedLookupFailure: Error {
+	let stage: ManagedHTTPFailureStage
+}
+
 /// Resolves the exact URL explicitly, before origin TLS. An authority-only
 /// CONNECT observation is never used as the PAC input.
 enum ManagedProxyLookup {
+	/// Routes only, for callers that do not need to name the failing step.
 	static func routes(url: URL, budget: TimeInterval, maximumSelections: Int,
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
 		certificates: [SecCertificate] = [],
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
-		guard budget.isFinite, budget > 0 else { return nil }
+		return try? resolve(url: url, budget: budget, maximumSelections: maximumSelections,
+			settingsProvider: settingsProvider, certificates: certificates,
+			discoveryMetadataProvider: discoveryMetadataProvider).get()
+	}
+
+	/// Same lookup as `routes`; a failure names the exact step that gave up.
+	static func resolve(url: URL, budget: TimeInterval, maximumSelections: Int,
+		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
+		certificates: [SecCertificate] = [],
+		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> Result<[[String: Any]], ManagedLookupFailure> {
+		guard budget.isFinite, budget > 0 else { return .failure(ManagedLookupFailure(stage: .proxyBudget)) }
 		let deadline = ProcessInfo.processInfo.systemUptime + budget
-		guard !ManagedPACSource.hasDebt, let settings = settingsProvider(),
-			ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+		guard !ManagedPACSource.hasDebt else { return .failure(ManagedLookupFailure(stage: .proxyBudget)) }
+		guard let settings = settingsProvider() else { return .failure(ManagedLookupFailure(stage: .proxyLookup)) }
+		guard ProcessInfo.processInfo.systemUptime < deadline else { return .failure(ManagedLookupFailure(stage: .proxyBudget)) }
 		let dictionary = (settings as AnyObject) as? [String: Any]
 		let discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
@@ -150,7 +181,7 @@ enum ManagedProxyLookup {
 		managedHTTPFixtureStage("proxy_copied")
 		#endif
 		guard let candidates = initial as? [[String: Any]], !candidates.isEmpty || discoveryEnabled,
-			candidates.count <= maximumSelections else { return nil }
+			candidates.count <= maximumSelections else { return .failure(ManagedLookupFailure(stage: .proxyCandidates)) }
 		// A native PAC callback owns the complete choice list. Initial fallback
 		// entries cannot add DIRECT or fixed proxies that the script omitted.
 		let hasNativePAC = candidates.contains(where: {
@@ -160,34 +191,48 @@ enum ManagedProxyLookup {
 		})
 		var routes: [[String: Any]] = []
 		for candidate in candidates {
-			guard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }
+			guard let kind = candidate[kCFProxyTypeKey as String] as? String else {
+				return .failure(ManagedLookupFailure(stage: .proxyCandidates))
+			}
 			if kind == kCFProxyTypeAutoConfigurationURL as String {
-				guard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,
-					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates),
-					!expanded.isEmpty else { return nil }
-				routes.append(contentsOf: expanded)
+				guard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL else {
+					return .failure(ManagedLookupFailure(stage: .proxyCandidates))
+				}
+				switch evaluateStaged(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates) {
+				case .failure(let failure): return .failure(failure)
+				case .success(let expanded):
+					guard !expanded.isEmpty else { return .failure(ManagedLookupFailure(stage: .proxyRoutes)) }
+					routes.append(contentsOf: expanded)
+				}
 			} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {
-				guard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,
-					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates),
-					!expanded.isEmpty else { return nil }
-				routes.append(contentsOf: expanded)
+				guard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String else {
+					return .failure(ManagedLookupFailure(stage: .proxyCandidates))
+				}
+				switch evaluateStaged(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates) {
+				case .failure(let failure): return .failure(failure)
+				case .success(let expanded):
+					guard !expanded.isEmpty else { return .failure(ManagedLookupFailure(stage: .proxyRoutes)) }
+					routes.append(contentsOf: expanded)
+				}
 			} else if !hasNativePAC { routes.append(candidate) }
-			guard routes.count <= maximumSelections else { return nil }
+			guard routes.count <= maximumSelections else { return .failure(ManagedLookupFailure(stage: .proxyRoutes)) }
 		}
 		// CFNetwork can expose discovery as a flag without a PAC candidate.
 		// Join that native state to public DHCP/DNS discovery metadata; never
 		// relabel the initial DIRECT entry as proof that WPAD has completed.
 		if discoveryEnabled,
 			!hasNativePAC {
-			guard let discovered = discover(url: url, deadline: deadline,
-				maximumSelections: maximumSelections, certificates: certificates, metadataProvider: discoveryMetadataProvider) else { return nil }
-			routes = discovered
+			switch discoverStaged(url: url, deadline: deadline, maximumSelections: maximumSelections,
+				certificates: certificates, metadataProvider: discoveryMetadataProvider) {
+			case .failure(let failure): return .failure(failure)
+			case .success(let discovered): routes = discovered
+			}
 		}
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
 		managedHTTPFixtureStage("routes_done")
 		managedHTTPFixtureRoutes(routes)
 		#endif
-		return routes.isEmpty ? nil : routes
+		return routes.isEmpty ? .failure(ManagedLookupFailure(stage: .proxyRoutes)) : .success(routes)
 	}
 
 	/// Public SystemConfiguration metadata for the current primary service.
@@ -236,30 +281,66 @@ enum ManagedProxyLookup {
 	static func discover(url: URL, deadline: TimeInterval, maximumSelections: Int,
 		certificates: [SecCertificate] = [],
 		metadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
-		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+		return try? discoverStaged(url: url, deadline: deadline, maximumSelections: maximumSelections,
+			certificates: certificates, metadataProvider: metadataProvider).get()
+	}
+
+	/// Discovery that names the failing step. The last PAC failure wins over the
+	/// generic discovery stage, because it says whether the script was reached.
+	static func discoverStaged(url: URL, deadline: TimeInterval, maximumSelections: Int,
+		certificates: [SecCertificate] = [],
+		metadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> Result<[[String: Any]], ManagedLookupFailure> {
+		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else {
+			return .failure(ManagedLookupFailure(stage: .proxyBudget))
+		}
 		let metadata = metadataProvider()
 		guard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),
-			!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }
-		for endpoint in endpoints {
-			guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
-			if let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates),
-				!result.isEmpty, result.count <= maximumSelections { return result }
+			!endpoints.isEmpty, endpoints.count <= maximumSelections else {
+			return .failure(ManagedLookupFailure(stage: .wpadDiscovery))
 		}
-		return nil
+		var last = ManagedLookupFailure(stage: .wpadDiscovery)
+		for endpoint in endpoints {
+			guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else {
+				return .failure(ManagedLookupFailure(stage: .proxyBudget))
+			}
+			switch evaluateStaged(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates) {
+			case .failure(let failure): last = failure
+			case .success(let result):
+				if !result.isEmpty, result.count <= maximumSelections { return .success(result) }
+				last = ManagedLookupFailure(stage: .proxyRoutes)
+			}
+		}
+		return .failure(last)
 	}
 
 	static func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval,
 		certificates: [SecCertificate] = []) -> [[String: Any]]? {
-		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+		return try? evaluateStaged(url: url, pacURL: pacURL, script: script, deadline: deadline,
+			certificates: certificates).get()
+	}
+
+	/// PAC acquisition and evaluation that names the failing step.
+	static func evaluateStaged(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval,
+		certificates: [SecCertificate] = []) -> Result<[[String: Any]], ManagedLookupFailure> {
+		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else {
+			return .failure(ManagedLookupFailure(stage: .proxyBudget))
+		}
 		let source: String
 		if let pacURL, script == nil {
-			guard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else { return nil }
+			guard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else {
+				return .failure(ManagedLookupFailure(stage: .pacDownload))
+			}
 			source = acquired
 		} else if pacURL == nil, let script { source = script }
-		else { return nil }
-		guard ProcessInfo.processInfo.systemUptime < deadline,
-			let bound = try? ManagedPACSource.bind(source, url: url) else { return nil }
-		return evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline)
+		else { return .failure(ManagedLookupFailure(stage: .pacEvaluation)) }
+		guard ProcessInfo.processInfo.systemUptime < deadline else {
+			return .failure(ManagedLookupFailure(stage: .proxyBudget))
+		}
+		guard let bound = try? ManagedPACSource.bind(source, url: url),
+			let evaluated = evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline) else {
+			return .failure(ManagedLookupFailure(stage: .pacEvaluation))
+		}
+		return .success(evaluated)
 	}
 
 	/// Keep the raw public framework boundary observable independently of the
@@ -772,6 +853,7 @@ enum ManagedHTTPWorker {
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() },
 		environment: [String: String] = ProcessInfo.processInfo.environment,
+		directFallback: Bool = true,
 		output: @escaping (Data) -> Bool) -> Int32 {
 		let certificates: [SecCertificate]
 		do { certificates = try ManagedCertificateAuthorities.load(environment: environment) }
@@ -782,12 +864,22 @@ enum ManagedHTTPWorker {
 		else {
 			let lookupRemaining = request.timeout.map { $0 - (ProcessInfo.processInfo.systemUptime - started) }
 			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .lookupDeadline, output: output) }
-			guard let selected = ManagedProxyLookup.routes(url: request.url,
+			switch ManagedProxyLookup.resolve(url: request.url,
 				budget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),
 				maximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,
-				discoveryMetadataProvider: discoveryMetadataProvider)
-			else { return refuse(reason: "unavailable", status: 78, stage: .proxyLookup, output: output) }
-			routes = selected
+				discoveryMetadataProvider: discoveryMetadataProvider) {
+			case .success(let selected):
+				routes = selected
+			case .failure(let failure):
+				guard directFallback else { return refuse(reason: "unavailable", status: 78, stage: failure.stage, output: output) }
+				// A PAC that cannot be fetched or evaluated names no route at all, which is
+				// not a proxy decision: go direct like a terminal does. A PAC that selects
+				// a proxy never reaches this branch, and the transfer stays https with a
+				// pinned digest (issue #101). The reason is the closed stage code of the
+				// step that gave up, never a URL; the Python receiver forwards it to the log.
+				_ = fputs("# native_http_proxy_fallback route=direct reason=\(failure.stage.rawValue)\n", stderr)
+				routes = [[kCFProxyTypeKey as String: kCFProxyTypeNone as String]]
+			}
 		}
 		for (index, route) in routes.enumerated() {
 			guard let proxy = ManagedProxyLookup.dictionary(route: route) else { return refuse(reason: "proxy", status: 78, stage: .proxyDictionary, output: output) }

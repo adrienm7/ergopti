@@ -3688,6 +3688,27 @@ type = "enum"
 enum_values = ["native", "digits", "symbols"]
 description_key = "menu.layout.number_row"
 
+# The Karabiner virtual keyboard type macOS deploys
+# (karabiner.json virtual_hid_keyboard.keyboard_type_v2). It decides which
+# keycode the ISO-only key pair (the key left of 1 and the extra key left of Z)
+# reaches: the ANSI product passes an Apple ISO keyboard's pair through
+# unswapped, the ISO product swaps it once more (issue #99). "auto" resolves to
+# ANSI (modules/keymap/layout.lua AUTOMATIC_VIRTUAL_KEYBOARD_PRODUCT); an
+# explicit "iso" or "ansi" is deployed as chosen and never replaced by what the
+# active layout would suggest. Only macOS has a virtual keyboard: Windows
+# (SC029/SC056) and Linux (evdev 41/86) name these keys by position. Not
+# input-altering on its own: it only decides how the generated rules name keys.
+[[features.layout]]
+id = "virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
+default = "auto"
+recommended = "auto"
+input_altering = false
+type = "enum"
+enum_values = ["auto", "iso", "ansi"]
+description_key = "menu.layout.virtual_keyboard"
+
 # Whether « digits first » and « symbols first » also swap the two levels of the
 # three edge keys of the number row (left of 1, the two right of 0). Off: the
 # ordering moves the ten digit keys only and the edge keys type what the
@@ -4921,6 +4942,55 @@ type = "command"
 id = "healthcheck"
 i18n = "menu.debug.healthcheck"
 
+# One-click field checks of the macOS input and network chain (issue #101, item
+# 31). Each runs read-only steps, opens a result window with a Copy report
+# button and writes one compact record, with no key, path or URL, to the log.
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_lease"
+i18n = "menu.debug.field_check_lease"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_owned_runtime"
+i18n = "menu.debug.field_check_owned_runtime"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_network"
+i18n = "menu.debug.field_check_network"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_key_accounting"
+i18n = "menu.debug.field_check_key_accounting"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+# Two one-click measurements of the Windows input-hook architecture (open items
+# 49 and 50): they exercise AutoHotkey's SendInput and its keyboard hook, which
+# no other driver has. Each writes a compact record, with no typed content, to
+# today's log under the InputProbe tag.
+[[menu.debug_menu]]
+type = "command"
+id = "send_probe"
+i18n = "menu.debug.send_probe"
+platforms = ["ahk"]
+reason_key = "platform_reason.input_probe_is_autohotkey_specific"
+
+[[menu.debug_menu]]
+type = "command"
+id = "hook_probe"
+i18n = "menu.debug.hook_probe"
+platforms = ["ahk"]
+reason_key = "platform_reason.input_probe_is_autohotkey_specific"
+
 # Right under the diagnostics window (the maintainer's request of 2026-10-02):
 # it decides whether an error shows itself, which that window then explains.
 [[menu.debug_menu]]
@@ -5880,6 +5950,15 @@ i18n = "menu.layout.emulate_bottom_row"
 platforms = ["ahk"]
 unavailable = "grey"
 reason_key = "platform_reason.layout_emulation_is_windows_only"
+
+# The Karabiner virtual keyboard type: Automatic, ISO or ANSI.
+[[menu.layout_menu]]
+type = "choice"
+id = "virtual_keyboard"
+path = "layout.virtual_keyboard"
+i18n = "menu.layout.virtual_keyboard"
+platforms = ["hs"]
+reason_key = "platform_reason.virtual_keyboard_is_karabiner"
 
 # The menubar icon, ONE row with its variants beneath it, last of the Ergopti
 # section. It was two sibling rows, one per variant, stored in hs.settings.

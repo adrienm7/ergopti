@@ -31,6 +31,14 @@ local SWITCH_KEYS = {
 	["notify.karabiner.removed"] = true,
 }
 
+-- The Debug menu's field checks exist so the maintainer can test the remap
+-- engine on a Mac; their rows must say what they test, and they are shown
+-- only in the Debug submenu.
+local DEBUG_FIELD_CHECK_KEYS = {
+	["menu.debug.field_check_lease"] = true,
+	["menu.debug.field_check_owned_runtime"] = true,
+}
+
 --- Reads one file whole.
 --- @param path string
 --- @return string|nil
@@ -116,7 +124,8 @@ helpers.describe("no macOS tray text names Karabiner, in any locale", function()
 			helpers.assert_true(type(locale) == "table", code .. ".json must decode")
 			for _, key in ipairs(tray_keys()) do
 				local value = locale[key]
-				if type(value) == "string" and not SWITCH_KEYS[key] then
+				if type(value) == "string" and not SWITCH_KEYS[key]
+					and not DEBUG_FIELD_CHECK_KEYS[key] then
 					helpers.assert_nil(value:lower():find("karabiner", 1, true),
 						key .. " names the remap engine in " .. code .. ".json: " .. value)
 				end

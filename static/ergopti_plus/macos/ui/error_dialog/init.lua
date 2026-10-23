@@ -540,6 +540,71 @@ end
 -- ================================
 -- ================================
 
+-- A Karabiner lease failure is followed by a bounded recovery with a fresh
+-- lease (platform/remap: retries after 1, 10 and 30 s, the last attempt's own
+-- duration on top). A window for a failure that recovered by itself alarms the
+-- user about nothing, so these errors are held for this long and shown only if
+-- the lease is not running again when it ends (hold-recoverable-error).
+M.RECOVERY_GRACE_SEC = 60
+local RECOVERABLE_MODULE = "karabiner.lease"
+local RECOVERABLE_TEMPLATE_PREFIX = "Karabiner lease %s failed"
+
+-- Errors held while their recovery runs: { module, template, message, timer }
+local _held = {}
+
+local decide_error
+
+--- Whether a fresh Karabiner generation is running: the failed one left the
+--- controller's current slot when it was fenced, so an active phase is its
+--- replacement.
+--- @return boolean
+local function lease_is_running()
+	local ok, phase = pcall(function()
+		return (require("platform.remap.lease_controller").status())
+	end)
+	return ok and phase == "active"
+end
+
+--- Holds one recoverable error for the grace period, then decides it.
+--- @param module_name string
+--- @param template string
+--- @param message string
+--- @return boolean handled Always true.
+local function hold_recoverable(module_name, template, message)
+	local entry = { module = module_name, template = template, message = message }
+	local timer, committed = TimerScheduler.after(M.RECOVERY_GRACE_SEC, function()
+		for index, held in ipairs(_held) do
+			if held == entry then table.remove(_held, index); break end
+		end
+		if entry.cancelled then return end
+		if lease_is_running() then
+			Logger.info(LOG, "A Karabiner lease failure recovered by itself; no error window for it.")
+			return
+		end
+		decide_error(entry.module, entry.template, entry.message)
+	end)
+	if committed ~= true then
+		-- Without the timer nothing would ever release the error: decide it now.
+		Logger.warn(LOG, "A recoverable error could not be held; deciding it now.")
+		return decide_error(module_name, template, message)
+	end
+	entry.timer = timer
+	_held[#_held + 1] = entry
+	return true
+end
+
+--- Drops the errors held for a recovery (they stay in the log).
+--- @return integer dropped How many held errors were dropped.
+local function drop_held()
+	local dropped = #_held
+	for _, entry in ipairs(_held) do
+		entry.cancelled = true
+		TimerScheduler.cancel(entry.timer)
+	end
+	_held = {}
+	return dropped
+end
+
 --- Decides what a logged ERROR does. Called by the logger's error handler
 --- after the line's native ACK.
 --- @param module_name string
@@ -550,6 +615,19 @@ end
 function M.on_error(module_name, template, message)
 	if _scope_owner ~= nil or _scope_busy then return false end
 	if _policy == nil then return true end
+	if module_name == RECOVERABLE_MODULE and type(template) == "string"
+		and template:sub(1, #RECOVERABLE_TEMPLATE_PREFIX) == RECOVERABLE_TEMPLATE_PREFIX then
+		return hold_recoverable(module_name, template, message)
+	end
+	return decide_error(module_name, template, message)
+end
+
+--- Applies the shared policy to one error and acts on its verdict.
+--- @param module_name string
+--- @param template string
+--- @param message string
+--- @return boolean handled Always true.
+decide_error = function(module_name, template, message)
 	local verdict = Policy.decide(_decisions, _policy, {
 		module = module_name, template = template, at = M.clock(), enabled = M.is_enabled(), open = _busy,
 	})
@@ -602,6 +680,7 @@ function M._reset()
 	_scope_generation = _scope_generation + 1
 	if _session then retire(_session) end
 	_scheduled = nil
+	drop_held()
 	_policy, _decisions, _enabled, _busy, _folded = nil, nil, nil, false, 0
 end
 

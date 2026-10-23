@@ -44,4 +44,98 @@ M.GRABBER = BIN_DIR .. "karabiner_grabber"
 M.CORE_SERVICE = SUPPORT_DIR
 	.. "Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
 
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Runtime-Selected Paths =======
+-- =========================================
+-- =========================================
+
+--- The two Karabiner runtimes (ADR 011). Shared is the official application the
+--- user installed; owned is the Ergopti background runtime. The names are the
+--- values of `[karabiner] runtime` in config_karabiner.toml.
+M.RUNTIME_SHARED = "shared"
+M.RUNTIME_OWNED = "owned"
+
+local OWNED_RUNTIME_DIR = "/Library/Application Support/ErgoptiPlus/Runtime"
+
+--- Everything the owned runtime puts on disk. The runtime directory and the
+--- launchd labels are the ones the Swift installer writes
+--- (OwnedRuntimeCoreServiceOwner.swift); the CLI and Console names are the
+--- products of tools/build/owned_runtime_product_build.py. The configuration
+--- lives under the user's Library so that the runtime's Console process, started
+--- with XDG_CONFIG_HOME set to CONFIG_HOME, reads a complete file Ergopti owns
+--- and never the user's ~/.config/karabiner.
+M.OWNED = {
+	RUNTIME_DIR = OWNED_RUNTIME_DIR,
+	CLI = OWNED_RUNTIME_DIR .. "/bin/ergoptiplus_remap_cli",
+	CORE_SERVICE = OWNED_RUNTIME_DIR .. "/ErgoptiPlus-Remap-Core.app/Contents/MacOS/ErgoptiPlus-Remap-Core",
+	CONSOLE = OWNED_RUNTIME_DIR .. "/ErgoptiPlus-Remap-Console.app/Contents/MacOS/ErgoptiPlus-Remap-Console",
+	CORE_JOB_FILE = "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist",
+	CORE_LABEL = "com.ergoptiplus.runtime.core",
+	VIRTUAL_HID_LABEL = "com.ergoptiplus.runtime.vhid",
+	CONFIG_HOME = "~/Library/Application Support/ErgoptiPlus",
+	CONFIG_FILE = "~/Library/Application Support/ErgoptiPlus/karabiner/karabiner.json",
+}
+
+--- Rejects a runtime name that is not one of the two.
+--- @param runtime any Candidate runtime name.
+--- @return string runtime The same name.
+local function checked_runtime(runtime)
+	assert(runtime == M.RUNTIME_SHARED or runtime == M.RUNTIME_OWNED,
+		"unknown Karabiner runtime: " .. tostring(runtime))
+	return runtime
+end
+
+local SHARED_CLI = M.CLI
+local selected_runtime = M.RUNTIME_SHARED
+local selection_made = false
+
+--- The command line tool of a runtime.
+--- @param runtime string `shared` or `owned`.
+--- @return string path Absolute path.
+function M.cli_for(runtime)
+	if checked_runtime(runtime) == M.RUNTIME_OWNED then return M.OWNED.CLI end
+	return SHARED_CLI
+end
+
+--- Selects, once per Lua VM, the runtime whose command line tool `M.CLI` names.
+--- Every writer of Karabiner variables spells that tool `KePaths.CLI`, so the
+--- selection reaches all of them without a second spelling. The shared tool
+--- stays the value until a caller opts in, which is the dormant default. A
+--- second call with the other runtime is refused: the lease and its variables
+--- of one generation must never straddle two runtimes, so changing runtime
+--- takes a reload.
+--- @param runtime string `shared` or `owned`.
+--- @return boolean selected Always true; an invalid or conflicting call raises.
+function M.select_runtime(runtime)
+	checked_runtime(runtime)
+	if selection_made then
+		assert(runtime == selected_runtime, "Karabiner runtime is already selected as "
+			.. selected_runtime .. "; reload to switch to " .. runtime)
+		return true
+	end
+	selection_made, selected_runtime = true, runtime
+	M.CLI = M.cli_for(runtime)
+	return true
+end
+
+--- The runtime `M.CLI` currently names.
+--- @return string runtime `shared` until a caller selects another.
+function M.selected_runtime()
+	return selected_runtime
+end
+
+--- The generated configuration file of the selected runtime, as a tilde path
+--- for the FileSystem port to expand.
+--- @param runtime string `shared` or `owned`.
+--- @return string path Tilde path.
+function M.config_file_for(runtime)
+	if checked_runtime(runtime) == M.RUNTIME_OWNED then return M.OWNED.CONFIG_FILE end
+	return "~/.config/karabiner/karabiner.json"
+end
+
 return M
