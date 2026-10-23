@@ -1,17 +1,13 @@
---- tests/meta/regressions/test_audit_v6_fixes.lua
+--- tests/meta/runloop/test_keymap_keyboard_echo_gate.lua
 
 --- ==============================================================================
---- MODULE: Audit V6 Regression Guards
+--- MODULE: Keymap keyboard echo gate (meta)
 --- DESCRIPTION:
---- Structural class guards for the macOS V6 fixes after synthetic ownership
---- moved to immutable SyntheticInput tags. Backspace, Cmd+V, and character echoes
---- now share one early provenance gate; paste emitters execute inside the same
---- explicit replacement transaction as their deletes and text; clipboard save
---- and restore preserve every UTI rather than only plain text.
+--- One explicit-tag gate protects every keyboard echo before LLM, shortcut or Backspace handling.
+--- Source-scan guard split out of the audit-named regression file it came from.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-
 
 --- Reads the one production unit containing a unique symbol.
 --- @param selector string
@@ -138,7 +134,6 @@ local function immutable_tag_owns_before_pid(body)
 	return code:sub(pid_at, owned_at - 1):find("return nil", 1, true) == nil
 end
 
-
 helpers.describe("keymap: one explicit-tag gate protects every keyboard echo (audit-v6-bug1)", function()
 	helpers.it("classifies once and filters before LLM, shortcut, or Backspace handling", function()
 		local src = read_unit("local function invalidate_observed_context")
@@ -191,117 +186,4 @@ helpers.describe("keymap: one explicit-tag gate protects every keyboard echo (au
 			"the adapter guard must fail if PID can override immutable tag ownership")
 	end)
 
-end)
-
-
-helpers.describe("keymap paste: Cmd+V inherits the replacement transaction (audit-v6-bug2)", function()
-	helpers.it("the paste helper emits Cmd+V through SyntheticInput", function()
-		local src = helpers.read_driver_source("local function perform_paste(")
-		helpers.assert_true(type(src) == "string" and src:match("%S") ~= nil,
-			"the paste declaration must select nonempty production source")
-		-- The complete unit stays contiguous if moved; ignore comments and parameter
-		-- arity, but stop at this top-level end before a sibling can supply Cmd+V.
-		src = "\n" .. strip_line_comments(src)
-		local declaration = "\nlocal function perform_paste%([^()\r\n]*%)"
-		local start_pos, declaration_end = src:find(declaration)
-		local next_pos = declaration_end and src:find("\nend[ \t]*\n", declaration_end + 1)
-		helpers.assert_not_nil(start_pos, "perform_paste must remain locatable")
-		helpers.assert_nil(src:find(declaration, declaration_end + 1),
-			"the paste declaration must be unique")
-		helpers.assert_not_nil(next_pos, "the paste body must have its own top-level end")
-		helpers.assert_true(src:sub(declaration_end + 1, next_pos - 1):match("%S") ~= nil,
-			"the paste body must not be empty")
-		local body = src:sub(start_pos, next_pos or #src)
-		local count = 0
-		for _ in body:gmatch("SyntheticInput%.emit_key_stroke") do count = count + 1 end
-		helpers.assert_eq(count, 1,
-			"the paste path must produce exactly one explicitly tagged Cmd+V pair")
-		helpers.assert_true(
-			body:find('SyntheticInput%.emit_key_stroke%({ "cmd" }, "v", 0%)') ~= nil,
-			"the tagged pair must be the actual paste shortcut")
-	end)
-
-	helpers.it("the replacement owns its emitter from begin through seal", function()
-		local src = read_unit("function M.try_terminator_expand")
-		local body = public_function_slice(src, "function M.perform_text_replacement(")
-		local begin_pos = body:find("SyntheticInput.begin", 1, true)
-		local scope_pos = body:find("SyntheticInput.with_transaction", 1, true)
-		local emit_pos = body:find("return emit_action()", 1, true)
-		local seal_pos = body:find("SyntheticInput.seal", 1, true)
-		helpers.assert_true(begin_pos and scope_pos and emit_pos and seal_pos,
-			"begin, transaction scope, real emitter, and seal must all remain present")
-		helpers.assert_true(begin_pos < scope_pos and scope_pos < emit_pos and emit_pos < seal_pos,
-			"delete, Cmd+V, and text metadata must belong to one ordered replacement")
-	end)
-
-	helpers.it("the expander never reconstructs ownership from paste metadata", function()
-		local src = read_unit("function M.try_terminator_expand")
-		helpers.assert_true(src:find("take_paste_ops", 1, true) == nil,
-			"compatibility metadata must not become a second ownership channel")
-	end)
-end)
-
-
-helpers.describe("modules/keymap/utils.lua: clipboard preserves non-text data (audit-v6-bug3)", function()
-	helpers.it("clipboard save uses readAllData() instead of getContents()", function()
-		local src = read_unit("local function invalidate_ignored_win_cache")
-		helpers.assert_true(
-			src:find("hs.pasteboard.readAllData()", 1, true) ~= nil,
-			"paste must save images, RTF, files, and text")
-	end)
-
-	helpers.it("clipboard restore uses writeAllData() instead of setContents()", function()
-		local src = read_unit("local function invalidate_ignored_win_cache")
-		helpers.assert_true(
-			src:find("hs.pasteboard.writeAllData", 1, true) ~= nil,
-			"paste must restore every saved clipboard UTI")
-	end)
-
-	helpers.it("plain-text clipboard reads are absent from paste save paths", function()
-		local src = read_unit("local function invalidate_ignored_win_cache")
-		helpers.assert_true(
-			src:find("_paste_saved_original = hs.pasteboard.getContents()", 1, true) == nil,
-			"the original clipboard must never be truncated to plain text")
-	end)
-
-	helpers.it("the asynchronous restore retains writeAllData", function()
-		local src = read_unit("local function invalidate_ignored_win_cache")
-		local timer_pos = src:find("local function schedule_paste_restore", 1, true)
-		local timer_end = timer_pos and src:find(
-			"\n--- Retains autonomous recovery after a restore failure", timer_pos, true)
-		helpers.assert_not_nil(timer_pos,
-			"the clipboard restore scheduler transaction must remain present")
-		helpers.assert_not_nil(timer_end,
-			"the clipboard restore scheduler transaction must remain independently bounded")
-		local restore = src:sub(timer_pos, timer_end - 1)
-		helpers.assert_true(restore:find("TimerScheduler.after", 1, true) ~= nil,
-			"the restore must use the retained scheduler owner, not an untracked native timer")
-		helpers.assert_true(restore:find("timer_committed ~= true", 1, true) ~= nil,
-			"an uncommitted restore timer must be rejected before publication")
-		helpers.assert_true(
-			restore:find("_paste_pending_timer = timer_or_error", 1, true) ~= nil,
-			"the exact committed timer must remain retained until callback or cancellation")
-		helpers.assert_true(restore:find("restore_owned_clipboard", 1, true) ~= nil,
-			"the timer must delegate to the retained exact-restore helper")
-		local code = strip_line_comments(src)
-		local declaration = "local function restore_owned_clipboard()"
-		local boundary = "\nlocal queue_paste_restore_retry"
-		helpers.assert_eq(count_literal(code, declaration), 1,
-			"the exact restore helper declaration must be unique and locatable")
-		helpers.assert_eq(count_literal(code, boundary), 1,
-			"the exact restore helper boundary must be unique and locatable")
-		local helper_pos = code:find(declaration, 1, true)
-		local helper_end = code:find(boundary, 1, true)
-		helpers.assert_true(helper_pos ~= nil and helper_end ~= nil
-			and helper_end > helper_pos + #declaration,
-			"the exact restore helper bounds must remain ordered and nonempty")
-		local helper = code:sub(helper_pos + #declaration, helper_end - 1)
-			:match("^(.-)%s+end%s*$")
-		helpers.assert_true(type(helper) == "string" and helper:find("%S") ~= nil,
-			"the exact restore helper body must remain nonempty")
-		helpers.assert_true(helper:find("writeAllData", 1, true) ~= nil,
-			"the shared restore helper must preserve every clipboard UTI")
-		helpers.assert_true(helper:find("restore_result ~= true", 1, true) ~= nil,
-			"a false/nil native restore must retain ownership for retry")
-	end)
 end)
