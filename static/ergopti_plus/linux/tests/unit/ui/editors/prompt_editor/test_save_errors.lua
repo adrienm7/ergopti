@@ -57,8 +57,8 @@ local function with_editor(body, logger)
 		seen.candidates[#seen.candidates + 1] = candidate
 		return profiles.save_user_profile(candidate, true, false)
 	end
-	fixture.open = function(saver)
-		assert(bridge.open(nil, saver or fixture.persist, { profile_id = "user_save_fixture" }))
+	fixture.open = function(saver, profile_id)
+		assert(bridge.open(nil, saver or fixture.persist, { profile_id = profile_id or "user_save_fixture" }))
 		local epoch = seen.epoch
 		local context = { app_name = "prompt_editor", epoch = epoch, close_owned_window = function()
 			if not manager.page_current("prompt_editor", epoch) then return false end
@@ -192,6 +192,98 @@ helpers.describe("prompt editor save error ownership", function()
 			helpers.assert_eq(f.save(payload, context), { saved = false, closed = false })
 			helpers.assert_eq(f.save(payload, context), { saved = true, closed = true })
 			helpers.assert_eq(f.seen.notices, { "prompt_editor.save_failed" })
+		end)
+	end)
+
+	helpers.it("(editor-close-successor) retains the real draft opened during native close", function()
+		with_editor(function(f)
+			local original, original_context = f.open()
+			local successor, successor_context
+			local hide = f.host.hide
+			f.host.hide = function(...)
+				local closed = hide(...)
+				f.host.hide = hide
+				successor, successor_context = f.open(nil, "user_successor_fixture")
+				successor.name, successor.prompt = "Successor profile", "Keep this later draft"
+				return closed
+			end
+			helpers.assert_eq(f.save(original, original_context), { saved = true, closed = true })
+			helpers.assert_eq(f.bridge.is_open(), true, "the acknowledged old close cannot forget its successor")
+			helpers.assert_eq(f.seen.visible, true)
+			helpers.assert_eq(f.seen.epoch, 2)
+			helpers.assert_eq(f.seen.closes, 1)
+			helpers.assert_eq(f.save(original, original_context), nil, "the old page cannot resubmit into the successor")
+			helpers.assert_eq(f.save(successor, successor_context), { saved = true, closed = true })
+			local stored = assert(f.profiles.resolve_id("user_successor_fixture"))
+			helpers.assert_eq(stored.label, successor.name)
+			helpers.assert_eq(stored.system_single, successor.prompt)
+			helpers.assert_eq(#f.profiles.list_user(), 2, "both distinct committed profiles remain readable")
+			helpers.assert_eq(#f.seen.candidates, 2)
+			helpers.assert_eq(f.seen.closes, 2)
+			helpers.assert_eq(f.bridge.is_open(), false)
+		end)
+	end)
+
+	helpers.it("(editor-close-successor) cancellation preserves the later profile save", function()
+		with_editor(function(f)
+			local original, original_context = f.open()
+			local successor, successor_context
+			local hide = f.host.hide
+			f.host.hide = function(...)
+				local closed = hide(...)
+				f.host.hide = hide
+				successor, successor_context = f.open()
+				return closed
+			end
+			local response = f.bridge.on_message({ action = "cancel", edit_id = original.edit_id,
+				epoch = original.epoch }, f.state, original_context)
+			helpers.assert_eq(response, { cancelled = true, closed = true })
+			helpers.assert_eq(#f.seen.candidates, 0, "cancellation cannot publish a profile")
+			helpers.assert_eq(f.bridge.is_open(), true)
+			helpers.assert_eq(f.seen.visible, true)
+			helpers.assert_eq(f.save(successor, successor_context), { saved = true, closed = true })
+			helpers.assert_eq(#f.seen.candidates, 1)
+			helpers.assert_eq(f.profiles.list_user()[1].label, successor.name)
+			helpers.assert_eq(f.seen.closes, 2)
+		end)
+	end)
+
+	helpers.it("(editor-close-successor) an older replacement opener yields to native close reentry", function()
+		with_editor(function(f)
+			f.open()
+			local successor, successor_context
+			local hide = f.host.hide
+			f.host.hide = function(...)
+				local closed = hide(...)
+				f.host.hide = hide
+				successor, successor_context = f.open(nil, "user_later_native")
+				return closed
+			end
+			local accepted = f.bridge.open(nil, function() error("superseded saver must not run") end,
+				{ profile_id = "user_earlier_request" })
+			helpers.assert_eq(accepted, false, "a later request supersedes the opener that caused native close")
+			helpers.assert_eq(f.seen.epoch, 2, "the superseded opener cannot create a third window")
+			helpers.assert_eq(f.save(successor, successor_context), { saved = true, closed = true })
+			helpers.assert_eq(f.profiles.list_user()[1].id, "user_later_native")
+		end)
+	end)
+
+	helpers.it("(editor-close-successor) an older native show cannot claim a later editor", function()
+		with_editor(function(f)
+			local successor, successor_context
+			local show = f.host.show
+			f.host.show = function(...)
+				local shown = show(...)
+				f.host.show = show
+				successor, successor_context = f.open(nil, "user_later_show")
+				return shown
+			end
+			local accepted = f.bridge.open(nil, function() error("superseded saver must not run") end,
+				{ profile_id = "user_earlier_request" })
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(f.seen.epoch, 2)
+			helpers.assert_eq(f.save(successor, successor_context), { saved = true, closed = true })
+			helpers.assert_eq(f.profiles.list_user()[1].id, "user_later_show")
 		end)
 	end)
 end)
