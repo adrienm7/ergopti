@@ -17,6 +17,36 @@
 			"reasons": ["unavailable"]
 		},
 		{
+			"symbol": "proxyBudget",
+			"code": "native_proxy_budget",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "proxyCandidates",
+			"code": "native_proxy_candidates",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "pacDownload",
+			"code": "native_pac_download",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "pacEvaluation",
+			"code": "native_pac_evaluation",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "proxyRoutes",
+			"code": "native_proxy_routes",
+			"reasons": ["unavailable"]
+		},
+		{
+			"symbol": "wpadDiscovery",
+			"code": "native_wpad_discovery",
+			"reasons": ["unavailable"]
+		},
+		{
 			"symbol": "proxyDictionary",
 			"code": "native_proxy_dictionary",
 			"reasons": ["proxy"]
