@@ -298,6 +298,7 @@ class HookDispatcher {
 
 	; Bound to IH.OnChar — receives (ih, char) from AHK.
 	static _OnChar(ih, char) {
+		PerfCount("hook.char")
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_CHAR, ih, char)
 	}
 
@@ -310,6 +311,7 @@ class HookDispatcher {
 	; consumer. Two QPC reads; the log line is gated by the profiler floor.
 	static _OnKeyDown(ih, vk, sc) {
 		_hpKeyDown := HotPath_Now()
+		PerfCount("hook.keydown")
 		KS_RecordPhysicalKeyDown(vk, sc, "dispatcher")
 		try TapHoldTrackKeyDownByScancode(vk, sc)
 		catch as _thTrackErr
@@ -327,6 +329,7 @@ class HookDispatcher {
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
 	static _OnKeyUp(ih, vk, sc) {
 		_hpKeyUp := HotPath_Now()
+		PerfCount("hook.keyup")
 		try TapHoldTrackKeyUpByScancode(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackKeyUpByScancode", _thTrackErr)

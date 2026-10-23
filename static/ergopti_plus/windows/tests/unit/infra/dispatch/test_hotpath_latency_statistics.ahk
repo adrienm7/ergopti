@@ -141,3 +141,126 @@ _HPLS_ShutdownStagesAreDistinct() {
 }
 Test("hotpath: reload shutdown attributes drains and reports privacy refusals (hotpath-latency-statistics)",
 	_HPLS_ShutdownStagesAreDistinct)
+
+
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 5/ Interval counters and process state (perf) =======
+; =============================================================
+; =============================================================
+
+_PC_WithFreshRegistry(Scenario) {
+	Owner := _PerfCountersOwner()
+	SavedCounts := Owner.Counts
+	SavedRefused := Owner.Refused
+	Owner.Counts := Map()
+	Owner.Refused := 0
+	try Scenario(Owner)
+	finally {
+		Owner.Counts := SavedCounts
+		Owner.Refused := SavedRefused
+	}
+}
+
+_PC_CountsAccumulateAndAreBounded() {
+	_Scenario(Owner) {
+		AssertTrue(PerfCount("a"))
+		AssertTrue(PerfCount("a", 4))
+		AssertEqual(5, Owner.Counts["a"])
+		Owner.Limit := 2
+		try {
+			AssertTrue(PerfCount("b"))
+			AssertFalse(PerfCount("c"), "a full registry refuses a new name")
+			AssertEqual(1, Owner.Refused)
+			AssertTrue(PerfCount("b", 2), "capacity never rejects an existing name")
+			AssertEqual(3, Owner.Counts["b"])
+		} finally Owner.Limit := 64
+	}
+	_PC_WithFreshRegistry(_Scenario)
+}
+Test("perf counters: increments accumulate and the registry is bounded (perf-counters)",
+	_PC_CountsAccumulateAndAreBounded)
+
+_PC_FlushPublishesOneEvidenceRecordAndResets() {
+	_Scenario(Lines, SetTime) {
+		_Inner(Owner) {
+			PerfCount("toml.file_read", 3)
+			PerfCount("hook.keydown", 2)
+			PerfCounters_Flush()
+			Text := ""
+			for Line in Lines
+				Text .= Line . "`n"
+			AssertContains(Text, "Interval counters (", "the counters are published")
+			AssertContains(Text, "hook.keydown=2 toml.file_read=3", "names are sorted for stable diffs")
+			AssertContains(Text, "Process state: working_set_mb=", "process state follows")
+			AssertEqual(0, Owner.Counts.Count, "publishing resets the window")
+			Before := Lines.Length
+			PerfCounters_Flush()
+			Text := ""
+			Loop Lines.Length - Before
+				Text .= Lines[Before + A_Index] . "`n"
+			Assert(!InStr(Text, "Interval counters ("), "an empty window publishes no counter record")
+		}
+		_PC_WithFreshRegistry(_Inner)
+	}
+	_TLRC_WithDrivenLogger(_Scenario)
+}
+Test("perf counters: flush publishes sorted counters once and resets (perf-counters)",
+	_PC_FlushPublishesOneEvidenceRecordAndResets)
+
+_PC_ProcessStateReportsRealValues() {
+	State := PerfProcessState()
+	AssertTrue(State.WorkingSetMb > 0, "the working set is read")
+	AssertTrue(State.PrivateMb > 0, "private bytes are read")
+	AssertTrue(State.Handles > 0, "the handle count is read")
+	AssertTrue(State.GdiObjects >= 0 && State.UserObjects >= 0, "GUI object counts are read")
+}
+Test("perf counters: process state reads memory and kernel-object counts (perf-counters)",
+	_PC_ProcessStateReportsRealValues)
+
+_PC_StageDebugLineIsLevelGated() {
+	global LOGGER_MIN_LEVEL
+	_Scenario(Lines, SetTime) {
+		Started := PerfStage_Begin()
+		LOGGER_MIN_LEVEL := "DEBUG"
+		_LoggerRefreshFastFlags()
+		PerfStage_End("Perf.test_stage", Started, 7)
+		Text := ""
+		for Line in Lines
+			Text .= Line . "`n"
+		AssertContains(Text, "Stage 'Perf.test_stage' took", "DEBUG shows the stage")
+		AssertContains(Text, "(count=7)")
+		Lines.Length := 0
+		LOGGER_MIN_LEVEL := "INFO"
+		_LoggerRefreshFastFlags()
+		Elapsed := PerfStage_End("Perf.test_stage", Started, 7)
+		AssertTrue(Elapsed >= 0, "the stage still reports its duration")
+		AssertEqual(0, Lines.Length, "no line is built below DEBUG")
+	}
+	_TLRC_WithDrivenLogger(_Scenario)
+}
+Test("perf counters: the stage debug line is built only when DEBUG is enabled (perf-counters)",
+	_PC_StageDebugLineIsLevelGated)
+
+_PC_BootSummaryListsTopLevelStagesOnly() {
+	Closed := _BootStageDurations()
+	Saved := Closed.Clone()
+	Closed.Length := 0
+	try {
+		Closed.Push({ Name: "feature gates", Ms: 250 })
+		Closed.Push({ Name: "menu row llm", Ms: 266 })
+		Closed.Push({ Name: "tray menu", Ms: 1813 })
+		AssertEqual("feature_gates=250 tray_menu=1813", BootProfile_StageSummary(),
+			"nested menu rows overlap the tray menu stage and are left out")
+	} finally {
+		Closed.Length := 0
+		for Stage in Saved
+			Closed.Push(Stage)
+	}
+}
+Test("perf counters: the boot summary lists top-level stages in completion order (perf-counters)",
+	_PC_BootSummaryListsTopLevelStagesOnly)

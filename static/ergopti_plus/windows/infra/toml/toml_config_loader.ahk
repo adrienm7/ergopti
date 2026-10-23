@@ -724,6 +724,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	MigratedOverrides := 0
 	OutdatedEntries := Map()
 	Applied := 0
+	PerfCount("config.apply")
 
 	try LoggerStart("TomlConfigLoader", "Applying v2 config from '{1}'…", FilePath)
 
