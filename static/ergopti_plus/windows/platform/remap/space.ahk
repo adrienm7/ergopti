@@ -89,13 +89,13 @@ _SpaceTap() {
 				; SC039 is suppressing, so the physical tap is not on screen yet. Emit it
 				; before feeding the engine: HSE_DispatchMatch's backspace count includes
 				; the end character and may only erase text which has actually landed.
-				if !TextPressKey("Space", "")
+				if !TextPressKeyFed("Space")
 						return false
 
 				; IsPhysical=true: this space came from a real key tap, not the engine's
 				; SendInput. Mirror the same proven screen character into the longer LLM
 				; context inside this Critical transaction; the I1 watcher deliberately
-				; ignores TextPressKey's synthetic replacement send.
+				; ignores the synthetic send of TextPressKeyFed.
 				HSEMatch := HSE_FeedChar(" ", true)
 				_HSE_MirrorLiteralEditToLlm(0, " ")
 				CommittedScreenEffect := 0

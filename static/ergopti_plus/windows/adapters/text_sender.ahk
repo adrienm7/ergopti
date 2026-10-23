@@ -1058,6 +1058,18 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 	return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "key press")
 }
 
+; Emits one plain key press that the CALLER feeds to the hotstring engine itself,
+; so the send must not also be declared to the buffers: TextPressKey declares an
+; unmodified key as a caret edit, which empties both buffers, and a trigger fed
+; afterwards (the Space tap-hold completing an end-character trigger) could never
+; complete. The caller owns the buffer feed that follows a true result.
+; @param Key {String} Key name (e.g. "Space").
+; @return {Boolean} True when the keystroke was sent.
+TextPressKeyFed(Key) {
+	Stroke := _TextSenderKeystroke([], Key)
+	return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "fed key press")
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.

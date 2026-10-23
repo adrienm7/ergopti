@@ -285,7 +285,7 @@ _AHK04M_ForcedCommitAndSpaceFallbackAreTransactional() {
 	Assert(CleanupFailureRing > CleanupGate and CleanupFeed > CleanupFailureRing
 		and CleanupLlm > CleanupFeed,
 		"failed cleanup must retain/ring the visible Space, while successful cleanup mutates HSE and LLM only after its backspace succeeds")
-	SpacePress := InStr(SpaceTap, 'if !TextPressKey("Space", "")')
+	SpacePress := InStr(SpaceTap, 'if !TextPressKeyFed("Space")')
 	SpaceFeed := InStr(SpaceTap, 'HSE_FeedChar(" ", true)')
 	SpaceLlm := InStr(SpaceTap, '_HSE_MirrorLiteralEditToLlm(0, " ")')
 	SpaceDispatch := InStr(SpaceTap, "HSE_DispatchMatch")
