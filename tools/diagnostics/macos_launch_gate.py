@@ -517,10 +517,24 @@ def evaluate(scenario, observation, *, defer_native=False):
             "the launcher and embedded Hammerspoon did not both survive the observation window"
         )
     if observation.get("quit_seconds") is None:
-        failures.append(f"Quit did not end both processes within {QUIT_TIMEOUT_SECONDS} s")
+        failures.append(
+            f"Quit did not end both processes within {QUIT_TIMEOUT_SECONDS} s"
+            + quit_evidence_detail(observation.get("quit_evidence"))
+        )
     for problem in observation.get("state_problems", []):
         failures.append(problem)
     return failures
+
+
+def quit_evidence_detail(evidence):
+    """Name the processes that outlived Quit and when the others left; empty without evidence."""
+    if not evidence or "survivors" not in evidence:
+        return ""
+    gone = ", ".join(
+        f"{name} left after {seconds} s" for name, seconds in evidence["exits"].items()
+    )
+    still = ", ".join(evidence["survivors"]) or "none by the final check"
+    return f" (still running: {still}" + (f"; {gone}" if gone else "") + ")"
 
 
 def check_state(scenario, state, home):
@@ -583,9 +597,17 @@ def driver_logs(state):
     return "\n".join(read_text(p) for p in files)
 
 
-def quit_application(bundle_id, executables):
-    """Send the ordinary application Quit and time both processes' exit."""
+def quit_application(bundle_id, executables, evidence=None):
+    """Send the ordinary application Quit and time both processes' exit.
+
+    When evidence is a dict it receives "exits" (seconds at which each executable
+    was first seen gone) and, on a timeout, "survivors" (those still running), so
+    a slow Quit names which process held it instead of only that the budget ended.
+    """
     started = time.monotonic()
+    exits = {}
+    if evidence is not None:
+        evidence["exits"] = exits
     subprocess.run(
         ["osascript", "-e", f'tell application id "{bundle_id}" to quit'],
         capture_output=True,
@@ -593,9 +615,17 @@ def quit_application(bundle_id, executables):
         timeout=QUIT_TIMEOUT_SECONDS,
     )
     while time.monotonic() - started < QUIT_TIMEOUT_SECONDS:
-        if not any(processes(executable) for executable in executables):
+        alive = [executable for executable in executables if processes(executable)]
+        for executable in executables:
+            if executable not in alive:
+                exits.setdefault(Path(executable).name, round(time.monotonic() - started, 3))
+        if not alive:
             return round(time.monotonic() - started, 3)
         time.sleep(0.25)
+    if evidence is not None:
+        evidence["survivors"] = [
+            Path(executable).name for executable in executables if processes(executable)
+        ]
     return None
 
 
@@ -1045,8 +1075,10 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
                     )
                 except Exception as error:
                     observation["appleevent_consent_boundary_error"] = bounded_refusal(error)
+        quit_evidence = {}
+        observation["quit_evidence"] = quit_evidence
         observation["quit_seconds"] = (
-            quit_application(bundle_id, (launcher, child))
+            quit_application(bundle_id, (launcher, child), quit_evidence)
             if observation["alive_after_window"]
             else None
         )

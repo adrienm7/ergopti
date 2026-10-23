@@ -1014,6 +1014,38 @@ class VerdictTests(unittest.TestCase):
             failures, [f"Quit did not end both processes within {gate.QUIT_TIMEOUT_SECONDS} s"]
         )
 
+    def test_hanging_quit_names_the_process_that_outlived_it(self):
+        launcher, child = Path("/app/ErgoptiPlus"), Path("/app/Hammerspoon")
+        evidence = {}
+        # The launcher is gone at the first poll; Hammerspoon never leaves.
+        with (
+            mock.patch.object(gate, "QUIT_TIMEOUT_SECONDS", 0.3),
+            mock.patch.object(gate.subprocess, "run"),
+            mock.patch.object(gate.time, "sleep"),
+            mock.patch.object(
+                gate, "processes", side_effect=lambda path: [7] if path == child else []
+            ),
+        ):
+            self.assertIsNone(gate.quit_application("bundle", (launcher, child), evidence))
+        self.assertEqual(evidence["survivors"], ["Hammerspoon"])
+        self.assertEqual(list(evidence["exits"]), ["ErgoptiPlus"])
+        failures = gate.evaluate("clean", observe(quit_seconds=None, quit_evidence=evidence))
+        self.assertEqual(len(failures), 1)
+        self.assertIn("still running: Hammerspoon; ErgoptiPlus left after", failures[0])
+
+    def test_quit_that_ends_both_processes_records_each_exit(self):
+        launcher, child = Path("/app/ErgoptiPlus"), Path("/app/Hammerspoon")
+        evidence = {}
+        with (
+            mock.patch.object(gate.subprocess, "run"),
+            mock.patch.object(gate.time, "sleep"),
+            mock.patch.object(gate, "processes", return_value=[]),
+        ):
+            seconds = gate.quit_application("bundle", (launcher, child), evidence)
+        self.assertIsNotNone(seconds)
+        self.assertEqual(sorted(evidence["exits"]), ["ErgoptiPlus", "Hammerspoon"])
+        self.assertNotIn("survivors", evidence)
+
     def test_refused_state_needs_a_named_reason(self):
         generic = observe(
             launcher_log="[t] FATAL: Embedded Hammerspoon stopped unexpectedly with exit code 0.\n",
