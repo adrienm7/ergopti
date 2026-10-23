@@ -66,6 +66,7 @@ local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
+local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
 local BindingIdentity = require("config_binding_identity")
 local BindingPublication = require("config_binding_publication")
 local PersonalFiles = require("hotstrings.personal_files")
@@ -401,6 +402,20 @@ local function boolean_choice(_, value)
 	return false, "a hotstring choice takes true or false"
 end
 
+--- Owner check of one [hotstrings.groups] entry: a boolean naming a category the
+--- loaded catalogue still ships. Boot publishes the catalogue after this reader
+--- ran, so the first load judges the type only and the cleanup judges the name.
+--- @param id string Category id.
+--- @param value any Persisted value.
+--- @return boolean known
+--- @return string|nil detail
+local function category_choice(id, value)
+	local fits, detail = boolean_choice(id, value)
+	if not fits then return false, detail end
+	if ChoiceCatalogue.retired(id) then return false, "no loaded hotstring category has this id" end
+	return true
+end
+
 --- Partitions [hotstrings.modules]: each child is one category's table of
 --- section choices. A child of another shape (an older build's
 --- `magickey = true`) is outdated as a whole; inside a table, each section
@@ -417,8 +432,15 @@ local function partition_section_choices(prefix, modules, mark)
 			ConfigOutdated.report(path, "not a text key")
 		elseif type(sections) ~= "table" or #sections > 0 then
 			ConfigOutdated.report(path, "section choices are not a table")
+		elseif ChoiceCatalogue.retired(id) then
+			ConfigOutdated.report(path, "no loaded hotstring category has this id")
 		else
-			kept[id] = ConfigOutdated.partition(path, sections, boolean_choice, mark)
+			kept[id] = ConfigOutdated.partition(path, sections, function(name, value)
+				local fits, detail = boolean_choice(name, value)
+				if not fits then return false, detail end
+				if ChoiceCatalogue.retired(id, name) then return false, "no loaded hotstring section has this name" end
+				return true
+			end, mark)
 		end
 	end
 	return kept
@@ -459,6 +481,17 @@ local function section_order_fits(value, shapes)
 		if value[index] == nil then return false, "section order is not a dense list" end
 	end
 	return true
+end
+
+--- Owner check of one [hotstrings.order_overrides] entry's category.
+--- @param id string Category id.
+--- @param value any Persisted section order.
+--- @param shapes table|nil Canonical document receipt.
+--- @return boolean known
+--- @return string|nil detail
+local function section_order_choice(id, value, shapes)
+	if ChoiceCatalogue.retired(id) then return false, "no loaded hotstring category has this id" end
+	return section_order_fits(value, shapes)
 end
 
 --- Set of known top-level section names for fast lookup.
@@ -852,7 +885,7 @@ local function flatten_from_disk(grouped, mark, shapes)
 							-- The hotstring projection asserts booleans: an old-shape
 							-- choice reaching it failed the boot hotstrings sync.
 							flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
-								boolean_choice, mark)
+								category_choice, mark)
 						elseif nested_fk == "section_states" then
 							flat[nested_fk] = partition_section_choices({ sec_name, disk_key }, owned, mark)
 						elseif nested_fk == "sections_order_overrides" then
@@ -861,7 +894,7 @@ local function flatten_from_disk(grouped, mark, shapes)
 								flat[nested_fk] = {}
 							else
 								flat[nested_fk] = ConfigOutdated.partition({ sec_name, disk_key }, owned,
-									function(_, value) return section_order_fits(value, shapes) end, mark)
+									function(id, value) return section_order_choice(id, value, shapes) end, mark)
 							end
 						elseif nested_fk == "delays" then
 							-- A retired delay was ignored by set_delay and saved back

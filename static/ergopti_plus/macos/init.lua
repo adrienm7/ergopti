@@ -1984,13 +1984,20 @@ local _toml_load_t0 = hs.timer.secondsSinceEpoch()
 local CommonHotstringsBoot = require("infra.common_hotstrings_boot")
 local common_file_count = 0
 local carried_categories = {}
+-- Whether every bundled source loaded, and which categories list the build's own
+-- sections (a user copy or an extension route lists another file's): the
+-- choice catalogue is published only from a complete load.
+local bundled_complete = true
+local build_sections = {}
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
 	local own = hotstrings_dir .. fname
 	local path, section_sources = ExtensionPacks.route(name, own, is_user_hotstrings_copy(own))
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
 	local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
-	if receipt.committed then common_file_count = common_file_count + 1 end
+	if receipt.committed then common_file_count = common_file_count + 1 else bundled_complete = false end
+	build_sections[name] = receipt.committed and path == own and section_sources == nil
+		and not is_user_hotstrings_copy(own)
 	carried_categories[name] = true
 end
 -- Language packs after the neutral files. A declared pack whose file is missing
@@ -2006,8 +2013,11 @@ for _, pack in ipairs(language_packs) do
 			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
 			local receipt = CommonHotstringsBoot.load(keymap, name, path, section_sources, hotfiles, hotfile_paths)
 			carried_categories[name] = true
-			if receipt.committed then language_file_count = language_file_count + 1 end
+			if receipt.committed then language_file_count = language_file_count + 1 else bundled_complete = false end
+			build_sections[name] = receipt.committed and path == own and section_sources == nil
+				and not is_user_hotstrings_copy(own)
 		else
+			bundled_complete = false
 			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
 		end
 	end
@@ -2022,6 +2032,28 @@ for _, route in ipairs(ExtensionPacks.unbundled_routes(carried_categories)) do
 		Logger.error(LOG, "An extension binds sections of '%s', a category this driver does not carry.",
 			route.category)
 	end
+end
+-- The cleanup judges an explicit category or section choice against what this
+-- build shipped, once every bundled source loaded. A personal file, an extension
+-- pack or a dynamic group is never judged: its absence may be temporary.
+if bundled_complete then
+	local PersonalHotstrings = require("infra.personal_hotstrings")
+	local Extensions = require("hotstrings.extensions")
+	local published = require("infra.hotstring_choice_catalogue").publish(function(id)
+		if PersonalHotstrings.is_personal_group(id) or Extensions.parse_category_key(id) ~= nil
+			or id == "dynamichotstrings" then
+			return { unjudged = true }
+		end
+		local sections = keymap.get_sections(id)
+		if sections == nil then return nil end
+		if not build_sections[id] then return { sections = nil } end
+		local names = {}
+		for _, section in ipairs(sections) do names[section.name] = true end
+		return { sections = names }
+	end)
+	if published ~= true then error("the hotstring choice catalogue did not publish at boot") end
+else
+	Logger.warn(LOG, "A bundled hotstring source did not load; explicit category choices stay unjudged this session.")
 end
 Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",
 	common_file_count, language_file_count, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
