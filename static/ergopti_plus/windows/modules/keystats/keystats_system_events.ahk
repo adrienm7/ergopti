@@ -15,7 +15,12 @@ _KL_SystemEventClock() {
 
 _KL_SystemEventAppend(Entry, Guard, Commit) {
 	RejectedBySuspend := false
-	return KL_AppendLog(Entry, &RejectedBySuspend, Guard, Commit)
+	Accepted := KL_AppendLog(Entry, &RejectedBySuspend, Guard, Commit)
+	; The central receipt reports only an exact lifecycle refusal. Earlier
+	; privacy/validation drops stay terminal even if the owner also changed.
+	if Accepted
+		return true
+	return RejectedBySuspend ? KLSystemEventOwner.APPEND_RETRY : false
 }
 
 _KL_Watchers_SystemStart() {
