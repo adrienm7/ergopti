@@ -227,6 +227,9 @@ class WebViewHost {
 		; sentinel makes both the load-once guard and the ``is Map`` read safe.
 		static _ManifestCache := ""
 		static _Instances      := Map()   ; AppId → WebViewHost (singleton tracking)
+		; Only an admitted ready signal refused under pause owns pending init.
+		; Subclass singletons need not live in _Instances; these receipts own resume.
+		static _PendingReady   := Map()
 
 		; ── Instance fields ──────────────────────────────────────────────────────
 		AppId      := ""
@@ -589,11 +592,65 @@ class WebViewHost {
 						SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
 		}
 
+		; Admission and the native one-shot arm are bounded; no COM or I/O runs
+		; here. A repeated resume cannot arm the same receipt a second time.
+		_ArmReady(Pending) {
+				PreviousCritical := Critical("On")
+				try {
+						if A_IsSuspended || this.ResetDone || this.CloseRequested
+								|| Pending.Epoch != this.Epoch || Pending.Scheduled
+								|| WebViewHost._PendingReady.Get(this, 0) != Pending
+								return false
+						Pending.Scheduled := true
+						try SetTimer(this._DispatchReady.Bind(this, this.Epoch), -1)
+						catch as Err {
+								Pending.Scheduled := false
+								throw Err
+						}
+						return true
+				} finally Critical(PreviousCritical)
+		}
+
 		_DispatchReady(CallbackEpoch) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
-						return
-				; Preserve initialization failures for the global timer error owner.
-				this.Opts["OnReady"](this)
+				PreviousCritical := Critical("On")
+				try {
+						if this.ResetDone || this.CloseRequested || CallbackEpoch != this.Epoch
+								return
+						Pending := WebViewHost._PendingReady.Get(this, 0)
+						if A_IsSuspended {
+								; Only a previously admitted ready event can retain init;
+								; neither a safety flush nor a user command creates one.
+								if !this.ReadyFired || !this.Opts.Has("OnReady")
+										return
+								if !IsObject(Pending) {
+										Pending := {Epoch: CallbackEpoch, Callback: this.Opts["OnReady"], Scheduled: false}
+										WebViewHost._PendingReady[this] := Pending
+								} else if Pending.Epoch == CallbackEpoch
+										Pending.Scheduled := false
+								return
+						}
+						if IsObject(Pending) {
+								if Pending.Epoch != CallbackEpoch
+										return
+								; Consume before the callout. It may submit a script before
+								; throwing; a later resume cannot authorize replay.
+								WebViewHost._PendingReady.Delete(this)
+								Callback := Pending.Callback
+						} else
+								Callback := this.Opts["OnReady"]
+				} finally Critical(PreviousCritical)
+				Callback.Call(this)
+		}
+
+		static ResumeReady() {
+				PreviousCritical := Critical("On")
+				try {
+						Pending := []
+						for Host, Receipt in WebViewHost._PendingReady
+								Pending.Push({Host: Host, Receipt: Receipt})
+				} finally Critical(PreviousCritical)
+				for Item in Pending
+						Item.Host._ArmReady(Item.Receipt)
 		}
 
 		; ── Queue-based eval ─────────────────────────────────────────────────────
@@ -677,10 +734,18 @@ class WebViewHost {
 
 		; ── Teardown — release subs before Controller.Close, idempotent ──────────
 		_Reset(CloseController := true) {
-				if this.ResetDone
-						return
-				this.ResetDone := true
-				this.Epoch += 1
+				PreviousCritical := Critical("On")
+				try {
+						if this.ResetDone
+								return
+						this.ResetDone := true
+						this.Epoch += 1
+						; Keep the detached callback alive until after Critical and all
+						; teardown callouts. A late timer cannot borrow another receipt.
+						RetiredReady := WebViewHost._PendingReady.Get(this, 0)
+						if IsObject(RetiredReady)
+								WebViewHost._PendingReady.Delete(this)
+				} finally Critical(PreviousCritical)
 
 				; Cancel the safety-flush timer so it never fires on a dead window.
 				; Guarded on the BoundFunc existing: passing the old empty-string
@@ -707,6 +772,14 @@ class WebViewHost {
 
 
 ; ── Standalone helpers (used by modules alongside WebViewHost) ───────────────
+
+/** Services only readiness receipts admitted before native Suspend was lifted. */
+WebViewHost_OnSuspendResume() {
+	if A_IsSuspended
+		return false
+	WebViewHost.ResumeReady()
+	return true
+}
 
 ; Returns a quoted, escaped JS string literal for safe interpolation.
 ; Centralised here so every module that builds JSON or init-payload JS can reuse
