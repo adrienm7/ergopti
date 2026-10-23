@@ -507,7 +507,26 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
 			Result["oversize"] := true
 			return Result
 		}
-		Result["body"] := ReadFn.Call(BodyPath, "UTF-8-RAW")
+		; All nonempty bodies consumed here are LLM JSON. Keep the same bounded
+		; byte image through validation and decoding; FileRead's text conversion
+		; repairs invalid UTF-8 before the JSON parser can reject it.
+		Raw := ReadFn.Call(BodyPath, "RAW m" . (MaxBodyBytes + 1))
+		if !(Raw is Buffer)
+			throw TypeError("The curl terminal body reader must return raw bytes.")
+		if Raw.Size > MaxBodyBytes {
+			Result["oversize"] := true
+			return Result
+		}
+		if Raw.Size > 0 && !HTTPIsValidUtf8(Raw, Raw.Size)
+			return Result
+		; FileRead previously removed a leading UTF-8 BOM. An empty successful
+		; DELETE is valid too; neither case may call the decoder with zero bytes.
+		Offset := Raw.Size >= 3 && NumGet(Raw, 0, "UChar") == 0xEF
+			&& NumGet(Raw, 1, "UChar") == 0xBB && NumGet(Raw, 2, "UChar") == 0xBF ? 3 : 0
+		Count := Raw.Size - Offset
+		; A positive StrGet length truncates at NUL. Exact length keeps every
+		; byte visible to JsonParse, including forbidden embedded/trailing NUL.
+		Result["body"] := Count > 0 ? StrGet(Raw.Ptr + Offset, -Count, "UTF-8") : ""
 		Result["body_read"] := true
 	}
 	return Result
