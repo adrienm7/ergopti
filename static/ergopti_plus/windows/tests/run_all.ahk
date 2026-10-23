@@ -1279,6 +1279,7 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/platform/network/test_host_curl_capability.ahk
 #Include unit/platform/network/test_managed_remote_sspi.ahk
 #Include meta/modules/llm/servers/test_remote_connect_timeout_bounded.ahk
+#Include unit/platform/network/test_winhttp_transport.ahk
 #Include meta/modules/keystats/test_keystats_json_64bit_decode.ahk
 #Include meta/adapters/crash_report/test_crash_build_offthread.ahk
 #Include meta/suite/test_assertions_are_case_sensitive.ahk
