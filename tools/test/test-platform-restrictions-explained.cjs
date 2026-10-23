@@ -96,7 +96,7 @@ const MANIFEST = path.join(
 // translated strings would have frozen it in place.
 // 2026-10-20: 104 → 103. The Layout menu's macOS-only separator before the
 // active input sources is a presentation, now classified unavailable = "hide".
-const BASELINE = 102;
+const BASELINE = 101;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -125,7 +125,6 @@ const KNOWN_UNEXPLAINED = new Set([
 	'["features.llm.navigation","hs","boolean","arrow_nav_enabled",null,null,null,null]',
 	'["features.llm.profiles","hs","array","user_profiles",null,null,null,null]',
 	'["features.llm.trigger","ahk","boolean","inline_autotype",null,null,null,null]',
-	'["features.llm.trigger","hs","array","disabled_apps",null,null,null,null]',
 	'["features.metrics","ahk","array","metrics_disabled_apps",null,null,null,null]',
 	'["features.metrics","ahk","boolean","metrics_wpm_menubar_colors",null,null,null,null]',
 	'["features.metrics","ahk","number","wpm_widget_x",null,null,null,null]',

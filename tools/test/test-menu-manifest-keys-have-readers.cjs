@@ -723,6 +723,74 @@ for (const withdrawn of [
 	]);
 }
 
+// ====================================================
+// ====================================================
+// ======= 3b/ Feature keys read only where declared =======
+// ====================================================
+// ====================================================
+
+// A configuration key declared for other platforms reaches no generated
+// manifest, template or default on this one. Windows wrote
+// llm.trigger.disabled_apps and read llm.navigation.nav_modifiers, and macOS
+// read mod_combos.*, while the manifest named other drivers: every reader was
+// right for its user and the declaration was wrong, which nothing noticed.
+{
+	const { parse: parseToml } = require('smol-toml');
+	const { platformReadViolations } = require('../lib/feature-platform-reads.cjs');
+	const featureManifest = parseToml(
+		fs
+			.readFileSync(path.join(DRIVERS, '_shared', 'modules', 'features', 'manifest.toml'), 'utf8')
+			.replace(
+				/^\[\[features\.([^\]]+)\]\]\r?$/gm,
+				(_match, section) => `[[entries]]\nsection = "${section}"`
+			)
+	);
+	const driverDirs = { ahk: 'windows', hs: 'macos', linux: 'linux' };
+	const driverSources = [];
+	for (const [driver, dirName] of Object.entries(driverDirs)) {
+		(function walk(dir) {
+			for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+				const p = path.join(dir, e.name);
+				if (e.isDirectory()) {
+					if (!['vendor', 'node_modules', 'tests', '_generated'].includes(e.name)) walk(p);
+				} else if (/\.(lua|ahk)$/.test(e.name)) {
+					driverSources.push({
+						driver,
+						rel: path.relative(DRIVERS, p).split(path.sep).join('/'),
+						source: fs.readFileSync(p, 'utf8')
+					});
+				}
+			}
+		})(path.join(DRIVERS, dirName));
+	}
+	if (featureManifest.entries.length < 200 || driverSources.length < MIN_SOURCES) {
+		errors.push('the feature-platform scan found too little to prove anything');
+	}
+	for (const violation of platformReadViolations(featureManifest, driverSources)) {
+		errors.push(violation);
+	}
+
+	// The scan must be able to fail: a hs-only key read by Windows is reported.
+	const probeManifest = {
+		sections: {},
+		entries: [{ section: 'probe', id: 'hs_only', platforms: ['hs'] }]
+	};
+	const probe = (driver, source) =>
+		platformReadViolations(probeManifest, [{ driver, rel: 'probe', source }]).length;
+	for (const spelling of [
+		'x := Cfg("probe.hs_only")',
+		'U.Push({ Section: "probe", Key: "hs_only", Value: 1 })',
+		'v := Cache["probe"]["hs_only"]'
+	]) {
+		if (probe('ahk', spelling) !== 1) errors.push(`the probe missed a read: ${spelling}`);
+		if (probe('hs', spelling) !== 0) errors.push(`the probe flagged a declared read: ${spelling}`);
+		if (probe('ahk', `; ${spelling}`) !== 0)
+			errors.push(`the probe flagged a comment: ${spelling}`);
+	}
+	if (probe('linux', 'p = { sec = "probe", key = "hs_only" }') !== 1)
+		errors.push('the probe missed a macOS-style preference row read by another driver');
+}
+
 // ==========================
 // ==========================
 // ======= 4/ Verdict =======

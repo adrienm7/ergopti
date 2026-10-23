@@ -466,6 +466,7 @@ auto_profile_for_model = true
 
 
 [llm.trigger]
+disabled_apps = []
 debounce_ms = 500
 instant_on_word_end = true
 after_hotstring = true
@@ -476,6 +477,7 @@ url_bar_filter_enabled = false
 
 
 [llm.navigation]
+nav_modifiers = []
 val_modifiers = []
 
 

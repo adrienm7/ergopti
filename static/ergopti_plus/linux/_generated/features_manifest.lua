@@ -54,7 +54,7 @@ M.sections = {
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs" }, subsections = {  } },
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
-	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "linux" }, subsections = {  } },
+	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "hs", "linux" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
@@ -401,7 +401,7 @@ M.features = {
 		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "llm.navigation.nav_modifiers", id = "nav_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.nav_modifiers_prompt", platforms = { "hs", "linux" }, recommended = {  }, input_altering = false,
+		path = "llm.navigation.nav_modifiers", id = "nav_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.nav_modifiers_prompt", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{
 		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
@@ -455,10 +455,10 @@ M.features = {
 		path = "shortcuts.key_combination_taps.left_alt_then_caps_lock", id = "left_alt_then_caps_lock", section = "shortcuts.key_combination_taps", default = "none", type = "action", description_key = "menu.shortcuts.key_combinations", platforms = { "ahk", "linux" }, recommended = "caps_word", input_altering = true,
 	},
 	{
-		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "linux" }, recommended = 100, input_altering = false,
+		path = "mod_combos.simultaneous_threshold_ms", id = "simultaneous_threshold_ms", section = "mod_combos", default = 100, type = "number", description_key = "menu.tapholds.simultaneous_dialog_title", platforms = { "hs", "linux" }, recommended = 100, input_altering = false,
 	},
 	{
-		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "linux" }, recommended = false, input_altering = false,
+		path = "mod_combos.symmetric", id = "symmetric", section = "mod_combos", default = false, type = "boolean", description_key = "menu.tapholds.symmetric", platforms = { "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
 		path = "shortcuts.script_control.chords_enabled", id = "chords_enabled", section = "shortcuts.script_control", default = true, type = "boolean", description_key = "menu.shortcuts.script_shortcuts_enable", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
@@ -680,7 +680,7 @@ M.unavailable = {
 		path = "llm.profiles.user_profiles", section = "llm.profiles", reason_key = "", platforms = { "hs" },
 	},
 	{
-		path = "llm.trigger.disabled_apps", section = "llm.trigger", reason_key = "", platforms = { "hs" },
+		path = "llm.trigger.disabled_apps", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
