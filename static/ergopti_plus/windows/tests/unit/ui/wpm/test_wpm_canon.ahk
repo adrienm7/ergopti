@@ -51,3 +51,5 @@ _WPMC_AiTextPaintsTheAiColour() {
 }
 Test("WPM canon: the AI's text paints the AI colour (wpm-canon)",
 	_WPMC_AiTextPaintsTheAiColour)
+
+#Include test_wpm_tick_rollover_owner.ahk
