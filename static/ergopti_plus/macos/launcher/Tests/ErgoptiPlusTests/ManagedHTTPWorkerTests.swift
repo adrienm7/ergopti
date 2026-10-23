@@ -29,7 +29,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		for (selections, started, stage, reason, expectedStatus) in cases {
 			var wire = Data()
 			let status = ManagedHTTPWorker.execute(parsed, maximumSelections: selections,
-				started: started, settingsProvider: { nil }, environment: [:],
+				started: started, settingsProvider: { nil }, environment: [:], directFallback: false,
 				output: { wire.append($0); return true })
 			XCTAssertEqual(status, expectedStatus)
 			XCTAssertGreaterThan(wire.count, 5)
