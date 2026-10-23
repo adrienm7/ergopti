@@ -749,3 +749,5 @@ _OHTD_PingTreeCompletion(World) {
 }
 Test("Ollama enable receipt: actual tree completion delivers the structured version once (curl-tree-structured-ping)",
 	_OHTD_WithFixture.Bind(_OHTD_PingTreeCompletion))
+
+#Include %A_LineFile%/../test_ollama_terminal_utf8_decoder.ahk
