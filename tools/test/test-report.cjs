@@ -1118,6 +1118,67 @@ function testTimingFixtureRetirement() {
 }
 testTimingFixtureRetirement();
 
+/** The run timing tool shares this file: it is the other reader of CI duration evidence. */
+function testRunTiming() {
+	const timing = require('../ci/run-timing.cjs');
+	const job = (name, attempt, start, end, steps = []) => ({
+		name,
+		run_attempt: attempt,
+		conclusion: 'success',
+		created_at: '2026-10-23T01:00:00Z',
+		started_at: start,
+		completed_at: end,
+		steps
+	});
+	const original = job('Linux / Build', 1, '2026-10-23T01:10:00Z', '2026-10-23T01:20:00Z', [
+		{ name: 'Build', started_at: '2026-10-23T01:10:00Z', completed_at: '2026-10-23T01:19:00Z' },
+		{ name: 'Skipped', started_at: null, completed_at: null }
+	]);
+	const summary = timing.summarize([
+		original,
+		// A partial rerun lists the unrerun job again under attempt 2 with the same times.
+		{ ...original, run_attempt: 2 },
+		job('macOS / Build', 1, '2026-10-23T01:05:00Z', '2026-10-23T01:45:00Z'),
+		job('Linux / Never started', 1, null, null)
+	]);
+	check('timing: a carried-over copy is not counted twice', summary.lanes[1].jobs === 1);
+	check('timing: wall clock spans the first start to the last end', summary.wall_ms === 40 * 60000);
+	check(
+		'timing: lanes are ranked by wall clock',
+		summary.lanes.map((row) => row.lane).join() === 'macOS,Linux'
+	);
+	check(
+		'timing: a step without times is skipped, not read as zero',
+		summary.steps.length === 1 && summary.steps[0].elapsed_ms === 9 * 60000
+	);
+	check(
+		'timing: queue time is the wait before the start',
+		summary.jobs.find((row) => row.job === 'Linux / Build').queued_ms === 10 * 60000
+	);
+	check('timing: durations read as minutes and seconds', timing.clock(723000) === '12m 03s');
+	let refused = false;
+	try {
+		timing.summarize([job('Linux / Never started', 1, null, null)]);
+	} catch {
+		refused = true;
+	}
+	check('timing: a run with no timed job is refused', refused);
+	const pages = [
+		{ total_count: 3, jobs: [original, original] },
+		{ total_count: 3, jobs: [original] }
+	];
+	const endpoints = [];
+	const read = timing.readJobs('7', (endpoint) => {
+		endpoints.push(endpoint);
+		return pages.shift();
+	});
+	check(
+		'timing: jobs are read in pages of thirty until the count is reached',
+		read.length === 3 && endpoints.length === 2 && endpoints[1].endsWith('per_page=30&page=2')
+	);
+}
+testRunTiming();
+
 testOutputDrain()
 	.then(() => {
 		console.log(
