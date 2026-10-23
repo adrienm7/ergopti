@@ -1852,6 +1852,8 @@ _LogBootProgress("keystats modules + tests included")
 #Include meta/platform/remap/keys/test_capsword_mouse_clobber.ahk
 #Include unit/infra/dispatch/test_timer_scheduler_suspend.ahk
 #Include meta/modules/hotstrings/magic_key/test_magic_key_probe_deadkey_safe.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include meta/ui/menu/test_script_shortcut_labels_locale.ahk
 #Include meta/platform/remap/altgr/test_altgr_chord_debounce_per_slot.ahk
 #Include meta/modules/keystats/ergonomics/test_roi_halflife_threshold_reachable.ahk
