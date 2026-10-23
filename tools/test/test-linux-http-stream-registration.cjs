@@ -107,8 +107,12 @@ function validate(root) {
 	);
 	const command = Pipeline.stepField(step, 'run');
 	assert.match(command, /set -euo pipefail/);
+	assert.doesNotMatch(command, /ubuntu_apt\.py/, 'the install has its own step');
 	assert.match(
-		command,
+		Pipeline.stepField(
+			Pipeline.step(job, 'Install prerequisites for Qualify native HTTP streaming receipts'),
+			'run'
+		),
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y --no-install-recommends curl lua-luv/
 	);
 	assert.match(

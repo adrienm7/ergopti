@@ -475,6 +475,14 @@ jobs:
           fi
         timeout-minutes: 10
 
+      - name: Install prerequisites for Launch option-looking application ids through actual GTK desktop entries
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+        timeout-minutes: 20
+
       - name: Launch option-looking application ids through actual GTK desktop entries
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
@@ -486,13 +494,20 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
           python3 tests/hardware/test_application_operand_diagnostics.py
           python3 tests/hardware/run_application_operand_receipts.py --evidence-dir "$RUNNER_TEMP/linux-application-operands"
           else
               exit 1
           fi
         timeout-minutes: 1
+
+      - name: Install prerequisites for Terminate real descendants after their process leader exits
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace build-essential meson ninja-build liblua5.4-dev libffi-dev pkg-config
+        timeout-minutes: 20
 
       - name: Terminate real descendants after their process leader exits
         if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
@@ -505,7 +520,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace build-essential meson ninja-build liblua5.4-dev libffi-dev pkg-config
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
           else
               exit 1
@@ -529,6 +543,14 @@ jobs:
           fi
         timeout-minutes: 1
 
+      - name: Install prerequisites for Derive encryption keys from the actual D-Bus machine ID
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dbus-x11 util-linux
+        timeout-minutes: 20
+
       - name: Derive encryption keys from the actual D-Bus machine ID
         if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
@@ -540,7 +562,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dbus-x11 util-linux
           task_uid=$(id -u)
           task_gid=$(id -g)
           sudo unshare --mount --propagation private bash tests/hardware/run_machine_id_fallback_receipts.sh "$task_uid" "$task_gid"
@@ -2482,6 +2503,14 @@ jobs:
           fi
         timeout-minutes: 2
 
+      - name: Install prerequisites for Resolve real system keymaps
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-tools xkb-data
+        timeout-minutes: 20
+
       # No display server needed: `xkbcli compile-keymap --layout fr` produces the
       # same text a live session dumps. The session decides WHICH layout is active
       # and has nothing to do with what a layout contains — so "can the driver read
@@ -2500,7 +2529,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-tools xkb-data
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
           else
               exit 1
@@ -2542,6 +2570,14 @@ jobs:
           fi
         timeout-minutes: 1
 
+      - name: Install prerequisites for Qualify actual X11 physical shortcut sources
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-x11-0 libx11-6 libx11-xcb1 libxtst6 xvfb x11-xkb-utils
+        timeout-minutes: 20
+
       # This fixture owns its Xvfb PID and reads actual native XKB group/map
       # receipts. It does not claim physical keyboard or native Wayland input.
       - name: Qualify actual X11 physical shortcut sources
@@ -2556,7 +2592,6 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-x11-0 libx11-6 libx11-xcb1 libxtst6 xvfb x11-xkb-utils
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_source_qualification.lua | tee "$RUNNER_TEMP/linux-xkb-source.log"
           else
               exit 1
@@ -2636,6 +2671,14 @@ jobs:
           fi
         timeout-minutes: 4
 
+      - name: Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
+        timeout-minutes: 20
+
       # "Needs a display server" sounded like "needs a desktop", and it does not.
       # Xvfb is a real X server and sway --backend headless is a real Wayland
       # compositor; both simply draw to nothing. Everything the driver does with a
@@ -2657,7 +2700,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 
           echo "--- X11 (Xvfb) ---"
@@ -2702,6 +2744,14 @@ jobs:
           fi
         timeout-minutes: 6
 
+      - name: Install prerequisites for The tray binding names libraries and symbols that exist
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
+        timeout-minutes: 20
+
       # An FFI binding is a set of NAMES — three sonames and thirteen symbols —
       # and each is a claim about a library this project does not ship. A wrong
       # soname, or a symbol that moved between releases, has exactly one symptom:
@@ -2721,12 +2771,19 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
           else
               exit 1
           fi
         timeout-minutes: 4
+
+      - name: Install prerequisites for The tray icon registers with a StatusNotifier host
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+        timeout-minutes: 20
 
       # The symbols resolving is not the icon appearing. A panel shows a tray
       # icon when an item registers with org.kde.StatusNotifierWatcher and then
@@ -2747,7 +2804,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
           dbus-run-session -- python3 tests/hardware/test_startup_desktop.py
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           dbus-run-session -- bash -c '
@@ -2776,6 +2832,13 @@ jobs:
           fi
         timeout-minutes: 4
 
+      - name: Install prerequisites for The secure-field probe on a real accessibility bus
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
+        timeout-minutes: 20
+
       # The secure-field probe decides whether ANY expansion may fire (it fails
       # closed), and its one real input is a desktop: an accessibility bus, a
       # window manager and applications that keep FOCUSED on their last field.
@@ -2791,12 +2854,19 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
           bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
           else
               exit 1
           fi
         timeout-minutes: 5
+
+      - name: Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool
+        timeout-minutes: 20
 
       - name: Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
@@ -2809,7 +2879,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool
           python3 tests/hardware/run_atspi_interpreter_receipts.py
           else
               exit 1
@@ -2856,6 +2925,13 @@ jobs:
           fi
         timeout-minutes: 6
 
+      - name: Install prerequisites for Update to the newest release and restart
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
+        timeout-minutes: 20
+
       # The updater a user runs, run: this tree built as an old release and
       # installed with its own install.sh, then its updater finds the newest
       # published release on GitHub, verifies and installs it, and restarts the
@@ -2875,7 +2951,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
           else
               exit 1
@@ -2896,6 +2971,13 @@ jobs:
             ${{ runner.temp }}/stable-linux-e2e-suite.json
           if-no-files-found: error
 
+      - name: Install prerequisites for Qualify native HTTP streaming receipts
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv
+        timeout-minutes: 20
+
       # This loopback fixture uses the actual libuv/curl adapter, including a
       # model removed between tags and chat, bounded complete receipts and
       # cancellation settlement. No external model download is needed.
@@ -2910,12 +2992,18 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv
           npm run test:linux:http-stream | tee "$RUNNER_TEMP/linux-http-stream.log"
           else
               exit 1
           fi
         timeout-minutes: 3
+
+      - name: Install prerequisites for Qualify native managed network runtime
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
+        timeout-minutes: 20
 
       # This lane qualifies native runtime admission and installed helper paths.
       # Its four actual groups are distinct from factory models and HTTP receipts.
@@ -2930,7 +3018,6 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
           npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"
           else
               exit 1
@@ -3049,6 +3136,13 @@ jobs:
           fi
         timeout-minutes: 3
 
+      - name: Install prerequisites for Qualify native runtime prerequisites
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd
+        timeout-minutes: 20
+
       # This prerequisite proof is independent of official runtime/model downloads.
       - name: Qualify native runtime prerequisites
         if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
@@ -3061,12 +3155,18 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd
           npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"
           else
               exit 1
           fi
         timeout-minutes: 5
+
+      - name: Install prerequisites for AI predictions against a real Ollama
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
+        timeout-minutes: 20
 
       # The AI a user runs locally, run: the official Ollama serving a small
       # model, asked through the production modules and the real curl transport
@@ -3084,7 +3184,6 @@ jobs:
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
           set -euo pipefail
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           curl -fsSL https://ollama.com/install.sh | sh
           (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
           for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
@@ -3272,6 +3371,14 @@ jobs:
           fi
         timeout-minutes: 2
 
+      - name: Install prerequisites for Preserve literal desktop notification text
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
+        timeout-minutes: 20
+
       - name: Preserve literal desktop notification text
         if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
@@ -3283,7 +3390,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
           else
@@ -3412,6 +3518,14 @@ jobs:
           fi
         timeout-minutes: 5
 
+      - name: Install prerequisites for The release list window lists GitHub's releases in real WebKit
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
+        timeout-minutes: 20
+
       # The release list a user opens from the tray, opened: real WebKit, the
       # Linux bridge fetching GitHub's releases through its curl adapter. It
       # opened on the stable channel, which hides prereleases, and every
@@ -3429,7 +3543,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
@@ -3438,6 +3551,14 @@ jobs:
               exit 1
           fi
         timeout-minutes: 5
+
+      - name: Install prerequisites for The WPM widget and tray readout draw on a real display
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
+        timeout-minutes: 20
 
       # The typing-speed readouts, drawn: the floating pill through its real GTK
       # surface (placed, painted in the source's colour, switched to the graph,
@@ -3455,7 +3576,6 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"

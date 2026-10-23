@@ -2080,7 +2080,7 @@ function assertUpdaterAuthentication(step) {
 	assert.strictEqual(pipeline.stepField(step, 'if'), UPDATER_IF);
 	assert.match(
 		step,
-		/^          bash static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.sh$/m
+		/^ {8}run: bash static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.sh$/m
 	);
 }
 assertUpdaterAuthentication(updaterStep);

@@ -17,36 +17,48 @@
 			"Load the uinput module",
 			"Round-trip real events through the kernel",
 			"Hold the grab under an interleaved burst",
+			"Install prerequisites for Resolve real system keymaps",
 			"Resolve real system keymaps",
 			"Preserve native localectl layout and variant alignment",
 			"Refuse malformed UTF-8 inverse plans before and after layout load",
+			"Install prerequisites for Qualify actual X11 physical shortcut sources",
 			"Qualify actual X11 physical shortcut sources",
 			"Qualify three actual XI2 property cookies",
 			"Retain actual XI2 property-cookie evidence",
 			"Install window-switch prerequisites",
 			"Qualify actual cursor-display window switching",
+			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland",
 			"Detect and read the keymap on a real X11 and a real Wayland",
 			"A virtual touchpad, described by the kernel and read back",
 			"A gesture written to uinput comes back as a gesture",
+			"Install prerequisites for AI predictions against a real Ollama",
 			"AI predictions against a real Ollama"
 		],
 		"desktop-webview": [
+			"Install prerequisites for Launch option-looking application ids through actual GTK desktop entries",
 			"Launch option-looking application ids through actual GTK desktop entries",
 			"Install native virtual audio locale prerequisites",
 			"Parse native virtual audio state independently of user locale",
+			"Install prerequisites for The tray binding names libraries and symbols that exist",
 			"The tray binding names libraries and symbols that exist",
+			"Install prerequisites for The tray icon registers with a StatusNotifier host",
 			"The tray icon registers with a StatusNotifier host",
+			"Install prerequisites for The secure-field probe on a real accessibility bus",
 			"The secure-field probe on a real accessibility bus",
+			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"Launch the bounded accessibility helper with Lua interpreter options",
 			"The whole daemon, live — a trigger typed, a tray shown",
 			"Install WebKit2GTK and lgi",
 			"Install virtual screenshot capture tools",
 			"Keep virtual screenshots inside literal private paths",
+			"Install prerequisites for Preserve literal desktop notification text",
 			"Preserve literal desktop notification text",
 			"The webview push reaches a real WebKit page",
 			"A page's own request is answered in real WebKit",
 			"Typing NONE clears actual WebKit rows and retains ALL controls",
+			"Install prerequisites for The release list window lists GitHub's releases in real WebKit",
 			"The release list window lists GitHub's releases in real WebKit",
+			"Install prerequisites for The WPM widget and tray readout draw on a real display",
 			"The WPM widget and tray readout draw on a real display",
 			"What each page raises while loading",
 			"Retain the source-bound linux-e2e-suite qualification",
@@ -69,6 +81,7 @@
 			"Preserve native updater temporary-file ownership",
 			"Acknowledge native updater temporary-allocation refusals",
 			"Hand off native restart relays after real zombie targets exit",
+			"Install prerequisites for Update to the newest release and restart",
 			"Update to the newest release and restart",
 			"Upload live updater diagnostic evidence",
 			"Install portable network staging prerequisites",
@@ -96,7 +109,9 @@
 			"Enforce exact native buffered HTTP body limits",
 			"Preserve literal HTTP targets through every native curl method",
 			"Retire native HTTP and digest process owners",
+			"Install prerequisites for Qualify native HTTP streaming receipts",
 			"Qualify native HTTP streaming receipts",
+			"Install prerequisites for Qualify native managed network runtime",
 			"Qualify native managed network runtime",
 			"Qualify native retained FD SHA-256",
 			"Prepare authenticated managed HTTP validation tools",
@@ -107,8 +122,10 @@
 			"Successful native model pulls retire stale retries"
 		],
 		"platform-metrics": [
+			"Install prerequisites for Terminate real descendants after their process leader exits",
 			"Terminate real descendants after their process leader exits",
 			"Reject real ENOSPC write and buffered-close failures",
+			"Install prerequisites for Derive encryption keys from the actual D-Bus machine ID",
 			"Derive encryption keys from the actual D-Bus machine ID",
 			"Reject unsuccessful at-rest cryptography receipts",
 			"Reject unsuccessful native process supervision receipts",
@@ -171,6 +188,7 @@
 			"Reject special native build-stamp version sources",
 			"Preserve native file-read and close failure receipts",
 			"Preserve JSON stores after native read refusals",
+			"Install prerequisites for Qualify native runtime prerequisites",
 			"Qualify native runtime prerequisites"
 		]
 	},
@@ -227,7 +245,8 @@
 			"Install native virtual audio locale prerequisites"
 		],
 		"Launch the bounded accessibility helper with Lua interpreter options": [
-			"The secure-field probe on a real accessibility bus"
+			"The secure-field probe on a real accessibility bus",
+			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options"
 		],
 		"Upload live updater diagnostic evidence": ["Update to the newest release and restart"],
 		"Qualify native managed HTTP public and retained output": [
@@ -252,13 +271,60 @@
 			"Install WebKit2GTK and lgi"
 		],
 		"The release list window lists GitHub's releases in real WebKit": [
-			"Install WebKit2GTK and lgi"
+			"Install WebKit2GTK and lgi",
+			"Install prerequisites for The release list window lists GitHub's releases in real WebKit"
 		],
-		"The WPM widget and tray readout draw on a real display": ["Install WebKit2GTK and lgi"],
+		"The WPM widget and tray readout draw on a real display": [
+			"Install WebKit2GTK and lgi",
+			"Install prerequisites for The WPM widget and tray readout draw on a real display"
+		],
 		"What each page raises while loading": ["Install WebKit2GTK and lgi"],
 		"Successful native model pulls retire stale retries": [
 			"Install the model pull window prerequisites"
 		],
-		"Qualify actual cursor-display window switching": ["Install window-switch prerequisites"]
+		"Qualify actual cursor-display window switching": ["Install window-switch prerequisites"],
+		"Launch option-looking application ids through actual GTK desktop entries": [
+			"Install prerequisites for Launch option-looking application ids through actual GTK desktop entries"
+		],
+		"Terminate real descendants after their process leader exits": [
+			"Install prerequisites for Terminate real descendants after their process leader exits"
+		],
+		"Derive encryption keys from the actual D-Bus machine ID": [
+			"Install prerequisites for Derive encryption keys from the actual D-Bus machine ID"
+		],
+		"Resolve real system keymaps": ["Install prerequisites for Resolve real system keymaps"],
+		"Qualify actual X11 physical shortcut sources": [
+			"Install prerequisites for Qualify actual X11 physical shortcut sources"
+		],
+		"Detect and read the keymap on a real X11 and a real Wayland": [
+			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland"
+		],
+		"The tray binding names libraries and symbols that exist": [
+			"Install prerequisites for The tray binding names libraries and symbols that exist"
+		],
+		"The tray icon registers with a StatusNotifier host": [
+			"Install prerequisites for The tray icon registers with a StatusNotifier host"
+		],
+		"The secure-field probe on a real accessibility bus": [
+			"Install prerequisites for The secure-field probe on a real accessibility bus"
+		],
+		"Update to the newest release and restart": [
+			"Install prerequisites for Update to the newest release and restart"
+		],
+		"Qualify native HTTP streaming receipts": [
+			"Install prerequisites for Qualify native HTTP streaming receipts"
+		],
+		"Qualify native managed network runtime": [
+			"Install prerequisites for Qualify native managed network runtime"
+		],
+		"Qualify native runtime prerequisites": [
+			"Install prerequisites for Qualify native runtime prerequisites"
+		],
+		"AI predictions against a real Ollama": [
+			"Install prerequisites for AI predictions against a real Ollama"
+		],
+		"Preserve literal desktop notification text": [
+			"Install prerequisites for Preserve literal desktop notification text"
+		]
 	}
 }

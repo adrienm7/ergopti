@@ -177,7 +177,8 @@ function validateRuntimeCI(workflow, coverage) {
 	const steps = Pipeline.steps(e2e[0].body);
 	const at = steps.findIndex((step) => step.name === NATIVE_STEP);
 	assert.ok(at > 0);
-	assert.equal(steps[at - 1].name, 'Qualify native HTTP streaming receipts');
+	assert.equal(steps[at - 1].name, 'Install prerequisites for ' + NATIVE_STEP);
+	assert.equal(steps[at - 2].name, 'Qualify native HTTP streaming receipts');
 	const native = Pipeline.step(e2e[0].body, NATIVE_STEP);
 	assert.equal(
 		Pipeline.stepField(native, 'if'),
@@ -187,8 +188,11 @@ function validateRuntimeCI(workflow, coverage) {
 	assert.equal(Pipeline.stepField(native, 'timeout-minutes'), '3');
 	assertLinuxQualifiedRun(Pipeline.runOf(native), [
 		'set -euo pipefail',
-		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
 		'npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"'
+	]);
+	assert.deepEqual(Pipeline.runOf(steps[at - 1].body), [
+		'set -euo pipefail',
+		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
 	]);
 	const record = Pipeline.runOf(Pipeline.step(e2e[0].body, 'Record mandatory E2E evidence'));
 	assert.equal(record.filter((line) => line === COUNT_LINE).length, 1);
@@ -252,8 +256,8 @@ for (const [before, after] of [
 	['- name: ' + NATIVE_STEP, '- name: omitted native runtime'],
 	['npm run test:linux:network-runtime | tee', 'npm run test:linux-network-runtime | tee'],
 	[
-		'elif [ "$mode" = full ]; then\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
-		'elif [ "$mode" = full ]; then\n          set -eu\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
+		'run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas',
+		'run: |\n          set -eu\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas'
 	],
 	[COUNT_LINE, 'network_runtime_assertions=4'],
 	[COUNT_LINE, COUNT_LINE + '\n          ' + COUNT_LINE],
