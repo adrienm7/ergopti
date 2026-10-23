@@ -149,3 +149,54 @@ result per row: that needs the physical run below.
   MSVC generator only; compare `docs/handovers/2026-10-12-dev-consolidation/`
   against the tree first.
 - A second-process rival injector for a true OS-level interleave measurement.
+
+## Hotstring output and chaining (2026-10-23, real-engine evidence)
+
+The decision recorded for item 50 ("hotstring output must be able to trigger
+another hotstring, `SendMode("Event")` exists for that") describes the retired
+native `Hotstring()` engine. Read from the code and reproduced on the real
+engine with `tests/unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk`
+(`--interactive`: real `InputHook`, real keyboard, an owned window):
+
+| Path                                             | Primitive and level                                                                          | Seen by the prefix watcher | Chain                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------- |
+| `HSE_DispatchMatch` atomic burst (GUI hosts)     | one `SendInput`, now at `TEXT_SENDER_SEND_LEVEL` (was the caller's level)                    | no (I1 ignores level 0)    | none; buffer set by `HSE_ApplyExpansion` |
+| ellipsis and ê dead key raw callbacks            | `SendNewResult(..., Atomic)`: `SendInput` at level 0 (was `SendEvent` at the caller's level) | no                         | none                                     |
+| terminal paced burst                             | `SendEvent` per key, `SendLevel(0)` (pacing needs `SetKeyDelay`)                             | no                         | none                                     |
+| Notepad native edit                              | no key injected                                                                              | no                         | none                                     |
+| `TextSender`                                     | `SendInput`, level 0                                                                         | no                         | none by design                           |
+| layout and keylayout emulation (`SendNewResult`) | `SendEvent`, hotkey level 2                                                                  | yes                        | this is how a typed trigger completes    |
+
+So the 2.7 times faster primitive was already the one in use for every
+expansion, and nothing chained through it. The one real dependency on the
+primitive was accidental: a burst sent at level 2 (the Space tap-hold thread)
+re-entered the watcher whenever `SendInput` fell back to `SendEvent` (another
+AutoHotkey keyboard hook, such as a user's own script), cascaded A, B, C and
+left `HSE_Buffer` out of step with the screen. Reproduced before the fix
+(`foo qbar qzz` instead of `foo qzy `), gone after.
+
+Measured in a standalone host with no keyboard hook, so `SendInput` is real
+(median of 14, `SetKeyDelay(0)`): expansion shape 117.2 ms (`SendEvent`) against
+81.5 ms (`SendInput`), dead key 30.3 against 24.7 ms, ellipsis 39.7 against
+41.8 ms (within the noise of the Edit repaint). The expansion path did not
+change primitive, so its before and after are the same; only the two raw
+callbacks moved, for consistency and level safety more than for speed.
+
+`SendMode("Event")` is kept: it governs `Send`, `Click` and `MouseMove`, and
+`SendInput` would remove the mouse hook around the gestures' `Click`. Its
+comment now says so.
+
+Left, decision for the maintainer: a deliberate cascade (an expansion that
+completes a trigger) would be a new feature on every driver, not a primitive
+choice. Measured blast radius on the shared data: 124 of 2786 replacements end
+with their own trigger up to case (an infinite loop without a same-spec guard)
+and 131 more end with another trigger. Do not add it without the shared corpus
+vectors and the macOS and Linux engines.
+
+Suspected separate defect, not touched: `_SpaceTap` (`platform/remap/space.ahk`)
+emits the space with `TextPressKey("Space", "")`, which the declaration channel
+treats as an "edit" payload (`HS_SyntheticPayloadKind("{Space}")`) and resets
+both buffers; the engine is then fed the space on an empty buffer, so an
+end-character trigger cannot complete from the Space tap-hold. Observed in the
+real-engine harness (`before buf=[qzs]`, after the press `buf=[ ]`, no match).
+Needs a look on a machine with the Space tap-hold on.
