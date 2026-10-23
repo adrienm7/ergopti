@@ -2585,6 +2585,10 @@ local function main()
 	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
 
+	-- The focus poll runs four times a second: on X11 it asks the server inside
+	-- this process (libxcb) instead of forking xdotool twice per poll.
+	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
+
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			wrap_on_type.end_selection_window()
