@@ -122,7 +122,7 @@ helpers.describe("changelog: document policy and terminal fetch", function()
 	helpers.it("a transport that raises still ends the fetch (changelog-document-policy)", function()
 		with_changelog(function(window, state, post)
 			hs.json.decode = json.decode
-			hs.http.asyncGet = function() error("synthetic NSURLSession refusal") end
+			hs.http.doAsyncRequest = function() error("synthetic NSURLSession refusal") end
 			helpers.assert_true(window.open({ channel = "main" }))
 			post("ready")
 			post({ action = "fetch", channel = "main" })
