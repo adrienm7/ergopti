@@ -33,6 +33,12 @@
 ; ================================
 ; ================================
 
+; Lines redacted per call of the redactor: a speed choice, not a rule.
+; @returns {Integer}
+_DayLog_BlockLines() {
+	return 256
+}
+
 ; Validates the parsed day_log.json.
 ; @param Limits {Map}
 ; @returns {Map} The same map.
@@ -88,18 +94,31 @@ DayLog_Collect(Raw, FileSize, Rules, Context, Limits) {
 		return Map("ok", false, "reason", "empty", "bytes", 0, "cap_bytes", Cap)
 	if (SubStr(Raw, -1) != "`n")
 		Raw .= "`n"
+	; The rules never reach across a line break, so redacting a block of lines
+	; at once gives the Lua port's line-by-line result; the block only saves the
+	; fixed cost of a call (about 1.3 ms per line, 18 s for a 2 MB day, otherwise)
 	Lines := []
 	FirstTime := "", LastTime := ""
 	Text := ""
-	for Line in StrSplit(SubStr(Raw, 1, -1), "`n") {
-		Clean := Redact_Apply(Line, Rules, Context)
-		Lines.Push(Clean)
-		Text .= Clean . "`n"
-		if RegExMatch(Clean, "^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", &Stamp) {
-			if (FirstTime == "")
-				FirstTime := Stamp[1]
-			LastTime := Stamp[1]
+	Block := ""
+	Pending := 0
+	Source := StrSplit(SubStr(Raw, 1, -1), "`n")
+	for Index, Line in Source {
+		Block .= (Pending ? "`n" : "") . Line
+		Pending += 1
+		if (Pending < _DayLog_BlockLines() && Index < Source.Length)
+			continue
+		for Clean in StrSplit(Redact_Apply(Block, Rules, Context), "`n") {
+			Lines.Push(Clean)
+			Text .= Clean . "`n"
+			if RegExMatch(Clean, "^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", &Stamp) {
+				if (FirstTime == "")
+					FirstTime := Stamp[1]
+				LastTime := Stamp[1]
+			}
 		}
+		Block := ""
+		Pending := 0
 	}
 	Bytes := StrPut(Text, "UTF-8") - 1
 	if (Bytes > Cap)

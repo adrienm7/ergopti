@@ -36,18 +36,33 @@
 			"id": "an_empty_file_attaches_nothing",
 			"raw": "",
 			"file_size": 0,
-			"expected": { "ok": false, "reason": "empty", "bytes": 0, "cap_bytes": 400 }
+			"expected": {
+				"ok": false,
+				"reason": "empty",
+				"bytes": 0,
+				"cap_bytes": 400
+			}
 		},
 		{
 			"id": "a_file_of_only_a_byte_order_mark_attaches_nothing",
 			"raw": "﻿",
 			"file_size": 3,
-			"expected": { "ok": false, "reason": "empty", "bytes": 0, "cap_bytes": 400 }
+			"expected": {
+				"ok": false,
+				"reason": "empty",
+				"bytes": 0,
+				"cap_bytes": 400
+			}
 		},
 		{
 			"id": "a_file_over_the_cap_is_refused_unread",
 			"file_size": 401,
-			"expected": { "ok": false, "reason": "too_large", "bytes": 401, "cap_bytes": 400 }
+			"expected": {
+				"ok": false,
+				"reason": "too_large",
+				"bytes": 401,
+				"cap_bytes": 400
+			}
 		},
 		{
 			"id": "redaction_that_grows_the_text_past_the_cap_is_refused",
@@ -59,7 +74,12 @@
 			},
 			"raw": "a@b.cc\na@b.cc\na@b.cc\na@b.cc\na@b.cc\n",
 			"file_size": 35,
-			"expected": { "ok": false, "reason": "too_large", "bytes": 40, "cap_bytes": 38 }
+			"expected": {
+				"ok": false,
+				"reason": "too_large",
+				"bytes": 40,
+				"cap_bytes": 38
+			}
 		},
 		{
 			"id": "the_preview_is_the_first_and_last_lines",
@@ -121,6 +141,22 @@
 				"first_time": "2026-10-23 09:59:59",
 				"last_time": "2026-10-23 09:59:59",
 				"head": ["2026-10-23 09:59:59:999 [INFO] [A] read …", "no stamp here"],
+				"tail": [],
+				"cap_bytes": 400
+			}
+		},
+		{
+			"id": "no_rule_reaches_across_a_line_break",
+			"raw": "token=\nabcdefghijkl\nsk-\nabcdefghijklmnopqrstuvwx\n",
+			"file_size": 49,
+			"expected": {
+				"ok": true,
+				"text": "token=\nabcdefghijkl\nsk-\nabcdefghijklmnopqrstuvwx\n",
+				"bytes": 49,
+				"lines": 4,
+				"first_time": "",
+				"last_time": "",
+				"head": ["token=", "abcdefghijkl", "sk-", "abcdefghijklmnopqrstuvwx"],
 				"tail": [],
 				"cap_bytes": 400
 			}
