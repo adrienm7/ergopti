@@ -1418,14 +1418,6 @@ local function consume_stdout(generation, chunk)
 		end
 		return
 	end
-	if #generation.stdout_buffer + #chunk > MAX_PROTOCOL_BUFFER_BYTES then
-		generation.stdout_buffer = ""
-		fail_generation(generation, string.format(
-			"watchdog protocol line exceeded %d bytes",
-			MAX_PROTOCOL_BUFFER_BYTES
-		))
-		return
-	end
 	generation.stdout_buffer = generation.stdout_buffer .. chunk
 	while true do
 		local newline = generation.stdout_buffer:find("\n", 1, true)
@@ -1433,6 +1425,15 @@ local function consume_stdout(generation, chunk)
 		local line = generation.stdout_buffer:sub(1, newline - 1):gsub("\r$", "")
 		generation.stdout_buffer = generation.stdout_buffer:sub(newline + 1)
 		process_line(generation, line)
+	end
+	-- Only an unterminated remainder is one oversized line: a main-thread stall
+	-- delivers several complete short lines in one chunk (issue #101).
+	if not generation.failed and #generation.stdout_buffer > MAX_PROTOCOL_BUFFER_BYTES then
+		generation.stdout_buffer = ""
+		fail_generation(generation, string.format(
+			"watchdog protocol line exceeded %d bytes",
+			MAX_PROTOCOL_BUFFER_BYTES
+		))
 	end
 end
 
