@@ -740,6 +740,14 @@ local function main()
 		os.exit(0)
 	end
 
+	-- A start outside launch.sh (AppRun, Nix wrapper, manual luajit) holds no lock
+	-- yet; a second keyboard grab next to a running daemon is refused here.
+	local lock_acquired, lock_refusal, lock_contended = require("infra.session_lock").acquire()
+	if not lock_acquired then
+		io.stderr:write("[session_lock] " .. lock_refusal .. "\n")
+		os.exit(lock_contended and 75 or 78)
+	end
+
 	-- Restore the user's durable preference before the first line. --verbose is a
 	-- one-run override: diagnostic output must not rewrite that preference.
 	ScriptSettings.apply(opts.verbose and "DEBUG" or nil)
