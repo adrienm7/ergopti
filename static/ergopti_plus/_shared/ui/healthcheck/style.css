@@ -100,6 +100,21 @@ body {
 	margin: 6px 0;
 }
 
+/* Deep-test output lives in the fixed toolbar; unbounded it pushed the report
+   tables out of view (issue #101), so it scrolls inside its own box. */
+#deep-results {
+	background: var(--pre-background);
+	color: var(--pre-text);
+	margin: 6px 0 0;
+	max-height: 7em;
+	overflow-y: auto;
+	white-space: pre-wrap;
+}
+
+#deep-results:empty {
+	display: none;
+}
+
 @media (max-width: 800px) {
 	.toolbar .buttons {
 		grid-template-columns: 1fr 1fr;
