@@ -1,0 +1,13 @@
+{
+	"expected_count": 6,
+	"filters": [
+		{
+			"contains": "layout-poll-pause-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "textsend-clipboard-owner",
+			"expected_count": 3
+		}
+	]
+}
