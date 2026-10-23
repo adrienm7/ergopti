@@ -616,12 +616,13 @@ local function perform_reload(trigger)
 	end
 	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Reload requested by %s — reloading hotstring config…", trigger)
-	local ok, count = pcall(function() return hotstrings_config.reload() end)
-	if ok then
+	local ok, count, committed, refusal = pcall(function() return hotstrings_config.reload() end)
+	if ok and committed == true then
 		Logger.success(LOG, "Hotstrings reloaded: %d mapping(s) active.", count or 0)
 		return true
 	end
-	Logger.error(LOG, "Hotstrings reload failed: %s.", tostring(count))
+	Logger.error(LOG, "Hotstrings reload failed: %s.",
+		tostring(ok and (refusal or "catalogue publication was not acknowledged") or count))
 	return false, "failed"
 end
 
@@ -2464,7 +2465,7 @@ local function main()
 			input_capture_gate = input_capture_gate,
 			is_paused = script_actions.is_paused,
 			layout    = opts.layout,
-			on_reload = function() perform_reload("the paths editor") end,
+			on_reload = function() return perform_reload("the paths editor") end,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,

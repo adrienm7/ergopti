@@ -57,6 +57,97 @@ local function check_shortcut_gate(control_body)
   end
 end
 
+
+--- Executes the actual daemon helper and the callback installed for the paths page.
+--- @param environment table Independent reload, native-debt and logger ports.
+--- @return function on_reload Exact daemon-wired callback.
+local function paths_reload_callback(environment)
+  local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+  local source = assert(handle:read("*a")); assert(handle:close())
+  local first = assert(source:find("local function perform_reload(trigger)", 1, true))
+  local last = assert(source:find("\n--- Starts the release", first, true))
+  local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
+  local callback = assert(source:sub(wiring):match(
+    'on_reload%s*=%s*(function%(%)%s*[^\n]-perform_reload%("the paths editor"%)%s*end)'),
+    "the paths page must use the actual daemon reload callback")
+  local body = source:sub(first, last - 1)
+  assert(#body > 500, "the complete native-debt and reload body must be present")
+  local text, chunk = body .. "\nreturn " .. callback
+  environment = setmetatable(environment, { __index = _G })
+  if setfenv then chunk = assert(loadstring(text)); setfenv(chunk, environment)
+  else chunk = assert(load(text, "actual paths reload callback", "t", environment)) end
+  return chunk()
+end
+
+helpers.describe("daemon paths reload acknowledgement", function()
+  local function world()
+    local state = { calls = 0, successes = 0, releases = 0, allowed = true }
+    local environment = { LOG = "test.paths_reload", Logger = setmetatable({
+      success = function() state.successes = state.successes + 1 end,
+    }, { __index = function() return function() end end }) }
+    environment.gestures = {
+      stop_window_switches = function() return state.window_allowed ~= false end,
+      stop_programs = function() return state.program_allowed ~= false end,
+      set_program_paused = function() state.releases = state.releases + 1 end,
+      set_window_switch_paused = function() state.releases = state.releases + 1 end,
+    }
+    environment.hotstrings_config = { reload = function()
+      state.calls = state.calls + 1
+      if state.raise then error("controlled catalogue refusal") end
+      return state.count or 0, state.ack, "controlled catalogue refusal"
+    end }
+    state.ack = true
+    return state, environment
+  end
+
+  for _, boundary in ipairs({ "window", "program" }) do
+    helpers.it("paths daemon reload: retains " .. boundary .. " debt refusal through the installed callback", function()
+      local state, environment = world()
+      state[boundary .. "_allowed"] = false
+      local callback = paths_reload_callback(environment)
+      local ok, reason = callback()
+      helpers.assert_eq({ ok, reason }, { false, "postponed" })
+      helpers.assert_eq({ state.calls, state.successes, state.releases }, { 0, 0, 0 })
+      state[boundary .. "_allowed"] = true
+      helpers.assert_eq(callback(), true, "a new attempt can apply after native cleanup acknowledges")
+      helpers.assert_eq({ state.calls, state.successes, state.releases }, { 1, 1, 2 })
+    end)
+  end
+
+  for _, outcome in ipairs({ "false", "nil", "truthy", "throw" }) do
+    helpers.it("paths daemon reload: refuses canonical publication acknowledgement " .. outcome, function()
+      local state, environment = world()
+      state.ack = nil
+      if outcome == "false" then state.ack = false end
+      if outcome == "truthy" then state.ack = 1 end
+      state.raise = outcome == "throw"
+      local callback = paths_reload_callback(environment)
+      local ok, reason = callback()
+      helpers.assert_eq({ ok, reason }, { false, "failed" })
+      helpers.assert_eq({ state.calls, state.successes }, { 1, 0 })
+      state.ack, state.raise = true, false
+      helpers.assert_eq(callback(), true)
+      helpers.assert_eq({ state.calls, state.successes }, { 2, 1 })
+    end)
+  end
+
+  for _, count in ipairs({ 0, 5 }) do
+    helpers.it("paths daemon reload: preserves acknowledged catalogue count " .. count, function()
+      local state, environment = world()
+      state.count = count
+      helpers.assert_eq(paths_reload_callback(environment)(), true)
+      helpers.assert_eq({ state.calls, state.successes }, { 1, 1 })
+    end)
+  end
+
+  helpers.it("paths daemon reload: admits a healthy driver without optional gestures", function()
+    local state, environment = world()
+    environment.gestures = nil
+    helpers.assert_eq(paths_reload_callback(environment)(), true)
+    helpers.assert_eq({ state.calls, state.successes }, { 1, 1 })
+  end)
+end)
+
 -- We test the argument parser and module structure by loading the daemon
 -- module. The daemon has a main() call at the bottom, so we must be careful
 -- to only test individual functions or the --help path.
