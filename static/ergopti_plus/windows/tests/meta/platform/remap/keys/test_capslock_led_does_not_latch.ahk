@@ -36,12 +36,12 @@
 
 ; Source guard: the writer must not consume its own output, in any spelling.
 _CLL_ConditionDoesNotReadBackTheWrittenBit() {
-	Seg := _DriverFuncBody("UpdateCapsLockLED")
-	Assert(Seg != "", "UpdateCapsLockLED must exist")
-	Assert(InStr(Seg, "SetCapsLockState") > 0,
-		"UpdateCapsLockLED must remain the single writer of the CapsLock state")
+	Seg := _DriverFuncBody("CapsWordLedWanted")
+	Assert(Seg != "", "CapsWordLedWanted must exist")
+	Assert(InStr(_DriverFuncBody("_CapsWordDefaultPorts"), "SetCapsLockState") > 0,
+		"the LED writer port must remain the single writer of the CapsLock state")
 	Assert(InStr(Seg, "GetKeyState") = 0,
-		"UpdateCapsLockLED must not call GetKeyState at all — it writes the CapsLock toggle, so "
+		"The LED condition must not call GetKeyState at all — it writes the CapsLock toggle, so "
 		. "reading any part of that state back into its own condition re-latches the LED")
 	Assert(InStr(Seg, "_HardwareCapsLockOn") > 0,
 		"the hardware CapsLock intent must come from _HardwareCapsLockOn, which only "

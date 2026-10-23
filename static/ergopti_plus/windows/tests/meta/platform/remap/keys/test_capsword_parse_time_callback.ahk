@@ -10,44 +10,29 @@
 ; far earlier: a key combination bound to caps_word fires from a
 ; parse-time-armed hotkey once Features exists (~420 ms). Dereferencing the still-
 ; unset global there threw UnsetError, which the pre-ready error net escalates to
-; ExitApp(1). The fix is a static-initializer accessor (_CapsWord_Callback) that
-; binds lazily on first call and returns the same object every time. This guards
-; the accessor exists, both toggles use it, and the fragile global is gone.
+; ExitApp(1). The fix is a static-initializer accessor (CapsWordEndCallback) that
+; binds lazily on first call and returns the same object every time; its
+; identity and the early toggle are pinned by behaviour in
+; unit/modules/shortcuts/test_capsword_state.ahk. This guards the fragile
+; global staying gone.
 ; (F11, audit 2026-07-20.)
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 _CPTC_CallbackViaStaticAccessor() {
-	AccBody := _DriverFuncBody("_CapsWord_Callback")
-	Assert(AccBody != "", "capsword must expose a _CapsWord_Callback() accessor")
-	Assert(InStr(AccBody, "static Bound := _CapsWord_HandleAutoOff.Bind()") > 0,
-		"_CapsWord_Callback must lazily bind via a static initializer (resolvable any time after parse, identity-stable)")
-
-	; Auto-off identities belong to one activation; the accessor reads a lazy
-	; class field, never a global assignment at its include position.
 	Listeners := _DriverFuncBody("_CapsWordAutoOffCallbacks")
 	Assert(Listeners != "", "capsword_auto_off must expose a _CapsWordAutoOffCallbacks() accessor")
 	Assert(InStr(Listeners, "return CapsWordAutoOff.Callbacks") > 0,
 		"the auto-off listeners must retain the exact activation callback map in their parse-time-safe class")
-
-	Toggle := _DriverFuncBody("ToggleCapsWord")
-	Disable := _DriverFuncBody("DisableCapsWord")
-	Assert(Toggle != "" && Disable != "", "both actual CapsWord entry points must exist")
-	Assert(InStr(Toggle, "CapsWordAutoOffArm(_CapsWord_Callback())") > 0,
-		"ToggleCapsWord must arm the listeners with the accessor, not a module-scope global")
-	Assert(InStr(Toggle, "CapsWordAutoOffDisarm()") > 0 && InStr(Disable, "CapsWordAutoOffDisarm()") > 0,
-		"ToggleCapsWord and DisableCapsWord must both disarm the listeners")
-
 	Src := _DriverSourceNoComments()
 	Assert(Src != "" && InStr(Src, "static Callbacks := Map()"),
 		"the activation callback map must initialize on class access, never at include execution")
 	Assert(InStr(Src, "_CapsWord_OnMouseDown") = 0,
 		"the include-position-dependent _CapsWord_OnMouseDown global must not be reintroduced")
 }
-Test("capsword: mouse-cancel callback resolves via a parse-time-safe static accessor", _CPTC_CallbackViaStaticAccessor)
+Test("capsword: the listener map initializes on class access, no include-position global (parse-time)", _CPTC_CallbackViaStaticAccessor)
 
-; A parse-time navigation callback reaches the LED writer before shortcuts load.
 _CPTC_HardwareIntentBeforePump() {
 	PrePump := _HGBS_PrePumpSource()
 	Assert(PrePump != "", "the actual entry and first message-pump boundary must exist")
