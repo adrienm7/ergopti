@@ -1325,6 +1325,14 @@ if KarabinerLeaseWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KarabinerLeaseWorker.run(arguments: CommandLine.arguments))
 }
 
+// The owned runtime's capture stream and, through it, its Console user server
+// (ADR 011, decision 8). It authenticates the installed runtime itself and
+// refuses with a closed status when none is installed, so reaching it changes
+// nothing for a Mac without the owned runtime.
+if InstalledPhysicalSourceBridge.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InstalledPhysicalSourceBridge.run())
+}
+
 // Write MJConfigFile via CFPreferences before NSApplication.run() so Hammerspoon
 // always sees the correct config path, even if applicationDidFinishLaunching is
 // never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).

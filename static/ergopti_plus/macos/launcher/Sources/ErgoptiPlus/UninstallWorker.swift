@@ -14,7 +14,61 @@ import ServiceManagement
 
 /// A failed ownership proof never authorizes filesystem removal.
 enum UninstallFailure: Error {
-	case invalidBundle, invalidProtocol, parentExit, activeLease, guardian
+	case invalidBundle, invalidProtocol, parentExit, activeLease, guardian, ownedRuntime
+}
+
+/// The Ergopti-owned Karabiner runtime (ADR 011) keeps root-owned files and two
+/// launchd jobs outside the application bundle. Trashing the bundle alone would
+/// leave them running from a copy nothing owns any more, so the uninstall retires
+/// them first, under one administrator prompt, and refuses to go on without it.
+///
+/// The pqrs VirtualHIDDevice system extension is deliberately not touched: it is
+/// shared with every Karabiner on the Mac, and removing a system extension needs the
+/// user's own approval in System Settings.
+enum OwnedRuntimeUninstall {
+	static let runtimeDirectory = "/Library/Application Support/ErgoptiPlus/Runtime"
+	/// Label and property list of each job the owned installer registers.
+	static let jobs: [(label: String, plist: String)] = [
+		("com.ergoptiplus.runtime.core", "/Library/LaunchDaemons/com.ergoptiplus.runtime.core.plist"),
+		("com.ergoptiplus.runtime.vhid", "/Library/LaunchDaemons/com.ergoptiplus.runtime.vhid.plist"),
+	]
+
+	/// True when any owned runtime file is present, however partly.
+	/// - Parameter exists: Path probe, injectable for tests.
+	static func installed(exists: (String) -> Bool) -> Bool {
+		return exists(runtimeDirectory) || jobs.contains(where: { exists($0.plist) })
+	}
+
+	/// The one fixed shell command run with administrator rights. It names only the
+	/// constants above, holds no caller-supplied text, and fails at the first error:
+	/// a job that is not loaded is skipped by an explicit test, not by ignoring a
+	/// failed `bootout`.
+	static func script() -> String {
+		var steps = ["set -e"]
+		for job in jobs {
+			steps.append("if /bin/launchctl print system/\(job.label) >/dev/null 2>&1; then /bin/launchctl bootout system/\(job.label); fi")
+			steps.append("/bin/rm -f \(job.plist)")
+		}
+		steps.append("/bin/rm -rf '\(runtimeDirectory)'")
+		return steps.joined(separator: "; ")
+	}
+
+	/// The AppleScript that asks macOS for the administrator prompt.
+	static func appleScript() -> String {
+		return "do shell script \"\(script())\" with administrator privileges"
+	}
+
+	/// Retires the owned runtime when it is installed.
+	/// - Parameters:
+	///   - exists: Path probe.
+	///   - runAsAdministrator: Runs the AppleScript; throws or returns false on refusal.
+	static func retire(
+		exists: (String) -> Bool,
+		runAsAdministrator: (String) throws -> Bool
+	) throws {
+		guard installed(exists: exists) else { return }
+		guard try runAsAdministrator(appleScript()) else { throw UninstallFailure.ownedRuntime }
+	}
 }
 
 /// Revalidates the immutable bundle target without following aliases or accepting
@@ -69,6 +123,7 @@ func performConfirmedUninstall(
 	validate: () throws -> Void,
 	authorize: () throws -> Bool,
 	waitForCleanExit: () -> Bool,
+	retireOwnedRuntime: () throws -> Void = {},
 	unregister: () throws -> Void,
 	trash: () throws -> Void
 ) throws {
@@ -76,6 +131,7 @@ func performConfirmedUninstall(
 	guard try authorize() else { throw UninstallFailure.invalidProtocol }
 	guard waitForCleanExit() else { throw UninstallFailure.parentExit }
 	try validate()
+	try retireOwnedRuntime()
 	try unregister()
 	try validate()
 	try trash()
@@ -144,7 +200,21 @@ enum UninstallWorker {
 				guard message == Data("COMMIT\n".utf8) else { return false }
 				try FileHandle.standardOutput.write(contentsOf: Data("ACK\n".utf8))
 				return true
-			}, waitForCleanExit: observation.wait, unregister: {
+			}, waitForCleanExit: observation.wait, retireOwnedRuntime: {
+				try OwnedRuntimeUninstall.retire(exists: { path in
+					var attributes = stat()
+					return Darwin.lstat(path, &attributes) == 0
+				}, runAsAdministrator: { script in
+					let process = Process()
+					process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+					process.arguments = ["-e", script]
+					process.standardOutput = FileHandle.nullDevice
+					process.standardError = FileHandle.nullDevice
+					try process.run()
+					process.waitUntilExit()
+					return process.terminationReason == .exit && process.terminationStatus == 0
+				})
+			}, unregister: {
 				let records = LeaseGuardianPaths().records
 				guard try waitForUninstallLeaseRetirement(isEmpty: {
 					var attributes = stat()
