@@ -527,7 +527,7 @@ schedule_baseline_refresh = function(element)
 	handle, committed = TimerScheduler.after(AX_TYPING_WINDOW_MS / 1000, function()
 		if _baseline_refresh ~= handle then return end
 		_baseline_refresh = nil
-		if _ax_value_watch_committed ~= true or not rawequal(element, _last_focused_element)
+		if _ax_value_watch_committed ~= true or element ~= _last_focused_element
 			or _is_paused() then return end
 		if (hs.timer.absoluteTime() / 1000000 - _state.last_time) <= AX_TYPING_WINDOW_MS then
 			schedule_baseline_refresh(element)
