@@ -722,6 +722,19 @@ if (!rpmArchMatch) {
 	}
 }
 
+// window_info.getAll() lists X11 windows through wmctrl: every system package that
+// can install it names it, and the Flatpak states that it is a host program.
+for (const [rel, pattern] of [
+	['tools/build/build-linux-deb.sh', /^Recommends:.*\bwmctrl\b/m],
+	['tools/build/build-linux-rpm.sh', /^Recommends:\s+wmctrl\s*$/m],
+	['tools/build/PKGBUILD', /'wmctrl: /],
+	['tools/build/build-linux-flatpak.sh', /^#\s+wmctrl, yad\) are host programs/m]
+]) {
+	if (!pattern.test(read(rel))) {
+		errors.push(`${rel}: does not declare wmctrl, which the X11 window list needs.`);
+	}
+}
+
 if (errors.length > 0) {
 	console.error(
 		'\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m'

@@ -149,6 +149,7 @@ function validate(root) {
 		'xvfb',
 		'openbox',
 		'xdotool',
+		'wmctrl',
 		'x11-utils',
 		'x11-xserver-utils',
 		'coreutils',

@@ -48,7 +48,7 @@
 #
 # FURTHER SANDBOX LIMITS, STATED RATHER THAN HIDDEN:
 #   - Helper binaries the driver shells out to (xclip, wl-clipboard, xdotool,
-#     yad) are host programs and are not in the runtime. Features that
+#     wmctrl, yad) are host programs and are not in the runtime. Features that
 #     depend on them degrade until each is added as a module here. Deliberately
 #     NOT worked around with --talk-name=org.freedesktop.Flatpak: spawning on
 #     the host is a sandbox escape, not a packaging fix.
