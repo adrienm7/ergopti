@@ -1,0 +1,61 @@
+{
+	"expected_count": 42,
+	"filters": [
+		{
+			"contains": "diagnostics-pac-native-decode",
+			"expected_count": 10
+		},
+		{
+			"contains": "model-browser-close-pause-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "wpm-calc-sampled-future-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "agent-tools-native64-ttl-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "timer-scheduler-record-lifetime",
+			"expected_count": 3
+		},
+		{
+			"contains": "error-dialog-startup-owner",
+			"expected_count": 5
+		},
+		{
+			"contains": "takenote-async-job",
+			"expected_count": 3
+		},
+		{
+			"contains": "takenote-duplicate-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "ahk6-05-takenote-exact-title",
+			"expected_count": 2
+		},
+		{
+			"contains": "takenote-suspend-effect-time",
+			"expected_count": 1
+		},
+		{
+			"contains": "takenote-native64-deadline",
+			"expected_count": 3
+		},
+		{
+			"contains": "MAX_SANE_AGE_MS clamp ceiling",
+			"expected_count": 1
+		},
+		{
+			"contains": "tools-cache-wrap",
+			"expected_count": 2
+		},
+		{
+			"contains": "model-browser-sort-owner",
+			"expected_count": 3
+		}
+	]
+}
