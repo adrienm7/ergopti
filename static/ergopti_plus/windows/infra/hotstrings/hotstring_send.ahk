@@ -364,14 +364,22 @@ _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
 		}
 }
 
-; Hotstrings will still be triggered downstream, so SendNewResult("a") can
-; cascade a ➜ b ➜ c (final result). OnlyText=true wraps the payload in {Text}
+; Types Text the way a key of the layout does: a SendEvent at the CALLER's
+; SendLevel. The layout and the keylayout emulation call it from their #InputLevel
+; 2 hotkeys, where the level makes the keys visible to the prefix watcher, which
+; is how a typed trigger (« ia » struck on the layout) reaches the hotstring
+; engine at all. A hotstring's OWN output must not come back that way: it goes
+; through Atomic=true, one SendInput at TEXT_SENDER_SEND_LEVEL, and the engine
+; commits its effect to its buffers itself (hotstring-output-is-final).
+; OnlyText=true wraps the payload in {Text}
 ; to avoid modifier side effects on symbols like ', ", accents. UpdateRing
 ; controls whether Text feeds the last-sent-character ring: pass false for a
 ; backspace-only call (e.g. the Notepad clipboard branch's pre-paste erase),
 ; where Text is a control sequence ("{BackSpace 5}") rather than a real
 ; emitted character — SubStr(Text, -1) on that sequence would record its
 ; trailing "}" instead of what actually landed on screen.
+; @param Atomic {Boolean} True for a hotstring's own output (SendInput at the
+;        TextSender level); false for a stand-in for a typed key (SendEvent).
 _SendVerdictSucceeded(Result) {
 		; Legacy recorder hooks return an empty string after capturing a send. Only an
 		; explicit Boolean false is a failure; type-checking first prevents the AHK v2
@@ -379,7 +387,7 @@ _SendVerdictSucceeded(Result) {
 		return !((Result is Integer) and Result = 0)
 }
 
-SendNewResult(Text, OnlyText := True, UpdateRing := True) {
+SendNewResult(Text, OnlyText := True, UpdateRing := True, Atomic := False) {
 		; Every layout/hotstring callback reaches this primitive.  A failed OS send
 		; must be contained here and must NOT advance the output ring: advancing it
 		; after a failed injection corrupts deadkey/time-gated decisions as though
@@ -389,6 +397,8 @@ SendNewResult(Text, OnlyText := True, UpdateRing := True) {
 						Hook := _SendHook
 						if !_SendVerdictSucceeded(Hook("SendNewResult", Text, OnlyText))
 								return false
+				} else if Atomic {
+						_TextSenderAtSendLevel(_AHK_SendInput.Bind(OnlyText ? "{Text}" Text : Text))
 				} else {
 						if OnlyText {
 								SendEvent("{Text}" Text)

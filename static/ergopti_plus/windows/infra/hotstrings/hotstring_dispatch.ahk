@@ -1421,7 +1421,13 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 												Hook := _SendHook
 												return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
 										}
-										SendInput(Burst)
+										; At TEXT_SENDER_SEND_LEVEL, never the caller's: the Space
+										; tap-hold completes a trigger from its #InputLevel 2 hotkey
+										; thread, and SendInput falls back to SendEvent whenever another
+										; AutoHotkey keyboard hook runs, so a burst typed at level 2 came
+										; back through the prefix watcher as typed input and cascaded
+										; (hotstring-output-is-final).
+										_TextSenderAtSendLevel(_AHK_SendInput.Bind(Burst))
 										return true
 								}
 								Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)

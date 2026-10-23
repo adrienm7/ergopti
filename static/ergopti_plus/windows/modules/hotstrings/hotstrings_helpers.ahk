@@ -137,13 +137,13 @@ ShouldActivateDeadkey(Combination, MappedValue, Delay, PrepareOnly := false) {
 			; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
 			if PrepareOnly
 				return { Prepared: true, Ok: true, Bs: 2, Ins: MappedValue }
-			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false)
+			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false, true, true)
 				return { Ok: true, Bs: 2, Ins: MappedValue }
 			return { Ok: false, Bs: 0, Ins: "" }
 		} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
 			if PrepareOnly
 				return { Prepared: true, Ok: true, Bs: 2, Ins: MappedValue }
-			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false)
+			if SendNewResult("{BackSpace 2}{Text}" . MappedValue, false, true, true)
 				return { Ok: true, Bs: 2, Ins: MappedValue }
 			return { Ok: false, Bs: 0, Ins: "" }
 		}
@@ -159,7 +159,7 @@ _EllipsisRawCallback(EndChar := "", PrepareOnly := false) {
 	if (GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$") {
 		if PrepareOnly
 			return { Prepared: true, Ok: true, Bs: 3, Ins: "…" }
-		if SendNewResult("{BackSpace 3}…", False)
+		if SendNewResult("{BackSpace 3}…", False, True, True)
 			return { Ok: true, Bs: 3, Ins: "…" }
 		return { Ok: false, Bs: 0, Ins: "" }
 	}
