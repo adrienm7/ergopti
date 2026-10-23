@@ -1118,6 +1118,11 @@ ReadPersonalInfoToml(FilePath) {
 			PersonalInformationLetters := Cache["letters"].Clone()
 			return
 		}
+		; A diagnostic or native read can pump another reader or durable writer.
+		; Retain the admitted identities before I/O, not whichever maps a later
+		; callback leaves behind when this older parse resumes.
+		OpeningInformation := PersonalInformation
+		OpeningLetters := PersonalInformationLetters
 	} finally Critical(PreviousCritical)
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
@@ -1142,16 +1147,27 @@ ReadPersonalInfoToml(FilePath) {
 		; would pass. Without the latch, opening the editor once and clicking OK
 		; overwrites the user's real IBAN, card number and SSN with the shipped
 		; placeholders, unrecoverably.
-		if IsSet(_TomlUnreadableFiles)
-			_TomlUnreadableFiles[FilePath] := true
+		PreviousCritical := Critical("On")
+		try {
+			if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
+				|| _ReadPersonalInfoTomlCache != Cache
+				return
+			if IsSet(_TomlUnreadableFiles)
+				_TomlUnreadableFiles[FilePath] := true
+		} finally Critical(PreviousCritical)
 		LoggerError("hotstrings", "Could not read personal info TOML '{1}': {2}. Writes to this file are blocked so the placeholder identity cannot replace its contents.", FilePath, e.Message)
 		return
 	}
-	; The read succeeded: the in-memory identity is the user's again, so the
-	; writer may run. Same lower-what-you-raise rule as ReadPersonalToml.
-	if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
-		_TomlUnreadableFiles.Delete(FilePath)
-	NextInformation := PersonalInformation.Clone()
+	; Only the still-current admission may clear an unreadable-source latch.
+	PreviousCritical := Critical("On")
+	try {
+		if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
+			|| _ReadPersonalInfoTomlCache != Cache
+			return
+		if (IsSet(_TomlUnreadableFiles) && _TomlUnreadableFiles.Has(FilePath))
+			_TomlUnreadableFiles.Delete(FilePath)
+		NextInformation := OpeningInformation.Clone()
+	} finally Critical(PreviousCritical)
 	NextLetters := Map()
 	SawLetters := false
 	FileContent := StrReplace(FileContent, "`r`n", "`n")
@@ -1197,6 +1213,11 @@ ReadPersonalInfoToml(FilePath) {
 	}
 	PreviousCritical := Critical("On")
 	try {
+		; Publish maps and their source cache only while this parse still owns
+		; the original admission. A completed newer transaction stays authoritative.
+		if PersonalInformation != OpeningInformation || PersonalInformationLetters != OpeningLetters
+			|| _ReadPersonalInfoTomlCache != Cache
+			return
 		PersonalInformation := NextInformation
 		if SawLetters
 			PersonalInformationLetters := NextLetters
