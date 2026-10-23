@@ -10,6 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SourceFile = require("tests.support.source_file")
+local ONE_SHOT_DATA = assert(require("json").decode(SourceFile.read(helpers.shared("tap_hold/one_shot_shift.json"))))
 
 local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
@@ -34,7 +36,7 @@ local function api(overrides)
 	})
 end
 
-local function load_fixture()
+local function load_fixture(prepare_input)
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -264,6 +266,8 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["infra.keycodes"] = { ESCAPE = 53, BACKSPACE = 51, RETURN = 36 }
+
+	if prepare_input then prepare_input(controls) end
 
 	local keymap = require("modules.keymap.init")
 	return {
@@ -742,4 +746,235 @@ helpers.describe("keymap start: exact native commitment", function()
 			helpers.assert_eq(fixture.mailbox_running(), false)
 		end)
 	end
+end)
+
+
+-- Keep these input scenarios inside a separate fixture scope: the historical
+-- lifecycle scenarios above intentionally reuse their own construction helpers.
+local INPUT_MODULES = {
+	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
+	"modules.keymap.one_shot_shift", "modules.keymap.control_sentinels",
+	"modules.keymap.magic_key_source", "adapters.event_clock",
+	"infra.key_event_health", "infra.keystroke_integrity", "infra.deferred_work",
+	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
+	"infra.hotstring_engine", "hotstring_engine", "infra.text_utils", "text_utils",
+	"compat.utf8", "keycodes", "keymap.control_signals", "tap_hold.one_shot_shift",
+	"unicode_case", "unicode_case.init", "unicode_case.data", "error_description", "number_policy",
+	"logger.shim", "hotstrings.personal_files", "native_path", "toml_codec.key_path", "toml_codec.basic_string",
+	"platform.remap", "modules.shortcuts.keyboard_shortcuts",
+}
+for _, name in ipairs(RESET_MODULES) do INPUT_MODULES[#INPUT_MODULES + 1] = name end
+
+local function with_input_fixture(callback)
+	helpers.with_stub_scope(INPUT_MODULES, function()
+		local calls = { emitted = {}, errors = {}, signals = {} }
+		local factory, owner, synthetic
+		local host_ns = 3600 * 1000000000
+		local fixture = load_fixture(function(controls)
+			controls.input_open = true
+			hs.timer.absoluteTime = function() return host_ns end
+			synthetic = package.loaded["adapters.synthetic_input"]
+			synthetic.STALE_PHYSICAL_EVENT_MS = 500
+			synthetic.admission_open = function() return controls.input_open end
+			synthetic.enter_callback = function() return true end
+			synthetic.leave_callback = function(consume) return consume end
+			synthetic.abort_callback = function() return true, false end
+			package.loaded["adapters.event_provenance"].classify_with_fence = function()
+				return nil, "foreign", nil, controls.physical_replay == true
+			end
+			package.loaded["infra.logger"].error = function(_, message)
+				calls.errors[#calls.errors + 1] = message
+			end
+			package.loaded["adapters.text_sender"] = {}
+			package.loaded["modules.llm.app_filter"] = {}
+			package.loaded["adapters.keyboard_geometry"] = {}
+			package.loaded["modules.keymap.magic_key_source"] = {
+				needs_geometry = function() return false end,
+				owns = function(code) return controls.magic_code == code end,
+				remaps = function(code) return controls.magic_code == code end,
+			}
+			factory = require("adapters.one_shot_shift")
+			package.loaded["adapters.one_shot_shift"] = { new = function(deps)
+				owner = factory.new({
+					data = ONE_SHOT_DATA, magic = deps.magic,
+					event = { rawFlagMasks = { shift = 2 } },
+					now = function() return 10 end,
+					is_repeat = function(event) return event.repeat_flag == 1 end,
+					translate = function(code, flags)
+						if code == 0 then return flags == 2 and "A" or "a" end
+						if code == 1 then return flags == 2 and "2" or "é" end
+						return " "
+					end,
+					emit = function(text)
+						calls.emitted[#calls.emitted + 1] = text
+						return true
+					end,
+				})
+				return owner
+			end }
+			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
+		end)
+		local clock = require("adapters.event_clock")
+		clock.reset()
+		require("infra.key_event_health").reset()
+		local properties = hs.eventtap.event.properties
+		local function event(code, text, age, repeat_flag, is_up)
+			local raw, unicode = 0, text
+			local current = { repeat_flag = repeat_flag or 0, unicode_writes = 0 }
+			current.getKeyCode = function() return code end
+			current.getType = function()
+				return is_up and hs.eventtap.event.types.keyUp or hs.eventtap.event.types.keyDown
+			end
+			current.getFlags = function() return {} end
+			current.getCharacters = function() return unicode end
+			current.rawFlags = function(_, value) if value ~= nil then raw = value end; return raw end
+			current.setUnicodeString = function(_, value)
+				current.unicode_writes = current.unicode_writes + 1
+				unicode = value
+			end
+			current.timestamp = function() return host_ns - (age or 1) * 1000000 end
+			current.getProperty = function(_, property)
+				if property == properties.keyboardEventAutorepeat then return repeat_flag or 0 end
+				return 0
+			end
+			return current
+		end
+		helpers.assert_eq(clock.lateness_ms(event(0, "a", 1)), 0)
+		helpers.assert_true(fixture.keymap.start())
+		fixture.down = fixture.taps[1].callback
+		fixture.up = fixture.taps[2].callback
+		fixture.event, fixture.calls, fixture.owner = event, calls, owner
+		local sentinels = require("modules.keymap.control_sentinels")
+		sentinels.set_listener("test.stale-input", function(signal) calls.signals[#calls.signals + 1] = signal end)
+		local ok, detail = xpcall(function() callback(fixture) end, debug.traceback)
+		local stopped, stop_result = pcall(fixture.keymap.stop, true)
+		helpers.assert_true(stopped and stop_result == true, "the input fixture must retire its native owners")
+		helpers.assert_eq(calls.errors, {}, "a passing input scenario must not hide a callback error")
+		if not ok then error(detail, 0) end
+	end)
+end
+
+helpers.describe("ordinary stale input before transformations (stale-physical-transform)", function()
+	helpers.it("does not add native Shift to an already-late physical key", function()
+		with_input_fixture(function(fixture)
+			helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+			local late = fixture.event(0, "a", 1200)
+			helpers.assert_eq(fixture.down(late), false)
+			helpers.assert_eq(late:rawFlags(), 0)
+			helpers.assert_eq(late:getCharacters(), "a")
+			helpers.assert_eq(late.unicode_writes, 0)
+			helpers.assert_eq(fixture.calls.emitted, {})
+		end)
+	end)
+
+	helpers.it("does not emit a Unicode replacement or own the stale key's release", function()
+		with_input_fixture(function(fixture)
+			helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+			helpers.assert_eq(fixture.down(fixture.event(1, "é", 1200)), false)
+			helpers.assert_eq(fixture.calls.emitted, {})
+			helpers.assert_eq(fixture.up(fixture.event(1, "é", 1, 0, true)), false)
+			-- Observation-gap invalidation disarms Shift. A fresh explicit arm must
+			-- still transform and own a genuinely fresh physical press.
+			helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+			helpers.assert_true(fixture.down(fixture.event(1, "é")))
+			helpers.assert_eq(fixture.calls.emitted, { "É" })
+			helpers.assert_true(fixture.up(fixture.event(1, "é", 1, 0, true)))
+		end)
+	end)
+
+	for _, repeat_flag in ipairs({ 0, 1 }) do
+		helpers.it("retires only the passed stale key's consumed claim, repeat=" .. tostring(repeat_flag), function()
+			with_input_fixture(function(fixture)
+				helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+				helpers.assert_true(fixture.down(fixture.event(1, "é")))
+				helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+				helpers.assert_true(fixture.down(fixture.event(2, " ")))
+				helpers.assert_eq(fixture.calls.emitted, { "É", "-" })
+				helpers.assert_eq(fixture.down(fixture.event(1, "é", 1200, repeat_flag)), false)
+				helpers.assert_eq(fixture.up(fixture.event(1, "é", 1, 0, true)), false,
+					"the release of a passed late press belongs to the application")
+				helpers.assert_true(fixture.up(fixture.event(2, " ", 1, 0, true)),
+					"an unrelated consumed press still owns its release")
+				helpers.assert_eq(fixture.calls.emitted, { "É", "-" })
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "paused", "admission-closed" }) do
+		helpers.it("retains preexisting consumed repeats and releases while " .. boundary, function()
+			with_input_fixture(function(fixture)
+				helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+				helpers.assert_true(fixture.down(fixture.event(1, "é")))
+				if boundary == "paused" then fixture.state.processing_paused = true
+				else fixture.controls.input_open = false end
+				fixture.state.buffer = "owned at boundary"
+				helpers.assert_true(fixture.down(fixture.event(1, "é", 1200, 1)))
+				helpers.assert_true(fixture.up(fixture.event(1, "é", 1, 0, true)))
+				helpers.assert_eq(fixture.state.buffer, "owned at boundary")
+				helpers.assert_eq(fixture.calls.emitted, { "É" })
+			end)
+		end)
+	end
+
+	helpers.it("keeps reserved stale controls consumed and publishes their existing signals", function()
+		with_input_fixture(function(fixture)
+			local codes = require("keycodes")
+			for _, code in ipairs({ codes.F20_LAYER_NAV_ENTERED, codes.F19_LAYER_NAV_EXITED }) do
+				helpers.assert_true(fixture.down(fixture.event(code, "", 1200)))
+				helpers.assert_true(fixture.up(fixture.event(code, "", 1, 0, true)))
+			end
+			helpers.assert_eq(fixture.calls.signals, { "nav_layer_entered", "nav_layer_exited" })
+			helpers.assert_eq(fixture.calls.emitted, {})
+		end)
+	end)
+
+	helpers.it("keeps stale fast-exit controls outside ordinary context invalidation", function()
+		with_input_fixture(function(fixture)
+			helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+			fixture.state.buffer = "observed text"
+			fixture.state.llm_buffer = "observed prediction"
+			fixture.state.start_is_word_boundary = true
+			fixture.state.start_is_line_start = true
+			-- Every production fast-exit identity represents a pass-through control.
+			for _, code in ipairs({ 105, 107, 113, 79, 64, 131, 134, 135 }) do
+				helpers.assert_eq(fixture.down(fixture.event(code, utf8.char(0xF700), 1200)), false)
+				helpers.assert_eq(fixture.state.buffer, "observed text")
+				helpers.assert_eq(fixture.state.llm_buffer, "observed prediction")
+				helpers.assert_true(fixture.state.start_is_word_boundary)
+				helpers.assert_true(fixture.state.start_is_line_start)
+			end
+			helpers.assert_eq(fixture.quarantine_values, {})
+			helpers.assert_eq(require("infra.key_event_health").counts().stale_passed, 0)
+			helpers.assert_eq(fixture.calls.emitted, {})
+			helpers.assert_true(fixture.down(fixture.event(1, "é")),
+				"pass-through controls must not spend the existing one-shot arm")
+			helpers.assert_eq(fixture.calls.emitted, { "É" })
+			helpers.assert_true(fixture.up(fixture.event(1, "é", 1, 0, true)))
+		end)
+	end)
+
+	helpers.it("keeps the physical replay exemption when an armed key has an old stamp", function()
+		with_input_fixture(function(fixture)
+			helpers.assert_true(fixture.keymap.arm_one_shot_shift())
+			fixture.controls.physical_replay = true
+			helpers.assert_true(fixture.down(fixture.event(1, "é", 1200)))
+			helpers.assert_eq(fixture.calls.emitted, { "É" })
+			helpers.assert_true(fixture.up(fixture.event(1, "é", 1, 0, true)))
+			local counts = require("infra.key_event_health").counts()
+			helpers.assert_eq(counts.downs + counts.ups, 0,
+				"the already-observed physical replay must not be counted twice")
+			helpers.assert_eq(counts.stale_passed, 0)
+		end)
+	end)
+
+	helpers.it("does not rewrite a late configured physical magic key", function()
+		with_input_fixture(function(fixture)
+			fixture.controls.magic_code = 3
+			local late = fixture.event(3, "j", 1200)
+			helpers.assert_eq(fixture.down(late), false)
+			helpers.assert_eq(late:getCharacters(), "j")
+			helpers.assert_eq(late.unicode_writes, 0)
+			helpers.assert_eq(fixture.calls.emitted, {})
+		end)
+	end)
 end)
