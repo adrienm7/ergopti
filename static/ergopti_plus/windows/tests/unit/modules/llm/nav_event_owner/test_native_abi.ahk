@@ -177,6 +177,31 @@ _LNEO_RealNativeAbiRoundTripDoesNotStartHook() {
 Test("LLM nav event owner: real ABI round-trip never calls native Start",
 	_LNEO_RealNativeAbiRoundTripDoesNotStartHook)
 
+; The reassertion counters cross the ABI as one 48-byte struct; a field read at
+; the wrong offset would report a healthy owner while it is not (todo49-hook-order).
+_LNEO_HookOrderStatsCrossTheAbiExactly() {
+	Counts := LLM_NavEventOwner_HookOrderStats()
+	for Name in ["timer_high_resolution", "keys_seen", "injected_armed",
+			"reinstalls", "reinstall_failures", "last_failure_error"]
+		AssertTrue(Counts.Has(Name) && Counts[Name] is Integer,
+			"hook-order stats must expose an integer " . Name)
+	AssertEqual(0, Counts["reinstall_failures"],
+		"a clean session must report no failed reinstall")
+	AssertTrue(Counts["timer_high_resolution"] == 0 || Counts["timer_high_resolution"] == 1,
+		"the timer kind is a flag")
+	; A caller with another struct size is refused and nothing is written.
+	Wrong := Buffer(48, 0xA5)
+	NumPut("UInt", 40, Wrong, 0)
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_GetHookOrderStats"),
+		"Ptr", Wrong, "Int")
+	AssertEqual(1, Status, "a mismatched struct size must be refused as invalid")
+	AssertEqual(0xA5A5A5A5, NumGet(Wrong, 8, "UInt"),
+		"a refused call must not write the counters")
+}
+
+Test("LLM nav event owner: hook-order stats cross the ABI exactly (todo49-hook-order)",
+	_LNEO_HookOrderStatsCrossTheAbiExactly)
+
 ; Empty val_modifiers is the shared default: a bare digit N while a prediction
 ; owner is committed must be suppressed (never typed) and target slot N, while
 ; a modified digit or a digit beyond the shown slots stays application input.

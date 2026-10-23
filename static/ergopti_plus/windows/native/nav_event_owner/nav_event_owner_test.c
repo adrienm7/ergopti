@@ -6187,6 +6187,45 @@ static bool TestHookTraceDoesNotQualifyTestDispatch(void)
  *
  * @return Zero when every test passes or one after the first failure set.
  */
+/** Pins the rule deciding which events show that AutoHotkey rehooked. */
+static bool TestHookReassertRuleMatchesAutoHotkeyOutput(void)
+{
+	const char *name = "hook reassertion follows only AutoHotkey Send output (todo49-hook-order)";
+	const uint64_t base = ERGOPTI_NAV_AHK_SEND_LEVEL_BASE;
+	ErgoptiNav_HookOrderStats stats;
+	/* Every level marker, the physical-ignore marker and the all-except-modifier
+	 * marker of AutoHotkey 2.0.26 arm a reassertion when injected. */
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(LLKHF_INJECTED, base) == 1);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(LLKHF_INJECTED, base - 1u) == 1);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(
+		LLKHF_INJECTED, base - ERGOPTI_NAV_AHK_SEND_LEVEL_MAX) == 1);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(LLKHF_INJECTED, base + 1u) == 1);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(LLKHF_INJECTED, base + 2u) == 1);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(
+		LLKHF_INJECTED | LLKHF_LOWER_IL_INJECTED, base) == 1);
+	/* One step outside the AutoHotkey range on each side does not. */
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(LLKHF_INJECTED, base + 3u) == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(
+		LLKHF_INJECTED, base - ERGOPTI_NAV_AHK_SEND_LEVEL_MAX - 1u) == 0);
+	/* Physical input, an unmarked injection and the owner's own replay do not. */
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(0, base) == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(LLKHF_INJECTED, 0) == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestHookReassertWanted(
+		LLKHF_INJECTED, ERGOPTI_NAV_TERMINAL_REPLAY_MARKER) == 0);
+	/* The stats ABI is exact: wrong size or NULL is refused, nothing is written. */
+	memset(&stats, 0xA5, sizeof(stats));
+	TEST_ASSERT(name, ErgoptiNav_GetHookOrderStats(NULL) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	stats.struct_size = ERGOPTI_NAV_HOOK_ORDER_STATS_SIZE - 8u;
+	TEST_ASSERT(name, ErgoptiNav_GetHookOrderStats(&stats) == ERGOPTI_NAV_STATUS_INVALID_ARGUMENT);
+	TEST_ASSERT(name, stats.keys_seen == 0xA5A5A5A5A5A5A5A5ull);
+	stats.struct_size = ERGOPTI_NAV_HOOK_ORDER_STATS_SIZE;
+	TEST_ASSERT(name, ErgoptiNav_GetHookOrderStats(&stats) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name, stats.reserved == 0 && stats.reinstall_failures == 0);
+	return true;
+}
+
+
+
 int main(int argc, char **argv)
 {
 	uint32_t index;
@@ -6267,7 +6306,9 @@ int main(int argc, char **argv)
 			TestHookTraceDoesNotQualifyTestDispatch},
 		{"native editor receiver matrix", ErgoptiEditor_TestReplacements},
 		{"terminal output custody preserves fault debt (todo49-output-custody)",
-			TestTerminalOutputCustodyPreservesFaultDebt}
+			TestTerminalOutputCustodyPreservesFaultDebt},
+		{"hook reassertion follows only AutoHotkey Send output (todo49-hook-order)",
+			TestHookReassertRuleMatchesAutoHotkeyOutput}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));
 	uint32_t selected_count = test_count;

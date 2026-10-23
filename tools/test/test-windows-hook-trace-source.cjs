@@ -57,6 +57,7 @@ const DIAGNOSTIC = [
 ];
 
 const SERIALIZATION = ['ErgoptiNav_SerializeTerminalOutputAttempt'];
+const HOOK_ORDER = ['ErgoptiNav_GetHookOrderStats'];
 const OWNED_CAPTURE = [
 	'ErgoptiNav_BeginTerminalCaptureOwned',
 	'ErgoptiNav_GetTerminalCaptureOwned',
@@ -204,7 +205,7 @@ function checkSerializationBinding(source) {
 	const required = [...loader[1].matchAll(/"(Ergopti\w+)"/g)].map((match) => match[1]);
 	assert.deepEqual(
 		required.sort(),
-		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION, ...OWNED_CAPTURE].sort(),
+		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION, ...OWNED_CAPTURE, ...HOOK_ORDER].sort(),
 		'The real loader must require all original, diagnostic and serializer exports exactly once.'
 	);
 	const binding = source.custodyAdapter.match(
@@ -334,7 +335,7 @@ function check(source) {
 	const exports = [...source.def.matchAll(/^\s*(Ergopti\w+)\s*$/gm)].map((match) => match[1]);
 	assert.deepEqual(
 		exports.sort(),
-		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION, ...OWNED_CAPTURE].sort(),
+		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION, ...OWNED_CAPTURE, ...HOOK_ORDER].sort(),
 		'The 37 original exports must survive the diagnostic ABI.'
 	);
 	checkSerializationBinding(source);

@@ -52,6 +52,15 @@ _Static_assert(INPUT_KEYBOARD == 1 && KEYEVENTF_EXTENDEDKEY == 1 && KEYEVENTF_KE
 #define NAV_INJECTED_MODIFIER_CAPACITY 16u
 #define NAV_TERMINAL_REPLAY_BATCH 128u
 
+/* AutoHotkey reinstalls its hook right after SendInput returns, which puts it
+ * ahead of this one. The first reassertion waits long enough for that rehook
+ * and the second one covers a caller descheduled between SendInput and rehook. */
+#define NAV_HOOK_REASSERT_FIRST_MS 8u
+#define NAV_HOOK_REASSERT_SETTLE_MS 64u
+#define NAV_HOOK_REASSERT_IDLE 0u
+#define NAV_HOOK_REASSERT_FIRST 1u
+#define NAV_HOOK_REASSERT_SETTLE 2u
+
 #define NAV_RECEIPT_EMPTY 0u
 #define NAV_RECEIPT_QUEUED 1u
 #define NAV_RECEIPT_CLAIMED 2u
@@ -121,6 +130,15 @@ typedef struct NavState {
 	HANDLE stop_event;
 	DWORD thread_id;
 	HHOOK hook;
+	/* Debounce timer owned by the hook thread; NULL outside its lifetime. */
+	HANDLE reassert_timer;
+	uint8_t reassert_stage;
+	uint8_t reassert_high_resolution;
+	uint64_t hook_keys_seen;
+	uint64_t hook_injected_armed;
+	uint64_t hook_reinstalls;
+	uint64_t hook_reinstall_failures;
+	DWORD hook_failure_error;
 	HWND wake_window;
 	UINT wake_message;
 	DWORD last_os_error;
@@ -2319,6 +2337,54 @@ static LRESULT NavLowLevelKeyboardProcCore(
 
 
 
+/**
+ * Tells whether a raw hook tuple comes from AutoHotkey's own Send.
+ *
+ * AutoHotkey removes its keyboard hook before SendInput and installs it again
+ * afterwards, which moves it ahead of every hook installed earlier, this one
+ * included. Only its own stamped output can have caused that, so the marker
+ * range is the whole rule: an arbitrary application injecting keys moves
+ * nothing, and the owner's own replay carries a different marker.
+ *
+ * @param flags KBDLLHOOKSTRUCT flags.
+ * @param extra_info KBDLLHOOKSTRUCT dwExtraInfo.
+ * @return True when the owner should reassert its hook position.
+ */
+static bool NavHookReassertWanted(uint32_t flags, uint64_t extra_info)
+{
+	return (flags & LLKHF_INJECTED) != 0
+		&& extra_info >= (uint64_t)ERGOPTI_NAV_AHK_SEND_LEVEL_BASE
+			- ERGOPTI_NAV_AHK_SEND_LEVEL_MAX
+		&& extra_info <= (uint64_t)ERGOPTI_NAV_AHK_MARKER_MAX;
+}
+
+
+
+/**
+ * Arms or re-arms the debounce timer after a foreign Send burst.
+ *
+ * Every event of the burst pushes the deadline out, so one reinstall follows
+ * the last event of the burst, not each of them.
+ *
+ * @param state Locked state owning the timer.
+ */
+static void NavArmHookReassertLocked(NavState *state)
+{
+	LARGE_INTEGER due;
+	if (state->reassert_timer == NULL || state->draining)
+		return;
+	due.QuadPart = -(int64_t)NAV_HOOK_REASSERT_FIRST_MS * 10000;
+	if (!SetWaitableTimer(state->reassert_timer, &due, 0, NULL, NULL, FALSE)) {
+		++state->hook_reinstall_failures;
+		state->hook_failure_error = GetLastError();
+		return;
+	}
+	state->reassert_stage = NAV_HOOK_REASSERT_FIRST;
+	++state->hook_injected_armed;
+}
+
+
+
 /** Records actual native hook entries only inside an explicitly owned fixture. */
 static LRESULT CALLBACK NavLowLevelKeyboardProc(
 	int code, WPARAM message, LPARAM data_pointer)
@@ -2333,6 +2399,11 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 	LRESULT result;
 	if (code == HC_ACTION && data_pointer != 0) {
 		EnterCriticalSection(&g_nav_state.lock);
+		++g_nav_state.hook_keys_seen;
+		if (NavHookReassertWanted(
+				((const KBDLLHOOKSTRUCT *)data_pointer)->flags,
+				(uint64_t)((const KBDLLHOOKSTRUCT *)data_pointer)->dwExtraInfo))
+			NavArmHookReassertLocked(&g_nav_state);
 		if (g_nav_hook_trace.enabled) {
 			owner = g_nav_hook_trace.owner;
 			token = g_nav_hook_trace.token;
@@ -2387,6 +2458,68 @@ static LRESULT CALLBACK NavLowLevelKeyboardProc(
 
 
 /**
+ * Installs a fresh hook in front of the current one, then removes the old one.
+ *
+ * Runs only on the hook thread between message dispatches, so no callback can
+ * observe both handles: the OS delivers hook events to this thread through its
+ * message queue, which is not pumped here. The new hook is installed before
+ * the old one is removed so no key is ever unobserved.
+ *
+ * @param settle_next True to schedule the later settle pass afterwards.
+ */
+static void NavReinstallHookFront(bool settle_next)
+{
+	HHOOK previous;
+	HHOOK fresh;
+	DWORD os_error = 0;
+	EnterCriticalSection(&g_nav_state.lock);
+	previous = g_nav_state.hook;
+	if (previous == NULL || g_nav_state.draining
+			|| g_nav_state.startup_cancelled) {
+		g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+		LeaveCriticalSection(&g_nav_state.lock);
+		return;
+	}
+	LeaveCriticalSection(&g_nav_state.lock);
+
+	fresh = SetWindowsHookExW(WH_KEYBOARD_LL, NavLowLevelKeyboardProc, NULL, 0);
+	if (fresh == NULL) {
+		os_error = GetLastError();
+	} else if (!UnhookWindowsHookEx(previous)) {
+		/* Two live hooks would run the state machine twice per key. */
+		os_error = GetLastError();
+		(void)UnhookWindowsHookEx(fresh);
+		fresh = NULL;
+	}
+
+	EnterCriticalSection(&g_nav_state.lock);
+	if (fresh == NULL) {
+		++g_nav_state.hook_reinstall_failures;
+		g_nav_state.hook_failure_error = os_error;
+		g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+	} else {
+		g_nav_state.hook = fresh;
+		++g_nav_state.hook_reinstalls;
+		if (settle_next && g_nav_state.reassert_timer != NULL) {
+			LARGE_INTEGER due;
+			due.QuadPart = -(int64_t)NAV_HOOK_REASSERT_SETTLE_MS * 10000;
+			if (SetWaitableTimer(g_nav_state.reassert_timer, &due, 0, NULL, NULL, FALSE)) {
+				g_nav_state.reassert_stage = NAV_HOOK_REASSERT_SETTLE;
+			} else {
+				++g_nav_state.hook_reinstall_failures;
+				g_nav_state.hook_failure_error = GetLastError();
+				g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+			}
+		} else {
+			g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+		}
+	}
+	LeaveCriticalSection(&g_nav_state.lock);
+}
+
+
+
+/**
  * Installs the hook and pumps messages until the stop event is signaled.
  *
  * @param parameter Unused CreateThread parameter.
@@ -2398,6 +2531,8 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	HHOOK hook;
 	HANDLE ready_event;
 	HANDLE stop_event;
+	HANDLE reassert_timer;
+	uint8_t reassert_high_resolution = 1;
 	uint8_t initial_modifiers;
 	DWORD os_error = 0;
 	DWORD exit_os_error = 0;
@@ -2423,22 +2558,44 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 	}
 
 	PeekMessageW(&message, NULL, WM_USER, WM_USER, PM_NOREMOVE);
+	/* The high-resolution kind needs Windows 10 1803; the plain timer's 15 ms
+	 * granularity is reported through the stats instead of hidden. */
+	reassert_timer = CreateWaitableTimerExW(
+		NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+	if (reassert_timer == NULL) {
+		reassert_high_resolution = 0;
+		reassert_timer = CreateWaitableTimerExW(
+			NULL, NULL, 0, TIMER_ALL_ACCESS);
+	}
+	if (reassert_timer == NULL)
+		os_error = GetLastError();
 	/* This hook remains desktop-wide, but low-level callbacks execute in this
 	 * owner thread instead of being injected into other processes. A DLL
 	 * module registration is unnecessary for this local callback execution.
 	 * The adapter retains this DLL for the entire process lifetime. */
-	hook = SetWindowsHookExW(
-		WH_KEYBOARD_LL,
-		NavLowLevelKeyboardProc,
-		NULL,
-		0);
-	if (hook == NULL)
-		os_error = GetLastError();
+	hook = NULL;
+	if (reassert_timer != NULL) {
+		hook = SetWindowsHookExW(
+			WH_KEYBOARD_LL,
+			NavLowLevelKeyboardProc,
+			NULL,
+			0);
+		if (hook == NULL)
+			os_error = GetLastError();
+	}
 	initial_modifiers = NavReadModifierState();
 
 	EnterCriticalSection(&g_nav_state.lock);
 	g_nav_state.thread_id = GetCurrentThreadId();
 	g_nav_state.hook = hook;
+	g_nav_state.reassert_timer = hook != NULL ? reassert_timer : NULL;
+	g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+	g_nav_state.reassert_high_resolution = reassert_high_resolution;
+	g_nav_state.hook_keys_seen = 0;
+	g_nav_state.hook_injected_armed = 0;
+	g_nav_state.hook_reinstalls = 0;
+	g_nav_state.hook_reinstall_failures = 0;
+	g_nav_state.hook_failure_error = 0;
 	g_nav_state.running = hook != NULL;
 	NavApplyInitialModifierSnapshotLocked(
 		&g_nav_state, initial_modifiers);
@@ -2455,16 +2612,31 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 
 	if (ready_event != NULL)
 		SetEvent(ready_event);
-	if (hook == NULL)
+	if (hook == NULL) {
+		if (reassert_timer != NULL)
+			(void)CloseHandle(reassert_timer);
 		return 0;
+	}
 
 	while (!stop_requested) {
-		DWORD wait_result = MsgWaitForMultipleObjects(
-			1,
-			&stop_event,
+		HANDLE wait_handles[2];
+		DWORD wait_result;
+		wait_handles[0] = stop_event;
+		wait_handles[1] = reassert_timer;
+		wait_result = MsgWaitForMultipleObjects(
+			2,
+			wait_handles,
 			FALSE,
 			INFINITE,
 			QS_ALLINPUT);
+		if (wait_result == WAIT_OBJECT_0 + 1u) {
+			uint8_t stage;
+			EnterCriticalSection(&g_nav_state.lock);
+			stage = g_nav_state.reassert_stage;
+			LeaveCriticalSection(&g_nav_state.lock);
+			NavReinstallHookFront(stage == NAV_HOOK_REASSERT_FIRST);
+			continue;
+		}
 		if (wait_result == WAIT_OBJECT_0) {
 			bool drain_complete;
 			bool startup_cancelled;
@@ -2482,7 +2654,7 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 			}
 			continue;
 		}
-		if (wait_result == WAIT_OBJECT_0 + 1u) {
+		if (wait_result == WAIT_OBJECT_0 + 2u) {
 			while (PeekMessageW(&message, NULL, 0, 0, PM_REMOVE)) {
 				if (message.message == WM_QUIT) {
 					stop_requested = true;
@@ -2498,6 +2670,13 @@ static DWORD WINAPI NavHookThreadMain(LPVOID parameter)
 		}
 	}
 
+	/* A reassertion replaces the handle, so the installed one is the live one. */
+	EnterCriticalSection(&g_nav_state.lock);
+	hook = g_nav_state.hook;
+	g_nav_state.reassert_timer = NULL;
+	g_nav_state.reassert_stage = NAV_HOOK_REASSERT_IDLE;
+	LeaveCriticalSection(&g_nav_state.lock);
+	(void)CloseHandle(reassert_timer);
 	if (!UnhookWindowsHookEx(hook)) {
 		if (exit_os_error == 0)
 			exit_os_error = GetLastError();
@@ -4400,6 +4579,41 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PendingForToken(
 // ======= 8/ Diagnostics and Test Seam =======
 // ==========================================
 // ==========================================
+
+/** Implements ErgoptiNav_GetHookOrderStats. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetHookOrderStats(
+	ErgoptiNav_HookOrderStats *out_stats)
+{
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (out_stats == NULL
+			|| out_stats->struct_size != ERGOPTI_NAV_HOOK_ORDER_STATS_SIZE)
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	EnterCriticalSection(&g_nav_state.lock);
+	out_stats->timer_high_resolution = g_nav_state.reassert_high_resolution;
+	out_stats->keys_seen = g_nav_state.hook_keys_seen;
+	out_stats->injected_armed = g_nav_state.hook_injected_armed;
+	out_stats->reinstalls = g_nav_state.hook_reinstalls;
+	out_stats->reinstall_failures = g_nav_state.hook_reinstall_failures;
+	out_stats->last_failure_error = g_nav_state.hook_failure_error;
+	out_stats->reserved = 0;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+#if defined(ERGOPTI_NAV_TESTING)
+/** Implements the hook-free reassertion rule seam. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestHookReassertWanted(
+	uint32_t flags,
+	uint64_t extra_info)
+{
+	return NavHookReassertWanted(flags, extra_info) ? 1 : 0;
+}
+#endif
+
+
 
 /** Implements ErgoptiNav_GetLastOsError. */
 ERGOPTI_NAV_API uint32_t ERGOPTI_NAV_CALL ErgoptiNav_GetLastOsError(void)
