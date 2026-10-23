@@ -45,8 +45,12 @@ _GKO_Source(OwnerReceipt) {
 	AssertTrue(_DriverIsProductionSource(Dispatcher), "the real dispatcher owner must be authored production")
 	AssertTrue(InStr(FSReadStrict(Dispatcher), "class HookDispatcher {", true) > 0, "the actual dispatcher class must exist")
 	OwnerReceipt["dispatcher_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(Dispatcher))
+	; The encoder delegates string escaping to the separate canonical JSON owner.
+	JsonOwner := _DriverProductionFileForSymbol("JsonStringLiteral")
+	AssertTrue(JsonOwner != "" && _DriverFuncBody("JsonStringLiteral") != "", "the real encoder string dependency must be nonempty")
+	OwnerReceipt["json_string_owner_sha256"] := CryptoSha256Bytes(FSReadBytesStrict(JsonOwner))
 	for Path in [Dispatcher, _DriverProductionFileForSymbol("WallClockTimestamp"),
-		_DriverProductionFileForSymbol("CryptoSha256Bytes"), _DriverProductionFileForSymbol("KL_JsonEncode")] {
+		_DriverProductionFileForSymbol("CryptoSha256Bytes"), _DriverProductionFileForSymbol("KL_JsonEncode"), JsonOwner] {
 		AssertTrue(Path != "", "the real child dependency must have a complete canonical owner")
 		if !Seen.Has(Path) {
 			Source .= "#Include " . Path . "`n"
