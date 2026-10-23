@@ -613,3 +613,63 @@ _SMB_FrameBuildPreflushAndRefusal() {
 	}
 }
 Test("personal DATA frame: actual full Build intercepts before separator flush on skip/refusal", _SMB_FrameBuildPreflushAndRefusal)
+
+
+
+
+
+; ===============================================================
+; ===============================================================
+; ======= Pending-receipt walks follow foreign calls only =======
+; ===============================================================
+; ===============================================================
+
+; The earlier deferred leaves' receipts were re-walked on all 32 liveness checks of one
+; frame (about 1 s of boot). They are walked again only after a call out to code that is
+; not a pure comparison, so a mutation made by such code is still refused.
+_SMB_FramePendingWalkCounts() {
+	Counts := _PerfCountersOwner().Counts
+	return [Counts.Get("menu.frame_pending_walk", 0), Counts.Get("menu.frame_pending_skip", 0)]
+}
+
+_SMB_FramePendingWalksFollowForeignCalls() {
+	global _MenuPopulationBuilding
+	Previous := _MenuPopulationBuilding
+	Owner := MenuPopulation(), Native := Menu(), Foreign := Menu()
+	Action := (*) => 0
+	ForeignRows := [Map("label", "Earlier seeded", "action", Action), Map("label", "Earlier pending", "action", Action)]
+	Data := [Map("label", "Frame seeded", "action", Action), Map("label", "Frame pending", "action", Action)]
+	try {
+		_MenuPopulationBuilding := Owner
+		Owner.Fill(Foreign, ForeignRows, "personal_shortcuts_frame", 2)
+		Binding := Map("manifest_key", "personal_shortcuts_frame", "children_id", "personal_shortcuts_registered",
+			"provider", () => Data)
+		Before := _SMB_FramePendingWalkCounts()
+		AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding))
+		After := _SMB_FramePendingWalkCounts()
+		Walks := After[1] - Before[1], Skips := After[2] - Before[2]
+		Assert(Skips >= 10, "checks with no foreign call in between reuse the last walk (skips=" . Skips . ")")
+		Assert(Walks >= 1 && Walks <= 14, "walks stay bounded by the foreign calls (walks=" . Walks . ")")
+		_CTC_ReleaseMenu(Native)
+		Native := Menu()
+		; An earlier pending entry changed by the provider, a foreign call, is still refused.
+		Entry := Owner.Pending[Foreign.Handle]
+		Binding["provider"] := () => (Entry.NextRow := 2, Data)
+		AssertEqual(0, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted),
+			"a pending entry mutated by the provider is refused")
+		AssertFalse(Admitted)
+		Entry.NextRow := 1
+		Binding["provider"] := () => (Owner.Pending.Delete(Foreign.Handle), Data)
+		AssertEqual(0, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted),
+			"a pending entry withdrawn by the provider is refused")
+		AssertFalse(Admitted)
+	} finally {
+		Owner.Stop()
+		Owner.Pending.Clear()
+		_MenuPopulationBuilding := Previous
+		_CTC_ReleaseMenu(Native)
+		_CTC_ReleaseMenu(Foreign)
+	}
+}
+Test("personal DATA frame: pending receipts are walked after foreign calls only and mutations stay refused (frame-pending-walk)",
+	_SMB_FramePendingWalksFollowForeignCalls)

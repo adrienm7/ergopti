@@ -211,6 +211,50 @@ TestMasterGates_InvalidManifestDoesNotMutateCandidate() {
 Test("master gates: invalid manifest fails before candidate mutation",
 	TestMasterGates_InvalidManifestDoesNotMutateCandidate)
 
+TestMasterGates_DecodeMemoNeverHidesInvalidOrChangedManifests() {
+	FixtureRoot := A_Temp . "\ergopti_master_gates_memo_" . A_TickCount
+	Path := FixtureRoot . "\menu_manifest.json"
+	try {
+		DirCreate(FixtureRoot)
+		FileAppend('{"hotstring_category_keys": {"memo_group_a": "MemoGateA"}}', Path, "UTF-8-RAW")
+		Skipped := _PerfCountersOwner().Counts
+		First := _MG_LoadSubCategories(Path)
+		Before := Skipped.Get("master_gates.manifest_decode_skipped", 0)
+		Second := _MG_LoadSubCategories(Path)
+		AssertEqual("memo_group_a", First["MemoGateA"])
+		AssertEqual(Before + 1, Skipped.Get("master_gates.manifest_decode_skipped", 0),
+			"equal text is decoded once")
+		Assert(First != Second, "each caller receives its own result Map")
+		First["MemoGateA"] := "mutated"
+		AssertEqual("memo_group_a", _MG_LoadSubCategories(Path)["MemoGateA"],
+			"a caller mutating its result cannot change later reads")
+		FileDelete(Path)
+		FileAppend('{"hotstring_category_keys": {"memo_group_b": "MemoGateB"}}', Path, "UTF-8-RAW")
+		Changed := _MG_LoadSubCategories(Path)
+		Assert(Changed.Has("MemoGateB") && !Changed.Has("MemoGateA"), "a changed manifest is decoded afresh")
+		FileDelete(Path)
+		FileAppend("{ not json", Path, "UTF-8-RAW")
+		loop 2 {
+			Thrown := false
+			try _MG_LoadSubCategories(Path)
+			catch as Err
+				Thrown := InStr(Err.Message, "Master gate manifest") > 0
+			AssertTrue(Thrown, "an invalid manifest throws on every call, even after a valid decode")
+		}
+		FileDelete(Path)
+		FileAppend('{"hotstring_category_keys": {"memo_group_b": "MemoGateB"}}', Path, "UTF-8-RAW")
+		AssertTrue(_MG_LoadSubCategories(Path).Has("MemoGateB"), "a repaired manifest loads again")
+		FileDelete(Path)
+		Thrown := false
+		try _MG_LoadSubCategories(Path)
+		catch as Err
+			Thrown := InStr(Err.Message, "Master gate manifest is missing") > 0
+		AssertTrue(Thrown, "a removed manifest throws although its text was decoded before")
+	} finally try DirDelete(FixtureRoot, true)
+}
+Test("master gates: the decode memo never hides an invalid, changed or removed manifest (master-gates-decode-memo)",
+	TestMasterGates_DecodeMemoNeverHidesInvalidOrChangedManifests)
+
 TestMasterGates_TargetNamesRemainExplicit() {
 	Body := _DriverFuncBody("ApplyMasterGatesToFeatures")
 	Assert(Body != "", "ApplyMasterGatesToFeatures must exist")

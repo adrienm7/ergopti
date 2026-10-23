@@ -38,9 +38,18 @@ async function main() {
 	const configArg = args.find((arg) => arg.startsWith('--config-dir='));
 	const samplesArg = args.find((arg) => arg.startsWith('--samples='));
 	const menuLatency = args.includes('--menu-latency');
-	if (args.some((arg) => arg !== configArg && arg !== samplesArg && arg !== '--menu-latency'))
+	const webviewWarmup = args.includes('--webview-warmup');
+	if (
+		args.some(
+			(arg) =>
+				arg !== configArg &&
+				arg !== samplesArg &&
+				arg !== '--menu-latency' &&
+				arg !== '--webview-warmup'
+		)
+	)
 		throw new Error(
-			'Usage: --config-dir=<existing configuration folder> [--samples=3] [--menu-latency]'
+			'Usage: --config-dir=<existing configuration folder> [--samples=3] [--menu-latency] [--webview-warmup]'
 		);
 	if (!configArg) throw new Error('--config-dir is required; the live configuration is read only.');
 	const configSource = path.resolve(configArg.slice('--config-dir='.length));
@@ -68,6 +77,16 @@ async function main() {
 				entry,
 				source.replace(guard, 'while !TickExpired(_StartupSmokePumpStarted, 0)')
 			);
+		}
+		if (webviewWarmup) {
+			// The smoke boot skips the shared browser warm-up; the private copy runs it so
+			// its cost on the main thread is part of the measured startup.
+			const entry = path.join(code.windows, 'ErgoptiPlus.ahk');
+			const source = fs.readFileSync(entry, 'utf8');
+			const guard = 'if _DriverStartupSmokeDir == ""\n\tWebView_BeginBrowserWarmup()';
+			if (source.split(guard).length !== 2)
+				throw new Error('The private browser warm-up seam changed; refusing misleading timings.');
+			fs.writeFileSync(entry, source.replace(guard, 'WebView_BeginBrowserWarmup()'));
 		}
 		fs.writeFileSync(wrapper, '\uFEFF#Requires AutoHotkey v2.0+\n#Include ErgoptiPlus.ahk\n');
 		for (let sample = 0; sample < samples; sample++) {
@@ -124,7 +143,7 @@ async function main() {
 				cache_events: lines.filter((line) =>
 					/Registry parse cache|Active locale.*cache retained/.test(line)
 				),
-				timing: lines.filter((line) => /\[(BootProfile|Perf)\]/.test(line))
+				timing: lines.filter((line) => /\[(BootProfile|Perf|WebView)\]/.test(line))
 			};
 			results.push(result);
 			console.log(JSON.stringify(result));

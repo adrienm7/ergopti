@@ -25,6 +25,10 @@ class WebViewBrowserWarmup {
 		this.EnvironmentPromise := 0
 		this.ControllerPromise := 0
 		this.Controller := 0
+		; Main-thread time spent inside this chain's own synchronous steps. The elapsed
+		; wall and process CPU of the whole warm-up include everything else the driver
+		; did meanwhile, so only this figure says what the warm-up itself costs input.
+		this.MainThreadMs := Map("begin", 0.0, "environment", 0.0, "controller", 0.0)
 	}
 
 	/** Dispatches background creation once, without pumping or awaiting. */
@@ -36,6 +40,7 @@ class WebViewBrowserWarmup {
 		this.Started := true
 		this.BeginMs := BootClockWallMs()
 		this.BeginCpuMs := BootClockCpuMs()
+		BeginTicks := PerfStage_Begin()
 		try {
 			this.Host := this.HostFn.Call()
 			Promise := this.EnvironmentFn.Call()
@@ -46,6 +51,7 @@ class WebViewBrowserWarmup {
 			this.Stop()
 			throw Err
 		}
+		this.MainThreadMs["begin"] := PerfStage_End("WebView.warmup_begin", BeginTicks)
 		LoggerInfo("WebView", "Shared browser warmup dispatched without awaiting.")
 		return true
 	}
@@ -56,6 +62,7 @@ class WebViewBrowserWarmup {
 		this.EnvironmentPromise := 0
 		if this.Stopped
 			return false
+		StepTicks := PerfStage_Begin()
 		try {
 			NextPromise := this.ControllerFn.Call(Environment, this.Host.Hwnd)
 			this.ControllerPromise := NextPromise
@@ -66,6 +73,7 @@ class WebViewBrowserWarmup {
 			LoggerError("WebView", "Shared browser warmup dispatch failed: {1}.", Err.Message)
 			return false
 		}
+		this.MainThreadMs["environment"] := PerfStage_End("WebView.warmup_environment_ready", StepTicks)
 		return true
 	}
 
@@ -80,14 +88,18 @@ class WebViewBrowserWarmup {
 		}
 		this.ControllerPromise := 0
 		this.Controller := Controller
+		StepTicks := PerfStage_Begin()
 		try Controller.IsVisible := false
 		catch as Err {
 			this.Stop()
 			LoggerError("WebView", "Shared browser warmup visibility failed: {1}.", Err.Message)
 			return false
 		}
+		this.MainThreadMs["controller"] := PerfStage_End("WebView.warmup_controller_ready", StepTicks)
 		LoggerInfo("WebView", Format("Shared browser warm in {1:.3f} ms; cpu={2:.3f} ms.",
 			BootClockWallMs() - this.BeginMs, BootClockCpuMs() - this.BeginCpuMs))
+		LoggerEvidence("WebView", "Shared browser warm-up main-thread time: begin={1:.1f} ms, environment_ready={2:.1f} ms, controller_ready={3:.1f} ms.",
+			this.MainThreadMs["begin"], this.MainThreadMs["environment"], this.MainThreadMs["controller"])
 		return true
 	}
 
