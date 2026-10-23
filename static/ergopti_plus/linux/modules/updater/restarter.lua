@@ -80,35 +80,56 @@ function M.relay_command(pid, wrapper, args)
 end
 
 --- Starts the installed version in place of this process.
---- @param opts table { wrapper, args, run?, cgroup?, pid? }
+--- @param opts table { wrapper, args, paused?, run?, cgroup?, pid? }
 --- @return string|nil "systemd" (systemd stops and restarts this process) or
 ---   "relay" (the caller must now exit), nil when nothing could be started.
 function M.restart(opts)
 	if type(opts) ~= "table" or type(opts.wrapper) ~= "string" or opts.wrapper == "" then
 		error("restart requires the installed launcher", 2)
 	end
-	local run = opts.run or ShellRunner.run
-	if M.under_unit(opts.cgroup) then
-		-- --no-block: systemd restarts the unit after this call returns, by
-		-- stopping this process the way a logout does.
-		if run("systemctl --user --no-block restart " .. M.UNIT) then
-			Logger.info(LOG, "Restart on the update requested from systemd.")
-			return "systemd"
+	local lease, Pause
+	if opts.paused ~= nil then
+		Pause = require("infra.restart_pause")
+		local detail
+		lease, detail = Pause.prepare(opts.paused)
+		if not lease then
+			Logger.error(LOG, "Restart refused: %s.", tostring(detail))
+			return nil
 		end
-		Logger.error(LOG, "systemctl refused the restart — the update applies at the next login.")
+	end
+	local run = opts.run or ShellRunner.run
+	local function dispatch()
+		if M.under_unit(opts.cgroup) then
+			-- --no-block: systemd restarts the unit after this call returns, by
+			-- stopping this process the way a logout does.
+			if run("systemctl --user --no-block restart " .. M.UNIT) then
+				Logger.info(LOG, "Restart on the update requested from systemd.")
+				return "systemd"
+			end
+			Logger.error(LOG, "systemctl refused the restart — the update applies at the next login.")
+			return nil
+		end
+		local pid = opts.pid or M.own_pid()
+		if not pid then
+			Logger.error(LOG, "Own process id unreadable — the update applies at the next start.")
+			return nil
+		end
+		if not run(M.relay_command(pid, opts.wrapper, opts.args)) then
+			Logger.error(LOG, "The restart relay could not be started — the update applies at the next start.")
+			return nil
+		end
+		Logger.info(LOG, "Restart relay armed: %s starts once process %d exits.", opts.wrapper, pid)
+		return "relay"
+	end
+	local ok, how = pcall(dispatch)
+	if not ok or how == nil then
+		if lease and not Pause.rollback(lease) then
+			Logger.error(LOG, "The refused restart could not retire its pause handoff.")
+		end
+		if not ok then Logger.error(LOG, "Restart dispatch failed: %s.", tostring(how)) end
 		return nil
 	end
-	local pid = opts.pid or M.own_pid()
-	if not pid then
-		Logger.error(LOG, "Own process id unreadable — the update applies at the next start.")
-		return nil
-	end
-	if not run(M.relay_command(pid, opts.wrapper, opts.args)) then
-		Logger.error(LOG, "The restart relay could not be started — the update applies at the next start.")
-		return nil
-	end
-	Logger.info(LOG, "Restart relay armed: %s starts once process %d exits.", opts.wrapper, pid)
-	return "relay"
+	return how
 end
 
 return M

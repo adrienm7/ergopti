@@ -17,7 +17,7 @@ local Logger = require("logger.shim")
 local LOG = "infra.daemon_restart"
 
 --- Requests a restart.
---- @param opts table `{ reason, args, restarter?, installation?, cgroup?, run? }`:
+--- @param opts table `{ reason, args, paused?, restarter?, installation?, cgroup?, run? }`:
 ---   `installation()` resolves the updater's installation context,
 ---   `restarter` defaults to modules.updater.restarter.
 --- @return string|nil how "systemd" or "relay" (the caller must then exit).
@@ -46,6 +46,7 @@ function M.restart(opts)
 	local how = Restarter.restart({
 		wrapper = wrapper or Restarter.UNIT,
 		args = opts.args,
+		paused = opts.paused,
 		run = opts.run,
 		cgroup = opts.cgroup,
 	})
