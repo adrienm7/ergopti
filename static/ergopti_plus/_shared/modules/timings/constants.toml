@@ -224,14 +224,6 @@ karabiner_prime_poll_ms = 300
 # HS: karabiner/init.lua LAYOUT_TIS_SETTLE_SEC.
 layout_tis_settle_ms = 500
 
-# Hotstring global default expansion delay.
-# AUTHORITATIVE SOURCE: _shared/modules/hotstrings/defaults.toml [delays] default_sec (0.75 s),
-# read at boot by both drivers (AHK GLOBAL_DEFAULT_DELAY / HS GLOBAL_DEFAULT_DELAY).
-# This entry mirrors that value in milliseconds for cross-module discovery only —
-# keep it in sync if the canonical default_sec ever changes.
-# UI: hotstrings_config_window GLOBAL_DEFAULT_DELAY_MS.
-hotstring_expansion_ms = 750
-
 # Inter-key pause for deletion prefixes sent to terminal/TUI prompt controls.
 # Their render loop may otherwise evaluate every Backspace against one stale
 # state snapshot before the replacement text arrives.

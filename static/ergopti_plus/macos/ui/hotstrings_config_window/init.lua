@@ -94,22 +94,18 @@ local _config = {
 -- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
 -- width/height constant: hardcoding here is what caused the cross-driver drift.
 
--- The global delay fallback (seconds) that applies when no TOML default is set.
--- Fallback only. The live value is read from hotstrings_config, which loads it
--- from the shared canon the AutoHotkey driver also reads. A hand-mirrored copy
--- with a comment saying the two "must stay in sync" IS the second source — and
--- the one that silently stops matching when the canon moves.
-local GLOBAL_DEFAULT_DELAY_MS_FALLBACK = 750
-
---- Returns the shared global default expansion delay in milliseconds.
+--- Returns the shared global default expansion delay in milliseconds, read from
+--- the module that loads it from the shared canon. There is no local copy to
+--- fall back on: a missing value is a broken install and must be loud, not a
+--- second source that silently stops matching when the canon moves.
 --- @return number
 local function global_default_delay_ms()
-	local ok, cfg = pcall(require, "modules.hotstrings.hotstrings_config")
-	if ok and type(cfg) == "table" and type(cfg.get_global_default_delay_ms) == "function" then
-		local v = cfg.get_global_default_delay_ms()
-		if type(v) == "number" then return v end
+	local cfg = require("modules.hotstrings.hotstrings_config")
+	local v = cfg.get_global_default_delay_ms()
+	if type(v) ~= "number" then
+		error("hotstrings_config.get_global_default_delay_ms() returned " .. type(v) .. ", expected a number")
 	end
-	return GLOBAL_DEFAULT_DELAY_MS_FALLBACK
+	return v
 end
 
 -- The frontend (index.html / script.js / style.css) lives in the cross-driver

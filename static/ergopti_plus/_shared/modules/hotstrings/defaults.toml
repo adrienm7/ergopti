@@ -58,9 +58,9 @@ neutral = "#6e6e73"
 [delays]
 
 # Global default expansion delay (seconds) applied when no user/TOML delay is set.
-# Mirrored as _shared/modules/timings/constants.toml [debounce] hotstring_expansion_ms = 750.
-# This file (hotstrings/defaults.toml) is the authoritative source; the timings
-# entry mirrors it for cross-module discovery.
+# This file is the authoritative source. The macOS user preference
+# `hotstrings.expansion_delay` declares the same value in the feature manifest;
+# tools/test/test-defaults-single-source.cjs fails when the two differ.
 default_sec = 0.75
 
 # Default activation delay (seconds) for the dynamic-hotstrings category (dates,

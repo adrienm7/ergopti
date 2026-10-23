@@ -99,6 +99,31 @@ async function main() {
 		[],
 		'no metrics key repeats its section name: one spelling per setting'
 	);
+	// PAR-6: the base expansion delay is declared in hotstrings/defaults.toml
+	// (read by all three drivers) and, as a user preference, in the manifest.
+	// The two must agree, and no third mirror may exist in the timing registry.
+	const shippedDelay = parse(
+		fs.readFileSync(paths.shared('modules/hotstrings/defaults.toml'), 'utf8')
+	).delays.default_sec;
+	const delayEntry = manifest.entries.find(
+		(entry) => entry.section === 'hotstrings' && entry.id === 'expansion_delay'
+	);
+	assert.equal(
+		delayEntry.default,
+		shippedDelay,
+		'hotstrings.expansion_delay must equal [delays] default_sec'
+	);
+	assert.equal(
+		delayEntry.recommended,
+		shippedDelay,
+		'the recommended base delay is the shipped one'
+	);
+	assert(
+		!/^hotstring_expansion_ms\s*=/m.test(
+			fs.readFileSync(paths.shared('modules/timings/constants.toml'), 'utf8')
+		),
+		'the timing registry must not mirror the base expansion delay: it has no reader'
+	);
 	assert.deepEqual(
 		Object.keys(manifest.scopes || {}),
 		[
