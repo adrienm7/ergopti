@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Field Check Definitions
 --- DESCRIPTION:
---- The three one-click Mac checks of the Debug menu, as step lists over the
+--- The four one-click Mac checks of the Debug menu, as step lists over the
 --- ports of infra/field_check.lua:
 --- 1. lease: is the Karabiner lease healthy right now (command line tool,
 ---    integration switch, lease phase, guardian, losses this session)?
@@ -12,6 +12,8 @@
 --- 3. key_accounting: for a few seconds, how many key presses does the Quartz
 ---    event tap see and how many credits does the Karabiner ledger append, and
 ---    which source is allowed to credit?
+--- 4. toolchain: do the timer service, the Apple Shortcuts tool, Homebrew and the
+---    installed Karabiner-Elements package behave as the driver assumes?
 ---
 --- FEATURES & RATIONALE:
 --- 1. Read-only: no step starts, stops or reconfigures Karabiner, writes a file
@@ -241,12 +243,110 @@ function M.network(ports, report, finish)
 	end)
 end
 
+local SHORTCUTS = "/usr/bin/shortcuts"
+local CODESIGN = "/usr/bin/codesign"
+local BREW_PATHS = { "/opt/homebrew/bin/brew", "/usr/local/bin/brew" }
+
+-- A shortcut name no Mac can hold: running it must be refused at once, which
+-- proves the real command line tool starts, answers and exits within its bound.
+M.ABSENT_SHORTCUT = "ergopti-field-check-absent-shortcut"
+
+-- Seconds a timer probe waits, and the lateness above which it is a failure.
+M.TIMER_PROBE_SECONDS = 0.25
+M.TIMER_LATE_MS = 250
+
+-- Homebrew may need to update its index before answering.
+local BREW_TIMEOUT = 20
+
+--- Describes why a bounded command did not succeed, as a closed token.
+--- @param code any Exit code, nil when it timed out.
+--- @return string token "timeout" or "exit_<code>".
+local function failure_token(code)
+	return code == nil and "timeout" or "exit_" .. tostring(code)
+end
+
+--- The Apple Shortcuts command line tool, the Homebrew install of Karabiner and
+--- the timer service, each isolated so that one failure names itself:
+--- a timer that fires late, the Shortcuts tool listing, and refusing a missing
+--- shortcut inside a bound (the same bound a cancelled invocation relies on),
+--- then Homebrew itself, the Karabiner-Elements cask, and the code signature of
+--- the installed app (package provenance). Read-only: nothing is installed,
+--- run or changed.
+function M.toolchain(ports, report, finish)
+	local function brew_stage()
+		local brew
+		for _, candidate in ipairs(BREW_PATHS) do
+			if ports.path_exists(candidate) then
+				brew = candidate
+				break
+			end
+		end
+		report.step("brew_present", STATE.info, yes_no(brew ~= nil))
+		local function signature_stage()
+			if not ports.path_exists(STOCK_APP) then
+				report.step("karabiner_signature", STATE.skip, "not_installed")
+				finish()
+				return
+			end
+			ports.exec(CODESIGN, { "--verify", "--deep", "--strict", STOCK_APP }, COMMAND_TIMEOUT, function(code)
+				report.step("karabiner_signature", code == 0 and STATE.pass or STATE.fail,
+					code == 0 and "valid" or failure_token(code))
+				finish()
+			end)
+		end
+		if not brew then
+			report.step("brew_version", STATE.skip, "no_brew")
+			report.step("karabiner_cask", STATE.skip, "no_brew")
+			signature_stage()
+			return
+		end
+		ports.exec(brew, { "--version" }, BREW_TIMEOUT, function(code, output)
+			local version = code == 0 and M.parse_version(output) or nil
+			report.step("brew_version", version and STATE.pass or STATE.fail, version or failure_token(code))
+			ports.exec(brew, { "list", "--cask", "--versions", "karabiner-elements" }, BREW_TIMEOUT, function(list_code, list_output)
+				local installed = list_code == 0 and count_lines(list_output) > 0
+				-- A cask that is absent exits non-zero: that is an answer, not a fault
+				local token = installed and "installed" or (list_code == nil and "timeout" or "absent")
+				report.step("karabiner_cask", list_code == nil and STATE.fail or STATE.info, token)
+				signature_stage()
+			end)
+		end)
+	end
+
+	local function shortcuts_stage()
+		if not ports.path_exists(SHORTCUTS) then
+			report.step("shortcuts_cli", STATE.fail, "no")
+			report.step("shortcuts_list", STATE.skip, "no_cli")
+			report.step("shortcuts_refusal", STATE.skip, "no_cli")
+			brew_stage()
+			return
+		end
+		report.step("shortcuts_cli", STATE.pass, "yes")
+		ports.exec(SHORTCUTS, { "list" }, COMMAND_TIMEOUT, function(code, output)
+			report.step("shortcuts_list", code == 0 and STATE.pass or STATE.fail,
+				code == 0 and count_lines(output) or failure_token(code))
+			ports.exec(SHORTCUTS, { "run", M.ABSENT_SHORTCUT }, COMMAND_TIMEOUT, function(run_code)
+				local refused = run_code ~= nil and run_code ~= 0
+				report.step("shortcuts_refusal", refused and STATE.pass or STATE.fail,
+					refused and "refused" or (run_code == nil and "timeout" or "unexpected_success"))
+				brew_stage()
+			end)
+		end)
+	end
+
+	ports.timer_probe(M.TIMER_PROBE_SECONDS, function(late_ms)
+		report.step("timer_late_ms", late_ms <= M.TIMER_LATE_MS and STATE.pass or STATE.fail, math.max(0, math.floor(late_ms)))
+		shortcuts_stage()
+	end)
+end
+
 --- Check identity → definition(ports, report, finish), as run by infra.field_check.
 M.checks = {
 	network = M.network,
 	lease = M.lease,
 	owned_runtime = M.owned_runtime,
 	key_accounting = M.key_accounting,
+	toolchain = M.toolchain,
 }
 
 return M

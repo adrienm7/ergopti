@@ -149,6 +149,16 @@ local function network_chain(callback)
 end
 
 
+--- Measures how late the timer service fires.
+--- @param seconds number Delay asked of the timer.
+--- @param callback function fn(late_ms) with the lateness in milliseconds.
+local function timer_probe(seconds, callback)
+	local started = hs.timer.secondsSinceEpoch()
+	Timer.after(seconds, function()
+		callback((hs.timer.secondsSinceEpoch() - started - seconds) * 1000)
+	end)
+end
+
 --- The bounded command runner, shared with adapters/runtime_owner_ports.lua.
 M.exec = exec
 
@@ -165,6 +175,7 @@ function M.new()
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,
 		network_chain = network_chain,
+		timer_probe = timer_probe,
 	}
 end
 
