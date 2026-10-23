@@ -12,6 +12,13 @@
 local helpers = require("tests.helpers")
 local provenance_fixture = require("tests.support.keystats_provenance_fixture")
 
+-- Own the real tracker dependency caches across construction, callbacks and teardown.
+local function scoped_tracker_case(callback)
+	return function()
+		return helpers.with_stub_scope({ "modules.keystats.context_tracker", "adapters.secure_field_detector", "native_path", "error_description", "number_policy", "adapters.synthetic_input", "adapters.event_provenance" }, callback)
+	end
+end
+
 local function load_tracker(focused_element)
 	local observer_callback
 	local observer = {
@@ -58,7 +65,7 @@ local function load_tracker(focused_element)
 		flush_buffer = function() end,
 		log_app_switch = function() end,
 	}, function() return false end)
-	return tracker, state, function() return observer_callback end
+	return tracker, state, function() return observer_callback, observer end
 end
 
 local function make_event_pair(owner)
@@ -83,7 +90,7 @@ local function assert_exact_pair(pair, consumer, owner)
 end
 
 helpers.describe("context tracker: exact provenance across privacy boundaries", function()
-	helpers.it("secure-field entry clears sensitive buffers but preserves event identity", function()
+	helpers.it("secure-field entry clears sensitive buffers but preserves event identity", scoped_tracker_case(function()
 		local secure_field = {
 			attributeValue = function(_self, attr)
 				if attr == "AXRole" then return "AXSecureTextField" end
@@ -103,9 +110,9 @@ helpers.describe("context tracker: exact provenance across privacy boundaries", 
 		helpers.assert_eq(#state.rich_chunks, 0)
 		helpers.assert_eq(pair.synthetic_input.stats().records, records_before)
 		assert_exact_pair(pair, "test.secure-boundary", "test.secure-boundary")
-	end)
+	end))
 
-	helpers.it("application activation updates context without mutating ownership", function()
+	helpers.it("application activation updates context without mutating ownership", scoped_tracker_case(function()
 		local tracker, state = load_tracker(nil)
 		local pair = make_event_pair("test.app-boundary")
 		local stats_before = pair.synthetic_input.stats()
@@ -123,9 +130,9 @@ helpers.describe("context tracker: exact provenance across privacy boundaries", 
 		helpers.assert_eq(stats_after.records, stats_before.records)
 		helpers.assert_eq(stats_after.generation, stats_before.generation)
 		assert_exact_pair(pair, "test.app-boundary", "test.app-boundary")
-	end)
+	end))
 
-	helpers.it("a focus callback cannot turn an untagged key into an owned echo", function()
+	helpers.it("a focus callback cannot turn an untagged key into an owned echo", scoped_tracker_case(function()
 		local plain_field = {
 			attributeValue = function(_self, attr)
 				if attr == "AXRole" then return "AXTextField" end
@@ -136,14 +143,11 @@ helpers.describe("context tracker: exact provenance across privacy boundaries", 
 		local tracker, _, get_observer_callback = load_tracker(nil)
 		local pair = make_event_pair("test.focus-boundary")
 		tracker.update_ax_observer(91)
-		local callback = get_observer_callback()
+		local callback, observer = get_observer_callback()
 		helpers.assert_type(callback, "function")
 
-		callback(plain_field, "AXFocusedUIElementChanged", {
-			addWatcher = function() end,
-			removeWatcher = function() end,
-		})
+		callback(observer, plain_field, "AXFocusedUIElementChanged", {})
 
 		assert_exact_pair(pair, "test.focus-boundary", "test.focus-boundary")
-	end)
+	end))
 end)
