@@ -353,7 +353,7 @@ local function load_error_dialog(view, app)
 		DRIVER = "macos",
 		config = function()
 			return {
-				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>",
+				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>", email_placeholder = "<email>", foreign_home_markers = {}, shared_profile_names = {},
 					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
 					secret_value_min_length = 6 },
 				templates = {}, repository = {},

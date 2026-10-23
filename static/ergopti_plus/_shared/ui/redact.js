@@ -51,6 +51,14 @@
 	// A character that continues a path segment after the home folder
 	var PATH_CHAR = /^[A-Za-z0-9_.-]$/;
 
+	// The characters of an e-mail local part and of a domain
+	var EMAIL_LOCAL = /^[A-Za-z0-9._%+-]$/;
+	var EMAIL_DOMAIN = /^[A-Za-z0-9.-]$/;
+	var LETTER = /^[A-Za-z]$/;
+
+	// The characters of the credential in front of the @ of a URL
+	var URL_USERINFO = /^[A-Za-z0-9._~%+:=!*-]$/;
+
 	// The characters a bearer token is made of
 	var BEARER_CHAR = /^[A-Za-z0-9._~+/=-]$/;
 
@@ -97,6 +105,20 @@
 	}
 
 	/**
+	 * Returns the index of the first character of the run of `pattern` that ends
+	 * at `from`.
+	 * @param {string} text
+	 * @param {number} from 0-based, the run's last index.
+	 * @param {RegExp} pattern
+	 * @returns {number} The run's first index, from + 1 when the run is empty.
+	 */
+	function runStart(text, from, pattern) {
+		var i = from;
+		while (charIs(text, i, pattern)) i--;
+		return i + 1;
+	}
+
+	/**
 	 * Returns the index of the last character of the run of `pattern` starting
 	 * at `from`.
 	 * @param {string} text
@@ -121,9 +143,11 @@
 	 * @param {string} text
 	 * @param {string} needle Non-empty literal.
 	 * @param {boolean} caseInsensitive ASCII-only folding.
-	 * @param {function(string, number, number): (null|{text: string, last: number})} accept
+	 * @param {function(string, number, number): (null|{text: string, last: number, first?: number})} accept
 	 *   Receives the text and the first and last index of the occurrence; returns
-	 *   the replacement and the last index it consumes, or null to keep it.
+	 *   the replacement and the last index it consumes, or null to keep it. It may
+	 *   also return `first`, an earlier index the replacement starts at (never
+	 *   before the end of the previous replacement).
 	 * @returns {string}
 	 */
 	function replaceOccurrences(text, needle, caseInsensitive, accept) {
@@ -137,7 +161,8 @@
 			var last = first + target.length - 1;
 			var accepted = accept(text, first, last);
 			if (accepted) {
-				out += text.substring(pos, first) + accepted.text;
+				var from = typeof accepted.first === 'number' ? Math.max(pos, accepted.first) : first;
+				out += text.substring(pos, from) + accepted.text;
 				pos = accepted.last + 1;
 			} else {
 				out += text.substring(pos, first + 1);
@@ -168,6 +193,71 @@
 				var stop = runEnd(source, last + 1, pattern);
 				if (stop - last < token.min_length) return null;
 				return { text: rules.secret_placeholder, last: stop };
+			});
+		});
+		return text;
+	}
+
+	/**
+	 * Replaces the credential of a URL ("scheme://user:password@host"), keeping
+	 * the scheme and the host.
+	 * @param {string} text
+	 * @param {object} rules
+	 * @returns {string}
+	 */
+	function redactUrlCredentials(text, rules) {
+		return replaceOccurrences(text, '://', false, function (source, first, last) {
+			var stop = runEnd(source, last + 1, URL_USERINFO);
+			if (stop <= last || !charIs(source, stop + 1, /^@$/)) return null;
+			return { text: '://' + rules.secret_placeholder, last: stop };
+		});
+	}
+
+	/**
+	 * Replaces e-mail addresses: a local part, an @, and a dotted domain ending
+	 * in a top-level label of at least two letters.
+	 * @param {string} text
+	 * @param {object} rules
+	 * @returns {string}
+	 */
+	function redactEmails(text, rules) {
+		return replaceOccurrences(text, '@', false, function (source, first, last) {
+			var start = runStart(source, first - 1, EMAIL_LOCAL);
+			if (start === first) return null;
+			var stop = runEnd(source, last + 1, EMAIL_DOMAIN);
+			// A trailing dot or dash is the sentence's, not the domain's
+			while (stop > last && /^[.-]$/.test(source.charAt(stop))) stop--;
+			var domain = source.substring(last + 1, stop + 1);
+			var dot = domain.lastIndexOf('.');
+			if (dot < 1) return null;
+			var tld = domain.substring(dot + 1);
+			if (
+				tld.length < 2 ||
+				!Array.from(tld).every(function (ch) {
+					return LETTER.test(ch);
+				})
+			)
+				return null;
+			return { text: rules.email_placeholder, last: stop, first: start };
+		});
+	}
+
+	/**
+	 * Replaces the profile folder of any other account (a Users folder on
+	 * Windows, /home/other, /Users/other) by the account placeholder, except the shared
+	 * profiles every machine has.
+	 * @param {string} text
+	 * @param {object} rules
+	 * @returns {string}
+	 */
+	function redactForeignHomes(text, rules) {
+		rules.foreign_home_markers.forEach(function (marker) {
+			text = replaceOccurrences(text, marker, true, function (source, first, last) {
+				var stop = runEnd(source, last + 1, PATH_CHAR);
+				if (stop <= last) return null;
+				var name = asciiLower(source.substring(last + 1, stop + 1));
+				if (rules.shared_profile_names.indexOf(name) >= 0) return null;
+				return { text: source.substring(first, last + 1) + rules.account_placeholder, last: stop };
 			});
 		});
 		return text;
@@ -285,9 +375,12 @@
 		context = context && typeof context === 'object' ? context : {};
 		var folded = context.case_insensitive === true;
 		text = redactTokens(text, rules);
+		text = redactUrlCredentials(text, rules);
 		text = redactBearer(text, rules);
 		text = redactKeyValues(text, rules);
 		text = redactHome(text, rules, context.home, folded);
+		text = redactForeignHomes(text, rules);
+		text = redactEmails(text, rules);
 		text = redactAccount(text, rules, context.user, folded);
 		return text;
 	}
