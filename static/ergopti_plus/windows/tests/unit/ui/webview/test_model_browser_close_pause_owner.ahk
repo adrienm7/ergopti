@@ -63,7 +63,7 @@ _MBPT_ChildSource() {
 	Owners := Map()
 	for Symbol in ["t", "I18nGetLocale", "LLM_GetModelIndex", "LLM_Defaults_Load",
 		"LLM_DisplayIndentValues", "LLM_Option_TryNormalize", "_TrayRootErrorIsSilent",
-		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "MasterGateDesiredFeatures",
+		"LLM_Menu_ApplySharedDefaults", "LLM_Engine_Init", "HotstringsLanguageCategories", "ReadTomlFile", "MagicEditorPhysicalCatalogue", "NotifierSend", "MasterGateDesiredFeatures",
 		"MetricsFiltersApplyManifestDefaults", "MS_SaveBuiltToIni", "WPMWidget_Show",
 		"AppPicker_SelectionsEqual", "UpdateChannels_Ids", "UpdateSchedule_Timing",
 		"Updater_LoadChannel", "LLM_ModelBrowser_Show"] {
@@ -76,7 +76,7 @@ _MBPT_ChildSource() {
 		if Symbol == "LLM_Defaults_Load"
 			Code .= "LLM_Defaults_Load()`n"
 	}
-	AssertEqual(20, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
+	AssertEqual(22, Owners.Count, "All native, data, configuration, menu and runtime owners must be included")
 	Fixture := _DriverDir . "\tests\fixtures\model_browser_close_pause_owner_body.ahk"
 	AssertTrue(FileExist(Fixture))
 	return Code . "#Include " . Fixture . "`n"
@@ -87,14 +87,14 @@ _MBPT_ChildSource() {
 _MBPT_StageAssets(Directory) {
 	global _SharedDir
 	for Relative in ["shared", "shared\modules", "shared\modules\llm", "shared\modules\hotstrings", "shared\modules\menu",
-		"shared\modules\diagnostics", "shared\data", "shared\data\locales", "shared\core",
+		"shared\modules\diagnostics", "shared\data", "shared\data\locales", "shared\data\keycodes", "shared\core",
 		"shared\core\config_schema", "shared\core\config_schema\examples", "local-app-data"]
 		FSCreateDirectoryExclusiveStrict(Directory . "\" . Relative)
 	; Stage the complete shipped schema pack for the genuine boot owner, plus
 	; canonical presentation/privacy policies for diagnostics. The component
 	; does not claim every reserved policy is read on its successful cold path.
 	for Relative in ["modules\llm\defaults.json", "modules\llm\models.json", "modules\hotstrings\_index.toml", "data\locales\fr.json", "data\locales\en.json",
-		"modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json",
+		"modules\menu\menu_manifest.json", "modules\diagnostics\redaction.json", "data\keycodes\physical_keys.json",
 		"core\config_schema\migrations.toml", "core\config_schema\config.schema.json",
 		"core\config_schema\tap_hold.schema.json", "core\config_schema\SCHEMA.md",
 		"core\config_schema\examples\hs_tap_hold.example.toml", "core\config_schema\examples\personal_info.example.toml",
