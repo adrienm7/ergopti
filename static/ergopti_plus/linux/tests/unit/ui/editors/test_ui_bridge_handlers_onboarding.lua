@@ -689,30 +689,35 @@ helpers.describe("ui.bridge_handlers", function()
 			local raw = '[_meta]\nschema_version = 7\n[hotstrings]\ntrigger_char = false\n[future]\nkeep = "independent"\n'
 			local concurrent = raw .. '# concurrent edit during candidate staging\n'
 			local original_open, staged = io.open, 0
+			local NativeWriter = require("infra.regular_file_writer")
+			local original_stage = NativeWriter.open
 			local ok, err = pcall(function()
 				helpers.assert_true(os.execute("mkdir -p '" .. target .. "'"))
 				write_file(path, raw)
 				state.writer = require("toml_codec.writer")
-				io.open = function(open_path, mode)
-					local fh, why, code = original_open(open_path, mode)
-					if fh and open_path == path .. ".tmp" and mode == "w" then
+				NativeWriter.open = function(open_path, mode)
+					if open_path ~= path .. ".tmp" or mode ~= "wx" then return original_stage(open_path, mode) end
+					local function opened(fh, ...)
+						if not fh then return fh, ... end
 						return {
 							write = function(_, content) return fh:write(content) end,
 							close = function()
-								local closed = fh:close()
-								staged = staged + 1
-								local source = assert(original_open(path, "w"))
-								assert(source:write(concurrent)); assert(source:close())
-								return closed
+								local function closed(...)
+									staged = staged + 1
+									local source = assert(original_open(path, "w"))
+									assert(source:write(concurrent)); assert(source:close())
+									return ...
+								end
+								return closed(fh:close())
 							end,
-						}
+						}, ...
 					end
-					return fh, why, code
+					return opened(original_stage(open_path, mode))
 				end
 				local refused = finish(state, { locale = "fr", config_dir = target, operations = {
 					{ path = "hotstrings.trigger_char", value = "§" },
 				} })
-				io.open = original_open
+				NativeWriter.open = original_stage
 				helpers.assert_eq(staged, 1, "the actual writer reaches the concurrent staging boundary")
 				helpers.assert_eq(refused, { done = false })
 				helpers.assert_eq(values, { locale = "en", config_dir = previous_dir }, "the failed commit restores preferences")
@@ -732,7 +737,7 @@ helpers.describe("ui.bridge_handlers", function()
 				helpers.assert_true(bytes:find('# concurrent edit during candidate staging', 1, true) ~= nil)
 				helpers.assert_eq(require("toml_codec").decode(bytes).hotstrings.trigger_char, "§")
 			end)
-			io.open = original_open
+			NativeWriter.open = original_stage
 			os.remove(path); os.remove(path .. ".tmp"); os.remove(target)
 			if not ok then error(err, 0) end
 		end)

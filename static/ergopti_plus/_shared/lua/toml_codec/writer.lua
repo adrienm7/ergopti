@@ -47,6 +47,8 @@ local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
 local SourceOpen = require("toml_codec.source_open")
+local NATIVE_WRITER = "infra.regular_file_writer"
+local has_native_writer = package.searchpath(NATIVE_WRITER, package.path) ~= nil
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
 local inline_member_spans = Codec.inline_member_spans
@@ -150,6 +152,18 @@ local function publication_admitted(admission)
 	return called and admitted == true
 end
 
+--- Acquires Linux staging exclusively; other drivers keep their stdio owner.
+--- An installed native module which refuses or fails to load never falls back.
+--- @param tmp_path string Adjacent staging path.
+--- @return file*|nil stream
+--- @return string|nil detail
+--- @return number|string|nil errno
+--- @return function|nil cleanup Native creation's identity-checked removal.
+local function open_staging(tmp_path)
+	if has_native_writer then return require(NATIVE_WRITER).open(tmp_path, "wx") end
+	return io.open(tmp_path, "w")
+end
+
 --- Publishes complete content through a same-directory staging file.
 --- A protected call only proves that Lua did not raise; file methods also
 --- return nil/false for ordinary I/O failures, so every terminal result is
@@ -172,26 +186,30 @@ local function publish(path, content, expected_source, admission)
 		return true
 	end
 	local tmp_path = path .. ".tmp"
-	local open_ok, fh, open_err = pcall(io.open, tmp_path, "w")
+	local open_ok, fh, open_err, _, remove_owned = pcall(open_staging, tmp_path)
 	if not open_ok or not fh then
 		return false, "cannot open staging file: " .. tostring(open_ok and open_err or fh)
+	end
+	local function discard_staging()
+		if has_native_writer then return type(remove_owned) == "function" and remove_owned() end
+		return os.remove(tmp_path)
 	end
 
 	local write_ok, wrote, write_err = pcall(fh.write, fh, content)
 	local close_ok, closed, close_err = pcall(fh.close, fh)
 	if not write_ok or wrote == nil or wrote == false then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "write failed: " .. tostring(write_ok and write_err or wrote)
 	end
 	if not close_ok or closed == nil or closed == false then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "close failed: " .. tostring(close_ok and close_err or closed)
 	end
 	if type(expected_source) == "table" then
 		local current, current_err, current_status = read_batch_source(path)
 		if current_status ~= expected_source.status
 			or (current_status == "ok" and current ~= expected_source.content) then
-			pcall(os.remove, tmp_path)
+			pcall(discard_staging)
 			return false, "source changed before publication: " .. tostring(current_err or current_status)
 		end
 	end
@@ -199,7 +217,7 @@ local function publish(path, content, expected_source, admission)
 	-- The last classified source read has completed. No logical reader or
 	-- observer runs between this captured admission and native publication.
 	if not publication_admitted(admission) then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "publication admission refused"
 	end
 	local rename_ok, renamed, rename_err = pcall(os.rename, tmp_path, path)
@@ -220,7 +238,7 @@ local function publish(path, content, expected_source, admission)
 		end
 	end
 	if not rename_ok or renamed ~= true then
-		pcall(os.remove, tmp_path)
+		pcall(discard_staging)
 		return false, "rename failed: " .. tostring(rename_ok and rename_err or renamed)
 	end
 	return true

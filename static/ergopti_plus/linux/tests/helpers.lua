@@ -143,13 +143,23 @@ end
 --- io.open double keyed on the path never sees. Native classification still
 --- runs first, so a FIFO or a missing file keeps its real receipt; only the
 --- stream of an admitted regular file is reopened by name for the double.
---- A virtual path exists only inside the double, so it skips native admission.
+--- A virtual path and its staging exist only inside the double, so both skip
+--- native admission while keeping the double's own write/close/remove receipts.
 --- @param path string Exact source path the test's io.open double recognises.
 --- @param virtual boolean|nil True when no file exists on disk at that path.
 --- @return function restore Reinstates the native admission.
 function M.route_source_through_stdio(path, virtual)
 	local Reader = require("infra.regular_file_reader")
 	local native = Reader.open
+	local Writer, native_write
+	if virtual then
+		Writer = require("infra.regular_file_writer"); native_write = Writer.open
+		Writer.open = function(candidate, mode)
+			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
+			local stream, detail, errno = io.open(candidate, "w")
+			return stream, detail, errno, function() return os.remove(candidate) end
+		end
+	end
 	Reader.open = function(candidate)
 		if virtual and candidate == path then return io.open(candidate, "r") end
 		local stream, detail, errno = native(candidate)
@@ -157,7 +167,10 @@ function M.route_source_through_stdio(path, virtual)
 		assert(stream:close(), "admitted source stream must close before stdio reopens it")
 		return io.open(candidate, "r")
 	end
-	return function() Reader.open = native end
+	return function()
+		Reader.open = native
+		if Writer then Writer.open = native_write end
+	end
 end
 
 
