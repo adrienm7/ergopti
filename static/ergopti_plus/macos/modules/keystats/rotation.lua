@@ -25,6 +25,7 @@
 local M = {}
 
 local json = require("hs.json")
+local LedgerAppend = require("adapters.ledger_append")
 
 local Logger = require("infra.logger")
 local LOG    = "keystats.rotation"
@@ -76,6 +77,9 @@ local _log_handle = nil
 --- next retry starts on a fresh line so that its complete JSON object remains
 --- independently ingestible after storage recovers.
 local _append_boundary_required = false
+
+--- Fences the exact old stream until durable rollover and native cleanup settle.
+local _pending_rollover = nil
 
 
 
@@ -209,7 +213,7 @@ end
 --- @param entry table The event entry. Must contain a `type` field.
 --- @return boolean True only after one unbuffered write accepted the complete line.
 function M.append_log(entry)
-	if not _require_init("append_log") then return false end
+	if not _require_init("append_log") or _pending_rollover then return false end
 	if type(entry) ~= "table" or type(entry.type) ~= "string" then
 		Logger.warn(LOG, "append_log: invalid entry — skipping")
 		return false
@@ -258,7 +262,7 @@ end
 --- @return integer offset New byte offset, or the previous committed offset on failure.
 --- @return string status One of READ_STATUS_BATCH, READ_STATUS_EOF, READ_STATUS_FAILED.
 function M.read_new_entries()
-	if not _require_init("read_new_entries") then
+	if not _require_init("read_new_entries") or _pending_rollover then
 		return {}, _today_log_offset, M.READ_STATUS_FAILED
 	end
 
@@ -345,49 +349,57 @@ end
 -- =======================================
 -- =======================================
 
---- Perform a daily log rollover: delete today.log and reset the offset
---- so tomorrow starts fresh. The caller (log_manager) must drain the
---- remaining today.log into the ingest pipeline before calling this.
---- @param data_sql_path string Path to the append-only data.sql file.
---- @param read_status string Must be READ_STATUS_EOF from the immediately
---- preceding drain check.
---- @return boolean True when rollover ran, false when the EOF proof was absent.
-function M.rollover(data_sql_path, read_status)
-	if not _require_init("rollover") then return false end
-	if read_status ~= M.READ_STATUS_EOF then
-		Logger.warn(LOG, "rollover refused without a committed EOF status; today.log preserved.")
-		return false
-	end
-
-	local prev_date = _today_log_date or ""
-	local new_date  = _today()
-	local remove_ok, removed_or_error, remove_detail, remove_code = pcall(
-		os.remove, _paths.today_log_path)
-	if not remove_ok or removed_or_error ~= true then
-		Logger.error(LOG, "Cannot remove today.log during rollover (%s, code=%s); state preserved.",
-			tostring(remove_detail or removed_or_error), tostring(remove_code or "unknown"))
-		return false
-	end
-
-	-- Publish the durable boundary only after the old journal is gone. Cache
-	-- recovery interprets this marker as proof that the next journal starts at
-	-- byte zero, so writing it before a refused unlink would duplicate metrics.
-	local f = io.open(data_sql_path, "a")
-	if f then
-		f:write(string.format("\n-- === day rollover %s -> %s ===\n",
-			prev_date, new_date))
-		f:close()
-	end
-
-	-- Close and nil the persistent handle so the next append_log reopens
-	-- against the fresh file. Without this, writes go to the old (now
-	-- unlinked) inode while the new today.log is a different file.
-	if _log_handle then
-		_log_handle:close()
+--- Closes only the stream already owned by this rotation generation.
+local function _close_rollover_stream()
+	if not _log_handle then return true end
+	local closed, ack = pcall(_log_handle.close, _log_handle)
+	if (closed and ack == true) or io.type(_log_handle) == "closed file" then
 		_log_handle = nil
+		return true
 	end
-	_today_log_offset = 0
-	_today_log_date   = new_date
+	Logger.error(LOG, "Rollover journal stream close remains pending; writer fenced.")
+	return false
+end
+
+--- Retires a drained journal through the canonical ledger's durable owner.
+--- A failed attempt keeps its exact dates and stream fenced for resume before
+--- any queue drain or tail read. Reset acknowledgement distinguishes cleanup-only
+--- retries after terminal publication from attempts that still need preparation.
+--- @param data_sql_path string Canonical local ledger path.
+--- @param read_status string Committed EOF required when beginning an attempt.
+--- @param reset function Idempotent transactional cache reset.
+--- @param origin function Existing complete-ledger admission predicate.
+--- @return boolean committed True only after durable intent and native cleanup settle.
+function M.rollover(data_sql_path, read_status, reset, origin)
+	if not _require_init("rollover") then return false end
+	if not _pending_rollover then
+		if read_status ~= M.READ_STATUS_EOF then
+			Logger.warn(LOG, "rollover refused without a committed EOF status; today.log preserved.")
+			return false
+		end
+		_pending_rollover = { offset = _today_log_offset,
+			previous_date = _today_log_date or "", date = _today(), reset_committed = false }
+	end
+	if not _close_rollover_stream() then return false end
+	local pending = _pending_rollover
+	local function checked_reset(next_date, completion)
+		if next_date ~= pending.date or reset(next_date) ~= true then return false end
+		pending.reset_committed, pending.completion = true, completion
+		return true
+	end
+	local committed
+	if pending.reset_committed then
+		-- Terminal publication may already have succeeded before release refused.
+		-- Recovery never prepares a new retirement when only cleanup remains.
+		committed = LedgerAppend.recover(data_sql_path, "", _paths.today_log_path, checked_reset, pending.completion)
+	else
+		committed = LedgerAppend.rollover(data_sql_path, _paths.today_log_path, pending.offset,
+			pending.previous_date, pending.date, checked_reset, origin)
+	end
+	if committed ~= true then return false end
+	_today_log_offset, _today_log_date = 0, pending.date
+	_append_boundary_required = false
+	_pending_rollover = nil
 	return true
 end
 
