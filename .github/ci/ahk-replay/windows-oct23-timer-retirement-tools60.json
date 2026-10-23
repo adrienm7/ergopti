@@ -1,0 +1,29 @@
+{
+	"expected_count": 60,
+	"filters": [
+		{
+			"contains": "TimerScheduler",
+			"expected_count": 46
+		},
+		{
+			"contains": "timer_scheduler",
+			"expected_count": 2
+		},
+		{
+			"contains": "tools-cache-wrap",
+			"expected_count": 2
+		},
+		{
+			"contains": "agent-tools-native64-ttl-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "timer-scheduler-record-lifetime",
+			"expected_count": 3
+		},
+		{
+			"contains": "timer-scheduler-retirement-after",
+			"expected_count": 4
+		}
+	]
+}
