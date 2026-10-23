@@ -1587,7 +1587,8 @@ _TooltipUiaProcessIsHostile(ProcName) {
 		if (ProcName == "" or !_TooltipUiaHostileCache.Has(ProcName))
 				return false
 		Entry := _TooltipUiaHostileCache[ProcName]
-		if !TickExpired(Entry.Tick, Entry.DurationMs)
+		; Hostile entries retain the full native A_TickCount clock.
+		if !TickExpired64(Entry.Tick, Entry.DurationMs)
 				return true
 		_TooltipUiaHostileCache.Delete(ProcName)
 		return false
