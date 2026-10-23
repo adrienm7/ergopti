@@ -113,7 +113,7 @@ local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S")
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
 -- follows symlinks and honours any macOS path aliasing), rather than naively
 -- concatenating HOME ourselves.  The CI/test override is still honoured first.
-local KARABINER_KE_TILDE_PATH = "~/.config/karabiner/karabiner.json"
+local KARABINER_KE_TILDE_PATH = require("platform.remap.ke_paths").config_file_for("shared")
 
 -- Resolved at M.init() time via the injected FileSystem adapter.
 -- Kept as a module-level variable (not constant) so generator calls can
@@ -203,6 +203,20 @@ local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after a
 local _ke_variables_recovery_observer = nil -- Exact callback owned by this remap lifecycle
 
 local _state = nil
+
+-- The owned runtime (ADR 011) is a field of the module table because this chunk
+-- is at Lua's limit of 200 local variables. `owner` is the runtime owner module,
+-- present only after an explicit opt-in with `[karabiner] runtime = "owned"`;
+-- default boot never requires that module. `paths` is the runtime-selected
+-- path table.
+M._owned = { owner = nil, paths = require("platform.remap.ke_paths") }
+
+--- True when this boot opted in to the owned runtime.
+--- @return boolean owned
+function M._owned.selected()
+	return _state ~= nil and _state.runtime == M._owned.paths.RUNTIME_OWNED
+end
+
 local _enabled_transition = nil
 local _enabled_preflight = nil -- Owns async onboarding settlement before disable can enter STOPPED
 local _bulk_settings_transaction = nil -- Owns candidate publication and exact inverse recovery
@@ -6132,6 +6146,12 @@ function M.regenerate(
 		Logger.debug(LOG, "Regenerate skipped — Karabiner integration is disabled.")
 		return fail("integration-disabled")
 	end
+	-- The owned runtime never falls back to the shared one: until it is admitted
+	-- nothing is generated, and the owner's own log names why.
+	if M._owned.selected() and not (M._owned.owner and M._owned.owner.admitted()) then
+		Logger.warn(LOG, "Regenerate skipped — the owned Karabiner runtime is not admitted.")
+		return fail("owned-runtime-not-admitted")
+	end
 
 	-- « pause = tout éteint ». Normal rules are now also gated by the exact pause
 	-- variable, so a rebuild cannot reactivate them. It would still perform config
@@ -6270,6 +6290,9 @@ function M.regenerate(
 	-- Counted before the call: a failed deploy may still have written.
 	_deploy_serial = _deploy_serial + 1
 	local deploy_ok, deployed, deploy_detail, _, deploy_refusal = xpcall(function()
+		if M._owned.selected() then
+			return Generator.deploy_owned_config(result, KARABINER_OUT)
+		end
 		return Generator.merge_and_deploy_config(
 			result,
 			KARABINER_OUT,
@@ -6342,6 +6365,19 @@ function M.regenerate(
 		Logger.error(LOG, "Karabiner lease cannot regenerate from phase '%s'.",
 			tostring(status_phase))
 		return fail("invalid-lease-phase")
+	end
+	if M._owned.selected() then
+		-- The user-side process starts only now that its configuration is on disk.
+		local prepared_start = start_lease
+		start_lease = function(on_ready)
+			return M._owned.owner.ensure_peers(function(ready, why)
+				if ready ~= true then
+					on_ready(false, "owned-runtime-" .. tostring(why))
+					return
+				end
+				if prepared_start(on_ready) ~= true then on_ready(false, "activation-request-rejected") end
+			end)
+		end
 	end
 	local layout_guard = nil
 	if not is_lease_failure_recovery then
@@ -6721,6 +6757,45 @@ end
 -- ============================
 -- ============================
 
+--- Binds the owned runtime owner to the real Mac ports and admits the runtime.
+--- Admission failure is reported by the owner with a named reason and leaves the
+--- bridge fail-closed: nothing falls back to the shared runtime. When admission
+--- succeeds, the configuration is generated and deployed to the owned path.
+--- @return boolean started False when the owner could not be bound.
+function M._owned.start()
+	local Owner = require("platform.remap.runtime_owner")
+	Logger.start(LOG, "Opting in to the owned Karabiner runtime…")
+	local ports_ok, ports = pcall(function() return require("adapters.runtime_owner_ports").new() end)
+	if not ports_ok then
+		Logger.error(LOG, "Owned Karabiner runtime ports could not be built: %s.", tostring(ports))
+		return false
+	end
+	if not Owner.init(ports) then
+		Logger.error(LOG, "Owned Karabiner runtime owner was already bound; the bridge stays fail-closed.")
+		return false
+	end
+	M._owned.owner = Owner
+	local epoch = _lifecycle_epoch
+	local accepted = Owner.start({ close_other_instances = Owner.CLOSE_OTHER_INSTANCES_DEFAULT, capture = false },
+		function(admitted, reason, explanation)
+			if epoch ~= _lifecycle_epoch or not _running then return end
+			if admitted ~= true then
+				Logger.error(LOG, "Owned Karabiner runtime refused (%s): %s Remapping stays off.",
+					tostring(reason), tostring(explanation))
+				return
+			end
+			if _state.enabled == true and not M.regenerate() then
+				Logger.error(LOG, "Owned Karabiner runtime was admitted but its configuration could not be requested.")
+			end
+		end)
+	if accepted ~= true then
+		Logger.error(LOG, "Owned Karabiner runtime admission could not start.")
+		return false
+	end
+	Logger.success(LOG, "Owned Karabiner runtime admission requested.")
+	return true
+end
+
 --- Initializes the Karabiner bridge.
 --- @param file_system table FileSystem port adapter (adapters/file_system.lua).
 ---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
@@ -6780,6 +6855,23 @@ function M.init(file_system)
 		return false
 	end
 	local first_launch = user_config_status == "absent"
+
+	-- The runtime this boot targets: shared unless config_karabiner.toml opted
+	-- in by hand. The command line tool every variable writer spells is chosen
+	-- here, once, and an owned boot writes its own complete file.
+	local runtime = user_cfg.runtime or M._owned.paths.RUNTIME_SHARED
+	local runtime_ok, runtime_err = pcall(M._owned.paths.select_runtime, runtime)
+	if not runtime_ok then
+		Logger.error(LOG, "Karabiner bridge initialization refused: %s", tostring(runtime_err))
+		return false
+	end
+	if runtime == M._owned.paths.RUNTIME_OWNED then
+		Logger.warn(LOG, "Opted in to the owned Karabiner runtime (not shipped; hidden preference).")
+		if not (env_override and env_override ~= "") then
+			KARABINER_OUT = file_system.expand_path(M._owned.paths.config_file_for(runtime))
+			Logger.info(LOG, "Owned KE config path resolved: '%s'.", KARABINER_OUT)
+		end
+	end
 
 	--- Retains failed boot publication before any remap runtime or native lease.
 	--- Failed native publication retains cleanup only: these saved defaults or
@@ -6841,6 +6933,7 @@ function M.init(file_system)
 
 	_state = {
 		enabled                   = user_cfg.enabled,
+		runtime                   = runtime,
 		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		mod_combos_enabled        = user_cfg.mod_combos_enabled,
 		tap_hold_config           = user_cfg.tap_hold_config,
@@ -7046,7 +7139,14 @@ function M.init(file_system)
 	-- aborting the timer while still making it visible in the file logger.
 	-- The session guard prevents the dialog from re-appearing on every
 	-- hs.reload() within the same Hammerspoon session.
-	if _state.enabled and not _wizard_ran_this_session then
+	-- The owned runtime is installed by its own installer, not by the wizard that
+	-- offers the official application.
+	if M._owned.selected() and _state.enabled then
+		if M._owned.start() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime could not be started; remapping stays off.")
+		end
+	end
+	if _state.enabled and not M._owned.selected() and not _wizard_ran_this_session then
 		_wizard_ran_this_session = true
 		local wizard_epoch = _lifecycle_epoch
 		if schedule_first_run_wizard(wizard_epoch) ~= true then
@@ -7072,6 +7172,15 @@ local function stop_local_resources()
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
 	if clear_ke_variables_recovery_observer() ~= true then all_stopped = false end
+	if M._owned.owner then
+		local stopped = M._owned.owner.stop()
+		if stopped ~= true or M._owned.owner.release() ~= true then
+			Logger.error(LOG, "Owned Karabiner runtime is still retained after teardown.")
+			all_stopped = false
+		else
+			M._owned.owner = nil
+		end
+	end
 	-- The module-level contract owns timers, installer tasks, partials, and mounts
 	if stop_loaded_onboarding("Karabiner local teardown") ~= true then all_stopped = false end
 	if release_wake_watcher("Wake watcher") ~= true then all_stopped = false end
