@@ -44,6 +44,15 @@ M.GRABBER = BIN_DIR .. "karabiner_grabber"
 M.CORE_SERVICE = SUPPORT_DIR
 	.. "Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
 
+--- The helper through which Karabiner-Elements registers, unregisters and asks
+--- about its own user agents (`running`, `unregister-core-agents`). It is the
+--- exact tool Karabiner's own « Quit Karabiner-Elements » runs, so it is the only
+--- way the default-on « close other Karabiner instances » option (ADR 011) asks
+--- the official application to quit. It was read at v16.0.0, the version the
+--- shared runtime installs, and at the revision the owned runtime is built from.
+M.NON_PRIVILEGED_AGENTS = SUPPORT_DIR
+	.. "Karabiner-Elements Non-Privileged Agents v2.app/Contents/MacOS/Karabiner-Elements Non-Privileged Agents v2"
+
 
 
 

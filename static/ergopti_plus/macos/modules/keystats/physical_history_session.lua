@@ -26,7 +26,7 @@ local function scope_ports(scope, names)
 	return result
 end
 
-local function resolve_native_ports(managed, media_constructor)
+local function resolve_native_ports(managed, media_constructor, spawn)
 	local native = rawget(_G, "hs")
 	local json = type(native) == "table" and rawget(native, "json") or nil
 	local decode, encode = port(json, "decode"), port(json, "encode")
@@ -37,7 +37,7 @@ local function resolve_native_ports(managed, media_constructor)
 	local engine_bind = port(Keystats, "bind_physical_lifecycle_observer")
 	local system_bind, pause_bind = port(Watchers, "bind_physical_lifecycle_observer"), port(ScriptControl, "bind_physical_pause_observer")
 	local context_sample = managed and port(Tracker, "sample_physical_context") or nil
-	return { media_constructor = media_constructor, context_sample = context_sample, decode = decode, encode = encode, capture_init = capture_init, capture_bind = capture_bind, capture_stop = capture_stop, clock_bind = clock_bind, project = project, configuration_bind = configuration_bind, context_bind = context_bind, may_persist = may_persist, engine_bind = engine_bind, system_bind = system_bind, pause_bind = pause_bind }
+	return { media_constructor = media_constructor, spawn = spawn, context_sample = context_sample, decode = decode, encode = encode, capture_init = capture_init, capture_bind = capture_bind, capture_stop = capture_stop, clock_bind = clock_bind, project = project, configuration_bind = configuration_bind, context_bind = context_bind, may_persist = may_persist, engine_bind = engine_bind, system_bind = system_bind, pause_bind = pause_bind }
 end
 
 local function new_session(capacity, on_refused, native_ports)
@@ -548,7 +548,9 @@ local function new_manager(capacity, on_refused, native_ports)
 	if not prepared then return nil, "physical_history_media_preparation_failed" end
 	local capture_ports = {
 		media = media,
-		spawn = port(ShellRunner, "spawn"), decode = native_ports.decode, encode = native_ports.encode,
+		-- The owned runtime supplies its installed-source task port; every other
+		-- caller keeps the shell runner.
+		spawn = native_ports.spawn or port(ShellRunner, "spawn"), decode = native_ports.decode, encode = native_ports.encode,
 		clock_ready = function(info) return routes("clock_ready", info) end,
 		baseline_ready = function() return routes("baseline_ready") end,
 		context = function(ticks) return routes("context", ticks) end,
@@ -680,15 +682,16 @@ local function validate_options(options)
 end
 
 --- Installs captured ports once; neither form starts or installs a native runtime.
-function M.init(capacity, on_refused, options, media_constructor)
+function M.init(capacity, on_refused, options, media_constructor, spawn)
 	local managed = validate_options(options)
 	assert(media_constructor == nil or managed and type(media_constructor) == "function",
 		"Invalid optional physical media constructor")
+	assert(spawn == nil or managed and type(spawn) == "function", "Invalid optional physical spawn port")
 	assert(math.type(capacity) == "integer" and capacity > 0 and capacity <= Coordinator.MAX_HISTORY,
 		"Invalid native history session budget")
 	assert(type(on_refused) == "function", "Missing native history session refusal observer")
 	if initialized or initializing then return nil, "physical_history_session_already_initialized" end
-	local native_ports = resolve_native_ports(managed, media_constructor)
+	local native_ports = resolve_native_ports(managed, media_constructor, spawn)
 	if managed then
 		local manager, reason, stop = new_manager(capacity, on_refused, native_ports)
 		if manager then current_owner, current_stop, current_retired = manager, stop, manager.retired end
@@ -718,9 +721,9 @@ end
 --- Capture the original initializer so public facade replacement cannot redirect
 --- this factory into a different owner or numeric fallback.
 local prepare_original = M.init
-function M.prepare_managed_metrics(capacity, on_refused)
+function M.prepare_managed_metrics(capacity, on_refused, spawn)
 	local constructor = port(require("modules.keystats.physical_media_metrics"), "new")
-	return prepare_original(capacity, on_refused, { managed = true }, constructor)
+	return prepare_original(capacity, on_refused, { managed = true }, constructor, spawn)
 end
 
 --- Forwards only to this module's privately captured, already initialized owner.

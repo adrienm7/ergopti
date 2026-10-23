@@ -4,11 +4,11 @@
 --- MODULE: Owned Karabiner Runtime Owner
 --- DESCRIPTION:
 --- The one Lua owner of the Ergopti background Karabiner runtime (ADR 011,
---- HS-274): it decides whether the runtime may run on this Mac, starts its
---- user-side process after the owned configuration exists, restarts it only on
---- explicit request, and stops it together with the physical capture. Dormant:
---- nothing requires this module at default boot, and every effect goes through a
---- port, so the whole state machine is testable with fakes.
+--- HS-274): it decides whether the runtime may run on this Mac, requests the
+--- user side of the runtime after the owned configuration exists, restarts it
+--- only on explicit request, and stops it. Dormant: nothing requires this module
+--- at default boot, and every effect goes through a port, so the whole state
+--- machine is testable with fakes.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Explicit Ownership: `init` binds the ports once and refuses a second
@@ -19,14 +19,17 @@
 ---    artifact each produce `unavailable` with a stable reason and a sentence
 ---    explaining it. The owner never selects the shared runtime on its own.
 --- 3. Read-Only Admission: the privileged jobs (VirtualHIDDevice daemon, Core
----    service) belong to the installer, so admission only observes them. The
----    one process this module spawns is the user-side Console, with the owned
----    XDG_CONFIG_HOME and an owner PID that makes it exit with Hammerspoon.
---- 4. Capture Before Peer: stopping revokes the physical capture first, so no
----    credit is recorded while the keyboard returns to native input.
---- 5. No Retry Loop: a lost peer is reported once as `failed`; restarting is a
----    caller decision. A stop settles only on observed exits and may be called
----    again to retry the same retained handles.
+---    service) belong to the installer, so admission only observes them. This
+---    module spawns no process at all.
+--- 4. One Console Owner: the user-side Console belongs to the signed launcher's
+---    installed-source role, which acquires, starts and retires it together
+---    with the capture stream (ADR 011, decision 8). This module only requests
+---    the stream through the capture port, so two Consoles can never run. The
+---    runtime is READY when the capture reports its first admitted stream,
+---    which proves the Console, the Core and the stream are all up.
+--- 5. No Retry Loop: a lost or timed-out capture is reported once as `failed`;
+---    restarting is a caller decision. A stop settles only on the observed
+---    retirement of the capture and may be called again to retry it.
 --- ==============================================================================
 
 local Logger = require("infra.logger")
@@ -38,7 +41,8 @@ local M = {}
 local LOG = "remap.runtime_owner"
 
 --- Lifecycle states. `admitted` means every precondition holds and the
---- configuration may be deployed; `ready` means the user-side process runs.
+--- configuration may be deployed; `ready` means the capture admitted its first
+--- stream, so the user side of the runtime runs.
 M.STATE = {
 	UNINITIALIZED = "uninitialized",
 	IDLE = "idle",
@@ -56,11 +60,21 @@ local STATE = M.STATE
 --- ADR 011 decision 3: quitting another active Karabiner is on by default.
 M.CLOSE_OTHER_INSTANCES_DEFAULT = true
 
+--- Seconds between two looks at the capture while the runtime starts.
+M.READY_POLL_INTERVAL_SEC = 0.25
+
+--- Seconds the runtime may take to reach its first admitted stream.
+M.READY_TIMEOUT_SEC = 30
+
+--- The capture states the owner understands (adapters/runtime_capture_port.lua).
+M.CAPTURE_STARTING = "starting"
+M.CAPTURE_ADMITTED = "admitted"
+M.CAPTURE_STOPPED = "stopped"
+
 --- Stable reasons of the `unavailable` and `failed` states.
 M.REASON = {
 	ARTIFACT_UNPINNED = "artifact_unpinned",
 	CAPTURE_UNPINNED = "capture_unpinned",
-	CAPTURE_UNBOUND = "capture_unbound",
 	NOT_INSTALLED = "runtime_not_installed",
 	JOB_NOT_LOADED = "runtime_job_not_loaded",
 	LAUNCHD_UNREADABLE = "launchd_unreadable",
@@ -71,9 +85,10 @@ M.REASON = {
 	OTHER_STILL_RUNNING = "other_karabiner_still_running",
 	PROBE_FAILED = "coexistence_probe_failed",
 	CONFIG_MISSING = "owned_configuration_missing",
-	PEER_SPAWN_FAILED = "peer_spawn_failed",
-	PEER_EXITED = "peer_exited",
 	CAPTURE_REFUSED = "capture_start_refused",
+	CAPTURE_LOST = "capture_lost",
+	CAPTURE_TIMEOUT = "capture_start_timeout",
+	TIMER_REFUSED = "readiness_timer_refused",
 }
 local REASON = M.REASON
 
@@ -82,19 +97,21 @@ local PORT_FUNCTIONS = {
 	launchd = { "loaded" },
 	system_extensions = { "listing" },
 	coexistence = { "detect" },
-	process = { "spawn", "owner_pid" },
 	artifact = { "pinned" },
+	capture = { "start", "stop", "status", "on_lost" },
+	timer = { "after", "cancel" },
 }
 
 local ports
 local state = STATE.UNINITIALIZED
 local state_reason, state_explanation
 local run
-local peer
 local capture_started, capture_settled = false, true
-local current_options
 local stop_observer
 local ready_waiters = {}
+local ready_poll
+local ready_polls = 0
+local capture_lost_handler
 
 
 
@@ -131,10 +148,6 @@ local function validate_ports(candidate)
 	end
 	assert(candidate.coexistence.close == nil or type(candidate.coexistence.close) == "function",
 		"Invalid owned runtime port: coexistence.close")
-	if candidate.capture ~= nil then
-		assert(type(candidate.capture) == "table" and type(candidate.capture.start) == "function"
-			and type(candidate.capture.stop) == "function", "Invalid owned runtime capture port")
-	end
 	assert(candidate.observer == nil or type(candidate.observer) == "function", "Invalid owned runtime observer")
 end
 
@@ -146,12 +159,14 @@ end
 ---   system_extensions.listing(fn(text|nil)) is the `systemextensionsctl list` output;
 ---   coexistence.detect(fn(count|nil)) counts other active Karabiner processes and
 ---     coexistence.close(fn(ok)) (optional) asks them to quit;
----   process.spawn(executable, arguments, environment, fn(exit_code)) -> handle with
----     start() -> boolean, terminate() and isSettled() -> boolean; process.owner_pid() -> integer;
 ---   artifact.pinned() -> table { virtual_hid_version, capture = start options|nil } or nil, reason;
----   capture.start(options) -> boolean, capture.stop(fn) -> settled boolean (the
----     modules.keystats.physical_capture contract), capture.status() -> table.
---- @param candidate table fs, launchd, system_extensions, coexistence, process, artifact; optional capture, observer.
+---   capture.start(options) -> boolean accepted; capture.stop(fn) -> settled boolean, fn(true)
+---     once it settles; capture.status() -> table { state = starting|admitted|stopped };
+---     capture.on_lost(fn) registers fn(reason) for a capture lost after it started.
+---     The capture port owns the launcher's installed-source stream, and through it the
+---     Console; the owner never spawns a process;
+---   timer.after(seconds, fn) -> handle, committed; timer.cancel(handle).
+--- @param candidate table fs, launchd, system_extensions, coexistence, artifact, capture, timer; optional observer.
 --- @return boolean initialized False when already initialized.
 function M.init(candidate)
 	if ports then
@@ -161,22 +176,28 @@ function M.init(candidate)
 	validate_ports(candidate)
 	Logger.start(LOG, "Initializing the owned runtime owner…")
 	ports = candidate
+	local bound = ports
+	capture_lost_handler = function(why)
+		if ports ~= bound then return end
+		M._capture_lost(why)
+	end
+	ports.capture.on_lost(capture_lost_handler)
 	set_state(STATE.IDLE)
 	Logger.success(LOG, "Owned runtime owner initialized; nothing is started.")
 	return true
 end
 
 --- Returns the ports back to unbound once nothing is retained.
---- @return boolean released False while a start, a peer or a capture is retained.
+--- @return boolean released False while a start or a capture is retained.
 function M.release()
 	if not ports then return true end
 	local retained = state == STATE.STARTING or state == STATE.ADMITTED or state == STATE.PEERS_STARTING
-		or state == STATE.READY or state == STATE.STOPPING or peer ~= nil or not capture_settled
+		or state == STATE.READY or state == STATE.STOPPING or not capture_settled
 	if retained then
 		Logger.warn(LOG, "Owned runtime owner release refused while state is %s.", state)
 		return false
 	end
-	ports, run, current_options, stop_observer = nil, nil, nil, nil
+	ports, run, stop_observer, capture_lost_handler = nil, nil, nil, nil
 	ready_waiters = {}
 	state, state_reason, state_explanation = STATE.UNINITIALIZED, nil, nil
 	Logger.info(LOG, "Owned runtime owner released.")
@@ -184,17 +205,14 @@ function M.release()
 end
 
 --- Reports the lifecycle without exposing live handles.
---- @return table status { state, reason, explanation, peer, capture }.
+--- @return table status { state, reason, explanation, capture }.
 function M.status()
 	local capture
-	if ports and ports.capture and type(ports.capture.status) == "function" then
+	if ports and type(ports.capture.status) == "function" then
 		local ok, value = pcall(ports.capture.status)
 		capture = ok and value or { state = "unreadable" }
 	end
-	local peer_state = "none"
-	if peer then peer_state = peer.exited and "exited" or "running" end
-	return { state = state, reason = state_reason, explanation = state_explanation, peer = peer_state,
-		capture = capture }
+	return { state = state, reason = state_reason, explanation = state_explanation, capture = capture }
 end
 
 --- True while the generated configuration may be deployed to the owned path.
@@ -304,24 +322,25 @@ end
 
 --- Starts admission: observes the machine and reaches `admitted` or names why not.
 --- Nothing is started, written or closed unless the close option asks for it.
---- @param options table { close_other_instances = boolean, capture = boolean }.
+--- The user side of the runtime always runs with the physical capture, because the
+--- launcher that owns the Console is the capture's only entry.
+--- @param options table { close_other_instances = boolean }.
 --- @param on_settled function|nil fn(admitted, reason, explanation) called once.
 --- @return boolean accepted False in a state that cannot start.
 function M.start(options, on_settled)
 	assert(ports, "Owned runtime owner is not initialized")
-	assert(type(options) == "table" and type(options.close_other_instances) == "boolean"
-		and type(options.capture) == "boolean", "Invalid owned runtime start options")
+	assert(type(options) == "table" and type(options.close_other_instances) == "boolean",
+		"Invalid owned runtime start options")
 	assert(on_settled == nil or type(on_settled) == "function", "Invalid owned runtime start callback")
 	local startable = state == STATE.IDLE or state == STATE.UNAVAILABLE or state == STATE.FAILED
 		or state == STATE.STOPPED
-	if not startable or peer ~= nil or not capture_settled then
-		Logger.warn(LOG, "Owned runtime start refused in state %s; stop it first if a process is retained.", state)
+	if not startable or not capture_settled then
+		Logger.warn(LOG, "Owned runtime start refused in state %s; stop it first if a capture is retained.", state)
 		return false
 	end
-	local attempt = { options = { close_other_instances = options.close_other_instances,
-		capture = options.capture }, on_settled = on_settled, done = false }
+	local attempt = { options = { close_other_instances = options.close_other_instances },
+		on_settled = on_settled, done = false }
 	run = attempt
-	current_options = attempt.options
 	set_state(STATE.STARTING)
 	Logger.start(LOG, "Admitting the owned runtime…")
 	local pinned, pinned_reason = ports.artifact.pinned()
@@ -330,12 +349,7 @@ function M.start(options, on_settled)
 			"No pinned runtime artifact is available: " .. tostring(pinned_reason or "invalid manifest") .. ".")
 		return true
 	end
-	if attempt.options.capture and not ports.capture then
-		settle_start(attempt, STATE.UNAVAILABLE, REASON.CAPTURE_UNBOUND,
-			"This build binds no physical capture owner.")
-		return true
-	end
-	if attempt.options.capture and type(pinned.capture) ~= "table" then
+	if type(pinned.capture) ~= "table" then
 		settle_start(attempt, STATE.UNAVAILABLE, REASON.CAPTURE_UNPINNED,
 			"The pinned artifact declares no physical capture executable.")
 		return true
@@ -367,11 +381,11 @@ end
 
 
 
--- ===================================
--- ===================================
--- ======= 3/ Peer And Capture =======
--- ===================================
--- ===================================
+-- ================================
+-- ================================
+-- ======= 3/ Capture Start =======
+-- ================================
+-- ================================
 
 --- Calls every waiter of ensure_peers once.
 --- @param ok boolean Whether the runtime is ready.
@@ -385,10 +399,17 @@ local function flush_waiters(ok, why)
 	end
 end
 
---- Records that a started peer or capture can no longer be trusted.
+--- Stops watching the capture for its first admission.
+local function cancel_ready_poll()
+	if ready_poll ~= nil and ports then ports.timer.cancel(ready_poll) end
+	ready_poll = nil
+end
+
+--- Records that a started capture can no longer be trusted.
 --- @param why string Stable reason.
 --- @param detail string Explanation.
 local function lose(why, detail)
+	cancel_ready_poll()
 	set_state(STATE.FAILED, why, detail)
 	Logger.error(LOG, "Owned runtime lost (%s): %s", why, detail)
 	if capture_started and not capture_settled then
@@ -400,25 +421,54 @@ local function lose(why, detail)
 	flush_waiters(false, why)
 end
 
-local finish_stop
-
---- Handles the exit of the user-side process.
---- @param candidate table The peer that exited.
---- @param code any Exit code.
-local function peer_exited(candidate, code)
-	candidate.exited, candidate.code = true, code
-	if peer ~= candidate then return end
-	if state == STATE.STOPPING then return finish_stop() end
-	if state == STATE.READY or state == STATE.PEERS_STARTING then
-		lose(REASON.PEER_EXITED, "The runtime's user-side process exited with code " .. tostring(code) .. ".")
-	end
+--- Handles the capture owner's report that its stream is gone.
+--- @param why any Reason text from the capture owner.
+function M._capture_lost(why)
+	if state ~= STATE.READY and state ~= STATE.PEERS_STARTING then return end
+	lose(REASON.CAPTURE_LOST, "The physical capture was lost: " .. tostring(why) .. ".")
 end
 
---- Starts the user-side process once the owned configuration exists, then the
---- physical capture when it was requested. Calls `on_ready` exactly once when
---- the request is accepted.
+local finish_stop
+local schedule_ready_poll
+
+--- Looks at the capture once while the runtime starts.
+local function poll_ready()
+	ready_poll = nil
+	if state ~= STATE.PEERS_STARTING then return end
+	local ok, status = pcall(ports.capture.status)
+	local capture_state = ok and type(status) == "table" and status.state or nil
+	if capture_state == M.CAPTURE_ADMITTED then
+		set_state(STATE.READY)
+		Logger.success(LOG, "Owned runtime started: the capture admitted its first stream.")
+		return flush_waiters(true, "ready")
+	end
+	if capture_state ~= M.CAPTURE_STARTING then
+		return lose(REASON.CAPTURE_LOST, "The physical capture ended before its first stream was admitted ("
+			.. tostring(capture_state) .. ").")
+	end
+	ready_polls = ready_polls + 1
+	if ready_polls * M.READY_POLL_INTERVAL_SEC >= M.READY_TIMEOUT_SEC then
+		return lose(REASON.CAPTURE_TIMEOUT, "The physical capture admitted no stream within "
+			.. tostring(M.READY_TIMEOUT_SEC) .. " seconds.")
+	end
+	schedule_ready_poll()
+end
+
+--- Arms the next look at the capture.
+schedule_ready_poll = function()
+	local handle, committed = ports.timer.after(M.READY_POLL_INTERVAL_SEC, poll_ready)
+	if committed ~= true then
+		return lose(REASON.TIMER_REFUSED, "The readiness check could not be scheduled.")
+	end
+	ready_poll = handle
+end
+
+--- Requests the physical capture, whose launcher role owns the Console, once the
+--- owned configuration exists. Calls `on_ready` exactly once when the request is
+--- accepted: with true when the capture admits its first stream, with false and a
+--- stable reason when it is refused, lost or too slow.
 --- @param on_ready function fn(ready, reason).
---- @return boolean accepted False when the state cannot start peers (no callback).
+--- @return boolean accepted False when the state cannot start the capture (no callback).
 function M.ensure_peers(on_ready)
 	assert(type(on_ready) == "function", "Missing owned runtime ready callback")
 	if state == STATE.READY then
@@ -430,49 +480,30 @@ function M.ensure_peers(on_ready)
 		return true
 	end
 	if state ~= STATE.ADMITTED then
-		Logger.warn(LOG, "Owned runtime peers refused in state %s.", state)
+		Logger.warn(LOG, "Owned runtime capture refused in state %s.", state)
 		return false
 	end
 	local owned = KePaths.OWNED
 	local config_file = ports.fs.expand(owned.CONFIG_FILE)
 	if ports.fs.exists(config_file) ~= true then
-		Logger.error(LOG, "Owned runtime peers not started: the owned configuration is missing.")
+		Logger.error(LOG, "Owned runtime capture not started: the owned configuration is missing.")
 		on_ready(false, REASON.CONFIG_MISSING)
 		return true
 	end
 	set_state(STATE.PEERS_STARTING)
 	ready_waiters[#ready_waiters + 1] = on_ready
-	Logger.start(LOG, "Starting the owned runtime's user-side process…")
-	local candidate = { exited = false }
-	local environment = { XDG_CONFIG_HOME = ports.fs.expand(owned.CONFIG_HOME) }
-	local arguments = { "--owner-pid", tostring(ports.process.owner_pid()) }
-	candidate.handle = ports.process.spawn(owned.CONSOLE, arguments, environment, function(code)
-		peer_exited(candidate, code)
-	end)
-	peer = candidate
-	if type(candidate.handle) ~= "table" or candidate.handle.start() ~= true then
-		candidate.exited = true
-		peer = nil
-		set_state(STATE.FAILED, REASON.PEER_SPAWN_FAILED, "The user-side process could not be started.")
-		Logger.error(LOG, "Owned runtime user-side process could not be started.")
-		flush_waiters(false, REASON.PEER_SPAWN_FAILED)
+	Logger.start(LOG, "Requesting the physical capture and, through it, the runtime's Console…")
+	local pinned = ports.artifact.pinned()
+	local accepted = type(pinned) == "table" and ports.capture.start(pinned.capture)
+	if accepted ~= true then
+		set_state(STATE.FAILED, REASON.CAPTURE_REFUSED, "The physical capture refused to start.")
+		Logger.error(LOG, "Owned runtime physical capture refused to start.")
+		flush_waiters(false, REASON.CAPTURE_REFUSED)
 		return true
 	end
-	if current_options.capture then
-		local pinned = ports.artifact.pinned()
-		local accepted = ports.capture and type(pinned) == "table" and ports.capture.start(pinned.capture)
-		if accepted ~= true then
-			-- The peer stays retained so a stop can settle it; nothing is credited.
-			set_state(STATE.FAILED, REASON.CAPTURE_REFUSED, "The physical capture refused to start.")
-			Logger.error(LOG, "Owned runtime physical capture refused to start.")
-			flush_waiters(false, REASON.CAPTURE_REFUSED)
-			return true
-		end
-		capture_started, capture_settled = true, false
-	end
-	set_state(STATE.READY)
-	Logger.success(LOG, "Owned runtime user-side process started.")
-	flush_waiters(true, "ready")
+	capture_started, capture_settled = true, false
+	ready_polls = 0
+	schedule_ready_poll()
 	return true
 end
 
@@ -486,16 +517,16 @@ end
 -- =======================
 -- =======================
 
---- Completes a stop once the capture and the peer are both observed settled.
+--- Completes a stop once the capture is observed settled. The Console and the
+--- stream end with the capture, so there is nothing else to wait for.
 --- @return boolean settled
 --- @return string|nil pending Which part is still pending.
 finish_stop = function()
-	-- A synchronous exit report may already have completed this very stop.
+	-- A synchronous settlement report may already have completed this very stop.
 	if state == STATE.STOPPED then return true end
 	if state ~= STATE.STOPPING then return false, "not_stopping" end
 	if capture_started and not capture_settled then return false, "capture_pending" end
-	if peer and not peer.exited and not (peer.handle.isSettled() == true) then return false, "peer_pending" end
-	peer, capture_started, capture_settled, current_options = nil, false, true, nil
+	capture_started, capture_settled = false, true
 	set_state(STATE.STOPPED)
 	Logger.success(LOG, "Owned runtime stopped.")
 	local observer = stop_observer
@@ -507,23 +538,11 @@ finish_stop = function()
 	return true
 end
 
---- Terminates the process once the capture is settled, then completes the stop
---- if both parts are observed gone.
---- @return boolean settled
---- @return string|nil pending
-local function advance_stop()
-	if state ~= STATE.STOPPING then return finish_stop() end
-	if capture_settled and peer and not peer.exited then
-		local ok, failure = pcall(peer.handle.terminate)
-		if not ok then Logger.error(LOG, "Owned runtime user-side process termination failed: %s.", tostring(failure)) end
-	end
-	return finish_stop()
-end
-
---- Stops the capture, then the user-side process. Safe to call again while a
---- part is pending: it retries the same retained handles and never spawns.
+--- Stops the capture, whose retirement ends the stream and the Console. Safe to
+--- call again while it is pending: it retries the same retained capture and
+--- never starts one.
 --- @param on_stopped function|nil Called once with true after exact settlement.
---- @return boolean settled True only when both parts are observed settled.
+--- @return boolean settled True only when the capture is observed settled.
 --- @return string|nil pending Reason while something remains.
 function M.stop(on_stopped)
 	assert(on_stopped == nil or type(on_stopped) == "function", "Invalid owned runtime stop observer")
@@ -535,6 +554,7 @@ function M.stop(on_stopped)
 	end
 	if state ~= STATE.STOPPING then
 		Logger.start(LOG, "Stopping the owned runtime…")
+		cancel_ready_poll()
 		run = nil
 		set_state(STATE.STOPPING)
 		flush_waiters(false, "stopped")
@@ -542,15 +562,17 @@ function M.stop(on_stopped)
 	if capture_started and not capture_settled then
 		local settled = ports.capture.stop(function()
 			capture_settled = true
-			advance_stop()
+			finish_stop()
 		end)
 		if settled == true then capture_settled = true end
 	end
-	return advance_stop()
+	return finish_stop()
 end
 
 --- Stops, then admits again, on an explicit request. There is no automatic
---- restart: a lost runtime stays `failed` until a caller decides.
+--- restart: a lost runtime stays `failed` until a caller decides. The capture
+--- port decides whether a second capture of the same Lua VM is possible; a
+--- refusal there is a named `capture_start_refused`.
 --- @param options table Same as M.start.
 --- @param on_settled function|nil Same as M.start.
 --- @return boolean accepted False when the stop could not complete first.
