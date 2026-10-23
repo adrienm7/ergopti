@@ -851,3 +851,5 @@ _KLMig_ClosedStageSizeMismatchPreservesSource() {
 }
 Test("KL_Mig durability: closed-stage validation gates the atomic move (AHK-077)",
     _KLMig_ClosedStageSizeMismatchPreservesSource)
+
+#Include test_keystats_migration_literal_values.ahk
