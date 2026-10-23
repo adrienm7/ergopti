@@ -1,0 +1,29 @@
+{
+	"expected_count": 24,
+	"filters": [
+		{
+			"contains": "diagnostics-pac-encoding",
+			"expected_count": 4
+		},
+		{
+			"contains": "input-probe-entry-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "input-probe-rival-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "input-probe-clipboard-owner",
+			"expected_count": 2
+		},
+		{
+			"contains": "wpm-tick-rollover-owner",
+			"expected_count": 3
+		},
+		{
+			"contains": "input probe:",
+			"expected_count": 10
+		}
+	]
+}
