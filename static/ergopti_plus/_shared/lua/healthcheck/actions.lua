@@ -21,7 +21,9 @@
 --- 4. A report prefills only the fields of the bug form
 ---    (_shared/modules/diagnostics/issue_templates.json), except its
 ---    report_field: the host fills that one with the report text itself.
---- 5. A refusal returns a stable reason code for the host to log. The AHK port
+--- 5. The opt-in day log: day_log {enabled} prepares or drops it, and only save,
+---    report and export_snapshot may carry day_log = true; copy never does.
+--- 6. A refusal returns a stable reason code for the host to log. The AHK port
 ---    (windows/ui/healthcheck/actions.ahk) replays the same vectors
 ---    (_shared/tests/corpus/healthcheck/action_vectors.json).
 --- ==============================================================================
@@ -67,6 +69,17 @@ local function path_ids(schema, driver)
 	return ids
 end
 
+--- The optional boolean flag of a message: absent is false.
+--- @param message table
+--- @param key string
+--- @return boolean|nil The flag, nil when it is not a boolean.
+local function flag(message, key)
+	local value = message[key]
+	if value == nil then return false end
+	if type(value) ~= "boolean" then return nil end
+	return value
+end
+
 --- True when a report file name keeps the schema's prefix and suffix and only
 --- file-name-safe characters in between.
 --- @param name any
@@ -92,13 +105,24 @@ end
 
 function VALIDATORS.copy(message, context)
 	if not bounded_text(message.text, context.schema.max_export_bytes) then return nil, "bad_text" end
+	-- The day log is a file: it is saved with the report, never copied
+	if flag(message, "day_log") ~= false then return nil, "bad_day_log" end
 	return { action = "copy", text = message.text }
+end
+
+function VALIDATORS.day_log(message)
+	local count = 0
+	for _ in pairs(message) do count = count + 1 end
+	if count ~= 2 or type(message.enabled) ~= "boolean" then return nil, "bad_enabled" end
+	return { action = "day_log", enabled = message.enabled }
 end
 
 function VALIDATORS.save(message, context)
 	if not bounded_text(message.text, context.schema.max_export_bytes) then return nil, "bad_text" end
 	if not valid_name(message.name, context.schema.report) then return nil, "bad_name" end
-	return { action = "save", text = message.text, name = message.name }
+	local day_log = flag(message, "day_log")
+	if day_log == nil then return nil, "bad_day_log" end
+	return { action = "save", text = message.text, name = message.name, day_log = day_log or nil }
 end
 
 function VALIDATORS.report(message, context)
@@ -116,7 +140,9 @@ function VALIDATORS.report(message, context)
 		if not bounded_text(value, limit) then return nil, "bad_fields" end
 		fields[id] = value
 	end
-	return { action = "report", text = message.text, fields = fields }
+	local day_log = flag(message, "day_log")
+	if day_log == nil then return nil, "bad_day_log" end
+	return { action = "report", text = message.text, fields = fields, day_log = day_log or nil }
 end
 
 function VALIDATORS.open_path(message, context)
@@ -147,7 +173,9 @@ function VALIDATORS.export_snapshot(message, context)
 	local sequence = message.export_sequence
 	if type(sequence) ~= "number" or sequence ~= math.floor(sequence) or sequence <= 0
 		or sequence > context.schema.report.export_sequence_max then return nil, "bad_export_sequence" end
-	local action = { action = "export_snapshot", export_sequence = sequence }
+	local day_log = flag(message, "day_log")
+	if day_log == nil then return nil, "bad_day_log" end
+	local action = { action = "export_snapshot", export_sequence = sequence, day_log = day_log or nil }
 	if message.page_checks ~= nil then
 		local observations = require("healthcheck.share").page_checks(message.page_checks, context.schema)
 		if not observations then return nil, "bad_page_checks" end

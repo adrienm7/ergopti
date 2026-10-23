@@ -139,6 +139,17 @@ for (const id of templateIds) {
 			failures.push(
 				`${template.file}: "${fieldId}" is a ${field.type}, which a URL cannot prefill`
 			);
+		} else {
+			// GitHub's form syntax has no way to lock a field, so a prefilled value is
+			// editable by construction; a lock-looking attribute would only mislead
+			// the next reader. Whether the web page keeps a user's edit when it is
+			// reloaded cannot be shown without a real draft.
+			for (const key of Object.keys(field.attributes || {})) {
+				if (/^(disabled|readonly|read_only)$/i.test(key))
+					failures.push(
+						`${template.file}: "${fieldId}" declares "${key}", which GitHub does not define`
+					);
+			}
 		}
 	}
 	// The host fills report_field with the full report: the budget cuts the

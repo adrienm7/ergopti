@@ -162,13 +162,18 @@ end
 --- Returns a detached technical projection; no callback or native authority is exported.
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
+--- @param with_day_log boolean|nil True when the action also saves the opt-in day
+---   log: its closed record (included, bytes, lines) is then part of the report.
 --- @return table
-function M.snapshot(snapshot, schema)
+function M.snapshot(snapshot, schema, with_day_log)
 	assert(type(schema.share_policy) == "table" and schema.share_policy.version == 1,
 		"Diagnostic sharing policy unavailable")
 	assert(type(snapshot) == "table" and (snapshot.driver == "macos" or snapshot.driver == "linux"
 		or snapshot.driver == "windows"), "Diagnostic sharing identity unavailable")
 	local safe = project(snapshot, schema.share_policy.projection)
+	if not with_day_log then safe.day_log_attachment = nil end
+	assert(not with_day_log or safe.day_log_attachment ~= nil,
+		"The day log was asked for but the snapshot holds no record of it")
 	local sections = type(snapshot.sections) == "table" and snapshot.sections or {}
 	local issues = sections.issues
 	if type(issues) == "table" then
@@ -291,9 +296,10 @@ end
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
 --- @param notice string Localized privacy notice from the driver's catalogue.
+--- @param with_day_log boolean|nil See M.snapshot.
 --- @return table { text, fields, name, snapshot }
-function M.document(snapshot, schema, notice)
-	local safe = M.snapshot(snapshot, schema)
+function M.document(snapshot, schema, notice, with_day_log)
+	local safe = M.snapshot(snapshot, schema, with_day_log)
 	notice = schema.export_strings and schema.export_strings[schema.share_policy.notice_key]
 	assert(type(notice) == "string" and notice ~= "", "English export notice unavailable")
 	local versions = safe.sections and safe.sections.versions or {}

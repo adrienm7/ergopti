@@ -920,7 +920,25 @@ local function perform_action(session, action, documents)
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
 			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text })
+				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
+	elseif action.action == "day_log" then
+		-- Opt-in: ticking collects and redacts today's log; unticking drops it
+		local DayLogHost = require("healthcheck.day_log")
+		if not action.enabled then
+			DayLogHost.discard(session.snapshot)
+			send(session, { type = "action", action = "day_log", ok = true, state = "off" })
+			return
+		end
+		Logger.start(LOG, "Collecting today's log for the report…")
+		Logger.flush_repeats(true)
+		local reply = DayLogHost.prepare(session.snapshot, documents, require("ui.healthcheck.report").redaction_context(),
+			function(cap) return DayLogHost.read_file(Logger.today_log_path(), cap) end)
+		if reply.state == "ready" then
+			Logger.success(LOG, "Today's log is ready: %d lines, %d bytes.", reply.lines, reply.bytes)
+		else
+			Logger.warn(LOG, "Today's log is not attachable: %s.", tostring(reply.state))
+		end
+		send(session, reply)
 	elseif action.action == "close" then
 		close_owned_window(session.webview, "page close")
 	elseif action.action == "cancel" then

@@ -82,6 +82,18 @@ _HCActions_ValidName(Name, Report) {
 	return RegExMatch(Body, "^[A-Za-z0-9._-]+$") > 0
 }
 
+; The optional boolean flag of a message: absent is false. The AHK JSON reader
+; turns true and false into 1 and 0.
+; @param Message {Map}
+; @param Key {String}
+; @returns {Integer} 0 or 1, or -1 when the flag is not a boolean.
+_HCActions_Flag(Message, Key) {
+	if !Message.Has(Key)
+		return 0
+	Value := Message[Key]
+	return (Value is Integer && (Value == 0 || Value == 1)) ? Value : -1
+}
+
 ; A refusal with its stable reason code.
 ; @param Reason {String}
 ; @returns {Map}
@@ -121,13 +133,27 @@ HealthCheck_ValidateAction(Message, Context) {
 		case "copy":
 			if !_HCActions_BoundedText(Message.Get("text", ""), Limit)
 				return _HCActions_Refuse("bad_text")
+			; The day log is a file: it is saved with the report, never copied
+			if _HCActions_Flag(Message, "day_log") != 0
+				return _HCActions_Refuse("bad_day_log")
 			return Map("action", Map("action", "copy", "text", Message["text"]))
+		case "day_log":
+			Enabled := Message.Get("enabled", "")
+			if Message.Count != 2 || !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
+				return _HCActions_Refuse("bad_enabled")
+			return Map("action", Map("action", "day_log", "enabled", Enabled = 1))
 		case "save":
 			if !_HCActions_BoundedText(Message.Get("text", ""), Limit)
 				return _HCActions_Refuse("bad_text")
 			if !_HCActions_ValidName(Message.Get("name", ""), Schema["report"])
 				return _HCActions_Refuse("bad_name")
-			return Map("action", Map("action", "save", "text", Message["text"], "name", Message["name"]))
+			SaveLog := _HCActions_Flag(Message, "day_log")
+			if SaveLog < 0
+				return _HCActions_Refuse("bad_day_log")
+			Saved := Map("action", "save", "text", Message["text"], "name", Message["name"])
+			if SaveLog
+				Saved["day_log"] := true
+			return Map("action", Saved)
 		case "report":
 			if !_HCActions_BoundedText(Message.Get("text", ""), Limit)
 				return _HCActions_Refuse("bad_text")
@@ -148,7 +174,13 @@ HealthCheck_ValidateAction(Message, Context) {
 					return _HCActions_Refuse("bad_fields")
 				Fields[Id] := Value
 			}
-			return Map("action", Map("action", "report", "text", Message["text"], "fields", Fields))
+			ReportLog := _HCActions_Flag(Message, "day_log")
+			if ReportLog < 0
+				return _HCActions_Refuse("bad_day_log")
+			Reported := Map("action", "report", "text", Message["text"], "fields", Fields)
+			if ReportLog
+				Reported["day_log"] := true
+			return Map("action", Reported)
 		case "open_path":
 			Id := Message.Get("id", "")
 			if !(Id is String) || !_HCActions_PathIds(Schema, Context["driver"]).Has(Id)
@@ -174,7 +206,12 @@ HealthCheck_ValidateAction(Message, Context) {
 			ExportSequence := Message.Get("export_sequence", 0)
 			if !(ExportSequence is Integer) || ExportSequence <= 0 || ExportSequence > Schema["report"]["export_sequence_max"]
 				return _HCActions_Refuse("bad_export_sequence")
+			ExportLog := _HCActions_Flag(Message, "day_log")
+			if ExportLog < 0
+				return _HCActions_Refuse("bad_day_log")
 			Normalized := Map("action", "export_snapshot", "export_sequence", ExportSequence)
+			if ExportLog
+				Normalized["day_log"] := true
 			if Message.Has("page_checks") {
 				Observations := HealthCheck_PageChecks(Message["page_checks"], Schema)
 				if !(Observations is Map)

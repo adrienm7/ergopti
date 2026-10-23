@@ -301,3 +301,36 @@ _TCD_ErrorReport() {
 }
 
 Test("corpus:diagnostics: error window report vectors (error-report-corpus)", _TCD_ErrorReport)
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 8/ Day Log Attachment =======
+; =====================================
+; =====================================
+
+_TCD_DayLog() {
+	Data := _TCD_Corpus("tests\corpus\diagnostics\day_log_vectors.json")
+	Rules := _TCD_Corpus("modules\diagnostics\redaction.json")
+	Assert(Data["vectors"].Length >= 8, "the day log corpus must hold its vectors")
+	for Vector in Data["vectors"] {
+		Got := DayLog_Collect(Vector.Has("raw") ? Vector["raw"] : "", Vector["file_size"], Rules, Data["context"],
+			Vector.Has("limits") ? Vector["limits"] : Data["limits"])
+		Expected := Vector["expected"]
+		AssertEqual(Expected.Count, Got.Count, Vector["id"] . ": the result carries extra or missing keys")
+		for Key, Value in Expected {
+			if (Value is Array) {
+				AssertEqual(Value.Length, Got[Key].Length, Vector["id"] . ": " . Key . " length")
+				for Index, Line in Value
+					AssertEqual(Line, Got[Key][Index], Vector["id"] . ": " . Key . " " . Index)
+			} else {
+				AssertEqual(Value, Got[Key], Vector["id"] . ": " . Key)
+			}
+		}
+	}
+}
+
+Test("corpus:diagnostics: day log vectors (day-log-corpus)", _TCD_DayLog)

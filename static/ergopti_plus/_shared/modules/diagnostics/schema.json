@@ -2250,6 +2250,24 @@
 							}
 						}
 					}
+				},
+				"day_log_attachment": {
+					"kind": "object",
+					"fields": {
+						"included": {
+							"kind": "boolean"
+						},
+						"bytes": {
+							"kind": "integer",
+							"minimum": 0,
+							"maximum": 4194304
+						},
+						"lines": {
+							"kind": "integer",
+							"minimum": 0,
+							"maximum": 4194304
+						}
+					}
 				}
 			}
 		}

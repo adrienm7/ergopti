@@ -793,3 +793,127 @@ helpers.describe("redaction context carries the configuration directory (config-
 			"read '<config>/hotstrings/<name>/<name>'")
 	end)
 end)
+
+--- Runs one action over the recorded effects to its explicit completion.
+local function completed_action_for(Report, action, config, context, overrides, snapshot)
+	return completed_action(Report, action, paths(), config, context, overrides, snapshot)
+end
+
+helpers.describe("opt-in day log in the report actions (day-log-host)", function()
+	local DayLogHost = require("healthcheck.day_log")
+	local LOG_TEXT = "2026-09-24 09:00:00:001 [INFO] [A] opened /Users/jdoe/x\n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl\n"
+	local REDACTED = "2026-09-24 09:00:00:001 [INFO] [A] opened ~/x\n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>\n"
+
+	--- A host fixture: the report module over recorded effects, a snapshot and its documents.
+	local function fixture()
+		local Report, calls, overrides = load_report()
+		local config = documents()
+		config.day_log = shared_json("modules/diagnostics/day_log.json")
+		local snapshot = host_snapshot(false)
+		local context = Report.redaction_context(overrides)
+		local function run(action)
+			return completed_action_for(Report, action, config, context, overrides, snapshot)
+		end
+		local function text(with_log)
+			return Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key),
+				with_log).text
+		end
+		return { calls = calls, config = config, snapshot = snapshot, context = context, run = run, text = text }
+	end
+
+	local function read_log(text)
+		return function() return { found = true, size = #text, text = text } end
+	end
+
+	helpers.it("collecting redacts the log, keeps its text away from the snapshot and records only the closed record (day-log-host)", function()
+		local f = fixture()
+		local reply = DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		helpers.assert_eq(reply.state, "ready")
+		helpers.assert_eq(reply.lines, 2)
+		helpers.assert_eq(reply.bytes, #REDACTED)
+		helpers.assert_eq(f.snapshot.day_log_attachment, { included = true, bytes = #REDACTED, lines = 2 })
+		helpers.assert_true(not Json.encode(f.snapshot):find("abcdefghijkl", 1, true), "the snapshot never holds the log")
+		DayLogHost.discard(f.snapshot)
+		helpers.assert_eq(f.snapshot.day_log_attachment, nil)
+	end)
+
+	helpers.it("a log over the cap, an empty one and a missing one are refused with their reason (day-log-host)", function()
+		local f = fixture()
+		f.config.day_log.max_bytes = 10
+		helpers.assert_eq(DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT)).state, "too_large")
+		helpers.assert_eq(f.snapshot.day_log_attachment, nil)
+		f.config.day_log.max_bytes = 4194304
+		helpers.assert_eq(DayLogHost.prepare(f.snapshot, f.config, f.context, read_log("")).state, "empty")
+		helpers.assert_eq(DayLogHost.prepare(f.snapshot, f.config, f.context,
+			function() return { found = false, size = 0, text = "" } end).state, "missing")
+	end)
+
+	helpers.it("save writes the log first, then the report, and the report records the log (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		local text = f.text(true)
+		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
+		local document = Share.document(f.snapshot, f.config.schema,
+			require("infra.i18n").get(f.config.schema.share_policy.notice_key), true)
+		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#f.calls.save, 2)
+		helpers.assert_eq(f.calls.save[1].name, "ergopti-day-log-macos-2026-09-24T10_00_00Z.log")
+		helpers.assert_eq(f.calls.save[1].text, REDACTED)
+		helpers.assert_eq(f.calls.save[2].name, document.name)
+		helpers.assert_eq(f.calls.save[2].text, text)
+	end)
+
+	helpers.it("without the flag nothing about the log is saved or recorded, even when it was prepared (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		local text = f.text(false)
+		helpers.assert_true(not text:find("day_log_attachment", 1, true), "the report omits the record")
+		local result = f.run({ action = "save", text = text, name = "x" })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#f.calls.save, 1)
+	end)
+
+	helpers.it("copy never carries the log and an unprepared log is refused before any file is written (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		helpers.assert_eq(f.run({ action = "copy", text = f.text(true), day_log = true }).ok, false)
+		helpers.assert_eq(#f.calls.copy, 0)
+		local g = fixture()
+		helpers.assert_eq(g.run({ action = "report", text = g.text(false), fields = {}, day_log = true }).ok, false)
+		helpers.assert_eq(#g.calls.save, 0)
+		helpers.assert_eq(#g.calls.copy, 0)
+	end)
+
+	helpers.it("a collection prepared for another snapshot is never saved (day-log-host)", function()
+		local f = fixture()
+		DayLogHost.prepare(f.snapshot, f.config, f.context, read_log(LOG_TEXT))
+		local other = host_snapshot(false)
+		other.day_log_attachment = { included = true, bytes = #REDACTED, lines = 2 }
+		helpers.assert_true(not pcall(DayLogHost.file, other, f.config, { driver = "macos" }),
+			"the file of an unprepared snapshot is refused")
+	end)
+
+	helpers.it("reading the file distinguishes missing, unreadable, too large and read (day-log-host)", function()
+		local function fake(size, content)
+			return function()
+				local handle = {}
+				function handle:seek(whence, offset)
+					if whence == "end" then return size end
+					return offset or 0
+				end
+				function handle:read() return content end
+				function handle:close() return true end
+				return handle
+			end
+		end
+		helpers.assert_eq(DayLogHost.read_file("x", 100, function() return nil, "No such file", 2 end).found, false)
+		helpers.assert_true(not pcall(DayLogHost.read_file, "x", 100, function() return nil, "Permission denied", 13 end),
+			"an unreadable file is an error, not a missing one")
+		local big = DayLogHost.read_file("x", 5, fake(6, "abcdef"))
+		helpers.assert_eq({ big.found, big.size, big.text }, { true, 6, "" })
+		local ok = DayLogHost.read_file("x", 100, fake(3, "abc"))
+		helpers.assert_eq({ ok.found, ok.size, ok.text }, { true, 3, "abc" })
+		helpers.assert_true(not pcall(DayLogHost.read_file, "x", 100, fake(5, "abc")), "a short read is an error")
+	end)
+end)

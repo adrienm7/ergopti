@@ -95,6 +95,19 @@
 				<input type="checkbox" id="chk-extensive" disabled />
 				<span data-i18n="healthcheck.deep_tests_checkbox"></span>
 			</label>
+			<section id="day-log" class="day-log">
+				<label class="details">
+					<input type="checkbox" id="chk-day-log" disabled />
+					<span data-i18n="healthcheck.day_log.checkbox"></span>
+				</label>
+				<p class="hint" data-i18n="healthcheck.day_log.hint"></p>
+				<p class="hint" data-i18n="healthcheck.day_log.upload_notice"></p>
+				<p id="day-log-status" role="status" aria-live="polite"></p>
+				<details id="day-log-preview" hidden>
+					<summary data-i18n="healthcheck.day_log.preview_title"></summary>
+					<pre id="day-log-preview-text"></pre>
+				</details>
+			</section>
 			<p id="deep-progress" role="status" aria-live="polite"></p>
 			<pre id="deep-results"></pre>
 			<p id="status" class="status info" role="status" aria-live="polite"></p>
