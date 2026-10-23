@@ -338,15 +338,12 @@ KL_Roi_HalflifeTick() {
 		}
 
 		for trig, last_tick in snapshot {
-				; Wrap-safe delta: A_TickCount overflows at ~49.7 days (~4,294,967,295 ms).
-				; Clamp to 0 only when the wrap-corrected age exceeds 45 days — far enough
-				; above the 30-day alert threshold so the half-life alert is reachable, yet
-				; safely below the 49.7-day TickCount ceiling where a post-wrap reading
-				; could produce a spurious multi-decade age.
-				age := (now - last_tick + 0x100000000) & 0xFFFFFFFF
-				static MAX_SANE_AGE_MS := 3888000000  ; 45 days in ms — sanity clamp
-				if (age > MAX_SANE_AGE_MS)
-						age := 0
+				; A_TickCount and retained fire ticks share the native64 domain.
+				; A fire may arrive after this frame sampled now but before its map
+				; snapshot: leave that newer observation for a subsequent timer.
+				if !(last_tick is Integer) || last_tick < 0 || last_tick > now
+						continue
+				age := TickElapsed64(last_tick, now)
 				if (age >= threshold) {
 						KL_AppendLog(Map(
 								"type",    "trigger_halflife",
