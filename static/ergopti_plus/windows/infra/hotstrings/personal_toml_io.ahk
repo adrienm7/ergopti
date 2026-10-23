@@ -571,13 +571,15 @@ _PersonalTomlCleanupStage(StagePath, DeleteFn := 0, WarnFn := 0) {
 }
 
 _PersonalTomlInvalidateCaches(FilePath) {
-	global _ReadPersonalTomlCache, _HS_GrandTotalCache, _PersonalTomlReadGeneration
+	global _ReadPersonalTomlCache, _HS_GrandTotalCache, _PersonalTomlReadGeneration, _HS_GrandTotalReadOwner
 	PreviousCritical := Critical("On")
 	try {
 		; Revoke older parses in the same RAM span as invalidation, including
 		; the false-to-false case before and after a completed durable rewrite.
 		_PersonalTomlReadGeneration += 1
 		_ReadPersonalTomlCache := false
+		if IsSet(_HS_GrandTotalReadOwner)
+			_HS_GrandTotalReadOwner := 0
 		_HS_GrandTotalCache := -1
 	} finally Critical(PreviousCritical)
 	; This also evicts the raw-content _TomlFileCache, group config, section
