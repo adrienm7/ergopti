@@ -41,6 +41,21 @@ Gui_Create(Options := "", Title := "") {
 	return Window
 }
 
+; Static phase names and existing counters only: never log evaluated scripts.
+; A failed diagnostic cannot mask the original browser/cleanup exception.
+_APNR_Phase(Name) {
+	global _APNR
+	_APNR.Phase := Name, _APNR.PhaseSerial += 1
+	try FileAppend("PHASE action-picker-native " . KL_JsonEncode(Map("ordinal", _APNR.PhaseSerial,
+		"phase", Name, "elapsed_ms", (A_TickCount - _APNR.DiagnosticStarted) & 0xFFFFFFFF,
+		"page", _APNR.PageCalls, "script", _APNR.ScriptCalls,
+		"frames", _APNR.Frames.Length, "browser_handles", _APNR.Browsers.Length)) . "`n", "*", "UTF-8-RAW")
+	catch as DiagnosticFailure {
+		if !IsObject(_APNR.DiagnosticFailure)
+			_APNR.DiagnosticFailure := DiagnosticFailure
+	}
+}
+
 _APNR_RecordFailure(Message) {
 	global _APNR
 	if !IsObject(_APNR.Failure)
@@ -56,7 +71,9 @@ _APNR_OnError(Failure, *) {
 }
 
 _APNR_Timeout() {
-	FileAppend("DIAG action-picker-native deadline exceeded`n", "*", "UTF-8-RAW")
+	global _APNR
+	FileAppend("DIAG action-picker-native deadline exceeded phase=" . _APNR.Phase
+		. " ordinal=" . _APNR.PhaseSerial . "`n", "*", "UTF-8-RAW")
 	ExitApp(2)
 }
 
@@ -83,16 +100,24 @@ _APNR_Confirm(Id) {
 }
 
 _APNR_Script(View, Script) {
+	global _APNR
+	_APNR.ScriptCalls += 1
+	_APNR_Phase("script-submit-before")
 	Pending := View.ExecuteScriptAsync(Script)
+	_APNR_Phase("script-submit-after")
 	; Keep a rejecting native Promise observed while its genuine await pumps.
 	Pending.onSettled((*) => 0, (*) => 0)
-	return JsonParse(Pending.await(3000))
+	_APNR_Phase("script-await-before")
+	Result := Pending.await(3000)
+	_APNR_Phase("script-await-after")
+	return JsonParse(Result)
 }
 
 ; Each observed native core proves its environment identity before we retain
 ; a stable browser handle. A new browser PID is allowed by the real SDK.
 _APNR_CaptureBrowser(Core) {
 	global _APNR
+	_APNR_Phase("browser-capture-before")
 	_APNR.CaptureDebt += 1
 	Unknown := "{00000000-0000-0000-C000-000000000046}"
 	Actual := ComObjQuery(Core.Environment.Ptr, Unknown)
@@ -109,16 +134,20 @@ _APNR_CaptureBrowser(Core) {
 	}
 	_APNR.CaptureDebt -= 1
 	_APNR.UnobservedBrowser := false
+	_APNR_Phase("browser-capture-after")
 }
 
 _APNR_Page(Title) {
 	global _APNR, _ActPickWeb_WebView, _ActPickWeb_Gui, _ActPickWeb_Controller
 	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_SessionEpoch
+	_APNR.PageCalls += 1
+	_APNR_Phase("page-enter")
 	_APNR_Require(IsObject(_ActPickWeb_Gui) && IsSet(_ActPickWeb_WebView)
 		&& IsSet(_ActPickWeb_Controller) && IsSet(_ActPickWeb_MsgSub) && IsSet(_ActPickWeb_NavSub),
 		"The public frontdoor must publish a complete real web picker, not its native fallback.")
 	View := _ActPickWeb_WebView, Window := _ActPickWeb_Gui, Epoch := _ActPickWeb_SessionEpoch
 	_APNR_CaptureBrowser(View)
+	_APNR_Phase("page-browser-captured")
 	Started := A_TickCount
 	loop {
 		if IsObject(_APNR.Failure)
@@ -137,12 +166,14 @@ _APNR_Page(Title) {
 		"The rendered page must be the actual HTTPS virtual-host document.")
 	_APNR.Frames.Push(Map("epoch", Epoch, "hwnd", Window.Hwnd, "browser_pid", View.BrowserProcessId,
 		"source", Data["source"], "title_match", true, "none_row", true))
+	_APNR_Phase("page-ready")
 	return {Window: Window, Hwnd: Window.Hwnd, Epoch: Epoch, View: View}
 }
 
 _APNR_WaitClosed(Frame) {
 	global _APNR, _ActPickWeb_SessionEpoch, _ActPickWeb_Gui, _ActPickWeb_ResetDone
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
+	_APNR_Phase("window-close-wait-before")
 	Started := A_TickCount
 	while DllCall("User32\IsWindow", "Ptr", Frame.Hwnd, "Int") || _ActPickWeb_SessionEpoch <= Frame.Epoch {
 		if IsObject(_APNR.Failure)
@@ -155,30 +186,46 @@ _APNR_WaitClosed(Frame) {
 		&& !IsSet(_ActPickWeb_Controller) && !IsSet(_ActPickWeb_WebView)
 		&& !IsSet(_ActPickWeb_MsgSub) && !IsSet(_ActPickWeb_NavSub),
 		"Physical window closure must also retire all published browser resources.")
+	_APNR_Phase("window-close-wait-after")
 }
 
 _APNR_Run() {
 	global _APNR, _ActPickWeb_SessionEpoch, _ActPickWeb_Gui
 	_APNR.UnobservedBrowser := true
+	_APNR_Phase("first-open-before")
 	ShowActionPicker("Private native picker one", "none", _APNR_Confirm)
+	_APNR_Phase("first-open-after")
+	_APNR_Phase("first-page-before")
 	First := _APNR_Page("Private native picker one")
+	_APNR_Phase("first-page-after")
 	_APNR_Require(_APNR.Windows.Length == 1 && _APNR.Confirmed == 0,
 		"The first public open must create exactly one real picker without confirmation.")
+	_APNR_Phase("first-native-close-before")
 	DllCall("User32\SendMessageW", "Ptr", First.Hwnd, "UInt", 0x10, "UPtr", 0, "Ptr", 0, "Ptr")
+	_APNR_Phase("first-native-close-sent")
 	_APNR_WaitClosed(First)
+	_APNR_Phase("first-native-close-after")
 	_APNR.NativeClose := true
 	_APNR_Require(_APNR.Confirmed == 0, "WM_CLOSE must not invoke the selected-action callback.")
 	_APNR.UnobservedBrowser := true
+	_APNR_Phase("reopen-before")
 	ShowActionPicker("Private native picker two", "none", _APNR_Confirm)
+	_APNR_Phase("reopen-after")
+	_APNR_Phase("second-page-before")
 	Second := _APNR_Page("Private native picker two")
+	_APNR_Phase("second-page-after")
 	_APNR_Require(_APNR.Windows.Length == 2 && Second.Window != First.Window && Second.Epoch > First.Epoch,
 		"Reopen must create a new real window/session, without native fallback.")
 	; A real page click crosses the shipped bridge; no native handler is invoked
 	; directly. This is DOM interaction, not physical mouse/keyboard input.
+	_APNR_Phase("confirm-script-submit-before")
 	Pending := Second.View.ExecuteScriptAsync("document.querySelector('[data-id=none]').click();true")
+	_APNR_Phase("confirm-script-submit-after")
 	Pending.onSettled((*) => 0, (*) => 0)
 	; Do not await this script: its real confirm callback closes the target page.
+	_APNR_Phase("confirm-close-before")
 	_APNR_WaitClosed(Second)
+	_APNR_Phase("confirm-close-after")
 	_APNR_Require(_APNR.Confirmed == 1, "Only the reopened page may confirm exactly once.")
 	_APNR.ReopenedConfirmed := true
 }
@@ -188,6 +235,7 @@ _APNR_Close(*) {
 	if _APNR.Closed
 		return
 	Primary := 0
+	_APNR_Phase("cleanup-before")
 	try _ActPickWeb_Close()
 	catch as Failure
 		Primary := Failure
@@ -254,6 +302,7 @@ _APNR_Close(*) {
 		_APNR.ProfileRetired := !DirExist(_APNR.Profile) && !FileExist(_APNR.Profile . ".retired")
 	}
 	_APNR.Closed := true
+	_APNR_Phase("cleanup-after")
 	try FileAppend("DIAG action-picker-native cleanup handles=" . _APNR.Browsers.Length
 		. " capture_debt=" . _APNR.CaptureDebt . " unobserved=" . _APNR.UnobservedBrowser
 		. " profile_owned=" . _APNR.ProfileOwned . " browser_retired=" . _APNR.BrowserRetired
@@ -276,53 +325,74 @@ _APNR_Main() {
 	Persistent(true)
 	_APNR := {Root: A_Args[1], Failure: 0, Windows: [], Hwnds: [], KeeperGui: 0, Keeper: 0, Environment: 0, BrowserVersion: "", PrivateFolder: false,
 		Browsers: [], BrowserPid: 0, BrowserRetired: false, ProfileRetired: false, Profile: "", ProfileOwned: false, CaptureDebt: 0, UnobservedBrowser: false,
-		Closed: false, Confirmed: 0, NativeClose: false, ReopenedConfirmed: false, Frames: [], Assets: Map()}
+		Closed: false, Confirmed: 0, NativeClose: false, ReopenedConfirmed: false, Frames: [], Assets: Map(),
+		Phase: "initialized", PhaseSerial: 0, DiagnosticStarted: A_TickCount, PageCalls: 0, ScriptCalls: 0,
+		PrimaryPhase: "", DiagnosticFailure: 0}
 	OnError(_APNR_OnError)
 	OnExit(_APNR_Close)
 	Primary := 0
 	try {
 		_APNR_Require(_APNR_Hash(A_ScriptFullPath) == A_Args[2] && _APNR_Hash(A_AhkPath) == A_Args[3],
 			"The child source and interpreter must match the launcher's measured inputs.")
+		_APNR_Phase("assets-before")
 		_APNR_CopyAssets()
+		_APNR_Phase("assets-after")
 		_VendorDir := _APNR_Driver . "\vendor"
+		_APNR_Phase("profile-before")
 		_APNR.Profile := WebView_NewProfilePath("ergopti_action_picker_native_")
 		FSCreateDirectoryExclusiveStrict(_APNR.Profile)
 		_APNR.ProfileOwned := true
 		WEBVIEW_SHARED_UDIR := _APNR.Profile
+		_APNR_Phase("profile-after")
 		_ActPickWeb_ProgramCapturing := true
 		SetTimer(_APNR_Timeout, -60000)
 		_APNR.UnobservedBrowser := true
+		_APNR_Phase("environment-create-before")
 		Environment := WebView_SharedEnvironment(_VendorDir . "\64bit\WebView2Loader.dll")
+		_APNR_Phase("environment-create-after")
 		_APNR.BrowserVersion := Environment.BrowserVersionString
 		_APNR.PrivateFolder := StrCompare(RTrim(Environment.UserDataFolder, "\"), RTrim(_APNR.Profile, "\"), false) == 0
 		_APNR_Require(_APNR.PrivateFolder && _APNR.BrowserVersion != "",
 			"The real installed environment must report the exact private profile and browser version.")
 		_APNR.KeeperGui := Gui("+ToolWindow -Caption")
+		_APNR_Phase("keeper-create-before")
 		_APNR.Keeper := WebView2.create(_APNR.KeeperGui.Hwnd, , Environment)
+		_APNR_Phase("keeper-create-after")
 		_APNR.Keeper.IsVisible := false
 		Core := _APNR.Keeper.CoreWebView2
 		_APNR.BrowserPid := Core.BrowserProcessId
 		_APNR.Environment := Core.Environment
 		_APNR_CaptureBrowser(Core)
+		_APNR_Phase("profile-watch-before")
 		WebView_WatchProfile(_APNR.Profile, Core)
+		_APNR_Phase("profile-watch-after")
 		Core := 0, Environment := 0
+		_APNR_Phase("public-lifecycle-before")
 		_APNR_Run()
+		_APNR_Phase("public-lifecycle-after")
 	} catch as Failure {
 		Primary := Failure
+		_APNR.PrimaryPhase := _APNR.Phase
 	} finally {
 		SetTimer(_APNR_Timeout, 0)
 		try _APNR_Close()
 		catch as Failure {
-			if !IsObject(Primary)
+			if !IsObject(Primary) {
 				Primary := Failure
+				_APNR.PrimaryPhase := _APNR.Phase
+			}
 		}
 		OnExit(_APNR_Close, 0)
 		OnError(_APNR_OnError, 0)
 	}
 	if !IsObject(Primary) && IsObject(_APNR.Failure)
 		Primary := _APNR.Failure
+	if !IsObject(Primary) && IsObject(_APNR.DiagnosticFailure)
+		Primary := _APNR.DiagnosticFailure
 	if IsObject(Primary) {
-		FileAppend("FAIL action-picker-native " . Primary.Message . "`n", "*", "UTF-8-RAW")
+		FileAppend("FAIL action-picker-native " . Primary.Message . " [" . Primary.File . ":" . Primary.Line
+			. "] type=" . Type(Primary) . " primary_phase=" . _APNR.PrimaryPhase
+			. " last_phase=" . _APNR.Phase . " ordinal=" . _APNR.PhaseSerial . "`n", "*", "UTF-8-RAW")
 		ExitApp(1)
 	}
 	Receipt := Map("child_pid", DllCall("GetCurrentProcessId"), "source_sha256", A_Args[2], "runtime_sha256", A_Args[3],
