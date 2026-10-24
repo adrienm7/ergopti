@@ -169,8 +169,17 @@ const WIN_KEYCODE_LABELS = {
 	125: '↓'
 };
 
+// The recording OSes whose dataset keys are PC scan codes (driver_meta.os of
+// the blob); every other dataset records macOS keycodes.
+const PC_SCANCODE_DRIVER_OSES = new Set(['win', 'linux']);
+
+/**
+ * Whether a dataset's keys are PC scan codes, from the OS that recorded it.
+ * @param {Object|undefined} driver_meta - `{ os, heatmap_id }` from the blob.
+ * @returns {boolean}
+ */
 function is_pc_scancode_driver(driver_meta) {
-	return !!driver_meta && (driver_meta.os === 'win' || driver_meta.os === 'linux');
+	return !!driver_meta && PC_SCANCODE_DRIVER_OSES.has(driver_meta.os);
 }
 
 // ==============================================
