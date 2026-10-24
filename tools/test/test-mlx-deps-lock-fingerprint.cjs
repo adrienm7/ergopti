@@ -28,6 +28,16 @@ const SOURCE_PYPROJECT = path.join(MACOS_ROOT, 'pyproject.toml');
 const SOURCE_LOCK = path.join(MACOS_ROOT, 'uv.lock');
 const SOURCE_NETWORK = path.join(MACOS_ROOT, 'modules', 'llm', 'network-retry.sh');
 const SOURCE_UV_RELEASE = path.join(MACOS_ROOT, 'modules', 'llm', 'uv-release.sh');
+// network-retry.sh reads the shared origin inventory from its bundle-relative path.
+const SOURCE_ROUTE_ORIGINS = path.join(
+	ROOT,
+	'static',
+	'ergopti_plus',
+	'_shared',
+	'modules',
+	'network',
+	'route_origins.json'
+);
 const SYNC_MARKER = 'VENV_SYNC_RAN';
 
 let passed = 0;
@@ -561,6 +571,15 @@ try {
 	fs.copyFileSync(SOURCE_SCRIPT, scriptPath);
 	fs.copyFileSync(SOURCE_NETWORK, path.join(path.dirname(scriptPath), 'network-retry.sh'));
 	fs.copyFileSync(SOURCE_UV_RELEASE, path.join(path.dirname(scriptPath), 'uv-release.sh'));
+	const routeOrigins = path.join(
+		fixtureRoot,
+		'_shared',
+		'modules',
+		'network',
+		'route_origins.json'
+	);
+	fs.mkdirSync(path.dirname(routeOrigins), { recursive: true });
+	fs.copyFileSync(SOURCE_ROUTE_ORIGINS, routeOrigins);
 	fs.copyFileSync(SOURCE_PYPROJECT, pyprojectPath);
 	fs.copyFileSync(SOURCE_LOCK, lockPath);
 	fs.chmodSync(scriptPath, 0o755);
