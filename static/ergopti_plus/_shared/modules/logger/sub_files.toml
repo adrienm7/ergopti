@@ -13,9 +13,15 @@
 #                          A line is routed when ANY pattern matches.
 #                          Match is case-sensitive, against the complete line
 #                          including timestamp, level label, and module tag.
-#   platforms (array)    — drivers that write this sub-file: "ahk" | "hs".
-#                          Entries absent from a platform's list are silently
-#                          ignored by that driver.
+#                          One list serves every platform of the entry: each
+#                          driver names its modules in its own style (macOS
+#                          "[keystats.sqlite_writer]", Windows "[Keystats]",
+#                          Linux "[modules.keystats.keystats]"), so a topic that
+#                          spans drivers lists every spelling and a spelling a
+#                          driver never emits simply never matches there.
+#   platforms (array)    — drivers that write this sub-file: "ahk" (Windows),
+#                          "hs" (macOS) | "linux". Entries absent from a
+#                          platform's list are silently ignored by that driver.
 #   description (string) — human-readable purpose (not read at runtime).
 #
 # ROUTING SEMANTICS:
@@ -24,24 +30,139 @@
 #
 # AUTHORING RULES:
 #   - One [[sub_files]] entry per logical topic.
+#   - A topic that exists on several drivers is declared for all of them: the
+#     same question ("what did the hotstrings do?") must open the same file name
+#     on every OS. Restrict a topic to one platform only when the module behind
+#     it exists on that platform alone, and say why in its description.
 #   - Patterns should be specific enough to avoid cross-topic pollution.
 #   - Prefer tag-based patterns (e.g. "[gestures") over keyword patterns.
-#   - Keep platforms lists in alphabetical order: ["ahk", "hs"].
+#   - Keep platforms lists in alphabetical order: ["ahk", "hs", "linux"].
 # ==============================================================================
 
-# ====================================================
-# ====================================================
-# ======= 1/ Cross-driver sub-files (ahk + hs) =======
-# ====================================================
-# ====================================================
+# ===========================================
+# ===========================================
+# ======= 1/ Cross-driver sub-files =========
+# ===========================================
+# ===========================================
 
 [[sub_files]]
 name        = "gestures"
 description = "Gesture recognition, probe loop, swipe events."
-platforms   = ["ahk", "hs"]
+platforms   = ["ahk", "hs", "linux"]
 patterns    = [
     "[gestures",
     "gesture",
+]
+
+[[sub_files]]
+name        = "ollama"
+description = "Ollama backend server, API calls, dependency installer."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[ollama",
+    "[llm.api_ollama]",
+    "[ollama_deps]",
+    "[LLM.ollama",
+    "[modules.llm.api_ollama]",
+    "[modules.llm.managed_ollama_proxy]",
+]
+
+[[sub_files]]
+name        = "llm"
+description = "LLM menu, model switching, warmup, toggle events."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[llm.",
+    "[menu_llm",
+    "[keymap.llm",
+    "WARMUP",
+    "[TOGGLE]",
+    "[LLM",
+    "[modules.llm.",
+    "[infra.llm_",
+    "[ui.llm_",
+    "[ui.menu.llm_",
+    "[ui.tooltip.llm]",
+]
+
+[[sub_files]]
+name        = "hotstrings"
+description = "Keymap processing, dynamic hotstrings, personal info, TOML reader."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[keymap.",
+    "[dynamic_hotstring",
+    "[personal_info]",
+    "[toml_reader]",
+    "hotstring",
+    "[Hotstring",
+    "[HSE",
+    "[UserHotstrings",
+    "[PersonalToml",
+    "[PersonalInfo",
+    "[modules.dynamic_hotstrings.",
+    "[infra.personal_info_fields]",
+]
+
+[[sub_files]]
+name        = "keystats"
+description = "Keystroke logging, SQLite writes, rotation, export."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[keystats",
+    "[Keystats",
+    "[KL",
+    "[modules.keystats.",
+    "[infra.metrics_",
+]
+
+[[sub_files]]
+name        = "menu"
+description = "Menu builder, UI components, app picker, download window."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[menu]",
+    "[menu_",
+    "[builder]",
+    "[ui_builder]",
+    "[app_picker]",
+    "[download_window]",
+    "[Menu",
+    "[TrayMenu]",
+    "[ui.menu.",
+    "[manifest_menu]",
+    "[adapters.tray_menu]",
+]
+
+[[sub_files]]
+name        = "notify"
+description = "Notification toasts and the notifications module."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[notify",
+    "[notifications",
+    "[Notifier]",
+    "[adapters.notifier]",
+    "[adapters.application_notifier]",
+]
+
+[[sub_files]]
+name        = "boot"
+description = "Driver initialisation, path resolution, config loading."
+platforms   = ["ahk", "hs", "linux"]
+patterns    = [
+    "[init]",
+    "[menu_paths]",
+    "[paths]",
+    "[config",
+    "[Boot]",
+    "[BootProfile]",
+    "[Startup]",
+    "[FirstBoot]",
+    "[ConfigPaths]",
+    "[timings]",
+    "[infra.runtime_guard]",
+    "[ergopti_hotstrings]",
 ]
 
 # =====================================
@@ -49,6 +170,11 @@ patterns    = [
 # ======= 2/ AHK-only sub-files =======
 # =====================================
 # =====================================
+
+# The three Windows topics below have no module on the other drivers: AltGr and
+# Shift layout emulation is a Windows-only layer (macOS delegates to Karabiner,
+# Linux to xkb), and the tray/script-shortcut dispatch is what the shared "menu"
+# topic covers elsewhere.
 
 [[sub_files]]
 name        = "layout"
@@ -84,6 +210,8 @@ patterns    = [
 # ====================================
 # ====================================
 
+# MLX is Apple-silicon only, and Karabiner-Elements is a macOS product.
+
 [[sub_files]]
 name        = "mlx"
 description = "MLX backend server, API calls, dependency installer."
@@ -96,84 +224,9 @@ patterns    = [
 ]
 
 [[sub_files]]
-name        = "ollama"
-description = "Ollama backend server, API calls, dependency installer."
-platforms   = ["hs"]
-patterns    = [
-    "[ollama",
-    "[llm.api_ollama]",
-    "[ollama_deps]",
-]
-
-[[sub_files]]
-name        = "llm"
-description = "LLM menu, model switching, warmup, toggle events."
-platforms   = ["hs"]
-patterns    = [
-    "[llm.",
-    "[menu_llm",
-    "[keymap.llm",
-    "WARMUP",
-    "[TOGGLE]",
-]
-
-[[sub_files]]
-name        = "hotstrings"
-description = "Keymap processing, dynamic hotstrings, personal info, TOML reader."
-platforms   = ["hs"]
-patterns    = [
-    "[keymap.",
-    "[dynamic_hotstring",
-    "[personal_info]",
-    "[toml_reader]",
-    "hotstring",
-]
-
-[[sub_files]]
-name        = "keystats"
-description = "Keystroke logging, SQLite writes, rotation, export."
-platforms   = ["hs"]
-patterns    = [
-    "[keystats",
-]
-
-[[sub_files]]
 name        = "karabiner"
 description = "Karabiner-Elements config generation and reload."
 platforms   = ["hs"]
 patterns    = [
     "[karabiner",
-]
-
-[[sub_files]]
-name        = "menu"
-description = "Menu builder, UI components, app picker, download window."
-platforms   = ["hs"]
-patterns    = [
-    "[menu]",
-    "[menu_",
-    "[builder]",
-    "[ui_builder]",
-    "[app_picker]",
-    "[download_window]",
-]
-
-[[sub_files]]
-name        = "notify"
-description = "Notification toasts and the notifications module."
-platforms   = ["hs"]
-patterns    = [
-    "[notify",
-    "[notifications",
-]
-
-[[sub_files]]
-name        = "boot"
-description = "Driver initialisation, path resolution, config loading."
-platforms   = ["hs"]
-patterns    = [
-    "[init]",
-    "[menu_paths]",
-    "[paths]",
-    "[config",
 ]

@@ -392,12 +392,20 @@ Each entry in [`sub_files.toml`](./sub_files.toml) defines one topical sub-file:
 [[sub_files]]
 name     = "gestures"                  # suffix of ErgoptiPlus_<name>.log
 patterns = ["[gestures", "gesture"]    # substring patterns matched against the full log line
-platforms = ["ahk", "hs"]             # which drivers write this sub-file
+platforms = ["ahk", "hs", "linux"]    # Windows, macOS, Linux: which drivers write it
 ```
 
 A log line is routed to a sub-file if **any** of its `patterns` is found as a
 substring of the full formatted line (case-sensitive). The match is against the
 complete line including timestamp, level, and module tag.
+
+A topic that exists on several drivers is declared for all of them, so the same
+file name answers the same question on every OS. Each driver spells its module
+tags in its own style, hence one pattern list per topic that names every
+spelling. Topical files carry no date in their name: the first write of a new day
+truncates a file whose first line is from an earlier day (macOS by modification
+time, Linux by that first line). Only MLX and Karabiner (macOS products) and the
+Windows layout, dispatch and tray topics are single-platform.
 
 ---
 

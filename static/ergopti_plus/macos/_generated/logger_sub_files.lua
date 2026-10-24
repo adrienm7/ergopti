@@ -19,22 +19,22 @@
 return {
 	-- Gesture recognition, probe loop, swipe events.
 	{ name = "ErgoptiPlus_gestures.log", patterns = { "[gestures", "gesture" } },
+	-- Ollama backend server, API calls, dependency installer.
+	{ name = "ErgoptiPlus_ollama.log", patterns = { "[ollama", "[llm.api_ollama]", "[ollama_deps]", "[LLM.ollama", "[modules.llm.api_ollama]", "[modules.llm.managed_ollama_proxy]" } },
+	-- LLM menu, model switching, warmup, toggle events.
+	{ name = "ErgoptiPlus_llm.log", patterns = { "[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]", "[LLM", "[modules.llm.", "[infra.llm_", "[ui.llm_", "[ui.menu.llm_", "[ui.tooltip.llm]" } },
+	-- Keymap processing, dynamic hotstrings, personal info, TOML reader.
+	{ name = "ErgoptiPlus_hotstrings.log", patterns = { "[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring", "[Hotstring", "[HSE", "[UserHotstrings", "[PersonalToml", "[PersonalInfo", "[modules.dynamic_hotstrings.", "[infra.personal_info_fields]" } },
+	-- Keystroke logging, SQLite writes, rotation, export.
+	{ name = "ErgoptiPlus_keystats.log", patterns = { "[keystats", "[Keystats", "[KL", "[modules.keystats.", "[infra.metrics_" } },
+	-- Menu builder, UI components, app picker, download window.
+	{ name = "ErgoptiPlus_menu.log", patterns = { "[menu]", "[menu_", "[builder]", "[ui_builder]", "[app_picker]", "[download_window]", "[Menu", "[TrayMenu]", "[ui.menu.", "[manifest_menu]", "[adapters.tray_menu]" } },
+	-- Notification toasts and the notifications module.
+	{ name = "ErgoptiPlus_notify.log", patterns = { "[notify", "[notifications", "[Notifier]", "[adapters.notifier]", "[adapters.application_notifier]" } },
+	-- Driver initialisation, path resolution, config loading.
+	{ name = "ErgoptiPlus_boot.log", patterns = { "[init]", "[menu_paths]", "[paths]", "[config", "[Boot]", "[BootProfile]", "[Startup]", "[FirstBoot]", "[ConfigPaths]", "[timings]", "[infra.runtime_guard]", "[ergopti_hotstrings]" } },
 	-- MLX backend server, API calls, dependency installer.
 	{ name = "ErgoptiPlus_mlx.log", patterns = { "[mlx", "[llm.api_mlx]", "MLX-", "[mlx_deps]" } },
-	-- Ollama backend server, API calls, dependency installer.
-	{ name = "ErgoptiPlus_ollama.log", patterns = { "[ollama", "[llm.api_ollama]", "[ollama_deps]" } },
-	-- LLM menu, model switching, warmup, toggle events.
-	{ name = "ErgoptiPlus_llm.log", patterns = { "[llm.", "[menu_llm", "[keymap.llm", "WARMUP", "[TOGGLE]" } },
-	-- Keymap processing, dynamic hotstrings, personal info, TOML reader.
-	{ name = "ErgoptiPlus_hotstrings.log", patterns = { "[keymap.", "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring" } },
-	-- Keystroke logging, SQLite writes, rotation, export.
-	{ name = "ErgoptiPlus_keystats.log", patterns = { "[keystats" } },
 	-- Karabiner-Elements config generation and reload.
 	{ name = "ErgoptiPlus_karabiner.log", patterns = { "[karabiner" } },
-	-- Menu builder, UI components, app picker, download window.
-	{ name = "ErgoptiPlus_menu.log", patterns = { "[menu]", "[menu_", "[builder]", "[ui_builder]", "[app_picker]", "[download_window]" } },
-	-- Notification toasts and the notifications module.
-	{ name = "ErgoptiPlus_notify.log", patterns = { "[notify", "[notifications" } },
-	-- Driver initialisation, path resolution, config loading.
-	{ name = "ErgoptiPlus_boot.log", patterns = { "[init]", "[menu_paths]", "[paths]", "[config" } },
 }
