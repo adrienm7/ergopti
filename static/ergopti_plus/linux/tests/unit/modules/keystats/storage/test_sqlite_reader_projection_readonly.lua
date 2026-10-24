@@ -962,9 +962,10 @@ helpers.describe("linux-sqlite-catalogue", function()
 	-- so a statement retyped here cannot drift from macOS and Windows again.
 	local Queries = require("keystats.queries")
 	for _, case in ipairs({
-		{ label = "unfiltered", where = "" },
+		{ label = "unfiltered", where = "", date_where = "" },
 		{ label = "filtered", first = "2026-10-01", last = "2026-10-02", apps = { "editor" },
-			where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('editor')" },
+			where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02' AND app IN ('editor')",
+			date_where = " WHERE date >= '2026-10-01' AND date <= '2026-10-02'" },
 	}) do
 		helpers.it("linux-sqlite-catalogue: the " .. case.label .. " manifest issues the catalogue renderings", function()
 			local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
@@ -976,9 +977,49 @@ helpers.describe("linux-sqlite-catalogue", function()
 					expected[#expected + 1] = Queries.render(name, "cli_json", { where = case.where })
 				end
 			end
+			-- The machine's day has no application column: dates filter it alone.
+			expected[#expected + 1] = Queries.render("manifest.system_day", "cli_json", { where = case.date_where })
 			table.sort(expected)
 			table.sort(statements)
 			helpers.assert_eq(statements, expected)
 		end)
 	end
+end)
+
+
+helpers.describe("linux-sqlite-system-day", function()
+	-- Both pages read manifest[day]._system, which only the Windows reader
+	-- published; Linux had read_system_days with no caller, and its plain MIN
+	-- let a device without a battery report a zero minimum (PAR-67 census).
+	local function system_rows(sql)
+		if not sql:find("FROM agg_system_day", 1, true) then return "[]" end
+		return Json.encode({
+			{ date = "2026-10-01", wifi_changes = 4, space_switches = 7, battery_sum = 4200, battery_count = 60,
+				audio_muted_ms = 600000, locked_ms = 3600000, sleep_ms = 28800000, awake_ms = 93600000,
+				passive_count = 4, night_wake_count = 1, battery_min = 22, battery_max = 98 },
+			{ date = "2026-10-02", wifi_changes = 0, space_switches = 2, battery_sum = 0, battery_count = 0,
+				audio_muted_ms = 0, locked_ms = 600000, sleep_ms = 0, awake_ms = 30000000,
+				passive_count = 1, night_wake_count = 0 },
+		})
+	end
+
+	helpers.it("linux-sqlite-system-day: the manifest publishes _system without inventing battery extrema", function()
+		local manifest, complete
+		local statements = with_stubbed_sqlite(system_rows, function(reader)
+			manifest, complete = reader.read_manifest("/db/metrics.sqlite", "2026-10-01", "2026-10-02", { "editor" })
+		end)
+		helpers.assert_eq(complete, true)
+		helpers.assert_eq(manifest["2026-10-01"]._system, {
+			wifi_changes = 4, space_switches = 7, battery_sum = 4200, battery_count = 60,
+			audio_muted_ms = 600000, locked_ms = 3600000, sleep_ms = 28800000, awake_ms = 93600000,
+			passive_count = 4, night_wake_count = 1, battery_min = 22, battery_max = 98,
+		})
+		helpers.assert_nil(manifest["2026-10-02"]._system.battery_min, "no sample, no minimum")
+		local system_sql
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_system_day", 1, true) then system_sql = sql end
+		end
+		helpers.assert_contains(system_sql, "MIN(CASE WHEN battery_count > 0 THEN battery_min END)")
+		helpers.assert_nil(system_sql:find("app IN", 1, true), "the machine's day has no application to filter")
+	end)
 end)

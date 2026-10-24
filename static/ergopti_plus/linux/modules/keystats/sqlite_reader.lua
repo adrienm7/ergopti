@@ -216,6 +216,23 @@ function M.read_user_categories(sqlite_path, device_id)
 	return categories
 end
 
+-- Totals of the machine's own day published under manifest[date]._system.
+local SYSTEM_DAY_TOTALS = {
+	"wifi_changes", "space_switches", "battery_sum", "battery_count", "audio_muted_ms",
+	"locked_ms", "sleep_ms", "awake_ms", "passive_count", "night_wake_count",
+}
+
+--- Projects one catalogue system-day row onto the page's field names. The
+--- battery extrema stay nil on a day no device sampled the battery: the lowest
+--- charge of the day is a record, and inventing a zero would be one.
+--- @param row table A manifest.system_day row.
+--- @return table
+local function system_day(row)
+	local out = { battery_min = row.battery_min, battery_max = row.battery_max }
+	for _, field in ipairs(SYSTEM_DAY_TOTALS) do out[field] = row[field] or 0 end
+	return out
+end
+
 --- Builds the shared date/app manifest from persisted aggregates.
 --- @return table manifest Partial or complete dashboard projection.
 --- @return boolean complete Whether every native query was accepted.
@@ -416,50 +433,30 @@ function M.read_manifest(sqlite_path, start_date, end_date, apps)
 		entry.switches_to[row.app_to] = row.count or 0
 	end
 
+	-- The machine's own day, which both pages read under _system, as the
+	-- Windows reader publishes it. It has no application, so only the dates
+	-- filter it.
+	local system_sql = Queries.render("manifest.system_day", "cli_json",
+		{ where = filters(start_date, end_date, nil) })
+	for _, row in ipairs(query(system_sql)) do
+		manifest[row.date] = manifest[row.date] or {}
+		manifest[row.date]._system = system_day(row)
+	end
+
 	return manifest, complete
 end
 
---- Reads the machine's own state for a range.
----
---- Separate from the manifest, which is keyed by (date, app): this table has no
---- application, and folding it into an app-keyed structure would make the
---- dashboard pick one arbitrarily and attribute the machine's battery to it.
+--- Reads the machine's own state for a range: the rows read_manifest publishes
+--- under the reserved `_system` pseudo-application, keyed by date alone.
 --- @param sqlite_path string
 --- @param start_date string|nil
 --- @param end_date string|nil
 --- @return table date → row
 function M.read_system_days(sqlite_path, start_date, end_date)
 	local out = {}
-	local clauses = {}
-	if valid_date(start_date) then clauses[#clauses + 1] = "date >= " .. sql_quote(start_date) end
-	if valid_date(end_date) then clauses[#clauses + 1] = "date <= " .. sql_quote(end_date) end
-	local where = #clauses > 0 and (" WHERE " .. table.concat(clauses, " AND ")) or ""
-
-	for _, row in ipairs(read_rows(sqlite_path, string.format([[
-SELECT date, SUM(wifi_changes) AS wifi_changes, SUM(space_switches) AS space_switches,
-       SUM(battery_sum) AS battery_sum, SUM(battery_count) AS battery_count,
-       MIN(battery_min) AS battery_min, MAX(battery_max) AS battery_max,
-       SUM(audio_muted_ms) AS audio_muted_ms, SUM(locked_ms) AS locked_ms,
-       SUM(sleep_ms) AS sleep_ms, SUM(awake_ms) AS awake_ms,
-       SUM(passive_count) AS passive_count, SUM(night_wake_count) AS night_wake_count
-FROM agg_system_day%s GROUP BY date;
-]], where))) do
-		out[row.date] = {
-			wifi_changes = row.wifi_changes or 0,
-			space_switches = row.space_switches or 0,
-			battery_sum = row.battery_sum or 0,
-			battery_count = row.battery_count or 0,
-			-- MIN and MAX across devices, not the last row's: the lowest charge of
-			-- the day is the lowest on whichever machine reached it.
-			battery_min = row.battery_min,
-			battery_max = row.battery_max,
-			audio_muted_ms = row.audio_muted_ms or 0,
-			locked_ms = row.locked_ms or 0,
-			sleep_ms = row.sleep_ms or 0,
-			awake_ms = row.awake_ms or 0,
-			passive_count = row.passive_count or 0,
-			night_wake_count = row.night_wake_count or 0,
-		}
+	local sql = Queries.render("manifest.system_day", "cli_json", { where = filters(start_date, end_date, nil) })
+	for _, row in ipairs(read_rows(sqlite_path, sql)) do
+		out[row.date] = system_day(row)
 	end
 	return out
 end
