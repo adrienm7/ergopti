@@ -601,3 +601,5 @@ _SBT_DiagnosticMarkerControls() {
 	} finally _SBT_DiagnosticMarkerDelete(Path)
 }
 Test("screen brightness: optional phase marker reads closed bounded facts without exposing paths", _SBT_DiagnosticMarkerControls)
+
+#Include test_screen_brightness_completion_deadline.ahk
