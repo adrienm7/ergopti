@@ -264,10 +264,11 @@ helpers.describe("menu_keyboard_layout.DEFAULT_STATE (pause-layout feature)", fu
 		-- Feature is off by default — false means "inactive"
 		helpers.assert_true(kbd.DEFAULT_STATE.layout_pause_switch_enabled == false,
 			"layout_pause_switch_enabled default must be false (feature off)")
-		helpers.assert_true(kbd.DEFAULT_STATE.layout_on_pause == false,
-			"layout_on_pause default must be false (no automatic switch)")
-		helpers.assert_true(kbd.DEFAULT_STATE.layout_on_resume == false,
-			"layout_on_resume default must be false (no automatic switch)")
+		-- The targets hold layout ids; "" is « no change ».
+		helpers.assert_true(kbd.DEFAULT_STATE.layout_on_pause == "",
+			"layout_on_pause default must be \"\" (no automatic switch)")
+		helpers.assert_true(kbd.DEFAULT_STATE.layout_on_resume == "",
+			"layout_on_resume default must be \"\" (no automatic switch)")
 	end)
 
 	-- Regression: before the fix, DEFAULT_STATE was absent, so preferences.lua

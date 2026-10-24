@@ -77,6 +77,7 @@ local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
 local CapsWordPolicy = require("caps_word.auto_off")
+local PauseSwitchPolicy = require("layout.pause_switch_policy")
 local RecordList = require("toml_codec.record_list")
 local LOG       = "preferences"
 local OperationReporter = require("diagnostics.operation_reporter")
@@ -597,6 +598,10 @@ SCALAR_VALUE_RULES.caps_word_idle_timeout_seconds = function(value)
 	if CapsWordPolicy.validate_idle_timeout(value) then return true end
 	return false, "the CapsWord delay is not a finite non-negative number of seconds"
 end
+-- The pause and resume layouts are layout ids or "" (no change), by the
+-- shared policy; a legacy `false` from the boolean declaration is outdated.
+SCALAR_VALUE_RULES.layout_on_pause = PauseSwitchPolicy.valid_target
+SCALAR_VALUE_RULES.layout_on_resume = PauseSwitchPolicy.valid_target
 SCALAR_VALUE_RULES.caps_word_terminators = function(value)
 	local valid, reason = CapsWordPolicy.validate_terminators(value)
 	if valid then return true end

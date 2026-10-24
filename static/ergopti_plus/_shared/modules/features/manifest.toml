@@ -6933,6 +6933,10 @@ type = "boolean"
 description_key = "category.magic_key"
 platforms = ["ahk"]
 
+# Automatic layout switching on a pause, a resume and a quit. The two targets
+# hold the driver's own layout id ("" = no change): typed as booleans, they
+# made every chosen layout an invalid value. One policy decides the switch:
+# _shared/lua/layout/pause_switch_policy.lua.
 [[features.layout]]
 id = "pause_switch_enabled"
 default = false
@@ -6945,20 +6949,20 @@ reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 [[features.layout]]
 id = "on_pause"
-default = false
-recommended = false
+default = ""
+recommended = ""
 input_altering = true
-type = "boolean"
+type = "string"
 description_key = "menu.layout"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 [[features.layout]]
 id = "on_resume"
-default = false
-recommended = false
+default = ""
+recommended = ""
 input_altering = true
-type = "boolean"
+type = "string"
 description_key = "menu.layout"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_switch_on_pause_is_macos"
