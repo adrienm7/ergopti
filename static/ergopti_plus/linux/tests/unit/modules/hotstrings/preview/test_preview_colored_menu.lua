@@ -4,7 +4,11 @@
 --- scalar preference lease and conditional TOML writer. Observations from native
 --- callbacks are asserted after the callback has returned.
 local helpers = require("tests.helpers")
-local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true\nfuture = "kept" # retained\n'
+-- The three presence switches start explicitly off, whatever their shipped
+-- default, so each case toggles one of them on from a known state.
+local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true\n'
+	.. 'preview_star_enabled = false\npreview_autocorrect_enabled = false\npreview_ai_enabled = false\n'
+	.. 'future = "kept" # retained\n'
 
 --- Runs a body with the actual scalar owner routed to private independent bytes.
 --- @param body function Receives owner, settings, private path and sandbox.
