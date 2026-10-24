@@ -467,7 +467,9 @@ do
 			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
 				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "adapters.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
-				"infra.config_paths", "config_migrate", "toml_codec.writer" }) do package.loaded[name] = nil end
+				"infra.config_paths", "config_migrate", "toml_codec.writer",
+				-- Main initialises this owner once; an earlier suite may have loaded it.
+				"modules.keymap.pause_layout_switch" }) do package.loaded[name] = nil end
 			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
 			local app = options.app or "gnome-terminal"
 			local action_mode = options.mode or "none"
