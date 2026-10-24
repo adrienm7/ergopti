@@ -1,4 +1,4 @@
---- ui/field_check_window.lua
+--- ui/field_check/window.lua
 
 --- ==============================================================================
 --- MODULE: Field Check Window Runner (Linux)

@@ -1,4 +1,4 @@
---- ui/network_check.lua
+--- ui/field_check/network_check.lua
 
 --- ==============================================================================
 --- MODULE: Network Check Window (Linux)
@@ -14,10 +14,10 @@
 ---    report names the step that failed (settings, PAC download, PAC verdict,
 ---    route lookup, TLS, transfer) with a closed token and no URL.
 --- 2. The window, the busy refusal and the clipboard copy are the runner every
----    one-click check shares (ui/field_check_window.lua).
+---    one-click check shares (ui/field_check/window.lua).
 --- ==============================================================================
 
-local Window = require("ui.field_check_window")
+local Window = require("ui.field_check.window")
 
 return Window.new({
 	label = "Network check",

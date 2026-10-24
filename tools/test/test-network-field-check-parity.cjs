@@ -107,7 +107,7 @@ check('each driver routes the row to its check', () => {
 	);
 	assert.match(
 		read('linux', 'ui', 'menu', 'menu_builder.lua'),
-		/\["field_check_network"\] = function\(\) require\("ui\.network_check"\)\.run\(\) end/
+		/\["field_check_network"\] = function\(\) require\("ui\.field_check\.network_check"\)\.run\(\) end/
 	);
 });
 
@@ -131,7 +131,7 @@ check('the check files spell no address of their own', () => {
 		luaSource,
 		ahkSource,
 		read('linux', 'adapters', 'network_check_ports.lua'),
-		read('linux', 'ui', 'network_check.lua')
+		read('linux', 'ui', 'field_check', 'network_check.lua')
 	];
 	for (const source of files) {
 		const addresses = source.match(/https?:\/\/[^\s"')]+/g) ?? [];
