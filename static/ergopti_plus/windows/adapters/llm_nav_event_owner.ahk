@@ -3653,6 +3653,16 @@ LLM_NavEventOwner_HookOrderStats() {
 		"last_failure_error", NumGet(Stats, 40, "UInt"))
 }
 
+; The same counters for the diagnostic snapshot, read only when the native owner
+; is already loaded: the snapshot must never load the DLL as a side effect.
+; @returns {Map|Integer} The HookOrderStats map, or 0 when the owner is not loaded.
+LLM_NavEventOwner_HookHealth() {
+	global _LLM_NavEventOwnerModule
+	if !_LLM_NavEventOwnerModule
+		return 0
+	return LLM_NavEventOwner_HookOrderStats()
+}
+
 ; One counters-only record per native session: no key identity, no text.
 _LLM_NavEventOwnerLogHookOrder() {
 	try {
