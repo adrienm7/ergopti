@@ -268,6 +268,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-shared-ui-no-platform-branches.cjs"],
 			"repro": "node tools/test/test-shared-ui-no-platform-branches.cjs"
+		},
+		{
+			"id": "js-0456",
+			"ordinal": 473,
+			"name": "tooltip duration decrement and floor have one declaration that every engine and vector uses",
+			"cmd": "node",
+			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
+			"repro": "npm run test:tooltip-timing-single-source"
 		}
 	]
 }
