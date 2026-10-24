@@ -2469,12 +2469,7 @@
 		},
 		{
 			"type": "list",
-			"id": "layout_switching",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+			"id": "layout_switching"
 		},
 		{
 			"type": "list",
@@ -6441,12 +6436,7 @@
 			"i18n": "menu.layout.pause_layout_enabled",
 			"checked_when": [
 				"layout_switch_checked"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "group",
@@ -6455,12 +6445,7 @@
 			"caption_getter": "layout_pause_caption",
 			"disabled_when": [
 				"layout_switch_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "group",
@@ -6469,12 +6454,7 @@
 			"caption_getter": "layout_resume_caption",
 			"disabled_when": [
 				"layout_switch_ready"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		}
 	],
 	"layout_switch_picker_frame": [
@@ -6484,12 +6464,7 @@
 			"i18n": "menu.layout.layout_auto",
 			"checked_when": [
 				"layout_picker_auto_checked"
-			],
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "include",
@@ -6503,12 +6478,7 @@
 		},
 		{
 			"type": "list",
-			"id": "layout_picker_choices",
-			"platforms": [
-				"hs",
-				"linux"
-			],
-			"unavailable": "hide"
+			"id": "layout_picker_choices"
 		}
 	],
 	"layout_native_record_choice": [

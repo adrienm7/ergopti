@@ -3628,7 +3628,6 @@
 	"platform_reason.ai_menu_bookkeeping_is_windows": "Windows のみ：Windows の AI メニューの内部管理フラグで、選択する設定ではありません。macOS と Linux の AI メニューにはこのような記録はありません。",
 	"platform_reason.inline_autotype_is_windows": "Windows のみ：このモードでは、予測が届くそばから文書に直接入力されます。macOS と Linux では予測を吹き出しに表示し、承認したときに挿入します。",
 	"platform_reason.arrow_navigation_is_macos": "macOS のみ：矢印キーで予測の間を移動するための macOS の AI メニューの設定です。Windows と Linux は、ナビゲーション修飾キーの設定でナビゲーションキーを選びます。",
-	"platform_reason.layout_switch_on_pause_is_macos": "macOS のみ：一時停止または再開時にシステムの入力ソースを切り替えます。Windows はレイアウトの独自エミュレーションをやめることで一時停止し、Linux はレイアウトをシステムのキーボードレイアウトとして導入したままにするため、どちらにも切り替える入力ソースがありません。",
 	"platform_reason.accented_shortcuts_are_windows": "Windows のみ：アクセント付きキーがショートカット用の文字ではないレイアウト（AZERTY、BÉPO、インストール済みの Ergopti レイアウト）では、Ctrl+é は何も割り当てられていない組み合わせとしてアプリに届きます。これはそれらのキーの Ctrl・Alt・Win の組み合わせを、その文字の通常のショートカットに割り当て直し、Ctrl+é を Ctrl+C として動作させます。macOS のレイアウトファイルは独自の Command と Control の層を持ち、Linux ドライバーに相当するものはありません。",
 	"platform_reason.dynamic_master_is_category_switch_on_windows": "Windows では独立した設定ではありません。動的ホットストリング カテゴリのチェックボックスがこのマスタースイッチの役割を果たします。",
 	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "Windows では利用できません：Windows の設定でショートカットを割り当てられるのは、3 本指・4 本指のタップと 4 方向のまっすぐなスワイプだけで、タッチデータは Ergopti に渡されません。そのため、2 本指・5 本指のスロット、斜め方向、水平スワイプのスロットはありません。"

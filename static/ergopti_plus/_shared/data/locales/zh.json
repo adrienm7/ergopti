@@ -3628,7 +3628,6 @@
 	"platform_reason.ai_menu_bookkeeping_is_windows": "仅限 Windows：Windows AI 菜单的内部记录标志，不是需要你选择的设置。macOS 和 Linux 的 AI 菜单没有这样的记录。",
 	"platform_reason.inline_autotype_is_windows": "仅限 Windows：在此模式下，预测一到就直接键入文档。macOS 和 Linux 在气泡中显示预测，并在你接受后才插入。",
 	"platform_reason.arrow_navigation_is_macos": "仅限 macOS：macOS AI 菜单中用方向键在预测之间移动的偏好设置。Windows 和 Linux 通过导航修饰键设置来选择导航键。",
-	"platform_reason.layout_switch_on_pause_is_macos": "仅限 macOS：暂停或恢复时切换系统输入源。Windows 通过放弃自己的布局模拟来暂停，Linux 则让布局始终安装为系统键盘布局，因此两者都没有可切换的输入源。",
 	"platform_reason.accented_shortcuts_are_windows": "仅限 Windows：在带重音的按键不是快捷键字母的布局上（AZERTY、BÉPO、已安装的 Ergopti 布局），Ctrl+é 会作为未绑定任何功能的组合到达应用。此功能把这些按键上的 Ctrl、Alt 和 Win 组合重新映射到该字母的常用快捷键，因此 Ctrl+é 的作用等同于 Ctrl+C。macOS 的布局文件自带 Command 和 Control 层，Linux 驱动没有对应功能。",
 	"platform_reason.dynamic_master_is_category_switch_on_windows": "在 Windows 上这不是单独的设置：动态热字符串类别的复选框就是这里的总开关。",
 	"platform_reason.windows_touchpad_slots_are_three_and_four_fingers": "不适用于 Windows：Windows 设置只允许为三指和四指轻点以及四个直线方向的滑动指定快捷键，并且不会把触摸数据传给 Ergopti。因此那里没有双指或五指槽位、斜向槽位或水平滑动槽位。"

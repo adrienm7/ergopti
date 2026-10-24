@@ -1,5 +1,5 @@
 {
-	"description": "Which layout a pause, a resume or a quit switches to. Replayed by _shared/lua/layout/pause_switch_policy.lua (macOS and Linux). An absent settings key is an unset value; the expected target is absent when nothing switches.",
+	"description": "Which layout a pause, a resume or a quit switches to. Replayed by _shared/lua/layout/pause_switch_policy.lua (macOS and Linux) and _shared/modules/features/pause_switch_policy.ahk (Windows). An absent settings key is an unset value; the expected target is absent when nothing switches.",
 	"events": ["pause", "resume", "quit"],
 	"invalid_events": ["", "Pause", "suspend", "reload", "exit"],
 	"targets": [

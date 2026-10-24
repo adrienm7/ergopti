@@ -1390,32 +1390,35 @@ OPENS_SUBMENU.llm_display.push({
 	kind: 'compose',
 	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
 });
-// Actual macOS and Linux switching use genuine canonical parents and native picker data.
+// Actual switching uses genuine canonical parents and native picker data on every driver.
 OPENS_SUBMENU.layout_switching = {
 	menu: 'layout_switching_frame',
-	platforms: ['hs', 'linux'],
+	platforms: ['ahk', 'hs', 'linux'],
 	kind: 'compose',
 	native_sources: {
 		hs: 'macos/ui/menu/menu_keyboard_layout.lua',
-		linux: 'linux/ui/menu/pause_layout_rows.lua'
+		linux: 'linux/ui/menu/pause_layout_rows.lua',
+		ahk: 'windows/modules/keymap/pause_layout_switch.ahk'
 	}
 };
 OPENS_SUBMENU.layout_pause_picker = {
 	menu: 'layout_switch_picker_frame',
-	platforms: ['hs', 'linux'],
+	platforms: ['ahk', 'hs', 'linux'],
 	kind: 'submenu',
 	native_sources: {
 		hs: 'macos/ui/menu/menu_keyboard_layout.lua',
-		linux: 'linux/ui/menu/pause_layout_rows.lua'
+		linux: 'linux/ui/menu/pause_layout_rows.lua',
+		ahk: 'windows/modules/keymap/pause_layout_switch.ahk'
 	}
 };
 OPENS_SUBMENU.layout_resume_picker = {
 	menu: 'layout_switch_picker_frame',
-	platforms: ['hs', 'linux'],
+	platforms: ['ahk', 'hs', 'linux'],
 	kind: 'submenu',
 	native_sources: {
 		hs: 'macos/ui/menu/menu_keyboard_layout.lua',
-		linux: 'linux/ui/menu/pause_layout_rows.lua'
+		linux: 'linux/ui/menu/pause_layout_rows.lua',
+		ahk: 'windows/modules/keymap/pause_layout_switch.ahk'
 	}
 };
 
