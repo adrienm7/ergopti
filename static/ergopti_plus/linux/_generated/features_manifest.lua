@@ -52,7 +52,7 @@ M.sections = {
 	["shortcuts.caps_word"] = { description_key = "menu.caps_word.auto_off", platforms = { "ahk", "hs", "linux" }, subsections = { "pointer" } },
 	["shortcuts.caps_word.pointer"] = { description_key = "menu.caps_word.pointer_header", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
-	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs" }, subsections = {  } },
+	["layout"] = { description_key = "menu.layout", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
 	["mod_combos"] = { description_key = "menu.shortcuts.key_combinations", platforms = { "hs", "linux" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },

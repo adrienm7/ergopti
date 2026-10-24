@@ -763,7 +763,9 @@ console.log(
 			{ length: 305 },
 			(_, index) => `[sections.hand_floor_${index}]\ndescription_key = "hand"\n`
 		).join('\n');
-	const knownDebt = '[sections.ui]\nplatforms = ["hs"]\n';
+	// One identity the ledger still holds; the earlier sections.ui entry got its reason.
+	const knownDebt =
+		'[[features.llm.profiles]]\nid = "user_profiles"\ntype = "array"\nplatforms = ["hs"]\n';
 	const command =
 		'[[menu.hand_commands]]\ntype = "command"\nid = "new_hand_command"\ni18n = "menu.hand"\nplatforms = ["linux"]\n';
 	const hidden = command + 'unavailable = "hide"\n';
@@ -824,8 +826,8 @@ console.log(
 	])
 		assert.throws(() => coverage.readCoverage(complete + text));
 
-	// All four original anonymous separators remain four distinct roles; neither
-	// a fifth separator nor an action borrowing an old index is grandfathered.
+	// Anonymous separators keep one identity per ordinal, so four of them are four
+	// distinct debts, and none is grandfathered now that the ledger holds no separator.
 	const anonymous = Array.from({ length: 19 }, (_, index) =>
 		[10, 12, 14, 18].includes(index)
 			? `[[menu.gestures_menu]]\ntype = "---"\nplatforms = ["${index === 18 ? 'linux' : 'hs'}"]\n`
@@ -833,26 +835,71 @@ console.log(
 	).join('\n');
 	const anonymousCoverage = coverage.readCoverage(complete + anonymous);
 	assert.equal(anonymousCoverage.unexplained.length, 4);
-	assert.equal(new Set(anonymousCoverage.unexplained.map((entry) => entry.identity)).size, 4);
-	assert.deepEqual(coverage.coverageErrors(anonymousCoverage), []);
-	assert.ok(
-		errorsFor(
-			complete + anonymous + '[[menu.gestures_menu]]\ntype = "---"\nplatforms = ["hs"]\n'
-		).some((error) => error.includes('new unexplained'))
-	);
-	assert.ok(
-		errorsFor(complete + anonymous.replace('type = "---"', 'type = "command"')).some((error) =>
-			error.includes('new unexplained')
-		)
-	);
-	const namedKnown =
-		'[[menu.apps_menu]]\ntype = "list"\nid = "apps_installed"\nplatforms = ["hs"]\n';
+	const anonymousIdentities = new Set(anonymousCoverage.unexplained.map((entry) => entry.identity));
+	assert.equal(anonymousIdentities.size, 4);
+	const anonymousErrors = coverage.coverageErrors(anonymousCoverage);
+	for (const identity of anonymousIdentities)
+		assert.ok(anonymousErrors.some((error) => error.includes(identity)));
+	const namedKnown = knownDebt;
 	assert.deepEqual(errorsFor(complete + namedKnown), []);
 	assert.ok(
 		errorsFor(complete + namedKnown + namedKnown).some((error) =>
 			error.includes('duplicate unexplained identity')
 		)
 	);
+
+	// Two-platform restrictions are counted like single-platform ones (PAR-37):
+	// a feature on two drivers is just as absent on the third.
+	const pairFeature =
+		'[[features.hand]]\nid = "pair_feature"\ntype = "boolean"\nplatforms = ["hs", "linux"]\n';
+	assert.ok(
+		errorsFor(complete + pairFeature).some(
+			(error) => error.includes('new unexplained') && error.includes('"hs,linux"')
+		)
+	);
+	assert.deepEqual(errorsFor(complete + pairFeature + 'reason_key = "hand.reason"\n'), []);
+	const pairSection = '[sections.hand_pair]\nplatforms = ["linux", "ahk"]\n';
+	assert.ok(
+		errorsFor(complete + pairSection).some((error) =>
+			error.includes('["sections.hand_pair","ahk,linux"')
+		)
+	);
+	// A feature restating its section's two platforms is the section's restriction.
+	const restated = coverage.readCoverage(
+		complete +
+			pairSection +
+			'reason_key = "hand.reason"\n' +
+			'[[features.hand_pair]]\nid = "restated"\ntype = "boolean"\nplatforms = ["ahk", "linux"]\n'
+	);
+	assert.equal(restated.artifacts.length, 1);
+	assert.deepEqual(coverage.coverageErrors(restated), []);
+	// A two-platform menu row: hidden is a presentation, unclassified is a debt.
+	const pairRow =
+		'[[menu.hand_pair]]\ntype = "command"\nid = "pair_command"\ni18n = "menu.hand"\nplatforms = ["ahk", "hs"]\n';
+	assert.ok(errorsFor(complete + pairRow).some((error) => error.includes('pair_command')));
+	assert.deepEqual(errorsFor(complete + pairRow + 'unavailable = "hide"\n'), []);
+	// A preset an onboarding choice leaves out is explained only by a validation
+	// policy declared for every platform it omits.
+	const presets = (validation) =>
+		'[onboarding.pages.hand.magic_key]\npath = "hand.trigger"\nplatforms = ["ahk", "hs", "linux"]\n' +
+		validation +
+		'options = [{ value = "a", label_key = "hand.a" }, { value = "b", label_key = "hand.b", platforms = ["ahk", "hs"] }]\n';
+	assert.deepEqual(errorsFor(complete + presets('validation = { linux = "hand_policy" }\n')), []);
+	for (const validation of ['', 'validation = { hs = "hand_policy" }\n'])
+		assert.ok(
+			errorsFor(complete + presets(validation)).some((error) =>
+				error.includes('onboarding.pages.hand.magic_key.options')
+			)
+		);
+	for (const platforms of ['["linux", "linux"]', '["ahk", "both"]'])
+		assert.throws(
+			() =>
+				coverage.readCoverage(
+					complete +
+						`[[features.hand]]\nid = "bad_pair"\ntype = "boolean"\nplatforms = ${platforms}\n`
+				),
+			/repeats a driver|unknown restricted platform/
+		);
 
 	// Source inspection qualifies the numeric row as a presentation difference,
 	// not a removed capability. Strip comments and require each actual owner to
