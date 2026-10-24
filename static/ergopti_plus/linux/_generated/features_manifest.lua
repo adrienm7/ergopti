@@ -38,7 +38,7 @@ M.sections = {
 	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "linux" }, subsections = {  } },
+	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -329,7 +329,7 @@ M.features = {
 		path = "llm.app_profile_overrides", id = "app_profile_overrides", section = "llm", default = "", type = "string", description_key = "menu.llm.app_profile_overrides", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
 	},
 	{
-		path = "llm.user_profiles", id = "user_profiles", section = "llm", default = "", type = "string", description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
+		path = "llm.user_profiles", id = "user_profiles", section = "llm", default = "", type = "string", description_key = "menu.llm.profiles", platforms = { "ahk", "linux" }, recommended = "", input_altering = false,
 	},
 	{
 		path = "llm.agent_system1", id = "agent_system1", section = "llm", default = "", type = "string", description_key = "menu.agent.system1_desc", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = false,
@@ -383,10 +383,10 @@ M.features = {
 		path = "llm.models.ollama", id = "ollama", section = "llm.models", default = "Qwen3.5-0.8B", type = "string", description_key = "menu.llm.models.ollama", platforms = { "ahk", "hs", "linux" }, recommended = "Qwen3.5-0.8B", input_altering = false,
 	},
 	{
-		path = "llm.profiles.active", id = "active", section = "llm.profiles", default = "basic", type = "string", description_key = "menu.llm.profiles.active", platforms = { "ahk", "linux" }, recommended = "basic", input_altering = false,
+		path = "llm.profiles.active", id = "active", section = "llm.profiles", default = "basic", type = "string", description_key = "menu.llm.profiles.active", platforms = { "ahk", "hs", "linux" }, recommended = "basic", input_altering = false,
 	},
 	{
-		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "linux" }, recommended = 3, input_altering = false,
+		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs", "linux" }, recommended = 3, input_altering = false,
 	},
 	{
 		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "linux" }, recommended = true, input_altering = false,

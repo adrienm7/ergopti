@@ -193,7 +193,7 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.profiles]
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "linux"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.trigger]
 description_key = "menu.llm.trigger"
@@ -1258,7 +1258,7 @@ recommended = ""
 input_altering = false
 type = "string"
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "hs", "linux"]
+platforms = ["ahk", "linux"]
 
 [[features.llm]]
 id = "agent_system1"
