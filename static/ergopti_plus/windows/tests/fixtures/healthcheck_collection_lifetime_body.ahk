@@ -237,9 +237,9 @@ _HCLT_Turn() {
 _HCLT_Observe(Observer) {
 	global _HCPO, _HC_Collection
 	FileAppend("RECEIPT collection-lifetime mode=" . _HCPO.Mode . " control_deleted=" . Observer.ControlDeleted
-		. " owner_deleted=" . Observer.OwnerDeleted . " a_id=" . Observer.AId . " a_pid=" . Observer.APid
+		. " owner_deleted=" . Observer.OwnerDeleted . " a_id=" . Observer.AId . " a_process_id=" . Observer.APid
 		. " a_ack=" . Observer.AAck . " a_archive=" . Observer.AArchive . " b_id=" . Observer.BId
-		. " b_pid=" . Observer.BPid . " current_id=" . (IsObject(_HC_Collection) ? _HC_Collection.Id : "unknown")
+		. " b_process_id=" . Observer.BPid . " current_id=" . (IsObject(_HC_Collection) ? _HC_Collection.Id : "unknown")
 		. " returned_turns=" . _HCPO.Pulses . " errors=" . IsObject(_HCPO.Failure) . "`n", "*", "UTF-8")
 }
 
