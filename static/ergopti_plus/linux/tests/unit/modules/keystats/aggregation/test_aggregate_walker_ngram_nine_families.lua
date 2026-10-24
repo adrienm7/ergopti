@@ -562,12 +562,15 @@ helpers.describe("aggregate walker: when the typing happened", function()
 			"the slot is floored to a five-minute step, so 10:07 belongs to 10:05")
 	end)
 
-	it("records the first and last minute the user typed", function()
+	it("records the first and last five-minute slot the user typed in", function()
 		local events = typed("ab")
 		local at = os.time({ year = 2026, month = 8, day = 6, hour = 14, min = 32, sec = 0 })
 		local batch = Walker.walk(events, "2026-08-06", "app", nil, clock_at(#events, at))
 		local row = batch.chars_class["2026-08-06\1app"]
-		local expected = os.date("%H:%M", at)
+		-- The slot the activity histogram bins the keystroke in, as on Windows and
+		-- macOS (corpus vector typed_minutes_use_five_minute_slots): 14:32 is 14:30.
+		local minute = tonumber(os.date("%M", at))
+		local expected = string.format("%s:%02d", os.date("%H", at), math.floor(minute / 5) * 5)
 		helpers.assert_eq(row.first_typed_min, expected)
 		helpers.assert_eq(row.last_typed_min, expected)
 	end)
@@ -669,24 +672,28 @@ end)
 
 helpers.describe("aggregate walker: the pause buckets", function()
 
+	-- The shared walk keeps one row per threshold, the schema's own key, as the
+	-- Windows and macOS walkers do.
+	local function bucket(batch, threshold)
+		return batch.app_buckets["2026-08-06\1app\1" .. threshold]
+	end
+
 	it("credits a delay to every threshold at or above it", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 1500) }, "2026-08-06", "app")
-		local maps = batch.app_buckets["2026-08-06\1app"]
-		helpers.assert_not_nil(maps, "the dropdown behind this had nothing to read")
-		helpers.assert_eq(maps.time["1000"] or 0, 0,
+		helpers.assert_not_nil(bucket(batch, 2000), "the dropdown behind this had nothing to read")
+		helpers.assert_eq(bucket(batch, 1000).time_sum, 0,
 			"a 1500 ms gap is longer than the 1 s threshold, so that bucket excludes it")
-		helpers.assert_eq(maps.time["2000"], 1500,
+		helpers.assert_eq(bucket(batch, 2000).time_sum, 1500,
 			"and every threshold above it includes the whole delay: the control asks "
 				.. "how much time is left once pauses over N are ignored, which is a "
 				.. "total rather than a slice")
-		helpers.assert_eq(maps.time["60000"], 1500)
+		helpers.assert_eq(bucket(batch, 60000).time_sum, 1500)
 	end)
 
 	it("counts the keystrokes each bucket credits", function()
 		local batch = Walker.walk({ key("a", 0), key("b", 200), key("c", 300) },
 			"2026-08-06", "app")
-		local maps = batch.app_buckets["2026-08-06\1app"]
-		helpers.assert_eq(maps.credited["1000"], 3,
+		helpers.assert_eq(bucket(batch, 1000).credited, 3,
 			"the dashboard divides the bucket's time by this to get a mean delay. "
 				.. "Dividing by a keystroke count that includes the pauses the bucket "
 				.. "excludes gives a number wrong in the flattering direction, and "
