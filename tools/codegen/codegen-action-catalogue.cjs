@@ -11,6 +11,14 @@
  * requirements), and the driver-specific extras (Karabiner aliases on macOS,
  * the gesture slot-space on Linux).
  *
+ * WHY ONE FILE FOR THE TWO LUA DRIVERS:
+ * The macOS and Linux catalogues shared four lines in five. They load one
+ * generated file, _shared/lua/actions/catalogue_data.lua, whose every item and
+ * action names the Lua drivers that keep it (with the heading pruning already
+ * decided per driver here); _shared/lua/actions/catalogue.lua filters it at
+ * load. Each driver's _generated/action_catalogue.lua is then only that call
+ * and what that driver alone declares. Windows keeps its own AHK data file.
+ *
  * WHY GENERATED RATHER THAN READ AT RUNTIME:
  * Three drivers read the same TOML with three parsers. Windows parsed it with
  * ParseTomlFile inside a loader deferred off the boot path; macOS used a
@@ -48,6 +56,12 @@ const OUTPUTS = {
 };
 
 const PLATFORMS = ['ahk', 'hs', 'linux'];
+
+/** The drivers that load the shared Lua catalogue, in emission order. */
+const LUA_PLATFORMS = ['hs', 'linux'];
+
+/** The shared catalogue data of the Lua drivers, relative to the repository root. */
+const SHARED_LUA_OUTPUT = 'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua';
 
 /** Locale key prefix every picker heading resolves through. */
 const HEADER_KEY_PREFIX = 'sg_actions.sg_order.header.';
@@ -259,28 +273,38 @@ function buildModel(data, platform) {
 	// Walk the order, keep what this driver claims, then drop the headings left
 	// without content: "Navigation" holds two Windows-only rows, and an empty
 	// heading on macOS reads as a list that failed to load.
+	// Each kept item's position in [sg_order], so the shared Lua catalogue can
+	// merge the drivers' lists in that one order.
 	const raw = [];
+	const rawOrders = [];
 	let parentLevel = 0;
-	for (const item of data.sg_order.items) {
-		if (item === '--') continue;
+	data.sg_order.items.forEach((item, order) => {
+		if (item === '--') return;
 		const heading = item.match(/^(#{1,2})([a-z_][a-z0-9_]*)$/);
 		if (heading) {
 			parentLevel = heading[1].length;
 			raw.push({ kind: 'heading', level: parentLevel, key: HEADER_KEY_PREFIX + heading[2] });
-			continue;
+			rawOrders.push(order);
+			return;
 		}
 		if (item === CHORD_PLACEHOLDER) {
-			if (!claims(data.sg_actions[item], `sg_actions.${item}`)) continue;
+			if (!claims(data.sg_actions[item], `sg_actions.${item}`)) return;
 			raw.push({ kind: 'modifier_chords', level: parentLevel + 1, groupKey: CHORD_GROUP_KEY });
-			continue;
+			rawOrders.push(order);
+			return;
 		}
-		if (actions[item]) raw.push({ kind: 'action', id: item });
-	}
+		if (actions[item]) {
+			raw.push({ kind: 'action', id: item });
+			rawOrders.push(order);
+		}
+	});
 	const sgItems = [];
+	const sgOrders = [];
 	for (let i = 0; i < raw.length; i++) {
 		const entry = raw[i];
 		if (entry.kind !== 'heading') {
 			sgItems.push(entry);
+			sgOrders.push(rawOrders[i]);
 			continue;
 		}
 		let hasContent = false;
@@ -291,11 +315,15 @@ function buildModel(data, platform) {
 				break;
 			}
 		}
-		if (hasContent) sgItems.push(entry);
+		if (hasContent) {
+			sgItems.push(entry);
+			sgOrders.push(rawOrders[i]);
+		}
 	}
 
 	const axItems = data.ax_order.items.filter((id) => actions[id] && actions[id].family === 'ax');
 	const model = { platform, sgItems, axItems, actions };
+	Object.defineProperty(model, 'sgOrders', { value: sgOrders, enumerable: false });
 	if (platform === 'hs') model.karabinerAliases = { ...(data.karabiner_aliases || {}) };
 	if (platform === 'linux')
 		model.slots = { single: [...data.slots.single], axis: [...data.slots.axis] };
@@ -308,8 +336,113 @@ const luaQ = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') 
 /** An AHK v2 double-quoted literal (backtick is the escape character). */
 const ahkQ = (s) => '"' + String(s).replace(/`/g, '``').replace(/"/g, '`"') + '"';
 
+/** A Lua list of double-quoted literals. */
+const luaList = (values) => (values.length ? `{ ${values.map(luaQ).join(', ')} }` : '{}');
+
+/** The Lua fields of one picker item, without the drivers that keep it. */
+function luaItemFields(item) {
+	if (item.kind === 'action') return `kind = "action", id = ${luaQ(item.id)}`;
+	if (item.kind === 'heading')
+		return `kind = "heading", level = ${item.level}, key = ${luaQ(item.key)}`;
+	return `kind = "modifier_chords", level = ${item.level}, group_key = ${luaQ(item.groupKey)}`;
+}
+
 /**
- * Renders a Lua catalogue.
+ * Merges the macOS and Linux models into the shared catalogue: every picker
+ * item, axis and action once, in the registry order, with the drivers that
+ * keep it. Heading pruning stays the per-driver decision of buildModel.
+ * @param {object} data The validated registry.
+ * @returns {{sgItems: object[], axItems: object[], actions: object}}
+ */
+function buildSharedLuaModel(data) {
+	const models = LUA_PLATFORMS.map((platform) => buildModel(data, platform));
+	const byOrder = new Map();
+	for (const model of models) {
+		model.sgItems.forEach((item, index) => {
+			const order = model.sgOrders[index];
+			const known = byOrder.get(order);
+			if (!known) byOrder.set(order, { item, platforms: [model.platform] });
+			else if (JSON.stringify(known.item) !== JSON.stringify(item))
+				throw new Error(`sg_order item ${order} differs between the Lua drivers`);
+			else known.platforms.push(model.platform);
+		});
+	}
+	const sgItems = [...byOrder.keys()].sort((a, b) => a - b).map((order) => byOrder.get(order));
+	const axItems = data.ax_order.items
+		.map((id) => ({
+			id,
+			platforms: models.filter((m) => m.axItems.includes(id)).map((m) => m.platform)
+		}))
+		.filter((entry) => entry.platforms.length > 0);
+	const actions = {};
+	for (const model of models) {
+		for (const [id, entry] of Object.entries(model.actions)) {
+			const { requires, ...common } = entry;
+			const known = actions[id];
+			if (!known) actions[id] = { common, platforms: [], requires: {} };
+			else if (JSON.stringify(known.common) !== JSON.stringify(common))
+				throw new Error(`action "${id}" differs between the Lua drivers`);
+			actions[id].platforms.push(model.platform);
+			if (requires) actions[id].requires[model.platform] = requires;
+		}
+	}
+	return { sgItems, axItems, actions };
+}
+
+/**
+ * Renders the shared catalogue data of the Lua drivers.
+ * @param {object} shared From buildSharedLuaModel.
+ * @param {string} refresh The npm command that regenerates it.
+ * @returns {string}
+ */
+function renderSharedLua(shared, refresh) {
+	const out = [];
+	out.push('--- _shared/lua/actions/catalogue_data.lua');
+	out.push('--- AUTO-GENERATED from _shared/modules/actions/actions.toml.');
+	out.push(`--- DO NOT EDIT BY HAND — run \`${refresh}\` to refresh.`);
+	out.push('');
+	out.push('--- ==============================================================================');
+	out.push('--- DATA: Action Catalogue Of The Lua Drivers');
+	out.push('--- DESCRIPTION:');
+	out.push('--- Every action the macOS and Linux drivers offer, once: the picker order with');
+	out.push('--- heading levels and locale keys, the modifier-chord block, the axes and the');
+	out.push('--- per-action metadata. Each entry names the drivers that keep it (`platforms`,');
+	out.push('--- "hs" or "linux"), with the empty headings of each driver already left out;');
+	out.push('--- actions.catalogue filters it into the table each driver loads.');
+	out.push('--- ==============================================================================');
+	out.push('');
+	out.push('return {');
+	out.push('\tsg_items = {');
+	for (const { item, platforms } of shared.sgItems)
+		out.push(`\t\t{ ${luaItemFields(item)}, platforms = ${luaList(platforms)} },`);
+	out.push('\t},');
+	out.push('\tax_items = {');
+	for (const { id, platforms } of shared.axItems)
+		out.push(`\t\t{ id = ${luaQ(id)}, platforms = ${luaList(platforms)} },`);
+	out.push('\t},');
+	out.push('\tactions = {');
+	for (const id of Object.keys(shared.actions).sort()) {
+		const { common, platforms, requires } = shared.actions[id];
+		const parts = [`family = ${luaQ(common.family)}`, `label_key = ${luaQ(common.labelKey)}`];
+		if (common.parameter) parts.push(`parameter = ${luaQ(common.parameter)}`);
+		if (common.confirm) parts.push('confirm = true');
+		parts.push(`platforms = ${luaList(platforms)}`);
+		const required = Object.keys(requires);
+		if (required.length)
+			parts.push(
+				`requires = { ${required.map((p) => `${p} = ${luaList(requires[p])}`).join(', ')} }`
+			);
+		out.push(`\t\t[${luaQ(id)}] = { ${parts.join(', ')} },`);
+	}
+	out.push('\t},');
+	out.push('}');
+	out.push('');
+	return out.join('\n');
+}
+
+/**
+ * Renders one Lua driver's catalogue: the shared data filtered to the driver
+ * at load, plus the extras only that driver declares.
  * @param {object} model From buildModel.
  * @param {string} refresh The npm command that regenerates it.
  * @returns {string}
@@ -324,42 +457,13 @@ function renderLua(model, refresh) {
 	out.push('--- ==============================================================================');
 	out.push(`--- MODULE: Action Catalogue (${label})`);
 	out.push('--- DESCRIPTION:');
-	out.push(`--- Every action the ${label} driver offers, already filtered to its platform:`);
-	out.push('--- the picker order with heading levels and locale keys, the modifier-chord');
-	out.push('--- block the driver expands from its own chord registry, and per-action');
-	out.push('--- metadata (label key, parameter kind, confirmation, requirements). The');
-	out.push('--- driver loads this table instead of parsing the shared TOML at runtime.');
+	out.push(`--- Every action the ${label} driver offers: the catalogue the two Lua drivers`);
+	out.push('--- share (_shared/lua/actions/catalogue_data.lua) filtered to this platform');
+	out.push('--- when it loads, plus what only this driver declares. The driver loads this');
+	out.push('--- table instead of parsing the shared TOML at runtime.');
 	out.push('--- ==============================================================================');
 	out.push('');
-	out.push('return {');
-	out.push(`\tplatform = ${luaQ(model.platform)},`);
-	out.push('\tsg_items = {');
-	for (const item of model.sgItems) {
-		if (item.kind === 'action') out.push(`\t\t{ kind = "action", id = ${luaQ(item.id)} },`);
-		else if (item.kind === 'heading') {
-			out.push(`\t\t{ kind = "heading", level = ${item.level}, key = ${luaQ(item.key)} },`);
-		} else {
-			out.push(
-				`\t\t{ kind = "modifier_chords", level = ${item.level}, group_key = ${luaQ(item.groupKey)} },`
-			);
-		}
-	}
-	out.push('\t},');
-	out.push(
-		model.axItems.length
-			? `\tax_items = { ${model.axItems.map(luaQ).join(', ')} },`
-			: '\tax_items = {},'
-	);
-	out.push('\tactions = {');
-	for (const id of Object.keys(model.actions).sort()) {
-		const a = model.actions[id];
-		const parts = [`family = ${luaQ(a.family)}`, `label_key = ${luaQ(a.labelKey)}`];
-		if (a.parameter) parts.push(`parameter = ${luaQ(a.parameter)}`);
-		if (a.confirm) parts.push('confirm = true');
-		if (a.requires) parts.push(`requires = { ${a.requires.map(luaQ).join(', ')} }`);
-		out.push(`\t\t[${luaQ(id)}] = { ${parts.join(', ')} },`);
-	}
-	out.push('\t},');
+	out.push(`return require("actions.catalogue").for_platform(${luaQ(model.platform)}, {`);
 	if (model.karabinerAliases) {
 		out.push('\tkarabiner_aliases = {');
 		for (const alias of Object.keys(model.karabinerAliases).sort()) {
@@ -369,11 +473,11 @@ function renderLua(model, refresh) {
 	}
 	if (model.slots) {
 		out.push('\tslots = {');
-		out.push(`\t\tsingle = { ${model.slots.single.map(luaQ).join(', ')} },`);
-		out.push(`\t\taxis = { ${model.slots.axis.map(luaQ).join(', ')} },`);
+		out.push(`\t\tsingle = ${luaList(model.slots.single)},`);
+		out.push(`\t\taxis = ${luaList(model.slots.axis)},`);
 		out.push('\t},');
 	}
-	out.push('}');
+	out.push('})');
 	out.push('');
 	return out.join('\n');
 }
@@ -436,40 +540,61 @@ function renderAhk(model, refresh) {
 	return out.join('\n');
 }
 
+const REFRESH = 'npm run codegen:action-catalogue';
+
 /**
- * Generates the three catalogues from a registry source.
+ * Generates the three driver catalogues from a registry source.
  * @param {string} source TOML text.
  * @returns {Record<string, {path: string, text: string, model: object}>}
  */
 function generate(source) {
 	const data = parseRegistry(source);
-	const refresh = 'npm run codegen:action-catalogue';
 	const result = {};
 	for (const platform of PLATFORMS) {
 		const model = buildModel(data, platform);
-		const text = platform === 'ahk' ? renderAhk(model, refresh) : renderLua(model, refresh);
+		const text = platform === 'ahk' ? renderAhk(model, REFRESH) : renderLua(model, REFRESH);
 		result[platform] = { path: OUTPUTS[platform], text, model };
 	}
 	return result;
 }
 
+/**
+ * Generates the shared catalogue data the Lua driver catalogues load.
+ * @param {string} source TOML text.
+ * @returns {{path: string, text: string}}
+ */
+function generateShared(source) {
+	return {
+		path: SHARED_LUA_OUTPUT,
+		text: renderSharedLua(buildSharedLuaModel(parseRegistry(source)), REFRESH)
+	};
+}
+
 module.exports = {
 	generate,
+	generateShared,
 	parseRegistry,
 	buildModel,
 	OUTPUTS,
+	SHARED_LUA_OUTPUT,
+	LUA_PLATFORMS,
 	CHORD_GROUP_KEY,
 	HEADER_KEY_PREFIX
 };
 
 if (require.main === module) {
 	let generated;
+	let shared;
 	try {
-		generated = generate(fs.readFileSync(CATALOGUE, 'utf8'));
+		const source = fs.readFileSync(CATALOGUE, 'utf8');
+		generated = generate(source);
+		shared = generateShared(source);
 	} catch (err) {
 		console.error(`[ERROR] ${err.message}`);
 		process.exit(1);
 	}
+	fs.writeFileSync(path.join(ROOT, shared.path), shared.text, 'utf8');
+	console.log(`  wrote ${shared.path}`);
 	for (const platform of PLATFORMS) {
 		const { path: rel, text, model } = generated[platform];
 		const abs = path.join(ROOT, rel);

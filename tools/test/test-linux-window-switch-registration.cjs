@@ -54,6 +54,8 @@ const SOURCES = [
 	'static/ergopti_plus/_shared/lua/cursor_window_policy.lua',
 	'static/ergopti_plus/_shared/modules/actions/actions.toml',
 	'static/ergopti_plus/linux/_generated/action_catalogue.lua',
+	'static/ergopti_plus/_shared/lua/actions/catalogue.lua',
+	'static/ergopti_plus/_shared/lua/actions/catalogue_data.lua',
 	'static/ergopti_plus/linux/_generated/action_emit.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py',
 	'static/ergopti_plus/linux/tests/hardware/run_window_switch_operation.lua',

@@ -19,11 +19,17 @@ with the picker order, heading levels and locale keys resolved.
 
 ## Generated outputs
 
-| Driver  | File                                      |
-| ------- | ----------------------------------------- |
-| macOS   | `macos/_generated/action_catalogue.lua`   |
-| Linux   | `linux/_generated/action_catalogue.lua`   |
-| Windows | `windows/_generated/action_catalogue.ahk` |
+| Driver          | File                                                                |
+| --------------- | ------------------------------------------------------------------- |
+| macOS and Linux | `_shared/lua/actions/catalogue_data.lua` (every entry names its OS) |
+| macOS           | `macos/_generated/action_catalogue.lua` (filters it, adds aliases)  |
+| Linux           | `linux/_generated/action_catalogue.lua` (filters it, adds slots)    |
+| Windows         | `windows/_generated/action_catalogue.ahk`                           |
+
+The two Lua drivers share one catalogue: `_shared/lua/actions/catalogue.lua`
+keeps the entries that name the driver when its `_generated` file loads, and
+`tools/test/test-action-catalogue-shared-projection.cjs` checks that each
+driver loads exactly the catalogue the generator's model of it holds.
 
 ## Usage
 

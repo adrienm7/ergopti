@@ -3,8 +3,9 @@
 # The single source of truth for every bindable action (gestures, keyboard
 # slots, tap-holds). No driver reads this file at runtime:
 # tools/codegen/codegen-action-catalogue.cjs turns it into one generated
-# catalogue per driver (macos/_generated/action_catalogue.lua,
-# linux/_generated/action_catalogue.lua,
+# catalogue per driver (macos/_generated/action_catalogue.lua and
+# linux/_generated/action_catalogue.lua, which filter the data they share in
+# _shared/lua/actions/catalogue_data.lua, and
 # windows/_generated/action_catalogue.ahk), already filtered to that driver's
 # platform, with the picker order, heading levels and i18n keys resolved. Run
 # `npm run codegen:action-catalogue` (or `npm run gen`) after editing it.
