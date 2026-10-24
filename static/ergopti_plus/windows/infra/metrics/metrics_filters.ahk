@@ -277,6 +277,16 @@ MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
 ; still fail privacy closed.
 global MF_FOCUS_TTL_MS := 50
 
+; Focus changes are pushed by the system (foreground window and window-title events);
+; the repeating poll below is only the safety net for an event that never arrives.
+; Polling every 50 ms woke the driver 20 times a second all day: 2.7 million probes in
+; two days, some of them 500 ms stalls on the keystroke thread.
+global MF_FOCUS_FALLBACK_POLL_MS := 2000
+global MF_EVENT_SYSTEM_FOREGROUND := 0x0003
+global MF_EVENT_OBJECT_NAMECHANGE := 0x800C
+; A burst of events (a page that rewrites its title) is served by one refresh.
+global MF_FOCUS_EVENT_COALESCE_MS := 5
+
 class MetricsFocusCache {
 	; Build-then-swap keeps every reader on one complete identity. `valid=false`
 	; is part of the snapshot contract, not an empty-context fallback: privacy
@@ -298,6 +308,12 @@ class MetricsFocusCache {
 	static lifecycle_generation := 0
 	static running := false
 	static timer_fn := 0
+	; System focus events: hook handles, the native callback, and whether the safety net
+	; may run slowly because the hooks are live.
+	static hooks := []
+	static event_callback := 0
+	static event_mode := false
+	static event_refresh_pending := false
 }
 
 ; Returns the current tick through an injectable seam used by the interleaving
@@ -415,6 +431,14 @@ _MF_CommitFocusRefresh(RequestGeneration, Candidate) {
 
 ; Captures one stable reference for both metrics and keystats consumers.
 MF_GetFocusSnapshot() {
+	; With events driving the cache, a foreground change that has not been delivered yet is
+	; caught here at the next read, which is exactly when the verdict matters: one cheap
+	; call instead of trusting the 2 s safety net.
+	if MetricsFocusCache.event_mode && MetricsFocusCache.state.hwnd
+			!= DllCall("User32\GetForegroundWindow", "Ptr") {
+		PerfCount("metrics.focus_read_refresh")
+		try MF_RefreshFocus(true)
+	}
 	return MetricsFocusCache.state
 }
 
@@ -585,8 +609,10 @@ MF_StartFocusRefresh() {
 
 	; Timer mutation stays outside Critical. The BoundFunc identity lets failure
 	; cleanup cancel only this start attempt, never a newer owner’s timer.
-	try SetTimer(FocusTimerFn, MF_FOCUS_TTL_MS)
+	EventsLive := _MF_StartFocusWinEvents()
+	try SetTimer(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)
 	catch as Err {
+		_MF_StopFocusWinEvents()
 		PreviousCritical := Critical("On")
 		try {
 			if MetricsFocusCache.lifecycle_generation = StartGeneration
@@ -629,9 +655,105 @@ MF_StartFocusRefresh() {
 	finally Critical(PreviousCritical)
 	if !StillOwned
 		return false
-	try LoggerTrace("MetricsFilters", "Bounded focus-cache refresh started ({1} ms).",
-		MF_FOCUS_TTL_MS)
+	try LoggerTrace("MetricsFilters", "Bounded focus-cache refresh started ({1} ms, {2}).",
+		EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS,
+		EventsLive ? "driven by system focus events" : "polling")
 	return true
+}
+
+; Installs the foreground and title event hooks. Returns false (the caller then keeps the
+; 50 ms poll) when they cannot be installed, under the dry-run harness, or already live.
+_MF_StartFocusWinEvents(AllowUnderHarness := false) {
+	if IsSet(_AHK_DRY_RUN) && !AllowUnderHarness
+		return false
+	if MetricsFocusCache.event_mode
+		return true
+	Callback := 0
+	try Callback := CallbackCreate(_MF_FocusWinEvent, "F", 7)
+	catch as Err {
+		try LoggerError("MetricsFilters", "Focus event callback could not be created: {1}; polling instead.", Err.Message)
+		return false
+	}
+	Hooks := []
+	for Event in [MF_EVENT_SYSTEM_FOREGROUND, MF_EVENT_OBJECT_NAMECHANGE] {
+		Hook := 0
+		try Hook := DllCall("SetWinEventHook", "UInt", Event, "UInt", Event, "Ptr", 0,
+			"Ptr", Callback, "UInt", 0, "UInt", 0, "UInt", 0, "Ptr")
+		catch as Err
+			try LoggerError("MetricsFilters", "SetWinEventHook raised for event 0x{1:X}: {2}.", Event, Err.Message)
+		if !Hook {
+			try LoggerError("MetricsFilters", "Focus event 0x{1:X} could not be hooked; polling instead.", Event)
+			for Done in Hooks
+				try DllCall("UnhookWinEvent", "Ptr", Done)
+			try CallbackFree(Callback)
+			return false
+		}
+		Hooks.Push(Hook)
+	}
+	PreviousCritical := Critical("On")
+	try {
+		MetricsFocusCache.hooks := Hooks
+		MetricsFocusCache.event_callback := Callback
+		MetricsFocusCache.event_mode := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Removes the hooks. A hook that refuses to unhook keeps its callback allocated: freeing
+; a callback the system can still invoke would crash the driver.
+_MF_StopFocusWinEvents() {
+	PreviousCritical := Critical("On")
+	try {
+		Hooks := MetricsFocusCache.hooks
+		Callback := MetricsFocusCache.event_callback
+		MetricsFocusCache.event_mode := false
+		MetricsFocusCache.event_refresh_pending := false
+		MetricsFocusCache.hooks := []
+		MetricsFocusCache.event_callback := 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	AllRemoved := true
+	for Hook in Hooks {
+		Removed := false
+		try Removed := !!DllCall("UnhookWinEvent", "Ptr", Hook)
+		catch as Err
+			try LoggerWarn("MetricsFilters", "Focus event hook teardown failed: {1}.", Err.Message)
+		AllRemoved := AllRemoved && Removed
+	}
+	if Callback && AllRemoved
+		try CallbackFree(Callback)
+	return AllRemoved
+}
+
+; Runs on the keystroke thread for every foreground change and window-name change in the
+; session, so it only filters and schedules; the probe itself happens in the coalesced timer.
+_MF_FocusWinEvent(WinEventHook, Event, Hwnd, ObjectId, ChildId, EventThread, EventTime) {
+	if A_IsSuspended || !MetricsFocusCache.running
+		return
+	if Event == MF_EVENT_OBJECT_NAMECHANGE {
+		; Only the title of the foreground top-level window matters; child controls rename
+		; themselves constantly.
+		if ObjectId != 0 || Hwnd != DllCall("User32\GetForegroundWindow", "Ptr")
+			return
+	}
+	PerfCount("metrics.focus_event")
+	if MetricsFocusCache.event_refresh_pending
+		return
+	MetricsFocusCache.event_refresh_pending := true
+	SetTimer(_MF_FocusEventRefresh, -MF_FOCUS_EVENT_COALESCE_MS)
+}
+
+_MF_FocusEventRefresh() {
+	MetricsFocusCache.event_refresh_pending := false
+	if A_IsSuspended || !MetricsFocusCache.running
+		return
+	PerfCount("metrics.focus_event_refresh")
+	try MF_RefreshFocus(true)
+	catch as Err
+		try LoggerError("MetricsFilters", "Event-driven focus refresh failed: {1}.", Err.Message)
 }
 
 ; Disarm the focus-cache poll. Required because MF_RefreshFocus is a REPEATING
@@ -657,7 +779,10 @@ MF_StopFocusRefresh(NativeCancelFn := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	EventsRemoved := _MF_StopFocusWinEvents()
 	ProcessCacheStopped := _WIResetFocusProcessCache()
+	if !EventsRemoved
+		try LoggerError("MetricsFilters", "Focus event hooks could not be removed.")
 	if !IsObject(FocusTimerFn)
 		return ProcessCacheStopped
 	try NativeCancelFn.Call(FocusTimerFn)

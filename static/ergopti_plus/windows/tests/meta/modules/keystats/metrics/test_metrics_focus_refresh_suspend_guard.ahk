@@ -84,7 +84,8 @@ _MFS_PollIsCancellable() {
 	PendingPublish := InStr(Start, "_MF_ApplyFocusStateLocked(PendingState)")
 	Bind := InStr(Start, "_MF_FocusTimerTick.Bind(StartGeneration)")
 	Store := InStr(Start, "MetricsFocusCache.timer_fn := FocusTimerFn")
-	Arm := InStr(Start, "SetTimer(FocusTimerFn, MF_FOCUS_TTL_MS)")
+	; The interval is the fast poll, or the slow safety net while system focus events drive the cache.
+	Arm := InStr(Start, "SetTimer(FocusTimerFn, EventsLive ? MF_FOCUS_FALLBACK_POLL_MS : MF_FOCUS_TTL_MS)")
 	Assert(Pending > 0 && PendingPublish > Pending && Bind > PendingPublish
 		&& Store > Bind && Arm > Store,
 		"each start must publish a fail-closed pending barrier, bind its lifecycle generation, publish that exact callback identity, then arm it — a shared timer callback lets stale stop/start work target the wrong owner")
@@ -190,3 +191,121 @@ _ATG_MetricsTicksGatedOnSuspend() {
 		"KL_Hook_LivePush must gate on A_IsSuspended (metrics-timers-bypass-pause)")
 }
 Test("metrics: the recurring keystats/metrics ticks gate on A_IsSuspended (metrics-timers-bypass-pause)", _ATG_MetricsTicksGatedOnSuspend)
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 3/ System focus events drive the cache =======
+; ======================================================
+; ======================================================
+
+_MFS_WithEventState(Body) {
+	Saved := [MetricsFocusCache.running, MetricsFocusCache.event_mode,
+		MetricsFocusCache.event_refresh_pending, MetricsFocusCache.state]
+	try Body.Call()
+	finally {
+		SetTimer(_MF_FocusEventRefresh, 0)
+		MetricsFocusCache.running := Saved[1]
+		MetricsFocusCache.event_mode := Saved[2]
+		MetricsFocusCache.event_refresh_pending := Saved[3]
+		MetricsFocusCache.state := Saved[4]
+	}
+}
+
+_MFS_EventHandlerFiltersAndCoalesces() {
+	Counts := _PerfCountersOwner().Counts
+	_Body() {
+		Foreground := DllCall("User32\GetForegroundWindow", "Ptr")
+		MetricsFocusCache.running := false
+		MetricsFocusCache.event_refresh_pending := false
+		_MF_FocusWinEvent(0, MF_EVENT_SYSTEM_FOREGROUND, 1, 0, 0, 0, 0)
+		AssertFalse(MetricsFocusCache.event_refresh_pending, "a stopped cache ignores events")
+		MetricsFocusCache.running := true
+		Before := Counts.Get("metrics.focus_event", 0)
+		_MF_FocusWinEvent(0, MF_EVENT_OBJECT_NAMECHANGE, Foreground, 7, 0, 0, 0)
+		AssertFalse(MetricsFocusCache.event_refresh_pending, "a child control rename is not a title change")
+		_MF_FocusWinEvent(0, MF_EVENT_OBJECT_NAMECHANGE, Foreground + 12345, 0, 0, 0, 0)
+		AssertFalse(MetricsFocusCache.event_refresh_pending, "a background window title is not the focus")
+		AssertEqual(Before, Counts.Get("metrics.focus_event", 0))
+		_MF_FocusWinEvent(0, MF_EVENT_SYSTEM_FOREGROUND, 1, 0, 0, 0, 0)
+		AssertTrue(MetricsFocusCache.event_refresh_pending, "a foreground change schedules one refresh")
+		_MF_FocusWinEvent(0, MF_EVENT_SYSTEM_FOREGROUND, 2, 0, 0, 0, 0)
+		AssertTrue(Counts.Get("metrics.focus_event", 0) >= Before + 2, "both foreground events are counted")
+		AssertTrue(MetricsFocusCache.event_refresh_pending, "the burst is still one pending refresh")
+		if Foreground {
+			MetricsFocusCache.event_refresh_pending := false
+			_MF_FocusWinEvent(0, MF_EVENT_OBJECT_NAMECHANGE, Foreground, 0, 0, 0, 0)
+			AssertTrue(MetricsFocusCache.event_refresh_pending, "the foreground window's own title change refreshes")
+		}
+	}
+	_MFS_WithEventState(_Body)
+}
+Test("metrics: focus events are filtered to real focus changes and coalesced into one refresh (metrics-focus-events)",
+	_MFS_EventHandlerFiltersAndCoalesces)
+
+_MFS_EventHooksLifecycle() {
+	AssertTrue(_MF_StopFocusWinEvents(), "stopping with no hooks is a clean no-op")
+	if IsSet(_AHK_DRY_RUN)
+		AssertFalse(_MF_StartFocusWinEvents(), "the dry-run harness keeps the 50 ms poll")
+	_Body() {
+		AssertTrue(_MF_StartFocusWinEvents(true), "both system hooks install")
+		AssertTrue(MetricsFocusCache.event_mode)
+		AssertEqual(2, MetricsFocusCache.hooks.Length)
+		; The native callback ABI: seven arguments, as the system delivers them.
+		MetricsFocusCache.running := true
+		MetricsFocusCache.event_refresh_pending := false
+		DllCall(MetricsFocusCache.event_callback, "Ptr", 0, "UInt", MF_EVENT_SYSTEM_FOREGROUND, "Ptr", 1,
+			"Int", 0, "Int", 0, "UInt", 0, "UInt", 0)
+		AssertTrue(MetricsFocusCache.event_refresh_pending, "the installed native callback reaches the handler")
+		MetricsFocusCache.running := false
+		AssertTrue(_MF_StartFocusWinEvents(true), "a second start is idempotent")
+		AssertEqual(2, MetricsFocusCache.hooks.Length, "and installs nothing more")
+		AssertTrue(_MF_StopFocusWinEvents(), "every hook is removed")
+		AssertFalse(MetricsFocusCache.event_mode)
+		AssertEqual(0, MetricsFocusCache.hooks.Length)
+		AssertEqual(0, MetricsFocusCache.event_callback)
+	}
+	_MFS_WithEventState(_Body)
+	_MF_StopFocusWinEvents()
+}
+Test("metrics: the focus event hooks install once and are fully removed on stop (metrics-focus-events)",
+	_MFS_EventHooksLifecycle)
+
+_MFS_ReadRefreshesOnlyWhenEventsDriveTheCache() {
+	Counts := _PerfCountersOwner().Counts
+	_Body() {
+		Foreground := DllCall("User32\GetForegroundWindow", "Ptr")
+		MetricsFocusCache.running := false
+		MetricsFocusCache.state := {valid: true, last_at: A_TickCount, hwnd: Foreground + 777, process_name: "x.exe",
+			title: "t", class: "c", failure_reason: "", timed_out: false}
+		MetricsFocusCache.event_mode := false
+		Before := Counts.Get("metrics.focus_read_refresh", 0)
+		MF_GetFocusSnapshot()
+		AssertEqual(Before, Counts.Get("metrics.focus_read_refresh", 0), "polling mode reads the cache as before")
+		MetricsFocusCache.event_mode := true
+		MF_GetFocusSnapshot()
+		AssertEqual(Before + 1, Counts.Get("metrics.focus_read_refresh", 0),
+			"event mode re-checks a snapshot whose window is no longer the foreground")
+	}
+	_MFS_WithEventState(_Body)
+}
+Test("metrics: a read re-checks a stale foreground only while events drive the cache (metrics-focus-events)",
+	_MFS_ReadRefreshesOnlyWhenEventsDriveTheCache)
+
+_MFS_StopAlwaysRemovesTheHooks() {
+	Stop := _DriverFuncBody("MF_StopFocusRefresh")
+	Start := _DriverFuncBody("MF_StartFocusRefresh")
+	Assert(InStr(Stop, "_MF_StopFocusWinEvents()") > 0
+		&& InStr(Stop, "_MF_StopFocusWinEvents()") < InStr(Stop, "NativeCancelFn.Call(FocusTimerFn)"),
+		"stop removes the focus hooks before it cancels the timer, so no event outlives the lifecycle")
+	Assert(InStr(Start, "_MF_StartFocusWinEvents()") > 0
+		&& InStr(Start, "_MF_StartFocusWinEvents()") < InStr(Start, "SetTimer(FocusTimerFn, EventsLive"),
+		"the interval is chosen after the hooks are known to be live")
+	Assert(InStr(Start, "_MF_StopFocusWinEvents()") > InStr(Start, "SetTimer(FocusTimerFn, EventsLive"),
+		"a failed arm releases the hooks it installed")
+}
+Test("metrics: the lifecycle installs the hooks before choosing the interval and removes them on stop (metrics-focus-events)",
+	_MFS_StopAlwaysRemovesTheHooks)

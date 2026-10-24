@@ -143,7 +143,7 @@ async function main() {
 				cache_events: lines.filter((line) =>
 					/Registry parse cache|Active locale.*cache retained/.test(line)
 				),
-				timing: lines.filter((line) => /\[(BootProfile|Perf|WebView)\]/.test(line))
+				timing: lines.filter((line) => /\[(BootProfile|Perf|WebView|MetricsFilters)\]/.test(line))
 			};
 			results.push(result);
 			console.log(JSON.stringify(result));

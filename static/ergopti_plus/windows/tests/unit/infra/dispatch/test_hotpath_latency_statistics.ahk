@@ -295,3 +295,34 @@ _PC_BuildMemoAnswersOncePerBuild() {
 }
 Test("perf counters: write-admission getters are answered once per menu build and live otherwise (menu-build-memo)",
 	_PC_BuildMemoAnswersOncePerBuild)
+
+_HPLS_DispatchAttributesOneEventInEight() {
+	Counts := _PerfCountersOwner().Counts
+	EventType := "perf_sample_probe"
+	Seen := 0
+	Probe(*) {
+		Seen += 1
+	}
+	HookDispatcher.Register(EventType, Probe)
+	try {
+		loop 16
+			HookDispatcher.Dispatch(EventType, 0)
+		AssertEqual(16, Seen, "every subscriber still runs on every event")
+		Samples := 0
+		for Name, Count in Counts
+			if InStr(Name, "hook.sub_samples." . EventType . ".")
+				Samples += Count
+		AssertEqual(2, Samples, "one dispatch in eight reports the subscriber's own time")
+		Total := 0
+		for Name, Count in Counts
+			if InStr(Name, "hook.sub_us." . EventType . ".")
+				Total += Count
+		AssertTrue(Total >= 0, "its microseconds ride the interval counter record")
+		for Name in ["hook.sub_samples.", "hook.sub_us."]
+			for Key in [Name . EventType . ".Probe", Name . EventType . ".unnamed"]
+				if Counts.Has(Key)
+					Counts.Delete(Key)
+	} finally HookDispatcher.Unregister(EventType, Probe)
+}
+Test("hook dispatcher: one dispatch in eight attributes its time to each named subscriber (hook-subscriber-sampling)",
+	_HPLS_DispatchAttributesOneEventInEight)
