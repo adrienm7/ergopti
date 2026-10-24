@@ -13,8 +13,13 @@ local helpers = require("tests.helpers")
 
 local Dequeue = helpers.load_with_stubs("ui.tooltip.dequeue")
 
-local DEC = 0.2
-local FLOOR = 0.05
+-- The decrement and the floor come from the shared tooltip constants, the one
+-- place they are declared, through the loader the driver itself uses.
+local Timing = helpers.load_with_stubs("ui.tooltip.config").timing
+local DEC = Timing.timeout_decrement_sec
+local FLOOR = Timing.timeout_floor_sec
+helpers.assert_true(type(DEC) == "number" and DEC > 0, "shared timeout_decrement_sec is a positive number")
+helpers.assert_true(type(FLOOR) == "number" and FLOOR > 0, "shared timeout_floor_sec is a positive number")
 local MS_OPTS = {
 	duration_field = "durationSec",
 	expire_field = "expireMs",
@@ -145,13 +150,28 @@ local stamped_hs = select(1, Dequeue.stamp_expiry_times(hs_rows, now, {
 	timeout_decrement_sec = DEC,
 	timeout_floor_sec = FLOOR,
 }))
-helpers.assert_eq(stamped_hs[1].expire_at, now + 0.8, "HS out1 expire_at")
-helpers.assert_eq(stamped_hs[2].expire_at, now + 1.8, "HS out2 expire_at")
+helpers.assert_eq(stamped_hs[1].expire_at, now + math.max(FLOOR, 1 - DEC), "HS out1 expire_at")
+helpers.assert_eq(stamped_hs[2].expire_at, now + math.max(FLOOR, 2 - DEC), "HS out2 expire_at")
 
-local remaining_hs = Dequeue.prune_expired(stamped_hs, now + 0.8, {
+local remaining_hs = Dequeue.prune_expired(stamped_hs, now + math.max(FLOOR, 1 - DEC), {
 	expire_field = "expire_at",
 })
 helpers.assert_eq(#remaining_hs, 1, "HS prune keeps longer row")
 helpers.assert_eq(remaining_hs[1].text, "b", "HS surviving row")
+
+-- The module keeps no copy of the shared timing: a caller that omits it must
+-- fail, not get a duration computed from a value the TOML no longer holds.
+for _, case in ipairs({
+	{ "no opts" },
+	{ "no decrement", { timeout_floor_sec = FLOOR } },
+	{ "no floor", { timeout_decrement_sec = DEC } },
+}) do
+	local label, opts = case[1], case[2]
+	local ok_eff, err_eff = pcall(Dequeue.effective_duration_sec, 1, opts)
+	helpers.assert_true(not ok_eff and tostring(err_eff):find("timeout_decrement_sec", 1, true) ~= nil,
+		"effective_duration_sec refuses missing shared timing (" .. label .. ")")
+	local ok_stamp = pcall(Dequeue.stamp_expiry_times, hs_rows, now, opts)
+	helpers.assert_true(not ok_stamp, "stamp_expiry_times refuses missing shared timing (" .. label .. ")")
+end
 
 print("[PASS] test_tooltip_dequeue_contract")

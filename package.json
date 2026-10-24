@@ -134,6 +134,7 @@
 		"test:gsub-single-return": "node ./tools/test/test-lua-gsub-single-return.cjs",
 		"test:tooltip-positioning": "node ./tools/test/test-tooltip-positioning-reach.cjs",
 		"test:tooltip-style-single-source": "node ./tools/test/test-tooltip-style-single-source.cjs",
+		"test:tooltip-timing-single-source": "node ./tools/test/test-tooltip-timing-single-source.cjs",
 		"test:layouts-registry": "node ./tools/test/test-layouts-registry.cjs",
 		"test:layouts-defaults-single-source": "node ./tools/test/test-layouts-defaults-single-source.cjs",
 		"test:layout-supersession-declared": "node ./tools/test/test-layout-supersession-declared.cjs",
