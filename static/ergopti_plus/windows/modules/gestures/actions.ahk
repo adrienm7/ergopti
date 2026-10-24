@@ -228,7 +228,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => GestureTeleportMouse(),
 		},
 		"spotlight_mouse", {
-				Fn: (*) => (MouseGetPos(&_Mx, &_My), SpotlightMouseAt(_Mx, _My, 5000)),
+				Fn: (*) => (SpotlightPoint := MCGetPosStrict(), SpotlightMouseAt(SpotlightPoint["x"], SpotlightPoint["y"], 5000)),
 		},
 		"toggle_capslock", {
 				Fn: (*) => ToggleCapsLock(),
@@ -588,7 +588,8 @@ GestureTeleportMouse() {
 				Ui_MsgBox(t("shortcuts.no_other_monitor"))
 				return
 		}
-		MouseGetPos(&CurX, &CurY)
+		Point := MCGetPosStrict()
+		CurX := Point["x"], CurY := Point["y"]
 		CurrentIndex := 1
 		for I, Mon in Monitors {
 				if (CurX >= Mon.Left and CurX < Mon.Right and CurY >= Mon.Top and CurY < Mon.Bottom) {
