@@ -588,7 +588,7 @@ _HsEdWeb_InitDataJs() {
 	}
 
 	compact   := (_EditorPrefGet("compact_view", "0") == "1") ? "true" : "false"
-	autoClose := (_EditorPrefGet("close_on_add", "0") == "1") ? "true" : "false"
+	autoClose := _EditorCloseOnAddEnabled() ? "true" : "false"
 	defSec    := _EditorPrefGet("default_section", "")
 	defSecJs  := (defSec == "") ? "null" : _HsEdWeb_JsStr(defSec)
 	defPrio   := _GetSharedPersonalDefault()

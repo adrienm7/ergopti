@@ -36,6 +36,12 @@
 ; =========================================
 ; =========================================
 
+; Whether the editor closes after an add. An absent key means off, the one
+; default the native menu, both editors and the macOS and Linux drivers share.
+_EditorCloseOnAddEnabled() {
+	return _EditorPrefGet("close_on_add", "0") == "1"
+}
+
 ; Keys under [personal_editor] in the v2 config TOML.
 _EditorPrefGet(Key, Default) {
 	global ConfigurationFile
@@ -224,7 +230,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	PrioEdit.GetPos(, &PrioY, , &PrioH)
 	BtnAdd := W.Add("Button", "xm y" . (PrioY + PrioH + 12) . " w110 h26", t("editor.hotstrings.btn_add"))
 	CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", t("editor.hotstrings.chk_close_after"))
-	CloseOnAddChk.Value := (_EditorPrefGet("close_on_add", "0") == "1") ? 1 : 0
+	CloseOnAddChk.Value := _EditorCloseOnAddEnabled() ? 1 : 0
 
 	; Token help — to the right of the Add button, vertically centered
 	BtnAdd.GetPos(, &BtnAddY, , &BtnAddH)
