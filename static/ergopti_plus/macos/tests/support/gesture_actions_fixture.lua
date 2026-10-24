@@ -13,6 +13,9 @@ local OWNERS = {
 	"compat.utf8",
 	-- The real logger and timer scheduler describe failures through this pure owner.
 	"error_description",
+	-- The real logger's shared core and the phase counters it records into.
+	"logger",
+	"infra.phase_stats",
 	-- The real paths, logger and configuration owners split paths through this pure owner,
 	-- and the timer scheduler admits delays through the number policy.
 	"native_path",
