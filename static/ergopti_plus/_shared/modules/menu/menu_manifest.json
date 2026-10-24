@@ -4621,12 +4621,7 @@
 			],
 			"disabled_when": [
 				"model_select_ready"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			]
 		},
 		{
 			"type": "include",
@@ -4643,12 +4638,7 @@
 		{
 			"type": "command",
 			"id": "model_delete",
-			"i18n": "menu.llm.delete_model_cache",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"unavailable": "hide"
+			"i18n": "menu.llm.delete_model_cache"
 		}
 	],
 	"llm_model_download_row": [

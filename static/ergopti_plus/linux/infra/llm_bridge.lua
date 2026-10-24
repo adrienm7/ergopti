@@ -27,6 +27,9 @@ M.OLLAMA_TAGS_PATH = "/api/tags"
 --- Ollama endpoint path that downloads a model.
 M.OLLAMA_PULL_PATH = "/api/pull"
 
+--- Ollama endpoint path that removes an installed model (HTTP DELETE).
+M.OLLAMA_DELETE_PATH = "/api/delete"
+
 --- Default host for Ollama (loopback). Not in defaults.json (macOS/Windows bind
 --- loopback implicitly); this is the single Linux-side source, so profiles.lua
 --- and prediction_engine.lua must read it here rather than re-typing "localhost".
@@ -86,7 +89,7 @@ end
 
 --- Builds one known Ollama operation URL from a path-free origin.
 --- @param base_url string Origin returned by resolve_base_url().
---- @param operation string Either "chat" or "tags".
+--- @param operation string "chat", "tags", "pull" or "delete".
 --- @return string|nil Exact endpoint, or nil for an invalid origin/operation.
 function M.ollama_endpoint(base_url, operation)
 	if type(base_url) ~= "string" or not base_url:match("^https?://[^/%s]+/?$") then
@@ -96,10 +99,20 @@ function M.ollama_endpoint(base_url, operation)
 		chat = M.OLLAMA_CHAT_PATH,
 		tags = M.OLLAMA_TAGS_PATH,
 		pull = M.OLLAMA_PULL_PATH,
+		delete = M.OLLAMA_DELETE_PATH,
 	}
 	local path = paths[operation]
 	if not path then return nil end
 	return base_url:gsub("/+$", "") .. path
+end
+
+--- Whether a value is an Ollama model tag this driver may name in a request
+--- body: the characters Ollama tags use ("qwen3:0.6b", "hf.co/user/repo:Q4_K_M").
+--- The pull and the delete share it, so one cannot accept a tag the other refuses.
+--- @param tag any
+--- @return boolean
+function M.valid_ollama_tag(tag)
+	return type(tag) == "string" and tag ~= "" and tag:match("^[%w%._%-%/:]+$") ~= nil
 end
 
 -- ============================================================================

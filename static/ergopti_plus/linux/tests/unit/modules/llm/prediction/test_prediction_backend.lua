@@ -1098,3 +1098,56 @@ helpers.describe("prediction resident global privacy admission", function()
 		end)
 	end
 end)
+
+helpers.describe("prediction engine: model removal", function()
+	--- Replaces the removal owner with a scripted one for one scenario.
+	--- @return table starts, function restore_delete
+	local function scripted_delete()
+		local previous = package.loaded["modules.llm.model_delete"]
+		local starts = { cancels = 0 }
+		package.loaded["modules.llm.model_delete"] = {
+			start = function(base_url, tag, on_done, admission)
+				starts[#starts + 1] = { base_url = base_url, tag = tag, on_done = on_done, admission = admission }
+				return true
+			end,
+			cancel = function() starts.cancels = starts.cancels + 1; return true end,
+		}
+		return starts, function() package.loaded["modules.llm.model_delete"] = previous end
+	end
+
+	helpers.it("linux-model-delete: lists the installed models again after Ollama removed one", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local starts, restore_delete = scripted_delete()
+		local okay, problem = pcall(function()
+			local refreshed, outcomes = 0, {}
+			package.loaded["modules.llm.profiles"].refresh_models_after_mutation = function() refreshed = refreshed + 1 end
+			helpers.assert_true(engine.delete_model("qwen:2b", function(...) outcomes[#outcomes + 1] = { ... } end))
+			helpers.assert_eq(#starts, 1)
+			helpers.assert_eq(starts[1].base_url, "http://127.0.0.1:11434")
+			helpers.assert_eq(starts[1].tag, "qwen:2b")
+			helpers.assert_true(starts[1].admission())
+			starts[1].on_done(true, "qwen:2b")
+			helpers.assert_eq(refreshed, 1, "the menu must not keep listing the removed model")
+			helpers.assert_eq(outcomes, { { true, "qwen:2b" } })
+		end)
+		restore_delete(); restore(); if not okay then error(problem, 0) end
+	end)
+
+	helpers.it("linux-model-delete: a removal answered after the AI was switched off is dropped and retired", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local starts, restore_delete = scripted_delete()
+		local okay, problem = pcall(function()
+			local refreshed, outcomes = 0, 0
+			package.loaded["modules.llm.profiles"].refresh_models_after_mutation = function() refreshed = refreshed + 1 end
+			package.loaded["modules.llm.profiles"].disable = function() return true end
+			helpers.assert_true(engine.delete_model("qwen:2b", function() outcomes = outcomes + 1 end))
+			helpers.assert_true(engine.disable())
+			helpers.assert_eq(starts.cancels, 1, "switching the AI off retires the removal in flight")
+			helpers.assert_eq(starts[1].admission(), false)
+			starts[1].on_done(true, "qwen:2b")
+			helpers.assert_eq(refreshed, 0)
+			helpers.assert_eq(outcomes, 0)
+		end)
+		restore_delete(); restore(); if not okay then error(problem, 0) end
+	end)
+end)
