@@ -5,6 +5,8 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
+	"adapters.task_environment", "infra.launcher_environment", "error_description",
+	"number_policy", "adapters.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
 	"infra.i18n",
 	"infra.logger",
 	"infra.notifications",
@@ -15,7 +17,7 @@ local MODULES = {
 
 local function with_fixture(options, callback)
 	options = options or {}
-	helpers.with_fresh_modules(MODULES, function()
+	helpers.with_stub_scope(MODULES, function()
 		local fixture = {
 			start_mode = "success",
 			stop_mode = "success",
@@ -637,17 +639,33 @@ helpers.describe("HuggingFace prompt/webview/task exact requirement ownership", 
 		end)
 	end)
 
-	helpers.it("settles a truthy start that is already stopped without a terminal", function()
-		with_fixture({}, function(fixture)
-			fixture.start_mode = "task_stopped_success"
-			helpers.assert_true(fixture.prompt())
-			fixture.fire_prompt_timer()
-			fixture.validate()
-			helpers.assert_nil(fixture.deps.active_tasks.hf_login)
-			helpers.assert_eq(fixture.settles, 1)
-			helpers.assert_eq(fixture.terminals, { false })
+	for _, outcome in ipairs({ { 0, false, "success" }, { 1, false, "failure" }, { 0, true, "paused" } }) do
+		local code, paused = outcome[1], outcome[2]
+		helpers.it("waits for queued native " .. outcome[3] .. " after an accepted stopped task", function()
+			with_fixture({}, function(fixture)
+				fixture.start_mode = "task_stopped_success"
+				helpers.assert_true(fixture.prompt())
+				fixture.fire_prompt_timer()
+				fixture.validate()
+				helpers.assert_eq(fixture.tasks[1]:isRunning(), false)
+				helpers.assert_true(fixture.deps.active_tasks.hf_login == fixture.tasks[1],
+					"accepted task stays pinned until its recorded native callback")
+				helpers.assert_true(fixture.registered, "queued native callback retains its exact flow")
+				helpers.assert_eq(fixture.settles, 0)
+				helpers.assert_eq(fixture.terminals, {})
+				helpers.assert_eq(fixture.prompt(), false, "the exact pending native callback blocks a successor")
+				helpers.assert_eq(#fixture.tasks, 1)
+				if paused then helpers.assert_true(fixture.pause()) end
+				fixture.tasks[1]:complete(code)
+				helpers.assert_nil(fixture.deps.active_tasks.hf_login)
+				helpers.assert_eq(fixture.registered, false)
+				helpers.assert_eq(fixture.terminals, paused and {} or { code == 0 })
+				fixture.tasks[1]:complete(code)
+				helpers.assert_eq(fixture.terminals, paused and {} or { code == 0 })
+				helpers.assert_eq(fixture.settles, 1)
+			end)
 		end)
-	end)
+	end
 
 	helpers.it("accepts a truthy terminate that proves the task stopped", function()
 		with_fixture({}, function(fixture)

@@ -1240,11 +1240,6 @@ PY
 			flow.task_committed = true
 			if pending_completion ~= nil then
 				finish_task(pending_completion.code, true)
-			elseif task_proven_not_running(task) then
-				-- A truthy start without either a live task or an exact terminal is
-				-- not a committed native capability. Settle it as a failed launch.
-				finish_task(nil, false)
-				return false
 			elseif not flow_is_authorized(flow) then
 				-- A signal accepted while start() was still on-stack predates the
 				-- capability that start() has just committed. Signal the same exact
