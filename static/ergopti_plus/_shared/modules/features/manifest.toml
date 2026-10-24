@@ -4976,6 +4976,20 @@ i18n = "menu.debug.field_check_key_accounting"
 platforms = ["hs"]
 reason_key = "platform_reason.debug_surface_is_each_drivers_own"
 
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_toolchain"
+i18n = "menu.debug.field_check_toolchain"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
+[[menu.debug_menu]]
+type = "command"
+id = "field_check_login_items"
+i18n = "menu.debug.field_check_login_items"
+platforms = ["hs"]
+reason_key = "platform_reason.debug_surface_is_each_drivers_own"
+
 # Two one-click measurements of the Windows input-hook architecture (open items
 # 49 and 50): they exercise AutoHotkey's SendInput and its keyboard hook, which
 # no other driver has. Each writes a compact record, with no typed content, to
@@ -4993,6 +5007,13 @@ id = "hook_probe"
 i18n = "menu.debug.hook_probe"
 platforms = ["ahk"]
 reason_key = "platform_reason.input_probe_is_autohotkey_specific"
+
+# Installs the shipped check composition through the composer's save path,
+# verifies the installed copy and removes it again, on every driver.
+[[menu.debug_menu]]
+type = "command"
+id = "composer_check"
+i18n = "menu.debug.composer_check"
 
 # Right under the diagnostics window (the maintainer's request of 2026-10-02):
 # it decides whether an error shows itself, which that window then explains.
