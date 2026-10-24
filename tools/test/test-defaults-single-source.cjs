@@ -94,15 +94,34 @@ async function main() {
 	);
 	assert.deepEqual(
 		manifest.entries
-			.filter(
-				(entry) =>
-					entry.section === 'metrics' &&
-					['metrics_enabled', 'metrics_disabled_apps'].includes(entry.id)
-			)
+			.filter((entry) => entry.section === 'metrics' && entry.id.startsWith('metrics_'))
 			.map((entry) => entry.id),
 		[],
 		'no metrics key repeats its section name: one spelling per setting'
 	);
+	// PAR-4: the typing-speed readouts have ONE name set and ONE shipped answer
+	// per setting. macOS used float_* and menubar_* (all on), Windows carried a
+	// dead menubar key, and each was declared for its own driver only.
+	const metricsEntries = manifest.entries.filter((entry) => entry.section === 'metrics');
+	assert.deepEqual(
+		metricsEntries.filter((entry) => /^(float_|menubar_)/.test(entry.id)).map((entry) => entry.id),
+		[],
+		'the macOS-only readout spellings are retired'
+	);
+	for (const [id, platforms, shipped] of [
+		['wpm_widget_visible', ['ahk', 'hs', 'linux'], false],
+		['wpm_widget_colors', ['ahk', 'hs', 'linux'], false],
+		['wpm_widget_graph', ['ahk', 'hs', 'linux'], false],
+		['wpm_menubar_visible', ['hs', 'linux'], false],
+		['wpm_menubar_colors', ['hs', 'linux'], true]
+	]) {
+		const entry = metricsEntries.find((candidate) => candidate.id === id);
+		assert(entry, `metrics.${id} must be declared`);
+		assert.deepEqual(entryPlatforms(manifest, entry), platforms, `metrics.${id} platforms`);
+		assert.equal(entry.default, shipped, `metrics.${id} ships ${shipped} on every driver`);
+		assert.equal(entry.recommended, shipped, `metrics.${id} recommends what it ships`);
+		assert.equal(entry.default_per_platform, undefined, `metrics.${id} has one default`);
+	}
 	// PAR-6: the base expansion delay is declared in hotstrings/defaults.toml
 	// (read by all three drivers) and, as a user preference, in the manifest.
 	// The two must agree, and no third mirror may exist in the timing registry.

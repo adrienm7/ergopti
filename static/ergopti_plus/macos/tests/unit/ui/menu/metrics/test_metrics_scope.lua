@@ -13,7 +13,7 @@ local function clone(value)
 end
 
 local function fixture(demoted)
-	local original = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nencrypt = true\nfloat_colors = false\nfuture = { keep = 9 }\nshortcut = { mods = ["cmd"], key = "m", future = 7 } # legacy typing\napps_shortcut = "unsupported" # legacy apps\n[llm]\nenabled = true\napi_key = "untouched"\n'
+	local original = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nencrypt = true\nwpm_widget_colors = false\nfuture = { keep = 9 }\nshortcut = { mods = ["cmd"], key = "m", future = 7 } # legacy typing\napps_shortcut = "unsupported" # legacy apps\n[llm]\nenabled = true\napi_key = "untouched"\n'
 	local files, control, writes = { config = original, history = "private historical bytes" }, {}, 0
 	local adapter = {
 		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,

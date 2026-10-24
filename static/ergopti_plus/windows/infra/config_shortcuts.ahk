@@ -208,7 +208,7 @@ _CS_RequireDisabledApps(Value) {
 
 _CS_ValidateMetricsSection(Section) {
 		Validated := Map()
-		for Key in ["enabled", "metrics_wpm_menubar_colors",
+		for Key in ["enabled",
 				"private_filter_enabled", "secure_filter_enabled",
 				"system_auth_filter_enabled", "encrypt"] {
 				if Section.Has(Key)
@@ -242,8 +242,6 @@ CS_Load() {
 		if Validated.Has("enabled")
 				MetricsShortcuts.enabled := Validated["enabled"]
 
-		if Validated.Has("metrics_wpm_menubar_colors")
-				MetricsShortcuts.wpm_menubar_colors := Validated["metrics_wpm_menubar_colors"]
 		; Canonical ids, shared with the macOS driver, which reads the same four
 		; through Manifest.default_for("metrics.<id>").
 		if Validated.Has("private_filter_enabled")

@@ -25,7 +25,6 @@ TestConfigShortcutsRejectsEveryInvalidScalarType() {
 		Path := CS_GetTomlPath()
 		Cases := [
 			["enabled", '"false"'],
-			["metrics_wpm_menubar_colors", "2"],
 			["private_filter_enabled", '""'],
 			["secure_filter_enabled", '""'],
 			["system_auth_filter_enabled", "-1"],
