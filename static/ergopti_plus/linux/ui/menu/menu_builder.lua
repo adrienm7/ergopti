@@ -3064,13 +3064,16 @@ local function _build_llm(ctx)
 		--- @param reason string|nil
 		local function deletion_notice(succeeded, tag, reason)
 			local Notifier = require("adapters.application_notifier")
+			-- A notification caption, not a menu row: it never reaches the renderer.
 			local delivered
 			if succeeded then
+				local caption = i18n_safe("ollama.deleted_title")
 				delivered = Notifier.send(string.format(i18n_safe("ollama.model_deleted"), tag),
-					{ title = i18n_safe("ollama.deleted_title"), level = "success" })
+					{ title = caption, level = "success" })
 			else
+				local caption = i18n_safe("ollama.delete_fail_title")
 				delivered = Notifier.send(string.format(i18n_safe("ollama.delete_error"), tag, tostring(reason)),
-					{ title = i18n_safe("ollama.delete_fail_title"), level = "error" })
+					{ title = caption, level = "error" })
 			end
 			if delivered ~= true then Logger.warn(LOG, "The model-deletion notice for '%s' was not delivered.", tag) end
 		end
@@ -3647,6 +3650,8 @@ local function _manifest_metrics_rows(ctx, k)
 			local AppRows = require("ui.menu.app_exclusion_rows")
 			local count = #k.get_disabled_apps()
 			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
+			-- The add-application prompt's caption, not a row label.
+			local prompt_title = i18n_safe("menu.metrics.exclude_apps")
 			return { {
 				label = AppRows.caption(count),
 				disabled = on,
@@ -3657,7 +3662,7 @@ local function _manifest_metrics_rows(ctx, k)
 					prompt = function(title, text, initial, hidden, choices)
 						return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
 					end,
-					title = i18n_safe("menu.metrics.exclude_apps"),
+					title = prompt_title,
 					changed = function()
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
