@@ -509,3 +509,92 @@ helpers.describe("linux-timer-finite-admission", function()
 		end)
 	end
 end)
+
+helpers.describe("native timer constructor rollback ownership", function()
+	local native_ok, uv = pcall(require, "luv")
+	if not native_ok then return end
+	local function exact(handle)
+		local count = 0
+		uv.walk(function(candidate) if candidate == handle then count = count + 1 end end)
+		return count
+	end
+	for _, method in ipairs({ "after", "every" }) do
+		for _, start in ipairs({ "false", "throw" }) do
+			for _, rollback in ipairs({ "accepted", "refused" }) do
+				helpers.it("(timer-start-retirement) " .. method .. " start " .. start .. " rollback " .. rollback, function()
+					local previous = package.loaded["adapters.timer_scheduler"]
+					local state = { allocations = 0, starts = 0, closes = 0, physical = 0,
+						callbacks = 0, allow_close = rollback == "accepted" }
+					local backend = setmetatable({
+						new_timer = function()
+							state.allocations = state.allocations + 1
+							state.timer = assert(uv.new_timer())
+							return state.timer
+						end,
+						timer_start = function(timer)
+							helpers.assert_true(timer == state.timer)
+							state.starts = state.starts + 1
+							if start == "throw" then error("controlled exception before native start") end
+							return false, "controlled refusal before native start"
+						end,
+						timer_stop = function(timer)
+							helpers.assert_true(timer == state.timer, "only the exact allocated timer may be stopped")
+							return uv.timer_stop(timer)
+						end,
+						close = function(timer, callback)
+							helpers.assert_true(timer == state.timer, "only the exact allocated timer may be closed")
+							state.closes = state.closes + 1
+							if not state.allow_close then error("controlled exception before native close") end
+							return uv.close(timer, function(...)
+								state.physical = state.physical + 1
+								if callback then callback(...) end
+							end)
+						end,
+					}, { __index = uv })
+					local scheduler = helpers.load_module_with_dependency("adapters.timer_scheduler", "luv", backend)
+					package.loaded["adapters.timer_scheduler"] = previous
+					local ok, detail = pcall(function()
+						local token = scheduler[method](60, function() state.callbacks = state.callbacks + 1 end)
+						helpers.assert_true(token.fired and not token.armed)
+						helpers.assert_eq(scheduler.activeCount(), 0, "cleanup debt must not count as an armed timer")
+						helpers.assert_eq(state.allocations, 1); helpers.assert_eq(state.starts, 1)
+						if rollback == "refused" then
+							helpers.assert_true(token.timer == state.timer, "failed rollback must retain the exact allocated native owner")
+							helpers.assert_true(not uv.is_active(state.timer) and not uv.is_closing(state.timer))
+							for attempt = 1, 2 do
+								local closes = state.closes
+								if attempt == 1 then helpers.assert_eq(scheduler.cancel(token), false)
+								else helpers.assert_eq(scheduler.cancelAll(), false) end
+								helpers.assert_eq(state.closes, closes + 1, "each refusal must retry the same real native owner")
+								helpers.assert_true(token.timer == state.timer and token.fired and not token.armed)
+								helpers.assert_eq(exact(state.timer), 1)
+								helpers.assert_eq(state.physical, 0)
+							end
+							state.allow_close = true
+							if start == "false" then helpers.assert_true(scheduler.cancel(token))
+							else helpers.assert_true(scheduler.cancelAll()) end
+						else
+							helpers.assert_eq(state.closes, 1, "accepted constructor rollback needs one native close")
+						end
+						helpers.assert_eq(token.timer, nil)
+						helpers.assert_true(token.fired and not token.armed and uv.is_closing(state.timer))
+						helpers.assert_eq(state.physical, 0, "accepted close is distinct from its later native callback")
+						uv.run("nowait")
+						helpers.assert_eq(state.physical, 1); helpers.assert_eq(exact(state.timer), 0)
+						helpers.assert_true(scheduler.cancelAll())
+						helpers.assert_eq(scheduler.activeCount(), 0); helpers.assert_eq(state.callbacks, 0)
+					end)
+					-- The fixture retains the allocation independently, including on baseline failure.
+					if state.timer and exact(state.timer) == 1 and not uv.is_closing(state.timer) then
+						uv.timer_stop(state.timer)
+						uv.close(state.timer, function() state.physical = state.physical + 1 end)
+					end
+					uv.run("nowait")
+					helpers.assert_eq(exact(state.timer), 0); helpers.assert_eq(state.physical, 1)
+					helpers.assert_eq(state.callbacks, 0)
+					if not ok then error(detail, 0) end
+				end)
+			end
+		end
+	end
+end)
