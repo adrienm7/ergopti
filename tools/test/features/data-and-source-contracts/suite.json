@@ -465,6 +465,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-config-keys-codegen.cjs"],
 			"repro": "npm run test:config-keys-codegen"
+		},
+		{
+			"id": "js-0466",
+			"ordinal": 468,
+			"name": "raw config-key and command-id literals only go down (ratchet against the generated constants)",
+			"cmd": "node",
+			"args": ["tools/test/test-config-key-literals.cjs"],
+			"repro": "npm run test:config-key-literals"
 		}
 	]
 }
