@@ -178,6 +178,7 @@ return {
 	"tests.unit.adapters.layout.test_keyboard_layout_terminal_plan_observation",
 	"tests.unit.modules.keymap.test_number_row_policy",
 	"tests.unit.modules.keymap.test_layout_rows_policy",
+	"tests.unit.modules.keymap.test_pause_switch_policy",
 	"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off_policy",
 	"tests.unit.modules.shortcuts.caps_word.test_caps_word_auto_off",
 	"tests.unit.ui.menu.shortcuts.test_caps_word_auto_off_menu",

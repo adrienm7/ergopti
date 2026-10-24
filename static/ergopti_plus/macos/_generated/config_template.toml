@@ -690,8 +690,8 @@ direct_access_digits = "native"
 virtual_keyboard = "auto"
 number_row_reorder_edges = false
 pause_switch_enabled = false
-on_pause = false
-on_resume = false
+on_pause = ""
+on_resume = ""
 
 
 
