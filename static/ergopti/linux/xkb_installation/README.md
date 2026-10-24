@@ -156,7 +156,10 @@ for the desktop pickers, and an owned block of includes in `~/.XCompose`.
   owner marker; any other existing file is a conflict (exit 3, `"code":
 "conflict"` in the JSON report) and nothing is written.
 - Only libxkbcommon reads this tree, so it serves Wayland sessions; an X11
-  session needs the system installer above.
+  session needs the system installer above. `install` and `activate` therefore
+  refuse in a pure Xorg session (`XDG_SESSION_TYPE=x11`): exit 3, `"code":
+"xorg_session"` in the JSON report, nothing written. The daemon turns that code
+  into the `layouts.linux_xorg_session` message. `uninstall` still works.
 - `install` compiles the layout with `xkbcli` when it is installed and reports
   `verified`; `activate` and `uninstall` add or remove the layout in the
   GNOME/KDE input sources through `desktop_activation.py`.

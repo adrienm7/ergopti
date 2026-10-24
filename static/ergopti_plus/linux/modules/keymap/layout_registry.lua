@@ -99,6 +99,7 @@ M.FAILURE_PYTHON = "python_missing"
 M.FAILURE_CONVERSION = "conversion_failed"
 M.FAILURE_INSTALLER = "installer_failed"
 M.FAILURE_FOREIGN_FILE = "foreign_file"
+M.FAILURE_XORG_SESSION = "xorg_session"
 M.FAILURE_SELECT = "select_failed"
 M.FAILURE_INVALID = "invalid"
 
@@ -525,6 +526,9 @@ local function run_installer(deps, args, on_done)
 			local reason = report and report.detail or result.stderr ~= "" and result.stderr or result.error
 			-- A file the user owns in the XKB tree is theirs: say so, never overwrite.
 			local code = report and report.code == "conflict" and M.FAILURE_FOREIGN_FILE or M.FAILURE_INSTALLER
+			-- A pure Xorg session never reads the user XKB tree: nothing was written,
+			-- and the user is told what to do instead of seeing a layout that types nothing.
+			if report and report.code == "xorg_session" then code = M.FAILURE_XORG_SESSION end
 			on_done(false, code, tostring(reason))
 			return
 		end
@@ -663,6 +667,7 @@ end
 --- @return string|nil
 local function user_message(deps, code)
 	if code == M.FAILURE_PYTHON then return deps.translate("layouts.linux_needs_python") end
+	if code == M.FAILURE_XORG_SESSION then return deps.translate("layouts.linux_xorg_session") end
 	return nil
 end
 

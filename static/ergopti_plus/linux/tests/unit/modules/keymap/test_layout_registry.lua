@@ -360,6 +360,19 @@ helpers.describe("layout manager (Linux): installing", function()
 		end
 	end)
 
+	helpers.it("tells the user why a pure Xorg session cannot install a layout (layout-registry-convert)", function()
+		local LayoutRegistry, deps, state = manager({
+			served = "offline",
+			files = shipped_files(),
+			runs = { OK_RUN, OK_RUN, OK_RUN, { exit_code = 3, error = "exit 3", stderr = "",
+				stdout = '{"ok": false, "verified": null, "detail": "this is an Xorg session", "code": "xorg_session"}\n' } },
+		})
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_XORG_SESSION)
+		helpers.assert_eq(result.user_message, "translated: layouts.linux_xorg_session")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "installed.json"], "a refused installation is not recorded")
+	end)
+
 	helpers.it("writes and runs nothing while the installed record is unreadable (layout-install-record-first)", function()
 		-- A layout installed before the record fails is in the user XKB tree
 		-- with no record: the layout manager then neither lists nor removes it.
