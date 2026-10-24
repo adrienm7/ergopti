@@ -49,6 +49,15 @@ helpers.describe("expansion delay: the shared time-gate corpus", function()
 				Timings.ms("hotstrings", "complex_key_carry_ms"), true)
 			local allowed = s.mapping_delay_remaining({ has_magic = vector.ends_with_magic }, elapsed_s, mult)
 			helpers.assert_eq(allowed, vector.fires, "the delay gate verdict")
+			-- A tap-hold expander is measured at its press, not at the later tap
+			-- decision: the vector only proves that when the decision instant
+			-- would have given the opposite verdict.
+			if vector.decided_ms ~= nil then
+				local decided_s = (vector.decided_ms - before_expander.down_ms) / 1000
+				local at_decision = s.mapping_delay_remaining({ has_magic = vector.ends_with_magic }, decided_s, mult)
+				helpers.assert_eq(at_decision, not vector.fires,
+					"measuring at the tap decision would flip the verdict, so the press is what is measured")
+			end
 		end)
 	end
 end)
