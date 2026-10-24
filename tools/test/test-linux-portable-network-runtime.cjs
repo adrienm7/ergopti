@@ -806,6 +806,56 @@ print('PASS GIO-owned metadata: 3 schema and 5 cache executable cases; native AB
 	console.log('GIO-owned schema metadata control: 1 passed; 0 skipped.');
 }
 
+// Command-contract witness of the closure walk: ldd lists a file's whole
+// closure, so the libraries reached only through the recipient's libgio used to
+// be staged with every seed. Built on Ubuntu 22.04, the image shadowed Ubuntu
+// 26.04's libmount, the host libgio missed MOUNT_2_40 and the tray never
+// loaded. Only what the recipient's GLib does not bring is staged.
+if (process.platform === 'linux') {
+	const recipientClosure = spawnSync(
+		'python3',
+		[
+			'-B',
+			'-c',
+			`
+import importlib.util,pathlib,sys,tempfile
+spec=importlib.util.spec_from_file_location('owned_stager',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+with tempfile.TemporaryDirectory(prefix='ergopti-recipient-closure-') as temporary:
+ root=pathlib.Path(temporary)
+ names=['curl','libgiolibproxy.so','libcurl.so.4','libproxy.so.1','libgio-2.0.so.0','libglib-2.0.so.0','libgobject-2.0.so.0','libmount.so.1','libblkid.so.1','libselinux.so.1','libffi.so.8','libpcre.so.3','libz.so.1','libstdc++.so.6','libgcc_s.so.1','libc.so.6','libm.so.6']
+ for name in names:(root/name).write_bytes(b'ldd fixture only, never loaded')
+ line=lambda name:'\\t'+name+' => '+str(root/name)+' (0x00007f0000000000)'
+ loader='\\t/lib64/ld-linux-x86-64.so.2 (0x00007f0000000000)'
+ gio=['libglib-2.0.so.0','libgobject-2.0.so.0','libmount.so.1','libblkid.so.1','libselinux.so.1','libffi.so.8','libpcre.so.3','libz.so.1','libc.so.6']
+ listings={
+  'curl':['libcurl.so.4','libz.so.1','libc.so.6'],
+  'libgiolibproxy.so':['libproxy.so.1','libgio-2.0.so.0','libstdc++.so.6','libgcc_s.so.1','libm.so.6',*gio],
+  'libcurl.so.4':['libz.so.1','libc.so.6'],
+  'libproxy.so.1':['libstdc++.so.6','libgcc_s.so.1','libm.so.6','libc.so.6'],
+  'libgio-2.0.so.0':gio,
+  'libstdc++.so.6':['libm.so.6','libgcc_s.so.1','libc.so.6'],
+ }
+ def controlled_run(arguments,**options):
+  assert arguments[0]=='ldd' and len(arguments)==2,'Only ldd is observed'
+  return '\\n'.join(['\\tlinux-vdso.so.1 (0x00007ffd00000000)',*map(line,listings.get(pathlib.Path(arguments[1]).name,['libc.so.6'])),loader])+'\\n'
+ copies=[]
+ m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append(pathlib.Path(destination).name)
+ m.copy_elf_closure([root/'curl',root/'libgiolibproxy.so'],root/'out',{})
+ assert sorted(set(copies))==['libcurl.so.4','libproxy.so.1'],sorted(set(copies))
+print('PASS recipient GLib closure: 2 libraries staged, 9 left to the recipient.')
+`,
+			path.join(root, 'tools/build/stage-linux-network-runtime.py')
+		],
+		{ cwd: '/', encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } }
+	);
+	assert.equal(recipientClosure.status, 0, recipientClosure.stderr);
+	assert.equal(
+		recipientClosure.stdout,
+		'PASS recipient GLib closure: 2 libraries staged, 9 left to the recipient.\n'
+	);
+	console.log('Recipient GLib closure control: 1 passed; 0 skipped.');
+}
+
 // Real filesystem controls for private evidence, independent of native runtime
 // success. Sample private bytes are never logged or uploaded by this harness.
 if (process.platform === 'linux') {
