@@ -97,7 +97,8 @@ end
 --- Creates the global owner from the menu's scope owners.
 --- @param options table owners (scope id -> function returning the scoped owner
 ---   or nil when unavailable), remap (facade or nil), backup_path(scope),
----   defer(fn), paused() and refresh(committed, report).
+---   defer(fn), paused() and refresh(committed, report), which also receives
+---   every refusal, with the typed failure point of its report.
 --- @return table owner apply(mode), pending(), retry_restore(done).
 function M.new(options)
 	assert(type(options) == "table" and type(options.owners) == "table", "the global scope needs its owners")
@@ -141,6 +142,10 @@ function M.new(options)
 			composition.retry_restore(function(ok) settled = ok == true end)
 			if not settled then
 				Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
+				-- Said like every other refusal: a click that changes nothing and
+				-- says nothing reads as a dead menu.
+				options.refresh(false, { scope = "global", mode = mode, point = "acquire",
+					kind = "rollback_pending", detail = "an earlier rollback is still pending" })
 				return false
 			end
 		end

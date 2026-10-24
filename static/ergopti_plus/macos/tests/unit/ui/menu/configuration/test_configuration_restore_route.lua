@@ -76,6 +76,40 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 		package.loaded["ui.menu.global_scope"] = saved
 		if not ok then error(err, 0) end
 	end)
+
+	-- The composition used to refuse in silence on macOS: the menu refreshed and
+	-- only the log said nothing had been restored.
+	helpers.it("shows the typed reset failure of a refused restore or clear", function()
+		local saved_scope, saved_dialog = package.loaded["ui.menu.global_scope"], package.loaded["infra.dialog_util"]
+		local alerts, requested = {}, {}
+		local ok, err = pcall(function()
+			local fixture = boot()
+			local actions = fixture.global_actions()
+			package.loaded["ui.menu.global_scope"] = { new = function(options)
+				requested.options = options
+				return { apply = function() return true end }
+			end }
+			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+				alerts[#alerts + 1] = { ... }
+				return "ok"
+			end }
+			helpers.assert_eq(actions.reset_defaults(), true)
+			requested.options.refresh(true, { scope = "global", applied = {} })
+			helpers.assert_eq(#alerts, 0, "a committed restore shows nothing")
+			local report = { scope = "global", mode = "clear", point = "rollback", kind = "rollback_pending",
+				failed = "llm", reverted = false }
+			-- Templates that show which key filled which placeholder.
+			package.loaded["infra.i18n"].get = function(key) return "[" .. key .. "|{1}|{2}]" end
+			requested.options.refresh(false, report)
+			helpers.assert_eq(#alerts, 1)
+			helpers.assert_eq(alerts[1], { "[dialog.reset_defaults.failed_title|{1}|{2}]",
+				"[dialog.reset_defaults.failed|[dialog.reset_defaults.reason.rollback|llm|rollback_pending]|{2}]",
+				"[button.ok|{1}|{2}]", nil, "critical" })
+		end)
+		package.loaded["ui.menu.global_scope"] = saved_scope
+		package.loaded["infra.dialog_util"] = saved_dialog
+		if not ok then error(err, 0) end
+	end)
 end)
 
 return true
