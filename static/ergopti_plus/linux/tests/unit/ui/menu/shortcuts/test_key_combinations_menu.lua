@@ -200,9 +200,10 @@ local function with_canonical_locale_menu(callback)
 			end)
 			return result
 		end
+		-- A pair's submenu is its clear row, the separator, then its slots.
 		function state.pick(row)
 			last_pick = nil
-			state.click(assert(row.menu[2]))
+			state.click(assert(row.menu[3]))
 			return assert(last_pick)
 		end
 		state.i18n, state.preference = i18n, function() return preference end
@@ -230,7 +231,8 @@ local function check_locale_matrix(state, rows, strings)
 				helpers.assert_true(type(second_label) == "string" and second_label ~= "")
 				local label = first_label .. " → " .. second_label
 				helpers.assert_eq(actual[cursor].title, label .. "  :  " .. strings["tap_hold.tap.none"] .. "  /  " .. strings["tap_hold.hold.none"])
-				helpers.assert_true(actual[cursor].menu[2].disabled ~= true, "real source receipt admits the tap picker")
+				helpers.assert_eq(actual[cursor].menu[2].title, "-", "the separator below the clear row is drawn on Linux too")
+				helpers.assert_true(actual[cursor].menu[3].disabled ~= true, "real source receipt admits the tap picker")
 				local picked = state.pick(actual[cursor])
 				helpers.assert_eq(picked.label, label)
 				helpers.assert_eq(picked.binding, "combination__" .. first .. "_then_" .. second, "native setter identity is locale-independent")
@@ -242,6 +244,15 @@ local function check_locale_matrix(state, rows, strings)
 		local label = row.title
 		helpers.assert_true(label ~= strings["menu.tapholds.symmetric"] and label ~= strings["menu.tapholds.copy_tap_to_combo"], "Linux never exposes unavailable simultaneous controls")
 	end)
+	-- The separator between the left-hand and the right-hand pairs, as on the other drivers.
+	local function is_pair(row) return tostring(row.title or ""):find("  :  ", 1, true) ~= nil end
+	local hand_boundaries = 0
+	for index = 2, #rows - 1 do
+		if rows[index].title == "-" and is_pair(rows[index - 1]) and is_pair(rows[index + 1]) then
+			hand_boundaries = hand_boundaries + 1
+		end
+	end
+	helpers.assert_eq(hand_boundaries, 1, "one separator splits the two hands' pairs")
 	return actual
 end
 
@@ -273,7 +284,7 @@ helpers.describe("actual Linux ordered-pair translations", function()
 			helpers.assert_true(saved_picker.confirm("copy") == true)
 			helpers.assert_eq(#state.edits, 1)
 			helpers.assert_eq(state.edits[1], {{ section = "shortcuts.key_combination_taps", key = "escape_then_tab", value = "copy" }})
-			state.click(second[1].menu[3])
+			state.click(second[1].menu[4])
 			helpers.assert_eq(state.last_hold.confirm("shift"), true)
 			helpers.assert_eq(state.edits[2], {{ section = "shortcuts.key_combination_holds", key = "escape_then_tab", value = "shift" }})
 			local third = check_locale_matrix(state, state.build("en"), english)

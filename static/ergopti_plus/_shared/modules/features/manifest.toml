@@ -231,7 +231,7 @@ reason_key = "platform_reason.category_gates_are_windows"
 
 [sections.layout]
 description_key = "menu.layout"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 # The tray's own appearance, which is not a keyboard feature. macOS alone draws a
 # menubar icon whose variant the user picks.
@@ -249,6 +249,7 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
 platforms = ["ahk", "linux"]
+reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos"
 
 [sections.shortcuts.keyboard]
 description_key = "menu.shortcuts.keyboard"
@@ -1690,6 +1691,7 @@ description_key = "menu.metrics.wpm_widget_graph"
 [[features.metrics]]
 id = "wpm_menubar_visible"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 default = false
 recommended = false
 input_altering = false
@@ -1699,6 +1701,7 @@ description_key = "menu.metrics.show_wpm_menubar"
 [[features.metrics]]
 id = "wpm_menubar_colors"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 default = true
 recommended = true
 input_altering = false
@@ -1719,6 +1722,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.shortcuts.enabled"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.category_master_is_a_gate_on_windows"
 
 [[features.shortcuts]]
 id = "chatgpt_url"
@@ -1858,6 +1862,7 @@ description_key = "shortcuts.label_wrap_text"
 # Linux decides in its keyboard hook's consumption callback, from the PRIMARY
 # selection (modules/shortcuts/wrap_on_type.lua).
 platforms = ["ahk", "linux"]
+reason_key = "platform_reason.wrap_selection_is_a_shortcut_key_on_macos"
 
 [[features.shortcuts]]
 id = "open_downloads"
@@ -3877,6 +3882,7 @@ description_key = "menu.category_enabled.tap_holds"
 [[features.category_enabled]]
 id = "key_combinations"
 platforms = ["ahk", "linux"]
+reason_key = "platform_reason.key_combinations_are_karabiner_settings_on_macos"
 default = true
 recommended = true
 input_altering = false
@@ -5473,7 +5479,6 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "---"
-platforms = ["ahk", "hs"]
 
 [[menu.key_combinations_group]]
 type = "list"
@@ -5523,7 +5528,6 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combination_pair_menu]]
 type = "---"
-platforms = ["ahk", "hs"]
 
 [[menu.key_combination_pair_menu]]
 type = "list"
@@ -6677,6 +6681,7 @@ input_altering = true
 type = "boolean"
 description_key = "menu.tap_holds"
 platforms = ["hs", "linux"]
+reason_key = "platform_reason.category_master_is_a_gate_on_windows"
 
 [[features.shortcuts.keys]]
 id = "wrap_text_if_selected"

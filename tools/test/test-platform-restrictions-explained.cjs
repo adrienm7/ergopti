@@ -4,7 +4,8 @@
  * ==============================================================================
  * MODULE: Platform-Coverage Report and Ratchet (I2)
  * DESCRIPTION:
- * Every declaration that restricts a feature or a menu row to one platform is
+ * Every declaration whose `platforms` leaves out one or two of the three
+ * drivers — a feature, a section, a menu row, an onboarding control — is
  * counted, classified, and — once it carries no `reason_key` — frozen. Run with
  * `--report` to print the full inventory.
  *
@@ -13,6 +14,14 @@
  * Canonical menu presentations explicitly classified HIDE are not applicable
  * on the omitted platforms and owe no reason. This exception never applies
  * to feature or section capabilities, or to unclassified legacy restrictions.
+ * A preset of an onboarding choice owes no reason of its own when the choice
+ * declares a `validation` policy for every platform the preset leaves out:
+ * that policy refuses the value there, and its refusal text is the reason.
+ *
+ * TWO-PLATFORM RESTRICTIONS (2026-10-24): the ratchet first counted only the
+ * declarations restricted to one platform. A feature on two drivers is just as
+ * absent on the third, so the same rule now covers both shapes; a restriction
+ * equal to its enclosing section's, of either shape, is still a restatement.
  *
  * WHY THE BASELINE ROSE FROM 76 TO 142 ON 2026-08-02 — READ THIS BEFORE
  * TREATING IT AS A REGRESSION:
@@ -102,7 +111,20 @@ const MANIFEST = path.join(
 // swipe_N_diag slots that no driver ever read were deleted instead of explained. The one
 // left, the macOS-only array of user profiles, goes with the unification of the stored
 // shape. Never raise it.
-const BASELINE = 1;
+// 2026-10-24: 1 → 2, and the rise is a measurement, not a new restriction. The count now
+// includes the restrictions to two platforms; thirteen had no reason. Seven now carry the
+// reason of what the third driver does instead (the two master switches Windows keeps in
+// category_enabled, the key combinations macOS keeps with Karabiner, the macOS shortcut
+// key that wraps a selection, the menubar readout Windows draws as a widget). The Layout
+// section was wrong, since Linux has its number-row settings, and now lists every driver.
+// Two separators Linux left out are drawn there as well, and the two magic-key presets
+// Linux leaves out are refused there by the declared validation policy. The one entered
+// in the ledger, the AI-profile section, is a wrong declaration rather than a missing
+// reason: macOS stores the active profile and the prediction count under the same
+// llm.profiles keys (infra/preferences.lua), so no true reason exists. Opening it to
+// macOS adds both keys to the macOS AI scope, a behaviour change that goes with the
+// manifest-matches-readers work once the macOS AI scope suite is green again.
+const BASELINE = 2;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -112,7 +134,8 @@ const BASELINE = 1;
 const PARENT_MANIFEST_SHA256 = '06b311ca65d356b405a889fb3479538b24505649a47e1d628299bf6611a5eb59';
 const PARENT_GATE_SHA256 = '872a8889a8767accdf5fdd3cd687da8726073741d9945df27d43ecd9990de290';
 const KNOWN_UNEXPLAINED = new Set([
-	'["features.llm.profiles","hs","array","user_profiles",null,null,null,null]'
+	'["features.llm.profiles","hs","array","user_profiles",null,null,null,null]',
+	'["sections.llm.profiles","ahk,linux",null,null,null,null,null,null]'
 ]);
 
 if (KNOWN_UNEXPLAINED.size !== BASELINE)
@@ -130,12 +153,41 @@ const {
 	validateChildTemplates
 } = require('../lib/menu-row-availability.cjs');
 
+const PLATFORMS = ['ahk', 'hs', 'linux'];
+
+/** The sorted platform set a restriction keeps, or null when it keeps all three. */
+function restrictedTo(platforms, where) {
+	if (!Array.isArray(platforms) || platforms.length === 0) return null;
+	for (const platform of platforms)
+		if (!PLATFORMS.includes(platform))
+			throw new Error(`${where}: unknown restricted platform "${platform}"`);
+	if (new Set(platforms).size !== platforms.length)
+		throw new Error(`${where}: platforms repeats a driver`);
+	return platforms.length < PLATFORMS.length ? [...platforms].sort().join(',') : null;
+}
+
+/**
+ * True for a preset in a choice's `options` whose every left-out platform has a
+ * `validation` policy on that choice: the policy refuses the value there, so the
+ * preset is a value that platform does not accept, not a missing capability.
+ */
+function refusedByValidation(owner) {
+	const choice = owner.parent;
+	if (!choice || !Array.isArray(choice.options) || !choice.options.includes(owner.row))
+		return false;
+	const policies = choice.validation;
+	if (!policies || typeof policies !== 'object' || Array.isArray(policies)) return false;
+	return PLATFORMS.filter((platform) => !owner.row.platforms.includes(platform)).every(
+		(platform) => typeof policies[platform] === 'string' && policies[platform] !== ''
+	);
+}
+
 /** Stable role and identity; anonymous rows retain their original multiplicity. */
 function restrictionIdentity(owner) {
 	const row = owner.row;
 	return JSON.stringify([
 		owner.name,
-		row.platforms[0],
+		[...row.platforms].sort().join(','),
 		row.type ?? null,
 		row.id ?? null,
 		row.path ?? null,
@@ -164,32 +216,29 @@ function readCoverage(src) {
 	);
 	const menuRows = new Set(Object.values(parsed.menu).filter(Array.isArray).flat());
 	const tables = [];
-	function walk(node, name) {
+	// `parent` is the table holding the array a row belongs to, so a preset can
+	// be read against the choice that declares its validation policy.
+	function walk(node, name, parent) {
 		if (Array.isArray(node)) {
 			for (const [index, row] of node.entries()) {
 				if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
-				tables.push({ name, row, index });
+				tables.push({ name, row, index, parent });
 				for (const [key, value] of Object.entries(row))
-					if (value && typeof value === 'object') walk(value, name + '.' + key);
+					if (value && typeof value === 'object') walk(value, name + '.' + key, row);
 			}
 			return;
 		}
 		if (!node || typeof node !== 'object') return;
-		if (name) tables.push({ name, row: node });
+		if (name) tables.push({ name, row: node, parent });
 		for (const [key, value] of Object.entries(node))
-			if (value && typeof value === 'object') walk(value, name ? name + '.' + key : key);
+			if (value && typeof value === 'object') walk(value, name ? name + '.' + key : key, node);
 	}
 	walk(parsed, '');
 	const sectionRestriction = new Map();
 	for (const owner of tables) {
-		const plats = owner.row.platforms;
-		if (
-			owner.name.startsWith('sections.') &&
-			Array.isArray(plats) &&
-			plats.length === 1 &&
-			plats[0] !== 'both'
-		)
-			sectionRestriction.set(owner.name.slice('sections.'.length), plats[0]);
+		const kept = restrictedTo(owner.row.platforms, owner.name);
+		if (owner.name.startsWith('sections.') && kept)
+			sectionRestriction.set(owner.name.slice('sections.'.length), kept);
 	}
 	function sectionPlatform(tableName) {
 		const parts = tableName.split('.');
@@ -207,17 +256,14 @@ function readCoverage(src) {
 		notApplicable = [];
 	for (const owner of tables) {
 		const row = owner.row;
-		const plats = row.platforms;
-		// Preserve I2's single-platform scope. This does not reclassify legacy
-		// two-platform declarations or their debt in this bounded correction.
-		if (!Array.isArray(plats) || plats.length !== 1 || plats[0] === 'both') continue;
-		if (!['ahk', 'hs', 'linux'].includes(plats[0]))
-			throw new Error(`${owner.name}: unknown restricted platform "${plats[0]}"`);
+		const kept = restrictedTo(row.platforms, owner.name);
+		if (!kept) continue;
 		const entry = {
 			name: owner.name,
-			platform: plats[0],
+			platform: kept,
 			identity: restrictionIdentity(owner),
-			explained: typeof row.reason_key === 'string' && row.reason_key !== ''
+			explained:
+				(typeof row.reason_key === 'string' && row.reason_key !== '') || refusedByValidation(owner)
 		};
 		// Only direct parsed [menu.*] array rows have a menu declaration owner.
 		// A feature/section/legacy row with an unavailable token is never exempt.
@@ -229,7 +275,7 @@ function readCoverage(src) {
 			notApplicable.push(entry);
 			continue;
 		}
-		(sectionPlatform(owner.name) === plats[0] ? artifacts : real).push(entry);
+		(sectionPlatform(owner.name) === kept ? artifacts : real).push(entry);
 	}
 	return {
 		tables,
