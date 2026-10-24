@@ -52,10 +52,11 @@ helpers.assert_true(
 )
 
 -- Test 4: esrc_json appears in GROUP BY clauses (multi-device grouping).
-local group_by_esrc = src:find("GROUP BY token, esrc_json", 1, true) ~= nil
+local group_by_esrc = Queries.render("ngram.tokens", "native",
+	{ table = "ngram_chars", where = "", conjunction = " WHERE " }):find("GROUP BY token, esrc_json", 1, true) ~= nil
 helpers.assert_true(
 	group_by_esrc,
-	"sqlite_reader.lua read_ngrams must GROUP BY token, esrc_json (keystats-storage-2)"
+	"the catalogue's ngram.tokens read by read_ngrams must GROUP BY token, esrc_json (keystats-storage-2)"
 )
 
 -- Test 5: Lua accumulation of esrc_json — item.hs and item.llm use += not direct assign.
@@ -67,7 +68,7 @@ helpers.assert_true(
 	"sqlite_reader.lua must not directly assign item.hs = src.hotstring — must accumulate with += (keystats-storage-2)"
 )
 
-local accum_hs = src:find("item.hs  = item.hs  + (src.hotstring", 1, true) ~= nil
+local accum_hs = src:find("item.hs  = item.hs  + (tonumber(src.hotstring)", 1, true) ~= nil
 helpers.assert_true(
 	accum_hs,
 	"sqlite_reader.lua must accumulate item.hs with item.hs + (src.hotstring or 0) (keystats-storage-2)"

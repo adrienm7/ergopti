@@ -39,6 +39,7 @@ local sqlite3 = require("hs.sqlite3")
 local Logger = require("infra.logger")
 local Literal = require("sqlite.literal")
 local Queries = require("keystats.queries")
+local KUtils = require("keystats.utils")
 local LOG    = "keystats.sqlite_reader"
 
 
@@ -561,6 +562,33 @@ local function _new_ngram_dict()
 end
 
 
+--- Adds one row of the catalogue's n-gram read into a dictionary item. TOTAL
+--- returns floats, and a row whose counters are not numbers comes back raw:
+--- it reads as zero rather than as the number its text happens to start with,
+--- as on Linux. Identical source maps count once per contributing row.
+--- @param item table { c, t, e, hs, llm, o } accumulated in place.
+--- @param r table A ngram.tokens or ngram.tokens_by_app row.
+local function _merge_ngram_row(item, r)
+	item.c = item.c + (tonumber(r.c) or 0)
+	item.t = item.t + (tonumber(r.td) or 0)
+	item.e = item.e + (tonumber(r.e) or 0)
+	local copies = tonumber(r.source_rows) or 1
+	-- An empty source map contributes nothing; skipping its decode is exact
+	local raw = r.esrc_json or "{}"
+	local ok, src = true, nil
+	if raw ~= "{}" then ok, src = pcall(json.decode, raw) end
+	if ok and type(src) == "table" then
+		item.hs  = item.hs  + (tonumber(src.hotstring) or 0) * copies
+		item.llm = item.llm + (tonumber(src.llm)       or 0) * copies
+		for k, v in pairs(src) do
+			if KUtils.is_other_synthetic_source(k) then
+				item.o = item.o + (tonumber(v) or 0) * copies
+			end
+		end
+	end
+end
+
+
 --- Lists the days a paced read must visit: the requested bounds clamped to the
 --- first and last day any n-gram table holds.
 --- @param db userdata Open handle.
@@ -629,42 +657,20 @@ local function _accumulate_ngrams(db, out, start_date, end_date, selected_apps, 
 	local app_filter = (selected_apps and #selected_apps > 0) and selected_apps or nil
 	local where = build_filter(app_filter)
 
-	-- GROUP BY token, esrc_json so multi-device rows are not collapsed via
-	-- MIN(esrc_json) — each distinct blob gets its own row and is merged in Lua.
-	-- Wrapped per-table: a schema mismatch on one ngram table must not abort
+	-- The catalogue's ngram.tokens (shared with Linux) groups by token and
+	-- esrc_json, so multi-device rows are not collapsed via MIN(esrc_json): each
+	-- distinct blob gets its own row and is merged in Lua. Wrapped per-table: a schema mismatch on one ngram table must not abort
 	-- the projection for the other eight (F-MED-28).
 	for code, tbl in pairs(NGRAM_TYPE_TABLE) do
 		query(tbl, function()
-			for r in _rows(db, string.format([[
-				SELECT token,
-				       SUM(c)  AS c,
-				       SUM(td) AS t,
-				       SUM(e)  AS e,
-				       esrc_json, COUNT(*) AS source_rows
-				FROM %s %s
-				GROUP BY token, esrc_json
-			]], tbl, where), pacer) do
+			for r in _rows(db, Queries.render("ngram.tokens", "native",
+				{ table = tbl, where = where, conjunction = where == "" and " WHERE " or " AND " }), pacer) do
 				local item = out[code][r.token]
 				if not item then
 					item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 					out[code][r.token] = item
 				end
-				item.c = item.c + (r.c or 0)
-				item.t = item.t + (r.t or 0)
-				item.e = item.e + (r.e or 0)
-				-- An empty source map contributes nothing; skipping its decode is exact
-				local raw = r.esrc_json or "{}"
-				local ok, src = true, nil
-				if raw ~= "{}" then ok, src = pcall(json.decode, raw) end
-				if ok and type(src) == "table" then
-					item.hs  = item.hs  + (src.hotstring or 0) * r.source_rows
-					item.llm = item.llm + (src.llm       or 0) * r.source_rows
-					for k, v in pairs(src) do
-						if k ~= "hotstring" and k ~= "llm" and k ~= "none" then
-							item.o = item.o + (v or 0) * r.source_rows
-						end
-					end
-				end
+				_merge_ngram_row(item, r)
 			end
 		end, pacer)
 	end
@@ -816,20 +822,14 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 			for _, a in ipairs(selected_apps) do table.insert(quoted, _q(a)) end
 			app_clause = " AND app IN (" .. table.concat(quoted, ",") .. ")"
 		end
-		-- GROUP BY app, token, esrc_json so multi-device rows produce separate
-		-- rows per distinct blob — accumulated in Lua to avoid MIN(esrc_json) collapse.
-		-- Wrapped per-table: a schema mismatch on one ngram table must not abort
+		-- The catalogue's ngram.tokens_by_app groups by app, token and esrc_json,
+		-- so each distinct blob is accumulated in Lua. Wrapped per-table: a schema mismatch on one ngram table must not abort
 		-- the projection for the other eight (F-MED-28).
 		for code, tbl in pairs(NGRAM_TYPE_TABLE) do
 			_safe_query(tbl, function()
-				for r in _rows(db, string.format([[
-					SELECT app, token,
-					       SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,
-					       esrc_json, COUNT(*) AS source_rows
-					FROM %s
-					WHERE date = %s %s
-					GROUP BY app, token, esrc_json
-				]], tbl, _q(today_str), app_clause), pacer) do
+				local where = " WHERE date = " .. _q(today_str) .. app_clause
+				for r in _rows(db, Queries.render("ngram.tokens_by_app", "native",
+					{ table = tbl, where = where, conjunction = " AND " }), pacer) do
 					if not today_idx[r.app] then
 						today_idx[r.app] = { c={},bg={},tg={},qg={},pg={},hx={},hp={},w={},sc={},sc_bg={},w_bg={},kc={} }
 					end
@@ -839,22 +839,7 @@ function M.read_today_split(sqlite_path, start_date, end_date, selected_apps, pa
 						if not today_idx[r.app][code] then today_idx[r.app][code] = {} end
 						today_idx[r.app][code][r.token] = item
 					end
-					item.c = item.c + (r.c or 0)
-					item.t = item.t + (r.t or 0)
-					item.e = item.e + (r.e or 0)
-					local raw = r.esrc_json or "{}"
-					local ok, src = true, nil
-					if raw ~= "{}" then ok, src = pcall(json.decode, raw) end
-					if ok and type(src) == "table" then
-						item.hs  = item.hs  + (src.hotstring or 0) * r.source_rows
-						item.llm = item.llm + (src.llm       or 0) * r.source_rows
-						for k, v in pairs(src) do
-							if k ~= "hotstring" and k ~= "llm" and k ~= "none" then
-								item.o = item.o + (v or 0) * r.source_rows
-							end
-						end
-					end
-					today_idx[r.app][code][r.token] = item
+					_merge_ngram_row(item, r)
 				end
 			end, pacer)
 		end
