@@ -136,6 +136,7 @@ local function run_case(family, change, route)
 						MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = false },
 						_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod,
 						engine = engine, dyn_hotstrings = dynamic, injector = injector, Logger = logger,
+						keyboard_hook = session.hook,
 						prediction_engine = change == "prediction" and { on_char = function(char)
 							if char == "★" then retire() end
 						end } or nil,
