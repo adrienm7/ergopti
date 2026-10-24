@@ -636,28 +636,14 @@ writes configuration. Reload the driver from the working tree for dev-only fixes
 
 Fixes of October 22 (dev, after v1.0.5):
 
-- [ ] **Win+S open target** (ec1c4105d9, open-target): select `192.168.1.1`, `localhost:3000`,
-      `example.com`, `ada@example.com`, `https://example.com/page.`, an existing file and folder
-      path (with spaces, quoted or not), `~/Documents`, `%APPDATA%`, a missing path (notice, no
-      search), `HKEY_CURRENT_USER\Control Panel\Desktop` and `HKCU:\Software` (Regedit),
-      `ms-settings:display`, `notes.txt` (asks for a full path), `bonjour le monde` (web search).
-- [ ] **Backspace word start**: Windows Terminal with Claude Code, Enter on an empty prompt, `ab`,
-      two Backspaces, `c` offers « c’est »; Backspace past the empty prompt then `C★`, `J★`, `Ct★`;
-      `ab`, 5 s pause, two Backspaces, `c★` expands; `ab`, one Backspace, `c★` does nothing; Notepad
-      Ctrl+Backspace then `c★`; browser Ctrl+L, Backspace, `c★`; AltGr+Backspace on an
-      AZERTY-style AltGr and a Kana layout acts as Backspace.
-- [ ] **Tap delay row** (0d5bd45a59): Tap-Hold > a key > "Tap delay: N ms" is a plain row whose
-      click opens the input box with N; OK saves and reloads.
-- [ ] **Keyboard group restore and clear** (c80bd4dcf2): Shortcuts > a modifier group > « Tout
-      effacer », then « Restaurer les valeurs conseillées »; only that group changes.
-- [ ] **Tap-hold and key-combination pickers**: a key's and a pair's « Tap → … » open the shared
-      picker; « Hold → … » opens it with holdable actions once the Wave 2 item lands.
-- [ ] **Versions tabs** (fb78c66d1f): switching channel tabs repaints at once, no spinner; Retry
-      still fetches.
-- [ ] **Window titles** (df0b4776c7, a22b920373): the unused-settings window and the API endpoint
-      dialog show the brand once.
-- [ ] **Private-browsing metrics filter** (fb877dbd51, af404db937): click it during startup and
-      while a configuration change applies; it toggles once, no error window.
+- [ ] **Win+S open target** (ec1c4105d9): automated checks cover the target resolution; by hand only
+      what leaves the driver: a browser, the mail client, Regedit with its prompt, Settings, a web
+      search (steps in [windows-maintainer-checks.md](tooling/windows-maintainer-checks.md)).
+- [ ] **Backspace word start**: the engine-buffer cases are automated; by hand only Windows Terminal
+      with Claude Code, Notepad Ctrl+Backspace, the browser Ctrl+L, and AltGr+Backspace on an
+      AZERTY-style AltGr and a Kana layout.
+- [ ] **Tap-hold and key-combination pickers**: automated except the native pair popup itself.
+- [ ] **Versions tabs**: automated except the Retry button.
 
 Standing checks:
 
@@ -690,19 +676,15 @@ Standing checks:
 10. **Managed network** (item 62): the twelve steps of the
     [Group 6 Windows handover](handovers/2026-10-04-group6-windows/README.md) behind a company
     proxy.
-11. **Menu-click replay**: tray toggles clicked during a slow startup that requests a reload all
-    apply in the successor, with no error toast.
-12. **CapsWord auto-off**: delays, the eight default delimiters, each pointer kind, the LAlt then
+11. **CapsWord auto-off**: delays, the eight default delimiters, each pointer kind, the LAlt then
     CapsLock trigger.
-13. **AI off (#97)**: no local server sweep, no AI hotkeys, a refused AI hotkey leaves the driver
+12. **AI off (#97)**: no local server sweep, no AI hotkeys, a refused AI hotkey leaves the driver
     running. Item 143: time the AI toggle behind an unfinished startup (3.05 s on the smoke).
-14. **Prediction chord (item 112)**: in Notepad each slot's modifier+digit inserts that prediction
+13. **Prediction chord (item 112)**: in Notepad each slot's modifier+digit inserts that prediction
     and its correction form; the shortcut column is right-aligned and muted.
-15. **Local reload command (item 142)**: `tools/control/request_driver_reload.ps1` idle, paused and
-    during a reload ("busy"); one driver afterwards.
-16. **Item 114**: observe the resident process during a prediction-key (1-5) or AltGr+Enter stall
+14. **Item 114**: observe the resident process during a prediction-key (1-5) or AltGr+Enter stall
     and collect the Notepad stale-admission diagnostics before changing anything.
-17. **Items 30, 46-48, 54/81, 63, 73, 88, 96-98, 107, 108, 125, 138**: physical magic key under
+15. **Items 30, 46-48, 54/81, 63, 73, 88, 96-98, 107, 108, 125, 138**: physical magic key under
     emulation; a real local model (chat, download, consent, pause/resume/shutdown, HTTPS behind the
     system proxy); installed menus (captions, unavailable reasons, state after restart);
     brightness up/down and refusal without a backlight; physical-key labels after a locale change;
