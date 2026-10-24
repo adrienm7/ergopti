@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Відкрити налаштування клавіатури…",
 	"menu.layout.pause_layout_enabled": "Перемикати розкладку при паузі / відновленні",
 	"menu.layout.pause_layout_section": "Розкладка при паузі / відновленні",
+	"menu.layout.pause_layout_unsupported_desktop": "Розкладка під час паузи / відновлення: недоступно в цьому середовищі (лише GNOME або X11)",
 	"menu.layout.replace": "Перетворити клавішу на клавішу ★",
 	"menu.layout.magic_key_source": "Фізична чарівна клавіша",
 	"menu.layout.magic_key_source.auto": "Автоматично (клавіша розкладки)",

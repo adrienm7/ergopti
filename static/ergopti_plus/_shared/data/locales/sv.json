@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Öppna tangentbordsinställningar…",
 	"menu.layout.pause_layout_enabled": "Byt layout vid paus / fortsättning",
 	"menu.layout.pause_layout_section": "Layout vid paus / fortsättning",
+	"menu.layout.pause_layout_unsupported_desktop": "Layout vid paus / återupptagning: inte tillgängligt på detta skrivbord (endast GNOME eller X11)",
 	"menu.layout.replace": "Omvandla en tangent till ★-tangenten",
 	"menu.layout.magic_key_source": "Fysisk magisk tangent",
 	"menu.layout.magic_key_source.auto": "Automatisk (layoutens tangent)",

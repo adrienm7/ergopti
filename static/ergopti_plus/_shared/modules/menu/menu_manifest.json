@@ -2469,7 +2469,15 @@
 		},
 		{
 			"type": "list",
-			"id": "layout_switching"
+			"id": "layout_switching",
+			"status_rows": {
+				"unsupported_desktop": [
+					{
+						"type": "label",
+						"i18n": "menu.layout.pause_layout_unsupported_desktop"
+					}
+				]
+			}
 		},
 		{
 			"type": "list",

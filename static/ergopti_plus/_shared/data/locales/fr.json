@@ -1558,6 +1558,7 @@
 	"menu.layout.layout_on_resume": "Disposition quand script actif",
 	"menu.layout.pause_layout_enabled": "Changer de disposition à la pause / reprise",
 	"menu.layout.pause_layout_section": "Disposition à la pause / reprise",
+	"menu.layout.pause_layout_unsupported_desktop": "Disposition à la pause / reprise : indisponible sur ce bureau (GNOME ou X11 uniquement)",
 	"menu.llm.add_custom_model": "Ajouter un modèle personnalisé",
 	"menu.llm.add_model_entry": "➕ Ajouter un modèle personnalisé…",
 	"menu.llm.after_hotstring": "Suggestion après expiration d’une bulle hotstring",

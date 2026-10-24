@@ -6025,6 +6025,9 @@ reason_key = "platform_reason.lists_windows_only_settings"
 [[menu.layout_menu]]
 type = "list"
 id = "layout_switching"
+# A Linux desktop with no way to change its layout (a Wayland compositor other
+# than GNOME) shows why instead of a switch that could never act.
+status_rows.unsupported_desktop = [{ type = "label", i18n = "menu.layout.pause_layout_unsupported_desktop" }]
 
 # The physical key whose replacement choice lives in Hotstrings Ergopti
 # (hotstrings.magic_key_source), on every driver: one row naming the key in
