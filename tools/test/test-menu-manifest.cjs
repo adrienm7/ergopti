@@ -8277,8 +8277,10 @@ console.log(
 					const token = tokens[index];
 					if (
 						token.kind !== 'identifier' ||
-						tokens[index - 1]?.value === '.' ||
-						(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value !== ':')
+						(tokens[index - 1]?.kind === 'symbol' && tokens[index - 1].value === '.') ||
+						(tokens[index - 1]?.kind === 'symbol' &&
+							tokens[index - 1].value === ':' &&
+							tokens[index - 2]?.value !== ':')
 					)
 						continue;
 					if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
