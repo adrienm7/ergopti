@@ -29,12 +29,10 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.settings"
-
--- Where the two choices live. One key each rather than one blob, so a corrupt
--- entry costs one setting instead of both.
-local PREF_PREFIX = "llm.generation."
 
 -- What each setting accepts. The bounds are the ones the menu offers and the
 -- ones a hand-edited config is judged against — a single source, so the two
@@ -54,13 +52,15 @@ local BOUNDS = {
 	max_words = { min = 0, max = 10000, integer = true },
 }
 
--- The manifest paths behind each setting.
+-- The manifest paths behind each setting, which are also the storage keys:
+-- one key each rather than one blob, so a corrupt entry costs one setting
+-- instead of all of them.
 local FEATURE_PATH = {
-	temperature = "llm.generation.temperature",
-	context_length = "llm.generation.context_length",
-	min_words = "llm.generation.min_words",
-	max_words = "llm.generation.max_words",
-	auto_raise_temp = "llm.generation.auto_raise_temp",
+	temperature = KEY.LLM_GENERATION_TEMPERATURE,
+	context_length = KEY.LLM_GENERATION_CONTEXT_LENGTH,
+	min_words = KEY.LLM_GENERATION_MIN_WORDS,
+	max_words = KEY.LLM_GENERATION_MAX_WORDS,
+	auto_raise_temp = KEY.LLM_GENERATION_AUTO_RAISE_TEMP,
 }
 
 -- Resolved shipped answers, read once.
@@ -101,7 +101,7 @@ end
 --- @param value any
 --- @return boolean
 local function in_bounds(name, value)
-	if name == "auto_raise_temp" then return type(value) == "boolean" end
+	if name == LEAF.AUTO_RAISE_TEMP then return type(value) == "boolean" end
 	local bounds = BOUNDS[name]
 	if not bounds or type(value) ~= "number" then return false end
 	return value >= bounds.min and value <= bounds.max
@@ -127,7 +127,7 @@ function M.get(name)
 
 	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
-		local stored = Storage.get(PREF_PREFIX .. name, nil)
+		local stored = Storage.get(FEATURE_PATH[name], nil)
 		-- A stored value outside the range is REFUSED, not clipped. It can only
 		-- come from a hand-edited config or an older schema, and clipping would
 		-- silently apply a setting the user never chose while the menu showed the
@@ -163,14 +163,14 @@ function M.set(name, value, expected_source, admission)
 			name, tostring(value), expectation)
 		return false
 	end
-	if name == "min_words" then
-		local maximum = M.get("max_words")
+	if name == LEAF.MIN_WORDS then
+		local maximum = M.get(LEAF.MAX_WORDS)
 		if maximum and maximum > 0 and value > maximum then
 			Logger.error(LOG, "set(): min_words cannot exceed max_words — refused.")
 			return false
 		end
-	elseif name == "max_words" then
-		local minimum = M.get("min_words")
+	elseif name == LEAF.MAX_WORDS then
+		local minimum = M.get(LEAF.MIN_WORDS)
 		if value > 0 and minimum and value < minimum then
 			Logger.error(LOG, "set(): max_words cannot be lower than min_words — refused.")
 			return false
@@ -186,13 +186,13 @@ function M.set(name, value, expected_source, admission)
 	if expected_source ~= nil or admission ~= nil then
 		if type(expected_source) ~= "table" or type(admission) ~= "function"
 			or type(Storage.set_many) ~= "function" then return false end
-		persisted = Storage.set_many({ [PREF_PREFIX .. name] = value }, expected_source, admission)
+		persisted = Storage.set_many({ [FEATURE_PATH[name]] = value }, expected_source, admission)
 	elseif value == default then
 		-- Back to the default means back to no entry, so the shipped answer stays
 		-- live for this user rather than being pinned at the moment they touched it.
-		persisted = Storage.delete(PREF_PREFIX .. name)
+		persisted = Storage.delete(FEATURE_PATH[name])
 	else
-		persisted = Storage.set(PREF_PREFIX .. name, value)
+		persisted = Storage.set(FEATURE_PATH[name], value)
 	end
 	if not persisted then
 		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", name)
@@ -211,10 +211,10 @@ end
 --- @param name string
 --- @return table Array of numbers.
 function M.presets(name)
-	if name == "temperature" then return { 0.0, 0.1, 0.3, 0.5, 0.8, 1.0, 1.3 } end
-	if name == "context_length" then return { 100, 250, 500, 1000, 2000, 4000 } end
-	if name == "min_words" then return { 1, 2, 3, 5, 10, 15, 20 } end
-	if name == "max_words" then return { 0, 5, 10, 15, 20, 50, 100 } end
+	if name == LEAF.TEMPERATURE then return { 0.0, 0.1, 0.3, 0.5, 0.8, 1.0, 1.3 } end
+	if name == LEAF.CONTEXT_LENGTH then return { 100, 250, 500, 1000, 2000, 4000 } end
+	if name == LEAF.MIN_WORDS then return { 1, 2, 3, 5, 10, 15, 20 } end
+	if name == LEAF.MAX_WORDS then return { 0, 5, 10, 15, 20, 50, 100 } end
 	return {}
 end
 
