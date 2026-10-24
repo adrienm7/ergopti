@@ -116,6 +116,10 @@ ERGOPTI_AHK_RESULTS_FILE="$(winepath -w "$results" 2>/dev/null)"
 export ERGOPTI_AHK_RESULTS_FILE
 # Wine's own debug channels would interleave with the runner's TAP on stderr.
 export WINEDEBUG="${WINEDEBUG:--all}"
+# Wine maps Windows file names to Unix ones through the Unix locale. Under C or
+# POSIX a name such as "script space é" fails with "(2) File not found", which
+# turned every Unicode-path test red; Windows itself has no such limit.
+export LC_ALL=C.UTF-8
 
 echo "AHK runtime : $ahk"
 echo "Test runner : $runner $*"
