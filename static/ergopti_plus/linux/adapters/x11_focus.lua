@@ -38,6 +38,9 @@ local ATOM_STRING, ATOM_WINDOW, ATOM_CARDINAL, ATOM_WM_NAME = 31, 33, 6, 39
 -- Longest title read, in 32-bit units (16 KiB). A longer title is truncated.
 local MAX_TITLE_LONGS = 4096
 
+-- Most managed windows one listing reads (the property is read in 32-bit units).
+M.MAX_CLIENTS = 1024
+
 -- Minimum milliseconds between two connection attempts after a failure.
 M.RECONNECT_MS = 2000
 
@@ -221,6 +224,27 @@ function M.query()
 	return tostring(window), title, window_pid(window)
 end
 
+--- Lists the managed top-level windows from the root window's _NET_CLIENT_LIST,
+--- as wmctrl -lp does, but in this process and without forking.
+--- @return table|nil windows Array of { id, title, pid }; nil with a reason on transport trouble.
+--- @return string|nil reason
+function M.clients()
+	if not _transport then return nil, "no X transport" end
+	local connected, reason = ensure_connected()
+	if not connected then return nil, reason end
+	local property = atom("_NET_CLIENT_LIST")
+	if not property then return {} end
+	local reply = _transport.property(_transport.root(), property, ATOM_WINDOW, M.MAX_CLIENTS)
+	if not reply or reply.format ~= 32 then return {} end
+	local windows = {}
+	for offset = 1, #reply.bytes - 3, 4 do
+		local id = u32(reply.bytes:sub(offset, offset + 3))
+		if id ~= nil and id ~= 0 then
+			windows[#windows + 1] = { id = id, title = window_title(id) or "", pid = tonumber(window_pid(id)) }
+		end
+	end
+	return windows
+end
 
 
 

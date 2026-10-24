@@ -211,11 +211,35 @@ function M._parse_wmctrl_list(text)
 	return windows
 end
 
---- Lists every managed window in one wmctrl query, each named by the process
+--- WindowInfo tables for a list of { title, pid } windows, naming each owner by its
+--- process (one /proc read per process).
+--- @param windows table Array of { title, pid }.
+--- @return table
+local function infos_of_windows(windows)
+	local infos, names = {}, {}
+	for _, window in ipairs(windows) do
+		local entry = empty_info()
+		entry.windowTitle = window.title
+		if window.pid and window.pid > 0 then
+			if names[window.pid] == nil then names[window.pid] = _read_proc_comm(window.pid) end
+			entry.appId = names[window.pid]
+		end
+		infos[#infos + 1] = entry
+	end
+	return infos
+end
+
+--- Lists every managed window from the X server (libxcb in this process, else one wmctrl query), each named by the process
 --- name focused_x11() reports, read from /proc without a spawn per window:
 --- the excluded-applications picker builds this list on the menu path.
 --- @return table Array of WindowInfo.
 local function all_x11()
+	if X11Focus.has_transport() then
+		-- In this process, like the focus query: no wmctrl fork, no wmctrl dependency.
+		local clients, native_reason = X11Focus.clients()
+		if clients then return infos_of_windows(clients) end
+		Logger.debug(LOG, "Native X11 window list unavailable (%s) — using wmctrl.", tostring(native_reason))
+	end
 	if not Shell.has_command("wmctrl", true) then
 		if not _reported_no_window_list then
 			_reported_no_window_list = true
@@ -229,17 +253,7 @@ local function all_x11()
 		Logger.error(LOG, "getAll(): wmctrl -lp failed — %s.", tostring(err))
 		return {}
 	end
-	local infos, names = {}, {}
-	for _, window in ipairs(M._parse_wmctrl_list(out)) do
-		local entry = empty_info()
-		entry.windowTitle = window.title
-		if window.pid and window.pid > 0 then
-			if names[window.pid] == nil then names[window.pid] = _read_proc_comm(window.pid) end
-			entry.appId = names[window.pid]
-		end
-		infos[#infos + 1] = entry
-	end
-	return infos
+	return infos_of_windows(M._parse_wmctrl_list(out))
 end
 
 

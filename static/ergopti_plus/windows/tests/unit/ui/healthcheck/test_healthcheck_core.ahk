@@ -139,6 +139,49 @@ Test("HealthCheck: Run produces the schema's sections and only its fields",
 	_TestHC_RunMatchesTheSchema)
 
 
+; The native navigation hook's front-position counters reach the input section
+; (macOS reports its key accounting there), and only as counters.
+_TestHC_InputReportsTheHookCounters() {
+	Counters := Map("timer_high_resolution", 1, "keys_seen", 120, "injected_armed", 7,
+		"reinstalls", 5, "reinstall_failures", 2, "last_failure_error", 1400)
+	Input := _HealthCheck_Input(() => Counters)
+	AssertTrue(Input["hook_installed"], "a loaded owner is an installed hook")
+	AssertEqual(120, Input["hook_events_seen"])
+	AssertEqual(7, Input["hook_foreign_injections"])
+	AssertEqual(5, Input["hook_front_reinstalls"])
+	AssertEqual(2, Input["hook_front_reinstall_failures"])
+	AssertEqual(1400, Input["hook_last_error"])
+	Declared := Map()
+	for Section in HealthCheck_Config()["schema"]["sections"] {
+		if (Section["id"] != "input")
+			continue
+		for Field in Section["fields"]
+			Declared[Field["id"]] := Field.Get("platforms", ["windows"])
+	}
+	for Id in ["hook_installed", "hook_events_seen", "hook_foreign_injections", "hook_front_reinstalls",
+		"hook_front_reinstall_failures", "hook_last_error"] {
+		Assert(Declared.Has(Id), "the schema does not declare the input field " . Id)
+		AssertEqual("windows", Declared[Id][1], Id . " is a Windows field")
+	}
+}
+
+Test("HealthCheck: the input section reports the native hook counters (hook-health-fields)",
+	_TestHC_InputReportsTheHookCounters)
+
+
+; An owner that was never loaded is reported as not installed, with no counter
+; invented and no DLL loaded by the snapshot itself.
+_TestHC_InputWithoutNativeOwner() {
+	Input := _HealthCheck_Input(() => 0)
+	AssertFalse(Input["hook_installed"], "an unloaded owner is not an installed hook")
+	AssertFalse(Input.Has("hook_front_reinstalls"), "no counter may be invented without an owner")
+	AssertFalse(Input.Has("hook_last_error"), "no error code may be invented without an owner")
+}
+
+Test("HealthCheck: no native owner means hook_installed false and no counters (hook-health-fields)",
+	_TestHC_InputWithoutNativeOwner)
+
+
 _TestHC_RunReflectsCounters() {
 	global _HealthCheckLastError
 

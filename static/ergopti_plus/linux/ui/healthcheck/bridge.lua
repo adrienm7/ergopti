@@ -231,11 +231,34 @@ local function process_memory(status)
 	return kib and tonumber(kib) * 1024 or nil
 end
 
+--- The applications with a window on screen, as the other two drivers list them
+--- (opt-in, process names only). Wayland has no cross-client window enumeration
+--- (no compositor exposes one), so the field is left out there rather than shown
+--- as an empty list, which would read as "nothing is open".
+--- @return table|nil Sorted process names, nil when the session cannot list windows.
+local function running_apps()
+	if not require("infra.display_server").is_x11() then
+		Logger.info(LOG, "Open applications are not listed: this session is not X11 and Wayland exposes no window list.")
+		return nil
+	end
+	local list, seen = {}, {}
+	for _, info in ipairs(require("adapters.window_info").getAll()) do
+		local app = type(info) == "table" and info.appId or nil
+		if type(app) == "string" and app ~= "" and info.windowTitle ~= "" and not seen[app] then
+			seen[app] = true
+			list[#list + 1] = app
+		end
+	end
+	table.sort(list)
+	return list
+end
+
 --- The system section and its load.
 --- @param facts table system_facts()
 --- @param state table Daemon state.
+--- @param detailed boolean Whether the user ticked "Include details".
 --- @return table
-local function collect_system(facts, state)
+local function collect_system(facts, state, detailed)
 	local layout = state.layout
 	local status = read_file("/proc/self/status")
 	return {
@@ -249,6 +272,7 @@ local function collect_system(facts, state)
 		process_memory  = process_memory(status),
 		uptime          = os.time() - _started_at,
 		elevated        = elevated(status),
+		running_apps    = detailed == true and running_apps() or nil,
 	}
 end
 
@@ -527,7 +551,7 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 		paths       = collect("paths", function() return collect_paths(schema) end),
 		versions    = collect("versions", function() return collect_versions(facts) end),
 		hardware    = collect("hardware", function() return collect_hardware(facts) end),
-		system      = collect("system", function() return collect_system(facts, state) end),
+		system      = collect("system", function() return collect_system(facts, state, detailed == true) end),
 		input       = collect("input", function() return collect_input(state) end),
 		features    = collect("features", function() return collect_features(state) end),
 		-- Filled by the configuration probe: reading and decoding the files is far

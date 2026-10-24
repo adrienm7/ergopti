@@ -281,10 +281,12 @@ _HealthCheck_System(Detailed, UptimeSec) {
 ; =========================================
 ; =========================================
 
-; The keyboard state at this instant.
+; The keyboard state at this instant, and the health of the native navigation
+; hook (the macOS section's key accounting has the same role there).
+; @param HookHealthFn {Func|Integer} Reads the hook counters (tests replace it).
 ; @returns {Map}
-_HealthCheck_Input() {
-	return Map(
+_HealthCheck_Input(HookHealthFn := 0) {
+	Input := Map(
 		"paused",    A_IsSuspended ? true : false,
 		"shift",     KS_IsDown("Shift") ? true : false,
 		"ctrl",      KS_IsDown("Ctrl") ? true : false,
@@ -293,6 +295,21 @@ _HealthCheck_Input() {
 		"meta",      (KS_IsDown("LWin") || KS_IsDown("RWin")) ? true : false,
 		; The lock state, not the key: "T" is the toggle
 		"caps_lock", GetKeyState("CapsLock", "T") ? true : false)
+	if !HasMethod(HookHealthFn, "Call") && IsSet(LLM_NavEventOwner_HookHealth)
+		HookHealthFn := LLM_NavEventOwner_HookHealth
+	if !HasMethod(HookHealthFn, "Call")
+		return Input
+	Health := _HealthCheck_Read("the navigation hook counters", HookHealthFn)
+	Input["hook_installed"] := (Health is Map) ? true : false
+	if (Health is Map) {
+		; Counters only: no key identity and no text ever reach the snapshot
+		Input["hook_events_seen"] := Health["keys_seen"]
+		Input["hook_foreign_injections"] := Health["injected_armed"]
+		Input["hook_front_reinstalls"] := Health["reinstalls"]
+		Input["hook_front_reinstall_failures"] := Health["reinstall_failures"]
+		Input["hook_last_error"] := Health["last_failure_error"]
+	}
+	return Input
 }
 
 ; The feature switches this driver can answer, as { id, enabled } items.

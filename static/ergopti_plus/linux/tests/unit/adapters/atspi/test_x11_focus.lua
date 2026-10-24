@@ -19,7 +19,7 @@ local ATOM_STRING, ATOM_WM_NAME = 31, 39
 --- @param state table { active = id|nil, windows = { [id] = { title, wm_name, pid, wm_name_type } }, ... }
 --- @return table transport
 local function scripted(state)
-	local atoms = { _NET_ACTIVE_WINDOW = 301, _NET_WM_NAME = 302, UTF8_STRING = 303, _NET_WM_PID = 304 }
+	local atoms = { _NET_ACTIVE_WINDOW = 301, _NET_WM_NAME = 302, UTF8_STRING = 303, _NET_WM_PID = 304, _NET_CLIENT_LIST = 305 }
 	state.connects, state.interns, state.disconnects = 0, 0, 0
 	local function le32(value)
 		return string.char(value % 256, math.floor(value / 256) % 256,
@@ -39,6 +39,12 @@ local function scripted(state)
 			if window == 1 and property == atoms._NET_ACTIVE_WINDOW then
 				if not state.active then return nil end
 				return { type = 33, format = 32, bytes = le32(state.active) }
+			end
+			if window == 1 and property == atoms._NET_CLIENT_LIST then
+				if not state.clients then return nil end
+				local packed = {}
+				for _, id in ipairs(state.clients) do packed[#packed + 1] = le32(id) end
+				return { type = 33, format = 32, bytes = table.concat(packed) }
 			end
 			local entry = state.windows[window]
 			if not entry then return nil end
@@ -210,5 +216,97 @@ helpers.describe("window_info: the native X11 route", function()
 		for _, command in ipairs(commands) do if command:find("xdotool getactivewindow", 1, true) then asked = true end end
 		helpers.assert_true(asked, "the tools were asked when the server was unreachable")
 		shell._reset_runner()
+	end)
+end)
+
+helpers.describe("x11_focus: the managed window list", function()
+	helpers.it("(linux-open-apps) lists every managed window with its title and owner, in this process", function()
+		local state = { clients = { 21, 22 }, windows = {
+			[21] = { title = "Notes", pid = 100 }, [22] = { title = "Terminal", pid = 200 } } }
+		local windows, reason = bound(state).clients()
+		helpers.assert_nil(reason)
+		helpers.assert_eq(#windows, 2)
+		helpers.assert_eq(windows[1], { id = 21, title = "Notes", pid = 100 })
+		helpers.assert_eq(windows[2], { id = 22, title = "Terminal", pid = 200 })
+	end)
+
+	helpers.it("(linux-open-apps) answers an empty list, not a failure, when the window manager publishes none", function()
+		local windows, reason = bound({ windows = {} }).clients()
+		helpers.assert_eq(windows, {})
+		helpers.assert_nil(reason)
+	end)
+
+	helpers.it("(linux-open-apps) answers a reason when the server cannot be reached", function()
+		local windows, reason = bound({ refuse = true, windows = {} }).clients()
+		helpers.assert_nil(windows)
+		helpers.assert_contains(reason, "no server")
+	end)
+
+	helpers.it("(linux-open-apps) answers a reason when no transport is bound", function()
+		local windows, reason = helpers.load_module("adapters.x11_focus").clients()
+		helpers.assert_nil(windows)
+		helpers.assert_contains(reason, "no X transport")
+	end)
+end)
+
+helpers.describe("window_info and the diagnostic snapshot: the open applications", function()
+	local function session(kind, state, shell_answers)
+		local display = helpers.load_module("infra.display_server")
+		display._set_for_test(kind, "x11 clients fixture")
+		package.loaded["infra.display_server"] = display
+		local shell = helpers.load_module("adapters.shell_runner")
+		local commands = {}
+		shell._set_runner(function(command)
+			commands[#commands + 1] = command
+			for pattern, answer in pairs(shell_answers or {}) do
+				if command:find(pattern, 1, true) then return answer end
+			end
+			return ""
+		end)
+		local focus = helpers.load_module("adapters.x11_focus")
+		focus._set_transport(scripted(state))
+		package.loaded["adapters.x11_focus"] = focus
+		local window = helpers.load_module("adapters.window_info")
+		window._reset_state()
+		-- The process names come from /proc, which a fixture pid does not have.
+		window._set_proc_comm_reader_for_test(function(pid) return pid == 100 and "editor" or "term" end)
+		package.loaded["adapters.window_info"] = window
+		return display, commands, shell
+	end
+
+	local STATE = function()
+		return { clients = { 21, 22, 23 }, windows = {
+			[21] = { title = "Notes", pid = 100 }, [22] = { title = "Other notes", pid = 100 },
+			[23] = { title = "Shell", pid = 200 } } }
+	end
+	local COMM = { ["/proc/100/comm"] = "editor\n", ["/proc/200/comm"] = "term\n" }
+
+	helpers.it("(linux-open-apps) window_info lists windows from the server and never forks wmctrl", function()
+		local display, commands, shell = session("x11", STATE(), COMM)
+		local infos = package.loaded["adapters.window_info"].getAll()
+		helpers.assert_eq(#infos, 3)
+		for _, command in ipairs(commands) do
+			helpers.assert_true(not command:find("wmctrl", 1, true), "unexpected: " .. command)
+		end
+		shell._reset_runner()
+		display._set_for_test(display.X11, "restored")
+	end)
+
+	helpers.it("(linux-open-apps) the snapshot lists one entry per open application on X11, with details only", function()
+		local display, _, shell = session("x11", STATE(), COMM)
+		local Bridge = helpers.load_module("ui.healthcheck.bridge")
+		helpers.assert_nil(Bridge.build_snapshot({}, false).sections.system.running_apps,
+			"the open applications are opt-in")
+		helpers.assert_eq(Bridge.build_snapshot({}, true).sections.system.running_apps, { "editor", "term" })
+		shell._reset_runner()
+		display._set_for_test(display.X11, "restored")
+	end)
+
+	helpers.it("(linux-open-apps) the snapshot omits the field on Wayland instead of reporting an empty list", function()
+		local display, _, shell = session("wayland", STATE(), COMM)
+		local Bridge = helpers.load_module("ui.healthcheck.bridge")
+		helpers.assert_nil(Bridge.build_snapshot({}, true).sections.system.running_apps)
+		shell._reset_runner()
+		display._set_for_test(display.X11, "restored")
 	end)
 end)
