@@ -3560,6 +3560,29 @@ local function _manifest_metrics_rows(ctx, k)
 	-- is the progress itself.
 	local providers = {
 		["metrics_migration"] = function() return { _migration_row(k) } end,
+		-- The applications whose typing is never recorded: the same submenu the
+		-- other two drivers draw, over this driver's own keystats list.
+		["exclude_apps"] = function()
+			local AppRows = require("ui.menu.app_exclusion_rows")
+			local count = #k.get_disabled_apps()
+			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
+			return { {
+				label = AppRows.caption(count),
+				disabled = on,
+				items = AppRows.rows({
+					get = k.get_disabled_apps,
+					set = k.set_disabled_apps,
+					current = k.last_app,
+					prompt = function(title, text, initial, hidden, choices)
+						return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+					end,
+					title = i18n_safe("menu.metrics.exclude_apps"),
+					changed = function()
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}),
+			} }
+		end,
 	}
 
 	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx, providers)
@@ -3599,29 +3622,6 @@ local function metrics_dense(value, records)
 		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
 		count, maximum = count + 1, math.max(maximum, index)
 	end
-		-- The applications whose typing is never recorded: the same submenu the
-		-- other two drivers draw, over this driver's own keystats list.
-		["exclude_apps"] = function()
-			local AppRows = require("ui.menu.app_exclusion_rows")
-			local count = #k.get_disabled_apps()
-			local on = type(k.is_enabled) == "function" and k.is_enabled() == true
-			return { {
-				label = AppRows.caption(count),
-				disabled = on,
-				items = AppRows.rows({
-					get = k.get_disabled_apps,
-					set = k.set_disabled_apps,
-					current = k.last_app,
-					prompt = function(title, text, initial, hidden, choices)
-						return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
-					end,
-					title = i18n_safe("menu.metrics.exclude_apps"),
-					changed = function()
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}),
-			} }
-		end,
 	return count == maximum
 end
 

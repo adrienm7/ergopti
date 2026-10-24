@@ -124,6 +124,43 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 end)
 
 
+helpers.describe("prediction_engine.predict: applications the trigger is switched off in", function()
+	helpers.it("trigger-apps: no prediction runs in an excluded application", function()
+		local restore_focus = install_insecure_focus()
+		local sent = {}
+		package.loaded["modules.llm.api_ollama"] = {
+			chat = function(_, _, _, _, _, on_done) sent[#sent + 1] = true; on_done(" suite", nil) end,
+			cancel = function() end,
+		}
+		package.loaded["modules.llm.profiles"] = {
+			init = function() end,
+			is_enabled = function() return true end,
+			get_current_model = function() return "test-model" end,
+			get_base_url = function() return "http://127.0.0.1:11434" end,
+		}
+		local triggers = helpers.load_module("modules.llm.trigger_settings")
+		triggers._reset()
+		local ok, err = pcall(function()
+			require("tests.support.llm_preferences_fixture").with(function()
+				helpers.assert_true(triggers.set_disabled_apps({ "Firefox" }))
+				local pe = helpers.load_module("modules.llm.prediction_engine")
+				pe.init({ focus_id = function() return "owned-prediction-window" end })
+				helpers.assert_eq(pe.predict("Bonjour //", { app_id = "firefox", input_chars = 2 }), false,
+					"the excluded application is refused")
+				helpers.assert_eq(#sent, 0, "and never reaches the backend")
+				pe.predict("Bonjour //", { app_id = "kate", input_chars = 2 })
+				helpers.assert_eq(#sent, 1, "any other application still does")
+			end)
+		end)
+		triggers._reset()
+		package.loaded["modules.llm.api_ollama"] = nil
+		package.loaded["modules.llm.profiles"] = nil
+		restore_focus()
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
 
 
 -- ============================================================
