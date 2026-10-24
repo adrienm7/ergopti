@@ -34,6 +34,12 @@ _KIO_ChildSource() {
 	Clock := _DriverFuncBody("KL_NowTimestamp")
 	AssertTrue(RegExMatch(Clock, "^KL_NowTimestamp\(\)\s*\{") > 0)
 	Source .= "_KIO_NativeTimestamp() " . SubStr(Clock, InStr(Clock, "{")) . "`n"
+	; KL_AppendLog and the hook sources ask the capture gate (Suspend or the
+	; metrics pause) that the collection module owns.
+	GateOwner := _DriverProductionFileForSymbol("KL_CaptureHeld", _DriverDir)
+	AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
+		"The child must use the actual capture gate class KLCollection")
+	Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\idle_activity_publication_owner_body.ahk`n"
 }
 

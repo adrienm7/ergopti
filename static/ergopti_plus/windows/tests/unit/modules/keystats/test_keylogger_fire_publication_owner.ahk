@@ -45,6 +45,12 @@ _KFPO_ChildSource() {
 			"Lifecycle state must use its real declaration: " . Name)
 		Source .= Declaration[0] . "`n"
 	}
+	; KL_AppendLog and the hook sources ask the capture gate (Suspend or the
+	; metrics pause) that the collection module owns.
+	GateOwner := _DriverProductionFileForSymbol("KL_CaptureHeld", _DriverDir)
+	AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
+		"The child must use the actual capture gate class KLCollection")
+	Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\keylogger_fire_publication_owner_body.ahk`n"
 }
 
