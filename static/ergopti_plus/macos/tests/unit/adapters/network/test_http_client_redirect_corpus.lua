@@ -39,7 +39,6 @@ local CURL_RECEIPT_ONLY = {
 -- Disagreements with the shared law. Each entry must still disagree: a fix
 -- turns its case red until the entry is removed.
 local PENDING = {
-	["invalid port refused"] = "the adapter accepts any decimal port",
 	["last allowed hop admitted"] = "the adapter stops after 5 hops, the shared law after 50",
 	["exact prior URL loop refused"] = "the adapter has no visited-URL guard",
 	["fragment does not bypass loop guard"] = "the adapter has no visited-URL guard",
