@@ -843,6 +843,35 @@ _raw_sql.sessions = function(device_id, events, first_id)
 		.. table.concat(parts, ",") .. ";"
 end
 
+--- Inserts machine transitions in the shared events_system format.
+--- @param device_id string Device identifier.
+--- @param events table Array of {ts,date,action,metadata?}.
+_raw_sql.system = function(device_id, events, first_id)
+	local parts = {}
+	for i, ev in ipairs(events) do
+		assert(type(ev.action) == "string" and ev.action ~= "", "a system event needs its action")
+		parts[#parts + 1] = string.format(
+			"('%s',%d,'%s','%s','%s',%s)",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts), _sql_escape(ev.date), _sql_escape(ev.action),
+			type(ev.metadata) == "table" and ("'" .. _sql_escape(Json.encode(ev.metadata)) .. "'") or "NULL"
+		)
+	end
+	return "INSERT OR IGNORE INTO events_system "
+		.. "(device_id,id,ts,date,action,metadata_json) VALUES "
+		.. table.concat(parts, ",") .. ";"
+end
+
+--- Commits one canonical raw system-event batch and returns its native receipt.
+function M.insert_system_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.system(device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
 --- Commits one canonical raw session-event batch and returns its native receipt.
 function M.insert_session_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
@@ -1639,7 +1668,8 @@ end
 --- Reservation gaps are harmless; acknowledged IDs and SQL remain stable across
 --- data-write retries. Only a unique durable marker resolves a lost COMMIT reply.
 --- @param device_id string Device identifier.
---- @param payload table { raw = { typing, hotstrings, shortcuts, switches, llm, windows, sessions }, upserts }.
+--- @param payload table { raw = { typing, hotstrings, shortcuts, switches, llm, windows, sessions, system },
+---   upserts }.
 --- @return table|nil Owned logical operation; nil refuses before SQL dispatch.
 function M.start_flush(device_id, payload)
 	if not M.is_available() or (_flush_owner and not _flush_owner:is_settled()) then return nil end
@@ -1663,13 +1693,14 @@ function M.start_flush(device_id, payload)
 		assert(type(entry.kind) == "string" and type(_derived_sql[entry.kind]) == "function"
 			and type(entry.args) == "table", "Invalid SQLite flush intent")
 	end
-	-- A payload built before the LLM, window and session families existed carries
-	-- none: that is an empty family.
+	-- A payload built before the LLM, window, session and system families existed
+	-- carries none: that is an empty family.
 	payload.raw.llm = payload.raw.llm or {}
 	payload.raw.windows = payload.raw.windows or {}
 	payload.raw.sessions = payload.raw.sessions or {}
+	payload.raw.system = payload.raw.system or {}
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]
