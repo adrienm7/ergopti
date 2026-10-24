@@ -7658,10 +7658,14 @@ const LINUX_SIMULTANEOUS_SOURCE_ENTRY =
 	LINUX_SIMULTANEOUS_ENV.map((key) => '            ' + key + '="$' + key + '" \\\n').join('') +
 	`            bash ${LINUX_SIMULTANEOUS_HARNESS}`;
 const LINUX_SIMULTANEOUS_ENTRY = `bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+// The packages install in their own step just before, under the install budget.
+const LINUX_SIMULTANEOUS_INSTALL_STEP = `Install prerequisites for ${LINUX_SIMULTANEOUS_STEP}`;
+const LINUX_SIMULTANEOUS_INSTALL_WORKFLOW = [
+	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\',
+	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv xclip'
+];
 const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
 	'sudo modprobe uinput',
-	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\',
-	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv xclip',
 	'sudo env \\',
 	'  GITHUB_ACTIONS="$GITHUB_ACTIONS" \\',
 	'  GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \\',
@@ -7684,28 +7688,39 @@ function linuxSimultaneousWorkflowProblems(files) {
 	} catch {
 		return ['Linux raw workflow admission refused'];
 	}
-	const steps = files
+	const all = files
 		.filter((entry) => entry.rel === LINUX_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
 		.filter((job) => job.id === 'e2e-linux')
-		.flatMap((job) => pipeline.steps(job.body))
-		.filter((step) => step.name === LINUX_SIMULTANEOUS_STEP);
-	if (steps.length !== 1) return ['Linux needs exactly one whole-daemon native step'];
-	const step = steps[0];
-	let wrapperFits = true;
-	try {
-		require('./ci-linux-qualified-run.cjs').assertLinuxQualifiedRun(
-			(pipeline.runOf(step.body) ?? []).filter((line) => !line.trimStart().startsWith('#')),
-			LINUX_SIMULTANEOUS_NATIVE_WORKFLOW
-		);
-	} catch {
-		wrapperFits = false;
-	}
+		.flatMap((job) => pipeline.steps(job.body));
+	const at = all.findIndex((step) => step.name === LINUX_SIMULTANEOUS_STEP);
+	const install = all.findIndex((step) => step.name === LINUX_SIMULTANEOUS_INSTALL_STEP);
+	if (all.filter((step) => step.name === LINUX_SIMULTANEOUS_STEP).length !== 1)
+		return ['Linux needs exactly one whole-daemon native step'];
 	if (
-		pipeline.stepField(step.body, 'if') !== linuxRow(step.name, NOT_CANCELLED) ||
-		pipeline.stepField(step.body, 'timeout-minutes') !== '6' ||
-		pipeline.stepField(step.body, 'continue-on-error') !== null ||
-		!wrapperFits
+		all.filter((step) => step.name === LINUX_SIMULTANEOUS_INSTALL_STEP).length !== 1 ||
+		install !== at - 1
+	)
+		return ['Linux whole-daemon packages install in one step just before it'];
+	/** Whether a step keeps the qualified wrapper, its row, budget and failure. */
+	const fits = (step, original, budget) => {
+		try {
+			require('./ci-linux-qualified-run.cjs').assertLinuxQualifiedRun(
+				(pipeline.runOf(step.body) ?? []).filter((line) => !line.trimStart().startsWith('#')),
+				original
+			);
+		} catch {
+			return false;
+		}
+		return (
+			pipeline.stepField(step.body, 'if') === linuxRow(step.name, NOT_CANCELLED) &&
+			pipeline.stepField(step.body, 'timeout-minutes') === budget &&
+			pipeline.stepField(step.body, 'continue-on-error') === null
+		);
+	};
+	if (
+		!fits(all[install], LINUX_SIMULTANEOUS_INSTALL_WORKFLOW, '20') ||
+		!fits(all[at], LINUX_SIMULTANEOUS_NATIVE_WORKFLOW, '6')
 	) {
 		return [
 			'Linux whole-daemon enrollment must retain its prerequisites, exact call and failure budget'
@@ -7724,8 +7739,12 @@ const linuxSimultaneousStepBody = pipeline.step(
 	linuxSimultaneousRawJob.body,
 	LINUX_SIMULTANEOUS_STEP
 );
+const linuxSimultaneousInstallBody = pipeline.step(
+	linuxSimultaneousRawJob.body,
+	LINUX_SIMULTANEOUS_INSTALL_STEP
+);
 let linuxSimultaneousWorkflowRefusals = 0;
-for (const [what, from, to] of [
+for (const [what, from, to, target] of [
 	['omitted live harness', LINUX_SIMULTANEOUS_SOURCE_ENTRY, 'true'],
 	[
 		'redirected live harness',
@@ -7749,9 +7768,16 @@ for (const [what, from, to] of [
 	[
 		'missing native dependencies',
 		'--no-install-recommends at-spi2-core',
-		'--no-install-recommends'
+		'--no-install-recommends',
+		'install'
 	],
-	['missing X11 clipboard prerequisite', 'lua-luv xclip', 'lua-luv'],
+	['missing X11 clipboard prerequisite', 'lua-luv xclip', 'lua-luv', 'install'],
+	[
+		'disabled install step',
+		linuxRow(LINUX_SIMULTANEOUS_INSTALL_STEP, NOT_CANCELLED),
+		'${{ false }}',
+		'install'
+	],
 	['missing strict wrapper status', 'set -euo pipefail', 'set +e'],
 	[
 		'wrong workflow selection scope',
@@ -7775,14 +7801,12 @@ for (const [what, from, to] of [
 	],
 	['sudo receipt root omitted', 'RUNNER_TEMP="$RUNNER_TEMP"', 'RUNNER_TEMP=/unrelated']
 ]) {
-	assert.ok(linuxSimultaneousStepBody.includes(from), `${what}: causal preimage must exist`);
-	assert.equal(linuxSimultaneousStepBody.split(from).length, 2, `${what}: one step-local target`);
+	const body = target === 'install' ? linuxSimultaneousInstallBody : linuxSimultaneousStepBody;
+	assert.ok(body.includes(from), `${what}: causal preimage must exist`);
+	assert.equal(body.split(from).length, 2, `${what}: one step-local target`);
 	const changed = linuxSimultaneousRawFiles.map((entry) => ({
 		...entry,
-		text:
-			entry.rel === LINUX_BOX
-				? entry.text.replace(linuxSimultaneousStepBody, linuxSimultaneousStepBody.replace(from, to))
-				: entry.text
+		text: entry.rel === LINUX_BOX ? entry.text.replace(body, body.replace(from, to)) : entry.text
 	}));
 	assert.ok(
 		linuxSimultaneousWorkflowProblems(changed).length > 0,
@@ -7790,7 +7814,7 @@ for (const [what, from, to] of [
 	);
 	linuxSimultaneousWorkflowRefusals++;
 }
-assert.equal(linuxSimultaneousWorkflowRefusals, 20);
+assert.equal(linuxSimultaneousWorkflowRefusals, 21);
 
 /** Retains exact ordered native calls, status admission and failing teardown. */
 function linuxSimultaneousEnrollmentProblems(source) {

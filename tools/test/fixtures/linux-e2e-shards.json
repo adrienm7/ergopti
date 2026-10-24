@@ -48,6 +48,7 @@
 			"The secure-field probe on a real accessibility bus",
 			"Install prerequisites for Launch the bounded accessibility helper with Lua interpreter options",
 			"Launch the bounded accessibility helper with Lua interpreter options",
+			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown",
 			"The whole daemon, live — a trigger typed, a tray shown",
 			"Install WebKit2GTK and lgi",
 			"Install virtual screenshot capture tools",
@@ -297,6 +298,9 @@
 		"Resolve real system keymaps": ["Install prerequisites for Resolve real system keymaps"],
 		"Qualify actual X11 physical shortcut sources": [
 			"Install prerequisites for Qualify actual X11 physical shortcut sources"
+		],
+		"The whole daemon, live — a trigger typed, a tray shown": [
+			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown"
 		],
 		"Qualify three actual XI2 property cookies": [
 			"Install prerequisites for Qualify three actual XI2 property cookies"
