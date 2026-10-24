@@ -23,6 +23,13 @@ local function read(relative)
 	return assert(SourceFile.read(helpers.driver_root() .. "/" .. relative), relative)
 end
 
+--- Reads the one production unit carrying a module banner, wherever it lives.
+--- @param header string The unit's MODULE banner.
+--- @return string source
+local function unit(header)
+	return assert(helpers.read_driver_unit("--- MODULE: " .. header .. "\n"))
+end
+
 local ROLE = "--installed-physical-source"
 
 helpers.describe("installed source role: one spelling in three languages", function()
@@ -52,9 +59,9 @@ end)
 helpers.describe("installed source role: the Lua side owns no Console", function()
 	helpers.it("never names the Console executable outside the install checks", function()
 		local owner = read("platform/remap/runtime_owner.lua")
-		local ports = read("adapters/runtime_owner_ports.lua")
-		local capture = read("adapters/runtime_capture_port.lua")
-		local source = read("adapters/installed_physical_source.lua")
+		local ports = unit("Owned Runtime Ports (Hammerspoon)")
+		local capture = unit("Owned Runtime Capture Port (Hammerspoon)")
+		local source = unit("Installed Physical Source Task Port (Hammerspoon)")
 		for name, text in pairs({ owner = owner, ports = ports, capture = capture, source = source }) do
 			helpers.assert_true(text:find("OWNED.CONSOLE", 1, true) == nil or name == "owner",
 				name .. " must not reference the Console executable")

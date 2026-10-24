@@ -162,15 +162,17 @@ function M.register(helpers)
 end
 
 --- Checks that each owner source delegates to the shared slots.
+--- The driver supplies each owner's source, so it can find an owner by a
+--- symbol rather than by a path a move would break.
 --- @param helpers table Driver test API.
---- @param paths table Paths of the owners' Lua sources.
-function M.register_sources(helpers, paths)
+--- @param owners table Array of { name = string, read = function } where read
+---   returns the owner's Lua source, or fails.
+function M.register_sources(helpers, owners)
 	helpers.describe("timer slot owners use the shared slots (owned-timer-slots)", function()
-		for _, path in ipairs(paths) do
-			helpers.it(path:match("[^/]+$") .. " requires owned_timer_slots and keeps no copy", function()
-				local file = assert(io.open(path, "rb"))
-				local source = assert(file:read("*a"))
-				assert(file:close())
+		for _, owner in ipairs(owners) do
+			helpers.it(owner.name .. " requires owned_timer_slots and keeps no copy", function()
+				local source = owner.read()
+				helpers.assert_type(source, "string", "the owner source is readable")
 				helpers.assert_true(source:find('require("owned_timer_slots")', 1, true) ~= nil, "requires the slots")
 				for _, copy in ipairs({ "local function arm_owned_timer", "local function cancel_owned_timer",
 					"local function when_owned_timer_settled", "delivery_during_acquisition" }) do

@@ -67,7 +67,9 @@ helpers.describe("field check menu rows", function()
 		for _, row in ipairs(manifest.debug_menu) do
 			if row.id and row.id:find("^field_check_") then rows[row.id] = row end
 		end
-		local builder = helpers.read_driver_source("ui/menu/builder.lua")
+		-- The one unit that dispatches the field checks, found by its dispatch call
+		-- rather than by its path.
+		local builder = assert(helpers.read_driver_unit('require("ui.field_check").run('))
 		with_window(function(Window)
 			for id, entry in pairs(Window.ROWS) do
 				local row = rows[id]

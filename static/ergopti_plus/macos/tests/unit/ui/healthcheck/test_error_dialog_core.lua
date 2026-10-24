@@ -4,4 +4,7 @@
 local helpers = require("tests.helpers")
 local Contract = require("test.error_dialog_core_contract")
 Contract.register(helpers, helpers.shared(""))
-Contract.register_host(helpers, helpers.driver_root() .. "/ui/error_dialog/init.lua")
+-- The host is the one production unit requiring the core, found by that require.
+Contract.register_host(helpers, "the macOS error window", function()
+	return assert(helpers.read_driver_unit('require("error_dialog.core")'))
+end)
