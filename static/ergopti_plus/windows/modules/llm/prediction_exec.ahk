@@ -253,6 +253,13 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 		return
 
 	Override := _LLM_Engine_NormalizePromptOverride(Override)
+	; The AI preview switch (hotstrings.preview_ai_enabled) governs the automatic
+	; typing-triggered bubble on every driver. A request the user asked for by
+	; name (a prompt action, live mode) carries an Override and is not a preview.
+	if !(Override is Map) && !HSE_PreviewSwitchCurrent("preview_ai_enabled") {
+		try LoggerDebug("LLM", "Automatic prediction skipped: the AI preview switch is off.")
+		return
+	}
 	IsLive := (Override is Map) && Override["live"]
 	; Hotstring tooltips win: a live prediction would replace the preview on the
 	; shared surface. The chain armed when it closes asks again.

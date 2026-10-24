@@ -400,109 +400,64 @@ Test("hotstrings delay settings: ordinary entry keeps the existing native config
 	_HSDT_DelayConfigKeepsNativeWindowAndRefreshOwner)
 
 
+; The four preview checkboxes are declared for Windows too (PAR-24): the shared
+; declaration carries no platform restriction and no unavailability reason, and
+; the real provider hands each one to the driver's own toggle.
+_HSDT_AssertPreviewRowIsLive(Section, Row, Expected) {
+	for Key in ["id", "type", "i18n"]
+		if Expected.Has(Key)
+			AssertEqual(Expected[Key], Row[Key], "The canonical checkbox identity stays shared.")
+	for Key in ["checked_when", "disabled_when"] {
+		AssertEqual(Expected[Key].Length, Row[Key].Length)
+		for Index, Value in Expected[Key]
+			AssertEqual(Value, Row[Key][Index])
+	}
+	AssertTrue(_MR_IsForAhk(Row), "Windows owns the preview switch " . Row["id"] . ".")
+	AssertFalse(Row.Has("unavailable"), "A live Windows row is not greyed.")
+	AssertFalse(Row.Has("reason_key"), "A live Windows row carries no platform reason.")
+	Called := Map("count", 0)
+	Commands := Map(Row["id"], (*) => Called["count"] += 1)
+	Getters := Map("hotstrings." . Row["id"], (*) => true, "preview_magic_ready", (*) => true,
+		"preview_presence_ready", (*) => true, "preview_colored_ready", (*) => true)
+	Native := MenuRenderer_CheckRow(Section, Row["id"], Commands, Getters)
+	Assert(Native is Map, "The real provider acquires the Windows toggle for " . Row["id"] . ".")
+	Native["action"].Call()
+	AssertEqual(1, Called["count"], "The row runs the supplied command.")
+}
+
 _HSDT_ColoredPreviewDeclaredCapability() {
 	global _SharedDir
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\preview_colored_control.json"))
-	Root := _MR_GetManifestRoot()
-	Rows := Root[Corpus["section"]]
+	Rows := _MR_GetManifestRoot()[Corpus["section"]]
 	AssertEqual(1, Rows.Length)
-	Row := Rows[1]
-	for Key in ["id", "type", "i18n", "unavailable", "reason_key"]
-		AssertEqual(Corpus["row"][Key], Row[Key])
-	for Key in ["checked_when", "disabled_when", "platforms"] {
-		AssertEqual(Corpus["row"][Key].Length, Row[Key].Length)
-		for Index, Value in Corpus["row"][Key]
-			AssertEqual(Value, Row[Key][Index])
-	}
-	AssertFalse(_MR_IsForAhk(Row), "Windows must not publish a Lua preview mutation owner")
-	AssertEqual("grey", Row["unavailable"])
-	Assert(t(Row["reason_key"]) != Row["reason_key"], "the native unavailable reason is translated")
+	_HSDT_AssertPreviewRowIsLive(Corpus["section"], Rows[1], Corpus["row"])
 }
-Test("preview coloured checkbox: shared declaration keeps Windows capability truthful",
+Test("preview coloured checkbox: shared declaration is live on Windows (PAR-24)",
 	_HSDT_ColoredPreviewDeclaredCapability)
 
 
-Test("Magic preview: shared checkbox remains truthfully unavailable on Windows", _HSDT_DeclaredMagicPreviewUnavailable)
+Test("Magic preview: shared checkbox is live on Windows (PAR-24)", _HSDT_DeclaredMagicPreviewLive)
 
-_HSDT_DeclaredMagicPreviewUnavailable() {
+_HSDT_DeclaredMagicPreviewLive() {
 	global _SharedDir
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\preview_magic_control.json"))
 	Definition := _MR_GetManifestRoot()[Corpus["section"]]
 	AssertEqual(1, Definition.Length, "The presence command has one authoritative row.")
 	Row := Definition[1]
 	AssertEqual("check", Row["type"], "The shared declaration owns the checkbox type.")
-	AssertEqual(Corpus["row"]["id"], Row["id"], "The real flag identity is preserved.")
-	AssertEqual(Corpus["row"]["i18n"], Row["i18n"], "All platforms use the canonical existing key.")
-	AssertEqual(Corpus["unavailable"]["mode"], Row["unavailable"], "Unsupported Windows previews remain grey.")
-	AssertEqual(Corpus["unavailable"]["reason"], Row["reason_key"], "The actual Lua-only reason stays shared.")
-	Called := Map("count", 0)
-	Commands := Map(Row["id"], (*) => Called["count"] += 1)
-	Getters := Map("hotstrings.preview_star_enabled", (*) => true, "preview_magic_ready", (*) => true)
-	Native := MenuRenderer_CheckRow(Corpus["section"], Row["id"], Commands, Getters)
-	AssertFalse(Native is Map, "The real provider refuses to acquire unsupported native work.")
-	_HSDT_AssertDrawnUnsupportedPreview(Corpus["section"], 0, 1, Row,
-		Corpus["unavailable"]["reason"], Commands, Getters, Called)
-	AssertEqual(0, Called["count"], "Unsupported native work never executes.")
+	_HSDT_AssertPreviewRowIsLive(Corpus["section"], Row, Corpus["row"])
 }
 
 
-Test("Autocorrection and AI previews: shared ordered checkboxes preserve Windows capability", _HSDT_DeclaredPresencePreviewUnavailable)
+Test("Autocorrection and AI previews: shared ordered checkboxes are live on Windows (PAR-24)", _HSDT_DeclaredPresencePreviewLive)
 
-_HSDT_DeclaredPresencePreviewUnavailable() {
+_HSDT_DeclaredPresencePreviewLive() {
 	global _SharedDir
 	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\preview_presence_controls.json"))
 	Definition := _MR_GetManifestRoot()[Corpus["section"]]
 	AssertEqual(2, Definition.Length, "The two historical presence flags are declared together.")
-	for Index, Row in Definition {
-		Expected := Corpus["rows"][Index]
-		for Key in ["id", "type", "i18n", "unavailable", "reason_key"]
-			AssertEqual(Expected[Key], Row[Key], "The ordered checkbox identity and canonical caption stay shared.")
-		for Key in ["checked_when", "disabled_when", "platforms"] {
-			AssertEqual(Expected[Key].Length, Row[Key].Length)
-			for ValueIndex, Value in Expected[Key]
-				AssertEqual(Value, Row[Key][ValueIndex])
-		}
-		AssertFalse(_MR_IsForAhk(Row), "Windows still has no native preview bubble owner.")
-		Called := Map("count", 0)
-		Commands := Map(Row["id"], (*) => Called["count"] += 1)
-		Getters := Map("hotstrings." . Row["id"], (*) => true, "preview_presence_ready", (*) => true)
-		Native := MenuRenderer_CheckRow(Corpus["section"], Row["id"], Commands, Getters)
-		AssertFalse(Native is Map, "Unsupported native work cannot be acquired.")
-		_HSDT_AssertDrawnUnsupportedPreview(Corpus["section"], Index - 1, 2, Row,
-			Expected["reason_key"], Commands, Getters, Called)
-		AssertEqual(0, Called["count"], "Unsupported native work never executes.")
-		Assert(t(Row["reason_key"]) != Row["reason_key"], "The existing capability reason is translated.")
-	}
-}
-
-; Read the actual unsupported branch, which renders before command admission.
-_HSDT_AssertDrawnUnsupportedPreview(Section, Position, Count, Row, Reason, Commands, Getters, Called) {
-	global _MenuDispatchCallbacks
-	Built := MenuRenderer_Build(Section, "Hotstrings", Map(), Map(), Map(), Commands, Getters)
-	try {
-		Assert(Built is Menu, "The public renderer supplies the actual grey stand-in menu.")
-		AssertEqual(Count, TrayMenuItemCount(Built), "Every declared unsupported row is drawn exactly once.")
-		ReasonText := t(Reason)
-		Assert(ReasonText != Reason, "The actual capability reason is translated.")
-		Head := Trim(RegExReplace(ReasonText, "[:：].*$", ""))
-		Assert(Head != "", "The stand-in retains a nonempty translated reason.")
-		ExpectedLabel := t(Row["i18n"]) . " — " . Head
-		AssertEqual(ExpectedLabel, _HSDT_NativePreviewLabelAt(Built, Position),
-			"The drawn caption includes the actual canonical label and translated reason.")
-		Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
-		Assert(Flags != 0xFFFFFFFF, "The actual native row must exist.")
-		; GetMenuState packs submenu counts above the low byte; only native state flags belong here.
-		Assert((Flags & 0xFF & 0x3) != 0, "The stand-in is natively disabled.")
-		AssertEqual(0, DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr"),
-			"The unsupported preview is a leaf, not a borrowed native submenu.")
-		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
-		Assert(Id != 0xFFFFFFFF, "The actual native leaf has an item identity.")
-		AssertFalse(_MenuDispatchCallbacks.Has(Id), "The stand-in has no native mutation callback.")
-		AssertEqual(0, Called["count"], "Drawing unsupported native work never executes its supplied command.")
-	} finally {
-		Built.Delete()
-		MenuDispatcher_PruneMenu(Built)
-	}
+	for Index, Row in Definition
+		_HSDT_AssertPreviewRowIsLive(Corpus["section"], Row, Corpus["rows"][Index])
 }
 
 _HSDT_NativePreviewLabelAt(TargetMenu, Position) {

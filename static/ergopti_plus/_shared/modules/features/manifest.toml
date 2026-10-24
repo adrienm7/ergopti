@@ -402,6 +402,10 @@ input_altering = true
 type = "boolean"
 description_key = "menu.hotstrings"
 platforms = ["hs", "linux"]
+# Windows keeps the same master as category_enabled.dynamichotstrings (the
+# per-driver file_path of the hotstring categories), so a second key there would
+# be a second master for one switch.
+reason_key = "platform_reason.dynamic_master_is_category_switch_on_windows"
 
 [[features.hotstrings]]
 id = "trigger_char"
@@ -555,8 +559,7 @@ description_key = "menu.hotstrings.expansion_delay"
 
 [[features.hotstrings]]
 id = "preview_ai_enabled"
-platforms = ["hs", "linux"]
-default = false
+default = true
 recommended = true
 input_altering = true
 type = "boolean"
@@ -564,8 +567,7 @@ description_key = "menu.hotstrings.preview_ai_enabled"
 
 [[features.hotstrings]]
 id = "preview_autocorrect_enabled"
-platforms = ["hs", "linux"]
-default = false
+default = true
 recommended = true
 input_altering = true
 type = "boolean"
@@ -573,8 +575,7 @@ description_key = "menu.hotstrings.preview_autocorrect_enabled"
 
 [[features.hotstrings]]
 id = "preview_colored_tooltips"
-platforms = ["hs", "linux"]
-default = false
+default = true
 recommended = true
 input_altering = true
 type = "boolean"
@@ -582,12 +583,11 @@ description_key = "menu.hotstrings.preview_colored_tooltips"
 
 [[features.hotstrings]]
 id = "preview_star_enabled"
-default = false
+default = true
 recommended = true
 input_altering = true
 type = "boolean"
 description_key = "menu.hotstrings.preview_star_enabled"
-platforms = ["hs", "linux"]
 
 
 
@@ -6245,11 +6245,11 @@ id = "magic_key_config"
 # its four switches and nothing ever called set_enabled, leaving them stuck at
 # their load-time value for the life of the process.
 #
-# Restricted to the two Lua drivers because the AHK tooltip is a different
-# surface with its own controls, not because Windows is behind.
+# On all three drivers since 2026-10-24: Windows classifies each preview candidate
+# into the star, autocorrect and AI families and honours the same four switches
+# (PAR-24), so the rows carry no platform restriction and no reason.
 [[menu.hotstrings_params_group]]
 type = "---"
-platforms = ["hs", "linux"]
 
 # `list` since 2026-08-07. The row and the toggles under it are the same on both
 # Lua drivers — the same four switches, the same separator before the one that
@@ -6259,8 +6259,6 @@ platforms = ["hs", "linux"]
 [[menu.hotstrings_params_group]]
 type = "list"
 id = "preview_bubbles"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
 # Preview checkbox declarations retain the existing presence/style positions.
 [[menu.preview_colored_control]]
@@ -6269,9 +6267,6 @@ id = "preview_colored_tooltips"
 i18n = "menu.hotstrings.tooltip_colored"
 checked_when = ["hotstrings.preview_colored_tooltips"]
 disabled_when = ["preview_colored_ready"]
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
 # Preview presence keeps its existing position; native ports supply only the
 # current flag and the acknowledged toggle owner.
@@ -6281,9 +6276,6 @@ id = "preview_star_enabled"
 i18n = "menu.hotstrings.tooltip_magic"
 checked_when = ["hotstrings.preview_star_enabled"]
 disabled_when = ["preview_magic_ready"]
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
 # Autocorrection and AI presence share one ordered checkbox declaration.
 # Native ports provide only current flags and acknowledged mutation owners.
@@ -6293,9 +6285,6 @@ id = "preview_autocorrect_enabled"
 i18n = "menu.hotstrings.tooltip_autocorrect"
 checked_when = ["hotstrings.preview_autocorrect_enabled"]
 disabled_when = ["preview_presence_ready"]
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
 [[menu.preview_presence_controls]]
 type = "check"
@@ -6303,9 +6292,6 @@ id = "preview_ai_enabled"
 i18n = "menu.hotstrings.tooltip_ai"
 checked_when = ["hotstrings.preview_ai_enabled"]
 disabled_when = ["preview_presence_ready"]
-platforms = ["hs", "linux"]
-unavailable = "grey"
-reason_key = "platform_reason.preview_bubbles_are_lua_previews"
 
 # Unrestricted with the feature above, and for the same reason: macOS built this
 # row by hand while the manifest said it was Windows-only, which is why the
@@ -7119,16 +7105,9 @@ checklist = "hotstrings"
 file_path = { ahk = "category_enabled.{group}", hs = "hotstrings.groups.{stem}", linux = "hotstrings.groups.{stem}" }
 section_path = { ahk = "hotstrings.{group}.{section}.enabled", hs = "hotstrings.modules.{stem}.{section}", linux = "hotstrings.modules.{stem}.{section}" }
 neutral_label_key = "onboarding.hotstrings.all_languages"
-# The preview bubbles only show what a hotstring will type. The neutral defaults
-# leave them off and the groups above never import them, so every fresh
-# configuration showed no bubble at all. The AI bubble stays out, as it does
-# from the menu's restore (restore_exclude): its backend is not chosen yet.
-settings_label_key = "menu.hotstrings.preview_bubbles"
-
-[onboarding.pages.hotstrings.settings]
-"hotstrings.preview_star_enabled" = "menu.hotstrings.tooltip_magic"
-"hotstrings.preview_autocorrect_enabled" = "menu.hotstrings.tooltip_autocorrect"
-"hotstrings.preview_colored_tooltips" = "menu.hotstrings.tooltip_colored"
+# The preview bubbles ship on (default and recommended, since 2026-10-24), so the
+# wizard has no preview setting to offer: a setting that recommends its neutral
+# default is refused by the onboarding generator.
 
 [onboarding.pages.hotstrings.magic_key]
 path = "hotstrings.trigger_char"
@@ -7901,25 +7880,17 @@ id = "parameter_custom_entries"
 [[menu.hotstrings_preview_frame]]
 type = "list"
 id = "parameter_preview_magic"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.hotstrings_preview_frame]]
 type = "list"
 id = "parameter_preview_presence"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.hotstrings_preview_frame]]
 type = "---"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.hotstrings_preview_frame]]
 type = "list"
 id = "parameter_preview_colored"
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.hotstrings_delays_frame]]
 type = "list"
@@ -8002,8 +7973,6 @@ type = "group"
 id = "parameter_preview_children"
 i18n = "menu.hotstrings.preview_bubbles"
 disabled_when = ["parameter_parent_ready"]
-platforms = ["hs", "linux"]
-unavailable = "hide"
 
 [[menu.hotstrings_delays_parent]]
 type = "group"

@@ -15,10 +15,9 @@
  *    timestamp owner, after verifying its control and before feeding the
  *    engine, and that owner loads with the engine rather than with the layout
  *    emulation.
- * 2. On the drivers that have preview switches (macOS, Linux), the switches
- *    start off (W1) and the recommended import turns them on: the first-run
- *    wizard offers them and « Restaurer les valeurs conseillées » restores
- *    them, the AI bubble excepted (consent).
+ * 2. The preview switches exist on all three drivers and ship on (PAR-24); the
+ *    bubble shows on a fresh configuration, and « Restaurer les valeurs
+ *    conseillées » restores them, the AI bubble excepted (consent).
  * 3. The AHK regression test is registered in run_all.ahk.
  *
  * ROOT CAUSE ENCODED:
@@ -161,33 +160,34 @@ check(
 	`the layout emulation's UpdateLastSentCharacter must stamp through the same owner, ${OWNER}`
 );
 
-// 2. Where preview switches exist, the recommended import turns them on.
+// 2. The preview switches exist on all three drivers (PAR-24) and ship on, so the
+// bubble shows on a fresh configuration without any import.
 const manifest = TOML.parse(
 	read(path.join(PLUS, '_shared', 'modules', 'features', 'manifest.toml'))
 );
 const previews = manifest.features.hotstrings.filter((entry) => /^preview_/.test(entry.id));
-check(previews.length > 0, 'the manifest must declare the hotstring preview switches');
+check(previews.length === 4, 'the manifest must declare the four hotstring preview switches');
 const wizard = manifest.onboarding.pages.hotstrings.settings || {};
 const scope = manifest.scopes.hotstrings;
 for (const entry of previews) {
 	const key = `hotstrings.${entry.id}`;
 	const consent = entry.id === 'preview_ai_enabled';
-	check(entry.default === false, `${key} must start off: W1 makes every preview feature neutral`);
+	check(entry.default === true, `${key} must ship on, on every driver`);
+	check(entry.recommended === true, `${key} must be recommended on`);
 	check(
-		entry.recommended === true,
-		`${key} must be recommended on, or no import can show the bubble`
+		entry.platforms === undefined ||
+			['ahk', 'hs', 'linux'].every((platform) => entry.platforms.includes(platform)),
+		`${key} must be offered by all three drivers: Windows has the switches since PAR-24`
 	);
 	check(
-		scope.prefixes.includes('hotstrings') && scope.restore_exclude.includes(key) === consent,
+		scope.restore_exclude.includes(key) === consent,
 		consent
-			? `${key} must stay out of « Restaurer les valeurs conseillées »: AI consent is never restored`
-			: `« Restaurer les valeurs conseillées » must turn ${key} on`
+			? `${key} must stay out of the restore of recommended values: AI consent is never restored`
+			: `the restore of recommended values must turn ${key} on`
 	);
 	check(
-		Object.prototype.hasOwnProperty.call(wizard, key) !== consent,
-		consent
-			? `${key} must stay out of the first-run wizard's hotstrings settings: its backend is not chosen yet`
-			: `the first-run wizard's hotstrings page must offer ${key}`
+		!Object.prototype.hasOwnProperty.call(wizard, key),
+		`the first-run wizard must not offer ${key}: it ships on, and the generator refuses a setting that recommends its neutral default`
 	);
 }
 

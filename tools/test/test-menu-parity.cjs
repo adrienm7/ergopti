@@ -838,22 +838,24 @@ const OPENS_SUBMENU = {
 			}
 		}
 	],
-	// Both Lua preview providers consume the same declared coloured checkbox.
+	// All three preview providers consume the same declared checkboxes (PAR-24).
 	preview_bubbles: [
 		{
 			menu: 'hotstrings_preview_parent',
-			platforms: ['hs', 'linux'],
+			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
 				linux: 'linux/ui/menu/menu_builder.lua'
 			}
 		},
 		{
 			menu: 'hotstrings_preview_frame',
-			platforms: ['hs', 'linux'],
+			platforms: ['ahk', 'hs', 'linux'],
 			kind: 'compose',
 			native_sources: {
+				ahk: 'windows/ui/menu/menu_hotstrings.ahk',
 				hs: 'macos/ui/menu/menu_hotstrings_management.lua',
 				linux: 'linux/ui/menu/menu_builder.lua'
 			}
