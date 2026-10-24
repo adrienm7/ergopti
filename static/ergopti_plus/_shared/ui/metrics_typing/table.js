@@ -1123,10 +1123,10 @@ function render_kc_heatmap(kc_data_arr) {
 			126: '↑',
 			76: '↵'
 		};
-		const SHORT_LABELS =
-			window.driver_meta && (window.driver_meta.os === 'win' || window.driver_meta.os === 'linux')
-				? SHORT_LABELS_WIN
-				: SHORT_LABELS_MAC;
+		// heatmap_win.js owns which recording OSes use PC scan codes.
+		const SHORT_LABELS = is_pc_scancode_driver(window.driver_meta)
+			? SHORT_LABELS_WIN
+			: SHORT_LABELS_MAC;
 		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
 		// at font_size 9; longer ones get the ellipsis fallback.
 		let label_disp;
@@ -1521,10 +1521,10 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		126: '↑',
 		76: '⏎'
 	};
-	const SHORT_LABELS =
-		window.driver_meta && (window.driver_meta.os === 'win' || window.driver_meta.os === 'linux')
-			? SHORT_LABELS_WIN
-			: SHORT_LABELS_MAC;
+	// heatmap_win.js owns which recording OSes use PC scan codes.
+	const SHORT_LABELS = is_pc_scancode_driver(window.driver_meta)
+		? SHORT_LABELS_WIN
+		: SHORT_LABELS_MAC;
 
 	let rects = '';
 	let labels = '';
