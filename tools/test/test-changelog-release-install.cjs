@@ -89,7 +89,7 @@ function fill(key, values) {
 function openPage(globals) {
 	const page = runPage({
 		_i18n_strings: EN,
-		__ergopti_host: 'linux',
+		__ergopti_host_capabilities: { document_bridge: true },
 		__subscribed_channel: LEAST_STABLE,
 		...globals
 	});
@@ -366,7 +366,7 @@ const FEED = [
 function openFeedPage(globals) {
 	const page = runPage({
 		_i18n_strings: EN,
-		__ergopti_host: 'linux',
+		__ergopti_host_capabilities: { document_bridge: true },
 		__subscribed_channel: LEAST_STABLE,
 		...globals
 	});

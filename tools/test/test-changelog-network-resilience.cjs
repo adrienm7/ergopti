@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { installHostCapabilities } = require('./support/host-capabilities.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PLUS = path.join(ROOT, 'static', 'ergopti_plus');
@@ -199,8 +200,9 @@ function runPage(options) {
 	};
 	sandbox.window = sandbox;
 	if (options.host === 'windows') sandbox.chrome = { webview: { postMessage() {} } };
-	if (options.host === 'linux') sandbox.__ergopti_host = 'linux';
+	if (options.host === 'linux') sandbox.__ergopti_host_capabilities = { document_bridge: true };
 	vm.createContext(sandbox);
+	installHostCapabilities(sandbox);
 	for (const src of pageScripts()) {
 		const file = path.resolve(CHANGELOG, src);
 		if (['host_bridge.js', 'i18n.js'].includes(path.basename(file))) continue;

@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { installHostCapabilities } = require('./support/host-capabilities.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED_CHANGELOG = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'changelog');
@@ -162,8 +163,9 @@ function checkLinuxProtocol() {
 		clearTimeout() {}
 	};
 	sandbox.window = sandbox;
-	sandbox.__ergopti_host = 'linux';
+	sandbox.__ergopti_host_capabilities = { document_bridge: true };
 	vm.createContext(sandbox);
+	installHostCapabilities(sandbox);
 	// Every local script, in document order: a page module the harness forgot
 	// to load would otherwise surface as a ReferenceError unrelated to Linux.
 	for (const src of pageScripts()) {

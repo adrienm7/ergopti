@@ -71,7 +71,11 @@ function withChannel(key, id) {
  * @param {Object} globals - Host seeds (subscription, restart flag).
  */
 function openPage(globals) {
-	const page = runPage({ _i18n_strings: EN, __ergopti_host: 'linux', ...globals });
+	const page = runPage({
+		_i18n_strings: EN,
+		__ergopti_host_capabilities: { document_bridge: true },
+		...globals
+	});
 	const el = (id) => page.document.getElementById(id);
 	return {
 		...page,

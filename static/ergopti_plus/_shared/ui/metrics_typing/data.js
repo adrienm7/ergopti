@@ -3436,7 +3436,10 @@ function request_cache_reset() {
 		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
 		return;
 	}
-	if (window.__ergopti_host === 'linux' && window.webkit?.messageHandlers?.metrics_typing_bridge) {
+	if (
+		hostHasCapability('document_bridge') &&
+		window.webkit?.messageHandlers?.metrics_typing_bridge
+	) {
 		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
 		return;
 	}
@@ -3594,7 +3597,7 @@ function request_range_data(show_loader = true) {
 		// Send the selected range directly so date/app changes refresh the
 		// n-gram tables instead of leaving the initial prefetch on screen.
 		if (
-			window.__ergopti_host === 'linux' &&
+			hostHasCapability('document_bridge') &&
 			window.webkit?.messageHandlers?.metrics_typing_bridge
 		) {
 			try {
