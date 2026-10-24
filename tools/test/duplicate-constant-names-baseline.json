@@ -1,0 +1,198 @@
+{
+	"_comment": "Constant names declared in more than one production file (tools/test/test-duplicate-constant-names.cjs). Shrink it with --update-baseline as copies move to the timing registry or one defining module; never add to it.",
+	"BOOT_SUPPRESS_SEC": {
+		"files": ["macos/infra/file_watchers.lua", "macos/ui/menu/init.lua"],
+		"divergent": false
+	},
+	"CHUNK_BYTES": {
+		"files": [
+			"windows/modules/keystats/keystats_reader_db.ahk",
+			"windows/modules/keystats/keystats_reader_rebuild.ahk"
+		],
+		"divergent": false
+	},
+	"COMMAND_TIMEOUT": {
+		"files": ["macos/adapters/runtime_owner_ports.lua", "macos/infra/field_check_checks.lua"],
+		"divergent": false
+	},
+	"COPY_SETTLE_SEC": {
+		"files": [
+			"macos/modules/shortcuts/actions/apps.lua",
+			"macos/modules/shortcuts/actions/text.lua"
+		],
+		"divergent": false
+	},
+	"DEFAULT_INTERVAL_SEC": {
+		"files": ["linux/modules/updater/manager.lua", "macos/infra/phase_stats.lua"],
+		"divergent": false
+	},
+	"DEFAULT_MAX_OUTPUT_BYTES": {
+		"files": ["linux/adapters/owned_process.lua", "linux/adapters/process_runner.lua"],
+		"divergent": false
+	},
+	"DEFAULT_TIMEOUT_DECREMENT_SEC": {
+		"files": ["_shared/modules/tooltip/dequeue.js", "macos/ui/tooltip/dequeue.lua"],
+		"divergent": false
+	},
+	"DEFAULT_TIMEOUT_FLOOR_SEC": {
+		"files": ["_shared/modules/tooltip/dequeue.js", "macos/ui/tooltip/dequeue.lua"],
+		"divergent": false
+	},
+	"DEFAULT_TIMEOUT_MS": {
+		"files": [
+			"linux/adapters/curl_http_client.lua",
+			"linux/adapters/file_digest.lua",
+			"linux/adapters/process_runner.lua",
+			"macos/adapters/http_client.lua"
+		],
+		"divergent": false
+	},
+	"HEADER_BYTES": {
+		"files": ["macos/adapters/native_python_probe.lua", "macos/adapters/python_interpreter.lua"],
+		"divergent": false
+	},
+	"LONG_SESSION_THRESHOLD_MS": {
+		"files": [
+			"_shared/ui/metrics_apps/script.js",
+			"_shared/ui/metrics_apps/state.js",
+			"_shared/ui/metrics_typing/data.js"
+		],
+		"divergent": false
+	},
+	"MAX_BODY_BYTES": {
+		"files": ["_shared/lua/updater/list_cache.lua", "linux/adapters/network_check_ports.lua"],
+		"divergent": true
+	},
+	"MAX_BYTES": {
+		"files": [
+			"_shared/lua/network/pac_check.lua",
+			"linux/adapters/atspi_focus_watch.lua",
+			"windows/infra/config_registry_cache.ahk"
+		],
+		"divergent": true
+	},
+	"MAX_FRAME_BYTES": {
+		"files": [
+			"macos/modules/llm/opaque_network_admission.lua",
+			"windows/modules/keystats/keystats_reader_rebuild.ahk"
+		],
+		"divergent": false
+	},
+	"MAX_SOURCE_BYTES": {
+		"files": [
+			"linux/ui/changelog/bridge.lua",
+			"macos/adapters/input_source_selector.lua",
+			"macos/adapters/keyboard_source_probe.lua"
+		],
+		"divergent": true
+	},
+	"MAX_TEXT_BYTES": {
+		"files": ["_shared/lua/keymap/layer_editor.lua", "_shared/lua/layout/number_row_native.lua"],
+		"divergent": true
+	},
+	"MICRO_IDLE_TIMEOUT_MS": {
+		"files": [
+			"macos/modules/keystats/init.lua",
+			"macos/modules/keystats/watchers.lua",
+			"windows/modules/keystats/keystats_watchers.ahk"
+		],
+		"divergent": false
+	},
+	"MS_PER_SEC": {
+		"files": [
+			"linux/infra/timings.lua",
+			"linux/ui/hotstrings_config_window/bridge.lua",
+			"linux/ui/menu/menu_builder.lua",
+			"macos/adapters/http_client.lua",
+			"macos/infra/timings.lua",
+			"macos/modules/updater/auto_check.lua"
+		],
+		"divergent": false
+	},
+	"NS_PER_MS": {
+		"files": [
+			"linux/infra/monotonic.lua",
+			"macos/adapters/event_clock.lua",
+			"macos/infra/boot_profiler.lua",
+			"macos/infra/hotpath_profiler.lua",
+			"macos/infra/key_event_health.lua",
+			"macos/infra/keystroke_integrity.lua",
+			"macos/infra/phase_stats.lua"
+		],
+		"divergent": false
+	},
+	"POLL_INTERVAL_SEC": {
+		"files": ["macos/infra/ui_restore.lua", "macos/platform/remap/onboarding.lua"],
+		"divergent": false
+	},
+	"PUMP_INTERVAL_SEC": {
+		"files": ["macos/adapters/installed_physical_source.lua", "macos/adapters/log_transport.lua"],
+		"divergent": true
+	},
+	"REQUEST_TIMEOUT_MS": {
+		"files": ["linux/adapters/network_check_ports.lua", "macos/modules/llm/api_remote.lua"],
+		"divergent": false
+	},
+	"RESTORE_DELAY_SEC": {
+		"files": ["macos/infra/ui_restore.lua", "macos/modules/shortcuts/actions/text.lua"],
+		"divergent": false
+	},
+	"SESSION_TIMEOUT_MS": {
+		"files": [
+			"linux/modules/keystats/metrics_collector.lua",
+			"macos/modules/keystats/init.lua",
+			"macos/modules/keystats/watchers.lua",
+			"windows/modules/keystats/keystats_watchers.ahk"
+		],
+		"divergent": false
+	},
+	"STALE_TEMP_MS": {
+		"files": [
+			"windows/infra/hotstrings/hotstrings_io.ahk",
+			"windows/infra/hotstrings/personal_toml_io.ahk",
+			"windows/infra/toml/toml_helpers.ahk",
+			"windows/modules/keystats/keystats.ahk",
+			"windows/modules/keystats/keystats_prefetch.ahk"
+		],
+		"divergent": false
+	},
+	"STREAM_TMPFILE_CLEANUP_SEC": {
+		"files": ["macos/modules/llm/api_mlx_inference.lua", "macos/modules/llm/api_ollama.lua"],
+		"divergent": false
+	},
+	"TAP_WATCHDOG_INTERVAL_SEC": {
+		"files": ["macos/modules/keystats/init.lua", "macos/modules/shortcuts/script_control.lua"],
+		"divergent": true
+	},
+	"THINK_PAUSE_MS": {
+		"files": [
+			"windows/modules/keystats/keystats_constants.ahk",
+			"windows/modules/keystats/keystats_walker_core.ahk"
+		],
+		"divergent": false
+	},
+	"UINT64_MAX": {
+		"files": [
+			"macos/modules/keystats/physical_clock.lua",
+			"macos/modules/keystats/physical_wire.lua"
+		],
+		"divergent": false
+	},
+	"UI_PAUSE_BUCKETS_MS": {
+		"files": [
+			"_shared/lua/keystats/aggregator_helpers.lua",
+			"_shared/ui/metrics_typing/state.js",
+			"macos/modules/keystats/aggregator/core.lua",
+			"windows/modules/keystats/keystats_walker_core.ahk"
+		],
+		"divergent": false
+	},
+	"WARMUP_RESUME_COMMIT_DELAY_SEC": {
+		"files": ["macos/modules/llm/api_ollama.lua", "macos/modules/llm/api_remote.lua"],
+		"divergent": false
+	},
+	"WINDOW_MS": {
+		"files": ["windows/adapters/shell_runner.ahk", "windows/ui/wpm/wpm_display.ahk"],
+		"divergent": false
+	}
+}
