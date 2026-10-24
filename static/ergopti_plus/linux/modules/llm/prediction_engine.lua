@@ -1204,7 +1204,8 @@ function M.on_pause_change(paused)
 	local retired = not paused or stop_runtime_app()
 	_enable_generation = _enable_generation + 1
 	if _enable_admission then _enable_admission.cancel() end
-	if paused then M.stop_live("Ergopti+ paused", false) end
+	if paused then M.stop_live("Ergopti+ paused", false)
+	else require("modules.llm.warmup").schedule("resume") end
 	return retired
 end
 
@@ -3108,8 +3109,10 @@ stop_runtime_app = function()
 		and profiles.cancel_model_inventory == Collision.inventory.cancel and type(Collision.inventory.cancel) == "function"
 		and Collision.inventory.cancel() == true
 	local retired = retire_runtime_request()
+	-- The warmup loads the model into the service this stop ends or pauses.
+	local warmup_closed = require("modules.llm.warmup").stop()
 	local stopped = not owner or owner.controller:stop_app() == true
-	return inventory_closed and retired and stopped and _runtime_owner == owner
+	return inventory_closed and retired and warmup_closed and stopped and _runtime_owner == owner
 		and (not owner or not owner.controller:has_debt())
 end
 --- Stops only this app's Ollama service for pause, scope or app shutdown.
@@ -3223,6 +3226,7 @@ local function runtime_owner()
 		if paused or _runtime_closed or _scope_owner or _enabled or revision ~= _enable_generation
 			or app_epoch ~= _runtime_app_epoch then return false end
 		_enabled = true
+		require("modules.llm.warmup").schedule("local runtime")
 		return true
 	end
 	--- Restores only the originating native gate after conditional profile compensation.
@@ -3291,6 +3295,7 @@ function M.enable(on_changed)
 			end
 			_enabled = true
 			Logger.info(LOG, "Prediction engine enabled after current admission.")
+			require("modules.llm.warmup").schedule("enable")
 			return true
 		end,
 		reject = function(origin, _, _, captured, current, cleanup_only)
@@ -3564,6 +3569,7 @@ function M.set_backend(kind, admit)
 	if require("infra.llm_preferences").set_many({ [BACKEND_KEY] = kind }, nil, current) ~= true
 		or not current() then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
+	require("modules.llm.warmup").schedule("backend selected")
 	return true
 end
 
@@ -3685,6 +3691,26 @@ function M.resolve_backend()
 	return backend_target(false)
 end
 
+--- The Ollama origin and model a warmup would load now, or nil when the AI is
+--- off, paused, reconfiguring or answered by an API entry.
+--- @return table|nil target { origin, model, receipt }
+function M.warmup_target()
+	if _runtime_closed or _scope_owner or not _enabled or _is_paused() or M.get_backend() ~= "ollama" then return nil end
+	local ollama, origin, model, receipt = backend_target(true)
+	if not ollama or type(origin) ~= "string" or origin == "" or type(model) ~= "string" or model == "" then return nil end
+	return { origin = origin, model = model, receipt = receipt }
+end
+
+--- Sends one model load request for a warmup target.
+--- @param target table From warmup_target().
+--- @param on_done function Receives (loaded, failure).
+--- @return table|nil operation Owned transport, nil when Ollama's module is unavailable.
+function M.warmup_request(target, on_done)
+	local ollama = get_ollama()
+	if not ollama then return nil end
+	return ollama.warmup(target.origin, target.model, target.receipt, on_done)
+end
+
 --- The model the next prediction goes to, whichever backend serves it. The
 --- menu resolves the automatic profile against it: resolving against the
 --- Ollama model while an API answered showed one profile and used another.
@@ -3724,8 +3750,10 @@ function M.set_model(model_name)
 	end
 	local _, source = require("infra.llm_preferences").get_many({ "llm.models.ollama" })
 	local profiles = get_profiles()
-	return current() and profiles and type(profiles.set_model) == "function"
+	local selected = current() and profiles and type(profiles.set_model) == "function"
 		and profiles.set_model(model_name, source, current) == true and current() or false
+	if selected then require("modules.llm.warmup").schedule("model selected") end
+	return selected
 end
 
 function M.refresh_models()
