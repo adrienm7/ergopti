@@ -481,6 +481,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-log-vocabulary-scan.cjs"],
 			"repro": "npm run test:log-vocabulary-scan"
+		},
+		{
+			"id": "js-0468",
+			"ordinal": 472,
+			"name": "no hard-coded UI strings at display calls on any surface (baseline only shrinks)",
+			"cmd": "node",
+			"args": ["tools/test/test-no-hardcoded-ui-strings.cjs"],
+			"repro": "npm run test:no-hardcoded-ui-strings"
 		}
 	]
 }
