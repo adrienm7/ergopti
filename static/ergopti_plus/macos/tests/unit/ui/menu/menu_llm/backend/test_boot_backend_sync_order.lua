@@ -63,7 +63,7 @@ helpers.describe("set_llm_model resolves the backend at call time (not capture t
 		-- Selected by a declaration unique to modules/llm/prediction_engine.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function compute_adaptive_debounce")
+		local src = helpers.read_driver_source("local function start_inactivity_timer")
 		helpers.assert_true(src ~= nil, "modules/llm/prediction_engine.lua source must be locatable")
 
 		local fn_start = src:find("function M.set_llm_model(model_name)", 1, true)
