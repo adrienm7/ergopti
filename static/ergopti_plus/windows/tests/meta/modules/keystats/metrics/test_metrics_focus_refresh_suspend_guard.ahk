@@ -289,6 +289,12 @@ _MFS_ReadRefreshesOnlyWhenEventsDriveTheCache() {
 		MF_GetFocusSnapshot()
 		AssertEqual(Before + 1, Counts.Get("metrics.focus_read_refresh", 0),
 			"event mode re-checks a snapshot whose window is no longer the foreground")
+		MetricsFocusCache.state := {valid: false, last_at: A_TickCount, hwnd: 0, process_name: "", title: "",
+			class: "", failure_reason: "process_unavailable", timed_out: false}
+		Mid := Counts.Get("metrics.focus_read_refresh", 0)
+		MF_GetFocusSnapshot()
+		AssertEqual(Mid, Counts.Get("metrics.focus_read_refresh", 0),
+			"an invalid snapshot is already fail-closed and is not re-probed on every read")
 	}
 	_MFS_WithEventState(_Body)
 }
