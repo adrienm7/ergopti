@@ -35,7 +35,15 @@
 --- 7. Privacy admission. Canonical rules and the captured account identity are
 ---    admitted before output. A missing policy or identity refuses startup;
 ---    directory/write failure still degrades to redacted stdout, never raw text.
---- 8. The logger boot. install() is also where this driver arms the core's
+--- 8. Topical fan-out. A line that matches a pattern of _generated/
+---    logger_sub_files.lua (declared once in _shared/modules/logger/sub_files.toml
+---    for all three drivers) is also appended to that topic's file, so "what did
+---    the hotstrings do?" opens ErgoptiPlus_hotstrings.log here exactly as on the
+---    other two drivers. Topical files carry no date in their name; like macOS,
+---    the first write of a new day truncates one whose first line is from an
+---    earlier day. A refusing topical handle is retired for the day and reported
+---    once, and never starves the main file.
+--- 9. The logger boot. install() is also where this driver arms the core's
 ---    repeat collapsing (logger SPEC § 4.2), once; the daemon's periodic callback
 ---    and exit paths own its flushes.
 --- ==============================================================================
@@ -58,6 +66,10 @@ local M = {}
 local AppDirs = require("app_dirs")
 local Redact = require("diagnostics.redact")
 local Json = require("json")
+
+--- Topical routing table generated from _shared/modules/logger/sub_files.toml:
+--- an array of { name = "<file name>", patterns = { ... } }.
+local SUB_FILES = require("_generated.logger_sub_files")
 
 --- Basename prefixes for the two files. The date suffix is the day the line was
 --- written, not the day the daemon started, so a long-running daemon rolls over.
@@ -110,6 +122,11 @@ local _date = nil
 --- Open append handles. Either may be nil after an I/O failure.
 local _main_handle   = nil
 local _errors_handle = nil
+
+--- Open topical append handles keyed by file name. `false` marks a topic whose
+--- handle was refused today: it stays retired until the next rollover, repoint
+--- or reinstall instead of failing again on every line.
+local _topical = {}
 
 --- True once M.install() has wired the sink into the shared core.
 local _installed = false
@@ -242,12 +259,41 @@ local function close_handles()
 	_errors_handle = nil
 end
 
+--- Closes every topical handle and forgets retirements, so the next matching
+--- line decides afresh whether its file starts a new day.
+local function close_topical()
+	for _, handle in pairs(_topical) do
+		if handle then pcall(function() handle:close() end) end
+	end
+	_topical = {}
+end
+
+--- io.open mode for a topical file: "a" when it is absent, empty or already
+--- carries today's lines, "w" when its first line is from an earlier day. Topical
+--- files have no date in their name, so this is what rotates them daily. An
+--- unparsable first line is kept ("a"): a stale line is recoverable, a deleted
+--- one is not.
+--- @param path string Absolute topical file path.
+--- @param date string "YYYY-MM-DD" of the line about to be written.
+--- @return string "a" or "w".
+local function topical_mode(path, date)
+	local handle = io.open(path, "r")
+	if not handle then return "a" end
+	local ok, first = pcall(handle.read, handle, "*l")
+	pcall(handle.close, handle)
+	if not ok or type(first) ~= "string" then return "a" end
+	local stamp = first:match("^(%d%d%d%d%-%d%d%-%d%d) ")
+	if stamp and stamp ~= date then return "w" end
+	return "a"
+end
+
 --- Opens (or reopens) both handles for the given date.
 --- Both are repointed together: repointing only the main file leaves WARNING and
 --- ERROR lines appended to yesterday's errors file forever.
 --- @param date string "YYYY-MM-DD".
 local function open_handles(date)
 	close_handles()
+	close_topical()
 	_date = date
 	if not _dir then return end
 	_main_handle   = io.open(_dir .. "/" .. MAIN_PREFIX   .. date .. LOG_EXT, "a")
@@ -320,6 +366,29 @@ local function append_line(handle, line, channel)
 	return nil
 end
 
+--- Appends the line to every topical file whose patterns match it.
+--- @param line string Redacted, formatted line.
+local function fan_out(line)
+	for _, sub in ipairs(SUB_FILES) do
+		local routed = false
+		for _, pattern in ipairs(sub.patterns) do
+			if line:find(pattern, 1, true) then routed = true; break end
+		end
+		if routed and _topical[sub.name] ~= false then
+			local handle = _topical[sub.name]
+			if not handle then
+				local path = _dir .. "/" .. sub.name
+				handle = io.open(path, topical_mode(path, _date))
+				if not handle then
+					io.stderr:write(_redact("[logger_sink] topical file " .. sub.name
+						.. " could not be opened — retired for today; logging continues through other outputs.\n"))
+				end
+			end
+			_topical[sub.name] = handle and append_line(handle, line, "topical " .. sub.name) or false
+		end
+	end
+end
+
 --- Writes one formatted line to every configured output.
 --- Signature is the shared core's sink contract: (line, variant).
 --- @param line string Already-formatted log line.
@@ -345,6 +414,8 @@ local function sink(line, variant)
 	if _errors_handle and ERROR_VARIANTS[variant] then
 		_errors_handle = append_line(_errors_handle, line, "errors")
 	end
+
+	if _dir then fan_out(line) end
 end
 
 
@@ -477,6 +548,7 @@ function M.repoint()
 		return false, "the logs folder '" .. target .. "' is not writable"
 	end
 	local previous_main, previous_errors = _main_handle, _errors_handle
+	close_topical()
 	_dir, _date = target, date
 	_main_handle, _errors_handle = main, errors_ok and errors or nil
 	_stdout_only = false
@@ -497,6 +569,7 @@ function M.uninstall(logger)
 		logger.disable_repeat_collapsing()
 	end
 	close_handles()
+	close_topical()
 	_dir         = nil
 	_date        = nil
 	_installed   = false

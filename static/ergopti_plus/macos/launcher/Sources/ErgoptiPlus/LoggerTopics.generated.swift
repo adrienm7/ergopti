@@ -12,13 +12,13 @@
 
 let kLoggerTopicalFileNames: Set<String> = [
 	"ErgoptiPlus_gestures.log",
-	"ErgoptiPlus_mlx.log",
 	"ErgoptiPlus_ollama.log",
 	"ErgoptiPlus_llm.log",
 	"ErgoptiPlus_hotstrings.log",
 	"ErgoptiPlus_keystats.log",
-	"ErgoptiPlus_karabiner.log",
 	"ErgoptiPlus_menu.log",
 	"ErgoptiPlus_notify.log",
 	"ErgoptiPlus_boot.log",
+	"ErgoptiPlus_mlx.log",
+	"ErgoptiPlus_karabiner.log",
 ]

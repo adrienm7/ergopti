@@ -4,8 +4,8 @@
  * ==============================================================================
  * MODULE: Logger Sub-file Routing Codegen
  * DESCRIPTION:
- * Emits the logger's sub-file routing table for each driver from the canonical
- * _shared/modules/logger/sub_files.toml.
+ * Emits the logger's sub-file routing table for each driver (macOS, Windows,
+ * Linux) from the canonical _shared/modules/logger/sub_files.toml.
  *
  * WHY THIS EXISTS:
  * Both drivers hand-rolled a TOML [[array_of_tables]] parser for this one file —
@@ -109,10 +109,16 @@ const BANNER_WHY =
 	'separately (a "]" inside a quoted pattern closed the array early), plus a\n' +
 	'hardcoded fallback list that had already drifted from the source.';
 
-// ── macOS ───────────────────────────────────────────────────────────────────
+// ── macOS and Linux (one Lua table, two platform values) ────────────────────
 
-function emitLua() {
-	const rows = forPlatform('hs').map((e) => {
+/**
+ * The Lua routing table for one platform.
+ * @param {string} platform  sub_files.toml platform value ("hs" or "linux").
+ * @param {string} driver    Display name used in the banner.
+ * @param {string} consumer  The module that fans lines out with the table.
+ */
+function emitLua(platform, driver, consumer) {
+	const rows = forPlatform(platform).map((e) => {
 		const pats = e.patterns.map(luaStr).join(', ');
 		return (
 			`\t-- ${e.description || e.name}\n` +
@@ -126,10 +132,10 @@ function emitLua() {
 		'--- DO NOT EDIT BY HAND — run `npm run codegen:logger-sub-files` to refresh.\n' +
 		'\n' +
 		'--- ==============================================================================\n' +
-		'--- MODULE: Logger Sub-file Routing Table (macOS)\n' +
+		`--- MODULE: Logger Sub-file Routing Table (${driver})\n` +
 		'--- DESCRIPTION:\n' +
-		'--- The [[sub_files]] entries whose platforms list includes "hs", as the table\n' +
-		'--- infra/logger.lua fans log lines out with. A line is routed to a sub-file when\n' +
+		`--- The [[sub_files]] entries whose platforms list includes "${platform}", as the table\n` +
+		`--- ${consumer} fans log lines out with. A line is routed to a sub-file when\n` +
 		'--- ANY of its patterns is a substring of the complete line; it is always also\n' +
 		'--- written to the main daily log.\n' +
 		'---\n' +
@@ -215,7 +221,14 @@ function emitSwift() {
 // ── Write ───────────────────────────────────────────────────────────────────
 
 const targets = [
-	[path.join(SP, 'macos/_generated/logger_sub_files.lua'), emitLua()],
+	[
+		path.join(SP, 'macos/_generated/logger_sub_files.lua'),
+		emitLua('hs', 'macOS', 'infra/logger.lua')
+	],
+	[
+		path.join(SP, 'linux/_generated/logger_sub_files.lua'),
+		emitLua('linux', 'Linux', 'infra/logger_sink.lua')
+	],
 	[path.join(SP, 'windows/_generated/logger_sub_files.ahk'), emitAhk()],
 	[path.join(SP, 'macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift'), emitSwift()]
 ];
@@ -230,5 +243,5 @@ for (const [abs, content] of targets) {
 
 console.log(
 	`[OK] logger sub-file routing generated: ${forPlatform('hs').length} macOS entr(ies), ` +
-		`${forPlatform('ahk').length} Windows entr(ies), from ${entries.length} declaration(s).`
+		`${forPlatform('ahk').length} Windows entr(ies), ${forPlatform('linux').length} Linux entr(ies), from ${entries.length} declaration(s).`
 );

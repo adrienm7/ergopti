@@ -880,3 +880,127 @@ helpers.describe("linux-logger-privacy malformed metadata", function()
 		end)
 	end)
 end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ Topical sub-files, as on the other two drivers =======
+-- =================================================================
+-- =================================================================
+
+helpers.describe("linux-logger-topical-fan-out", function()
+	local IDENTITY = { home = "/home/fixture-user", user = "fixture-user" }
+
+	--- A private directory per case so a topical file left by an earlier case
+	--- cannot make a missing fan-out look like a pass.
+	local function topical_dir(name)
+		local dir = temp_dir() .. "/ergopti-topical-" .. name .. "-" .. tostring(os.time()) .. tostring(math.random(1e6))
+		os.execute("mkdir -p '" .. dir .. "'")
+		return dir
+	end
+
+	local function remove_dir(dir)
+		os.execute("rm -rf '" .. dir .. "'")
+	end
+
+	local function with_sink(name, body)
+		local Sink   = helpers.load_module("infra.logger_sink")
+		local Logger = helpers.load_module("logger")
+		local dir    = topical_dir(name)
+		local ok, err = xpcall(function()
+			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
+			body(Sink, Logger, dir)
+		end, debug.traceback)
+		Sink.uninstall(Logger)
+		remove_dir(dir)
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("linux-logger-topical-fan-out: keystats, llm and hotstrings lines reach their own files", function()
+		with_sink("route", function(_, Logger, dir)
+			Logger.info("modules.keystats.keystats", "marker-keystats")
+			Logger.info("modules.llm.inference", "marker-llm")
+			Logger.info("modules.hotstrings.injector", "marker-hotstrings")
+			Logger.info("sink_test", "marker-unrouted")
+			local keystats = read_file(dir .. "/ErgoptiPlus_keystats.log")
+			local llm = read_file(dir .. "/ErgoptiPlus_llm.log")
+			local hotstrings = read_file(dir .. "/ErgoptiPlus_hotstrings.log")
+			helpers.assert_not_nil(keystats, "the keystats topic file must exist")
+			helpers.assert_contains(keystats, "marker-keystats")
+			helpers.assert_true(not keystats:find("marker%-llm"), "a topic file holds only its own lines")
+			helpers.assert_contains(llm, "marker-llm")
+			helpers.assert_contains(hotstrings, "marker-hotstrings")
+			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
+			helpers.assert_contains(main, "marker-unrouted", "the main log still receives every line")
+			for _, name in ipairs({ "keystats", "llm", "hotstrings" }) do
+				local topic = read_file(dir .. "/ErgoptiPlus_" .. name .. ".log")
+				helpers.assert_true(not topic:find("marker%-unrouted"), name .. " must not hold an unrouted line")
+			end
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: macOS-only topics are never created", function()
+		with_sink("platform", function(_, Logger, dir)
+			Logger.info("karabiner", "marker-karabiner")
+			Logger.info("mlx", "marker-mlx")
+			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_karabiner.log"), nil)
+			helpers.assert_eq(read_file(dir .. "/ErgoptiPlus_mlx.log"), nil)
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: a topic file from an earlier day starts over, today's is appended", function()
+		local Sink   = helpers.load_module("infra.logger_sink")
+		local Logger = helpers.load_module("logger")
+		local dir    = topical_dir("rotate")
+		local stale  = io.open(dir .. "/ErgoptiPlus_llm.log", "w")
+		stale:write("2000-01-01 10:00:00:000 [INFO] [modules.llm.inference] marker-yesterday\n")
+		stale:close()
+		local ok, err = xpcall(function()
+			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
+			Logger.info("modules.llm.inference", "marker-first-today")
+			Sink.uninstall(Logger)
+			Sink.install(Logger, { log_dir = dir, redaction_context = IDENTITY })
+			Logger.info("modules.llm.inference", "marker-second-today")
+			local content = read_file(dir .. "/ErgoptiPlus_llm.log")
+			helpers.assert_true(not content:find("marker%-yesterday"), "an earlier day's lines must be dropped")
+			helpers.assert_contains(content, "marker-first-today")
+			helpers.assert_contains(content, "marker-second-today", "a restart on the same day appends")
+		end, debug.traceback)
+		Sink.uninstall(Logger)
+		remove_dir(dir)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: a refused topic handle is retired without silencing the main log", function()
+		with_sink("refuse", function(_, Logger, dir)
+			os.execute("mkdir '" .. dir .. "/ErgoptiPlus_menu.log'")
+			Logger.info("ui.menu.menu_builder", "marker-menu-refused")
+			Logger.info("modules.llm.inference", "marker-llm-after")
+			local main = read_file(dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
+			helpers.assert_contains(main, "marker-menu-refused")
+			helpers.assert_contains(read_file(dir .. "/ErgoptiPlus_llm.log"), "marker-llm-after")
+		end)
+	end)
+
+	helpers.it("linux-logger-topical-fan-out: the generated table is exactly sub_files.toml's linux entries", function()
+		local raw = read_file(DRIVER_ROOT .. "/../_shared/modules/logger/sub_files.toml")
+		helpers.assert_not_nil(raw, "the canonical routing file must be readable")
+		local expected = {}
+		local current
+		for line in raw:gmatch("[^\r\n]+") do
+			local name = line:match('^name%s*=%s*"([^"]*)"')
+			if name then current = name end
+			local platforms = line:match("^platforms%s*=%s*(%b[])")
+			if platforms and current and platforms:find('"linux"', 1, true) then
+				expected["ErgoptiPlus_" .. current .. ".log"] = true
+			end
+		end
+		local generated = {}
+		for _, sub in ipairs(require("_generated.logger_sub_files")) do generated[sub.name] = true end
+		helpers.assert_true(next(expected) ~= nil, "the canonical file must declare Linux topics")
+		helpers.assert_eq(generated, expected)
+	end)
+end)
