@@ -86,7 +86,6 @@
 		"static/ergopti_plus/macos/modules/keymap/magic_key_source.lua": 1,
 		"static/ergopti_plus/macos/modules/keymap/registry_index.lua": 1,
 		"static/ergopti_plus/macos/modules/keystats/context_tracker.lua": 3,
-		"static/ergopti_plus/macos/modules/keystats/init.lua": 13,
 		"static/ergopti_plus/macos/modules/llm/agent_runner.lua": 4,
 		"static/ergopti_plus/macos/modules/llm/init.lua": 3,
 		"static/ergopti_plus/macos/modules/llm/prediction_engine.lua": 1,
