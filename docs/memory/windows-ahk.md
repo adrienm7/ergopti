@@ -30,6 +30,18 @@ UTF-8 receipt and read it with an explicit encoding; retain an ASCII completion
 acknowledgement, the exact exit status and strict error checks. Do not change
 the general process port's decoding contract to repair one fixture.
 
+### project-ahk-unit-suite-runs-under-wine
+
+On a Linux host without Windows, Ubuntu's Wine 9 (`wine`, `wine64`) plus
+`xvfb` runs the headless unit suite with the official AutoHotkey 2.0.26 x64
+zip: `xvfb-run -a wine AutoHotkey64.exe /ErrorStdOut <run_all.ahk as a Z:\
+path> --only "<slug>"`. Without a display the first window creation fails and
+the script exits silently. Stdout (`FileAppend(..., "*")`) reaches the shell;
+the TAP file lands under the prefix's `drive_c/users/<user>/Temp`. Loading all
+14,500 tests takes about 20 s. This is portable evidence for pure AHK logic
+only: hooks, SendInput, WebView2, PowerShell workers and real desktop timing
+still need a Windows runner or the maintainer's PC.
+
 ### feedback-ahk-ui-syntax-validation
 
 Some UI modules are outside the headless unit include graph. Validate the real
