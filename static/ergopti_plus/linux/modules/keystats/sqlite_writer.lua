@@ -818,6 +818,41 @@ _raw_sql.windows = function(device_id, events, first_id)
 		.. table.concat(parts, ",") .. ";"
 end
 
+--- Inserts typing session events in the shared events_session format.
+--- kind is one of the table's CHECK values; another would be dropped silently by
+--- INSERT OR IGNORE, so the batch is refused.
+--- @param device_id string Device identifier.
+--- @param events table Array of {ts,date,kind,duration_ms?}.
+_raw_sql.sessions = function(device_id, events, first_id)
+	local kinds = { session_start = true, session_end = true, idle_start = true, idle_end = true }
+	local parts = {}
+	for i, ev in ipairs(events) do
+		if not kinds[ev.kind] then
+			Logger.error(LOG, "Session event batch refused: '%s' is not an events_session kind.", tostring(ev.kind))
+			return nil
+		end
+		parts[#parts + 1] = string.format(
+			"('%s',%d,'%s','%s','%s',%s)",
+			_sql_escape(device_id), first_id + i - 1,
+			_sql_escape(ev.ts), _sql_escape(ev.date), ev.kind,
+			type(ev.duration_ms) == "number" and string.format("%d", math.floor(ev.duration_ms)) or "NULL"
+		)
+	end
+	return "INSERT OR IGNORE INTO events_session "
+		.. "(device_id,id,ts,date,kind,duration_ms) VALUES "
+		.. table.concat(parts, ",") .. ";"
+end
+
+--- Commits one canonical raw session-event batch and returns its native receipt.
+function M.insert_session_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.sessions(device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
 --- Commits one canonical raw window-switch batch and returns its native receipt.
 function M.insert_window_switch_events(device_id, events)
 	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
@@ -1604,7 +1639,7 @@ end
 --- Reservation gaps are harmless; acknowledged IDs and SQL remain stable across
 --- data-write retries. Only a unique durable marker resolves a lost COMMIT reply.
 --- @param device_id string Device identifier.
---- @param payload table { raw = { typing, hotstrings, shortcuts, switches, llm, windows }, upserts }.
+--- @param payload table { raw = { typing, hotstrings, shortcuts, switches, llm, windows, sessions }, upserts }.
 --- @return table|nil Owned logical operation; nil refuses before SQL dispatch.
 function M.start_flush(device_id, payload)
 	if not M.is_available() or (_flush_owner and not _flush_owner:is_settled()) then return nil end
@@ -1628,11 +1663,13 @@ function M.start_flush(device_id, payload)
 		assert(type(entry.kind) == "string" and type(_derived_sql[entry.kind]) == "function"
 			and type(entry.args) == "table", "Invalid SQLite flush intent")
 	end
-	-- A payload built before the LLM and window families existed carries none: that is an empty family.
+	-- A payload built before the LLM, window and session families existed carries
+	-- none: that is an empty family.
 	payload.raw.llm = payload.raw.llm or {}
 	payload.raw.windows = payload.raw.windows or {}
+	payload.raw.sessions = payload.raw.sessions or {}
 	local path, count = _db_path, 0
-	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows" }
+	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]

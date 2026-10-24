@@ -55,6 +55,17 @@ local function new_live_tracker()
 end
 local _live = new_live_tracker()
 
+-- The typing session's start and end and its idle spans (events_session), the
+-- state machine macOS and Windows run, ticked by the periodic flush.
+local SessionEvents = require("keystats.session_events")
+local function new_session_tracker()
+	return SessionEvents.new({
+		micro_idle_ms = Timings.ms("keystats", "micro_idle_timeout_ms"),
+		session_timeout_ms = Timings.ms("keystats", "session_timeout_ms"),
+	})
+end
+local _session = new_session_tracker()
+
 -- For converting os.time()'s seconds to the millisecond scale the monotonic
 -- clock reports in, so the two can be subtracted.
 local MS_PER_SECOND = 1000
@@ -152,6 +163,19 @@ local _pending_app_switch_events = {}
 -- Window title changes, written to events_window_switch as Windows and macOS do:
 -- the dashboard's per-application context shifts read them.
 local _pending_window_switch_events = {}
+-- events_session rows produced by _session.
+local _pending_session_events = {}
+
+--- Buffers the session events the tracker produced, stamped now.
+--- @param events table { kind, duration_ms? } in order.
+local function queue_session_events(events)
+	for _, event in ipairs(events) do
+		_pending_session_events[#_pending_session_events + 1] = {
+			ts = os.date("!%Y-%m-%d %H:%M:%S"), date = os.date("%Y-%m-%d"),
+			kind = event.kind, duration_ms = event.duration_ms,
+		}
+	end
+end
 -- The observed pointers' stream, measured into the mouse columns of the
 -- focused application's next typing row (pending.mouse), as on macOS.
 local _pointer = PointerMetrics.new()
@@ -571,6 +595,7 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	-- leaves Backspace out of its typing rings. Counting it would make every
 	-- held Backspace read as a burst of fast typing.
 	local is_correction = ch == BACKSPACE_MARKER
+	if type(timestamp_ms) == "number" then queue_session_events(_session.input(timestamp_ms, true)) end
 	-- Forward to the base metrics collector if available.
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
@@ -875,6 +900,7 @@ end
 function M.record_pointer(kind, code, value)
 	local delta = _pointer.observe(kind, code, value)
 	if not delta or not may_record() then return end
+	queue_session_events(_session.input(math.floor(Monotonic.now_ms()), false))
 	local app_id = _focused_app_id
 	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
 	local pending = ensure_pending(app_id)
@@ -1860,8 +1886,8 @@ end
 --- Composes one immutable snapshot without advancing public watermarks.
 local function capture_flush()
 	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
-	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {} },
-		upserts = {} }
+	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
+		sessions = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -1870,12 +1896,13 @@ local function capture_flush()
 	local buffers = {
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
-		llm = _pending_llm_events, windows = _pending_window_switch_events,
+		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
 	local _pending_window_switch_events = buffers.windows
+	local _pending_session_events = buffers.sessions
 	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
 	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
 	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
@@ -1981,6 +2008,10 @@ local function capture_flush()
 	if #_pending_window_switch_events > 0 then
 		payload.raw.windows = _pending_window_switch_events
 		_pending_window_switch_events = {}
+	end
+	if #_pending_session_events > 0 then
+		payload.raw.sessions = _pending_session_events
+		_pending_session_events = {}
 	end
 	-- The machine's own state, which the dashboard puts beside the typing to
 	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
@@ -2234,6 +2265,7 @@ local function restore_flush_buffers(buffers)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
 	_pending_window_switch_events = prepend(buffers.windows, _pending_window_switch_events)
+	_pending_session_events = prepend(buffers.sessions, _pending_session_events)
 	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
 end
 
@@ -2258,7 +2290,7 @@ local function dispatch_flush()
 	local payload = snapshot.payload
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
-		and #payload.upserts == 0 then
+		and #payload.raw.sessions == 0 and #payload.upserts == 0 then
 		_last_flush_committed = true
 		return true
 	end
@@ -2270,6 +2302,7 @@ local function dispatch_flush()
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
 	_pending_window_switch_events = {}
+	_pending_session_events = {}
 	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
 	if not called then
 		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
@@ -2312,6 +2345,7 @@ local function flush_json()
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
 	_pending_window_switch_events = {}
+	_pending_session_events = {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
 	return true
@@ -2337,6 +2371,8 @@ end
 --- @return boolean True only after durable COMMIT and native cleanup ACK.
 function M.flush()
 	if _flush_stopping then return false end
+	-- The periodic flush is the session's idle check (timings ingest_tick_ms).
+	if may_record() then queue_session_events(_session.tick(math.floor(Monotonic.now_ms()))) end
 	local started = Perf.clock()
 	Perf.count("keystats.flushes")
 	local result = flush_dispatch()
@@ -2350,6 +2386,8 @@ end
 --- @return boolean True only when no native flush work remains acquired.
 function M.stop()
 	if not _flush_stopping then
+		-- The open session ends with the daemon, before the final flush takes it.
+		if may_record() then queue_session_events(_session.stop()) end
 		_flush_stopping = true
 		_flush_generation = _flush_generation + 1
 		_flush_listeners = {}
@@ -2449,8 +2487,10 @@ function M.reset_session()
 	_pending_shortcut_events = {}
 	_pending_llm_events = {}
 	_pending_window_switch_events = {}
+	_pending_session_events = {}
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
+	_session = new_session_tracker()
 	_session_started_at = os.time() * 1000
 	return true
 end
@@ -2508,7 +2548,8 @@ _to_json = function(val)
 end
 
 
---- How many raw-event buffers are waiting for a flush (tests).
+--- How many raw-event buffers are waiting for a flush (tests). Session events
+--- are left out: the clock ticks them on its own, whatever a test types.
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
