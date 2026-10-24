@@ -617,7 +617,8 @@ if Features["shortcuts"]["teleport_mouse"] {
 						return
 				}
 
-				MouseGetPos(&CurX, &CurY)
+				Point := MCGetPosStrict()
+				CurX := Point["x"], CurY := Point["y"]
 
 				; Find which monitor currently holds the cursor
 				CurrentIndex := 1
@@ -641,7 +642,7 @@ if Features["shortcuts"]["teleport_mouse"] {
 
 if Features["shortcuts"]["spotlight_mouse"] {
 		; Win + '
-		AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
+		AddShortcut("#", "'", (*) => (SpotlightPoint := MCGetPosStrict(), SpotlightMouseAt(SpotlightPoint["x"], SpotlightPoint["y"], 5000)))
 }
 
 ; SpotlightMouseAt is defined in infra/spotlight.ahk and included globally before this module.
