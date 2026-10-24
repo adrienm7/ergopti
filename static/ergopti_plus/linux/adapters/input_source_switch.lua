@@ -30,6 +30,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local TextUtils = require("text_utils")
 
 local LOG = "adapters.input_source_switch"
 
@@ -54,7 +55,7 @@ local GNOME_EMPTY = "@a(ss) []"
 --- @return table|nil pairs Array of { kind, name }, nil when the text is not a list.
 function M.parse_gnome_sources(text)
 	if type(text) ~= "string" then return nil end
-	local body = text:gsub("^%s+", ""):gsub("%s+$", "")
+	local body = TextUtils.trim(text)
 	if body == GNOME_EMPTY then return {} end
 	local inner = body:match("^%[(.*)%]$")
 	if inner == nil then return nil end

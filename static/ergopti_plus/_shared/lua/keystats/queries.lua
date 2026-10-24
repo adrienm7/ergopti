@@ -4,6 +4,8 @@
 --- Source: _shared/data/db/queries.sql (the named keystats queries).
 local M = {}
 
+local TableUtil = require("table_util")
+
 --- In-process engines (Hammerspoon, AHK) and the Linux sqlite3 -json CLI.
 M.DIALECTS = { "native", "cli_json" }
 
@@ -385,10 +387,7 @@ end
 --- Lists every catalogue name, sorted.
 --- @return table Array of names.
 function M.names()
-	local out = {}
-	for name in pairs(QUERIES) do out[#out + 1] = name end
-	table.sort(out)
-	return out
+	return TableUtil.sorted_keys(QUERIES)
 end
 
 return M
