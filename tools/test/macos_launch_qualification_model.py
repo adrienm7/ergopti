@@ -23,6 +23,7 @@ names = {
     "native_failures",
     "qualify_native_features",
     "feature_proof",
+    "quit_evidence_detail",
 }
 selected = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
 assert len(selected) == len(names), "Every exact source producer must exist"
