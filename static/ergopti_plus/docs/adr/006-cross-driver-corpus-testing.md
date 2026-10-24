@@ -37,6 +37,10 @@ Current corpus directories:
 
 - `static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json` — hotstring
   expansion input/output pairs.
+- `static/ergopti_plus/_shared/tests/corpus/hotstrings/family_samples.json` —
+  two or three shipped expansions per hotstring family of the menu manifest,
+  read from the shipped packs by `_shared/lua/test/hotstring_family_samples.lua`
+  and replayed by the macOS and Linux E2E harnesses.
 - `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json` — tap-hold
   configuration accessors.
 - `static/ergopti_plus/_shared/tests/corpus/tap_hold/decision_vectors.json` —
