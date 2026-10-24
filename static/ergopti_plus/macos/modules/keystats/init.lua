@@ -26,6 +26,8 @@ local utf8     = utf8
 local Logger   = require("infra.logger")
 local Timings  = require("infra.timings")
 local Manifest = require("infra.manifest_reader")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 local i18n     = require("infra.i18n")
 local dialog   = require("infra.dialog_util")
 local TeardownTransaction = require("infra.teardown_transaction")
@@ -151,17 +153,17 @@ local NAV_KEY_CODES = {
 -- All preferences come from the shared manifest. Metrics activation remains
 -- neutral on every host; visualization parameters do not grant consent.
 M.DEFAULT_STATE = {
-	keystats_enabled                = Manifest.default_for("metrics.enabled"),
-	keystats_disabled_apps          = Manifest.default_for("metrics.disabled_apps"),
-	keystats_encrypt                = Manifest.default_for("metrics.encrypt"),
-	keystats_menubar_wpm            = Manifest.default_for("metrics.wpm_menubar_visible"),
-	keystats_menubar_colors         = Manifest.default_for("metrics.wpm_menubar_colors"),
-	keystats_float_wpm              = Manifest.default_for("metrics.wpm_widget_visible"),
-	keystats_float_graph            = Manifest.default_for("metrics.wpm_widget_graph"),
-	keystats_float_colors           = Manifest.default_for("metrics.wpm_widget_colors"),
-	keystats_private_filter_enabled      = Manifest.default_for("metrics.private_filter_enabled"),
-	keystats_secure_filter_enabled       = Manifest.default_for("metrics.secure_filter_enabled"),
-	keystats_system_auth_filter_enabled  = Manifest.default_for("metrics.system_auth_filter_enabled"),
+	keystats_enabled                = Manifest.default_for(KEY.METRICS_ENABLED),
+	keystats_disabled_apps          = Manifest.default_for(KEY.METRICS_DISABLED_APPS),
+	keystats_encrypt                = Manifest.default_for(KEY.METRICS_ENCRYPT),
+	keystats_menubar_wpm            = Manifest.default_for(KEY.METRICS_WPM_MENUBAR_VISIBLE),
+	keystats_menubar_colors         = Manifest.default_for(KEY.METRICS_WPM_MENUBAR_COLORS),
+	keystats_float_wpm              = Manifest.default_for(KEY.METRICS_WPM_WIDGET_VISIBLE),
+	keystats_float_graph            = Manifest.default_for(KEY.METRICS_WPM_WIDGET_GRAPH),
+	keystats_float_colors           = Manifest.default_for(KEY.METRICS_WPM_WIDGET_COLORS),
+	keystats_private_filter_enabled      = Manifest.default_for(KEY.METRICS_PRIVATE_FILTER_ENABLED),
+	keystats_secure_filter_enabled       = Manifest.default_for(KEY.METRICS_SECURE_FILTER_ENABLED),
+	keystats_system_auth_filter_enabled  = Manifest.default_for(KEY.METRICS_SYSTEM_AUTH_FILTER_ENABLED),
 }
 
 
@@ -1296,7 +1298,7 @@ function M.apply_configuration(config)
 	end
 	assert(type(config) == "table" and type(config.options) == "table"
 		and type(config.disabled_apps) == "table", "invalid metrics configuration")
-	for _, key in ipairs({ "private_filter_enabled", "secure_field_filter_enabled", "system_auth_filter_enabled" }) do
+	for _, key in ipairs({ LEAF.PRIVATE_FILTER_ENABLED, "secure_field_filter_enabled", LEAF.SYSTEM_AUTH_FILTER_ENABLED }) do
 		assert(type(config[key]) == "boolean", "invalid metrics filter: " .. key)
 	end
 	assert(type(config.options.encrypt) == "boolean", "invalid metrics encryption preference")
