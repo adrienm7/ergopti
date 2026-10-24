@@ -21,16 +21,9 @@
 
 [llm]
 
-# Keystroke inactivity debounce before firing an LLM prediction request.
-# AHK: prediction_engine.ahk "debounce_ms" default.
-# HS:  prediction_engine.lua DEBOUNCE_MIN_SEC / DEBOUNCE_MAX_SEC range midpoint.
-prediction_debounce_ms = 500
-
-# Minimum debounce — snappiest allowed prediction trigger (HS only).
-prediction_debounce_min_ms = 50
-
-# Maximum debounce — slowest allowed prediction trigger (HS only).
-prediction_debounce_max_ms = 600
+# The keystroke debounce before an LLM prediction request is the user's
+# llm.trigger.debounce_ms, shipped as llm_debounce_ms in
+# _shared/modules/llm/defaults.json; every driver waits exactly that value.
 
 # Chain-fallback timer: fire the chained LLM call if the F16 sync signal
 # is missed (HS prediction_engine.lua CHAIN_FALLBACK_SEC).

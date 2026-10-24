@@ -59,8 +59,6 @@ local function load_fixture(streaming)
 		sec = function(_section, key)
 			if key == "stream_watchdog_ms" then return 7 end
 			if key == "chain_fallback_ms" then return 1 end
-			if key == "prediction_debounce_min_ms" then return 0.01 end
-			if key == "prediction_debounce_max_ms" then return 2 end
 			return 0.1
 		end,
 	}
