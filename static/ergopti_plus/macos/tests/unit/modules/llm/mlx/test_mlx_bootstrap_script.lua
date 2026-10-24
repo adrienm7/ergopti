@@ -146,7 +146,12 @@ local function new_fixture()
 		.. sh_quote(driver .. "modules/llm/uv-release.sh") .. " "
 		.. sh_quote(project .. "/modules/llm/") .. " && cp "
 		.. sh_quote(driver .. "pyproject.toml") .. " " .. sh_quote(driver .. "uv.lock") .. " "
-		.. sh_quote(project .. "/"))
+		.. sh_quote(project .. "/")
+		-- network-retry.sh reads the shared origin inventory three folders up,
+		-- where the bundle and the checkout keep _shared beside the driver.
+		.. " && mkdir -p " .. sh_quote(root .. "/_shared/modules/network") .. " && cp "
+		.. sh_quote(driver .. "../_shared/modules/network/route_origins.json") .. " "
+		.. sh_quote(root .. "/_shared/modules/network/"))
 	helpers.assert_eq(made, 0, "the fixture project must be created")
 	write(home .. "/.local/bin/uv", FAKE_UV)
 	run("chmod +x " .. sh_quote(home .. "/.local/bin/uv"))
