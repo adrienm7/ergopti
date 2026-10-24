@@ -62,7 +62,7 @@ _EDOT_Source(Root) {
 		"_LoggerPrivacyConfig", "ErrorPolicy_Decide", "ManifestFindEntryByPath", "ConfigBindingIdentityTapPublication", "TapKeyBindingId",
 		"IsCategoryGated", "IniCacheGet", "Gui_Create", "t", "UpdateChannels_Ids", "UpdateSchedule_Timing", "Updater_CurrentVersion",
 		"CrashReport_Dir", "DiagSnapshot_ResolveCommit", "KS_IsDown", "HealthCheck_Config", "_HealthCheck_Paths",
-		"ErrorReport_Compose", "IssueReport_Markdown", "Redact_Apply", "WebView_SharedEnvironment", "ErrorDialog_Init"] {
+		"ErrorReport_Compose", "IssueReport_Markdown", "Redact_Apply", "WebView_SharedEnvironment", "ErrorDialog_Init", "DayLog_CheckLimits"] {
 		OwnerRoot := Symbol == "ConfigBindingIdentityTapPublication" ? _SharedDir : _DriverDir
 		Owner := _DriverProductionFileForSymbol(Symbol, OwnerRoot)
 		AssertTrue(Owner != "", "The error child requires its genuine whole owner: " . Symbol)
