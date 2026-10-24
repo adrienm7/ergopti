@@ -52,8 +52,9 @@ const NEUTRAL_LAYOUT = {
 			direct_access_digits: 'native',
 			number_row_reorder_edges: false,
 			pause_switch_enabled: false,
-			on_pause: false,
-			on_resume: false
+			// Layout ids; "" is « no change ».
+			on_pause: '',
+			on_resume: ''
 		}
 	},
 	linux: {

@@ -350,8 +350,8 @@
 			"additionalProperties": false,
 			"properties": {
 				"pause_switch_enabled": { "type": "boolean" },
-				"on_pause": { "type": ["boolean", "string"] },
-				"on_resume": { "type": ["boolean", "string"] },
+				"on_pause": { "type": "string" },
+				"on_resume": { "type": "string" },
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
 				"number_row_reorder_edges": { "type": "boolean" },

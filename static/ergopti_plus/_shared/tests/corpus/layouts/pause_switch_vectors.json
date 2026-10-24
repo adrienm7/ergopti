@@ -1,0 +1,94 @@
+{
+	"description": "Which layout a pause, a resume or a quit switches to. Replayed by _shared/lua/layout/pause_switch_policy.lua (macOS and Linux). An absent settings key is an unset value; the expected target is absent when nothing switches.",
+	"events": ["pause", "resume", "quit"],
+	"invalid_events": ["", "Pause", "suspend", "reload", "exit"],
+	"targets": [
+		{
+			"id": "layout id",
+			"value": "Ergopti_v2_2_2_plus",
+			"valid": true,
+			"target": "Ergopti_v2_2_2_plus"
+		},
+		{ "id": "no change", "value": "", "valid": true },
+		{ "id": "space is an id", "value": " ", "valid": true, "target": " " },
+		{ "id": "legacy boolean", "value": false, "valid": false },
+		{ "id": "number", "value": 3, "valid": false },
+		{ "id": "list", "value": ["fr"], "valid": false }
+	],
+	"vectors": [
+		{
+			"id": "off: pause keeps the layout",
+			"settings": { "enabled": false, "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "pause"
+		},
+		{
+			"id": "off: resume keeps the layout",
+			"settings": { "enabled": false, "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "resume"
+		},
+		{
+			"id": "off: quit keeps the layout",
+			"settings": { "enabled": false, "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "quit"
+		},
+		{
+			"id": "unset switch is off",
+			"settings": { "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "pause"
+		},
+		{
+			"id": "text switch is off",
+			"settings": { "enabled": "true", "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "pause"
+		},
+		{
+			"id": "on: pause selects its layout",
+			"settings": { "enabled": true, "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "pause",
+			"target": "French"
+		},
+		{
+			"id": "on: resume selects its layout",
+			"settings": { "enabled": true, "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "resume",
+			"target": "Ergopti"
+		},
+		{
+			"id": "on: quit selects the pause layout",
+			"settings": { "enabled": true, "on_pause": "French", "on_resume": "Ergopti" },
+			"event": "quit",
+			"target": "French"
+		},
+		{
+			"id": "on: empty pause target is no change",
+			"settings": { "enabled": true, "on_pause": "", "on_resume": "Ergopti" },
+			"event": "pause"
+		},
+		{
+			"id": "on: empty pause target leaves quit unchanged",
+			"settings": { "enabled": true, "on_pause": "", "on_resume": "Ergopti" },
+			"event": "quit"
+		},
+		{
+			"id": "on: resume still selects with no pause target",
+			"settings": { "enabled": true, "on_pause": "", "on_resume": "Ergopti" },
+			"event": "resume",
+			"target": "Ergopti"
+		},
+		{
+			"id": "on: unset resume target is no change",
+			"settings": { "enabled": true, "on_pause": "French" },
+			"event": "resume"
+		},
+		{
+			"id": "on: legacy boolean target is no change",
+			"settings": { "enabled": true, "on_pause": false, "on_resume": false },
+			"event": "pause"
+		},
+		{
+			"id": "on: number target is no change",
+			"settings": { "enabled": true, "on_pause": 7, "on_resume": "Ergopti" },
+			"event": "quit"
+		}
+	]
+}
