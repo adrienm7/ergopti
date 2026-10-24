@@ -619,6 +619,24 @@ sweep of #99 found no running oMLX. A configured entry may still say
 (`_shared/lua/llm/local_server_auth.lua`). Action: a new local backend default
 uses `127.0.0.1`, and a sweep logs each server's answer, not only the total.
 
+### project-route-plan-is-for-environment-only-clients
+
+The per-origin route plan (`_shared/lua/network/route_plan.lua`, Go and shell
+twins, `route_plan_vectors.json`) exists for clients that honor only one
+environment relay for a whole download: the Ollama daemon and uv. Their
+origins, redirect targets included, are listed in
+`_shared/modules/network/route_origins.json`. Each origin is looked up natively.
+The result is exported as `HTTPS_PROXY` plus `NO_PROXY` for the origins sent
+direct; two relays are refused. Ergopti's own managed HTTP clients (Linux
+`infra/managed_http.lua`, Windows WinHTTP worker, macOS native workers)
+re-resolve the route at every redirect hop, so a precomputed plan would only
+weaken them. On Windows the managed Ollama daemon
+(`modules/llm/ollama-runtime-launch.ps1`) gets no relay variable, and Go's
+net/http there reads only the environment: a PAC-only network cannot pull a
+model until that launcher applies the plan. Action: add a new
+environment-driven client to `route_origins.json` and plan it; never put a
+managed HTTP download on a plan.
+
 ### project-metrics-day-and-correction-semantics
 
 Metrics raw days use the local calendar day and "yesterday" is derived at noon
