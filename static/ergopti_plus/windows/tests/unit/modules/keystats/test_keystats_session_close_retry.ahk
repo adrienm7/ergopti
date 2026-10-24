@@ -247,14 +247,17 @@ _KLSCR_ShutdownCloseNativeChain() {
 	Receipt := 0
 	try {
 		Source := Chr(0xFEFF) . "#Requires AutoHotkey v2.0`n#Warn All, StdOut`n"
+		; KL_AppendLog asks the capture gate (Suspend or the metrics pause) that
+		; the collection module owns, so its class and reader join the chain.
 		for Spec in [["keystats_password.ahk", "KLPasswordCache"],
-			["keystats_watchers.ahk", "KLWatchConst"], ["keystats_watchers.ahk", "KLWatch"]] {
+			["keystats_watchers.ahk", "KLWatchConst"], ["keystats_watchers.ahk", "KLWatch"],
+			["keystats_collection.ahk", "KLCollection"]] {
 			ClassSource := FileRead(A_ScriptDir . "\..\modules\keystats\" . Spec[1], "UTF-8")
 			AssertTrue(RegExMatch(ClassSource, "ms)^class " . Spec[2] . " \{.*?^\}", &NativeClass) > 0,
 				"each native-chain class must come from actual production source")
 			Source .= NativeClass[0] . "`n"
 		}
-		for Name in ["KL_AppendLog", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
+		for Name in ["KL_AppendLog", "KL_CaptureHeld", "KL_BeginShutdown", "KL_CancelShutdown", "KL_Hook_Stop", "KL_Hook_InvalidateCapture",
 			"KL_CommitPwCache", "KL_TryGetPwCachedVerdict", "KL_PasswordFocusSnapshot",
 			"KL_PasswordFocusTrackingStop", "KL_FreePasswordFocusCallback", "KL_IsFocusedFieldPassword",
 			"MF_ShouldFilter", "MF_ShouldFilterFor", "KL_AssignStableEventId", "KL_AllocEventId",
