@@ -249,6 +249,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-menu-labels-resolve.cjs"],
 			"repro": "node tools/test/test-menu-labels-resolve.cjs"
+		},
+		{
+			"id": "platform-reason-wording",
+			"ordinal": 465,
+			"name": "platform reasons describe the platform and never schedule work",
+			"cmd": "node",
+			"args": ["tools/test/test-platform-reason-wording.cjs"],
+			"repro": "npm run test:platform-reason-wording"
 		}
 	]
 }

@@ -96,7 +96,13 @@ const MANIFEST = path.join(
 // translated strings would have frozen it in place.
 // 2026-10-20: 104 → 103. The Layout menu's macOS-only separator before the
 // active input sources is a presentation, now classified unavailable = "hide".
-const BASELINE = 88;
+// 2026-10-24: 88 → 1. The ledger below is no longer a list of silences. Every other
+// single-platform feature, section and menu row now carries a reason that says what the
+// platform does differently (checked against the code when it was written), and the four
+// swipe_N_diag slots that no driver ever read were deleted instead of explained. The one
+// left, the macOS-only array of user profiles, goes with the unification of the stored
+// shape. Never raise it.
+const BASELINE = 1;
 
 // 2026-10-05: the original1794 source (SHA256 below) contained136 debt rows,
 // despite its138 allowance.31 were already canonical MENU-HIDE declarations;
@@ -106,98 +112,13 @@ const BASELINE = 88;
 const PARENT_MANIFEST_SHA256 = '06b311ca65d356b405a889fb3479538b24505649a47e1d628299bf6611a5eb59';
 const PARENT_GATE_SHA256 = '872a8889a8767accdf5fdd3cd687da8726073741d9945df27d43ecd9990de290';
 const KNOWN_UNEXPLAINED = new Set([
-	'["features.gestures","hs","action","swipe_2_diag",null,null,null,null]',
-	'["features.gestures","hs","action","swipe_3_diag",null,null,null,null]',
-	'["features.gestures","hs","action","swipe_4_diag",null,null,null,null]',
-	'["features.gestures","hs","action","swipe_5_diag",null,null,null,null]',
-	'["features.hotstrings","hs","boolean","enabled",null,null,null,null]',
-	'["features.layout","ahk","boolean","ctrl_magic_save",null,null,null,null]',
-	'["features.layout","ahk","boolean","ergopti_alt_gr",null,null,null,null]',
-	'["features.layout","ahk","boolean","ergopti_base",null,null,null,null]',
-	'["features.layout","ahk","boolean","ergopti_plus",null,null,null,null]',
-	'["features.layout","ahk","string","emulated_layout",null,null,null,null]',
-	'["features.layout","hs","boolean","on_pause",null,null,null,null]',
-	'["features.layout","hs","boolean","on_resume",null,null,null,null]',
-	'["features.layout","hs","boolean","pause_switch_enabled",null,null,null,null]',
-	'["features.llm","ahk","boolean","onboarding_seen",null,null,null,null]',
-	'["features.llm","ahk","string","app_profile_overrides",null,null,null,null]',
-	'["features.llm.navigation","hs","boolean","arrow_nav_enabled",null,null,null,null]',
-	'["features.llm.profiles","hs","array","user_profiles",null,null,null,null]',
-	'["features.llm.trigger","ahk","boolean","inline_autotype",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","get_hex_value",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","microsoft_bold",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","move",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","open_downloads",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","paste_without_formatting",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","screen",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","select_line",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","spotlight_mouse",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","surround_with_parentheses",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","teleport_mouse",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","title_case",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","uppercase",null,null,null,null]',
-	'["features.shortcuts","ahk","boolean","win_caps_lock",null,null,null,null]',
-	'["features.shortcuts","ahk","feature","gpt",null,null,null,null]',
-	'["features.shortcuts","ahk","feature","search",null,null,null,null]',
-	'["features.shortcuts","ahk","feature","take_note",null,null,null,null]',
-	'["features.shortcuts.a_grave","ahk","boolean","enabled",null,null,null,null]',
-	'["features.shortcuts.a_grave","ahk","string","letter",null,null,null,null]',
-	'["features.shortcuts.e_acute","ahk","boolean","enabled",null,null,null,null]',
-	'["features.shortcuts.e_acute","ahk","string","letter",null,null,null,null]',
-	'["features.shortcuts.e_circ","ahk","boolean","enabled",null,null,null,null]',
-	'["features.shortcuts.e_circ","ahk","string","letter",null,null,null,null]',
-	'["features.shortcuts.e_grave","ahk","boolean","enabled",null,null,null,null]',
-	'["features.shortcuts.e_grave","ahk","string","letter",null,null,null,null]',
-	'["features.shortcuts.keyboard","hs","action","hs_ctrl_space",null,null,null,null]',
-	'["features.shortcuts.keyboard","linux","action","ctrl_g",null,null,null,null]',
-	'["features.shortcuts.keyboard","linux","action","super_space",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","cmd_shift_v",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","cmd_star",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_a",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_capslock",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_d",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_e",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_g",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_h",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_i",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_l",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_m",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_o",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_p",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_period",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_quote",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_s",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_t",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_u",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_w",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","ctrl_x",null,null,null,null]',
-	'["features.shortcuts.keys","hs","boolean","wrap_text_if_selected",null,null,null,null]',
-	'["menu.accented_letters_group","ahk","letter_picker","a_grave",null,null,null,null]',
-	'["menu.accented_letters_group","ahk","letter_picker","e_acute",null,null,null,null]',
-	'["menu.accented_letters_group","ahk","letter_picker","e_circ",null,null,null,null]',
-	'["menu.accented_letters_group","ahk","letter_picker","e_grave",null,null,null,null]',
-	'["menu.apps_menu","hs","list","apps_installed",null,null,null,null]',
-	'["menu.gestures_menu","hs","---",null,null,null,null,10]',
-	'["menu.gestures_menu","hs","---",null,null,null,null,12]',
-	'["menu.gestures_menu","hs","---",null,null,null,null,14]',
-	'["menu.gestures_menu","linux","---",null,null,null,null,18]',
-	'["menu.hotstrings_menu","linux","---",null,null,null,null,18]',
-	'["menu.llm_menu","linux","---",null,null,null,null,6]',
-	'["menu.metrics_menu","linux","---",null,null,null,null,20]',
-	'["menu.tap_holds_menu","hs","---",null,null,null,null,5]',
-	'["sections.category_enabled","ahk",null,null,null,null,null,null]',
-	'["sections.gestures.modes","hs",null,null,null,null,null,null]',
-	'["sections.gestures.sensitivities","hs",null,null,null,null,null,null]',
-	'["sections.hotstrings.order_overrides","hs",null,null,null,null,null,null]',
-	'["sections.shortcuts.key_combination_taps","ahk",null,null,null,null,null,null]',
-	'["sections.shortcuts.keyboard","ahk",null,null,null,null,null,null]',
-	'["sections.shortcuts.personal","ahk",null,null,null,null,null,null]',
-	'["sections.shortcuts.wrap_symbols","hs",null,null,null,null,null,null]',
-	'["sections.ui","hs",null,null,null,null,null,null]'
+	'["features.llm.profiles","hs","array","user_profiles",null,null,null,null]'
 ]);
 
 if (KNOWN_UNEXPLAINED.size !== BASELINE)
-	throw new Error('the original unexplained identity ledger must contain exactly104 distinct rows');
+	throw new Error(
+		'the original unexplained identity ledger must contain exactly BASELINE distinct rows'
+	);
 
 // Floor: retain the original complete-inventory safeguard.
 const MIN_TABLES = 300;

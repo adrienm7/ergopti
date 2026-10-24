@@ -76,8 +76,7 @@ try {
 			'swipe_2_left_up',
 			'swipe_2_right_up',
 			'swipe_2_left_down',
-			'swipe_2_right_down',
-			'swipe_2_diag'
+			'swipe_2_right_down'
 		];
 		const rows = manifest.entries.filter(
 			(row) =>
