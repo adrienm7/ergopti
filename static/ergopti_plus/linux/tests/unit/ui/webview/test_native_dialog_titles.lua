@@ -244,6 +244,30 @@ h.describe("programmable source problems open no dialog", function()
 end)
 
 
+h.describe("one-click check report caption (linux-native-titles)", function()
+	h.it("(linux-native-titles) the check report brands its caption and keeps the body plain text", function()
+		scenario(function(observed)
+			observed.status = 1
+			local runner = require("ui.field_check_window").new({
+				label = "Owned check", log = "owned_check", check_id = "owned", title_key = "Native 'check'",
+				steps = function(_, _, finish) finish() end, env = function() return {} end,
+				unusable_step = "owned_env",
+			})
+			h.assert_true(runner.run())
+			h.assert_eq(#observed.queued, 1, "the report opens from a fresh event-loop turn")
+			observed.queued[1]()
+			h.assert_eq(observed.modals, 1)
+			h.assert_eq(#observed.commands, 1)
+			local command = observed.commands[1]
+			local head = "zenity --question --no-markup --title='ErgoptiPlus — Native '\\''check'\\''' --text="
+			h.assert_eq(command:sub(1, #head), head)
+			local tail = " --ok-label='field_check.copy' --cancel-label='field_check.close'"
+			h.assert_eq(command:sub(-#tail), tail, "Close answers the dialog without a copy")
+		end)
+	end)
+end)
+
+
 h.describe("native caption consumer inventory", function()
 	h.it("(linux-native-titles) every production CLI caption remains in the independently bounded owner inventory", function()
 		local expected = {
@@ -256,6 +280,8 @@ h.describe("native caption consumer inventory", function()
 			["modules/llm/local_model_offer.lua"] = 2,
 			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
 			["ui/llm_enable_refusal.lua"] = 2,
+			-- The one-click check runner owns the caption of every check report.
+			["ui/field_check_window.lua"] = 1,
 		}
 		local observed = {}
 		local root = h.driver_root()
