@@ -24,7 +24,8 @@ const CI_LINUX = {
 	platform: 'linux',
 	uid: 1001,
 	luaVersionText: 'Lua 5.4.6  Copyright (C) 1994-2023 Lua.org, PUC-Rio',
-	pwshVersionText: '7.4.6'
+	pwshVersionText: '7.4.6',
+	accountVariables: []
 };
 
 assert.equal(pinnedNodeVersion(), fs.readFileSync(path.join(ROOT, '.node-version'), 'utf8').trim());
@@ -44,7 +45,8 @@ const cases = [
 	],
 	[{ luaVersionText: 'Lua 5.40.0' }, /lua is "Lua 5\.40\.0"/],
 	[{ luaVersionText: null }, /no lua command/],
-	[{ pwshVersionText: null }, /no pwsh on PATH/]
+	[{ pwshVersionText: null }, /no pwsh on PATH/],
+	[{ accountVariables: ['USER', 'LOGNAME'] }, /USER and LOGNAME unset/]
 ];
 for (const [override, expected] of cases) {
 	const problems = evaluateHost({ ...CI_LINUX, ...override });
@@ -57,9 +59,12 @@ const windows = {
 	platform: 'win32',
 	uid: null,
 	luaVersionText: null,
-	pwshVersionText: null
+	pwshVersionText: null,
+	accountVariables: ['USER']
 };
 assert.deepEqual(evaluateHost(windows), [], 'Windows checks only the Node pin');
 assert.equal(evaluateHost({ ...windows, nodeVersion: '22.21.0' }).length, 1);
 
-console.log('[OK] host toolchain guard: pinned Node, Lua 5.4, non-root user and pwsh');
+console.log(
+	'[OK] host toolchain guard: pinned Node, Lua 5.4, non-root user, pwsh and account variables'
+);

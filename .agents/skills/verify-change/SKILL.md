@@ -40,7 +40,8 @@ high-risk state migrations still deserve a durable plan proportional to scope.
 differs from the hosted runners (`tools/test/lib/host-toolchain.cjs`, pinned by `test-host-toolchain.cjs`):
 
 - Node exactly as pinned in `.node-version` (generator output and Unicode tables follow the Node release);
-- on Linux and macOS, `lua` must be Lua 5.4, the run must not be root, and `pwsh` must be on PATH.
+- on Linux and macOS, `lua` must be Lua 5.4, the run must not be root, `pwsh` must be on PATH, and `USER` and
+  `LOGNAME` must be set.
 
 Fix the host instead of reading its reds: select the pinned Node (`n`, `fnm`, `nvm` or the official tarball), point
 `lua` at `lua5.4` (`update-alternatives` or a shim first in PATH), run as a normal user, install PowerShell. A cloud

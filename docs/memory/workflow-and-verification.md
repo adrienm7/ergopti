@@ -101,7 +101,7 @@ subset is not a green change, and the supported Node engine floor matters.
 
 Local runners refuse a host that differs from the hosted runners
 (`tools/test/lib/host-toolchain.cjs`): Node exactly as in `.node-version`, and on
-Linux and macOS `lua` as Lua 5.4, a non-root user and `pwsh` on PATH. On
+Linux and macOS `lua` as Lua 5.4, a non-root user, `pwsh` on PATH and `USER`/`LOGNAME` set. On
 2026-10-24 a cloud container (root, Lua 5.1, Node 22.22.0, no pwsh) produced about
 twenty false reds: `table.pack` missing, uid and sudo paths, Unicode 16 generator
 output, PowerShell gates. Fix the host before triaging any red. Plans
