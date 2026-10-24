@@ -137,6 +137,6 @@ KL_ResetSession(FlushFn := 0, CloseFn := 0, WpmFn := 0) {
 		WpmFn.Call()
 	else if IsSet(_WPMWidget_ResetRolling)
 		_WPMWidget_ResetRolling()
-	try LoggerDone("Keystats", "Metrics session reset.")
+	try LoggerSuccess("Keystats", "Metrics session reset.")
 	return true
 }
