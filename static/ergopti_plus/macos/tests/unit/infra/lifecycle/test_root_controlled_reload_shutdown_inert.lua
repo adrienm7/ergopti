@@ -12,6 +12,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+-- The declared base expansion delay, read through the real reader before the
+-- fixture replaces it.
+local EXPANSION_DELAY = require("infra.manifest_reader").default_for("hotstrings.expansion_delay")
 
 local MODULE_NAMES = {
 	"hs",
@@ -323,7 +326,15 @@ local function run_isolated(options, assertions)
 				stop = function() return true end,
 			},
 			["infra.manifest_reader"] = {
-				default_for = function() return "★" end,
+				-- The real cold hotstring controller reads the base expansion
+				-- delay from the manifest (31372616); every other read is the
+				-- trigger character the boot asks for.
+				default_for = function(path)
+					if path == "hotstrings.expansion_delay" then
+						return EXPANSION_DELAY
+					end
+					return "★"
+				end,
 				has_default = function() return false end,
 				sparse_operation = function() error("no configuration write in shutdown fixture") end,
 			},
