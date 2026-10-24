@@ -432,12 +432,14 @@ local DAEMON_SCENARIOS = {
 	-- together read a second apart whenever that second turns over between
 	-- them: the 0.75 s expansion delay then dropped the trigger. This is the
 	-- stubbed CI step's clock, where the AI twin above once failed that way.
-	{ name = "a trigger typed across a clock second still expands", keys = " ad{TICK}n ", screen = " ADN ",
+	-- The delay runs from the last letter to the expander, so the second turns
+	-- over between those two keys.
+	{ name = "a trigger typed across a clock second still expands", keys = " adn{TICK} ", screen = " ADN ",
 		clock = "seconds" },
 	{ name = "with AI loaded, a corrected typo typed across a clock second still expands",
-		keys = " adx{BS}{TICK}n ", screen = " ADN ", llm = true, clock = "seconds" },
+		keys = " adx{BS}n{TICK} ", screen = " ADN ", llm = true, clock = "seconds" },
 	-- Two seconds on that clock is more than one of real pause: the delay holds.
-	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = " ad{TICK}{TICK}n ",
+	{ name = "a pause the whole-second clock can prove still expires the trigger", keys = " adn{TICK}{TICK} ",
 		screen = " adn ", clock = "seconds" },
 	-- A touchpad reader that fails stops the reader alone: the same module
 	-- still runs the tap actions (gesture-pump-keeps-actions).
