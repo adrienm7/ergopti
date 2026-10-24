@@ -191,6 +191,48 @@ _HS_DelaysColorsRows(OpenConfigFn := OpenHotstringsConfigWindow) {
 	return Rows is Array ? Rows : []
 }
 
+; Dynamic handler: the preview-bubble switches sub-menu, the same four rows in
+; the same order as macOS and Linux (star, autocorrect, AI, then the tint after a
+; separator). Each row is declared once in the shared manifest; this driver
+; supplies the toggle and the state behind the tick. The switches stay
+; configurable while the driver is paused, as on the other two.
+; @param Toggle {Func} Optional seam called with the switch key.
+; @returns {Array} The provider rows, [] when a declaration was refused.
+_HS_PreviewBubbleRows(Toggle := ToggleHotstringsPreviewSwitch) {
+	Commands := Map()
+	Getters := Map(
+		"preview_magic_ready", (*) => true,
+		"preview_presence_ready", (*) => true,
+		"preview_colored_ready", (*) => true)
+	for Key in HSE_PreviewSwitchKeys() {
+		Commands[Key] := ((SwitchKey, *) => Toggle.Call(SwitchKey)).Bind(Key)
+		Getters["hotstrings." . Key] := ((SwitchKey, *) => HSE_PreviewSwitchCurrent(SwitchKey)).Bind(Key)
+	}
+	Magic := MenuRenderer_CheckRow("preview_magic_control", "preview_star_enabled", Commands, Getters)
+	Colored := MenuRenderer_CheckRow("preview_colored_control", "preview_colored_tooltips", Commands, Getters)
+	if !(Magic is Map) || !(Colored is Map)
+		return []
+	Presence := []
+	Declarations := _MR_GetManifestRoot().Get("preview_presence_controls", false)
+	if !(Declarations is Array)
+		return []
+	for Declaration in Declarations {
+		Row := MenuRenderer_CheckRow("preview_presence_controls", Declaration["id"], Commands, Getters)
+		if !(Row is Map)
+			return []
+		Presence.Push(Row)
+	}
+	Sub := MenuRenderer_TemplateRows("hotstrings_preview_frame", Map(), Map(), Map(
+		"parameter_preview_magic", (*) => [Magic],
+		"parameter_preview_presence", (*) => Presence,
+		"parameter_preview_colored", (*) => [Colored]))
+	if !(Sub is Array)
+		return []
+	Rows := MenuRenderer_TemplateRows("hotstrings_preview_parent", Map(),
+		Map("parameter_parent_ready", (*) => true), Map("parameter_preview_children", Sub))
+	return Rows is Array ? Rows : []
+}
+
 ; Label for the "default expansion delay" item: "Default : <ms>[ (default)]". The
 ; "(default)" marker shows when no global override is set — the effective value
 ; is then the built-in GLOBAL_DEFAULT_DELAY fallback.

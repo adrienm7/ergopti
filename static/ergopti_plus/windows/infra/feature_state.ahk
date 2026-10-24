@@ -16,6 +16,10 @@
 ; boot.ahk.  Do not dereference boot-owned path globals while constructing the
 ; declaration: their empty standalone values are harmless and the real driver
 ; has assigned both before this file executes.
+; The preview-switch readers the loader publishes to. The engine includes the same
+; file; an already included file is skipped.
+#Include hotstrings/preview_switches.ahk
+
 global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
@@ -259,6 +263,11 @@ ReadScriptConfig(Cache) {
 		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, "arrow_resets_word")
 		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, "shortcut_resets_word")
 		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, "tap_hold_resets_word")
+		; The preview-bubble switches: the stored value, or the manifest default.
+		global HSE_PreviewSwitches
+		HSE_PreviewSwitches := Map()
+		for PreviewKey in HSE_PreviewSwitchKeys()
+				HSE_PreviewSwitches[PreviewKey] := _FeatureStateWordResetFlag(Cache, PreviewKey)
 		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 				HSE_AdvanceRuntimeDecisionGeneration()
 		; Paths are always derived from _ConfigDir at startup and are never persisted.

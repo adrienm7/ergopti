@@ -77,7 +77,10 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 			local file = assert(io.open(path, "wb")); assert(file:write(owned_source)); file:close()
 			local loaded, status = Preferences.load(path)
 			helpers.assert_eq(status, "ok")
-			local state = { preview_colored_tooltips = loaded.preview_colored_tooltips,
+			-- The previews ship on (PAR-24): an absent leaf is the effective value true.
+			local state = { preview_colored_tooltips = loaded.preview_colored_tooltips == nil
+			and require("infra.manifest_reader").default_for("hotstrings.preview_colored_tooltips")
+			or loaded.preview_colored_tooltips,
 				preview_star_enabled = true, preview_autocorrect_enabled = true, preview_ai_enabled = true,
 				delays = {}, expansion_delay = 0.1, trigger_char = "★" }
 			local calls = { native = 0, saves = 0, writes = 0, notices = 0, updates = 0, rollbacks = 0 }
@@ -234,10 +237,11 @@ helpers.describe("preview menu mutation transaction", function()
 			helpers.assert_true(f.read():find('[foreign]\nfuture = "kept" # retained', 1, true) ~= nil)
 			local loaded, status = f.preferences.load(f.path)
 			helpers.assert_eq(status, "ok")
-			helpers.assert_nil(loaded[KEY], "the existing sparse writer removes neutral false")
+			helpers.assert_eq(loaded[KEY], false, "a choice away from the shipped default stays in the file")
 			local effective = loaded[KEY]
 			if effective == nil then effective = require("infra.manifest_reader").default_for("hotstrings." .. KEY) end
 			helpers.assert_eq(effective, false, "the acknowledged choice remains effective after reload")
+			helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings." .. KEY), true)
 		end)
 	end)
 end)
@@ -339,8 +343,8 @@ helpers.describe("declared magic preview checkbox", function()
 			helpers.assert_eq(f.calls.updates, 1)
 			local loaded, status = f.preferences.load(f.path)
 			helpers.assert_eq(status, "ok")
-			helpers.assert_nil(loaded.preview_star_enabled)
-			helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings.preview_star_enabled"), false)
+			helpers.assert_eq(loaded.preview_star_enabled, false)
+			helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings.preview_star_enabled"), true)
 			helpers.assert_true(f.read():find('[foreign]\nfuture = "kept" # retained', 1, true) ~= nil)
 		end, nil, nil, "preview_star_enabled")
 	end)
@@ -428,8 +432,8 @@ helpers.describe("declared autocorrection and AI preview presence", function()
 				helpers.assert_eq(f.runtime(), false)
 				local loaded, status = f.preferences.load(f.path)
 				helpers.assert_eq(status, "ok")
-				helpers.assert_nil(loaded[key], "the existing sparse writer removes the neutral false leaf")
-				helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings." .. key), false)
+				helpers.assert_eq(loaded[key], false, "a choice away from the shipped default stays in the file")
+				helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings." .. key), true)
 				local neighbour = key == "preview_ai_enabled" and "preview_autocorrect_enabled" or "preview_ai_enabled"
 				helpers.assert_eq(loaded[neighbour], true)
 				helpers.assert_true(f.read():find('future = "kept" # retained', 1, true) ~= nil)

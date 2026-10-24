@@ -2765,8 +2765,15 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 			: HotstringsResolve(Entry.Category, Entry.Section)
 		if !Cfg.ShowTooltip
 			continue
-		Color := (Cfg.Color != "") ? Cfg.Color : ""
 		Decision := Entry.FireDecision
+		; The preview switches decide which family may paint at all: the star
+		; family (magic-key completion) and the autocorrect family (end character)
+		; each have their own, as on macOS and Linux. Dispatch is unaffected.
+		if !HSE_PreviewSwitchCurrent(HSE_PreviewFamilySwitch(Decision))
+			continue
+		; The tint is the colour switch's: off, every bubble is neutral.
+		Color := (Cfg.Color != "" && HSE_PreviewSwitchCurrent("preview_colored_tooltips"))
+			? Cfg.Color : ""
 		GateDurationMs := Decision.HasOwnProp("GateDurationMs")
 			? Decision.GateDurationMs : 0
 		RemainingMs := Decision.HasOwnProp("RemainingMs")
@@ -2791,7 +2798,7 @@ _LookupAndRender(CollectFn := unset, ResolveFn := unset) {
 	HotPath_LogIfSlow("Prefix.PreviewMetadata", MetadataStarted)
 	if (Items.Length == 0) {
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG all candidates have ShowTooltip=false, hiding.")
+			LoggerDebug("PrefixWatcher", "DBG no candidate may be shown (ShowTooltip=false or its preview switch off), hiding.")
 		_PrefixRetireEmptyLookup(EmptyOwner, "LookupNoItems")
 		return
 	}

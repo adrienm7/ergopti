@@ -31,10 +31,10 @@ local STAR = "★" -- magic key trigger (UTF-8 literal, as used across the .lua 
 local KEYMAP_WIRED = {
 	["hotstrings.expansion_delay"]             = 0.75,
 	["hotstrings.trigger_char"]                   = STAR,
-	["hotstrings.preview_star_enabled"]        = false,
-	["hotstrings.preview_autocorrect_enabled"] = false,
-	["hotstrings.preview_ai_enabled"]          = false,
-	["hotstrings.preview_colored_tooltips"]    = false,
+	["hotstrings.preview_star_enabled"]        = true,
+	["hotstrings.preview_autocorrect_enabled"] = true,
+	["hotstrings.preview_ai_enabled"]          = true,
+	["hotstrings.preview_colored_tooltips"]    = true,
 }
 
 

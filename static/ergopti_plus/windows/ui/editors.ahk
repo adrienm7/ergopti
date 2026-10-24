@@ -624,6 +624,8 @@ _EditorWordResetGlobal(Key, Value) {
 		HSE_ShortcutResetsWord := Value
 	else if (Key == "tap_hold_resets_word")
 		HSE_TapHoldResetsWord := Value
+	else if HSE_PreviewSwitchIsKnown(Key)
+		HSE_PreviewSwitchPublish(Key, Value)
 	else
 		throw ValueError("Unknown word-reset setting: " . Key)
 }
@@ -758,6 +760,31 @@ ToggleHotstringsClickResetsWord(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 ToggleHotstringsWordResetFlag(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return _EditorCommitWordReset(Key, !HSE_WordResetFlagCurrent(Key),
 		"the " . Key . " toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips one preview-bubble switch (hotstrings.preview_star_enabled,
+ * preview_autocorrect_enabled, preview_ai_enabled, preview_colored_tooltips).
+ * The engine and the prediction path read the switches live, so there is no
+ * reload; the bubble on screen is retired because it was promised under the old
+ * value (macOS and Linux revoke it the same way).
+ * @param {String} Key One of HSE_PreviewSwitchKeys().
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsPreviewSwitch(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_PreviewSwitchIsKnown(Key) {
+		try LoggerError("Editors", "Refused unknown preview switch.")
+		return false
+	}
+	Candidate := !HSE_PreviewSwitchCurrent(Key)
+	if !_EditorCommitWordReset(Key, Candidate, "the " . Key . " toggle",
+			WriterFn, NotifyFn, RebuildFn)
+		return false
+	; Retire what the old value promised: a bubble on screen, a prediction timer.
+	TooltipHide("PreviewSwitch", true)
+	if (Key == "preview_ai_enabled" && !Candidate && IsSet(LLM_Engine_CancelTimer))
+		LLM_Engine_CancelTimer()
+	return true
 }
 
 _PersonalInfoReportSaveFailure(NotifyFn := 0) {
