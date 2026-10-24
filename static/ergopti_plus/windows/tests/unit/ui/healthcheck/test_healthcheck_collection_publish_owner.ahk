@@ -36,9 +36,48 @@ _HCPT_ClassOwner() {
 	return Found
 }
 
+; Observe the real swallowed launch exception in a private, reversible whole owner.
+_HCPT_ObservedCollection(Root, Owner) {
+	Original := FSReadStrict(Owner), Code := _DriverMaskNonCode(&Original)
+	Definition := _DriverFindFunctionDefinition(&Code, "Start", 1, true)
+	AssertTrue(IsObject(Definition), "The genuine collection Start method must exist.")
+	AssertFalse(IsObject(_DriverFindFunctionDefinition(&Code, "Start", Definition.Idx + 1, true)),
+		"Only one genuine Start method may receive the diagnostic observer.")
+	Depth := 0, Cursor := Definition.OpenPos, Closed := 0
+	while Cursor <= StrLen(Code) {
+		Character := SubStr(Code, Cursor, 1)
+		if Character == "{"
+			Depth += 1
+		else if Character == "}" {
+			Depth -= 1
+			if Depth == 0 {
+				Closed := Cursor
+				break
+			}
+		}
+		Cursor += 1
+	}
+	AssertTrue(Closed > Definition.OpenPos && Depth == 0, "The genuine method must retain its balanced raw range.")
+	Method := SubStr(Original, Definition.Idx, Closed - Definition.Idx + 1)
+	Anchor := "`t`t} catch as Err {`n"
+	Observation := '`t`t`ttry _EDOS_Phase("collection Start caught exception", Err)' . "`n"
+	Observed := StrReplace(Method, Anchor, Anchor . Observation, true, &Changed)
+	AssertEqual(1, Changed, "Only the genuine Start catch may receive a passive exception observation.")
+	Private := SubStr(Original, 1, Definition.Idx - 1) . Observed . SubStr(Original, Closed + 1)
+	Restored := StrReplace(Private, Observation, "", true, &Removed)
+	AssertEqual(1, Removed)
+	AssertEqual(Original, Restored, "Removing the observation must reproduce the entire production owner exactly.")
+	Path := Root . "\collection-start-observed.ahk"
+	AssertTrue(FSWriteCreateDurable(Path, Private))
+	_TestPrint("# collection-owner diagnostic original_sha256=" . CryptoSha256Bytes(FSReadBytesStrict(Owner))
+		. " private_sha256=" . CryptoSha256Bytes(FSReadBytesStrict(Path)))
+	return Path
+}
+
 _HCPT_Source(Root) {
 	global _DriverDir
 	Source := _EDOT_Source(Root), Owners := Map(), Added := ""
+	CollectionOwner := _DriverProductionFileForSymbol("HealthCheck_CollectWindows", _DriverDir)
 	for Symbol in ["_Updater_ShowManagedDownloadFailure", "_LLM_NavEventOwnerPortFn", "OllamaNativeIdentityDrain",
 		"ShellRunner_SpawnTreeOwned", "BootClockWallMs", "BootProfile_MenuWaitMs", "HotPath_RecordLatency", "WMHandleExists",
 		"HealthCheck_CollectWindows", "HealthCheck_CancelProbes", "HealthCheck_ValidateAction", "HealthCheck_PerformAction",
@@ -46,7 +85,8 @@ _HCPT_Source(Root) {
 		Owner := _DriverProductionFileForSymbol(Symbol, _DriverDir)
 		if !Owners.Has(Owner) {
 			Owners[Owner] := true
-			Added .= "#Include " . Owner . "`n"
+			IncludeOwner := Owner == CollectionOwner ? _HCPT_ObservedCollection(Root, Owner) : Owner
+			Added .= "#Include " . IncludeOwner . "`n"
 		}
 	}
 	Added .= "#Include " . _HCPT_ClassOwner() . "`n"
