@@ -1253,7 +1253,7 @@ function M.validate_action_parameter(action_name, value)
 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
-	if spec == "program" then return ProgramParameter.parse(value, "linux") ~= nil end
+	if spec == "program" then return ProgramParameter.parse(value, "posix") ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1400,7 +1400,7 @@ local function capture_program(binding)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
 	local scalar = M.get_action_parameter(binding, "run_program")
-	if ProgramParameter.parse(scalar, "linux") == nil then return nil end
+	if ProgramParameter.parse(scalar, "posix") == nil then return nil end
 	local content, status = FileSystem.read_with_status(_config_path)
 	if status ~= "ok" or type(content) ~= "string" then return nil end
 	local decoded, config = pcall(TomlCodec.decode, content)

@@ -58,7 +58,7 @@ local function with_provider(kind, options, body)
 			return receipt(options.parameter)
 		end,
 		validate_action_parameter = function(_, value)
-			if selected == "run_program" then return ProgramParameter.parse(value, "hs") ~= nil end
+			if selected == "run_program" then return ProgramParameter.parse(value, "posix") ~= nil end
 			return value == scalar
 		end,
 		parameter_prompt = function() return "Program" end,

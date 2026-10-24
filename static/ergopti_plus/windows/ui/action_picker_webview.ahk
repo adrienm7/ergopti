@@ -354,7 +354,8 @@ _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative, BindingId := "") {
 		. _ActPickWeb_Kv("searchPlaceholder", t("dialog.action_picker.search")) . ","
 		. _ActPickWeb_Kv("noResults", t("dialog.action_picker.no_results")) . ","
 		. _ActPickWeb_Kv("cancelLabel", t("button.cancel")) . ","
-		. _ActPickWeb_Kv("platform", "ahk") . ","
+		. _ActPickWeb_Kv("executableSyntax", "windows") . ","
+		. '"commandIsPrimary":false,'
 		. '"sendVocabulary":' . SendInputVocabularyJson() . ","
 		. '"parameterStrings":' . _ActPickWeb_ParameterStringsJson() . ","
 		. '"programProviders":' . _ActPickWeb_ProgramPacketJson() . ","

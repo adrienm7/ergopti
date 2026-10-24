@@ -582,18 +582,18 @@ helpers.describe("private user program durable parameter receipts", function()
 end)
 
 helpers.describe("private program lossless shared parameter corpus", function()
-	helpers.it("checks every platform against independently declared literal vectors", function()
+	helpers.it("checks every executable syntax against independently declared literal vectors", function()
 		local Json, Program = require("json"), require("program_parameter")
 		local file = assert(io.open(require("infra.paths").shared("tests/corpus/action_parameters/program_vectors.json"), "rb"))
 		local corpus = assert(Json.decode_lossless(file:read("*a"))); file:close()
 		local count = 0
 		for _, vector in ipairs(corpus.cases) do
-			for _, platform in ipairs(vector.platforms) do
-				local actual = Program.parse(vector.value, platform)
+			for _, syntax in ipairs(vector.syntaxes) do
+				local actual = Program.parse(vector.value, syntax)
 				if Json.is_null(vector.expected) then
-					helpers.assert_eq(actual, nil, vector.id .. "/" .. platform)
+					helpers.assert_eq(actual, nil, vector.id .. "/" .. syntax)
 				else
-					helpers.assert_not_nil(actual, vector.id .. "/" .. platform)
+					helpers.assert_not_nil(actual, vector.id .. "/" .. syntax)
 					if actual then
 						helpers.assert_eq(actual.executable, vector.expected.executable)
 						helpers.assert_eq(actual.arguments, vector.expected.arguments)
@@ -602,7 +602,7 @@ helpers.describe("private program lossless shared parameter corpus", function()
 				count = count + 1
 			end
 		end
-		helpers.assert_eq(count, 63, "the whole independent cross-platform vector census executes")
+		helpers.assert_eq(count, 42, "the whole independent cross-syntax vector census executes")
 	end)
 end)
 

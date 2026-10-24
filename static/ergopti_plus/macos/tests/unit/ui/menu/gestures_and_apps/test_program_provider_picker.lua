@@ -319,7 +319,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	end
 	helpers.it("malformed syntax stays with the existing parameter owner", function()
 		fixture(function(f)
-			helpers.assert_eq(require("program_parameter").parse("not JSON", "hs"), nil)
+			helpers.assert_eq(require("program_parameter").parse("not JSON", "posix"), nil)
 			helpers.assert_eq(f.utils.program_assignment_reason("not JSON"), nil)
 			helpers.assert_eq(f.native_tasks, 0)
 		end)
@@ -450,7 +450,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 			local scalar = f.utils.ask_parameter_value({ parameter_prompt = function() return "Program" end }, "run_program", "program", "T", RESERVED)
 			local planner = require("shortcuts.physical_entries").new({ parse = function() return true end, owns = function() return true end }, {
 				is_assignable = function() return true end, get_action_parameter_spec = function() return "program" end,
-				validate_action_parameter = function(_, value) return require("program_parameter").parse(value, "hs") ~= nil end,
+				validate_action_parameter = function(_, value) return require("program_parameter").parse(value, "posix") ~= nil end,
 				split_action_parameter_key = function() return nil end,
 			}, { parameter_section = "gestures.action_parameters" })
 			local rows, reason = planner.plan({ operation = "add", slot = "position", action = "run_program", parameter = scalar }, { assignments = {}, parameters = {} })

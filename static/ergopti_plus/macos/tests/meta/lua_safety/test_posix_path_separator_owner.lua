@@ -37,7 +37,7 @@ local OWNER = "_shared/lua/native_path.lua"
 -- Genuine Windows-path parsers, which must see both separators on every host:
 -- path = { count, reason }.
 local WINDOWS_PATH_PARSERS = {
-	["_shared/lua/program_parameter.lua"] = { 3, "validates a drive or UNC executable typed for the AHK driver" },
+	["_shared/lua/program_parameter.lua"] = { 3, "validates a drive or UNC executable in the windows executable syntax" },
 	["_shared/lua/diagnostics/redact.lua"] = { 1, "redacts the home folder in both slash spellings a log can hold" },
 	["_shared/lua/open_target/init.lua"] = { 3, "classifies a drive, UNC or %VARIABLE% target as Windows-only" },
 	["_shared/lua/updater/config_backup.lua"] = { 1,

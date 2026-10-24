@@ -113,7 +113,7 @@ sys.exit(37)
 		local discovery, key = discover(label)
 		local arguments = { record }; for _, value in ipairs(literals) do arguments[#arguments + 1] = value end
 		local scalar = assert(discovery.resolve(key, arguments))
-		local parsed = assert(Parameter.parse(scalar, "linux"))
+		local parsed = assert(Parameter.parse(scalar, "posix"))
 		assert(parsed.executable == (label:match("%.sh$") and native_targets.sh
 			or label:match("%.py$") and native_targets.python3 or scripts .. "/" .. label))
 		local owner, handle, statuses, receipts = run(scalar)
@@ -155,7 +155,7 @@ sys.exit(99)
 	local scalar = assert(discovery.resolve(key, {}))
 	assert(uv.fs_chmod(scripts .. "/exécutable direct", 384))
 	assert(discovery.resolve(key, {}) == nil, "changed permissions invalidate the discovered choice")
-	local parsed = assert(Parameter.parse(scalar, "linux"))
+	local parsed = assert(Parameter.parse(scalar, "posix"))
 	local completed = 0
 	local refused = Runner.spawn(parsed.executable, parsed.arguments, function() completed = completed + 1 end, function() return true end)
 	handles[#handles + 1] = refused
@@ -168,7 +168,7 @@ sys.exit(99)
 	assert(uv.fs_lstat(absent) == nil)
 	write(scripts .. "/refus direct", "#!" .. absent .. "\n", 448)
 	discovery, key = discover("refus direct")
-	parsed = assert(Parameter.parse(assert(discovery.resolve(key, {})), "linux"))
+	parsed = assert(Parameter.parse(assert(discovery.resolve(key, {})), "posix"))
 	assert(Runner.available(parsed.executable), "fixture must reach actual native exec after mode admission")
 	local native_refused = Runner.spawn(parsed.executable, parsed.arguments,
 		function() completed = completed + 1 end, function() return true end)
