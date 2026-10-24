@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-0464",
-			"ordinal": 466,
+			"ordinal": 467,
 			"name": "key-combination defaults are the same on the three drivers",
 			"cmd": "node",
 			"args": ["tools/test/test-key-combination-defaults-parity.cjs"],
