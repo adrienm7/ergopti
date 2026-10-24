@@ -5,6 +5,8 @@
 
 ; Foreign scalar/array preferences belong to this owner, not the Features map.
 ; Removing their overrides reuses this owner's existing load-time defaults.
+; A key the Windows manifest also declares is already planned by the manifest
+; scope, and a second row for it makes the scope refuse as overlapping owners.
 _LLM_Menu_ScopeResetOperations(ScopeId, Mode) {
 	if ScopeId != "llm" || !(Mode == "recommended" || Mode == "clear")
 		throw ValueError("LLM persistence cannot reset another configuration scope.")
@@ -15,6 +17,8 @@ _LLM_Menu_ScopeResetOperations(ScopeId, Mode) {
 				continue
 			if !(Section == "llm" || SubStr(Section, 1, 4) == "llm.")
 				throw ValueError("An LLM preference escaped its owned configuration namespace.")
+			if ManifestFindEntryByPath(Section . "." . Key) is Map
+				continue
 			Rows.Push({ Section: Section, Key: Key, Delete: true })
 		}
 	}
