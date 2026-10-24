@@ -203,7 +203,14 @@ local function parse_http_url(url)
 	end
 	if not host or host == "" then return nil, "redirect URL has no host" end
 	if port == "" then port = scheme == "https" and "443" or "80" end
-	if not port:match("^%d+$") then return nil, "redirect URL has an invalid port" end
+	-- The shared redirect law admits ports 1 to 65535 and compares them as
+	-- numbers, so a padded spelling names the same origin.
+	port = port:match("^0*(%d+)$")
+	local number = port and #port <= 5 and tonumber(port)
+	if not number or number < 1 or number > 65535 then
+		return nil, "redirect URL has an invalid port"
+	end
+	port = tostring(number)
 	local path = tail:match("^([^?#]*)") or ""
 	if path == "" then path = "/" end
 	return {
