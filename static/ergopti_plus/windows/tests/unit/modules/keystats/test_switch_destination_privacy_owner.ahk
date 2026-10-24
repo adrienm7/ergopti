@@ -37,6 +37,12 @@ _KSD_ChildSource() {
 	Flush := _DriverFuncBody("KL_FlushBuffer")
 	AssertTrue(RegExMatch(Flush, "^KL_FlushBuffer\(") > 0)
 	Source .= RegExReplace(Flush, "^KL_FlushBuffer", "_KSD_NativeFlush") . "`n"
+	; KL_AppendLog and the hook sources ask the capture gate (Suspend or the
+	; metrics pause) that the collection module owns.
+	GateOwner := _DriverProductionFileForSymbol("KL_CaptureHeld", _DriverDir)
+	AssertTrue(RegExMatch(FileRead(GateOwner, "UTF-8"), "ms)^class KLCollection \{.*?^\}", &GateClass) > 0,
+		"The child must use the actual capture gate class KLCollection")
+	Source .= GateClass[0] . "`n" . _DriverFuncBody("KL_CaptureHeld") . "`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\switch_destination_privacy_owner_body.ahk`n"
 }
 
