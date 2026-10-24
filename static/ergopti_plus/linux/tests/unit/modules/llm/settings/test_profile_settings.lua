@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local RegistryCodec = require("modules.llm.profile_registry_codec")
+local RegistryCodec = require("llm.profile_registry_codec")
 
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
