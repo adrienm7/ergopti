@@ -24,6 +24,32 @@ answer once, then move the answered line below.
 
 ## Answered
 
+- **Answers of 2026-10-24 evening (QCM):**
+  - **PAR-6:** yes, `hotstrings.expansion_delay` becomes user-settable on all three drivers; the per-section delays
+    become optional offsets from that base.
+  - **PAR-8:** write the built-in delimiter states through the live config writer (no reload per click), drop the
+    override-file strings, keep custom delimiters as records, but KEEP the per-character "consumed" option and carry it
+    to macOS and Linux as well.
+  - **PAR-15:** per-key tap-hold thresholds on macOS too, after the key-id vocabularies are reconciled (shared with
+    PAR-41).
+  - **PAR-21:** delete the Linux autocompletion delay row; `llm.trigger.debounce_ms` is the only delay.
+  - **PAR-24:** migrate Windows `category_enabled.dynamichotstrings` to `hotstrings.dynamic.enabled`, with a config
+    migration that keeps the old value.
+  - **Hotstring cascading:** build it for every hotstring, shipped pack included, behind a user setting: the
+    cascade depth, 0 disables it, 1 lets a hotstring output trigger one more hotstring, and so on (for example
+    `chatg` > `chatgpt` > `ChatGPT` when both are enabled). Keep SendInput and a same-spec guard.
+  - **Space tap-hold:** a Space tap must complete an end-character trigger exactly like a plain space; only the
+    hold runs the action.
+  - **Recommended defaults rule (gestures, keys):** by default recommend nothing that conflicts with the system's
+    own default; every combination stays reassignable, as on macOS, and the menu says clearly to remove the system
+    assignment first to avoid a double action. On Linux the recommended three- and four-finger swipes become `none`.
+  - **AI off on Linux:** disarm the agent's automatic mode and the `llm_*` chords, as on macOS and Windows.
+  - **macOS recommendations:** one shared trigger debounce value for all OS; gestures follow the rule above; keep
+    MLX on macOS (a real platform difference, with its reason); never touch the user's number row or layout by
+    default on any OS, both stay options the user turns on.
+  - **PAR-12:** enable token streaming on Windows after a live Ollama check on the PC.
+  - **Windows prediction tooltip Gui pool:** decide after measuring with and without the pool in the PC logs.
+
 - **#99: automatic proxy discovery without a WPAD server (answered October 22):** not the
   maintainer's setup, no change. His Mac has Auto Proxy Discovery off and Automatic Proxy
   Configuration on with a corporate PAC URL; the static Web (HTTP), Secure Web (HTTPS), SOCKS
