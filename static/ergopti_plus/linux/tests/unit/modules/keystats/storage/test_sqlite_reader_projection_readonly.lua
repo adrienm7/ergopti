@@ -901,7 +901,7 @@ helpers.describe("linux-sqlite-text-nul", function()
 		helpers.assert_nil(day["Fire"], "a NUL-cut application id is a different application")
 		local entry = day[TEXT.app]
 		helpers.assert_true(entry ~= nil, "the complete application id keys the manifest")
-		helpers.assert_true(entry.titles[TEXT.title] ~= nil and entry.titles["Doc"] == nil)
+		helpers.assert_true(entry.win_titles[TEXT.title] ~= nil and entry.win_titles["Doc"] == nil)
 		helpers.assert_true(entry.layouts_seen[TEXT.layout] ~= nil and entry.layouts_seen["fr"] == nil)
 		helpers.assert_true(entry.switches_to[TEXT.app_to] ~= nil and entry.switches_to["Term"] == nil)
 		for _, sql in ipairs(statements) do
@@ -932,5 +932,25 @@ helpers.describe("linux-sqlite-text-nul", function()
 			helpers.assert_eq(complete, false, quoted)
 			helpers.assert_nil(next(manifest), quoted)
 		end
+	end)
+end)
+
+
+helpers.describe("linux-sqlite-dashboard-keys", function()
+	-- The shared metrics page reads `win_titles`, as the Windows and macOS
+	-- readers project it; the Linux reader landed the rows under `titles`, so its
+	-- window-title panel stayed empty (keystats SQL census, PAR-67).
+	helpers.it("linux-sqlite-dashboard-keys: window titles land under win_titles", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if not sql:find("FROM agg_app_day_titles", 1, true) then return "[]" end
+			return Json.encode({ { date = "2026-10-01", app_json = Json.encode("Code"),
+				title_json = Json.encode("main.lua"), c = 500, ms = 1200000 } })
+		end, function(reader)
+			manifest = reader.read_manifest("/db/metrics.sqlite", "2026-10-01", "2026-10-01", {})
+		end)
+		local entry = manifest["2026-10-01"].Code
+		helpers.assert_eq(entry.win_titles["main.lua"], { c = 500, ms = 1200000 })
+		helpers.assert_nil(entry.titles, "no second key the page never reads")
 	end)
 end)
