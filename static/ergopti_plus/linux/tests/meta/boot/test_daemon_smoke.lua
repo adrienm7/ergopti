@@ -120,6 +120,11 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local expiry_call = "ExpansionDelay.allows(result, delay_sec, Monotonic.resolution_ms(),"
       helpers.assert_true(src:find(expiry_call, 1, true) ~= nil,
         "expiry must evaluate the last-letter-to-expander interval against the stamping clock's resolution")
+      local gate = io.open(driver_root .. "/modules/hotstrings/expansion_delay.lua", "r")
+      helpers.assert_true(gate ~= nil, "expansion delay gate is readable")
+      local gate_src = gate:read("*a"); gate:close()
+      helpers.assert_true(gate_src:find("Engine.within_expansion_delay(result, delay_sec, resolution_ms, factor)", 1, true) ~= nil,
+        "the gate must hand the stamping clock's resolution to the shared engine rule")
       helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
         "a single previous-key timestamp cannot be reset at every text-context boundary")
 
