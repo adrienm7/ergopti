@@ -5627,7 +5627,7 @@ local function _build_debug(ctx)
 		["healthcheck"]    = call_ctx("on_healthcheck"),
 		["composer_check"] = call_ctx("on_composer_check"),
 		-- Self-contained like the report rows: the check reads its own settings and ports
-		["field_check_network"] = function() require("ui.network_check").run() end,
+		["field_check_network"] = function() require("ui.field_check.network_check").run() end,
 		-- Self-contained: the report reads the daemon state the webview manager
 		-- already holds, so the daemon supplies no callback for them
 		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,

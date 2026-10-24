@@ -183,7 +183,13 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //   36/59 (61.0 %) — merge the two symmetric additions above. Their
 //                    independent branch measurements share the same base; both
 //                    paths remain in the combined tracked driver tree.
-const BASELINE_SHARED = 36;
+//   39/62 (62.9 %) — 2026-10-24: ui/field_check, the host of the one-click
+//                    Debug checks, landed on macOS and Windows; the three Linux
+//                    check modules moved from flat ui/ files into
+//                    ui/field_check/, so the path is shared on all three. The
+//                    measurement had also carried two paths of slack (38 against
+//                    36); tightened to the measurement.
+const BASELINE_SHARED = 39;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -241,7 +247,12 @@ const BASELINE_SHARED = 36;
 //   Windows and macOS use their own native file APIs and gain no wrapper folders.
 //   Shared-count36 and canonical-source17 remain unchanged. No generated bin,
 //   private fixture directory or implementation-independent feature is counted.
-const BASELINE_UNION = 60;
+//   60 -> 62 on 2026-10-24 - ui/field_check is one path on all three drivers,
+//   paired with BASELINE_SHARED 39 (symmetric growth). vendor/remap-runtime is
+//   macOS only: it pins the owned Karabiner remap runtime and its VirtualHID
+//   driver package (ADR 011), which neither Windows nor Linux ships; a
+//   counterpart folder there would hold nothing.
+const BASELINE_UNION = 62;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //
