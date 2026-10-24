@@ -51,8 +51,8 @@ local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
 -- Records from the (expensive) HIToolbox active-layout probe. nil until first
 -- computed; refreshed asynchronously so menu opens never pay a subprocess.
 local _active_layouts_cache = nil
--- Epoch seconds of the last async refresh (throttle anchor); 0 forces a refresh.
-local _active_layouts_last_refresh = 0
+-- Awake seconds of the last refresh attempt; nil admits the initial sample, including zero.
+local _active_layouts_last_refresh = nil
 -- Exact active read-only probe owner. ShellRunner retains every native task
 -- through settlement; this owner additionally fences cache publication and the
 -- watchdog so a late terminal cannot overwrite a successor.
@@ -226,7 +226,7 @@ end
 local function invalidate_active_layouts_cache()
 	_active_layouts_generation = _active_layouts_generation + 1
 	_active_layouts_cache        = nil
-	_active_layouts_last_refresh = 0
+	_active_layouts_last_refresh = nil
 end
 
 --- Test seam: overwrite the active-layout cache directly (latency tests prime it
@@ -581,12 +581,12 @@ end
 --- spawn overlapping probes.
 --- @param force boolean|nil When true, bypasses the throttle (startup prime).
 local function maybe_refresh_active_layouts(force)
-	local now = (hs.timer and type(hs.timer.secondsSinceEpoch) == "function")
-		and hs.timer.secondsSinceEpoch() or nil
-	if not force and now and (now - _active_layouts_last_refresh) < ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC then
+	local now = TimerScheduler.awake_time()
+	if not force and _active_layouts_last_refresh ~= nil
+		and (now - _active_layouts_last_refresh) < ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC then
 		return
 	end
-	if now then _active_layouts_last_refresh = now end
+	_active_layouts_last_refresh = now
 	refresh_active_layouts_async(nil)
 end
 
