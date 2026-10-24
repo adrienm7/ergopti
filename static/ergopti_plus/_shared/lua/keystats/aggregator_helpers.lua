@@ -36,6 +36,9 @@ M.CASCADE_MIN_BS = 3
 --- Lookback ring buffer length for HS / LLM trigger-time reclassification.
 M.TRIGGER_LOOKBACK_LEN = 50
 
+--- Erasable typed entries a context keeps for backspace attribution.
+M.HIST_CAP = 8
+
 --- Keycodes counted as "content" for same-finger/same-hand streak tracking.
 M.CONTENT_KCS = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11,

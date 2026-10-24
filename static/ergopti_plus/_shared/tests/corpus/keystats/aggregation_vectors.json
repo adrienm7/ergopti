@@ -577,6 +577,323 @@
 				"ergo_focus_sum_ms": 300,
 				"ergo_focus_count": 1
 			}
+		},
+		{
+			"id": "punctuation_ends_a_word",
+			"description": "A comma ends the open word like a space does (the Windows separator set, shared by every driver)",
+			"events": [
+				{
+					"type": "typing",
+					"app": "PunctApp",
+					"timestamp": "2024-06-01 10:00:00.000",
+					"events": [
+						{
+							"char": "h",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "i",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": ",",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "y",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "o",
+							"delay": 100,
+							"meta": {}
+						}
+					]
+				}
+			],
+			"expected": {
+				"last_prev_word": "hi",
+				"last_cur_word": "yo",
+				"ngram_words": ["hi"],
+				"chars_class_punct": 1
+			}
+		},
+		{
+			"id": "synthetic_output_keeps_the_finger_streak",
+			"description": "Driver output (a hotstring correction and expansion) neither extends nor breaks a same-finger run; meta.kc are macOS virtual keycodes and the characters their QWERTY glyphs",
+			"events": [
+				{
+					"type": "typing",
+					"app": "StreakApp",
+					"timestamp": "2024-06-01 10:00:00.000",
+					"events": [
+						{
+							"char": "f",
+							"delay": 100,
+							"meta": {
+								"kc": 3
+							}
+						},
+						{
+							"char": "g",
+							"delay": 100,
+							"meta": {
+								"kc": 5
+							}
+						},
+						{
+							"char": "[BS]",
+							"delay": 100,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						},
+						{
+							"char": "x",
+							"delay": 100,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						},
+						{
+							"char": "v",
+							"delay": 100,
+							"meta": {
+								"kc": 9
+							}
+						}
+					]
+				}
+			],
+			"expected": {
+				"ergo_same_finger_max": 3,
+				"ergo_same_hand_max": 3
+			}
+		},
+		{
+			"id": "synthetic_correction_is_not_a_typing_error",
+			"description": "A hotstring erasing its trigger counts as synthetic corrections (es) and trigger input, never as a typing error",
+			"events": [
+				{
+					"type": "typing",
+					"app": "SynthBsApp",
+					"timestamp": "2024-06-01 10:00:00.000",
+					"events": [
+						{
+							"char": "b",
+							"delay": 150,
+							"meta": {}
+						},
+						{
+							"char": "t",
+							"delay": 150,
+							"meta": {}
+						},
+						{
+							"char": "w",
+							"delay": 150,
+							"meta": {}
+						},
+						{
+							"char": "[BS]",
+							"delay": 10,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						},
+						{
+							"char": "[BS]",
+							"delay": 10,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						},
+						{
+							"char": "[BS]",
+							"delay": 10,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						},
+						{
+							"char": "b",
+							"delay": 10,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						},
+						{
+							"char": "y",
+							"delay": 10,
+							"meta": {
+								"s": true,
+								"st": "hotstring"
+							}
+						}
+					]
+				}
+			],
+			"expected": {
+				"hourly_es": 3,
+				"hourly_e": 0,
+				"errors_bs_total": 0,
+				"trigger_buckets_hs_count": 24,
+				"app_day": {
+					"2024-06-01\u0001SynthBsApp": {
+						"chars": 3,
+						"hs_input_chars": 3,
+						"hs_chars": 2,
+						"hs_triggers": 1
+					}
+				}
+			}
+		},
+		{
+			"id": "typed_minutes_use_five_minute_slots",
+			"description": "The first and last typed minute of an application day are its five-minute slots, as the activity histogram bins them",
+			"events": [
+				{
+					"type": "typing",
+					"app": "SlotApp",
+					"timestamp": "2024-06-01 10:07:30.000",
+					"events": [
+						{
+							"char": "a",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "b",
+							"delay": 100,
+							"meta": {}
+						}
+					]
+				}
+			],
+			"expected": {
+				"chars_class_first_typed_min": "10:05",
+				"chars_class_last_typed_min": "10:05",
+				"hourly_c": 2
+			}
+		},
+		{
+			"id": "layout_counts_one_per_typing_entry",
+			"description": "A layout tag counts the typing entry it was recorded on, not each keystroke of it",
+			"events": [
+				{
+					"type": "typing",
+					"app": "LayoutApp",
+					"timestamp": "2024-06-01 10:00:00.000",
+					"layout": "ergopti",
+					"events": [
+						{
+							"char": "a",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "b",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "c",
+							"delay": 100,
+							"meta": {}
+						}
+					]
+				}
+			],
+			"expected": {
+				"layouts_count_total": 1
+			}
+		},
+		{
+			"id": "long_run_bounds_the_correction_history",
+			"description": "The erasable history keeps the newest eight entries (the Windows HIST_CAP), so a long run without a pause cannot grow the persisted context",
+			"events": [
+				{
+					"type": "typing",
+					"app": "HistoryApp",
+					"timestamp": "2024-06-01 10:00:00.000",
+					"events": [
+						{
+							"char": "a",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "b",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "c",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "d",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "e",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "f",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "g",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "h",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "i",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "j",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "k",
+							"delay": 100,
+							"meta": {}
+						},
+						{
+							"char": "l",
+							"delay": 100,
+							"meta": {}
+						}
+					]
+				}
+			],
+			"expected": {
+				"last_hist_len": 8,
+				"last_p1": "l"
+			}
 		}
 	],
 	"primitives": {

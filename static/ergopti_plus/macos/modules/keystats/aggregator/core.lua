@@ -21,6 +21,7 @@ local Paths   = require("infra.paths")
 local Timings = require("infra.timings")
 local KUtils    = require("keystats.utils")
 local AggHelper = require("keystats.aggregator_helpers")
+local Walker    = require("keystats.walker")
 local LOG       = "keystats.aggregator"
 local media_policy = nil
 local media_policy_loading, media_policy_handle = false, nil
@@ -171,6 +172,21 @@ M.CASCADE_MIN_BS           = CASCADE_MIN_BS
 M.HOLD_THRESHOLD_MS        = HOLD_THRESHOLD_MS
 M.TITLE_CAP_PER_APP_DAY    = TITLE_CAP_PER_APP_DAY
 M.KC_TO_FINGER             = KC_TO_FINGER
+
+--- The shared walker (_shared/lua/keystats/walker.lua), keyed on the macOS
+--- virtual keycode a typed keystroke carries in meta.kc.
+M.walker = Walker.new({
+	timings = {
+		max_keystroke_delay_ms   = MAX_KEYSTROKE_DELAY_MS,
+		think_pause_ms           = THINK_PAUSE_THRESHOLD_MS,
+		burst_gap_ms             = BURST_GAP_MS,
+		session_gap_ms           = SESSION_GAP_MS,
+		auto_repeat_max_delay_ms = AUTO_REPEAT_MAX_DELAY_MS,
+	},
+	finger_of = function(_char, meta)
+		return type(meta.kc) == "number" and KC_TO_FINGER[meta.kc] or nil
+	end,
+})
 
 
 
