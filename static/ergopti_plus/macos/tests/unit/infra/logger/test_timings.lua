@@ -40,8 +40,6 @@ local WIRED_MS = {
 	{ "keystats", "system_load_poll_ms",    300000 },
 	{ "keystats", "auto_flush_idle_ms",     120000 },
 	-- llm/prediction_engine.lua
-	{ "llm", "prediction_debounce_min_ms",       50 },
-	{ "llm", "prediction_debounce_max_ms",      600 },
 	{ "llm", "chain_fallback_ms",               500 },
 	{ "llm", "dependency_bootstrap_timeout_ms", 1800000 },
 	-- gestures/engine.lua
@@ -73,7 +71,7 @@ helpers.describe("timings: ms / sec accessors", function()
 	end)
 
 	helpers.it("sec is exactly ms / 1000", function()
-		helpers.assert_eq(Timings.sec("llm", "prediction_debounce_max_ms"), 0.6, "debounce_max sec")
+		helpers.assert_eq(Timings.sec("llm", "chain_fallback_ms"), 0.5, "chain_fallback sec")
 		helpers.assert_eq(Timings.sec("gestures", "finger_count_stable_ms"), 0.06, "stable sec")
 	end)
 
