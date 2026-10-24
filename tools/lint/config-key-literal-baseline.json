@@ -45,7 +45,6 @@
 		"static/ergopti_plus/linux/modules/llm/profile_settings.lua": 10,
 		"static/ergopti_plus/linux/modules/llm/profiles.lua": 15,
 		"static/ergopti_plus/linux/modules/llm/runtime_source.lua": 19,
-		"static/ergopti_plus/linux/modules/llm/settings.lua": 13,
 		"static/ergopti_plus/linux/modules/llm/trigger_settings.lua": 9,
 		"static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua": 1,
 		"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua": 3,
