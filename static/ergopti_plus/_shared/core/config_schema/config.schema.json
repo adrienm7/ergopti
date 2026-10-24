@@ -271,7 +271,6 @@
 				"secure_filter_enabled": { "type": "boolean" },
 				"system_auth_filter_enabled": { "type": "boolean" },
 				"encrypt": { "type": "boolean" },
-				"metrics_wpm_menubar_colors": { "type": "boolean" },
 				"disabled_apps": { "type": "array", "items": { "type": "string" } },
 				"wpm_widget_visible": { "type": "boolean" },
 				"wpm_widget_x": { "type": "number" },
@@ -279,12 +278,7 @@
 				"wpm_widget_colors": { "type": "boolean" },
 				"wpm_widget_graph": { "type": "boolean" },
 				"wpm_menubar_visible": { "type": "boolean" },
-				"wpm_menubar_colors": { "type": "boolean" },
-				"menubar_wpm": { "type": "boolean" },
-				"menubar_colors": { "type": "boolean" },
-				"float_wpm": { "type": "boolean" },
-				"float_graph": { "type": "boolean" },
-				"float_colors": { "type": "boolean" }
+				"wpm_menubar_colors": { "type": "boolean" }
 			}
 		},
 

@@ -177,8 +177,10 @@ local function partial_wpm_position(ctx)
 	local config = assert(read(ctx.home .. "/" .. relative))
 	local enabled, enabled_count = config:gsub("%[metrics%]\nenabled = false", "[metrics]\nenabled = true")
 	assert(enabled_count == 1, "the metrics configuration section must be present exactly once")
-	local compact, graph_count = enabled:gsub("float_graph = true", "float_graph = false")
-	assert(graph_count == 1, "the widget graph configuration must be present exactly once")
+	-- The shipped widget is hidden and compact: the scenario shows it, keeping the compact pill.
+	local compact, shown_count = enabled:gsub("wpm_widget_visible = false", "wpm_widget_visible = true")
+	assert(shown_count == 1, "the widget visibility configuration must be present exactly once")
+	assert(compact:find("wpm_widget_graph = false", 1, true), "the shipped widget must be compact")
 	write_home(ctx.home, relative, compact)
 	ctx.settings = { ["ergopti.wpm_widget.pos_x"] = 120 }
 	-- An existing Metrics user already owns its device identity and folders.

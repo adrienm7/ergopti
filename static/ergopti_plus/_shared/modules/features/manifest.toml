@@ -1633,15 +1633,6 @@ input_altering = false
 type = "boolean"
 description_key = "menu.metrics.encrypt_toggle"
 
-[[features.metrics]]
-id = "metrics_wpm_menubar_colors"
-platforms = ["ahk"]
-default = false
-recommended = false
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.metrics_wpm_menubar_colors"
-
 # Applications whose typing is never recorded. The element is that OS's own
 # application identity (executable name, bundle identifier), so only the key
 # and its meaning are shared.
@@ -1656,7 +1647,6 @@ description_key = "menu.metrics.metrics_disabled_apps"
 
 [[features.metrics]]
 id = "wpm_widget_visible"
-platforms = ["ahk", "linux"]
 default = false
 recommended = false
 input_altering = false
@@ -1683,10 +1673,10 @@ description_key = "menu.metrics.wpm_widget_y"
 
 [[features.metrics]]
 id = "wpm_widget_colors"
-platforms = ["ahk", "linux"]
 # Linux used to colour the pill by keystroke origin while Windows ships it
 # neutral. The maintainer decided on 2026-10-22 that Linux recommends what
 # Windows recommends, and a pure parameter's default is its recommendation.
+# macOS shipped it on until 2026-10-24: the three drivers now share one answer.
 default = false
 recommended = false
 input_altering = false
@@ -1695,18 +1685,17 @@ description_key = "menu.metrics.wpm_widget_colors"
 
 [[features.metrics]]
 id = "wpm_widget_graph"
-platforms = ["ahk", "linux"]
 default = false
 recommended = false
 input_altering = false
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_graph"
 
-# The typing-speed readout in the Linux tray, the equivalent of the macOS
-# menu bar item. Same shipped answers as macOS: off, coloured by source once on.
+# The typing-speed readout in the Linux tray and the macOS menu bar. Same
+# shipped answers on both: off, coloured by source once on.
 [[features.metrics]]
 id = "wpm_menubar_visible"
-platforms = ["linux"]
+platforms = ["hs", "linux"]
 default = false
 recommended = false
 input_altering = false
@@ -1715,7 +1704,7 @@ description_key = "menu.metrics.show_wpm_menubar"
 
 [[features.metrics]]
 id = "wpm_menubar_colors"
-platforms = ["linux"]
+platforms = ["hs", "linux"]
 default = true
 recommended = true
 input_altering = false
@@ -6906,53 +6895,6 @@ input_altering = true
 type = "boolean"
 description_key = "category.magic_key"
 platforms = ["ahk"]
-
-[[features.metrics]]
-id = "menubar_wpm"
-default = false
-recommended = false
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.show_wpm_menubar"
-platforms = ["hs"]
-
-[[features.metrics]]
-id = "menubar_colors"
-default = true
-recommended = true
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.colors_by_source"
-platforms = ["hs"]
-
-[[features.metrics]]
-id = "float_wpm"
-default = true
-recommended = true
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.wpm_widget_visible"
-platforms = ["hs"]
-
-[[features.metrics]]
-id = "float_graph"
-default = true
-recommended = true
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.wpm_widget_graph"
-platforms = ["hs"]
-
-[[features.metrics]]
-id = "float_colors"
-default = true
-recommended = true
-input_altering = false
-type = "boolean"
-description_key = "menu.metrics.wpm_widget_colors"
-platforms = ["hs"]
-
-
 
 [[features.layout]]
 id = "pause_switch_enabled"

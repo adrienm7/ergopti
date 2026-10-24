@@ -422,19 +422,19 @@ M.features = {
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt_toggle", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "linux" }, recommended = false, input_altering = false,
+		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" }, recommended = false, input_altering = false,
+		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "linux" }, recommended = false, input_altering = false,
+		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "linux" }, recommended = false, input_altering = false,
+		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "linux" }, recommended = true, input_altering = false,
+		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "hs", "linux" }, recommended = true, input_altering = false,
 	},
 	{
 		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = false, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
@@ -687,9 +687,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.navigation.arrow_nav_enabled", section = "llm.navigation", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.metrics_wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "metrics.disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk", "hs" },
@@ -1182,21 +1179,6 @@ M.unavailable = {
 	},
 	{
 		path = "category_enabled.magic_key", section = "category_enabled", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.menubar_wpm", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.menubar_colors", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.float_wpm", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.float_graph", section = "metrics", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.float_colors", section = "metrics", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "layout.pause_switch_enabled", section = "layout", reason_key = "", platforms = { "hs" },

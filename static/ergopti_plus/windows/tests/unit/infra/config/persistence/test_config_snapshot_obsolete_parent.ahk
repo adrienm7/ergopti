@@ -52,7 +52,6 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
 	Fields := [
 		{ target: MetricsShortcuts, key: "enabled", path: "metrics.enabled" },
-		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
 		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
 		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },
 		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },
@@ -368,7 +367,6 @@ _FMS_PersonalFileCaseAlias(Path, Name) {
 	SavedIniCache := IsSet(_IniCache) ? _IniCache : unset
 	Fields := [
 		{ target: MetricsShortcuts, key: "enabled", path: "metrics.enabled" },
-		{ target: MetricsShortcuts, key: "wpm_menubar_colors", path: "metrics.metrics_wpm_menubar_colors" },
 		{ target: MetricsFilters, key: "private_browsing", path: "metrics.private_filter_enabled" },
 		{ target: MetricsFilters, key: "secure_field", path: "metrics.secure_filter_enabled" },
 		{ target: MetricsFilters, key: "system_auth", path: "metrics.system_auth_filter_enabled" },

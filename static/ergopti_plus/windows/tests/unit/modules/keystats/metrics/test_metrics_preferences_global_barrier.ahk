@@ -115,7 +115,6 @@ _MPGB_UnrelatedTerminalRefusesEveryPreferenceBeforeEffects() {
 	SavedEncrypt := MetricsFilters.encrypt
 	SavedApps := MetricsFilters.disabled_apps
 	SavedEnabled := MetricsShortcuts.enabled
-	SavedColors := MetricsShortcuts.wpm_menubar_colors
 	SavedCipher := KL_Enc_IsEnabled()
 	Bundle := false
 	try {
@@ -127,7 +126,6 @@ _MPGB_UnrelatedTerminalRefusesEveryPreferenceBeforeEffects() {
 		MetricsFilters.encrypt := false
 		MetricsFilters.disabled_apps := Map("retained.exe", true)
 		MetricsShortcuts.enabled := false
-		MetricsShortcuts.wpm_menubar_colors := false
 		KL_Enc_SetEnabled(false)
 		_MPGB_ResetFakes()
 		Bundle := _ConfigWriteTerminalTryAcquire(
@@ -144,14 +142,12 @@ _MPGB_UnrelatedTerminalRefusesEveryPreferenceBeforeEffects() {
 			_MPGB_Writer, _MPGB_Notify, _MPGB_Reload))
 		AssertFalse(_MetricsSetEnabledAndReload(true, _MPGB_Writer,
 			_MPGB_Notify, _MPGB_Reload))
-		AssertFalse(_MetricsSetPreferenceAndReload("wpm_menubar_colors", true,
-			_MPGB_Writer, _MPGB_Notify, _MPGB_Reload))
 
 		AssertEqual(0, _MPGB_WriteCalls,
 			"the unrelated terminal barrier must refuse before every metrics writer")
 		AssertEqual(0, _MPGB_ReloadCalls,
 			"a refused metrics commit must never request a nested reload")
-		AssertEqual(7, _MPGB_NotifyCalls,
+		AssertEqual(6, _MPGB_NotifyCalls,
 			"every refused user preference must surface one visible failure")
 		AssertTrue(MetricsFilters.private_browsing)
 		AssertFalse(MetricsFilters.secure_field)
@@ -163,7 +159,6 @@ _MPGB_UnrelatedTerminalRefusesEveryPreferenceBeforeEffects() {
 		AssertTrue(MetricsFilters.disabled_apps.Has("retained.exe"))
 		AssertFalse(MetricsFilters.disabled_apps.Has("candidate.exe"))
 		AssertFalse(MetricsShortcuts.enabled)
-		AssertFalse(MetricsShortcuts.wpm_menubar_colors)
 	} finally {
 		if (Bundle is Object)
 			_ConfigWriteTerminalRelease(Bundle)
@@ -175,7 +170,6 @@ _MPGB_UnrelatedTerminalRefusesEveryPreferenceBeforeEffects() {
 		MetricsFilters.encrypt := SavedEncrypt
 		MetricsFilters.disabled_apps := SavedApps
 		MetricsShortcuts.enabled := SavedEnabled
-		MetricsShortcuts.wpm_menubar_colors := SavedColors
 		KL_Enc_SetEnabled(SavedCipher)
 		_MPGB_ResetFakes()
 	}

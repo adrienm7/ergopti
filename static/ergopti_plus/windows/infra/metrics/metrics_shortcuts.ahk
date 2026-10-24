@@ -35,8 +35,6 @@ class MetricsShortcuts {
 		; auto-enable it: the user must tick it on once and confirm the
 		; warning dialog. The choice persists across reloads via INI.
 		static enabled           := false
-		; Real-time WPM display prefs.
-		static wpm_menubar_colors     := false  ; Color-code menubar WPM by keystroke origin
 }
 
 
@@ -58,8 +56,7 @@ MS_SaveBuiltToIni(Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 
 _MS_PreferenceConfigKey(Prop) {
 		static Keys := Map(
-				"enabled", "enabled",
-				"wpm_menubar_colors", "metrics_wpm_menubar_colors"
+				"enabled", "enabled"
 		)
 		return Keys.Get(Prop, "")
 }
