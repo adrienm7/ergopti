@@ -1930,16 +1930,27 @@ checkPrivacyTriggerControls();
 		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_init.ahk'),
 		'utf8'
 	);
-	for (const [name, id, owner] of [
-		['Reload', 'reload', 'ActivateReload'],
-		['Quit', 'quit', 'ActivateExitApp']
+	// Reload's wrapper is the startup-safe subclass the dispatcher recognises, so a
+	// click during a reload joins it instead of starting a second one.
+	assert(
+		/^class MenuStartupReloadCommand extends MenuStartupSafeCommand \{$/m.test(
+			readFileSync(
+				resolve(REPO_ROOT, 'static/ergopti_plus/windows/infra/menu_startup_commands.ahk'),
+				'utf8'
+			)
+		),
+		'the Reload wrapper must keep the startup-safe admission it inherits'
+	);
+	for (const [name, id, owner, wrapper] of [
+		['Reload', 'reload', 'ActivateReload', 'MenuStartupReloadCommand'],
+		['Quit', 'quit', 'ActivateExitApp', 'MenuStartupSafeCommand']
 	]) {
 		const body = windows.match(new RegExp(`_MI_Stage${name}\\(\\) \\{([\\s\\S]*?)\\n\\}`))?.[1];
 		assert(body, `the real Windows ${id} builder must be readable`);
 		assert(body.includes(`MenuRenderer_CommandRow("top_level", "${id}"`));
 		assert(body.includes(`MenuStartupLifecycleDispatch.Bind("${id}", ${owner})`));
 		assert(
-			body.includes('TrayMenuStage_AddAction(Row["label"], MenuStartupSafeCommand(Row["action"]))'),
+			body.includes(`TrayMenuStage_AddAction(Row["label"], ${wrapper}(Row["action"]))`),
 			'the shared callback wrapper must retain native startup lifecycle admission'
 		);
 		assert(
@@ -2013,7 +2024,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	if (
 		!has(
 			windows
-				? ['return', 'MenuRenderer_TemplateRows', '(', frame, ',']
+				? // The frame's rows pass through the newer-configuration greying guard.
+					['return', '_LLM_Menu_GuardConfigRows', '(', 'MenuRenderer_TemplateRows', '(', frame, ',']
 				: ['local', 'rows', '=', 'ManifestMenu', '.', 'template_rows', '(', frame, ',']
 		)
 	)
@@ -4454,7 +4466,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		const tokens = scriptTokens(source, platform === 'ahk' ? '.ahk' : '.lua');
 		const call =
 			platform === 'ahk'
-				? ['return', 'MenuRenderer_TemplateRows', '(', frame, ',']
+				? // The frame's rows pass through the newer-configuration greying guard.
+					['return', '_LLM_Menu_GuardConfigRows', '(', 'MenuRenderer_TemplateRows', '(', frame, ',']
 				: ['local', 'rows', '=', 'ManifestMenu', '.', 'template_rows', '(', frame, ','];
 		assert(sequence(tokens, call), 'actual provider consumes the complete declared frame');
 		const native =
@@ -6558,8 +6571,8 @@ console.log(
 			'the actual receiving call retains all authentic Build registration receipts'
 		],
 		[
-			'if !FrameAdmitted\n\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
-			'if false\n\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
+			'if !FrameAdmitted\n\t\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
+			'if false\n\t\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
 			'declared DATA refusal cannot fall through to pending separator effects'
 		],
 		[

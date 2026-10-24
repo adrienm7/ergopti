@@ -404,6 +404,8 @@ function personalOwnerGuard(unit, receiver) {
 	prefix.take(
 		'Admitted := false Child := false, ChildHandle := 0, LeafCallbacks := [], Published := false, Population := false, Pending := false, PendingEntry := false PrimaryError := false'
 	);
+	// The pending-leaf walk memo: a plain counter record the receiver owns.
+	prefix.take('Guard := { Foreign: 0, PendingKey: "" }');
 	prefix.take(
 		'RegistryOwners := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles, _MenuDispatchLastFire, _MenuDispatchClickSequences] DispatcherEpoch := _MenuDispatcherEpoch OriginalCritical := Critical("On")'
 	);
@@ -435,7 +437,8 @@ function personalCentral(unit) {
 	const branchAt = unit.unique(
 		'if IsSet(DeclaredFrames) && DeclaredFrames.Has(_MR_Get(Item, "id")) {',
 		build,
-		2
+		// The item loop runs inside the build-memo try block.
+		3
 	);
 	const open =
 		branchAt +
@@ -446,9 +449,9 @@ function personalCentral(unit) {
 	const callAt = unit.unique(
 		'Added := FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [FrameBindings, HandlersReceipt, ProvidersReceipt])',
 		branch,
-		3
+		4
 	);
-	const pending = unit.unique('if PendingSep and ItemCount > 0 {', build, 2);
+	const pending = unit.unique('if PendingSep and ItemCount > 0 {', build, 3);
 	const dispatch = reader(branchTokens);
 	dispatch.take(
 		'Id := _MR_Get(Item, "id") if ItemType != "list" || FrameDataOwner != MenuRenderer_AppendFrameData'
@@ -521,7 +524,7 @@ function personalCentral(unit) {
 	const registrationEnd = unit.pairs.get(snapshotOpen) + 1;
 	const iteration = reader(unit.tokens.slice(registrationEnd, branchAt));
 	iteration.take(
-		'MenuDef := _MR_GetMenuDef(ManifestKey) if IsSet(TargetMenu) Result := TargetMenu else Result := Menu() ItemCount := 0 PendingSep := false for Item in MenuDef {'
+		'MenuDef := _MR_GetMenuDef(ManifestKey) if IsSet(TargetMenu) Result := TargetMenu else Result := Menu() ItemCount := 0 PendingSep := false BuildMemo := _MR_BuildMemoEnter() try { for Item in MenuDef {'
 	);
 	iteration.take('if !_MR_CommandLiteralPrefix(Item, &Prefix) { try LoggerError("MenuRenderer",');
 	iteration.refusal();
@@ -648,8 +651,13 @@ function personalCentral(unit) {
 		'if Population is MenuPopulation { if Object.Prototype.HasOwnProp.Call(Population, "Fill") || Object.Prototype.GetOwnPropDesc.Call(MenuPopulation.Prototype, "Fill").Call != FillOwner || Object.Prototype.HasOwnProp.Call(FillOwner, "Call") return false'
 	);
 	held.take('NowPending := Object.Prototype.GetOwnPropDesc.Call(Population, "Pending")');
+	held.take('if !NowPending.HasOwnProp("Value") || NowPending.Value != Pending return false');
+	// The pending walk reruns only after foreign code or a new staged child or entry.
 	held.take(
-		'if !NowPending.HasOwnProp("Value") || NowPending.Value != Pending return false if !PendingCurrentOwner.Call(PendingReceipt, Child, PendingEntry) return false } return OwnersLive()'
+		'PendingKey := Guard.Foreign . ":" . (Child is Menu ? ObjPtr(Child) : 0) . ":" . (IsObject(PendingEntry) ? ObjPtr(PendingEntry) : 0)'
+	);
+	held.take(
+		'if PendingKey != Guard.PendingKey { PerfCount("menu.frame_pending_walk") _perfWalk := PerfStage_Begin() if !PendingCurrentOwner.Call(PendingReceipt, Child, PendingEntry) return false PerfStage_End("Menu.frame.pending_walk", _perfWalk, Pending.Count) Guard.PendingKey := PendingKey } else PerfCount("menu.frame_pending_skip") } return OwnersLive()'
 	);
 	if (!held.done()) throw Error('Actual live registration and source grammar required');
 	const destinationAt = unit.unique('DestinationLive() {', main, 2),
@@ -678,7 +686,7 @@ function personalCentral(unit) {
 	const stages = unit.tokens.slice(dataAt, allocation);
 	const r = reader(stages);
 	r.take(
-		'Data := Provider.Call() if !DestinationLive() return 0 if Type(Data) == "Integer" && Data == 0 { Admitted := true return 0 }'
+		'Data := Provider.Call() Guard.Foreign += 1 if !DestinationLive() return 0 if Type(Data) == "Integer" && Data == 0 { Admitted := true return 0 }'
 	);
 	r.take(
 		'if !LeafOwner.Call(Data) || !DestinationLive() return 0 DataReceipt := SnapshotOwner.Call(Data) if !DataReceipt || !DestinationLive() return 0'
@@ -697,7 +705,9 @@ function personalCentral(unit) {
 		).length === 1
 	)
 		r.take(scalar.value + ' := ' + JSON.stringify(stages[scalarAt + 2].value));
-	r.take('Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))');
+	r.take(
+		'Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data)) Guard.Foreign += 1'
+	);
 	r.take(
 		'if !DestinationLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data) || !AdmissionOwner.Call(Rows, 1, Map()) || Rows.Length != Frame.Length'
 	);
@@ -713,7 +723,7 @@ function personalCentral(unit) {
 	);
 	const staged = reader(unit.tokens.slice(allocation, parent));
 	staged.take(
-		'Child := NativeConstructor.Call() ChildHandle := Child.Handle if !DestinationLive() return 0 if Population is MenuPopulation { FillOwner.Call(Population, Child, Data, FrameKey, 2) PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle) } else { if RenderOwner.Call(Child, Data, FrameKey, 2, 0, true) != Data.Length return 0 NormalizeOwner.Call(Child) }'
+		'Child := NativeConstructor.Call() Guard.Foreign += 1 ChildHandle := Child.Handle if !DestinationLive() return 0 if Population is MenuPopulation { FillOwner.Call(Population, Child, Data, FrameKey, 2) Guard.Foreign += 1 PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle) } else { RenderedRows := RenderOwner.Call(Child, Data, FrameKey, 2, 0, true) Guard.Foreign += 1 if RenderedRows != Data.Length return 0 NormalizeOwner.Call(Child) Guard.Foreign += 1 }'
 	);
 	staged.take(
 		'if !DestinationLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data) || !CurrentOwner.Call(RowsReceipt) return 0 StageReceipt := DestinationOwner.Call(Child) if !DestinationLive() || !StageOwner.Call(StageReceipt, Data, Population is MenuPopulation) return 0'
@@ -742,7 +752,7 @@ function personalCentral(unit) {
 		unit.tokens.slice(publicationOpen + 1, unit.pairs.get(publicationOpen))
 	);
 	publication.take(
-		'if !SourceLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data) || !CurrentOwner.Call(RowsReceipt) return false NowStage := DestinationOwner.Call(Child)'
+		'Guard.Foreign += 1 if !SourceLive() || !CurrentOwner.Call(DataReceipt) || !LeafOwner.Call(Data) || !CurrentOwner.Call(RowsReceipt) return false NowStage := DestinationOwner.Call(Child)'
 	);
 	publication.take(
 		'return SourceLive() && StageOwner.Call(NowStage, Data, Population is MenuPopulation) && ImageOwner.Call(StageReceipt, NowStage)'
@@ -751,7 +761,7 @@ function personalCentral(unit) {
 		throw Error('Actual native stage identity must remain current at publication');
 	const final = reader(unit.tokens.slice(unit.pairs.get(publicationOpen) + 1, main.end));
 	final.take(
-		'if !PublicationLive() || !DestinationLive() return 0 Added := PublishOwner.Call(TargetMenu, Child, Rows, Label, Destination, NativeMethods, OldChild, OldParentFlags, PublicationLive) Published := true, Admitted := true return Added'
+		'if !PublicationLive() || !DestinationLive() return 0 Added := PublishOwner.Call(TargetMenu, Child, Rows, Label, Destination, NativeMethods, OldChild, OldParentFlags, PublicationLive) Guard.Foreign += 1 Published := true, Admitted := true return Added'
 	);
 	if (!final.done())
 		throw Error('Actual retained completed DATA must reach the native publication operation');
