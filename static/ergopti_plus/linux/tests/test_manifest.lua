@@ -291,6 +291,7 @@ return {
 	"tests.meta.corpus.test_corpus_updater_check_only",
 	"tests.meta.corpus.test_corpus_llm_app_profile_overrides",
 	"tests.meta.corpus.test_corpus_metrics_collection_session",
+	"tests.meta.corpus.test_corpus_keystats_aggregation",
 	"tests.unit.modules.diagnostics.test_crash_reporter",
 	"tests.unit.adapters.storage.test_crypto_adapter",
 	"tests.meta.boot.test_daemon_cli",
