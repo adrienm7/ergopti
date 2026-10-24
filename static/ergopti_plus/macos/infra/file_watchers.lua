@@ -34,6 +34,7 @@ local fs_dir        = require("infra.fs_dir")
 local git_status    = require("infra.git_status")
 local reload_gate   = require("reload_gate")
 local RuntimeLog    = require("diagnostics.runtime_log")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "file_watchers"
 
@@ -189,8 +190,9 @@ function M.start(ctx)
 	-- Drop FSEvents replays delivered during the post-boot suppress window (see
 	-- BOOT_SUPPRESS_SEC). Captured now because M.start runs at the tail of boot,
 	-- right where the freshly-armed watchers would otherwise catch the previous
-	-- session's buffered events.
-	local suppress_until = hs.timer.secondsSinceEpoch() + BOOT_SUPPRESS_SEC
+	-- session's buffered events. This private window measures awake duration;
+	-- change receipts below keep their existing epoch domain for debounce.
+	local suppress_until = TimerScheduler.awake_time() + BOOT_SUPPRESS_SEC
 
 	local reload_timer = nil
 
@@ -375,7 +377,7 @@ function M.start(ctx)
 		local now = hs.timer.secondsSinceEpoch()
 		-- Ignore the FSEvents batch macOS replays right after an hs.reload(): during
 		-- the boot window these are the previous session's changes, not a new edit.
-		if now < suppress_until then return end
+		if TimerScheduler.awake_time() < suppress_until then return end
 		if type(changed) == "table" then
 			for _, p in ipairs(changed) do
 				if not burst_paths[p] then
