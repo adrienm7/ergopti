@@ -454,3 +454,5 @@ Test("spotlight session ownership: cancellation waits for local cleanup (spotlig
 	_SOW_DismissDuringStartRetainsReservationUntilBuilderSettles)
 
 #Include test_spotlight_upload_owner.ahk
+
+#Include test_spotlight_coordinate_owner.ahk
