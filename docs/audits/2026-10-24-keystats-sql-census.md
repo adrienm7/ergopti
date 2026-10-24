@@ -68,13 +68,12 @@ all three OS unless there is a good reason) and the side that follows it.
 6. **Application filter on the manifest.** Linux filters the manifest by application, Windows
    and macOS by date only (their dashboards filter applications in the page). The catalogue
    takes the filter as a parameter, so each driver keeps its own filter builder.
-7. **N-gram token reads.** macOS sums with `SUM` and counts every source other than
-   `hotstring`, `llm` and `none` as "other"; Linux sums with `TOTAL`, keeps non-numeric rows
-   raw through a `typeof` split and classifies sources through the shared
-   `keystats.utils.is_other_synthetic_source` (the same rule as macOS for string labels); Windows
-   aggregates the source map in SQL through `json_each`. Not catalogued yet. Recommended: the
-   Linux form, because `TOTAL` cannot overflow and a malformed row stays visible instead of being
-   summed as the number its text happens to start with.
+7. **N-gram token reads.** macOS summed with `SUM`, which overflows and sums a malformed counter
+   as the number its text starts with (and aborted the family when the text held no number);
+   Linux used `TOTAL` and returned such a row raw for the reader to read as zero; Windows
+   aggregates the source map in SQL through `json_each`. Right: the Linux form, now the catalogue's
+   `ngram.tokens` and `ngram.tokens_by_app`, which macOS and Linux both render. Windows keeps its
+   own reads.
 8. **Semantic media keys.** Windows validates the grouped rows through temporary tables built
    from the shared `media_schema.sql`; macOS and Linux select them directly. The catalogue
    holds the direct form used by the two Lua drivers.
@@ -127,5 +126,6 @@ pinned by the vector named in brackets.
 - The census now counts the migrated statements as catalogue call sites: 11 on Windows, 16 on
   macOS and 17 on Linux (its system-day query is rendered by the manifest and by
   `read_system_days`). The table at the top is the census before the migration.
-- Not catalogued yet: the n-gram reads (finding 7), the walker flush upserts (identical on
+- The n-gram token reads (finding 7) are catalogued and rendered by macOS and Linux.
+- Not catalogued yet: the walker flush upserts (identical on
   Windows and macOS, a different column list and quoting on Linux), the event inserts.
