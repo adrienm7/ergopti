@@ -195,11 +195,13 @@ helpers.describe("script storage retired journal roots", function()
 			helpers.assert_true(storage.publish_owned(owner, receipt, { a = { present = true, value = 2 } }, backup, files))
 			-- Retain the exact private journal that the native publication closure
 			-- keeps as a JIT constant; no synthetic journal is substituted.
+			-- The map is the receipts upvalue of the shared owned-alias protocol
+			-- (storage_owned.lua), which forget_owned is.
 			local records, slot = nil, 1
 			while true do
 				local name, value = debug.getupvalue(storage.forget_owned, slot)
 				if name == nil then break end
-				if name == "_owned_receipts" then records = value; break end
+				if name == "receipts" then records = value; break end
 				slot = slot + 1
 			end
 			helpers.assert_type(records, "table", "the real native receipt map must be reachable")
