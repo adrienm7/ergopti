@@ -21,14 +21,17 @@ _IPR_ChildSource() {
 	Body := RegExReplace(Body, "\bSendEvent\(", "_IPR_SendEvent(", &EventCalls)
 	AssertEqual(3, InputCalls, "All current native SendInput call sites must be explicit")
 	AssertEqual(4, EventCalls, "All current native SendEvent call sites must be explicit")
-	Clock := _DriverFuncBody("HotPath_Now")
-	AssertTrue(RegExMatch(Clock, "^HotPath_Now\(") > 0, "The real QPC reader must resolve")
-	Clock := RegExReplace(Clock, "^HotPath_Now", "_IPR_NativeClock", &ClockNames)
-	AssertEqual(1, ClockNames)
+	; The probe times itself with its own QPC reader; the fixture observes it
+	; under that name and delegates to the real body renamed here.
+	Body := RegExReplace(Body, "m)^_IP_Now\(\) \{", "_IPR_NativeClock() {", &ClockNames)
+	AssertEqual(1, ClockNames, "The real probe stopwatch must be defined once")
 	TickOwner := _DriverProductionFileForSymbol("TickElapsed64", _DriverDir)
 	AssertTrue(TickOwner != "")
+	; The probe presents its target through the shared window presenter.
+	PresenterOwner := _DriverProductionFileForSymbol("WMPresentWindow", _DriverDir)
+	AssertTrue(PresenterOwner != "" && PresenterOwner != TickOwner)
 	return "#Requires AutoHotkey v2.0`n#NoTrayIcon`n#SingleInstance Off`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-		. "#Include " . TickOwner . "`n" . Body . "`n" . Clock . "`n"
+		. "#Include " . TickOwner . "`n#Include " . PresenterOwner . "`n" . Body . "`n"
 		. "#Include " . _DriverDir . "\tests\fixtures\input_probe_rival_owner_body.ahk`n"
 }
 
