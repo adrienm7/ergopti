@@ -593,6 +593,7 @@ tis_call_delay_ms = 100
 
 # Hard deadline for a native keyboard input-source mutation subprocess.
 # HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
+# Linux: adapters/input_source_switch.lua (each gsettings or setxkbmap child).
 input_source_operation_timeout_ms = 10000
 
 # Karabiner ready notification debounce delay.

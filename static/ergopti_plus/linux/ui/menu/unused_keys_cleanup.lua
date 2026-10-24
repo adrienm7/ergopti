@@ -50,6 +50,7 @@ function M.collect(decoded, mark)
 	require("modules.shortcuts.script_chords").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.keyboard_shortcuts").mark_config_reads(decoded, mark)
 	require("infra.metrics_preferences").resolve(decoded, mark)
+	require("infra.pause_layout_preferences").resolve(decoded, mark)
 	for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings", "profile_settings" }) do
 		require("modules.llm." .. name).mark_config_reads(decoded, mark)
 	end

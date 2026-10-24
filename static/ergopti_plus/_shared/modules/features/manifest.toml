@@ -6028,13 +6028,12 @@ i18n = "menu.shortcuts.group_accented"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
 
-# Which layout to switch to when the driver pauses and when it resumes. macOS's
-# alone, and for the same reason as the blocks above: the choices are the
-# system's input sources.
+# Which layout to switch to when the driver pauses and when it resumes: the
+# choices are the system's input sources, which macOS and Linux list.
 [[menu.layout_menu]]
 type = "list"
 id = "layout_switching"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 # The physical key whose replacement choice lives in Hotstrings Ergopti
@@ -6944,7 +6943,7 @@ recommended = false
 input_altering = true
 type = "boolean"
 description_key = "menu.layout"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 [[features.layout]]
@@ -6954,7 +6953,7 @@ recommended = ""
 input_altering = true
 type = "string"
 description_key = "menu.layout"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 [[features.layout]]
@@ -6964,7 +6963,7 @@ recommended = ""
 input_altering = true
 type = "string"
 description_key = "menu.layout"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.layout_switch_on_pause_is_macos"
 
 # `clear_exclude` lists the paths a clear leaves as they are, as
@@ -9575,13 +9574,14 @@ target = true
 platforms = ["hs"]
 unavailable = "hide"
 
-# Complete macOS automatic-switching policy frame; TIS ownership remains native.
+# Complete automatic-switching policy frame; the input-source switch stays native
+# (macOS TIS, Linux gsettings or setxkbmap).
 [[menu.layout_switching_frame]]
 type = "check"
 id = "layout_switch_toggle"
 i18n = "menu.layout.pause_layout_enabled"
 checked_when = ["layout_switch_checked"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.layout_switching_frame]]
@@ -9590,7 +9590,7 @@ id = "layout_pause_picker"
 i18n = "menu.layout.pause_picker_caption"
 caption_getter = "layout_pause_caption"
 disabled_when = ["layout_switch_ready"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.layout_switching_frame]]
@@ -9599,7 +9599,7 @@ id = "layout_resume_picker"
 i18n = "menu.layout.resume_picker_caption"
 caption_getter = "layout_resume_caption"
 disabled_when = ["layout_switch_ready"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.layout_switch_picker_frame]]
@@ -9607,7 +9607,7 @@ type = "check"
 id = "layout_picker_auto"
 i18n = "menu.layout.layout_auto"
 checked_when = ["layout_picker_auto_checked"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 [[menu.layout_switch_picker_frame]]
@@ -9621,7 +9621,7 @@ type = "---"
 [[menu.layout_switch_picker_choices_frame]]
 type = "list"
 id = "layout_picker_choices"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 unavailable = "hide"
 
 # Complete macOS Layout frames; native providers supply exact records and callbacks.
