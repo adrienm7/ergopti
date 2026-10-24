@@ -92,6 +92,9 @@ local function with_manager(config, body)
   function port.download_output_owned() error("release-check control must not dispatch an archive") end
   function port.cancel(owner) return coordinator.cancel(owner) end
   manager._http_client = port
+  -- The check's second source when the API gave no list (the Atom feed) is
+  -- answered here, so every physical join below stays the API request's own.
+  manager._fetch_feed = function(callback) callback(nil, "feed not exercised"); return true end
   manager.current_version = function() return "1.0.0" end
   state.manager = manager
   state.answer = function(count) return { ok = true, status = 200, body = release_body(manager, count) } end
@@ -330,7 +333,7 @@ helpers.describe("release-check genuine pre-start retirement", function()
    helpers.assert_eq(completions, 0)
    state.timers[1]:ack()
    helpers.assert_eq(completions, 1)
-   helpers.assert_eq(error_text, "independent pre-start pipe retirement failed")
+   helpers.assert_eq(error_text, "independent pre-start pipe retirement failed; Atom feed: feed not exercised")
    helpers.assert_eq(manager.get_state(), "idle")
   end)
  end)
@@ -343,7 +346,7 @@ helpers.describe("release-check genuine pre-start retirement", function()
    helpers.assert_eq(sent, false)
    helpers.assert_eq(#state.curls + #state.timers, 0)
    helpers.assert_eq(completions, 1)
-   helpers.assert_eq(error_text, "independent route refused")
+   helpers.assert_eq(error_text, "independent route refused; Atom feed: feed not exercised")
    helpers.assert_eq(manager.get_state(), "idle")
   end)
  end)
