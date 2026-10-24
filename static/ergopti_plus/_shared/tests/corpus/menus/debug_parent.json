@@ -23,6 +23,7 @@
 			"-",
 			"System diagnostics",
 			"Test network (PAC, proxy, download)",
+			"Test the composed layout",
 			"Show a window for every error",
 			"Report a bug",
 			"Suggest a feature"
@@ -52,6 +53,7 @@
 			"-",
 			"Diagnostic système",
 			"Tester le réseau (PAC, proxy, téléchargement)",
+			"Tester la disposition composée",
 			"Afficher une fenêtre à chaque erreur",
 			"Signaler un bug",
 			"Proposer une fonctionnalité"
