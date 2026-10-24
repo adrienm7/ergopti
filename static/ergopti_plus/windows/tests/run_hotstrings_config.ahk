@@ -6,6 +6,7 @@ global _AHK_DRY_RUN := false
 
 #Include test_framework.ahk
 #Include test_stubs.ahk
+#Include ../infra/hotpath_profiler.ahk
 #Include ../_generated/terminators.ahk
 #Include ../adapters/file_system.ahk
 #Include ../infra/toml/toml_helpers.ahk

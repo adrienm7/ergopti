@@ -265,3 +265,33 @@ _PC_BootSummaryListsTopLevelStagesOnly() {
 }
 Test("perf counters: the boot summary lists top-level stages in completion order (perf-counters)",
 	_PC_BootSummaryListsTopLevelStagesOnly)
+_PC_BuildMemoAnswersOncePerBuild() {
+	Calls := 0
+	Probe := () => (Calls += 1, true)
+	AssertTrue(_MR_EvaluateDisabledGetter("llm_toggle_ready", Probe))
+	AssertTrue(_MR_EvaluateDisabledGetter("llm_toggle_ready", Probe))
+	AssertEqual(2, Calls, "outside a build every call is live")
+	Owner := _MR_BuildMemoEnter()
+	try {
+		AssertTrue(Owner, "the outermost build owns the memo")
+		AssertFalse(_MR_BuildMemoEnter(), "a nested build shares it without owning it")
+		Calls := 0
+		loop 5
+			_MR_EvaluateDisabledGetter("llm_scope_ready", Probe)
+		AssertEqual(1, Calls, "a memoised getter is asked once per build")
+		loop 3
+			_MR_EvaluateDisabledGetter("other_getter", Probe)
+		AssertEqual(4, Calls, "any other getter stays live inside the build")
+	} finally _MR_BuildMemoLeave(Owner)
+	Calls := 0
+	_MR_EvaluateDisabledGetter("llm_scope_ready", Probe)
+	_MR_EvaluateDisabledGetter("llm_scope_ready", Probe)
+	AssertEqual(2, Calls, "the memo is gone when the build ends, so clicks see live state")
+	Refusing := () => false
+	Owner := _MR_BuildMemoEnter()
+	try AssertFalse(_MR_EvaluateDisabledGetter("llm_toggle_ready", Refusing))
+	finally _MR_BuildMemoLeave(Owner)
+	AssertTrue(Probe.Call() && !Refusing.Call(), "fixture sanity")
+}
+Test("perf counters: write-admission getters are answered once per menu build and live otherwise (menu-build-memo)",
+	_PC_BuildMemoAnswersOncePerBuild)

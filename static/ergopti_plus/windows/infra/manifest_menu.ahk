@@ -242,141 +242,146 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 	ItemCount  := 0      ; real items added so far
 	PendingSep := false  ; separator deferred until next real item
 
-	for Item in MenuDef {
-		if !_MR_CommandLiteralPrefix(Item, &Prefix) {
-			try LoggerError("MenuRenderer", "Invalid literal command prefix — row refused.")
-			continue
-		}
-		if !_MR_IsForAhk(Item) {
-			; A handler registered for an entry the platform filter drops is
-			; always drift: the driver implements the action, the manifest says
-			; this platform does not have it, and the row silently disappears
-			; with nothing anywhere to explain why. Surface the asymmetry.
-			FilteredId := _MR_Get(Item, "id")
-			if (FilteredId != "" and DynamicHandlers is Map and DynamicHandlers.Has(FilteredId)) {
-				try LoggerDebug("MenuRenderer", "Item '{1}' in '{2}' is platform-filtered out but a handler is registered for it — manifest/driver drift.", FilteredId, ManifestKey)
+	; One question about write admission (a registry deep compare of about 21 ms) is asked by
+	; every greyed row of a build. Within this synchronous build it has one answer.
+	BuildMemo := _MR_BuildMemoEnter()
+	try {
+		for Item in MenuDef {
+			if !_MR_CommandLiteralPrefix(Item, &Prefix) {
+				try LoggerError("MenuRenderer", "Invalid literal command prefix — row refused.")
+				continue
 			}
-			; Hidden unless declared `unavailable = "grey"`: not yet ported here, so
-			; drawn disabled with the short form of its reason (the maintainer's
-			; rule of 2026-09-30); a hidden row is not applicable here.
-			if _MR_Get(Item, "unavailable") == "grey" {
-				if PendingSep and ItemCount > 0
-					Result.Add()
-				PendingSep := false
-				ItemCount += Item.Has("label_prefix")
-					? _MR_RenderGreyedStandIn(Result, Item, ManifestKey, Prefix . t(_MR_Get(Item, "i18n")))
-					: _MR_RenderGreyedStandIn(Result, Item, ManifestKey)
-			}
-			continue
-		}
-
-		if Item.Has("caption_count_policy") && !_MR_TranslatedCountPolicy(Item)
-			continue
-		ItemType := _MR_Get(Item, "type", "")
-
-		if ItemType == "---" {
-			; Defer separator — only flush when a real item follows.
-			PendingSep := true
-			continue
-		}
-
-		; Frame DATA admission precedes every native effect belonging to this entry.
-		if IsSet(DeclaredFrames) && DeclaredFrames.Has(_MR_Get(Item, "id")) {
-			Id := _MR_Get(Item, "id")
-			if ItemType != "list" || FrameDataOwner != MenuRenderer_AppendFrameData
-				|| Object.Prototype.HasOwnProp.Call(FrameDataOwner, "Call")
-				|| !_MR_ReasonedGroupCurrent(FrameBindings)
-				|| !_MR_ReasonedGroupCurrent(HandlersReceipt) || !_MR_ReasonedGroupCurrent(ProvidersReceipt)
-				|| (DynamicHandlers is Map && DynamicHandlers.Has(Id)) || ListProviders.Has(Id)
-				throw Error("Declared frame DATA registration was withdrawn")
-			Added := FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [FrameBindings, HandlersReceipt, ProvidersReceipt])
-			if !FrameAdmitted
-				throw Error("Declared frame DATA was refused before publication")
-			; This frame owns its literal prefix; skipped frames never flush PendingSep.
-			if Added > 0
-				PendingSep := false
-			ItemCount += Added
-			continue
-		}
-		; Flush deferred separator before any real item (never at position 0).
-		if PendingSep and ItemCount > 0 {
-			Result.Add()
-		}
-		PendingSep := false
-
-		if ItemType == "toggle" {
-			ItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)
-
-		} else if ItemType == "choice" {
-			ItemCount += _MR_RenderChoice(Result, Item, ManifestKey, Commands, StateGetters)
-
-		} else if ItemType == "feature" {
-			_MR_RenderFeature(Result, Item, CategoryName)
-			ItemCount++
-
-		} else if ItemType == "action" {
-			Id := _MR_Get(Item, "id")
-			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-				(DynamicHandlers[Id])(Result, CategoryName)
-				ItemCount++
-			} else {
-				; Manifest/handler drift: the entry exists but nothing can render
-				; it, so the item simply vanishes from the menu. Every sibling
-				; branch reports, and the unknown-item-type fallback below has
-				; logged since it was written — this one was the exception.
-				try LoggerWarn("MenuRenderer", "No handler for action item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+			if !_MR_IsForAhk(Item) {
+				; A handler registered for an entry the platform filter drops is
+				; always drift: the driver implements the action, the manifest says
+				; this platform does not have it, and the row silently disappears
+				; with nothing anywhere to explain why. Surface the asymmetry.
+				FilteredId := _MR_Get(Item, "id")
+				if (FilteredId != "" and DynamicHandlers is Map and DynamicHandlers.Has(FilteredId)) {
+					try LoggerDebug("MenuRenderer", "Item '{1}' in '{2}' is platform-filtered out but a handler is registered for it — manifest/driver drift.", FilteredId, ManifestKey)
+				}
+				; Hidden unless declared `unavailable = "grey"`: not yet ported here, so
+				; drawn disabled with the short form of its reason (the maintainer's
+				; rule of 2026-09-30); a hidden row is not applicable here.
+				if _MR_Get(Item, "unavailable") == "grey" {
+					if PendingSep and ItemCount > 0
+						Result.Add()
+					PendingSep := false
+					ItemCount += Item.Has("label_prefix")
+						? _MR_RenderGreyedStandIn(Result, Item, ManifestKey, Prefix . t(_MR_Get(Item, "i18n")))
+						: _MR_RenderGreyedStandIn(Result, Item, ManifestKey)
+				}
+				continue
 			}
 
-		} else if ItemType == "section_header" {
-			_MR_RenderSectionHeader(Result, Item)
-			ItemCount++
+			if Item.Has("caption_count_policy") && !_MR_TranslatedCountPolicy(Item)
+				continue
+			ItemType := _MR_Get(Item, "type", "")
 
-		} else if ItemType == "group" {
-			Id := _MR_Get(Item, "id")
-			if IsSet(GroupDisabled) && GroupDisabled.Has(Id) {
-				if !_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters, GroupDisabled[Id])
-					throw Error("Declared native group '" . Id . "' was refused.")
-			} else {
-				_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters)
+			if ItemType == "---" {
+				; Defer separator — only flush when a real item follows.
+				PendingSep := true
+				continue
 			}
-			ItemCount++
 
-		} else if ItemType == "letter_picker" {
-			_MR_RenderLetterPicker(Result, Item, CategoryName)
-			ItemCount++
-
-		} else if ItemType == "list" {
-			Id := _MR_Get(Item, "id")
-			if (Id != "" and ListProviders is Map and ListProviders.Has(Id)) {
-				Rows := (ListProviders[Id])()
-				Added := _MR_RenderRows(Result, Rows, Id, 1)
+			; Frame DATA admission precedes every native effect belonging to this entry.
+			if IsSet(DeclaredFrames) && DeclaredFrames.Has(_MR_Get(Item, "id")) {
+				Id := _MR_Get(Item, "id")
+				if ItemType != "list" || FrameDataOwner != MenuRenderer_AppendFrameData
+					|| Object.Prototype.HasOwnProp.Call(FrameDataOwner, "Call")
+					|| !_MR_ReasonedGroupCurrent(FrameBindings)
+					|| !_MR_ReasonedGroupCurrent(HandlersReceipt) || !_MR_ReasonedGroupCurrent(ProvidersReceipt)
+					|| (DynamicHandlers is Map && DynamicHandlers.Has(Id)) || ListProviders.Has(Id)
+					throw Error("Declared frame DATA registration was withdrawn")
+				Added := FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [FrameBindings, HandlersReceipt, ProvidersReceipt])
+				if !FrameAdmitted
+					throw Error("Declared frame DATA was refused before publication")
+				; This frame owns its literal prefix; skipped frames never flush PendingSep.
+				if Added > 0
+					PendingSep := false
 				ItemCount += Added
-			} else {
-				; Same class of drift as the action and dynamic branches: a list
-				; entry with no provider is a whole menu section that vanishes
-				try LoggerWarn("MenuRenderer", "No provider for list item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+				continue
 			}
+			; Flush deferred separator before any real item (never at position 0).
+			if PendingSep and ItemCount > 0 {
+				Result.Add()
+			}
+			PendingSep := false
 
-		} else if (ItemType == "check" or ItemType == "command") {
-			if !Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
-				ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
+			if ItemType == "toggle" {
+				ItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)
 
-		} else if ItemType == "dynamic" {
-			Id := _MR_Get(Item, "id")
-			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-				Rows := (DynamicHandlers[Id])(Result, CategoryName)
-				if !(Rows is Array)
-					throw Error("Dynamic item '" . Id . "' in '" . ManifestKey . "' returned no row data.")
-				_MR_RenderRows(Result, Rows, Id, 1)
+			} else if ItemType == "choice" {
+				ItemCount += _MR_RenderChoice(Result, Item, ManifestKey, Commands, StateGetters)
+
+			} else if ItemType == "feature" {
+				_MR_RenderFeature(Result, Item, CategoryName)
 				ItemCount++
-			} else {
-				try LoggerWarn("MenuRenderer", "No handler for dynamic item '{1}' in '{2}' — skipped.", Id, ManifestKey)
-			}
 
-		} else {
-			try LoggerWarn("MenuRenderer", "Unknown item type '{1}' in '{2}' — skipped.", ItemType, ManifestKey)
+			} else if ItemType == "action" {
+				Id := _MR_Get(Item, "id")
+				if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
+					(DynamicHandlers[Id])(Result, CategoryName)
+					ItemCount++
+				} else {
+					; Manifest/handler drift: the entry exists but nothing can render
+					; it, so the item simply vanishes from the menu. Every sibling
+					; branch reports, and the unknown-item-type fallback below has
+					; logged since it was written — this one was the exception.
+					try LoggerWarn("MenuRenderer", "No handler for action item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+				}
+
+			} else if ItemType == "section_header" {
+				_MR_RenderSectionHeader(Result, Item)
+				ItemCount++
+
+			} else if ItemType == "group" {
+				Id := _MR_Get(Item, "id")
+				if IsSet(GroupDisabled) && GroupDisabled.Has(Id) {
+					if !_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters, GroupDisabled[Id])
+						throw Error("Declared native group '" . Id . "' was refused.")
+				} else {
+					_MR_RenderGroup(Result, Item, CategoryName, GroupBuilders, ManifestKey, StateGetters)
+				}
+				ItemCount++
+
+			} else if ItemType == "letter_picker" {
+				_MR_RenderLetterPicker(Result, Item, CategoryName)
+				ItemCount++
+
+			} else if ItemType == "list" {
+				Id := _MR_Get(Item, "id")
+				if (Id != "" and ListProviders is Map and ListProviders.Has(Id)) {
+					Rows := (ListProviders[Id])()
+					Added := _MR_RenderRows(Result, Rows, Id, 1)
+					ItemCount += Added
+				} else {
+					; Same class of drift as the action and dynamic branches: a list
+					; entry with no provider is a whole menu section that vanishes
+					try LoggerWarn("MenuRenderer", "No provider for list item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+				}
+
+			} else if (ItemType == "check" or ItemType == "command") {
+				if !Object.Prototype.HasOwnProp.Call(_MR_RenderCommand, "Call")
+					ItemCount += _MR_RenderCommand(Result, Item, ManifestKey, Commands, StateGetters)
+
+			} else if ItemType == "dynamic" {
+				Id := _MR_Get(Item, "id")
+				if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
+					Rows := (DynamicHandlers[Id])(Result, CategoryName)
+					if !(Rows is Array)
+						throw Error("Dynamic item '" . Id . "' in '" . ManifestKey . "' returned no row data.")
+					_MR_RenderRows(Result, Rows, Id, 1)
+					ItemCount++
+				} else {
+					try LoggerWarn("MenuRenderer", "No handler for dynamic item '{1}' in '{2}' — skipped.", Id, ManifestKey)
+				}
+
+			} else {
+				try LoggerWarn("MenuRenderer", "Unknown item type '{1}' in '{2}' — skipped.", ItemType, ManifestKey)
+			}
 		}
-	}
+	} finally _MR_BuildMemoLeave(BuildMemo)
 
 	_MR_NormalizeSeparators(Result)
 	return Result
@@ -2378,6 +2383,40 @@ _MR_FindItemById(MenuKey, ItemId) {
 	return Selected
 }
 
+; Getters whose answer is the same for every row of one synchronous menu build, and
+; costly to compute: write admission deep-compares the migration registry each time.
+; Outside a build (a click, a repaint, a test) every call is live.
+global MR_BUILD_MEMO_GETTERS := Map("llm_toggle_ready", true, "llm_scope_ready", true)
+global _MR_BuildMemoActive := false
+
+; Opens the memo for the outermost build; nested builds share it.
+_MR_BuildMemoEnter() {
+	global _MR_BuildMemoActive
+	if _MR_BuildMemoActive is Map
+		return false
+	_MR_BuildMemoActive := Map()
+	return true
+}
+
+_MR_BuildMemoLeave(Owner) {
+	global _MR_BuildMemoActive
+	if Owner
+		_MR_BuildMemoActive := false
+}
+
+; Evaluates a disabled_when getter, once per build for the memoised ones.
+_MR_EvaluateDisabledGetter(Key, Getter) {
+	global _MR_BuildMemoActive, MR_BUILD_MEMO_GETTERS
+	if !(_MR_BuildMemoActive is Map) || !MR_BUILD_MEMO_GETTERS.Has(Key)
+		return Getter.Call()
+	if !_MR_BuildMemoActive.Has(Key) {
+		PerfCount("menu.disabled_getter_evaluated")
+		_MR_BuildMemoActive[Key] := Getter.Call() ? true : false
+	} else
+		PerfCount("menu.disabled_getter_reused")
+	return _MR_BuildMemoActive[Key]
+}
+
 ; Evaluates the declarative ``disabled_when`` predicate of a manifest item
 ; against a caller-supplied Map of canonical state key -> zero-arg getter Func.
 ;
@@ -2411,7 +2450,7 @@ MenuRenderer_ResolveDisabledWhen(MenuKey, ItemId, Getters) {
 			try LoggerError("MenuRenderer", "No getter for disabled_when key '{1}' on item '{2}.{3}' — treating as disabled.", Key, MenuKey, ItemId)
 			return true
 		}
-		if !(Getters[Key])() {
+		if !_MR_EvaluateDisabledGetter(Key, Getters[Key]) {
 			return true
 		}
 	}

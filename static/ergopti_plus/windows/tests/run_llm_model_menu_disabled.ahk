@@ -17,6 +17,7 @@ SetWorkingDir(A_ScriptDir)
 ; ==============================================================================
 
 #Include test_framework.ahk
+#Include ../infra/hotpath_profiler.ahk
 
 ; Fixed commands read the actual shared declaration through the native owners.
 ; These includes construct no tray root, browser, timer or population owner.

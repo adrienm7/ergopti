@@ -202,6 +202,32 @@ ConfigRegistryCacheDecode(Text, Identity) {
 	return ConfigRegistryCodec.Decode(Bytes)
 }
 
+/** Owns the pristine validated registry per source path, keyed by the source content hash. */
+_ConfigRegistryPristineStore() {
+	static Store := Map()
+	return Store
+}
+
+/**
+ * Remembers an independent copy of a registry that was just validated from the
+ * source with this content hash, before anything else can hold or mutate it.
+ */
+_ConfigRegistryRememberPristine(Path, SourceHash, Registry) {
+	_ConfigRegistryPristineStore()[Path] := { Hash: SourceHash, Registry: ManifestCloneValue(Registry) }
+}
+
+/**
+ * Returns a fresh independent copy of the registry validated from exactly this
+ * source content, or false when the content differs from every validated load.
+ * A changed, removed or invalid source never matches: the caller parses it.
+ */
+ConfigRegistryPristineFor(Path, SourceHash) {
+	Store := _ConfigRegistryPristineStore()
+	if !Store.Has(Path) || Store[Path].Hash != SourceHash
+		return false
+	return ManifestCloneValue(Store[Path].Registry)
+}
+
 /** Reads the authoritative file on every load and always validates cached models. */
 ConfigRegistryCacheLoad(Path, CachePath, CodeIdentity := unset, ParseFn := 0, ValidateFn := 0) {
 	global _ConfigRegistryCachePending
@@ -223,6 +249,7 @@ ConfigRegistryCacheLoad(Path, CachePath, CodeIdentity := unset, ParseFn := 0, Va
 				throw Error("Registry cache envelope could not be read")
 			Model := ConfigRegistryCacheDecode(Text, Identity)
 			Registry := Validate.Call(Model)
+			_ConfigRegistryRememberPristine(Path, SourceHash, Registry)
 			try LoggerInfo("ConfigMigration", "Registry parse cache hit, validated in {1} ms.", TickElapsed(Started))
 			return Registry
 		}
@@ -235,6 +262,8 @@ ConfigRegistryCacheLoad(Path, CachePath, CodeIdentity := unset, ParseFn := 0, Va
 	}
 	Model := Parse.Call(Source, "the shipped migration registry")
 	Registry := Validate.Call(Model)
+	if IsSet(SourceHash) && StrLen(SourceHash) == 64
+		_ConfigRegistryRememberPristine(Path, SourceHash, Registry)
 	if IsSet(Identity)
 		_ConfigRegistryCachePending := {Path: CachePath, Identity: Identity, Model: Model}
 	try LoggerInfo("ConfigMigration", "Registry parse cache miss, authoritative parse validated in {1} ms.", TickElapsed(Started))

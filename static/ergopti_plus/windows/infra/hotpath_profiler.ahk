@@ -427,6 +427,18 @@ PerfStage_Begin() {
 	return counter
 }
 
+/** Microseconds since PerfStage_Begin, without recording anything; for per-name counters. */
+PerfElapsedUs(StartTicks) {
+	global _HOTPATH_QPC_FREQ
+	if !IsSet(_HOTPATH_QPC_FREQ)
+		return 0
+	local now := 0
+	if (_HOTPATH_QPC_FREQ == 0)
+		DllCall("QueryPerformanceFrequency", "Int64*", &_HOTPATH_QPC_FREQ)
+	DllCall("QueryPerformanceCounter", "Int64*", &now)
+	return Round((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000000)
+}
+
 /** Records a stage's duration into the latency summaries; the debug line is built only when enabled. */
 PerfStage_End(Label, StartTicks, Count := -1) {
 	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS
