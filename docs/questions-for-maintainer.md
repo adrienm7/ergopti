@@ -76,3 +76,13 @@ answer once, then move the answered line below.
   identical on the three drivers (commit 1e12217b92). Which should win: remove the multiplier on macOS, or declare it
   once in the shared constants and apply it on all three (it helps slow Shift typing but lengthens the window on
   Windows and Linux)?
+- **Delimiters as config leaves on Windows (asked 2026-10-24, PAR-8):** on Windows every terminator edit goes through
+  a reload-and-acknowledge path and users can enter arbitrary delimiter characters and mark any as consumed; the macOS
+  and Linux leaves (`terminator_states`, `terminators`) cannot express that. Proposed: write the built-in states through
+  the live config writer (like the WPM settings, no reload per click), drop the override-file strings and the
+  per-character consume opt-in on built-ins, keep custom delimiters as records. Acceptable? (about 230 references in 17
+  files and 40 AHK tests.)
+- **Hotstring base delay setting (asked 2026-10-24, PAR-6):** `hotstrings.expansion_delay` is now the single
+  declaration of the 0.75 s default, but only macOS reads a user-set value; Windows and Linux ignore one written in
+  `config.toml` (their delay is set per section in the « Délais & couleurs » window). Should the base value become
+  user-settable on all three?

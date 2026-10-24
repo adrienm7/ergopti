@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-23. Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
+Updated: 2026-10-24 (see the handover section below). Latest stable: [v1.0.6](https://github.com/adrienm7/ergopti/releases/tag/v1.0.6)
 (tag 950979d19c, 2026-10-23). **Next step: issue #101 follow-ups on the Mac (Backlog).** Open work only: a finished item is removed, its lessons go to
 [docs/memory](memory/README.md), and the history stays in Git
 (`git log -p -- docs/ERGOPTIPLUS_TODO.md`). Item numbers are stable and never reused. Open
@@ -28,6 +28,105 @@ ruff 0.15.8 and Prettier before every commit. After touching
 a sealed Windows updater source, reseal with
 `node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write`. Procedures:
 [COORDINATOR-MEMORY](todo-agents/COORDINATOR-MEMORY.md).
+
+## Handover of 2026-10-24: where we stand and how to continue
+
+Written at the end of a long multi-agent session. Read this first, then the item you pick.
+
+**State of the repository.** About 140 local commits on `dev` are NOT pushed (the last push to `origin/dev` was
+7099eb93ef). Pushing `dev` needs the maintainer's explicit go-ahead in the current conversation (AGENTS.md); a push
+cuts a release unless the run is cancelled, so cancel the CI run of each push (`gh run cancel`). No release was cut and
+`main` was not touched. Before the first push: integrate the shared JSON (see "Integration checklist"), run
+`node tools/lint/lint-conventions.js`, the three AHK boot checks and the targeted gates of the items you touched.
+
+**What was done in this session (details in `git log` and in the items).** Keystats rename (keylogger gone); issue #101
+fixes (ATS key for an http PAC, direct route when the PAC lookup names no route, named lookup stages, no retry of a
+refused route, lease line cap, Ollama 412 upgrade request); WinHTTP transport (item 62); per-layer layout composer on the
+three OS; hotstring expansion delay defined once and aligned (shared corpus `time_gate_vectors.json`, definition in
+`docs/memory/text-input-and-config.md`); chaining pinned by tests (buffer continuity, `test_hotstring_chaining.ahk`);
+Space tap-hold press tick; HS-274 owned Karabiner runtime (dormant, hidden `[karabiner] runtime = "owned"`); one-click
+Debug field checks on all OS; evidence log API that is never collapsed (`LoggerEvidence`, `Logger.evidence`); redaction
+rules and the opt-in redacted day log; AV-surface gate and the false-positive submission pack; CI tooling (rerun verdict,
+Flatpak cache and retry, remap-runtime workflow, slowest-test summary); performance work (below); cross-OS parity audit
+(PAR entries). Hosted validation on throwaway `tmp/ci-validate-*` branches is logged in
+[ci-validation-2026-10-24.md](ci-validation-2026-10-24.md).
+
+**Performance state per OS (measure before optimising; every driver now has permanent counters).**
+
+- Windows: boot to ready 13.6 s to about 8.4 s, tray menu stage 2.6 s to 1.2 s, focus cache event driven. Next: remaining
+  registry compares (about 28 write-admission callers), `Hook.KeyDown` attribution (sampled subscriber timings are in;
+  read the next live log), `Tooltip.Build` 7.6 ms and `Present` 10.6 ms, layout registration (about 1 s of `Hotkey()`
+  calls), the 2 s script parse (9.7 MB include graph, no safe lever found), typst/emoji hotstring sections (about 460 ms).
+- Linux: idle loop 99.99 % of a core to 1.5 %, X11 focus without forks, TOML about 2x faster. Next: 315 eagerly loaded
+  modules (about 500 ms), five `find` forks in the hotstring loader, log rotation forks in `logger_sink.lua`, validate
+  idle CPU and the libxcb focus path on a real desktop.
+- macOS: instrumentation only (`infra/phase_stats.lua`, menu per row, boot sub-stages, hold attribution). Next: read the
+  Mac log lines listed in "Mac field test" and optimise the dominant phases (menu rebuild 113-247 ms, boot stages,
+  preview 21-29 ms per key, preferences writes of 300 operations, ingest tick 1.0-1.5 s).
+
+**Maintainer decisions taken (do not re-ask).** Hotstring chaining is buffer continuity and already works; it is pinned
+by tests, never break it. Shared complex-key multiplier on all three OS (PAR-7). Layout pause/resume implemented on
+Windows and Linux (PAR-19). Tap-hold and key-combination defaults identical on all OS except real role differences,
+each with a stated reason (PAR-17). Linux reload through a TTL-bound pending-record protocol shared by the three OS.
+Preview switches default ON everywhere, notifications aligned on macOS, WPM defaults off (coordinator choices, ask for
+review). libXi dependency declined (Xi packet retired). Items 46/47/48 retired except the macOS Ollama termination debt
+(120). Optional redacted day log allowed; config-directory names masked in logs. Item 131 is a read-only login-items
+check, no removal. No token-reuse rearm (ADR 012). Expansion delay with end char: from the last typed letter to the
+expander (`★` or the end character).
+
+**Decisions still pending for the maintainer.** `docs/questions-for-maintainer.md` (check it for anything new).
+
+**Remaining work, in the order to take it.**
+
+1. Integrate and push (see checklist), then run the FULL suites once on the final tree: `node tools/test/verify-change.cjs`
+   (about an hour with parallel agents idle) and the full AHK suite (about 90 minutes, single threaded, nothing else
+   running: `run_all.ahk` is `#SingleInstance Force`, concurrent runs silently kill each other). Fix only reds caused by
+   our changes (hosts reds: Node 22.16 vs pinned 22.22.2, Unicode 16, no pwsh, no lfs, `build:linux`, Windows file staging).
+2. Hosted CI on the final source: `gh workflow run ci.yml --ref tmp/preflight-dev -f os_lanes=all` (only after every
+   piece passed alone; macOS runners are expensive). Then the CI receipts section.
+3. The cross-OS parity entries `PAR-1` to `PAR-85` below: unfinished ones are those not marked done; centralisation and
+   constants (PAR-65 to PAR-85) were not started: one declaration in `_shared` per constant, delay, colour, label;
+   hexagonal architecture (rules and ports in `_shared`, OS code only in adapters); each with a single-source gate.
+4. Performance items above, on each OS; then re-measure with the permanent counters and keep the numbers in the commits.
+5. Items that need devices or the maintainer: see "Mac field test", "Windows PC field test", SignPath application,
+   Microsoft/vendor submissions, tester retests, the maintainer checks sections.
+
+**Mac field test (after a release or a local build of this tree).** Debug menu, one click each, then Copy report and
+send the log lines `Field check result:`: Test Karabiner lease, Test owned Karabiner runtime (dormant check), Test
+network (PAC, proxy, download), Test key accounting (30 s while typing), login items and agents, toolchain (timer,
+Shortcuts, Homebrew, Karabiner signature), Test the composed layout. Also bring back after an hour of normal use:
+`Phase summary [family]` (keymap, preview, menu, menu_item, toml, process, boot_sub, hotstring_load, runtime, hotpath),
+`Menu tree rebuilt ... Slowest:`, `Boot stage requires:`, `Boot sub-stage:`, `Common hotstring load:`, every
+`held the main thread ... Phases inside the hold:`, `Slow ingest tick`, `Slow preferences save`,
+`Lease token decision=`, `written in N ms`, `Memory snapshot`. Confirm on the Mac: an http company PAC works (issue
+#101), `pr` + Space style triggers, the ISO/ANSI selector (Automatic/ISO/ANSI) with a physical keyboard, the
+menu-triggered redeploy.
+
+**Windows PC field test.** Reload the driver from the working tree only when the tree parses (the three boot checks);
+then run `node tools/maintainer/windows-live-checks.cjs` with NO other AutoHotkey process running (SendInput falls back
+to SendEvent when another script has a keyboard hook, and the real-key checks refuse to run next to another driver);
+Debug > Record keyboard hook order (expect the native owner first again after the reassertion) and Measure SendEvent vs
+SendInput on a quiet machine; the manual lists in [windows-maintainer-checks.md](tooling/windows-maintainer-checks.md).
+
+**Integration checklist (shared files other agents leave uncommitted, because the pre-commit hook rejects a partially
+staged `.json`).** `static/ergopti_plus/_shared/data/locales/*.json` (21 files), `_shared/modules/menu/menu_manifest.json`
+(regenerate with `npm run build:domain`; `codegen-unicode-case` fails on this host, ignore that step),
+`_shared/modules/diagnostics/schema.json`, `_shared/modules/features/manifest.toml`, `_shared/ui/layout_manager/strings.json`,
+`windows/tests/run_all.ahk` (includes for tests whose files already exist: capsword state, composer check, new live
+tests), `package.json` (npm aliases such as `test:remap-runtime-manifest`, `test:neutral-installation`), the test suite
+registries under `tools/test/features/*/suite.json` (renumber clashing ids), `docs/memory/*.md` entries listed by the
+agents. After integrating: `python tools/locale/check_locales.py`, `node tools/test/test-menu-manifest.cjs`,
+`test-approved-menu-labels.cjs`, `test-diagnostic-ui-integrity.cjs`, `npm run test:ci-pipeline-wiring`. Reseal the
+updater original source after any change to a pinned file:
+`node tools/ci/seal-windows-updater-original-source.cjs --ref <commit> --write` (only when `run_all.ahk` is clean).
+
+**Hazards learned.** One lint violation in anyone's new file blocks every commit (the hook lints the whole repo):
+run the lint after every save. A half-saved `.ahk` file breaks the maintainer's live driver (reloads come from the
+working tree): edit a copy and move it in when it parses. Committing through a temporary index leaves the real index
+stale: run `git status` before a plain commit and reset only your own paths. `wsl --shutdown` kills other agents' WSL
+jobs and clears `/tmp`: do not run it while others work. Never type backslashes through bash heredocs or python text
+mode (use the Write/Edit tools). Test the Windows pieces for real on the maintainer's PC (everything Windows can be run
+here); macOS and Linux behaviour that needs hardware goes through the Debug field checks and the maintainer's logs.
 
 ## Big item 1: Windows corporate networks and trust (items 62, 132)
 
