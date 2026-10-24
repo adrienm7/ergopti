@@ -80,12 +80,14 @@ stream_connect_timeout_ms = 5000
 stream_hard_timeout_ms = 90000
 
 # MLX warmup: unblock _warmup_in_flight if the single-token POST never returns.
+# LX: the ceiling of one Ollama load request (modules/llm/api_ollama.lua warmup).
 warmup_post_timeout_ms = 30000
 
 # MLX non-streaming inference: prevents a hung server from blocking on_fail indefinitely.
 non_stream_timeout_ms = 8000
 
 # Initial delay before the first warmup attempt after startup.
+# HS: warmup_controller.lua. LX: modules/llm/warmup.lua (also its retry base and cap).
 warmup_initial_delay_ms = 2000
 
 # Base retry interval for the exponential-backoff warmup retry loop.

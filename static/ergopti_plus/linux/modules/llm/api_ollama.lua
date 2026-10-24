@@ -33,6 +33,10 @@ local LOG = "modules.llm.api_ollama"
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
 local LocalModelPolicy = require("llm.local_model_policy")
+local Json = require("json")
+
+-- The warmup's HTTP owner: a prediction's own request never waits for it.
+local WARMUP_OWNER = "ollama_model_warmup"
 
 
 -- =========================================
@@ -315,6 +319,35 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		end, runtime_receipt)
 	end
 	return dispatch()
+end
+
+--- Asks Ollama to load a model and keep it for the keep-alive window without
+--- generating anything: a chat request with no message only loads the weights.
+--- Its own HTTP owner, so it never cancels or waits for a prediction.
+--- @param base_url string Ollama origin.
+--- @param model string Ollama-native tag.
+--- @param runtime_receipt table|nil The engine's runtime receipt the target was read with.
+--- @param on_done function Receives (loaded, failure): a string, or the missing-model failure.
+--- @return table operation Owned transport; `started` is false when refused before sending.
+function M.warmup(base_url, model, runtime_receipt, on_done)
+	local response = { runtime_engine = ResponseEngine, runtime_capture = ResponseCapture,
+		runtime_current = ResponseCurrent, runtime_receipt = runtime_receipt, origin = base_url }
+	local url = bridge_mod.ollama_endpoint(base_url, "chat")
+	if type(on_done) ~= "function" or type(model) ~= "string" or model == "" or not url
+		or not runtime_current(response) then
+		return { started = false }
+	end
+	local body = json_encode({ model = model, messages = Json.array({}), stream = false, keep_alive = OLLAMA_KEEP_ALIVE })
+	Logger.debug(LOG, "warmup() → %s (model=%s)", url, model)
+	return HttpClient.post_stream_owned(url, { ["Content-Type"] = "application/json" }, body, {
+		owner = WARMUP_OWNER, timeout_ms = Timings.ms("llm", "warmup_post_timeout_ms"),
+		authorized = function() return runtime_current(response) end,
+	}, function() end, function(result)
+		if not runtime_current(response) then return end
+		if type(result) == "table" and result.ok == true then on_done(true); return end
+		on_done(false, LocalModelPolicy.response_failure(result, base_url)
+			or (type(result) == "table" and type(result.error) == "string" and result.error) or "HTTP transport failed")
+	end)
 end
 
 --- Cancels the in-flight request and publishes one terminal cancellation.
