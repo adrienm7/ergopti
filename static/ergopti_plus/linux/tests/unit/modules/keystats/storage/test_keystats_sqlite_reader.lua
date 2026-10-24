@@ -32,7 +32,14 @@ helpers.describe("keystats sqlite_reader", function()
       "reader must compose its sqlite3 invocation through the audited builder")
     helpers.assert_true(src:find('flags = { "-readonly", "-json" }', 1, true) ~= nil,
       "reader must open readonly while retaining JSON output from sqlite3")
-    helpers.assert_true(src:find("FROM agg_app_day", 1, true) ~= nil)
+    -- The manifest SQL is the shared catalogue's, rendered by name, so the
+    -- aggregate tables are asserted on the statements the reader renders.
+    helpers.assert_true(src:find('Queries.render(name, "cli_json"', 1, true) ~= nil,
+      "reader must render the manifest from the shared catalogue in the CLI dialect")
+    local Queries = require("keystats.queries")
+    local app_day = Queries.render("manifest.app_day", "cli_json", { where = "" })
+    helpers.assert_true(app_day:find("FROM agg_app_day", 1, true) ~= nil)
+    helpers.assert_true(app_day:find("GROUP BY date, app", 1, true) ~= nil)
     -- The single-character table used to be the only one named here, in the
     -- source and in the reader alike. It is now reached through the code→table
     -- map, so the assertion follows the map — and covers all nine families
@@ -50,6 +57,5 @@ helpers.describe("keystats sqlite_reader", function()
 	  "reader must expose persisted hardware scancodes to the heatmap")
 	helpers.assert_true(src:find("source_count", 1, true) ~= nil,
 	  "reader must retain hotstring/LLM provenance instead of dropping esrc_json")
-    helpers.assert_true(src:find("GROUP BY date, app", 1, true) ~= nil)
   end)
 end)

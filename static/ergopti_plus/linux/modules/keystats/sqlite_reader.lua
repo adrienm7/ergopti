@@ -14,6 +14,7 @@ local Logger = require("logger.shim")
 local Utils = require("keystats.utils")
 local MediaStore = require("keystats.media_store")
 local SqliteCommand = require("modules.keystats.sqlite_command")
+local Queries = require("keystats.queries")
 local ok_json, Json = pcall(require, "json")
 local LOG = "modules.keystats.sqlite_reader"
 
@@ -228,16 +229,14 @@ function M.read_manifest(sqlite_path, start_date, end_date, apps)
 		if not accepted then complete = false end
 		return rows
 	end
-	local rows = query(string.format([[
-SELECT date, json_quote(app) AS app_json, SUM(chars) AS chars, SUM(pauses) AS pauses,
-       SUM(time_ms) AS time_ms, SUM(think_time_ms) AS think_time_ms,
-       SUM(hs_chars) AS hs_chars, SUM(llm_chars) AS llm_chars,
-       SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,
-       SUM(hs_suggested) AS hs_suggested, SUM(llm_suggested) AS llm_suggested,
-       SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,
-       SUM(app_time_ms) AS app_time_ms, json_quote(MAX(category)) AS category_json
-FROM agg_app_day%s GROUP BY date, app;
-]], filters(start_date, end_date, apps)))
+	-- The per-app-day aggregates. The SQL is the shared catalogue's
+	-- (_shared/data/db/queries.sql) in the CLI dialect, so field names match the
+	-- macOS and Windows projections exactly: the dashboard is the same one.
+	local where = filters(start_date, end_date, apps)
+	local function manifest_query(name, media_owned)
+		return query(Queries.render(name, "cli_json", { where = where }), media_owned)
+	end
+	local rows = manifest_query("manifest.app_day")
 	for _, row in ipairs(rows) do
 		-- Quoted in SQL as read_user_categories quotes it: the CLI's JSON mode
 		-- cuts raw TEXT at NUL, so a saved category came back shortened.
@@ -264,16 +263,7 @@ FROM agg_app_day%s GROUP BY date, app;
 		entry.category = row.category or "Unknown"
 	end
 
-	-- The per-app-day aggregates. Field names match the macOS projection exactly,
-	-- because the dashboard that reads them is the same one.
-	local where = filters(start_date, end_date, apps)
-
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
-       SUM(space) AS space, SUM(other) AS other,
-       MIN(first_typed_min) AS first_min, MAX(last_typed_min) AS last_min
-FROM agg_app_day_chars_class%s GROUP BY date, app;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.chars_class")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.char_letter = row.letter or 0
 		entry.char_digit = row.digit or 0
@@ -287,12 +277,7 @@ FROM agg_app_day_chars_class%s GROUP BY date, app;
 		entry.last_typed_min = row.last_min
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, SUM(bs_total) AS bs_total, SUM(cascade_count) AS cascade_count,
-       MAX(cascade_max_len) AS cascade_max_len,
-       SUM(recovery_sum_ms) AS recovery_sum, SUM(recovery_count) AS recovery_count
-FROM agg_app_day_errors%s GROUP BY date, app;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.errors")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.bs_total = row.bs_total or 0
 		entry.cascade_count_total = row.cascade_count or 0
@@ -301,13 +286,7 @@ FROM agg_app_day_errors%s GROUP BY date, app;
 		entry.recovery_time_count = row.recovery_count or 0
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, MAX(same_finger_streak_max) AS f_max,
-       MAX(same_hand_streak_max) AS h_max, SUM(auto_repeat_count) AS ar_count,
-       SUM(focus_to_first_key_sum_ms) AS focus_sum,
-       SUM(focus_to_first_key_count) AS focus_count
-FROM agg_app_day_ergo%s GROUP BY date, app;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.ergo")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		-- MAX, not SUM: the longest same-finger run of the day is a record. Adding
 		-- two devices' records would invent a streak nobody typed.
@@ -318,61 +297,39 @@ FROM agg_app_day_ergo%s GROUP BY date, app;
 		entry.focus_to_first_key_count = row.focus_count or 0
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, media_id, SUM(c) AS c
-FROM ngram_media_keys%s GROUP BY date, app, media_id;
-]], where), true)) do
+	for _, row in ipairs(manifest_query("manifest.media_keys", true)) do
 		get_entry(manifest, row.date, row.app).media_keys[row.media_id] = MediaStore.project_press(row)
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, media_id, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
-       MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count, SUM(hold_count) AS hold_count
-FROM agg_app_day_media_hold%s GROUP BY date, app, media_id;
-]], where), true)) do
+	for _, row in ipairs(manifest_query("manifest.media_hold", true)) do
 		get_entry(manifest, row.date, row.app).media_hold[row.media_id] = MediaStore.project_hold(row)
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, keycode, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
-       MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count,
-       SUM(hold_count) AS hold_count
-FROM agg_app_day_kc_hold%s GROUP BY date, app, keycode;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.kc_hold")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.kc_hold = entry.kc_hold or {}
 		entry.kc_hold[tostring(row.keycode)] = {
-			s = row.sum_ms or 0, n = row.count or 0,
+			s = row.s or 0, n = row.c or 0,
 			-- MAX, not SUM: the longest hold of the day is a record across devices.
-			m = row.max_ms or 0,
-			tap = row.tap_count or 0, hold = row.hold_count or 0,
+			m = row.mx or 0,
+			tap = row.t or 0, hold = row.h or 0,
 		}
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, json_quote(layout) AS layout_json, SUM(count) AS count
-FROM agg_app_day_layouts%s GROUP BY date, app, layout;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.layouts")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.layouts_seen = entry.layouts_seen or {}
 		entry.layouts_seen[row.layout] = (entry.layouts_seen[row.layout] or 0) + (row.count or 0)
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, json_quote(title) AS title_json, SUM(c) AS c, SUM(ms) AS ms
-FROM agg_app_day_titles%s GROUP BY date, app, title;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.titles")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		-- The shared page reads win_titles, as the Windows and macOS readers name it.
 		entry.win_titles = entry.win_titles or {}
 		entry.win_titles[row.title] = { c = row.c or 0, ms = row.ms or 0 }
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
-       e_buckets_json, COUNT(*) AS source_rows
-FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.hourly")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		local bucket = entry.hourly[row.hour] or { c = 0, e = 0, em = 0, es = 0, e_buckets = {} }
 		entry.hourly[row.hour] = bucket
@@ -382,11 +339,7 @@ FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 		merge_error_buckets(bucket.e_buckets, row)
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
-       e_buckets_json, COUNT(*) AS source_rows
-FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.hourly_min5")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		local bucket = entry.hourly_min5[row.slot] or { c = 0, e = 0, es = 0, e_buckets = {} }
 		entry.hourly_min5[row.slot] = bucket
@@ -396,12 +349,7 @@ FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 		merge_error_buckets(bucket.e_buckets, row)
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, bucket_ms, SUM(time_sum) AS time_sum, SUM(credited) AS credited,
-       SUM(hs_input_time_sum) AS hs_in_t, SUM(hs_input_credited) AS hs_in_c,
-       SUM(llm_input_time_sum) AS llm_in_t, SUM(llm_input_credited) AS llm_in_c
-FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.buckets")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		local key = tostring(row.bucket_ms)
 		entry.time_buckets[key] = (entry.time_buckets[key] or 0) + (row.time_sum or 0)
@@ -415,13 +363,7 @@ FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
 	-- Grouped by the histogram blob as well as by app-day, so two devices'
 	-- distinct blobs each come back as their own row and are merged below.
 	-- Count identical blobs too: grouping must not deduplicate their buckets.
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
-       MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
-       SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
-       length_buckets_json, COUNT(*) AS source_rows
-FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.burst")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.burst_count_total = (entry.burst_count_total or 0) + (row.count_total or 0)
 		entry.burst_max_cpm = math.max(entry.burst_max_cpm or 0, row.max_cpm or 0)
@@ -441,10 +383,7 @@ FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 		end
 	end
 
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, count_total, longest_ms, longest_chars, total_active_ms, durations_json
-FROM agg_app_day_session%s;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.session")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.session_count_total = (entry.session_count_total or 0) + (row.count_total or 0)
 		-- The longest session of the day is a record across devices, not a sum:
@@ -471,11 +410,7 @@ FROM agg_app_day_session%s;
 	-- workflow the shared metrics pages display. Alias the source at the SQL
 	-- boundary so the same date/app filter policy covers this differently keyed
 	-- aggregate, including synchronized contributions from several devices.
-	for _, row in ipairs(query(string.format([[
-SELECT date, json_quote(app) AS app_json, json_quote(app_to) AS app_to_json, SUM(count) AS count
-FROM (SELECT date, app_from AS app, app_to, count FROM agg_app_day_switches_to)%s
-GROUP BY date, app, app_to;
-]], where))) do
+	for _, row in ipairs(manifest_query("manifest.switches_to")) do
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.switches_to = entry.switches_to or {}
 		entry.switches_to[row.app_to] = row.count or 0
