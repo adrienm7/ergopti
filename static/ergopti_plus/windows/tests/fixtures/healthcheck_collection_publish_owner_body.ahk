@@ -237,7 +237,7 @@ _HCPO_Observe() {
 	}
 	_HCPO.LateA := LateA
 	FileAppend("RECEIPT collection-publish mode=" . _HCPO.Mode . " a_id=" . (IsObject(_HCPO.A) ? _HCPO.A.Id : "unknown")
-		. " a_pid=" . _HCPO.APid . " b_id=" . (IsObject(_HCPO.B) ? _HCPO.B.Id : "unknown") . " b_pid=" . _HCPO.BPid
+		. " a_process_id=" . _HCPO.APid . " b_id=" . (IsObject(_HCPO.B) ? _HCPO.B.Id : "unknown") . " b_process_id=" . _HCPO.BPid
 		. " rows=" . _HCPO.Rows.Length . " timer_calls=" . _HCPO.ActorCalls . " cut_entered=" . _HCPO.CutEntered
 		. " actor_done=" . _HCPO.ActorDone . " close_ack=" . _HCPO.CloseAck . " b_first=" . _HCPO.BFirst
 		. " late_a=" . LateA . " errors=" . IsObject(_HCPO.Failure)
