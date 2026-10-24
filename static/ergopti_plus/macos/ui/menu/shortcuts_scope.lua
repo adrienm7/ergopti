@@ -125,6 +125,16 @@ function M.new(options)
 		-- cleanup. Physical edits retain their source-bound leaf validation;
 		-- the script chords' submenu writes only its own leaves.
 		local containers = config.select == nil and not config.editing and Preferences.SHORTCUT_CONTAINERS or nil
+		-- [mod_combos] lives in config_karabiner.toml: the remap engine applies
+		-- the Shortcuts scope's combination section itself (platform/remap
+		-- REMAP_SCOPE_SECTIONS), so this config.toml transaction leaves it.
+		if not config.editing then
+			local narrowed = config.select
+			config.select = function(path)
+				if path == "mod_combos" or path:sub(1, #"mod_combos.") == "mod_combos." then return false end
+				return narrowed == nil or narrowed(path) == true
+			end
+		end
 		config.parameter_name_owned = function(domain, name)
 			if domain == "keyboard" and require("shortcuts.physical_slots").is_namespace(name) then
 				return keyboard.physical_slot_descriptor(name) ~= nil
