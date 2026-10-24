@@ -55,8 +55,6 @@
 local hs             = hs
 local Logger         = require("infra.logger")
 local TimerScheduler = require("adapters.timer_scheduler")
-local Paths          = require("infra.paths")
-local Json           = require("json")
 
 local LOG = "adapters.http_client"
 local CACHE_POLICIES = {
@@ -109,23 +107,10 @@ local TIMEOUT_ERROR                 = "timeout"
 local TIMEOUT_UNAVAILABLE_ERROR     = "timeout unavailable"
 local TIMEOUT_CLEANUP_PENDING_ERROR = "timeout cleanup pending"
 
---- Reads the shared redirect policy every driver applies, failing fast when
---- the shared tree is unreachable rather than guessing a hop limit.
---- @return table policy
-local function read_redirect_policy()
-	local path = assert(Paths.shared("data/http/redirect_policy.json"), "shared tree unreachable")
-	local handle = assert(io.open(path, "rb"))
-	local bytes = handle:read("*a")
-	handle:close()
-	local policy = assert(Json.decode(bytes), "redirect policy is not JSON")
-	assert(type(policy.buffered_get) == "table" and math.type(policy.buffered_get.max_hops) == "integer",
-		"redirect policy has no integer max_hops")
-	assert(type(policy.sensitive_headers) == "table", "redirect policy has no sensitive_headers")
-	return policy
-end
-local REDIRECT_POLICY = read_redirect_policy()
-
-local MAX_REDIRECTS = REDIRECT_POLICY.buffered_get.max_hops
+-- The shared redirect law's buffered_get.max_hops (data/http/redirect_policy.json),
+-- pinned by tools/test/test-port-compliance.cjs. Kept literal so loading the
+-- adapter never depends on finding the shared tree.
+local MAX_REDIRECTS = 50
 
 local REDIRECT_STATUSES = {
 	[301] = true,
@@ -135,8 +120,15 @@ local REDIRECT_STATUSES = {
 	[308] = true,
 }
 
-local SENSITIVE_HEADERS = {}
-for _, name in ipairs(REDIRECT_POLICY.sensitive_headers) do SENSITIVE_HEADERS[name:lower()] = true end
+local SENSITIVE_HEADERS = {
+	["api-key"] = true,
+	["authorization"] = true,
+	["cookie"] = true,
+	["cookie2"] = true,
+	["proxy-authorization"] = true,
+	["x-api-key"] = true,
+	["x-goog-api-key"] = true,
+}
 
 local ENTITY_HEADERS = {
 	["content-length"] = true,

@@ -231,8 +231,8 @@ if (totalFail === failBeforeCompleteness) {
 // ==================================================
 // ==================================================
 
-// Linux and macOS consume the canonical list. The macOS adapter must build its
-// table from the shared policy and hold no literal copy that could drift.
+// Linux consumes the canonical list. Pin the existing macOS native owner's
+// inventory until it can adopt the shared binding without changing its gates.
 const redirectPolicy = JSON.parse(
 	fs.readFileSync(shared('data/http/redirect_policy.json'), 'utf8')
 );
@@ -249,17 +249,29 @@ const macHttpSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/adapters/http_client.lua'),
 	'utf8'
 );
-const macReadsPolicy = macHttpSource.includes('Paths.shared("data/http/redirect_policy.json")');
-const macBindsHeaders =
-	/local SENSITIVE_HEADERS = \{\}\nfor _, name in ipairs\(REDIRECT_POLICY\.sensitive_headers\) do/.test(
-		macHttpSource
-	);
-const macLiteralHeaders = sensitiveHeaders.filter((name) => macHttpSource.includes(`["${name}"]`));
-if (validHeaderInventory && macReadsPolicy && macBindsHeaders && macLiteralHeaders.length === 0) {
-	pass('macOS native redirect header inventory is bound to the shared policy');
+const macHeaderBlock = macHttpSource.match(/local SENSITIVE_HEADERS = \{([\s\S]*?)\n\}/);
+const macHeaders = macHeaderBlock
+	? [...macHeaderBlock[1].matchAll(/\["([^"]+)"\]\s*=\s*true/g)].map((match) => match[1])
+	: [];
+if (
+	validHeaderInventory &&
+	JSON.stringify([...sensitiveHeaders].sort()) === JSON.stringify(macHeaders.sort())
+) {
+	pass('macOS native redirect header inventory matches the shared policy');
 } else {
-	fail('macOS native redirect header inventory is bound to the shared policy', [
-		'the adapter must build SENSITIVE_HEADERS from redirect_policy.json, without a literal copy'
+	fail('macOS native redirect header inventory matches the shared policy', [
+		'credential inventory drift or unrecognized native table'
+	]);
+}
+
+// The hop limit is pinned the same way: the native owner keeps a literal so
+// loading the adapter never reads the shared tree.
+const macMaxRedirects = macHttpSource.match(/^local MAX_REDIRECTS = (\d+)$/m);
+if (macMaxRedirects && Number(macMaxRedirects[1]) === redirectPolicy.buffered_get.max_hops) {
+	pass('macOS native redirect hop limit matches the shared policy');
+} else {
+	fail('macOS native redirect hop limit matches the shared policy', [
+		'MAX_REDIRECTS must equal buffered_get.max_hops of data/http/redirect_policy.json'
 	]);
 }
 
