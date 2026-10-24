@@ -413,8 +413,8 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.keys.ctrl_quote", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.cmd_shift_v", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
         Map("path", "shortcuts.keys.cmd_star", "section", "shortcuts.keys", "reason_key", "platform_reason.shortcut_settings_are_stored_per_driver", "platforms", ["hs"]),
-        Map("path", "layout.pause_switch_enabled", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs"]),
-        Map("path", "layout.on_pause", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs"]),
-        Map("path", "layout.on_resume", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs"])
+        Map("path", "layout.pause_switch_enabled", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs", "linux"]),
+        Map("path", "layout.on_pause", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs", "linux"]),
+        Map("path", "layout.on_resume", "section", "layout", "reason_key", "platform_reason.layout_switch_on_pause_is_macos", "platforms", ["hs", "linux"])
     ]
 )

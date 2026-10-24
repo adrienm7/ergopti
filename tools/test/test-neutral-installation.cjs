@@ -61,7 +61,10 @@ const NEUTRAL_LAYOUT = {
 		driver: 'linux',
 		values: {
 			direct_access_digits: 'native',
-			number_row_reorder_edges: false
+			number_row_reorder_edges: false,
+			pause_switch_enabled: false,
+			on_pause: '',
+			on_resume: ''
 		}
 	}
 };

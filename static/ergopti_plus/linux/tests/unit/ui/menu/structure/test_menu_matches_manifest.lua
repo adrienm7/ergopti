@@ -251,6 +251,12 @@ local function build_fixture_menu(context)
 		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
 		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
 		context.is_paused = function() return false end
+		-- Layout on pause / resume: a desktop listing no layout, so only « No change ».
+		if context.pause_layout == nil then
+			context.pause_layout = { switcher = function()
+				return { choices = function() return {} end, refresh = function() end }
+			end }
+		end
 		context.gestures.is_assignable = function() return false end
 		context.gestures.capture_parameter_source_guard = function() return function() return true end end
 		local owner = Pair.new({keys = context.tap_holds.key_catalog(), hold_picker = defaults.tap_hold.hold_picker,
@@ -556,6 +562,9 @@ helpers.describe("menu certification: published available component rows are ren
 			agent_system_backend_current_caption = i18n.get("menu.agent.off"),
 			agent_system_model_caption = "",
 			agent_disabled_apps_count = "0",
+			-- No configuration: both pause layouts are « No change ».
+			layout_pause_caption = i18n.get("menu.layout.layout_auto"),
+			layout_resume_caption = i18n.get("menu.layout.layout_auto"),
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
