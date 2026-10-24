@@ -41,6 +41,9 @@ Current corpus directories:
   two or three shipped expansions per hotstring family of the menu manifest,
   read from the shipped packs by `_shared/lua/test/hotstring_family_samples.lua`
   and replayed by the macOS and Linux E2E harnesses.
+- `static/ergopti_plus/_shared/tests/corpus/hotstrings/sequence_vectors.json` —
+  typed sequences over several mappings (chaining, synthetic output, erase
+  accounting) and the text they leave on screen, replayed by the same harnesses.
 - `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json` — tap-hold
   configuration accessors.
 - `static/ergopti_plus/_shared/tests/corpus/tap_hold/decision_vectors.json` —

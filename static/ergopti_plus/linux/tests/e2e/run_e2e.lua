@@ -404,6 +404,79 @@ else
 	print(string.format("Family samples processed: %d", #samples))
 end
 
+-- What a typed sequence leaves on screen: chaining, synthetic output and erase
+-- accounting, which one trigger per vector cannot show. The engine is fed as the
+-- daemon feeds it (ergopti_hotstrings.lua on_char): the hook has already
+-- forwarded the key to the application, an expansion erases backspace_count
+-- codepoints, types its replacement and the unconsumed terminator back, and the
+-- buffer keeps the output unless the mapping is final_result.
+print("\n--- Shared sequence vectors ---")
+local SEQUENCE_FLAGS = { "is_word", "auto_expand", "is_case_sensitive", "is_case_sensitive_strict", "final_result" }
+
+--- The codepoints of a UTF-8 string, in order.
+--- @param text string
+--- @return table
+local function codepoints(text)
+	local out = {}
+	for cp in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do out[#out + 1] = cp end
+	return out
+end
+
+--- Types `text` into a fresh engine holding `mappings`.
+--- @param mappings table Corpus mappings.
+--- @param text string Typed characters.
+--- @return string screen What the application shows.
+--- @return number fired Expansions that fired.
+local function type_sequence(mappings, text)
+	local engine = require("modules.hotstrings.engine").new()
+	local list = {}
+	for _, m in ipairs(mappings) do
+		local mapping = { trigger = m.trigger, replacement = m.replacement }
+		for _, flag in ipairs(SEQUENCE_FLAGS) do mapping[flag] = m[flag] == true end
+		list[#list + 1] = mapping
+	end
+	engine:load_mappings(list)
+	local screen, fired = {}, 0
+	for _, ch in ipairs(codepoints(text)) do
+		screen[#screen + 1] = ch
+		local is_terminator = terminators.is_terminator(ch)
+		local result = engine:on_char(ch, {
+			is_terminator       = is_terminator,
+			terminator_consumed = is_terminator and terminators.terminator_is_consumed(ch),
+		})
+		if result then
+			fired = fired + 1
+			for _ = 1, result.backspace_count do table.remove(screen) end
+			for _, cp in ipairs(codepoints(result.replacement)) do screen[#screen + 1] = cp end
+			if result.end_char and not result.consume_terminator then screen[#screen + 1] = result.terminator end
+			if result.final_result then engine:reset() else engine:apply_expansion(result) end
+		end
+	end
+	return table.concat(screen), fired
+end
+
+local ok_sequences, sequences = pcall(function()
+	local handle = assert(io.open(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json", "r"))
+	local decoded = require("json").decode(handle:read("*a"))
+	handle:close()
+	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
+	return decoded.vectors
+end)
+if not ok_sequences then
+	fail("mandatory sequence vectors", "decoded vectors", tostring(sequences))
+else
+	for _, v in ipairs(sequences) do
+		local ok_typed, screen, fired = pcall(type_sequence, v.mappings, v.typed)
+		if not ok_typed then
+			fail("sequence[" .. v.id .. "] — replay", "ok", tostring(screen))
+		else
+			assert_eq("sequence[" .. v.id .. "] — screen", v.expected.screen, screen)
+			assert_eq("sequence[" .. v.id .. "] — expansions", v.expected.expansions, fired)
+		end
+	end
+	print(string.format("Sequence vectors processed: %d", #sequences))
+end
+
 -- The real daemon main(), one process per scenario (it runs once per
 -- process), against a scripted keyboard and a model of the focused field.
 -- These pin what no engine-level vector can: the injector's erase arithmetic,
