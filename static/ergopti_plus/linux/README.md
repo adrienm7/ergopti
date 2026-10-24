@@ -221,6 +221,15 @@ typing, including when the general privacy filters are disabled.
 
 Target distributions: **Ubuntu 22.04+, Fedora 38+, Arch Linux, Debian 12+**.
 
+The AppImage brings its own LuaJIT, curl and tray library but uses the
+system's GNU C library (glibc) and GTK 3: it needs **glibc 2.35 or newer**
+(Ubuntu 22.04, Debian 12, Fedora 36, openSUSE Leap 16 or newer, Arch Linux).
+On an older glibc (Ubuntu 20.04, Debian 11) it refuses to start and says
+which version it found. Distributions built on **musl** instead of glibc
+(Alpine Linux, the musl editions of Void Linux) cannot run programs built for
+glibc at all, so neither the AppImage nor the `.deb`/`.rpm` packages run there;
+the AppImage refuses with a message saying so.
+
 Requirements:
 
 - `uinput` kernel module loaded (`modprobe uinput`)
