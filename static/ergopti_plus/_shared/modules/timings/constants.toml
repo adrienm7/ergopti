@@ -146,26 +146,11 @@ val_chord_release_timeout_ms = 5000
 
 [tooltip]
 
-# Default duration a standard (non-LLM) tooltip stays visible.
-# HS: tooltip/config.lua DEFAULT_TIMEOUT_SEC.
-display_ttl_ms = 2500
-
-# Default duration an LLM prediction tooltip stays visible.
-# HS: tooltip/config.lua DEFAULT_LLM_TIMEOUT_SEC.
-llm_display_ttl_ms = 12000
-
-# Shortest tolerable tooltip display (guard against sub-frame flicker).
-# HS: tooltip/config.lua TIMEOUT_FLOOR_SEC.
-min_visible_ms = 50
-
-# Step size used when decrementing the remaining TTL on each poll tick.
-# HS: tooltip/config.lua TIMEOUT_DECREMENT_SEC.
-# AHK: lib/tooltip.ahk _TOOLTIP_TIMEOUT_DECREMENT_SEC.
-# Authoritative value: _shared/modules/tooltip/constants.toml [timing] timeout_decrement_sec = 0.2
-# (200 ms). If the two TOML files ever disagree again, tooltip/constants.toml wins —
-# it is the visual-layer canon; timings/constants.toml mirrors it for cross-module
-# discovery only.
-ttl_decrement_ms = 200
+# The hotstring and LLM tooltip durations, their decrement and their floor are
+# declared once, in _shared/modules/tooltip/constants.toml [timing], which every
+# driver reads. They are not repeated here: the copies this section used to hold
+# had no reader, and the LLM one already disagreed (12 s against 20 s).
+# test-tooltip-timing-single-source.cjs keeps them out.
 
 # Stand-in for "never auto-dismiss" (24 h).
 # HS: keymap/llm_bridge.lua INFINITE_TOOLTIP_SEC.

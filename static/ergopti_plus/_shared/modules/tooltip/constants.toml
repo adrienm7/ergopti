@@ -394,10 +394,11 @@ llm_timeout_sec = 20.0
 safety_timeout_sec = 3.0
 
 # Each tooltip's effective duration is shortened by this amount so the visual
-# disappears slightly before the expansion window closes.
-# Also mirrored as _shared/modules/timings/constants.toml [tooltip] ttl_decrement_ms = 200.
-# This file (tooltip/constants.toml) is the authoritative source; timings/constants.toml
-# mirrors the value for cross-module discovery.
+# disappears slightly before the expansion window closes. This [timing] section
+# is the only declaration of these values: Windows (infra/ui_style.ahk) and
+# macOS (ui/tooltip/config.lua) read it, and the dequeue engines
+# (_shared/modules/tooltip/dequeue.js, macos/ui/tooltip/dequeue.lua) take it from
+# their caller and keep no default (test-tooltip-timing-single-source.cjs).
 timeout_decrement_sec = 0.2
 
 # Hard floor below which the effective duration is never reduced.

@@ -21,19 +21,37 @@
 
 'use strict';
 
-const DEFAULT_TIMEOUT_DECREMENT_SEC = 0.2;
-const DEFAULT_TIMEOUT_FLOOR_SEC = 0.05;
 const MIN_TIMER_MS = 50;
+
+/**
+ * Reads the shared decrement and floor the caller loaded from
+ * _shared/modules/tooltip/constants.toml [timing]. That file is their only
+ * declaration, so this module keeps no copy to fall back on: a caller that
+ * forgot them gets an error instead of a duration computed from a stale value.
+ * @param {object} opts
+ * @returns {{ dec: number, floor: number }}
+ */
+function timingOpts(opts) {
+	const dec = opts?.timeoutDecrementSec;
+	const floor = opts?.timeoutFloorSec;
+	if (typeof dec !== 'number' || typeof floor !== 'number') {
+		throw new TypeError(
+			'dequeue: opts.timeoutDecrementSec and opts.timeoutFloorSec are required ' +
+				'(tooltip/constants.toml [timing] timeout_decrement_sec, timeout_floor_sec)'
+		);
+	}
+	return { dec, floor };
+}
 
 /**
  * Shortens a caller duration by the shared decrement, with a hard floor.
  * @param {number} callerDurationSec
- * @param {object} [opts]
+ * @param {object} opts
+ *   - timeoutDecrementSec, timeoutFloorSec: [timing] values of tooltip/constants.toml
  * @returns {number} Effective display duration in seconds (0 when caller ≤ 0).
  */
-function effectiveDurationSec(callerDurationSec, opts = {}) {
-	const dec = opts.timeoutDecrementSec ?? DEFAULT_TIMEOUT_DECREMENT_SEC;
-	const floor = opts.timeoutFloorSec ?? DEFAULT_TIMEOUT_FLOOR_SEC;
+function effectiveDurationSec(callerDurationSec, opts) {
+	const { dec, floor } = timingOpts(opts);
 	if (!(callerDurationSec > 0)) return 0;
 	return Math.max(floor, callerDurationSec - dec);
 }
@@ -110,10 +128,11 @@ function shouldUseDequeuePath(rows, opts = {}) {
  * Stamps absolute expiry timestamps on shallow row copies.
  * @param {object[]} rows
  * @param {number} nowMs Monotonic clock in milliseconds.
- * @param {object} [opts]
+ * @param {object} opts Field names, plus the timing values effectiveDurationSec requires.
  * @returns {{ rows: object[], maxRemainingMs: number }}
  */
-function stampExpiryTimes(rows, nowMs, opts = {}) {
+function stampExpiryTimes(rows, nowMs, opts) {
+	timingOpts(opts);
 	const durationField = opts.durationField ?? 'durationSec';
 	const expireField = opts.expireField ?? 'expireMs';
 	const { isRebuild } = analyzeDurations(rows, opts);
@@ -249,8 +268,6 @@ function dequeueTestVectors() {
 }
 
 module.exports = {
-	DEFAULT_TIMEOUT_DECREMENT_SEC,
-	DEFAULT_TIMEOUT_FLOOR_SEC,
 	MIN_TIMER_MS,
 	effectiveDurationSec,
 	analyzeDurations,

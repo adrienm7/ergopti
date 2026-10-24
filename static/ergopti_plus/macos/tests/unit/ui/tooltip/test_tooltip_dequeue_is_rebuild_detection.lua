@@ -22,12 +22,13 @@
 local helpers = require("tests.helpers")
 
 local Dequeue = helpers.load_with_stubs("ui.tooltip.dequeue")
+local Timing = helpers.load_with_stubs("ui.tooltip.config").timing
 
 local OPTS = {
 	duration_field = "duration",
 	expire_field   = "expire_at",
-	timeout_decrement_sec = 0.2,
-	timeout_floor_sec     = 0.05,
+	timeout_decrement_sec = Timing.timeout_decrement_sec,
+	timeout_floor_sec     = Timing.timeout_floor_sec,
 }
 
 
