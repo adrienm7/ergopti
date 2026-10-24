@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Klavye Ayarlarını aç…",
 	"menu.layout.pause_layout_enabled": "Duraklatma / devam ettirmede düzeni değiştir",
 	"menu.layout.pause_layout_section": "Duraklatma / devam ettirmede düzen",
+	"menu.layout.pause_layout_unsupported_desktop": "Duraklatma / sürdürmede düzen: bu masaüstünde kullanılamaz (yalnızca GNOME veya X11)",
 	"menu.layout.replace": "Bir tuşu ★ tuşuna dönüştür",
 	"menu.layout.magic_key_source": "Fiziksel sihirli tuş",
 	"menu.layout.magic_key_source.auto": "Otomatik (düzenin tuşu)",

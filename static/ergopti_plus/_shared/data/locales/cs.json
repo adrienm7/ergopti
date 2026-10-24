@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Otevřít Nastavení klávesnice…",
 	"menu.layout.pause_layout_enabled": "Přepínat rozložení při pozastavení / obnovení",
 	"menu.layout.pause_layout_section": "Rozložení při pozastavení / obnovení",
+	"menu.layout.pause_layout_unsupported_desktop": "Rozložení při pozastavení / obnovení: v tomto prostředí nedostupné (pouze GNOME nebo X11)",
 	"menu.layout.replace": "Přeměna klávesy na klávesu ★",
 	"menu.layout.magic_key_source": "Fyzická kouzelná klávesa",
 	"menu.layout.magic_key_source.auto": "Automaticky (klávesa rozložení)",

@@ -19,7 +19,7 @@ local CHOICES = { { id = "xkb:fr", label = "fr" }, { id = "xkb:fr+ergopti", labe
 --- @param settings table { enabled, on_pause, on_resume }
 --- @param refresh_changed boolean|nil What the next refresh reports.
 local function world(settings, refresh_changed)
-	local state = { writes = {}, redraws = 0, refreshes = 0, errors = 0 }
+	local state = { writes = {}, redraws = 0, refreshes = 0, errors = 0, backend = "gnome" }
 	state.preferences = {
 		settings = function() return settings end,
 		set = function(role, value)
@@ -30,6 +30,7 @@ local function world(settings, refresh_changed)
 	state.switch = {
 		switcher = function()
 			return {
+				backend = function() return state.backend end,
 				choices = function() return CHOICES end,
 				refresh = function(on_done)
 					state.refreshes = state.refreshes + 1
@@ -99,6 +100,17 @@ helpers.describe("pause layout rows", function()
 		helpers.assert_eq(rows[2].disabled, true)
 		local live = world({ enabled = true, on_pause = "xkb:fr", on_resume = "" })
 		helpers.assert_nil(Rows.rows(live.ctx)[2].disabled)
+	end)
+
+	helpers.it("explains a desktop that cannot change its layout instead of drawing the switch", function()
+		local state = world({ enabled = true, on_pause = "xkb:fr", on_resume = "" })
+		state.backend = nil
+		local rows = Rows.rows(state.ctx)
+		helpers.assert_eq(#rows, 1, "one status line, no switch and no pickers")
+		helpers.assert_eq(rows[1].label, require("infra.i18n").get("menu.layout.pause_layout_unsupported_desktop"))
+		helpers.assert_true(rows[1].label:find("GNOME", 1, true) ~= nil, rows[1].label)
+		helpers.assert_eq(rows[1].disabled, true, "the status line is inert")
+		helpers.assert_eq(state.refreshes, 0, "nothing is listed on such a desktop")
 	end)
 
 	helpers.it("redraws once when the desktop's list changed", function()

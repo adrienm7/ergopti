@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "打开键盘设置…",
 	"menu.layout.pause_layout_enabled": "暂停/恢复时自动切换键盘布局",
 	"menu.layout.pause_layout_section": "暂停/恢复时的键盘布局",
+	"menu.layout.pause_layout_unsupported_desktop": "暂停 / 恢复时的布局：此桌面不可用（仅限 GNOME 或 X11）",
 	"menu.layout.replace": "将一个键转换为 ★ 键",
 	"menu.layout.magic_key_source": "物理魔法键",
 	"menu.layout.magic_key_source.auto": "自动（布局的按键）",
