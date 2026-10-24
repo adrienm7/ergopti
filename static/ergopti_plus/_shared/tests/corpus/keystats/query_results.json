@@ -1,5 +1,5 @@
 {
-	"_description": "Expected rows of every named keystats query on query_fixture.sql, per filter and per dialect. Derived from the legacy driver SQL before the catalogue replaced it: native rows from the macOS reader (the Windows reader returned the same rows), cli_json rows from the Linux reader with its json_quote columns decoded. Catalogue choices that change a legacy result: manifest.ergo adds the focus-latency sums (Linux legacy), manifest.kc_hold keeps the Windows/macOS aliases, manifest.system_day is the Windows query. In-process engines cut TEXT at NUL, so native rows hold the truncated text the json_quote dialect preserves.",
+	"_description": "Expected rows of every named keystats query on query_fixture.sql, per filter and per dialect. Derived from the legacy driver SQL before the catalogue replaced it: native rows from the macOS reader (the Windows reader returned the same rows), cli_json rows from the Linux reader with its json_quote columns decoded. Catalogue choices that change a legacy result: manifest.ergo adds the focus-latency sums (Linux legacy), manifest.kc_hold keeps the Windows/macOS aliases, manifest.system_day is the Windows query. In-process engines cut TEXT at NUL, so native rows hold the truncated text the json_quote dialect preserves. The n-gram queries are the legacy Linux statements (grouped_ngram_sql); their native rows are the same rows with the text an in-process engine cuts at NUL, and replace the legacy macOS SUM reads (census finding 7). Their filter parameter set is { table = \"ngram_chars\", where, conjunction }.",
 	"filters": {
 		"all": "",
 		"day1": " WHERE date >= '2026-10-01' AND date <= '2026-10-01'"
@@ -1691,6 +1691,306 @@
 						"sleep_ms": 28800000,
 						"space_switches": 7,
 						"wifi_changes": 4
+					}
+				]
+			}
+		},
+		"ngram.tokens": {
+			"all": {
+				"native": [
+					{
+						"c": "12oops",
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 100,
+						"token": "z"
+					},
+					{
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x"
+					},
+					{
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"c": 7,
+						"e": 0,
+						"esrc_json": "{\"llm\":2,\"case_transform\":1}",
+						"source_rows": 1,
+						"td": 800,
+						"token": "a"
+					},
+					{
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					}
+				],
+				"cli_json": [
+					{
+						"c": "12oops",
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 100,
+						"token": "z"
+					},
+					{
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x\u0000y"
+					},
+					{
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"c": 7,
+						"e": 0,
+						"esrc_json": "{\"llm\":2,\"case_transform\":1}",
+						"source_rows": 1,
+						"td": 800,
+						"token": "a"
+					},
+					{
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x"
+					},
+					{
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					}
+				],
+				"cli_json": [
+					{
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x\u0000y"
+					},
+					{
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					}
+				]
+			}
+		},
+		"ngram.tokens_by_app": {
+			"all": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"app": "Code",
+						"c": 7,
+						"e": 0,
+						"esrc_json": "{\"llm\":2,\"case_transform\":1}",
+						"source_rows": 1,
+						"td": 800,
+						"token": "a"
+					},
+					{
+						"app": "Code",
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					},
+					{
+						"app": "Mail",
+						"c": "12oops",
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 100,
+						"token": "z"
+					},
+					{
+						"app": "Mail",
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"app": "Code",
+						"c": 7,
+						"e": 0,
+						"esrc_json": "{\"llm\":2,\"case_transform\":1}",
+						"source_rows": 1,
+						"td": 800,
+						"token": "a"
+					},
+					{
+						"app": "Code",
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					},
+					{
+						"app": "Mail",
+						"c": "12oops",
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 100,
+						"token": "z"
+					},
+					{
+						"app": "Mail",
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x\u0000y"
+					}
+				]
+			},
+			"day1": {
+				"native": [
+					{
+						"app": "Code",
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"app": "Code",
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					},
+					{
+						"app": "Mail",
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x"
+					}
+				],
+				"cli_json": [
+					{
+						"app": "Code",
+						"c": 420,
+						"e": 5,
+						"esrc_json": "{}",
+						"source_rows": 2,
+						"td": 51000,
+						"token": "e"
+					},
+					{
+						"app": "Code",
+						"c": 90,
+						"e": 1,
+						"esrc_json": "{\"hotstring\":5}",
+						"source_rows": 2,
+						"td": 11000,
+						"token": "a"
+					},
+					{
+						"app": "Mail",
+						"c": 2,
+						"e": 0,
+						"esrc_json": "{}",
+						"source_rows": 1,
+						"td": 300,
+						"token": "x\u0000y"
 					}
 				]
 			}

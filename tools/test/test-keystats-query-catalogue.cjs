@@ -109,7 +109,14 @@ check('every catalogue query has expected rows and nothing else is expected', ()
 for (const query of queries) {
 	for (const [filter, where] of Object.entries(expected.filters)) {
 		check(`${query.name} (${filter}) returns the legacy rows in both dialects`, () => {
-			const params = query.params.includes('where') ? { where } : {};
+			// The n-gram family table and the filter's connective are parameters too;
+			// the fixture's n-gram rows live in ngram_chars.
+			const available = {
+				where,
+				conjunction: where === '' ? ' WHERE ' : ' AND ',
+				table: 'ngram_chars'
+			};
+			const params = Object.fromEntries(query.params.map((name) => [name, available[name]]));
 			const native = canonical(
 				db.prepare(Codegen.render(queries, query.name, 'native', params)).all()
 			);
@@ -143,6 +150,15 @@ check('the fixture exercises what the catalogue exists for', () => {
 		burst.some((r) => r.source_rows === 2),
 		'identical blobs from two devices'
 	);
+	const tokens = expected.queries['ngram.tokens'].all.cli_json;
+	assert.ok(
+		tokens.some((r) => r.source_rows === 2),
+		'an n-gram source map shared by two devices'
+	);
+	assert.ok(
+		tokens.some((r) => r.c === '12oops'),
+		'a malformed counter returned raw, not summed'
+	);
 	const system = expected.queries['manifest.system_day'].all.native.find(
 		(r) => r.date === '2026-10-01'
 	);
@@ -170,7 +186,7 @@ check('the compiler refuses malformed catalogues', () => {
 		twoStatements: '-- name: a.b\nSELECT 1; SELECT 2;\n',
 		unterminated: '-- name: a.b\nSELECT 1\n',
 		badName: '-- name: nodot\nSELECT 1;\n',
-		duplicateText: '-- name: a.b\nSELECT {{text app}}, {{text app}} FROM t;\n',
+		conflictingText: '-- name: a.b\nSELECT {{text app}}, {{text MAX(app) AS app}} FROM t;\n',
 		empty: '-- nothing\n'
 	};
 	for (const [label, text] of Object.entries(refusals))
