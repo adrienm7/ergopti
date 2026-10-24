@@ -70,7 +70,7 @@ _FTI_Inventory() {
 		"_SuspendPendingPoll",          "25",    ; short-lived, awaits a pending suspend
 		"_UserHotstringsPoll",          "25",    ; only while exact worker/Job/stage debt is owned; stale source/focus/input cancellation
 		"ScreenBrightnessPoll",          "50",    ; only while a native backlight worker or exact retirement debt is owned
-		"FocusTimerFn",                 "50",    ; generation-bound focus snapshot, title deadline <= 5 ms
+		"FocusTimerFn",                 "?",     ; focus snapshot: MF_FOCUS_FALLBACK_POLL_MS (2000) while focus events are live, MF_FOCUS_TTL_MS (50) only when they could not be installed
 		"_LLM_PointerWatch_MoveFn",     "50",    ; only armed while a prediction is on screen
 		"WPMWidget_MouseWatch",         "50",    ; only armed while the WPM widget is visible
 		"_SR_Poll",                     "100",   ; shell_runner completion poll
