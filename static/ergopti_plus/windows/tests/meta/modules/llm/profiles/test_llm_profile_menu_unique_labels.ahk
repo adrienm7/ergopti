@@ -108,7 +108,8 @@ Test("menu_profiles: two profiles sharing a label render as two rows (duplicate-
 _LPUL_FrameSharesLabelCounter(Frame) {
 	Patterns := [
 		'm)^[ \t]*seen_labels := Map\(\)',
-		'm)^[ \t]*return MenuRenderer_TemplateRows\("llm_profile_windows_frame", Map\(',
+		; The frame's rows pass through the newer-configuration row guard.
+		'm)^[ \t]*return _LLM_Menu_GuardConfigRows\(MenuRenderer_TemplateRows\("llm_profile_windows_frame", Map\(',
 		'm)^[ \t]*"llm_profile_builtin_rows", _LLM_Menu_ProfileBuiltinRows\.Bind\(seen_labels\),',
 		'm)^[ \t]*"llm_profile_custom_rows", _LLM_Menu_ProfileCustomRows\.Bind\(seen_labels, FrameState\),'
 	]
