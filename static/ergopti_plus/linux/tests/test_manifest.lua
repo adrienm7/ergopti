@@ -635,6 +635,7 @@ return {
 	"tests.unit.ui.webview.test_text_prompt_exit_status",
 	"tests.unit.ui.webview.test_asset_inlining_is_loud",
 	"tests.unit.ui.webview.test_error_dialog_bridge",
+	"tests.unit.ui.webview.test_error_dialog_core",
 	"tests.unit.ui.healthcheck.test_diagnostics_window_title",
 	"tests.unit.ui.menu.shortcuts.test_configured_gesture_label",
 	"tests.unit.ui.menu.shortcuts.test_program_binding_transaction",
