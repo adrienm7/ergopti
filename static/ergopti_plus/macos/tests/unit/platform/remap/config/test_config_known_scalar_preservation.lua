@@ -216,8 +216,9 @@ helpers.describe("obsolete nonstring combination save preservation", function()
 		with_file(source_for(vectors[1]), function(f)
 			local state = f.load()
 			helpers.assert_eq(f.config.save_user_config(state, f.path, true), true)
+			-- The sticky timeout is the one shared one-shot timeout, 2000 ms (PAR-15).
 			helpers.assert_eq(f.decode(f.read()), { karabiner = { integration_enabled = false },
-				tap_holds = { enabled = false, timeout_ms = 250, sticky_timeout_ms = 3000,
+				tap_holds = { enabled = false, timeout_ms = 250, sticky_timeout_ms = 2000,
 					config = { escape = { tap = "none", hold = "none" }, tab = { tap = "none", hold = "none" } } },
 				mod_combos = { simultaneous_threshold_ms = 100, symmetric = false,
 					config = { esc_tab = { tap = "none", hold = "none", combo = "none" } } } },
