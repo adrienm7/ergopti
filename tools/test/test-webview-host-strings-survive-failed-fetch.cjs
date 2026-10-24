@@ -271,7 +271,13 @@ const redaction = JSON.parse(
 /** The diagnostics init message, with an ERROR in the snapshot. */
 const DIAGNOSTICS_INIT = {
 	type: 'init',
-	config: { schema, redaction, context: { home: '/Users/a', user: 'a' }, mode: null },
+	config: {
+		schema,
+		redaction,
+		context: { home: '/Users/a', user: 'a' },
+		capabilities: { diagnostic_collection: false },
+		mode: null
+	},
 	snapshot: {
 		schema_version: 2,
 		driver: 'macos',

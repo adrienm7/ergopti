@@ -212,6 +212,8 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_eq(messages[1].config.schema.schema_version, 2)
 			helpers.assert_eq(messages[1].config.context.home, HOME)
 			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
+			helpers.assert_eq(messages[1].config.capabilities, { diagnostic_collection = false },
+				"the page learns from the host that macOS runs no guided collection")
 			helpers.assert_eq(messages[1].snapshot.driver, "macos")
 			helpers.assert_eq(context.started_probes, 0, "opening the window must not start subprocess probes")
 			helpers.assert_eq(context.local_runs, 1, "opening the window starts only the local configuration probe")

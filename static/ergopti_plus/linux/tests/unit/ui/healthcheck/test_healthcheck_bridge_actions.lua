@@ -109,6 +109,8 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 			helpers.assert_eq(answer.config.schema.schema_version, 2)
 			helpers.assert_eq(answer.config.context.home, HOME)
 			helpers.assert_eq(answer.config.context.case_insensitive, false)
+			helpers.assert_eq(answer.config.capabilities, { diagnostic_collection = false },
+				"the page learns from the host that Linux runs no guided collection")
 			helpers.assert_eq(answer.snapshot.driver, "linux")
 			helpers.assert_eq(answer.snapshot.schema_version, 2)
 			helpers.assert_eq(context.starts, 1)

@@ -898,6 +898,8 @@ local function init_message(session)
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
+			-- The guided diagnostic collection is a Windows host action only.
+			capabilities = { diagnostic_collection = false },
 		},
 		snapshot = session.snapshot,
 	}
