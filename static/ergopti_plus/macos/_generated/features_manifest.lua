@@ -926,10 +926,10 @@ M.features = {
 		path = "layout.pause_switch_enabled", id = "pause_switch_enabled", section = "layout", default = false, type = "boolean", description_key = "menu.layout", platforms = { "hs" }, recommended = false, input_altering = true,
 	},
 	{
-		path = "layout.on_pause", id = "on_pause", section = "layout", default = false, type = "boolean", description_key = "menu.layout", platforms = { "hs" }, recommended = false, input_altering = true,
+		path = "layout.on_pause", id = "on_pause", section = "layout", default = "", type = "string", description_key = "menu.layout", platforms = { "hs" }, recommended = "", input_altering = true,
 	},
 	{
-		path = "layout.on_resume", id = "on_resume", section = "layout", default = false, type = "boolean", description_key = "menu.layout", platforms = { "hs" }, recommended = false, input_altering = true,
+		path = "layout.on_resume", id = "on_resume", section = "layout", default = "", type = "string", description_key = "menu.layout", platforms = { "hs" }, recommended = "", input_altering = true,
 	},
 }
 

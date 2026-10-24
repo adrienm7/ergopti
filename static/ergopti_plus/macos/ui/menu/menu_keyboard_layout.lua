@@ -35,6 +35,7 @@ local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
 local NumberRowPolicy = require("layout.number_row_policy")
+local PauseSwitchPolicy = require("layout.pause_switch_policy")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
@@ -561,7 +562,7 @@ function M.build(ctx)
 
 	-- Pause / resume layout switching — two dropdowns that let the user pick which
 	-- keyboard layout to activate automatically when the script is paused or resumed.
-	-- Nil / "auto" means "do nothing" (default). Stored in state.layout_on_pause and
+	-- Nil / "" means "do nothing" (default). Stored in state.layout_on_pause and
 	-- state.layout_on_resume so they survive a reload via preferences.lua.
 	local state      = ctx and ctx.state
 	local save_prefs = ctx and ctx.save_prefs
@@ -573,8 +574,9 @@ function M.build(ctx)
 		local feature_on = state.layout_pause_switch_enabled and true or false
 		local cur_pause, cur_resume = state.layout_on_pause, state.layout_on_resume
 		local function target_label(current)
-			return (current and current ~= false and current ~= "")
-				and display_for_record({ id = current, name = current:gsub("_", " "):gsub("%s+v%d.*$", "") })
+			local id = PauseSwitchPolicy.target_id(current)
+			return id
+				and display_for_record({ id = id, name = id:gsub("_", " "):gsub("%s+v%d.*$", "") })
 				or i18n.get("menu.layout.layout_auto")
 		end
 		local getters = {
@@ -601,7 +603,7 @@ function M.build(ctx)
 			local native_rows = {}
 			local picker_getters = {
 				layout_picker_auto_checked = function()
-					return current_id == nil or current_id == false or current_id == ""
+					return PauseSwitchPolicy.target_id(current_id) == nil
 				end,
 				layout_picker_has_choices = function() return #records > 0 end,
 			}
@@ -831,17 +833,19 @@ function M.set_layout_by_kl_name_async(kl_name, on_done)
 	return set_input_source_async(localised, kl_name, on_done)
 end
 
---- The layout a pause (or a resume) switches to, or nil when switching is off
---- or set to « no change ». Pause, resume and quit all read it here.
+--- The layout an event switches to, or nil when switching is off or set to
+--- « no change ». Pause, resume and quit all read it here, through the policy
+--- the Windows and Linux drivers share (_shared/lua/layout/pause_switch_policy.lua).
 --- @param state table|nil Menu state (layout_pause_switch_enabled, layout_on_pause, layout_on_resume).
---- @param is_paused boolean True for the pause target, false for the resume one.
+--- @param event string "pause", "resume" or "quit".
 --- @return string|nil kl_name
-local function switch_target(state, is_paused)
-	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
-	local target = is_paused and state.layout_on_pause or state.layout_on_resume
-	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
-	if type(target) ~= "string" or target == "" then return nil end
-	return target
+local function switch_target(state, event)
+	if type(state) ~= "table" then return nil end
+	return PauseSwitchPolicy.target({
+		enabled = state.layout_pause_switch_enabled,
+		on_pause = state.layout_on_pause,
+		on_resume = state.layout_on_resume,
+	}, event)
 end
 
 --- Switches to the pause layout before ErgoptiPlus quits: quitting leaves the
@@ -851,7 +855,7 @@ end
 ---   switch was started (set_input_source_async answers on every path).
 --- @return string "none" when nothing is configured, "pending" once on_done is owed.
 function M.apply_quit_layout(state, on_done)
-	local target = switch_target(state, true)
+	local target = switch_target(state, "quit")
 	if target == nil then return "none" end
 	Logger.info(LOG, "Quit: applying the pause keyboard layout.")
 	-- Looked up on M at call time so a test stub on the module is honoured.
@@ -939,7 +943,7 @@ end
 --- @param schedule function|nil Injectable scheduler(fn) for tests.
 --- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
 function M.schedule_pause_layout_switch(is_paused, state, schedule)
-	local target = switch_target(state, is_paused)
+	local target = switch_target(state, is_paused and "pause" or "resume")
 	if target == nil then return nil end
 	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
 	-- test harness where hs is absent and the scheduler is injected.
