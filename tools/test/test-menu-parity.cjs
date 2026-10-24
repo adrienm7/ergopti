@@ -1015,7 +1015,9 @@ const OPENS_SUBMENU = {
 				hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
 				linux: 'linux/ui/menu/menu_builder.lua'
 			}
-		}
+		},
+		// The per-application overrides the Lua providers append after that frame.
+		{ menu: 'llm_profile_lua_app_overrides', platforms: ['hs', 'linux'] }
 	],
 	// Optional category-file providers return this declared opening command.
 	hotstring_category_file: 'hotstring_file_commands',
@@ -4971,8 +4973,8 @@ require('./fixtures/linux-native-caption-binding-counterexamples.cjs')(linuxAiSo
 			'builders.keyboard_layout = function() return {} end\nlocal children = builders[id]() or {}'
 		],
 		[
-			'\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do',
-			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do'
+			'\n\t}\n\n\tlocal items = {}\n\tlocal item_timings = {}\n\tfor _, entry in ipairs(load_top_level()) do',
+			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tlocal item_timings = {}\n\tfor _, entry in ipairs(load_top_level()) do'
 		],
 		['local builders = {', 'local ignored, module_rows\nlocal builders = {'],
 		[
@@ -8354,8 +8356,8 @@ function languageParentSource(source, driver) {
 			'builders.keyboard_layout = function() return {} end\nlocal children = builders[id]() or {}'
 		],
 		[
-			'\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do',
-			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do'
+			'\n\t}\n\n\tlocal items = {}\n\tlocal item_timings = {}\n\tfor _, entry in ipairs(load_top_level()) do',
+			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tlocal item_timings = {}\n\tfor _, entry in ipairs(load_top_level()) do'
 		],
 		['local builders = {', 'local ignored, module_rows\nlocal builders = {'],
 		[
@@ -8473,7 +8475,7 @@ function languageParentSource(source, driver) {
 		'actual complete donor owner with only the two approved scalar policy edits'
 	);
 	const late =
-		'\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFChild))';
+		'\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : 0) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFChild))';
 	assert.equal(
 		source.split(late).length - 1,
 		1,

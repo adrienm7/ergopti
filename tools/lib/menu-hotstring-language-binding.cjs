@@ -2722,7 +2722,8 @@ function personalFileCaptionPublication(source) {
 			],
 			[
 				'\tResult := Map(\n\t\t"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",\n\t\t"submenu", TFMenu)',
-				'\t; Keep original late reads and native concatenation coercion before projection.\n\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))\n\tif !(Result is Map)\n\t\treturn false'
+				// A refused source counts no active mapping (its raw count is inventory only).
+				'\t; A source the adoption refused loads nothing (PersonalFileControls.ActiveOwner), so\n\t; its caption counts no active mapping; its raw entry count is only the inventory\n\t; below. Keep native concatenation coercion before projection.\n\tResult := (FileStem := TF.stem . "",\n\t\tFileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : 0) . "",\n\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\tCaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))\n\tif !(Result is Map)\n\t\treturn false'
 			],
 			[
 				'\n\tTFMenu := Menu(), HandedOff := false',
