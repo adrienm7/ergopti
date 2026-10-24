@@ -358,6 +358,7 @@ return {
 	"tests.meta.architecture.test_keycode_single_source",
 	"tests.unit.modules.keystats.core.test_keystats",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_reader",
+	"tests.unit.modules.keystats.storage.test_keystats_queries_contract",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_media_schema_admission",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_ngram_source_map",
 	"tests.unit.modules.keystats.aggregation.test_keystats_utils",
