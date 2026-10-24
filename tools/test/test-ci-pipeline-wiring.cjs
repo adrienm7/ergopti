@@ -796,6 +796,20 @@ const STEP_CONDITIONS = [
 	],
 	[WINDOWS_BOX, 'e2e-ahk', 'Download E2E runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
+	// The detached update-asset signatures (_shared/modules/updater/asset_signing.json)
+	// are made on release runs only, like the Authenticode signature above.
+	[
+		WINDOWS_BOX,
+		'package-windows',
+		'Sign the update asset (detached signature)',
+		'${{ inputs.release }}'
+	],
+	[
+		LINUX_BOX,
+		'package-linux',
+		'Sign the update asset (detached signature)',
+		'${{ inputs.release }}'
+	],
 	// SignPath runs only once the maintainer configures it, and never for a dev prerelease.
 	[
 		WINDOWS_BOX,
