@@ -204,7 +204,12 @@ helpers.describe("Runtime diagnostics: previously invisible events now log", fun
 		local RuntimeLog = require("diagnostics.runtime_log")
 		helpers.assert_eq("osascript",
 			RuntimeLog.program_name("/usr/bin/osascript -e 'set the clipboard to \"secret\"'"))
-		local src = unit_with("_record_exit(RuntimeLog.program_name(executable)")
-		helpers.assert_true(src:find("_record_exit(RuntimeLog.program_name(executable)", 1, true) ~= nil)
+		-- The task completion names the program once, for the exit record and its
+		-- phase counter: the recorded exit must take that name, never the command.
+		local naming = "local program = RuntimeLog.program_name(executable)"
+		local src = unit_with(naming)
+		local named_at = src:find(naming, 1, true)
+		local recorded_at = src:find("_record_exit(program, exit_code", named_at, true)
+		helpers.assert_true(recorded_at ~= nil, "the exit is recorded under the program name")
 	end)
 end)
