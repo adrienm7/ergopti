@@ -3124,13 +3124,14 @@ function M.shutdown_runtime()
 	-- Revoke ordinary probe/download authority before a native stop can reenter.
 	local probe_closed = not _enable_admission or _enable_admission.cancel() == true
 	local download_closed = M.cancel_model_download() == true
+	local delete_closed = M.cancel_model_delete() == true
 	local runtime_closed = stop_runtime_app()
 	local selection_closed = true
 	if _cancel_selection then
 		local checked, acknowledged = pcall(_cancel_selection)
 		selection_closed = checked and acknowledged == true
 	end
-	return probe_closed and download_closed and runtime_closed and selection_closed
+	return probe_closed and download_closed and delete_closed and runtime_closed and selection_closed
 end
 
 --- Captures existing managed lifetime before origin/settings/native readers run.
@@ -3472,6 +3473,9 @@ function M.disable()
 	if not M.cancel_model_download() then
 		Logger.error(LOG, "AI switched off but the model download has not stopped yet.")
 	end
+	if not M.cancel_model_delete() then
+		Logger.error(LOG, "AI switched off but the model deletion has not stopped yet.")
+	end
 	Logger.info(LOG, "Prediction engine disabled.")
 	return true
 end
@@ -3774,6 +3778,39 @@ end
 function M.cancel_model_download()
 	local ok_download, Download = pcall(require, "modules.llm.model_download")
 	return not ok_download or type(Download.shutdown) ~= "function" or Download.shutdown() == true
+end
+
+--- Removes one installed Ollama model, then lists the installed models again.
+--- The selection is left alone, as on Windows and macOS: a prediction asked of
+--- the removed model offers its download.
+--- @param model_tag string Ollama-native model identity.
+--- @param on_done function Receives (succeeded, tag, reason) once Ollama answered.
+--- @return boolean dispatched
+function M.delete_model(model_tag, on_done)
+	if _runtime_closed or _scope_owner or type(on_done) ~= "function" then return false end
+	local revision, app_epoch = _enable_generation, _runtime_app_epoch
+	local function current()
+		return not _runtime_closed and _scope_owner == nil
+			and revision == _enable_generation and app_epoch == _runtime_app_epoch
+	end
+	local base_url = M.get_base_url()
+	if not base_url then return false end
+	return require("modules.llm.model_delete").start(base_url, model_tag, function(succeeded, tag, reason)
+		if not current() then return end
+		if succeeded then
+			local profiles = get_profiles()
+			if profiles and type(profiles.refresh_models_after_mutation) == "function" then
+				profiles.refresh_models_after_mutation()
+			end
+		end
+		if current() then on_done(succeeded, tag, reason) end
+	end, current) == true
+end
+
+--- Cancels a model removal owned by this engine.
+--- @return boolean settled
+function M.cancel_model_delete()
+	return require("modules.llm.model_delete").cancel() == true
 end
 
 function M.get_max_tokens() return _max_tokens or PromptBuilder.DEFAULT_MAX_TOKENS end
