@@ -144,9 +144,6 @@ num_predictions = 3
 [llm.profiles.shortcuts]
 # user-defined per-app profile shortcuts
 
-[llm.profiles.user_profiles]
-# user-defined prompt profiles
-
 
 
 # =======================

@@ -16,6 +16,7 @@ local Contract   = require("test.config_unused_keys_contract")
 local Engine     = require("config_unused_keys")
 local TomlCodec  = require("toml_codec")
 local TomlWriter = require("toml_codec.writer")
+local ProfileRegistry = require("llm.profile_registry_codec")
 
 local Sandbox = Contract.sandbox
 
@@ -441,12 +442,14 @@ helpers.with_stub_scope(MODULES, function()
 			function()
 				-- The active id silently ran "basic"; the shortcut was unbound with a
 				-- WARNING at every boot. Both were marked as read.
+				local registry = ProfileRegistry.encode({ { id = "user_mine", label = "Mine" } })
 				local source = table.concat({
+					"[llm]",
+					"user_profiles = \"" .. registry .. "\"",
 					"[llm.profiles]",
 					"active = \"deleted_profile\"",
 					"shortcuts = { deleted_profile = { mods = [\"cmd\"], key = \"p\" }, "
 						.. "user_mine = { mods = [\"cmd\"], key = \"m\" }, basic = { mods = [\"cmd\"], key = \"b\" } }",
-					"user_profiles = [{ id = \"user_mine\", label = \"Mine\" }]",
 					"",
 				}, "\n")
 				local flat = Preferences.flatten_document(TomlCodec.decode(source))
@@ -463,6 +466,27 @@ helpers.with_stub_scope(MODULES, function()
 				helpers.assert_eq(offered, { "llm.profiles.active", "llm.profiles.shortcuts.deleted_profile" })
 				local legacy = Preferences.flatten_document(TomlCodec.decode("[llm.profiles]\nactive = \"parallel\"\n"))
 				helpers.assert_eq(legacy.llm_active_profile, "parallel", "a legacy id is migrated by its owner, not outdated")
+			end)
+
+		helpers.it("unused keys: an older build's profile list is never read and is offered (config-outdated-profiles)",
+			function()
+				-- macOS once kept its own array at [llm.profiles] user_profiles; the
+				-- profiles now live in the llm.user_profiles envelope of every OS.
+				local source = table.concat({
+					"[llm]",
+					"user_profiles = [{ id = \"user_mine\", label = \"Mine\" }]",
+					"[llm.profiles]",
+					"user_profiles = [{ id = \"user_old\", label = \"Old\" }]",
+					"",
+				}, "\n")
+				local flat = Preferences.flatten_document(TomlCodec.decode(source))
+				helpers.assert_nil(flat.llm_user_profiles, "neither old shape reaches the profile list")
+				local offered = {}
+				for _, key in ipairs(Engine.find_in_source(source, Cleanup.collect).keys) do
+					offered[#offered + 1] = key.section .. "." .. key.key
+				end
+				table.sort(offered)
+				helpers.assert_eq(offered, { "llm.profiles.user_profiles", "llm.user_profiles" })
 			end)
 
 		helpers.it("unused keys: a retired hotstring delay is never saved back and is offered (config-outdated-delays)", function()

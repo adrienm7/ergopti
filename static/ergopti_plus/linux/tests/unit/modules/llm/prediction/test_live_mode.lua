@@ -428,7 +428,7 @@ helpers.describe("live mode: turning it on and off", function()
 
 	helpers.it("stops, never falls back, when its prompt is deleted while it runs", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
@@ -618,7 +618,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 
 	helpers.it("has one profile chooser, keeps prompt actions and retires their override on explicit selection", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
@@ -702,7 +702,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 
 	helpers.it("requires exact stop ACK before profile persistence and never redraws a refused cancellation", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
 			}),
 		} }, function(world)

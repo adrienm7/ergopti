@@ -1,6 +1,14 @@
---- modules/llm/profile_registry_codec.lua
+--- _shared/lua/llm/profile_registry_codec.lua
 
---- Uses the canonical versioned JSON envelope already written by Windows.
+--- ==============================================================================
+--- MODULE: User LLM Profile Registry Codec — Shared Lua Implementation
+--- DESCRIPTION:
+--- Encodes and decodes the llm.user_profiles string of config.toml: the
+--- versioned "v1:" + base64(JSON array) envelope Windows already writes. macOS
+--- and Linux store the user's prompt profiles through it, so one config.toml
+--- key holds them on every OS.
+--- ==============================================================================
+
 local M = {}
 local Json = require("json")
 local Base64 = require("compat.base64")
