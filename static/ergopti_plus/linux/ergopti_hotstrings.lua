@@ -367,6 +367,11 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			-- The runtime stop above already ended the chain; this releases its ports.
+			name = "LLM model warmup",
+			stop = function() return require("modules.llm.warmup").shutdown() end,
+		},
+		{
 			name = "AI selection capture",
 			wait_for_ack = true,
 			stop = function()
@@ -1607,6 +1612,17 @@ local function main()
 				end
 			end,
 		})
+		-- The selected Ollama model is loaded before the first prediction needs it,
+		-- as on Windows and macOS. The engine schedules the chain when the AI starts,
+		-- resumes or changes model, and stops it with its runtime.
+		if require("modules.llm.warmup").init({
+			scheduler = require("adapters.timer_scheduler"),
+			target = prediction_engine.warmup_target,
+			request = prediction_engine.warmup_request,
+			busy = prediction_engine.is_predicting,
+		}) then
+			require("modules.llm.warmup").schedule("startup")
+		end
 	end
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
