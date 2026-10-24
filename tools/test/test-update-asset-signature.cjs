@@ -151,19 +151,106 @@ check('the policy cannot require signatures without a verification key', () => {
 	assert.equal(policy.signature_bytes, 64);
 });
 
-// The Linux lane (ci-linux.yml) is checked the same way once its signing step lands
-// with the shared-file integration commit.
+check('release-sign fails fast without the secret once the policy expects signatures', () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-sign-'));
+	try {
+		const asset = path.join(dir, 'ErgoptiPlus.exe');
+		fs.writeFileSync(asset, crypto.randomBytes(2048));
+		const pair = Tool.generateKeyPair();
+		const provisioned = { ...policy, public_key_spki_base64: pair.publicKeySpkiBase64 };
+		const required = { ...provisioned, enforcement: 'required' };
+		for (const expecting of [provisioned, required]) {
+			assert.equal(Tool.signaturesExpected(expecting), true);
+			for (const env of [{}, { UPDATE_SIGNING_KEY: '' }]) {
+				assert.throws(
+					() => Tool.releaseSign(expecting, env, [asset], () => {}),
+					/UPDATE_SIGNING_KEY is not set/
+				);
+			}
+		}
+		const unprovisioned = { ...policy, enforcement: 'off', public_key_spki_base64: '' };
+		assert.equal(Tool.signaturesExpected(unprovisioned), false);
+		const lines = [];
+		Tool.releaseSign(unprovisioned, {}, [asset], (line) => lines.push(line));
+		assert.equal(lines.length, 1);
+		assert.match(lines[0], /^::warning::UPDATE_SIGNING_KEY is not set/);
+		assert.equal(fs.existsSync(asset + '.sig'), false);
+		assert.throws(() => Tool.releaseSign(unprovisioned, {}, [], () => {}), /No asset/);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
 check(
-	'release CI signs the Windows asset, uploads the signature and gates the release on both',
+	'release-sign signs with the provisioned key and refuses a secret that does not match it',
+	() => {
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-sign-'));
+		try {
+			const asset = path.join(dir, 'ergopti-plus-linux.tar.gz');
+			fs.writeFileSync(asset, crypto.randomBytes(4096));
+			const pair = Tool.generateKeyPair();
+			const stranger = Tool.generateKeyPair();
+			const provisioned = { ...policy, public_key_spki_base64: pair.publicKeySpkiBase64 };
+			assert.throws(
+				() =>
+					Tool.releaseSign(
+						provisioned,
+						{ UPDATE_SIGNING_KEY: stranger.privateKeyPem },
+						[asset],
+						() => {}
+					),
+				/does not match public_key_spki_base64/
+			);
+			assert.equal(fs.existsSync(asset + '.sig'), false, 'a mismatched key writes no signature');
+			const lines = [];
+			Tool.releaseSign(provisioned, { UPDATE_SIGNING_KEY: pair.privateKeyPem }, [asset], (line) =>
+				lines.push(line)
+			);
+			assert.deepEqual(lines, ['signed ergopti-plus-linux.tar.gz.sig']);
+			const signature = fs.readFileSync(asset + '.sig', 'utf8');
+			assert.match(signature, /^[A-Za-z0-9+/]+=*\n$/);
+			assert.equal(
+				Tool.verifyRecord(
+					pair.publicKeySpkiBase64,
+					Tool.recordOfFile(policy, asset),
+					signature.trim()
+				),
+				true
+			);
+			const unprovisioned = { ...policy, public_key_spki_base64: '' };
+			fs.rmSync(asset + '.sig');
+			const warned = [];
+			Tool.releaseSign(unprovisioned, { UPDATE_SIGNING_KEY: pair.privateKeyPem }, [asset], (line) =>
+				warned.push(line)
+			);
+			assert.equal(warned.length, 2);
+			assert.match(warned[1], /^::warning::asset_signing.json names no verification key/);
+		} finally {
+			fs.rmSync(dir, { recursive: true, force: true });
+		}
+	}
+);
+
+check(
+	'release CI signs both update assets through release-sign and gates the release on them',
 	() => {
 		const read = (name) => fs.readFileSync(path.join(root, '.github', 'workflows', name), 'utf8');
 		for (const [name, target, uploaded] of [
-			['ci-windows.yml', 'static/ergopti_plus/windows/ErgoptiPlus.exe', 'ErgoptiPlus.exe.sig']
+			['ci-windows.yml', 'static/ergopti_plus/windows/ErgoptiPlus.exe', 'ErgoptiPlus.exe.sig'],
+			[
+				'ci-linux.yml',
+				'"build/linux/$LINUX_BUNDLE_ASSET"',
+				'build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sig'
+			]
 		]) {
 			const workflow = read(name);
 			assert.ok(
-				workflow.includes('node tools/build/update-asset-signature.cjs sign ' + target),
-				name + ' does not sign ' + target
+				workflow.includes('node tools/build/update-asset-signature.cjs release-sign ' + target),
+				name + ' does not sign ' + target + ' through release-sign'
+			);
+			assert.ok(
+				!/update-asset-signature\.cjs sign /.test(workflow),
+				name + ' bypasses the release-sign decision'
 			);
 			assert.ok(
 				workflow.includes('UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}'),
@@ -176,8 +263,8 @@ check(
 			release.includes('ErgoptiPlus.exe.sig') && release.includes('$LINUX_BUNDLE_ASSET.sig')
 		);
 		assert.ok(
-			release.includes('asset_signing.json'),
-			'ci-release.yml does not read the signing policy'
+			release.includes('node tools/build/update-asset-signature.cjs expects-signatures'),
+			'ci-release.yml does not ask the signing policy whether signatures are expected'
 		);
 	}
 );

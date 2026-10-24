@@ -47,6 +47,21 @@ P-256. Windows 10 and later, and OpenSSL 3, are the verifiers; no extra binary.
    without the signatures fails in CI, and an updater refuses an asset whose
    signature is missing or wrong.
 
+## What the release lanes do
+
+`node tools/build/update-asset-signature.cjs release-sign <asset>` is the whole
+CI decision, tested by `tools/test/test-update-asset-signature.cjs` with
+throwaway keys:
+
+- the policy names a key, or `enforcement` is `"required"`: a missing
+  `UPDATE_SIGNING_KEY` fails the lane, and a secret whose signatures do not
+  verify against `public_key_spki_base64` fails it too (nothing is written);
+- the policy names no key yet: a missing secret only warns, and the release is
+  published without `.sig` files.
+
+`ci-release.yml` asks `expects-signatures` and refuses to publish a release
+whose `.sig` assets are missing once the answer is `yes`.
+
 While `enforcement` is `"off"` the updaters log on every update that the signature
 was not enforced; this is a stated, reversible interim state and not a fallback.
 
