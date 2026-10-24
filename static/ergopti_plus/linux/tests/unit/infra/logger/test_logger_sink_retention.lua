@@ -233,4 +233,33 @@ helpers.describe("log retention purge reports a refused folder and keeps logging
 		helpers.assert_true(reported[1]:find("retention purge could not list", 1, true) ~= nil
 			and reported[1]:find("EIO", 1, true) ~= nil, reported[1])
 	end)
+
+	-- Main installs the sink before it parses --help, which must answer where
+	-- luv is absent; the backend's own refusal is then one more reported purge.
+	helpers.it("reports a runtime without the native directory backend and still installs", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
+		local previous = package.loaded["infra.native_directory"]
+		local Walker = helpers.load_module_with_dependency("infra.native_directory", "luv", false)
+		package.loaded["infra.native_directory"] = Walker
+		local Sink = helpers.load_module("infra.logger_sink")
+		package.loaded["infra.native_directory"] = previous
+		local logger = fake_logger()
+		local stderr = io.stderr
+		local reported = {}
+		io.stderr = { write = function(_, text) reported[#reported + 1] = text; return true end }
+		local ok, err = pcall(function()
+			helpers.assert_eq(Sink.install(logger, { log_dir = dir, redaction_context = IDENTITY }), true,
+				"a purge without its backend never refuses the file sink")
+		end)
+		io.stderr = stderr
+		Sink.uninstall(logger)
+		helpers.load_module("infra.logger_sink")
+		assert(Shell.run("rm -rf -- " .. Shell.quote(dir)))
+		if not ok then error(err, 0) end
+		helpers.assert_eq(#reported, 1)
+		helpers.assert_true(reported[1]:find("retention purge could not list", 1, true) ~= nil
+			and reported[1]:find("luv", 1, true) ~= nil, reported[1])
+	end)
 end)

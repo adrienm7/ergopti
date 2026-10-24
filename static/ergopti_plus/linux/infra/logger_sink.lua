@@ -348,7 +348,14 @@ end
 local function purge_old()
 	local days = retention_days()
 	if not days or not _dir then return end
-	local entries, message, code = NativeDirectory.entries(_dir)
+	-- A runtime without the native directory backend raises; for the purge that
+	-- is one more refusal to report, so a log sink (and --help, which loads one
+	-- before parsing its arguments) still installs where luv is absent.
+	local listed, entries, message, code = pcall(NativeDirectory.entries, _dir)
+	if not listed then
+		report_purge_refusal("list", _dir, entries)
+		return
+	end
 	if entries == nil then
 		-- An absent folder holds nothing to purge; any other refusal is reported.
 		if code ~= "ENOENT" then report_purge_refusal("list", _dir, message) end
