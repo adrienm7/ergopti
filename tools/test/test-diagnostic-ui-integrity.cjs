@@ -119,6 +119,27 @@ report(
 	/window\.receiveDiagnostics\s*=\s*function/.test(script) && !/renderHealthcheck/.test(script),
 	'script.js must define receiveDiagnostics and drop renderHealthcheck'
 );
+// The guided collection is offered from the host's capability, never from the
+// driver name: each host states it in its init message.
+report(
+	'Shared: collection availability reads the host capability, not the driver',
+	/config\.capabilities\.diagnostic_collection/.test(script) &&
+		!/\.driver\s*[!=]==?\s*['"]/.test(script),
+	'script.js must read config.capabilities.diagnostic_collection'
+);
+report(
+	'Windows: the host states it runs the guided collection',
+	read('windows/ui/healthcheck/core.ahk').includes(
+		`',"capabilities":{"diagnostic_collection":true}}`
+	),
+	'_HC_InitJson must send capabilities.diagnostic_collection = true'
+);
+for (const host of ['linux/ui/healthcheck/bridge.lua', 'macos/ui/healthcheck/core.lua'])
+	report(
+		`${host}: the host states it runs no guided collection`,
+		/capabilities = \{ diagnostic_collection = false \}/.test(read(host)),
+		'the init message must send capabilities.diagnostic_collection = false'
+	);
 report(
 	'Shared: the page follows a dark system appearance',
 	/@media \(prefers-color-scheme: dark\)/.test(style),
