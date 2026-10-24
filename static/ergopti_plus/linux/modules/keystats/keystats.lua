@@ -1770,10 +1770,13 @@ local function encode_open_walk(contexts)
 	end
 	local records = {}
 	for _, ctx in pairs(contexts) do
-		if type(ctx.date) == "string" and type(ctx.app) == "string" and (ctx.session or ctx.burst) then
+		-- The shared walk context names its cursors current_session and
+		-- current_burst; the persisted record keeps its own field names.
+		local session, burst = ctx.current_session, ctx.current_burst
+		if type(ctx.date) == "string" and type(ctx.app) == "string" and (session or burst) then
 			records[#records + 1] = { date = ctx.date, app = ctx.app, text = "{\"date\":" .. Json.encode(ctx.date)
-				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(ctx.session, OPEN_SESSION_FIELDS)
-				.. ",\"burst\":" .. cursor(ctx.burst, OPEN_BURST_FIELDS) .. "}" }
+				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(session, OPEN_SESSION_FIELDS)
+				.. ",\"burst\":" .. cursor(burst, OPEN_BURST_FIELDS) .. "}" }
 		end
 	end
 	table.sort(records, function(a, b) return a.date < b.date or (a.date == b.date and a.app < b.app) end)
@@ -1784,7 +1787,7 @@ end
 
 --- Decodes an open-walk record into settle-ready contexts.
 --- @param encoded string Record text read from the database.
---- @return table|nil contexts { date, app, session?, burst? } list; nil when malformed.
+--- @return table|nil contexts { date, app, current_session?, current_burst? } list; nil when malformed.
 decode_open_walk = function(encoded)
 	local Json = require("json")
 	local ok, records = pcall(Json.decode, encoded)
@@ -1807,7 +1810,7 @@ decode_open_walk = function(encoded)
 		local session_ok, session = cursor(record.session, OPEN_SESSION_FIELDS)
 		local burst_ok, burst = cursor(record.burst, OPEN_BURST_FIELDS)
 		if not session_ok or not burst_ok then return nil end
-		contexts[index] = { date = record.date, app = record.app, session = session, burst = burst }
+		contexts[index] = { date = record.date, app = record.app, current_session = session, current_burst = burst }
 	end
 	return contexts
 end

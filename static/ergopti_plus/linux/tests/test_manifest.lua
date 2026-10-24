@@ -282,6 +282,7 @@ return {
 	"tests.meta.corpus.test_corpus_hotstring_engine",
 	"tests.meta.corpus.test_corpus_hotstrings_config_resolve",
 	"tests.meta.corpus.test_corpus_keymap_layers",
+	"tests.meta.corpus.test_corpus_keystats_aggregation",
 	"tests.meta.corpus.test_corpus_locale_resolution",
 	"tests.meta.corpus.test_corpus_logger_behaviour",
 	"tests.meta.corpus.test_corpus_updater_release_parser",

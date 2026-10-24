@@ -1010,18 +1010,29 @@ end
 --- The buckets are cumulative: a row for 5000 ms holds every delay at or below
 --- five seconds, so the dashboard's "ignore pauses longer than…" control reads
 --- one row and gets a total rather than a slice.
---- @param row table { date, app, bucket_ms, time_sum, credited }
+--- @param row table { date, app, bucket_ms, time_sum, credited, hs_in_t, hs_in_c,
+---        llm_in_t, llm_in_c } — the last four are the trigger keystrokes a
+---        hotstring or a prediction erased, credited the same way.
 _derived_sql.app_bucket = function(device_id, row)
 	if type(row) ~= "table" then return end
 	local sql = string.format(
-		"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited) "
-		.. "VALUES ('%s','%s','%s',%d,%d,%d) "
+		"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited, "
+		.. "hs_input_time_sum, hs_input_credited, llm_input_time_sum, llm_input_credited) "
+		.. "VALUES ('%s','%s','%s',%d,%d,%d,%d,%d,%d,%d) "
 		.. "ON CONFLICT(device_id, date, app, bucket_ms) DO UPDATE SET "
-		.. "time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited;",
+		.. "time_sum = time_sum + excluded.time_sum, credited = credited + excluded.credited, "
+		.. "hs_input_time_sum = hs_input_time_sum + excluded.hs_input_time_sum, "
+		.. "hs_input_credited = hs_input_credited + excluded.hs_input_credited, "
+		.. "llm_input_time_sum = llm_input_time_sum + excluded.llm_input_time_sum, "
+		.. "llm_input_credited = llm_input_credited + excluded.llm_input_credited;",
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		math.floor(tonumber(row.bucket_ms) or 0),
 		math.floor(tonumber(row.time_sum) or 0),
-		math.floor(tonumber(row.credited) or 0))
+		math.floor(tonumber(row.credited) or 0),
+		math.floor(tonumber(row.hs_in_t) or 0),
+		math.floor(tonumber(row.hs_in_c) or 0),
+		math.floor(tonumber(row.llm_in_t) or 0),
+		math.floor(tonumber(row.llm_in_c) or 0))
 	return sql
 end
 
