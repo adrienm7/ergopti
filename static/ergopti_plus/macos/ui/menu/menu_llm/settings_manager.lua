@@ -536,7 +536,7 @@ function M.new(deps)
 		local current_val = tonumber(state.llm_max_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "0"
 
-		local full_msg = i18n.get("menu.settings.max_words_prompt")
+		local full_msg = i18n.get("menu.llm.max_words_prompt")
 
 		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.max_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
@@ -597,7 +597,7 @@ function M.new(deps)
 	function obj.set_temperature()
 		return generic_numeric_prompt(deps, obj.apply_setting_transaction,
 			i18n.get("menu.settings.temperature_title"),
-			i18n.get("menu.settings.temperature_prompt"),
+			i18n.get("menu.llm.temperature_prompt"),
 			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, 0.0, 1.0
 		)
 	end
@@ -639,9 +639,9 @@ function M.new(deps)
 		local default_port = ApiMlx.get_default_port()
 		local lo, hi       = ApiMlx.get_port_bounds()
 
-		local full_msg = string.format(i18n.get("menu.llm.mlx_port_prompt"), tostring(default_port))
+		local full_msg = string.format(i18n.get("menu.llm.server_port_prompt"), "MLX", tostring(default_port))
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
-			i18n.get("menu.llm.mlx_port_title"), full_msg, tostring(current),
+			string.format(i18n.get("menu.llm.server_port_title"), "MLX"), full_msg, tostring(current),
 			i18n.get("button.ok"), i18n.get("common.cancel"))
 		if not (ok_p and btn == i18n.get("button.ok")) then return end
 
@@ -654,7 +654,7 @@ function M.new(deps)
 		if not new_port or new_port < lo or new_port > hi then
 			Logger.warn(LOG, "set_mlx_port: invalid input '%s' (expected an integer %d-%d).",
 				tostring(raw), lo, hi)
-			return reject_numeric_input(i18n.get("menu.llm.mlx_port_title"),
+			return reject_numeric_input(string.format(i18n.get("menu.llm.server_port_title"), "MLX"),
 				new_port and "numeric_prompt.out_of_range" or nil)
 		end
 		local committed = false

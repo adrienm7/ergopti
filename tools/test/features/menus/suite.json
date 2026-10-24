@@ -257,6 +257,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-platform-reason-wording.cjs"],
 			"repro": "npm run test:platform-reason-wording"
+		},
+		{
+			"id": "llm-prompt-keys-single-source",
+			"ordinal": 466,
+			"name": "AI numeric prompts and local-server port dialogs use one key set on every driver",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-prompt-keys-single-source.cjs"],
+			"repro": "npm run test:llm-prompt-keys-single-source"
 		}
 	]
 }

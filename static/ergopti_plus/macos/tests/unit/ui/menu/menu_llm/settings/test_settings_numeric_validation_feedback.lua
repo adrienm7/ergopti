@@ -159,13 +159,13 @@ local INVALID_ROUTES = {
 	{
 		name = "MLX port garbage",
 		raw = "garbage",
-		title = "menu.llm.mlx_port_title",
+		title = "menu.llm.server_port_title",
 		invoke = function(manager) return manager.set_mlx_port() end,
 	},
 	{
 		name = "MLX port outside its range",
 		raw = "70000",
-		title = "menu.llm.mlx_port_title",
+		title = "menu.llm.server_port_title",
 		body = "numeric_prompt.out_of_range",
 		invoke = function(manager) return manager.set_mlx_port() end,
 	},
