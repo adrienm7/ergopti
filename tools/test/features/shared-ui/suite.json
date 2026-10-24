@@ -260,6 +260,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-composer-model.cjs"],
 			"repro": "npm run test:layout-composer-model"
+		},
+		{
+			"id": "js-0466",
+			"ordinal": 469,
+			"name": "tooltip duration decrement and floor have one declaration that every engine and vector uses",
+			"cmd": "node",
+			"args": ["tools/test/test-tooltip-timing-single-source.cjs"],
+			"repro": "npm run test:tooltip-timing-single-source"
 		}
 	]
 }
