@@ -37,7 +37,8 @@ helpers.describe("canonical LLM debounce persistence", function()
 		local prefs, observed = fixture('[llm.trigger]\ndebounce_ms = 900\ndebounce = 4\n')
 		local state = prefs.load("config")
 		helpers.assert_eq(state.llm_debounce, 0.9)
-		state.llm_debounce = 0.2
+		-- The neutral value is the shared 500 ms default (PAR-18).
+		state.llm_debounce = 0.5
 		helpers.assert_eq(prefs.save("config", state, {}, {}), true)
 		local disk = Codec.decode(observed())
 		helpers.assert_eq(disk.llm.trigger.debounce_ms, nil)
