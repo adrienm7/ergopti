@@ -28,10 +28,20 @@ _LDSR_NoSecondLogsFormula() {
 	for Formula in ['_AhkSubDir . "logs', 'autohotkey\crash_reports', 'A_ScriptDir . "\logs']
 		Assert(InStr(Src, Formula) == 0,
 			"'" . Formula . "' is a second copy of the logs-folder resolver; ask the logger")
-	; The pre-logger sink was written beside paths.toml in two places.
-	First := InStr(Src, "bootstrap.log")
-	Assert(First > 0 && InStr(Src, "bootstrap.log", , First + 1) == 0,
-		"bootstrap.log must be named once, by LoggerAppendBootstrapLine")
+	; The pre-logger sink was written beside paths.toml in two places. Its name
+	; is now declared once in _shared/modules/paths/app_dirs.toml and reaches
+	; the driver as the generated AppDirsLogBootstrapName(), which the
+	; production scan above excludes with every other generated file.
+	Assert(InStr(Src, "bootstrap.log") == 0,
+		"bootstrap.log must not be spelled in hand-written driver code; use AppDirsLogBootstrapName()")
+	SplitPath(A_ScriptDir, , &Root)
+	Generated := _StripFullLineComments(FileRead(Root . "\_generated\app_dirs.ahk", "UTF-8"))
+	First := InStr(Generated, '"bootstrap.log"')
+	Assert(First > 0 && InStr(Generated, '"bootstrap.log"', , First + 1) == 0,
+		"the generated app_dirs.ahk must name bootstrap.log once")
+	Body := _DriverFuncBody("LoggerAppendBootstrapLine")
+	Assert(InStr(_DriverMaskNonCode(&Body), "AppDirsLogBootstrapName()") > 0,
+		"LoggerAppendBootstrapLine must take the file name from AppDirsLogBootstrapName()")
 }
 Test("logs folder: one resolver, no copy of the old folder formulas (logs-dir-single-resolver)",
 	_LDSR_NoSecondLogsFormula)
