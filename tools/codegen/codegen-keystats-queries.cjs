@@ -153,9 +153,17 @@ function parse(text) {
 				throw new SyntaxError(`${where}: ${current.name} must hold exactly one statement.`);
 			const segs = segments(current.name, body);
 			const params = [...new Set(segs.filter((s) => s.param).map((s) => s.param))];
-			const texts = segs.filter((s) => s.text).map((s) => s.text.alias);
-			if (new Set(texts).size !== texts.length)
-				throw new SyntaxError(`${where}: ${current.name} names a text column twice.`);
+			// A UNION repeats its projection: the same column may recur, but one
+			// name for two expressions would decode one as the other.
+			const exprOf = new Map();
+			for (const seg of segs.filter((s) => s.text)) {
+				if (exprOf.has(seg.text.alias) && exprOf.get(seg.text.alias) !== seg.text.expr)
+					throw new SyntaxError(
+						`${where}: ${current.name} names two text columns ${seg.text.alias}.`
+					);
+				exprOf.set(seg.text.alias, seg.text.expr);
+			}
+			const texts = [...exprOf.keys()];
 			queries.push({ name: current.name, doc: current.doc, params, texts, segments: segs });
 			current = null;
 		}
@@ -318,6 +326,17 @@ function M.text_columns(name)
 	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
 	local out = {}
 	for index, column in ipairs(query.texts) do out[index] = column end
+	return out
+end
+
+--- Lists the parameters a query declares, in first-use order.
+--- @param name string Catalogue name.
+--- @return table Array of parameter names.
+function M.params(name)
+	local query = QUERIES[name]
+	if not query then error("Unknown keystats query: " .. tostring(name), 2) end
+	local out = {}
+	for index, param in ipairs(query.params) do out[index] = param end
 	return out
 end
 

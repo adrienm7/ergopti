@@ -169,3 +169,29 @@ SELECT date,
        MAX(CASE WHEN battery_count > 0 THEN battery_max END) AS battery_max
 FROM agg_system_day{{where}}
 GROUP BY date;
+
+
+-- ============================================================================
+-- 2. N-GRAM PROJECTION (one row per token and source map, all devices)
+-- ============================================================================
+
+-- name: ngram.tokens
+-- doc: Tokens of one n-gram family. {{table}} is a family table name from the
+-- doc: reader's fixed map; {{conjunction}} is " WHERE " after an empty filter
+-- doc: and " AND " after a non-empty one. TOTAL accumulates as a float, so a
+-- doc: large count cannot overflow; a row whose counters are not numbers is
+-- doc: returned raw, once, for the reader to read as zero instead of SQLite
+-- doc: summing "12oops" as 12. Identical source maps keep their multiplicity.
+SELECT {{text token}}, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows
+FROM {{table}}{{where}}{{conjunction}}(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'))
+GROUP BY token, esrc_json
+UNION ALL SELECT {{text token}}, c, td, e, esrc_json, 1 AS source_rows
+FROM {{table}}{{where}}{{conjunction}}NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));
+
+-- name: ngram.tokens_by_app
+-- doc: The same projection split by application, for today's live slice.
+SELECT {{text app}}, {{text token}}, TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows
+FROM {{table}}{{where}}{{conjunction}}(typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'))
+GROUP BY app, token, esrc_json
+UNION ALL SELECT {{text app}}, {{text token}}, c, td, e, esrc_json, 1 AS source_rows
+FROM {{table}}{{where}}{{conjunction}}NOT (typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real'));

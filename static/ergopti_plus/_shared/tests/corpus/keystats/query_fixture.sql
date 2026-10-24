@@ -98,3 +98,15 @@ INSERT INTO agg_system_day VALUES
 	('pc', '2026-10-01', 1, 0, 0, 0, 0, 0, 0, 0, 0, 43200000, 0, 0),
 	('pc', '2026-10-02', 0, 2, NULL, NULL, NULL, NULL, 0, 600000, 0, 30000000, 1, 0),
 	('mac', '2026-10-03', 2, 1, 900, 10, 80, 95, 0, 0, 3600000, 20000000, 0, 0);
+
+-- N-gram rows: the same token and source map on two devices (multiplicity),
+-- a different source map for the same token, a NUL-bearing token, and a row
+-- whose counter is malformed text the reader must not sum as a number.
+INSERT INTO ngram_chars VALUES
+	('mac', '2026-10-01', 'Code', 'e', 300, 36000, 290, 4, '{}'),
+	('pc', '2026-10-01', 'Code', 'e', 120, 15000, 118, 1, '{}'),
+	('mac', '2026-10-01', 'Code', 'a', 50, 6000, 48, 0, '{"hotstring":5}'),
+	('pc', '2026-10-01', 'Code', 'a', 40, 5000, 39, 1, '{"hotstring":5}'),
+	('mac', '2026-10-02', 'Code', 'a', 7, 800, 7, 0, '{"llm":2,"case_transform":1}'),
+	('mac', '2026-10-01', 'Mail', 'x' || char(0) || 'y', 2, 300, 2, 0, '{}'),
+	('pc', '2026-10-02', 'Mail', 'z', '12oops', 100, 1, 0, '{}');
