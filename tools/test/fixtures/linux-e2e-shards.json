@@ -298,6 +298,9 @@
 		"Qualify actual X11 physical shortcut sources": [
 			"Install prerequisites for Qualify actual X11 physical shortcut sources"
 		],
+		"Qualify three actual XI2 property cookies": [
+			"Install prerequisites for Qualify three actual XI2 property cookies"
+		],
 		"Detect and read the keymap on a real X11 and a real Wayland": [
 			"Install prerequisites for Detect and read the keymap on a real X11 and a real Wayland"
 		],
