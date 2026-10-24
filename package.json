@@ -553,7 +553,21 @@
 		"test:macos-release-stage-native-receiving-controls": "node ./tools/test/test-macos-release-stage-native-receiving.cjs",
 		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs",
 		"test:macos-launch-qualification": "node ./tools/test/test-macos-launch-qualification.cjs",
-		"test:macos-launch-qualification-lifetime": "node ./tools/test/test-macos-launch-qualification-lifetime.cjs"
+		"test:macos-launch-qualification-lifetime": "node ./tools/test/test-macos-launch-qualification-lifetime.cjs",
+		"test:managed-proxy-route-contract": "node ./tools/test/test-managed-proxy-route-contract.cjs",
+		"test:layout-composer-page": "node ./tools/test/test-layout-composer-page.cjs",
+		"test:windows-native-hook-front": "node ./tools/test/test-windows-native-hook-front.cjs",
+		"test:windows-replay-consumers": "node ./tools/test/test-windows-replay-consumers.cjs",
+		"test:go-route-plan-gate": "node ./tools/test/test-go-route-plan-gate.cjs",
+		"test:proxy-policy-single-source": "node ./tools/test/test-proxy-policy-single-source.cjs",
+		"test:shared-ui-no-platform-branches": "node ./tools/test/test-shared-ui-no-platform-branches.cjs",
+		"test:action-catalogue-shared-projection": "node ./tools/test/test-action-catalogue-shared-projection.cjs",
+		"test:key-combination-defaults-parity": "node ./tools/test/test-key-combination-defaults-parity.cjs",
+		"test:shared-lua-helpers-single-use": "node ./tools/test/test-shared-lua-helpers-single-use.cjs",
+		"test:keystats-sql-census": "node ./tools/test/test-keystats-sql-census.cjs",
+		"test:keystats-query-catalogue": "node ./tools/test/test-keystats-query-catalogue.cjs",
+		"test:duplicate-constant-names": "node ./tools/test/test-duplicate-constant-names.cjs",
+		"test:network-field-check-parity": "node ./tools/test/test-network-field-check-parity.cjs"
 	},
 	"type": "module",
 	"dependencies": {

@@ -77,6 +77,10 @@ const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/run-linux-window-switch-receipts.cjs',
 	// Real process/file probes run under verify-change and mandatory Linux CI.
 	'tools/test/run-linux-runtime-native.cjs',
+	// The Go twin needs an installed Go toolchain; the Linux network-ai CI shard
+	// and verify-change run it, and the suite runs its vacuity gate
+	// (test-go-route-plan-gate.cjs) instead.
+	'tools/test/run-go-route-plan.cjs',
 	// Actual staged package/kernel admission is mandatory in its planner and CI lane.
 	'tools/test/run-linux-portable-network-native.cjs',
 	// Retained descriptor hashing has its own mandatory actual Linux qualification.
