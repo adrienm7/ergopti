@@ -486,6 +486,7 @@ return {
 	"tests.unit.modules.hotstrings.magic_key.test_magic_key_source_config_toml_leaf",
 	"tests.unit.modules.hotstrings.magic_key.test_magic_key_source_caller_cohort_after",
 	"tests.unit.modules.hotstrings.catalogue.test_section_opt_in_defaults",
+	"tests.unit.modules.hotstrings.catalogue.test_rolls_left_arrow",
 	"tests.unit.modules.hotstrings.injector.test_output_transaction",
 	"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver",
 	"tests.unit.modules.hotstrings.engine.test_prefix_expansions",
