@@ -1637,7 +1637,6 @@ description_key = "menu.metrics.encrypt_toggle"
 # and its meaning are shared.
 [[features.metrics]]
 id = "disabled_apps"
-platforms = ["ahk", "hs"]
 default = []
 recommended = []
 input_altering = false
@@ -5723,8 +5722,6 @@ disabled_when = ["keystats_enabled"]
 type = "list"
 id = "exclude_apps"
 disabled_when = ["keystats_enabled"]
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 

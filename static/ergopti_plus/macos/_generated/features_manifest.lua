@@ -434,7 +434,7 @@ M.features = {
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt_toggle", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
-		path = "metrics.disabled_apps", id = "disabled_apps", section = "metrics", default = {  }, type = "array", description_key = "menu.metrics.metrics_disabled_apps", platforms = { "ahk", "hs" }, recommended = {  }, input_altering = false,
+		path = "metrics.disabled_apps", id = "disabled_apps", section = "metrics", default = {  }, type = "array", description_key = "menu.metrics.metrics_disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{
 		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,

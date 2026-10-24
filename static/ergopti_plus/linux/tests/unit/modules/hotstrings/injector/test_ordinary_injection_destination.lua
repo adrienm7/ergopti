@@ -26,7 +26,7 @@ helpers.describe("Main retains the ordinary expansion target", function()
 					WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
 					terminators_mod = { is_terminator = function() return false end },
 					RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
-					keystats = { is_password_app = function() return false end, suppress = function() end,
+					keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
 						unsuppress = function() end, on_keydown = function() end },
 					engine = { reset = function() end, on_char = function()
 						return { trigger = "btw", replacement = "☃", backspace_count = 3 }

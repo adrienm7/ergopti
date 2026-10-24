@@ -425,6 +425,9 @@ M.features = {
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt_toggle", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
+		path = "metrics.disabled_apps", id = "disabled_apps", section = "metrics", default = {  }, type = "array", description_key = "menu.metrics.metrics_disabled_apps", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
+	},
+	{
 		path = "metrics.wpm_widget_visible", id = "wpm_widget_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_visible", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = false,
 	},
 	{
@@ -687,9 +690,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.navigation.arrow_nav_enabled", section = "llm.navigation", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "metrics.disabled_apps", section = "metrics", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "metrics.wpm_widget_x", section = "metrics", reason_key = "", platforms = { "ahk" },

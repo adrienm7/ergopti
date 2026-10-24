@@ -1027,7 +1027,7 @@ local function main()
 		publish_context = function(context)
 			_cached_app_id = context.app_id
 			keystats.set_private_window(keystats.is_private_window(context.title))
-			local password_app = keystats.is_password_app(context.app_id)
+			local password_app = keystats.is_unrecorded_app(context.app_id)
 			if password_app then keystats.suppress() else keystats.unsuppress() end
 			return true, keystats.is_context_protected(context.app_id, context.title)
 		end,
@@ -1168,7 +1168,7 @@ local function main()
 		local app_id = _cached_app_id or "Unknown"
 
 		-- Check password suppression.
-		if keystats.is_password_app(app_id) then
+		if keystats.is_unrecorded_app(app_id) then
 			keystats.suppress()
 		else
 			keystats.unsuppress()
@@ -1450,7 +1450,7 @@ local function main()
 		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
-		if keystats.is_password_app(app_id) then
+		if keystats.is_unrecorded_app(app_id) then
 			keystats.suppress()
 		else
 			keystats.unsuppress()
@@ -1633,7 +1633,7 @@ local function main()
 			end
 			if admitted then
 				local app_id = _cached_app_id or "Unknown"
-				if keystats.is_password_app(app_id) then
+				if keystats.is_unrecorded_app(app_id) then
 					keystats.suppress()
 				else
 					keystats.unsuppress()
