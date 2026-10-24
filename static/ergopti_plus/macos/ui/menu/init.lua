@@ -1605,7 +1605,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_menu_dirty        = false
 			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
-				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.last_item_timings) or "")
+				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
 			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))

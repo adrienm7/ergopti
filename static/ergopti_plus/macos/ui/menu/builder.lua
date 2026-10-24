@@ -654,6 +654,16 @@ end
 -- concatenates a name per item.
 local _item_phase_names = {}
 
+-- Per-row build times of the last generate() call, in build order. Kept local
+-- so the module table is never written outside its function declarations.
+local _last_item_timings = {}
+
+--- Returns the per-row build times of the last menu generation.
+--- @return table List of { id, ms } in build order.
+function M.get_last_item_timings()
+	return _last_item_timings
+end
+
 --- Returns the phase name `menu_item.<id>` of a top-level row.
 --- @param id string Top-level id declared by the manifest.
 --- @return string
@@ -958,7 +968,7 @@ function M.generate(ctx, menu_mods, actions)
 		end
 	end
 
-	M.last_item_timings = item_timings
+	_last_item_timings = item_timings
 	-- Everything above collected row DATA; this is where the shared renderer turns
 	-- it into the table hs.menubar consumes, dropping any separator that would not
 	-- sit between two rows.
