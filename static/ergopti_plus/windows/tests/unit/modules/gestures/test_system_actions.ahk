@@ -685,3 +685,5 @@ _SysActions_OpenApp() {
 	}
 }
 Test("system actions: open_app launches the application stored for its binding", _SysActions_OpenApp)
+
+#Include test_microphone_endpoint_owner.ahk
