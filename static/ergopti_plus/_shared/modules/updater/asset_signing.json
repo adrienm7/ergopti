@@ -1,0 +1,10 @@
+{
+	"_comment": "Detached signatures of the Windows and Linux update assets (PAR-30). Release CI signs a canonical record of each asset with the maintainer's ECDSA P-256 key and publishes it as <asset>.sig; both updaters verify it before installing. The record is the header line, the asset file name, its size in bytes and its lowercase SHA-256 hex, each followed by a line feed, so the signature binds the name, the size and the content, and the verifier signs nothing but a digest it already computed over the exact bytes it installs. The signature is the raw 64-byte r||s, base64 on one line. P-256 and not Ed25519 (Sparkle's macOS key) because the Windows CNG provider only gained Ed25519 recently and the driver supports Windows 10; both OS-native providers (CNG, OpenSSL) verify P-256. enforcement: 'off' until the maintainer has provisioned the key and the CI secret (docs/tooling/update-signing.md): the updaters then log, on every update, that the signature was not enforced; 'required' refuses an asset without a valid signature. public_key_spki_base64 is the DER SubjectPublicKeyInfo of the verification key, empty until provisioned.",
+	"schema_version": 1,
+	"algorithm": "ecdsa-p256-sha256",
+	"signature_suffix": ".sig",
+	"record_header": "ergopti-update-asset-v1",
+	"signature_bytes": 64,
+	"public_key_spki_base64": "",
+	"enforcement": "off"
+}

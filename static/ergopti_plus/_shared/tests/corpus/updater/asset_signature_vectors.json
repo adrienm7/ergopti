@@ -1,0 +1,32 @@
+{
+	"_comment": "A fixed public key, one signed record and the records that must NOT verify with that signature. The private key was discarded. Every verifier (tools/build/update-asset-signature.cjs, Linux OpenSSL, Windows CNG) must accept valid and refuse every tampered entry.",
+	"algorithm": "ecdsa-p256-sha256",
+	"public_key_spki_base64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfu1mkWVQvZLljcefM6lto6wBeecPAykYM9drd7IwqSvXgZvkTJ8UlEY8Xq7KhKBhnc5TqW/Xrw4BLcxL9sWhog==",
+	"record_header": "ergopti-update-asset-v1",
+	"valid": {
+		"name": "ergopti-plus-linux.tar.gz",
+		"size": 1048576,
+		"sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"signature_base64": "5zps7iEU2XbcJjpWgwlBJ/XoD+RwErBCfEP9rAy8kQ9/ySrCJW+zmoWMXwaVka9BgFBoZ4rSXno2dVRGC2uTcg=="
+	},
+	"tampered": [
+		{
+			"why": "size changed",
+			"name": "ergopti-plus-linux.tar.gz",
+			"size": 1048577,
+			"sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+		},
+		{
+			"why": "name changed",
+			"name": "ergopti-plus-windows.zip",
+			"size": 1048576,
+			"sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+		},
+		{
+			"why": "digest changed",
+			"name": "ergopti-plus-linux.tar.gz",
+			"size": 1048576,
+			"sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+		}
+	]
+}

@@ -213,6 +213,18 @@ jobs:
                   missing=$((missing + 1))
               fi
           done
+          # PAR-30: once the maintainer has provisioned the update signing key the
+          # policy is "required", and an asset without its detached signature would
+          # publish a release no updater accepts.
+          signing=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/asset_signing.json').enforcement")
+          if [ "$signing" = "required" ]; then
+              for asset in ErgoptiPlus.exe.sig "$LINUX_BUNDLE_ASSET.sig"; do
+                  if [ ! -s "release-assets/$asset" ]; then
+                      echo "::error::release-assets/$asset is missing or empty: the update signature policy is required."
+                      missing=$((missing + 1))
+                  fi
+              done
+          fi
           if [ "$missing" -gt 0 ]; then
               echo "::error::$missing release asset(s) missing; nothing was published."
               exit 1
