@@ -45,6 +45,7 @@ local MAX_TYPING_INTERVAL_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 -- Counted here because every character that reaches the page passes here —
 -- typed, expanded or generated — and only here is it known which it was.
 local LiveWpm = require("keystats.live_wpm")
+local PointerMetrics = require("modules.keystats.pointer_metrics")
 local function new_live_tracker()
 	return LiveWpm.new({
 		window_ms = Timings.ms("keystats", "wpm_window_ms"),
@@ -148,6 +149,9 @@ local _pending_shortcut_events = {}
 -- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
 local _pending_llm_events = {}
 local _pending_app_switch_events = {}
+-- The observed pointers' stream, measured into the mouse columns of the
+-- focused application's next typing row (pending.mouse), as on macOS.
+local _pointer = PointerMetrics.new()
 local _flush_state, _flush_stopping, _flush_pumping = nil, false, false
 local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
 local _flush_listeners = {}
@@ -852,6 +856,27 @@ function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
 		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
 		key  = key,
 	}
+end
+
+--- Records one report of an observed pointer for the mouse columns of
+--- events_typing. The clicks, wheel turns and distance accumulate under the
+--- focused application and are written with its next typing row, as macOS
+--- carries them to the next flushed run. Gated like every recording entry
+--- point, and never for an application whose input stays out of the metrics.
+--- @param kind string "press", "motion" or "frame" (pointer_metrics).
+--- @param code integer evdev code.
+--- @param value integer evdev value.
+function M.record_pointer(kind, code, value)
+	local delta = _pointer.observe(kind, code, value)
+	if not delta or not may_record() then return end
+	local app_id = _focused_app_id
+	if type(app_id) ~= "string" or M.is_unrecorded_app(app_id) then return end
+	local pending = ensure_pending(app_id)
+	local mouse = pending.mouse or { clicks = 0, scrolls = 0, distance = 0 }
+	mouse.clicks = mouse.clicks + delta.clicks
+	mouse.scrolls = mouse.scrolls + delta.scrolls
+	mouse.distance = mouse.distance + delta.distance
+	pending.mouse = mouse
 end
 
 -- The events_llm kinds, with the fields each may carry. The table's CHECK constraint
@@ -1850,7 +1875,9 @@ local function capture_flush()
 	-- them, and the offset is what makes an uptime figure into an hour.
 	local wall_offset_ms = os.time() * MS_PER_SECOND - math.floor(Monotonic.now_ms())
 	for app_id, pending in pairs(_pending_typing_events) do
-		if #pending.events > 0 then
+		-- Pointer activity alone is a row too, with no text, as macOS flushes it.
+		local mouse = pending.mouse
+		if #pending.events > 0 or mouse then
 			local total_time_ms = 0
 			for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
 			typing_batch[#typing_batch + 1] = {
@@ -1858,7 +1885,12 @@ local function capture_flush()
 				text = table.concat(pending.text),
 				wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
 				events_json = _to_json(pending.events),
+				mouse_clicks = mouse and mouse.clicks or 0,
+				mouse_scrolls = mouse and mouse.scrolls or 0,
+				mouse_distance_px = mouse and math.floor(mouse.distance) or 0,
 			}
+		end
+		if #pending.events > 0 then
 			walker_contexts[app_id] = walker_contexts[app_id] or {}
 			local ok_walk, walked = pcall(AggregateWalker.walk,
 				pending.events, date, dashboard_app_name(app_id), ngram_batch,
@@ -2164,6 +2196,11 @@ local function restore_flush_buffers(buffers)
 		local newer = _pending_typing_events[app]
 		if newer then
 			for _, field in ipairs({ "text", "events", "times" }) do older[field] = prepend(older[field], newer[field]) end
+			if newer.mouse then
+				local mouse = older.mouse or { clicks = 0, scrolls = 0, distance = 0 }
+				for _, field in ipairs({ "clicks", "scrolls", "distance" }) do mouse[field] = mouse[field] + newer.mouse[field] end
+				older.mouse = mouse
+			end
 		end
 		_pending_typing_events[app] = older
 	end
