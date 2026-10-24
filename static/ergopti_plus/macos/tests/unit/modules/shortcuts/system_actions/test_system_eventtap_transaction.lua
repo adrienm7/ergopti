@@ -413,6 +413,7 @@ helpers.describe("keep-awake owns every pending cursor return", function()
 		local fixture = load_fixture({{}})
 		local now = 1000
 		fixture.hs.timer.secondsSinceEpoch = function() return now end
+		fixture.hs.timer.absoluteTime = function() return now * 1e9 end
 		fixture.hs.mouse.absolutePosition = function(position)
 			return position or { x = 100, y = 200 }
 		end
