@@ -78,8 +78,10 @@ function M.acquire()
 	if _inherited or _held_fd then return true end
 	local root = os.getenv("XDG_RUNTIME_DIR")
 	if root == nil or root == "" then
-		local home = os.getenv("HOME")
-		if home == nil or home == "" then return false, "Neither XDG_RUNTIME_DIR nor HOME is set; no session lock folder." end
+		-- The account home, never home()'s temporary fallback: a lock under /tmp
+		-- would not be the file launch.sh takes, so two instances could both run.
+		local home = require("infra.config_paths").account_home()
+		if home == nil then return false, "Neither XDG_RUNTIME_DIR nor an absolute HOME is set; no session lock folder." end
 		root = home .. FALLBACK_ROOT
 	end
 	local ffi = ffi_c()
