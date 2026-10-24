@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local KEY = require("config_keys").KEY
 
 -- The cooperative constructor captures one engine owner, not a later compatible export.
 local ResponseEngine = require("modules.llm.prediction_engine")
@@ -108,8 +109,8 @@ function M.init(opts)
 		local port = type(options.port) == "number" and options.port or default_port
 		origin = HttpBridge and HttpBridge.resolve_base_url(port, default_host) or nil
 
-		local values = require("infra.llm_preferences").get_many({ "llm.models.ollama", "llm.enabled" })
-		model, enabled = options.model ~= nil and options.model or values["llm.models.ollama"], values["llm.enabled"]
+		local values = require("infra.llm_preferences").get_many({ KEY.LLM_MODELS_OLLAMA, KEY.LLM_ENABLED })
+		model, enabled = options.model ~= nil and options.model or values[KEY.LLM_MODELS_OLLAMA], values[KEY.LLM_ENABLED]
 		assert(type(model) == "string" and model ~= "", "the configured Ollama model must be nonempty")
 		assert(type(enabled) == "boolean", "AI consent must be boolean")
 		inventory = require("modules.llm.model_inventory").new({
@@ -191,7 +192,7 @@ end
 --- @return boolean
 function M.set_model(model_name, expected_source, admission)
 	if type(model_name) ~= "string" or model_name == "" then return false end
-	if not persist("llm.models.ollama", model_name, expected_source, admission) then return false end
+	if not persist(KEY.LLM_MODELS_OLLAMA, model_name, expected_source, admission) then return false end
 	if admission and admission() ~= true then return false end
 	_current_model = model_name
 	Logger.info(LOG, "Model set to: %s", model_name)
@@ -216,7 +217,7 @@ end
 --- @param admission function|nil Captured final writer admission.
 --- @return boolean
 function M.enable(expected_source, admission)
-	if not persist("llm.enabled", true, expected_source, admission) then return false end
+	if not persist(KEY.LLM_ENABLED, true, expected_source, admission) then return false end
 	_enabled = true
 	Logger.info(LOG, "LLM enabled.")
 	return true
@@ -227,7 +228,7 @@ end
 --- @param admission function|nil Captured final writer admission.
 --- @return boolean acknowledged
 function M.disable(expected_source, admission)
-	if not persist("llm.enabled", false, expected_source, admission) then return false end
+	if not persist(KEY.LLM_ENABLED, false, expected_source, admission) then return false end
 	_enabled = false
 	Logger.info(LOG, "LLM disabled.")
 	return true
@@ -250,8 +251,8 @@ end
 --- @param mark function Consumed-key collector.
 function M.mark_config_reads(document, mark)
 	local preferences = require("infra.llm_preferences")
-	preferences.mark_config_read(document, "llm.models.ollama", mark)
-	preferences.mark_config_read(document, "llm.enabled", mark)
+	preferences.mark_config_read(document, KEY.LLM_MODELS_OLLAMA, mark)
+	preferences.mark_config_read(document, KEY.LLM_ENABLED, mark)
 end
 
 --- Captures dormant model identity and the existing consent gate.
@@ -270,9 +271,9 @@ end
 --- Reads the detached canonical candidate without changing available models.
 --- @return boolean applied
 function M.reload_configuration()
-	local values = require("infra.llm_preferences").get_many({ "llm.models.ollama", "llm.enabled" })
-	if type(values["llm.models.ollama"]) ~= "string" or values["llm.models.ollama"] == "" then return false end
-	return M.restore_configuration({ model = values["llm.models.ollama"], enabled = values["llm.enabled"] })
+	local values = require("infra.llm_preferences").get_many({ KEY.LLM_MODELS_OLLAMA, KEY.LLM_ENABLED })
+	if type(values[KEY.LLM_MODELS_OLLAMA]) ~= "string" or values[KEY.LLM_MODELS_OLLAMA] == "" then return false end
+	return M.restore_configuration({ model = values[KEY.LLM_MODELS_OLLAMA], enabled = values[KEY.LLM_ENABLED] })
 end
 
 return M
