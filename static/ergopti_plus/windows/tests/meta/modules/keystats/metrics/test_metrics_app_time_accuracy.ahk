@@ -113,8 +113,10 @@ _A0720B3_PausedContextTicksDoNotBillAppTime() {
 	Body := _DriverFuncBody("KL_Hook_RefreshContext")
 	Assert(Body != "", "KL_Hook_RefreshContext must exist")
 
-	GuardIdx := InStr(Body, "A_IsSuspended")
-	Assert(GuardIdx > 0, "KL_Hook_RefreshContext must guard on A_IsSuspended")
+	; KL_CaptureHeld() is the capture gate (native Suspend or the metrics
+	; pause); test_mouse_suspend_guard.ahk keeps A_IsSuspended inside it.
+	GuardIdx := InStr(Body, "KL_CaptureHeld()")
+	Assert(GuardIdx > 0, "KL_Hook_RefreshContext must guard on KL_CaptureHeld()")
 
 	; Assert the ADVANCE form directly. A positional slice will not do here: the
 	; suspended branch is itself the first mention of app_entered_at, so anchoring
