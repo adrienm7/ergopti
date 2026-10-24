@@ -94,8 +94,11 @@ helpers.describe("kc_bridge: the physical-key writers respect pause and privacy"
 	end)
 
 	helpers.it("still advances its bookkeeping when the guard refuses", function()
-		local src = helpers.read_driver_source("may_persist")
-		local at  = src:find("local function may_persist", 1, true)
+		-- One file: the AI bridge's may_persist_preview shares the prefix and,
+		-- since keylogger became keystats, sorts before this guard.
+		local src = helpers.read_driver_unit("local function may_persist()")
+		helpers.assert_not_nil(src, "the kc_bridge guard must be in exactly one file")
+		local at  = src:find("local function may_persist()", 1, true)
 		helpers.assert_not_nil(at, "the guard must exist")
 		local doc = src:sub(math.max(1, at - 700), at)
 		helpers.assert_true(doc:find("offset", 1, true) ~= nil,
