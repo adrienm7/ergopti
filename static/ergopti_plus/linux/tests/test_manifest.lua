@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_semantic_controls",
+	"tests.unit.adapters.layout.test_xkb_capture_semantic_controls",
 	"tests.unit.modules.shortcuts.keyboard.test_deferred_action_configuration_owner",
 	"tests.unit.modules.llm.agent.test_agent_learning_source",
 	"tests.unit.ui.editors.action_picker.test_close_successor",

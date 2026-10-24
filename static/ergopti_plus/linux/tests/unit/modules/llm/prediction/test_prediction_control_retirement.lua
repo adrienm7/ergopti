@@ -567,7 +567,18 @@ do
 			local original_engine_new = engine_module.new
 			local main_engine = {}
 			for name, value in pairs(engine_module) do main_engine[name] = value end
-			main_engine.new = function(...) state.matcher = original_engine_new(...); return state.matcher end
+			main_engine.new = function(...)
+				state.matcher = original_engine_new(...)
+				if options.semantic_input then
+					local reset = state.matcher.reset
+					state.resets = {}
+					state.matcher.reset = function(owner, boundary, line_start)
+						state.resets[#state.resets + 1] = { boundary = boundary, line_start = line_start }
+						return reset(owner, boundary, line_start)
+					end
+				end
+				return state.matcher
+			end
 			put("modules.hotstrings.engine", main_engine)
 			local prediction = require("modules.llm.prediction_engine"); fixture_prediction = prediction
 			local hook = require("adapters.keyboard_hook")
@@ -646,6 +657,42 @@ do
 				if phase == "visible" then state.requests[1].done(state.response, nil); helpers.assert_true(prediction.has_suggestions()) end
 			end
 			function state.control()
+				if options.semantic_input then
+					local input = options.semantic_input
+					local code, held = input.code or 71, {}
+					state.before_control = { text = state.text, caret = state.caret }
+					hook._test_drive({ { type = 1, code = code, value = 1 }, { type = 1, code = code, value = 0 } }, {
+						onPhysical = callbacks.onPhysical, onConsume = callbacks.onConsume,
+						captureEvent = function(c, value)
+							if c == code and value == 1 then return input.text, input.identity, nil, input.control end
+						end,
+						onChar = function(ch, c)
+							state.chars = state.chars + 1; state.last_char = ch; callbacks.onChar(ch, c)
+						end,
+						onKey = function(name, detail)
+							state.controls = state.controls + 1; state.semantic = { name = name, key = detail.key, mods = detail.mods }
+							callbacks.onKey(name, detail)
+						end,
+						onEmitRaw = function(c, value)
+							held[c] = value == 1 or nil
+							if c == code and value == 1 then
+								state.forwarded = state.forwarded + 1
+								-- Independent controlled receiver; no actual GUI/caret claim.
+								if input.control == "home" then state.caret = 0
+								elseif input.text then
+									state.text = state.text:sub(1, state.caret) .. input.text .. state.text:sub(state.caret + 1)
+									state.caret = state.caret + #input.text
+								end
+							end
+							return true
+						end,
+					}, true)
+					helpers.assert_eq(held, {}, "semantic input must release its private forwarded press")
+					helpers.assert_eq(guard.focused_text_identity(), original_focus)
+					helpers.assert_eq(guard.blocks_text(), false)
+					state.after_control = { text = state.text, caret = state.caret }
+					return
+				end
 				local codes = { u = 22, h = 35, k = 37, w = 17, c = 46, s = 31, v = 47,
 					b = 48, f = 33, e = 18, d = 32, t = 20, p = 25, n = 49, j = 36, m = 50 }
 				local control_text = { p = string.char(16), n = string.char(14), j = "\n", m = "\r" }
@@ -1031,5 +1078,63 @@ do
 				end)
 			end)
 		end
+	end)
+
+	helpers.describe("whole Main receives selected keypad Home conservatively", function()
+		for _, app in ipairs({ "gnome-terminal", "owned-gui-editor" }) do
+			for _, phase in ipairs({ "debounce", "late", "visible" }) do
+				for _, reset in ipairs({ false, true }) do
+					helpers.it("keypad-home-retirement " .. app .. " " .. phase .. " reset=" .. tostring(reset), function()
+						whole_main({ semantic_input = { control = "home" }, app = app, phase = phase, reset = reset }, function(s)
+							s.prepare()
+							local request, callback = s.requests[1], s.requests[1] and s.requests[1].done
+							local pending = {}; for id, handle in pairs(s.scheduler.pending) do pending[id] = { handle = handle, callback = handle.fn } end
+							s.control()
+							helpers.assert_eq(s.forwarded, 1); helpers.assert_eq(s.controls, 1); helpers.assert_eq(s.chars, 0)
+							helpers.assert_eq(s.semantic, { name = "home", mods = {} })
+							helpers.assert_eq(s.after_control, { text = "hello world", caret = 0 })
+							helpers.assert_eq(s.matcher:current_buffer(), ""); helpers.assert_eq(s.matcher:buffer_starts_at_word_boundary(), false)
+							helpers.assert_eq(s.resets[#s.resets], { boundary = false, line_start = false }, "real Main must reach the existing unknown Home reset")
+							helpers.assert_eq(s.word_reset(), reset)
+							finish_old(s, phase)
+							if phase == "debounce" then
+								helpers.assert_eq(#s.requests, 0)
+								for id, ref in pairs(pending) do
+									helpers.assert_eq(ref.handle.fn, ref.callback); helpers.assert_true(s.scheduler.pending[id] ~= ref.handle)
+								end
+							else helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback) end
+							helpers.assert_eq(s.prediction.has_suggestions(), false); helpers.assert_eq(s.visible, false)
+							helpers.assert_eq(s.prediction.accept(1), false); helpers.assert_eq(s.output, 0)
+							helpers.assert_eq({ text = s.text, caret = s.caret }, s.after_control)
+							-- Empty Backspace through actual Main cannot acquire an empty-line promise.
+							s.callbacks.onPhysical(14, "backspace", nil, 1); s.callbacks.onKey("backspace", { mods = {} })
+							helpers.assert_eq(s.matcher:buffer_starts_at_word_boundary(), false)
+						end)
+					end)
+				end
+			end
+		end
+
+		helpers.it("keypad numeric text reaches actual Main onChar without acquiring Home policy", function()
+			whole_main({ semantic_input = { text = "7", identity = "7" }, phase = "visible" }, function(s)
+				s.prepare(); local buffer, resets = s.matcher:current_buffer(), #s.resets
+				local request, callback = s.requests[1], s.requests[1].done
+				s.control(); helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.chars, 1); helpers.assert_eq(s.last_char, "7")
+				helpers.assert_eq(s.after_control, { text = "hello world7", caret = 12 })
+				helpers.assert_eq(s.matcher:current_buffer(), buffer .. "7"); helpers.assert_eq(#s.resets, resets)
+				callback(s.response, nil); helpers.assert_eq(s.requests[1], request); helpers.assert_eq(request.done, callback)
+				helpers.assert_eq(s.prediction.has_suggestions(), false); helpers.assert_eq(s.output, 0)
+			end)
+		end)
+
+		helpers.it("an unclassified nil-text input leaves the unchanged Main field and offer alone", function()
+			whole_main({ semantic_input = {}, phase = "visible" }, function(s)
+				s.prepare(); local buffer, resets = s.matcher:current_buffer(), #s.resets
+				s.control(); helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.chars, 0)
+				helpers.assert_eq(s.after_control, s.before_control); helpers.assert_eq(s.matcher:current_buffer(), buffer)
+				helpers.assert_eq(#s.resets, resets); helpers.assert_true(s.prediction.has_suggestions())
+				helpers.assert_true(s.prediction.accept(1)); helpers.assert_eq(s.output, 1)
+			end)
+		end)
 	end)
 end
