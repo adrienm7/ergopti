@@ -734,6 +734,11 @@ function M.predict(context, output_context, override)
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return false
 	end
+	-- The applications the user switched the trigger off in (llm.trigger.disabled_apps)
+	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil) then
+		Logger.debug(LOG, "Prediction suppressed: the application is excluded.")
+		return false
+	end
 	local function admission_current()
 		return not _runtime_closed and _scope_owner == nil and not _predicting
 			and request == _request_epoch and app_epoch == _runtime_app_epoch
@@ -748,11 +753,6 @@ function M.predict(context, output_context, override)
 	-- even when it returns the same field. The older admission owns no cleanup.
 	if not admission_current() then return false end
 	if focus == "" or observed_focus ~= focus then
-	-- The applications the user switched the trigger off in (llm.trigger.disabled_apps)
-	if TriggerSettings.is_app_disabled(type(output_context) == "table" and output_context.app_id or nil) then
-		Logger.debug(LOG, "Prediction suppressed: the application is excluded.")
-		return false
-	end
 		Logger.info(LOG, "Prediction suppressed: the native typing target is unavailable or changed.")
 		return false
 	end
