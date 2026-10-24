@@ -12,9 +12,13 @@ local helpers = require("tests.helpers")
 --- Runs a scenario with retained native callbacks and restores module overrides.
 --- @param scenario function Callback receiving the window and native records.
 local function with_window(scenario)
-	local keys = { "ui.download_window", "ui.ui_builder", "infra.deferred_work", "infra.logger" }
+	local keys = { "ui.download_window", "ui.ui_builder", "infra.deferred_work", "infra.logger",
+		"adapters.timer_scheduler", "error_description", "number_policy" }
 	local saved, prior_hs = {}, _G.hs
 	for _, key in ipairs(keys) do saved[key] = package.loaded[key] end
+	for _, name in ipairs({ "adapters.timer_scheduler", "error_description", "number_policy" }) do
+		package.loaded[name] = nil
+	end
 	local records = { windows = {}, timers = {}, bridges = {} }
 	package.loaded["infra.logger"] = nil
 	package.loaded["infra.deferred_work"] = {
