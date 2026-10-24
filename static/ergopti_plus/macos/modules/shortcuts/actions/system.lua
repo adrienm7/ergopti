@@ -109,6 +109,8 @@ local awake_origin_pos = nil
 -- to log the duration as an "awake" passive period on toggle OFF so the
 -- dashboard can subtract it from focus stats when the toggle is disabled.
 local awake_started_at = nil
+-- Only activation grace uses awake duration; passive-period accounting keeps its epoch receipt.
+local awake_grace_started_at = nil
 -- Name of the focused app at the moment keep-awake was enabled. The
 -- jiggler keeps this app at the foreground for the duration, so the
 -- dashboard can credit the awake_ms back to that app on toggle OFF.
@@ -436,6 +438,7 @@ local function auto_disable_awake(expected_started_at)
 
 	_awake_generation = _awake_generation + 1
 	awake_active = false
+	awake_grace_started_at = nil
 	stop_awake_input_watcher()
 	cancel_awake_return_timer()
 
@@ -470,6 +473,7 @@ function M.toggle_awake()
 	if awake_active then
 		_awake_generation = _awake_generation + 1
 		awake_active = false
+		awake_grace_started_at = nil
 
 		local watcher_settled = stop_awake_input_watcher()
 		local return_timer_settled = cancel_awake_return_timer()
@@ -541,7 +545,7 @@ function M.toggle_awake()
 			-- Ignore events within the activation grace window so the trigger
 			-- keystroke, the origin nudge, and a rapid second Ctrl+M (with the
 			-- touchpad brush it carries) never instantly deactivate keep-awake.
-			if awake_started_at and hs.timer.secondsSinceEpoch() - awake_started_at < AWAKE_ACTIVATION_GRACE_SEC then
+			if awake_grace_started_at and TimerScheduler.awake_time() - awake_grace_started_at < AWAKE_ACTIVATION_GRACE_SEC then
 				return finish_tap(false, fence_events)
 			end
 
@@ -599,6 +603,7 @@ function M.toggle_awake()
 		_awake_generation = next_generation
 		awake_active = true
 		awake_started_at = hs.timer.secondsSinceEpoch()
+		awake_grace_started_at = TimerScheduler.awake_time()
 		-- Capture the focused app at toggle-on so we can credit the keep-awake
 		-- duration back to it on toggle-off.
 		local _ok_app, _front = pcall(hs.application.frontmostApplication)
@@ -635,6 +640,7 @@ end
 function M.stop_awake()
 	_awake_generation = _awake_generation + 1
 	awake_active = false
+	awake_grace_started_at = nil
 
 	local watcher_settled = stop_awake_input_watcher()
 	local return_timer_settled = cancel_awake_return_timer()
