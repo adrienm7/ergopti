@@ -72,9 +72,9 @@ end
 local function preserve_corrupt(path)
 	local candidate, suffix = path .. ".corrupt", 0
 	while true do
-		local called, moved, reason = pcall(NoReplaceMove.move, path, candidate)
+		local called, moved, failure = pcall(NoReplaceMove.move, path, candidate)
 		if called and moved == true then return true end
-		if not called or reason ~= "EEXIST" then return false end
+		if not called or failure ~= "EEXIST" then return false end
 		suffix = suffix + 1
 		candidate = path .. ".corrupt." .. suffix
 	end
