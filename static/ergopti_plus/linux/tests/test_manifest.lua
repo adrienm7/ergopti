@@ -496,6 +496,7 @@ return {
 	"tests.unit.modules.hotstrings.preview.test_preview_colored_menu",
 	"tests.unit.modules.hotstrings.preview.test_preview_masks_secrets",
 	"tests.unit.modules.hotstrings.preview.test_preview_policy_failure",
+	"tests.unit.modules.hotstrings.preview.test_preview_autocorrect_toggle",
 	"tests.unit.modules.hotstrings.preview.test_preview_rows",
 	"tests.unit.modules.hotstrings.injector.test_private_mapping_sinks",
 	"tests.unit.modules.hotstrings.engine.test_repeat_key",
