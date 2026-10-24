@@ -557,6 +557,8 @@ return {
 	"tests.unit.modules.llm.features.test_screen_answers",
 	"tests.unit.modules.llm.agent.test_agent_vectors",
 	"tests.unit.modules.llm.remote.test_remote_formats_vectors",
+	"tests.unit.modules.llm.remote.test_remote_usage_vectors",
+	"tests.unit.modules.llm.remote.test_api_remote_usage",
 	"tests.unit.modules.llm.remote.test_api_entry_names_vectors",
 	"tests.unit.modules.llm.remote.test_api_test_admission",
 	"tests.unit.modules.llm.remote.test_remote_providers",

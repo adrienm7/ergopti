@@ -29,7 +29,7 @@ package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.
 local Formats = require("llm.remote_formats")
 
 local function read_json(path)
-	local fh = assert(io.open(SHARED .. path, "r"), "cannot open " .. path)
+	local fh = assert(io.open(helpers.shared(path), "r"), "cannot open " .. path)
 	local raw = fh:read("*a")
 	fh:close()
 	return assert(json.decode(raw), path .. " is not valid JSON")
@@ -62,7 +62,7 @@ end
 --- @return table api, table posts
 local function load_api()
 	package.loaded["modules.llm.api_remote"] = nil
-	package.loaded["modules.llm.remote_response_classifier"] = nil
+	package.loaded["llm.remote_response_classifier"] = nil
 	package.loaded["modules.llm.provider_uses"] = nil
 	package.loaded["modules.shortcuts.script_control"] = nil
 	local api = helpers.load_with_stubs("modules.llm.api_remote", {})

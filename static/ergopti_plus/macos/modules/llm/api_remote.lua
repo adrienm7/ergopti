@@ -59,7 +59,7 @@ local _probe_client = _http_adapter.new(_http_options)
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
-local ResponseClassifier = require("modules.llm.remote_response_classifier")
+local ResponseClassifier = require("llm.remote_response_classifier")
 local Formats        = require("llm.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
@@ -109,11 +109,6 @@ local function catalog_descriptor_is_valid(provider_id, desc)
 	end
 	if desc.base_url ~= "" and not desc.base_url:match("^https?://%S+$") then return false end
 	return true
-end
-
-local function catalog_price_is_valid(value)
-	return type(value) == "number" and value == value and value >= 0
-		and value ~= math.huge and value ~= -math.huge
 end
 
 --- Normalizes the optional per-provider model_extras section (table model id
@@ -256,17 +251,9 @@ local function load_api_providers()
 				end
 			end
 		end
-		local out_prices = {}
-		for model, row in pairs(p_prices) do
-			if type(model) == "string" and model ~= ""
-				and type(row) == "table"
-				and catalog_price_is_valid(row["in"])
-				and catalog_price_is_valid(row["out"])
-			then
-				out_prices[model] = { ["in"] = row["in"], ["out"] = row["out"] }
-			else
-				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))
-			end
+		local out_prices, skipped_prices = ResponseClassifier.parse_prices(p_prices)
+		for _, model in ipairs(skipped_prices) do
+			Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", model)
 		end
 		local out_test = parse_test_request(root.test_request)
 		local out_decisions_test = parse_decisions_test(root.decisions_test)
@@ -1550,9 +1537,7 @@ local function dispatch_probe(client, base, format, token, callback)
 end
 
 local function estimate_cost(model, in_tokens, out_tokens)
-	if not model or model == "" or not MODEL_PRICES[model] then return 0.0 end
-	local p = MODEL_PRICES[model]
-	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
+	return ResponseClassifier.estimate_cost(MODEL_PRICES, model, in_tokens, out_tokens)
 end
 M.__estimate_cost_for_test = estimate_cost
 
