@@ -256,8 +256,8 @@ TestHotstringsConfig_SharedDefaultsAreSingleSource() {
         "GLOBAL_DEFAULT_COLOR is loaded from defaults.toml [colors] global_default")
     AssertEqual(NormHash(IniCacheGet(c, "colors", "personal")), HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"],
         "personal baseline is loaded from defaults.toml [colors] personal")
-    AssertEqual(Float(IniCacheGet(c, "delays", "default_sec")), GLOBAL_DEFAULT_DELAY,
-        "GLOBAL_DEFAULT_DELAY is loaded from defaults.toml [delays] default_sec")
+    AssertEqual(Float(ManifestDefaultFor("hotstrings.expansion_delay")), GLOBAL_DEFAULT_DELAY,
+        "GLOBAL_DEFAULT_DELAY is the manifest default of hotstrings.expansion_delay")
     AssertEqual(Float(IniCacheGet(c, "delays", "dynamichotstrings_sec")), DYN_HOTSTRINGS_DEFAULT_DELAY,
         "DYN_HOTSTRINGS_DEFAULT_DELAY is loaded from defaults.toml [delays] dynamichotstrings_sec")
 

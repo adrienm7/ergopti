@@ -1698,12 +1698,12 @@ local function load_shared_defaults()
 		return s[key]
 	end
 
-	GLOBAL_DEFAULT_DELAY             = tonumber(require_key("delays", "default_sec"))
+	GLOBAL_DEFAULT_DELAY             = tonumber(require("infra.manifest_reader").default_for("hotstrings.expansion_delay"))
 	GLOBAL_DEFAULT_COLOR             = require_key("colors", "global_default")
 	CATEGORY_DEFAULT_COLORS.personal = require_key("colors", "personal")
 
 	if type(GLOBAL_DEFAULT_DELAY) ~= "number" then
-		error("[hotstrings_config] [delays].default_sec must be a number in " .. toml_path)
+		error("[hotstrings_config] hotstrings.expansion_delay must be a number in the feature manifest")
 	end
 
 	Logger.done(LOG, "Shared hotstring defaults loaded (delay=%.2fs color=%s personal=%s).",

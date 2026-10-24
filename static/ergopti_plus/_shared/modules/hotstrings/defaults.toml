@@ -57,11 +57,8 @@ neutral = "#6e6e73"
 
 [delays]
 
-# Global default expansion delay (seconds) applied when no user/TOML delay is set.
-# This file is the authoritative source. The macOS user preference
-# `hotstrings.expansion_delay` declares the same value in the feature manifest;
-# tools/test/test-defaults-single-source.cjs fails when the two differ.
-default_sec = 0.75
+# The global default expansion delay is not declared here: it is the feature
+# manifest default of `hotstrings.expansion_delay`, read by all three drivers.
 
 # Default activation delay (seconds) for the dynamic-hotstrings category (dates,
 # phone / SSN / IBAN prefixes). This category has no per-file [_meta] delay, so

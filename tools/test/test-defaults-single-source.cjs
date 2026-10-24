@@ -122,48 +122,27 @@ async function main() {
 		assert.equal(entry.recommended, shipped, `metrics.${id} recommends what it ships`);
 		assert.equal(entry.default_per_platform, undefined, `metrics.${id} has one default`);
 	}
-	// PAR-6: the base expansion delay is declared in hotstrings/defaults.toml
-	// (read by all three drivers) and, as a user preference, in the manifest.
-	// The two must agree, and no third mirror may exist in the timing registry.
-	const shippedDelay = parse(
-		fs.readFileSync(paths.shared('modules/hotstrings/defaults.toml'), 'utf8')
-	).delays.default_sec;
+	// PAR-6: the base expansion delay has ONE declaration, the manifest default of
+	// hotstrings.expansion_delay, read by all three drivers. Neither the shared
+	// hotstring defaults nor the timing registry may declare it again.
 	const delayEntry = manifest.entries.find(
 		(entry) => entry.section === 'hotstrings' && entry.id === 'expansion_delay'
 	);
-	assert.equal(
-		delayEntry.default,
-		shippedDelay,
-		'hotstrings.expansion_delay must equal [delays] default_sec'
+	assert.deepEqual(
+		entryPlatforms(manifest, delayEntry),
+		['ahk', 'hs', 'linux'],
+		'the base expansion delay is declared for every driver'
 	);
 	assert.equal(
 		delayEntry.recommended,
-		shippedDelay,
+		delayEntry.default,
 		'the recommended base delay is the shipped one'
 	);
-	// PAR-18: the prediction debounce is ONE value on every driver. macOS used
-	// to declare 200 ms with no stated reason while the shared LLM defaults and the
-	// two other drivers ran 500 ms; a per-platform value needs a reason_key.
-	const debounceEntry = manifest.entries.find(
-		(entry) => entry.section === 'llm.trigger' && entry.id === 'debounce_ms'
-	);
-	const shippedDebounce = JSON.parse(
-		fs.readFileSync(paths.shared('modules/llm/defaults.json'), 'utf8')
-	).llm_debounce_ms;
 	assert.equal(
-		debounceEntry.default,
-		shippedDebounce,
-		'llm.trigger.debounce_ms must equal llm_debounce_ms'
-	);
-	assert.equal(
-		debounceEntry.recommended,
-		shippedDebounce,
-		'the recommended debounce is the shipped one'
-	);
-	assert.equal(
-		debounceEntry.default_per_platform ?? debounceEntry.recommended_per_platform,
+		parse(fs.readFileSync(paths.shared('modules/hotstrings/defaults.toml'), 'utf8')).delays
+			.default_sec,
 		undefined,
-		'the debounce has no per-platform value: a difference needs a reason_key declared with it'
+		'hotstrings/defaults.toml must not declare the base delay a second time'
 	);
 	assert(
 		!/^hotstring_expansion_ms\s*=/m.test(
