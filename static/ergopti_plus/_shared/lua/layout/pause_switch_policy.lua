@@ -3,9 +3,11 @@
 -- MODULE: Pause Switch Policy
 -- DESCRIPTION:
 -- Decides which keyboard layout a pause, a resume or a quit switches to, from
--- the three [layout] settings declared in the features manifest. The macOS
--- and Linux suites replay tests/corpus/layouts/pause_switch_vectors.json.
--- Drivers keep the native switch, the picker and the lifecycle hooks.
+-- the three [layout] settings declared in the features manifest. Twin of
+-- _shared/modules/features/pause_switch_policy.ahk; both replay
+-- tests/corpus/layouts/pause_switch_vectors.json. Drivers keep the native
+-- switch (macOS TIS, Linux gsettings or setxkbmap, Windows
+-- WM_INPUTLANGCHANGEREQUEST), the picker and the lifecycle hooks.
 -- ============================================================================
 
 local M = {}

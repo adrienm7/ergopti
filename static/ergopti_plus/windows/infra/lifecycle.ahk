@@ -638,6 +638,11 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(_LLM_Deps_PollTimer)
 		_LifecycleRunRequiredStep(Transition, "llm-dependency-poll",
 			() => SetTimer(_LLM_Deps_PollTimer, 0))
+		; Layout > « Layout on pause / resume »: the keyboard the user types on
+		; while the driver is paused (pause_layout_switch.ahk).
+	if IsSet(PauseLayoutSwitch_Apply)
+		_LifecycleRunRequiredStep(Transition, "keyboard-layout",
+			() => PauseLayoutSwitch_Apply("pause"), true)
 	if !LifecycleTransitionFinish(Transition) {
 		_LifecycleLogTransitionDebt(Transition)
 		return false
@@ -726,6 +731,9 @@ Ergopti_OnSuspendResume() {
 			and Features["shortcuts"]["wrap_text_if_selected"]
 			_LifecycleRunRequiredStep(Transition, "uia-selection-worker",
 				() => SetTimer(UIASW_Start, -1))
+		if IsSet(PauseLayoutSwitch_Apply)
+			_LifecycleRunRequiredStep(Transition, "keyboard-layout",
+				() => PauseLayoutSwitch_Apply("resume"), true)
 		if !LifecycleTransitionFinish(Transition) {
 				_LifecycleLogTransitionDebt(Transition)
 				return false
@@ -737,6 +745,20 @@ Ergopti_OnSuspendResume() {
 		}
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 		return true
+}
+
+; Runs the quit transition: one owner, the switch to the pause layout. Its
+; debt is logged; nothing past the terminal gates may refuse the exit.
+_LifecycleApplyQuitLayout() {
+	Transition := LifecycleTransitionBegin("quit")
+	if IsSet(PauseLayoutSwitch_Apply)
+		_LifecycleRunRequiredStep(Transition, "keyboard-layout",
+			() => PauseLayoutSwitch_Apply("quit"), true)
+	if !LifecycleTransitionFinish(Transition) {
+		_LifecycleLogTransitionDebt(Transition)
+		return false
+	}
+	return true
 }
 
 _LifecycleLogTransitionDebt(Transaction) {
@@ -1270,6 +1292,10 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
+		; A user quit leaves the keyboard on the pause layout, as on macOS and
+		; Linux; a reload, a logoff or another instance taking over is no quit.
+		if IsSet(PauseLayoutSwitch_IsUserQuit) && PauseLayoutSwitch_IsUserQuit(reason)
+			_LifecycleApplyQuitLayout()
 		; The reload is now certain: menu commands that waited for it go to the
 		; successor, read from the tray before any teardown retires its rows.
 		if (TerminalHandoff is Map) {

@@ -302,6 +302,19 @@ maintainer's rule): `test-native-menu-rows.cjs` ratchets the rows drivers still
 build themselves against `native-menu-rows-baseline.json`, which lists each
 site as file:line; lower it with `--update-baseline` as rows move.
 
+### project-pause-layout-ids-are-per-driver
+
+`layout.on_pause` and `layout.on_resume` hold a layout id in each driver's own
+vocabulary: a macOS KeyboardLayout Name, a Linux GNOME source
+(`xkb:fr+ergopti`) or X11 group (`fr(ergopti)`), a Windows KLID (`0000040C`,
+never the per-session HKL). A config copied between OS therefore names a
+layout the other driver does not list; the switch then logs a refusal and the
+picker shows the raw id. `""` is « no change ». Which event selects which
+target (a quit uses the pause one, only an exact `true` enables) is
+`_shared/lua/layout/pause_switch_policy.lua` and its AHK twin, both pinned by
+`_shared/tests/corpus/layouts/pause_switch_vectors.json`; change the corpus
+first. A reload, a signal or a logoff is not a quit and never switches.
+
 ### project-a-row-a-platform-lacks-is-hidden-or-greyed
 
 A manifest row restricted by `platforms` declares how the other platforms lack

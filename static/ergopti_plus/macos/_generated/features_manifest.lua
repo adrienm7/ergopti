@@ -926,13 +926,13 @@ M.features = {
 		path = "shortcuts.keys.cmd_star", id = "cmd_star", section = "shortcuts.keys", default = false, type = "boolean", description_key = "shortcuts.label_cmd_star", platforms = { "hs" }, recommended = true, input_altering = true,
 	},
 	{
-		path = "layout.pause_switch_enabled", id = "pause_switch_enabled", section = "layout", default = false, type = "boolean", description_key = "menu.layout", platforms = { "hs", "linux" }, recommended = false, input_altering = true,
+		path = "layout.pause_switch_enabled", id = "pause_switch_enabled", section = "layout", default = false, type = "boolean", description_key = "menu.layout", platforms = { "ahk", "hs", "linux" }, recommended = false, input_altering = true,
 	},
 	{
-		path = "layout.on_pause", id = "on_pause", section = "layout", default = "", type = "string", description_key = "menu.layout", platforms = { "hs", "linux" }, recommended = "", input_altering = true,
+		path = "layout.on_pause", id = "on_pause", section = "layout", default = "", type = "string", description_key = "menu.layout", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = true,
 	},
 	{
-		path = "layout.on_resume", id = "on_resume", section = "layout", default = "", type = "string", description_key = "menu.layout", platforms = { "hs", "linux" }, recommended = "", input_altering = true,
+		path = "layout.on_resume", id = "on_resume", section = "layout", default = "", type = "string", description_key = "menu.layout", platforms = { "ahk", "hs", "linux" }, recommended = "", input_altering = true,
 	},
 }
 
