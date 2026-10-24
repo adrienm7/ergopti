@@ -432,6 +432,7 @@ return {
 	"tests.unit.infra.network.test_release_check_physical_join",
 	"tests.unit.modules.llm.settings.test_profile_app_overrides",
 	"tests.unit.ui.menu.llm.test_llm_profile_app_override_rows",
+	"tests.unit.ui.menu.llm.test_llm_trigger_app_exclusion_rows",
 	"tests.unit.modules.updater.check.test_updater_release_json_admission",
 	"tests.unit.modules.updater.check.test_updater_channel_and_recheck",
 	"tests.unit.modules.updater.install.test_updater_restart",

@@ -13,6 +13,7 @@ local M = {}
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
+local AppIdentity = require("llm.app_identity")
 
 local LOG = "modules.llm.trigger_settings"
 local PREF_PREFIX = "llm.trigger."
@@ -41,7 +42,16 @@ local DEFINITIONS = {
 		path = "llm.trigger.url_bar_filter_enabled",
 		type = "boolean",
 	},
+	-- The applications no prediction runs in, as the identifiers the session reports.
+	disabled_apps = {
+		path = "llm.trigger.disabled_apps",
+		type = "table",
+		apps = true,
+	},
 }
+
+-- A hand-edited list cannot hold the menu hostage
+local MAX_APPS = 200
 
 local _defaults = {}
 local _values = {}
@@ -65,9 +75,24 @@ local function default_for(name)
 	return value
 end
 
+--- Whether a value is a dense list of distinct, normalised application identifiers.
+--- @param value any
+--- @return boolean
+local function valid_apps(value)
+	if type(value) ~= "table" or #value > MAX_APPS then return false end
+	local seen, count = {}, 0
+	for index, app in pairs(value) do
+		count = count + 1
+		if type(index) ~= "number" or type(app) ~= "string" or AppIdentity.normalize(app) ~= app or seen[app] then return false end
+		seen[app] = true
+	end
+	return count == #value
+end
+
 local function valid(name, value)
 	local def = definition(name)
 	if not def or type(value) ~= def.type then return false end
+	if def.apps then return valid_apps(value) end
 	if def.type == "number" then
 		return value == math.floor(value) and value >= def.min and value <= def.max
 	end
@@ -95,6 +120,45 @@ function M.get(name)
 	end
 	_values[name] = shipped
 	return shipped
+end
+
+--- The applications the trigger never runs in, as a detached list.
+--- @return table apps Normalised identifiers.
+function M.disabled_apps()
+	local copy = {}
+	for index, app in ipairs(M.get("disabled_apps") or {}) do copy[index] = app end
+	return copy
+end
+
+--- Whether the trigger is switched off in an application.
+--- @param app any The identifier the session reports for the focused application.
+--- @return boolean disabled
+function M.is_app_disabled(app)
+	local key = AppIdentity.normalize(app)
+	if not key then return false end
+	for _, disabled in ipairs(M.get("disabled_apps") or {}) do
+		if disabled == key then return true end
+	end
+	return false
+end
+
+--- Replaces the list of applications the trigger never runs in.
+--- @param apps table Identifiers; each is normalised and duplicates are merged.
+--- @param expected_source table|nil Exact source retained by a deferred editor.
+--- @param admission function|nil Final originating configuration admission.
+--- @return boolean committed
+function M.set_disabled_apps(apps, expected_source, admission)
+	if type(apps) ~= "table" then return false end
+	local list, seen = {}, {}
+	for _, app in ipairs(apps) do
+		local key = AppIdentity.normalize(app)
+		if not key then
+			Logger.error(LOG, "Refused an unusable application identifier for the trigger exclusions.")
+			return false
+		end
+		if not seen[key] then seen[key] = true; list[#list + 1] = key end
+	end
+	return M.set("disabled_apps", list, expected_source, admission)
 end
 
 --- Persists before publishing the live value.
