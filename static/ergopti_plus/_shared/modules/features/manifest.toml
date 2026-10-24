@@ -4968,6 +4968,13 @@ type = "command"
 id = "field_check_network"
 i18n = "menu.debug.field_check_network"
 
+# The composed-layout check installs the shipped check composition through the
+# composer's save path, verifies it and removes it again; every driver routes it.
+[[menu.debug_menu]]
+type = "command"
+id = "composer_check"
+i18n = "menu.debug.composer_check"
+
 [[menu.debug_menu]]
 type = "command"
 id = "field_check_key_accounting"
