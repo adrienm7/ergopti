@@ -21,6 +21,10 @@
 --- 4. Finalization Debt: refused inverse release retains its exact ordered
 ---    cohort. Retry forgets only remaining inverses; already committed sources
 ---    and acknowledged releases are never rolled back or repeated.
+--- 5. Typed Refusals: every refused report names its failure point (`point`)
+---    and a stable `kind`, the points the Windows reset names (acquire, commit,
+---    rollback) plus finalize, so a driver shows one message per point instead
+---    of parsing the free-text `detail` (config_reset_failure.lua).
 ---
 --- A participant is a table with:
 ---   apply(mode, done)    done(committed, detail) exactly once
@@ -210,11 +214,12 @@ function M.new(options)
 		done = done or function() end
 		local report = { scope = options.scope, mode = mode, applied = {}, skipped = {} }
 		if mode ~= "recommended" and mode ~= "clear" then
-			report.detail = "unknown scope mode"
+			report.point, report.kind, report.detail = "commit", "unknown_mode", "unknown scope mode"
 			done(false, report)
 			return false
 		end
 		if busy or debt ~= nil then
+			report.point, report.kind = "acquire", "pending"
 			report.detail = "a composed configuration transaction is still pending"
 			done(false, report)
 			return false
@@ -223,7 +228,7 @@ function M.new(options)
 			return resolve(options.manifest.scopes(), options.scope, options.participants())
 		end)
 		if not resolved then
-			report.detail = tostring(steps)
+			report.point, report.kind, report.detail = "commit", "unresolved", tostring(steps)
 			logger.error(LOG, "Scope %s cannot be composed: %s.", options.scope, report.detail)
 			done(false, report)
 			return false
@@ -231,6 +236,7 @@ function M.new(options)
 		report.skipped = skipped
 		for _, step in ipairs(steps) do
 			if step.participant.pending() ~= false then
+				report.point, report.kind, report.failed = "acquire", "retained_debt", step.id
 				report.detail = "participant " .. step.id .. " retains unsettled debt"
 				logger.warn(LOG, "Scope %s refused: %s.", options.scope, report.detail)
 				done(false, report)
@@ -261,6 +267,8 @@ function M.new(options)
 			report.failed_step = nil
 			return settle(once(logger, LOG, "rollback " .. options.scope, function(settled)
 				report.reverted = settled == true
+				report.point = report.reverted and "commit" or "rollback"
+				report.kind = report.reverted and "refused" or "rollback_pending"
 				if not settled then report.detail = tostring(report.detail) .. "; rollback remains pending" end
 				return finish(false)
 			end))
@@ -277,6 +285,7 @@ function M.new(options)
 				return settle(once(logger, LOG, "finalize " .. options.scope, function(settled, failed, detail)
 					if settled ~= true then
 						report.failed, report.detail = failed, detail
+						report.point, report.kind = "finalize", "release_refused"
 						report.phase, report.committed, report.finalization_pending = "finalization", true, true
 						return finish(false)
 					end

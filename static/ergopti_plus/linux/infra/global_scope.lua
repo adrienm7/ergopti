@@ -76,7 +76,8 @@ end
 --- @param mode string "recommended" or "clear".
 --- @param registry table Scope id -> participant, from participants().
 --- @return boolean committed
---- @return table report Composition report (applied, skipped, failed, detail).
+--- @return table report Composition report (applied, skipped, failed, detail, and the
+---   typed failure point and kind of a refusal).
 function M.apply(mode, registry)
 	assert(type(registry) == "table", "the global scope needs its participant registry")
 	local owner = composition()
@@ -85,7 +86,8 @@ function M.apply(mode, registry)
 		owner.retry_restore(function(ok) settled = ok == true end)
 		if not settled then
 			Logger.error(LOG, "Global scope %s refused: an earlier rollback is still pending.", tostring(mode))
-			return false, { scope = "global", mode = mode, detail = "an earlier rollback is still pending" }
+			return false, { scope = "global", mode = mode, point = "acquire", kind = "rollback_pending",
+				detail = "an earlier rollback is still pending" }
 		end
 	end
 	_registry = registry
