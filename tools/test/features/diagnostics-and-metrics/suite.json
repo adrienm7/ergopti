@@ -377,6 +377,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-collection-controls.cjs"],
 			"repro": "npm run test:metrics-collection-controls"
+		},
+		{
+			"id": "keystats-sql-census",
+			"ordinal": 468,
+			"name": "keystats SQL census extractor counts concatenated statements once and groups CLI and in-process spellings by shape",
+			"cmd": "node",
+			"args": ["tools/test/test-keystats-sql-census.cjs"],
+			"repro": "node tools/test/test-keystats-sql-census.cjs"
 		}
 	]
 }
