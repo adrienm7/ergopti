@@ -305,7 +305,9 @@ h.describe("native caption consumer inventory", function()
 		local file = assert(io.open(root .. "/uninstall.sh", "rb"))
 		local source = assert(file:read("*a")); assert(file:close())
 		local _, count = source:gsub("%-%-title", "")
-		h.assert_eq(count, 1, "the independent removal worker has exactly one caption supplied by its tested GUI handoff")
+		-- One caption, GUI_TITLE from the tested GUI handoff, shown by zenity or by the
+		-- kdialog fallback (tools/test/test-linux-uninstall-sandbox.cjs proves both).
+		h.assert_eq(count, 2, "the independent removal worker shows its one handed-off caption through two dialog tools")
 	end)
 end)
 
