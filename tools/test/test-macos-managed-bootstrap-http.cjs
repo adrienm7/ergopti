@@ -201,7 +201,7 @@ const failureStages = spawnSync(
 assert.equal(failureStages.error, undefined, 'the failed-frame stage receiver must start');
 assert.equal(failureStages.signal, null, 'the failed-frame stage receiver must retire');
 assert.equal(failureStages.status, 0, failureStages.stderr || failureStages.stdout);
-assert.match(failureStages.stderr, /Ran 6 tests in/);
+assert.match(failureStages.stderr, /Ran 11 tests in/);
 assert.match(failureStages.stderr, /\bOK\b/);
 assert.doesNotMatch(failureStages.stderr, /skipped=/);
 process.stdout.write(failureStages.stdout);
