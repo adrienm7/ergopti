@@ -388,7 +388,7 @@
 		},
 		{
 			"id": "js-0467",
-			"ordinal": 467,
+			"ordinal": 466,
 			"name": "Go route plan gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-go-route-plan-gate.cjs"],
@@ -396,7 +396,7 @@
 		},
 		{
 			"id": "js-0468",
-			"ordinal": 468,
+			"ordinal": 467,
 			"name": "proxy policy single source (every hand-typed precedence pinned to proxy_policy.json, no new copy)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-proxy-policy-single-source.cjs"],
