@@ -262,7 +262,7 @@ KL_Mouse_OnLDown(*) {
 						KLMouse.lbtn_down_tick := A_TickCount
 						KLMouse.lbtn_hwnd      := TargetHwnd
 						KLMouse.lbtn_focus_gen := MetricsFocusCache.generation
-						KLMouse.lbtn_authorized := !A_IsSuspended
+						KLMouse.lbtn_authorized := !KL_CaptureHeld()
 								&& Keystats.initialized && !Filtered && TargetHwnd > 0
 						KLMouse.lbtn_held      := true
 				} finally {
@@ -272,7 +272,7 @@ KL_Mouse_OnLDown(*) {
 }
 
 KL_Mouse_OnLUp(*) {
-		if A_IsSuspended {
+		if KL_CaptureHeld() {
 				KLMouse.lbtn_held := false
 				KLMouse.lbtn_authorized := false
 				return
@@ -290,7 +290,7 @@ KL_Mouse_OnLUp(*) {
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
 						Gesture.hwnd, Gesture.focus_generation,
 						TargetHwnd, MetricsFocusCache.generation,
-						filtered, A_IsSuspended)
+						filtered, KL_CaptureHeld())
 						return
 				if !Keystats.initialized
 						return
@@ -325,7 +325,7 @@ KL_Mouse_OnRDown(*) {
 						KLMouse.rbtn_down_tick := A_TickCount
 						KLMouse.rbtn_hwnd      := TargetHwnd
 						KLMouse.rbtn_focus_gen := MetricsFocusCache.generation
-						KLMouse.rbtn_authorized := !A_IsSuspended
+						KLMouse.rbtn_authorized := !KL_CaptureHeld()
 								&& Keystats.initialized && !Filtered && TargetHwnd > 0
 						KLMouse.rbtn_held      := true
 				} finally {
@@ -335,7 +335,7 @@ KL_Mouse_OnRDown(*) {
 }
 
 KL_Mouse_OnRUp(*) {
-		if A_IsSuspended {
+		if KL_CaptureHeld() {
 				KLMouse.rbtn_held := false
 				KLMouse.rbtn_authorized := false
 				return
@@ -353,7 +353,7 @@ KL_Mouse_OnRUp(*) {
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
 						Gesture.hwnd, Gesture.focus_generation,
 						TargetHwnd, MetricsFocusCache.generation,
-						filtered, A_IsSuspended)
+						filtered, KL_CaptureHeld())
 						return
 				if !Keystats.initialized
 						return
@@ -388,7 +388,7 @@ KL_Mouse_OnMDown(*) {
 						KLMouse.mbtn_down_tick := A_TickCount
 						KLMouse.mbtn_hwnd      := TargetHwnd
 						KLMouse.mbtn_focus_gen := MetricsFocusCache.generation
-						KLMouse.mbtn_authorized := !A_IsSuspended
+						KLMouse.mbtn_authorized := !KL_CaptureHeld()
 								&& Keystats.initialized && !Filtered && TargetHwnd > 0
 						KLMouse.mbtn_held      := true
 				} finally {
@@ -398,7 +398,7 @@ KL_Mouse_OnMDown(*) {
 }
 
 KL_Mouse_OnMUp(*) {
-		if A_IsSuspended {
+		if KL_CaptureHeld() {
 				KLMouse.mbtn_held := false
 				KLMouse.mbtn_authorized := false
 				return
@@ -413,7 +413,7 @@ KL_Mouse_OnMUp(*) {
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
 						Gesture.hwnd, Gesture.focus_generation,
 						TargetHwnd, MetricsFocusCache.generation,
-						filtered, A_IsSuspended)
+						filtered, KL_CaptureHeld())
 						return
 				if !Keystats.initialized
 						return
@@ -456,7 +456,7 @@ KL_Mouse_OnWheelLeft(*) {
 ; Optional ports leave physical wheel callbacks unchanged and keep headless
 ; qualification from querying the cursor or arming native timers.
 KL_Mouse_AccumScroll(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
-		if A_IsSuspended
+		if KL_CaptureHeld()
 				return
 		; Filter before session counts or timer admission.
 		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
@@ -487,7 +487,7 @@ KL_Mouse_AccumScroll(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 }
 
 KL_Mouse_AccumScrollH(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
-		if A_IsSuspended
+		if KL_CaptureHeld()
 				return
 		; Horizontal admission uses the same privacy and timing policy.
 		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
@@ -518,7 +518,7 @@ KL_Mouse_AccumScrollH(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 }
 
 KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
-		if A_IsSuspended {
+		if KL_CaptureHeld() {
 				KLMouse.scroll_ticks := 0
 				KLMouse.scroll_h_ticks := 0
 				KLMouse.scroll_start := 0
@@ -603,14 +603,14 @@ KL_Mouse_ParkTick(FilterFn := unset, PositionFn := unset, DistanceFn := unset) {
 	}
 
 	filtered := true
-	if (!A_IsSuspended and Keystats.initialized)
+	if (!KL_CaptureHeld() and Keystats.initialized)
 		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 	return _KL_Mouse_ProcessParkSample(
 		KLMouse,
 		mx,
 		my,
 		A_TickCount,
-		A_IsSuspended,
+		KL_CaptureHeld(),
 		filtered,
 		Keystats.initialized,
 		KL_AppendLog.Bind(),

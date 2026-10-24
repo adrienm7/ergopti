@@ -357,6 +357,9 @@ function M.build(ctx)
 		metrics_menubar_wpm    = function() return state.keystats_menubar_wpm end,
 		metrics_menubar_colors = function() return state.keystats_menubar_colors end,
 		metrics_encrypt_enabled = function() return state.keystats_encrypt end,
+		-- The user's pause is a runtime state of the keystats module, never a stored
+		-- preference: the tick reads the module itself.
+		metrics_suspended = function() return kl_mod.is_collection_suspended() end,
 	}
 
 	-- `command` rows since 2026-08-07: the label and the greying are the
@@ -364,6 +367,19 @@ function M.build(ctx)
 	local function cmd_show_typing()
 		local Keystats = require("modules.keystats")
 		Keystats.show_metrics()
+	end
+
+	--- Pauses or resumes metrics collection. The pause is not persisted, so the
+	--- click changes the running module and repaints the tick.
+	local function cmd_metrics_suspend()
+		if kl_mod.is_collection_suspended() then kl_mod.resume_collection() else kl_mod.suspend_collection() end
+		updateMenu()
+		return true
+	end
+
+	--- Ends the typing session and restarts the live figures; stored data is kept.
+	local function cmd_metrics_reset_session()
+		return kl_mod.reset_session() ~= false
 	end
 
 	local function cmd_show_apps()
@@ -667,6 +683,8 @@ function M.build(ctx)
 		["reset_wpm_position"] = cmd_reset_wpm_position,
 		["show_typing"]    = cmd_show_typing,
 		["show_apps"]      = cmd_show_apps,
+		["metrics_suspend"] = cmd_metrics_suspend,
+		["metrics_reset_session"] = cmd_metrics_reset_session,
 		["wpm_menubar"]    = cmd_wpm_menubar,
 		["menubar_colors"] = cmd_menubar_colors,
 	}

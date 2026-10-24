@@ -32,6 +32,8 @@ global _MET_STATE_GETTERS := Map(
 	; The encryption row became `check` on 2026-08-07, so its tick is read here
 	; instead of being set by a handler.
 	"metrics_encrypt_enabled", () => KL_Enc_IsEnabled(),
+	; The user's pause from the Metrics menu, ticked from the pause state itself.
+	"metrics_suspended",       () => KL_IsCollectionSuspended(),
 )
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
@@ -64,6 +66,8 @@ BuildMetricsMenu() {
 		"reset_wpm_position", (*) => WPMWidget_ResetPosition(),
 		"show_typing",     KLUI_ToggleTyping,
 		"show_apps",       KLUI_ToggleApps,
+		"metrics_suspend", (*) => ToggleMetricsCollectionPause(),
+		"metrics_reset_session", (*) => ResetMetricsSession(),
 	)
 		Commands[Id] := Handler
 
@@ -73,6 +77,35 @@ BuildMetricsMenu() {
 	)
 
 	return MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
+}
+
+; The Metrics menu's pause row. Pausing stores the text already typed, then stops
+; recording until the row is ticked off or the driver reloads; the tick is
+; repainted from the pause state itself.
+ToggleMetricsCollectionPause(SuspendFn := 0, ResumeFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ToggleMetricsCollectionPause(SuspendFn, ResumeFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	if KL_IsCollectionSuspended()
+		HasMethod(ResumeFn, "Call") ? ResumeFn.Call() : KL_ResumeCollection()
+	else
+		HasMethod(SuspendFn, "Call") ? SuspendFn.Call() : KL_SuspendCollection()
+	return _MET_RebuildWidgetMenu(RebuildFn)
+}
+
+; The Metrics menu's session-reset row: ends the typing session, stores what is
+; pending, and restarts the live figures. Stored history is untouched.
+ResetMetricsSession(ResetFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return ResetMetricsSession(ResetFn)
+		finally Critical(InheritedCritical)
+	}
+	return HasMethod(ResetFn, "Call") ? ResetFn.Call() : KL_ResetSession()
 }
 
 ; List provider: App exclusion — label reflects current count.

@@ -178,6 +178,7 @@ class Keystats {
 }
 
 #Include keystats_health.ahk
+#Include keystats_collection.ahk
 
 
 
@@ -491,7 +492,9 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
     ; _pending_entries data.sql queue). system_event lifecycle markers (e.g. the
     ; "paused" marker itself) are exempt so the pause transition stays diagnosable.
     ; See project_suspend_pause_invariant.
-	if A_IsSuspended && entry["type"] != "system_event" && !Keystats._shutting_down {
+	if (A_IsSuspended && entry["type"] != "system_event" && !Keystats._shutting_down)
+			|| (KLCollection.suspended && !Keystats._shutting_down
+			&& KLCollection.Rejects(entry["type"])) {
 		; Callers that detached mutable state need to distinguish a lifecycle
 		; refusal (safe to retry) from a privacy/validation drop (must never be
 		; replayed in a later foreground context).
@@ -574,7 +577,9 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 	; the one-statement gap and publish a row after the pause boundary.
 	AppendCritical := Critical("On")
 	try {
-		if A_IsSuspended && entry["type"] != "system_event" && !Keystats._shutting_down {
+		if (A_IsSuspended && entry["type"] != "system_event" && !Keystats._shutting_down)
+			|| (KLCollection.suspended && !Keystats._shutting_down
+			&& KLCollection.Rejects(entry["type"])) {
 			RejectedBySuspend := true
 			return false
 		}

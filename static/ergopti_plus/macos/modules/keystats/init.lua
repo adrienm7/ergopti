@@ -185,6 +185,10 @@ local CoreState = {
 	options    = { encrypt = false },
 	is_enabled = false,
 
+	-- The user's pause from the Metrics menu: its own state, never derived from
+	-- the secure-field flag, never persisted, cleared on every start.
+	collection_suspended = false,
+
 	-- Keystroke buffer (flushed at sentence boundaries / context switches)
 	buffer_events         = {},
 	buffer_text           = "",
@@ -1371,6 +1375,60 @@ function M.set_system_auth_filter_enabled(v)
 	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end
 
+--- Pauses metrics collection at the user's request. Idempotent. Text already
+--- typed is stored first, so the pause boundary never splits or discards it, and
+--- any modifier hold in progress is retired like any other exclusion.
+function M.suspend_collection()
+	if CoreState.collection_suspended then return end
+	if CoreState.is_enabled then LogManager.flush_buffer() end
+	CoreState.collection_suspended = true
+	assert(settle_context_modifiers(), "Metrics pause modifier settlement remains pending")
+	Logger.info(LOG, "Metrics collection suspended by the user.")
+end
+
+--- Ends the user's pause. Nothing typed meanwhile is recovered.
+function M.resume_collection()
+	if not CoreState.collection_suspended then return end
+	CoreState.collection_suspended = false
+	assert(settle_context_modifiers(), "Metrics resume modifier settlement remains pending")
+	Logger.info(LOG, "Metrics collection resumed by the user.")
+end
+
+--- Reports whether the user paused metrics collection.
+--- @return boolean
+function M.is_collection_suspended()
+	return CoreState.collection_suspended == true
+end
+
+--- Ends the current typing session as the idle timeout would, then restarts the
+--- live figures from zero. Stored history is never deleted: the pending text is
+--- flushed and the session is closed with its own session_end before anything
+--- is cleared. Works while paused or disabled; it changes neither.
+--- @return boolean reset False when no session machinery is running to end it.
+function M.reset_session()
+	if not CoreState.is_enabled then
+		Logger.warn(LOG, "Session reset ignored: metrics are not running.")
+		return false
+	end
+	LogManager.flush_buffer()
+	if CoreState.session_start_time > 0 then
+		LogManager.append_log({
+			type        = "session_end",
+			duration_ms = math.max(0, CoreState.session_last_active - CoreState.session_start_time),
+		})
+	end
+	CoreState.session_start_time  = 0
+	CoreState.session_last_active = 0
+	CoreState.is_micro_idle       = false
+	CoreState.recent_typing_eff   = {}
+	CoreState.recent_typing_phys  = {}
+	CoreState.last_source_type    = "none"
+	CoreState.last_source_variant = "none"
+	CoreState.last_source_time    = 0
+	Logger.info(LOG, "Metrics session reset by the user.")
+	return true
+end
+
 --- Injects a string directly into the tracking buffer (used for testing).
 --- @param text string The string to inject.
 function M.set_buffer(text)
@@ -2089,6 +2147,7 @@ function M.start(script_control)
 		end
 		_teardown_state = TeardownTransaction.new_state()
 		Logger.start(LOG, "Starting keystats engine…")
+		CoreState.collection_suspended = false
 		_script_control = script_control
 	
 		-- Seed the layout cache and keep it current from the OS notification. The

@@ -369,6 +369,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-compact-data-sql-protocol.cjs"],
 			"repro": "npm run test:compact-data-sql-protocol"
+		},
+		{
+			"id": "metrics-collection-controls",
+			"ordinal": 464,
+			"name": "metrics pause and session reset: one declaration, one meaning and one set of sequences on all three drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-collection-controls.cjs"],
+			"repro": "npm run test:metrics-collection-controls"
 		}
 	]
 }
