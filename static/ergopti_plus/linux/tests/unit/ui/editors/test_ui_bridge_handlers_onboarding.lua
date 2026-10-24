@@ -113,6 +113,8 @@ helpers.describe("ui.bridge_handlers", function()
 			local result = handler.on_message({ action = "ready" }, state)
 			helpers.assert_true(result.pushed)
 			helpers.assert_eq(result.data.platform, "linux")
+			helpers.assert_eq(result.data.capabilities, { gesture_registration = false },
+				"the page learns from the host that Linux registers no gesture with the system")
 			helpers.assert_eq(result.data.locale, "en")
 			helpers.assert_eq(result.data.system_layout, "qwerty")
 			helpers.assert_eq(result.data.config_dir, "", "the default folder is not a custom choice")

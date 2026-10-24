@@ -32,6 +32,8 @@ helpers.describe("onboarding metrics path", function()
 			helpers.assert_eq(#errors, 0)
 			helpers.assert_true(evaluations[1].code:find("window.initData(", 1, true) ~= nil)
 			helpers.assert_eq(last_payload(state).metrics_path, "<metrics of /virtual/current>")
+			helpers.assert_eq(last_payload(state).capabilities, { gesture_registration = false },
+				"the page learns from the host that macOS registers no gesture with the system")
 		end)
 	end)
 
