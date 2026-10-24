@@ -18,6 +18,7 @@
 /** Runs collection state regressions in an owned synthetic directory without launching a worker. */
 _TestHC_CollectionState(TestCase) {
 	D := DiagnosticCollectionWindows()
+	CleanupTimer := D.CollectionTimer
 	Root := A_Temp . "\ergopti-hc-collection-" . D.Id
 	D.Directory := Root . "\" . D.Id
 	D.Archive := D.Directory . ".zip"
@@ -127,7 +128,7 @@ _TestHC_CollectionState(TestCase) {
 			}
 		}
 	} finally {
-		SetTimer(D.CollectionTimer, 0)
+		SetTimer(CleanupTimer, 0)
 		DirDelete(Root, true)
 	}
 }
