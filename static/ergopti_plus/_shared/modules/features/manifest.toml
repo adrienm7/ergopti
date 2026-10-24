@@ -7061,7 +7061,9 @@ restore_exclude = []
 #                feature sections it governs.
 #                The answer writes it only where it changes what is in force:
 #                off when it turns the category switch from Yes to No, on when
-#                it imports one of those items that was off.
+#                it imports one of those items that was off. `independent`
+#                marks a switch that is its own master: every No turns it off,
+#                even on a first run or with the category switch already off.
 #   state        Per-platform switch a page without a category switch starts
 #                its question from: its host reads it from its own file and
 #                reports it with the values in force; the page never writes it.
@@ -7097,7 +7099,7 @@ exclude = ["shortcuts.personal"]
 # Windows pairs that ship a recommendation: a re-run answered No must leave
 # them off as the master once did. macOS lists no combination here and Linux
 # owns ordered combinations independently of the Shortcuts master.
-sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] }, linux = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] } }
+sub_switch = { ahk = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"] }, linux = { path = "category_enabled.key_combinations", sections = ["shortcuts.key_combination_taps"], independent = true } }
 
 [onboarding.pages.shortcuts.labels]
 "shortcuts.select_line" = "sg_actions.select_line"

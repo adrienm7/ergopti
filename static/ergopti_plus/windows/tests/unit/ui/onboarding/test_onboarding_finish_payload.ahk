@@ -64,6 +64,8 @@ _TOFP_EmptyFolderInitDestination(Custom) {
 			"C:\Users\fixture\.config\ergopti_plus\")
 		AssertEqual(_TOFP_InitDataStringField(Script, "config_dir"), Custom ? "E:\Custom-B\" : "",
 			"the original custom-choice payload is preserved")
+		Assert(InStr(Script, ",capabilities:{gesture_registration:true},"),
+			"the Windows host tells the page it registers gestures with the system")
 		AssertFalse(FileExist(ConfigurationFile), "initial presentation cannot create configuration")
 	} finally {
 		_ob_locale := SavedLocale.present ? SavedLocale.value : unset

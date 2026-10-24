@@ -299,14 +299,24 @@ function catalogue() {
 
 const CATALOGUE = catalogue();
 
+// Each host's capabilities, as the host test below checks in the host sources:
+// only the Windows host registers gestures with the system.
+const HOST_CAPABILITIES = {
+	windows: { gesture_registration: true },
+	macos: { gesture_registration: false },
+	linux: { gesture_registration: false }
+};
+
 /**
  * Loads the page and performs the host's initData handshake.
  * @param {object} [extra] Extra initData fields.
+ * @param {function} [prepare] Called with the page's window before initData.
  * @returns {object} Page handle.
  */
-function openWizard(extra) {
+function openWizard(extra, prepare) {
 	const page = loadPage();
 	assert.deepEqual(page.messages.splice(0), [{ action: 'ready' }]);
+	if (prepare) prepare(page.window);
 	page.window.initData(
 		Object.assign(
 			{
@@ -321,7 +331,8 @@ function openWizard(extra) {
 				config_dir: '',
 				current: {},
 				metrics_path: '/Volumes/Fixture/me/.config/ergopti_plus/metrics',
-				platform: 'macos'
+				platform: 'macos',
+				capabilities: HOST_CAPABILITIES[(extra && extra.platform) || 'macos']
 			},
 			extra || {}
 		)
@@ -634,6 +645,7 @@ function cataloguePaths(driver) {
 	assert.deepEqual(described.sub_switch, {
 		path: 'category_enabled.key_combinations',
 		default: true,
+		independent: false,
 		items: families.flatMap((family) =>
 			items.filter((item) => item.path.startsWith(family + '.')).map((item) => item.path)
 		)
@@ -729,6 +741,56 @@ function cataloguePaths(driver) {
 	);
 })();
 
+(function anIndependentSubSwitchIsReadFromTheCatalogueNotThePlatform() {
+	// The Windows page with its sub-switch marked independent behaves as the
+	// Linux one: a first No writes the switch off. The page reads the flag.
+	const page = openWizard({ platform: 'windows' }, (window) => {
+		const shortcuts = window.ONBOARDING_CATALOGUE.platforms.windows.pages.find(
+			(described) => described.id === 'shortcuts'
+		);
+		shortcuts.sub_switch.independent = true;
+	});
+	page.platform = 'windows';
+	goToPage(page, 'shortcuts');
+	answer(page, false);
+	assert.deepEqual(
+		finish(page).answers.operations.filter((op) => op.path === 'category_enabled.key_combinations'),
+		[{ path: 'category_enabled.key_combinations', value: false }],
+		'an independent sub-switch is turned off by every No'
+	);
+})();
+
+(function gestureRegistrationFollowsTheHostCapability() {
+	const shown = (platform, capabilities) => {
+		const page = openWizard({ platform, capabilities });
+		page.platform = platform;
+		goToPage(page, 'gestures');
+		answer(page, true);
+		return !page.el('page-register').classList.contains('hidden');
+	};
+	for (const platform of ['windows', 'macos', 'linux'])
+		assert.equal(
+			shown(platform, HOST_CAPABILITIES[platform]),
+			HOST_CAPABILITIES[platform].gesture_registration,
+			platform + ': the registration panel follows the host capability'
+		);
+	assert.equal(
+		shown('linux', { gesture_registration: true }),
+		true,
+		'the capability, not the platform name, shows the panel'
+	);
+	assert.equal(
+		shown('windows', { gesture_registration: false }),
+		false,
+		'a host without the capability never shows the panel'
+	);
+	assert.throws(
+		() => openWizard({ platform: 'windows', capabilities: undefined }),
+		/gesture_registration/,
+		'a host that states no capability is refused'
+	);
+})();
+
 (function linuxOrderedPairsFollowTheirOwnNoFirstAnswer() {
 	const described = CATALOGUE.platforms.linux.pages.find((page) => page.id === 'shortcuts');
 	const families = manifestToml.onboarding.pages.shortcuts.sub_switch.linux.sections;
@@ -749,6 +811,7 @@ function cataloguePaths(driver) {
 		described.sub_switch.items,
 		items.map((item) => item.path)
 	);
+	assert.equal(described.sub_switch.independent, true, 'the catalogue marks the own master');
 	const open = (current = {}) => {
 		const page = openWizard({ platform: 'linux', current });
 		page.platform = 'linux';
