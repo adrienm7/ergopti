@@ -12,23 +12,27 @@
 
 #Requires AutoHotkey v2.0
 
+; The generated config-key constants (ConfigKey, ConfigLeaf); #Include skips a
+; file the entry script already loaded.
+#Include %A_LineFile%\..\..\..\..\windows\_generated\config_keys.ahk
+
 
 
 
 ; The settings the policy reads, by role.
 global PAUSE_SWITCH_POLICY_PATHS := Map(
-	"enabled", "layout.pause_switch_enabled",
-	"on_pause", "layout.on_pause",
-	"on_resume", "layout.on_resume"
+	"enabled", ConfigKey.LAYOUT_PAUSE_SWITCH_ENABLED,
+	ConfigLeaf.ON_PAUSE, ConfigKey.LAYOUT_ON_PAUSE,
+	ConfigLeaf.ON_RESUME, ConfigKey.LAYOUT_ON_RESUME
 )
 
 ; Quitting leaves the keyboard on the layout a pause selects: a quit has no
 ; setting of its own, and a user who wants their system layout back while
 ; ErgoptiPlus is not typing gets it whether they paused or quit.
 global PAUSE_SWITCH_POLICY_EVENT_FIELDS := Map(
-	"pause", "on_pause",
-	"resume", "on_resume",
-	"quit", "on_pause"
+	"pause", ConfigLeaf.ON_PAUSE,
+	"resume", ConfigLeaf.ON_RESUME,
+	"quit", ConfigLeaf.ON_PAUSE
 )
 
 /**

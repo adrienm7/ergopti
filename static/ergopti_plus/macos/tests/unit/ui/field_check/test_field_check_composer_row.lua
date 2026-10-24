@@ -90,7 +90,7 @@ helpers.describe("composer check row", function()
 		-- The one unit that dispatches the field checks, found by its dispatch call
 		-- rather than by its path.
 		local builder = assert(helpers.read_driver_unit('require("ui.field_check").run('))
-		helpers.assert_true(builder:find('["composer_check"]', 1, true) ~= nil, "the builder wires the row")
+		helpers.assert_true(builder:find("[COMMAND.COMPOSER_CHECK]", 1, true) ~= nil, "the builder wires the row")
 		with_window(nil, function(Window)
 			helpers.assert_eq(Window.SHARED_ROWS.composer_check.check, "composer")
 			helpers.assert_eq(Window.SHARED_ROWS.composer_check.title, rows[1].i18n)

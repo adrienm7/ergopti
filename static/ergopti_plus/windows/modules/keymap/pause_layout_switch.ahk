@@ -21,6 +21,10 @@
 
 #Requires AutoHotkey v2.0
 
+; The generated menu-command and config-leaf constants; #Include skips a file
+; the entry script already loaded.
+#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -139,19 +143,19 @@ PauseLayoutSwitch_MenuRows(ChoicesFn := 0, SetFn := 0) {
 				"action", PickAction(Path, Choice["id"])))
 		; Own names: a nested function assigning an outer variable shares it.
 		PickerRows := MenuRenderer_TemplateRows("layout_switch_picker_frame",
-			Map("layout_picker_auto", (*) => SetFn.Call(Path, "")),
+			Map(MenuCommand.LAYOUT_PICKER_AUTO, (*) => SetFn.Call(Path, "")),
 			Map("layout_picker_auto_checked", () => Current == "",
 				"layout_picker_has_choices", () => Native.Length > 0),
 			Map("layout_picker_choices", (*) => Native))
 		return PickerRows is Array ? PickerRows : []
 	}
 	Rows := MenuRenderer_TemplateRows("layout_switching_frame",
-		Map("layout_switch_toggle", (*) => SetFn.Call(PAUSE_SWITCH_POLICY_PATHS["enabled"], !Enabled)),
+		Map(MenuCommand.LAYOUT_SWITCH_TOGGLE, (*) => SetFn.Call(PAUSE_SWITCH_POLICY_PATHS["enabled"], !Enabled)),
 		Map("layout_switch_checked", () => Enabled,
 			"layout_switch_ready", () => Enabled && !A_IsSuspended,
-			"layout_pause_caption", () => LabelFor(Settings["on_pause"]),
-			"layout_resume_caption", () => LabelFor(Settings["on_resume"])),
-		Map("layout_pause_picker", (*) => Picker("on_pause"),
-			"layout_resume_picker", (*) => Picker("on_resume")))
+			"layout_pause_caption", () => LabelFor(Settings[ConfigLeaf.ON_PAUSE]),
+			"layout_resume_caption", () => LabelFor(Settings[ConfigLeaf.ON_RESUME])),
+		Map("layout_pause_picker", (*) => Picker(ConfigLeaf.ON_PAUSE),
+			"layout_resume_picker", (*) => Picker(ConfigLeaf.ON_RESUME)))
 	return Rows is Array ? Rows : []
 }

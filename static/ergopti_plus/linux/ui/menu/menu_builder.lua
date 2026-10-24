@@ -48,6 +48,7 @@ local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
 local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
 local LOG = "ui.menu.menu_builder"
+local COMMAND = require("config_keys").COMMAND
 
 --- Keeps private executable/argv data out of persistent menu presentation.
 local function binding_label(label, registry, binding, action)
@@ -2808,7 +2809,7 @@ local function _build_llm(ctx)
 				}
 			end
 			return ManifestMenu.template_rows("llm_profile_app_override_frame", {
-				["llm_profile_override_active_app"] = function()
+				[COMMAND.LLM_PROFILE_OVERRIDE_ACTIVE_APP] = function()
 					if not create_ready() or AppOverrides.normalize_app(last) == nil then return false end
 					if ProfileSettings.set_app_override(last, effective) ~= true then return false end
 					refresh()
@@ -3100,11 +3101,11 @@ local function _build_llm(ctx)
 			-- Each installed model opens the submenu the other two drivers draw:
 			-- Select, then Delete. The parent keeps the tick of the selected one.
 			local action_rows = ManifestMenu.template_rows("llm_model_action_rows", {
-				["model_select"] = function()
+				[COMMAND.MODEL_SELECT] = function()
 					if llm.set_model then llm.set_model(model) end
 					changed()
 				end,
-				["model_delete"] = function() return delete_model(model) end,
+				[COMMAND.MODEL_DELETE] = function() return delete_model(model) end,
 			}, {
 				["model_selected"] = function() return model == current end,
 				["model_select_ready"] = function() return ctx.paused ~= true end,
@@ -5625,9 +5626,9 @@ local function _build_debug(ctx)
 		["open_today_log"] = call_ctx("on_open_today_log"),
 		["open_error_log"] = call_ctx("on_open_error_log"),
 		["healthcheck"]    = call_ctx("on_healthcheck"),
-		["composer_check"] = call_ctx("on_composer_check"),
+		[COMMAND.COMPOSER_CHECK] = call_ctx("on_composer_check"),
 		-- Self-contained like the report rows: the check reads its own settings and ports
-		["field_check_network"] = function() require("ui.field_check.network_check").run() end,
+		[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check.network_check").run() end,
 		-- Self-contained: the report reads the daemon state the webview manager
 		-- already holds, so the daemon supplies no callback for them
 		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,

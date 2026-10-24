@@ -6,6 +6,7 @@ local PhysicalAvailability = require("shortcuts.physical_availability")
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.preferences")
 local Scope = require("infra.preferences_scope")
+local MOD_COMBOS = require("config_keys").KEY.MOD_COMBOS
 
 local STATE_FIELDS = { "shortcuts", "chatgpt_url", "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
 
@@ -131,7 +132,7 @@ function M.new(options)
 		if not config.editing then
 			local narrowed = config.select
 			config.select = function(path)
-				if path == "mod_combos" or path:sub(1, #"mod_combos.") == "mod_combos." then return false end
+				if path == MOD_COMBOS or path:sub(1, #MOD_COMBOS + 1) == MOD_COMBOS .. "." then return false end
 				return narrowed == nil or narrowed(path) == true
 			end
 		end

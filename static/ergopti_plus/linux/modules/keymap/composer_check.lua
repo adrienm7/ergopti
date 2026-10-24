@@ -49,7 +49,7 @@ function M.env(overrides)
 		registry = Registry,
 		deps = deps,
 		exists = exists,
-		log = function(level, message, ...) Logger[level]("composer_check", message, ...) end,
+		log = function(level, message, ...) Logger[level]("modules.keymap.composer_check", message, ...) end,
 	}
 
 	function env.snapshot() return Registry.snapshot(deps) end

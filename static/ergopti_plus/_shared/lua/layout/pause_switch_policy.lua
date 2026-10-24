@@ -12,17 +12,20 @@
 
 local M = {}
 
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
+
 --- The settings the policy reads, by role.
 M.PATHS = {
-	enabled = "layout.pause_switch_enabled",
-	on_pause = "layout.on_pause",
-	on_resume = "layout.on_resume",
+	enabled = KEY.LAYOUT_PAUSE_SWITCH_ENABLED,
+	on_pause = KEY.LAYOUT_ON_PAUSE,
+	on_resume = KEY.LAYOUT_ON_RESUME,
 }
 
 -- Quitting leaves the keyboard on the layout a pause selects: a quit has no
 -- setting of its own, and a user who wants their system layout back while
 -- ErgoptiPlus is not typing gets it whether they paused or quit.
-local EVENT_FIELDS = { pause = "on_pause", resume = "on_resume", quit = "on_pause" }
+local EVENT_FIELDS = { pause = LEAF.ON_PAUSE, resume = LEAF.ON_RESUME, quit = LEAF.ON_PAUSE }
 
 --- Whether a stored target is a value the setting can hold: a layout id, or
 --- "" for « no change ». The id is the driver's own (a macOS KeyboardLayout

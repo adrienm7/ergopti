@@ -64,6 +64,7 @@ end
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local Manifest = require("infra.manifest_reader")
+local LEAF = require("config_keys").LEAF
 local HotstringLanguages = require("hotstrings.languages")
 local ConfigOutdated = require("config_outdated")
 local ChoiceCatalogue = require("infra.hotstring_choice_catalogue")
@@ -173,10 +174,10 @@ local KEY_MAP = {
 	llm_agent_system2                    = { sec = "llm", key = "agent_system2"                     },
 	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
 	-- Per-application prompt profiles: the v1 text of _shared/lua/llm/app_profile_overrides.lua
-	llm_app_profile_overrides            = { sec = "llm", key = "app_profile_overrides"             },
+	llm_app_profile_overrides            = { sec = "llm", key = LEAF.APP_PROFILE_OVERRIDES          },
 	-- User prompt profiles: the v1 envelope Windows and Linux store at the same key,
 	-- decoded into the profile list at the persistence boundary (scalar_units).
-	llm_user_profiles                    = { sec = "llm", key = "user_profiles", codec = ProfileRegistry },
+	llm_user_profiles                    = { sec = "llm", key = LEAF.USER_PROFILES, codec = ProfileRegistry },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
 	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
@@ -186,7 +187,7 @@ local KEY_MAP = {
 	layout_on_pause                      = { sec = "layout", key = "on_pause"                },
 	layout_on_resume                     = { sec = "layout", key = "on_resume"               },
 	-- The Karabiner virtual keyboard type (auto / iso / ansi): platform/remap deploys it.
-	layout_virtual_keyboard              = { sec = "layout", key = "virtual_keyboard", enum = true },
+	layout_virtual_keyboard              = { sec = "layout", key = LEAF.VIRTUAL_KEYBOARD, enum = true },
 
 	-- ── Shortcuts ──────────────────────────────────────────────────────────
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },

@@ -19,6 +19,7 @@ local PhaseStats = require("infra.phase_stats")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
 local i18n       = require("infra.i18n")
+local COMMAND    = require("config_keys").COMMAND
 -- The single reader of menu_manifest.json. See load_manifest below for why this
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
@@ -899,13 +900,13 @@ function M.generate(ctx, menu_mods, actions)
 				["open_today_log"] = actions.open_today_log,
 				["open_error_log"] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
-				["field_check_lease"] = function() require("ui.field_check").run("field_check_lease") end,
-				["field_check_owned_runtime"] = function() require("ui.field_check").run("field_check_owned_runtime") end,
-				["field_check_network"] = function() require("ui.field_check").run("field_check_network") end,
-				["field_check_toolchain"] = function() require("ui.field_check").run("field_check_toolchain") end,
-				["field_check_login_items"] = function() require("ui.field_check").run("field_check_login_items") end,
-				["field_check_key_accounting"] = function() require("ui.field_check").run("field_check_key_accounting") end,
-				["composer_check"] = function() require("ui.field_check").run("composer_check") end,
+				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
+				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
+				[COMMAND.FIELD_CHECK_NETWORK] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_NETWORK) end,
+				[COMMAND.FIELD_CHECK_TOOLCHAIN] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_TOOLCHAIN) end,
+				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
+				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
+				[COMMAND.COMPOSER_CHECK] = function() require("ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
 				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
 				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
 				["show_error_dialog"] = actions.toggle_error_dialog,

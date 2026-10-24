@@ -13,6 +13,10 @@
 ; 3. Safe Fallback: returns hard-coded lists on any read or parse failure.
 ; ==============================================================================
 
+; The generated menu-command constants; #Include skips a file the entry script
+; already loaded.
+#Include %A_LineFile%\..\..\_generated\config_keys.ahk
+
 
 
 
@@ -273,9 +277,9 @@ _MM_DebugFallback() {
 		Map("id", "open_error_log"),
 		Map("id", "---"),
 		Map("id", "healthcheck"),
-		Map("id", "send_probe"),
-		Map("id", "hook_probe"),
-		Map("id", "composer_check"),
+		Map("id", MenuCommand.SEND_PROBE),
+		Map("id", MenuCommand.HOOK_PROBE),
+		Map("id", MenuCommand.COMPOSER_CHECK),
 		Map("id", "report_bug"),
 		Map("id", "suggest_feature"),
 	]
