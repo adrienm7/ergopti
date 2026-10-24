@@ -13,7 +13,12 @@ local helpers = require("tests.helpers")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
 
-local SOURCE = '[hotstrings]\npreview_star_enabled = true\nunknown = "kept"\n[other]\nvalue = 1\n'
+-- The leaf these cases toggle. Its neutral value is the manifest default, read
+-- from the one declaration; the explicit choice is the other boolean.
+local STAR_NEUTRAL = require("infra.manifest_reader").default_for("hotstrings.preview_star_enabled")
+local STAR_CHOICE = not STAR_NEUTRAL
+
+local SOURCE = '[hotstrings]\npreview_star_enabled = ' .. tostring(STAR_CHOICE) .. '\nunknown = "kept"\n[other]\nvalue = 1\n'
 
 --- Runs body against a fresh owner routed to a private file.
 --- @param content string|nil Initial bytes; nil is an absent file.
@@ -49,7 +54,7 @@ end
 helpers.describe("hotstring preferences: canonical leaves", function()
 	helpers.it("answers every owned leaf with its neutral default for an empty configuration", function()
 		with_preferences(nil, function(Preferences, path)
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false)
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_NEUTRAL)
 			helpers.assert_eq(Preferences.get("hotstrings.dynamic.enabled"), false)
 			helpers.assert_eq(Preferences.get("hotstrings.dynamic.date.enabled"), false)
 			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"),
@@ -78,21 +83,21 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 
 	helpers.it("removes a leaf set back to its neutral value", function()
 		with_preferences(SOURCE, function(Preferences, path)
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), true)
-			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", false))
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_CHOICE)
+			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", STAR_NEUTRAL))
 			local decoded = Codec.decode(read(path))
-			helpers.assert_nil(decoded.hotstrings.preview_star_enabled, "neutral absence, not a stored false")
+			helpers.assert_nil(decoded.hotstrings.preview_star_enabled, "neutral absence, not a stored default")
 			helpers.assert_eq(Preferences.is_explicit("hotstrings.preview_star_enabled"), false)
 		end)
 	end)
 
 	helpers.it("keeps a malformed configuration neutral and refuses to write over it", function()
-		local malformed = '[hotstrings\npreview_star_enabled = true\n'
+		local malformed = '[hotstrings\npreview_star_enabled = ' .. tostring(STAR_CHOICE) .. '\n'
 		with_preferences(malformed, function(Preferences, path)
 			helpers.assert_eq(Preferences.refresh(), false)
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false,
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_NEUTRAL,
 				"an unreadable choice is never guessed on")
-			helpers.assert_eq(Preferences.set("hotstrings.preview_star_enabled", true), false)
+			helpers.assert_eq(Preferences.set("hotstrings.preview_star_enabled", STAR_CHOICE), false)
 			helpers.assert_eq(read(path), malformed)
 		end)
 	end)
@@ -122,16 +127,16 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 		local source = '[hotstrings]\ntrigger_char = "§"\npreview_star_enabled = "on"\n'
 		with_recorded_log(source, function(Preferences, path, errors, warnings)
 			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"), "§")
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false)
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_NEUTRAL)
 			helpers.assert_eq(errors, {})
 			helpers.assert_eq(#warnings, 1, table.concat(warnings, " | "))
 			helpers.assert_true(warnings[1]:find("'hotstrings.preview_star_enabled'", 1, true) ~= nil, warnings[1])
 			local scan = require("config_unused_keys").find_in_source(source, Preferences.mark_config_reads)
 			helpers.assert_eq(#scan.keys, 1)
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "preview_star_enabled" })
-			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", true),
+			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", STAR_CHOICE),
 				"a new choice replaces the old shape")
-			helpers.assert_eq(read(path):match('preview_star_enabled = (%a+)'), "true")
+			helpers.assert_eq(read(path):match('preview_star_enabled = (%a+)'), tostring(STAR_CHOICE))
 		end)
 	end)
 
@@ -149,7 +154,7 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 
 	helpers.it("refuses a write raced by an external editor and keeps its cache", function()
 		with_preferences(SOURCE, function(Preferences, path)
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), true)
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_CHOICE)
 			local original = Writer.batch_write
 			local external = SOURCE .. "external = 9\n"
 			Writer.batch_write = function(...)
@@ -158,12 +163,12 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 				handle:close()
 				return original(...)
 			end
-			local ok, committed = pcall(Preferences.set, "hotstrings.preview_star_enabled", false)
+			local ok, committed = pcall(Preferences.set, "hotstrings.preview_star_enabled", STAR_NEUTRAL)
 			Writer.batch_write = original
 			helpers.assert_true(ok, tostring(committed))
 			helpers.assert_eq(committed, false)
 			helpers.assert_eq(read(path), external, "the external edit wins")
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), true, "the cache is unchanged")
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_CHOICE, "the cache is unchanged")
 		end)
 	end)
 
@@ -209,18 +214,18 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 			helpers.assert_eq(Preferences.adopt(owner, {}), false, "adoption requires ownership")
 			helpers.assert_true(Preferences.acquire(owner))
 			helpers.assert_eq(Preferences.acquire(stranger), false)
-			helpers.assert_eq(Preferences.set("hotstrings.preview_star_enabled", false), false,
+			helpers.assert_eq(Preferences.set("hotstrings.preview_star_enabled", STAR_NEUTRAL), false,
 				"an ordinary write waits for the scope")
 			helpers.assert_eq(Preferences.adopt(owner, { hotstrings = { preview_star_enabled = 1 } }), false,
 				"a malformed candidate is refused")
 			helpers.assert_true(Preferences.adopt(owner, {}))
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), false, "the candidate is effective")
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_NEUTRAL, "the candidate is effective")
 			helpers.assert_eq(Preferences.restore(stranger, snapshot), false)
 			helpers.assert_true(Preferences.restore(owner, snapshot))
-			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), true, "the snapshot is effective")
+			helpers.assert_eq(Preferences.get("hotstrings.preview_star_enabled"), STAR_CHOICE, "the snapshot is effective")
 			helpers.assert_eq(Preferences.release(stranger), false)
 			helpers.assert_true(Preferences.release(owner))
-			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", false))
+			helpers.assert_true(Preferences.set("hotstrings.preview_star_enabled", STAR_NEUTRAL))
 		end)
 	end)
 end)
