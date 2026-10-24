@@ -368,6 +368,16 @@ _IP_RivalFire() {
 	SendEvent("{Text}" . INPUT_PROBE_RIVAL_CHAR)
 }
 
+; Reads the performance counter for the probe's own stopwatch. Not
+; _IP_Now(): that opens a hot-path profiler segment, which the profiler
+; contract requires to be closed and reported, and a probe timing is neither.
+; @returns {Integer} Raw QPC ticks.
+_IP_Now() {
+	Counter := 0
+	DllCall("QueryPerformanceCounter", "Int64*", &Counter)
+	return Counter
+}
+
 ; Ticks to microseconds.
 ; @param Ticks {Integer} QPC ticks.
 ; @param Frequency {Integer} QPC frequency.
@@ -389,24 +399,24 @@ _IP_RunRep(Target, Spec, Mode, Frequency) {
 		return Map("kind", "foreground", "lost", 0, "ret_us", 0, "settle_us", -1)
 	Expected := Spec["expected"]
 	Rival := Spec["rival"]
-	Start := HotPath_Now()
+	Start := _IP_Now()
 	if (Rival != "")
 		SetTimer(_IP_RivalFire, -1)
 	Spec["send"].Call(Mode)
-	ReturnTicks := HotPath_Now() - Start
+	ReturnTicks := _IP_Now() - Start
 	SettleTicks := -1
 	if (Rival == "") {
 		Deadline := Start + Frequency * INPUT_PROBE_SETTLE_TIMEOUT_MS // 1000
-		while (HotPath_Now() < Deadline) {
+		while (_IP_Now() < Deadline) {
 			if (Target["edit"].Value == Expected) {
-				SettleTicks := HotPath_Now() - Start
+				SettleTicks := _IP_Now() - Start
 				break
 			}
 			Sleep(-1)
 		}
 	} else {
 		Sleep(INPUT_PROBE_RIVAL_WAIT_MS)
-		SettleTicks := HotPath_Now() - Start
+		SettleTicks := _IP_Now() - Start
 	}
 	Judged := InputProbe_ClassifyText(Expected, Target["edit"].Value, Rival)
 	return Map("kind", Judged["kind"], "lost", Judged["lost"],
