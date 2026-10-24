@@ -27,6 +27,8 @@
 ;      literal makes the test fail at midnight for a reason that is not a bug.
 ;   3. The module still declares the ordering contract, since the call site's
 ;      position feeds the engine's collision tiebreak.
+;   4. The activation delay: the shared defaults.toml value, unless the user
+;      set a category override.
 ;
 ; SCOPE: pure functions and actual in-memory registration/matching. Synthetic
 ;   Features/personal values exercise the HSE word boundary without input hooks,
@@ -449,3 +451,51 @@ _DynHSTest_GateAdmitsBody(Triggers) {
 	for Trigger in Triggers
 		AssertTrue(IsObject(_DynHSTest_WordFeed(Trigger)), "a sibling family must stay registered for '" . Trigger . "'")
 }
+
+
+
+
+; ======================================
+; ======================================
+; ======= 6/ Activation delay ==========
+; ======================================
+; ======================================
+
+; The delay every built-in dynamic expansion registers with. No category TOML
+; backs it, so only the user's tray override can replace the shared default.
+_DynHSTest_DelayDefault() {
+	global _SharedDir, _HotstringsOverrides
+	Shared := ParseTomlFile(_SharedDir . "\modules\hotstrings\defaults.toml")["delays"]["dynamichotstrings_sec"]
+	Saved := _HotstringsOverrides.Has("dynamichotstrings") ? _HotstringsOverrides["dynamichotstrings"] : ""
+	try {
+		if (Saved != "")
+			_HotstringsOverrides.Delete("dynamichotstrings")
+		HotstringsResolveBumpGen()
+		AssertEqual(Float(Shared), _DynamicHotstringDelay(), "no override means the shared defaults.toml delay")
+	} finally {
+		if (Saved != "")
+			_HotstringsOverrides["dynamichotstrings"] := Saved
+		HotstringsResolveBumpGen()
+	}
+}
+Test("dynamic hotstrings: the activation delay defaults to the shared dynamichotstrings_sec (dynamic-delay)",
+	_DynHSTest_DelayDefault)
+
+_DynHSTest_DelayOverride() {
+	global _HotstringsOverrides
+	Saved := _HotstringsOverrides.Has("dynamichotstrings") ? _HotstringsOverrides["dynamichotstrings"] : ""
+	try {
+		_HotstringsOverrides["dynamichotstrings"] := { Delay: 0.6, Color: "", ShowTooltip: "", Priority: "",
+			Sections: Map() }
+		HotstringsResolveBumpGen()
+		AssertEqual(0.6, _DynamicHotstringDelay(), "the user's category override wins")
+	} finally {
+		if (Saved != "")
+			_HotstringsOverrides["dynamichotstrings"] := Saved
+		else
+			_HotstringsOverrides.Delete("dynamichotstrings")
+		HotstringsResolveBumpGen()
+	}
+}
+Test("dynamic hotstrings: a category delay override replaces the shared default (dynamic-delay)",
+	_DynHSTest_DelayOverride)
