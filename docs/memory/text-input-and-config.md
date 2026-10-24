@@ -380,6 +380,17 @@ changes and session fences remain failures. The common typed operations live in
 Windows also checks retained modification time, and macOS checks the native
 lock and absence of staging/publication.
 
+### project-toml-source-memo-is-pure-and-private
+
+`toml_codec/source_memo.lua` keeps the newest results of
+`Codec.decode_with_shapes` and `RecordScanner.scan_records` because one
+preferences save used to decode the same config text 17 times and scan it 10
+times. Its whole invalidation contract is that the result is a pure function of
+the exact text and the listed variant (the header grammar for scans). Adding an
+option, global or file read that changes the result requires adding it to the
+variant key, or bypassing the memo. Callers always receive a deep copy whose
+identity-keyed receipts are re-bound; never return the stored value.
+
 ### project-toml-cache-returns-real-booleans
 
 TOML caches return native booleans. Do not compare their values to string
