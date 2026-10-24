@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M={}
+local KEY=require("config_keys").KEY
 local function same_source(a,b)
 	return type(a)=='table' and type(b)=='table' and a.status==b.status and a.content==b.content
 end
@@ -16,7 +17,7 @@ function M.new(deps)
 	local backend_key=deps.backend_key
 	assert(type(backend_key)=='string' and deps.manifest.find_entry_by_path(backend_key),
 		'runtime source requires the engine-owned backend declaration')
-	local KEYS={backend_key,'llm.models.ollama','llm.enabled'}
+	local KEYS={backend_key,KEY.LLM_MODELS_OLLAMA,KEY.LLM_ENABLED}
 	local p=deps.preferences
 	local get_many,generation,admit=p.get_many,p.generation,p.admit
 	local revision_current=p.is_current_revision
@@ -61,15 +62,15 @@ function M.new(deps)
 	local function unchanged(record)
 		local values,image,revision,state=read()
 		return identity(state,record,false) and is_enabled()==false and revision==record.preference_revision
-			and values['llm.enabled']==false and values[backend_key]=='ollama'
-			and values['llm.models.ollama']==record.model and same_source(image,record.image)
+			and values[KEY.LLM_ENABLED]==false and values[backend_key]=='ollama'
+			and values[KEY.LLM_MODELS_OLLAMA]==record.model and same_source(image,record.image)
 			and identity(native_get(),record,false) and revision_current(revision)==true
 	end
 	function source.capture()
 		local values,image,revision,state=read()
 		if not available(state) or state.enabled~=false or is_enabled()~=false or state.backend~='ollama'
-			or values['llm.enabled']~=false or values[backend_key]~='ollama'
-			or state.model~=values['llm.models.ollama'] or type(state.origin)~='string' then return nil end
+			or values[KEY.LLM_ENABLED]~=false or values[backend_key]~='ollama'
+			or state.model~=values[KEY.LLM_MODELS_OLLAMA] or type(state.origin)~='string' then return nil end
 		local handle={origin=state.origin}
 		local record={origin=state.origin,model=state.model,image=copy(image),
 			preference_revision=revision,native=copy(state)}
@@ -92,7 +93,7 @@ function M.new(deps)
 		if type(values)~='table' or not available(state) or state.revision~=record.native.revision
 			or state.app_epoch~=record.native.app_epoch or state.origin~=record.origin
 			or state.backend~='ollama' or state.model~=record.model or values[backend_key]~='ollama'
-			or values['llm.models.ollama']~=record.model then return false end
+			or values[KEY.LLM_MODELS_OLLAMA]~=record.model then return false end
 		local original=revision==record.preference_revision and same_source(image,record.image)
 		local restored=record.compensated and revision==record.restored_revision and same_source(image,record.restored_image)
 		local saved=record.candidate~=nil and revision==record.preference_revision+2
@@ -115,8 +116,8 @@ function M.new(deps)
 		local observe_source=function()
 			local values,current,observed=read_source()
 			return type(values)=='table' and same_source(current,expected)
-				and observed==revision and values['llm.enabled']==profile_enabled
-				and values[backend_key]=='ollama' and values['llm.models.ollama']==record.model
+				and observed==revision and values[KEY.LLM_ENABLED]==profile_enabled
+				and values[backend_key]=='ollama' and values[KEY.LLM_MODELS_OLLAMA]==record.model
 				and not record.retired and is_enabled()==profile_enabled and revision_current(revision)==true
 		end
 		local native_revision,app_epoch=record.native.revision,record.native.app_epoch
@@ -134,8 +135,8 @@ function M.new(deps)
 		if not record.written then return record.write_unknown~=true end
 		local values,image,revision,state=read()
 		if type(values)~='table' or revision~=record.preference_revision+2 or image.status~='ok'
-			or image.content~=record.candidate or values['llm.enabled']~=true
-			or values[backend_key]~='ollama' or values['llm.models.ollama']~=record.model
+			or image.content~=record.candidate or values[KEY.LLM_ENABLED]~=true
+			or values[backend_key]~='ollama' or values[KEY.LLM_MODELS_OLLAMA]~=record.model
 			or is_enabled()~=true or not identity(state,record,record.native_ack==true)
 			or not identity(native_get(),record,record.native_ack==true) or generation()~=revision then
 			record.compensation='foreign_or_stale';return false
@@ -144,8 +145,8 @@ function M.new(deps)
 			final_admission(record,image,revision,record.native_ack==true,true))
 		if not ok or restored~=true then record.compensation='writer_refused';return false end
 		values,image,revision,state=read()
-		if type(values)~='table' or values['llm.enabled']~=false or is_enabled()~=false
-			or values[backend_key]~='ollama' or values['llm.models.ollama']~=record.model
+		if type(values)~='table' or values[KEY.LLM_ENABLED]~=false or is_enabled()~=false
+			or values[backend_key]~='ollama' or values[KEY.LLM_MODELS_OLLAMA]~=record.model
 			or revision~=record.preference_revision+4 or not identity(state,record,record.native_ack==true)
 			or generation()~=revision then record.compensation='restore_context_changed';return false end
 		if record.native_ack and native_restore(record.native.revision,record.native.app_epoch)~=true then
@@ -159,7 +160,7 @@ function M.new(deps)
 	function source.publish(handle,acknowledge)
 		local record=records[handle]
 		if not record or type(acknowledge)~='function' or not source.current(handle) then return false end
-		local prepared,_,candidate,preimage=prepare(path,{operation('llm.enabled',true)},nil,record.image)
+		local prepared,_,candidate,preimage=prepare(path,{operation(KEY.LLM_ENABLED,true)},nil,record.image)
 		if prepared~=true or type(candidate)~='string' or not same_source(preimage,record.image)
 			or not source.current(handle) then return false end
 		-- Keep this write owner reserved across profiles/storage/logger callbacks.
@@ -174,8 +175,8 @@ function M.new(deps)
 		-- One acknowledged preference write + one observed changed source. A
 		-- same-byte extra write or independently observed image adds a revision.
 		if type(values)~='table' or revision~=record.preference_revision+2 or image.status~='ok' or image.content~=candidate
-			or values['llm.enabled']~=true or values[backend_key]~='ollama'
-			or values['llm.models.ollama']~=record.model or is_enabled()~=true
+			or values[KEY.LLM_ENABLED]~=true or values[backend_key]~='ollama'
+			or values[KEY.LLM_MODELS_OLLAMA]~=record.model or is_enabled()~=true
 			or not identity(state,record,false) or not identity(native_get(),record,false)
 			or generation()~=revision then record.writing=false;return false end
 		local published=native_publish(record.native.revision,record.native.app_epoch)
@@ -183,8 +184,8 @@ function M.new(deps)
 		if published~=true or record.retired then record.writing=false;return false end
 		values,image,revision,state=read()
 		if type(values)~='table' or revision~=record.preference_revision+2 or image.status~='ok' or image.content~=candidate
-			or values['llm.enabled']~=true or values[backend_key]~='ollama'
-			or values['llm.models.ollama']~=record.model or is_enabled()~=true
+			or values[KEY.LLM_ENABLED]~=true or values[backend_key]~='ollama'
+			or values[KEY.LLM_MODELS_OLLAMA]~=record.model or is_enabled()~=true
 			or not identity(state,record,true) or not identity(native_get(),record,true)
 			or generation()~=revision then record.writing=false;return false end
 		local proof={}
@@ -200,7 +201,7 @@ function M.new(deps)
 			or records[handle]~=receipt.record or receipt.record.retired or not receipt.record.writing then return nil end
 		local values,image,revision,state=read()
 		if not identity(state,receipt.record,true) or is_enabled()~=true
-			or values['llm.enabled']~=true or image.status~='ok' or image.content~=receipt.candidate
+			or values[KEY.LLM_ENABLED]~=true or image.status~='ok' or image.content~=receipt.candidate
 			or revision~=receipt.revision or not identity(native_get(),receipt.record,true)
 			or generation()~=revision or receipt.record.retired then return nil end
 		local app={};receipt.consumed=true
