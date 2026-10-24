@@ -458,9 +458,9 @@ global LLM_OLLAMA_KEEP_ALIVE := ""
 global LLM_OLLAMA_TIMEOUT  := 180000  ; ms (3 min) — cold CPU inference headroom
 
 ; DELETE /api/delete round-trip ceiling for LLM_OllamaDeleteModel_Async.
-; Mirrors the retired blocking version's WinHTTP receive timeout so observed
-; behaviour is unchanged — only non-blocking now (F24).
-global LLM_OLLAMA_DELETE_TIMEOUT_MS := 10000  ; ms
+; Sentinel 0 — sourced at boot by LLMApiLoadTimings() ([llm]
+; ollama_delete_timeout_ms), the value the Linux model delete reads too.
+global LLM_OLLAMA_DELETE_TIMEOUT_MS := 0
 
 ; Polling interval for the async path. 50 ms is the same cadence the HS side
 ; effectively gets from hs.http.asyncPost's underlying CFRunLoop tick — fine
@@ -478,8 +478,9 @@ global LLM_OLLAMA_POLL_MS := 0
 ; TimingsGet on a missing key.
 LLMApiLoadTimings() {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS, LLM_INSTALLED_CACHE_TTL_MS
-	global LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+	global LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS, LLM_OLLAMA_DELETE_TIMEOUT_MS
 	LLM_OLLAMA_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
+	LLM_OLLAMA_DELETE_TIMEOUT_MS := TimingsGet("llm", "ollama_delete_timeout_ms")
 	LLM_REMOTE_TIMEOUT_MS      := TimingsGet("llm", "request_timeout_ms")
 	LLM_REMOTE_READY_PING_DEADLINE_MS := TimingsGet("llm", "request_timeout_ms")
 	LLM_REMOTE_POLL_MS         := TimingsGet("llm", "poll_interval_ms")

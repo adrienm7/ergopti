@@ -8262,6 +8262,7 @@ section = "shortcut_extension_empty_frame"
 present_when = "shortcut_extension_builder_missing"
 
 # Complete native per-model action, identity, specification, capability and hardware frames.
+# Linux draws the action rows in the submenu of each model Ollama reports installed.
 
 [[menu.llm_model_action_rows]]
 type = "check"
@@ -8270,8 +8271,6 @@ i18n = "menu.llm.select_model"
 command = "model_select"
 checked_when = ["model_selected"]
 disabled_when = ["model_select_ready"]
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.llm_model_action_rows]]
 type = "include"
@@ -8287,8 +8286,6 @@ present_when = "model_download_present"
 type = "command"
 id = "model_delete"
 i18n = "menu.llm.delete_model_cache"
-platforms = ["ahk", "hs"]
-unavailable = "hide"
 
 [[menu.llm_model_download_row]]
 type = "command"

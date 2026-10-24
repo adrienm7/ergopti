@@ -192,7 +192,10 @@ helpers.describe("declared model picker tail boundary", function()
 				helpers.assert_eq(#actual,2)
 				helpers.assert_eq(actual[1].label,"native-model")
 				helpers.assert_eq(actual[2].label,"menu.llm.browse_models_entry")
-				helpers.assert_type(find_row(rows,"native-model").fn,"function")
+				-- The model opens its submenu; its Select row carries the click.
+				local model_row=find_row(rows,"native-model")
+				helpers.assert_type(model_row.menu,"table")
+				helpers.assert_type(find_row(model_row.menu,"menu.llm.select_model").fn,"function")
 				helpers.assert_type(find_row(rows,"menu.llm.browse_models_entry").fn,"function")
 				helpers.assert_eq(effects,0)
 				helpers.assert_eq(f.controls.shows,0)
@@ -223,6 +226,119 @@ helpers.describe("AI off: the tray asks Ollama for no model (ai-off-inert-linux-
 			enabled = false
 			f.builder.build(f.ctx)
 			helpers.assert_eq(reads, 1, "the switch-off stops the inventory reads again")
+		end)
+	end)
+end)
+
+
+--- Captures the notices the removal sends instead of showing desktop notifications.
+--- @return table notices, function restore
+local function scripted_notices()
+	local previous = package.loaded["adapters.application_notifier"]
+	local notices = {}
+	package.loaded["adapters.application_notifier"] = { send = function(body, opts)
+		notices[#notices + 1] = { body = body, title = opts.title, level = opts.level }
+		return true
+	end }
+	return notices, function() package.loaded["adapters.application_notifier"] = previous end
+end
+
+--- Answers zenity's question with the given exit, recording the commands it ran.
+--- @param answer boolean True presses Delete, false presses Cancel.
+--- @return table commands, function restore
+local function scripted_question(answer)
+	local previous = os.execute
+	local commands = {}
+	os.execute = function(command)
+		commands[#commands + 1] = command
+		if command:find("command -v zenity", 1, true) then return true end
+		return answer
+	end
+	return commands, function() os.execute = previous end
+end
+
+helpers.describe("installed model submenu: select and delete as on Windows and macOS", function()
+	--- Prepares an AI-on context listing two installed models.
+	--- @param f table with_browser fixture.
+	--- @return table deletes
+	local function installed(f)
+		-- The fixture's blank dialog owners: the question runs inline, titled as given.
+		package.loaded["ui.modal"].run = function(fn) return fn() end
+		package.loaded["window_titles"].compose = function(title) return title end
+		local deletes = {}
+		f.ctx.llm.is_enabled = function() return true end
+		f.ctx.llm.get_models = function() return { "qwen:2b", "gemma:1b" } end
+		f.ctx.llm.get_current_model = function() return "gemma:1b" end
+		f.ctx.llm.set_model = function(model) deletes.selected = model; return true end
+		f.ctx.llm.delete_model = function(model, on_done)
+			deletes[#deletes + 1] = { model = model, on_done = on_done }
+			return true
+		end
+		f.ctx.on_menu_changed = function() deletes.refreshes = (deletes.refreshes or 0) + 1 end
+		return deletes
+	end
+
+	helpers.it("linux-model-delete: each installed model opens Select and Delete, the parent keeps the tick", function()
+		with_browser(function(f)
+			local deletes = installed(f)
+			local rows = f.builder.build(f.ctx)
+			local selected, other = find_row(rows, "gemma:1b"), find_row(rows, "qwen:2b")
+			helpers.assert_eq(selected.checked, true)
+			helpers.assert_eq(other.checked, false)
+			helpers.assert_type(other.menu, "table")
+			local select = find_row(other.menu, "menu.llm.select_model")
+			helpers.assert_eq(select.checked, false)
+			helpers.assert_eq(find_row(selected.menu, "menu.llm.select_model").checked, true)
+			helpers.assert_type(find_row(other.menu, "menu.llm.delete_model_cache").fn, "function")
+			select.fn()
+			helpers.assert_eq(deletes.selected, "qwen:2b")
+			helpers.assert_eq(#deletes, 0, "selecting removes nothing")
+		end)
+	end)
+
+	helpers.it("linux-model-delete: Delete asks first, removes the model, then says so and redraws", function()
+		with_browser(function(f)
+			local deletes = installed(f)
+			local notices, restore_notices = scripted_notices()
+			local commands, restore_question = scripted_question(true)
+			local ok, err = pcall(function()
+				local rows = f.builder.build(f.ctx)
+				helpers.assert_eq(find_row(find_row(rows, "qwen:2b").menu, "menu.llm.delete_model_cache").fn(), true)
+				helpers.assert_true(commands[#commands]:find("menu.llm.delete_model_title", 1, true) ~= nil,
+					"the removal is confirmed with the dialog the other drivers show")
+				helpers.assert_eq(#deletes, 1)
+				helpers.assert_eq(deletes[1].model, "qwen:2b")
+				deletes[1].on_done(true, "qwen:2b")
+				helpers.assert_eq(notices[1].level, "success")
+				helpers.assert_eq(notices[1].title, "ollama.deleted_title")
+				deletes[1].on_done(false, "qwen:2b", "model busy")
+				helpers.assert_eq(notices[2].level, "error")
+				helpers.assert_eq(notices[2].title, "ollama.delete_fail_title")
+				helpers.assert_eq(deletes.refreshes, 2)
+			end)
+			restore_question(); restore_notices()
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("linux-model-delete: a declined question or a paused script removes nothing", function()
+		with_browser(function(f)
+			local deletes = installed(f)
+			local commands, restore_question = scripted_question(false)
+			local ok, err = pcall(function()
+				local rows = f.builder.build(f.ctx)
+				local row = find_row(find_row(rows, "qwen:2b").menu, "menu.llm.delete_model_cache")
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(#deletes, 0)
+				-- A row still on screen when the script is paused asks nothing.
+				local asked = #commands
+				f.ctx.paused = true
+				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(#commands, asked)
+				helpers.assert_eq(#deletes, 0)
+			end)
+			restore_question()
+			if not ok then error(err, 0) end
 		end)
 	end)
 end)
