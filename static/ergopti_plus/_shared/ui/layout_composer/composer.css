@@ -31,7 +31,7 @@
 }
 
 .composer h2 {
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-size: 13px;
 	font-weight: 600;
 	margin: 14px 0 6px;
@@ -82,12 +82,12 @@
 }
 
 .composer-tab {
-	background: #e5e5ea;
-	color: #1d1d1f;
+	background: var(--theme-gray5);
+	color: var(--theme-label);
 }
 
 .composer-tab.is-active {
-	background: #007aff;
+	background: var(--theme-blue);
 	color: #fff;
 }
 
@@ -99,7 +99,7 @@
 .composer-key {
 	background: #fff;
 	border: 1px solid #c8c8cc;
-	color: #1d1d1f;
+	color: var(--theme-label);
 	font-size: 14px;
 	height: 42px;
 	overflow: hidden;
@@ -108,8 +108,8 @@
 }
 
 .composer-key.is-overridden {
-	border-color: #007aff;
-	box-shadow: inset 0 0 0 1px #007aff;
+	border-color: var(--theme-blue);
+	box-shadow: inset 0 0 0 1px var(--theme-blue);
 }
 
 .composer-key.is-dead {
@@ -156,7 +156,7 @@
 
 @media (prefers-color-scheme: dark) {
 	.composer h2 {
-		color: #f5f5f7;
+		color: var(--theme-page-background);
 	}
 
 	.composer-row select,
@@ -166,17 +166,17 @@
 	.composer-key,
 	.composer-key-editor {
 		background: #2a2a2c;
-		border-color: #3a3a3c;
-		color: #f5f5f7;
+		border-color: var(--theme-gray4-dark);
+		color: var(--theme-page-background);
 	}
 
 	.composer-tab {
-		background: #3a3a3c;
-		color: #f5f5f7;
+		background: var(--theme-gray4-dark);
+		color: var(--theme-page-background);
 	}
 
 	.composer-tab.is-active {
-		background: #0a84ff;
+		background: var(--theme-blue-dark);
 	}
 
 	.composer-key.is-dead {

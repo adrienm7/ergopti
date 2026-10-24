@@ -12,26 +12,20 @@
  * =========================================================================== */
 
 :root {
-	--text: #1a1a1a;
-	--muted: #666;
-	--background: #fff;
-	--border: #e0e0e0;
-	--accent: #0a66c2;
-	--accent-text: #fff;
-	--ok: #1a7f37;
-	--fail: #cf222e;
+	--text: var(--theme-dialog-text);
+	--muted: var(--theme-dialog-muted);
+	--background: var(--theme-dialog-background);
+	--border: var(--theme-dialog-border);
+	--accent: var(--theme-dialog-accent);
+	--accent-text: var(--theme-dialog-accent-text);
+	--ok: var(--theme-dialog-ok);
+	--fail: var(--theme-dialog-fail);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root {
-		--text: #e6e6e6;
-		--muted: #9a9a9a;
-		--background: #1f1f1f;
-		--border: #3a3a3a;
 		--accent: #4a9eff;
 		--accent-text: #0b0b0b;
-		--ok: #3fb950;
-		--fail: #ff7b72;
 	}
 }
 

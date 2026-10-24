@@ -284,6 +284,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hex-colours.cjs"],
 			"repro": "npm run test:hex-colours"
+		},
+		{
+			"id": "shared-ui-theme",
+			"ordinal": 468,
+			"name": "shared pages take their recurring colours from theme.css and link it",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-ui-theme.cjs"],
+			"repro": "npm run test:shared-ui-theme"
 		}
 	]
 }

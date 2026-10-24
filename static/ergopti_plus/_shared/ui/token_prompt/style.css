@@ -146,7 +146,7 @@ button {
 #btn-validate {
 	background: rgba(48, 209, 88, 0.12);
 	border-color: rgba(48, 209, 88, 0.45);
-	color: #30d158;
+	color: var(--theme-green-dark);
 }
 
 #btn-validate:hover {

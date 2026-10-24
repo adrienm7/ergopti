@@ -16,18 +16,18 @@
 :root {
 	/* Single source of truth for all filter-bar control heights */
 	--filter-h: 35px;
-	--bg-color: #f5f5f7;
-	--panel-bg: #ffffff;
-	--text-color: #1d1d1f;
+	--bg-color: var(--theme-metrics-bg);
+	--panel-bg: var(--theme-metrics-panel);
+	--text-color: var(--theme-metrics-text);
 	--text-color-rgb: 29, 29, 31; /* matches --text-color for use in rgba() */
-	--text-muted: #86868b;
-	--accent: #007aff;
-	--border: #d2d2d7;
+	--text-muted: var(--theme-metrics-text-muted);
+	--accent: var(--theme-accent);
+	--border: var(--theme-metrics-border);
 	--mono-bg: #eaeaea;
 	--mono-color: #005cc5;
-	--th-bg: #e5e5ea;
-	--th-hover: #d1d1d6;
-	--td-hover: #f0f0f5;
+	--th-bg: var(--theme-metrics-th-bg);
+	--th-hover: var(--theme-metrics-th-hover);
+	--td-hover: var(--theme-metrics-td-hover);
 	--tooltip-bg: #333333;
 	--modal-overlay: rgba(0, 0, 0, 0.3);
 
@@ -77,24 +77,15 @@
 	--chart-border: rgba(0, 0, 0, 0.3);
 
 	/* Text colors */
-	--strong-color: #1d1d1f;
+	--strong-color: var(--theme-metrics-strong);
 }
 
 /* Variables mode SOMBRE */
 @media (prefers-color-scheme: dark) {
 	:root {
-		--bg-color: #1e1e1e;
-		--panel-bg: #2d2d2d;
-		--text-color: #f0f0f0;
 		--text-color-rgb: 240, 240, 240; /* matches --text-color for use in rgba() */
-		--text-muted: #aaaaaa;
-		--accent: #0a84ff;
-		--border: #444444;
 		--mono-bg: #111111;
 		--mono-color: #9cdcfe;
-		--th-bg: #333333;
-		--th-hover: #444444;
-		--td-hover: #3d3d3d;
 		--tooltip-bg: #555555;
 		--modal-overlay: rgba(0, 0, 0, 0.6);
 
@@ -144,7 +135,6 @@
 		--chart-border: rgba(255, 255, 255, 0.4);
 
 		/* Text colors */
-		--strong-color: #ffffff;
 	}
 }
 
@@ -284,12 +274,12 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 .filter-reset {
 	background: rgba(255, 59, 48, 0.05);
-	border-color: #ff3b30;
-	color: #ff3b30;
+	border-color: var(--theme-red);
+	color: var(--theme-red);
 }
 .filter-reset:hover {
 	background: rgba(255, 59, 48, 0.15);
-	color: #ff3b30;
+	color: var(--theme-red);
 }
 
 /* ============================= */
@@ -997,13 +987,13 @@ tr:hover td {
 .shortcut-mod-cmd {
 	background: rgba(48, 209, 88, 0.1);
 	border-color: rgba(48, 209, 88, 0.4) !important;
-	color: #30d158 !important;
+	color: var(--theme-green-dark) !important;
 }
 
 .shortcut-mod-ctrl {
 	background: rgba(255, 149, 0, 0.1);
 	border-color: rgba(255, 149, 0, 0.4) !important;
-	color: #ff9500 !important;
+	color: var(--theme-orange) !important;
 }
 
 /* Brighter purple — aligns perceptual weight with cmd’s vibrant green */
@@ -1509,7 +1499,7 @@ th .tooltip .tooltiptext {
 }
 
 .find-status.find-not-found {
-	color: #ff3b30;
+	color: var(--theme-red);
 }
 
 .find-nav-btn {
@@ -1554,6 +1544,6 @@ th .tooltip .tooltiptext {
 .find-highlight-current {
 	background: rgba(255, 159, 10, 0.65);
 	border-radius: 2px;
-	outline: 2px solid #ff9f0a;
+	outline: 2px solid var(--theme-orange-dark);
 	outline-offset: 1px;
 }
