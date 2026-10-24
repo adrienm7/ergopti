@@ -31,6 +31,8 @@ const LLM_ROOT = path.join(MACOS_ROOT, 'modules', 'llm');
 const SOURCE_SCRIPT = path.join(LLM_ROOT, 'ensure-ollama-deps.sh');
 const SOURCE_NETWORK = path.join(LLM_ROOT, 'network-retry.sh');
 const SOURCE_RELEASE = path.join(LLM_ROOT, 'ollama-release.sh');
+// network-retry.sh reads the shared origin inventory from its bundle-relative path.
+const SOURCE_ROUTE_ORIGINS = path.join(ROOT, sharedRel('modules', 'network', 'route_origins.json'));
 const MLX_SCRIPT = path.join(LLM_ROOT, 'ensure-mlx-deps.sh');
 const BUILD_SCRIPT = path.join(ROOT, 'tools', 'build', 'build_macos_app.sh');
 
@@ -99,6 +101,15 @@ function createFixture(mode, checksumMode) {
 	]) {
 		if (fs.existsSync(source)) fs.copyFileSync(source, path.join(scriptDir, name));
 	}
+	const routeOrigins = path.join(
+		fixtureRoot,
+		'_shared',
+		'modules',
+		'network',
+		'route_origins.json'
+	);
+	fs.mkdirSync(path.dirname(routeOrigins), { recursive: true });
+	fs.copyFileSync(SOURCE_ROUTE_ORIGINS, routeOrigins);
 	fs.writeFileSync(path.join(homeDir, 'curl-mode'), mode, 'utf8');
 	fs.writeFileSync(path.join(homeDir, 'checksum-mode'), checksumMode, 'utf8');
 
