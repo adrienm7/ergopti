@@ -405,8 +405,10 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 			GROUP BY date, app, keycode
 		]], date_filter()), pacer) do
 			local a = _get(manifest, r.date, r.app)
+			-- The shared dashboard reads s/n/m, as the Windows and Linux readers
+			-- project them; any other key reads as a zero hold time.
 			a.kc_hold[tostring(r.keycode)] = {
-				sum = r.s or 0, count = r.c or 0, max = r.mx or 0,
+				s = r.s or 0, n = r.c or 0, m = r.mx or 0,
 				tap = r.t or 0, hold = r.h or 0,
 			}
 		end
