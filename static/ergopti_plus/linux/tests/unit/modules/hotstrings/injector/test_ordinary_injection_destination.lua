@@ -22,6 +22,8 @@ helpers.describe("Main retains the ordinary expansion target", function()
 				logger.set_error_observer(function(_, template) errors[#errors + 1] = template end)
 				local environment = setmetatable({
 					secure_focus_guard = guard, script_actions = { is_paused = function() return false end },
+					-- Bare keys: the shared expansion delay reads the held modifiers per key.
+					keyboard_hook = { held_modifiers = function() return {} end },
 					Monotonic = { now_ms = function() return state.now end }, _cached_app_id = "owned-editor",
 					WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
 					terminators_mod = { is_terminator = function() return false end },
