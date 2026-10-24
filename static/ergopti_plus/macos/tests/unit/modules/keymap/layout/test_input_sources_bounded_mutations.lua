@@ -15,7 +15,19 @@
 --- predictable missing target must not partially mutate the enabled list.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local BaseHelpers = require("tests.helpers")
+local FIXTURE_MODULES = { "modules.keymap.input_sources", "modules.keymap.layout_install" }
+local helpers = setmetatable({}, { __index = BaseHelpers })
+
+--- Registers the original case under its two exact installation-port owners.
+--- The parent can retain its captured port only for this case, including errors.
+--- @param name string Original regression description.
+--- @param body function Original case body and assertions.
+function helpers.it(name, body)
+	return BaseHelpers.it(name, function()
+		return BaseHelpers.with_fresh_modules(FIXTURE_MODULES, body)
+	end)
+end
 
 local LOCALISED_NAME = "Ergopti+"
 local KL_NAME = "Ergopti_v2_2_2_plus"
@@ -31,6 +43,32 @@ local function reset_fixture_modules()
 	package.loaded["adapters.task_lifecycle"] = nil
 	package.loaded["adapters.input_source_selector"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
+end
+
+
+--- Loads the real parent with an explicitly empty installed-bundle inventory.
+--- The standard preload hook survives the loader's intentional cache reset;
+--- its exact predecessor is restored even when parent construction raises.
+--- @param overrides table Native task, timer and execute boundaries.
+--- @return table sources Real input-source controller bound to the inventory port.
+local function load_sources_without_installed_bundles(overrides)
+	local module_name = "modules.keymap.layout_install"
+	local preload = package.preload
+	local previous_loader = preload[module_name]
+	preload[module_name] = function()
+		return {
+			highest_installed = function() return nil end,
+			version_gt = function() return false end,
+			bundle_variants = function() return {} end,
+			USER_LAYOUTS_DIR = "/virtual/user-layouts",
+			SYSTEM_LAYOUTS_DIR = "/virtual/system-layouts",
+		}
+	end
+	local outcome = table.pack(xpcall(helpers.load_with_stubs, debug.traceback,
+		"modules.keymap.input_sources", overrides))
+	preload[module_name] = previous_loader
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 
@@ -122,7 +160,7 @@ local function load_fixture(options)
 		return timer
 	end
 
-	local IS = helpers.load_with_stubs("modules.keymap.input_sources", {
+	local IS = load_sources_without_installed_bundles({
 		task = task_api,
 		timer = timer_api,
 		execute = function()
