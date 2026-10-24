@@ -164,7 +164,8 @@ route_origins_for_client() {
 # Twin of _shared/lua/network/route_plan.lua and _shared/go/route_plan: both
 # answer _shared/tests/corpus/network/route_plan_vectors.json. Reads
 # "<https origin><TAB><route>" lines on stdin, one per looked-up origin, where a
-# route is "direct" or an http / socks5 relay with a port. Prints
+# route is "direct" or an http, https, socks5 or socks5h relay with a port and
+# an optional userinfo (an apostrophe in it must be percent-encoded). Prints
 # "PLAN|<relay or direct>|<comma list of origins the lookup sent direct>" or
 # "REFUSED|<closed reason>". A client holding one environment relay cannot serve
 # two different relays, so that is refused rather than guessed.
@@ -182,7 +183,7 @@ route_plan_from_entries() {
 				if (host == "" || length(host) > 253 || index(host, "..") > 0) refuse("route-plan-invalid")
 				hostname[i] = host
 				if (route[i] != "direct") {
-					if (route[i] !~ /^(http|socks5):\/\/(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+):[0-9]+$/) refuse("route-plan-invalid")
+					if (route[i] !~ /^(https?|socks5h?):\/\/([A-Za-z0-9._~%!$&()*+,;=:-]+@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+):[0-9]+$/) refuse("route-plan-invalid")
 					parts = split(route[i], pieces, ":")
 					if (length(pieces[parts]) > 5 || pieces[parts] + 0 < 1 || pieces[parts] + 0 > 65535) refuse("route-plan-invalid")
 				}

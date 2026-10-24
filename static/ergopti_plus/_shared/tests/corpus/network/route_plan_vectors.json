@@ -31,6 +31,21 @@
 			"expect": { "proxy": "socks5://10.0.0.2:1080", "no_proxy": "" }
 		},
 		{
+			"name": "an authenticated desktop relay keeps its credentials",
+			"entries": [{ "origin": "https://a.example", "route": "http://user:p%40ss@relay.corp:3128" }],
+			"expect": { "proxy": "http://user:p%40ss@relay.corp:3128", "no_proxy": "" }
+		},
+		{
+			"name": "an https relay is exportable",
+			"entries": [{ "origin": "https://a.example", "route": "https://relay.corp:443" }],
+			"expect": { "proxy": "https://relay.corp:443", "no_proxy": "" }
+		},
+		{
+			"name": "a socks5h relay is exportable",
+			"entries": [{ "origin": "https://a.example", "route": "socks5h://gate.corp:1080" }],
+			"expect": { "proxy": "socks5h://gate.corp:1080", "no_proxy": "" }
+		},
+		{
 			"name": "an IPv6 relay keeps its brackets",
 			"entries": [{ "origin": "https://a.example", "route": "http://[fd00::1]:3128" }],
 			"expect": { "proxy": "http://[fd00::1]:3128", "no_proxy": "" }
@@ -68,6 +83,26 @@
 		{
 			"name": "an unsupported route scheme is refused",
 			"entries": [{ "origin": "https://a.example", "route": "ftp://relay.corp:21" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a socks4 relay no environment client honors is refused",
+			"entries": [{ "origin": "https://a.example", "route": "socks4://gate.corp:1080" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a relay with an empty userinfo is refused",
+			"entries": [{ "origin": "https://a.example", "route": "http://@relay.corp:3128" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a relay with two userinfo separators is refused",
+			"entries": [{ "origin": "https://a.example", "route": "http://a@b@relay.corp:3128" }],
+			"expect": { "reason": "route-plan-invalid" }
+		},
+		{
+			"name": "a relay userinfo with a raw apostrophe is refused",
+			"entries": [{ "origin": "https://a.example", "route": "http://o'neil:pw@relay.corp:3128" }],
 			"expect": { "reason": "route-plan-invalid" }
 		},
 		{
