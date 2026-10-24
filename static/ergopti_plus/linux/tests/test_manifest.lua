@@ -359,6 +359,7 @@ return {
 	"tests.unit.modules.keystats.core.test_keystats",
 	"tests.unit.modules.keystats.core.test_keystats_pointer_metrics",
 	"tests.unit.modules.keystats.core.test_keystats_window_switches",
+	"tests.unit.modules.keystats.core.test_keystats_session_events",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_reader",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_media_schema_admission",
 	"tests.unit.modules.keystats.storage.test_keystats_sqlite_writer_ngram_source_map",
