@@ -96,8 +96,8 @@ _TEAR_BothBranchesAnchorOnTheOrigin() {
 
 	; No remainder is allowed to cross an interruptible call. The common presenter
 	; resolves it under the same Critical fence that publishes the timer + pixels.
-	Assert(InStr(Bounds, "TickRemaining(") > 0,
-		"the timer period must be the current wrap-safe remainder of the original interval")
+	Assert(InStr(Bounds, "TickRemaining64(") > 0,
+		"the timer period must be the current native-width remainder of the original interval")
 	CriticalOn := InStr(Present, 'Critical("On")')
 	Resolve := InStr(Present, "_TooltipLifecycleDeadlineBounds(", true,
 		CriticalOn)
