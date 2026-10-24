@@ -348,7 +348,7 @@ end
 --- explicit pure-Lua test seam.
 --- @param code integer evdev keycode.
 --- @param value integer 0 release, 1 press, 2 repeat.
---- @return string|nil text, string|nil identity, string|nil error
+--- @return string|nil text, string|nil identity, string|nil error, string|nil control
 local function _capture(code, value)
 	if _test_capture_event then return _test_capture_event(code, value) end
 	return XkbCapture.process(code, value)
@@ -1662,11 +1662,11 @@ local function _dispatch_post_remap(ev, source)
 		or (ev.value == InputEvent.VALUE_DOWN and not aggregate_before and aggregate_after)
 		or (ev.value == InputEvent.VALUE_UP and aggregate_before and not aggregate_after)
 		or (ev.value == InputEvent.VALUE_REPEAT and held_role ~= nil)
-	local char, identity, capture_err
+	local char, identity, capture_err, captured_control
 	local row_plan = not is_modifier and _number_row.preview(ev, source) or nil
 	if not is_modifier and not row_plan and not _capture_wire_transition(ev, source) then capture_transition = false end
 	if row_plan then char, identity = row_plan.text, row_plan.identity
-	elseif capture_transition then char, identity, capture_err = _capture(ev.code, ev.value) end
+	elseif capture_transition then char, identity, capture_err, captured_control = _capture(ev.code, ev.value) end
 
 	if capture_err then
 		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
@@ -1808,7 +1808,7 @@ local function _dispatch_post_remap(ev, source)
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
 
-	local control = EvdevCodes.CONTROL_NAME_OF[ev.code]
+	local control = (not row_plan and not capture_err and captured_control) or EvdevCodes.CONTROL_NAME_OF[ev.code]
 	if control then
 		local text_char = TEXT_CONTROL_CHAR[control]
 		if text_char and not _shortcut_modifier_held() then
