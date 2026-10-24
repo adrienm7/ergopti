@@ -165,6 +165,9 @@ const BOOT_STAMPS = [
 	'LLM defaults loaded', // Attribute shared model defaults parsing.
 	'Module includes initialised',
 	'Paths and shared configuration loaded', // Attribute locator and shared defaults.
+	'Personal shortcuts file ensured', // Attribute the first-run personal file write.
+	'Safe tray and startup commands installed', // Bound the pre-onboarding safe tray.
+	'Configuration schema source prepared', // Attribute the read-only schema build.
 	'Tray reset + onboarding',
 	'Configuration migration checked', // Attribute migration registry parsing.
 	'Configuration TOML snapshot parsed', // Attribute the cached configuration read.
