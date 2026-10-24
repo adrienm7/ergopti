@@ -45,15 +45,19 @@ _KLQCat_Canonical(Row) {
 	return Text
 }
 
+; InStr reads its needle as a C string, so InStr(Value, Chr(0)) is an empty
+; needle that matches every row; PCRE takes the subject with its length.
 _KLQCat_HasNul(Row) {
 	for Key, Value in Row
-		if (Value is String) && InStr(Value, Chr(0))
+		if (Value is String) && RegExMatch(Value, "\x00")
 			return true
 	return false
 }
 
 _KLQCat_FixtureReturnsCatalogueRows() {
 	global _SharedDir
+	AssertFalse(_KLQCat_HasNul(Map("app", "Code")), "a plain row is compared, not stripped as NUL-bearing")
+	AssertTrue(_KLQCat_HasNul(Map("app", "Co" . Chr(0) . "de")), "an embedded NUL is detected")
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the catalogue fixture must open an in-memory DB")
 	try {
