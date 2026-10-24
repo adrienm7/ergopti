@@ -136,7 +136,7 @@ _RKF_ReplaysRepeatKeyCorpus() {
 	try {
 		for Vector in _RKF_CorpusVectors("repeat_key_vectors.json") {
 			HSE_Buffer := Vector["buffer"]
-			HSE_StartIsWordBoundary := true
+			HSE_StartIsWordBoundary := !(Vector.Has("start_is_word_boundary") and !Vector["start_is_word_boundary"])
 			Spec := HSE_TryRepeatKey(Vector["magic_key"])
 			if Vector["fires"] {
 				Assert(IsObject(Spec), Vector["id"] . ": " . Vector["description"])

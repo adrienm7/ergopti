@@ -449,6 +449,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-visible-text-is-localized.cjs"],
 			"repro": "node tools/test/test-visible-text-is-localized.cjs"
+		},
+		{
+			"id": "js-0464",
+			"ordinal": 466,
+			"name": "key-combination defaults are the same on the three drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-key-combination-defaults-parity.cjs"],
+			"repro": "node tools/test/test-key-combination-defaults-parity.cjs"
 		}
 	]
 }

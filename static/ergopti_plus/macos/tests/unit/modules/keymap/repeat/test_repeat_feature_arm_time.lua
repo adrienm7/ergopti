@@ -146,6 +146,7 @@ helpers.describe("keymap expander: the shared repeat_key_vectors.json corpus", f
 	for _, vector in ipairs(corpus_vectors("repeat_key_vectors.json")) do
 		helpers.it(vector.id .. " (repeat-key-corpus)", function()
 			local fixture = load_fixture({ buffer = vector.buffer, magic_key = vector.magic_key })
+			fixture.state.start_is_word_boundary = vector.start_is_word_boundary ~= false
 			fixture.synthetic.enter_callback()
 			local fired = fixture.expander.try_repeat_feature(vector.magic_key, true)
 			fixture.synthetic.leave_callback(fired)

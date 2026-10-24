@@ -204,15 +204,15 @@ local _manifest_cache = { revision = nil, manifest = nil }
 -- Whether password-field suppression is active.
 local _suppressed = false
 
--- Cross-driver privacy posture, read from the shared features manifest so the
--- three drivers cannot drift. Linux had none of these: it recorded
--- unconditionally, because the metrics section of the manifest did not list
 -- Whether the user paused metrics collection from the Metrics menu. A state of
 -- its own: the password flag above is driven by the focused application and is
 -- cleared whenever focus moves, which would silently end a pause the user set.
 -- Never persisted, so every launch starts recording as its settings say.
 local _suspended = false
 
+-- Cross-driver privacy posture, read from the shared features manifest so the
+-- three drivers cannot drift. Linux had none of these: it recorded
+-- unconditionally, because the metrics section of the manifest did not list
 -- "linux" and the codegen emitted no manifest for this driver to read.
 --
 -- Where each toggle's user choice is kept, and the shape of that keeping: only a
@@ -264,15 +264,6 @@ local _secure_filter_enabled      = _DEFAULTS.secure_filter_enabled
 local _system_auth_filter_enabled = _DEFAULTS.system_auth_filter_enabled
 local _encrypt_enabled            = _DEFAULTS.encrypt
 
--- Whether the focused window is a private/incognito browser session. Set from
--- the focus-change callback, never computed on the keystroke path.
-local _private_window = false
-
--- Whether the AT-SPI adapter reported a secure field on the focused window.
--- Also set from the focus-change callback: the probe spawns a subprocess and
--- has no business running once per keystroke.
-local _secure_field = false
-
 -- Applications the user excluded from recording, as a lower-cased set; the
 -- configured list is `metrics.disabled_apps`.
 local _disabled_apps = {}
@@ -287,6 +278,15 @@ local function exclusion_set(list)
 	for _, app in ipairs(list) do set[app:lower()] = true end
 	return set
 end
+
+-- Whether the focused window is a private/incognito browser session. Set from
+-- the focus-change callback, never computed on the keystroke path.
+local _private_window = false
+
+-- Whether the AT-SPI adapter reported a secure field on the focused window.
+-- Also set from the focus-change callback: the probe spawns a subprocess and
+-- has no business running once per keystroke.
+local _secure_field = false
 
 -- Password managers and credential UIs (case-insensitive substring match on
 -- appId). Gated by metrics.secure_filter_enabled.
@@ -517,18 +517,18 @@ function M.init(opts)
 	_private_filter_enabled     = preferences["metrics.private_filter_enabled"]
 	_secure_filter_enabled      = preferences["metrics.secure_filter_enabled"]
 	_system_auth_filter_enabled = preferences["metrics.system_auth_filter_enabled"]
+	_disabled_list              = preferences["metrics.disabled_apps"]
+	_disabled_apps              = exclusion_set(_disabled_list)
 
 	_hold_token = {}
 	_hold_focus_app = nil
+	_suspended = false
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
 		_secure_apps   = _default_secure_apps()
 		_password_apps = _default_password_apps()
-	_suspended = false
 		for _, app in ipairs(options.password_apps) do
-	_disabled_list              = preferences["metrics.disabled_apps"]
-	_disabled_apps              = exclusion_set(_disabled_list)
 			_secure_apps[#_secure_apps + 1]     = app:lower()
 			_password_apps[#_password_apps + 1] = app:lower()
 		end
@@ -1245,6 +1245,21 @@ function M.is_password_app(app_id)
 	return false
 end
 
+--- Whether the user excluded this application from recording. Unlike a password
+--- application this blocks the metrics only: hotstrings and predictions work there.
+--- @param app_id string|nil Application identifier.
+--- @return boolean
+function M.is_app_excluded(app_id)
+	return type(app_id) == "string" and _disabled_apps[app_id:lower()] == true
+end
+
+--- Whether anything typed in this application must stay out of the metrics.
+--- @param app_id string|nil Application identifier.
+--- @return boolean
+function M.is_unrecorded_app(app_id)
+	return M.is_password_app(app_id) or M.is_app_excluded(app_id)
+end
+
 --- Applies the live application/window privacy filters to a joined context.
 --- Reads only in-memory policy; native metadata must already belong to its field.
 --- @param app_id string Exact current application's identifier.
@@ -1292,21 +1307,6 @@ end
 --- @param scancode number evdev code.
 --- @param held_ms number
 function M.record_hold(app_id, scancode, held_ms)
---- Whether the user excluded this application from recording. Unlike a password
---- application this blocks the metrics only: hotstrings and predictions work there.
---- @param app_id string|nil Application identifier.
---- @return boolean
-function M.is_app_excluded(app_id)
-	return type(app_id) == "string" and _disabled_apps[app_id:lower()] == true
-end
-
---- Whether anything typed in this application must stay out of the metrics.
---- @param app_id string|nil Application identifier.
---- @return boolean
-function M.is_unrecorded_app(app_id)
-	return M.is_password_app(app_id) or M.is_app_excluded(app_id)
-end
-
 	if not may_record() then return end
 	if type(app_id) ~= "string" or app_id == "" then return end
 	local code = tonumber(scancode)
@@ -1406,6 +1406,30 @@ function M.is_suppressed()
 	return _suppressed
 end
 
+--- Pauses metrics collection at the user's request. Idempotent. The pause is
+--- independent of the password flag: leaving a secure field does not end it.
+function M.suspend_collection()
+	if not _suspended then
+		_suspended = true
+		settle_hold_policy()
+		Logger.info(LOG, "Metrics collection suspended by the user.")
+	end
+end
+
+--- Ends the user's pause. Nothing typed meanwhile is recovered.
+function M.resume_collection()
+	if _suspended then
+		_suspended = false
+		Logger.info(LOG, "Metrics collection resumed by the user.")
+	end
+end
+
+--- Returns whether the user paused metrics collection.
+--- @return boolean
+function M.is_collection_suspended()
+	return _suspended
+end
+
 --- Turns keystroke collection on or off. The Linux driver had no off switch at
 --- all; the other two drivers have had one since they shipped.
 --- @param enabled boolean
@@ -1446,30 +1470,6 @@ function M.set_secure_field(is_secure)
 end
 
 --- Admits one privacy-filter change, or says why it was refused. A metrics
---- Pauses metrics collection at the user's request. Idempotent. The pause is
---- independent of the password flag: leaving a secure field does not end it.
-function M.suspend_collection()
-	if not _suspended then
-		_suspended = true
-		settle_hold_policy()
-		Logger.info(LOG, "Metrics collection suspended by the user.")
-	end
-end
-
---- Ends the user's pause. Nothing typed meanwhile is recovered.
-function M.resume_collection()
-	if _suspended then
-		_suspended = false
-		Logger.info(LOG, "Metrics collection resumed by the user.")
-	end
-end
-
---- Returns whether the user paused metrics collection.
---- @return boolean
-function M.is_collection_suspended()
-	return _suspended
-end
-
 --- scope that still owes a rollback holds the preferences; the click then
 --- changes nothing, and it must not do so silently.
 --- @param label string Filter name for the log.
@@ -1492,6 +1492,41 @@ function M.set_private_filter_enabled(enabled)
 	_private_filter_enabled = wanted
 	settle_hold_policy()
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
+	return true
+end
+
+--- The application last reported in the foreground, for the exclusion menu.
+--- @return string|nil app_id
+function M.last_app()
+	return _hold_focus_app
+end
+
+--- Returns the configured exclusion list, in its stored order.
+--- @return table apps A detached list.
+function M.get_disabled_apps()
+	local copy = {}
+	for index, app in ipairs(_disabled_list) do copy[index] = app end
+	return copy
+end
+
+--- Replaces the list of applications excluded from recording.
+--- @param apps table Application identifiers.
+--- @return boolean persisted
+function M.set_disabled_apps(apps)
+	if not admit_filter_change("Excluded-applications") then return false end
+	if type(apps) ~= "table" then return false end
+	for _, app in ipairs(apps) do
+		if type(app) ~= "string" or app == "" then return false end
+	end
+	if not Preferences.set(PREF_PREFIX .. "disabled_apps", apps) then
+		Logger.error(LOG, "The excluded applications were not persisted — the list was not changed.")
+		return false
+	end
+	_disabled_list = {}
+	for index, app in ipairs(apps) do _disabled_list[index] = app end
+	_disabled_apps = exclusion_set(_disabled_list)
+	settle_hold_policy()
+	Logger.debug(LOG, "Excluded applications: %d.", #apps)
 	return true
 end
 
@@ -1566,41 +1601,6 @@ function M.migrate_stored_text()
 	return TextMigration.start(
 		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
 		_device_id)
---- The application last reported in the foreground, for the exclusion menu.
---- @return string|nil app_id
-function M.last_app()
-	return _hold_focus_app
-end
-
---- Returns the configured exclusion list, in its stored order.
---- @return table apps A detached list.
-function M.get_disabled_apps()
-	local copy = {}
-	for index, app in ipairs(_disabled_list) do copy[index] = app end
-	return copy
-end
-
---- Replaces the list of applications excluded from recording.
---- @param apps table Application identifiers.
---- @return boolean persisted
-function M.set_disabled_apps(apps)
-	if not admit_filter_change("Excluded-applications") then return false end
-	if type(apps) ~= "table" then return false end
-	for _, app in ipairs(apps) do
-		if type(app) ~= "string" or app == "" then return false end
-	end
-	if not Preferences.set(PREF_PREFIX .. "disabled_apps", apps) then
-		Logger.error(LOG, "The excluded applications were not persisted — the list was not changed.")
-		return false
-	end
-	_disabled_list = {}
-	for index, app in ipairs(apps) do _disabled_list[index] = app end
-	_disabled_apps = exclusion_set(_disabled_list)
-	settle_hold_policy()
-	Logger.debug(LOG, "Excluded applications: %d.", #apps)
-	return true
-end
-
 end
 
 --- Advances the at-rest migration by one bounded batch.
@@ -1645,6 +1645,7 @@ function M.configuration_snapshot()
 		system_auth_filter_enabled = _system_auth_filter_enabled,
 		encrypt = _encrypt_enabled,
 		cipher_enabled = TextCipher.is_enabled(),
+		disabled_apps = M.get_disabled_apps(),
 	}
 end
 
@@ -1658,6 +1659,10 @@ function M.apply_configuration(candidate)
 	for _, key in ipairs({ "enabled", "private_filter_enabled", "secure_filter_enabled",
 		"system_auth_filter_enabled", "encrypt", "cipher_enabled" }) do
 		if type(candidate[key]) ~= "boolean" then return false end
+	end
+	if type(candidate.disabled_apps) ~= "table" then return false end
+	for _, app in ipairs(candidate.disabled_apps) do
+		if type(app) ~= "string" then return false end
 	end
 	if TextCipher.is_enabled() ~= candidate.cipher_enabled then
 		if candidate.cipher_enabled and not TextCipher.is_available() then
@@ -1675,6 +1680,9 @@ function M.apply_configuration(candidate)
 	_secure_filter_enabled = candidate.secure_filter_enabled
 	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
 	_encrypt_enabled = candidate.encrypt
+	_disabled_list = {}
+	for index, app in ipairs(candidate.disabled_apps) do _disabled_list[index] = app end
+	_disabled_apps = exclusion_set(_disabled_list)
 	settle_hold_policy()
 	Logger.debug(LOG, "Collector configuration applied without historical conversion.")
 	return true
@@ -1692,6 +1700,7 @@ function M.get_privacy_state()
 		private_window             = _private_window,
 		secure_field               = _secure_field,
 		suppressed                 = _suppressed,
+		suspended                  = _suspended,
 	}
 end
 
@@ -1716,7 +1725,6 @@ function M.export_session()
 
 	return {
 		session_started_ms = _session_started_at,
-		disabled_apps = M.get_disabled_apps(),
 		exported_at_ms     = os.time() * 1000,
 		keystrokes         = stats.keystrokes,
 		words              = stats.words,
@@ -1724,6 +1732,7 @@ function M.export_session()
 		wpm                = wpm,
 		apps               = apps,
 		suppressed         = _suppressed,
+		suspended          = _suspended,
 	}
 end
 
@@ -1731,16 +1740,11 @@ end
 --- @return string
 function M.export_json()
 	local data = M.export_session()
-	if type(candidate.disabled_apps) ~= "table" then return false end
-	for _, app in ipairs(candidate.disabled_apps) do
-		if type(app) ~= "string" then return false end
-	end
 	return _to_json(data)
 end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
 local function copy_flush_value(value)
-		suspended                  = _suspended,
 	if type(value) ~= "table" then return value end
 	local result = {}
 	for key, item in pairs(value) do result[key] = copy_flush_value(item) end
@@ -1752,9 +1756,6 @@ end
 local OPEN_SESSION_FIELDS = { "char_count", "total_ms" }
 local OPEN_BURST_FIELDS = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" }
 
-	_disabled_list = {}
-	for index, app in ipairs(candidate.disabled_apps) do _disabled_list[index] = app end
-	_disabled_apps = exclusion_set(_disabled_list)
 --- Encodes the sessions and bursts the walk contexts hold open, canonically, so
 --- an unchanged state encodes to the same text and causes no write.
 --- @param contexts table Walk contexts by application id.
@@ -1772,7 +1773,6 @@ local function encode_open_walk(contexts)
 		if type(ctx.date) == "string" and type(ctx.app) == "string" and (ctx.session or ctx.burst) then
 			records[#records + 1] = { date = ctx.date, app = ctx.app, text = "{\"date\":" .. Json.encode(ctx.date)
 				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(ctx.session, OPEN_SESSION_FIELDS)
-		suspended          = _suspended,
 				.. ",\"burst\":" .. cursor(ctx.burst, OPEN_BURST_FIELDS) .. "}" }
 		end
 	end

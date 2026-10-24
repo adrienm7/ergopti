@@ -1086,6 +1086,29 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 		return Fired
 }
 
+; The factor that widens the expansion delay for a complex keystroke (PAR-7);
+; the same rule as hotstring_engine.complex_delay_multiplier on macOS and Linux.
+; The factor and the carry are the shared timing registry's
+; [hotstrings] complex_key_delay_multiplier / complex_key_carry_ms.
+; @param ExpanderComplex {Boolean} Shift/Alt/AltGr held on the expander keystroke.
+; @param ReferenceComplex {Boolean} The same for the reference (last letter) keystroke.
+; @param GapMs {Integer} Reference-to-expander gap in milliseconds.
+; @param Widenable {Boolean} False for a category that is never widened (autocorrection).
+; @returns {Integer} The registry's multiplier, or 1.
+HSE_ComplexDelayMultiplier(ExpanderComplex, ReferenceComplex, GapMs, Widenable) {
+		Multiplier := TimingsGet("hotstrings", "complex_key_delay_multiplier")
+		CarryMs := TimingsGet("hotstrings", "complex_key_carry_ms")
+		if (Multiplier < 1 or CarryMs < 0)
+				throw ValueError("HSE_ComplexDelayMultiplier: the registry values are out of range.")
+		if !Widenable
+				return 1
+		if ExpanderComplex
+				return Multiplier
+		if (ReferenceComplex and GapMs <= CarryMs)
+				return Multiplier
+		return 1
+}
+
 ; Resolve every dispatch gate into one immutable decision shared by the preview
 ; and the fire path. Keeping time, casing and callable resolution below in one
 ; owner prevents a tooltip from advertising a matcher winner that dispatch will
@@ -1096,7 +1119,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 ; @return Canonical decision object, or "" when dispatch must decline.
 _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 		TypoNbspStripped := false, FrozenResolvedBase := unset, NowTick := unset) {
-		global LastSentCharacterKeyTime
+		global LastSentCharacterKeyTime, LastSentCharacterKeyComplex
 		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
 				return ""
 		if (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
@@ -1129,6 +1152,12 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 						return ""
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
 				ElapsedMs := TickElapsed(GateOriginTick, NowTick?)
+				; A complex keystroke widens the allowed delay, never the measured gap.
+				Widenable := !(Spec.HasOwnProp("Category") and Spec.Category = "autocorrection")
+				GateDurationMs := Min(0xFFFFFFFF, GateDurationMs * HSE_ComplexDelayMultiplier(
+						HSE_KeyIsComplex(),
+						LastSentCharacterKeyComplex.Has(PrevKey) and LastSentCharacterKeyComplex[PrevKey],
+						ElapsedMs, Widenable))
 				; Preserve the engine's existing strict comparison: equality is the last
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so
 				; it never paints a promise with no usable interaction window.

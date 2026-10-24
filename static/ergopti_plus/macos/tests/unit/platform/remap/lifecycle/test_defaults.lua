@@ -53,9 +53,11 @@ helpers.describe("karabiner.defaults: combos table", function()
 	end)
 
 	helpers.it("contains the documented rcmd combos", function()
-		helpers.assert_true(D.combos.rcmd_caps ~= nil)
-		helpers.assert_eq(D.combos.rcmd_caps[1], "capsword")
-		helpers.assert_eq(D.combos.rcmd_lcmd[1], "opt_backspace")
+		-- The three key-combination defaults Windows and Linux ship, by position:
+		-- AltGr (right Cmd) then LAlt (left Cmd), AltGr then Caps, LAlt then Caps.
+		helpers.assert_eq(D.combos.rcmd_lcmd[2], "opt_backspace")
+		helpers.assert_eq(D.combos.rcmd_caps[2], "opt_delete_fwd")
+		helpers.assert_eq(D.combos.lcmd_caps[2], "capsword")
 	end)
 end)
 
@@ -82,12 +84,15 @@ helpers.describe("karabiner.defaults: full set loaded from shared TOML", functio
 	helpers.it("preserves sentinel tap/hold defaults", function()
 		helpers.assert_eq(D.tap_hold.caps_lock[1], "return")
 		helpers.assert_eq(D.tap_hold.caps_lock[2], "cmd")
-		helpers.assert_eq(D.tap_hold.tab[1], "alt_tab_windows")
-		helpers.assert_eq(D.tap_hold.tab[2], "fn")
+		helpers.assert_eq(D.tap_hold.tab[1], "alt_tab_monitor")
+		helpers.assert_eq(D.tap_hold.tab[2], "alt")
 		helpers.assert_eq(D.tap_hold.left_command[2], "layer")
 	end)
 
-	helpers.it("preserves the rcmd_lcmd asymmetric hold (option_shift)", function()
-		helpers.assert_eq(D.combos.rcmd_lcmd[3], "option_shift")
+	helpers.it("ships no chord and no hold in the combination matrix (Windows and Linux have none)", function()
+		for id, slots in pairs(D.combos) do
+			helpers.assert_eq(slots[1], "none", id .. " combo slot")
+			helpers.assert_eq(slots[3], "none", id .. " hold slot")
+		end
 	end)
 end)

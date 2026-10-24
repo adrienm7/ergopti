@@ -4088,6 +4088,29 @@ jobs:
           bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
           echo "... $bundle_entries entries"
 
+      - name: Sign the update asset (detached signature)
+        # PAR-30: the updaters verify <asset>.sig against the key in
+        # _shared/modules/updater/asset_signing.json. Until the maintainer has
+        # provisioned the key (docs/tooling/update-signing.md) the policy is "off"
+        # and a missing secret only warns; once it is "required" a release
+        # without the secret fails here.
+        if: ${{ inputs.release }}
+        shell: bash
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          enforcement=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/asset_signing.json').enforcement")
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+              if [ "$enforcement" = "required" ]; then
+                  echo "::error::the update signature policy is 'required' but the UPDATE_SIGNING_KEY secret is empty: no update would verify."
+                  exit 1
+              fi
+              echo "::warning::UPDATE_SIGNING_KEY is not set and the policy is 'off': the bundle is published without a detached signature."
+              exit 0
+          fi
+          node tools/build/update-asset-signature.cjs sign "build/linux/$LINUX_BUNDLE_ASSET"
+
       - name: Install the packaging toolchains
         # rpmbuild is not on the runner image. appimagetool runs in the AppImage
         # build container above.
@@ -4237,6 +4260,7 @@ jobs:
             build/linux/xkb/Ergopti_xkb.zip
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sig
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-x86_64.rpm
             build/linux/ErgoptiPlus-x86_64.AppImage
@@ -4338,8 +4362,9 @@ jobs:
 
       - name: Install the Flatpak toolchain
         shell: bash
-        # A stalled Flathub download must fail the job, not hold the lane for 45 minutes.
-        timeout-minutes: 20
+        # A stalled Flathub download is cut after 12 minutes and retried once; the job
+        # budget covers the apt install and both bounded attempts.
+        timeout-minutes: 30
         run: |
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y flatpak flatpak-builder
@@ -4347,7 +4372,16 @@ jobs:
               echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           version='${{ steps.flatpak-runtime.outputs.version }}'
-          flatpak install --user -y flathub "org.freedesktop.Platform//$version" "org.freedesktop.Sdk//$version"
+          for attempt in 1 2; do
+              if timeout 12m flatpak install --user -y flathub "org.freedesktop.Platform//$version" "org.freedesktop.Sdk//$version"; then
+                  break
+              fi
+              echo "::warning::Flatpak runtime download attempt $attempt of 2 failed or exceeded 12 minutes"
+              if [ "$attempt" = 2 ]; then
+                  echo "::error::Flatpak runtime download failed twice"
+                  exit 1
+              fi
+          done
 
       - name: Save the Flatpak runtimes
         if: steps.flatpak-cache.outputs.cache-hit != 'true'

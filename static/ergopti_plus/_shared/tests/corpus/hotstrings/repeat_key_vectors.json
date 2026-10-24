@@ -2,7 +2,9 @@
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings.v1.json",
 	"description": "Cross-driver repeat-key vectors (PAR-2): the magic key typed after a character that no hotstring claimed doubles that character, but only mid-word. Replayed by the Windows engine (HSE_TryRepeatKey), the macOS expander (try_repeat_feature) and the Linux rule (repeat_key.resolve). Only cases on which the three drivers agree belong here.",
 	"field_semantics": {
-		"buffer": "The typed buffer INCLUDING the magic key just typed, which is the last character of the buffer. The buffer starts at a word boundary.",
+		"buffer": "The typed buffer INCLUDING the magic key just typed, which is the last character of the buffer. The buffer starts at a word boundary unless start_is_word_boundary says otherwise.",
+		"start_is_word_boundary": "Optional, true when absent: whether the buffer's own start abuts a word boundary. When false the buffer's first character may be the middle of an older word.",
+		"word_character": "One rule on the three drivers, _shared/lua/text_utils is_hotstring_word_char: every non-ASCII character, @, letters, digits and underscore are word characters; a space, newline, punctuation, quote, parenthesis or hyphen is not.",
 		"magic_key": "The magic key in effect.",
 		"fires": "Whether the repeat fires.",
 		"replacement": "When it fires: the character that is doubled, so the buffer afterwards is the buffer without the magic key plus this character."
@@ -87,6 +89,60 @@
 			"buffer": "★",
 			"magic_key": "★",
 			"fires": false
+		},
+		{
+			"id": "digit_predecessor_doubles",
+			"description": "A digit is a word character: the letter after it is not a word start.",
+			"buffer": "1a★",
+			"magic_key": "★",
+			"fires": true,
+			"replacement": "a"
+		},
+		{
+			"id": "underscore_predecessor_doubles",
+			"description": "An underscore is a word character.",
+			"buffer": "_a★",
+			"magic_key": "★",
+			"fires": true,
+			"replacement": "a"
+		},
+		{
+			"id": "opening_parenthesis_is_a_word_start",
+			"description": "A parenthesis is not a word character: the letter after it is the first of its word.",
+			"buffer": "x (a★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "hyphen_is_a_word_start",
+			"description": "A hyphen is not a word character.",
+			"buffer": "x -a★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "two_magic_keys_are_not_a_repeat",
+			"description": "The key repeating itself is a second trigger, never doubled.",
+			"buffer": "ab★★",
+			"magic_key": "★",
+			"fires": false
+		},
+		{
+			"id": "unknown_buffer_start_refuses_the_first_letter",
+			"description": "When the buffer's start is not a known word boundary its first character may be the tail of an older word, so a repeat resting on it is refused.",
+			"buffer": "ab★",
+			"magic_key": "★",
+			"start_is_word_boundary": false,
+			"fires": false
+		},
+		{
+			"id": "unknown_buffer_start_allows_a_later_letter",
+			"description": "With a third character the repeat does not rest on the buffer's first one.",
+			"buffer": "abc★",
+			"magic_key": "★",
+			"start_is_word_boundary": false,
+			"fires": true,
+			"replacement": "c"
 		},
 		{
 			"id": "user_chosen_magic_key",

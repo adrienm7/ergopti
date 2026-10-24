@@ -15,6 +15,9 @@ and makes stale details harder to notice.
   logging, i18n, menus, and cross-driver invariants.
 - [Windows and AutoHotkey](windows-ahk.md) — AHK v2 syntax, startup, callbacks,
   suspension, files, menus, WebView2, and the native DLL build.
+- [Windows live checks](windows-live-checks.md) — driving a real, isolated
+  Windows driver for the maintainer's checks: smoke hooks, tray clicks, timers
+  and modal dialogs, real keys, and why a second driver spoils them.
 - [macOS and Hammerspoon](macos-hammerspoon.md) — event taps, lifecycle
   ownership, timers, tasks, clipboard, Karabiner, test isolation, packaging,
   and AppleEvents.

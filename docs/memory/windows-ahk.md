@@ -508,6 +508,62 @@ prediction accepted by the physical Tab (SC00F, #InputLevel 2) was typed at
 level 2 (`test_llm_accept_injects_exact_text.ahk`,
 `test-windows-llm-accept-injection.cjs`).
 
+### project-hotstring-output-is-final
+
+A hotstring's output is never read back from the keyboard, and no global
+`SendMode("Event")` carries that: `HSE_DispatchMatch` sends one `SendInput`
+(erase, text, end character), the engine commits the edit to `HSE_Buffer`
+itself, and the prefix watcher and the hook dispatcher (`I1`) ignore SendLevel 0. The mode only governs plain `Send`, `Click` and `MouseMove` (the gestures
+hold buttons with `Click`; `SendInput` would remove the mouse hook around
+them). Layout output is the opposite case: `SendNewResult` is a `SendEvent` at
+the hotkey's level 2 because it stands in for the key the user struck, and the
+watcher must see it to complete a typed trigger.
+Two hazards. A burst sent at the caller's level cascades: the Space tap-hold
+completes a trigger from its #InputLevel 2 thread, and with another AutoHotkey
+keyboard hook running `SendInput` falls back to `SendEvent`, so a level-2 burst
+re-entered the watcher as typed input and fired A, B, C with an engine buffer
+that no longer matched the screen. So every expansion burst goes through
+`_TextSenderAtSendLevel` (and the ellipsis and ê dead-key callbacks through
+`SendNewResult(..., Atomic := true)`). A thread that sends before its first
+`Sleep` also hands its level to the callbacks that run inside the wait: a test
+that sets `SendLevel(2)` in the auto-execute thread makes every InputHook
+callback inherit it, so type from a timer thread.
+Action: keep an expansion at TEXT_SENDER_SEND_LEVEL; never re-feed it.
+
+Chaining nevertheless works, and has for years (`ab` gives `cd`, `cde` gives
+`xyz`, so `abe` gives `xyz`; `at★`, `att★`, `attention★` give the sign by
+typing the magic key three times). The mechanism is buffer continuity, not the
+primitive: `HSE_ApplyExpansion` rewrites `HSE_Buffer` to what the screen now
+holds (trigger stripped, replacement and re-emitted end character appended), so
+the NEXT typed character is matched against the output plus the keystroke. The
+shared Lua engine does the same in `apply_expansion`. A trigger wholly inside an
+output fires nothing alone, which is also why no loop exists. Proven on the real
+engine with SendEvent and SendInput, from the watcher, the plain path and the
+Space tap-hold, on HEAD and on the sources before the level change: the level-0
+change did not touch it (`test_hotstring_chaining.ahk`, `--interactive`). Any
+change that stops committing the expansion to the buffer, or that clears it
+(`HSE_HardReset`, a wipe after a fire), breaks chaining. The earlier note that
+chaining does not exist was wrong: it only looked for a re-feed of the output.
+
+Layout emulation stays a `SendEvent` on purpose (decided 2026-10-23 with live
+numbers): `_RemapEmit` measured mean 2.1 to 2.6 ms and max 5.7 ms per emitted key
+over several hundred keystrokes in the maintainer's log (`SetKeyDelay(0)` is set
+globally), so `SendInput` could win about 2 ms a key, below what typing can
+feel, against real risks: the emit is the only trace of the key its level-2
+hotkey suppresses and must reach the watcher in order under Critical,
+`{Blind}`/AltGr/Kana modifier semantics are those of the hook path, every
+`SendInput` reinstalls AutoHotkey's hook in front of the native owner, and with
+another AutoHotkey hook it falls back to `SendEvent` anyway. The terminal paced
+burst stays `SendEvent` for `SetKeyDelay` pacing (the live log's `HSE.Dispatch`
+is 0.1 to 3.5 ms for GUI expansions, SendInput, and 20 to 64 ms for the paced
+terminal and Notepad ones, which is the 20 ms key delay and the native edit, not
+the primitive); modifier releases
+(`config_io`, `error_net`, `lifecycle`) need the hook path. Expansions, the
+ellipsis, the ê dead key, TextSender, predictions and paste already use
+`SendInput`.
+`tests/unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk` and
+`test_hotstring_chaining.ahk` (`--interactive` adds the real engine and keyboard).
+
 ### project-ahk-hotif-variant-precedence
 
 When several `#HotIf` variants of one hotkey are eligible, AutoHotkey fires the

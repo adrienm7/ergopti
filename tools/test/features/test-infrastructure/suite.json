@@ -465,6 +465,30 @@
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-not-executed.cjs"],
 			"repro": "npm run test:ahk-not-executed"
+		},
+		{
+			"id": "js-0459",
+			"ordinal": 459,
+			"name": "layout composer page: per-layer model rendering and bridge actions",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-composer-page.cjs"],
+			"repro": "node tools/test/test-layout-composer-page.cjs"
+		},
+		{
+			"id": "js-0460",
+			"ordinal": 460,
+			"name": "Windows native owner hook stays first after the AutoHotkey SendInput rehook",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-native-hook-front.cjs"],
+			"repro": "node tools/test/test-windows-native-hook-front.cjs"
+		},
+		{
+			"id": "js-0461",
+			"ordinal": 461,
+			"name": "Windows replayed edge: what AutoHotkey consumers make of it",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-replay-consumers.cjs"],
+			"repro": "node tools/test/test-windows-replay-consumers.cjs"
 		}
 	]
 }

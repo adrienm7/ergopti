@@ -1052,6 +1052,8 @@ function M.try_repeat_feature(chars, is_ignored)
 
 	-- Refuse to repeat whitespace — repeating a space or newline is never useful.
 	if last_char == "" or last_char:match("^%s$") then return false end
+	-- Two magic keys in a row are a second trigger, not a repeat.
+	if last_char == _state.magic_key then return false end
 
 	-- Refuse to repeat the first letter of a word: the char before last_char
 	-- must itself be a non-whitespace letter. Without this guard "c★" would
@@ -1065,9 +1067,15 @@ function M.try_repeat_feature(chars, is_ignored)
 		pred_offset = ok_pred and off_pred or nil
 	end
 	local pred_char   = pred_offset and before_last:sub(pred_offset) or ""
-	if pred_char == "" or pred_char:match("^%s$") or not text_utils.is_letter_char(pred_char) then
+	-- The shared word-character rule (Windows HSE_IsWordChar, Linux repeat_key)
+	-- on both characters: a digit or "_" counts, "(" or "-" does not.
+	if pred_char == "" or not text_utils.is_hotstring_word_char(pred_char)
+		or not text_utils.is_hotstring_word_char(last_char) then
 		return false
 	end
+	-- The predecessor is the buffer's first character and its start is not known
+	-- to be a word start: it may be the tail of an older word.
+	if before_last == pred_char and _state.start_is_word_boundary == false then return false end
 
 	local next_buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
 	local replaced = M.perform_text_replacement(

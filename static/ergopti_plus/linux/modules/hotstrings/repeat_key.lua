@@ -200,8 +200,12 @@ end
 ---
 --- @param buffer string The typed buffer INCLUDING the magic key just typed.
 --- @param magic_key string The character in effect.
+--- @param start_is_boundary boolean|nil Whether the buffer's own start abuts a word
+---   boundary (engine:buffer_starts_at_word_boundary()); nil means it does. When
+---   false the first character of the buffer may be the middle of a word, so a
+---   repeat that rests on it is refused, as on Windows and macOS.
 --- @return table|nil { backspace_count, replacement } or nil when it must not fire.
-function M.resolve(buffer, magic_key)
+function M.resolve(buffer, magic_key, start_is_boundary)
 	if type(buffer) ~= "string" or type(magic_key) ~= "string" or magic_key == "" then
 		return nil
 	end
@@ -224,10 +228,14 @@ function M.resolve(buffer, magic_key)
 	-- before it, `c★` is the start of a word, where the user typed the key to ask
 	-- for a text expansion and doubling the letter replaces it with `cc`.
 	if not TextUtils.is_hotstring_word_char(previous) then return nil end
-	local before_previous = last_codepoint(before:sub(1, #before - #previous))
+	local rest = before:sub(1, #before - #previous)
+	local before_previous = last_codepoint(rest)
 	if not before_previous or not TextUtils.is_hotstring_word_char(before_previous) then
 		return nil
 	end
+	-- The character before the repeated one is the buffer's first and its start
+	-- is not known to be a word start: it may be the tail of an older word.
+	if start_is_boundary == false and #rest == #before_previous then return nil end
 
 	return {
 		-- Erase the magic key only; the character before it stays and is joined by

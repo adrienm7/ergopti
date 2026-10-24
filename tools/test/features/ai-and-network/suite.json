@@ -377,6 +377,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-managed-ollama-no-cloud.cjs"],
 			"repro": "npm run test:managed-ollama-no-cloud"
+		},
+		{
+			"id": "js-0456",
+			"ordinal": 456,
+			"name": "managed Ollama PAC route (launcher role, shell admission and daemon environment)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-managed-proxy-route-contract.cjs"],
+			"repro": "node tools/test/test-managed-proxy-route-contract.cjs"
 		}
 	]
 }

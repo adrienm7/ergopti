@@ -137,7 +137,13 @@ a CA file. uv comes from its pinned PyPI wheel (`uv-release.sh`), and a native
 Python 3.11–3.14 builds the venv without the managed interpreter download from
 GitHub. Failures use the shared classes (certificate, proxy, host_blocked,
 offline) and `network.failure.*` sentences with their actions. Never log the
-word "proxy" in a normal line: the shared classifier matches it bare.
+word "proxy" in a normal line: the shared classifier matches it bare. A stock
+Ollama daemon Ergopti starts reads only HTTPS_PROXY, so under a PAC-only
+network `network-retry.sh` asks the launcher role `--managed-proxy-route` for
+the registry origin (`resolve_system_route_for_probe`, enabled by
+`pac_probe_url` of the prelude) and exports the first route, or nothing for
+DIRECT; the pull is admitted only then, and a daemon start whose lookup fails
+still starts. Only the failing stage code is logged, never the route.
 
 ### project-managed-ollama-native-hooks-follow-the-pinned-source
 
@@ -778,14 +784,24 @@ HS-274 stream. It runs only while Tap-Hold is on; metrics-only users keep the
 Quartz event tap, exact when nothing is remapped. Mechanisms future work must
 keep: the console user server takes its configuration from `$XDG_CONFIG_HOME`,
 so Ergopti owns a complete `karabiner.json` without a source patch; the daemon
-ungrabs when its console-user peer closes, so the owner must start that peer
-with the owner-PID watch WP4 adds; root binaries run only from a root-owned
+ungrabs when its console-user peer closes, and that peer is owned by the signed
+launcher's `--installed-physical-source` role (ADR 011 decision 8), never by a
+Lua-spawned process: the Lua owner spawns nothing and is READY only when the
+capture admits its first stream, and a managed capture session is single-use
+per Lua VM (a restart takes a reload); root binaries run only from a root-owned
 `/Library/Application Support/ErgoptiPlus/…` copy, never from the
 user-writable app bundle; upstream `same_team_id` trusts every peer of an
 unsigned daemon, so the fork must pin the Ergopti certificate leaf before it is
 distributed. A selected stream never falls back to Quartz or the ledger when it
 is lost: it records a gap. Never ship the 10-product « complete candidate » or
 keep the Updater, which can replace the fork with official binaries.
+The consented « close other Karabiner instances » option runs Karabiner's own
+quit steps through its `Non-Privileged Agents` helper (`unregister-core-agents`
+and the optional agent steps) and counts the user-side console process, not the
+product name: `pgrep -f Karabiner-Elements` also matches an installed but idle
+root daemon and would block owned mode forever. A lease record names its
+runtime (`shared` or `owned`), so a guardian never fences an owned token
+through a stock tool that may not exist, which would retry forever.
 
 ### project-hs-karabiner-switch-precedes-lease-and-guardian
 

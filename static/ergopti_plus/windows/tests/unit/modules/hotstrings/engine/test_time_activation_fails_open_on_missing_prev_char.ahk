@@ -109,19 +109,24 @@ _TGC_Vectors() {
 }
 
 _TGC_Replay(Vector) {
-	global LastSentCharacterKeyTime, HSE_LastEndChar, ScriptInformation
+	global LastSentCharacterKeyTime, LastSentCharacterKeyComplex, HSE_LastEndChar, ScriptInformation
+	global HSE_ComplexKeyOverride, _TimingsCache
+	if (Type(_TimingsCache) != "Map")
+		TimingsLoadShared()
 	Delay := Vector["delay_s"]
 	Opts := Map("OnlyText", true, "Priority", HSE_PRIORITY_COMMON, "TimeActivationSeconds", Delay)
 	Trigger := Vector["trigger"]
 	Base := A_TickCount
 	Typed := Vector["typed"]
 	LastSentCharacterKeyTime := Map()
+	LastSentCharacterKeyComplex := Map()
 	Missing := Vector.Has("reference_time_missing") && Vector["reference_time_missing"]
 	Reference := Vector["reference_char"]
 	for Key in Typed {
 		if (Missing && Key["char"] == Reference)
 			continue
 		LastSentCharacterKeyTime[Key["char"]] := Base + Key["down_ms"]
+		LastSentCharacterKeyComplex[Key["char"]] := Key.Has("complex") and Key["complex"] ? true : false
 	}
 	Expander := Vector["expander"]
 	GateTick := Base + Expander["down_ms"]
@@ -149,7 +154,12 @@ _TGC_Replay(Vector) {
 		Match := HSE_FeedChar(Char, true)
 	AssertTrue(IsObject(Match), Vector["id"] . ": the typed text must complete the trigger")
 	Effect := 0
-	Fired := HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect, false, unset, GateTick)
+	; The expander keystroke's Shift/Alt/AltGr state is the vector's.
+	HSE_ComplexKeyOverride := Expander.Has("complex") and Expander["complex"] ? true : false
+	try
+		Fired := HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect, false, unset, GateTick)
+	finally
+		HSE_ComplexKeyOverride := ""
 	AssertEqual(Vector["fires"] ? true : false, Fired ? true : false,
 		Vector["id"] . ": the delay gate verdict")
 }

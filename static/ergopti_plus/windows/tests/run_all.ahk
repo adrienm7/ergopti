@@ -385,6 +385,7 @@ SFD_ConfigureUiaWorker(
 ; CapsWord auto-off listeners: definitions only (capsword.ahk, with its
 ; hotkeys, stays out of the runner; the stubs stand in for DisableCapsWord).
 #Include ../modules/shortcuts/capsword_auto_off.ahk
+#Include ../infra/capsword_state.ahk
 #Include ../adapters/keyboard_hook.ahk
 #Include ../ui/editors.ahk
 
@@ -588,6 +589,7 @@ InstallSendNoOps()
 #Include unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk
 #Include unit/modules/shortcuts/test_caps_word_auto_off_policy.ahk
 #Include unit/modules/shortcuts/test_capsword_auto_off.ahk
+#Include unit/modules/shortcuts/test_capsword_state.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
 #Include unit/modules/updater/test_updater_release_fetch.ahk
@@ -596,6 +598,7 @@ InstallSendNoOps()
 #Include unit/modules/updater/test_updater_tray_root.ahk
 #Include unit/modules/updater/test_updater_install_deadlines.ahk
 #Include unit/modules/updater/test_updater_channel_bundle.ahk
+#Include unit/modules/updater/test_asset_signature.ahk
 #Include unit/modules/updater/test_updater_managed_failure.ahk
 #Include unit/modules/updater/test_release_install.ahk
 #Include unit/infra/lifecycle/test_uninstall.ahk
@@ -773,8 +776,14 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/keymap/test_layout_extension_refresh.ahk
 #Include unit/modules/hotstrings/catalogue/test_ergopti_extension_hotstrings.ahk
 #Include ../ui/layout_manager/init.ahk
+#Include ../ui/layout_manager/composer.ahk
+#Include ../ui/layout_manager/composer_check.ahk
+#Include ../ui/field_check/network_check.ahk
 #Include ../ui/menu/menu_layout.ahk
 #Include unit/modules/keymap/test_layout_manager_host.ahk
+#Include unit/modules/keymap/test_layout_composer_host.ahk
+#Include unit/modules/keymap/test_layout_composer_check.ahk
+#Include unit/ui/field_check/test_network_check.ahk
 #Include unit/modules/keymap/test_ergopti_keylayout_tables.ahk
 #Include unit/modules/keymap/test_layout_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
@@ -1846,14 +1855,14 @@ _LogBootProgress("keystats modules + tests included")
 #Include unit/modules/hotstrings/engine/test_hotstring_send_failure_containment.ahk
 #Include unit/modules/hotstrings/engine/test_title_timeout_does_not_eat_expansion.ahk
 #Include unit/modules/hotstrings/engine/test_hse_send_failure_transaction.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
+#Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include meta/modules/hotstrings/catalogue/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/modules/keystats/ergonomics/test_ergo_flow_gap_end.ahk
 #Include meta/infra/config/persistence/test_config_window_patch_toml_meta_error.ahk
 #Include meta/platform/remap/keys/test_capsword_mouse_clobber.ahk
 #Include unit/infra/dispatch/test_timer_scheduler_suspend.ahk
 #Include meta/modules/hotstrings/magic_key/test_magic_key_probe_deadkey_safe.ahk
-#Include unit/modules/hotstrings/engine/test_hotstring_output_is_final.ahk
-#Include unit/modules/hotstrings/engine/test_hotstring_chaining.ahk
 #Include meta/ui/menu/test_script_shortcut_labels_locale.ahk
 #Include meta/platform/remap/altgr/test_altgr_chord_debounce_per_slot.ahk
 #Include meta/modules/keystats/ergonomics/test_roi_halflife_threshold_reachable.ahk
