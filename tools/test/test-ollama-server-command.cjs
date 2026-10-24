@@ -35,6 +35,12 @@ function buildCommand(fakeBinary, logFile) {
 		// stat, so this host stand-in reports the regular files the builder
 		// locates (the bundled network policy and daemon owner) as present.
 		'hs = { fs = { attributes = function(p) local f = io.open(p, "rb"); if not f then return nil end; f:close(); return { mode = "file" } end } }',
+		// The prelude reads the shared route inventory through read_with_status,
+		// whose symlink-safe walk needs hs.fs.dir and symlinkAttributes. Plain Lua
+		// has neither, so the stand-in serves that one file's real bytes.
+		'local FileSystem = require("adapters.file_system")',
+		'local read_with_status = FileSystem.read_with_status',
+		'FileSystem.read_with_status = function(p, ...) if p:match("/modules/network/route_origins%.json$") then local f = assert(io.open(p, "rb")); local bytes = f:read("*a"); f:close(); return bytes, "ok" end; return read_with_status(p, ...) end',
 		// Native Windows Lua expands module dots with backslashes. Load this
 		// path-sensitive macOS module with its real POSIX filename on every host.
 		`package.loaded["modules.llm.network_env"] = assert(loadfile(${JSON.stringify(`${moduleRoot}/modules/llm/network_env.lua`)}))()`,
