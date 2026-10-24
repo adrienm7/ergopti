@@ -14,37 +14,39 @@ local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
 local Manifest = require("infra.manifest_reader")
 local AppIdentity = require("llm.app_identity")
+local ConfigKeys = require("config_keys")
+local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.trigger_settings"
 local PREF_PREFIX = "llm.trigger."
 
 local DEFINITIONS = {
 	debounce_ms = {
-		path = "llm.trigger.debounce_ms",
+		path = KEY.LLM_TRIGGER_DEBOUNCE_MS,
 		type = "number",
 		min = 50,
 		max = 10000,
 		presets = { 50, 100, 200, 300, 500, 750, 1000, 2000 },
 	},
 	instant_on_word_end = {
-		path = "llm.trigger.instant_on_word_end",
+		path = KEY.LLM_TRIGGER_INSTANT_ON_WORD_END,
 		type = "boolean",
 	},
 	after_hotstring = {
-		path = "llm.trigger.after_hotstring",
+		path = KEY.LLM_TRIGGER_AFTER_HOTSTRING,
 		type = "boolean",
 	},
 	secure_filter_enabled = {
-		path = "llm.trigger.secure_filter_enabled",
+		path = KEY.LLM_TRIGGER_SECURE_FILTER_ENABLED,
 		type = "boolean",
 	},
 	url_bar_filter_enabled = {
-		path = "llm.trigger.url_bar_filter_enabled",
+		path = KEY.LLM_TRIGGER_URL_BAR_FILTER_ENABLED,
 		type = "boolean",
 	},
 	-- The applications no prediction runs in, as the identifiers the session reports.
 	disabled_apps = {
-		path = "llm.trigger.disabled_apps",
+		path = KEY.LLM_TRIGGER_DISABLED_APPS,
 		type = "table",
 		apps = true,
 	},
@@ -126,7 +128,7 @@ end
 --- @return table apps Normalised identifiers.
 function M.disabled_apps()
 	local copy = {}
-	for index, app in ipairs(M.get("disabled_apps") or {}) do copy[index] = app end
+	for index, app in ipairs(M.get(LEAF.DISABLED_APPS) or {}) do copy[index] = app end
 	return copy
 end
 
@@ -136,7 +138,7 @@ end
 function M.is_app_disabled(app)
 	local key = AppIdentity.normalize(app)
 	if not key then return false end
-	for _, disabled in ipairs(M.get("disabled_apps") or {}) do
+	for _, disabled in ipairs(M.get(LEAF.DISABLED_APPS) or {}) do
 		if disabled == key then return true end
 	end
 	return false
@@ -158,7 +160,7 @@ function M.set_disabled_apps(apps, expected_source, admission)
 		end
 		if not seen[key] then seen[key] = true; list[#list + 1] = key end
 	end
-	return M.set("disabled_apps", list, expected_source, admission)
+	return M.set(LEAF.DISABLED_APPS, list, expected_source, admission)
 end
 
 --- Persists before publishing the live value.
