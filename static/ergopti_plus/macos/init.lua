@@ -1469,11 +1469,9 @@ end
 -- boot_llm_enabled computation (including the saved-prefs / DEFAULT_STATE
 -- fallback) runs later in Section 3. Named distinctly so the two never shadow
 -- each other and the intent of each is unambiguous.
--- Overrides applied FIRST. config.toml's [features] layer can disable the LLM,
--- and it writes into hs.settings — but it used to run 50 lines below this read,
--- so a user who turned the LLM off in the file still paid the synchronous
--- lsof + curl cleanup on every boot. The two readers of this one setting sat on
--- opposite sides of the layer that populates it.
+-- Overrides applied FIRST. config.toml's [script] layer writes into hs.settings,
+-- and the native llm.enabled consent read below sits beside it: the two readers
+-- of one setting must not sit on opposite sides of the layer that populates it.
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
@@ -1539,16 +1537,16 @@ Boot.stage("LLM backend bootstrap")
 -- =======================================
 
 -- Apply optional user overrides from hammerspoon/config.toml on top of
--- hs.settings. The [script] and [features] sections are an optional "expert"
--- layer the user can edit by hand to override anything the menu exposes
--- (LogLevel, individual feature flags). All overrides live in the
--- driver-specific config — no separate cross-driver config.toml.
+-- hs.settings. The [script] section is an optional "expert" layer the user can
+-- edit by hand (log_level). The [features] layer was retired: each declared
+-- feature has one canonical leaf, and a leftover [features] table is reported by
+-- the unused-key scan. All overrides live in the driver-specific config.
 -- (config_overrides.apply already ran in Section 2, before the MLX cleanup gate
 -- that reads a value it can write.)
 
 -- Re-apply the log level AFTER overrides. Logger.set_level already ran at boot
--- (above), BEFORE config_overrides — so a [script] log_level / LogLevel override
--- (which config_overrides maps onto the canonical "ergopti.log_level" key) would
+-- (above), BEFORE config_overrides — so a [script] log_level override
+-- (which config_overrides stores under the canonical "ergopti.log_level" key) would
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do

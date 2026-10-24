@@ -9,7 +9,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The driver's rule, from its readers. A key is used when a canonical
----    readers of this file takes it: config_overrides ([script] / [features]
+---    readers of this file takes it: config_overrides ([script]
 ---    scalars, applied to hs.settings at boot), Preferences.load (the menu
 ---    state), shortcut assignments and the setup wizard's import of an existing file. Each marks what
 ---    it reads through the walk it applies, so the cleanup cannot drift from

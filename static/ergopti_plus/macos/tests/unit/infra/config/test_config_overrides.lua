@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Config Overrides Unit Tests
 --- DESCRIPTION:
---- Validates the user-config TOML overrides loader: type coercion, [script]
---- and [features] sections routing to hs.settings, and graceful no-op on
---- missing file.
+--- Validates the user-config TOML overrides loader: type coercion, the [script]
+--- section routing to hs.settings, the retired [features] layer staying
+--- unapplied, and graceful no-op on missing file.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -75,19 +75,18 @@ helpers.describe("config_overrides.apply", function()
 		_G.hs.settings.set = function(k, v) stored[k] = v end
 		with_tmp([[
 [script]
-LogLevel = "DEBUG"
+log_level = "DEBUG"
 ]], function(path)
 			local applied = Overrides.apply(path)
 			helpers.assert_true(applied >= 1)
-			-- log_level / LogLevel are special-cased onto the canonical key the logger
-			-- restore reads (ergopti.log_level); a bare "LogLevel" key has no reader and
-			-- would silently no-op (F-M4).
+			-- log_level reaches the key the logger restore reads (ergopti.log_level);
+			-- a bare "log_level" key has no reader and would silently no-op (F-M4).
 			helpers.assert_eq(stored["ergopti.log_level"], "DEBUG")
-			helpers.assert_nil(stored["LogLevel"])
+			helpers.assert_nil(stored["log_level"])
 		end)
 	end)
 
-	helpers.it("applies [features] section with dotted keys", function()
+	helpers.it("does not apply a [features] section (retired layer)", function()
 		stored = {}
 		_G.hs.settings.set = function(k, v) stored[k] = v end
 		with_tmp([[
@@ -95,10 +94,8 @@ LogLevel = "DEBUG"
 "MagicKey.Repeat.Enabled" = false
 "Personal.Code.Enabled" = true
 ]], function(path)
-			local applied = Overrides.apply(path)
-			helpers.assert_eq(applied, 2)
-			helpers.assert_eq(stored["ergopti.MagicKey.Repeat.Enabled"], false)
-			helpers.assert_eq(stored["ergopti.Personal.Code.Enabled"],  true)
+			helpers.assert_eq(Overrides.apply(path), 0)
+			helpers.assert_eq(stored, {}, "every declared feature has one canonical leaf, not a second spelling")
 		end)
 	end)
 

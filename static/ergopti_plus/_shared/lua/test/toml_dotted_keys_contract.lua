@@ -37,25 +37,15 @@ return function(helpers)
 				else helpers.assert_eq(actual, nil, row.name) end
 			end)
 		end
-		local Projection = require("config_override_projection")
-		test("legacy feature projection keeps exact paths and closes arrays", function()
-			local rows = assert(Projection.prepare(Codec.decode('[script]\nordinary="001"\n[features]\nllm.enabled=false\n"literal.dot"=true\nitems=[1,2]\n[other]\nignored=true\n')))
+		local Projection = require("script_override_projection")
+		test("script projection keeps exact paths and ignores every other table", function()
+			local rows = assert(Projection.prepare(Codec.decode('[script]\nordinary="001"\n[features]\nllm.enabled=false\n"literal.dot"=true\n[other]\nignored=true\n')))
 			helpers.assert_eq(rows, {
 				{ section = "script", key = "ordinary", path = { "ordinary" }, value = "001", accepted = true },
-				{ section = "features", key = "items", path = { "items" }, value = { 1, 2 }, accepted = false },
-				{ section = "features", key = "literal.dot", path = { "literal.dot" }, value = true, accepted = true },
-				{ section = "features", key = "llm.enabled", path = { "llm", "enabled" }, value = false, accepted = true },
 			})
 		end)
-		test("distinct TOML paths cannot compete for one legacy feature setting", function()
-			local decoded = Codec.decode('[features]\nllm.enabled=true\n"llm.enabled"=false\n')
-			helpers.assert_true(type(decoded) == "table")
-			local rows, detail = Projection.prepare(decoded)
-			helpers.assert_eq(rows, nil)
-			helpers.assert_eq(detail, "Ambiguous legacy feature setting: llm.enabled")
-		end)
-		test("legacy script tables and feature arrays stay non-scalar", function()
-			local rows = assert(Projection.prepare(Codec.decode('[script]\nchild={enabled=true}\n[features]\nitems=[{enabled=true}]\nempty={}\n')))
+		test("script tables and arrays stay non-scalar", function()
+			local rows = assert(Projection.prepare(Codec.decode('[script]\nchild={enabled=true}\nitems=[1,2]\nempty={}\n')))
 			helpers.assert_eq(#rows, 3)
 			for _, row in ipairs(rows) do helpers.assert_eq(row.accepted, false) end
 		end)
