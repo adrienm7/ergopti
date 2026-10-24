@@ -141,6 +141,8 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 				if name == "url_bar_filter_enabled" then return false end
 			end,
 			set = function() return true end,
+			-- No application is excluded from the trigger here (llm.trigger.disabled_apps).
+			is_app_disabled = function() return false end,
 		})
 		replace("modules.llm.api_ollama", {
 			chat = function() chat_calls = chat_calls + 1 end,
