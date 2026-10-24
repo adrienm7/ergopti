@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = assert(source:match("^(.*)/tests/fixtures/native_event_loop_sleep_receipts%.lua$"))
 package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;"
-	.. driver_root .. "/../_shared/lua/?.lua;" .. package.path
+	.. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
 local uv = require("luv")
 local ffi_ok = pcall(require, "ffi")
 local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-native-nap-XXXXXX"))

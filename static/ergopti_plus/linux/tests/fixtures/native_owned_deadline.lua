@@ -2,7 +2,7 @@
 --- Actual child deadlines after synchronous work; each invocation owns its loop.
 local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver_root = assert(self_path:match("^(.*)/tests/fixtures/[^/]+$"))
-package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driver_root .. "/../_shared/lua/?.lua;" .. package.path
+package.path = driver_root .. "/?.lua;" .. driver_root .. "/?/init.lua;" .. driver_root .. "/../_shared/lua/?.lua;" .. driver_root .. "/../_shared/lua/?/init.lua;" .. package.path
 local uv = require("luv")
 local Owned = require("adapters.owned_process")
 local Timer = require("infra.native_timer")
