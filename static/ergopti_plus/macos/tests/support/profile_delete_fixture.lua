@@ -31,6 +31,11 @@ local MODULES = {
 	"logger.shim",
 	"menu.renderer",
 	"llm.tone",
+	-- The real profiles manager keeps per-application overrides through these
+	-- shared owners (56e8569a); the codec encodes them through compat.base64.
+	"llm.app_identity",
+	"llm.app_profile_overrides",
+	"compat.base64",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
