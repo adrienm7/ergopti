@@ -19,6 +19,8 @@
  * 4. The catalogue's runner has GTK 3 and an XEmbed tray but no libayatana:
  *    the image bundles the tray library without GTK, and the smoke replays the
  *    catalogue's stalonetray check on a host without libayatana.
+ * 5. A musl system or an older glibc is refused in words by a plain-sh AppRun
+ *    preflight, before the loader fails or bash is needed.
  * ==============================================================================
  */
 
@@ -278,6 +280,117 @@ if (process.platform === 'linux') {
 		assert.equal(observed.status, 0, observed.stderr);
 		assert.equal(observed.stdout, 'started:none\n');
 		assert.match(observed.stderr, /certificate bundle unavailable/);
+	} finally {
+		fs.rmSync(sandbox, { recursive: true, force: true });
+	}
+}
+passed++;
+
+// A system whose C library cannot load the image is refused in words, in the
+// user's language, before anything glibc-linked runs. On glibc 2.31 the bundled
+// luajit died with "version `GLIBC_2.34' not found"; on Alpine, AppRun itself
+// died with "No such file or directory": musl systems have no bash.
+const Preflight = require('../build/render-appimage-libc-preflight.cjs');
+const appRunSource = builder.slice(
+	builder.indexOf('cat > "$APPDIR/AppRun" << \'APPRUN_EOF\'\n') +
+		'cat > "$APPDIR/AppRun" << \'APPRUN_EOF\'\n'.length,
+	builder.indexOf('\nAPPRUN_EOF\n') + 1
+);
+assert.ok(appRunSource.startsWith('#!/bin/sh\n'), 'AppRun starts without bash, which musl lacks');
+const sourcedAt = appRunSource.indexOf('\n. "$HERE/usr/lib/ergopti/libc-preflight.sh"\n');
+assert.ok(sourcedAt > 0, 'AppRun sources the preflight');
+assert.ok(
+	sourcedAt < appRunSource.indexOf('exec bash "$0" "$@"') &&
+		sourcedAt < appRunSource.indexOf('network-runtime-env.sh') &&
+		sourcedAt < appRunSource.indexOf('exec "$LUAJIT_BIN"'),
+	'the preflight runs before bash and before any bundled program'
+);
+assert.ok(
+	builder.includes(
+		'\nnode "$SCRIPT_DIR/render-appimage-libc-preflight.cjs" "$APPDIR_LIB/libc-preflight.sh"\n'
+	),
+	'the packager renders the preflight into the image'
+);
+// The catalogue keys the preflight reads (tools/build is outside the
+// translation audit's usage scan, which skips every build directory).
+assert.deepEqual(Preflight.MESSAGE_KEYS, {
+	title: 'startup.linux_appimage_libc_title',
+	musl: 'startup.linux_appimage_musl_body',
+	old: 'startup.linux_appimage_old_glibc_body'
+});
+const preflightLocales = Preflight.readLocales();
+assert.equal(preflightLocales.length, 21, 'every shipped locale reads the refusal');
+const preflight = Preflight.render(preflightLocales);
+assert.ok(
+	preflight.includes('\nergopti_glibc_required_major=2\nergopti_glibc_required_minor=35\n')
+);
+if (process.platform === 'linux') {
+	const { spawnSync } = require('node:child_process');
+	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-libc-preflight-'));
+	try {
+		const appDir = path.join(sandbox, 'AppDir');
+		const write = (relative, text, mode = 0o755) => {
+			fs.mkdirSync(path.dirname(path.join(appDir, relative)), { recursive: true });
+			fs.writeFileSync(path.join(appDir, relative), text, { mode });
+		};
+		write('AppRun', appRunSource);
+		write('usr/lib/ergopti/libc-preflight.sh', preflight, 0o644);
+		write(
+			'usr/lib/ergopti/network-runtime-env.sh',
+			'# The bundled environment, not under test.\n',
+			0o644
+		);
+		write('usr/bin/luajit', '#!/bin/sh\necho "launched $*"\n');
+		// Only what AppRun needs before the preflight, and a getconf that answers
+		// as the system under test does: no bash, as on Alpine.
+		const bin = path.join(sandbox, 'bin');
+		fs.mkdirSync(bin);
+		for (const tool of ['sh', 'readlink', 'dirname']) {
+			const found = spawnSync('sh', ['-c', `command -v ${tool}`], { encoding: 'utf8' });
+			assert.equal(found.status, 0, `${tool} is on this host`);
+			fs.symlinkSync(found.stdout.trim(), path.join(bin, tool));
+		}
+		fs.writeFileSync(
+			path.join(bin, 'getconf'),
+			'#!/bin/sh\n[ "$1" = GNU_LIBC_VERSION ] && [ -n "$FAKE_LIBC" ] || exit 1\necho "$FAKE_LIBC"\n',
+			{ mode: 0o755 }
+		);
+		const launch = (libc, language, withBash) => {
+			const env = { PATH: bin, FAKE_LIBC: libc, LANG: language };
+			if (withBash) {
+				const bash = spawnSync('sh', ['-c', 'command -v bash'], { encoding: 'utf8' });
+				fs.symlinkSync(bash.stdout.trim(), path.join(bin, 'bash'));
+			}
+			try {
+				return spawnSync(path.join(appDir, 'AppRun'), [], { encoding: 'utf8', env });
+			} finally {
+				if (withBash) fs.unlinkSync(path.join(bin, 'bash'));
+			}
+		};
+		const musl = launch('', 'C', false);
+		assert.equal(musl.status, Preflight.REFUSAL_EXIT, musl.stderr);
+		assert.equal(
+			musl.stderr,
+			'Ergopti+ cannot start on this system\nThis AppImage needs the GNU C library (glibc) 2.35 or newer. ' +
+				'This system uses another C library, such as musl on Alpine Linux, which cannot run programs built for glibc.\n'
+		);
+		assert.equal(musl.stdout, '');
+		const old = launch('glibc 2.31', 'fr_FR.UTF-8', false);
+		assert.equal(old.status, Preflight.REFUSAL_EXIT, old.stderr);
+		assert.match(old.stderr, /^Ergopti\+ ne peut pas démarrer sur ce système\n/);
+		assert.match(old.stderr, /glibc\) 2\.35 ou plus récente, et ce système a la glibc 2\.31\./);
+		// 2.9 is older than 2.35: the comparison is numeric.
+		assert.equal(launch('glibc 2.9', 'de_DE', false).status, Preflight.REFUSAL_EXIT);
+		assert.match(launch('glibc 2.34', 'xx_XX', false).stderr, /this system has glibc 2\.34\./);
+		for (const libc of ['glibc 2.35', 'glibc 2.43', 'glibc 3.0']) {
+			const admitted = launch(libc, 'en_US.UTF-8', true);
+			assert.equal(admitted.status, 0, `${libc}: ${admitted.stderr}`);
+			assert.equal(admitted.stderr, '');
+			assert.match(
+				admitted.stdout,
+				/^launched \S+\/usr\/lib\/ergopti\/ergopti_hotstrings\.lua --tray\n$/
+			);
+		}
 	} finally {
 		fs.rmSync(sandbox, { recursive: true, force: true });
 	}
