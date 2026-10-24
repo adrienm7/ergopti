@@ -25,10 +25,10 @@ local M = {}
 local NativePath = require("native_path")
 
 local SPEC_KEYS = { "_comment", "schema", "max_request_bytes", "token_hex_length", "request_id_pattern",
-	"files", "folders", "windows_message", "states", "reasons" }
+	"files", "folders", "windows_message", "states", "reasons", "pending_ttl_seconds", "timeout_reason" }
 local REQUEST_KEYS = { schema = true, token = true, request_id = true }
 local RESULT_KEYS = { schema = true, request_id = true, state = true, driver_pid = true,
-	successor_pid = true, reason = true }
+	successor_pid = true, reason = true, deadline = true }
 
 -- The declared request_id pattern, as a Lua pattern: the JSON spells the same
 -- character class in regular-expression syntax for the AHK port and the tools.
@@ -97,8 +97,14 @@ function M.validate(spec)
 	end
 	spec.state_set = list_set(spec.states, "states")
 	spec.reason_set = list_set(spec.reasons, "reasons")
-	for _, state in ipairs({ "requested", "refused", "completed" }) do
+	for _, state in ipairs({ "requested", "claimed", "refused", "completed", "timeout" }) do
 		if not spec.state_set[state] then error("driver control: state " .. state .. " is not declared", 2) end
+	end
+	if not is_integer(spec.pending_ttl_seconds) or spec.pending_ttl_seconds < 10 or spec.pending_ttl_seconds > 3600 then
+		error("driver control: pending_ttl_seconds must be an integer from 10 to 3600", 2)
+	end
+	if type(spec.timeout_reason) ~= "string" or not spec.reason_set[spec.timeout_reason] then
+		error("driver control: timeout_reason must be a declared reason", 2)
 	end
 	return spec
 end
@@ -211,8 +217,11 @@ function M.session_text(spec, driver, pid, token)
 end
 
 --- Builds one result text; an inconsistent result stops the caller.
+--- A `requested` result either names its successor or, when a restart cannot
+--- name it beforehand, carries no successor and a deadline (Unix seconds).
 --- @param spec table Validated declaration.
---- @param fields table { request_id = string|nil, state, driver_pid, successor_pid, reason }
+--- @param fields table { request_id = string|nil, state, driver_pid, successor_pid,
+---   reason, deadline }
 --- @return string text
 function M.result_text(spec, fields)
 	local state, reason = fields.state, fields.reason
@@ -226,22 +235,42 @@ function M.result_text(spec, fields)
 	if not is_integer(fields.driver_pid) or fields.driver_pid <= 0 then
 		error("driver control: the result needs the writing driver's process id", 2)
 	end
-	local successor = fields.successor_pid
-	if state == "refused" then
-		if successor ~= nil then error("driver control: a refusal names no successor", 2) end
-		if not spec.reason_set[reason] then error("driver control: unknown refusal reason " .. tostring(reason), 2) end
-	else
-		if not is_integer(successor) or successor <= 0 then
-			error("driver control: a " .. state .. " result names its successor", 2)
-		end
-		if reason ~= nil then error("driver control: only a refusal carries a reason", 2) end
-		if state == "completed" and successor ~= fields.driver_pid then
-			error("driver control: completion is written by the successor itself", 2)
-		end
+	local successor, deadline = fields.successor_pid, fields.deadline
+	if deadline ~= nil and (not is_integer(deadline) or deadline <= 0) then
+		error("driver control: the deadline must be a positive integer", 2)
 	end
 	local id = fields.request_id ~= nil and ('"' .. fields.request_id .. '"') or "null"
-	local tail = state == "refused" and string.format(',"reason":"%s"', reason)
-		or string.format(',"successor_pid":%d', successor)
+	local tail
+	if state == "refused" or state == "timeout" then
+		if successor ~= nil then error("driver control: a " .. state .. " names no successor", 2) end
+		if deadline ~= nil then error("driver control: a " .. state .. " carries no deadline", 2) end
+		if not spec.reason_set[reason] then error("driver control: unknown refusal reason " .. tostring(reason), 2) end
+		-- The deadline reason belongs to the timeout alone, and a timeout takes no other.
+		if (state == "timeout") ~= (reason == spec.timeout_reason) then
+			error("driver control: reason " .. tostring(reason) .. " does not fit a " .. state, 2)
+		end
+		tail = string.format(',"reason":"%s"', reason)
+	else
+		if reason ~= nil then error("driver control: only a refusal carries a reason", 2) end
+		if state == "requested" and successor == nil then
+			if deadline == nil then error("driver control: a pending request carries its deadline", 2) end
+			tail = string.format(',"successor_pid":null,"deadline":%d', deadline)
+		else
+			if not is_integer(successor) or successor <= 0 then
+				error("driver control: a " .. state .. " result names its successor", 2)
+			end
+			if state == "claimed" then
+				if deadline == nil then error("driver control: a claim keeps the deadline", 2) end
+			elseif deadline ~= nil then
+				error("driver control: a " .. state .. " result carries no deadline", 2)
+			end
+			if (state == "completed" or state == "claimed") and successor ~= fields.driver_pid then
+				error("driver control: " .. state .. " is written by the successor itself", 2)
+			end
+			tail = string.format(',"successor_pid":%d', successor)
+			if state == "claimed" then tail = tail .. string.format(',"deadline":%d', deadline) end
+		end
+	end
 	return string.format('{"schema":%d,"request_id":%s,"state":"%s","driver_pid":%d%s}\n',
 		spec.schema, id, state, fields.driver_pid, tail)
 end
@@ -265,6 +294,49 @@ function M.completion(spec, text, own_pid, json_decode)
 	end
 	return M.result_text(spec, { request_id = result.request_id, state = "completed",
 		driver_pid = own_pid, successor_pid = own_pid })
+end
+
+--- What a freshly ready driver owes the pending result, if anything.
+--- The named-successor rule of `completion` stays; a record without a
+--- successor is claimed by the first driver that reads it before its deadline,
+--- and past the deadline it becomes a timeout, never a completion.
+--- @param spec table Validated declaration.
+--- @param text string|nil Current result file bytes.
+--- @param own_pid integer This process id.
+--- @param now integer Unix time in seconds.
+--- @param json_decode function
+--- @return string|nil kind "claimed", "completed" or "timeout".
+--- @return string|nil text The result to publish.
+function M.resolve(spec, text, own_pid, now, json_decode)
+	if type(text) ~= "string" or text == "" or #text > spec.max_request_bytes then return nil end
+	local ok, result = pcall(json_decode, text)
+	if not ok or type(result) ~= "table" then return nil end
+	for key in pairs(result) do
+		if not RESULT_KEYS[key] then return nil end
+	end
+	if result.schema ~= spec.schema or not is_request_id(result.request_id) then return nil end
+	local function write(state, extra)
+		extra.request_id, extra.state, extra.driver_pid = result.request_id, state, own_pid
+		return state, M.result_text(spec, extra)
+	end
+	-- A decoder may answer null with nil or with its own sentinel table.
+	local successor_unknown = result.successor_pid == nil or type(result.successor_pid) == "table"
+	if result.state == "requested" and successor_unknown then
+		-- The raw text must say null: an absent field is a malformed record.
+		if not text:find('"successor_pid"%s*:%s*null') or not is_integer(result.deadline) or result.deadline <= 0 then
+			return nil
+		end
+		if now > result.deadline then return write("timeout", { reason = spec.timeout_reason }) end
+		return write("claimed", { successor_pid = own_pid, deadline = result.deadline })
+	end
+	if result.state == "claimed" and result.successor_pid == own_pid and is_integer(result.deadline)
+		and result.driver_pid == own_pid then
+		if now > result.deadline then return write("timeout", { reason = spec.timeout_reason }) end
+		return write("completed", { successor_pid = own_pid })
+	end
+	local completed = M.completion(spec, text, own_pid, json_decode)
+	if completed then return "completed", completed end
+	return nil
 end
 
 return M

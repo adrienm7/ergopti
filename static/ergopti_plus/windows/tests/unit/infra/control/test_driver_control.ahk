@@ -40,7 +40,7 @@ Test("driver-control: the shared corpus admits only a request carrying the sessi
 
 _TDC_CorpusResults() {
 	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
-	AssertEqual(9, Corpus["results"].Length, "complete result vectors")
+	AssertEqual(16, Corpus["results"].Length, "complete result vectors")
 	for Row in Corpus["results"] {
 		Fields := Map()
 		for Key, Value in Row["fields"]
@@ -64,6 +64,19 @@ _TDC_CorpusCompletions() {
 		AssertEqual(Row.Get("completed", ""), DriverControl_Completion(Spec, Row["text"], Row["pid"]), Row["name"])
 }
 Test("driver-control: only the named successor completes a pending request", _TDC_CorpusCompletions)
+
+_TDC_CorpusResolutions() {
+	Spec := _TDC_Spec(), Corpus := _TDC_Corpus()
+	AssertEqual(12, Corpus["resolutions"].Length, "complete resolution vectors")
+	for Row in Corpus["resolutions"] {
+		Owed := DriverControl_Resolve(Spec, Row["text"], Row["pid"], Row["now"], &Kind)
+		AssertEqual(Row.Get("kind", ""), Kind, Row["name"] . " kind")
+		AssertEqual(Row.Get("result", ""), Owed, Row["name"] . " result")
+	}
+	AssertEqual(120, Spec["pending_ttl_seconds"])
+	AssertEqual("deadline", Spec["timeout_reason"])
+}
+Test("driver-control: a pending record is claimed, completed or timed out exactly as the corpus says", _TDC_CorpusResolutions)
 
 _TDC_Folder() {
 	Spec := _TDC_Spec()
