@@ -43,7 +43,9 @@ local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
 -- (capsword-auto-off-settings).
 local TAP_HOLDS_ON_PINS = {
 	default     = { rules = 24, digest = "cff39a3f5e11da3e" },
-	recommended = { rules = 30, digest = "b01ce410bea9a14a" },
+	-- Re-pinned for PAR-17: the recommended pairs became the three tap slots
+	-- Windows and Linux ship, with no chord and no hold slot.
+	recommended = { rules = 27, digest = "a88bc2998cd58096" },
 }
 
 --- Returns the key codes an engine posted at key_down, in order, with the
@@ -303,10 +305,14 @@ helpers.with_fresh_modules({
 		-- off: Cmd gauche + Cmd droit entered the navigation layer (F20, here
 		-- key_90) that only left Command's hold may enter. Key 1 is native in
 		-- that graph: the chord types ⌥⌫, then left Command stays a held Cmd.
-		helpers.it("the recommended LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)", function()
+		-- The chord no longer ships (PAR-17: Windows and Linux ship no chord slot),
+		-- so the case chooses it on the recommended preset, whose left Command hold
+		-- enters the navigation layer.
+		helpers.it("a chosen LCmd + RCmd chord types ⌥⌫ with no layer (chord-without-tap-holds)", function()
 			local state = Config.build_recommended_state(keys, combos)
 			state.tap_holds_enabled = false
 			state.mod_combos_enabled = true
+			state.mod_combos_config.lcmd_rcmd = { combo = "opt_backspace", tap = "none", hold = "none" }
 			local engine = engine_for(rules_of(state))
 			helpers.assert_true(engine:chord({ "left_command", "right_command" }) ~= nil, "a chord rule takes both keys")
 			local keys_typed = typed(engine)

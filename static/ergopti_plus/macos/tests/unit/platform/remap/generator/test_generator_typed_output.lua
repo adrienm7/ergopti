@@ -507,10 +507,12 @@ helpers.with_fresh_modules({
 			end
 		end)
 
-		helpers.it("the default right Command + left Option deletes words forward while held (default-delete-word-repeats)", function()
-			-- The default sets a tap and no hold, so the delete goes out at key down
-			-- and stays down while held.
-			local engine = engine_for(build())
+		helpers.it("a tap-only right Command + left Option deletes words forward while held (default-delete-word-repeats)", function()
+			-- A tap and no hold: the delete goes out at key down and stays down while
+			-- held. The pair no longer ships (PAR-17), so the case chooses the slots
+			-- the former default had.
+			local engine = engine_for(build(nil,
+				{ rcmd_lopt = { combo = "none", tap = "opt_delete_fwd", hold = "none" } }))
 			engine:down("right_command")
 			engine:clear()
 			engine:down("left_option")
@@ -825,7 +827,14 @@ helpers.with_fresh_modules({
 						combo_def.id .. ": the hold-then-tap rule already types " .. slots.combo)
 				end
 			end
-			helpers.assert_true(skipped >= 5, "expected the five right Command defaults, found " .. skipped)
+			-- The shipped pairs set a tap slot and no chord (PAR-17: Windows and Linux
+			-- ship none), so no default chord can duplicate its hold-then-tap rule.
+			helpers.assert_eq(skipped, 0, "no shipped pair sets a chord slot")
+			for _, combo_def in ipairs(combos) do
+				local slots = state.mod_combos_config[combo_def.id] or {}
+				helpers.assert_true(slots.combo == nil or slots.combo == "none",
+					combo_def.id .. " ships no chord slot")
+			end
 			for _, rule in ipairs(rules) do
 				for _, manipulator in ipairs(rule.manipulators or {}) do
 					local simultaneous = manipulator.from and manipulator.from.simultaneous
