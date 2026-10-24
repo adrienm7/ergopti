@@ -272,6 +272,7 @@ try {
 	function run(arguments_, platform = 'linux') {
 		const stopped = {};
 		const calls = [];
+		const hostGuards = [];
 		const output = [];
 		const timingRoot = fs.mkdtempSync(path.join(temporaryRoot, 'run-'));
 		let exitCode;
@@ -297,6 +298,8 @@ try {
 							}
 						};
 					if (name === 'node:perf_hooks') return { performance: { now: () => ++clock } };
+					if (name === './lib/host-toolchain.cjs')
+						return { requireCiEquivalentHost: (entry) => hostGuards.push(entry) };
 					assert.ok(
 						[
 							'path',
@@ -339,15 +342,25 @@ try {
 					.split('\n')
 					.map(JSON.parse)
 			: [];
-		return { calls, output, exitCode, error, rows };
+		return { calls, output, exitCode, error, rows, hostGuards };
 	}
 	const listed = run(['--list-features']);
 	assert.equal(listed.exitCode, 0);
 	assert.equal(listed.error, undefined);
 	assert.equal(listed.calls.length, 0);
+	assert.deepEqual(
+		listed.hostGuards,
+		[],
+		'listing features executes nothing, so it needs no CI-equivalent host'
+	);
 	assert.equal(listed.rows.length, 0);
 	assert.deepEqual(JSON.parse(listed.output[0]).features, ['alpha', 'beta']);
 	const defaultRun = run([]);
+	assert.deepEqual(
+		defaultRun.hostGuards,
+		['test:js'],
+		'a run that executes checks refuses a host that differs from CI'
+	);
 	assert.equal(defaultRun.exitCode, 0);
 	assert.equal(defaultRun.error, undefined);
 	assert.deepEqual(defaultRun.calls, [

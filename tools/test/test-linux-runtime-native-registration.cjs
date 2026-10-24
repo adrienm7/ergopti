@@ -510,6 +510,7 @@ function main() {
 			...MANUAL_FIXTURES,
 			'package.json',
 			'tools/test/verify-change.cjs',
+			'tools/test/lib/host-toolchain.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/validate-ahk-e2e-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs',
