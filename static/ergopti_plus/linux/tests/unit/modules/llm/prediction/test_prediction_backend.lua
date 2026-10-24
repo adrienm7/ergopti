@@ -27,7 +27,8 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local calls = { ollama = {}, remote = {}, notices = {}, outputs = {}, cancelled = 0, applied = 0, resets = 0, focus = "x11:fixture:1" }
+	local calls = { ollama = {}, remote = {}, notices = {}, outputs = {}, generations = {}, cancelled = 0, applied = 0,
+		resets = 0, focus = "x11:fixture:1" }
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
@@ -110,6 +111,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 			if calls.on_output then calls.on_output(text, context) end
 		end,
 		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
+		on_generation = function(_, info) calls.generations[#calls.generations + 1] = info end,
 	})
 	return engine, calls, scheduler, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
@@ -215,6 +217,29 @@ helpers.describe("prediction backend: variants are paced and diverse", function(
 		restore()
 		helpers.assert_true(calls.remote[2].opts.temperature > calls.remote[1].opts.temperature)
 		helpers.assert_true(calls.remote[3].opts.temperature > calls.remote[2].opts.temperature)
+	end)
+
+	helpers.it("reports the remote tokens and cost summed over the variants", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, false, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous")
+			calls.remote[1].done(" première suite", nil, { prompt_tokens = 100, completion_tokens = 10,
+				total_tokens = 110, est_cost_usd = 0.25 })
+			scheduler.settle()
+			calls.remote[2].done(" deuxième suite", nil, { prompt_tokens = 0, completion_tokens = 0,
+				total_tokens = 0, est_cost_usd = 0.0 })
+			scheduler.settle()
+			calls.remote[3].done(" troisième suite", nil, { prompt_tokens = 50, completion_tokens = 5,
+				total_tokens = 55, est_cost_usd = 0.5 })
+			helpers.assert_eq(#calls.generations, 1, "one generation row per prediction")
+			local info = calls.generations[1]
+			helpers.assert_eq(info.prompt_tokens, 150)
+			helpers.assert_eq(info.completion_tokens, 15)
+			helpers.assert_eq(info.total_tokens, 165)
+			helpers.assert_eq(info.est_cost_usd, 0.75)
+		end)
+		restore()
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("offers the first variant before the next one arrives", function()

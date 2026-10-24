@@ -947,6 +947,7 @@ function M.predict(context, output_context, override)
 			if type(usage) == "table" then
 				tokens.prompt = (tokens.prompt or 0) + (tonumber(usage.prompt_tokens) or 0)
 				tokens.completion = (tokens.completion or 0) + (tonumber(usage.completion_tokens) or 0)
+				tokens.cost = (tokens.cost or 0) + (tonumber(usage.est_cost_usd) or 0)
 			end
 			if err then
 				_predicting = false
@@ -971,7 +972,7 @@ function M.predict(context, output_context, override)
 			if _observers.generation then
 				local reported = tokens.prompt ~= nil and {
 					prompt_tokens = tokens.prompt, completion_tokens = tokens.completion,
-					total_tokens = tokens.prompt + tokens.completion } or {}
+					total_tokens = tokens.prompt + tokens.completion, est_cost_usd = tokens.cost } or {}
 				reported.count = #candidates
 				local observed, observe_err = pcall(_observers.generation, _suggestion_context, reported)
 				if not observed then Logger.warn(LOG, "Prediction generation observer failed: %s", tostring(observe_err)) end

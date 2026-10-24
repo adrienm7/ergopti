@@ -25,7 +25,7 @@ local MODULES = {
 	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
 	"ui.tooltip", "llm.vision", "llm.rewrite", "llm.prompt_action", "llm.translate",
 	"text_utils", "compat.utf8", "modules.llm.api_token_crypto", "adapters.http_client",
-	"modules.llm.remote_response_classifier", "modules.llm.local_servers",
+	"llm.remote_response_classifier", "modules.llm.local_servers",
 	"modules.llm.provider_uses", "modules.llm.progressive_reveal", "modules.llm.parser",
 	"infra.manifest_reader", "llm.provider_config_policy", "llm.remote_formats",
 	"llm.profile_selector", "llm.parser", "llm.prompt_builder", "llm.local_server_auth",

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("Remote provider error envelopes (macOS)", function()
 	local contract = require("test.response_error_contract")
-	local Classifier = require("modules.llm.remote_response_classifier")
+	local Classifier = require("llm.remote_response_classifier")
 	helpers.it("executes every independent Lua response vector", function()
 		helpers.assert_eq(#contract.vectors, 23)
 	end)

@@ -142,7 +142,7 @@ local OWNED = {
 	"modules.llm.progressive_reveal",
 	"modules.llm.prompt_builder",
 	"modules.llm.provider_uses",
-	"modules.llm.remote_response_classifier",
+	"llm.remote_response_classifier",
 	"modules.llm.selection_publication",
 	"modules.llm.selection_translation",
 	"modules.llm.streaming_handler",
