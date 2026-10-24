@@ -47,8 +47,8 @@ _PWF_AssertSnapshot() {
 	Src := _PWF_ReadSource("modules/shortcuts/ctrl.ahk")
 	Body := _DriverFuncBody("PasteWithoutFormatting")
 	Assert(Body != "", "PasteWithoutFormatting(*) declaration must exist in ctrl.ahk")
-	Assert(InStr(Body, "CB_SaveAll()") > 0,
-		"PasteWithoutFormatting must snapshot the full clipboard via CB_SaveAll() before coercion (paste-without-formatting-no-restore)")
+	Assert(InStr(Body, "CB_SavePlainSnapshot(OwnerToken, &Captured)") > 0,
+		"PasteWithoutFormatting must snapshot the full clipboard via CB_SavePlainSnapshot() before coercion (paste-without-formatting-no-restore)")
 }
 Test("ctrl: PasteWithoutFormatting snapshots clipboard before coercion (paste-without-formatting-no-restore)", _PWF_AssertSnapshot)
 
@@ -72,7 +72,7 @@ _PWF_AssertClipBusyGuardChecked() {
 	Assert(GuardPos > 0,
 		"PasteWithoutFormatting must participate in the shared exact-owner clipboard lease")
 
-	SnapshotPos := InStr(Body, "CB_SaveAll()")
+	SnapshotPos := InStr(Body, "CB_SavePlainSnapshot(OwnerToken, &Captured)")
 	Assert(GuardPos < SnapshotPos,
 		"PasteWithoutFormatting must claim the lease BEFORE snapshotting/coercing the clipboard")
 }
@@ -86,12 +86,12 @@ _PWF_AssertClipBusyGuardSetAndCleared() {
 
 	RestoreBody := _DriverFuncBody("_PasteWithoutFormattingRestore")
 	Assert(RestoreBody != "", "_PasteWithoutFormattingRestore must exist in ctrl.ahk")
-	Assert(InStr(RestoreBody, "CB_RestoreOwnedAllEventually") > 0
+	Assert(InStr(RestoreBody, "CB_RestorePlainSnapshotEventually") > 0
 		and InStr(RestoreBody, "OwnerToken") > 0,
 		"_PasteWithoutFormattingRestore must retain its exact owner until cleanup settles")
 
 	Assert(InStr(Body, "catch as e") > 0
-		and RegExMatch(Body, "catch[\s\S]*?CB_RestoreOwnedAllEventually\(OldClip, OwnedSequence,[\s\S]*?OwnerToken") > 0,
+		and RegExMatch(Body, "catch[\s\S]*?CB_RestorePlainSnapshotEventually\(OldClip, OwnedSequence,[\s\S]*?OwnerToken") > 0,
 		"PasteWithoutFormatting must transfer its snapshot and exact token on a thrown paste")
 }
 Test("ctrl: PasteWithoutFormatting sets and clears the clip-busy guard on every exit path (paste-without-formatting-clip-busy-race)",
