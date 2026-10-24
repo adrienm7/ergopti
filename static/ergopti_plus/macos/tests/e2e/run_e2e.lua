@@ -152,13 +152,16 @@ end
 ---   inject(buffer, char, mode)  — drives a terminator or auto-expand callback
 ---   emitted()                  — returns the concatenated emitted text
 ---   backspaces()               — returns logical codepoints replaced
+---   type_text(text)            — types a sequence and returns the screen
 --- @param trigger string The hotstring trigger to register.
 --- @param replacement string The expansion text.
 --- @param opts table Per-entry flags exactly as the shared corpus declares them
 ---   (is_word, auto_expand, is_case_sensitive, is_case_sensitive_strict,
 ---   final_result).
+--- @param others table|nil Further mappings registered beside it, each
+---   { trigger, replacement, <flags> } as sequence_vectors.json declares them.
 --- @return table Virtual keyboard context.
-local function make_vkb(trigger, replacement, opts)
+local function make_vkb(trigger, replacement, opts, others)
 	opts = opts or {}
 
 	-- Fresh stub environment for each scenario to prevent cross-test leakage.
@@ -244,12 +247,16 @@ local function make_vkb(trigger, replacement, opts)
 	-- Every per-entry flag, driven off a list. Naming a subset is how this harness
 	-- came to register `is_case_sensitive_strict` vectors as ordinary ones and then
 	-- report that macOS matched a casing the vector says it must not.
-	local add_opts = { group = "e2e" }
-	for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive",
-		"is_case_sensitive_strict", "final_result" }) do
-		add_opts[flag] = opts[flag] == true
+	local function register(entry_trigger, entry_replacement, flags)
+		local add_opts = { group = "e2e" }
+		for _, flag in ipairs({ "is_word", "auto_expand", "is_case_sensitive",
+			"is_case_sensitive_strict", "final_result" }) do
+			add_opts[flag] = flags[flag] == true
+		end
+		Registry.add(entry_trigger, entry_replacement, add_opts)
 	end
-	Registry.add(trigger, replacement, add_opts)
+	register(trigger, replacement, opts)
+	for _, other in ipairs(others or {}) do register(other.trigger, other.replacement, other) end
 	Registry.sort_mappings()
 
 	-- Stub LLMBridge — Expander.init requires it but we never call LLM paths.
@@ -283,11 +290,13 @@ local function make_vkb(trigger, replacement, opts)
 	-- against a virtual screen. `mode="auto"` means `terminator` is the trigger's
 	-- last character and has not reached the application; `mode="terminator"`
 	-- means buffer_text already contains the full trigger and the external
-	-- terminator is the callback's current physical event.
-	local function inject(buffer_text, terminator, mode)
+	-- terminator is the callback's current physical event. `screen_before` is what
+	-- the application shows when the callback runs; it defaults to buffer_text.
+	local function inject(buffer_text, terminator, mode, screen_before)
 		mode = mode or "terminator"
 		-- Reset from any previous scenario.
 		_result.expanded        = false
+		_result.screen          = nil
 		_result.replacement     = ""
 		_result.logical_bs      = 0
 		_result.terminator_held = false
@@ -417,7 +426,7 @@ local function make_vkb(trigger, replacement, opts)
 		-- Apply only callback-returned replacement keyDown events to the screen. The
 		-- globally posted terminator is deliberately excluded so emitted() matches
 		-- the corpus replacement contract.
-		local screen = buffer_text
+		local screen = screen_before or buffer_text
 		for index, event in ipairs(events) do
 			if event.isDown then
 				local metadata = metadata_by_event[index]
@@ -444,6 +453,7 @@ local function make_vkb(trigger, replacement, opts)
 		if _result.terminator_held and not found_terminator_replay then
 			_result.provenance_ok = false
 		end
+		_result.screen = screen
 
 		-- Strip only the input context, never search for the expected replacement.
 		-- This keeps the assertion capable of seeing a wrong or partial emission.
@@ -513,6 +523,29 @@ local function make_vkb(trigger, replacement, opts)
 		return _result.remaining_transactions
 	end
 
+	--- Types `text` one character at a time, each one keyDown callback over the
+	--- buffer the previous ones left. A key no expansion takes reaches the
+	--- application as typed; an expansion's callback events are applied to the
+	--- screen, followed by the terminator the replay gate posts.
+	--- @param text string Typed characters.
+	--- @return string screen What the application shows.
+	--- @return number fired Expansions that fired.
+	local function type_text(text)
+		local screen, fired = "", 0
+		for _, code in utf8.codes(text) do
+			local char = utf8.char(code)
+			inject(state.buffer, char, Registry.is_terminator(char) and "terminator" or "auto", screen)
+			if not _result.provenance_ok then return "<invalid synthetic transaction provenance>", fired end
+			if _result.expanded then
+				fired = fired + 1
+				screen = _result.screen .. (_result.posted_replay_pairs > 0 and char or "")
+			else
+				screen = screen .. char
+			end
+		end
+		return screen, fired
+	end
+
 	return {
 		inject          = inject,
 		emitted         = emitted,
@@ -522,6 +555,7 @@ local function make_vkb(trigger, replacement, opts)
 		callback_replay_pairs = callback_replay_pairs,
 		posted_replay_pairs = posted_replay_pairs,
 		remaining_transactions = remaining_transactions,
+		type_text       = type_text,
 	}
 end
 
@@ -723,6 +757,37 @@ else
 		run_corpus_vector(v)
 	end
 	print(string.format("Family samples processed: %d", #samples))
+end
+
+-- What a typed sequence leaves on screen: chaining, synthetic output and erase
+-- accounting, which one trigger per vector cannot show.
+print("\n--- Shared sequence vectors ---")
+local ok_sequences, sequences = pcall(function()
+	local raw = require("tests.support.source_file").read(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json")
+	local decoded = require("json").decode(raw)
+	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
+	return decoded.vectors
+end)
+if not ok_sequences then
+	fail_count = fail_count + 1
+	print("  FAIL  mandatory sequence vectors: " .. tostring(sequences))
+else
+	for _, v in ipairs(sequences) do
+		local first = v.mappings[1]
+		local others = {}
+		for index = 2, #v.mappings do others[#others + 1] = v.mappings[index] end
+		local ok_typed, screen, fired = pcall(function()
+			return make_vkb(first.trigger, first.replacement, first, others).type_text(v.typed)
+		end)
+		if not ok_typed then
+			fail_count = fail_count + 1
+			print(string.format("  FAIL  sequence[%s] — replay: %s", v.id, tostring(screen)))
+		else
+			assert_eq("sequence[" .. v.id .. "] — screen", v.expected.screen, screen)
+			assert_eq("sequence[" .. v.id .. "] — expansions", v.expected.expansions, fired)
+		end
+	end
+	print(string.format("Sequence vectors processed: %d", #sequences))
 end
 
 -- The REAL init.lua of an installed application copy, booted over each user
