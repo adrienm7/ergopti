@@ -784,6 +784,17 @@ const RULES = [
 			].includes(f)
 	},
 	{
+		gate: 'go-route-plan',
+		why: 'the Go twin of the shared route plan answers route_plan_vectors.json only under go test',
+		match: (f) =>
+			f.startsWith('static/ergopti_plus/_shared/go/route_plan/') ||
+			[
+				'static/ergopti_plus/_shared/tests/corpus/network/route_plan_vectors.json',
+				'static/ergopti_plus/_shared/modules/network/route_origins.json',
+				'tools/test/run-go-route-plan.cjs'
+			].includes(f)
+	},
+	{
 		gate: 'linux-network-runtime',
 		why: 'managed networking requires actual LuaJIT luv, GIO modules, compiled schemas and installed helper paths',
 		match: (f) =>
@@ -945,6 +956,7 @@ const GATE_COMMANDS = {
 	'linux-xkb-source': { npm: 'test:linux:xkb-source' },
 	'linux-http-stream': { npm: 'test:linux:http-stream' },
 	'linux-network-runtime': { npm: 'test:linux:network-runtime' },
+	'go-route-plan': { npm: 'test:go-route-plan' },
 	'linux-nix-native': { npm: 'test:linux:nix-native', platform: 'linux' },
 	'linux-updater-temp-native': { npm: 'test:linux:updater-temp-native', platform: 'linux' },
 	'linux-updater-archive-native': { npm: 'test:linux:updater-archive-native', platform: 'linux' },

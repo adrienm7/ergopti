@@ -3140,6 +3140,24 @@ jobs:
               exit 1
           fi
         timeout-minutes: 3
+      # The Go twin of the shared route plan answers the vectors the Lua and
+      # shell twins answer; the runner's preinstalled Go runs it offline.
+      - name: Qualify the Go route plan twin
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
+          npm run --silent test:go-route-plan | tee "$RUNNER_TEMP/go-route-plan.log"
+          else
+              exit 1
+          fi
+        timeout-minutes: 3
       # Independent NIST vectors use retained, already unlinked descriptors.
       - name: Qualify native retained FD SHA-256
         if: ${{ !cancelled() && matrix.shard == 'network-ai' }}

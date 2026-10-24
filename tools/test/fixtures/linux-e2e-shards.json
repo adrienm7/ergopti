@@ -113,6 +113,7 @@
 			"Qualify native HTTP streaming receipts",
 			"Install prerequisites for Qualify native managed network runtime",
 			"Qualify native managed network runtime",
+			"Qualify the Go route plan twin",
 			"Qualify native retained FD SHA-256",
 			"Prepare authenticated managed HTTP validation tools",
 			"Qualify native managed HTTP public and retained output",

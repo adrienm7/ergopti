@@ -682,6 +682,7 @@ const STEP_CONDITIONS = [
 	],
 	[COMMON_BOX, 'common-integration', 'Retain captured JS integration failure output', 'always()'],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native runtime prerequisites', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Qualify the Go route plan twin', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native retained FD SHA-256', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Prepare authenticated managed HTTP validation tools', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],

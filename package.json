@@ -403,6 +403,7 @@
 		"test:linux-network-runtime": "node ./tools/test/test-linux-network-runtime.cjs",
 		"test:linux-network-runtime-registration": "node ./tools/test/test-linux-network-runtime-registration.cjs",
 		"test:linux:network-runtime": "node ./tools/test/run-linux-network-runtime.cjs",
+		"test:go-route-plan": "node ./tools/test/run-go-route-plan.cjs",
 		"test:linux-managed-http-phase-protocol": "node ./tools/test/test-linux-managed-http-phase-protocol.cjs",
 		"test:linux:managed-http-native": "node ./tools/test/run-linux-managed-http-native.cjs",
 		"test:linux-managed-http-ci-registration": "node ./tools/test/test-linux-managed-http-ci-registration.cjs",

@@ -385,6 +385,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-proxy-route-contract.cjs"],
 			"repro": "node tools/test/test-managed-proxy-route-contract.cjs"
+		},
+		{
+			"id": "js-0467",
+			"ordinal": 467,
+			"name": "Go route plan gate cannot pass vacuously (missing toolchain, no test files, skipped test)",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-go-route-plan-gate.cjs"],
+			"repro": "node tools/test/test-go-route-plan-gate.cjs"
 		}
 	]
 }
