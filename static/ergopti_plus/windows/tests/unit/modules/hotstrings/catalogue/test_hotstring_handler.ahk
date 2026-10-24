@@ -31,10 +31,10 @@ TestHH_PriorKeyDifferentCharFailsClosed() {
     global LastSentCharacterKeyTime
     ResetHotstringRecorders()
     SimulateRegularApp()
-    ; The handler asks IsTimeActivationExpired for SubStr("xy", -2, 1) == "x".
-    ; Only "y" is tracked, so the gate char "x" has no timestamp — we cannot
-    ; prove "x" was typed recently, so the gate fails CLOSED (suppressed).
-    LastSentCharacterKeyTime := Map("y", A_TickCount - 60000)
+    ; An end-char trigger measures the delay from its last letter, "y". Only a
+    ; fresh "x" is tracked, so the gate char "y" has no timestamp — we cannot
+    ; prove "y" was typed recently, so the gate fails CLOSED (suppressed).
+    LastSentCharacterKeyTime := Map("x", A_TickCount)
     _TestCallHotstring("xy", "z", "", true, false, 1)
     AssertEqual(0, _Stub_RecordedSends.Length)
 }
@@ -209,7 +209,7 @@ TestHH_TimeActivationExpiredSkipsAll() {
     global LastSentCharacterKeyTime
     ResetHotstringRecorders()
     SimulateRegularApp()
-    LastSentCharacterKeyTime := Map("a", A_TickCount - 60000)
+    LastSentCharacterKeyTime := Map("b", A_TickCount - 60000)
     _TestCallHotstring("ab", "x", "", true, false, 1)
     ; Timeout 1 s exceeded by the 60 s gap → handler returns immediately.
     AssertEqual(0, _Stub_RecordedSends.Length)
@@ -224,7 +224,8 @@ TestHH_TimeActivationFreshAllowsAll() {
         TimingsLoadShared()
     ResetHotstringRecorders()
     SimulateRegularApp()
-    LastSentCharacterKeyTime := Map("a", A_TickCount)
+    ; The delay runs from the trigger's last letter to the end character.
+    LastSentCharacterKeyTime := Map("b", A_TickCount)
     _TestCallHotstring("ab", "x", "", true, false, 1)
     AssertEqual(3, _Stub_RecordedSends.Length)
 }
@@ -236,7 +237,7 @@ TestHH_TimeActivationZeroDisablesGuard() {
     ResetHotstringRecorders()
     SimulateRegularApp()
     ; Even with a stale prior key, timeout=0 must NEVER expire.
-    LastSentCharacterKeyTime := Map("a", A_TickCount - 3600 * 1000)
+    LastSentCharacterKeyTime := Map("b", A_TickCount - 3600 * 1000)
     _TestCallHotstring("ab", "x", "", true, false, 0)
     AssertEqual(3, _Stub_RecordedSends.Length)
 }
