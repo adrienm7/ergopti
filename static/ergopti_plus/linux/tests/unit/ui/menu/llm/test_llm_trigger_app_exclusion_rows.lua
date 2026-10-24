@@ -20,6 +20,9 @@ helpers.describe("Linux AI menu: trigger application exclusions", function()
 			local Triggers = helpers.load_module("modules.llm.trigger_settings")
 			Triggers._reset()
 			local engine = require("modules.llm.prediction_engine")
+			-- A fresh builder over the current module state: an earlier test may have
+			-- retired the separator or manifest sources the cached one captured.
+			local MenuBuilder = helpers.load_module("ui.menu.menu_builder")
 			local original_enabled, original_last = engine.is_enabled, engine.get_agent_last_app
 			local ok, err = xpcall(function()
 				local ctx = { llm = engine, paused = false, on_quit = function() end, on_menu_changed = function() end }
@@ -32,7 +35,7 @@ helpers.describe("Linux AI menu: trigger application exclusions", function()
 				local function exclusion_children()
 					local title = I18n.get("menu.llm.title")
 					local trigger_title = I18n.get("menu.llm.trigger_menu_title")
-					for _, top in ipairs(require("ui.menu.menu_builder").build(ctx)) do
+					for _, top in ipairs(MenuBuilder.build(ctx)) do
 						if type(top.title) == "string" and top.title:sub(1, #title) == title then
 							for _, child in ipairs(top.menu or {}) do
 								if type(child.title) == "string" and child.menu
