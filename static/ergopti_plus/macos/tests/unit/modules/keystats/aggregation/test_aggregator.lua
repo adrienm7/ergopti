@@ -196,6 +196,22 @@ helpers.describe("aggregator — determinism, volume and hostile input", functio
 			"identical input must aggregate identically; a difference means state leaked across instances")
 	end)
 
+	-- The shared walker refuses an entry without a valid date; macOS must turn
+	-- a missing or malformed timestamp into today's date before it walks, or one
+	-- bad JSONL line would abort every ingest batch that carries it.
+	helpers.it("an entry with a malformed timestamp is credited to today", function()
+		for _, stamp in ipairs({ "", "garbage" }) do
+			State.initialized, State.agg_batch, State.ngram_ctx = false, nil, nil
+			local a = helpers.load_with_stubs("modules.keystats.aggregator")
+			a.init({ device_id = "timestamp-probe" })
+			local ok, err = pcall(a.walk_typing, { app = "Editor", timestamp = stamp,
+				events = { { "a", 100, {} } } })
+			helpers.assert_true(ok, "walk_typing must not throw on timestamp '" .. stamp .. "': " .. tostring(err))
+			local row = State.agg_batch.app_day[os.date("%Y-%m-%d") .. "\1Editor"]
+			helpers.assert_true(row ~= nil and row.chars == 1, "the keystroke is credited to today")
+		end
+	end)
+
 	helpers.it("200 characters are all counted", function()
 		local batch = walk_fresh("Editor", string.rep("ab", 100))
 		helpers.assert_eq(classified_chars(batch), 200,
