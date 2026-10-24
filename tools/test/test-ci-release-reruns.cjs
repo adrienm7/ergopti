@@ -1150,6 +1150,9 @@ function preflight(
 		...['.github/ci/stable_v103_macos_native_qualification_exception.json'].filter((file) =>
 			fs.existsSync(path.join(ROOT, file))
 		),
+		// The preflight asks the signing owner whether the assets must carry a .sig.
+		'tools/build/update-asset-signature.cjs',
+		'static/ergopti_plus/_shared/modules/updater/asset_signing.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json'
