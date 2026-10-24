@@ -153,6 +153,7 @@ local function exercise(kind, dry_run)
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
 					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,
 					dyn_hotstrings = dynamic, injector = injector, Logger = require("logger.shim"), user_hotstring_native = native,
+					keyboard_hook = session.hook,
 				}, { __index = _G })
 				local main = assert(io.open(root .. "/ergopti_hotstrings.lua", "rb"))
 				local source = main:read("*a"); assert(main:close())
