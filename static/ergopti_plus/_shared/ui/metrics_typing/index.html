@@ -1319,11 +1319,11 @@
 						let incoming_hist = incoming.historical || {};
 						let incoming_today = incoming.today || {};
 						// PC-scancode drivers: translate sc_kb → kc per app so
-						// the renderer keeps reading the same field.
+						// the renderer keeps reading the same field. heatmap_win.js
+						// owns both the translation and which drivers need it.
 						if (
-							window.driver_meta &&
-							(window.driver_meta.os === 'win' || window.driver_meta.os === 'linux') &&
-							typeof window.translate_win_today === 'function'
+							typeof window.translate_win_today === 'function' &&
+							is_pc_scancode_driver(window.driver_meta)
 						) {
 							incoming_today = window.translate_win_today(incoming_today);
 							incoming_hist = window.translate_win_today(incoming_hist);
