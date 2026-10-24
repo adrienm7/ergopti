@@ -85,15 +85,24 @@ Test("llm_bridge: TickCount delta uses wrap-safe (now - last + 0x100000000) & 0x
 ; ==========================================================================
 
 _TTCWS_LoggerWrapSafe() {
-	Src := _TTCWS_StripLineComments(_TTCWS_ReadSource("infra/logger.ahk"))
-	Assert(Src != "", "infra/logger.ahk must be readable")
-
-	; Both halves of the wrap-safe formula must be present in the ERROR dedup path
-	Assert(InStr(Src, "0x100000000") > 0,
-		"infra/logger.ahk must use the wrap-safe constant 0x100000000 in ERROR dedup TickCount delta (F38)")
-	Assert(InStr(Src, "0xFFFFFFFF") > 0,
-		"infra/logger.ahk must mask with 0xFFFFFFFF in ERROR dedup TickCount delta (F38)")
+	; Keep the historical F38 registration below for replay compatibility.
+	; Whole-file constants can come from the separate repeat helper and cannot
+	; prove the width of the actual consecutive-dedup comparison.
+	Src := _DriverFuncBody("_LoggerEmitBody")
+	Assert(Src != "", "The real _LoggerEmitBody() body must exist before checking its native clock domain")
+	Code := _DriverMaskNonCode(&Src)
+	Assert(RegExMatch(Code, "\bNow\s*:=\s*_LoggerNowMs\s*\(") > 0,
+		"F38: the actual emitter must acquire the production suppression clock")
+	Assert(RegExMatch(Code, "\bMsgLine\s*==\s*_LOGGER_DEDUP_KEY\b") > 0,
+		"F38: the guard must constrain the real identical-line dedup path")
+	Assert(RegExMatch(Code, "\(\s*Now\s*-\s*_LastErrTime\s*\)\s*<\s*LOGGER_DEDUP_WINDOW_MS\b") > 0,
+		"F38: the actual dedup window must compare the untruncated native64 age")
+	AssertEqual(0, RegExMatch(Code, "i)\b(?:0x0*(?:100000000|ffffffff)|429496729[56])\b|(?<!&)&(?!&)|\b_LoggerElapsedMs\s*\("),
+		"F38: the emitter must not fold the age to DWORD or borrow the modulo32 repeat helper")
+	Assert(RegExMatch(Code, "\b_LastErrTime\s*:=\s*Now\b") > 0,
+		"F38: accepted emissions must retain the actual full-width clock origin")
 }
+
 Test("logger: ERROR dedup TickCount delta uses wrap-safe (now - last + 0x100000000) & 0xFFFFFFFF formula (F38)", _TTCWS_LoggerWrapSafe)
 
 
