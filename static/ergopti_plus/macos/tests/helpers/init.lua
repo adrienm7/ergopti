@@ -804,6 +804,8 @@ function M.make_logger_stub()
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,
+		-- Every dialog_util modal runs through this wrapper; it has no clock here.
+		run_modal = function(fn, ...) return fn(...) end,
 		redact_message = function(text) return text end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
