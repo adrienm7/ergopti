@@ -30,6 +30,9 @@ M.INVALID = "route-plan-invalid"
 M.CONFLICT = "route-plan-conflict"
 M.UNPLANNED_HOST = "route-plan-unplanned-host"
 
+--- Relay schemes an exported HTTPS_PROXY may carry.
+local RELAY_SCHEMES = { http = true, https = true, socks5 = true, socks5h = true }
+
 --- Normalizes a DNS host: lowercase, no trailing dot, plain label characters.
 --- @param host string
 --- @return string|nil
@@ -48,14 +51,20 @@ local function origin_host(origin)
 	return host and dns_host(host) or nil
 end
 
---- Accepts "direct" or an exportable http / socks5 relay with a port.
+--- Accepts "direct" or an exportable relay with a port. The schemes are the
+--- ones every environment-driven client honors (Go net/http, reqwest); the
+--- optional userinfo keeps an authenticated desktop proxy usable, and an
+--- apostrophe in it must be percent-encoded.
 --- @param route any
 --- @return boolean
 local function valid_route(route)
 	if route == "direct" then return true end
 	if type(route) ~= "string" then return false end
-	local host, port = route:match("^http://([^/%s]+):(%d+)$")
-	if not host then host, port = route:match("^socks5://([^/%s]+):(%d+)$") end
+	local scheme, rest = route:match("^(%l[%l%d]*)://(.+)$")
+	if not RELAY_SCHEMES[scheme] then return false end
+	local userinfo, address = rest:match("^([^@]*)@(.*)$")
+	if userinfo and (userinfo == "" or userinfo:find("[^%w%._~%%!%$&%(%)%*%+,;=:%-]")) then return false end
+	local host, port = (address or rest):match("^([^/%s@]+):(%d+)$")
 	if not host or #port > 5 then return false end
 	port = tonumber(port)
 	if port < 1 or port > 65535 then return false end

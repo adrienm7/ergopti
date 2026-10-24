@@ -23,7 +23,8 @@ const (
 )
 
 // RouteEntry is one lookup result: an https origin and its route, either
-// "direct" or an http / socks5 relay URL with a port.
+// "direct" or an http, https, socks5 or socks5h relay URL with a port and an
+// optional userinfo (an apostrophe in it must be percent-encoded).
 type RouteEntry struct {
 	Origin string
 	Route  string
@@ -39,7 +40,7 @@ type RoutePlan struct {
 
 var (
 	routeOriginPattern = regexp.MustCompile(`^https://([^/?#@:\s]+)$`)
-	routeRelayPattern  = regexp.MustCompile(`^(?:http|socks5)://(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+):([0-9]+)$`)
+	routeRelayPattern  = regexp.MustCompile(`^(?:https?|socks5h?)://(?:[A-Za-z0-9._~%!$&()*+,;=:-]+@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9._-]+):([0-9]+)$`)
 	routeHostPattern   = regexp.MustCompile(`^[A-Za-z0-9.-]+$`)
 )
 
