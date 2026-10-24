@@ -121,8 +121,6 @@ local LOG = "ergopti_hotstrings"
 -- =========================================
 -- =========================================
 
-local engine_mod        = require("modules.hotstrings.engine")
-local ExpansionDelay     = require("modules.hotstrings.expansion_delay")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local injector          = require("modules.hotstrings.injector")
 local keyboard_layout   = require("adapters.keyboard_layout")
@@ -152,7 +150,6 @@ local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
 -- must not stop working because it cannot draw a hint about them).
 local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
 local llm_overlay = RuntimeGuard.optional_require("ui.tooltip.llm")
-local dev_finder        = require("modules.hotstrings.device_finder")
 local keystats         = require("modules.keystats.keystats")
 local keyboard_hook     = require("adapters.keyboard_hook")
 local InputEvent        = require("infra.input_event")
@@ -160,11 +157,9 @@ local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
-local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
-local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 
@@ -736,6 +731,11 @@ local function main()
 	-- Keep main within older LuaJIT's 60-upvalue budget; these dependencies remain mandatory.
 	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 	local PreviewSettings = require("modules.hotstrings.preview_settings")
+	local engine_mod = require("modules.hotstrings.engine")
+	local ExpansionDelay = require("modules.hotstrings.expansion_delay")
+	local dev_finder = require("modules.hotstrings.device_finder")
+	local ScriptActions = require("modules.shortcuts.script_actions")
+	local InputCaptureGate = require("infra.input_capture_gate")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
 	-- every keystroke, and a bucket for a common tail character holds hundreds of
