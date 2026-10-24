@@ -136,3 +136,27 @@ _ScopeMenuLlmHasNoClear() {
 	AssertEqual(1, Restores, "the AI menu declares its restore row once")
 }
 Test("ai-menu-no-clear: the AI menu declares and registers the restore alone", _ScopeMenuLlmHasNoClear)
+
+; llm-scope-single-owner. The manifest came to declare llm.navigation.nav_modifiers
+; and llm.trigger.disabled_apps for Windows while the AI menu still listed them
+; as its own: both owners planned them, and the global scope refused every
+; restore and clear as overlapping owners. Each key has one planner per mode.
+_ScopeMenuLlmSupplementIsDisjoint() {
+	for Mode in ["recommended", "clear"] {
+		Planned := Map()
+		for Row in ManifestScopePlan("llm", Mode).operations
+			Planned[Row.Section . "`n" . Row.Key] := true
+		Supplement := Map()
+		for Row in _LLM_Menu_ScopeResetOperations("llm", Mode) {
+			Identity := Row.Section . "`n" . Row.Key
+			AssertFalse(Planned.Has(Identity),
+				"the manifest already plans " . StrReplace(Identity, "`n", ".") . " in " . Mode)
+			Supplement[Identity] := true
+		}
+		for Identity in ["llm`nollama_port", "llm`napi_entry_id"]
+			Assert(Supplement.Has(Identity),
+				"the AI menu still resets its undeclared " . StrReplace(Identity, "`n", ".") . " in " . Mode)
+	}
+}
+Test("llm-scope-single-owner: the AI menu supplement never replans a manifest key",
+	_ScopeMenuLlmSupplementIsDisjoint)
