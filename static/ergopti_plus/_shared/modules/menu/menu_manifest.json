@@ -1315,6 +1315,11 @@
 		},
 		{
 			"type": "command",
+			"id": "composer_check",
+			"i18n": "menu.debug.composer_check"
+		},
+		{
+			"type": "command",
 			"id": "field_check_key_accounting",
 			"i18n": "menu.debug.field_check_key_accounting",
 			"platforms": [
