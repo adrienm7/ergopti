@@ -32,8 +32,7 @@ a sealed Windows updater source, reseal with
 ## Integration pass of 2026-10-24 evening: what landed and what is left
 
 A coordinator session ran a parallel pass on the parity and performance items. Its work is now on `dev` (about 495
-commits). Every `agent/*`, `wt/*`, `land/*` and `fix/*` branch was deleted, and the CI run of the push was cancelled, so
-no release was cut.
+commits). Its CI run was cancelled, so no release was cut. The `agent/*` and `fix/*` branches on origin could not be deleted from the session (the proxy refuses branch deletion): delete them by hand, since all their commits are on `dev`.
 
 **Landed.** 9 cloud worker branches:
 
