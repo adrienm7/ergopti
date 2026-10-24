@@ -20,7 +20,6 @@
 		"static/ergopti_plus/linux/infra/diagnostic_snapshot.lua": 1,
 		"static/ergopti_plus/linux/infra/dynamic_hotstrings_scope.lua": 3,
 		"static/ergopti_plus/linux/infra/gesture_scope.lua": 1,
-		"static/ergopti_plus/linux/infra/hotstring_preferences.lua": 13,
 		"static/ergopti_plus/linux/infra/hotstrings_scope.lua": 1,
 		"static/ergopti_plus/linux/infra/key_combinations_scope.lua": 10,
 		"static/ergopti_plus/linux/infra/legacy_hotstring_storage.lua": 1,
