@@ -161,7 +161,13 @@ helpers.describe("file watchers single selected TOML", function()
 		if options.prepare then options.prepare(state) elseif not options.absent then state.write(state.path) end
 		local called, primary = xpcall(function() run(state) end, debug.traceback)
 		local cleanup = {}
-		for path in pairs(files) do native_luv.fs_chmod(path, 384) end
+		-- Restore owner read only on the fixture files themselves: chmod follows a
+		-- symlink, and a case links the selected path to /dev/null, whose mode an
+		-- unprivileged run cannot change but a root run would.
+		for path in pairs(files) do
+			local link = native_luv.fs_lstat(path)
+			if link and link.type ~= "link" then native_luv.fs_chmod(path, 384) end
+		end
 		if watcher then local stopped, detail = pcall(watcher.stop); if not stopped then cleanup[#cleanup + 1] = tostring(detail) end end
 		native_luv.run("nowait")
 		for handle, record in pairs(records) do
@@ -348,6 +354,7 @@ helpers.describe("file watchers single selected TOML", function()
 	end)
 
 	helpers.it("(linux-watch-selected-topology) a selected path that is not a regular file is refused in the log", function()
+		local device_mode = assert(native_luv.fs_stat("/dev/null")).mode
 		selected_file_session("native", function(s)
 			local logger = require("logger.shim")
 			local held, refusals = logger.warn, {}
@@ -361,6 +368,8 @@ helpers.describe("file watchers single selected TOML", function()
 			helpers.assert_eq(#refusals, 1, "the unusable selected path is named once")
 			helpers.assert_eq(#s.active(s.path), 0, "nothing is bound to an unusable path")
 		end, { prepare = function(s) s.symlink("/dev/null", s.path) end })
+		helpers.assert_eq(assert(native_luv.fs_stat("/dev/null")).mode, device_mode,
+			"the fixture cleanup never changes the link target")
 	end)
 
 	if native_luv.getuid() ~= 0 then
