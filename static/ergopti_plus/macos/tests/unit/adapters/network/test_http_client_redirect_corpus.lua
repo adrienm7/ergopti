@@ -39,7 +39,6 @@ local CURL_RECEIPT_ONLY = {
 -- Disagreements with the shared law. Each entry must still disagree: a fix
 -- turns its case red until the entry is removed.
 local PENDING = {
-	["last allowed hop admitted"] = "the adapter stops after 5 hops, the shared law after 50",
 	["explicit https floor rejects http from http initial"] =
 		"the adapter has no HTTPS floor for an HTTP initial request",
 	["original HTTP floor stays HTTP after an intermediate HTTPS upgrade"] =
