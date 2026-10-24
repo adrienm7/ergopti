@@ -260,7 +260,7 @@
 		},
 		{
 			"id": "llm-prompt-keys-single-source",
-			"ordinal": 466,
+			"ordinal": 467,
 			"name": "AI numeric prompts and local-server port dialogs use one key set on every driver",
 			"cmd": "node",
 			"args": ["tools/test/test-llm-prompt-keys-single-source.cjs"],
