@@ -12,6 +12,16 @@
 local M = {}
 local Bom = require("toml_codec.bom")
 local KeyPath = require("toml_codec.key_path")
+local SourceMemo = require("toml_codec.source_memo")
+
+-- One preferences save scans the same config.toml text 10 times (record list,
+-- preferences, inline parents, batch writer, personal metadata). A scan is a
+-- pure function of the text and the header grammar, so the newest texts are
+-- kept and every caller receives a private copy.
+local SCAN_MEMO_ENTRIES = 4
+local _scan_memo = SourceMemo.new(SCAN_MEMO_ENTRIES)
+-- Defined below scan_records, which is the only public entry point.
+local scan_source
 
 --- Finds the end of an already recognized triple-quote closing run.
 --- Value decoding owns validation of the maximum run length.
@@ -210,6 +220,18 @@ end
 --- @return table|nil scan `{ lines, headers, records }`, nil when a value never closes.
 --- @return string|nil error_detail
 function M.scan_records(source, options)
+	local quoted = (options and options.quoted_headers) and true or false
+	if type(source) ~= "string" then return scan_source(source, quoted) end
+	return _scan_memo.fetch(source, quoted, function() return scan_source(source, quoted) end)
+end
+
+--- Scans one source without the memo; see scan_records.
+--- @param source string Complete file content.
+--- @param quoted boolean Whether headers use the quoted key-path grammar.
+--- @return table|nil scan
+--- @return string|nil error_detail
+scan_source = function(source, quoted)
+	local options = quoted and { quoted_headers = true } or nil
 	local lines = split_lines(source)
 	local headers, records = {}, {}
 	local current = nil
