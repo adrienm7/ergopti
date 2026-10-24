@@ -1187,7 +1187,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 
 ; The page's first message: its configuration and the first snapshot. The
 ; schema and the redaction rules go as their files are; the redaction context
-; is written by hand so its flag is a JSON true, not the 1 AHK stores.
+; is written by hand so its flag is a JSON true, not the 1 AHK stores. This
+; host runs the guided diagnostic collection, so it says so to the page.
 ; @param Session {Map}
 ; @returns {String}
 _HC_InitJson(Session) {
@@ -1198,7 +1199,8 @@ _HC_InitJson(Session) {
 	return '{"type":"init","collection":' . _HC_ValueToJson(Collection) . ',"config":{"schema":' . Config["raw_schema"]
 		. ',"redaction":' . Config["raw_redaction"]
 		. ',"context":{"home":' . _HC_JsStr(Context["home"]) . ',"user":' . _HC_JsStr(Context["user"])
-		. ',"config_dir":' . _HC_JsStr(Context["config_dir"]) . ',"case_insensitive":true}},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
+		. ',"config_dir":' . _HC_JsStr(Context["config_dir"]) . ',"case_insensitive":true}'
+		. ',"capabilities":{"diagnostic_collection":true}},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
 }
 
 ; Sends one message into the window's page.
