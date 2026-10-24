@@ -1176,3 +1176,73 @@ helpers.describe("prediction engine: model removal", function()
 		restore_delete(); restore(); if not okay then error(problem, 0) end
 	end)
 end)
+
+helpers.describe("prediction engine: model warmup lifecycle", function()
+	--- Binds the warmup to this engine on a virtual clock, as the daemon does.
+	--- @param engine table
+	--- @return table world, function restore_warmup
+	local function bound_warmup(engine)
+		package.loaded["modules.llm.warmup"] = nil
+		local Warmup = require("modules.llm.warmup")
+		local world = { scheduler = Fakes.timer_scheduler(), loads = {} }
+		package.loaded["modules.llm.api_ollama"].warmup = function(origin, model, receipt, on_done)
+			world.loads[#world.loads + 1] = { origin = origin, model = model, receipt = receipt, on_done = on_done }
+			return { started = true, is_settled = function() return true end, cancel = function() return true end }
+		end
+		helpers.assert_true(Warmup.init({ scheduler = world.scheduler, target = engine.warmup_target,
+			request = engine.warmup_request, busy = engine.is_predicting }))
+		world.warmup = Warmup
+		return world, function()
+			Warmup.shutdown()
+			package.loaded["modules.llm.warmup"] = nil
+		end
+	end
+	local INITIAL_SEC = require("infra.timings").ms("llm", "warmup_initial_delay_ms") / 1000
+
+	helpers.it("linux-model-warmup: the engine loads its Ollama model, and a pause stops the chain until resume", function()
+		local engine, _, _, restore = load("ollama", ENTRY, nil, false, true)
+		local world, restore_warmup = bound_warmup(engine)
+		local okay, problem = pcall(function()
+			local target = engine.warmup_target()
+			helpers.assert_eq(target.origin, "http://127.0.0.1:11434")
+			helpers.assert_eq(target.model, "ollama-model")
+			helpers.assert_true(world.warmup.schedule("startup"))
+			engine.on_pause_change(true)
+			helpers.assert_eq(world.warmup.pending(), false, "a pause stops the chain with the runtime")
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.loads, 0, "nothing is loaded while paused")
+			engine.on_pause_change(false)
+			helpers.assert_true(world.warmup.pending(), "resuming warms the model again")
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.loads, 1)
+			helpers.assert_eq(world.loads[1].model, "ollama-model")
+			world.loads[1].on_done(true)
+			helpers.assert_eq(world.warmup.pending(), false, "a loaded model ends the chain")
+			-- The scripted profiles answer the stored selection from here on.
+			local selected = "ollama-model"
+			package.loaded["modules.llm.profiles"].get_current_model = function() return selected end
+			local set_model = package.loaded["modules.llm.profiles"].set_model
+			package.loaded["modules.llm.profiles"].set_model = function(name, ...)
+				local saved = set_model(name, ...)
+				if saved == true then selected = name end
+				return saved
+			end
+			helpers.assert_true(engine.set_model("replacement-model"))
+			world.scheduler.test.advance(INITIAL_SEC)
+			helpers.assert_eq(#world.loads, 2)
+			helpers.assert_eq(world.loads[2].model, "replacement-model", "a new model is warmed in its turn")
+		end)
+		restore_warmup(); restore(); if not okay then error(problem, 0) end
+	end)
+
+	helpers.it("linux-model-warmup: an API backend or a switched-off AI loads nothing", function()
+		local engine, _, _, restore = load("api", ENTRY, nil, false, true)
+		local world, restore_warmup = bound_warmup(engine)
+		local okay, problem = pcall(function()
+			helpers.assert_nil(engine.warmup_target())
+			helpers.assert_eq(world.warmup.schedule("startup"), false)
+			helpers.assert_eq(world.warmup.pending(), false)
+		end)
+		restore_warmup(); restore(); if not okay then error(problem, 0) end
+	end)
+end)
