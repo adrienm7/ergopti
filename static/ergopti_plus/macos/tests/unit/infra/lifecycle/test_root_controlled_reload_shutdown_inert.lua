@@ -243,7 +243,9 @@ local function run_isolated(options, assertions)
 			["platform.remap.lease_controller"] = LeaseController,
 			["infra.boot_profiler"] = {
 				begin = function() end,
+				trace_requires = function() end,
 				stage = function() end,
+				sub = function() end,
 				mark = function() end,
 				complete = function() end,
 				current_stage = function() return "fixture stage" end,
