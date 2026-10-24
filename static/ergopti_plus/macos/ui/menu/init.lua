@@ -1407,6 +1407,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return committed
 	end
 	local global_scope = nil
+	--- Shows why a global restore or clear was refused, with the typed failure
+	--- point the Windows reset names too. It used to refuse in silence: only
+	--- the log said that nothing had been restored.
+	--- @param report table Refused composition report.
+	local function show_reset_failure(report)
+		local title, message = require("config_reset_failure").message(report, i18n.get)
+		local shown, err = pcall(require("infra.dialog_util").block_alert, title, message,
+			i18n.get("button.ok"), nil, "critical")
+		if not shown then
+			Logger.error(LOG, "Reset failure dialog could not be shown (%s): %s.", tostring(err), message)
+		end
+	end
 	apply_global_scope = function(mode)
 		if read_only_reason ~= nil then return false end
 		if not global_scope then
@@ -1443,9 +1455,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
 					return core_mods.shortcuts_mod.is_paused()
 				end,
-				refresh = function()
+				refresh = function(committed, report)
 					Builder.invalidate_cache()
 					updateMenu()
+					if committed ~= true then show_reset_failure(report) end
 				end,
 			})
 		end
