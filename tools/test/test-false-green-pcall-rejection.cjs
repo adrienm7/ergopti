@@ -22,7 +22,9 @@ for (const statement of [
 	'helpers.assert_eq(ok, false)',
 	'helpers.assert_equal(ok, false, "expected rejection")',
 	'helpers.assert_false(ok)',
-	'helpers.assert_false(pcall(subject))'
+	'helpers.assert_false(pcall(subject))',
+	'helpers.assert_eq(pcall(subject, { a = ")" }), false)',
+	'helpers.assert_equal(pcall(subject), false, "expected rejection")'
 ]) {
 	assert.equal(
 		scan(fixture, `local ok = pcall(subject)\n${statement}`).length,
@@ -35,6 +37,8 @@ for (const statement of [
 	'helpers.assert_eq(ok, true)',
 	'helpers.assert_eq(ok, false or true)',
 	'helpers.assert_true(pcall(subject))',
+	'helpers.assert_eq(pcall(subject), true)',
+	'helpers.assert_eq(pcall(subject, false), true)',
 	'helpers.assert_false(ok); helpers.assert_true(ok)'
 ]) {
 	assert.equal(
@@ -115,6 +119,14 @@ for (const literal of [
 		1,
 		'an unreached nested registration remains dead'
 	);
+	const withArgument = nested
+		.replace('Register() {', 'Register(Name) {')
+		.replace('\nRegister()', '\nRegister("updates")');
+	assert.equal(
+		context.findDeadTests(ahkFixture, withArgument, '.ahk').length,
+		0,
+		'a registration helper called at top level with an argument is reached'
+	);
 }
 // A child-process harness carries its registrations as continuation data: they
 // register in the child, which the parent test then reads back. Only a real
@@ -157,6 +169,6 @@ assert.deepEqual(
 	'a real registration after the continuation section remains dead'
 );
 console.log(
-	'false-green pcall rejection: 10 scenarios; AHK mixed quotes: 5 live/dead/nested vectors; ' +
+	'false-green pcall rejection: 14 scenarios; AHK mixed quotes: 5 live/dead/nested vectors; ' +
 		'continuation child harness live/dead vectors passed'
 );

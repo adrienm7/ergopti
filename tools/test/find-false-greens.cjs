@@ -448,11 +448,14 @@ function findDeadTests(file, src, ext) {
 	const lines = src.split(/\r?\n/);
 	// A child script written as continuation data neither calls nor registers here.
 	const data = ahkContinuationLines(lines);
-	// A function is "reached" when the file calls it from outside any function.
+	// A function is "reached" when the file calls it from outside any function,
+	// with or without arguments: a registration helper is often called once per
+	// corpus (`_Register("updates")`). A definition always opens its brace on the
+	// header line here (see ahkEnclosingFunction), so a bare call cannot be one.
 	const reached = new Set();
 	lines.forEach((line, i) => {
 		if (isComment(line, '.ahk') || owners[i] || data[i]) return;
-		const m = line.match(/^[ \t]*([A-Za-z_]\w*)\s*\(\s*\)\s*$/);
+		const m = line.match(/^[ \t]*([A-Za-z_]\w*)\s*\(.*\)\s*$/);
 		if (m) reached.add(m[1]);
 	});
 	lines.forEach((line, i) => {
@@ -479,6 +482,29 @@ function findDeadTests(file, src, ext) {
  * surrounding pcall swallowed it, and the test stayed green
  * (PROJECT_MEMORY, project-lua-closure-before-local-nil-global).
  */
+/**
+ * True when `assert_eq(pcall(f), false)` compares the inline status with false:
+ * an expected rejection, as `local ok = pcall(f)` then `assert_eq(ok, false)`.
+ * @param {RegExpMatchArray} match The `assertX(pcall(` match on the line.
+ * @param {string} line Source line.
+ * @returns {boolean}
+ */
+function inlineExpectsFalse(match, line) {
+	if (!['assert_eq', 'assert_equal'].includes(match[1])) return false;
+	let depth = 1;
+	let quote = null;
+	for (let k = match.index + match[0].length; k < line.length; k++) {
+		const ch = line[k];
+		if (quote) {
+			if (ch === '\\') k++;
+			else if (ch === quote) quote = null;
+		} else if (ch === '"' || ch === "'") quote = ch;
+		else if (ch === '(') depth++;
+		else if (ch === ')' && --depth === 0) return /^\s*,\s*false\s*[,)]/.test(line.slice(k + 1));
+	}
+	return false;
+}
+
 function findPcallOnly(file, src) {
 	const out = [];
 	const lines = src.split(/\r?\n/);
@@ -486,7 +512,7 @@ function findPcallOnly(file, src) {
 	lines.forEach((line, i) => {
 		if (isComment(line, '.lua')) return;
 		for (const match of line.matchAll(/(assert\w*)\s*\(\s*pcall\s*\(/g)) {
-			if (match[1] !== 'assert_false') {
+			if (match[1] !== 'assert_false' && !inlineExpectsFalse(match, line)) {
 				out.push({
 					file: rel(file),
 					line: i + 1,
