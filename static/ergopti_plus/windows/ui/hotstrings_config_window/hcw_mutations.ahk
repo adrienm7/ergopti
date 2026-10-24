@@ -109,14 +109,18 @@ _HCW_ReconcileNativeReset(Outcome) {
 		_HCW_LoadCurrent()
 }
 
-_HCW_CompleteNativeReset(Outcome) {
+; Owner is the window whose reset button started the batch. A rebuild inside
+; the batch can let the user close it and reopen another window; that newer
+; window shows the cleared state already and is not this reset's to retire.
+_HCW_CompleteNativeReset(Owner, Outcome) {
 	global _HCWGui, _HCWWidgets
-	if (_HCWGui != 0)
+	if (Owner != 0 && _HCWGui == Owner) {
 		_HCWGui.Destroy()
-	; Destroy() does not fire OnEvent('Close'), so clear globals manually to
-	; prevent OpenHotstringsConfigWindow from showing a destroyed Gui.
-	_HCWGui := 0
-	_HCWWidgets := 0
+		; Destroy() does not fire OnEvent('Close'), so clear globals manually to
+		; prevent OpenHotstringsConfigWindow from showing a destroyed Gui.
+		_HCWGui := 0
+		_HCWWidgets := 0
+	}
 	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
 }
 
@@ -395,7 +399,7 @@ _HCW_ResetAll() {
 	_HCW_CancelAllNumericWrites()
 	Writes := _HCW_BuildResetAllWrites(_HCW_CATEGORY_LIST)
 	Outcome := _HCW_RunWriteBatch(Writes, _HCW_ReconcileNativeReset.Bind(),
-		_HCW_CompleteNativeReset.Bind(), _HCW_ReportWriteFailure.Bind())
+		_HCW_CompleteNativeReset.Bind(_HCWGui), _HCW_ReportWriteFailure.Bind())
 	return Outcome["ok"]
 }
 
