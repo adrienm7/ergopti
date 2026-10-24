@@ -509,7 +509,7 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_nil(saved.hotstrings.trigger_char)
 	end)
 
-	helpers.it("clears to the neutral engine: stopped, defaults, no choices, consent revoked", function()
+	helpers.it("clears to the neutral engine: stopped, defaults, no choices, previews at their shipped default", function()
 		local f = fixture()
 		helpers.assert_eq(f.owner.apply("clear"), true)
 		local decoded = Codec.decode(f.files.config)
@@ -522,7 +522,10 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(decoded.hotstrings.future, { keep = 1 })
 		helpers.assert_eq(f.engine.stops, 1)
 		helpers.assert_eq(f.state.keymap, false)
-		helpers.assert_eq(f.km.previews.ai, false)
+		-- The previews ship on (PAR-24): clearing deletes the row, whose default is
+		-- the value already running, so the AI preview is neither re-applied nor revoked.
+		helpers.assert_nil(f.km.previews.ai, "an unchanged preview is not re-applied")
+		helpers.assert_eq(f.state.preview_ai_enabled, true)
 		helpers.assert_eq(f.km.is_group_enabled("autocorrection"), false)
 		for _, family in ipairs(COMMON_FAMILIES) do
 			helpers.assert_eq(f.km.is_section_enabled("autocorrection", family), false)

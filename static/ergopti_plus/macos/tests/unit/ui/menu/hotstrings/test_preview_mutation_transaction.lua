@@ -435,7 +435,13 @@ helpers.describe("declared autocorrection and AI preview presence", function()
 				helpers.assert_eq(loaded[key], false, "a choice away from the shipped default stays in the file")
 				helpers.assert_eq(require("infra.manifest_reader").default_for("hotstrings." .. key), true)
 				local neighbour = key == "preview_ai_enabled" and "preview_autocorrect_enabled" or "preview_ai_enabled"
-				helpers.assert_eq(loaded[neighbour], true)
+				-- The neighbour now equals the shipped default (PAR-24), which the sparse
+				-- writer leaves out: its effective value is what must not change.
+				local neighbour_value = loaded[neighbour]
+				if neighbour_value == nil then
+					neighbour_value = require("infra.manifest_reader").default_for("hotstrings." .. neighbour)
+				end
+				helpers.assert_eq(neighbour_value, true)
 				helpers.assert_true(f.read():find('future = "kept" # retained', 1, true) ~= nil)
 			end, nil, nil, key)
 		end)

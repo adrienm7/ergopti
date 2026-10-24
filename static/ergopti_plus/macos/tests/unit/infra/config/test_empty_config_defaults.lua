@@ -81,9 +81,13 @@ helpers.describe("empty configuration boot projection", function()
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local state = preferences.build_initial_state({ "french_autocorrection.toml" }, {}, modules)
 		for _, key in ipairs({ "keymap", "shortcuts", "gestures", "keystats_enabled",
-			"dynamichotstrings_enabled", "preview_ai_enabled",
-			"preview_autocorrect_enabled", "preview_star_enabled" }) do
+			"dynamichotstrings_enabled" }) do
 			helpers.assert_eq(state[key], false, "empty configuration must leave " .. key .. " off")
+		end
+		-- The second declared exception (PAR-24): the preview bubbles alter no input
+		-- and ship on, so a fresh configuration shows them.
+		for _, key in ipairs({ "preview_ai_enabled", "preview_autocorrect_enabled", "preview_star_enabled" }) do
+			helpers.assert_eq(state[key], true, "empty configuration must show the " .. key .. " bubble")
 		end
 		-- The declared exception (script-chords-three-os-2026-09-30): the script
 		-- chords are no typing feature and start with their preset.
