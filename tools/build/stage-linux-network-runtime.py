@@ -685,7 +685,8 @@ def recipient_base(name):
     # library built against GLib 2.80 then misses g_once_init_enter_pointer and
     # the tray never loads. The build host is the oldest supported LTS, so the
     # recipient's copies are never older than the ones the modules were built
-    # against; neither they nor their own dependencies are staged.
+    # against; neither they nor their own dependencies are staged (see
+    # recipient_dependencies).
     return name in {
         "libglib-2.0.so.0",
         "libgobject-2.0.so.0",
@@ -733,7 +734,32 @@ def tray_sources():
     return sources
 
 
+def recipient_dependencies(seeds):
+    """Name every library the recipient's GLib and C++ runtime load themselves.
+
+    ldd lists a file's whole closure, so the libraries reached only through
+    libgio (libmount, libblkid, libselinux, libffi, libpcre, libz) appeared in
+    every seed's listing and were staged anyway. Built on Ubuntu 22.04, the
+    image then shadowed Ubuntu 26.04's libmount with util-linux 2.37's, the
+    host libgio missed MOUNT_2_40, and the tray library failed to load with it.
+    Every recipient that has GLib has its own copies of these.
+    """
+    names = set()
+    resolved = set()
+    for seed in seeds:
+        for name, dependency in dependency_paths(run(["ldd", str(regular_source(seed))])):
+            if recipient_base(name) and dependency not in resolved:
+                resolved.add(dependency)
+                names.add(name)
+                names.update(
+                    found
+                    for found, _ in dependency_paths(run(["ldd", str(regular_source(dependency))]))
+                )
+    return frozenset(name for name in names if not external_glibc(name))
+
+
 def copy_elf_closure(seeds, library_directory, owners):
+    recipient = recipient_dependencies(seeds)
     pending = list(seeds)
     visited = set()
     while pending:
@@ -744,7 +770,7 @@ def copy_elf_closure(seeds, library_directory, owners):
         if len(visited) > 256:
             raise RuntimeRefused("Native packaging dependency bound exceeded.")
         for name, dependency in dependency_paths(run(["ldd", str(source)])):
-            if external_glibc(name) or recipient_base(name):
+            if external_glibc(name) or name in recipient:
                 continue
             copy_unique(dependency, library_directory / name, owners)
             pending.append(dependency)

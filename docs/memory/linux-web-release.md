@@ -490,6 +490,14 @@ the name); installed AppImages never self-update, so a rename breaks no updater.
 Action: keep the build in that container until the catalogue's LTS moves, then
 raise `GLIBC_CEILING` and the image together.
 
+GLib's own dependencies are not bundled either: `ldd` lists a whole closure,
+so libmount, libblkid, libselinux, libffi, libpcre and libz reached through
+libgio were staged with every seed, and on Ubuntu 26.04 the bundled 22.04
+libmount made the host libgio fail (`MOUNT_2_40`) and the tray with it.
+`recipient_dependencies` in the stager now leaves that closure to the host.
+Action: never bundle what the host GLib loads itself. curl's brotli and zstd
+are still bundled and are the first suspects if a host library misses a symbol.
+
 The catalogue's runner has GTK 3 but no libayatana, no StatusNotifier host and
 no keyboard; its tray retry docks XEmbed icons into stalonetray. v1.0.3 held its
 "keyboard access unavailable" tray correctly but exited because the tray
