@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local function install_insecure_focus()
 	local previous = package.loaded["adapters.secure_field_detector"]
@@ -257,5 +258,57 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 			"the failure assertion is meaningful only if a request actually ran")
 		helpers.assert_eq(callback_count, 0,
 			"erased failure fragments must not be written as synthetic output")
+	end)
+end)
+
+
+
+
+-- ============================================================
+-- ============================================================
+-- ======= 4/ Per-application profile overrides ===============
+-- ============================================================
+-- ============================================================
+
+helpers.describe("prediction_engine.predict: per-application profile overrides", function()
+	--- Runs one prediction typed in an application and returns the system prompt sent.
+	local function system_prompt_for(app)
+		local sent = nil
+		package.loaded["modules.llm.api_ollama"] = {
+			chat = function(_, _, messages, _, _, on_done)
+				sent = messages[1].content
+				on_done(" suite", nil)
+			end,
+			cancel = function() end,
+		}
+		package.loaded["modules.llm.profiles"] = {
+			init = function() end,
+			is_enabled = function() return true end,
+			get_current_model = function() return "test-model" end,
+			get_base_url = function() return "http://127.0.0.1:11434" end,
+		}
+		local pe = helpers.load_module("modules.llm.prediction_engine")
+		pe.init({ focus_id = function() return "owned-prediction-window" end })
+		pe.predict("Bonjour //", { app_id = app, input_chars = 2 })
+		package.loaded["modules.llm.api_ollama"] = nil
+		package.loaded["modules.llm.profiles"] = nil
+		return sent
+	end
+
+	PreferencesFixture.it("a prediction typed in a mapped application uses that application's profile", function()
+		local restore_focus = install_insecure_focus()
+		local settings = helpers.load_module("modules.llm.profile_settings")
+		settings._reset()
+		helpers.assert_true(settings.save_user_profile({ id = "user_app_fixture", label = "App",
+			system_single = "APPFIXTURE {context}", batch = false }, false, false))
+		helpers.assert_true(settings.set_app_override("Firefox.exe", "user_app_fixture"))
+		local mapped = system_prompt_for("firefox")
+		local other = system_prompt_for("kate")
+		settings._reset()
+		restore_focus()
+		helpers.assert_true(type(mapped) == "string" and mapped:find("APPFIXTURE", 1, true) ~= nil,
+			"the mapped application must use its own profile's prompt")
+		helpers.assert_true(type(other) == "string" and other:find("APPFIXTURE", 1, true) == nil,
+			"any other application keeps the menu's profile")
 	end)
 end)

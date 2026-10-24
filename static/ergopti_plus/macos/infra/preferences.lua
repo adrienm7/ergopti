@@ -72,6 +72,7 @@ local BindingPublication = require("config_binding_publication")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
+local AppProfileOverrides = require("llm.app_profile_overrides")
 local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
@@ -169,6 +170,8 @@ local KEY_MAP = {
 	llm_agent_system1                    = { sec = "llm", key = "agent_system1"                     },
 	llm_agent_system2                    = { sec = "llm", key = "agent_system2"                     },
 	llm_agent_mode                       = { sec = "llm", key = "agent_mode"                        },
+	-- Per-application prompt profiles: the v1 text of _shared/lua/llm/app_profile_overrides.lua
+	llm_app_profile_overrides            = { sec = "llm", key = "app_profile_overrides"             },
 
 	-- ── Layout ─────────────────────────────────────────────────────────────
 	layout_number_row_mode               = { sec = "layout", key = "direct_access_digits", enum = true },
@@ -582,6 +585,11 @@ local SCALAR_VALUE_RULES = {
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end
 		return false, "'" .. tostring(value) .. "' is no longer an agent mode"
+	end,
+	llm_app_profile_overrides = function(value)
+		local overrides, reason = AppProfileOverrides.decode(value)
+		if overrides ~= nil then return true end
+		return false, "the application profile overrides are unreadable (" .. tostring(reason) .. ")"
 	end,
 }
 -- The CapsWord delay and delimiters follow the shared policy's rules.

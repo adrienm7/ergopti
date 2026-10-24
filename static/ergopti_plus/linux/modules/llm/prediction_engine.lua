@@ -758,7 +758,11 @@ function M.predict(context, output_context, override)
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
 	local requested = override and override.num_predictions or ProfileSettings.get("num_predictions") or 1
-	local profile = override and override.profile or ProfileSettings.resolve(model)
+	-- A request naming its own prompt keeps it; otherwise the profile the user mapped
+	-- to the application typed in wins over the menu's.
+	local profile = override and override.profile
+		or ProfileSettings.resolve_for_app(type(output_context) == "table" and output_context.app_id or nil)
+		or ProfileSettings.resolve(model)
 	if not profile then Logger.error(LOG, "Prediction profile catalogue is unavailable."); return end
 	local params = PromptBuilder.build_params(clean_context, {
 		max_words = Settings.get("max_words"),

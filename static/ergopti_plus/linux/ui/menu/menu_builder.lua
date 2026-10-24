@@ -2763,6 +2763,39 @@ local function _build_llm(ctx)
 			}
 			return true
 		end
+		--- The per-application overrides: map the application last typed in to the profile
+		--- in force, and one row per mapping that clears it. The same rows as Windows.
+		local function app_override_rows()
+			local AppOverrides = require("llm.app_profile_overrides")
+			local mapped = AppOverrides.rows(ProfileSettings.app_overrides())
+			local last = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
+			local clear_rows = {}
+			for _, entry in ipairs(mapped) do
+				local app, profile_id = entry.app, entry.profile
+				local profile = ProfileSettings.resolve_id(profile_id)
+				clear_rows[#clear_rows + 1] = {
+					label = app .. "  →  " .. (profile and ProfileSettings.menu_label(profile, count) or profile_id),
+					action = function()
+						if not create_ready() then return false end
+						if ProfileSettings.clear_app_override(app) ~= true then return false end
+						refresh()
+						return true
+					end,
+				}
+			end
+			return ManifestMenu.template_rows("llm_profile_app_override_frame", {
+				["llm_profile_override_active_app"] = function()
+					if not create_ready() or AppOverrides.normalize_app(last) == nil then return false end
+					if ProfileSettings.set_app_override(last, effective) ~= true then return false end
+					refresh()
+					return true
+				end,
+			}, {
+				["llm_profile_overrides_present"] = function() return #clear_rows > 0 end,
+			}, {
+				["llm_profile_override_rows"] = function() return clear_rows end,
+			}) or {}
+		end
 		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
 			["llm_profile_auto_detect"] = auto_profile,
 			["llm_profile_clone"] = function() return open_editor(seed, true, { as_new = true }, true) end,
@@ -2780,6 +2813,12 @@ local function _build_llm(ctx)
 			["llm_profile_custom_rows"] = custom_rows,
 		})
 		if not rows then return end
+		-- The per-application overrides end the submenu, as on Windows.
+		local override_rows = ManifestMenu.template_rows("llm_profile_lua_app_overrides", {}, {}, {
+			["llm_profile_app_overrides"] = app_override_rows,
+		})
+		if not override_rows then return end
+		for _, row in ipairs(override_rows) do rows[#rows + 1] = row end
 		-- The profile parent writes config.toml: it names the same cause as the
 		-- switch, and its retained rows recheck it at click time.
 		local ConfigGuard = require("ui.menu.llm_config_guard")

@@ -154,8 +154,10 @@ package.loaded["modules.llm.streaming_handler"] = {
 }
 
 -- Stub AppFilter — the real export is is_blocked(state, apps, url_filter, secure_filter).
+local focused_app_for_test = nil
 package.loaded["modules.llm.app_filter"] = {
 	is_blocked = function(_state, _apps, _url, _secure) return false end,
+	focused_app_id = function() return focused_app_for_test end,
 }
 
 -- Stub api_common (required inline at module level). get_rate_limit_min_interval_s
@@ -914,6 +916,43 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 		helpers.assert_true(dispatched, "perform_check must dispatch fetch_llm_prediction when the backend is ready")
 		helpers.assert_eq(last_prompt_buffer, "hello wor",
 			"prompt construction must read only the independent LLM context")
+	end)
+
+	helpers.it("app-profile: the profile mapped to the focused application is the one the backend runs", function()
+		local core = package.loaded["modules.llm"]
+		local Overrides = require("llm.app_profile_overrides")
+		local previous_fetch, previous_find = core.fetch_llm_prediction, core.find_profile
+		local sent
+		core.find_profile = function(id) return id == "formal" and { id = "formal", label = "Formal" } or nil end
+		core.fetch_llm_prediction = function(...) sent = { profile = select(13, ...) } end
+		local ok, err = xpcall(function()
+			PE.set_llm_enabled(true)
+			helpers.assert_true(PE.set_llm_app_profile_overrides(Overrides.encode({ ["com.slack.app"] = "formal" })))
+			local found, text = PE.get_llm_runtime_setting("llm_app_profile_overrides")
+			helpers.assert_true(found and text == Overrides.encode({ ["com.slack.app"] = "formal" }),
+				"the transaction owner reads the stored text back")
+
+			focused_app_for_test = "com.Slack.app"
+			PE.init({ buffer = "hello wor", llm_buffer = "hello wor", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_true(sent ~= nil and type(sent.profile) == "table" and sent.profile.id == "formal",
+				"a request typed in the mapped application runs its profile")
+
+			sent, focused_app_for_test = nil, "com.other.app"
+			PE.init({ buffer = "hello wor ", llm_buffer = "hello wor ", mappings = {}, DELAYS = { llm_prediction = 0 } })
+			PE.perform_check(true)
+			helpers.assert_true(sent ~= nil, "the other application still gets its request")
+			helpers.assert_nil(sent.profile, "and runs the menu's profile")
+
+			helpers.assert_eq(PE.set_llm_app_profile_overrides("v1:***"), false, "an unreadable text is refused")
+			local _, kept = PE.get_llm_runtime_setting("llm_app_profile_overrides")
+			helpers.assert_eq(kept, Overrides.encode({ ["com.slack.app"] = "formal" }), "and leaves the map in force")
+		end, debug.traceback)
+		core.fetch_llm_prediction, core.find_profile = previous_fetch, previous_find
+		PE.set_llm_app_profile_overrides("")
+		PE.set_llm_enabled(false)
+		focused_app_for_test = nil
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()

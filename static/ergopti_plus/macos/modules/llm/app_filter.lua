@@ -165,6 +165,18 @@ local function get_focused_app()
 end
 
 
+--- The identifier of the application that has keyboard focus: its bundle identifier.
+--- This is the key the per-application profile overrides are stored under.
+--- @return string|nil bundle_id Nil when no application or no bundle identifier is available.
+function M.focused_app_id()
+	local front = get_focused_app()
+	if not front then return nil end
+	local ok, bundle_id = pcall(function() return front:bundleID() end)
+	if ok and type(bundle_id) == "string" and bundle_id ~= "" then return bundle_id end
+	return nil
+end
+
+
 --- =============================================
 --- =============================================
 --- ======= 3/ Public Filter ===================

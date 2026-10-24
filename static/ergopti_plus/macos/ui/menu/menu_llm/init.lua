@@ -167,6 +167,7 @@ M.DEFAULT_STATE = {
 		llm_active_profile    = llm_mod.DEFAULT_STATE.llm_active_profile,
 		llm_user_models       = {},
 		llm_disabled_apps          = {},
+		llm_app_profile_overrides  = "",
 		llm_url_bar_filter_enabled        = Manifest.default_for("llm.trigger.url_bar_filter_enabled"),
 		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
 		llm_user_profiles     = {},
@@ -849,6 +850,8 @@ local function create_menu(deps)
 		local apply_llm_profile_shortcut   = trigger_orch.apply_llm_profile_shortcut
 
 		deps.apply_llm_profile_shortcut = apply_llm_profile_shortcut
+		-- The profile submenu changes the per-application overrides through the same transaction as every other AI setting
+		deps.apply_setting_transaction = settings_mgr.apply_setting_transaction
 
 		local profiles_ok, profiles_result = xpcall(
 			Profiles.new, debug.traceback, deps, models_mgr)

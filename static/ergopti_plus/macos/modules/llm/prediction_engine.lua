@@ -30,6 +30,7 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
+local AppProfileOverrides = require("llm.app_profile_overrides")
 local Rewrite          = require("llm.rewrite")
 local PromptAction     = require("llm.prompt_action")
 local Logger           = require("infra.logger")
@@ -261,6 +262,11 @@ local show_info_bar           = LLM_DEFAULTS.llm_show_info_bar
 local sequential_mode         = LLM_DEFAULTS.llm_sequential_mode
 local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
 local excluded_apps              = {}
+-- The application-to-profile map (llm.app_profile_overrides) and the stored text it came from
+local app_profile_overrides      = {}
+local app_profile_overrides_text = ""
+-- The mapped profiles already reported missing
+local missing_override_profiles = {}
 local is_ai_preview_enabled      = true
 -- Privacy gates, sourced from defaults.json like every other shared scalar. These
 -- were hardcoded to true here while the shared value said false and Windows read
@@ -881,6 +887,21 @@ function M.set_llm_instant_on_word_end(v)
 	Logger.debug(LOG, "Instant on word end: %s.", instant_on_word_end and "on" or "off")
 end
 
+--- Applies the stored per-application profile overrides.
+--- @param text any The v1 text of llm.app_profile_overrides ("" for none).
+--- @return boolean applied False when the text is unreadable, which leaves the map in force.
+function M.set_llm_app_profile_overrides(text)
+	local overrides, reason = AppProfileOverrides.decode(text)
+	if overrides == nil then
+		Logger.error(LOG, "Application profile overrides refused: %s.", tostring(reason))
+		return false
+	end
+	app_profile_overrides = overrides
+	app_profile_overrides_text = text or ""
+	Logger.debug(LOG, "Application profile overrides: %d configured.", #AppProfileOverrides.rows(overrides))
+	return true
+end
+
 function M.set_llm_disabled_apps(apps)
 	excluded_apps = apps
 	Logger.debug(LOG, "Excluded apps: %d configured.", type(apps) == "table" and #apps or 0)
@@ -951,6 +972,7 @@ function M.get_llm_runtime_setting(key)
 		return true, secure_field_filter_enabled
 	end
 	if key == "llm_disabled_apps" then return true, excluded_apps end
+	if key == "llm_app_profile_overrides" then return true, app_profile_overrides_text end
 	return false, nil
 end
 
@@ -1659,6 +1681,27 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			request_profile   = live_profile
 			request_count     = live.num_predictions or num_predictions
 			request_min_words = LIVE_CONFIG.min_words
+		end
+	end
+	-- The profile the user mapped to the focused application wins over the menu's; a live
+	-- prompt or a request that names its own keeps its own.
+	if request_profile == nil and next(app_profile_overrides) ~= nil then
+		local mapped = AppProfileOverrides.resolve(app_profile_overrides, AppFilter.focused_app_id(), nil)
+		if mapped ~= nil then
+			local mapped_ok, mapped_profile = xpcall(core_llm.find_profile, debug.traceback, mapped)
+			if not mapped_ok then
+				Logger.error(LOG, "Application profile lookup raised — request aborted: %s", tostring(mapped_profile))
+				return
+			end
+			if type(mapped_profile) == "table" then
+				request_profile = mapped_profile
+			else
+				if not missing_override_profiles[mapped] then
+					-- Once per profile and process: every request asks.
+					missing_override_profiles[mapped] = true
+					Logger.warn(LOG, "A profile mapped to an application no longer exists; the menu's profile applies there.")
+				end
+			end
 		end
 	end
 	local model_ok, model_to_use = xpcall(function()
