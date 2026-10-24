@@ -29,6 +29,7 @@ return {
 	"tests.unit.modules.llm.features.test_selected_write_partial",
 	"tests.unit.modules.llm.features.test_selected_main_cache",
 	"tests.unit.adapters.synthetic_input.test_clipboard_prepared_stage",
+	"tests.unit.adapters.synthetic_input.test_clipboard_snapshot_restorability",
 	"tests.unit.modules.hotstrings.injector.test_ordinary_clipboard_preparation",
 	"tests.unit.adapters.synthetic_input.test_clipboard_write_deadline",
 	"tests.unit.modules.hotstrings.injector.test_selected_output_custody",
