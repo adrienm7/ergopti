@@ -430,3 +430,7 @@ _KLF_BackspaceUnicodeScalar() {
 }
 Test("keystats input: Backspace preserves complete Unicode scalars (keystats-backspace-unicode)",
 	_KLF_WithState.Bind(_KLF_BackspaceUnicodeScalar))
+
+; The pause and session-reset sequences drive this same hook, so they share its
+; reachability from the runner.
+#Include test_keystats_collection.ahk

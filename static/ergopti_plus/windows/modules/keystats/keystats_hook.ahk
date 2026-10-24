@@ -50,6 +50,9 @@
 
 #Requires Autohotkey v2.0+
 
+; The capture sources below ask KL_CaptureHeld, which the collection module owns.
+#Include keystats_collection.ahk
+
 
 
 
@@ -193,7 +196,7 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 		; day. The gap compensation in KL_Watchers_OnKeystroke cannot help: it is
 		; driven by the first post-resume KEYSTROKE, and this 250 ms timer always
 		; fires first whenever the focused app changed during the pause.
-		if A_IsSuspended {
+		if KL_CaptureHeld() {
 				PausedNow := A_TickCount
 				if (KLHook.suspend_tick != 0) {
 						Elapsed := (PausedNow - KLHook.suspend_tick) & 0xFFFFFFFF
@@ -364,7 +367,7 @@ KL_Hook_InvalidateCapture(Stopping := false) {
 _KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
 	PreviousCritical := Critical("On")
 	try {
-		if A_IsSuspended
+		if KL_CaptureHeld()
 			return false
 		if !Keystats.initialized || Keystats._shutting_down || KLHook.capture_stopping
 			return false
@@ -402,7 +405,7 @@ _KL_Hook_CaptureInput(Kind, Character, vk, sc, FilterFn := unset, NowTick := uns
 }
 
 _KL_Hook_InputLifecycleCurrent(Intent) {
-	return Keystats.initialized && !Keystats._shutting_down && !A_IsSuspended
+	return Keystats.initialized && !Keystats._shutting_down && !KL_CaptureHeld()
 		&& !KLHook.capture_stopping
 		&& Intent.lifecycle = Keystats.lifecycle_generation
 		&& Intent.generation = KLHook.capture_generation
@@ -588,7 +591,7 @@ _KL_Hook_CommitInput(Intent) {
 }
 
 KL_Hook_OnChar(ih, c, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
-	if A_IsSuspended || !Keystats.initialized
+	if KL_CaptureHeld() || !Keystats.initialized
 		return
 	Intent := false
 	_hpKlIngest := HotPath_Now()
@@ -611,7 +614,7 @@ KL_Hook_OnChar(ih, c, FilterFn := unset, NowTick := unset, ErgoFn := unset) {
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn := unset, ErgoFn := unset) {
-	if A_IsSuspended
+	if KL_CaptureHeld()
 		return
 	Intent := false
 	PotentialFocusMove := vk = 0x09

@@ -204,6 +204,12 @@ local _suppressed = false
 -- Cross-driver privacy posture, read from the shared features manifest so the
 -- three drivers cannot drift. Linux had none of these: it recorded
 -- unconditionally, because the metrics section of the manifest did not list
+-- Whether the user paused metrics collection from the Metrics menu. A state of
+-- its own: the password flag above is driven by the focused application and is
+-- cleared whenever focus moves, which would silently end a pause the user set.
+-- Never persisted, so every launch starts recording as its settings say.
+local _suspended = false
+
 -- "linux" and the codegen emitted no manifest for this driver to read.
 --
 -- Where each toggle's user choice is kept, and the shape of that keeping: only a
@@ -333,7 +339,7 @@ local _password_apps = _default_password_apps()
 local function may_record()
 	if _flush_stopping then return false end
 	if not _enabled then return false end
-	if _suppressed then return false end
+	if _suppressed or _suspended then return false end
 	if _secure_filter_enabled and _secure_field then return false end
 	if _private_filter_enabled and _private_window then return false end
 	return true
@@ -516,6 +522,7 @@ function M.init(opts)
 	if type(options.password_apps) == "table" then
 		_secure_apps   = _default_secure_apps()
 		_password_apps = _default_password_apps()
+	_suspended = false
 		for _, app in ipairs(options.password_apps) do
 	_disabled_list              = preferences["metrics.disabled_apps"]
 	_disabled_apps              = exclusion_set(_disabled_list)
@@ -1399,6 +1406,30 @@ function M.set_secure_field(is_secure)
 end
 
 --- Admits one privacy-filter change, or says why it was refused. A metrics
+--- Pauses metrics collection at the user's request. Idempotent. The pause is
+--- independent of the password flag: leaving a secure field does not end it.
+function M.suspend_collection()
+	if not _suspended then
+		_suspended = true
+		settle_hold_policy()
+		Logger.info(LOG, "Metrics collection suspended by the user.")
+	end
+end
+
+--- Ends the user's pause. Nothing typed meanwhile is recovered.
+function M.resume_collection()
+	if _suspended then
+		_suspended = false
+		Logger.info(LOG, "Metrics collection resumed by the user.")
+	end
+end
+
+--- Returns whether the user paused metrics collection.
+--- @return boolean
+function M.is_collection_suspended()
+	return _suspended
+end
+
 --- scope that still owes a rollback holds the preferences; the click then
 --- changes nothing, and it must not do so silently.
 --- @param label string Filter name for the log.
@@ -1669,6 +1700,7 @@ end
 
 --- Copies only caller-owned RAM data; no I/O or persistence is implied.
 local function copy_flush_value(value)
+		suspended                  = _suspended,
 	if type(value) ~= "table" then return value end
 	local result = {}
 	for key, item in pairs(value) do result[key] = copy_flush_value(item) end
@@ -1700,6 +1732,7 @@ local function encode_open_walk(contexts)
 		if type(ctx.date) == "string" and type(ctx.app) == "string" and (ctx.session or ctx.burst) then
 			records[#records + 1] = { date = ctx.date, app = ctx.app, text = "{\"date\":" .. Json.encode(ctx.date)
 				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(ctx.session, OPEN_SESSION_FIELDS)
+		suspended          = _suspended,
 				.. ",\"burst\":" .. cursor(ctx.burst, OPEN_BURST_FIELDS) .. "}" }
 		end
 	end

@@ -322,6 +322,10 @@ package.loaded["adapters.file_system"] = {
 		appended        = appended_entries,
 		set_paused      = function(v) is_paused = v end,
 		set_disabled_apps = km.set_disabled_apps,
+		suspend         = function() return km.suspend_collection() end,
+		resume          = function() return km.resume_collection() end,
+		is_suspended    = function() return km.is_collection_suspended() end,
+		reset_session   = function() return km.reset_session() end,
 		stop            = km.stop,
 		-- The two SYNTHETIC routes into the same sink. handle_key was the only
 		-- entry point this harness could drive, which is precisely why the context
@@ -946,6 +950,95 @@ helpers.describe("context filters apply to synthetic expansions, not only to key
 		helpers.assert_true(found,
 			"without this case every assertion above would pass against a keystats that "
 			.. "records nothing at all")
+	end)
+
+end)
+
+
+
+
+-- ============================================================
+-- ============================================================
+-- ======= 8/ Metrics pause and session reset (shared) ========
+-- ============================================================
+-- ============================================================
+
+-- The same operation sequences the Linux and Windows suites replay. A keystroke
+-- is recorded when it enters the typing buffer; the live session count is the
+-- rolling physical-typing window that the WPM readouts and the reset share.
+local _SESSION_CORPUS_PATH = helpers.shared("tests/corpus/metrics/collection_session_vectors.json")
+
+local function load_session_corpus()
+	local handle = assert(io.open(_SESSION_CORPUS_PATH, "rb"), "cannot open " .. _SESSION_CORPUS_PATH)
+	local raw = handle:read("*a")
+	handle:close()
+	helpers.load_with_stubs("infra.logger")
+	return require("hs").json.decode(raw)
+end
+
+--- Applies one corpus operation to the real keystats module.
+local function apply_session_op(session, op, label)
+	local state = session.core_state()
+	if op.op == "type" then
+		local before = #state.buffer_events
+		session.handle_key(fake_key_event("x"))
+		local counted = #state.buffer_events > before
+		if op.recorded ~= nil then helpers.assert_eq(counted, op.recorded, label .. ": type recorded") end
+	elseif op.op == "suspend" then
+		session.suspend()
+	elseif op.op == "resume" then
+		session.resume()
+	elseif op.op == "secure_on" then
+		state.is_secure_field = true
+	elseif op.op == "secure_off" then
+		state.is_secure_field = false
+	elseif op.op == "reset" then
+		helpers.assert_eq(session.reset_session() ~= false, op.reset_applied, label .. ": reset applied")
+	else
+		error(label .. ": unknown operation " .. tostring(op.op))
+	end
+	if op.suspended ~= nil then
+		helpers.assert_eq(session.is_suspended(), op.suspended, label .. ": suspended")
+	end
+	if op.session_keystrokes ~= nil then
+		helpers.assert_eq(#state.recent_typing_phys, op.session_keystrokes, label .. ": live session count")
+	end
+end
+
+helpers.describe("metrics pause and session reset corpus: the shared contract on macOS", function()
+	local corpus = load_session_corpus()
+
+	helpers.it("the corpus is readable", function()
+		helpers.assert_true(type(corpus) == "table" and #corpus.vectors >= 8, "the vectors must be present")
+	end)
+
+	for _, vector in ipairs(corpus.vectors) do
+		helpers.it("vector " .. vector.id, function()
+			local session = start_real_keystats()
+			for _, op in ipairs(vector.ops) do apply_session_op(session, op, vector.id) end
+			session.stop()
+		end)
+	end
+end)
+
+helpers.describe("metrics session reset: the session is closed cleanly", function()
+	helpers.it("a reset ends the typing session like the idle timeout and stores the pending text", function()
+		local session = start_real_keystats()
+		session.handle_key(fake_key_event("a"))
+		session.handle_key(fake_key_event("b"))
+		helpers.assert_true(session.reset_session() ~= false)
+		local state = session.core_state()
+		helpers.assert_eq(state.session_start_time, 0, "the session start is cleared")
+		helpers.assert_eq(state.session_last_active, 0, "the last activity is cleared")
+		helpers.assert_eq(#state.buffer_events, 0, "the pending text was flushed")
+		session.stop()
+		local ended, typed = 0, 0
+		for _, entry in ipairs(session.appended) do
+			if entry.type == "session_end" then ended = ended + 1 end
+			if entry.type == "typing" then typed = typed + 1 end
+		end
+		helpers.assert_eq(ended, 1, "exactly one session_end closes the session the reset ended")
+		helpers.assert_true(typed > 0, "the text typed before the reset is stored, not discarded")
 	end)
 
 end)

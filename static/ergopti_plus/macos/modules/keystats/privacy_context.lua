@@ -12,6 +12,9 @@ local SYSTEM_AUTH_BUNDLE_IDS = {
 ---@return boolean allowed
 function M.allows_logging(state)
 	if state.foreground_refresh_pending then return false end
+	-- The user's own pause from the Metrics menu. Held apart from the three filters
+	-- below: no focus change or filter toggle may end it.
+	if state.collection_suspended then return false end
 	if state.private_filter_enabled and state.is_private_window then return false end
 	if state.secure_field_filter_enabled and state.is_secure_field then return false end
 	if state.system_auth_filter_enabled and state.active_app_bundle

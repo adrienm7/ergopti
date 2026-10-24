@@ -3361,8 +3361,8 @@ local function _manifest_metrics_rows(ctx, k)
 		-- subject. Without this getter the resolver logs an error and falls back to
 		-- the safe answer, so the row would be permanently greyed — right by
 		-- accident, and wrong the moment the widget is shown.
-		metrics_suppressed     = function()
-			return type(k.is_suppressed) == "function" and k.is_suppressed() or false
+		metrics_suspended      = function()
+			return type(k.is_collection_suspended) == "function" and k.is_collection_suspended() or false
 		end,
 		wpm_widget_visible     = function()
 			local widget = wpm_widget()
@@ -3516,11 +3516,11 @@ local function _manifest_metrics_rows(ctx, k)
 		-- since 2026-08-06, so the manifest can describe a driver-specific row
 		-- rather than the driver keeping it to itself.
 		["metrics_suspend"] = function()
-			if type(k.is_suppressed) ~= "function" then
-				Logger.error(LOG, "Keystats exposes no is_suppressed — the row cannot toggle anything.")
+			if type(k.is_collection_suspended) ~= "function" then
+				Logger.error(LOG, "Keystats exposes no is_collection_suspended — the row cannot toggle anything.")
 				return
 			end
-			if k.is_suppressed() then k.unsuppress() else k.suppress() end
+			if k.is_collection_suspended() then k.resume_collection() else k.suspend_collection() end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		["reset_wpm_position"] = function()
