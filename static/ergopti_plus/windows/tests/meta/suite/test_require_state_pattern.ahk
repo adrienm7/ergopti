@@ -80,7 +80,11 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; It exists precisely BECAUSE the previous design had no such variable and
 	; re-derived the hardware intent from GetKeyState — the bit the same function
 	; writes — which made the CapsLock LED self-latching.
-	"modules/shortcuts/capsword.ahk", true
+	"modules/shortcuts/capsword.ahk", true,
+	; _ComposerCheckBusy — a re-entrancy flag, not injected state. It starts false
+	; at its declaration, ComposerCheck_Run sets it for the one running check and
+	; that check's terminal step clears it; there is no init for a guard to wait on.
+	"ui/layout_manager/composer_check.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
