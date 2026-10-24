@@ -1337,6 +1337,24 @@
 		},
 		{
 			"type": "command",
+			"id": "field_check_toolchain",
+			"i18n": "menu.debug.field_check_toolchain",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
+			"id": "field_check_login_items",
+			"i18n": "menu.debug.field_check_login_items",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.debug_surface_is_each_drivers_own"
+		},
+		{
+			"type": "command",
 			"id": "send_probe",
 			"i18n": "menu.debug.send_probe",
 			"platforms": [
