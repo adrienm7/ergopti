@@ -153,7 +153,9 @@
 			"---",
 			"clone",
 			"---",
-			"create"
+			"create",
+			"---",
+			"app_overrides"
 		],
 		"hs_empty_builtin": [
 			"auto_detect",
@@ -164,7 +166,9 @@
 			"---",
 			"clone",
 			"---",
-			"create"
+			"create",
+			"---",
+			"app_overrides"
 		],
 		"hs_custom_active_user": [
 			"auto_detect",
@@ -176,7 +180,9 @@
 			"custom_heading",
 			"custom:user_canonical",
 			"---",
-			"create"
+			"create",
+			"---",
+			"app_overrides"
 		],
 		"hs_paused_custom_builtin": [
 			"auto_detect",
@@ -188,7 +194,9 @@
 			"custom_heading",
 			"custom:user_canonical",
 			"---",
-			"create"
+			"create",
+			"---",
+			"app_overrides"
 		],
 		"linux_custom_builtin": [
 			"auto_detect",
@@ -201,7 +209,9 @@
 			"---",
 			"clone",
 			"---",
-			"create"
+			"create",
+			"---",
+			"app_overrides"
 		],
 		"windows_custom_builtin": [
 			"builtin_heading",
@@ -239,7 +249,7 @@
 	"native_contract": {
 		"mac_auto_detect": "recommendation command force_dialog, captured pause; no checkbox",
 		"linux_windows_auto_detect": "automatic profile checkbox with original native state/mutation",
-		"windows_app_overrides": "actual Windows-only feature",
+		"app_overrides": "per-application profile overrides on every driver: Windows inside llm_profile_windows_frame, macOS and Linux in llm_profile_lua_app_overrides after llm_profile_lua_frame",
 		"presence": "build-time conditions; existing held callback owner/readiness unchanged",
 		"shortcut_dialog_title": "not a menu site; retained native"
 	}

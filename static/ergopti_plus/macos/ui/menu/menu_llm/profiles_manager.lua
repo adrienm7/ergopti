@@ -18,6 +18,7 @@ local i18n          = require("infra.i18n")
 local dialog        = require("infra.dialog_util")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local ManifestMenu  = require("infra.manifest_menu")
+local AppProfileOverrides = require("llm.app_profile_overrides")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -1201,6 +1202,52 @@ local function build_profile_menu(
 		return true
 	end
 
+	--- The per-application overrides: map the focused application to the profile in force,
+	--- and one row per mapping that clears it. The same rows as Windows. Each change is
+	--- one acknowledged setting transaction, like every other AI preference.
+	local function app_override_rows()
+		local overrides = AppProfileOverrides.decode(state.llm_app_profile_overrides)
+		if overrides == nil then
+			Logger.error(LOG, "The stored application profile overrides are unreadable; the rows are withheld.")
+			return {}
+		end
+		local function commit(candidate)
+			local payload = AppProfileOverrides.encode(candidate)
+			if payload == nil or type(deps.apply_setting_transaction) ~= "function" then return false end
+			if not settle_profile_mutation_recovery(deps) then return false end
+			return deps.apply_setting_transaction({
+				key = "llm_app_profile_overrides", value = payload,
+				runtime_fn = "set_llm_app_profile_overrides", publish_setting = false,
+			}) == true
+		end
+		local clear_rows = {}
+		for _, entry in ipairs(AppProfileOverrides.rows(overrides)) do
+			local profile = llm_mod.find_profile(entry.profile)
+			clear_rows[#clear_rows + 1] = {
+				label = entry.app .. "  →  " .. (profile
+					and ProfileLabel.format(profile.label or entry.profile, state.llm_num_predictions) or entry.profile),
+				disabled = paused or nil,
+				action = not paused and function()
+					return commit(AppProfileOverrides.without(overrides, entry.app))
+				end or nil,
+			}
+		end
+		return ManifestMenu.template_rows("llm_profile_app_override_frame", {
+			["llm_profile_override_active_app"] = function()
+				if not create_ready() then return false end
+				-- Read at click time: the focus engine is not needed to draw the menu
+				local focused = require("modules.llm.app_filter").focused_app_id()
+				local candidate = AppProfileOverrides.with(overrides, focused, state.llm_active_profile)
+				if candidate == nil then return false end
+				return commit(candidate)
+			end,
+		}, {
+			["llm_profile_overrides_present"] = function() return #clear_rows > 0 end,
+		}, {
+			["llm_profile_override_rows"] = function() return clear_rows end,
+		}) or {}
+	end
+
 	local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
 		["llm_profile_recommend"] = recommend_profile,
 		["llm_profile_clone"] = function()
@@ -1220,6 +1267,12 @@ local function build_profile_menu(
 		["llm_profile_custom_rows"] = custom_rows,
 	})
 	if not rows then return {} end
+	-- The per-application overrides end the submenu, as on Windows.
+	local override_rows = ManifestMenu.template_rows("llm_profile_lua_app_overrides", {}, {}, {
+		["llm_profile_app_overrides"] = app_override_rows,
+	})
+	if not override_rows then return {} end
+	for _, row in ipairs(override_rows) do rows[#rows + 1] = row end
 	return ManifestMenu.render_rows(rows, "llm_profile")
 end
 

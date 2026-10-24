@@ -595,6 +595,7 @@ function M.set_llm_show_info_bar(v)         return engine.set_llm_show_info_bar(
 function M.set_llm_sequential_mode(v)       return engine.set_llm_sequential_mode(v)       end
 function M.set_llm_auto_raise_temp(v)       return engine.set_llm_auto_raise_temp(v)       end
 function M.set_llm_disabled_apps(apps)           return engine.set_llm_disabled_apps(apps)           end
+function M.set_llm_app_profile_overrides(text)   return engine.set_llm_app_profile_overrides(text)   end
 function M.set_llm_url_bar_filter_enabled(v)      return engine.set_llm_url_bar_filter_enabled(v)      end
 function M.set_llm_secure_field_filter_enabled(v) return engine.set_llm_secure_field_filter_enabled(v) end
 function M.set_llm_instant_on_word_end(v)         return engine.set_llm_instant_on_word_end(v)         end
