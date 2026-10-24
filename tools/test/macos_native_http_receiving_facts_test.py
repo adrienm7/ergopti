@@ -25,6 +25,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = ROOT / "static/ergopti_plus/macos/tests/support"
+WORKER = SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
 
 
 def load(name, path):
@@ -143,6 +144,81 @@ def proxy_connection_failure_projection(source):
     for new, old in PROXY_CONNECTION_FAILURE_INVERSE:
         source = source.replace(new, old, 1)
     return source
+
+
+# Closed inverse for the reviewed direct fallback of an unusable company PAC and
+# the closed stage naming the lookup step that gave up. It composes before every
+# other projection, so each historical whole-source pin still covers every byte
+# outside these exact spans.
+MANAGED_LOOKUP_STAGE_INVERSE = (
+    (
+        '\tcase proxyLookup = "native_proxy_lookup"\n\tcase proxyBudget = "native_proxy_budget"\n\tcase proxyCandidates = "native_proxy_candidates"\n\tcase pacDownload = "native_pac_download"\n\tcase pacEvaluation = "native_pac_evaluation"\n\tcase proxyRoutes = "native_proxy_routes"\n\tcase wpadDiscovery = "native_wpad_discovery"\n\tcase proxyDictionary = "native_proxy_dictionary"\n',
+        '\tcase proxyLookup = "native_proxy_lookup"\n\tcase proxyDictionary = "native_proxy_dictionary"\n',
+    ),
+    (
+        '\t\tcase .proxyLookup: return ["unavailable"].contains(reason)\n\t\tcase .proxyBudget: return ["unavailable"].contains(reason)\n\t\tcase .proxyCandidates: return ["unavailable"].contains(reason)\n\t\tcase .pacDownload: return ["unavailable"].contains(reason)\n\t\tcase .pacEvaluation: return ["unavailable"].contains(reason)\n\t\tcase .proxyRoutes: return ["unavailable"].contains(reason)\n\t\tcase .wpadDiscovery: return ["unavailable"].contains(reason)\n\t\tcase .proxyDictionary: return ["proxy"].contains(reason)\n',
+        '\t\tcase .proxyLookup: return ["unavailable"].contains(reason)\n\t\tcase .proxyDictionary: return ["proxy"].contains(reason)\n',
+    ),
+    (
+        "\n/// The step of the route lookup that named no usable route. Only the closed\n/// stage is kept: the PAC address names the company intranet and is never read\n/// back into a log or a refusal.\nstruct ManagedLookupFailure: Error {\n\tlet stage: ManagedHTTPFailureStage\n}\n\n/// Resolves the exact URL explicitly, before origin TLS. An authority-only\n/// CONNECT observation is never used as the PAC input.\nenum ManagedProxyLookup {\n\t/// Routes only, for callers that do not need to name the failing step.\n\tstatic func routes(url: URL, budget: TimeInterval, maximumSelections: Int,\n",
+        "\n/// Resolves the exact URL explicitly, before origin TLS. An authority-only\n/// CONNECT observation is never used as the PAC input.\nenum ManagedProxyLookup {\n\tstatic func routes(url: URL, budget: TimeInterval, maximumSelections: Int,\n",
+    ),
+    (
+        "\t\tdiscoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\treturn try? resolve(url: url, budget: budget, maximumSelections: maximumSelections,\n\t\t\tsettingsProvider: settingsProvider, certificates: certificates,\n\t\t\tdiscoveryMetadataProvider: discoveryMetadataProvider).get()\n\t}\n\n\t/// Same lookup as `routes`; a failure names the exact step that gave up.\n\tstatic func resolve(url: URL, budget: TimeInterval, maximumSelections: Int,\n\t\tsettingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },\n\t\tcertificates: [SecCertificate] = [],\n\t\tdiscoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> Result<[[String: Any]], ManagedLookupFailure> {\n\t\tguard budget.isFinite, budget > 0 else { return .failure(ManagedLookupFailure(stage: .proxyBudget)) }\n\t\tlet deadline = ProcessInfo.processInfo.systemUptime + budget\n\t\tguard !ManagedPACSource.hasDebt else { return .failure(ManagedLookupFailure(stage: .proxyBudget)) }\n\t\tguard let settings = settingsProvider() else { return .failure(ManagedLookupFailure(stage: .proxyLookup)) }\n\t\tguard ProcessInfo.processInfo.systemUptime < deadline else { return .failure(ManagedLookupFailure(stage: .proxyBudget)) }\n\t\tlet dictionary = (settings as AnyObject) as? [String: Any]\n",
+        "\t\tdiscoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\tguard budget.isFinite, budget > 0 else { return nil }\n\t\tlet deadline = ProcessInfo.processInfo.systemUptime + budget\n\t\tguard !ManagedPACSource.hasDebt, let settings = settingsProvider(),\n\t\t\tProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet dictionary = (settings as AnyObject) as? [String: Any]\n",
+    ),
+    (
+        "\t\tguard let candidates = initial as? [[String: Any]], !candidates.isEmpty || discoveryEnabled,\n\t\t\tcandidates.count <= maximumSelections else { return .failure(ManagedLookupFailure(stage: .proxyCandidates)) }\n\t\t// A native PAC callback owns the complete choice list. Initial fallback\n",
+        "\t\tguard let candidates = initial as? [[String: Any]], !candidates.isEmpty || discoveryEnabled,\n\t\t\tcandidates.count <= maximumSelections else { return nil }\n\t\t// A native PAC callback owns the complete choice list. Initial fallback\n",
+    ),
+    (
+        "\t\tfor candidate in candidates {\n\t\t\tguard let kind = candidate[kCFProxyTypeKey as String] as? String else {\n\t\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyCandidates))\n\t\t\t}\n\t\t\tif kind == kCFProxyTypeAutoConfigurationURL as String {\n\t\t\t\tguard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL else {\n\t\t\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyCandidates))\n\t\t\t\t}\n\t\t\t\tswitch evaluateStaged(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates) {\n\t\t\t\tcase .failure(let failure): return .failure(failure)\n\t\t\t\tcase .success(let expanded):\n\t\t\t\t\tguard !expanded.isEmpty else { return .failure(ManagedLookupFailure(stage: .proxyRoutes)) }\n\t\t\t\t\troutes.append(contentsOf: expanded)\n\t\t\t\t}\n\t\t\t} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {\n\t\t\t\tguard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String else {\n\t\t\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyCandidates))\n\t\t\t\t}\n\t\t\t\tswitch evaluateStaged(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates) {\n\t\t\t\tcase .failure(let failure): return .failure(failure)\n\t\t\t\tcase .success(let expanded):\n\t\t\t\t\tguard !expanded.isEmpty else { return .failure(ManagedLookupFailure(stage: .proxyRoutes)) }\n\t\t\t\t\troutes.append(contentsOf: expanded)\n\t\t\t\t}\n\t\t\t} else if !hasNativePAC { routes.append(candidate) }\n\t\t\tguard routes.count <= maximumSelections else { return .failure(ManagedLookupFailure(stage: .proxyRoutes)) }\n\t\t}\n",
+        "\t\tfor candidate in candidates {\n\t\t\tguard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }\n\t\t\tif kind == kCFProxyTypeAutoConfigurationURL as String {\n\t\t\t\tguard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n\t\t\t\troutes.append(contentsOf: expanded)\n\t\t\t} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {\n\t\t\t\tguard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n\t\t\t\troutes.append(contentsOf: expanded)\n\t\t\t} else if !hasNativePAC { routes.append(candidate) }\n\t\t\tguard routes.count <= maximumSelections else { return nil }\n\t\t}\n",
+    ),
+    (
+        "\t\t\t!hasNativePAC {\n\t\t\tswitch discoverStaged(url: url, deadline: deadline, maximumSelections: maximumSelections,\n\t\t\t\tcertificates: certificates, metadataProvider: discoveryMetadataProvider) {\n\t\t\tcase .failure(let failure): return .failure(failure)\n\t\t\tcase .success(let discovered): routes = discovered\n\t\t\t}\n\t\t}\n",
+        "\t\t\t!hasNativePAC {\n\t\t\tguard let discovered = discover(url: url, deadline: deadline,\n\t\t\t\tmaximumSelections: maximumSelections, certificates: certificates, metadataProvider: discoveryMetadataProvider) else { return nil }\n\t\t\troutes = discovered\n\t\t}\n",
+    ),
+    (
+        "\t\t#endif\n\t\treturn routes.isEmpty ? .failure(ManagedLookupFailure(stage: .proxyRoutes)) : .success(routes)\n\t}\n",
+        "\t\t#endif\n\t\treturn routes.isEmpty ? nil : routes\n\t}\n",
+    ),
+    (
+        "\t\tmetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\treturn try? discoverStaged(url: url, deadline: deadline, maximumSelections: maximumSelections,\n\t\t\tcertificates: certificates, metadataProvider: metadataProvider).get()\n\t}\n\n\t/// Discovery that names the failing step. The last PAC failure wins over the\n\t/// generic discovery stage, because it says whether the script was reached.\n\tstatic func discoverStaged(url: URL, deadline: TimeInterval, maximumSelections: Int,\n\t\tcertificates: [SecCertificate] = [],\n\t\tmetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> Result<[[String: Any]], ManagedLookupFailure> {\n\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else {\n\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyBudget))\n\t\t}\n\t\tlet metadata = metadataProvider()\n\t\tguard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),\n\t\t\t!endpoints.isEmpty, endpoints.count <= maximumSelections else {\n\t\t\treturn .failure(ManagedLookupFailure(stage: .wpadDiscovery))\n\t\t}\n\t\tvar last = ManagedLookupFailure(stage: .wpadDiscovery)\n\t\tfor endpoint in endpoints {\n\t\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else {\n\t\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyBudget))\n\t\t\t}\n\t\t\tswitch evaluateStaged(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates) {\n\t\t\tcase .failure(let failure): last = failure\n\t\t\tcase .success(let result):\n\t\t\t\tif !result.isEmpty, result.count <= maximumSelections { return .success(result) }\n\t\t\t\tlast = ManagedLookupFailure(stage: .proxyRoutes)\n\t\t\t}\n\t\t}\n\t\treturn .failure(last)\n\t}\n",
+        "\t\tmetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet metadata = metadataProvider()\n\t\tguard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),\n\t\t\t!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }\n\t\tfor endpoint in endpoints {\n\t\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\t\tif let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates),\n\t\t\t\t!result.isEmpty, result.count <= maximumSelections { return result }\n\t\t}\n\t\treturn nil\n\t}\n",
+    ),
+    (
+        "\t\tcertificates: [SecCertificate] = []) -> [[String: Any]]? {\n\t\treturn try? evaluateStaged(url: url, pacURL: pacURL, script: script, deadline: deadline,\n\t\t\tcertificates: certificates).get()\n\t}\n\n\t/// PAC acquisition and evaluation that names the failing step.\n\tstatic func evaluateStaged(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval,\n\t\tcertificates: [SecCertificate] = []) -> Result<[[String: Any]], ManagedLookupFailure> {\n\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else {\n\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyBudget))\n\t\t}\n\t\tlet source: String\n\t\tif let pacURL, script == nil {\n\t\t\tguard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else {\n\t\t\t\treturn .failure(ManagedLookupFailure(stage: .pacDownload))\n\t\t\t}\n\t\t\tsource = acquired\n\t\t} else if pacURL == nil, let script { source = script }\n\t\telse { return .failure(ManagedLookupFailure(stage: .pacEvaluation)) }\n\t\tguard ProcessInfo.processInfo.systemUptime < deadline else {\n\t\t\treturn .failure(ManagedLookupFailure(stage: .proxyBudget))\n\t\t}\n\t\tguard let bound = try? ManagedPACSource.bind(source, url: url),\n\t\t\tlet evaluated = evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline) else {\n\t\t\treturn .failure(ManagedLookupFailure(stage: .pacEvaluation))\n\t\t}\n\t\treturn .success(evaluated)\n\t}\n",
+        "\t\tcertificates: [SecCertificate] = []) -> [[String: Any]]? {\n\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet source: String\n\t\tif let pacURL, script == nil {\n\t\t\tguard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else { return nil }\n\t\t\tsource = acquired\n\t\t} else if pacURL == nil, let script { source = script }\n\t\telse { return nil }\n\t\tguard ProcessInfo.processInfo.systemUptime < deadline,\n\t\t\tlet bound = try? ManagedPACSource.bind(source, url: url) else { return nil }\n\t\treturn evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline)\n\t}\n",
+    ),
+    (
+        "\t\tenvironment: [String: String] = ProcessInfo.processInfo.environment,\n\t\tdirectFallback: Bool = true,\n\t\toutput: @escaping (Data) -> Bool) -> Int32 {\n",
+        "\t\tenvironment: [String: String] = ProcessInfo.processInfo.environment,\n\t\toutput: @escaping (Data) -> Bool) -> Int32 {\n",
+    ),
+    (
+        '\t\t\tif let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .lookupDeadline, output: output) }\n\t\t\tswitch ManagedProxyLookup.resolve(url: request.url,\n\t\t\t\tbudget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),\n\t\t\t\tmaximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,\n\t\t\t\tdiscoveryMetadataProvider: discoveryMetadataProvider) {\n\t\t\tcase .success(let selected):\n\t\t\t\troutes = selected\n\t\t\tcase .failure(let failure):\n\t\t\t\tguard directFallback else { return refuse(reason: "unavailable", status: 78, stage: failure.stage, output: output) }\n\t\t\t\t// A PAC that cannot be fetched or evaluated names no route at all, which is\n\t\t\t\t// not a proxy decision: go direct like a terminal does. A PAC that selects\n\t\t\t\t// a proxy never reaches this branch, and the transfer stays https with a\n\t\t\t\t// pinned digest (issue #101). The reason is the closed stage code of the\n\t\t\t\t// step that gave up, never a URL; the Python receiver forwards it to the log.\n\t\t\t\t_ = fputs("# native_http_proxy_fallback route=direct reason=\\(failure.stage.rawValue)\\n", stderr)\n\t\t\t\troutes = [[kCFProxyTypeKey as String: kCFProxyTypeNone as String]]\n\t\t\t}\n\t\t}\n',
+        '\t\t\tif let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .lookupDeadline, output: output) }\n\t\t\tguard let selected = ManagedProxyLookup.routes(url: request.url,\n\t\t\t\tbudget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),\n\t\t\t\tmaximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,\n\t\t\t\tdiscoveryMetadataProvider: discoveryMetadataProvider)\n\t\t\telse { return refuse(reason: "unavailable", status: 78, stage: .proxyLookup, output: output) }\n\t\t\troutes = selected\n\t\t}\n',
+    ),
+)
+MANAGED_LOOKUP_STAGE_MARKERS = ("ManagedLookupFailure", "directFallback")
+
+
+def managed_lookup_stage_projection(source):
+    """Invert the complete reviewed lookup-stage repair, or keep a source that has none of it."""
+    if not any(marker in source for marker in MANAGED_LOOKUP_STAGE_MARKERS):
+        return source
+    if any(source.count(new) != 1 for new, _ in MANAGED_LOOKUP_STAGE_INVERSE):
+        raise ValueError("Managed lookup stage enrollment refused")
+    for new, old in MANAGED_LOOKUP_STAGE_INVERSE:
+        source = source.replace(new, old, 1)
+    if any(marker in source for marker in MANAGED_LOOKUP_STAGE_MARKERS):
+        raise ValueError("Managed lookup stage projection refused")
+    return source
+
+
+def worker_source():
+    """Read the worker with the newest reviewed layer peeled, as every historical pin expects."""
+    return managed_lookup_stage_projection(WORKER.read_text(encoding="utf-8"))
 
 
 def native_failure_stage_projection(source):
@@ -838,8 +914,7 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
                 )
 
     def test10FixtureFlagCannotChangeReleaseOperationsOrMoveCausalBoundaries(self):
-        worker = SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        source = worker.read_text(encoding="utf-8")
+        source = worker_source()
         blocks = re.findall(
             r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
             source,
@@ -1386,9 +1461,7 @@ class NativeSelectedRouteObservationTests(unittest.TestCase):
         # is unexecuted here and cannot be inferred from the JavaScript result.
 
     def test32ActualRouteArrayObservationKeepsReleaseOperationsAndNonblockingOwner(self):
-        worker = (
-            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        ).read_text()
+        worker = worker_source()
         fixture = (SUPPORT / "native_http_fixture_main.swift").read_text()
         self.assertIn(
             'managedHTTPFixtureStage("routes_done")\n\t\tmanagedHTTPFixtureRoutes(routes)\n\t\t#endif',
@@ -1616,9 +1689,7 @@ class NativeServerRetirementTests(unittest.TestCase):
 class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
     @staticmethod
     def release_source():
-        source = (
-            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        ).read_text(encoding="utf-8")
+        source = worker_source()
         return pac_source_acquisition_projection(
             re.sub(
                 r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
@@ -1702,9 +1773,7 @@ class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
 class PACSourceAcquisitionProjectionTests(unittest.TestCase):
     @staticmethod
     def raw_source():
-        source = (
-            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        ).read_text()
+        source = worker_source()
         return re.sub(
             r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
             "",
@@ -1715,9 +1784,17 @@ class PACSourceAcquisitionProjectionTests(unittest.TestCase):
     def _assert_closed_failure_stage_overlay(self):
         # Read the actual staged producer. No historical source file replaces
         # this input: only the complete, closed literal overlay may disappear.
-        source = (
-            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        ).read_text()
+        # The newest lookup-stage layer peels first, and only as a complete set.
+        current = WORKER.read_text(encoding="utf-8")
+        for new, old in MANAGED_LOOKUP_STAGE_INVERSE:
+            with self.subTest(lookup_stage=new[:60]):
+                self.assertEqual(current.count(new), 1)
+                for replacement in (old, new + new):
+                    with self.assertRaises(ValueError):
+                        managed_lookup_stage_projection(current.replace(new, replacement, 1))
+        source = worker_source()
+        for marker in MANAGED_LOOKUP_STAGE_MARKERS:
+            self.assertNotIn(marker, source)
         projected = native_failure_stage_projection(source)
         self.assertEqual(len(NATIVE_FAILURE_STAGE_INVERSE), 11)
         self.assertEqual(
@@ -1810,9 +1887,7 @@ class PACSourceAcquisitionProjectionTests(unittest.TestCase):
 class TrustCauseDiagnosticEnrollmentTests(unittest.TestCase):
     @staticmethod
     def source():
-        return (
-            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        ).read_text(encoding="utf-8")
+        return worker_source()
 
     def test58CompleteDiagnosticInverseKeepsExactPreimageAndHistoricalWholePin(self):
         source = self.source()
