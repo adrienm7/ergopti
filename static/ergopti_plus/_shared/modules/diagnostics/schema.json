@@ -324,7 +324,7 @@
 					"id": "running_apps",
 					"type": "list",
 					"opt_in": true,
-					"platforms": ["windows", "macos"]
+					"platforms": ["windows", "macos", "linux"]
 				}
 			]
 		},
@@ -418,6 +418,36 @@
 					"id": "keymap_resolved",
 					"type": "bool",
 					"platforms": ["linux"]
+				},
+				{
+					"id": "hook_installed",
+					"type": "bool",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_events_seen",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_foreign_injections",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_front_reinstalls",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_front_reinstall_failures",
+					"type": "count",
+					"platforms": ["windows"]
+				},
+				{
+					"id": "hook_last_error",
+					"type": "count",
+					"platforms": ["windows"]
 				}
 			]
 		},
