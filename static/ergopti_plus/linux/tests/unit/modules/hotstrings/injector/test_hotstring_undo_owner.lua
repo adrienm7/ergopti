@@ -112,6 +112,7 @@ local function with_undo(options, body)
 				WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end },
 				terminators_mod = { is_terminator = function() return false end },
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
+				keyboard_hook = { held_modifiers = function() return {} end },
 				keystats = { is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end,
 					unsuppress = function() end, on_keydown = function() end, record_hotstring = function() end,
 					-- The physical Backspace that requests the Undo is a manual correction.
