@@ -756,3 +756,24 @@ is on GitHub (public repositories serve uploads to anyone with the link, and
 GitHub's attachment documentation describes no revocation). Action: change the
 cap or preview in `day_log.json` only; add a log rule to `redaction.json` and
 its vectors, never a driver-local filter; keep any new page action out of Copy.
+
+### project-keystats-query-catalogue-and-shared-walker
+
+Keystats SQL that more than one driver runs lives once in
+`_shared/data/db/queries.sql` (named queries, `{{where}}` for the driver's own
+filter, `{{text col}}` for TEXT columns); `tools/codegen/codegen-keystats-queries.cjs`
+compiles it to `_shared/lua/keystats/queries.lua` (macOS renders the `native`
+dialect, Linux the `cli_json` one, which selects text through `json_quote`
+because the CLI's JSON mode cuts TEXT at NUL) and `windows/_generated/keystats_queries.ahk`
+(`KeystatsQuery`). `tools/test/test-keystats-query-catalogue.cjs` proves every
+query on `query_fixture.sql` against `query_results.json` in both dialects, and
+the AHK suite replays the same fixture. The typing walk of macOS and Linux is
+`_shared/lua/keystats/walker.lua` (ports: `finger_of`, a per-keystroke slot, a
+session gap); Windows keeps its AHK walker, and all three replay
+`aggregation_vectors.json` (the Lua side through the shared checker
+`_shared/lua/test/keystats_aggregation_corpus.lua`, which fails on an expected
+key it cannot read). Action: add or change a shared query in `queries.sql`,
+regenerate, and update the fixture rows; change walk behaviour in the shared
+walker with a corpus vector and its Windows branch in
+`test_corpus_keystats_aggregation.ahk`. `node tools/audit/keystats-sql-census.cjs`
+lists what is still hand-typed per driver.
