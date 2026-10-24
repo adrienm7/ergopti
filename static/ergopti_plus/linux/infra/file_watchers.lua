@@ -72,6 +72,7 @@ end
 
 -- All active luv fs_event handles: { handle = userdata, path = string, filter = function }
 local _luv_handles = {}
+local _legacy_retiring = {}
 
 -- Pump-mode entries: { path = string, last_mtime = number, filter = function, is_dir = bool }
 local _pump_entries = {}
@@ -337,6 +338,27 @@ end
 -- =========================================
 -- =========================================
 
+--- Retains exact legacy owners until their native close callback acknowledges retirement.
+local function _retire_legacy(entry)
+	entry.active = false
+	if entry.retired then return true end
+	_legacy_retiring[entry] = true
+	if entry.close_requested then return false end
+	entry.close_requested = true
+	-- Native close also retires an active watcher when its preceding stop refuses.
+	if entry.started then pcall(entry.stop, entry.handle) end
+	local called, status, detail = pcall(entry.close, entry.handle, function()
+		entry.retired = true
+		_legacy_retiring[entry] = nil
+	end)
+	if not entry.retired and (not called or status == false or detail ~= nil) then
+		entry.close_requested = false
+		Logger.warn(LOG, "Legacy watcher close remains owned for '%s': %s.", entry.path, tostring(called and detail or status))
+		return false
+	end
+	return entry.retired == true
+end
+
 --- Arms a single luv fs_event watcher on a path (file or directory).
 --- @param path string Absolute path to watch.
 --- @param accept_fn function(fname) → bool  Returns true when the event should trigger a reload.
@@ -348,9 +370,12 @@ local function _arm_luv_watcher(path, accept_fn)
 		Logger.warn(LOG, "luv.new_fs_event() returned nil for '%s' — skipping.", path)
 		return
 	end
+	local entry = { handle = handle, path = path, filter = accept_fn, active = true,
+		stop = luv.fs_event_stop, close = luv.close, started = false }
 
 	local protected, activated, activation_error = pcall(function()
 		return luv.fs_event_start(handle, path, FS_EVENT_FLAGS, function(err, fname, events)
+			if not entry.active then return end
 			if err then
 				Logger.warn(LOG, "fs_event error on '%s': %s", path, tostring(err))
 				return
@@ -371,12 +396,13 @@ local function _arm_luv_watcher(path, accept_fn)
 
 	if not protected or activated == nil or activated == false then
 		local reason = protected and activation_error or activated
+		_retire_legacy(entry)
 		Logger.warn(LOG, "luv.fs_event_start() failed for '%s': %s — skipping.", path, tostring(reason))
-		pcall(function() luv.close(handle) end)
 		return
 	end
 
-	table.insert(_luv_handles, { handle = handle, path = path, filter = accept_fn })
+	entry.started = true
+	table.insert(_luv_handles, entry)
 	Logger.debug(LOG, "luv fs_event armed on '%s'.", path)
 end
 
@@ -966,7 +992,10 @@ end
 
 --- Stops all file watchers and clears state. Safe to call at any time,
 --- including before start() or after a prior stop(). Idempotent.
+--- @return boolean retired True after every owned native close callback.
 function M.stop()
+	-- Revoke legacy callbacks before any native owner can deliver during teardown.
+	for _, entry in ipairs(_luv_handles) do entry.active = false end
 	_personal_epoch = _personal_epoch + 1
 	_personal_root, _personal_dirty, _personal_retry_at, _personal_rebind = nil, false, nil, false
 	_personal_file, _personal_last_refusal, _personal_verify_at = false, nil, nil
@@ -974,12 +1003,12 @@ function M.stop()
 	for _, entry in pairs(_personal_entries) do _retire_personal(entry) end
 	_personal_entries = {}
 	_retry_personal_retirement()
-	-- Close luv handles.
+	-- Move legacy ownership to the retryable retirement registry.
 	for _, entry in ipairs(_luv_handles) do
-		pcall(function() luv.fs_event_stop(entry.handle) end)
-		pcall(function() luv.close(entry.handle) end)
+		_legacy_retiring[entry] = true
 	end
 	_luv_handles = {}
+	for entry in pairs(_legacy_retiring) do _retire_legacy(entry) end
 
 	-- Clear pump entries.
 	_pump_entries = {}
@@ -990,8 +1019,8 @@ function M.stop()
 	_base_dir = nil
 
 	_on_reload = nil
-	local retired = next(_personal_retiring) == nil
-	Logger.debug(LOG, retired and "All file watchers stopped." or "File watchers deactivated; Personal native retirement remains owned.")
+	local retired = next(_personal_retiring) == nil and next(_legacy_retiring) == nil
+	Logger.debug(LOG, retired and "All file watchers stopped." or "File watchers deactivated; native retirement remains owned.")
 	return retired
 end
 
