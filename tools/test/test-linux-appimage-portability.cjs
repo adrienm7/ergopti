@@ -318,6 +318,19 @@ assert.deepEqual(Preflight.MESSAGE_KEYS, {
 	musl: 'startup.linux_appimage_musl_body',
 	old: 'startup.linux_appimage_old_glibc_body'
 });
+// The distribution matrix keeps a musl image, an image below the ceiling and
+// the catalogue's LTS, and takes its expectations from the same two sources.
+const matrix = read('tools/build/appimage-distro-matrix.sh');
+const matrixImages = matrix.slice(matrix.indexOf('DEFAULT_IMAGES=('), matrix.indexOf('\n)\n'));
+for (const image of ['alpine:latest', 'ubuntu:20.04', 'debian:11', Ceiling.OLDEST_LTS_IMAGE]) {
+	assert.ok(matrixImages.includes(` ${image}`) || matrixImages.includes(`\t${image}`), image);
+}
+assert.ok(matrix.includes("check-elf-glibc-ceiling.cjs').GLIBC_CEILING"));
+assert.ok(matrix.includes("render-appimage-libc-preflight.cjs').REFUSAL_EXIT"));
+assert.ok(
+	read('tools/build/appimage-distro-check.sh').startsWith('#!/bin/sh\n'),
+	'Alpine has no bash'
+);
 const preflightLocales = Preflight.readLocales();
 assert.equal(preflightLocales.length, 21, 'every shipped locale reads the refusal');
 const preflight = Preflight.render(preflightLocales);
