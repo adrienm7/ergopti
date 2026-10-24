@@ -21,7 +21,7 @@ _HSCS_PersonalFrameNativeRefusal() {
 	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
 	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
 	Fixture := _ScopeOwnerFixture(), PersonalPath := Fixture.path . ".personal.toml"
-	Source := Chr(0xFEFF) . '[personal_editor]`nDefaultSection = "beta"`nclose_on_add = "1"`n[private]`nkeep = "personal-frame-source"`n'
+	Source := Chr(0xFEFF) . '[personal_editor]`ndefault_section = "beta"`nclose_on_add = "1"`n[private]`nkeep = "personal-frame-source"`n'
 	PersonalSource := '[[alpha]]`n[[beta]]`n'
 	SavedInfo := ScriptInformation, SavedFeatures := Features, SavedCategories := CategoryEnabled
 	SavedConfig := IsSet(ConfigurationFile) ? ConfigurationFile : unset
@@ -138,7 +138,7 @@ _HSCS_PersonalFrameNativeRefusal() {
 			finally _PrevDefaultLabel := BeforeCaption
 			AssertUnchanged("old caption refusal")
 			AlphaCallback.Call()
-			AssertEqual("alpha", _EditorPrefGet("DefaultSection", ""), "the original callback still reaches the genuine native preference writer")
+			AssertEqual("alpha", _EditorPrefGet("default_section", ""), "the original callback still reaches the genuine native preference writer")
 			AssertEqual(LabelMap["alpha"], _PrevDefaultLabel)
 			AssertEqual(1, _CTC_CountLabel(LivePersonal, t("menu.hotstrings.default_category_prefix") . LabelMap["alpha"]))
 			AssertEqual(LiveHandle, LivePersonal.Handle, "repaint keeps the exact original native parent")
@@ -148,7 +148,7 @@ _HSCS_PersonalFrameNativeRefusal() {
 			Assert(InStr(FSReadUtf8Exact(Fixture.path), 'keep = "personal-frame-source"'), "the genuine write preserves unknown source data")
 			; Restore the fixture's original desired default through that same native UI owner.
 			AssertTrue(BetaCallback.Call())
-			AssertEqual("beta", _EditorPrefGet("DefaultSection", ""))
+			AssertEqual("beta", _EditorPrefGet("default_section", ""))
 		} finally {
 			Root[ParentKey] := ParentDefinition
 		}
@@ -158,7 +158,7 @@ _HSCS_PersonalFrameNativeRefusal() {
 		ReleasedSource := FSReadUtf8Exact(Fixture.path)
 		AssertFalse(AlphaCallback.Call(), "a released default child refuses its retained callback")
 		AssertEqual(ReleasedSource, FSReadUtf8Exact(Fixture.path), "the stale callback writes no preference")
-		AssertEqual("beta", _EditorPrefGet("DefaultSection", ""))
+		AssertEqual("beta", _EditorPrefGet("default_section", ""))
 		for Key, Original in Originals {
 			Root.Delete(Key)
 			loop 2 {
@@ -410,7 +410,7 @@ _HSCS_DefaultChoiceSourceReceiving(Kind) {
 	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
 	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
 	Fixture := _ScopeOwnerFixture(), PersonalPath := Fixture.path . ".personal.toml"
-	Source := Chr(0xFEFF) . '[personal_editor]`nDefaultSection = "beta"`nclose_on_add = "1"`n[private]`nkeep = "personal-frame-source"`n'
+	Source := Chr(0xFEFF) . '[personal_editor]`ndefault_section = "beta"`nclose_on_add = "1"`n[private]`nkeep = "personal-frame-source"`n'
 	PersonalSource := '[[alpha]]`n[[beta]]`n'
 	SavedInfo := ScriptInformation, SavedFeatures := Features, SavedCategories := CategoryEnabled
 	SavedConfig := IsSet(ConfigurationFile) ? ConfigurationFile : unset
@@ -526,14 +526,14 @@ _HSCS_DefaultChoiceSourceReceiving(Kind) {
 		if Kind == "missing" {
 			AssertFalse(AlphaCallback.Call(), "a retained actual choice refuses before the original writer when its declaration is absent")
 			AssertEqual(BeforeSource, FSReadUtf8Exact(Fixture.path))
-			AssertEqual("beta", _EditorPrefGet("DefaultSection", ""))
+			AssertEqual("beta", _EditorPrefGet("default_section", ""))
 			loop TrayMenuItemCount(LiveDefault)
 				AssertEqual(LiveFlags[A_Index], DllCall("GetMenuState", "ptr", LiveDefault.Handle, "uint", A_Index - 1, "uint", 0x400, "uint"))
 		}
 		Root[LeafKey] := Originals[LeafKey]
 		AssertEqual(1, ReadRows().Length, "exact declaration repair restores the actual native provider")
 		AlphaCallback.Call()
-		AssertEqual("alpha", _EditorPrefGet("DefaultSection", ""), "the retained original writer publishes through genuine native preference IO")
+		AssertEqual("alpha", _EditorPrefGet("default_section", ""), "the retained original writer publishes through genuine native preference IO")
 		Assert(InStr(FSReadUtf8Exact(Fixture.path), 'keep = "personal-frame-source"'))
 		AssertTrue(_MenuDispatchCallbacks.Has(AlphaId) && _MenuDispatchCallbacks[AlphaId] == AlphaCallback)
 
