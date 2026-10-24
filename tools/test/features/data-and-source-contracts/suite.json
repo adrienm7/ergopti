@@ -457,6 +457,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-key-combination-defaults-parity.cjs"],
 			"repro": "node tools/test/test-key-combination-defaults-parity.cjs"
+		},
+		{
+			"id": "timings-registry-liveness",
+			"ordinal": 468,
+			"name": "every shared timing registry key is read at runtime or pinned to a driver copy",
+			"cmd": "node",
+			"args": ["tools/test/test-timings-registry-liveness.cjs"],
+			"repro": "npm run test:timings-registry-liveness"
 		}
 	]
 }

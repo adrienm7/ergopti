@@ -138,6 +138,7 @@ local function with_fixture(options, scenario)
 		sec = function(_, key)
 			if key == "health_check_interval_ms" then return 30 end
 			if key == "startup_phase_timeout_ms" then return 10 end
+			if key == "probe_interval_ms" then return 0.5 end
 			return 5
 		end,
 	}

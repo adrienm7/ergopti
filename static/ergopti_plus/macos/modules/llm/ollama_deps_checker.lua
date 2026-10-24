@@ -71,7 +71,7 @@ local KNOWN_MARKERS = {
 for marker, _ in pairs(FAILURE_MESSAGES) do KNOWN_MARKERS[marker] = true end
 
 local FAILURE_TAIL_CHARS    = 280
-local SUCCESS_AUTO_HIDE_SEC = 1.5
+local SUCCESS_AUTO_HIDE_SEC = Timings.sec("tooltip", "success_banner_autohide_ms")
 local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- "pending" until the first check, "ready" once an executable is provisioned,
