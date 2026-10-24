@@ -107,9 +107,14 @@ global LOGGER_ERRORS_LOG_PATH := ""
 ; compares this against today and re-resolves on a change.
 global _LOGGER_PATH_DATE := ""
 
-; Retention window for dated log files, in days. Single source of truth: both
-; LoggerInit and the midnight rollover in _LoggerFlush purge with this value.
-global LOGGER_RETENTION_DAYS := 14
+; Retention window for dated log files, in days. Both LoggerInit and the
+; midnight rollover in _LoggerFlush purge with this value, which LoggerLoadTimings
+; reassigns at boot from the shared registry ([logger] retention_days), the
+; number macOS and Linux read too. The sentinel 0 means "not loaded yet": a purge
+; is skipped rather than run with a guessed window, because _LoggerPurgeOldLogs
+; with 0 days treats every dated file as expired. Only the fatal-path LoggerInit
+; of infra/error_net.ahk can run that early.
+global LOGGER_RETENTION_DAYS := 0
 
 ; Fixed-name diagnostic files used by detached helpers cannot participate in
 ; the dated-log retention sweep. Keep one current file plus one rotated archive,
@@ -451,6 +456,19 @@ _LoggerResolveDatedPaths() {
 		return LogDir
 }
 
+; Reassign the retention window from the shared registry ([logger] retention_days).
+; AHK v2 runs global initializers before the auto-execute body, so the sentinel
+; above cannot call TimingsGet itself; infra/boot.ahk calls this right after
+; TimingsLoadShared(), before LoggerInit purges. Fail-fast: TimingsGet throws on
+; a missing key, and a window under one day would purge today's own files.
+LoggerLoadTimings() {
+		global LOGGER_RETENTION_DAYS
+		Days := TimingsGet("logger", "retention_days")
+		if (Days < 1)
+				throw ValueError(Format("[logger] retention_days must be at least 1 day, got {1}.", Days))
+		LOGGER_RETENTION_DAYS := Days
+}
+
 ; Initialise the logger. Reads the minimum level from the ini and resolves the
 ; log file path. Safe to call multiple times — later calls just refresh the
 ; minimum level (e.g. after the user changes it via the menu).
@@ -462,7 +480,10 @@ LoggerInit() {
 		if !(_LoggerPrivacyConfig() is Map)
 				throw Error("Logger privacy policy is not initialized.")
 		LogDir := _LoggerResolveDatedPaths()
-		_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		if (LOGGER_RETENTION_DAYS > 0)
+				_LoggerPurgeOldLogs(LogDir, LOGGER_RETENTION_DAYS)
+		else
+				LoggerDebug("Logger", "Log retention is not loaded yet; the purge waits for the next rollover.")
 		; Sub-file routing comes from _generated/logger_sub_files.ahk, generated from
 		; _shared/modules/logger/sub_files.toml — adding a topical log is a TOML edit
 		; plus a codegen run, never a parser change in two drivers.
@@ -856,7 +877,9 @@ _LoggerFlushOwned(ForceFlush := false) {
 	; file the operator reads as today's.
 	if (_LOGGER_PATH_DATE != "" and _LOGGER_PATH_DATE != FormatTime(, "yyyy-MM-dd")) {
 		RolledDir := _LoggerResolveDatedPaths()
-		_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
+		; Same sentinel guard as LoggerInit: a window not loaded yet purges nothing.
+		if (LOGGER_RETENTION_DAYS > 0)
+			_LoggerPurgeOldLogs(RolledDir, LOGGER_RETENTION_DAYS)
 		_LoggerInitSubFiles(RolledDir)
 	}
 
