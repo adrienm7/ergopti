@@ -120,6 +120,15 @@ const GENERATORS = [
 		]
 	},
 	{
+		// Reads menu_manifest.json, so it runs after the menu build above.
+		script: 'codegen/codegen-config-keys.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/config_keys.lua',
+			'static/ergopti_plus/_shared/ui/_generated/config_keys.js',
+			'static/ergopti_plus/windows/_generated/config_keys.ahk'
+		]
+	},
+	{
 		script: 'build/gen-metrics-category-aliases.cjs',
 		outputs: ['static/ergopti_plus/_shared/data/metrics_general_category_aliases.json']
 	},
