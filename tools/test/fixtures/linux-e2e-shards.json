@@ -88,6 +88,7 @@
 			"Upload live updater diagnostic evidence",
 			"Install portable network staging prerequisites",
 			"Qualify actual staged portable network runtime and retirement",
+			"Install prerequisites for Qualify genuine Nix installed runtime",
 			"Qualify genuine Nix installed runtime"
 		],
 		"network-ai": [
@@ -301,6 +302,9 @@
 		],
 		"The whole daemon, live — a trigger typed, a tray shown": [
 			"Install prerequisites for The whole daemon, live — a trigger typed, a tray shown"
+		],
+		"Qualify genuine Nix installed runtime": [
+			"Install prerequisites for Qualify genuine Nix installed runtime"
 		],
 		"Qualify three actual XI2 property cookies": [
 			"Install prerequisites for Qualify three actual XI2 property cookies"
