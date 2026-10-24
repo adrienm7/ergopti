@@ -3029,8 +3029,12 @@ function M.execute_single(name, binding)
 		end
 		-- The action owns the dispatch whether or not its question could be shown
 		-- (ask logs why not): a fallback provider must never run it unasked.
+		local confirmation_scope = action_scope_lifecycle(parent)
+		local confirmation_epoch = confirmation_scope.epoch
 		ActionConfirm.ask(M.get_label(name), function(acted_from)
-			if not aux_admission_open(parent) then
+			if not aux_admission_open(parent)
+				or action_scope_lifecycle(parent) ~= confirmation_scope
+				or confirmation_scope.epoch ~= confirmation_epoch then
 				Logger.info(LOG, "'%s' was confirmed after its scope was paused — not run.", name)
 				return
 			end
