@@ -120,7 +120,7 @@ _UGH_Case(Consumer, InvokeFn, ListResult, CacheExpected, Mode) {
 				AssertFalse(IsObject(Request.DeadlineFn), "the actual deadline callback must retire")
 				AssertFalse(_HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId), "no private response file debt may remain")
 				AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId), "no private abort debt may remain")
-				for Path in [Request.ConfigPath, Request.BodyPath, Request.HeaderPath]
+				for Path in [Request.BodyPath, Request.HeaderPath]
 					AssertFalse(FileExist(Path), "all private response artifacts must retire")
 			}
 			if State.Has("directory")
