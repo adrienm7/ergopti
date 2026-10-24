@@ -177,10 +177,6 @@ end
 
 local SCUTIL = "/usr/sbin/scutil"
 
--- Steps the native helper may report, in display order, and the states it may use.
-local NETWORK_STEPS = { "route_lookup", "tls", "transfer", "digest" }
-local NETWORK_STATES = { pass = true, fail = true, info = true, skip = true }
-
 --- Names the kinds of system proxy configured, from `scutil --proxy` text.
 --- @param text any Command output.
 --- @return string kinds Tokens joined by "+" (pac, discovery, fixed), or "none".
@@ -194,64 +190,35 @@ function M.parse_proxy_kinds(text)
 end
 
 --- Reads the `step <id> <state> <value>` lines of the native network helper.
---- Unknown ids, states and repeated ids are ignored: the helper cannot add a step.
+--- The grammar is shared with the Linux and Windows checks.
 --- @param output any Helper stdout.
 --- @return table steps id → { state, value }
-function M.parse_network_helper(output)
-	local wanted, steps = {}, {}
-	for _, id in ipairs(NETWORK_STEPS) do wanted[id] = true end
-	for id, state, value in tostring(output or ""):gmatch("step (%S+) (%S+) (%S+)") do
-		if wanted[id] and NETWORK_STATES[state] and not steps[id] then
-			steps[id] = { state = state, value = value }
-		end
-	end
-	return steps
-end
+M.parse_network_helper = require("network.field_check_network").parse_chain_lines
 
 --- The managed download chain end to end: system proxy settings, the PAC
 --- download and verdict, then one HEAD request through the native transport.
 --- The PAC address is only handed to the port that fetches it; no step carries it.
+--- The steps are the shared ones (network.field_check_network); this function
+--- binds them to scutil, the PAC fetch and the native helper.
 function M.network(ports, report, finish)
 	local PacCheck = require("network.pac_check")
-	ports.exec(SCUTIL, { "--proxy" }, COMMAND_TIMEOUT, function(code, output)
-		if code ~= 0 then
-			report.step("proxy_settings", STATE.fail, code == nil and "timeout" or "unreadable")
-		else
-			report.step("proxy_settings", STATE.info, M.parse_proxy_kinds(output))
-		end
-		local function native_chain()
-			ports.network_chain(function(helper_code, helper_output)
-				local steps = helper_code == 0 and M.parse_network_helper(helper_output) or {}
-				for _, id in ipairs(NETWORK_STEPS) do
-					local step = steps[id]
-					if step then
-						report.step(id, step.state, step.value)
-					elseif id == "transfer" then
-						report.step(id, STATE.fail, helper_code == nil and "helper_unavailable" or "no_answer")
-					else
-						report.step(id, STATE.skip, helper_code == nil and "helper_unavailable" or "no_answer")
-					end
+	require("network.field_check_network").run({
+		proxy_settings = function(callback)
+			ports.exec(SCUTIL, { "--proxy" }, COMMAND_TIMEOUT, function(code, output)
+				if code ~= 0 then
+					callback({ failure = code == nil and "timeout" or "unreadable" })
+				else
+					callback({ kinds = M.parse_proxy_kinds(output), pac_url = PacCheck.url_from_scutil(output) })
 				end
-				finish()
 			end)
-		end
-		local url = code == 0 and PacCheck.url_from_scutil(output) or nil
-		if not url then
-			report.step("pac_download", STATE.skip, "no_pac")
-			report.step("pac_script", STATE.skip, "no_pac")
-			native_chain()
-			return
-		end
-		ports.fetch_pac(url, function(status, body)
-			local number = tonumber(status) or 0
-			report.step("pac_download", number == 200 and STATE.pass or STATE.fail,
-				number > 0 and ("http_" .. number) or "failed")
-			local verdict = PacCheck.judge(status, body)
-			report.step("pac_script", verdict == "ok" and STATE.pass or STATE.fail,
-				verdict == "ok" and "valid" or "invalid")
-			native_chain()
-		end)
-	end)
+		end,
+		fetch_pac = ports.fetch_pac,
+		chain = function(callback)
+			ports.network_chain(function(helper_code, helper_output)
+				callback(helper_code, helper_code == 0 and M.parse_network_helper(helper_output) or {})
+			end)
+		end,
+	}, report, finish)
 end
 
 local SHORTCUTS = "/usr/bin/shortcuts"

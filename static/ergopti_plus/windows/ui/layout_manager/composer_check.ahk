@@ -133,16 +133,20 @@ ComposerCheck_Passed(Report) {
  * The one evidence line: check=composer verdict=pass steps=N id=state[:value] …
  * Same grammar as the macOS and Linux records.
  * @param {Map} Report
+ * @param {string} CheckId - Identity of the check; the composer's by default (the
+ *   network check shares this record's grammar).
  * @returns {string}
  */
-ComposerCheck_LogLine(Report) {
+ComposerCheck_LogLine(Report, CheckId := "") {
 	global COMPOSER_CHECK_ID
+	if CheckId == ""
+		CheckId := COMPOSER_CHECK_ID
 	Parts := ""
 	for Step in Report["steps"] {
 		Part := Step["id"] . "=" . Step["state"] . (Step["value"] != "" ? ":" . Step["value"] : "")
 		Parts .= " " . Part
 	}
-	return "check=" . COMPOSER_CHECK_ID . " verdict=" . (ComposerCheck_Passed(Report) ? "pass" : "fail")
+	return "check=" . CheckId . " verdict=" . (ComposerCheck_Passed(Report) ? "pass" : "fail")
 		. " steps=" . Report["steps"].Length . Parts
 }
 
@@ -414,20 +418,22 @@ ComposerCheck_Command(*) {
  * Shows a finished report, one line per step, with a « Copy report » button.
  * @param {Map} Report
  * @param {Func} ShowFn - Opens the window; tests replace it.
+ * @param {string} TitleKey - Locale key of the window title; the composer's by
+ *   default (the network check shows its report through the same window).
  */
-ComposerCheck_ShowReport(Report, ShowFn := 0) {
+ComposerCheck_ShowReport(Report, ShowFn := 0, TitleKey := "menu.debug.composer_check") {
 	Text := ComposerCheck_Text(Report, t)
 	if !HasMethod(ShowFn, "Call")
-		ShowFn := _ComposerCheck_ShowWindow
-	ShowFn.Call(t("menu.debug.composer_check"), Text)
+		ShowFn := (Title, Body) => _ComposerCheck_ShowWindow(Title, Body, TitleKey)
+	ShowFn.Call(t(TitleKey), Text)
 }
 
-_ComposerCheck_ShowWindow(Title, Text) {
+_ComposerCheck_ShowWindow(Title, Text, TitleKey := "menu.debug.composer_check") {
 	Window := Gui("+AlwaysOnTop", WindowTitle(Title))
 	Window.AddEdit("w560 r10 ReadOnly -Wrap", Text)
 	Copy := Window.AddButton("w140 Default", t("field_check.copy"))
 	Close := Window.AddButton("x+10 w140", t("field_check.close"))
-	Copy.OnEvent("Click", (*) => ComposerCheck_CopyReport(Text))
+	Copy.OnEvent("Click", (*) => ComposerCheck_CopyReport(Text, 0, 0, TitleKey))
 	Close.OnEvent("Click", (*) => Window.Destroy())
 	Window.OnEvent("Close", (*) => Window.Destroy())
 	Window.Show()
@@ -438,13 +444,14 @@ _ComposerCheck_ShowWindow(Title, Text) {
  * @param {string} Text - The report text.
  * @param {Func} WriteFn - Receives the text; the clipboard by default.
  * @param {Func} NoticeFn - Receives the notice text; a tray tip by default.
+ * @param {string} TitleKey - Locale key of the tray tip's title.
  */
-ComposerCheck_CopyReport(Text, WriteFn := 0, NoticeFn := 0) {
+ComposerCheck_CopyReport(Text, WriteFn := 0, NoticeFn := 0, TitleKey := "menu.debug.composer_check") {
 	global COMPOSER_CHECK_TAG
 	if !HasMethod(WriteFn, "Call")
 		WriteFn := (Value) => A_Clipboard := Value
 	if !HasMethod(NoticeFn, "Call")
-		NoticeFn := (Notice) => TrayTip(Notice, WindowTitle(t("menu.debug.composer_check")))
+		NoticeFn := (Notice) => TrayTip(Notice, WindowTitle(t(TitleKey)))
 	; The clipboard takes Windows line breaks, as the window's own text has.
 	WriteFn.Call(StrReplace(Text, "`n", "`r`n"))
 	LoggerInfo(COMPOSER_CHECK_TAG, "Report copied to the clipboard.")
