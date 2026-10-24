@@ -256,6 +256,11 @@ local function build_fixture(callback, options)
 			get_array = presentation_renderer.get_array,
 			render_rows = function(rows, slot)
 				if slot == "llm_profile" then return presentation_renderer.render_rows(rows, slot) end
+				-- The AI parents over a completed native submenu are materialised by
+				-- the renderer; the API panel's own provider rows stay data here.
+				if slot == "llm_backend" and #rows == 1 and type(rows[1].submenu) == "table" then
+					return presentation_renderer.render_rows(rows, slot)
+				end
 				if slot == "llm_generation_settings" then return native_renderer.render_rows(rows, slot) end
 				return rows
 			end,
