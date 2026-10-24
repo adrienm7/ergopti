@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Åbn tastaturindstillinger…",
 	"menu.layout.pause_layout_enabled": "Skift layout ved pause / genoptagelse",
 	"menu.layout.pause_layout_section": "Layout ved pause / genoptagelse",
+	"menu.layout.pause_layout_unsupported_desktop": "Layout ved pause / genoptagelse: ikke tilgængeligt på dette skrivebord (kun GNOME eller X11)",
 	"menu.layout.replace": "Omdanne en tast til ★-tasten",
 	"menu.layout.magic_key_source": "Fysisk magisk tast",
 	"menu.layout.magic_key_source.auto": "Automatisk (layoutets tast)",

@@ -8,7 +8,8 @@
 --- switch, then one picker per event listing the desktop's own layouts after
 --- « No change ». The choices come from the input source adapter's last
 --- reading; each build asks for a fresh one and the tray is rebuilt only when
---- the desktop's list changed.
+--- the desktop's list changed. A desktop with no supported backend gets the
+--- declared status line instead.
 --- ==============================================================================
 
 local M = {}
@@ -27,6 +28,11 @@ local LOG = "ui.menu.pause_layout_rows"
 function M.rows(ctx)
 	local preferences, switch = ctx.preferences, ctx.switch
 	local switcher = switch.switcher()
+	-- No backend can change this desktop's layout: say why rather than draw a
+	-- switch and pickers that could never act.
+	if switcher.backend() == nil then
+		return ManifestMenu.status_rows("layout_menu", "layout_switching", "unsupported_desktop") or {}
+	end
 	local called, settings = pcall(preferences.settings)
 	if not called then
 		Logger.error(LOG, "The pause layout settings are unreadable: %s.", tostring(settings))

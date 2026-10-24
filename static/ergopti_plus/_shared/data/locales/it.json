@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Apri Impostazioni tastiera…",
 	"menu.layout.pause_layout_enabled": "Cambia layout in pausa / ripresa",
 	"menu.layout.pause_layout_section": "Layout in pausa / ripresa",
+	"menu.layout.pause_layout_unsupported_desktop": "Layout in pausa / ripresa: non disponibile su questo desktop (solo GNOME o X11)",
 	"menu.layout.replace": "Trasformare un tasto nel tasto ★",
 	"menu.layout.magic_key_source": "Tasto magico fisico",
 	"menu.layout.magic_key_source.auto": "Automatico (il tasto del layout)",

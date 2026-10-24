@@ -1550,6 +1550,7 @@
 	"menu.layout.open_prefs": "Otwórz Ustawienia klawiatury…",
 	"menu.layout.pause_layout_enabled": "Zmień układ przy pauzie / wznowieniu",
 	"menu.layout.pause_layout_section": "Układ przy pauzie / wznowieniu",
+	"menu.layout.pause_layout_unsupported_desktop": "Układ przy pauzie / wznowieniu: niedostępne na tym pulpicie (tylko GNOME lub X11)",
 	"menu.layout.replace": "Przekształcenie klawisza w klawisz ★",
 	"menu.layout.magic_key_source": "Fizyczny klawisz magiczny",
 	"menu.layout.magic_key_source.auto": "Automatycznie (klawisz układu)",
