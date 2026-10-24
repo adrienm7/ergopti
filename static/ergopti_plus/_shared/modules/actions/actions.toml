@@ -1262,9 +1262,7 @@ platform = "all"
 # --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
 
 [sg_actions.one_shot_shift]
-# The Linux tap-hold engine implements it (tap_hold_engine.lua), so its tap
-# picker offers it as Windows does.
-platform = "ahk,linux"
+platform = "ahk"
 
 [sg_actions.caps_word]
 # Linux toggles the shortcuts manager's CapsWord, which locks CapsLock as
