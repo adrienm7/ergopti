@@ -7,6 +7,18 @@ local Preferences = require("infra.preferences")
 local Transaction = require("config_scope_transaction")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local ProfileRegistry = require("llm.profile_registry_codec")
+
+--- The user profiles a document stores at llm.user_profiles. An older build's
+--- list is outdated configuration its reader reports, so it owns no profile;
+--- a damaged registry fails the transaction.
+--- @param llm table Decoded [llm] table.
+--- @return table profiles
+local function stored_user_profiles(llm)
+	local stored = llm.user_profiles
+	if stored == nil or type(stored) ~= "string" or ProfileRegistry.is_outdated(stored) then return {} end
+	return ProfileRegistry.decode(stored)
+end
 
 --- Creates the AI preference transaction without touching credentials or models.
 --- @param options table Common transaction options, runtime and profile registry.
@@ -36,7 +48,7 @@ function M.new(options)
 			local ids, paths = {}, {}
 			local registered = options.profiles()
 			assert(type(registered) == "table", "LLM profile ownership is unavailable")
-			for _, list in ipairs({ registered, profiles.user_profiles or {}, options.state.llm_user_profiles or {} }) do
+			for _, list in ipairs({ registered, stored_user_profiles(llm), options.state.llm_user_profiles or {} }) do
 				assert(type(list) == "table", "LLM profile ownership is unavailable")
 				for _, profile in ipairs(list) do
 					assert(type(profile) == "table" and type(profile.id) == "string"

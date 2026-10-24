@@ -389,9 +389,6 @@ M.features = {
 		path = "llm.models.mlx", id = "mlx", section = "llm.models", default = "Qwen3.5-2B", type = "string", description_key = "menu.llm.models.mlx", platforms = { "hs" }, recommended = "Qwen3.5-2B", input_altering = false,
 	},
 	{
-		path = "llm.profiles.user_profiles", id = "user_profiles", section = "llm.profiles", default = {  }, type = "array", description_key = "menu.profiles.header_custom_profiles", platforms = { "hs" }, recommended = {  }, input_altering = false,
-	},
-	{
 		path = "llm.trigger.disabled_apps", id = "disabled_apps", section = "llm.trigger", default = {  }, type = "array", description_key = "menu.llm.title", platforms = { "ahk", "hs", "linux" }, recommended = {  }, input_altering = false,
 	},
 	{

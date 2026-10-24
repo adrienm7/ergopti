@@ -280,7 +280,6 @@ global FEATURES_MANIFEST := Map(
         Map("path", "hotstrings.dynamic.enabled", "section", "hotstrings.dynamic", "reason_key", "platform_reason.dynamic_master_is_category_switch_on_windows", "platforms", ["hs", "linux"]),
         Map("path", "llm.models.user_models", "section", "llm.models", "reason_key", "platform_reason.llm_saved_user_models_are_macos", "platforms", ["hs"]),
         Map("path", "llm.models.mlx", "section", "llm.models", "reason_key", "platform_reason.llm_mlx_is_apple_silicon", "platforms", ["hs"]),
-        Map("path", "llm.profiles.user_profiles", "section", "llm.profiles", "reason_key", "", "platforms", ["hs"]),
         Map("path", "llm.navigation.arrow_nav_enabled", "section", "llm.navigation", "reason_key", "platform_reason.arrow_navigation_is_macos", "platforms", ["hs"]),
         Map("path", "metrics.wpm_menubar_visible", "section", "metrics", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "metrics.wpm_menubar_colors", "section", "metrics", "reason_key", "", "platforms", ["hs", "linux"]),

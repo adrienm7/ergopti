@@ -16,7 +16,7 @@ local cases = {
 		{ backend = "ollama", name = "first/model" },
 		{ backend = "ollama", name = "second/model" },
 	} },
-	{ key = "llm_user_profiles", path = "llm.profiles.user_profiles", values = {
+	{ key = "llm_user_profiles", path = "llm.user_profiles", values = {
 		{ id = "user_first", label = "First Profile", system_single = "first" },
 		{ id = "user_second", label = "Second Profile", system_single = "second" },
 	} },
@@ -27,7 +27,8 @@ local cases = {
 --- @param value table Expected array or dictionary.
 local function check_roundtrip(key, value, path)
 	fixture.with_roundtrip({ [key] = value }, function(saved, preferences)
-		local neutral = path and require("infra.manifest_reader").default_for(path) or nil
+		-- The neutral value in state form: llm.user_profiles stores "" for no profile.
+		local neutral = path and preferences.state_value_for(path, require("infra.manifest_reader").default_for(path)) or nil
 		if neutral and helpers.deep_equal(neutral, value) then
 			helpers.assert_nil(saved[key], key .. " must remain sparse at its neutral value")
 		else

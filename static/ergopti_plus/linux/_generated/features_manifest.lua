@@ -683,9 +683,6 @@ M.unavailable = {
 		path = "llm.models.mlx", section = "llm.models", reason_key = "platform_reason.llm_mlx_is_apple_silicon", platforms = { "hs" },
 	},
 	{
-		path = "llm.profiles.user_profiles", section = "llm.profiles", reason_key = "", platforms = { "hs" },
-	},
-	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "platform_reason.inline_autotype_is_windows", platforms = { "ahk" },
 	},
 	{
