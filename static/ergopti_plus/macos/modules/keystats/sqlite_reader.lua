@@ -321,6 +321,9 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 			a.same_finger_streak_max = r.f_max or 0
 			a.same_hand_streak_max   = r.h_max or 0
 			a.auto_repeat_count      = r.ar_count or 0
+			-- Written by the focus_first_key walker branch; the page reads both.
+			a.focus_to_first_key_sum_ms = r.focus_sum or 0
+			a.focus_to_first_key_count  = r.focus_count or 0
 		end
 	end, pacer)
 
