@@ -28,6 +28,7 @@
 local Registry = require("layouts.registry")
 local Extension = require("layouts.extension")
 local Json = require("json")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -417,11 +418,8 @@ end
 --- @param record table
 --- @return table
 function M.installed_list(record)
-	local ids = {}
-	for id in pairs(record.layouts) do ids[#ids + 1] = id end
-	table.sort(ids)
 	local list = {}
-	for _, id in ipairs(ids) do list[#list + 1] = record.layouts[id] end
+	for _, id in ipairs(TableUtil.sorted_keys(record.layouts)) do list[#list + 1] = record.layouts[id] end
 	return list
 end
 

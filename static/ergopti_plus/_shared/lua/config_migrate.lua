@@ -37,6 +37,7 @@
 
 local M = {}
 local NativePath = require("native_path")
+local TableUtil = require("table_util")
 local SourceIdentity = require("module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
 local source_directory = require("module_source_directory").capture()
@@ -193,12 +194,7 @@ local read_only_statuses = {}
 local validated_registries = setmetatable({}, { __mode = "k" })
 local admission_factory
 
-local function detached(value)
-	if type(value) ~= "table" then return value end
-	local copy = {}
-	for key, child in pairs(value) do copy[key] = detached(child) end
-	return copy
-end
+local detached = TableUtil.deep_copy
 
 -- Resolve only a journal key, never rewrite a native path or fold its case.
 -- Dot spellings of a known destination are refused: '..' through a symlink
@@ -379,17 +375,12 @@ end
 --- @return boolean
 local function is_array(value)
 	if type(value) ~= "table" then return false end
-	local count = 0
-	for _ in pairs(value) do count = count + 1 end
-	return count == #value
+	return TableUtil.count(value) == #value
 end
 
 --- Sorted keys of a table.
 local function sorted_keys(map)
-	local keys = {}
-	for key in pairs(map) do keys[#keys + 1] = key end
-	table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
-	return keys
+	return TableUtil.sorted_keys(map, TableUtil.by_text)
 end
 
 --- Formats a version for a log line without a Lua 5.4 float suffix.

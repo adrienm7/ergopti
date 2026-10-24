@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 local SourceIdentity = require("module_source_identity")
 local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
 local source_directory = require("module_source_directory").capture()
@@ -1417,10 +1418,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		end
 	end
 
-	local pending_sections = {}
-	for section in pairs(pending) do pending_sections[#pending_sections + 1] = section end
-	table.sort(pending_sections)
-	for _, section in ipairs(pending_sections) do
+	for _, section in ipairs(TableUtil.sorted_keys(pending)) do
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do

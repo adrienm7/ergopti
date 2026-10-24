@@ -37,6 +37,7 @@ local BasicString = require("toml_codec.basic_string")
 local KeyPath = require("toml_codec.key_path")
 local RecordScanner = require("toml_codec.record_scanner")
 local SourceOpen = require("toml_codec.source_open")
+local TextUtils = require("text_utils")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -206,7 +207,7 @@ local function parse_entry(line)
 			-- such as `priority = 75` would be skipped and silently lost.
 			local vs = i
 			i = line:find("[,}]", i) or (#line + 1)
-			local raw = line:sub(vs, i - 1):match("^%s*(.-)%s*$")
+			local raw = TextUtils.trim(line:sub(vs, i - 1))
 			result[key] = tonumber(raw) or result[key]
 		end
 	end
@@ -407,13 +408,7 @@ end
 
 --- Trims a physical line in linear time (the pattern form backtracks on every
 --- line of a 466 KB hotstring pack).
-local function trim_line(raw_line)
-	local first = raw_line:find("%S")
-	if first == nil then return "" end
-	local last = #raw_line
-	while raw_line:find("^%s", last) do last = last - 1 end
-	return raw_line:sub(first, last)
-end
+local trim_line = TextUtils.trim
 
 local function empty_document()
 	return {
@@ -497,7 +492,7 @@ local function parse_lines(lines)
 			if line:sub(1, 1) == "[" then
 				local _, _, comment_offset = RecordScanner.advance(line, 0, nil)
 				if comment_offset then
-					line = line:sub(1, comment_offset - 1):match("^%s*(.-)%s*$")
+					line = TextUtils.trim(line:sub(1, comment_offset - 1))
 				elseif line:sub(1, 2) == "[[" and not KeyPath.header(line, true).segments then
 					-- Historical raw names can contain an unmatched quote, so the
 					-- value scanner cannot see their trailing comment. Recover only

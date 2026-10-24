@@ -26,6 +26,7 @@
 local Json = require("json")
 local Base64 = require("compat.base64")
 local AppIdentity = require("llm.app_identity")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -90,9 +91,7 @@ function M.with(overrides, app, profile_id)
 	end
 	local copy = {}
 	for stored, mapped in pairs(overrides or {}) do copy[stored] = mapped end
-	local count = 0
-	for _ in pairs(copy) do count = count + 1 end
-	if copy[key] == nil and count >= M.MAX_ENTRIES then return nil, "too many application overrides" end
+	if copy[key] == nil and TableUtil.count(copy) >= M.MAX_ENTRIES then return nil, "too many application overrides" end
 	copy[key] = profile_id
 	return copy
 end

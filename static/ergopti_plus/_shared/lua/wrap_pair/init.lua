@@ -20,11 +20,7 @@ local M = {}
 --- The separator of a custom pair.
 M.SEPARATOR = "|"
 
---- @param text string
---- @return string text without its leading and trailing whitespace.
-local function trim(text)
-	return (text:gsub("^%s+", ""):gsub("%s+$", ""))
-end
+local trim = require("text_utils").trim
 
 --- Resolves a stored parameter value.
 --- @param value any The stored value.

@@ -13,6 +13,8 @@ local KeyPath = require("toml_codec.key_path")
 local Bom = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
 local SourceMemo = require("toml_codec.source_memo")
+local TableUtil = require("table_util")
+local TextUtils = require("text_utils")
 -- Integer subtype is an optional capability; LuaJIT leaves it absent.
 local math_type = math.type
 --- MODULE: TOML Codec (shared)
@@ -167,10 +169,8 @@ encode_value = function(v, shapes, owner, key)
 		end
 		-- Array members cannot become sections: keep their dictionaries inline,
 		-- including nested values, using the same escaping and ordering rules.
-		local keys, parts = {}, {}
-		for key in pairs(v) do keys[#keys + 1] = key end
-		table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
-		for _, key in ipairs(keys) do
+		local parts = {}
+		for _, key in ipairs(TableUtil.sorted_keys(v, TableUtil.by_text)) do
 			parts[#parts + 1] = encode_key(key) .. " = " .. encode_value(v[key], shapes, v, key)
 		end
 		return "{ " .. table.concat(parts, ", ") .. " }"
@@ -281,15 +281,8 @@ end
 -- =================================
 -- =================================
 
---- Trims whitespace in linear time. The pattern form `^%s*(.-)%s*$` backtracks
---- quadratically on a long value that ends in spaces.
-local function trim(s)
-	local first = s:find("%S")
-	if first == nil then return "" end
-	local last = #s
-	while s:find("^%s", last) do last = last - 1 end
-	return s:sub(first, last)
-end
+-- Linear-time trim: the pattern form backtracks on a long value ending in spaces.
+local trim = TextUtils.trim
 
 --- Split a dotted section path into its segments, honouring quoted segments
 --- that may contain dots themselves. e.g.
