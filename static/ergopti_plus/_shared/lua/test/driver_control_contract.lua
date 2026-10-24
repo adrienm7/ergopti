@@ -38,7 +38,7 @@ function M.run(helpers, shared_root)
 		end)
 
 		helpers.it("writes each result byte for byte and refuses an inconsistent one", function()
-			helpers.assert_eq(#corpus.results, 9, "complete result vectors")
+			helpers.assert_eq(#corpus.results, 16, "complete result vectors")
 			for _, row in ipairs(corpus.results) do
 				local ok, text = pcall(Policy.result_text, spec, row.fields)
 				if row.invalid then
@@ -55,6 +55,21 @@ function M.run(helpers, shared_root)
 			for _, row in ipairs(corpus.completions) do
 				helpers.assert_eq(Policy.completion(spec, row.text, row.pid, Json.decode), row.completed, row.name)
 			end
+		end)
+
+		helpers.it("resolves a pending record: claim, completion, double claim and timeout", function()
+			helpers.assert_eq(#corpus.resolutions, 12, "complete resolution vectors")
+			for _, row in ipairs(corpus.resolutions) do
+				local kind, text = Policy.resolve(spec, row.text, row.pid, row.now, Json.decode)
+				helpers.assert_eq(kind, row.kind, row.name .. " kind")
+				helpers.assert_eq(text, row.result, row.name .. " result")
+			end
+		end)
+
+		helpers.it("declares the pending lifetime and the timeout reason", function()
+			helpers.assert_eq(spec.pending_ttl_seconds, 120)
+			helpers.assert_eq(spec.timeout_reason, "deadline")
+			helpers.assert_true(spec.state_set.claimed and spec.state_set.timeout, "both new states are declared")
 		end)
 
 		helpers.it("resolves each platform folder from its declared base", function()

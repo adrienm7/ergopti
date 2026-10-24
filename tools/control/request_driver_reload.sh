@@ -75,6 +75,16 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
 		case "$last" in
 			*'"state":"completed"'*) printf '%s\n' "$last"; exit 0 ;;
 			*'"state":"refused"'*) printf '%s\n' "$last"; exit 1 ;;
+			*'"state":"timeout"'*) printf '%s\n' "$last"; exit 2 ;;
+			*'"state":"requested"'*'"successor_pid":null'*)
+				# A restart that cannot name its successor leaves a pending record with a
+				# deadline: past it, the answer is a timeout and never a completion.
+				pending_deadline=$(printf '%s' "$last" | sed -n 's/.*"deadline":\([0-9][0-9]*\).*/\1/p')
+				if [ -n "$pending_deadline" ] && [ "$(date +%s)" -gt "$pending_deadline" ]; then
+					printf '{"request_id":"%s","state":"timeout","reason":"deadline","driver_pid":%s}\n' "$request_id" "$pid"
+					exit 2
+				fi
+				;;
 		esac
 	fi
 	sleep 0.2 2>/dev/null || sleep 1

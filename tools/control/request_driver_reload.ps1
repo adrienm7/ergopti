@@ -134,6 +134,14 @@ while ([DateTime]::UtcNow -lt $deadline) {
 			$last = $result
 			if ($result.state -eq 'completed') { Write-Outcome $result; exit 0 }
 			if ($result.state -eq 'refused') { Write-Outcome $result; exit 1 }
+			if ($result.state -eq 'timeout') { Write-Outcome $result; exit 2 }
+			# A restart that cannot name its successor leaves a pending record with a
+			# deadline: past it, the answer is a timeout and never a completion.
+			if ($result.state -eq 'requested' -and $null -eq $result.successor_pid -and $null -ne $result.deadline -and
+				[DateTimeOffset]::UtcNow.ToUnixTimeSeconds() -gt [int64]$result.deadline) {
+				Write-Outcome ([ordered]@{ request_id = $requestId; state = 'timeout'; reason = $spec.timeout_reason; driver_pid = $driverPid })
+				exit 2
+			}
 		}
 	}
 	Start-Sleep -Milliseconds 200
