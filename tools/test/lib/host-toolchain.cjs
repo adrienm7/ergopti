@@ -18,7 +18,9 @@
  *    path as root.
  * 4. On Linux and macOS PowerShell (pwsh) must be on PATH: the CI images ship
  *    it and several AHK and Windows tooling gates spawn it.
- * 5. evaluateHost is a pure function of the probed facts, so the rules are
+ * 5. On Linux and macOS USER and LOGNAME must be set, as on the runners: the
+ *    driver log sinks refuse to open without the account identity they redact.
+ * 6. evaluateHost is a pure function of the probed facts, so the rules are
  *    tested without changing the real host.
  * ==============================================================================
  */
@@ -60,7 +62,7 @@ function probeOutput(command, args) {
 /**
  * Probe the facts the rules need from the real host.
  * @returns {{nodeVersion: string, pinnedNode: string, platform: string, uid: number|null,
- *   luaVersionText: string|null, pwshVersionText: string|null}}
+ *   luaVersionText: string|null, pwshVersionText: string|null, accountVariables: string[]}}
  */
 function probeHost() {
 	const posix = process.platform !== 'win32';
@@ -69,6 +71,7 @@ function probeHost() {
 		pinnedNode: pinnedNodeVersion(),
 		platform: process.platform,
 		uid: typeof process.getuid === 'function' ? process.getuid() : null,
+		accountVariables: ['USER', 'LOGNAME'].filter((name) => !process.env[name]),
 		luaVersionText: posix ? probeOutput('lua', ['-v']) : null,
 		pwshVersionText: posix
 			? probeOutput('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'])
@@ -97,6 +100,10 @@ function evaluateHost(facts) {
 	)
 		problems.push(
 			`lua is "${facts.luaVersionText.split('\n')[0]}", CI has Lua ${REQUIRED_LUA_SERIES}: make lua resolve to lua${REQUIRED_LUA_SERIES}`
+		);
+	if (facts.accountVariables.length > 0)
+		problems.push(
+			`${facts.accountVariables.join(' and ')} unset, the CI runners set both: export them (the log sinks need the account identity)`
 		);
 	if (facts.pwshVersionText === null)
 		problems.push('no pwsh on PATH, the CI images ship PowerShell: install it');
