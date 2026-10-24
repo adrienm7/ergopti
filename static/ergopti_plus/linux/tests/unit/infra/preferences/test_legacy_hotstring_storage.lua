@@ -78,11 +78,15 @@ local function with_config(content, body)
 	if not ok then error(err, 0) end
 end
 
+-- A legacy preview choice the import must carry: the opposite of the neutral
+-- manifest default, since a neutral value is stored as absence.
+local AI_PREVIEW_CHOICE = not require("infra.manifest_reader").default_for("hotstrings.preview_ai_enabled")
+
 local MAINTAINER = {
 	["hotstrings.disabled_categories"] = "+autocorrection.caps,+rolls.hc,rolls,+french_autocorrection.accents,"
 		.. "french_autocorrection.accents,+ext:demo:pack.main",
 	["hotstrings.trigger_char"] = "§",
-	["hotstrings.preview_ai_enabled"] = true,
+	["hotstrings.preview_ai_enabled"] = AI_PREVIEW_CHOICE,
 	["hotstrings.dynamic.datefr"] = true,
 	["hotstrings.terminators"] = "kept",
 }
@@ -106,7 +110,7 @@ helpers.describe("legacy hotstring storage import", function()
 			helpers.assert_eq(hotstrings.groups["ext:demo:pack"], true, "an extension identity is kept")
 			helpers.assert_eq(hotstrings.modules["ext:demo:pack"].main, true)
 			helpers.assert_eq(hotstrings.trigger_char, "§")
-			helpers.assert_eq(hotstrings.preview_ai_enabled, true)
+			helpers.assert_eq(hotstrings.preview_ai_enabled, AI_PREVIEW_CHOICE)
 			helpers.assert_eq(hotstrings.dynamic.date_fr.enabled, true)
 			helpers.assert_eq(hotstrings.repeat_key_enabled, true, "the legacy repeat default was on")
 			helpers.assert_eq(hotstrings.unknown, "kept")
