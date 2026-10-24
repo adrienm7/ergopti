@@ -129,6 +129,8 @@ typedef struct MSG {
 #define PM_NOREMOVE 0u
 #define PM_REMOVE 1u
 #define QS_ALLINPUT 0x4FFu
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002u
+#define TIMER_ALL_ACCESS 0x001F0003u
 
 _Static_assert(sizeof(INPUT) == 40, "Portable keyboard input must retain x64 layout.");
 _Static_assert(offsetof(INPUT, ki) == 8, "Portable keyboard input union offset changed.");
@@ -175,5 +177,7 @@ _Noreturn intptr_t ErgoptiPortable_Unsupported(const char *operation, ...);
 #define TranslateMessage(...) ErgoptiPortable_Unsupported("TranslateMessage", __VA_ARGS__)
 #define DispatchMessageW(...) ErgoptiPortable_Unsupported("DispatchMessageW", __VA_ARGS__)
 #define MsgWaitForMultipleObjects(...) ErgoptiPortable_Unsupported("MsgWaitForMultipleObjects", __VA_ARGS__)
+#define CreateWaitableTimerExW(...) ((HANDLE)ErgoptiPortable_Unsupported("CreateWaitableTimerExW", __VA_ARGS__))
+#define SetWaitableTimer(...) ErgoptiPortable_Unsupported("SetWaitableTimer", __VA_ARGS__)
 
 #endif
