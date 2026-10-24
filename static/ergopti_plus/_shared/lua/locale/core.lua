@@ -27,6 +27,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 -- Internal state — nil until M.init() succeeds.
 local _state = nil
@@ -155,9 +156,8 @@ local function load_locale(code)
 	local ok, data = pcall(_state.json_decode, raw)
 	if ok and type(data) == "table" then
 		_state.load_failure_reported[code] = nil
-		local n = 0; for _ in pairs(data) do n = n + 1 end
 		if _state.log_debug then
-			_state.log_debug("locale", "Locale '%s' loaded (%d key(s)).", code, n)
+			_state.log_debug("locale", "Locale '%s' loaded (%d key(s)).", code, TableUtil.count(data))
 		end
 		return data
 	end

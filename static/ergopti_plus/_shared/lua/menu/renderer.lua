@@ -41,6 +41,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- Captures plain source records and callback maps before a reasoned group calls native owners.
 local function reasoned_group_snapshot(value, seen)
@@ -442,7 +443,7 @@ function M.new(deps)
 			if at and (cut == nil or at < cut) then cut = at end
 		end
 		local head = cut and text:sub(1, cut - 1) or text
-		return (head:gsub("^%s+", ""):gsub("%s+$", ""))
+		return TextUtils.trim(head)
 	end
 
 	--- The reason a greyed row names: the first `disabled_reasons` entry whose

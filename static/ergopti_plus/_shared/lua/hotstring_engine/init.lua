@@ -53,6 +53,7 @@ local Logger = require("logger.shim")
 -- gets them. Reimplementing any of it here would be a second Unicode case table
 -- — the accented and French-punctuation mappings are the whole difficulty.
 local text_utils = require("text_utils")
+local TableUtil = require("table_util")
 local PersonalFiles = require("hotstrings.personal_files")
 
 local LOG = "shared.hotstring_engine"
@@ -706,8 +707,7 @@ function M.new()
 				return a.seq < b.seq
 			end)
 		end
-		local bucket_count = 0
-		for _ in pairs(candidate_buckets) do bucket_count = bucket_count + 1 end
+		local bucket_count = TableUtil.count(candidate_buckets)
 		Logger.success(LOG, "Mappings loaded (%d mapping(s) → %d entry(ies), %d bucket(s)).",
 			loaded, registered, bucket_count)
 		_buckets = candidate_buckets

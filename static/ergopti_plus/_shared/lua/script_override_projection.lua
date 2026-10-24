@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 local function is_scalar(value)
 	local kind = type(value)
@@ -23,10 +24,7 @@ local function is_scalar(value)
 end
 
 local function keys(values)
-	local result = {}
-	for key in pairs(values) do result[#result + 1] = key end
-	table.sort(result, function(left, right) return tostring(left) < tostring(right) end)
-	return result
+	return TableUtil.sorted_keys(values, TableUtil.by_text)
 end
 
 --- Builds every `[script]` candidate before native settings or read marks publish.

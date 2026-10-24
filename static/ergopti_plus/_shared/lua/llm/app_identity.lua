@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 -- The longest identifier a setting may hold
 M.MAX_CHARS = 256
@@ -29,7 +30,7 @@ M.MAX_CHARS = 256
 --- @return string|nil key Lower-cased, trimmed, without ".exe"; nil when unusable.
 function M.normalize(app)
 	if type(app) ~= "string" then return nil end
-	local key = app:match("^%s*(.-)%s*$"):lower():gsub("%.exe$", "")
+	local key = TextUtils.trim(app):lower():gsub("%.exe$", "")
 	if key == "" or #key > M.MAX_CHARS or key:find("%c") then return nil end
 	return key
 end

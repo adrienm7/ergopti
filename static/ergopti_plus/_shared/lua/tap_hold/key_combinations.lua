@@ -9,6 +9,7 @@ local M = {
 	PAIR_SEPARATOR = "_then_",
 	NONE = "none",
 }
+local TableUtil = require("table_util")
 local function id(value)
 	return type(value) == "string" and value:match("^[a-z][a-z0-9_]*$") ~= nil
 end
@@ -111,10 +112,8 @@ function M.new(options)
 	function owner.activity() activity() end
 	function owner.retire()
 		if retirement then return retirement.effects, retirement.token end
-		local effects, tokens = {}, {}
-		for token in pairs(taken) do tokens[#tokens + 1] = token end
-		table.sort(tokens)
-		for _, token in ipairs(tokens) do
+		local effects = {}
+		for _, token in ipairs(TableUtil.sorted_keys(taken)) do
 			local state = taken[token]
 			if state.pair.hold ~= M.NONE then effects[#effects + 1] = effect("release_hold", state) end
 		end

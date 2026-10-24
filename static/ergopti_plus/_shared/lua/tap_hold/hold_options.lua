@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 --- The ordered modifier and layer ids of a picker catalogue.
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
@@ -155,7 +156,7 @@ end
 function M.canonical_layer(value, catalogue)
 	if type(value) ~= "string" then return nil, "a hold layer must be a string" end
 	local _, layers = catalogue_ids(catalogue)
-	local wanted = value:match("^%s*(.-)%s*$"):lower()
+	local wanted = TextUtils.trim(value):lower()
 	if wanted == "" then return "" end
 	for _, layer in ipairs(layers) do
 		if layer == wanted then return layer end

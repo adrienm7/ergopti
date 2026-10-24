@@ -9,6 +9,7 @@
 
 local M = {}
 local Json = require("json")
+local TableUtil = require("table_util")
 
 local KINDS = { object = true, array = true, enum = true, boolean = true, number = true, integer = true,
 	version = true, hash = true, utc = true, commit = true, runtime = true, setting_row = true }
@@ -229,10 +230,7 @@ end
 
 local function rows_for(value, rule, prefix, rows)
 	if rule.kind == "object" then
-		local keys = {}
-		for key in pairs(value) do keys[#keys + 1] = key end
-		table.sort(keys)
-		for _, key in ipairs(keys) do
+		for _, key in ipairs(TableUtil.sorted_keys(value)) do
 			rows_for(value[key], rule.fields[key], prefix == "" and key or prefix .. "." .. key, rows)
 		end
 	elseif rule.kind == "array" then
@@ -271,9 +269,7 @@ local function readable(safe, schema)
 	for _, section in ipairs(schema.sections) do
 		local data = safe.sections and safe.sections[section.id]
 		if data then
-			rows, keys = {}, {}
-			for key in pairs(data) do keys[#keys + 1] = key end
-			table.sort(keys)
+			rows, keys = {}, TableUtil.sorted_keys(data)
 			for _, key in ipairs(keys) do
 				local label = key
 				for _, field in ipairs(section.fields or {}) do

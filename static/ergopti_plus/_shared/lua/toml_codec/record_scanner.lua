@@ -22,6 +22,7 @@ local SCAN_MEMO_ENTRIES = 4
 local _scan_memo = SourceMemo.new(SCAN_MEMO_ENTRIES)
 -- Defined below scan_records, which is the only public entry point.
 local scan_source
+local TextUtils = require("text_utils")
 
 --- Finds the end of an already recognized triple-quote closing run.
 --- Value decoding owns validation of the maximum run length.
@@ -128,13 +129,7 @@ local function split_lines(source)
 	return lines
 end
 
-local function trim(value)
-	local first = value:find("%S")
-	if first == nil then return "" end
-	local last = #value
-	while value:find("^%s", last) do last = last - 1 end
-	return value:sub(first, last)
-end
+local trim = TextUtils.trim
 
 --- Splits an assignment at the first equals sign outside quoted key segments.
 --- The strict codec still owns key and value validation; this shared lexical

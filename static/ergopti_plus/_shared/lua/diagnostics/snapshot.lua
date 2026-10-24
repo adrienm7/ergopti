@@ -25,6 +25,7 @@ local M = {}
 
 local reload_gate = require("reload_gate")
 local NativePath = require("native_path")
+local TextUtils = require("text_utils")
 
 
 
@@ -143,7 +144,7 @@ end
 local function read_trimmed(fs, path)
 	local content = fs.read(path)
 	if type(content) ~= "string" then return nil end
-	content = content:match("^%s*(.-)%s*$")
+	content = TextUtils.trim(content)
 	if content == "" then return nil end
 	return content
 end

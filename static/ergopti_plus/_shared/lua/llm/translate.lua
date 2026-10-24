@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 local Utf8 = require("compat.utf8")
 
 
@@ -137,7 +138,7 @@ function M.extract(config, block)
 	local at = block:upper():find(config.tag:upper(), 1, true)
 	if not at then return nil end
 	local text = block:sub(at + #config.tag):gsub("%*%*", "")
-	text = text:match("^%s*(.-)%s*$")
+	text = TextUtils.trim(text)
 	if text == "" then return nil end
 	return text
 end

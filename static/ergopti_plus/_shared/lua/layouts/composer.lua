@@ -25,6 +25,7 @@
 --- ==============================================================================
 
 local Registry = require("layouts.registry")
+local TableUtil = require("table_util")
 
 local M = {}
 
@@ -227,10 +228,7 @@ function M.sources(env, on_done)
 			end
 		end
 	end
-	local ids = {}
-	for id in pairs(env.installed or {}) do ids[#ids + 1] = id end
-	table.sort(ids)
-	for _, id in ipairs(ids) do
+	for _, id in ipairs(TableUtil.sorted_keys(env.installed or {})) do
 		if id ~= env.composer_id and not seen[id] then
 			candidates[#candidates + 1] = { entry = env.installed[id], path = env.local_dir .. id .. ".keylayout" }
 		end

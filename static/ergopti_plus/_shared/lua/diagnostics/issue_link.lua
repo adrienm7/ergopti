@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local TextUtils = require("text_utils")
 
 
 
@@ -68,21 +69,12 @@ local function code_points(text)
 	return out
 end
 
---- Percent-encodes one code point; only RFC 3986 unreserved characters stay.
---- @param ch string One code point.
---- @return string
-local function encode_code_point(ch)
-	if #ch == 1 and ch:match("^[A-Za-z0-9%-%._~]$") then return ch end
-	return (ch:gsub(".", function(byte) return string.format("%%%02X", byte:byte()) end))
-end
-
 --- Percent-encodes a query value as UTF-8, only unreserved characters literal.
+--- An invalid byte is first replaced by U+FFFD, as in the JS and AHK ports.
 --- @param text string
 --- @return string
 function M.percent_encode(text)
-	local parts = code_points(tostring(text))
-	for i = 1, #parts do parts[i] = encode_code_point(parts[i]) end
-	return table.concat(parts)
+	return TextUtils.percent_encode(table.concat(code_points(tostring(text))))
 end
 
 
@@ -116,7 +108,7 @@ local function cut_value(value, budget, marker)
 	local kept, used = {}, 0
 	-- Strictly shorter than the value: a cut that keeps everything is no cut
 	for i = 1, #parts - 1 do
-		local cost = #encode_code_point(parts[i])
+		local cost = #TextUtils.percent_encode(parts[i])
 		if used + cost > room then break end
 		kept[#kept + 1] = parts[i]
 		used = used + cost

@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local M = {}
+local TableUtil = require("table_util")
 
 
 
@@ -111,9 +112,7 @@ function VALIDATORS.copy(message, context)
 end
 
 function VALIDATORS.day_log(message)
-	local count = 0
-	for _ in pairs(message) do count = count + 1 end
-	if count ~= 2 or type(message.enabled) ~= "boolean" then return nil, "bad_enabled" end
+	if TableUtil.count(message) ~= 2 or type(message.enabled) ~= "boolean" then return nil, "bad_enabled" end
 	return { action = "day_log", enabled = message.enabled }
 end
 
