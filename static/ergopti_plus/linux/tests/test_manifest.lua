@@ -338,6 +338,7 @@ return {
 	"tests.unit.infra.network.test_managed_network_failure",
 	"tests.meta.boot.test_i18n_is_ready_before_the_tray",
 	"tests.unit.infra.i18n.test_i18n_persistence",
+	"tests.unit.infra.i18n.test_native_presentation_receiver",
 	"tests.unit.modules.hotstrings.injector.test_injector_commands",
 	"tests.unit.modules.hotstrings.injector.test_injector_sleep_ceiling",
 	"tests.unit.modules.hotstrings.injector.test_injector_race",
