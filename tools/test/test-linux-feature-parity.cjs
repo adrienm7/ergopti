@@ -80,12 +80,14 @@ assert.ok(
 	'ui.menubar_icon must stay a macOS-specific setting, not a Linux gap'
 );
 // layout.emulated_layout is unavailable on Linux: layout.emulated_layout, Windows-specific by design: Windows
-// emulates a registry layout, Linux converts the same .keylayout to XKB.
+// emulates a registry layout, Linux converts the same .keylayout to XKB. The manifest
+// states that reason, so the row carries it rather than the inferred platform kind.
 const emulatedLayout = rows.find((row) => row.path === 'layout.emulated_layout');
 assert.ok(
 	emulatedLayout &&
 		emulatedLayout.status === 'unavailable' &&
-		emulatedLayout.reason.kind === 'windows_specific',
+		emulatedLayout.reason.kind === 'declared_reason' &&
+		emulatedLayout.reason.key === 'platform_reason.layout_emulation_is_windows_only',
 	'layout.emulated_layout must stay a Windows-specific setting, not a Linux gap'
 );
 assert.strictEqual(summary.claimed_supported + summary.unavailable, summary.total);
