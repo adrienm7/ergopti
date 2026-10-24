@@ -1017,7 +1017,10 @@ helpers.describe("hotstring journal retains the replayed terminator", function()
           if group.family == "ngram_words" then for token, row in pairs(group.rows) do words[token] = row end end
         end
         helpers.assert_nil(words.ADNami, "a missing replay separator must not invent a concatenated word")
-        helpers.assert_not_nil(words[tail == "." and "ADN.ami" or "ami"], "the walk retains its existing word-separator policy")
+        -- The shared walker's separator set (the Windows reference) ends a word
+        -- at a period too, so every replayed tail leaves "ami" its own word.
+        helpers.assert_not_nil(words.ami, "the walk applies the shared word-separator policy")
+        helpers.assert_nil(words["ADN.ami"], "a replayed period separates words like any other")
         helpers.assert_eq(world.hotstrings[1].replacement, "ADN", "the logical replacement excludes its replay")
         helpers.assert_eq(world.app_days[1].hs_chars, 3, "replay must not inflate generated replacement counts")
       end)
