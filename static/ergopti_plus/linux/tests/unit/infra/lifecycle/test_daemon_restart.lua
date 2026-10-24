@@ -305,8 +305,18 @@ helpers.describe("Main early pause restoration", function()
 				local chunk
 				if loadstring then chunk = assert(loadstring(text)); setfenv(chunk, environment)
 				else chunk = assert(load(text, "Main early pause", "t", environment)) end
-				local controller = chunk()()
+				-- The desktop layout switch is initialised by an earlier Main span.
+				local layout_switches = {}
+				local previous_switch = package.loaded["modules.keymap.pause_layout_switch"]
+				package.loaded["modules.keymap.pause_layout_switch"] = { on_pause_change = function(paused)
+					layout_switches[#layout_switches + 1] = paused
+				end }
+				local ran, controller = pcall(chunk())
+				package.loaded["modules.keymap.pause_layout_switch"] = previous_switch
+				if not ran then error(controller, 0) end
 				helpers.assert_eq(applications, 1, "startup must apply the normal remapper transition once")
+				helpers.assert_eq(#layout_switches, 1, "the restored pause switches the desktop layout once")
+				helpers.assert_true(layout_switches[1])
 				if acknowledged then
 					helpers.assert_true(controller.is_paused())
 					local _, status = f.read(); helpers.assert_eq(status, "absent")
