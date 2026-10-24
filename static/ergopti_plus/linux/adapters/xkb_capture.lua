@@ -75,6 +75,10 @@ local XKB_RIGHTALT = EvdevCodes.KEY_RIGHTALT + EVDEV_TO_XKB_OFFSET
 -- KEY_CODE_MAX); a character on a higher key could never be typed.
 local UINPUT_KEY_MAX = 0x2FF
 
+-- Non-text controls come from the selected keysym, not the keypad's physical
+-- position: NumLock and the live keymap can make that same key type a digit.
+local SEMANTIC_CONTROL_OF_KEYSYM = { [0xff95] = "home" } -- KP_Home
+
 -- The keysyms (keysymdef.h) that make a key a modifier, by the role the
 -- keyboard hook gives it: shift and altgr select a level of the layout and so
 -- produce text, ctrl, alt and meta start a shortcut. A physical key has no
@@ -1306,7 +1310,11 @@ local function resolve_press(keycode)
 	elseif status ~= "nothing" then
 		error("invalid Compose status: " .. tostring(status))
 	end
-	return text, identity
+	-- A real composed result keeps its text route. Reporting a known control
+	-- during pending Compose does not cancel or reset the Compose owner.
+	local control = status ~= "composed" and (text == nil or text == "")
+		and SEMANTIC_CONTROL_OF_KEYSYM[sym] or nil
+	return text, identity, control
 end
 
 --- Ends a pending Compose sequence, leaving the key state as it is. For a press
@@ -1358,7 +1366,7 @@ end
 --- state and never apply a duplicate action.
 --- @param evdev_code integer Linux input-event keycode.
 --- @param value integer 0 release, 1 press, 2 repeat.
---- @return string|nil text, string|nil identity, string|nil error
+--- @return string|nil text, string|nil identity, string|nil error, string|nil control
 function M.process(evdev_code, value)
 	_physical_probe_epoch = _physical_probe_epoch + 1
 	if not _session then return nil, nil, "XKB capture state is not ready" end
@@ -1377,7 +1385,7 @@ function M.process(evdev_code, value)
 		return nil, nil, nil
 	end
 
-	local ok_resolve, text, identity = pcall(resolve_press, keycode)
+	local ok_resolve, text, identity, control = pcall(resolve_press, keycode)
 	if not ok_resolve then return nil, nil, tostring(text) end
 	if value == VALUE_DOWN then
 		local ok_update, update_err = pcall(
@@ -1385,7 +1393,7 @@ function M.process(evdev_code, value)
 		if not ok_update then return nil, nil, tostring(update_err) end
 		capture_identity()
 	end
-	return text, identity, nil
+	return text, identity, nil, control
 end
 
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
