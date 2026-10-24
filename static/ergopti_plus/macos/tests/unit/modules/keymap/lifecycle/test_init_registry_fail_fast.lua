@@ -31,7 +31,8 @@ local function load_keymap_with_results(results)
 		["modules.keymap.utils"] = {},
 		["adapters.text_sender"] = {},
 		["modules.llm.app_filter"] = {},
-		["infra.logger"] = {},
+		-- The real timing registry, read when the keymap loads, logs its path walk.
+		["infra.logger"] = helpers.make_logger_stub(),
 		["infra.keycodes"] = {},
 		["infra.manifest_reader"] = {
 			default_for = function() return true end,
