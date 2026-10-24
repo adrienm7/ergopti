@@ -28,7 +28,7 @@
 		"static/ergopti_plus/linux/infra/script_settings.lua": 1,
 		"static/ergopti_plus/linux/infra/shortcuts_scope.lua": 1,
 		"static/ergopti_plus/linux/infra/tap_hold_scope.lua": 3,
-		"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua": 7,
+		"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua": 1,
 		"static/ergopti_plus/linux/modules/dynamic_hotstrings/user_code.lua": 1,
 		"static/ergopti_plus/linux/modules/gestures/manager.lua": 6,
 		"static/ergopti_plus/linux/modules/hotstrings/hotstrings_config.lua": 1,
