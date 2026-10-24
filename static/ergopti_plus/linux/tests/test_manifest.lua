@@ -246,6 +246,7 @@ return {
 	"tests.unit.modules.llm.runtime.test_runtime_engine_acquisition_managed_inventory_getter",
 	"tests.unit.modules.llm.runtime.test_runtime_native_claim",
 	"tests.unit.modules.llm.runtime.test_runtime_owned_timer",
+	"tests.unit.modules.llm.runtime.test_owned_timer_slots",
 	"tests.unit.modules.llm.runtime.test_runtime_publication_admission",
 	"tests.unit.modules.llm.runtime.test_runtime_repair",
 	"tests.unit.modules.llm.runtime.test_runtime_source",
