@@ -38,7 +38,6 @@
 		"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua": 2,
 		"static/ergopti_plus/linux/modules/llm/agent_settings.lua": 4,
 		"static/ergopti_plus/linux/modules/llm/display_settings.lua": 4,
-		"static/ergopti_plus/linux/modules/llm/navigation_settings.lua": 6,
 		"static/ergopti_plus/linux/modules/llm/prediction_engine.lua": 34,
 		"static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua": 1,
 		"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua": 3,
