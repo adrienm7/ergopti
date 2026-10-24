@@ -274,6 +274,8 @@ local function with_menu_fixture(options, callback)
 				return true
 			end
 		end
+		logger.LEVELS = require("logger").LEVELS
+		logger.is_enabled = function() return false end
 		return logger
 	end
 
