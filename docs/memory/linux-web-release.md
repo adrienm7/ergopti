@@ -498,6 +498,15 @@ libmount made the host libgio fail (`MOUNT_2_40`) and the tray with it.
 Action: never bundle what the host GLib loads itself. curl's brotli and zstd
 are still bundled and are the first suspects if a host library misses a symbol.
 
+glibc itself is not bundled: the daemon loads the host GTK, which needs the
+host's own glibc, so a bundled loader would have to be newer than every host
+library. Below the ceiling and on musl, AppRun (plain `/bin/sh`, since Alpine
+has no bash) sources `libc-preflight.sh`, rendered by
+`render-appimage-libc-preflight.cjs` from `GLIBC_CEILING` and the
+`startup.linux_appimage_*` locale keys, which refuses in words with exit 69
+(`getconf GNU_LIBC_VERSION` answers only on glibc). Action: never put a bash
+construct before that `.` line.
+
 The catalogue's runner has GTK 3 but no libayatana, no StatusNotifier host and
 no keyboard; its tray retry docks XEmbed icons into stalonetray. v1.0.3 held its
 "keyboard access unavailable" tray correctly but exited because the tray

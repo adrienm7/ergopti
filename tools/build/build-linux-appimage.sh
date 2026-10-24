@@ -13,6 +13,7 @@
 #        AppDir/usr/bin/ergopti                         launcher, forwards to AppRun
 #        AppDir/usr/bin/luajit                          required bundled runtime
 #        AppDir/usr/lib/ergopti/                        driver tree, flat
+#        AppDir/usr/lib/ergopti/libc-preflight.sh       glibc check AppRun runs first
 #        AppDir/usr/lib/ergopti/_shared/                shared tree, as a child
 #   2. build/linux/ErgoptiPlus-x86_64.AppImage and its .zsync — only when appimagetool is
 #      on PATH. Without it the AppDir is left staged and the manual packaging
@@ -24,7 +25,8 @@
 # the C++ runtime and certificate trust, so the build host must be the
 # oldest supported Ubuntu LTS (ubuntu-22.04, glibc 2.35): built on a newer one,
 # the bundled luajit needed GLIBC_2.38 and the image died on Ubuntu 22.04 before
-# showing its tray. check-elf-glibc-ceiling.cjs refuses such a build below.
+# showing its tray. check-elf-glibc-ceiling.cjs refuses such a build below, and
+# AppRun refuses an older glibc or a musl system in words before any of it runs.
 # Missing components refuse packaging. Native admission does not prove
 # physical input, PAC or desktop settings.
 #
@@ -163,18 +165,31 @@ node "$SCRIPT_DIR/check-elf-glibc-ceiling.cjs" "$APPDIR"
 # ----------------------------------------------------------------------
 # 5. AppRun — the single entry point
 # ----------------------------------------------------------------------
+# The C library preflight AppRun sources first, rendered from the glibc
+# ceiling and the shared locale catalogue.
+node "$SCRIPT_DIR/render-appimage-libc-preflight.cjs" "$APPDIR_LIB/libc-preflight.sh"
+
 cat > "$APPDIR/AppRun" << 'APPRUN_EOF'
-#!/bin/bash
+#!/bin/sh
 # AppRun — entry point of the Ergopti AppImage.
 # Resolves the driver root, LUA_PATH and the LuaJIT binary, then execs the
 # driver. This is the ONLY place those three are decided; usr/bin/ergopti
 # forwards here rather than deriving its own.
-set -euo pipefail
+set -eu
 
 # An AppImage is mounted at a fresh temporary path on every run, so nothing
 # inside it may be resolved from an absolute /usr prefix the way the .deb
 # wrapper can. HERE is that mount point.
 HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
+
+# Every bundled program needs the recipient's glibc. A musl system (Alpine)
+# cannot run them and has no bash either, and an older glibc fails in the
+# loader: the preflight refuses both in the user's language, in plain sh.
+. "$HERE/usr/lib/ergopti/libc-preflight.sh"
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
+set -o pipefail
 
 DRIVER_ROOT="$HERE/usr/lib/ergopti"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
