@@ -57,6 +57,8 @@ local _active_layouts_last_refresh = 0
 -- through settlement; this owner additionally fences cache publication and the
 -- watchdog so a late terminal cannot overwrite a successor.
 local _active_probe_owner = nil
+-- A successful enabled-list edit retires every earlier read's cache authority.
+local _active_layouts_generation = 0
 
 -- Input-source mutations are serialized. A timed-out child remains the exact
 -- owner until its native completion callback settles, so a successor cannot
@@ -222,6 +224,7 @@ end
 --- Clears the active-layout cache and resets the throttle so the next menu open
 --- recomputes immediately. Called after the enabled input-source set changes.
 local function invalidate_active_layouts_cache()
+	_active_layouts_generation = _active_layouts_generation + 1
 	_active_layouts_cache        = nil
 	_active_layouts_last_refresh = 0
 end
@@ -447,7 +450,7 @@ local function finalize_active_probe(owner)
 		or owner.task_settled ~= true then
 		return false
 	end
-	if _active_probe_owner == owner then
+	if _active_probe_owner == owner and owner.cache_generation == _active_layouts_generation then
 		local records = parse_active_layouts(owner.raw_output, owner.current_name)
 		if records then
 			_active_layouts_cache = records
@@ -498,6 +501,7 @@ local function refresh_active_layouts_async(on_done)
 	end
 
 	local owner = {
+		cache_generation = _active_layouts_generation,
 		waiters = {},
 		current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
 			and hs.keycodes.currentLayout() or nil,
